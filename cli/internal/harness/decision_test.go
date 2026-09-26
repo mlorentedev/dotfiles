@@ -66,6 +66,7 @@ func TestDecisionOutcomesAreDistinct(t *testing.T) {
 	all := []Outcome{
 		OutcomePayloadUnrecognised, OutcomeSkillConsumed, OutcomeSkillUnnamed,
 		OutcomeNoRole, OutcomeRoleUnresolved, OutcomeAllow, OutcomeWarn, OutcomeBlock,
+		OutcomeSessionUnscoped,
 	}
 	seen := map[Outcome]bool{}
 	for _, o := range all {
@@ -76,6 +77,21 @@ func TestDecisionOutcomesAreDistinct(t *testing.T) {
 			t.Errorf("duplicate outcome %q — two states would be recorded as one", o)
 		}
 		seen[o] = true
+	}
+}
+
+// TestDecisionPathNeverFallsBackToTheDigestOfNothing: a record with no scope goes
+// to the journal named for that case, not to the file scopeKey("") would name,
+// which is the digest of the empty string and looks like a session called
+// "unknown".
+func TestDecisionPathNeverFallsBackToTheDigestOfNothing(t *testing.T) {
+	dir := t.TempDir()
+	got := DecisionPath(dir, "")
+	if got != DecisionPath(dir, UnscopedScope) {
+		t.Errorf("an empty scope journals to %s, want the %q journal %s", got, UnscopedScope, DecisionPath(dir, UnscopedScope))
+	}
+	if strings.Contains(filepath.Base(got), "unknown-") {
+		t.Errorf("an empty scope must not journal under the digest of nothing: %s", got)
 	}
 }
 

@@ -93,7 +93,8 @@ and suggests matching patterns and skills to load.`,
 				}
 			}
 
-			sugg := harness.Suggest(cfg.Triggers, prompt, paths)
+			sugg := harness.SuggestWithDeps(cfg.Triggers, prompt, paths,
+				harness.SkillDependencies(harness.TriggersRoot("")))
 
 			if jsonOut {
 				enc := json.NewEncoder(cmd.OutOrStdout())

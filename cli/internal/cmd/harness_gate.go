@@ -63,7 +63,13 @@ the call. One declared 'enforce: warn' is reported on stderr and allowed. A skil
 carrying no declared severity is neither — it is a migration gap, surfaced by
 ` + "`dotf doctor`" + `, not noise on every tool call.
 
-Invoking a skill is never blocked: forbidding it would deadlock the session.`,
+Invoking a skill is never blocked: forbidding it would deadlock the session.
+
+agy answers differently, because its hooks do not read an exit code: a PreToolUse
+hook prints a JSON decision on stdout and the command always exits 0. A call the
+gate has no objection to is answered "ask", which defers to agy's own permission
+prompt; it is never "allow", which would approve the call without asking anyone.
+A blocked call is answered "deny" with the reason.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -82,6 +88,11 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				_ = harness.RecordDecision(harness.DecisionPath(stateDir, scope), rec)
 			}
 
+			// Every return below goes through gateAnswer; see there.
+			finish := func(block bool, reason string) error {
+				return gateAnswer(cmd.OutOrStdout(), harnessName, block, reason)
+			}
+
 			call, understood := normaliseToolCall(harnessName, payload)
 			if !understood {
 				record(harness.UnparsedScope, harness.DecisionRecord{
@@ -97,13 +108,21 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				// unit tests that call Decide directly. A gate that blocks on
 				// input it cannot read blocks on every harness upgrade.
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: payload not recognised")
-				return nil
+				return finish(false, "")
 			}
 			// Scoped to the acting persona when the harness names one: a subagent
 			// reuses the parent session id, so keying by session alone would let one
 			// persona's skill runs satisfy another's gate.
 			scope := call.ConsumptionScope()
 			statePath := harness.StatePath(stateDir, scope)
+			// A payload that named no session has no scope: nothing durable may be
+			// keyed by it (StatePath and DispatchPath hand back no path), and the
+			// journal files it under its own name instead of the digest of "".
+			unscoped := scope == ""
+			journalScope := scope
+			if unscoped {
+				journalScope = harness.UnscopedScope
+			}
 
 			// Every record from here carries what the harness said was acting.
 			// THIS IS WHAT CONVERTS agent_type FROM INFERRED TO MEASURED: it is
@@ -131,33 +150,12 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 					call.DispatchName, call.DispatchType)
 			}
 
-			// A skill invocation is the act the gate exists to require: record
-			// it and get out of the way. Recording failures are ignored on
-			// purpose — losing the record costs a redundant skill run, while
-			// failing here would block a session over a full disk.
-			if call.Skill != "" {
-				_ = harness.RecordConsumed(statePath, call.Skill)
-				rec := base
-				rec.Skill = call.Skill
-				rec.Outcome = harness.OutcomeSkillConsumed
-				rec.Allowed = true
-				rec.Reason = "skill invocation recorded"
-				record(scope, rec)
-				return nil
-			}
-			if call.IsSkillTool {
-				// The tool IS the skill primitive but its argument was
-				// unreadable. There is nothing to record, and blocking would
-				// deadlock the session on the one action that could satisfy the
-				// gate — a well-formed payload with a missing argument, not a
-				// parse failure. Raised by the reviewer on #1272.
-				rec := base
-				rec.Outcome = harness.OutcomeSkillUnnamed
-				rec.Allowed = true
-				rec.Reason = "skill invocation with no readable name"
-				record(scope, rec)
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
-				return nil
+			if rec, ok := skillCallRecord(call, base, unscoped, statePath); ok {
+				record(journalScope, rec)
+				if rec.Outcome == harness.OutcomeSkillUnnamed {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
+				}
+				return finish(false, "")
 			}
 
 			requested := effectiveRole(role, call.AgentType)
@@ -169,6 +167,24 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			fromFlag := strings.TrimSpace(role) != ""
 			dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
 			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested, dispatched, fromFlag)
+
+			// A persona is in scope and the payload named no session: there is no
+			// ledger to consult, and consulting an empty one would BLOCK - a blocked
+			// call can never record the skill that would satisfy it, so the persona
+			// would be stuck for good. Enforcement is impossible here, so allow, and
+			// say so in the journal and on stderr rather than passing for healthy.
+			if unscoped && persona != nil {
+				rec := base
+				rec.RoleRequested = requested
+				rec.RoleResolved = persona.Name
+				rec.Outcome = harness.OutcomeSessionUnscoped
+				rec.Allowed = true
+				rec.Reason = fmt.Sprintf("persona %q in scope but the payload named no session: nothing to scope consumption to, so nothing is enforced", persona.Name)
+				record(journalScope, rec)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] allow: %s\n", rec.Reason)
+				return finish(false, "")
+			}
+
 			result := harness.Decide(harness.GateInput{
 				Persona:  persona,
 				Call:     call,
@@ -184,32 +200,12 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 			if persona != nil {
 				rec.RoleResolved = persona.Name
 			}
-			switch {
-			case resolution == roleUnresolved:
-				// Checked BEFORE the decision, because this call allowed and a
-				// healthy allow looks identical to it. The distinction is the
-				// whole reason AC5 names this case: enforcement was off, and
-				// nothing outside this record says so.
-				rec.Outcome = harness.OutcomeRoleUnresolved
-			case resolution == roleNotAsked || resolution == roleNotAPersona:
-				// Deliberately one case: "nobody with forced skills is acting"
-				// is the same fact whether nobody was asked for or a witnessed
-				// dispatch turned out to be a built-in agent. RoleRequested
-				// keeps the raw name, so the journal still separates them
-				// without spending a ninth Outcome.
-				rec.Outcome = harness.OutcomeNoRole
-			case result.Decision == harness.Block:
-				rec.Outcome = harness.OutcomeBlock
-			case len(result.Warned) > 0:
-				rec.Outcome = harness.OutcomeWarn
-			default:
-				rec.Outcome = harness.OutcomeAllow
-			}
+			rec.Outcome = gateOutcome(resolution, result)
 			// Written before the return below, not after: the block path used to
 			// call os.Exit, which runs no defers, so a record deferred past it
 			// would be the one decision never written — the only one anybody
 			// would go looking for.
-			record(scope, rec)
+			record(journalScope, rec)
 
 			for _, w := range result.Warned {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] warn: %s not consumed\n", w)
@@ -222,17 +218,91 @@ Invoking a skill is never blocked: forbidding it would deadlock the session.`,
 				// that matters most could never be driven end to end in process.
 				// The command sets SilenceErrors, so main prints nothing extra
 				// and the reason a human reads is still the line above.
-				return withExitCode(gateExitBlock, fmt.Errorf("%s", result.Reason))
+				return finish(true, result.Reason)
 			}
-			return nil
+			return finish(false, "")
 		},
 	}
 
-	cmd.Flags().StringVar(&harnessName, "harness", "", "harness emitting the event (claude|pi|opencode)")
+	cmd.Flags().StringVar(&harnessName, "harness", "", "harness emitting the event (claude|pi|opencode|agy); anything else is read as a command-hook payload in claude's shape")
 	cmd.Flags().StringVar(&role, "role", "", "persona in scope")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "root containing harness/agents (default: the deploy dir, else the checkout)")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "where per-session consumption is recorded")
 	return cmd
+}
+
+// gateAnswer is the ONE place a decision leaves the gate, so the two answer
+// protocols cannot drift apart path by path. Every return in the gate goes
+// through it; a path that returned nil directly would answer agy with an empty
+// stdout, which is not a decision.
+func gateAnswer(w io.Writer, harnessName string, block bool, reason string) error {
+	if harnessName == harnessAgy {
+		return writeAgyVerdict(w, block, reason)
+	}
+	if block {
+		return withExitCode(gateExitBlock, fmt.Errorf("%s", reason))
+	}
+	return nil
+}
+
+// skillCallRecord is the journal record for a call that invokes a skill, and
+// false for any other call. Such a call is always allowed.
+//
+// A skill invocation is the act the gate exists to require: record it and get
+// out of the way. Recording failures are ignored on purpose — losing the record
+// costs a redundant skill run, while failing here would block a session over a
+// full disk.
+func skillCallRecord(call harness.ToolCall, base harness.DecisionRecord, unscoped bool, statePath string) (harness.DecisionRecord, bool) {
+	rec := base
+	rec.Allowed = true
+	switch {
+	case call.Skill != "" && unscoped:
+		// Recording it would file the consumption under a key every session
+		// with no id shares, and satisfy their gates too.
+		rec.Skill = call.Skill
+		rec.Outcome = harness.OutcomeSessionUnscoped
+		rec.Reason = "skill invocation not recorded: the payload named no session to scope it to"
+	case call.Skill != "":
+		_ = harness.RecordConsumed(statePath, call.Skill)
+		rec.Skill = call.Skill
+		rec.Outcome = harness.OutcomeSkillConsumed
+		rec.Reason = "skill invocation recorded"
+	case call.IsSkillTool:
+		// The tool IS the skill primitive but its argument was unreadable.
+		// There is nothing to record, and blocking would deadlock the session on
+		// the one action that could satisfy the gate — a well-formed payload with
+		// a missing argument, not a parse failure. Raised by the reviewer on
+		// #1272.
+		rec.Outcome = harness.OutcomeSkillUnnamed
+		rec.Reason = "skill invocation with no readable name"
+	default:
+		return harness.DecisionRecord{}, false
+	}
+	return rec, true
+}
+
+// gateOutcome names why the gate decided what it decided, for the journal.
+func gateOutcome(resolution roleResolution, result harness.GateResult) harness.Outcome {
+	switch {
+	case resolution == roleUnresolved:
+		// Checked BEFORE the decision, because this call allowed and a healthy
+		// allow looks identical to it. The distinction is the whole reason AC5
+		// names this case: enforcement was off, and nothing outside this record
+		// says so.
+		return harness.OutcomeRoleUnresolved
+	case resolution == roleNotAsked || resolution == roleNotAPersona:
+		// Deliberately one case: "nobody with forced skills is acting" is the
+		// same fact whether nobody was asked for or a witnessed dispatch turned
+		// out to be a built-in agent. RoleRequested keeps the raw name, so the
+		// journal still separates them without spending a ninth Outcome.
+		return harness.OutcomeNoRole
+	case result.Decision == harness.Block:
+		return harness.OutcomeBlock
+	case len(result.Warned) > 0:
+		return harness.OutcomeWarn
+	default:
+		return harness.OutcomeAllow
+	}
 }
 
 // loadGatePersona resolves the persona, returning nil rather than an error.
@@ -393,18 +463,77 @@ func defaultGateStateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "dotfiles")
 }
 
+// harnessAgy names Antigravity's CLI.
+const harnessAgy = "agy"
+
+// agyVerdict is what an agy PreToolUse hook prints on stdout.
+type agyVerdict struct {
+	Decision string `json:"decision"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// writeAgyVerdict answers an agy PreToolUse hook: "ask" for a call the gate has
+// no objection to, "deny" with the reason for one it blocks.
+//
+// NEVER "allow". agy documents that value as "Automatically allow the tool
+// execution", and a gate whose only job is to refuse would approve every call it
+// did not object to, past agy's own permission prompt and for every tool the
+// user had not already trusted. "ask" defers to that prompt (and to the user's
+// "always allow" cache), which is what Orca's own hook prints when it has no
+// opinion, and is the only neutral answer the protocol has.
+//
+// It returns nil whatever the write does, for the reason the whole command does:
+// a hook that could fail its own output would turn a full pipe into a refused
+// tool call.
+func writeAgyVerdict(w io.Writer, block bool, reason string) error {
+	v := agyVerdict{Decision: "ask"}
+	if block {
+		v = agyVerdict{Decision: "deny", Reason: reason}
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil //nolint:nilerr // two fixed string fields cannot fail to marshal; and this must never return an error
+	}
+	_, _ = fmt.Fprintln(w, string(raw))
+	return nil
+}
+
+// agyHookPayload is the JSON agy sends a PreToolUse command hook on stdin.
+//
+// READ FROM agy's OWN HOOK DOCUMENTATION, which the binary embeds, and not from a
+// capture. Its keys are camelCase (protojson): the session is `conversationId`
+// and the call is `toolCall.name` with `toolCall.args` - not the `session_id`,
+// `tool_name` and `tool_input` claude sends. Reading agy with the claude shape
+// made every agy call "payload not recognised", which allowed, which looked
+// exactly like a gate with nothing to say.
+//
+// There is no agent type or id: agy documents none, so a call resolves to no
+// persona unless the operator names one. That makes the agy binding measurement
+// plumbing for now (recognised payloads, one journal per conversation), not
+// enforcement; the payload cannot say which persona is acting.
+type agyHookPayload struct {
+	ConversationID string `json:"conversationId"`
+	ToolCall       struct {
+		Name string         `json:"name"`
+		Args map[string]any `json:"args"`
+	} `json:"toolCall"`
+}
+
 // commandHookPayload is the JSON a COMMAND hook receives on stdin.
 //
-// Two harnesses use this family. Claude sends it to `PreToolUse`; **agy sends it
-// to `BeforeTool`** — measured 2026-08-26, `~/.gemini/settings.json` carries
-// hooks in Claude's exact `{"hooks":[{"type":"command",...}]}` shape and declares
-// `BeforeAgent`, `AfterAgent`, `BeforeTool`, `AfterTool`. So agy is NOT
-// presence-only as #561 and ADR-027 assumed; it has a tool gate, and it is the
-// cheapest harness to add after claude rather than a deferred one.
+// Claude sends it to `PreToolUse`. It was long believed that agy sent it to
+// `BeforeTool`, an inference from `~/.gemini/settings.json` declaring
+// `BeforeAgent`, `AfterAgent`, `BeforeTool` and `AfterTool` in claude's exact
+// shape. That file is GEMINI CLI's, and Orca writes it for the Gemini CLI. agy
+// reads its hooks from `~/.gemini/config/hooks.json`, in a different schema and
+// with a different payload (agyHookPayload); its log says so on every start
+// ("loaded N named hooks from N hooks.json file(s)"). Measured 2026-09-24. The
+// hook bound to settings.json therefore never ran under agy, and had it run, this
+// shape would not have parsed.
 //
-// agy's exact FIELD names are unverified — no agy payload has been captured — so
-// a mismatch degrades to "not understood", which allows. The gate never blocks
-// on a guess.
+// Any harness not named in normaliseToolCall - Gemini CLI is the one that
+// belongs here - is still read as this shape, which is the safe default: a
+// mismatch degrades to "not understood", which allows.
 // AgentType and AgentID are how the gate learns WHICH persona is acting, and
 // they are the reason no session-state mechanism was built for it. Claude
 // documents both on every hook event fired inside a subagent: `agent_type`
@@ -461,6 +590,18 @@ func normaliseToolCall(harnessName string, payload []byte) (harness.ToolCall, bo
 		return harness.ToolCall{}, false
 	}
 	switch harnessName {
+	case harnessAgy:
+		var p agyHookPayload
+		if json.Unmarshal(payload, &p) != nil || strings.TrimSpace(p.ToolCall.Name) == "" {
+			return harness.ToolCall{}, false
+		}
+		name := strings.TrimSpace(p.ToolCall.Name)
+		return harness.ToolCall{
+			SessionID:   strings.TrimSpace(p.ConversationID),
+			Tool:        name,
+			Skill:       skillArg(name, p.ToolCall.Args),
+			IsSkillTool: isSkillTool(name),
+		}, true
 	case "pi", "opencode":
 		var p canonicalPayload
 		if json.Unmarshal(payload, &p) != nil || p.Tool == "" {

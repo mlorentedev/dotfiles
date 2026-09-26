@@ -155,7 +155,7 @@ alias obsidian='obsidian --no-sandbox'
 
 # Claude Code - use slash commands inside session:
 #   claude
-#   > /audit src/auth.py
+#   > /test src/auth.py
 #   > /refactor this function
 
 # ==========================

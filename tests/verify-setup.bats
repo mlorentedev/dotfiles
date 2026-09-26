@@ -311,12 +311,12 @@ setup() {
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
     [ "$count" -eq "$expected" ]
-    # Spot check: audit.md present (portable), crystallize.md absent (targets:[claude]).
-    [ -f "$HOME/.config/opencode/commands/audit.md" ]
+    # Spot check: spec.md present (portable), crystallize.md absent (targets:[claude]).
+    [ -f "$HOME/.config/opencode/commands/spec.md" ]
     [ ! -f "$HOME/.config/opencode/commands/crystallize.md" ]
     # rendered command carries provenance + drops name: (opencode keys off filename)
-    grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/audit.md"
-    refute_grep '^name:' "$HOME/.config/opencode/commands/audit.md"
+    grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/spec.md"
+    refute_grep '^name:' "$HOME/.config/opencode/commands/spec.md"
 }
 
 @test "no MCP servers registered (claude CLI absent)" {
@@ -470,9 +470,11 @@ setup() {
          -type f ! -path "*/.git/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum > "$snap2"
     sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config" >> "$snap2"
 
-    # Assert diff is empty
+    # Assert diff is empty. On failure, print it: bats shows only the failed line,
+    # so without this the file that changed between the two runs, which is the
+    # actual non-idempotence, never reached the log (TEST-012).
     run diff -u "$snap1" "$snap2"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || { printf 'files whose hash changed between the two setup runs:\n%s\n' "$output"; return 1; }
     [ -z "$output" ]
 
     rm -f "$snap1" "$snap2"

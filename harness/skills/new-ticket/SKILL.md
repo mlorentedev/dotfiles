@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: 4e93e78845c0ac41
+generated_sha: e5d46cfad104b1c5
 id: new-ticket-skill
 type: skill
 status: active
@@ -12,10 +12,13 @@ description: Create a bitácora ticket interactively with suggested defaults. Tr
   on /new-ticket, 'new ticket', 'create a ticket', 'file an issue on the board', 'crea
   un ticket', 'nuevo ticket', and the detect-then-ticket standing order. Proposes
   Type, Priority, Status, assignee and the AREA-NNN-slug ID, the human confirms, then
-  it opens the issue and sets the board fields.
-allowed-tools: [Bash, Read, AskUserQuestion]
+  it opens the issue and sets the board fields. Also enriches a thin backlog item or
+  pasted user story into an implementation-ready form ('enrich SDD-014', 'rewrite this
+  user story', 'make this ticket implementation-ready').
+allowed-tools: [Bash, Read, Grep, AskUserQuestion, mcp__hive__vault_query, mcp__hive__vault_search]
 keywords: [new ticket, create ticket, file issue, nuevo ticket, crea ticket, bitacora
-    issue]
+    issue, enrich user story, enrich ticket, user story rewrite, make ticket ready, enriquecer
+    historia]
 paths: []
 ---
 # New Ticket Workflow
@@ -27,6 +30,7 @@ paths: []
 
 - `/new-ticket "<title>"` explicitly, or "create a ticket" / "new ticket" / "file an issue on the board" / "crea un ticket" / "nuevo ticket".
 - When the **detect→ticket** standing order fires: you found work outside the current change's scope → file it instead of silently dropping it or letting scope creep (see [[feedback_side_comments_are_triage]]).
+- "Enrich AUTH-001" / "rewrite this user story" / "make this ticket implementation-ready" → the **Enrich a thin item** section below.
 
 ## When NOT to use
 
@@ -143,6 +147,31 @@ query($item: ID!) {
 ## Non-interactive / autonomous mode
 
 For agents acting under **detect→ticket** (no human in the loop), skip step 3's `AskUserQuestion`: accept the computed defaults (or explicit args), create the issue, set the fields, and report the URL. Defaults stay **Backlog / P2 / unassigned + nature labels** so a human triages priority and start later — an autonomous agent files the work, it does not self-prioritize it.
+
+## Enrich a thin item
+
+> Formerly the `enrich-us` skill, ported from [LIDR-academy/lidr-specboot](https://github.com/LIDR-academy/lidr-specboot/blob/main/ai-specs/skills/enrich-us/SKILL.md) (`enrich-us`, MIT) and adapted: no Jira mode, task state on the bitácora (ADR-018), technical context from `00_meta/patterns/`.
+
+A single-shot rewrite of a backlog item or a pasted user story into an implementation-ready form, usually before `/spec fill` when the issue is too thin to drive its questions. Skip it when the item already names the files to modify, a definition of done and acceptance criteria, for trivial changes, and for spikes.
+
+**Input.** An id matching `^[A-Z]+[0-9]*-\d+[a-z]?(-[a-z0-9-]+)?$` is read with `gh issue view <id> --json title,body`; if it is not found, ask for the story. The pattern is a deliberate subset of the spec `idPattern`: a dated `YYYY-MM-DD-slug` is not a backlog id. Multi-line markdown is used as it is.
+
+**Check the story for each item its domain needs,** reading at most 2-3 relevant patterns from `$VAULT_PATH/00_meta/patterns/`:
+
+1. The full behavior change, observable from outside.
+2. Fields, data shapes and migrations, if data is touched.
+3. Endpoints (method, URL, request and response schema), if the change is HTTP.
+4. Files and modules to modify, as concrete paths that fit the repo's architecture.
+5. A definition of done: build, test, deploy, docs.
+6. Tests to add or update: unit, integration, contract.
+7. Non-functional requirements: security, performance, observability, error handling.
+
+**Output** two sections, in this order: `## Original` (the input verbatim, fenced if multi-line) and `## Enhanced` (the rewrite, in the same voice and constraint level: no invented scope, no softened directives). With `--write-back` on an id, add the marker comment `<!-- enriched YYYY-MM-DD -->` to the issue with `gh issue comment`. Never replace the issue body: it stays terse, and the enhanced version belongs in `proposal.md` once the spec exists.
+
+- **Ambiguous input** (a short reference with no id and no body): ask whether to read an issue or take a pasted story. Do not guess.
+- **An item already done** (`[x]`, or a closed issue): still allowed. The enrichment becomes a post-hoc spec for audit; say so in the `## Enhanced` heading.
+- **No matching pattern:** proceed without citing one, never invent a pattern name, and flag the gap as a pattern candidate.
+- **Not Socratic** (that is `/spec fill`), not a redirection of the user's intent, and no pattern bodies pasted into the output: cite them by name.
 
 ## Type inference from the AREA prefix
 

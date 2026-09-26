@@ -45,22 +45,40 @@ func LoadTriggers(repoRoot string) (*TriggerConfig, error) {
 		}
 	}
 
-	// Walk up from current working directory to discover local harness/triggers.json (e.g. in worktrees)
-	if cwd, err := os.Getwd(); err == nil {
-		for d := cwd; d != "" && d != "/" && d != "."; {
-			p := filepath.Join(d, TriggersFile)
-			if data, err := os.ReadFile(p); err == nil {
-				return ParseTriggers(data)
-			}
-			parent := filepath.Dir(d)
-			if parent == d {
-				break
-			}
-			d = parent
+	if root := TriggersRoot(""); root != "" {
+		if data, err := os.ReadFile(filepath.Join(root, TriggersFile)); err == nil {
+			return ParseTriggers(data)
 		}
 	}
 
 	return ParseTriggers(defaultTriggersJSON)
+}
+
+// TriggersRoot is the directory whose harness/triggers.json LoadTriggers reads:
+// repoRoot when it has one, else the nearest ancestor of the working directory
+// that does, such as a worktree. Empty means the embedded rules, which have no
+// skill records beside them.
+func TriggersRoot(repoRoot string) string {
+	if repoRoot != "" {
+		if _, err := os.Stat(filepath.Join(repoRoot, TriggersFile)); err == nil {
+			return repoRoot
+		}
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for d := cwd; d != "" && d != "/" && d != "."; {
+		if _, err := os.Stat(filepath.Join(d, TriggersFile)); err == nil {
+			return d
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			break
+		}
+		d = parent
+	}
+	return ""
 }
 
 // ParseTriggers unmarshals raw JSON into a TriggerConfig.
@@ -72,22 +90,44 @@ func ParseTriggers(data []byte) (*TriggerConfig, error) {
 	return &cfg, nil
 }
 
-// MatchPaths evaluates paths against trigger rules and returns sorted unique pattern IDs.
-func MatchPaths(triggers []TriggerRule, paths []string) []string {
-	matched := make(map[string]struct{})
+// matchedPathRules returns every rule with a glob matching at least one of the
+// paths, once each, in declaration order.
+//
+// Rules are the unit here, not patterns: two rules may name the same pattern
+// (`pattern-language-standards` serves both the complexity rule and the Go
+// rule), and a caller that only learns the PATTERN cannot tell which rule
+// matched.
+func matchedPathRules(triggers []TriggerRule, paths []string) []TriggerRule {
+	var matched []TriggerRule
+	seen := make(map[int]struct{})
 	for _, p := range paths {
 		norm := filepath.ToSlash(strings.TrimSpace(p))
 		norm = strings.TrimPrefix(strings.TrimPrefix(norm, "./"), "/")
 		if norm == "" || norm == "/dev/null" || norm == "dev/null" {
 			continue
 		}
-		for _, rule := range triggers {
+		for i, rule := range triggers {
+			if _, done := seen[i]; done {
+				continue
+			}
 			for _, glob := range rule.Globs {
 				if MatchGlob(glob, norm) {
-					matched[rule.Pattern] = struct{}{}
+					seen[i] = struct{}{}
+					matched = append(matched, rule)
 					break
 				}
 			}
+		}
+	}
+	return matched
+}
+
+// MatchPaths evaluates paths against trigger rules and returns sorted unique pattern IDs.
+func MatchPaths(triggers []TriggerRule, paths []string) []string {
+	matched := make(map[string]struct{})
+	for _, rule := range matchedPathRules(triggers, paths) {
+		if rule.Pattern != "" {
+			matched[rule.Pattern] = struct{}{}
 		}
 	}
 
@@ -148,18 +188,39 @@ type Suggestion struct {
 	Skills   []string `json:"skills"`
 }
 
-// DefaultSkillDependencies maps composite skills to their declared prerequisite skills.
+// DefaultSkillDependencies maps composite skills to their declared prerequisite
+// skills. It is the fallback where no skill records can be read; the router
+// reads the records' `requires:` (SkillDependencies), and a test keeps this map
+// equal to the committed records (HARNESS-147).
 var DefaultSkillDependencies = map[string][]string{
-	"spec":                    {"adversarial-review", "verification-before-completion"},
-	"adversarial-review":      {"verification-before-completion"},
-	"executing-plans":         {"systematic-debugging", "test-driven-development", "verification-before-completion"},
-	"writing-plans":           {"executing-plans"},
+	"spec":                    {"adversarial-review"},
 	"architecture-session":    {"read-all-adrs", "spec"},
-	"project-maturation":      {"audit", "test", "verification-before-completion"},
 	"vault-doctor":            {"insights"},
 	"test-driven-development": {"test"},
-	"handoff":                 {"verification-before-completion"},
-	"pr-review-triage":        {"verification-before-completion"},
+	"cyclomatic-complexity":   {"test"},
+	"handoff":                 {"adversarial-review"},
+	"pr-review-triage":        {"adversarial-review"},
+}
+
+// SkillDependencies is the dependency map the router uses: the `requires:` of
+// the skill records under root/harness/skills, read at run time.
+//
+// A skill's prerequisites were declared twice, in its frontmatter and in the map
+// above, and only the map was read. The map ships inside the binary, so a change
+// to a skill reached the prompt hook only when a release was installed: after
+// SKILL-001 retired a skill, an installed 0.58.0 kept suggesting it while the
+// deployed records had already dropped it. Read from the records, the
+// prerequisites deploy with the skills. The compiled map answers only where
+// there is nothing to read.
+func SkillDependencies(root string) map[string][]string {
+	if root == "" {
+		return DefaultSkillDependencies
+	}
+	deps, err := LoadSkillDependencies(filepath.Join(root, "harness", "skills"))
+	if err != nil || len(deps) == 0 {
+		return DefaultSkillDependencies
+	}
+	return deps
 }
 
 // ResolveDependencies computes the transitive closure of required skills,
@@ -280,13 +341,19 @@ func SuggestWithDeps(triggers []TriggerRule, prompt string, paths []string, deps
 		skillMap[s] = struct{}{}
 	}
 
-	// Also link skills mapped to triggered patterns
-	for _, rule := range triggers {
-		if _, ok := patMap[rule.Pattern]; ok {
-			for _, sk := range rule.Skills {
-				if sk != "" {
-					skillMap[sk] = struct{}{}
-				}
+	// Skills follow the RULES that matched, never the patterns those rules name.
+	// A prompt match already carries its own rule's skills (MatchPrompt); a path
+	// match is a rule too, so it contributes its own.
+	//
+	// This used to link every rule whose pattern had matched. That was the same
+	// thing only while each rule had a pattern to itself. Once two rules share
+	// one - a Go rule and a complexity rule both pointing at the language
+	// standards - a Python refactor prompt would also suggest golang-pro, because
+	// the sibling rule's pattern was "triggered".
+	for _, rule := range matchedPathRules(triggers, paths) {
+		for _, sk := range rule.Skills {
+			if sk != "" {
+				skillMap[sk] = struct{}{}
 			}
 		}
 	}

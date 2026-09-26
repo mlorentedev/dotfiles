@@ -257,12 +257,14 @@ func TestMatchPrompt(t *testing.T) {
 }
 
 func TestResolveDependencies(t *testing.T) {
+	// Synthetic ids: the resolver is blind to names, and a real skill's name here
+	// reads as a live dependency, which is how retired names outlived SKILL-001.
 	deps := map[string][]string{
-		"spec":            {"adversarial-review", "verification-before-completion"},
-		"writing-plans":   {"executing-plans"},
-		"executing-plans": {"systematic-debugging", "test-driven-development"},
-		"cycle-a":         {"cycle-b"},
-		"cycle-b":         {"cycle-a"},
+		"root":    {"dep-a", "dep-b"},
+		"chain-1": {"chain-2"},
+		"chain-2": {"leaf-x", "leaf-y"},
+		"cycle-a": {"cycle-b"},
+		"cycle-b": {"cycle-a"},
 	}
 
 	tests := []struct {
@@ -272,13 +274,13 @@ func TestResolveDependencies(t *testing.T) {
 	}{
 		{
 			name:     "single skill with direct dependencies",
-			initial:  []string{"spec"},
-			expected: []string{"adversarial-review", "spec", "verification-before-completion"},
+			initial:  []string{"root"},
+			expected: []string{"dep-a", "dep-b", "root"},
 		},
 		{
 			name:     "multi-level transitive dependencies",
-			initial:  []string{"writing-plans"},
-			expected: []string{"executing-plans", "systematic-debugging", "test-driven-development", "writing-plans"},
+			initial:  []string{"chain-1"},
+			expected: []string{"chain-1", "chain-2", "leaf-x", "leaf-y"},
 		},
 		{
 			name:     "cycle protection",
@@ -341,6 +343,56 @@ name: skill2
 	}
 }
 
+// TestSuggestSharedPatternDoesNotCrossLinkSkills pins that skills follow the rule
+// that matched, not the pattern it names.
+//
+// Two rules can name one pattern (the Go rule and the complexity rule both point
+// at the language standards). Linking by pattern made a Python refactor prompt
+// suggest golang-pro, because the sibling rule's pattern had been "triggered".
+// Both entry points are covered: a keyword match and a path match reach the
+// skills by different routes.
+func TestSuggestSharedPatternDoesNotCrossLinkSkills(t *testing.T) {
+	rules := []TriggerRule{
+		{ID: "complexity", Pattern: "pattern-language-standards", Globs: []string{"*.py"},
+			Keywords: []string{"refactor"}, Skills: []string{"cyclomatic-complexity"}},
+		{ID: "golang", Pattern: "pattern-language-standards", Globs: []string{"*.go"},
+			Keywords: []string{"goroutine"}, Skills: []string{"golang-pro"}},
+	}
+
+	tests := []struct {
+		name   string
+		prompt string
+		paths  []string
+		want   []string
+	}{
+		{"a prompt matching one rule", "refactor this", nil, []string{"cyclomatic-complexity"}},
+		{"a prompt matching the other rule", "a goroutine leak", nil, []string{"golang-pro"}},
+		{"a path matching one rule", "", []string{"main.py"}, []string{"cyclomatic-complexity"}},
+		{"a path matching the other rule", "", []string{"main.go"}, []string{"golang-pro"}},
+		{"paths matching both rules", "", []string{"a.py", "b.go"}, []string{"cyclomatic-complexity", "golang-pro"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SuggestWithDeps(rules, tt.prompt, tt.paths, map[string][]string{})
+			if !reflect.DeepEqual(got.Skills, tt.want) {
+				t.Errorf("Skills = %v; want %v", got.Skills, tt.want)
+			}
+			if !reflect.DeepEqual(got.Patterns, []string{"pattern-language-standards"}) {
+				t.Errorf("Patterns = %v; want the shared pattern reported once", got.Patterns)
+			}
+		})
+	}
+}
+
+// TestMatchPathsNeverReportsAnEmptyPattern: a rule with no pattern must not put
+// "" into the result, where a caller would print it as a pattern name.
+func TestMatchPathsNeverReportsAnEmptyPattern(t *testing.T) {
+	rules := []TriggerRule{{ID: "bare", Globs: []string{"*.tf"}, Skills: []string{"terraform"}}}
+	if got := MatchPaths(rules, []string{"main.tf"}); len(got) != 0 {
+		t.Errorf("MatchPaths() = %q; want no patterns", got)
+	}
+}
+
 // TestRealTriggersFileValid guards harness/triggers.json against silent rot or schema deviation (GUARD #1137).
 func TestRealTriggersFileValid(t *testing.T) {
 	cfg, err := ParseTriggers(defaultTriggersJSON)
@@ -384,5 +436,58 @@ func TestTriggersEmbeddedMatchesDiskSSOT(t *testing.T) {
 	}
 	if !reflect.DeepEqual(diskBytes, defaultTriggersJSON) {
 		t.Errorf("embedded triggers.json drifted from %s; re-sync copies", diskPath)
+	}
+}
+
+// TestEverySkillTheRouterNamesHasARecord is TestEveryDeclaredSkillHasARecord's
+// sibling for the two other places a skill id is typed by hand: a trigger rule's
+// `skills` and DefaultSkillDependencies. Retiring a skill drops its record under
+// harness/skills/, and neither list was checked against the records, so a retired
+// id would go on being suggested by `dotf harness suggest` and the prompt hook: a
+// skill name that nothing can invoke. SKILL-001 retired eight skills that both
+// lists still named.
+func TestEverySkillTheRouterNamesHasARecord(t *testing.T) {
+	root := repoRootForTest(t)
+	cfg, err := ParseTriggers(defaultTriggersJSON)
+	if err != nil {
+		t.Fatalf("the embedded triggers do not parse: %v", err)
+	}
+
+	named := map[string]string{}
+	for _, rule := range cfg.Triggers {
+		for _, s := range rule.Skills {
+			named[s] = "trigger " + rule.ID
+		}
+	}
+	for skill, deps := range DefaultSkillDependencies {
+		named[skill] = "DefaultSkillDependencies"
+		for _, d := range deps {
+			named[d] = "DefaultSkillDependencies[" + skill + "]"
+		}
+	}
+	// The records' own requires:, read with the YAML parser, so the block form
+	// (`requires:` then `- audit`) is covered as well as the flow form. The
+	// round-3 review of SKILL-001 slipped a block-form retired name past every
+	// guard.
+	recorded, err := LoadSkillDependencies(filepath.Join(root, "harness", "skills"))
+	if err != nil {
+		t.Fatalf("the skill records' requires: cannot be read: %v", err)
+	}
+	for skill, deps := range recorded {
+		for _, d := range deps {
+			named[d] = "harness/skills/" + skill + " requires:"
+		}
+	}
+	if len(named) == 0 {
+		t.Fatal("neither the triggers, the dependency map nor the records name a skill; nothing was checked")
+	}
+
+	for skill, where := range named {
+		// IsRegular, as in the persona guard: os.Stat also succeeds on a directory.
+		info, err := os.Stat(filepath.Join(root, "harness", "skills", skill, "SKILL.md"))
+		if err != nil || !info.Mode().IsRegular() {
+			t.Errorf("%s names skill %q, but harness/skills/%s/SKILL.md is not a readable file: "+
+				"the router would suggest a skill nothing can invoke", where, skill, skill)
+		}
 	}
 }

@@ -675,6 +675,49 @@ build_skill_catalog() {
 
 # --- modes ---
 
+# Every pattern a trigger names must exist in the vault.
+#
+# A trigger whose pattern is missing still fires and routes work: the prompt hook
+# prints "<- pattern: pattern-terraform-standards" and a session goes looking for
+# it. Measured 2026-09-24, 8 of the 18 triggers named patterns that were never
+# written or had been renamed, and nothing said so, because the file is only read
+# by code that treats the name as an opaque string. --refresh is the one mode that
+# has the vault, so it is where this can be checked at all: --check runs offline,
+# and CI has no vault. A pattern renamed in the vault later is caught by the next
+# --refresh, and by `dotf doctor` on a machine that has the vault.
+#
+# Checked BEFORE anything is written, so a dangling trigger fails the refresh
+# whole instead of leaving records refreshed and the targets not.
+check_trigger_targets() {
+    local pat_dir="$1" triggers="$REPO_ROOT/harness/triggers.json" id pat rows dangling=0 named=0
+    [[ -f "$triggers" ]] || return 0
+    # Read first, then loop (HARNESS-148). Inside `< <(jq ...)` a parse error never
+    # reached this function's status: the loop ran zero times and the success line
+    # below claimed every pattern exists after nothing was examined.
+    if ! rows="$(jq -r '.triggers[] | "\(.id)\t\(.pattern // "")"' "$triggers")"; then
+        printf '[ERROR] harness/triggers.json cannot be read as trigger rules (%s)\n' "$triggers" >&2
+        return 1
+    fi
+    while IFS=$'\t' read -r id pat; do
+        [[ -n "$pat" ]] || continue
+        named=$((named + 1))
+        if [[ ! -f "$pat_dir/$pat.md" ]]; then
+            printf '[ERROR] harness/triggers.json: trigger "%s" names pattern "%s", which is not in the vault (%s)\n' \
+                "$id" "$pat" "$pat_dir" >&2
+            dangling=1
+        fi
+    done <<< "$rows"
+    if (( named == 0 )); then
+        printf '[ERROR] harness/triggers.json names no pattern, so nothing was checked (%s)\n' "$triggers" >&2
+        return 1
+    fi
+    if (( dangling )); then
+        printf '        point the trigger at a pattern that exists, or remove it, then re-run --refresh\n' >&2
+        return 1
+    fi
+    printf '[refresh] triggers: every pattern named in harness/triggers.json exists in the vault\n'
+}
+
 do_refresh() {
     require_tools
     local vsub pat_dir
@@ -688,6 +731,8 @@ do_refresh() {
 EOF
         exit 2
     fi
+
+    check_trigger_targets "$pat_dir" || exit 1
 
     mkdir -p "$RECORD_DIR"
 
@@ -1099,10 +1144,96 @@ build_agent_presence() {
 #           AGENTS.md — the more specific file, and the one you least want lost.
 #
 # Both therefore receive the COMPACT payload: the enforced rules plus the agent
-# presence block, ~2 KB. Same content, same marker mechanism, smaller render —
+# presence block, folded to ASCII and held under 8000 characters by a bats guard
+# (tests/compile-harness.bats). Same content, same marker mechanism, smaller render —
 # exclusion by demonstrated incompatibility, not by agent identity. Rationale and
 # sources live in manifest.json next to each row.
 has_doctrine() { jq -e '.doctrine.deploy' "$MANIFEST" >/dev/null 2>&1; }
+
+# Fold a file to pure ASCII, in place.
+#
+# A CAPPED surface is normalised because a cap is only enforceable when its unit
+# is unambiguous, and ours was not. Measured 2026-09-05: .gemini/GEMINI.md was
+# 11974 CHARACTERS and 12047 BYTES against a 12000 cap. The bats assertion read
+# `wc -m`, so it passed; a byte-counting consumer would have been 47 over and, per
+# the platform's documented behaviour, would have dropped the overflow SILENTLY.
+# An ASCII file has bytes == chars by construction, so the guard and the platform
+# cannot disagree however the platform counts.
+#
+# The first version folded only typographic punctuation and left the accent and
+# the section signs alone, on the ground that folding them changes a word or a
+# reference. That left the invariant stated as "under the cap in both units"
+# rather than "ASCII", and on 2026-09-24 the deployed file still carried 7
+# non-ASCII characters while sitting 23 characters under the cap. The fold is a
+# fixed table, so it costs nothing that mattered: `bitacora` is the same word and
+# `Section 4` is the same reference. What the table does not know is NOT guessed
+# at, because a catch-all that replaces unknown bytes corrupts words silently;
+# it survives and deploy_doctrine reports it by its bytes, so the table is
+# extended on purpose.
+#
+# The 2026-09-05 gap also hid that persona prose costs ZERO characters (the
+# roster renders skill ids only) and two bytes per em dash, so a per-id budget
+# that tracked characters was tracking the measure that was not growing (#1241).
+#
+# Hex escapes, not literals: a curly quote or dash pasted into shell source is
+# SC1112, which fails `shellcheck` and therefore CI lint, and the escape also
+# names the exact codepoint where a literal in a monospace diff does not.
+fold_to_ascii() {
+    local file="$1" tmp
+    tmp="$(mktemp)"
+    LC_ALL=C sed \
+        -e 's/\xe2\x80\x94/--/g'   `# U+2014 em dash` \
+        -e 's/\xe2\x80\x93/-/g'    `# U+2013 en dash` \
+        -e "s/\xe2\x80\x99/'/g"    `# U+2019 right single quote` \
+        -e "s/\xe2\x80\x98/'/g"    `# U+2018 left single quote` \
+        -e 's/\xe2\x80\x9c/"/g'    `# U+201C left double quote` \
+        -e 's/\xe2\x80\x9d/"/g'    `# U+201D right double quote` \
+        -e 's/\xe2\x80\xa6/.../g'  `# U+2026 ellipsis` \
+        -e 's/\xe2\x86\x92/->/g'   `# U+2192 rightwards arrow` \
+        -e 's/\xe2\x86\x90/<-/g'   `# U+2190 leftwards arrow` \
+        -e 's/\xe2\x89\xa5/>=/g'   `# U+2265 greater-than or equal to` \
+        -e 's/\xe2\x89\xa4/<=/g'   `# U+2264 less-than or equal to` \
+        -e 's/\xc3\x97/x/g'        `# U+00D7 multiplication sign` \
+        -e 's/\xc2\xa0/ /g'        `# U+00A0 no-break space` \
+        -e 's/\xc2\xa7/Section /g' `# U+00A7 section sign` \
+        -e 's/\xc3\xa1/a/g' -e 's/\xc3\x81/A/g' `# U+00E1 U+00C1 a acute` \
+        -e 's/\xc3\xa9/e/g' -e 's/\xc3\x89/E/g' `# U+00E9 U+00C9 e acute` \
+        -e 's/\xc3\xad/i/g' -e 's/\xc3\x8d/I/g' `# U+00ED U+00CD i acute` \
+        -e 's/\xc3\xb3/o/g' -e 's/\xc3\x93/O/g' `# U+00F3 U+00D3 o acute` \
+        -e 's/\xc3\xba/u/g' -e 's/\xc3\x9a/U/g' `# U+00FA U+00DA u acute` \
+        -e 's/\xc3\xbc/u/g' -e 's/\xc3\x9c/U/g' `# U+00FC U+00DC u diaeresis` \
+        -e 's/\xc3\xb1/n/g' -e 's/\xc3\x91/N/g' `# U+00F1 U+00D1 n tilde` \
+        "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+# Distinct non-ASCII byte sequences in a file, as hex, for the leftover warning.
+# Always succeeds: it is diagnostics on the way to a warning, and `grep -o` exits
+# 1 on no match, which under `set -e -o pipefail` would abort the whole deploy.
+non_ascii_hex() {
+    { LC_ALL=C grep -o -E '[^[:print:][:space:]]+' "$1" || true; } | sort -u | while IFS= read -r run; do
+        printf '%s ' "$(printf '%s' "$run" | od -An -tx1 | tr -d ' \n')"
+    done
+    return 0
+}
+
+# The line written into a rules file this script creates. ASCII, so the file it
+# starts is ASCII: the cap covers the whole file, and this line is ours.
+DOCTRINE_PREAMBLE='> Cross-agent doctrine. The marked region is generated; edit the vault pattern and re-run setup.'
+
+# Bring a file this script created before the preamble became ASCII up to date.
+#
+# The file is created once and then belongs to the user, so it is never rewritten
+# wholesale. But a line that is byte-for-byte what this script wrote is ours, and
+# leaving it would keep the whole file from being ASCII (`wc -c` != `wc -m`).
+# Exact-line match only, the same adoption rule as `sameCommand` in bind.go: a
+# user's own line that merely resembles it is never touched.
+migrate_legacy_preamble() {
+    local file="$1" legacy tmp
+    legacy="> Cross-agent doctrine. The marked region is generated $(printf '\xe2\x80\x94') edit the vault pattern and re-run setup."
+    grep -qxF -- "$legacy" "$file" 2>/dev/null || return 0
+    tmp="$(mktemp)"
+    awk -v old="$legacy" -v new="$DOCTRINE_PREAMBLE" '$0 == old { print new; next } { print }' "$file" > "$tmp" && mv "$tmp" "$file"
+}
 
 deploy_doctrine() {
     local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars bytes gen_chars gen_bytes ids
@@ -1118,50 +1249,9 @@ deploy_doctrine() {
             build_agent_presence "$ag_recdir" "$agent"
         } > "$payload"
 
-        # A CAPPED payload is normalised to ASCII punctuation, because a cap is
-        # only enforceable when its unit is unambiguous — and ours was not.
-        #
-        # Measured 2026-09-05: .gemini/GEMINI.md was 11974 CHARACTERS and 12047
-        # BYTES against a 12000 cap. The bats assertion reads `wc -m`, so it
-        # passed; a byte-counting consumer would have been 47 over and, per the
-        # platform's documented behaviour, would have dropped the overflow
-        # SILENTLY. The 73-byte gap was 33 em-dashes, four section signs, an
-        # accented vowel and an ellipsis.
-        #
-        # The gap also hid a second thing: persona prose costs ZERO characters
-        # (the roster renders skill ids only) and two bytes per em-dash. So the
-        # per-id budget on #1241 was tracking the measure that was not growing.
-        #
-        # This does not decide which unit the platform counts. It removes the
-        # question: an ASCII payload has bytes == chars by construction, so the
-        # guard and the platform cannot disagree however the platform counts.
-        #
-        # ONLY punctuation that does not alter the lexicon. Em/en dashes, curly
-        # quotes and the ellipsis are typographic; folding them is uglier and
-        # means exactly the same thing. Accents and section signs are NOT folded:
-        # `bitácora` -> `bitacora` changes a word, and `§4` -> `S4` changes a
-        # reference. Five such characters survive, which is why the invariant
-        # below is stated as "under the cap in both units" rather than "ASCII".
-        # The codepoints are written as \u escapes rather than as literals: a
-        # curly quote pasted into shell source is SC1112 ("this is a unicode
-        # quote"), which fails `shellcheck` and therefore CI lint. Writing them
-        # as escapes also says WHICH character is meant, where a literal in a
-        # monospace diff does not.
+        # A capped payload is folded to ASCII (fold_to_ascii says why).
         if [[ "$cap" != 0 ]]; then
-            tmp="$(mktemp)"
-            # Hex escapes, not literals: a curly quote or dash pasted into shell
-            # source is SC1112 ("this is a unicode quote"), which fails
-            # `shellcheck` and therefore CI lint. The escapes also name the exact
-            # codepoint, which a literal in a monospace diff does not.
-            LC_ALL=C sed \
-                -e 's/\xe2\x80\x94/-/g'    `# U+2014 em dash` \
-                -e 's/\xe2\x80\x93/-/g'    `# U+2013 en dash` \
-                -e "s/\xe2\x80\x99/'/g"    `# U+2019 right single quote` \
-                -e "s/\xe2\x80\x98/'/g"    `# U+2018 left single quote` \
-                -e 's/\xe2\x80\x9c/"/g'    `# U+201C left double quote` \
-                -e 's/\xe2\x80\x9d/"/g'    `# U+201D right double quote` \
-                -e 's/\xe2\x80\xa6/.../g'  `# U+2026 ellipsis` \
-                "$payload" > "$tmp" && mv "$tmp" "$payload"
+            fold_to_ascii "$payload"
         fi
 
         # A shadow file wins over ours at read time, so a silent deploy here
@@ -1173,13 +1263,13 @@ deploy_doctrine() {
 
         mkdir -p "$(dirname "$file_abs")"
         if [[ ! -f "$file_abs" ]]; then
-            printf '# Global rules\n\n> Cross-agent doctrine. The marked region is generated — edit the vault pattern and re-run setup.\n' \
-                > "$file_abs"
+            printf '# Global rules\n\n%s\n' "$DOCTRINE_PREAMBLE" > "$file_abs"
             printf '[deploy] doctrine: created %s\n' "$file_abs"
         fi
+        migrate_legacy_preamble "$file_abs"
 
         sha="$(sha_of "$payload")"
-        begin="$BEGIN_PREFIX (sha256:$sha) — cross-agent doctrine from vault $(jq -r '.vault_subpath' "$MANIFEST"); edit there + re-run setup, do NOT edit between markers -->"
+        begin="$BEGIN_PREFIX (sha256:$sha) -- vault $(jq -r '.vault_subpath' "$MANIFEST"); edit there + re-run setup, do NOT edit between markers -->"
         tmp="$(mktemp)"
         if grep -q "^$BEGIN_PREFIX" "$file_abs" && grep -qF "$END_MARKER" "$file_abs"; then
             awk -v beginm="$begin" -v endm="$END_MARKER" -v bp="$BEGIN_PREFIX" -v cf="$payload" '
@@ -1219,8 +1309,9 @@ deploy_doctrine() {
             # and takes the whole `&&` chain with it, which aborts the script
             # under `set -e`. Prohibited-pattern table, the `((count++))` row.
             if (( gen_bytes > gen_chars )); then
-                printf '[deploy] note %s: generated doctrine is %s chars / %s bytes; non-ASCII survives normalisation\n' \
-                    "$file_abs" "$gen_chars" "$gen_bytes" >&2
+                printf '[deploy] WARN %s: generated doctrine is %s chars / %s bytes; non-ASCII survives the fold (utf-8 hex: %s)\n' \
+                    "$file_abs" "$gen_chars" "$gen_bytes" "$(non_ascii_hex "$payload")" >&2
+                printf '        extend fold_to_ascii for it, or reword the vault record\n' >&2
                 gen_chars="$gen_bytes"
             fi
             if (( bytes > chars )); then

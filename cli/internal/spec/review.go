@@ -406,12 +406,14 @@ func reviewStale(repoRoot, specID, specDir string, review Review, checker Stalen
 }
 
 // changedContracts names, in contractFiles order, every contract file whose
-// normalised digest differs from the one recorded at launch.
+// normalised digest differs from the one recorded at launch. A request recorded
+// before HARNESS-151 folded the lifecycle status carries the legacy form, so a
+// file matching either form is unchanged.
 func changedContracts(specDir string, recorded map[string]string) []string {
-	current := ContractDigests(specDir)
+	current, legacy := ContractDigests(specDir), legacyContractDigests(specDir)
 	var moved []string
 	for _, name := range contractFiles {
-		if current[name] != recorded[name] {
+		if current[name] != recorded[name] && legacy[name] != recorded[name] {
 			moved = append(moved, name)
 		}
 	}

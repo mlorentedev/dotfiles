@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -441,8 +442,8 @@ func commit(c Config, staged, dst string, mode os.FileMode) error {
 // a JSON object is an error, because "merge" has no meaning for it and silently
 // replacing it is the data loss this strategy exists to prevent.
 func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
-	var managed map[string]any
-	if err := json.Unmarshal(srcData, &managed); err != nil {
+	managed, err := decodeJSONObject(srcData)
+	if err != nil {
 		return nil, false, fmt.Errorf("source is not a JSON object: %w", err)
 	}
 	if managed == nil {
@@ -450,7 +451,7 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	}
 	existing := map[string]any{}
 	if raw, err := os.ReadFile(dst); err == nil { //nolint:gosec // manifest-declared destination
-		if err := json.Unmarshal(stripLineComments(raw), &existing); err != nil {
+		if existing, err = decodeJSONObject(stripLineComments(raw)); err != nil {
 			return nil, false, fmt.Errorf("destination is not a JSON object: %w", err)
 		}
 		// A JSON `null` unmarshals into a nil map without error; assigning
@@ -461,19 +462,103 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, false, err
 	}
-	changed := false
-	for k, v := range managed {
-		if cur, ok := existing[k]; ok && reflect.DeepEqual(cur, v) {
-			continue
-		}
-		existing[k] = v
-		changed = true
-	}
-	content, err := json.MarshalIndent(existing, "", "  ")
+	merged, changed := deepMerge(existing, managed)
+	content, err := encodeJSON(merged)
 	if err != nil {
 		return nil, false, err
 	}
-	return append(content, '\n'), changed, nil
+	return content, changed, nil
+}
+
+func deepMerge(existing, managed map[string]any) (map[string]any, bool) {
+	changed := false
+	for key, managedValue := range managed {
+		existingValue, exists := existing[key]
+		if !exists {
+			existing[key] = managedValue
+			changed = true
+			continue
+		}
+		switch value := managedValue.(type) {
+		case map[string]any:
+			if object, ok := existingValue.(map[string]any); ok {
+				merged, didChange := deepMerge(object, value)
+				existing[key] = merged
+				changed = changed || didChange
+				continue
+			}
+		case []any:
+			if list, ok := existingValue.([]any); ok {
+				merged, didChange := unionLists(list, value)
+				existing[key] = merged
+				changed = changed || didChange
+				continue
+			}
+		}
+		if jsonEqual(existingValue, managedValue) {
+			continue
+		}
+		existing[key] = managedValue
+		changed = true
+	}
+	return existing, changed
+}
+
+func unionLists(existing, managed []any) ([]any, bool) {
+	out := existing
+	changed := false
+	for _, managedValue := range managed {
+		found := false
+		for _, existingValue := range existing {
+			if jsonEqual(existingValue, managedValue) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			out = append(out, managedValue)
+			changed = true
+		}
+	}
+	return out, changed
+}
+
+func jsonEqual(a, b any) bool {
+	switch value := a.(type) {
+	case json.Number:
+		other, ok := b.(json.Number)
+		if !ok {
+			return false
+		}
+		left, leftOK := new(big.Rat).SetString(value.String())
+		right, rightOK := new(big.Rat).SetString(other.String())
+		return leftOK && rightOK && left.Cmp(right) == 0
+	case map[string]any:
+		other, ok := b.(map[string]any)
+		if !ok || len(value) != len(other) {
+			return false
+		}
+		for key, child := range value {
+			otherChild, exists := other[key]
+			if !exists || !jsonEqual(child, otherChild) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		other, ok := b.([]any)
+		if !ok || len(value) != len(other) {
+			return false
+		}
+		for index, child := range value {
+			if !jsonEqual(child, other[index]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return reflect.DeepEqual(a, b)
+	}
 }
 
 // stripLineComments removes lines that are only a `//` comment — the header

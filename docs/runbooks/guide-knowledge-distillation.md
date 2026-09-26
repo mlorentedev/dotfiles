@@ -348,9 +348,9 @@ Open a new Claude session in any project and verify:
 
 In any Claude session, the skill descriptions should auto-trigger correctly:
 - Say "I need to create a new skill" -> should invoke `creating-skills`
-- Say "This project needs hardening" -> should invoke `project-maturation`
+- Say "Check this change for security issues" -> should invoke `adversarial-review` (its code-level checklist)
 - Say "The vault has broken links" -> should invoke `vault-doctor`
-- Say "I'm about to commit this fix" -> should invoke `verification-before-completion`
+- Say "I'm about to commit this fix" -> should invoke `adversarial-review` (its "Evidence before claims" section)
 
 ---
 

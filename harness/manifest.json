@@ -203,21 +203,30 @@
       "EVERY EVENT NAME BELOW WAS MEASURED against the installed harness, not taken",
       "from ADR-027, whose render kinds were already stale in 2 of 5 (#563).",
       "",
-      "TWO FAMILIES, NOT FOUR CASES:",
+      "THREE FAMILIES, NOT FOUR CASES:",
       "  command-hook  a process receives the event as JSON on stdin and answers",
-      "                with an exit code. claude and agy both use this, and agy",
-      "                uses claude's exact `{hooks:[{type:command,...}]}` shape.",
+      "                with an exit code. claude uses this, with `{hooks:[{type:",
+      "                command,...}]}` groups under a `hooks` key of events.",
+      "  hooks-json    agy. A document of NAMED hooks (`{name:{PreToolUse:[...]}}`,",
+      "                no `hooks` key) in ~/.gemini/config/hooks.json. The payload is",
+      "                camelCase (conversationId, toolCall) and the answer is a JSON",
+      "                decision on stdout, with the command exiting 0. Owned by NAME.",
       "  ts-extension  an in-process TypeScript handler. pi's `tool_call` returns",
       "                {block:true,reason}; opencode sets output.status='deny'.",
       "                The wrapper is generated here, so it emits ONE canonical",
       "                payload rather than each harness's own — which deletes two",
       "                parsers instead of adding them.",
       "",
-      "`agy` IS NOT PRESENCE-ONLY. #561 defers it on the assumption that it has no",
-      "gate. Measured: ~/.gemini/settings.json declares BeforeAgent, AfterAgent,",
-      "BeforeTool, AfterTool. It is the CHEAPEST harness to add after claude, not a",
-      "deferred one. Its groups carry no `matcher` key, hence `matcher: false` —",
-      "declared per harness rather than assumed from a family resemblance.",
+      "`agy` IS NOT PRESENCE-ONLY, and it does NOT read ~/.gemini/settings.json.",
+      "#561 defers it on the assumption that it has no gate, and the first binding",
+      "then wrote BeforeTool into settings.json because that file declared",
+      "BeforeAgent, AfterAgent, BeforeTool and AfterTool. That file is Gemini CLI's",
+      "(Orca writes it for that product), and agy never read it: its own log says",
+      "\"loaded N named hooks from N hooks.json file(s)\" at every start, and the",
+      "binary embeds the schema it does read (measured 2026-09-24). The hook is now",
+      "emitted into hooks.json, and `retire` removes the old settings.json entry.",
+      "The gate is measurement plumbing there for now: agy's payload names no",
+      "persona, so a call resolves to none unless the operator names one.",
       "",
       "`opencode`'s gate is `permission.ask`, NOT `tool.execute.before`. The latter",
       "is typed (input, output:{args}) => Promise<void>: it mutates arguments and",
@@ -225,7 +234,8 @@
       "",
       "COEXISTENCE IS THE CENTRAL CONSTRAINT, not an edge case. Orca owns 10 of",
       "claude's 12 hook events on the measured machine — including PreToolUse — and",
-      "all four of agy's, and writes real .ts files into pi's extensions dir. So",
+      "the `orca-status` group in agy's hooks.json, and writes real .ts files into",
+      "pi's extensions dir. So",
       "emission is find-by-marker and additive: ours is replaced in place, absent",
       "ours is appended as a NEW group, and a foreign entry is never reordered,",
       "rewritten or removed. That also retires a positional bug: the shell path",
@@ -273,25 +283,6 @@
         ]
       },
       {
-        "agent": "agy",
-        "file": ".gemini/settings.json",
-        "format": "command-hook",
-        "matcher": false,
-        "events": {
-          "presence": "BeforeAgent",
-          "action": "BeforeTool"
-        },
-        "requires_command": "agy",
-        "emit_hooks": [
-          {
-            "id": "gate",
-            "event": "BeforeTool",
-            "command": "harness gate --harness agy",
-            "timeout": 5
-          }
-        ]
-      },
-      {
         "agent": "pi",
         "file": ".pi/agent/extensions/dotfiles-gate.ts",
         "format": "ts-extension",
@@ -310,6 +301,47 @@
           "presence": "chat.system.transform",
           "action": "permission.ask"
         }
+      }
+    ],
+    "bind_named_comment": [
+      "Targets whose file is a document of NAMED hooks (format `hooks-json`), which is",
+      "agy's ~/.gemini/config/hooks.json. They live under their OWN key, not in `bind`,",
+      "and that is load-bearing: the manifest is mirrored by setup and the binary is",
+      "released separately, so a binary from before this format existed reads `bind`",
+      "and IGNORES this key. Had the agy target sat in `bind`, that binary would have",
+      "run claude's merge against hooks.json and written a top-level `hooks` key, with",
+      "a `_managed` sidecar inside a handler, into a file agy decodes as protojson and",
+      "shares with Orca. (Reproduced 2026-09-24 with dotf 0.57.0 against a copy of the",
+      "real file.) Under this key an older binary does nothing for agy, which is the",
+      "status quo. dotf reads both keys; a hooks-json target under `bind`, or another",
+      "format under `bind_named`, is refused when the manifest loads."
+    ],
+    "bind_named": [
+      {
+        "agent": "agy",
+        "file": ".gemini/config/hooks.json",
+        "format": "hooks-json",
+        "matcher": true,
+        "events": {
+          "presence": "PreInvocation",
+          "action": "PreToolUse"
+        },
+        "requires_command": "agy",
+        "emit_hooks": [
+          {
+            "id": "gate",
+            "event": "PreToolUse",
+            "command": "harness gate --harness agy",
+            "timeout": 5
+          }
+        ],
+        "retire": [
+          {
+            "file": ".gemini/settings.json",
+            "event": "BeforeTool",
+            "id": "gate"
+          }
+        ]
       }
     ]
   }

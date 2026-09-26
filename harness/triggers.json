@@ -112,7 +112,8 @@
       ],
       "description": "Triggered when modifying Python packaging, async code, or dependencies",
       "skills": [
-        "async-python-patterns"
+        "async-python-patterns",
+        "test"
       ],
       "keywords": [
         "python",
@@ -125,7 +126,7 @@
     },
     {
       "id": "infrastructure-as-code",
-      "pattern": "pattern-terraform-standards",
+      "pattern": "pattern-git-workflow",
       "globs": [
         "*.tf",
         "**/*.tf",
@@ -134,7 +135,7 @@
         "terraform.tfstate*",
         "**/.terraform.lock.hcl"
       ],
-      "description": "Triggered when modifying Terraform or OpenTofu infrastructure code",
+      "description": "Triggered when modifying Terraform or OpenTofu infrastructure code (the IaC policy is section 12 of the pattern)",
       "skills": [
         "terraform"
       ],
@@ -151,7 +152,7 @@
     },
     {
       "id": "kubernetes-packaging",
-      "pattern": "pattern-kubernetes-packaging",
+      "pattern": "pattern-container-workflow",
       "globs": [
         "Chart.yaml",
         "**/Chart.yaml",
@@ -162,7 +163,7 @@
         "templates/*.tpl",
         "**/templates/*.tpl"
       ],
-      "description": "Triggered when modifying Kubernetes manifests or Helm charts",
+      "description": "Triggered when modifying Kubernetes manifests or Helm charts (production guidance is section 5 of the pattern)",
       "skills": [
         "helm"
       ],
@@ -177,7 +178,7 @@
     },
     {
       "id": "golang-engineering",
-      "pattern": "pattern-go-standards",
+      "pattern": "pattern-language-standards",
       "globs": [
         "go.mod",
         "go.sum",
@@ -186,7 +187,8 @@
       ],
       "description": "Triggered when modifying Go codebase, dependencies, or modules",
       "skills": [
-        "golang-pro"
+        "golang-pro",
+        "test"
       ],
       "keywords": [
         "golang",
@@ -202,7 +204,7 @@
     },
     {
       "id": "security-and-quality-audit",
-      "pattern": "pattern-security-audit",
+      "pattern": "pattern-secrets-security",
       "globs": [
         ".trivy*",
         "gitleaks.toml",
@@ -212,8 +214,7 @@
       ],
       "description": "Triggered when performing security, performance, or quality audits",
       "skills": [
-        "audit",
-        "project-maturation"
+        "adversarial-review"
       ],
       "keywords": [
         "security",
@@ -232,7 +233,7 @@
     },
     {
       "id": "architecture-and-adr",
-      "pattern": "pattern-architecture-session",
+      "pattern": "pattern-architecture",
       "globs": [
         "docs/adr/**",
         "**/docs/adr/**",
@@ -256,7 +257,7 @@
     },
     {
       "id": "task-and-ticket-tracking",
-      "pattern": "pattern-bitacora-tracking",
+      "pattern": "pattern-bitacora-project-setup",
       "globs": [
         ".github/workflows/add-to-bitacora*.yml",
         ".github/ISSUE_TEMPLATE/**"
@@ -264,8 +265,7 @@
       "description": "Triggered when managing bitacora tickets or user stories",
       "skills": [
         "new-ticket",
-        "prd-to-issues",
-        "enrich-us"
+        "prd-to-issues"
       ],
       "keywords": [
         "ticket",
@@ -312,7 +312,7 @@
     },
     {
       "id": "hardware-and-embedded-debug",
-      "pattern": "pattern-hardware-debugging",
+      "pattern": "pattern-matlab-embedded",
       "globs": [
         "firmware/**",
         "drivers/**",
@@ -320,9 +320,10 @@
         "*.dtb",
         "hardware/**"
       ],
-      "description": "Triggered when troubleshooting hardware, firmware, or embedded devices",
+      "description": "Triggered when troubleshooting hardware, firmware, or embedded devices (nearest existing pattern; no dedicated hardware-debugging pattern yet)",
       "skills": [
-        "debug-hardware"
+        "debug-hardware",
+        "systematic-debugging"
       ],
       "keywords": [
         "hardware",
@@ -340,7 +341,7 @@
     },
     {
       "id": "plan-authoring-and-execution",
-      "pattern": "pattern-plan-execution",
+      "pattern": "pattern-spec-driven-development",
       "globs": [
         "plans/**",
         "**/plans/**",
@@ -348,8 +349,7 @@
       ],
       "description": "Triggered when creating or executing structured implementation plans",
       "skills": [
-        "writing-plans",
-        "executing-plans"
+        "spec"
       ],
       "keywords": [
         "plan",
@@ -402,7 +402,8 @@
         "**/mcp_*.go"
       ],
       "skills": [
-        "mcp-builder"
+        "mcp-builder",
+        "test"
       ],
       "description": "Triggered when modifying MCP server configurations or tools",
       "keywords": [

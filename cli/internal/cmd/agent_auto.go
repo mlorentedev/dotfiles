@@ -197,7 +197,7 @@ func resolvePersonaForTask(root, task, role, tier string, m map[string]any) (*ha
 		if err != nil {
 			return nil, route{}, fmt.Errorf("%s: %w", filepath.Join(root, harness.TriggersFile), err)
 		}
-		sugg := harness.Suggest(cfg.Triggers, task, nil)
+		sugg := harness.SuggestWithDeps(cfg.Triggers, task, nil, harness.SkillDependencies(root))
 		if persona, r.pattern, err = harness.ResolveOne(sugg, personas); err != nil {
 			return nil, route{}, err
 		}

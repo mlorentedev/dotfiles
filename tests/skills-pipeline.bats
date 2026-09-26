@@ -228,6 +228,25 @@ path_without_copilot() {
     [ ! -d "$FAKEHOME/.copilot/skills/stale-skill" ]
 }
 
+# SKILL-001 review: a retired skill's name is not ours alone. Another tool put a
+# skill named `audit` into the same directories, and a check that read only the
+# name went red. Deploy removes what it rendered, which carries the vault source
+# it came from, and a foreign skill of the same name survives it.
+@test "SKILL-001: deploy prunes a retired skill it rendered and keeps a foreign one of the same name" {
+    mkdir -p "$FAKEHOME/.claude/skills/audit" "$FAKEHOME/.pi/agent/skills/enrich-us" "$FAKEHOME/.gemini/prompts"
+    printf -- '---\nname: audit\ndescription: another tool installed this\n---\nforeign\n' \
+        > "$FAKEHOME/.claude/skills/audit/SKILL.md"
+    printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/enrich-us/SKILL.md\nname: enrich-us\n---\nours\n' \
+        > "$FAKEHOME/.pi/agent/skills/enrich-us/SKILL.md"
+    printf '<!-- generated: true; from: 00_meta/skills/writing-plans/SKILL.md; sha256:0 -->\nours\n' \
+        > "$FAKEHOME/.gemini/prompts/writing-plans.md"
+    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    [ "$status" -eq 0 ]
+    grep -q '^foreign$' "$FAKEHOME/.claude/skills/audit/SKILL.md"
+    [ ! -e "$FAKEHOME/.pi/agent/skills/enrich-us" ]
+    [ ! -e "$FAKEHOME/.gemini/prompts/writing-plans.md" ]
+}
+
 # HARNESS-056: the Definition of Done is doctrine, so it must reach EVERY
 # surface, not only the ones whose instruction file happens to be convenient.
 # These assert the real records, not a fixture.
@@ -277,8 +296,10 @@ path_without_copilot() {
 
 @test "HARNESS-056: the checklist binds the standing orders instead of restating them" {
     # a second source of truth is the failure mode this change exists to avoid
-    grep -q 'not a second source of truth' harness/skills/verification-before-completion/SKILL.md
-    grep -q 'The Closing Pass' harness/skills/verification-before-completion/SKILL.md
+    # the closing pass moved into adversarial-review when SKILL-001 retired
+    # verification-before-completion
+    grep -q 'not a second source of truth' harness/skills/adversarial-review/SKILL.md
+    grep -q '^## Closing pass (Definition of Done)' harness/skills/adversarial-review/SKILL.md
 }
 
 # HERMES-018: one frontmatter contract for the whole library, enforced by the
@@ -306,7 +327,7 @@ path_without_copilot() {
 }
 
 @test "HERMES-018: --check rejects a record that drops a required key" {
-    local victim="harness/skills/audit/SKILL.md" backup
+    local victim="harness/skills/test/SKILL.md" backup
     backup="$(mktemp)"
     cp "$victim" "$backup"
     sed -i '/^owner: /d' "$victim"

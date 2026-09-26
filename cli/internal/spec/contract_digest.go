@@ -20,6 +20,17 @@ import (
 // fresh clone discards the reviewed commit. Normalisation folds away only what
 // is bookkeeping rather than contract — see normaliseContract.
 func ContractDigests(specDir string) map[string]string {
+	return contractDigests(specDir, true)
+}
+
+// legacyContractDigests is the digest before the lifecycle status was folded
+// (HARNESS-151). A review launched earlier recorded this form, and it must stay
+// fresh after the upgrade rather than demand a re-review of an unchanged spec.
+func legacyContractDigests(specDir string) map[string]string {
+	return contractDigests(specDir, false)
+}
+
+func contractDigests(specDir string, foldStatus bool) map[string]string {
 	digests := make(map[string]string, len(contractFiles))
 	for _, name := range contractFiles {
 		data, err := os.ReadFile(filepath.Join(specDir, name))
@@ -27,7 +38,7 @@ func ContractDigests(specDir string) map[string]string {
 			digests[name] = ""
 			continue
 		}
-		sum := sha256.Sum256(normaliseContract(name, data))
+		sum := sha256.Sum256(normaliseContract(name, data, foldStatus))
 		digests[name] = hex.EncodeToString(sum[:])
 	}
 	return digests
@@ -42,21 +53,30 @@ var listCheckbox = regexp.MustCompile(`(?m)^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\]`)
 // progress, not contract, so they are blanked before digesting.
 var harnessFeatureFields = []string{"state", "evidence"}
 
-// normaliseContract folds exactly three kinds of bookkeeping, and nothing else:
+// normaliseContract folds exactly these kinds of bookkeeping, and nothing else:
 //
 //   - line endings, so a Windows checkout (`* text=auto`, no eol for .md) does
 //     not read as an edit;
 //   - list checkbox state, so ticking `- [ ]` to `- [x]` is progress and a
 //     review whose own finding was "tick the boxes" does not invalidate itself
 //     (#998 part 2);
-//   - the harness-owned fields of features.json.
+//   - the harness-owned fields of features.json;
+//   - the frontmatter's lifecycle `status:`, which the archive itself writes
+//     (HARNESS-151), when foldStatus is set.
 //
 // A reworded criterion, a new task or a changed feature behavior still moves
 // the digest; the tests pin both halves.
-func normaliseContract(name string, data []byte) []byte {
+func normaliseContract(name string, data []byte, foldStatus bool) []byte {
 	data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	if filepath.Ext(name) == ".json" {
 		return normaliseFeatures(data)
+	}
+	// The frontmatter status is lifecycle, not contract (HARNESS-151): `dotf spec
+	// archive` writes `status: archived` after the freshness check passes, so
+	// reading it would stale every archived review against its own archive.
+	// setStatus touches the first frontmatter block only; a body line is prose.
+	if foldStatus {
+		data = []byte(setStatus(string(data), "-"))
 	}
 	return listCheckbox.ReplaceAll(data, []byte("${1}[ ]"))
 }

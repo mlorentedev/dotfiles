@@ -194,7 +194,7 @@ dbg() { nan-debug.sh "$@"; }
 
 # Claude Code - use slash commands inside session:
 #   claude
-#   > /audit src/auth.py
+#   > /test src/auth.py
 #   > /refactor this function
 
 # ==========================

@@ -62,7 +62,7 @@ func recordDispatches(t *testing.T) *recordingBackend {
 //
 // The task text is the one proposal.md names exactly rather than describes, so
 // the criterion is reproducible from the spec file. It matches
-// pattern-bitacora-tracking alone, whose skills intersect only planner, whose
+// pattern-bitacora-project-setup alone, whose skills intersect only planner, whose
 // record declares model: mid.
 func TestAgentAuto_DerivesBothRoleAndTierFromTheTask(t *testing.T) {
 	root := repoRootForTest(t)
