@@ -83,7 +83,7 @@ func loadPiTarget(repo, agentDir string) (piTarget, error) {
 	if err != nil {
 		return t, err
 	}
-	return piTarget{manifest: m, agentDir: agentDir, plan: pi.NewPlan(m, live)}, nil
+	return piTarget{manifest: m, agentDir: agentDir, plan: pi.NewPlan(m, live, agentDir)}, nil
 }
 
 func newPiPackagesCheckCmd() *cobra.Command {
@@ -93,7 +93,8 @@ func newPiPackagesCheckCmd() *cobra.Command {
 		Short: "Report pi packages the manifest declares and pi lacks, and the reverse",
 		Long: `Compare ` + pi.ManifestFile + ` with the packages pi records in
 ~/.pi/agent/settings.json, and list what apply would change: undeclared
-packages to remove and declared ones to install. It changes nothing. Exit status is non-zero when anything would change, and
+packages to remove, declared ones to install, and retired paths to archive.
+It changes nothing. Exit status is non-zero when anything would change, and
 when the manifest or the live settings cannot be read.`,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
@@ -124,8 +125,9 @@ func newPiPackagesApplyCmd() *cobra.Command {
 		Short: "Converge pi's packages on the manifest, both ways",
 		Long: `Converge pi on ` + pi.ManifestFile + ` (HARNESS-139): remove each
 package the manifest does not declare at any version, install each declared one
-that is not live at exactly its source. Every change goes through pi's own
-CLI; pi owns its settings file. A second run reports changed=0.
+that is not live at exactly its source, then move each retired path to
+~/.pi/agent/archive/. Every change goes through pi's own CLI; pi owns its
+settings file. A second run reports changed=0.
 
 ` + skipEnv + ` set skips everything, loudly. A missing pi or npm is a warning
 and exit 0, so a setup run degrades instead of breaking.`,
@@ -169,8 +171,8 @@ func runPiApply(out, errOut io.Writer, repo, agentDir, piBin string, dryRun bool
 		return nil
 	}
 	res := pi.Apply(t.plan, pi.Options{PiBin: bin, Log: out}, piRun)
-	_, _ = fmt.Fprintf(out, "pi packages: changed=%d (%d removed, %d installed), %d failed\n",
-		res.Changed(), res.Removed, res.Installed, res.Failed)
+	_, _ = fmt.Fprintf(out, "pi packages: changed=%d (%d removed, %d installed, %d retired), %d failed\n",
+		res.Changed(), res.Removed, res.Installed, res.Retired, res.Failed)
 	if res.Failed > 0 {
 		return errPiDrift
 	}
@@ -206,5 +208,9 @@ func printPiPlan(w io.Writer, t piTarget) {
 	for _, s := range t.plan.Install {
 		_, _ = fmt.Fprintf(w, "  install  %s\n", s)
 	}
-	_, _ = fmt.Fprintf(w, "pi packages: %d to remove, %d to install\n", len(t.plan.Remove), len(t.plan.Install))
+	for _, r := range t.plan.Retire {
+		_, _ = fmt.Fprintf(w, "  retire   %s -> archive/ (%s)\n", filepath.Join(t.agentDir, r.Path), r.Why)
+	}
+	_, _ = fmt.Fprintf(w, "pi packages: %d to remove, %d to install, %d to retire\n",
+		len(t.plan.Remove), len(t.plan.Install), len(t.plan.Retire))
 }
