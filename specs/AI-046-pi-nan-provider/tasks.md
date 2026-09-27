@@ -26,12 +26,16 @@ created: "2026-09-26"
 - [x] Document the package in `ai/pi/README.md`
 - [ ] PR opened, triaged, merged by the owner
 
-## PR-B: the package owns the ids
+## PR-B1: check the ids against the package (additive)
 
-- [ ] [AC2] CI test: install the pinned package, dummy key, assert every `nan/*` id in `enabledModels` is in `pi --list-models nan`
-- [ ] Live prompt test without our `timeoutSeconds: 300` and `compat.supportsDeveloperRole`; keep them as `modelOverrides` if NaN needs them
+- [x] [AC2] CI job `pi-nan-package`: pinned pi, the pinned package, dummy key, no `models.json`. `tests/pi-nan-package.bats` asserts `enabledModels`, `defaultModel` and the nan reviewer-pool members against the package, and #1772's context-window parity against the package snapshot, failing on an empty intersection
+- [x] Live prompt test without our `timeoutSeconds: 300` and `compat.supportsDeveloperRole`: all six answer, so no `modelOverrides` are needed (`verification.md`)
+- [ ] PR opened, triaged, merged by the owner
+
+## PR-B2: the package owns the ids
+
 - [ ] [AC3] Remove the NaN models from `models.json`, and rework its consumers (`pi-config.bats`, `guard-pi-models-schema.bats`, `reviewer-pool.bats`, `checks_model_limits.go`, `render_test.go`, `deploy_test.go`, `model-pins.json`) with the test-deletion evidence ledger
-- [ ] #1772's opencode/pi context parity test must not go vacuous: fail on an empty intersection, or retarget it at the package snapshot
+- [ ] Delete #1772's `models.json` parity test; PR-B1's package-snapshot twin replaces it
 - [ ] [AC6] Measure the model-switch guard once
 - [ ] Announce the first `dotf pi packages apply` to peers (it also removes pi-memory on msi, HARNESS-139 AC8)
 

@@ -27,6 +27,7 @@ jobs:
       # all". HARNESS-041 asked whether a diff needs CI; this asks which PART of
       # CI a diff needs, which one bucket cannot answer.
       pi: ${{ steps.filter.outputs.pi }}
+      pi_nan: ${{ steps.filter.outputs.pi_nan }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
@@ -90,6 +91,17 @@ jobs:
               - 'tests/pi-*.bats'
               - 'cli/internal/pi/**'
               - 'cli/internal/cmd/pi.go'
+            # What the pi-nan-package job reads (AI-046): the package pin and
+            # the files that name NaN models. Kept apart from `pi` so an
+            # opencode or reviewer-pool edit does not re-run nine Windows
+            # installs.
+            pi_nan:
+              - 'ai/pi/**'
+              - 'ai/opencode/opencode.jsonc'
+              - 'harness/reviewer-pool.json'
+              - 'versions.conf'
+              - 'tests/pi-nan-package.bats'
+              - '.github/workflows/ci.yml'
 
   lint:
     runs-on: ubuntu-latest
@@ -274,6 +286,41 @@ jobs:
           DOTF_TEST_GH_TOKEN: ${{ github.token }}
         run: |
           bats tests/*.bats
+
+  # AI-046 (#1764): the NaN model ids belong to @gtrabanco/pi-nan-provider, so
+  # the checks that name one run against the installed package. Its own job
+  # because it needs a pinned pi, Node 24 (type stripping, for the package's
+  # snapshot module) and the network, none of which the bats suite needs.
+  pi-nan-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.pi_nan == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Install bats-core
+        run: |
+          . ./versions.conf
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          tar -xzf bats.tar.gz
+          sudo "bats-core-${BATS_VERSION}/install.sh" /usr/local
+          rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
+
+      - name: Install pi at the version the machines run
+        run: |
+          . ./versions.conf
+          [ -n "${PI_VERSION:-}" ] || { echo "PI_VERSION missing from versions.conf" >&2; exit 1; }
+          npm install -g --ignore-scripts --prefix "$RUNNER_TEMP/pi" "@earendil-works/pi-coding-agent@$PI_VERSION"
+          "$RUNNER_TEMP/pi/bin/pi" --version
+
+      - name: Check the NaN ids against the package
+        run: |
+          PI_BIN="$RUNNER_TEMP/pi/bin/pi" PI_NAN_PACKAGE_REQUIRED=1 bats tests/pi-nan-package.bats
 
   test-windows:
     runs-on: windows-latest
