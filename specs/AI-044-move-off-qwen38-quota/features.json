@@ -1,0 +1,23 @@
+[
+  {
+    "id": "AI-044-move-off-qwen38-quota-f1",
+    "behavior": "AC1: opencode's model is nan/glm5.3-flash and small_model is nan/qwen3.6",
+    "verification": "bats -f 'default model' tests/opencode.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-26 at 0b18c9a; fails on 757d69a (main)"
+  },
+  {
+    "id": "AI-044-move-off-qwen38-quota-f2",
+    "behavior": "AC2: opencode and pi declare the same context window for every NaN model both carry",
+    "verification": "bats -f 'context window' tests/opencode.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-26 at 0b18c9a; on main it reports qwen3.8-flash, qwen3.6, mimo-v2.5 and gemma4"
+  },
+  {
+    "id": "AI-044-move-off-qwen38-quota-f3",
+    "behavior": "AC3: no model-map tier or chain head is qwen3.8-flash, and the rerank service is named rerank",
+    "verification": "jq -e '.tiers.low.nan != \"qwen3.8-flash\" and .chains.low[0] != \"nan:qwen3.8-flash\" and .services.rerank.model == \"rerank\"' harness/model-map.json",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-26 at d4b78ef; live API: qwen3-rerank 401, rerank 200"
+  }
+]
