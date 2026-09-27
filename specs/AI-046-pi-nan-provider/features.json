@@ -8,8 +8,8 @@
   },
   {
     "id": "AI-046-pi-nan-provider-f2",
-    "behavior": "pi --list-models nan lists every nan id in settings.json enabledModels with the package installed",
-    "verification": "echo 'PR-B: CI install of the pinned package with a dummy key' && exit 1",
+    "behavior": "the package alone (no models.json) registers every nan id in settings.json enabledModels, the defaultModel and the nan reviewer-pool members, and its snapshot agrees with opencode's context windows",
+    "verification": "PI_BIN=\"$HOME/.local/bin/pi\" PI_NAN_PACKAGE_REQUIRED=1 bats tests/pi-nan-package.bats",
     "state": "pending",
     "evidence": ""
   },

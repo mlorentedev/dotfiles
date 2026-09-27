@@ -8,7 +8,7 @@ created: "2026-09-26"
 ## Evidence
 
 - [x] AC1 -> `ai/pi/packages.json` entry; `bats tests/pi-packages.bats` (pin, uniqueness and `why` contracts) green.
-- [ ] AC2 -> PR-B.
+- [x] AC2 -> `tests/pi-nan-package.bats`, run by the `pi-nan-package` CI job (PR-B1). It lists with the package alone, with no `models.json` in the agent dir, which is stricter than the criterion's wording: with our `models.json` present pi lists the union, and every id would pass on our own definition. Mutations caught: a ghost id in `enabledModels` (tests 2 and 3), a ghost `defaultModel` (3), an opencode window changed from 262144 to 262000 (5), a ghost pool member (4). Without `PI_BIN` the file skips; with `PI_NAN_PACKAGE_REQUIRED=1` a skip fails.
 - [ ] AC3 -> PR-B.
 - [x] AC4 -> `tests/pi-config.bats` "pi-nan-provider's media MCP bridge is deployed OFF, merged into the package's state file". It fails on either mutation: `mediaMcp: true`, or the entry without `strategy: merge`.
 - [x] AC5 -> measured 2026-09-26, below.
@@ -39,9 +39,29 @@ nan       qwen3.8-flash      262.1K   131.1K   yes       yes
 
 **Package plus today's `models.json` (the state PR-A ships).** pi lists the union: the six ids `models.json` declares, plus `mimo-v2.6-flash` from the package. It exits 0, offline. pi `docs/models.md` states that a `models` entry adds or replaces the model with the same id. So until PR-B, our six definitions are the ones in use.
 
+**Live prompt, package alone (PR-B1, 2026-09-26).** Isolated agent dir with the package and a `models.json` holding only `openrouter`, so our `timeoutSeconds: 300`, `compat.supportsDeveloperRole: true` and `authHeader: false` were all absent. Real key through `dotf secrets run --only NAN_API_KEY`, `-p` "Reply with exactly the word PONG", one call per model:
+
+| model | exit | seconds |
+|---|---|---|
+| glm5.3-flash | 0 | 10 |
+| deepseek-v4-flash | 0 | 4 |
+| qwen3.8-flash | 0 | 6 |
+| qwen3.6 | 0 | 3 |
+| mimo-v2.5 | 0 | 6 |
+| gemma4 | 0 | 3 |
+
+All six answered (qwen3.8-flash answered "pong — standing by", which is the model, not the transport). No `modelOverrides` are needed. What the three removed keys did, read from pi 0.87.1's bundle:
+
+- `timeoutSeconds` is read nowhere in pi. The only match is a local variable in the OpenAI SDK's `retry-after` handling. It has been dead config since AI-025.
+- `authHeader` is a compat flag: when true, pi refuses a request without a resolved key and sends the header itself. `false` is the default, so the key was a no-op.
+- `supportsDeveloperRole`: the package's generator sets it `false`, and every model answered without it.
+
+**Key delivery.** Removing the `nan` block removes `apiKey: "${NAN_API_KEY}"`, and nothing changes: pi resolves that reference from its own process environment at request time (`docs/models.md`), and the package's `envApiKeyAuth` reads the same variable from the same process. The `pi` wrapper (`.zshrc`, `.bashrc`, `profile.ps1`) injects it with `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY`, and `~/.pi/agent/auth.json` is empty on msi, so no stored credential takes precedence.
+
 ## Test status
 
 - `bats tests/pi-config.bats tests/pi-packages.bats` -> 0 failures.
+- `PI_BIN=~/.local/bin/pi bats tests/pi-nan-package.bats` -> 5/5 (PR-B1). Without `PI_BIN`: 5 skipped; with `PI_NAN_PACKAGE_REQUIRED=1` and no `PI_BIN`: fails.
 
 ## Decisions made during implementation
 
