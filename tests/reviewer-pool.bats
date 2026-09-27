@@ -2,9 +2,11 @@
 # harness/reviewer-pool.json is the allow-list of models that may sign a
 # review.md, and since HARNESS-093 (#1370) `dotf spec review` draws one member
 # at random by default. The gate is only as strong as its weakest member, so a
-# pi member must be a model ai/pi/models.json marks reasoning-class -- the line
-# this pool draws (a latency-only daily driver that PASSes cheaply is worse than
-# no gate). Measured on the ids, never on prose.
+# pi member must be a reasoning-class model -- the line this pool draws (a
+# latency-only daily driver that PASSes cheaply is worse than no gate). Measured
+# on the ids, never on prose. Since AI-046 the NaN models belong to
+# pi-nan-provider, so that check runs against the installed package in
+# tests/pi-nan-package.bats.
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -23,18 +25,6 @@ setup() {
     for id in nan/deepseek-v4-flash nan/mimo-v2.5 nan/glm5.3-flash nan/qwen3.8-flash; do
         jq -e --arg id "$id" '.pool[] | select(.id == $id)' "$POOL" >/dev/null
     done
-}
-
-@test "every pi member of the pool is a reasoning-class model in ai/pi/models.json" {
-    # A pi entry carries provider + model; the model must exist under that
-    # provider with reasoning: true, or the gate would be signable by a model
-    # that reasons no more than the daily driver does.
-    while IFS=$'\t' read -r provider model; do
-        [ -n "$model" ] || continue
-        jq -e --arg p "$provider" --arg m "$model" \
-            '.providers[$p].models[] | select(.id == $m and .reasoning == true)' "$MODELS" >/dev/null \
-            || { echo "pool member $provider/$model is not a reasoning model in ai/pi/models.json"; return 1; }
-    done < <(jq -r '.pool[] | select(.runner == "pi") | "\(.provider)\t\(.model)"' "$POOL" | tr -d '\r')
 }
 
 @test "dotf spec review draws a member at random by default and --reviewer names one (HARNESS-093)" {
