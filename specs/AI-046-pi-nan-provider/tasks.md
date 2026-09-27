@@ -13,31 +13,33 @@ created: "2026-09-26"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/AI-046-pi-nan-provider`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/pi-nan-provider`
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions" (owner chose A, 2026-09-26)
 
-## Implementation
+## PR-A: install the package next to today's provider
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
+- [x] Measure provider coexistence and offline start on pi 0.87.1 (`verification.md`)
+- [x] [AC1] Declare `npm:@gtrabanco/pi-nan-provider@0.7.0` in `ai/pi/packages.json` (covered by the existing pin contract, `tests/pi-packages.bats`)
+- [x] [AC4] Failing test: the deploy entry for `nan-provider.json` is `merge` and sets `mediaMcp: false`
+- [x] [AC4] `ai/pi/nan-provider.json` plus its `ai/deploy.json` entry
+- [x] Document the package in `ai/pi/README.md`
+- [ ] PR opened, triaged, merged by the owner
 
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+## PR-B: the package owns the ids
+
+- [ ] [AC2] CI test: install the pinned package, dummy key, assert every `nan/*` id in `enabledModels` is in `pi --list-models nan`
+- [ ] Live prompt test without our `timeoutSeconds: 300` and `compat.supportsDeveloperRole`; keep them as `modelOverrides` if NaN needs them
+- [ ] [AC3] Remove the NaN models from `models.json`, and rework its consumers (`pi-config.bats`, `guard-pi-models-schema.bats`, `reviewer-pool.bats`, `checks_model_limits.go`, `render_test.go`, `deploy_test.go`, `model-pins.json`) with the test-deletion evidence ledger
+- [ ] #1772's opencode/pi context parity test must not go vacuous: fail on an empty intersection, or retarget it at the package snapshot
+- [ ] [AC6] Measure the model-switch guard once
+- [ ] Announce the first `dotf pi packages apply` to peers (it also removes pi-memory on msi, HARNESS-139 AC8)
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
+- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
 - [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [ ] Independent adversarial review before archive
 
 ## Machine-readable features
 

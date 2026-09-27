@@ -1,7 +1,7 @@
 ---
 id: "AI-046-pi-nan-provider"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-09-26"
 issue: "mlorentedev/dotfiles#1764"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, pi, nan]
@@ -20,7 +20,7 @@ After this change, the package owns pi's NaN provider, and every machine gets it
 
 - `ai/pi/packages.json` declares `npm:@gtrabanco/pi-nan-provider@0.7.0`, pinned like every entry there. `dotf pi packages apply` installs it.
 - `ai/pi/models.json` no longer lists NaN models. At most it keeps per-model overrides the package documents as composable (pi `docs/models.md`, Per-model Overrides), and only when a measured need exists.
-- The package's media MCP bridge (`npx -y nan-mcp-server@<version>`) is off by default through managed config (`NAN_MEDIA_MCP=0`). It spawns a second npm package at runtime, outside the pinned manifest. Turning it on is a later, separate decision.
+- The package's media MCP bridge (`npx -y nan-mcp-server@<version>`) is off by default through managed config: `ai/pi/nan-provider.json` (`{"mediaMcp": false}`), deployed with `strategy: merge` into the package's own state file. It spawns a second npm package at runtime, outside the pinned manifest. Turning it on is a later, separate decision.
 - `NAN_API_KEY` reaches pi the way it does today, from the environment through the secrets facade (ADR-028). The package's key file and `/login` paths are not used.
 - `ai/pi/settings.json` `enabledModels` and the README model list keep naming only ids NaN serves, now checked against the package's catalog.
 
@@ -33,12 +33,12 @@ After this change, the package owns pi's NaN provider, and every machine gets it
 
 ## Risks / open questions
 
-- **Owner decision: who owns the `nan` provider id.** The package registers `id: "nan"`, the same id `ai/pi/models.json` defines. Options:
+- **Owner decision: who owns the `nan` provider id. DECIDED 2026-09-26: (A).** The package registers `id: "nan"`, the same id `ai/pi/models.json` defines. Options:
   - **(A) The package owns it, and models.json keeps only overrides. Recommended.** The live catalog ends the drift class, and the package's reasoning guard and retry only act on requests to the providers it registers.
   - (B) models.json keeps the full provider and the package is installed for its extras only. What pi does when two sources define one id is unmeasured. A shadowed provider would silently drop the guard.
   - (C) Do not adopt; keep hand-maintaining.
 
-  Before implementing either A or B, measure: `pi --list-models nan` on pi 0.87.1, with both present and with each one alone.
+  Measured before implementing (pi 0.87.1, `verification.md`): with both present pi lists the union, and a `models` entry replaces the package's model with the same id (pi `docs/models.md`). So (A) lands in two PRs: PR-A installs the package next to today's provider; PR-B moves the ids out of `models.json`.
 - **Supply chain.** The package runs with full system access inside an agent that holds `NAN_API_KEY`, like every pi package (see the `packages.json` header). The pin plus review on every bump is the same control the other nine entries get. The runtime `npx` spawn is the part the pin does not cover, hence off.
 - **pi version.** The peer range is `>=0.83.0 <1`, but the truncated-stream fix targets 0.87. #1774 raises the floor to 0.87.1.
 - **Blast radius of the first apply.** `dotf pi packages apply` converges in both directions. On msi, the first apply after #1755 also removes pi-memory (HARNESS-139 AC8). Peers are told before and after; the apply is not run from this branch.
@@ -46,11 +46,11 @@ After this change, the package owns pi's NaN provider, and every machine gets it
 
 ## Acceptance criteria
 
-- [ ] AC1: `ai/pi/packages.json` declares `npm:@gtrabanco/pi-nan-provider@0.7.0`, and `tests/pi-config.bats` (the pinned-entry contract) passes.
-- [ ] AC2: With the package installed and `ai/pi/models.json` deployed, `pi --list-models nan` lists every id in `ai/pi/settings.json` `enabledModels`, and `glm5.3`. The output is recorded in `verification.md`.
+- [x] AC1: `ai/pi/packages.json` declares `npm:@gtrabanco/pi-nan-provider@0.7.0`, and `tests/pi-config.bats` (the pinned-entry contract) passes.
+- [ ] AC2: With the package installed and `ai/pi/models.json` deployed, `pi --list-models nan` lists every id in `ai/pi/settings.json` `enabledModels`. The output is recorded in `verification.md`. (Amended 2026-09-26: `glm5.3` was dropped from this criterion. It is premium, and the package filters it by the member's tier, so a standard key never lists it.)
 - [ ] AC3: `ai/pi/models.json` defines no NaN model the package already registers. A test fails if one comes back.
-- [ ] AC4: `NAN_MEDIA_MCP=0` reaches pi on every managed launch path, and a test fails if the default flips.
-- [ ] AC5: With `api.nan.builders` unreachable, pi starts and lists the snapshot models. Measured and recorded.
+- [x] AC4: The media bridge is off on every managed launch path, and a test fails if the default flips. (Amended 2026-09-26: through the deployed `nan-provider.json`, which the package reads on every launch, instead of an env var each wrapper would have to carry.)
+- [x] AC5: With `api.nan.builders` unreachable, pi starts and lists the snapshot models. Measured and recorded.
 - [ ] AC6: A model switch from `deepseek-v4-flash` to `qwen3.6` in a session whose history exceeds 262K tokens including reasoning completes without a context overflow. This is the guard the package exists for. Measured once and recorded.
 
 ## References
