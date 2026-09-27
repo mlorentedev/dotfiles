@@ -58,12 +58,22 @@ The rest of the field reviews once and again only on request, or past a bound:
 ## Acceptance criteria
 
 - [ ] AC1: the gate returns `run=false` below 3 new non-merge commits and `run=true` at or past it. It finds the previous review as PR-Agent does, ignores merge commits, skips a bot push, runs when there is no previous review, and runs on unreadable input. Tested offline.
-- [ ] AC2: `pr-agent.yml` runs the gate only on `synchronize`. PR-Agent and the guard are skipped when it returns `run=false`, and `push_commands` is exactly `["/review -i"]`.
+- [ ] AC2: `pr-agent.yml` runs the gate only on `synchronize`. PR-Agent and the guard are skipped when it returns `run=false`, and `push_commands` follows the gate's `mode` output — `["/review -i"]` when it is `incremental`, `["/review"]` otherwise (amended by the #1757 triage follow-up below).
 - [ ] AC3: the registry declares the incremental heading, and the guard accepts any declared marker.
 - [ ] AC4: the #1053 comment is replaced, ADR-040 exists, and `pr-stewardship` names the draft practice.
+
+## Follow-up (triage on #1757, comment 5851151835)
+
+Three findings accepted against `scripts/pr-agent-push-gate.sh` after #1757 merged, all fixed in the same follow-up PR (#1756):
+
+1. **CWE-345, insufficient verification of data authenticity.** The baseline was any comment carrying a review marker, regardless of author — on a public repo, anyone can comment the marker text and have it stand in for a review that never happened. Fixed: only a comment authored by `github-actions[bot]` sets the baseline. PR-Agent's own `get_previous_review` (v0.45.0) has the same gap and is not author-checked either — filed upstream, not fixed here — so if a forged comment is newer than the real baseline, the gate now asks for a FULL review (`mode=full`) instead of incremental, since PR-Agent would pick the forged comment as its own baseline too and `/review` never picks one at all.
+2. **Rebase blind spot.** New commits were counted by `.commit.author.date > baseline`; a rebase preserves author dates, and this repo rebases with `--onto` routinely, so a review followed by rebased-but-genuinely-new commits could count as zero new commits. Fixed: when the baseline review's persistent state block (`<!-- pr-agent-review-state:v1 {...} -->`) carries `last_run.head_sha`, commits are counted by POSITION after that sha, immune to date reordering. If the sha is no longer in the PR (rebase or force-push rewrote it), the range cannot be trusted: `mode=full`.
+   - **Disclosed limitation.** Only a FULL review's comment carries `last_run.head_sha` — PR-Agent v0.45.0 disables its finding-state machinery entirely for an incremental run (`_review_finding_state_enabled` returns `False` when `self.incremental.is_incremental`), confirmed by reading the pinned source; no real incremental comment exists yet on this repo to double-check against (`in:comments` search, 2026-09-27). So once a PR's most recent bot review is itself incremental, this gate is back on the date-based fallback — and its original rebase blind spot — until the next FULL review. A rebased incremental-on-incremental PR is not fixed by this change.
+3. **`push_commands` chooses per push.** The workflow CAN select between `/review` and `/review -i` per run: `github_action_config.push_commands` is a step `env:` value, and GitHub Actions expressions may read an earlier step's output there, the same as `STARTED`/`HEAD_SHA` already do lower in this file. So the gate now emits `mode=full|incremental` and the workflow reads it, rather than only implementing the author filter.
 
 ## References
 
 - Bitácora: #1756. Evidence: #1732's pr-agent run on `4b7d126`, and pr-agent runs 2026-09-19 to 09-26.
-- PR-Agent v0.45.0 (`f3b385e`): `pr_agent/tools/pr_reviewer.py` (`_can_run_incremental_review`), `pr_agent/git_providers/github_provider.py` (`get_commit_range`, `get_previous_review`), `pr_agent/algo/utils.py` (headers and identities).
-- ADR-037 (review runners bounded in time); #1053, #1107, #1618.
+- PR-Agent v0.45.0 (`f3b385e`): `pr_agent/tools/pr_reviewer.py` (`_can_run_incremental_review`, `_review_finding_state_enabled`, `_prepare_review_finding_state`), `pr_agent/git_providers/github_provider.py` (`get_commit_range`, `get_previous_review`), `pr_agent/algo/utils.py` (headers and identities).
+- A real state block: `gh api repos/mlorentedev/dotfiles/issues/comments/5851012976 --jq .body`.
+- ADR-037 (review runners bounded in time); #1053, #1107, #1618, #1756, #1757.
