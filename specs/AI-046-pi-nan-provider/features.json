@@ -1,0 +1,9 @@
+[
+  {
+    "id": "AI-046-pi-nan-provider-f1",
+    "behavior": "Outcome 1",
+    "verification": "echo 'not implemented' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
