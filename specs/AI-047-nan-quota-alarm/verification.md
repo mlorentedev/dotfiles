@@ -39,7 +39,21 @@ Mutations applied one at a time, each caught by the named test: transport error 
   [WARN] qwen3.8-flash: 415.4M / 500.0M tokens this month (83%) — move routed traffic off it before it runs out
 ```
 
-On main it catches both defects #1772 fixes. So this PR merges after #1772.
+That run was on the pre-#1772 main, and it caught both defects #1772 fixes.
+
+After rebasing on main with #1772 merged (`qwen3.8-flash` unbound, rerank named `rerank`):
+
+```
+[NaN quota]
+  [ OK ] deepseek-v4-flash: 682.8M / 3000.0M tokens this month (23%)
+  [ OK ] glm5.3-flash: 117.3M / 2000.0M tokens this month (6%)
+  [ OK ] mimo-v2.5: 83.3M / 1000.0M tokens this month (8%)
+  [INFO] qwen3-embedding: unmetered, 0.0M tokens this period
+  [INFO] qwen3.6: unmetered, 0.0M tokens this period
+  [INFO] rerank: unmetered, 0.0M tokens this period
+```
+
+The rebase also broke `TestCheckNaNQuota_ReportsEachBoundModel`. It had read the `qwen3.8-flash` binding from the repo's map, and #1772 removed that binding. The fixture now pins `tiers.low.nan` itself.
 
 ## Test status
 

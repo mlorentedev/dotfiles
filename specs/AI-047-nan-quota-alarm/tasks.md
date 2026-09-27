@@ -23,7 +23,7 @@ created: "2026-09-26"
 - [x] Declared table `harness/nan-quotas.json`, closed-world (metered + unmetered)
 - [x] [AC3] [AC4] [AC5] Failing doctor tests against fixtures (unserved id, outage, no key, bw gate, key never printed), then `checks_nan_quota.go` and the `HTTPGetBody` seam
 - [x] [AC2] Live run, recorded
-- [ ] PR opened, triaged, merged by the owner **after #1772** (on main the check FAILs on `qwen3-rerank` until #1772 lands)
+- [ ] PR opened, triaged, merged by the owner (#1772, which it depended on, merged 2026-09-27)
 
 ## PR-2: hermes
 

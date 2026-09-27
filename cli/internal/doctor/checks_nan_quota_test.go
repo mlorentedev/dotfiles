@@ -28,8 +28,8 @@ const nanServed = `{"data":[{"id":"deepseek-v4-flash"},{"id":"qwen3.8-flash"},{"
 	`{"id":"qwen3.6"},{"id":"qwen3-embedding"},{"id":"rerank"},{"id":"glm5.3-flash"}]}`
 
 // nanCfg builds a dotfiles tree holding the registry, the repo's real model map
-// and schema with services.rerank set to rerankID, and the repo's quota table
-// with its checked date replaced.
+// and schema with services.rerank set to rerankID and tiers.low.nan pinned to
+// qwen3.8-flash, and the repo's quota table with its checked date replaced.
 func nanCfg(t *testing.T, registry, rerankID, checked string) *Config {
 	t.Helper()
 	repo := filepath.Join("..", "..", "..")
@@ -45,6 +45,9 @@ func nanCfg(t *testing.T, registry, rerankID, checked string) *Config {
 	var m map[string]any
 	readJSON(t, filepath.Join(repo, "harness", "model-map.json"), &m)
 	m["services"].(map[string]any)["rerank"].(map[string]any)["model"] = rerankID
+	// Pin the binding the percentages below are about, so the fixture does not
+	// depend on what the repo's map routes today (#1772 moved qwen3.8-flash off).
+	m["tiers"].(map[string]any)["low"].(map[string]any)["nan"] = "qwen3.8-flash"
 	writeJSON(t, filepath.Join(dir, "harness", "model-map.json"), m)
 
 	var q map[string]any
