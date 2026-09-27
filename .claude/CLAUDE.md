@@ -132,8 +132,8 @@ oc                    # TUI launcher (NaN provider default)
 qq "tu pregunta"      # one-shot quick-question via nan/qwen3.6 (bash/zsh/pwsh)
 qf "explica..."       # one-shot long-context question via nan/deepseek-v4-flash
 ```
-- Default TUI model: `nan/qwen3.6` (NaN community catalog; fast ~0.8s, 256K context).
-- `qq` wrapper pinned to `nan/qwen3.6` (multilingual, fast, never-rate-limited). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`.
+- Default TUI model: `nan/glm5.3-flash` (NaN's coding model, 1M context, 2B tokens/month); titles use `nan/qwen3.6`, which has no monthly quota. Quotas: `ai/nan/README.md`.
+- `qq` wrapper pinned to `nan/qwen3.6` (multilingual, fast, no monthly quota). One-shot: each call is a fresh session. Defined in `.zsh/aliases.zsh`, `.bashrc`, and `powershell/profile.ps1`.
 - `qf` wrapper pinned to `nan/deepseek-v4-flash` (1M context reasoning model).
 - Frontier on-demand: provider `openrouter` (consumes existing `OPENROUTER_API_KEY` credit).
 - Runbook: `docs/runbooks/guide-opencode-go-setup.md`.
