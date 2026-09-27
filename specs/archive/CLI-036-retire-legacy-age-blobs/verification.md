@@ -32,7 +32,7 @@ created: "2026-09-25"
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson: yes, lesson-308 (a comment that grants a safety exemption outlives the ADR it cites).
+- [x] Lesson: yes, lesson-310 (a comment that grants a safety exemption outlives the ADR it cites).
 - [x] ADR: yes, the ADR-028 amendment (2026-09-26).
 - [x] Pattern: no; the rule is specific to this repo's secrets layout.
 
