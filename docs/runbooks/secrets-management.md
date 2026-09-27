@@ -14,10 +14,14 @@ owner: manu
 > mapped in **`secrets/registry.yaml`** (ADR-028) and accessed via `dotf secrets {run,show,render}`.
 > Treat the `env-mapping.conf` steps here as historical until this runbook is refreshed.
 >
-> **[§ Physical Backup (USB + VeraCrypt)](#physical-backup-usb--veracrypt) is NOT affected and is current.**
-> ADR-028 keeps age as the DR floor, so the encrypted-USB procedure still applies —
-> it is called from step 1 of the disaster chain in
-> [`guide-secrets-governance.md` § RECOVER](guide-secrets-governance.md#protocol--recover-disaster).
+> The per-secret `sensitive/*.secret.age` blobs these examples create were retired in
+> CLI-036: the DR floor is the whole-vault escrow `sensitive/dr/bitwarden-export.age`
+> (ADR-028 §5), and `dotf doctor` fails on an unclaimed blob.
+>
+> **[§ Physical Backup (USB + VeraCrypt)](#physical-backup-usb--veracrypt) is also out of date.**
+> The USB now holds only `key.txt` and the escrow (`ci-age-key.txt`, `age-standalone.sh` and
+> the per-secret copies were removed when #1000 closed). The procedure is being rewritten
+> as `dotf secrets usb` ([#1770](https://github.com/mlorentedev/dotfiles/issues/1770)).
 > Said explicitly because a banner at the top of a document is read as covering all of it,
 > and this is the only place the physical procedure is written down.
 

@@ -330,8 +330,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\age" | Out-Null
           age-keygen -o "$env:USERPROFILE\.config\age\key.txt"
-          $pub = (Select-String "$env:USERPROFILE\.config\age\key.txt" -Pattern 'age1[0-9a-z]+').Matches.Value | Select-Object -First 1
-          'ci-dummy-nan-key' | age -r $pub -o sensitive\nan.api-key.secret.age
+          # No per-secret blob is planted: NAN_API_KEY is bw-backed, and doctor
+          # FAILs any blob the registry does not claim (CLI-036).
           $vault = "$env:USERPROFILE\Projects\knowledge"
           foreach ($d in '00_meta', '10_projects', '40_resources', '.obsidian') {
             New-Item -ItemType Directory -Force (Join-Path $vault $d) | Out-Null
