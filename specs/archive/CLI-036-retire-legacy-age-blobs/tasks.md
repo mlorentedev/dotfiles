@@ -34,7 +34,7 @@ Heavy runs go through `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapM
 
 ## Closing
 
-- [ ] `go build ./... && go vet ./... && go test ./...`, `golangci-lint run` (pinned), `GOOS=windows go vet ./...`
+- [x] `go build ./... && go vet ./... && go test ./...`, `golangci-lint run` (pinned), `GOOS=windows go vet ./...`
 - [x] `features.json` verifications pass; `verification.md` filled
 - [x] Lesson: a comment that grants a safety exemption ("these blobs ARE the floor") outlived the ADR it cited
-- [ ] PR body closes #938, #971, #802; `## Review triage` recorded
+- [x] PR body closes #938, #971, #802; `## Review triage` recorded
