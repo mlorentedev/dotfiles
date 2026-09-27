@@ -30,7 +30,7 @@
   {
     "id": "AI-046-pi-nan-provider-f5",
     "behavior": "with NaN unreachable pi starts and lists the snapshot models",
-    "verification": "echo 'measured once, see verification.md (network cut by a Node preload)' && exit 1",
+    "verification": "echo 'Recorded measurement, not re-runnable here: verification.md, Package alone, offline. PR-B adds the CI install test that re-runs it' && exit 1",
     "state": "pending",
     "evidence": ""
   },
