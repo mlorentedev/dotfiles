@@ -212,6 +212,15 @@ setup() {
     [ "$days" -ge 1 ]
 }
 
+@test "template sets language to spanish, which also sets the voice dictation language" {
+    # Claude Code has no separate key for the dictation language: `language` is
+    # described as "Preferred language for Claude responses and voice
+    # dictation", and with it unset /voice dictates in English. The UI stays in
+    # English either way. Git and GitHub artifacts stay English because
+    # AGENTS.md says so, not because of this key.
+    [[ "$(jq -r '.language' "$SETTINGS_TEMPLATE")" == "spanish" ]]
+}
+
 @test "the merge expression survives a template that omits an optional key" {
     # jq: a condition that evaluates to `empty` makes the WHOLE if-expression
     # produce nothing, so `if ($tmpl.key // empty) then ... else . end` does not

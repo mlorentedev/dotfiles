@@ -15,6 +15,7 @@
   "autoCompactWindow": 300000,
   "autoContinueAtUsageLimit": true,
   "cleanupPeriodDays": 90,
+  "language": "spanish",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL": "1"

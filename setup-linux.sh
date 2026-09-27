@@ -1297,7 +1297,8 @@ merge_claude_settings() {
 
     # Per-key merge via single jq invocation. Policy table in proposal.md:
     # model, effortLevel, outputStyle, advisorModel, crossSessionInbound,
-    # attribution, autoCompactEnabled, precomputeCompactionEnabled: template wins.
+    # attribution, autoCompactEnabled, precomputeCompactionEnabled, language:
+    # template wins.
     # permissions.allow: UNION (deduped). enabledPlugins, env: object merge
     # (template wins on conflict). All other keys: existing preserved.
     # `hooks` is ABSENT from this policy on purpose -- `dotf harness bind` owns it.
@@ -1353,6 +1354,7 @@ merge_claude_settings() {
         | (if ($tmpl | has("autoCompactWindow")) then .autoCompactWindow = $tmpl.autoCompactWindow else . end)
         | (if ($tmpl | has("autoContinueAtUsageLimit")) then .autoContinueAtUsageLimit = $tmpl.autoContinueAtUsageLimit else . end)
         | (if ($tmpl | has("cleanupPeriodDays")) then .cleanupPeriodDays = $tmpl.cleanupPeriodDays else . end)
+        | (if ($tmpl | has("language")) then .language = $tmpl.language else . end)
         | (if ($tmpl | has("env")) then .env = ((.env // {}) + $tmpl.env) else . end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
