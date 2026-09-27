@@ -62,7 +62,7 @@ evidence can be traced; the order follows readiness.
 ## Risks / open questions
 
 - **P0.5 is blocked on six spec archives.** CLI-057, CLI-062, GUARD-005, GUARD-006, HARNESS-106 and WIN-007 must be disposed of first (`dotf spec archive`, or `--abandoned`). They are queued in the `feat-harness-hardening` thread (W1.4). PR 4 does not open before `dotf doctor` reports zero spec-issue-state `[FAIL]`s on `main`.
-- **P0.3 needs GNU `parallel`** (`bats --jobs` requires it), which is a new CI dependency. It is not installed on this machine. It must be verified present on `ubuntu-latest` or installed, and pinned if it is installed. Resolve this before PR 2's code.
+- **P0.3 needs GNU `parallel`** (`bats --jobs` requires it). Resolved 2026-09-27: the `ubuntu-latest` (24.04) runner image ships `parallel 20231122+ds-1` (actions/runner-images `Ubuntu2404-Readme.md`), so nothing is installed or pinned. The step checks for it first and fails with a named error if the image ever drops it.
 - **P0.3 may expose fixture collisions.** Files that write a fixed path (`/tmp/...`, the real `$HOME`) collide when they run concurrently. #1409 was this class. PR 2 audits for them and runs the parallel suite repeatedly before switching CI.
 - **P0.2's shared homes rely on the tests being read-only.** They are enforced with `chmod -R a-w` rather than trusted; a write fails the test instead of corrupting a sibling.
 - **P0.6 on `main`.** A push still runs the full pi reconcile, which CI-003 measured at 24x variance on identical input. Since 2026-09-05, `push`: n=111, p50 544 s, p99 858 s, max 961 s; `pull_request`: n=198, max 1000 s. 20 minutes is 1200 s: 20% above the overall maximum (25% above push's). The 40 runs after 2026-09-25 peak at 908 s. A slow registry night can still cross it, and that is the signal the ceiling exists to give.
@@ -75,7 +75,7 @@ evidence can be traced; the order follows readiness.
 - [x] AC2 — `skills-pipeline.bats` invokes `compile-harness.sh --deploy` at most 6 times per run (baseline 17), counted by a wrapper rather than by grep, and every one of its 24 tests still passes.
 - [x] AC3 — A test that writes into a shared `setup_file` home fails. This is shown by a deliberate write under mutation.
 - [x] AC4 — `test-windows` declares `timeout-minutes: 20`, and the CI-001 loan comment is replaced by the measured distribution that justifies it.
-- [ ] AC5 — The stray detector ignores a test-shaped process whose `--user-data-dir` lies in a **different** bats run's tmpdir, and still reports one inside its own. Both halves are asserted.
+- [x] AC5 — The stray detector ignores a test-shaped process whose `--user-data-dir` lies in a **different** bats run's tmpdir, and still reports one inside its own. Both halves are asserted.
 - [ ] AC6 — CI runs the Linux bats suite with `--jobs`, and the "Run bats test suite" step's mean over the first 5 runs on `main` is at most half the baseline (mean 199 s over 8 runs of `main`, 2026-09-25).
 - [ ] AC7 — Exactly one workflow reports a check named `lint`, and `cli.yml`'s lint reports as `cli-lint`.
 - [ ] AC8 — The `test-windows` doctor gate runs with `GH_TOKEN`. Its log shows zero "set the GH_TOKEN environment variable" lines (baseline 43), and the gate is green.

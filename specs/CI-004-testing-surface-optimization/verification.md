@@ -11,7 +11,9 @@ created: "2026-09-25"
 - [x] AC2 -> `4a0f6c2`. `skills-pipeline deploys at most 6 times per run` failed at 17 before the shared homes ("compile-harness.sh --deploy ran 17 times, budget 6"), passes at 6. All 24 original tests pass, plus the 2 new ones. Local wall time per run: ~117 s to ~43 s.
 - [x] AC3 -> `4a0f6c2`. `a write into a shared setup_file home fails`. Mutation: replacing the `chmod -R a-w` with `:` fails it. It skips under root, where mode bits do not bind.
 - [x] AC4 -> `21c4eef`. `timeout-minutes: 20`; the CI-001 loan comment is replaced by the distribution and the rule for raising it.
-- [ ] AC5-AC10 -> PRs 2 to 6.
+- [x] AC5 -> `b48a288`. `guard: the stray detector ignores a test-shaped process from another bats run` failed before the fix ("matched another run's process; teardown would kill it"). It also asserts the detector matches nothing when `BATS_RUN_TMPDIR` is empty; mutation: dropping that guard fails it ("matched with BATS_RUN_TMPDIR empty").
+- [ ] AC6 -> PR 2 switches CI to `bats --jobs "$(nproc)" --no-parallelize-within-files`. Local, GNU parallel 20231122 (the runner's version), `--jobs 4` under a 3G cap, three runs: 89, 90 and 89 s; each 1679 tests, 1678 ok, the one failure #1641 (environmental, also failing serially). Serial on the same tree: 250 s. `git status` clean afterwards. Fixture audit: no test writes a fixed `/tmp` path shared across processes (`check-spec-gate.bats` keys its fixture on `$$`), none binds a port, and `compile-harness.bats` runs `--refresh` against its own temporary repo. Pending: the CI step on the PR run and the mean of the first 5 runs on `main`.
+- [ ] AC7-AC10 -> PRs 3 to 6.
 
 CI step "Run bats test suite" before and after: recorded from this PR's run.
 
