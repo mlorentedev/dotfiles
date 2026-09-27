@@ -18,6 +18,12 @@ func TestValidateID(t *testing.T) {
 		"ADR028-004", // AREA carrying digits (the ADR028-* bitacora series)
 		"ADR028-004-classify-stateful-service-placement",
 		"ADR028-004b", // digits in AREA and a sub-id letter together
+		// Hyphen-joined AREA segments (#1479): the live board convention, e.g.
+		// kubelab's APP-CONFIG-*, CI-GATE-* and SEC-VIKUNJA-* series.
+		"APP-CONFIG-015",
+		"CI-GATE-018-flaky-guard",
+		"SEC-VIKUNJA-001b",
+		"APP-CONFIG2-003", // a segment may carry digits, like ADR028
 	}
 	for _, id := range valid {
 		if err := ValidateID(id); err != nil {
@@ -31,7 +37,13 @@ func TestValidateID(t *testing.T) {
 		"AI-001-Bad_Slug", // underscore + caps not allowed in slug
 		"AI-001-CAPS",
 		"foo",
-		"2026-5-13-foo", // unpadded date
+		"2026-5-13-foo",  // unpadded date
+		"APP--001",       // empty AREA segment
+		"-APP-001",       // leading hyphen
+		"APP-config-001", // every AREA segment is upper case
+		"APP-CONFIG",     // no ticket number
+		"APP-CONFIG-",    // hyphen with no number after it
+		"APP-001-CONFIG", // an upper-case segment after the number is not a slug
 	}
 	for _, id := range invalid {
 		if err := ValidateID(id); err == nil {
@@ -206,5 +218,22 @@ func TestGateMissingIssueFails(t *testing.T) {
 	stubGh(t, "", "gh: could not resolve issue", true)
 	if _, err := Gate(99999, ""); err == nil {
 		t.Errorf("expected error when gh fails to find the issue")
+	}
+}
+
+// TestValidateIDErrorNamesTheRule pins #1479's second outcome: the refusal
+// states the grammar instead of listing examples for the reader to generalise
+// from. An examples-only message is how ADR028-004 read as proof that any
+// AREA shape was fine, and how CI-GATE-* spread across 17 tickets before the
+// first spec attempt discovered the rule.
+func TestValidateIDErrorNamesTheRule(t *testing.T) {
+	err := ValidateID("app-config-015")
+	if err == nil {
+		t.Fatal("ValidateID(\"app-config-015\") = nil, want error")
+	}
+	for _, want := range []string{"upper-case", "hyphen", "APP-CONFIG-015"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error does not name the rule (missing %q):\n%s", want, err)
+		}
 	}
 }
