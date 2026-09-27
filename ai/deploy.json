@@ -70,6 +70,15 @@
       "requires": "pi"
     },
     {
+      "name": "pi-nan-provider",
+      "src": "ai/pi/nan-provider.json",
+      "dst": "{HOME}/.pi/agent/nan-provider.json",
+      "render": false,
+      "mode": "0644",
+      "strategy": "merge",
+      "requires": "pi"
+    },
+    {
       "name": "orca-keybindings",
       "src": "ai/orca/keybindings.json",
       "dst": "{HOME}/.orca/keybindings.json",
