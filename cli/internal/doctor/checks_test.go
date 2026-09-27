@@ -258,7 +258,7 @@ func TestCheckSecrets(t *testing.T) {
 	cfg := &Config{DotfilesDir: dotfiles}
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkSecrets(newSys(map[string]string{"HOME": dotfiles}, nil, nil), cfg, rep)
+	checkSecrets(newSys(map[string]string{"HOME": dotfiles}, nil, nil), cfg, rep, false)
 
 	// MISSING.secret.age absent (fail) + orphan.secret.age unmapped (fail) = 2.
 	if rep.Failures() != 2 {
@@ -278,16 +278,16 @@ func TestCheckSecrets(t *testing.T) {
 // registry held no bw secrets until 28 migrated at once, so the bug shipped
 // months before it was reachable; this fixture keeps one permanently reachable.
 //
-// It pins all four behaviours together, because the first fix attempt that only
-// silences the bw FAIL still leaves the orphan half asserting that a migrated
-// secret's DR floor is deletable.
+// It also pins CLI-036's reversal of the #971 exemption: a blob no entry claims
+// is a FAIL naming it even after secrets have migrated. The DR floor is the
+// escrow (ADR-028 §5), not per-secret blobs, so "some of these are the floor"
+// no longer excuses an unclaimed one.
 func TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted(t *testing.T) {
 	dotfiles := t.TempDir()
 	secretsDir := filepath.Join(dotfiles, "sensitive")
 	writeFile(t, filepath.Join(secretsDir, "AGEONE.secret.age"), "x")
-	// The DR floor of the migrated secret. `migrate` drops the `age:` pointer, so
-	// nothing in the registry claims it and the name does not match the bw item
-	// either — the real pair is OPENAI_API_KEY -> chatgpt.api-key.
+	// A migrated secret's leftover: `migrate` drops the `age:` pointer, so nothing
+	// in the registry claims it (the real pair was OPENAI_API_KEY -> chatgpt.api-key).
 	writeFile(t, filepath.Join(secretsDir, "chatgpt.api-key.secret.age"), "x")
 	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"),
 		"version: 1\nsecrets:\n"+
@@ -299,13 +299,13 @@ func TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted(t *testing.T) {
 	cfg := &Config{DotfilesDir: dotfiles}
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkSecrets(newSys(map[string]string{"HOME": dotfiles}, nil, nil), cfg, rep)
+	checkSecrets(newSys(map[string]string{"HOME": dotfiles}, nil, nil), cfg, rep, false)
 	out := buf.String()
 
-	// AGEMISS + OFFLINE have no blob. Nothing else may fail: not the bw entry,
-	// and not the unclaimed DR blob.
-	if rep.Failures() != 2 {
-		t.Fatalf("failures = %d, want 2 (AGEMISS, OFFLINE only)\n%s", rep.Failures(), out)
+	// AGEMISS + OFFLINE have no blob, and the unclaimed leftover is an orphan.
+	// Nothing else may fail: not the bw entry.
+	if rep.Failures() != 3 {
+		t.Fatalf("failures = %d, want 3 (AGEMISS, OFFLINE, the orphan)\n%s", rep.Failures(), out)
 	}
 	// age-offline is a backend in its own right. Exempting bw by whitelisting
 	// "age" would silently stop asserting the floor plane.
@@ -316,11 +316,11 @@ func TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted(t *testing.T) {
 	if strings.Contains(out, " -> .secret.age") {
 		t.Errorf("bw entry was age-asserted, producing an empty blob name\n%s", out)
 	}
-	if strings.Contains(out, "orphan: chatgpt.api-key") {
-		t.Errorf("a migrated secret's surviving DR floor must not be called an orphan\n%s", out)
+	if !strings.Contains(out, "orphan: chatgpt.api-key.secret.age") {
+		t.Errorf("an unclaimed blob must be named as an orphan once secrets have migrated\n%s", out)
 	}
-	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "1 age blob(s) claimed by no registry entry") {
-		t.Errorf("unclaimed blobs must degrade to one WARN naming the count\n%s", out)
+	if strings.Contains(out, "#971") {
+		t.Errorf("the #971 exemption WARN must be gone\n%s", out)
 	}
 }
 
@@ -353,7 +353,7 @@ func TestCheckSecrets_FileAuthorityBackend(t *testing.T) {
 	cfg := &Config{DotfilesDir: dotfiles}
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkSecrets(newSys(map[string]string{"HOME": home}, nil, nil), cfg, rep)
+	checkSecrets(newSys(map[string]string{"HOME": home}, nil, nil), cfg, rep, false)
 	out := buf.String()
 
 	if rep.Failures() != 1 {

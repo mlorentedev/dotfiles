@@ -113,7 +113,8 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 
 // checkSecrets reproduces healthcheck section 8 over the registry SSOT: every
 // age-backed secrets/registry.yaml entry resolves to an existing *.secret.age,
-// and no orphan .age file lacks a registry entry.
+// and no orphan .age file lacks a registry entry. With fix, it prunes orphans
+// from the deploy mirror (see pruneOrReportOrphans).
 //
 // Entries() returns a TAGGED UNION, not a list of age sources: #606 taught it to
 // emit bw-backed secrets too, because the Loader dispatches on Backend. Only the
@@ -124,7 +125,7 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 // "", making every migrated secret's surviving DR blob read as an orphan. It stayed
 // invisible while the registry held no bw entries and became 56 FAILs the day 28
 // were migrated (#961, #965). Dispatch on the tag; do not infer it from File.
-func checkSecrets(sys *System, cfg *Config, rep *Report) {
+func checkSecrets(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Secrets integrity")
 	secretsDir := filepath.Join(cfg.DotfilesDir, "sensitive")
 
@@ -136,7 +137,6 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 	rep.Pass("secrets/registry.yaml exists")
 
 	referenced := map[string]bool{}
-	migrated := 0
 	for _, e := range reg.Entries(sys.home()) {
 		display := e.Var
 		if e.IsFile {
@@ -147,7 +147,6 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 		// plane), and a whitelist would silently stop checking any backend added
 		// later. Unknown tags keep asserting — the check errs toward checking.
 		if e.Backend == secrets.BackendBW {
-			migrated++
 			// Its live tier is proven by [Bitwarden reach], which exercises the
 			// token. This section is about the age store, which a bw secret has
 			// no declared entry in.
@@ -174,46 +173,86 @@ func checkSecrets(sys *System, cfg *Config, rep *Report) {
 		}
 	}
 
-	ageFiles, _ := filepath.Glob(filepath.Join(secretsDir, "*.secret.age"))
-	var unreferenced []string
-	for _, f := range ageFiles {
-		base := strings.TrimSuffix(filepath.Base(f), ".secret.age")
-		if !referenced[base] {
-			unreferenced = append(unreferenced, base)
+	var orphans []string
+	for _, f := range secretBlobCandidates(secretsDir) {
+		base, complete := strings.CutSuffix(f, ".secret.age")
+		if !complete || !referenced[base] {
+			orphans = append(orphans, f)
 		}
 	}
-	reportUnreferencedBlobs(rep, unreferenced, migrated)
+	pruneOrReportOrphans(sys, cfg, rep, orphans, fix)
 }
 
-// reportUnreferencedBlobs decides the severity of age blobs no registry entry
-// claims. The answer depends on whether migration has happened at all.
-//
-// With no bw-backed secrets, an unclaimed blob is unambiguously a leftover: FAIL,
-// naming it, as before. Once secrets have migrated the claim stops being decidable
-// — `migrate` drops the `age:` line (registry_write.go), so the surviving DR-floor
-// blob of a migrated secret is indistinguishable from a genuine leftover, and the
-// names cannot be correlated either (OPENAI_API_KEY's blob is chatgpt.api-key).
-// Those blobs ARE the ADR-028 floor for the live tier, so calling them orphans
-// invites deleting the recovery path for exactly the secrets that just moved.
-//
-// So it degrades to one WARN that says the set is unclassifiable, rather than N
-// FAILs asserting something it cannot know. It regains its teeth — per blob, as a
-// failure — once the registry records a DR pointer for migrated secrets (#971).
-func reportUnreferencedBlobs(rep *Report, unreferenced []string, migrated int) {
-	if len(unreferenced) == 0 {
-		return
+// secretBlobCandidates lists the top-level files in the secrets dir that hold
+// age-encrypted secret material: *.secret.age, and the *.secret.age.tmp.* that
+// a shell-era writer left behind when interrupted (one on msi, 2026-05-11). A
+// partial write is never claimed by an entry. Machine-local files (env-mapping.conf,
+// README.md) and the dr/ escrow never match.
+func secretBlobCandidates(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
 	}
-	if migrated == 0 {
-		for _, base := range unreferenced {
-			rep.Fail("orphan: " + base + ".secret.age (no registry entry)")
+	var out []string
+	for _, e := range entries {
+		name := e.Name()
+		if !e.Type().IsRegular() {
+			continue
 		}
+		if strings.HasSuffix(name, ".secret.age") || strings.Contains(name, ".secret.age.tmp.") {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// pruneOrReportOrphans FAILs every age blob no registry entry claims, and with
+// fix removes it from the deploy mirror when that is safe.
+//
+// An unclaimed blob used to degrade to one WARN once any secret had migrated, on
+// the belief that such blobs were "the ADR-028 floor" (#971). They are not: the
+// floor is the escrow, a verified export of the whole vault (ADR-028 §5), and
+// §3 gates age-file retirement on exactly that. Per-secret blobs exist only for
+// age-offline entries, which claim theirs. CLI-036 retired the other 31.
+//
+// The prune follows #802's decision (doctor --fix prunes; setup only copies) and
+// refuses unless the checkout resolveRepoDir found is plausibly the dotfiles one:
+// it must differ from the mirror and hold both secrets/registry.yaml and the DR
+// escrow. resolveRepoDir proves only "a git checkout"; against an unrelated repo
+// every mirror blob would look deleted (see checkHarnessMirrorOrphans). A blob
+// the checkout still holds is not pruned either, since setup would copy it back.
+func pruneOrReportOrphans(sys *System, cfg *Config, rep *Report, orphans []string, fix bool) {
+	if len(orphans) == 0 {
 		return
 	}
-	rep.Warn(fmt.Sprintf(
-		"%d age blob(s) claimed by no registry entry, and %d secret(s) have migrated to bw — "+
-			"migrate drops the `age:` pointer, so a surviving DR floor cannot be told from a "+
-			"leftover here. Do not bulk-delete: some are the ADR-028 floor. Tracked as #971",
-		len(unreferenced), migrated))
+	mirrorDir := filepath.Join(cfg.DotfilesDir, "sensitive")
+	repo := resolveRepoDir(sys)
+	refusal := ""
+	switch {
+	case repo == "":
+		refusal = "no dotfiles checkout resolved"
+	case filepath.Clean(repo) == filepath.Clean(cfg.DotfilesDir):
+		refusal = "the mirror is the checkout; git rm it there"
+	case !pathExists(filepath.Join(repo, "secrets", "registry.yaml")) ||
+		!pathExists(filepath.Join(repo, "sensitive", "dr", "bitwarden-export.age")):
+		refusal = "checkout " + repo + " lacks the registry or the DR escrow"
+	}
+	for _, name := range orphans {
+		switch {
+		case refusal != "":
+			rep.Fail("orphan: " + name + " (no registry entry; not pruned: " + refusal + ")")
+		case pathExists(filepath.Join(repo, "sensitive", name)):
+			rep.Fail("orphan: " + name + " (no registry entry; still committed in " + repo + "/sensitive, git rm it there)")
+		case !fix:
+			rep.Fail("orphan: " + name + " (no registry entry, gone from the checkout — run: dotf doctor --fix)")
+		default:
+			if err := os.Remove(filepath.Join(mirrorDir, name)); err != nil {
+				rep.Fail("failed to prune orphan: " + name + " (" + err.Error() + ")")
+			} else {
+				rep.Fix("pruned orphan secret blob: sensitive/" + name)
+			}
+		}
+	}
 }
 
 // loadRegistry reads and parses secrets/registry.yaml under the dotfiles dir.

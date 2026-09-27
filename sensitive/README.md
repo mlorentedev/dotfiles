@@ -1,18 +1,19 @@
 # Encrypted Secrets
 
-> **🔐 BACKUP REMINDER:** Run `backup-secrets-to-usb.sh` monthly with your encrypted USB.
-
-This folder contains age-encrypted secrets. Only `.age` files are committed to git.
+Bitwarden holds the secrets; `secrets/registry.yaml` (repo root) maps each one to
+the env var or file it becomes (ADR-028). This folder keeps only what must survive
+without Bitwarden:
 
 ```text
 sensitive/
-├── *.secret.age         # Encrypted (committed)
-├── *.secret             # Plaintext (gitignored)
-└── *.secret.dec         # Decrypted (gitignored)
+├── id_ed25519.secret.age      # the SSH key, the one age-offline secret (committed)
+└── dr/bitwarden-export.age    # the whole-vault DR escrow (committed, ADR-028 §5)
 ```
 
-`secrets/registry.yaml` (repo root) is the mapping SSOT — env var / file dest to
-age source, per ADR-028.
+A `*.secret.age` that no age-backed registry entry claims is refused: a test fails
+on one committed here, and `dotf doctor` fails on one left in the `~/.dotfiles`
+mirror (`dotf doctor --fix` prunes it). The per-secret blobs ADR-002 left were
+retired in CLI-036.
 
 ## Quick Commands
 
@@ -23,14 +24,10 @@ dotf secrets set VAR     # Add or rotate an env var secret
 dotf secrets run -- CMD  # Inject secrets into a child process only (no ambient env)
 ```
 
-## USB Backup
+## Offline copy (USB)
 
-```bash
-# Mount encrypted USB, backup, dismount
-veracrypt /dev/sdX1 /media/veracrypt1
-bash ~/Projects/dotfiles/scripts/backup-secrets-to-usb.sh /media/veracrypt1
-veracrypt -d /media/veracrypt1
-```
+The encrypted USB holds the age key and a copy of `dr/`, and carries its own
+`README.md`. The procedure is being folded into `dotf secrets usb` (#1770).
 
 ## Full Documentation
 

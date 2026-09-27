@@ -356,3 +356,29 @@ Three mechanical safeguards enforce this in `dotf secrets`:
    - **Explicit reveal:** Plaintext display requires `--reveal`.
    - **Clipboard copy:** `-c` / `--clip` copies directly to system clipboard (`wl-copy`/`xclip`/`pbcopy`/`clip.exe`) with zero stdout footprint.
    - **Agent session refusal:** In an agent session (any of `AI_AGENT`, `CLAUDECODE`, `CLAUDE_CODE`, `PI_CODING_AGENT`, `OPENCODE`, `COPILOT_CLI`, `ANTIGRAVITY_AGENT`, `ANTIGRAVITY_CLI`, `CODEX_THREAD_ID`, `CODEX_SANDBOX`, `AGENT_SESSION`; every harness in `harness/model-map.json` must export one), `dotf secrets show` categorically refuses to print to stdout, redirecting to `dotf secrets run`.
+
+## Amendment (2026-09-26): the escrow is the floor; per-secret blobs exist only for `age-offline`
+
+**Context:** Ratification item 3 gated retiring a migrated secret's `.secret.age` on a verified
+escrow, but no retire path was ever built (#938). Meanwhile BUG-078 (#971) read the leftover
+blobs as a second DR floor, and downgraded doctor's "unreferenced blob" check to a WARN so
+they would survive. The result: 31 committed blobs that no registry entry claimed, each a
+stale, decryptable copy of a value in a public repository, and a mirror that never pruned
+them (#802).
+
+**Decision:**
+
+1. **The DR floor is the whole-vault escrow** `sensitive/dr/bitwarden-export.age` (§5),
+   rooted in the offline age key (§4). It was verified before the blobs went: the offline
+   key alone decrypts it to the full vault (#1000). A per-secret blob of a bw-backed secret
+   is not a backup; it is a second, unrotated copy.
+2. **A `sensitive/*.secret.age` exists only for an `age-offline` entry** (today, the SSH
+   key). A test asserts every committed blob is claimed by an age-backed registry entry.
+3. **The mirror converges on the same rule.** `dotf doctor` FAILs on an unclaimed blob in
+   `~/.dotfiles/sensitive/`, and `dotf doctor --fix` prunes it (#802: doctor prunes, setup
+   only copies). The prune refuses unless the resolved checkout carries the registry and the
+   escrow, no longer commits that blob, and is not the mirror itself.
+4. **#971's WARN is superseded.** Retiring a secret is now `git rm` of its blob in a PR plus
+   one `dotf doctor --fix` per machine; no `retire` subcommand is needed.
+
+Implementation: `specs/CLI-036-retire-legacy-age-blobs`.

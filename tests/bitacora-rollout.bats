@@ -173,3 +173,12 @@ STUB
     [ "$(count_calls 'addProjectV2ItemById')" -eq 0 ]
     [[ "$output" != *"item-add failed"* ]]
 }
+
+@test "without BITACORA_PAT a provisioning run fails before uploading anything, naming dotf secrets run" {
+    # CLI-036 retired the age copy of the PAT; the script must not fall back to
+    # decrypting a blob that no longer exists, or to anything else.
+    run env -u BITACORA_PAT bash "$SCRIPT" --check some-repo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"dotf secrets run --only BITACORA_PAT"* ]]
+    [ ! -e "$GH_LOG" ] || refute_grep 'secret set' "$GH_LOG"
+}

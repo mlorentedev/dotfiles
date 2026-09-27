@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-036-retire-legacy-age-blobs-f1",
+    "behavior": "Every committed sensitive/*.secret.age is claimed by an age-backed registry entry; only id_ed25519 remains",
+    "verification": "test \"$(git ls-files 'sensitive/*.secret.age')\" = sensitive/id_ed25519.secret.age && cd cli && go test ./internal/secrets -run TestCommittedAgeBlobsAreClaimed -count=1",
+    "state": "passing",
+    "evidence": "test green after the 31 git rm; red with exactly 31 names before"
+  },
+  {
+    "id": "CLI-036-retire-legacy-age-blobs-f2",
+    "behavior": "doctor FAILs each unclaimed mirror blob, naming it, and the #971 WARN is gone",
+    "verification": "cd cli && go test ./internal/doctor -run 'TestCheckSecrets_BwBackedEntriesAreNotAgeAsserted' -count=1",
+    "state": "passing",
+    "evidence": "3 failures expected (AGEMISS, OFFLINE, the orphan); no '#971' in output"
+  },
+  {
+    "id": "CLI-036-retire-legacy-age-blobs-f3",
+    "behavior": "doctor --fix prunes unclaimed blobs and partial writes the checkout lacks, one FIX line each, idempotently, keeping every other file",
+    "verification": "cd cli && go test ./internal/doctor -run TestCheckSecrets_FixPrunesUnclaimedMirrorBlob -count=1",
+    "state": "passing",
+    "evidence": "2 [FIX ] lines, then none on the second run; id_ed25519, env-mapping.conf, README.md and dr/ survive"
+  },
+  {
+    "id": "CLI-036-retire-legacy-age-blobs-f4",
+    "behavior": "--fix refuses when the checkout still has the blob, lacks the registry or the escrow, or is the mirror",
+    "verification": "cd cli && go test ./internal/doctor -run TestCheckSecrets_FixRefuses -count=1",
+    "state": "passing",
+    "evidence": "4 rows green; mutation (escrow gate dropped) turns the escrow row red"
+  },
+  {
+    "id": "CLI-036-retire-legacy-age-blobs-f5",
+    "behavior": "bitacora-rollout.sh takes BITACORA_PAT by injection and fails naming dotf secrets run without it",
+    "verification": "~/.local/bin/bats tests/bitacora-rollout.bats",
+    "state": "passing",
+    "evidence": "new test red on the old script (it decrypted the retired blob), green on the new one"
+  }
+]

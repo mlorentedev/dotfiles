@@ -8,7 +8,8 @@
 #
 # Per repo (idempotent — mutates only on diff, 2nd run reports 0 changes):
 #   1. link the repo to GitHub Project #1 (the bitácora)
-#   2. upload the BITACORA_PAT secret (decrypted from sensitive/, or $BITACORA_PAT)
+#   2. upload the BITACORA_PAT secret, read from $BITACORA_PAT. Inject it from the
+#      registry: dotf secrets run --only BITACORA_PAT -- ./scripts/bitacora-rollout.sh
 #   3. deploy .github/workflows/add-to-project.yml + bitacora-status.yml
 #      (canonical copies = THIS repo's .github/workflows/; deployed via the contents API)
 #   4. backfill: put every open issue and PR on the board (item-add is idempotent)
@@ -33,8 +34,6 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 OWNER="${BITACORA_OWNER:-mlorentedev}"
 PROJECT_NUMBER="${BITACORA_PROJECT:-1}"
 WORKFLOWS=(add-to-project.yml bitacora-status.yml)
-SECRET_FILE="${BITACORA_SECRET_FILE:-$REPO_ROOT/sensitive/github.bitacora.secret.age}"
-AGE_KEY="${AGE_KEY_FILE:-$HOME/.config/age/key.txt}"
 
 CHECK=0
 BACKFILL_ONLY=0
@@ -63,15 +62,16 @@ if [ "${#REPOS[@]}" -eq 0 ]; then
 fi
 echo "=== bitácora rollout$( [ "$CHECK" = 1 ] && echo ' (--check, read-only)') — ${#REPOS[@]} repo(s) ==="
 
-# ── Secret: explicit env wins; otherwise decrypt the age-encrypted PAT ──
+# ── Secret: injected by the caller, never decrypted here ──
 if [ "$BACKFILL_ONLY" = 1 ]; then
     # Step 2 is skipped, so no PAT value is needed here: `gh` authenticates from
-    # GH_TOKEN. This is what lets the reconciler run in CI, where the age key
-    # that would decrypt the secret does not exist.
+    # GH_TOKEN. This is what lets the reconciler run in CI.
     :
 elif [ -z "${BITACORA_PAT:-}" ]; then
-    BITACORA_PAT="$(age --decrypt -i "$AGE_KEY" "$SECRET_FILE" 2>/dev/null | tr -d '[:space:]')" \
-        || { err "cannot decrypt $SECRET_FILE (set BITACORA_PAT or fix the age key)"; exit 1; }
+    # The PAT lives in Bitwarden (registry id BITACORA_PAT). Its age copy in
+    # sensitive/ was retired by CLI-036, and it had been stale since the migration.
+    err "BITACORA_PAT is not set; run: dotf secrets run --only BITACORA_PAT -- $0 $*"
+    exit 1
 fi
 
 # ── Already-linked repos (one GraphQL call, not one per repo) ──
