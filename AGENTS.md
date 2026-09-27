@@ -125,8 +125,9 @@ archive a spec. CLI subcommands via `dotf spec …` (Go CLI, works in CI/Windows
 ("close spec X"). Conversational workflow steps (`/spec fill`, `/spec check`,
 `/spec bootstrap`) are driven via the `/spec` skill. Specs live at `specs/<feature-id>/`, archived at
 `specs/archive/` (never deleted — audit trail). `<feature-id>`:
-`^([A-Z]+[0-9]*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`
-— the AREA may carry digits (`ADR028-004`), the number an optional sub-id letter
+`^([A-Z]+[0-9]*(-[A-Z]+[0-9]*)*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`
+— the AREA is upper-case segments joined by hyphens, each of which may carry digits
+(`APP-CONFIG-015`, `ADR028-004`), the number an optional sub-id letter
 (`SDD-012b`). Verbatim copy of `idPattern` in `cli/internal/spec/spec.go`, held
 to it by `TestIDPatternProseMatchesCode`; do not reword it.
 
