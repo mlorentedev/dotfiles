@@ -14,6 +14,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
 // now is the clock used to stamp created: in scaffolded specs and session dates.
@@ -593,9 +594,12 @@ of the reviewed commit does not stale a review (SDD-042).
 require --reason, and an override is RECORDED: the archived proposal.md gains a
 review_bypass: line naming the flags, what the skipped check would have refused,
 the reason and the date. The checks still run, so the record says what was
-overridden, not merely which flag was typed. Vault promotion
-(lessons/ADR/pattern) and any backlog tick stay interactive via "/spec archive"
-in an agent.`,
+overridden, not merely which flag was typed.
+
+A third pre-flight reads verification.md's "Promotion candidates": each line must
+be answered "yes: <path>", with the promoted lesson, ADR or pattern existing
+(a 00_meta/ path in the vault), or "no: <reason>". No flag skips it; write the
+promoted file, or the reason, first.`,
 		Example:      "  dotf spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
@@ -618,6 +622,7 @@ in an agent.`,
 				BypassReason:       reason,
 				PRURL:              prURL,
 				Date:               now().Format("2006-01-02"),
+				VaultRoot:          vault.ResolveVaultStrict,
 			})
 			if err != nil {
 				return err
@@ -636,8 +641,7 @@ in an agent.`,
 			if prURL != "" {
 				cmd.Printf("     PR: %s\n", prURL)
 			}
-			cmd.Printf("\nVault promotion (lessons/ADR/pattern) and backlog tick must be done\n")
-			cmd.Printf("separately (via \"/spec archive\" in an agent, or by hand).\n")
+			cmd.Printf("     promotions: every candidate in verification.md is answered\n")
 			return nil
 		},
 	}
