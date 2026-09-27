@@ -377,7 +377,14 @@ func httpGetBody(url string, headers map[string]string) (int, []byte, error) {
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	// Never follow a redirect: Go keeps Authorization on a same-host redirect
+	// whatever the scheme, so an https->http hop would send the key in clear.
+	// The 3xx comes back as the status, which the caller reports as unexpected.
+	client := &http.Client{
+		Timeout:       15 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, nil, fmt.Errorf("GET %q: %w", url, err)
 	}

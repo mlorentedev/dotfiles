@@ -160,8 +160,47 @@ func TestTableAge(t *testing.T) {
 }
 
 func TestParseTableRejectsAModelDeclaredTwice(t *testing.T) {
-	_, err := ParseTable([]byte(`{"checked":"2026-09-26","metered":{"a":{"tokens":1,"period":"month"}},"unmetered":["a"]}`))
+	_, err := ParseTable([]byte(`{"checked":"2026-09-26","source":"s","metered":{"a":{"tokens":1,"period":"month"}},"unmetered":["a"]}`))
 	if err == nil {
 		t.Error("a model both metered and unmetered must be rejected")
+	}
+}
+
+// A 200 that lacks the field the verdict comes from is not zero usage: read as
+// zero it PASSes a spent model.
+func TestParseUsageRejectsAnAnswerWithoutByModel(t *testing.T) {
+	for _, body := range []string{`{"totals":{}}`, `{}`, `{"totals":{"by_model":null}}`} {
+		if _, err := ParseUsage([]byte(body)); err == nil {
+			t.Errorf("ParseUsage(%s) accepted an answer with no totals.by_model", body)
+		}
+	}
+	if _, err := ParseUsage([]byte(`{"totals":{"by_model":[]}}`)); err != nil {
+		t.Errorf("an empty by_model is a month with no traffic, not a malformed answer: %v", err)
+	}
+}
+
+// An empty served set would FAIL every binding at once, so it is inconclusive.
+func TestParseModelsRejectsAnAnswerWithoutModels(t *testing.T) {
+	for _, body := range []string{`{}`, `{"data":null}`, `{"data":[]}`} {
+		if _, err := ParseModels([]byte(body)); err == nil {
+			t.Errorf("ParseModels(%s) accepted an answer that serves nothing", body)
+		}
+	}
+}
+
+// Omitting a list is not a decision that it is empty (closed-world table).
+func TestParseTableRequiresItsDecisionFields(t *testing.T) {
+	cases := map[string]string{
+		"no source":    `{"checked":"2026-09-26","metered":{},"unmetered":[]}`,
+		"no metered":   `{"checked":"2026-09-26","source":"s","unmetered":[]}`,
+		"no unmetered": `{"checked":"2026-09-26","source":"s","metered":{}}`,
+	}
+	for name, doc := range cases {
+		if _, err := ParseTable([]byte(doc)); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if _, err := ParseTable([]byte(`{"checked":"2026-09-26","source":"s","metered":{},"unmetered":[]}`)); err != nil {
+		t.Errorf("explicitly empty lists are a decision and must parse: %v", err)
 	}
 }

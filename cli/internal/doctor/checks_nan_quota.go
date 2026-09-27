@@ -43,6 +43,7 @@ func checkNaNQuota(sys *System, cfg *Config, rep *Report) {
 	if !ok {
 		return
 	}
+	reportNaNTableAge(sys, table, rep)
 	key, ok := resolveNaNKey(sys, cfg, rep)
 	if !ok {
 		return
@@ -51,7 +52,6 @@ func checkNaNQuota(sys *System, cfg *Config, rep *Report) {
 	if !ok {
 		return
 	}
-	reportNaNTableAge(sys, table, rep)
 	for _, f := range nanquota.Evaluate(bound, served, usage, table, nanQuotaWarnPct) {
 		reportNaNFinding(f, rep)
 	}

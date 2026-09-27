@@ -75,6 +75,10 @@ func ParseUsage(body []byte) (Usage, error) {
 	if err := json.Unmarshal(body, &u); err != nil {
 		return Usage{}, fmt.Errorf("parse /v1/usage: %w", err)
 	}
+	// Absent is not zero: read as zero, a spent model would PASS.
+	if u.Totals.ByModel == nil {
+		return Usage{}, fmt.Errorf("parse /v1/usage: no totals.by_model")
+	}
 	return u, nil
 }
 
@@ -87,6 +91,11 @@ func ParseModels(body []byte) (map[string]bool, error) {
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return nil, fmt.Errorf("parse /v1/models: %w", err)
+	}
+	// An empty set would FAIL every binding at once; that is NaN answering
+	// oddly, not NaN dropping every model.
+	if len(doc.Data) == 0 {
+		return nil, fmt.Errorf("parse /v1/models: no models listed")
 	}
 	served := make(map[string]bool, len(doc.Data))
 	for _, m := range doc.Data {
@@ -103,6 +112,16 @@ func ParseTable(raw []byte) (Table, error) {
 	}
 	if _, err := time.Parse(time.DateOnly, t.Checked); err != nil {
 		return Table{}, fmt.Errorf("quota table: checked %q is not a YYYY-MM-DD date", t.Checked)
+	}
+	// Closed-world: an omitted list would make every model in it read as
+	// undeclared, so each must be stated, even when empty.
+	switch {
+	case t.Source == "":
+		return Table{}, fmt.Errorf("quota table: source is required")
+	case t.Metered == nil:
+		return Table{}, fmt.Errorf("quota table: metered is required (use {} for none)")
+	case t.Unmetered == nil:
+		return Table{}, fmt.Errorf("quota table: unmetered is required (use [] for none)")
 	}
 	for id, q := range t.Metered {
 		if q.Tokens <= 0 || q.Period == "" {

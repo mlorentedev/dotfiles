@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -203,5 +205,36 @@ func TestCheckNaNQuota_WarnsOnAStaleTable(t *testing.T) {
 	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, nil), nanCfg(t, nanRegistryAge, "rerank", "2026-01-01"))
 	if fails != 0 || !strings.Contains(out, "harness/nan-quotas.json was read 2026-01-01") {
 		t.Errorf("want a WARN naming the stale date:\n%s", out)
+	}
+}
+
+// The table's age is a fact about the checkout, so it is reported even on a box
+// with no key, where the rest of the section SKIPs.
+func TestCheckNaNQuota_WarnsOnAStaleTableWithoutAKey(t *testing.T) {
+	out, fails := runNaNQuota(newSys(nil, nil, nil), nanCfg(t, nanRegistryAge, "rerank", "2026-01-01"))
+	if fails != 0 || !strings.Contains(out, "harness/nan-quotas.json was read 2026-01-01") {
+		t.Errorf("want the stale-table WARN before the key SKIP:\n%s", out)
+	}
+}
+
+// A redirect must not carry the bearer token anywhere, least of all to plain
+// http on the same host, where Go would keep the Authorization header.
+func TestHTTPGetBody_DoesNotFollowRedirects(t *testing.T) {
+	var sawAuth bool
+	target := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		sawAuth = r.Header.Get("Authorization") != ""
+	}))
+	defer target.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusFound)
+	}))
+	defer origin.Close()
+
+	status, _, err := httpGetBody(origin.URL, map[string]string{"Authorization": "Bearer " + nanTestKey})
+	if err != nil || status != http.StatusFound {
+		t.Errorf("status = %d, err = %v; want the 302 itself", status, err)
+	}
+	if sawAuth {
+		t.Error("the redirect was followed with the Authorization header")
 	}
 }
