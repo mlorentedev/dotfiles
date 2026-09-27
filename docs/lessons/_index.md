@@ -326,3 +326,4 @@ tags: [lessons, index, dotfiles]
 | [307 - A new silent path must be taught to the guard that demands output](lesson-307-a-new-silent-path-must-be-taught-to-the-guard-that-demands-output.md) | 2026-09-25 |  |
 | [301 - Knowledge goes where a mechanism asks for it](lesson-301-knowledge-goes-where-a-mechanism-asks-for-it.md) | 2026-09-25 |  |
 | [308 - A baseline picked by content is a baseline anyone can post](lesson-308-a-baseline-picked-by-content-is-a-baseline-anyone-can-post.md) | 2026-09-27 |  |
+| [309 - A test filter that matches nothing passes](lesson-309-a-test-filter-that-matches-nothing-passes.md) | 2026-09-27 |  |

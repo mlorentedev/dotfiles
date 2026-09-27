@@ -12,28 +12,71 @@ load 'lib/refute'
 # versions.conf (BATS_VERSION=1.13.0), so the floor is well under what runs.
 bats_require_minimum_version 1.5.0
 
+# copilot base file so catalog injection has a marked target
+seed_copilot_base() {
+    mkdir -p "$1/.copilot"
+    printf '## Skills\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n' \
+        > "$1/.copilot/copilot-instructions.md"
+}
+
+# deploy_shared <name> <PATH>: deploy once into $BATS_FILE_TMPDIR/home-<name>,
+# keeping the status and log for shared_home to report.
+deploy_shared() {
+    local home="$BATS_FILE_TMPDIR/home-$1" rc=0
+    seed_copilot_base "$home"
+    (cd "$BATS_TEST_DIRNAME/.." && env HOME="$home" PATH="$2" "$COUNTING_SCRIPT" --deploy) > "$home.log" 2>&1 || rc=$?
+    echo "$rc" > "$home.status"
+}
+
+# shared_home <name>: point $SHARED at a home deployed once in setup_file, and
+# fail with that deploy's log if it failed. Tests that only read a deploy's
+# result use one of these instead of deploying again: 17 deploys became 6.
+shared_home() {
+    SHARED="$BATS_FILE_TMPDIR/home-$1"
+    [ "$(cat "$SHARED.status")" = 0 ] || { cat "$SHARED.log" >&2; return 1; }
+}
+
+# Every --deploy in this file goes through a counting wrapper, so the budget
+# test at the end measures invocations instead of grepping for them (CI-004
+# AC2). The tests call "$SCRIPT" by absolute path, which a PATH stub never sees.
+setup_file() {
+    local real
+    real="$(cd "$BATS_TEST_DIRNAME/.." && pwd)/scripts/compile-harness.sh"
+    export DEPLOY_COUNT="$BATS_FILE_TMPDIR/deploys"
+    export COUNTING_SCRIPT="$BATS_FILE_TMPDIR/compile-harness.sh"
+    : > "$DEPLOY_COUNT"
+    printf '#!/usr/bin/env bash\ncase " $* " in *" --deploy "*) echo deploy >> %q ;; esac\nexec %q "$@"\n' \
+        "$DEPLOY_COUNT" "$real" > "$COUNTING_SCRIPT"
+    chmod +x "$COUNTING_SCRIPT"
+
+    deploy_shared clean "$PATH"
+    # The copilot skill target has a manifest-declared requires_command (BUG-771:
+    # native skills must not create ~/.copilot on a box that never installed
+    # Copilot). The copilot home needs a fake `copilot` on PATH; the BUG-771
+    # test proving the gate needs PATH without one.
+    mkdir -p "$BATS_FILE_TMPDIR/stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$BATS_FILE_TMPDIR/stub/copilot"
+    chmod +x "$BATS_FILE_TMPDIR/stub/copilot"
+    deploy_shared copilot "$BATS_FILE_TMPDIR/stub:$PATH"
+
+    # Read-only, enforced rather than trusted: a test that writes into a shared
+    # home fails instead of changing what its siblings read.
+    chmod -R a-w "$BATS_FILE_TMPDIR/home-clean" "$BATS_FILE_TMPDIR/home-copilot"
+}
+
+teardown_file() {
+    chmod -R u+w "$BATS_FILE_TMPDIR/home-clean" "$BATS_FILE_TMPDIR/home-copilot" 2>/dev/null || true
+}
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
-    SCRIPT="$REPO/scripts/compile-harness.sh"
+    SCRIPT="$COUNTING_SCRIPT"
     FAKEHOME="$(mktemp -d)"
-    # copilot base file so catalog injection has a marked target
-    mkdir -p "$FAKEHOME/.copilot"
-    printf '## Skills\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n' \
-        > "$FAKEHOME/.copilot/copilot-instructions.md"
+    seed_copilot_base "$FAKEHOME"
     cd "$REPO" || exit 1
 }
 
 teardown() { cd / || true; rm -rf "$FAKEHOME"; }
-
-# The copilot skill target has a manifest-declared requires_command (BUG-771:
-# native skills must not create ~/.copilot on a box that never installed
-# Copilot). Tests that exercise the deploy itself need a fake `copilot` on
-# PATH; tests proving the gate need PATH left alone.
-stub_copilot() {
-    mkdir -p "$FAKEHOME/stub"
-    printf '#!/usr/bin/env bash\nexit 0\n' > "$FAKEHOME/stub/copilot"
-    chmod +x "$FAKEHOME/stub/copilot"
-}
 
 # path_without_copilot: $PATH with every directory holding a `copilot` removed.
 #
@@ -64,26 +107,24 @@ path_without_copilot() {
 }
 
 @test "AC8 smoke: /spec is discoverable for claude + opencode after deploy" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
+    shared_home clean
     # claude: native skill dir carrying the spec SKILL.md (name: preserved)
-    [ -f "$FAKEHOME/.claude/skills/spec/SKILL.md" ]
-    grep -q '^name: spec' "$FAKEHOME/.claude/skills/spec/SKILL.md"
+    [ -f "$SHARED/.claude/skills/spec/SKILL.md" ]
+    grep -q '^name: spec' "$SHARED/.claude/skills/spec/SKILL.md"
     # opencode: spec command file present (name: dropped — keyed off filename)
-    [ -f "$FAKEHOME/.config/opencode/commands/spec.md" ]
-    refute_grep '^name:' "$FAKEHOME/.config/opencode/commands/spec.md"
+    [ -f "$SHARED/.config/opencode/commands/spec.md" ]
+    refute_grep '^name:' "$SHARED/.config/opencode/commands/spec.md"
     # AC1: neither deployed path is a symlink
-    [ ! -L "$FAKEHOME/.claude/skills/spec" ]
-    [ ! -L "$FAKEHOME/.config/opencode/commands/spec.md" ]
+    [ ! -L "$SHARED/.claude/skills/spec" ]
+    [ ! -L "$SHARED/.config/opencode/commands/spec.md" ]
 }
 
 @test "HARNESS-075: deployed claude skills drop paths: and neutral keys, ensuring unconditional discovery" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
+    shared_home clean
     # Claude Code treats `paths:` frontmatter as a conditional skill (deferred until a matching path is touched).
     # Deployed skills must not carry `paths:` or other store-only metadata in their top-level frontmatter.
-    [ -d "$FAKEHOME/.claude/skills" ]
-    for f in "$FAKEHOME"/.claude/skills/*/SKILL.md; do
+    [ -d "$SHARED/.claude/skills" ]
+    for f in "$SHARED"/.claude/skills/*/SKILL.md; do
         [ -f "$f" ] || continue
         fm="$(awk '/^---[[:space:]]*$/{n++; next} n==1{print} n>=2{exit}' "$f")"
         run grep -nE '^(paths|keywords|requires|id|type|status|created|owner|targets):' <<<"$fm"
@@ -92,56 +133,50 @@ path_without_copilot() {
 }
 
 @test "SDD-011: deployed /spec carries the Agent-Side Activation Rule (claude + opencode)" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
+    shared_home clean
     # The agent-side proactive trigger must survive the vault -> record -> render
     # chain; if the record is regenerated from a SKILL.md missing the section, the
     # proactive /spec proposal behavior silently regresses. Guard both renders.
-    grep -q '^## Agent-Side Activation Rule' "$FAKEHOME/.claude/skills/spec/SKILL.md"
-    grep -q '^## Agent-Side Activation Rule' "$FAKEHOME/.config/opencode/commands/spec.md"
+    grep -q '^## Agent-Side Activation Rule' "$SHARED/.claude/skills/spec/SKILL.md"
+    grep -q '^## Agent-Side Activation Rule' "$SHARED/.config/opencode/commands/spec.md"
 }
 
 @test "AC8 smoke: agy gets /spec as a native skill + a flat prompt" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    [ -f "$FAKEHOME/.gemini/skills/spec/SKILL.md" ]
-    [ -f "$FAKEHOME/.gemini/prompts/spec.md" ]
-    refute_grep '^name:' "$FAKEHOME/.gemini/prompts/spec.md"   # frontmatter stripped
+    shared_home clean
+    [ -f "$SHARED/.gemini/skills/spec/SKILL.md" ]
+    [ -f "$SHARED/.gemini/prompts/spec.md" ]
+    refute_grep '^name:' "$SHARED/.gemini/prompts/spec.md"   # frontmatter stripped
 }
 
 @test "HANDOFF-001: /handoff deploys cross-agent (claude + opencode + agy) with its checklist" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    [ -f "$FAKEHOME/.claude/skills/handoff/SKILL.md" ]
-    grep -q '^name: handoff' "$FAKEHOME/.claude/skills/handoff/SKILL.md"
-    [ -f "$FAKEHOME/.config/opencode/commands/handoff.md" ]
-    [ -f "$FAKEHOME/.gemini/skills/handoff/SKILL.md" ]
+    shared_home clean
+    [ -f "$SHARED/.claude/skills/handoff/SKILL.md" ]
+    grep -q '^name: handoff' "$SHARED/.claude/skills/handoff/SKILL.md"
+    [ -f "$SHARED/.config/opencode/commands/handoff.md" ]
+    [ -f "$SHARED/.gemini/skills/handoff/SKILL.md" ]
     # the continuity-block checklist survives the vault -> record -> render chain
-    grep -q '## Session Handoff' "$FAKEHOME/.claude/skills/handoff/SKILL.md"
+    grep -q '## Session Handoff' "$SHARED/.claude/skills/handoff/SKILL.md"
 }
 
 @test "AC8 smoke: a Claude-only skill is NOT exposed to opencode/agy" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
+    shared_home clean
     # crystallize is targets:[claude] (agent-local auto-memory store)
-    [ -f "$FAKEHOME/.claude/skills/crystallize/SKILL.md" ]
-    [ ! -f "$FAKEHOME/.config/opencode/commands/crystallize.md" ]
-    [ ! -d "$FAKEHOME/.gemini/skills/crystallize" ]
+    [ -f "$SHARED/.claude/skills/crystallize/SKILL.md" ]
+    [ ! -f "$SHARED/.config/opencode/commands/crystallize.md" ]
+    [ ! -d "$SHARED/.gemini/skills/crystallize" ]
 }
 
 @test "AI-022: pi gets /spec as a native skill (regular copy, not a symlink)" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    [ -f "$FAKEHOME/.pi/agent/skills/spec/SKILL.md" ]
-    grep -q '^name: spec' "$FAKEHOME/.pi/agent/skills/spec/SKILL.md"
-    [ ! -L "$FAKEHOME/.pi/agent/skills/spec" ]
+    shared_home clean
+    [ -f "$SHARED/.pi/agent/skills/spec/SKILL.md" ]
+    grep -q '^name: spec' "$SHARED/.pi/agent/skills/spec/SKILL.md"
+    [ ! -L "$SHARED/.pi/agent/skills/spec" ]
 }
 
 @test "AI-022: a Claude-only skill is NOT exposed to pi" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
+    shared_home clean
     # crystallize is targets:[claude] (agent-local auto-memory store)
-    [ ! -d "$FAKEHOME/.pi/agent/skills/crystallize" ]
+    [ ! -d "$SHARED/.pi/agent/skills/crystallize" ]
 }
 
 @test "AI-022: deploy leaves pi-installed sibling symlinks alone" {
@@ -158,40 +193,34 @@ path_without_copilot() {
 }
 
 @test "AC1 smoke: no deployed skill path is a symlink" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    [ -z "$(find "$FAKEHOME/.claude/skills" "$FAKEHOME/.config/opencode/commands" "$FAKEHOME/.gemini/skills" "$FAKEHOME/.gemini/prompts" "$FAKEHOME/.copilot/skills" -type l 2>/dev/null)" ]
+    shared_home clean
+    [ -z "$(find "$SHARED/.claude/skills" "$SHARED/.config/opencode/commands" "$SHARED/.gemini/skills" "$SHARED/.gemini/prompts" "$SHARED/.copilot/skills" -type l 2>/dev/null)" ]
 }
 
 @test "AC6 smoke: the copilot catalog lists /spec but not the Claude-only skill" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    grep -qF -- '**spec**' "$FAKEHOME/.copilot/copilot-instructions.md"
-    refute_grep_fixed '**crystallize**' "$FAKEHOME/.copilot/copilot-instructions.md"
+    shared_home clean
+    grep -qF -- '**spec**' "$SHARED/.copilot/copilot-instructions.md"
+    refute_grep_fixed '**crystallize**' "$SHARED/.copilot/copilot-instructions.md"
 }
 
 @test "HARNESS-051: copilot gets native /spec and /handoff skills" {
-    stub_copilot
-    run env HOME="$FAKEHOME" PATH="$FAKEHOME/stub:$PATH" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    [ -f "$FAKEHOME/.copilot/skills/spec/SKILL.md" ]
-    grep -q '^name: spec' "$FAKEHOME/.copilot/skills/spec/SKILL.md"
-    [ -f "$FAKEHOME/.copilot/skills/handoff/SKILL.md" ]
-    grep -q '^name: handoff' "$FAKEHOME/.copilot/skills/handoff/SKILL.md"
-    [ ! -L "$FAKEHOME/.copilot/skills/spec" ]
-    [ ! -L "$FAKEHOME/.copilot/skills/handoff" ]
+    shared_home copilot
+    [ -f "$SHARED/.copilot/skills/spec/SKILL.md" ]
+    grep -q '^name: spec' "$SHARED/.copilot/skills/spec/SKILL.md"
+    [ -f "$SHARED/.copilot/skills/handoff/SKILL.md" ]
+    grep -q '^name: handoff' "$SHARED/.copilot/skills/handoff/SKILL.md"
+    [ ! -L "$SHARED/.copilot/skills/spec" ]
+    [ ! -L "$SHARED/.copilot/skills/handoff" ]
 }
 
 @test "HARNESS-051: copilot target filtering and auxiliary files are preserved" {
-    stub_copilot
-    run env HOME="$FAKEHOME" PATH="$FAKEHOME/stub:$PATH" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
-    [ ! -d "$FAKEHOME/.copilot/skills/crystallize" ]
-    [ -f "$FAKEHOME/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
+    shared_home copilot
+    [ ! -d "$SHARED/.copilot/skills/crystallize" ]
+    [ -f "$SHARED/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
 }
 
 @test "BUG-771: copilot native skills are not deployed when the copilot binary is absent" {
-    # No stub_copilot here, and the absence is MADE TRUE rather than assumed:
+    # No copilot stub here, and the absence is MADE TRUE rather than assumed:
     # this is the class of box the gate exists for (setup-linux.sh never
     # auto-installs Copilot), but the developer running the suite may well have
     # it. Asserting "the gate fires when the binary is absent" against a PATH
@@ -268,13 +297,12 @@ path_without_copilot() {
 }
 
 @test "HARNESS-056: the compact doctrine payload carries it and stays under its cap" {
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
-    [ "$status" -eq 0 ]
+    shared_home clean
     local f cap chars bytes
     while IFS=$'\t' read -r f cap; do
-        [ -f "$FAKEHOME/$f" ]
-        grep -q 'Working code is not a finished change' "$FAKEHOME/$f"
-        chars="$(wc -m < "$FAKEHOME/$f")"
+        [ -f "$SHARED/$f" ]
+        grep -q 'Working code is not a finished change' "$SHARED/$f"
+        chars="$(wc -m < "$SHARED/$f")"
         [ "$chars" -lt "$cap" ] || { echo "$f is $chars chars, at or over its $cap cap"; return 1; }
 
         # BOTH units, because asserting one was how this went unnoticed.
@@ -289,7 +317,7 @@ path_without_copilot() {
         # payload, so the two measures track each other. This assertion is what
         # keeps that true: reintroduce a multi-byte character and the byte count
         # separates from the character count and lands here first.
-        bytes="$(wc -c < "$FAKEHOME/$f")"
+        bytes="$(wc -c < "$SHARED/$f")"
         [ "$bytes" -lt "$cap" ] || { echo "$f is $bytes BYTES, at or over its $cap cap (chars: $chars)"; return 1; }
     done < <(jq -r '.doctrine.deploy[] | "\(.file)\t\(.char_cap)"' harness/manifest.json)
 }
@@ -346,4 +374,23 @@ path_without_copilot() {
         grep -q '^license:' "$d/SKILL.md" || { echo "$name has source but no license"; return 1; }
         grep -qF "\`$name\`" harness/skills/ATTRIBUTION.md || { echo "$name is vendored but absent from ATTRIBUTION.md"; return 1; }
     done
+}
+
+# The shared homes are only safe if nothing writes to them.
+@test "a write into a shared setup_file home fails" {
+    [ "$(id -u)" -ne 0 ] || skip "root ignores the mode bits that keep the shared homes read-only"
+    shared_home clean
+    run touch "$SHARED/.written-by-a-test"
+    [ "$status" -ne 0 ]
+    # An append, not a touch: the owner may reset a timestamp without write access.
+    run sh -c 'printf x >> "$1"' _ "$SHARED/.claude/skills/spec/SKILL.md"
+    [ "$status" -ne 0 ]
+}
+
+# Last in the file on purpose: it reads the count every test above left. 17
+# deploys per run was the baseline; the shared homes in setup_file bring it to 6.
+@test "skills-pipeline deploys at most 6 times per run" {
+    local n
+    n="$(wc -l < "$DEPLOY_COUNT")"
+    [ "$n" -le 6 ] || { echo "compile-harness.sh --deploy ran $n times, budget 6" >&2; return 1; }
 }

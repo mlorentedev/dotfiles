@@ -105,6 +105,44 @@ _guard_is_active() {
     [ "$status" -eq 0 ]
 }
 
+# Launch a fake GUI in the background. `kill -9` of the fake leaves its own
+# child (`sleep`) running as an orphan, and an orphan that still holds bats'
+# fd 3 makes bats wait for it to exit: that is how this file took 30.9 s to run
+# 0.3 s of tests (CI-004, #1739).
+#
+# The descriptors are closed rather than the fake `exec`ing `sleep`: the
+# detector matches on the process name `obsidian`, and exec would rename it.
+_launch_fake() {
+    "$@" >/dev/null 2>&1 3>&- &
+}
+
+# The leak itself, asserted rather than timed: no descendant of a fake launched
+# through _launch_fake holds the descriptor bats waits on.
+@test "guard: a fake GUI launched by this file does not hold bats' fd 3" {
+    [ -e /proc/self/fd/3 ] || skip "no /proc fd view on this platform"
+    command -v pgrep >/dev/null 2>&1 || skip "pgrep not installed"
+
+    local fake="$BATS_TEST_TMPDIR/obsidian"
+    printf '#!/bin/sh\nsleep 30\n' > "$fake"
+    chmod +x "$fake"
+    _launch_fake "$fake" --user-data-dir="$BATS_TEST_TMPDIR/nowhere"
+    local pid=$!
+    sleep 0.3
+
+    local ours children c leaked=""
+    ours="$(readlink /proc/$$/fd/3)"
+    children="$(pgrep -P "$pid")"
+    kill -9 "$pid" 2>/dev/null || true
+    for c in $children; do
+        [ "$(readlink "/proc/$c/fd/3" 2>/dev/null)" = "$ours" ] && leaked="$leaked $c"
+    done
+    # shellcheck disable=SC2086
+    kill -9 $children 2>/dev/null || true
+
+    [ -n "$children" ] || { echo "the fake spawned no child; the test proves nothing" >&2; return 1; }
+    [ -z "$leaked" ] || { echo "orphans holding bats' fd 3 ($ours):$leaked" >&2; return 1; }
+}
+
 # The post-suite detector, tested against a process built to look exactly like
 # the strays the incident left behind. A detector never seen firing is a claim,
 # not a check — and this one's job is to catch what the PATH interceptors
@@ -121,10 +159,10 @@ _guard_is_active() {
     local fake="$BATS_TEST_TMPDIR/obsidian"
     printf '#!/bin/sh\nsleep 30\n' > "$fake"
     chmod +x "$fake"
-    "$fake" --user-data-dir=/tmp/bats-run-FAKE/test/1/config/obsidian &
+    _launch_fake "$fake" --user-data-dir=/tmp/bats-run-FAKE/test/1/config/obsidian
     local stray=$!
     # And one that looks like a human's: the real config dir, no bats tmpdir.
-    "$fake" --user-data-dir="$HOME/.config/obsidian" &
+    _launch_fake "$fake" --user-data-dir="$HOME/.config/obsidian"
     local human=$!
     sleep 0.3
 
