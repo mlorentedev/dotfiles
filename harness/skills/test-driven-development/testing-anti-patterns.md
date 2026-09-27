@@ -257,6 +257,32 @@ TDD cycle:
 4. THEN claim complete
 ```
 
+## The Authoring Gate
+
+Before adding or changing a test, answer four questions. A missing answer means do not add it yet.
+
+1. **What does it protect?** An observable behavior, an invariant, or an independent contract.
+2. **What credible regression makes it fail?**
+3. **Why does existing coverage not already catch that failure?** Each contract has one primary test at its strongest boundary. A second layer needs a risk the first cannot reach, such as a transport or lifecycle failure. Extend a table-driven case rather than adding a near-duplicate.
+4. **Does it need a production seam that no production caller needs?** That is Anti-Pattern 2: move the test to the real boundary.
+
+A test that breaks under a behavior-preserving refactor asserts implementation, not behavior. A regression test that never failed on the pre-fix code proves the mock, not the fix.
+
+## Anti-Pattern 6: Tests That Cannot Fail for the Right Reason
+
+The gate rejects a new test that matches one of these shapes. A review flags an existing one unless the retention bar in `adversarial-review` names the contract it independently guards.
+
+- An assertion-free coverage probe, or a self-comparison.
+- A fixture, inventory or manifest copied from the thing it is compared against.
+- An exact source or string grep that breaks on a rename but not on a change in behavior.
+- An expected value produced by the helper or renderer under test.
+- A capability test that restates a declared flag instead of exercising what the flag promises.
+- A negative control that passes for an unrelated reason: another guard's denial, or an `awk`/`sed` range that silently matches nothing once a marker moves.
+- A name that promises more than the input exercises.
+- The same contract asserted at two layers with no distinct risk between them.
+
+*Adapted from OpenClaw's `test-audit` skill (MIT); see `harness/skills/ATTRIBUTION.md` in dotfiles.*
+
 ## When Mocks Become Too Complex
 
 **Warning signs:**

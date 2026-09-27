@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: 43859027293c2ef3
+generated_sha: e5f49308d68390d6
 id: adversarial-review-skill
 type: skill
 status: active
@@ -197,6 +197,28 @@ For each finding, name the test that *proves* it (or proves its fix). A finding 
 - Cite the **named test** that exercises the finding's path — a `bats` case (`test/*.bats` → `@test "…"`), a pytest id, or a Go test func — **by name**, not "the test suite".
 - A finding with **no named covering test → mark it `UNTESTED`**. An UNTESTED Blocker/Major is **not** resolved by the implementer's claim alone; it needs a named regression test before PASS.
 - This closes the gap where `verification.md` asserts "tested" but no *named* test maps to the specific risk.
+
+### Test deletions — retention bar and candidate evidence
+
+A change that deletes or weakens a test gets the same scrutiny as one that adds code. It is the only kind of change that makes a suite quieter by construction.
+
+**Keep a test** when it independently enforces a public API, protocol, config, default, migration, storage, security, platform, prompt-byte, generated cross-language, release or architecture contract. Also keep:
+
+- call ordering, when the order is observable;
+- a regression with a credible failure mode;
+- a source inspection, when it is the cheapest independent guard: it fails when the contract changes (the user-facing key, byte or path) and survives a rename.
+
+A retained test that fails is a possible product bug. Reproduce it and fix the owner; do not delete the test. Being static or slow is not a reason to delete.
+
+**A deletion is ready only when every field below is recorded.** A missing field is a **REAL** finding against the deletion, whatever the rest of the change looks like:
+
+1. The exact test, and the failure it can actually detect.
+2. The stronger proof that remains, **shown**, not assumed: a mutation of the guarded property that turns another named test or gate red. "X probably covers this" is a missing field.
+3. Non-test callers of any seam the deletion unlocks, and the production code it lets you remove.
+4. Why the test exists, from its history (`git log -S`).
+5. The focused command that validates the remaining proof.
+
+*Retention bar and evidence fields adapted from OpenClaw's `test-audit` skill (MIT).*
 
 ## Evaluator Rubric (quantitative — SDD-028c)
 
