@@ -1,8 +1,43 @@
 [
   {
     "id": "AI-047-nan-quota-alarm-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "A recorded /v1/usage fixture and the declared table give WARN at 83%, PASS at 10%, nothing for an unmetered model",
+    "verification": "cd cli && go test ./internal/nanquota/ -run 'TestEvaluate'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-047-nan-quota-alarm-f2",
+    "behavior": "dotf doctor reports each metered bound NaN model with used / quota / percent, live",
+    "verification": "echo 'Live measurement recorded in verification.md; it needs NAN_API_KEY' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-047-nan-quota-alarm-f3",
+    "behavior": "A bound id missing from /v1/models is a FAIL naming it",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckNaNQuota_FailsOnAnUnservedBinding' && go test ./internal/nanquota/ -run 'TestEvaluateFailsOnAnIDNaNDoesNotServe'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-047-nan-quota-alarm-f4",
+    "behavior": "NaN unreachable, or no key on the box, is a SKIP with a reason and no failure",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckNaNQuota_SkipsWhenNaNIsUnreachable|TestCheckNaNQuota_SkipsWithoutAKey|TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-047-nan-quota-alarm-f5",
+    "behavior": "No key reaches the report on any error branch",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckNaNQuota_NeverPrintsTheKey'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-047-nan-quota-alarm-f6",
+    "behavior": "hermes's digest no longer states a single 500M pool",
+    "verification": "echo 'PR-2: vault change' && exit 1",
     "state": "pending",
     "evidence": ""
   }

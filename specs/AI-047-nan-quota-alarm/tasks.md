@@ -13,31 +13,27 @@ created: "2026-09-26"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/AI-047-nan-quota-alarm`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/nan-quota-alarm`
+- [x] Owner chose (A), 2026-09-26
+- [x] Measure `/v1/usage`: window, paging, UTC dates, accepted User-Agents (`verification.md`)
 
-## Implementation
+## PR-1: the check
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
+- [x] [AC1] [AC3] Failing tests for `nanquota.Evaluate` against a recorded fixture, then the package
+- [x] Declared table `harness/nan-quotas.json`, closed-world (metered + unmetered)
+- [x] [AC3] [AC4] [AC5] Failing doctor tests against fixtures (unserved id, outage, no key, bw gate, key never printed), then `checks_nan_quota.go` and the `HTTPGetBody` seam
+- [x] [AC2] Live run, recorded
+- [ ] PR opened, triaged, merged by the owner **after #1772** (on main the check FAILs on `qwen3-rerank` until #1772 lands)
 
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+## PR-2: hermes
+
+- [ ] [AC6] Vault: remove the single-pool quota section from `00_meta/agents/scripts/budget-report.sh` and its false "no usage endpoint" header; point the digest reader at `dotf doctor`
+- [ ] Measure whether `/v1/usage` is per key or per member
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [ ] Every acceptance criterion covered by a test or a recorded measurement
+- [ ] Independent adversarial review before archive
 
 ## Machine-readable features
 

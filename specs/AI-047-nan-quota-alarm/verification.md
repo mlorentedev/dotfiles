@@ -7,24 +7,51 @@ created: "2026-09-26"
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+- [x] AC1 -> `TestEvaluateClassifiesByShareOfQuota`, `TestEvaluateFailsAtTheQuota`, `TestEvaluateTreatsAnAbsentModelAsUnused`, `TestEvaluateWarnsOnAnUndeclaredModel`.
+- [x] AC2 -> live run below.
+- [x] AC3 -> `TestCheckNaNQuota_FailsOnAnUnservedBinding` (a copy of the real model map with `services.rerank` set to `qwen3-rerank`), `TestEvaluateFailsOnAnIDNaNDoesNotServe`.
+- [x] AC4 -> `TestCheckNaNQuota_SkipsWhenNaNIsUnreachable`, `TestCheckNaNQuota_SkipsWithoutAKey`, `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon`.
+- [x] AC5 -> `TestCheckNaNQuota_NeverPrintsTheKey`, on the rejected, unparseable and transport branches, each with the key planted where a careless message would echo it.
+- [ ] AC6 -> PR-2.
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+Mutations applied one at a time, each caught by the named test: transport error as FAIL; the usage body echoed into the parse warning; unserved id as WARN; the warn threshold moved to 90%; the key not sent; the bw daemon gate removed. The gate mutation survived the first version of the tests, because the default resolver already answers "absent". `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon` was added for it.
+
+## Measurements (2026-09-26, through `dotf secrets run`; only status codes and metadata printed)
+
+- The default `/v1/usage` window is a rolling 30 days (`2026-08-28` to `2026-09-27`). Dates are UTC: the run was at about 01:00 UTC on the 27th.
+- `start_date` and `end_date` are accepted.
+- `totals.by_model` covers the whole window when `data` is paged: under `limit=3` it equals the unpaged totals.
+- NaN answers 403 to the `Python-urllib` User-Agent on `/v1/usage` and `/v1/models`. It answers 200 to Go's default UA (1.1 and 2.0) and to curl. The check sends `User-Agent: dotf-doctor`.
+- Open: whether the endpoint reports per key or per member. It is not measured yet.
+- Open: which period NaN meters against. The 83% figure in AI-044 was computed from the calendar month, so it cannot settle this.
+
+## Live run (AC2)
+
+`DOTFILES_DIR=<this worktree> go run ./cmd/dotf doctor --verbose`, NaN section:
+
+```
+[NaN quota]
+  [ OK ] deepseek-v4-flash: 682.8M / 3000.0M tokens this month (23%)
+  [ OK ] mimo-v2.5: 83.0M / 1000.0M tokens this month (8%)
+  [INFO] qwen3-embedding: unmetered, 0.0M tokens this period
+  [FAIL] qwen3-rerank is bound in model-map.json but NaN does not serve it (absent from /v1/models)
+  [INFO] qwen3.6: unmetered, 0.0M tokens this period
+  [WARN] qwen3.8-flash: 415.4M / 500.0M tokens this month (83%) — move routed traffic off it before it runs out
+```
+
+On main it catches both defects #1772 fixes. So this PR merges after #1772.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- `go build ./... && go vet ./...`: clean.
+- `go test ./...`: `doctor` and `nanquota` pass. `initrepo` and `spec` fail on vault drift from the spec-id grammar thread (#1479). They read the live vault, not this diff, and fail the same on main.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- The table is closed-world: a bound NaN model in neither list is a WARN, so a model NaN adds is never silently treated as unmetered.
+- Severity: a spent quota and an unserved binding FAIL. No key, an outage or an unexpected answer is a SKIP or a WARN, so a CI runner or an outage never reads as a breach.
+- The key is resolved through the Loader seam, as the PAT section does. It is never read from the environment (ADR-028).
+- The table and the model map are read from `DOTFILES_DIR`, like `checkModelMap`. `dotf harness mirror` copies the whole `harness/` tree, so the new file reaches the deploy dir on the next setup.
 
 ## Promotion candidates
 
