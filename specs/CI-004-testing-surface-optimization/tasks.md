@@ -16,24 +16,24 @@ created: "2026-09-25"
 - [x] Gating issue open and self-assigned: #1739
 - [x] Worktree `../dotfiles-wt-ci-004`, branch `feat/ci-004-testing-surface` from `origin/main` (`f42c212`)
 - [x] `proposal.md` complete, with measured baselines for every criterion
-- [ ] Owner approves the plan (proposal + this file) before any code
+- [x] Owner approves the plan (proposal + this file) before any code: 2026-09-27, "ok dale" on taking CI-004 over
 - [x] Out-of-scope rows recorded where they now live: P0.4 and P1.4 on #1628, P1.2 on #1478, P1.1 as #1741 (CI-005), P2.1–P2.4 as #1742–#1745 (CI-006 to CI-009)
 
 Heavy runs go through `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapMax=0`. The box has ~3 GB free.
-The bats verifications need two files so `setup_suite` loads; `tests/guard-lesson-numbers-unique.bats` is the cheap companion.
+The bats verifications need two files so `setup_suite` loads. The companion for timing is `tests/vault-health.bats` (~0.5 s); `tests/guard-lesson-numbers-unique.bats` takes ~3 s alone and would dominate a 5 s bound.
 
 ## Implementation
 
 ### PR 1: the spec, P0.1, P0.2 and P0.6
 
-- [ ] [AC1] Write a failing timing assertion. `tests/guard-no-gui.bats` gets a test that bounds how long the fake GUI's descendants outlive the test. Run `bats tests/guard-no-gui.bats tests/guard-lesson-numbers-unique.bats`. Expected: the new test fails, and the file still takes ~31 s.
-- [ ] [AC1] Fix the leak at `tests/guard-no-gui.bats:121-127` by closing the descriptors the orphan inherits: launch both fakes with `>/dev/null 2>&1 3>&- &`. bats-core documents that a background process must close fd 3, or bats waits for it. Do not reach for `exec sleep` first: `pgrep -a obsidian` matches on the process name, and `exec` renames the process to `sleep`, which would blind the existing detector test. Expected: the file finishes in under 5 s, and every test passes.
-- [ ] [AC1] Mutation. Make `_gui_guard_test_shaped_processes` return nothing. Expected: the stray-detector test fails. Record the diff and the output in `verification.md`.
-- [ ] [AC2] Add a deploy counter. The tests call `"$SCRIPT" --deploy` by absolute path, so a PATH stub would never see them. Instead, `setup_file` writes a wrapper into `$BATS_FILE_TMPDIR` that appends one line per `--deploy` to `$BATS_FILE_TMPDIR/deploys` and `exec`s the real `scripts/compile-harness.sh`, and `setup` points `SCRIPT` at it. Add a last test, `skills-pipeline deploys at most 6 times per run`, that asserts on the count. Expected: it fails at 17.
-- [ ] [AC2] In `setup_file`, deploy once into `$BATS_FILE_TMPDIR/home-clean` (ambient PATH; tests 1–8, 10, 11 and 19) and once into `$BATS_FILE_TMPDIR/home-copilot` (the `stub_copilot` PATH; tests 12 and 13). Those tests stop deploying and read the shared home. Tests 9, 14, 15 and 16 seed state or change PATH, so they keep their own `FAKEHOME`. Expected: 24/24 pass, and the count is 6.
-- [ ] [AC3] `chmod -R a-w` both shared homes at the end of `setup_file`; `teardown_file` restores `u+w` before removing them. Add the test `a write into a shared setup_file home fails`, which runs `touch` on the clean home and asserts that it fails. Mutation: drop the `chmod`, and that test fails. Record it.
-- [ ] [AC4] Set `.github/workflows/ci.yml` `test-windows` `timeout-minutes: 45` to `20`. Replace the CI-001 loan comment with the distribution from `proposal.md` and the rule for revisiting it: raise it only with a run that crossed it and a ticket. Verify with `grep -n 'timeout-minutes: 20' .github/workflows/ci.yml` inside the `test-windows` block.
-- [ ] [AC1] [AC2] Before and after timings go in `verification.md`: local wall time for both bats files, and the CI "Run bats test suite" step on the PR run.
+- [x] [AC1] Write a failing timing assertion. `tests/guard-no-gui.bats` gets a test that bounds how long the fake GUI's descendants outlive the test. Run `bats tests/guard-no-gui.bats tests/guard-lesson-numbers-unique.bats`. Expected: the new test fails, and the file still takes ~31 s.
+- [x] [AC1] Fix the leak at `tests/guard-no-gui.bats:121-127` by closing the descriptors the orphan inherits: launch both fakes with `>/dev/null 2>&1 3>&- &`. bats-core documents that a background process must close fd 3, or bats waits for it. Do not reach for `exec sleep` first: `pgrep -a obsidian` matches on the process name, and `exec` renames the process to `sleep`, which would blind the existing detector test. Expected: the file finishes in under 5 s, and every test passes.
+- [x] [AC1] Mutation. Make `_gui_guard_test_shaped_processes` return nothing. Expected: the stray-detector test fails. Record the diff and the output in `verification.md`.
+- [x] [AC2] Add a deploy counter. The tests call `"$SCRIPT" --deploy` by absolute path, so a PATH stub would never see them. Instead, `setup_file` writes a wrapper into `$BATS_FILE_TMPDIR` that appends one line per `--deploy` to `$BATS_FILE_TMPDIR/deploys` and `exec`s the real `scripts/compile-harness.sh`, and `setup` points `SCRIPT` at it. Add a last test, `skills-pipeline deploys at most 6 times per run`, that asserts on the count. Expected: it fails at 17.
+- [x] [AC2] In `setup_file`, deploy once into `$BATS_FILE_TMPDIR/home-clean` (ambient PATH; tests 1–8, 10, 11 and 19) and once into `$BATS_FILE_TMPDIR/home-copilot` (the `stub_copilot` PATH; tests 12 and 13). Those tests stop deploying and read the shared home. Tests 9, 14, 15 and 16 seed state or change PATH, so they keep their own `FAKEHOME`. Expected: 24/24 pass, and the count is 6.
+- [x] [AC3] `chmod -R a-w` both shared homes at the end of `setup_file`; `teardown_file` restores `u+w` before removing them. Add the test `a write into a shared setup_file home fails`, which runs `touch` on the clean home and asserts that it fails. Mutation: drop the `chmod`, and that test fails. Record it.
+- [x] [AC4] Set `.github/workflows/ci.yml` `test-windows` `timeout-minutes: 45` to `20`. Replace the CI-001 loan comment with the distribution from `proposal.md` and the rule for revisiting it: raise it only with a run that crossed it and a ticket. Verify with `grep -n 'timeout-minutes: 20' .github/workflows/ci.yml` inside the `test-windows` block.
+- [x] [AC1] [AC2] Before and after timings go in `verification.md`: local wall time for both bats files, and the CI "Run bats test suite" step on the PR run.
 
 ### PR 2: P0.3, a run-scoped stray detector and `bats --jobs`
 
@@ -74,7 +74,7 @@ The bats verifications need two files so `setup_suite` loads; `tests/guard-lesso
 - [ ] No unrelated changes in any PR (no scope creep); every PR body states "no `.sh`/`.ps1` setup script touched"
 - [ ] `verification.md` filled in, with before and after numbers per row
 - [ ] Independent review through `dotf spec review CI-004-testing-surface-optimization` before archive
-- [ ] Lesson in `docs/lessons/` (PR 1): `bats -f` with a filter that matches nothing prints `1..0` and exits 0, so a feature check that selects a test by name passes before the test exists. Measured while writing this spec; the checks require the `ok N <name>` line instead
+- [x] Lesson in `docs/lessons/` (PR 1, lesson 309): `bats -f` with a filter that matches nothing prints `1..0` and exits 0, so a feature check that selects a test by name passes before the test exists. Measured while writing this spec; the checks require the `ok N <name>` line instead
 
 ## Machine-readable features
 
