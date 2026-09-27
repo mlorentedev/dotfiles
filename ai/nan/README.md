@@ -55,18 +55,13 @@ Errors to expect: `401` invalid key, `404` unknown model, `429` rate limit, `500
 2. Go to https://cloud.nan.builders/ → user settings → **API Keys**.
 3. Generate a key. Format: starts with `sk-`. **The key is personal and non-transferable** — don't share.
 
-### 2. Encrypt + commit the key
+### 2. Store the key in Bitwarden
 
-NaN's API key is loaded via the repo's age-based secret system. The encrypted file lives at `sensitive/nan.api-key.secret.age`; the mapping in `secrets/registry.yaml` already exposes it as `NAN_API_KEY`.
+`secrets/registry.yaml` maps `NAN_API_KEY` to the Bitwarden item `nan-api-key` (field `api-key`, folder `Dotfiles/apps`), per ADR-028. Put the `sk-...` key there, then:
 
 ```bash
-# From the repo root:
-age -r "$(age-keygen -y ~/.config/age/key.txt)" \
-    -o sensitive/nan.api-key.secret.age
-# (then paste your sk-... key, press Ctrl-D)
-
-# Verify the secret can be decrypted + loaded:
-dotf secrets verify
+dotf secrets verify                       # resolves every secret, reports OK/MISSING/FAILED
+dotf secrets run --only NAN_API_KEY -- <cmd>   # hands the key to one process
 ```
 
 ### 3. Activate the integration
@@ -101,8 +96,7 @@ curl https://api.nan.builders/v1/chat/completions \
 
 | File | Role |
 |---|---|
-| `secrets/registry.yaml` | exposes `nan.api-key` as `NAN_API_KEY` (registry entry) |
-| `sensitive/nan.api-key.secret.age` | encrypted key (user creates, see Setup §2) |
+| `secrets/registry.yaml` | maps Bitwarden item `nan-api-key` to `NAN_API_KEY` (and `HIVE_WORKER_API_KEY`) |
 | `ai/opencode/opencode.jsonc` | provider block `nan` (default model + 6 chat models) |
 | `.zsh/aliases.zsh` + `.bashrc` + `powershell/profile.ps1` | `qqn` alias + `NAN_BASE_URL` export |
 
@@ -156,7 +150,7 @@ OpenCode no expone estos como provider-level config; los inyecta por agente. Par
 | `429 rate limit` errors during agentic loops | NaN's 60 rpm per key / per-model concurrency cap | Switch to `openrouter/<model>` for the burst, or backoff |
 | `402 Payment Required` | That model's monthly quota is spent | Switch model until the month resets; check `GET /v1/usage` |
 | `524 timeout` on `kokoro` TTS | Large audio request, NaN server timeout | Split input into shorter chunks |
-| `NAN_API_KEY` empty after `secrets_refresh` | `sensitive/nan.api-key.secret.age` missing / unreadable | Re-run Setup §2; check `~/.config/age/key.txt` exists |
+| `NAN_API_KEY` empty | Bitwarden item `nan-api-key` missing or the vault is locked | `dotf secrets verify`; see Setup §2 |
 
 ## References
 

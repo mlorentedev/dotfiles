@@ -38,7 +38,7 @@
 
   "provider": {
     // NaN community — primary daily provider.
-    // API key: $NAN_API_KEY (sensitive/nan.api-key.secret.age, managed via dotf secrets).
+    // API key: $NAN_API_KEY, from Bitwarden item nan-api-key (secrets/registry.yaml, ADR-028).
     "nan": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "NaN",
