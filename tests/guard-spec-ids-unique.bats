@@ -38,11 +38,22 @@
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     SPECS_DIR="$DOTFILES_DIR/specs"
+    # The ticket-ID part of the spec idPattern (cli/internal/spec/spec.go): an
+    # AREA of hyphen-joined upper-case segments, each optionally ending in
+    # digits, then the number. Narrower than that, and APP-CONFIG-015 or
+    # ADR028-004 folders are never listed, so they can collide unseen (#1479).
+    # The sub-id letter stays outside it: SDD-012b belongs to SDD-012's number.
+    TICKET_RE='[A-Z]+[0-9]*(-[A-Z]+[0-9]*)*-[0-9]+'
 }
 
 # Every spec folder name, active and archived, one per line.
 _spec_dirs() {
-    ls "$SPECS_DIR" "$SPECS_DIR/archive" 2>/dev/null | grep -E '^[A-Z]+-[0-9]+' || true
+    ls "$SPECS_DIR" "$SPECS_DIR/archive" 2>/dev/null | grep -E "^${TICKET_RE}" || true
+}
+
+# The ticket ID a folder name carries.
+_ticket_id() {
+    printf '%s' "$1" | grep -oE "^${TICKET_RE}"
 }
 
 _explain() {
@@ -55,7 +66,7 @@ _explain() {
     [ -d "$SPECS_DIR" ] || skip "specs/ not present"
 
     bad=""
-    for id in $(_spec_dirs | grep -xE '[A-Z]+-[0-9]+'); do
+    for id in $(_spec_dirs | grep -xE "${TICKET_RE}"); do
         siblings="$(_spec_dirs | grep -E "^${id}-" || true)"
         [ -n "$siblings" ] || continue
         bad="$bad$id plus $(printf '%s' "$siblings" | tr '\n' ' ')"$'\n'
@@ -73,8 +84,8 @@ _explain() {
     [ -d "$SPECS_DIR" ] || skip "specs/ not present"
 
     bad=""
-    for active in $(ls "$SPECS_DIR" | grep -E '^[A-Z]+-[0-9]+'); do
-        id="$(printf '%s' "$active" | grep -oE '^[A-Z]+-[0-9]+')"
+    for active in $(ls "$SPECS_DIR" | grep -E "^${TICKET_RE}"); do
+        id="$(_ticket_id "$active")"
         members="$(_spec_dirs | grep -E "^${id}(-|\$)" | sort -u)"
         [ "$(printf '%s\n' "$members" | wc -l)" -gt 1 ] || continue
         # Series: every member slugged, all agreeing on the first slug word.
@@ -98,4 +109,13 @@ _explain() {
     # assertion is only ever running its collision branch.
     n="$(_spec_dirs | grep -cE '^CLI-024-secrets-')"
     [ "$n" -ge 2 ]
+}
+
+@test "guard: the ticket-ID grammar sees every AREA shape the spec CLI accepts" {
+    # A folder the guard cannot parse is a folder it never checks.
+    [ "$(_ticket_id APP-CONFIG-015-webhook-auth)" = "APP-CONFIG-015" ]
+    [ "$(_ticket_id ADR028-004-slug)" = "ADR028-004" ]
+    [ "$(_ticket_id CI-GATE-2)" = "CI-GATE-2" ]
+    [ "$(_ticket_id SDD-012b-guard)" = "SDD-012" ]
+    [ "$(_ticket_id HARNESS-111)" = "HARNESS-111" ]
 }

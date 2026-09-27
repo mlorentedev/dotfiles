@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: e5d46cfad104b1c5
+generated_sha: 9982757a207c2757
 id: new-ticket-skill
 type: skill
 status: active
@@ -55,7 +55,7 @@ Take the title and any description/body the user gave. A title alone is enough; 
 | Field | How to propose |
 |-------|----------------|
 | **Home repo** | Infer from §1b: harness / methodology / skills / agents / `AGENTS.md` / SDD → `dotfiles`; vault content or structure → `knowledge`; a specific project's code/infra → that repo. Tie-breaker: where the deploy/runtime contract lives, else `dotfiles`. Fallback: the current repo (`git rev-parse --show-toplevel`). |
-| **AREA prefix** | Pick the area the work belongs to (e.g. `HARNESS`, `OPS`, `CUR`, `AI`, `BUG`, `REFACTOR`, `IDEAS`). If the user typed one in the title, reuse it. |
+| **AREA prefix** | Pick the area the work belongs to (e.g. `HARNESS`, `OPS`, `CUR`, `AI`, `BUG`, `REFACTOR`, `IDEAS`). An AREA may be several upper-case segments joined by hyphens (`APP-CONFIG`, `CI-GATE`); the spec `idPattern` accepts them. If the user typed one in the title, reuse it. |
 | **Type** | Infer from the AREA prefix via the table below. |
 | **Priority** | Propose from "Priority by signal" below (calibrated to the board's real distribution); `P2` when no signal fires. |
 | **Status** | `Backlog`. |
@@ -154,7 +154,7 @@ For agents acting under **detect→ticket** (no human in the loop), skip step 3'
 
 A single-shot rewrite of a backlog item or a pasted user story into an implementation-ready form, usually before `/spec fill` when the issue is too thin to drive its questions. Skip it when the item already names the files to modify, a definition of done and acceptance criteria, for trivial changes, and for spikes.
 
-**Input.** An id matching `^[A-Z]+[0-9]*-\d+[a-z]?(-[a-z0-9-]+)?$` is read with `gh issue view <id> --json title,body`; if it is not found, ask for the story. The pattern is a deliberate subset of the spec `idPattern`: a dated `YYYY-MM-DD-slug` is not a backlog id. Multi-line markdown is used as it is.
+**Input.** An id matching `^[A-Z]+[0-9]*(-[A-Z]+[0-9]*)*-\d+[a-z]?(-[a-z0-9-]+)?$` is read with `gh issue view <id> --json title,body`; if it is not found, ask for the story. The pattern is a deliberate subset of the spec `idPattern`: a dated `YYYY-MM-DD-slug` is not a backlog id. Multi-line markdown is used as it is.
 
 **Check the story for each item its domain needs,** reading at most 2-3 relevant patterns from `$VAULT_PATH/00_meta/patterns/`:
 
