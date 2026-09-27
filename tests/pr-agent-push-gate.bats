@@ -131,6 +131,10 @@ _gate() {
     comment "mlorentedev" 2026-09-25T14:30:00Z $'a\nb\nc\nd\ne\n<!-- pr-agent:review:full -->'
     _gate
     [[ "$output" == *"run=true"* ]]
+    # Pins the direction: run=true here comes from the 3 real commits meeting
+    # the threshold (mode=incremental), never from the forged-override path
+    # (mode=full) misfiring on prose that only mentions the Guide.
+    [[ "$output" == *"mode=incremental"* ]]
 }
 
 @test "an identity line with CRLF endings still marks a review" {

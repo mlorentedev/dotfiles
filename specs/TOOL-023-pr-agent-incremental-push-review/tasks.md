@@ -37,6 +37,7 @@ created: "2026-09-25"
 - [x] [f6] Failing cases: a `head_sha` in the state block counts commits by position (immune to a rebase preserving author dates); the sha absent from the PR's commits forces `mode=full`; a state block without a `head_sha` (every incremental review; PR-Agent's `_review_finding_state_enabled` disables it) falls back to the date count; unreadable commits on the sha path still fail open.
 - [x] [f7] Confirm the workflow can select per push (an `env:` value may read a step output, as `STARTED`/`HEAD_SHA` already do); gate emits `mode=full|incremental`, `pr-agent.yml`'s `push_commands` reads it; update `tests/pr-agent-config.bats`'s exact-equality check for the template.
 - [x] Read the pinned PR-Agent v0.45.0 source to confirm incremental reviews carry no state block, rather than assume it.
+- [x] Disclose a fourth, narrower gap surfaced by reviewing this fix: SHA-position counting can disagree with PR-Agent's own date-based `get_commit_range` on a cherry-pick with a preserved old author date. Amended ADR-040 D2 rather than leaving it as an absolute guarantee; the pre-existing "no review published" guard (#1107) is what actually catches it.
 - [ ] File the upstream finding: `get_previous_review` picks a baseline by comment body only, with no author check, so a forged comment can become PR-Agent's own incremental baseline too (not filed by this agent; owner's call per the triage).
 
 ## Closing

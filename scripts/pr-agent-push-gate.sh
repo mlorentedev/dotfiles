@@ -33,6 +33,16 @@
 # review was incremental is exposed to the same rebase blind spot until its
 # next FULL one.
 #
+# Counting by SHA position can disagree with PR-Agent's own get_commit_range,
+# which still walks by author date: if every commit after the reviewed sha
+# happens to be dated AT OR BEFORE the review's created_at (a cherry-pick with
+# a preserved old author date, not a plain rebase), PR-Agent computes an empty
+# range, `_can_run_incremental_review` declines, and it publishes nothing. That
+# is the narrower failure this repo already guards against elsewhere: a run
+# with nothing published fails the workflow's "no review published" check
+# loudly, with `/review` named as the remedy, rather than the silent
+# `run=false` this whole gate exists to replace.
+#
 # It fails OPEN: input it cannot read means run=true, mode=full. Skipping a
 # review has to be justified by the data; running one costs only inference.
 #

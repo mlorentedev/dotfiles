@@ -86,6 +86,15 @@ Follow-up findings (this branch, not yet merged):
   gate is back on date-based counting — and the original rebase blind spot — until the next
   full review. Not widened here: doing so would mean trusting a field PR-Agent does not
   populate for that case, which is a guess, not a fix.
+- **A fourth, narrower disclosure, found reviewing this fix rather than in the original
+  triage:** SHA-position counting (f6) can disagree with PR-Agent's own date-based
+  `get_commit_range` when every commit after the reviewed sha is authored at or before the
+  review's `created_at` (a cherry-pick with a preserved old date, not a plain rebase, which
+  lands in `mode=full` already via f6's absent-sha check). PR-Agent then computes an empty
+  incremental range and publishes nothing — loudly caught by the pre-existing "no review
+  published" guard (#1107), never silently. ADR-040 D2 is amended in this PR (was: "the gate
+  mirrors its rule, so it never starts a run PR-Agent would then decline" — now states the
+  exception and what catches it) rather than left to read as an absolute it no longer is.
 - **Upstream finding, not filed by this agent (owner's call):** `get_previous_review`
   (`github_provider.py`) picks its baseline comment by body text alone, walking the comment
   list by position, with no author check — the same class of bug as f5, in the tool this
