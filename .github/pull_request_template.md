@@ -4,6 +4,18 @@
 
 -
 
+## Knowledge
+
+<!--
+Enforced by .github/workflows/knowledge-gate.yml (ADR-039). One line per kind:
+the files this PR adds or changes for it (docs/lessons/, docs/adr/,
+docs/runbooks/), or "none: " followed by the reason there are none.
+-->
+
+- Lesson:
+- ADR:
+- Runbook:
+
 ## SDD checklist
 
 <!-- Enforced by .github/workflows/spec-gate.yml. See AGENTS.md "Discipline Gate". -->
