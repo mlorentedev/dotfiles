@@ -46,6 +46,21 @@ setup() {
     jq empty "$PI_SETTINGS"
 }
 
+# AI-046 AC4: pi-nan-provider's media bridge runs `npx -y nan-mcp-server@<v>` per
+# tool call, a second npm package the pinned manifest never sees. The package
+# resolves the toggle env var > ~/.pi/agent/nan-provider.json > default ON, so
+# the managed file is what keeps it off on every launch path. `merge`, not
+# `replace`: webSearch in the same file is the box's own /nan-mcp toggle.
+@test "pi-nan-provider's media MCP bridge is deployed OFF, merged into the package's state file" {
+    command -v jq >/dev/null || skip "jq not available"
+    local entry
+    entry="$(jq -c '.configs[] | select(.dst == "{HOME}/.pi/agent/nan-provider.json")' "$DOTFILES_DIR/ai/deploy.json")"
+    [ -n "$entry" ]
+    [ "$(printf '%s' "$entry" | jq -r '.strategy')" = "merge" ]
+    [ "$(printf '%s' "$entry" | jq -r '.requires')" = "pi" ]
+    [ "$(jq -r '.mediaMcp' "$DOTFILES_DIR/$(printf '%s' "$entry" | jq -r '.src')")" = "false" ]
+}
+
 @test "ai/pi/settings.json omits the volatile lastChangelogVersion (seed-if-missing)" {
     refute_grep_fixed 'lastChangelogVersion' "$PI_SETTINGS"
 }

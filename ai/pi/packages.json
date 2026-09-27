@@ -83,6 +83,10 @@
     {
       "source": "npm:pi-mcp-client@0.8.0",
       "why": "Model Context Protocol client for Pi; exposes Hive, context7, and sequential-thinking tools."
+    },
+    {
+      "source": "npm:@gtrabanco/pi-nan-provider@0.7.0",
+      "why": "Registers pi's NaN provider from a models.dev snapshot merged with NaN's live /models, drops cross-model reasoning replays that overflow qwen3.6's 262K window, and retries truncated streams (AI-046, #1764). Its media MCP bridge spawns an unpinned-by-us npx server, so ai/pi/nan-provider.json turns it off."
     }
   ],
   "retire": [
