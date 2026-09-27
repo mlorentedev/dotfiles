@@ -12,18 +12,24 @@
 | Base URL | `https://api.nan.builders/v1` |
 | Auth header | `Authorization: Bearer sk-...` |
 | API style | OpenAI-compatible (chat, embeddings, audio, completions, responses) |
-| Rate limit | 100 requests/minute · max 5 concurrent |
+| Rate limit | 60 requests/minute per key · 1.5M tokens/minute per model · 5-7 concurrent per model |
+| Quota | Monthly tokens per model (see the catalog); a spent quota answers `402` until the month resets. Own usage: `GET /v1/usage` |
 | Pricing | Community subscription (fixed, not per-token PAYG) |
 
 ## Model catalog
 
 ### Chat models (visibles en opencode `/models`)
 
-| Model ID | Context | Multimodal | Use case |
+| Model ID | Context | Quota / month | Use case |
 |---|---|---|---|
-| `deepseek-v4-flash` | **1M** | text | **Default in opencode** — full-repo reasoning, large diffs, root-cause analysis |
-| `qwen3.6` | 256K | text + image | Daily quick-questions via `qq`, multilingual (ES) |
-| `gemma4` | 256K | text + image | A/B candidate vs qwen3.6 |
+| `glm5.3-flash` | 1M | 2B | **opencode default and `plan` agent** — NaN's recommendation for coding agents |
+| `deepseek-v4-flash` | 1M | 3B | pi default; long-context via `qf` |
+| `qwen3.6` | 262K | none (per-minute limits only) | `qq` quick questions; opencode titles (`small_model`); `model-map` low tier |
+| `gemma4` | 262K | none | A/B candidate vs qwen3.6 |
+| `qwen3.8-flash` | 262K | 500M | picker only since 2026-09-26: it reached 83% of its quota as the default (AI-044, #1762) |
+| `mimo-v2.5` | 1M | 1B | pr-agent reviewer; `mimo-v2.6-flash` replaces it (AI-045, #1763) |
+
+Every chat model reads images. Source: https://nan.builders/docs/models (checked 2026-09-26).
 
 ### Non-chat models (NO en opencode picker — usar curl/SDK directos)
 
@@ -97,7 +103,7 @@ curl https://api.nan.builders/v1/chat/completions \
 |---|---|
 | `secrets/registry.yaml` | exposes `nan.api-key` as `NAN_API_KEY` (registry entry) |
 | `sensitive/nan.api-key.secret.age` | encrypted key (user creates, see Setup §2) |
-| `ai/opencode/opencode.jsonc` | provider block `nan` (default model + 3 chat models) |
+| `ai/opencode/opencode.jsonc` | provider block `nan` (default model + 6 chat models) |
 | `.zsh/aliases.zsh` + `.bashrc` + `powershell/profile.ps1` | `qqn` alias + `NAN_BASE_URL` export |
 
 ## Workflow — when to use which
@@ -106,7 +112,7 @@ Empirically measured with `scripts/nan-bench.sh` (2026-05-25):
 
 | Task | Tool / model | Wall |
 |---|---|---|
-| Coding interactivo, refactor, daily Q&A | OpenCode TUI / `qq` → `nan/qwen3.6` (**default**) | ~0.5-1.5s |
+| Coding, refactor, daily Q&A | OpenCode TUI → `nan/glm5.3-flash` (**default**); `qq` → `nan/qwen3.6` | ~0.8s (measured 2026-09-26) |
 | Coding A/B vs qwen3.6 | OpenCode `/models` → `nan/gemma4` | ~0.5-1.4s |
 | Async/batch jobs (no time pressure) | OpenCode `/models` / `qf` → `nan/deepseek-v4-flash` | ~3-5s (reasoning ON) |
 | Long-context >256K | OpenCode `/models` → `nan/deepseek-v4-flash` | ~3s + scales w/ input |
@@ -118,10 +124,9 @@ Empirically measured with `scripts/nan-bench.sh` (2026-05-25):
 
 | Gotcha | Detail | Mitigation |
 |---|---|---|
-| **deepseek-v4-flash reasoning chain SIEMPRE ON** | +30-180 `reasoning_tokens` por call → 3-10× más lento que qwen3.6 (datos en `scripts/nan-bench.sh`) | Default es qwen3.6; deepseek solo para async/long-ctx |
-| **deepseek-v4-flash 100M tokens/mes per-member** | Quota mensual silenciosa | Monitor uso; no rutar TODO el tráfico a deepseek |
-| **Rate limits account-wide** | 100 RPM + 5 concurrent total — compartido entre `qq` / TUI / curl / Hermes | `nan-bench.sh` ya throttle-a con `sleep 1`; agentic loops paralelos pegan 429 |
-| **Tool-calling solo en qwen3.6** | gemma4 no lista "Tool calling"; qwen3.6 usa XML internal traducido por LiteLLM | Para agentic tool-use, fija a qwen3.6 |
+| **Thinking is controlled by `reasoning_effort`** | `chat_template_kwargs.enable_thinking` is ignored (same reasoning output, measured 2026-09-26) | Send `reasoning_effort` (`none` to disable); the opencode variants move to it in AI-045 (#1763) |
+| **Monthly quota per model** | 500M to 3B depending on the model; spent answers `402` until the month resets | Read `GET /v1/usage`; do not route a high-volume path to a 500M model (AI-047, #1766) |
+| **Rate limits per key and per model** | 60 RPM per key, shared by `qq` / TUI / curl / Hermes; 5-7 concurrent per model | Parallel agentic loops hit 429: back off, or spread across models |
 | **`/v1/responses` streaming roto** | Emite solo `response.completed`, no deltas | Usar `/v1/chat/completions` (opencode default) |
 | **whisper file cap 25MB / 2min** | Audios largos → HTTP 524. NO WAV | OGG/Opus o MP3 |
 | **kokoro 15 RPM** | TTS batch se bloquea | Serializar |
@@ -148,7 +153,8 @@ OpenCode no expone estos como provider-level config; los inyecta por agente. Par
 |---|---|---|
 | `oc /models` shows no `nan/*` entries | `~/.config/opencode/opencode.jsonc` not deployed | Re-run `./setup-linux.sh` |
 | `401 Unauthorized` from `qqn` | `$NAN_API_KEY` not exported in current shell | Reload shell (`exec zsh`), or check with `dotf secrets verify` |
-| `429 rate limit` errors during agentic loops | NaN's 100 rpm / 5 concurrent cap | Switch to `openrouter/<model>` for the burst, or backoff |
+| `429 rate limit` errors during agentic loops | NaN's 60 rpm per key / per-model concurrency cap | Switch to `openrouter/<model>` for the burst, or backoff |
+| `402 Payment Required` | That model's monthly quota is spent | Switch model until the month resets; check `GET /v1/usage` |
 | `524 timeout` on `kokoro` TTS | Large audio request, NaN server timeout | Split input into shorter chunks |
 | `NAN_API_KEY` empty after `secrets_refresh` | `sensitive/nan.api-key.secret.age` missing / unreadable | Re-run Setup §2; check `~/.config/age/key.txt` exists |
 
