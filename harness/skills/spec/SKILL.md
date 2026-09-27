@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: 51bf549e04c005e0
+generated_sha: a368ef4f7d10f2d3
 id: spec-skill
 type: skill
 status: active
@@ -102,7 +102,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 **Steps:**
 
-1. **Validate id** matches `^([A-Z]+[0-9]*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`. Reject otherwise. The AREA may carry digits (`ADR028-004`), the ticket number an optional sub-id letter (`SDD-012b`). This string is `idPattern` in `cli/internal/spec/spec.go` **verbatim** — the Go regex is the enforcement point and therefore the canonical form; a drift test asserts the two match, so do not reword it.
+1. **Validate id** matches `^([A-Z]+[0-9]*(-[A-Z]+[0-9]*)*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`. Reject otherwise. The AREA is upper-case segments joined by hyphens, each of which may carry digits (`APP-CONFIG-015`, `ADR028-004`), the ticket number an optional sub-id letter (`SDD-012b`). This string is `idPattern` in `cli/internal/spec/spec.go` **verbatim** — the Go regex is the enforcement point and therefore the canonical form; a drift test asserts the two match, so do not reword it.
 2. **No clobber:** fail if `$REPO_ROOT/specs/<feature-id>/` exists. Warn if `specs/archive/<feature-id>/` exists.
 3. **Work-gate pre-flight (mandatory):**
    - The gate is an OPEN GitHub issue on the repo (tracked in the bitácora Project). Verify via `gh issue view <number> --json state,title`: the issue must exist and be `OPEN`.

@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -52,6 +53,11 @@ type System struct {
 	// this seam exists to isolate; tests inject canned responses. err != nil for
 	// transport failures (offline, DNS, timeout).
 	HTTPGet func(url string, headers map[string]string) (int, http.Header, error)
+	// HTTPGetBody is HTTPGet for a check that reads the response: it returns the
+	// status and the body, capped at 1 MiB, with a longer deadline than a
+	// header-only probe needs. The error never carries a request header, so a
+	// bearer token cannot reach the report through it.
+	HTTPGetBody func(url string, headers map[string]string) (int, []byte, error)
 	// Now returns the current time (time.Now in production). A clock seam keeps
 	// "days until expiry" deterministic under test.
 	Now func() time.Time
@@ -217,6 +223,7 @@ func realSystem() *System {
 			defer func() { _ = resp.Body.Close() }()
 			return resp.StatusCode, resp.Header, nil
 		},
+		HTTPGetBody:     httpGetBody,
 		Now:             time.Now,
 		GOOS:            runtime.GOOS,
 		AgeRoundTrip:    ageRoundTrip,
@@ -357,4 +364,34 @@ func userEnvReader() func(name string) (string, bool, error) {
 		return nil
 	}
 	return store.Get
+}
+
+// httpGetBody is the production HTTPGetBody. 15s covers /v1/usage, which
+// aggregates a month of rows server-side; doctor is the last step of setup, so
+// the call is still bounded.
+func httpGetBody(url string, headers map[string]string) (int, []byte, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return 0, nil, fmt.Errorf("build request %q: %w", url, err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	// Never follow a redirect: Go keeps Authorization on a same-host redirect
+	// whatever the scheme, so an https->http hop would send the key in clear.
+	// The 3xx comes back as the status, which the caller reports as unexpected.
+	client := &http.Client{
+		Timeout:       15 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("GET %q: %w", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return resp.StatusCode, nil, fmt.Errorf("read %q: %w", url, err)
+	}
+	return resp.StatusCode, body, nil
 }

@@ -116,6 +116,7 @@ func Run(opts Options) (int, error) {
 		checkModelMap(cfg, rep)
 		checkModelPins(sys, cfg, rep)
 		checkModelLimits(sys, cfg, rep)
+		checkNaNQuota(sys, cfg, rep)
 		checkPiExtensions(sys, cfg, rep, opts.Fix)
 		checkPiPackageRequirements(sys, cfg, rep)
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
