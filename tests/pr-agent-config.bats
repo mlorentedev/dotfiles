@@ -287,10 +287,18 @@ if 'synchronize' in types and not push_on:
 # path costs a second inference call on every push, which is a decision worth
 # forcing through this line rather than letting it arrive as an edit nobody
 # weighs. And incremental (TOOL-023): a push is reviewed for the commits since
-# the previous review, never in full again.
-@test "pr-agent: the push path runs exactly /review -i, no more and no less" {
+# the previous review, never in full again, UNLESS the push gate's own mode
+# output says the baseline is not one it can vouch for (a forged marker, a
+# rebase, or no previous review at all) — then it is /review, in full,
+# because PR-Agent's own baseline pick for `-i` has no author check either.
+#
+# push_commands is now a template driven by steps.push_gate.outputs.mode
+# rather than a bare literal, so this reads out every quoted array the
+# template can produce and checks each one, rather than json.loads-ing the
+# whole value (which would just throw on a template string).
+@test "pr-agent: the push path runs /review -i only when the gate's mode says incremental, /review otherwise" {
     run python3 -c "
-import json, sys, yaml
+import json, re, sys, yaml
 d = yaml.safe_load(open('$WF'))
 step = next(s for s in d['jobs']['review']['steps'] if 'pr-agent' in s.get('uses', ''))
 env = step['env']
@@ -300,15 +308,34 @@ raw = env.get('github_action_config.push_commands')
 if raw is None:
     print('handle_push_trigger is on with no push_commands: describe returns by default')
     sys.exit(1)
-cmds = [c.strip() for c in json.loads(raw)]
-if cmds != ['/review -i']:
-    print(f'push_commands is {cmds!r}, want exactly [\'/review -i\']')
-    if '/review' in cmds:
-        print('  a full /review on every push is what TOOL-023 removed')
-    if '/describe' in cmds:
+raw = str(raw)
+allowed = {('/review -i',), ('/review',)}
+if '\${{' not in raw:
+    # A plain literal always reviews the same way regardless of the gate's
+    # verdict, which only the incremental command could ever have meant.
+    cmds = tuple(c.strip() for c in json.loads(raw))
+    if cmds != ('/review -i',):
+        print(f'push_commands is {cmds!r}, want exactly (\'/review -i\',)')
+        sys.exit(1)
+    sys.exit(0)
+if 'steps.push_gate.outputs.mode' not in raw:
+    print(f'push_commands is a template that does not read the push gate mode: {raw!r}')
+    sys.exit(1)
+literals = re.findall(r\"'(\[[^]]*\])'\", raw)
+if not literals:
+    print(f'push_commands template has no quoted command array to check: {raw!r}')
+    sys.exit(1)
+branches = [tuple(c.strip() for c in json.loads(lit)) for lit in literals]
+bad = [b for b in branches if b not in allowed]
+if bad:
+    print(f'push_commands branch(es) {bad!r} are not one of {sorted(allowed)!r}')
+    if any('/describe' in b for b in bad):
         print('  /describe rewrites the PR body, turned off deliberately')
-    if not cmds:
+    if any(not b for b in bad):
         print('  an empty list makes the push trigger fire and do nothing')
+    sys.exit(1)
+if set(branches) != allowed:
+    print(f'push_commands only ever produces {sorted(set(branches))!r}, missing the other mode\'s branch')
     sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }

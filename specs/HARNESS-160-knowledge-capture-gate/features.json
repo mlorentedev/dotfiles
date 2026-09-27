@@ -17,15 +17,15 @@
     "id": "HARNESS-160-knowledge-capture-gate-f3",
     "behavior": "AC3: spec-gate-pr.sh --gate runs the named checker, and knowledge-gate.yml triggers and concurrency equal spec-gate.yml's",
     "verification": "bats tests/spec-gate-pr.bats tests/knowledge-gate-workflow.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 4a36573: 18 adapter and 5 workflow cases; 8 mutations killed"
   },
   {
     "id": "HARNESS-160-knowledge-capture-gate-f4",
     "behavior": "AC4: the release-please footer's Knowledge section passes the checker",
     "verification": "bats --filter 'release-please footer' tests/check-knowledge-gate.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 4a36573: the footer read from release-please-config.json passes the checker under a release PR body"
   },
   {
     "id": "HARNESS-160-knowledge-capture-gate-f5",
