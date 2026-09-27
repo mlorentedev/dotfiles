@@ -1,0 +1,44 @@
+[
+  {
+    "id": "AI-046-pi-nan-provider-f1",
+    "behavior": "packages.json declares npm:@gtrabanco/pi-nan-provider@0.7.0 and the pinned-entry contract passes",
+    "verification": "jq -e '.packages[] | select(.source == \"npm:@gtrabanco/pi-nan-provider@0.7.0\")' ai/pi/packages.json && bats tests/pi-packages.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-046-pi-nan-provider-f2",
+    "behavior": "pi --list-models nan lists every nan id in settings.json enabledModels with the package installed",
+    "verification": "echo 'PR-B: CI install of the pinned package with a dummy key' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-046-pi-nan-provider-f3",
+    "behavior": "models.json defines no NaN model the package already registers",
+    "verification": "echo 'PR-B' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-046-pi-nan-provider-f4",
+    "behavior": "the media MCP bridge is deployed off, merged into nan-provider.json",
+    "verification": "bats -f 'media MCP' tests/pi-config.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-046-pi-nan-provider-f5",
+    "behavior": "with NaN unreachable pi starts and lists the snapshot models",
+    "verification": "echo 'Recorded measurement, not re-runnable here: verification.md, Package alone, offline. PR-B adds the CI install test that re-runs it' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-046-pi-nan-provider-f6",
+    "behavior": "a deepseek-v4-flash -> qwen3.6 switch past 262K history does not overflow",
+    "verification": "echo 'PR-B: measured once' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

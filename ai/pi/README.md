@@ -8,10 +8,11 @@ SSOT (see root `AGENTS.md`).
 
 | Source | Deploy target | Notes |
 |--------|---------------|-------|
-| `models.json` | `~/.pi/agent/models.json` | NaN custom provider. `apiKey` is `{env:NAN_API_KEY}` in source; `setup-{linux,windows}` inject the literal at deploy time (SDD-009 pattern) so the deployed config is self-contained cross-OS and the key is never committed. |
+| `models.json` | `~/.pi/agent/models.json` | NaN and OpenRouter providers. `apiKey` is `${NAN_API_KEY}` in source; `dotf deploy` renders it into the deployed copy (`ai/deploy.json`: `render: true`, mode `0600`), so the key is never committed. |
 | `settings.json` | `~/.pi/agent/settings.json` | UX defaults + curated `enabledModels`. **Seed-if-missing**: pi mutates this file at runtime (`lastChangelogVersion`), so setup deploys it only when absent and never clobbers local edits. |
 | `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup installs the difference against the live `settings.json` on every run, through `pi install`. See below. |
 | `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Tools load on-demand via `pi-mcp-client` meta-tool (`mcp_tools`). Note: `context7` routes context over HTTPS to an external API. |
+| `nan-provider.json` | `~/.pi/agent/nan-provider.json` | `pi-nan-provider`'s own state file. Only `mediaMcp: false` is managed (`strategy: merge`); `webSearch` stays the box's own `/nan-mcp` toggle. See *NaN provider package* below. |
 | (canonical `AGENTS.md`) | `~/.pi/agent/AGENTS.md` | Cross-agent SSOT system prompt, deployed verbatim (same as opencode). |
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
@@ -48,6 +49,28 @@ Adding one by hand (`pi install npm:pkg@1.2.3`) works and writes the live array,
 but nothing else will ever know about it — put it in `packages.json` instead.
 
 Docs: <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md>
+
+## NaN provider package
+
+`npm:@gtrabanco/pi-nan-provider` (`packages.json`, AI-046) registers pi's `nan`
+provider from a build-time snapshot merged with NaN's live `/models`. It also
+drops cross-model reasoning replays that would overflow `qwen3.6`'s 262K window
+on a model switch, and retries truncated streams.
+
+- **The key** reaches it the way it reaches every pi provider: `NAN_API_KEY`
+  from the environment, which the `pi` shell wrapper injects through
+  `dotf secrets run`. The package's `/login` and key-file paths are not used.
+- **The media MCP bridge is off.** It spawns `npx -y nan-mcp-server@<version>`
+  per tool call, a second npm package outside this manifest. The package reads
+  `NAN_MEDIA_MCP`, then `nan-provider.json`, then defaults to on, so the managed
+  file is what keeps it off. `NAN_MEDIA_MCP=1 pi` turns it on for one session.
+- **Offline:** with NaN unreachable, pi still starts and lists the snapshot
+  models (measured 2026-09-26, `specs/AI-046-pi-nan-provider/verification.md`).
+- **Premium models** such as `glm5.3` are filtered by the member's tier, so a
+  standard key does not list them.
+- `models.json` still defines the `nan` provider too. A `models` entry replaces
+  the package's model with the same id, and pi lists the union. Moving the ids
+  out of `models.json` is AI-046's second PR.
 
 ## MCP (Model Context Protocol)
 
