@@ -286,8 +286,9 @@ if 'synchronize' in types and not push_on:
 # Exact rather than "contains /review" on purpose: adding a command to the push
 # path costs a second inference call on every push, which is a decision worth
 # forcing through this line rather than letting it arrive as an edit nobody
-# weighs.
-@test "pr-agent: the push path runs exactly /review, no more and no less" {
+# weighs. And incremental (TOOL-023): a push is reviewed for the commits since
+# the previous review, never in full again.
+@test "pr-agent: the push path runs exactly /review -i, no more and no less" {
     run python3 -c "
 import json, sys, yaml
 d = yaml.safe_load(open('$WF'))
@@ -300,8 +301,10 @@ if raw is None:
     print('handle_push_trigger is on with no push_commands: describe returns by default')
     sys.exit(1)
 cmds = [c.strip() for c in json.loads(raw)]
-if cmds != ['/review']:
-    print(f'push_commands is {cmds!r}, want exactly [\'/review\']')
+if cmds != ['/review -i']:
+    print(f'push_commands is {cmds!r}, want exactly [\'/review -i\']')
+    if '/review' in cmds:
+        print('  a full /review on every push is what TOOL-023 removed')
     if '/describe' in cmds:
         print('  /describe rewrites the PR body, turned off deliberately')
     if not cmds:
@@ -518,8 +521,8 @@ if bad:
 }
 
 @test "pr-agent: the guard reads the marker from the PR head when the base has no registry yet" {
-    grep -q 'read_marker "${BASE_REF}"' "$WF"
-    grep -q 'read_marker "${HEAD_SHA}"' "$WF"
+    grep -q 'read_markers "${BASE_REF}"' "$WF"
+    grep -q 'read_markers "${HEAD_SHA}"' "$WF"
 }
 
 @test "pr-agent: the guard counts comments across all pages, not per page" {
@@ -555,8 +558,8 @@ if bad:
 }
 
 @test "pr-agent: the head-ref fallback never takes the marker text from the PR" {
-    grep -q 'marker="PR Reviewer Guide"' "$WF"
-    run grep -c 'marker=$(read_marker "${HEAD_SHA}")' "$WF"
+    grep -q "markers='\\[\"PR Reviewer Guide\"\\]'" "$WF"
+    run grep -c 'markers=$(read_markers "${HEAD_SHA}")' "$WF"
     [ "$output" = "0" ]
 }
 
@@ -598,4 +601,51 @@ _reviewable_kept() { # $1 = newline-separated file list; prints how many survive
     # entry re-includes nothing and silently hides nothing either (#1618).
     run python3 -c 'import sys,tomllib; g=tomllib.load(open(sys.argv[1],"rb"))["ignore"]["glob"]; bad=[x for x in g if x.startswith("!")]; print(bad); sys.exit(1 if bad else 0)' "$CFG"
     [ "$status" -eq 0 ] || { echo "negated globs are inert in PR-Agent: $output" >&2; false; }
+}
+
+# TOOL-023: a push is reviewed only past a threshold of new commits, and the
+# decision is made BEFORE PR-Agent starts, by scripts/pr-agent-push-gate.sh, so
+# that a skipped push is not mistaken by the guard for a failed inference.
+_step_if() { # $1 = python expression selecting a step; prints its `if:`
+    python3 -c "
+import sys, yaml
+d = yaml.safe_load(open('$WF'))
+steps = d['jobs']['review']['steps']
+s = next(s for s in steps if $1)
+print(s.get('if', ''))
+"
+}
+
+@test "pr-agent: a push runs the push gate first, and only a push does" {
+    run _step_if "s.get('id') == 'push_gate'"
+    [ "$status" -eq 0 ] || { echo "no step with id push_gate" >&2; false; }
+    [[ "$output" == *"github.event.action == 'synchronize'"* ]]
+    grep -q 'scripts/pr-agent-push-gate.sh' "$WF"
+    # The job has no full checkout; the gate script alone is checked out.
+    run _step_if "'checkout' in s.get('uses', '') and 'pr-agent-push-gate' in str(s.get('with', {}))"
+    [ "$status" -eq 0 ] || { echo "no sparse checkout of the gate script" >&2; false; }
+    [[ "$output" == *"synchronize"* ]]
+}
+
+@test "pr-agent: below the push gate's threshold, neither PR-Agent nor the guard runs" {
+    run _step_if "'pr-agent' in s.get('uses', '')"
+    [[ "$output" == *"steps.push_gate.outputs.run != 'false'"* ]] \
+        || { echo "PR-Agent still runs on a push the gate skipped: $output" >&2; false; }
+    run _step_if "s.get('name') == 'Fail if no review was published'"
+    [[ "$output" == *"steps.push_gate.outputs.run != 'false'"* ]] \
+        || { echo "the guard would fail a push the gate skipped: $output" >&2; false; }
+}
+
+@test "pr-agent: the registry declares the incremental Guide heading as a review marker" {
+    run jq -r '.reviewers[] | select(.login == "github-actions") | .review_markers[]' \
+        "$REPO/harness/review-attestation.json"
+    [[ "$output" == *"## PR Reviewer Guide"* ]]
+    [[ "$output" == *"## Incremental PR Reviewer Guide"* ]]
+}
+
+@test "pr-agent: the guard accepts every marker the registry declares, not only the first" {
+    run grep -c 'review_markers\[0\]' "$WF"
+    [ "$output" = "0" ]
+    grep -q -- '--argjson markers' "$WF"
+    grep -q 'any($markers\[\]' "$WF"
 }

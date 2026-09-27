@@ -9,6 +9,7 @@
 
 - **`dotf pr triage-queue`**: run at session start and before reporting PR work complete, in a repository with a reviewer registry. A non-zero exit means pending work or an unanswerable queue: read it, never treat it as empty.
 - **`## Review triage` comment**: record the dispositions on the PR under that heading, even "CI green, no review findings"; unwritten reads as nobody having looked.
+- **Draft while iterating**: open the PR as a draft (`gh pr create --draft`) while you are still pushing to it, and mark it ready (`gh pr ready`) when it is. Reviewers skip drafts, so the review reads the finished change, not each intermediate push.
 
 <!-- full-only:begin -->
 Wire `dotf pr triage-queue` into any session-start hook the harness offers.
