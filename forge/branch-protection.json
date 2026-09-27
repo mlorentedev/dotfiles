@@ -16,6 +16,10 @@
           "strict": true,
           "checks": [
             {
+              "context": "cli-gate",
+              "app_id": 15368
+            },
+            {
               "context": "lint",
               "app_id": 15368
             },

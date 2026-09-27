@@ -11,7 +11,8 @@ created: "2026-09-25"
 - [x] AC2 -> `4a0f6c2`. `skills-pipeline deploys at most 6 times per run` failed at 17 before the shared homes ("compile-harness.sh --deploy ran 17 times, budget 6"), passes at 6. All 24 original tests pass, plus the 2 new ones. Local wall time per run: ~117 s to ~43 s.
 - [x] AC3 -> `4a0f6c2`. `a write into a shared setup_file home fails`. Mutation: replacing the `chmod -R a-w` with `:` fails it. It skips under root, where mode bits do not bind.
 - [x] AC4 -> `21c4eef`. `timeout-minutes: 20`; the CI-001 loan comment is replaced by the distribution and the rule for raising it.
-- [ ] AC5-AC10 -> PRs 2 to 6.
+- [x] AC7 -> `tests/workflow-job-names.bats` failed before the change: `status check 'lint' is reported by 2 jobs: ci.yml:lint, cli.yml:lint`, and `required check 'lint' comes from cli.yml:lint, which does not report on every pull request`. Its first version also flagged `review-attestation`, a commit status posted through the API rather than a job; the checker now reads those too. It then caught a second collision the change itself introduced (`changes` in both workflows), which is why the job is named `cli-changes`. Mutations: a `paths` filter on `pull_request` fails on `cli-gate`; requiring `test (ubuntu-latest)` fails on the matrix job.
+- [ ] AC8-AC10 -> PRs 4 to 6.
 
 CI step "Run bats test suite" before and after: recorded from this PR's run.
 
