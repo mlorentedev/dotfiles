@@ -30,7 +30,7 @@ Heavy runs go through `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapM
 - [x] [AC1] Add `TestCommittedAgeBlobsAreClaimed` in `cli/internal/secrets` (repo-reading, like the existing registry drift tests): every `sensitive/*.secret.age` in the checkout is named by an age-backed entry. Expected: FAIL with 31 names.
 - [x] [AC1] `git rm` the 31 unclaimed blobs, by explicit path. Expected: the test passes; `git ls-files 'sensitive/*.secret.age'` prints only `sensitive/id_ed25519.secret.age`.
 - [x] [AC5] ADR-028 amendment (2026-09-26): the escrow is the floor; per-secret blobs exist only for `age-offline` entries; #971 superseded. Rewrite the `reportUnreferencedBlobs` comment to match.
-- [ ] [AC6] On msi: `go run ./cmd/dotf doctor --fix` from the worktree, then `ls ~/.dotfiles/sensitive/*.secret.age*` (expected: only `id_ed25519.secret.age`) and the owner runs `dotf secrets drift` (expected: 0 findings). Record both in `verification.md`.
+- [x] [AC6] On msi: `go run ./cmd/dotf doctor --fix` from the worktree, then `ls ~/.dotfiles/sensitive/*.secret.age*` (expected: only `id_ed25519.secret.age`) and the owner runs `dotf secrets drift` (expected: 0 findings). Record both in `verification.md`.
 
 ## Closing
 

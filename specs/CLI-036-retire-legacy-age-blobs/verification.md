@@ -12,7 +12,7 @@ created: "2026-09-25"
 - [x] AC3 -> `TestCheckSecrets_FixPrunesUnclaimedMirrorBlob`: without `--fix`, 2 FAILs and no disk change; with it, 0 FAILs and 2 `[FIX ]` lines; the second run prints no `[FIX ]`.
 - [x] AC4 -> `TestCheckSecrets_FixRefuses`, four rows (blob still in the checkout, no escrow, no registry, mirror == checkout). Case (d), the files that are not blobs, is asserted in the AC3 test: `id_ed25519.secret.age`, `env-mapping.conf`, `README.md` and `dr/` survive `--fix`. Mutation: with the escrow gate dropped, the "checkout without the DR escrow" row fails; restored.
 - [x] AC5 -> ADR-028 amendment (2026-09-26). `reportUnreferencedBlobs` no longer exists; its replacement `pruneOrReportOrphans` carries the corrected comment.
-- [ ] AC6 -> pending: `go run ./cmd/dotf doctor --fix` on msi from the worktree, then the owner runs `dotf secrets drift`.
+- [x] AC6 -> on msi, 2026-09-26: `DOTFILES_REPO_DIR=<worktree> go run ./cmd/dotf doctor --fix` printed 32 `pruned orphan secret blob` lines (the 31 blobs and `openrouter.api.key.secret.age.tmp.699081`) and one unrelated DX-006 fix (`orca.json` hook timeout). `~/.dotfiles/sensitive/` now holds `dr/`, `env-mapping.conf`, `id_ed25519.secret.age` and `README.md`. A second `--fix` printed no `[FIX ]`. Then the owner ran `dotf secrets drift`, which reported `31 declared target(s) naming 21 item(s), 21 of them in the vault; 0 finding(s)`. The override was needed because `DOTFILES_REPO_DIR` pointed at a stale checkout that still commits the blobs, which the prune rightly refuses. Doctor also flagged the worktree as "not a git checkout"; that is #1358.
 
 ## Test status
 
