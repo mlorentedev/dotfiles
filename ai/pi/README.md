@@ -131,6 +131,6 @@ context windows live in `models.json` — the one place they cannot drift from.)
 
 ## Secret
 
-`NAN_API_KEY` lives only in the age store (`sensitive/nan.api-key.secret.age`, mapped in
-`secrets/registry.yaml`). The literal never appears in a committed file. Rotate it at the
+`NAN_API_KEY` lives only in Bitwarden (item `nan-api-key`, mapped in
+`secrets/registry.yaml`, ADR-028). The literal never appears in a committed file. Rotate it at the
 NaN dashboard if ever exposed.

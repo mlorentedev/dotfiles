@@ -99,7 +99,7 @@ func Run(opts Options) (int, error) {
 		checkAutoMemoryLink(sys, start, rep, opts.Fix)
 		checkMemoryShape(sys, rep, opts.Fix)
 		checkPathFiles(sys, cfg, rep)
-		checkSecrets(sys, cfg, rep)
+		checkSecrets(sys, cfg, rep, opts.Fix)
 		checkSecretsTooling(sys, cfg, rep)
 		checkBitwardenReach(sys, rep)
 		checkBWServeDaemon(sys, cfg, rep)
