@@ -4,6 +4,7 @@
   "include-component-in-tag": false,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": false,
+  "pull-request-footer": "## Knowledge\n\n- Lesson: none: a release PR only versions merged changes, and each one carried its own Knowledge section\n- ADR: none: a release PR only versions merged changes\n- Runbook: none: releasing and installing dotf is docs/runbooks/release-dotf.md",
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",

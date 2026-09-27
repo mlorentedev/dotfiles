@@ -10,12 +10,23 @@ import (
 	"testing"
 )
 
-// writeSpec materializes specs/<id>/ under root with the given files.
+// answeredPromotions is a verification.md whose promotion candidates are all
+// answered, so a fixture about something else passes the promotion pre-flight.
+const answeredPromotions = "## Promotion candidates\n\n" +
+	"- [x] Lesson for the repo's `docs/lessons/`? no: a fixture\n" +
+	"- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a fixture\n" +
+	"- [x] New pattern candidate for `00_meta/patterns/`? no: a fixture\n"
+
+// writeSpec materializes specs/<id>/ under root with the given files. A spec
+// given no verification.md gets answeredPromotions.
 func writeSpec(t *testing.T, root, id string, files map[string]string) string {
 	t.Helper()
 	dir := filepath.Join(root, "specs", id)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
+	}
+	if _, ok := files["verification.md"]; !ok {
+		files["verification.md"] = answeredPromotions
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
@@ -439,7 +450,7 @@ func TestArchiveAcceptsSpecThatOnlyQuotesTags(t *testing.T) {
 	writeSpec(t, root, "AI-002-y", map[string]string{
 		"proposal.md":     "---\nstatus: implementing\n---\nprose\n",
 		"tasks.md":        "- [x] Add `sb_specs` (`[AGENT-DRAFT]` flagging — lifted from detect_repo_specs)\n",
-		"verification.md": "```\n[AGENT-SUGGESTION]\n```\n",
+		"verification.md": "```\n[AGENT-SUGGESTION]\n```\n" + answeredPromotions,
 		"review.md":       passingReview("AI-002-y"),
 	})
 

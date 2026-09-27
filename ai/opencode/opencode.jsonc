@@ -6,22 +6,20 @@
 // Spec: specs/SDD-007-ai-tooling-consolidation/ (NaN default + drop Go + drop legacy gemini-cli + drop aider).
 // Historical context: specs/archive/AI-011-opencode-bootstrap/ (initial bootstrap, 2026-05-17).
 //
-// Model Tier (per AGENTS.md "Model Selection") — post-SDD-007:
-//   Default: nan/qwen3.6                — 256K, multimodal, FAST (~0.8s wall, 0 reasoning tokens)
-//   On-demand long-context: nan/deepseek-v4-flash  — 1M context, but ~3s wall + 30+ reasoning
-//                                                    tokens per call. Use only when 256K is not enough.
-//   A/B:     nan/gemma4                 — multimodal alternative vs qwen3.6 (256K, ~0.7s wall).
-// Empirical (scripts/nan-bench.sh): deepseek-v4-flash is 4x slower than qwen3.6 even
-// for trivial prompts due to mandatory reasoning chain. Default chosen by latency.
-//   Embeddings / Audio: qwen3-embedding, kokoro (TTS), whisper (STT) — exposed for
-//                       cluster completeness; not chat-routable (use curl / OpenAI SDK directly).
-//   Frontier on-demand: openrouter/* (PAYG, uses existing $5 credit) — Opus / Sonnet / GPT-4
-//   Cataloged, not routed: nan/qwen3.8-flash, nan/glm5.3-flash — added 2026-08-26,
-//                       picker-only. Both are genuine frontier-tier 2026-08-26 releases
-//                       (Alibaba / Zhipu) with real 1M context, not weak "flash" tiers —
-//                       quality is not why they're unrouted. NaN's own allocation for
-//                       them is promotional and expires end of Aug 2026; see #1244
-//                       before promoting either past the picker.
+// Model Tier (per AGENTS.md "Model Selection"), re-routed 2026-09-26 (AI-044, #1762):
+//   Default + plan: nan/glm5.3-flash  — 1M, NaN's recommendation for coding agents,
+//                                       2B/month quota of its own.
+//   Titles (small_model): nan/qwen3.6 — 262K, no monthly quota; titles are the
+//                                       highest-volume, lowest-value calls.
+//   Long-context / general: nan/deepseek-v4-flash (via `qf`) — 1M, 3B/month.
+//   Picker only: nan/qwen3.8-flash (262K served, 500M/month: it reached 83% on
+//                2026-09-26 as the default, which is why it no longer is),
+//                nan/gemma4, nan/mimo-v2.5.
+//   Quotas and windows: https://nan.builders/docs/models. A spent quota answers
+//   402 until the month resets.
+//   Embeddings / Audio: qwen3-embedding, kokoro (TTS), whisper (STT) — not
+//                       chat-routable (use curl / OpenAI SDK directly).
+//   Frontier on-demand: openrouter/* (PAYG) — Opus / Sonnet / GPT.
 // Selection: TUI `/models` picker. Wrappers `qq` (nan/qwen3.6) / `qf` (nan/deepseek-v4-flash)
 //            in .zsh/aliases.zsh + .bashrc + powershell/profile.ps1.
 {
@@ -31,23 +29,23 @@
   "lsp": false,
   "snapshot": false,
   "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
-  // Explicit fast model for title generation — avoids fallback delay.
-  "small_model": "nan/qwen3.8-flash",
-  // Default = fast model (matches the tier comment above). deepseek-v4-flash
-  // is reasoning-heavy (~3s + mandatory reasoning chain) — reach for it
-  // on-demand via the `qf` wrapper, not as the always-on default.
-  "model": "nan/qwen3.8-flash",
+  // Explicit fast model for title generation — avoids fallback delay. qwen3.6
+  // has no monthly quota, so the most frequent calls spend none.
+  "small_model": "nan/qwen3.6",
+  // Default = NaN's coding model (matches the tier comment above). deepseek-v4-flash
+  // stays the long-context option via the `qf` wrapper.
+  "model": "nan/glm5.3-flash",
 
   "provider": {
     // NaN community — primary daily provider.
-    // API key: $NAN_API_KEY (sensitive/nan.api-key.secret.age, managed via dotf secrets).
+    // API key: $NAN_API_KEY, from Bitwarden item nan-api-key (secrets/registry.yaml, ADR-028).
     "nan": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "NaN",
       "options": {
         "baseURL": "https://api.nan.builders/v1",
         "apiKey": "{env:NAN_API_KEY}",
-        "model": "qwen3.8-flash",
+        "model": "glm5.3-flash",
         // Overall request timeout (opencode default = 300000). Generous on
         // purpose: reasoning models (deepseek-v4-flash via `qf`) and thinking-
         // enabled chats produce long generations; 60s here cut them off with
@@ -96,7 +94,7 @@
             "output": 8192
           },
           "modalities": {
-            "input": ["text"],
+            "input": ["text", "image"],
             "output": ["text"]
           },
           "options": {
@@ -118,10 +116,10 @@
           }
         },
         "qwen3.8-flash": {
-          "name": "Qwen 3.8 Flash Next (Alibaba - 1M)",
+          "name": "Qwen 3.8 Flash Next (Alibaba - 262K)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
-            "context": 1000000,
+            "context": 262144,
             "output": 8192
           },
           "modalities": {
@@ -147,10 +145,10 @@
           }
         },
         "qwen3.6": {
-          "name": "Qwen 3.6 (Alibaba - 256K)",
+          "name": "Qwen 3.6 (Alibaba - 262K)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
-            "context": 256000,
+            "context": 262144,
             "output": 8192
           },
           "modalities": {
@@ -179,7 +177,7 @@
           "name": "MiMo V2.5 (Xiaomi - 1M)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
-            "context": 1000000,
+            "context": 1048576,
             "output": 8192
           },
           "modalities": {
@@ -208,7 +206,7 @@
           "name": "Gemma 4 (Google - 256K)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
-            "context": 256000,
+            "context": 262144,
             "output": 8192
           },
           "modalities": {
@@ -299,12 +297,12 @@
     "max_bytes": 20480
   },
   // Agent overrides. `plan` is the built-in read-only planning mode (toggle in
-  // the TUI) — pin it to the fast model and hard-deny writes so planning never
+  // the TUI) — pin it to the default model and hard-deny writes so planning never
   // edits files or runs commands. deepseek-v4-flash stays the depth option via
   // /models.
   "agent": {
     "plan": {
-      "model": "nan/qwen3.8-flash",
+      "model": "nan/glm5.3-flash",
       "permission": {
         "edit": "deny",
         "bash": "deny"
