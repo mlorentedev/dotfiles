@@ -38,8 +38,8 @@ ADR-037 bounded how long one review may run. Nothing bounded how many reviews on
 1. **A full review runs when a PR is opened, reopened or marked ready,** and whenever someone comments `/review`.
 2. **A push is reviewed incrementally** (`/review -i`: the commits since the previous review), and only once **three non-merge commits** are newer than that review.
    - `scripts/pr-agent-push-gate.sh` decides this before PR-Agent starts.
-   - "The previous review" is the one PR-Agent itself picks. The gate mirrors its rule, so the gate never starts a run that PR-Agent would then decline.
-   - The gate fails open: input it cannot read means the push is reviewed.
+   - "The previous review" is the one PR-Agent itself picks, from a comment authored by `github-actions[bot]` only (CWE-345: any other author is forgeable on a public repo). The gate mirrors its rule closely enough that it almost never starts a run PR-Agent would then decline — except when the reviewed commit's SHA is still present but every commit after it happens to be dated at or before the review (a cherry-pick with a preserved old author date; PR-Agent's own range is date-based). That narrow case is caught, loudly, by the existing "no review published" guard (#1107) rather than by the gate itself.
+   - The gate fails open: input it cannot read, or a baseline it cannot vouch for (no previous review, a forged marker, a rebase or force-push that moved the reviewed commit's sha), means a FULL review, not an incremental one.
 3. **Below the bound nothing runs, and nothing reports.** The published-review guard (#1107) is skipped with PR-Agent, so a push held back is not mistaken for a failed inference. The guard, the triage queue and the attestation all recognise the incremental heading through the reviewer registry.
 4. **Agents iterate on a draft PR** and mark it ready when it is ready. Reviewers skip drafts, so the full review reads the finished change. `pr-stewardship` carries this instruction to every agent.
 
