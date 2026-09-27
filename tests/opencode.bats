@@ -150,8 +150,27 @@ setup() {
     [ -z "$output" ] || { echo "ollama is still declared: $output"; false; }
 }
 
-@test "opencode.jsonc default model is nan/qwen3.8-flash" {
-    grep -qE '"model":\s*"nan/qwen3.8-flash"' "$OPENCODE_CFG"
+@test "opencode.jsonc default model is nan/glm5.3-flash, and titles use unmetered qwen3.6 (AI-044)" {
+    grep -qE '^  "model":\s*"nan/glm5.3-flash"' "$OPENCODE_CFG"
+    grep -qE '^  "small_model":\s*"nan/qwen3.6"' "$OPENCODE_CFG"
+}
+
+# AI-044 (#1762): opencode declared qwen3.8-flash at 1M while NaN serves it at
+# 262K and pi already said so; NaN's docs warn a raised window makes the model
+# reject requests. The two configs describe the same endpoint, so a window they
+# disagree on is wrong in one of them.
+@test "opencode.jsonc and ai/pi/models.json declare the same context window for every NaN model both carry" {
+    run python3 - "$OPENCODE_CFG" "$DOTFILES_DIR/ai/pi/models.json" <<'PY'
+import json, re, sys
+src = "".join(l for l in open(sys.argv[1]) if not l.lstrip().startswith("//"))
+oc = json.loads(re.sub(r",(\s*[}\]])", r"\1", src))["provider"]["nan"]["models"]
+pi = {m["id"]: m for m in json.load(open(sys.argv[2]))["providers"]["nan"]["models"]}
+bad = [f"{k}: opencode {v['limit']['context']} pi {pi[k]['contextWindow']}"
+       for k, v in oc.items() if k in pi and v["limit"]["context"] != pi[k]["contextWindow"]]
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+PY
+    [ "$status" -eq 0 ] || { echo "context windows disagree: $output"; false; }
 }
 
 @test "opencode.jsonc exposes 6 chat NaN models (non-chat models intentionally excluded - opencode schema rejects 'embedding' modality)" {
