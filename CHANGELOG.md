@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.60.0](https://github.com/mlorentedev/dotfiles/compare/v0.59.0...v0.60.0) (2026-09-27)
+
+
+### Features
+
+* **claude:** set language to spanish so voice dictation is Spanish ([#1771](https://github.com/mlorentedev/dotfiles/issues/1771)) ([88a6591](https://github.com/mlorentedev/dotfiles/commit/88a6591cf94319df7b2d0e378abeacdd3a3c712b))
+* **doctor:** warn before a bound NaN model runs out of quota ([#1779](https://github.com/mlorentedev/dotfiles/issues/1779)) ([f917eff](https://github.com/mlorentedev/dotfiles/commit/f917effb32c86b5bedbb6a695b01f9e1fe89f1ea))
+* **forge:** apply declared branch protection, and require spec-gate on dotfiles ([#1746](https://github.com/mlorentedev/dotfiles/issues/1746)) ([60de574](https://github.com/mlorentedev/dotfiles/commit/60de5746ef7fd7247ff0cc272cdcf4ee0676993c))
+* **harness:** add a knowledge gate that checks a PR names its lesson, ADR and runbook ([#1732](https://github.com/mlorentedev/dotfiles/issues/1732)) ([6ceebd4](https://github.com/mlorentedev/dotfiles/commit/6ceebd46e4869bf5c98a32d358eddba7a4ed6496))
+* **harness:** the handoff skill passes the calling agent's own name, and MEMORY-009 archives ([#1729](https://github.com/mlorentedev/dotfiles/issues/1729)) ([b2364ab](https://github.com/mlorentedev/dotfiles/commit/b2364ab3ff2ac4b445575fc4983688189e2624bc))
+* **pi:** dotf pi packages converges pi on its manifest both ways, and both setups call it ([#1754](https://github.com/mlorentedev/dotfiles/issues/1754)) ([e4b39f5](https://github.com/mlorentedev/dotfiles/commit/e4b39f553b6b3357495c2ce2873f61f8abbcd4f4))
+* **pi:** install pi-nan-provider with its media MCP bridge off ([#1778](https://github.com/mlorentedev/dotfiles/issues/1778)) ([b7ebd3e](https://github.com/mlorentedev/dotfiles/commit/b7ebd3e2b2422386891a8f0fd74205c7f3587208))
+* **pi:** the manifest retires pi-memory data to an archive, and doctor checks declared requirements ([#1755](https://github.com/mlorentedev/dotfiles/issues/1755)) ([4dad5ea](https://github.com/mlorentedev/dotfiles/commit/4dad5eadd8857c084499e2474a67b4ac87024ea7))
+* **skills:** add a test authoring gate and a deletion evidence bar, adapted from OpenClaw test-audit ([#1777](https://github.com/mlorentedev/dotfiles/issues/1777)) ([bb5d12d](https://github.com/mlorentedev/dotfiles/commit/bb5d12d30cb6b7926c58b4bd11f417efdd4d1bf0))
+* **spec:** refuse an archive whose promotion candidates are not answered ([#1761](https://github.com/mlorentedev/dotfiles/issues/1761)) ([030ade1](https://github.com/mlorentedev/dotfiles/commit/030ade1e1ca5539b1adf7d38eae20ea3524fd957))
+
+
+### Bug Fixes
+
+* **ci:** the release PR body closes nothing ([#1734](https://github.com/mlorentedev/dotfiles/issues/1734)) ([57f81c7](https://github.com/mlorentedev/dotfiles/commit/57f81c75260e4d9e33c5642e94579bf9524545f5))
+* **lessons:** stop the index check reporting indexed lessons as missing at random ([#1736](https://github.com/mlorentedev/dotfiles/issues/1736)) ([f9d5b25](https://github.com/mlorentedev/dotfiles/commit/f9d5b25e9aea30612347c1f581c4ccc93a04067b))
+* **mem:** move text before the first thread only when it reads as a handoff ([#1726](https://github.com/mlorentedev/dotfiles/issues/1726)) ([c17c4ce](https://github.com/mlorentedev/dotfiles/commit/c17c4ceeebb73fca242627048df9ab6eba4134db))
+* **opencode:** move routed traffic off qwen3.8-flash before its NaN quota runs out ([#1772](https://github.com/mlorentedev/dotfiles/issues/1772)) ([75eb855](https://github.com/mlorentedev/dotfiles/commit/75eb855d49001872f97af666b4d931ee26f3487a))
+* **pr-agent:** only the bot's own review sets the push gate's baseline, and a rebase is reviewed in full ([#1773](https://github.com/mlorentedev/dotfiles/issues/1773)) ([94c9e6b](https://github.com/mlorentedev/dotfiles/commit/94c9e6bc80ef4f3d55374ca1cf156cac889d7f8a))
+* **secrets:** retire the 31 legacy age blobs; doctor fails and prunes unclaimed ones ([#1776](https://github.com/mlorentedev/dotfiles/issues/1776)) ([6c963fa](https://github.com/mlorentedev/dotfiles/commit/6c963fa7c64771fcab04f3d02553bf4ae7224120))
+* **spec:** accept hyphen-joined AREAs in feature ids ([#1479](https://github.com/mlorentedev/dotfiles/issues/1479)) ([#1769](https://github.com/mlorentedev/dotfiles/issues/1769)) ([37d7e64](https://github.com/mlorentedev/dotfiles/commit/37d7e64c46e72449e50e139b05d445e604ee4527))
+
 ## [0.59.0](https://github.com/mlorentedev/dotfiles/compare/v0.58.0...v0.59.0) (2026-09-25)
 
 
