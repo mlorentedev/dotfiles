@@ -18,8 +18,13 @@ repository; this file is the NOTICE-equivalent that preserves attribution as the
 | `golang-pro` | [jeffallan/claude-skills](https://github.com/jeffallan/claude-skills) | golang-pro | MIT | © 2025 Jeff Allan |
 | `async-python-patterns` | [wshobson/agents](https://github.com/wshobson/agents) | async-python-patterns | MIT | © 2024 Seth Hobson |
 | `cyclomatic-complexity` | [saurabhkumar8112/cyclomatic-complexity-skill](https://github.com/saurabhkumar8112/cyclomatic-complexity-skill) | cyclomatic-complexity | Apache-2.0 | © 2026 Saurabh Kumar |
+| `test-driven-development` (testing-anti-patterns: authoring gate, anti-pattern 6), `adversarial-review` (test deletions) | [openclaw/openclaw](https://github.com/openclaw/openclaw/tree/main/.agents/skills/test-audit) | test-audit | MIT | © 2026 OpenClaw Foundation |
 
 All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03).
 Apache-2.0 and MIT both permit redistribution with attribution; this file plus the per-skill
 footer satisfy the notice requirement. If a skill is updated upstream, re-vendor the `SKILL.md`
 into the vault source and re-run `compile-harness.sh --refresh`.
+
+The `test-audit` row is a partial adaptation, not a vendored skill: its authoring gate, junk
+patterns, retention bar and candidate-evidence fields were folded into two existing skills
+(HARNESS-164, #1765), with each adapted section carrying its own footer. License read 2026-09-26.
