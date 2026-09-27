@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "NaN's per-model token quotas, as its docs state them. Read by `dotf doctor`",
+    "(section \"NaN quota\", AI-047 #1766), which sums GET /v1/usage per model over the",
+    "current period and compares it here: WARN at 80%, FAIL at 100% (NaN answers 402).",
+    "",
+    "Closed-world. Every NaN model harness/model-map.json binds must be listed under",
+    "`metered` or `unmetered`; one in neither is a WARN, so a model NaN adds is never",
+    "silently treated as unmetered.",
+    "",
+    "Declared, not fetched: /v1/usage reports usage and no limits. `checked` is when the",
+    "numbers were read; doctor WARNs once it is older than 90 days. Re-read the source,",
+    "update the numbers and the date together.",
+    "",
+    "Image models (flux-2-klein, qwen-image-2.1) are metered in requests, not tokens, and",
+    "are left out until something binds them."
+  ],
+  "checked": "2026-09-26",
+  "source": "https://nan.builders/docs/models",
+  "metered": {
+    "deepseek-v4-flash": { "tokens": 3000000000, "period": "month" },
+    "glm5.3": { "tokens": 3000000000, "period": "month", "note": "premium tier; NaN says 'period', and adds a 400M rolling 4-hour window this check does not watch" },
+    "glm5.3-flash": { "tokens": 2000000000, "period": "month" },
+    "mimo-v2.5": { "tokens": 1000000000, "period": "month" },
+    "mimo-v2.6-flash": { "tokens": 1000000000, "period": "month" },
+    "qwen3.8-flash": { "tokens": 500000000, "period": "month" }
+  },
+  "unmetered": ["gemma4", "kokoro", "qwen3-embedding", "qwen3.6", "rerank", "whisper"]
+}
