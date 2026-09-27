@@ -30,6 +30,15 @@ commit() {
 FULL=$'## PR Reviewer Guide \xf0\x9f\x94\x8d\n\n<!-- pr-agent:review:full -->\n\nfindings'
 INCREMENTAL=$'## Incremental PR Reviewer Guide \xf0\x9f\x94\x8d\n\n<!-- pr-agent:review:incremental -->\n\nmore'
 
+# full_review_with_sha SHA: a full-review body carrying the persistent state
+# block PR-Agent v0.45.0 actually appends (append_review_state), verified
+# against a real one: issue comment 5851012976 on this repo carries
+# `"last_run":{"head_sha":"...","kind":"full",...}`.
+full_review_with_sha() {
+    printf '%s\n\n<!-- pr-agent-review-state:v1\n{"last_run":{"head_sha":"%s"},"schema_version":1}\n-->' \
+        "$FULL" "$1"
+}
+
 # Every case runs under zsh and bash, which must agree: the repo's scripts run
 # under both (.claude/CLAUDE.md).
 _gate() {
@@ -137,6 +146,98 @@ _gate() {
     _gate
     [[ "$output" == *"run=true"* ]]
     [[ "$output" == *"no previous review"* ]]
+    [[ "$output" == *"mode=full"* ]]
+}
+
+# CWE-345: the baseline used to be picked by content alone, so ANY account
+# could post a comment carrying the marker and have it stand in for a review
+# that never happened. Reproduced pre-fix: this exact fixture (a marker from a
+# non-bot login, dated before the one real commit) returned run=false.
+@test "a review marker from a non-bot commenter is never trusted as the baseline (CWE-345)" {
+    comment "randomuser" 2026-09-25T10:00:00Z "$FULL"
+    commit 2026-09-25T09:00:00Z
+    _gate
+    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"no previous review"* ]]
+    [[ "$output" == *"mode=full"* ]]
+}
+
+# PR-Agent's own get_previous_review (github_provider.py) walks its comments
+# by position and matches the marker by body only, with no author check
+# either. A forged comment newer than the bot's real review would become
+# PR-Agent's OWN incremental baseline, not just this gate's — so once one is
+# seen, the safe response is a full review, not incremental over an
+# untrustworthy range.
+@test "a forged marker newer than the bot's real review forces a full review" {
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z "$FULL"
+    commit 2026-09-25T11:00:00Z
+    comment "randomuser" 2026-09-25T12:00:00Z "$FULL"
+    _gate
+    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"mode=full"* ]]
+}
+
+# A rebase preserves author dates, so date-based counting undercounts across
+# one (this repo rebases with --onto routinely). The state block's
+# last_run.head_sha anchors the count to a commit's POSITION instead: these
+# three commits are dated BEFORE the review that predates them (as a rebase
+# would leave them), and are still counted correctly because c0 is found.
+@test "a head_sha anchors the count by position, immune to rebased-looking dates" {
+    commit 2026-09-25T08:00:00Z                                   # c0: reviewed
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z "$(full_review_with_sha c0)"
+    commit 2026-09-25T09:00:00Z                                   # c1: new, but dated before the review
+    commit 2026-09-25T09:15:00Z                                   # c2: new, but dated before the review
+    commit 2026-09-25T09:30:00Z                                   # c3: new, but dated before the review
+    _gate
+    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"mode=incremental"* ]]
+}
+
+@test "a head_sha still respects the threshold: 2 new commits after it do not run" {
+    commit 2026-09-25T08:00:00Z                                   # c0: reviewed
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z "$(full_review_with_sha c0)"
+    commit 2026-09-25T09:00:00Z                                   # c1
+    commit 2026-09-25T09:15:00Z                                   # c2
+    _gate
+    [[ "$output" == *"run=false"* ]]
+    [[ "$output" == *"2 new commit"* ]]
+}
+
+# When the reviewed sha is gone entirely (a rebase or force-push rewrites
+# every commit's own sha, including the one the review points at), there is
+# no range left to trust: review in full.
+@test "a head_sha absent from the PR's commits means a rebase or force-push: full review" {
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z "$(full_review_with_sha deadbeef)"
+    commit 2026-09-25T11:00:00Z
+    _gate
+    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"mode=full"* ]]
+    [[ "$output" == *"rebase"* ]]
+}
+
+# Incremental reviews carry no state block at all (PR-Agent v0.45.0,
+# _review_finding_state_enabled returns False when self.incremental.is_incremental),
+# and a full review's block could still lack last_run.head_sha (a schema this
+# gate does not control). Either way: fall back to the existing, tested
+# author-date counting rather than treat unparsed state as a rebase.
+@test "a state block without a head_sha falls back to counting by author date" {
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z \
+        "$FULL"$'\n\n<!-- pr-agent-review-state:v1\n{"schema_version":1}\n-->'
+    commit 2026-09-25T11:00:00Z
+    commit 2026-09-25T12:00:00Z
+    commit 2026-09-25T13:00:00Z
+    _gate
+    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"mode=incremental"* ]]
+    [[ "$output" == *"since the review of 2026-09-25T10:00:00Z"* ]]
+}
+
+@test "a head_sha review with unreadable commits still fails open" {
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z "$(full_review_with_sha c0)"
+    echo 'not json' > "$COMMITS"
+    run "$GATE" --comments "$COMMENTS" --commits "$COMMITS"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"run=true"* ]]
 }
 
 @test "a push by a bot is skipped, as PR-Agent skips it" {
