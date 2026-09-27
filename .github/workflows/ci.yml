@@ -287,26 +287,19 @@ jobs:
     # could see degrading until it cancelled two unrelated PRs at the ceiling.
     # `integration`, the other heavy job, already runs on both for this reason.
     #
-    # CI-001 (#1472): 45 rather than 30 — and READ WHAT THIS DOES NOT DO.
+    # 20 minutes, measured (CI-004, #1739). CI-001 (#1472) raised this to 45 as
+    # a loan until the pi package reconcile left the blocking path; CI-002
+    # (#1482) did that, and the loan is repaid here.
     #
-    # It fixes nothing. It converts a cancelled job into a slow one. The work
-    # takes exactly as long as it did; the ceiling merely stopped catching it.
-    # What the raise buys is the ability to OBSERVE the problem instead of
-    # having it reported as a failure of whichever PR paid for it — and a
-    # cancelled run tells you nothing about that PR.
+    # Job duration since 2026-09-05: push n=111, p50 544 s, p99 858 s, max
+    # 961 s; pull_request n=198, max 1000 s. The 40 runs after 2026-09-25 peak
+    # at 908 s. 1200 s is 20% above the worst run observed.
     #
-    # The ticket rejected raising the ceiling as "option 4" and that rejection
-    # stands: CI-001 does not close here. Measured on this branch, the pi
-    # package reconcile is ~66% of the setup step and ~57% of the job, and its
-    # cost tracks npm registry latency, which is not a property of this
-    # repository. Two runs of the SAME commit spent 1175s and >1900s in that
-    # step. The second crossed 30 minutes — not for a defect, for a slow night.
-    #
-    # So this is a margin on an undiagnosed and unbounded cost, which is a loan,
-    # not headroom: the next slow night eats 45 the way this one ate 30. It is
-    # deliberately temporary and it is not a substitute for taking the reconcile
-    # off the blocking path. Lower it again when that lands.
-    timeout-minutes: 45
+    # A push still runs the full reconcile, whose cost tracks npm registry
+    # latency (24x variance on identical input, CI-003). A slow registry night
+    # can cross this ceiling, and that is the signal it exists to give. Raise it
+    # only with a run that crossed it and a ticket that names the cause.
+    timeout-minutes: 20
     needs: [changes]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
