@@ -26,7 +26,7 @@
     "spellings: `nan:mimo-v2.5` here, `openai/mimo-v2.5` in .pr_agent.toml",
     "(litellm treats NaN as an OpenAI-compatible provider, so the prefix names a",
     "wire protocol rather than a vendor), and bare `mimo-v2.5` in",
-    "ai/pi/models.json. A grep-shaped guard cannot check that. Each entry below",
+    "harness/reviewer-pool.json. A grep-shaped guard cannot check that. Each entry below",
     "carries the rule for turning its own spelling into a map-resolvable",
     "`pool:id`.",
     "",
