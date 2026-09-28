@@ -9,7 +9,7 @@ created: "2026-09-28"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [x] Criterion 1 -> `TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout`
+- [x] Criterion 1 -> `TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout` and `TestHarnessMirrorCmd_ExplicitRepoWinsInsideAnotherRepository`
 - [x] Criterion 2 -> `TestMirror_PreservesTheSourceMode`
 - [x] Criterion 3 -> setup BATS cases named `passes its checkout explicitly and warns when dotf is unavailable`
 

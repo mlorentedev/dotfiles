@@ -24,8 +24,9 @@ func newHarnessMirrorCmd() *cobra.Command {
 		Long: "mirror copies the harness inputs the deploy-dir consumers read — the whole\n" +
 			"harness/ tree and every file harness/manifest.json declares as an injection\n" +
 			"target — from the dotfiles checkout into $DOTFILES_DIR, preserving paths.\n\n" +
-			"Idempotent: a file whose bytes already match is left untouched, so a re-run\n" +
-			"reports 0 updated. It never prunes; `dotf doctor --fix` removes orphans.\n\n" +
+			"Idempotent: a file whose bytes and permission bits already match is left\n" +
+			"untouched, so a converged re-run reports 0 updated. It never prunes;\n" +
+			"`dotf doctor --fix` removes orphans.\n\n" +
 			"A declared target the checkout does not have is named and the command exits 1\n" +
 			"after mirroring everything else — the gap is the finding, not a reason to\n" +
 			"leave the rest of the harness stale.",

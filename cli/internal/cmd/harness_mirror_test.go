@@ -117,3 +117,32 @@ func TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout(t *testing.T) {
 		t.Fatalf("mirror did not use explicit repo: %v", err)
 	}
 }
+
+func TestHarnessMirrorCmd_ExplicitRepoWinsInsideAnotherRepository(t *testing.T) {
+	repo, deploy, decoy := t.TempDir(), t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[]}`)
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "model-map.json"), `{"source":"declared"}`)
+	writeMirrorFixture(t, filepath.Join(decoy, ".git", "marker"), "")
+	writeMirrorFixture(t, filepath.Join(decoy, "harness", "manifest.json"), `{"targets":[]}`)
+	writeMirrorFixture(t, filepath.Join(decoy, "harness", "model-map.json"), `{"source":"cwd"}`)
+	t.Chdir(decoy)
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("DOTFILES_DIR", deploy)
+
+	var out, errb bytes.Buffer
+	cmd := newHarnessMirrorCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&errb)
+	cmd.SetArgs([]string{"--repo", repo})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("explicit repo inside decoy repo: %v\n%s", err, errb.String())
+	}
+	got, err := os.ReadFile(filepath.Join(deploy, "harness", "model-map.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `{"source":"declared"}` {
+		t.Fatalf("mirrored %s, want declared checkout", got)
+	}
+}

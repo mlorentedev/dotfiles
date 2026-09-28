@@ -38,14 +38,15 @@ Things this PR explicitly does NOT include:
 ## Risks / open questions
 
 The explicit repository path must still fail clearly when it lacks the manifest.
-Mode preservation must not rewrite byte-identical destination files, and setup
-must preserve its current non-fatal behavior for a missing CLI while making
-that skip visible.
+Mode preservation must not rewrite destination files when both bytes and mode
+match; it must rewrite byte-identical destinations when their mode differs.
+Setup must preserve its current non-fatal behavior for a missing CLI while
+making that skip visible.
 
 ## Acceptance criteria
 
-- [ ] A mirror invoked outside a checkout uses `--repo` and copies the named
-  checkout's harness and manifest targets.
+- [ ] A mirror invoked outside a checkout or from inside another repository
+  uses `--repo` and copies the named checkout's harness and manifest targets.
 - [ ] An executable source file remains executable in the mirror.
 - [ ] Linux and Windows setup pass their checkout paths to the mirror command
   and both warn when `dotf` is unavailable.
