@@ -15,7 +15,7 @@
 
 .PARAMETER Version
     dotf version to install. Defaults to $env:DOTF_VERSION, then the DOTF_VERSION
-    line in versions.conf.
+    line in versions.conf, then the latest published release for raw recovery.
 
 .EXAMPLE
     # One-line bootstrap - no clone, no admin:
@@ -51,12 +51,28 @@ function Get-DotfVersion {
     param([string]$Version)
     if ($Version) { return $Version }
     if ($env:DOTF_VERSION) { return $env:DOTF_VERSION }
-    $versionsConf = Join-Path $PSScriptRoot '..\versions.conf'
-    if (Test-Path $versionsConf) {
+    $versionsConf = if ($PSScriptRoot) {
+        Join-Path $PSScriptRoot '..\versions.conf'
+    }
+    if ($versionsConf -and (Test-Path $versionsConf)) {
         $match = Select-String -Path $versionsConf -Pattern '^DOTF_VERSION=(.+)$' | Select-Object -First 1
         if ($match) { return $match.Matches[0].Groups[1].Value.Trim() }
     }
-    return $null
+
+    $releaseApi = if ($env:DOTF_RELEASE_API) {
+        $env:DOTF_RELEASE_API
+    } else {
+        'https://api.github.com/repos/mlorentedev/dotfiles/releases/latest'
+    }
+    try {
+        $release = Invoke-RestMethod -Uri $releaseApi -ErrorAction Stop
+        if ($release.tag_name -match '^v?(\d+\.\d+\.\d+)$') {
+            return $Matches[1]
+        }
+        throw "latest-release metadata has no semver tag"
+    } catch {
+        throw "latest-release lookup failed: $($_.Exception.Message)"
+    }
 }
 
 # Place $Source at $Target, tolerating a *live* dotf. Windows locks a running

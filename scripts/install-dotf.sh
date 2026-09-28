@@ -8,22 +8,61 @@
 # Sourced by setup-linux.sh; also runnable standalone to (re)install/upgrade:
 #     ./scripts/install-dotf.sh [version] [dest_dir] [base_url]
 #
+# Raw recovery stream (no checkout required; resolves the latest release):
+#     curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | bash
+#
 # DOTF_VERSION is the pinned version (versions.conf SSOT). The functions take
 # the version/dest/base_url as args so bats can drive them against a file://
 # fixture with no network. Cross-shell: bash + zsh safe.
 
-# Resolve this script's directory once — used to find utils.sh and, when run
-# standalone, versions.conf (the DOTF_VERSION SSOT).
-_DOTF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# Resolve the actual script directory once. A raw stream has no script file:
+# never treat its current working directory as a checkout, because that could
+# source an unrelated utils.sh. Raw recovery instead uses local fallbacks and
+# resolves the latest release through DOTF_RELEASE_API.
+_DOTF_SOURCE="${BASH_SOURCE[0]:-$0}"
+if [ -f "$_DOTF_SOURCE" ]; then
+    _DOTF_SCRIPT_DIR="$(cd "$(dirname "$_DOTF_SOURCE")" && pwd)"
+else
+    _DOTF_SCRIPT_DIR=''
+fi
 
 # Load logging + helpers if the caller (setup) has not already sourced utils.sh.
-if ! command -v log_info >/dev/null 2>&1; then
-    # shellcheck source=/dev/null
-    . "$_DOTF_SCRIPT_DIR/utils.sh"
+# A raw curl stream has no checkout-relative utils.sh, so retain a small local
+# fallback for release recovery instead of failing before the verified download.
+if [ -n "$_DOTF_SCRIPT_DIR" ] && [ -f "$_DOTF_SCRIPT_DIR/utils.sh" ]; then
+    if ! command -v log_info >/dev/null 2>&1; then
+        # shellcheck source=/dev/null
+        . "$_DOTF_SCRIPT_DIR/utils.sh"
+    fi
+else
+    log_info() { printf '[INFO] %s\n' "$*"; }
+    log_success() { printf '[OK] %s\n' "$*"; }
+    log_error() { printf '[ERROR] %s\n' "$*" >&2; }
+    command_exists() { command -v "$1" >/dev/null 2>&1; }
+    ensure_directory() { mkdir -p "$1"; }
 fi
 
 # Release location; overridable (tests pass a file:// base).
 DOTF_RELEASE_BASE="${DOTF_RELEASE_BASE:-https://github.com/mlorentedev/dotfiles/releases/download}"
+DOTF_RELEASE_API="${DOTF_RELEASE_API:-https://api.github.com/repos/mlorentedev/dotfiles/releases/latest}"
+
+# _dotf_latest_version resolves GitHub's latest release to a strict semver.
+# This is used only when no explicit version, environment pin, or checkout
+# versions.conf is available, such as a raw curl recovery stream.
+_dotf_latest_version() {
+    _dotf_metadata="$(curl -fsSL "$DOTF_RELEASE_API")" || {
+        log_error "install_dotf: latest-release lookup failed: $DOTF_RELEASE_API"
+        return 1
+    }
+    _dotf_version="$(printf '%s\n' "$_dotf_metadata" |
+        sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\([0-9.]*\)".*/\1/p' |
+        head -n1)"
+    if ! printf '%s\n' "$_dotf_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        log_error "install_dotf: latest-release metadata has no semver tag"
+        return 1
+    fi
+    printf '%s\n' "$_dotf_version"
+}
 
 # _dotf_arch <uname-m>: map host machine to the goreleaser arch token.
 _dotf_arch() {
@@ -132,8 +171,7 @@ install_dotf() {
     base="${3:-$DOTF_RELEASE_BASE}"
 
     if [ -z "$version" ]; then
-        log_error "install_dotf: no version given (set DOTF_VERSION in versions.conf)"
-        return 1
+        version="$(_dotf_latest_version)" || return 1
     fi
 
     _dotf_osname="$(_dotf_os "$(uname -s)")" || return 1

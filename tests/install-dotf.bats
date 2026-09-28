@@ -265,3 +265,76 @@ teardown() {
     [[ "$output" != *"no version given"* ]]
     [[ "$output" == *"$pinned"* ]]
 }
+
+@test "a raw installer stream installs an explicit release outside a checkout" {
+    # The curl-style recovery path runs the script from stdin. Its directory is
+    # /dev, not the checkout, so it cannot depend on utils.sh or versions.conf.
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    pipe_home="$TMP/pipe-home"
+    pipe_path="$TMP/pipe-path"
+    mkdir -p "$pipe_path"
+
+    run bash -c "env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
+        DOTF_VERSION='$VERSION' DOTF_RELEASE_BASE='$BASE' \
+        bash < '$SCRIPTS_DIR/install-dotf.sh'"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"command_exists"* ]]
+    [ -x "$pipe_home/.local/bin/dotf" ]
+
+    run "$pipe_home/.local/bin/dotf"
+    [ "$output" = "dotf version $VERSION" ]
+}
+
+@test "latest-release resolver accepts a semver tag from release metadata" {
+    curl() { printf '%s\n' '{"tag_name":"v9.9.9"}'; }
+
+    run _dotf_latest_version
+    [ "$status" -eq 0 ]
+    [ "$output" = "$VERSION" ]
+}
+
+@test "latest-release resolver rejects malformed release metadata" {
+    curl() { printf '%s\n' '{"tag_name":"not-a-version"}'; }
+
+    run _dotf_latest_version
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"semver"* ]]
+}
+
+@test "a raw installer stream resolves its release without a checkout pin" {
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+    printf '%s\n' "{\"tag_name\":\"v$VERSION\"}" > "$FIXTURE/latest.json"
+
+    pipe_home="$TMP/latest-pipe-home"
+    pipe_path="$TMP/latest-pipe-path"
+    mkdir -p "$pipe_path"
+
+    run bash -c "env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
+        DOTF_RELEASE_BASE='$BASE' DOTF_RELEASE_API='file://$FIXTURE/latest.json' \
+        bash < '$SCRIPTS_DIR/install-dotf.sh'"
+    [ "$status" -eq 0 ]
+
+    run "$pipe_home/.local/bin/dotf"
+    [ "$output" = "dotf version $VERSION" ]
+}
+
+@test "a raw installer stream never sources a utils.sh from its current directory" {
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    pipe_home="$TMP/untrusted-pipe-home"
+    pipe_path="$TMP/untrusted-pipe-path"
+    untrusted="$TMP/untrusted-working-directory"
+    marker="$TMP/untrusted-utils-was-sourced"
+    mkdir -p "$pipe_path" "$untrusted"
+    touch "$untrusted/main"
+    cat > "$untrusted/utils.sh" <<'EOF'
+touch "$RAW_INSTALL_MARKER"
+EOF
+
+    run bash -c "cd '$untrusted' && env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
+        DOTF_VERSION='$VERSION' DOTF_RELEASE_BASE='$BASE' RAW_INSTALL_MARKER='$marker' \
+        bash < '$SCRIPTS_DIR/install-dotf.sh'"
+    [ "$status" -eq 0 ]
+    [ ! -e "$marker" ]
+}
