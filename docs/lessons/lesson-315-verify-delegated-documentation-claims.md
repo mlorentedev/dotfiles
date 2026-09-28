@@ -1,5 +1,5 @@
 ---
-id: lesson-312
+id: lesson-315
 type: lesson
 status: active
 created: "2026-09-24"
@@ -7,13 +7,13 @@ owner: manu
 tags: [lesson, verification, subagents, claude-code, delegation]
 ---
 
-# 312 — A subagent's documentation summary is a claim: check it against what is observable locally before acting on it
+# 315 — A subagent's documentation summary is a claim: check it against what is observable locally before acting on it
 
 ## What happened
 
 While tuning Claude Code auto-compaction (2026-09-24), a `claude-code-guide` subagent was asked what `autoCompactWindow` means. It answered with citations that the setting is a percentage, default 80, and that the displayed 800k was 80% of the 1M window.
 
-The claim contradicted local evidence already on screen. The user's `settings.json` held `"autoCompactWindow": 800000`, and `/context` printed "Auto-compact window: 800k tokens". Read as a percentage, 800000 would be meaningless. Acting on the summary would have put a percentage (e.g. 50) into the dotfiles template, where Claude Code would have raised or clamped it to its 100000 minimum rather than compacting at 50%. The citation URL was real; the content attributed to it was not.
+The claim contradicted local evidence already on screen. The user's `settings.json` held `"autoCompactWindow": 800000`, and `/context` printed "Auto-compact window: 800k tokens". Read as a percentage, 800000 would be meaningless. Acting on the summary would have put a percentage (e.g. 50) into the dotfiles template, where `50` is outside Claude Code's documented 100000–1000000 token range rather than configuring a 50% threshold. The citation URL was real; the content attributed to it was not.
 
 ## The rule
 

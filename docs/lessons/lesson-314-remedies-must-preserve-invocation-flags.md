@@ -1,13 +1,13 @@
 ---
-id: lesson-311
+id: lesson-314
 type: lesson
 status: active
-created: "2026-09-23"
+created: "2026-09-24"
 owner: manu
 tags: [lesson, cli-ux, error-messages, verification, secrets]
 ---
 
-# 311 — A printed remedy is run verbatim, so it must reproduce the invocation that failed
+# 314 — A printed remedy is run verbatim, so it must reproduce the invocation that failed
 
 ## What happened
 
