@@ -1,0 +1,44 @@
+[
+  {
+    "id": "SEC-006-vault-curation-f1",
+    "behavior": "AC1: the dry run prints one line per row as apply/done/blocked and writes nothing",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestCurateDryRunThenApplyWithTheDigest' -count=1",
+    "state": "passing",
+    "evidence": "verification.md"
+  },
+  {
+    "id": "SEC-006-vault-curation-f2",
+    "behavior": "AC2: every blocking rule blocks alone, and a blocked plan refuses --apply whole with no write",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -run 'TestCurateBlocks|TestCurateBlocksRegistryAndPasskeyItems|TestApplyMutationRefusesAPasskeyItem|TestCurateDropURIsLetsAPasskeyKeeperStandUntouched' -count=1",
+    "state": "passing",
+    "evidence": "verification.md"
+  },
+  {
+    "id": "SEC-006-vault-curation-f3",
+    "behavior": "AC3: --apply performs every op, re-plans to all done, and a second run writes nothing",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -run 'TestCurateAppliesEveryOpAndConverges|TestCurateDryRunThenApplyWithTheDigest' -count=1",
+    "state": "passing",
+    "evidence": "verification.md"
+  },
+  {
+    "id": "SEC-006-vault-curation-f4",
+    "behavior": "AC4: --apply refuses a missing or stale digest; a touched item's revision changes the digest",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -run 'TestCurateDigestTracksRevisions|TestCurateApplyRefusesAStaleOrMissingDigest' -count=1",
+    "state": "passing",
+    "evidence": "verification.md"
+  },
+  {
+    "id": "SEC-006-vault-curation-f5",
+    "behavior": "AC5: no output, error paths included, carries a value, a URI or an item name",
+    "verification": "cd cli && go test ./internal/secrets/ ./internal/cmd/ -run 'TestCurate|TestDecodeItemsCountsWhatCurateNeedsWithoutKeepingIt' -count=1",
+    "state": "passing",
+    "evidence": "verification.md"
+  },
+  {
+    "id": "SEC-006-vault-curation-f6",
+    "behavior": "AC6: --apply fails when the vault's passkey count changes",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestCurateApplyFailsOnAPasskeyCountChange' -count=1",
+    "state": "passing",
+    "evidence": "verification.md"
+  }
+]
