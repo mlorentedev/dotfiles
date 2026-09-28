@@ -4,7 +4,7 @@
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-    SCRATCH="$BATS_TMPDIR/sdd-006-$$"
+    SCRATCH="$BATS_TEST_TMPDIR/sdd-006"
     mkdir -p "$SCRATCH"
 }
 

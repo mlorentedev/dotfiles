@@ -10,7 +10,7 @@
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     GUARD="$DOTFILES_DIR/scripts/check-doc-paths.sh"
-    SCRATCH="$BATS_TMPDIR/check-doc-paths"
+    SCRATCH="$BATS_TEST_TMPDIR/check-doc-paths"
     mkdir -p "$SCRATCH"
 }
 

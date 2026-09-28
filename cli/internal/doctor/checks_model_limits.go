@@ -22,6 +22,11 @@ import (
 // plausible round powers of two, which is exactly why they survived review: 2^20
 // reads as "1M" and is 48576 tokens more than the 1000000 the provider grants.
 //
+// SINCE AI-046 (#1764) the NaN models are not declared here at all:
+// pi-nan-provider registers them from models.dev merged with NaN's live /models,
+// so there is no hand-written number left to drift. What is still declared
+// (OpenRouter) is still compared.
+//
 // WHY DOCTOR AND NOT CI, the same split checkModelPins documents next door. The
 // truth side is a machine-local file — opencode's models.dev cache — and CI has
 // no machine. Committing a snapshot of the catalog would only move the drift: a
