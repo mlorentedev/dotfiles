@@ -159,7 +159,7 @@ _launch_fake() {
     local fake="$BATS_TEST_TMPDIR/obsidian"
     printf '#!/bin/sh\nsleep 30\n' > "$fake"
     chmod +x "$fake"
-    _launch_fake "$fake" --user-data-dir=/tmp/bats-run-FAKE/test/1/config/obsidian
+    _launch_fake "$fake" --user-data-dir="$BATS_RUN_TMPDIR/test/1/config/obsidian"
     local stray=$!
     # And one that looks like a human's: the real config dir, no bats tmpdir.
     _launch_fake "$fake" --user-data-dir="$HOME/.config/obsidian"
@@ -183,3 +183,39 @@ _launch_fake() {
         return 1
     fi
 }
+
+# Under `bats --jobs`, and on a box where several agent sessions run suites at
+# once, another run's fixtures are alive while this one tears down. The detector
+# reports and kills what it matches, so it must match only this run's.
+@test "guard: the stray detector ignores a test-shaped process from another bats run" {
+    _guard_is_active || skip "setup_suite did not run (single-file invocation); the guard is inactive here"
+    command -v pgrep >/dev/null 2>&1 || skip "pgrep not installed"
+
+    # shellcheck source=setup_suite.bash disable=SC1091
+    . "$REPO_ROOT/tests/setup_suite.bash"
+
+    local fake="$BATS_TEST_TMPDIR/obsidian"
+    printf '#!/bin/sh\nsleep 30\n' > "$fake"
+    chmod +x "$fake"
+    _launch_fake "$fake" --user-data-dir="$BATS_RUN_TMPDIR/test/1/config/obsidian"
+    local ours=$!
+    _launch_fake "$fake" --user-data-dir="/tmp/bats-run-OTHER$$/test/1/config/obsidian"
+    local theirs=$!
+    sleep 0.3
+
+    local found unscoped
+    found="$(_gui_guard_test_shaped_processes)"
+    # With no run tmpdir to scope to, it must match nothing rather than
+    # everything: an empty prefix would sweep up a human's editor.
+    unscoped="$(BATS_RUN_TMPDIR='' _gui_guard_test_shaped_processes)"
+
+    kill -9 "$ours" "$theirs" 2>/dev/null || true
+
+    printf '%s' "$found" | grep -q "^$ours " || { printf 'missed this run'"'"'s process (pid %s):\n%s\n' "$ours" "$found" >&2; return 1; }
+    if printf '%s' "$found" | grep -q "^$theirs "; then
+        printf 'matched another run'"'"'s process (pid %s); teardown would kill it\n' "$theirs" >&2
+        return 1
+    fi
+    [ -z "$unscoped" ] || { printf 'matched with BATS_RUN_TMPDIR empty:\n%s\n' "$unscoped" >&2; return 1; }
+}
+

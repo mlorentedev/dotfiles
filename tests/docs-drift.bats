@@ -8,7 +8,7 @@ setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     AI_COPILOT="$DOTFILES_DIR/ai/copilot/copilot-instructions.md"
     GH_COPILOT="$DOTFILES_DIR/.github/copilot-instructions.md"
-    SCRATCH="$BATS_TMPDIR/sdd-005"
+    SCRATCH="$BATS_TEST_TMPDIR/sdd-005"
     mkdir -p "$SCRATCH"
 }
 
