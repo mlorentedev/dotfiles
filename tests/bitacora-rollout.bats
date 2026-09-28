@@ -182,3 +182,27 @@ STUB
     [[ "$output" == *"dotf secrets run --only BITACORA_PAT"* ]]
     [ ! -e "$GH_LOG" ] || refute_grep 'secret set' "$GH_LOG"
 }
+
+# ── provisioning runs reach the backfill too ──────────────────────────────────
+
+@test "a provisioning run resolves the project id before its backfill step" {
+    # Step 4 runs in every mode, but the id was resolved only under
+    # --backfill-only, so a full run and a --check run died under `set -u` with
+    # "PROJECT_ID: unbound variable" at the first repo with an open item. The
+    # rollout that deploys the canonical workflows could not reach a single repo
+    # past that point, and the copies drifted unnoticed.
+    default_issues
+    BITACORA_PAT=stub run "$SCRIPT" --check demo
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"unbound variable"* ]]
+    [ "$(count_calls 'projectV2(number: 1) { id }')" -eq 1 ]
+    [[ "$output" == *"✅ demo: backfill — 2 open item(s) ensured on board"* ]]
+}
+
+@test "a provisioning run with an unresolvable project id aborts before touching any repo" {
+    default_issues
+    BITACORA_PAT=stub STUB_NO_PROJECT=1 run "$SCRIPT" --check demo
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot resolve project #1"* ]]
+    [[ "$output" != *"── demo ──"* ]]
+}
