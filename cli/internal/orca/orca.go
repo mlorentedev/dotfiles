@@ -59,25 +59,25 @@ type TuneReport struct {
 // DefaultDesiredSettings defines the baseline optimizations for Orca ADE.
 var DefaultDesiredSettings = map[string]any{
 	"experimentalAgentHibernation":        true,
-	"agentHibernationIdleMs":               float64(600000),
+	"agentHibernationIdleMs":              float64(600000),
 	"refreshLocalBaseRefOnWorktreeCreate": true,
 	"telemetry.optedIn":                   false,
 }
 
 var volatileSettingsKeys = map[string]bool{
 	"opencodeSessionCookie":                     true,
-	"opencodeWorkspaceId":                         true,
-	"claudeManagedAccounts":                       true,
-	"activeClaudeManagedAccountId":                true,
-	"activeClaudeManagedAccountIdsByRuntime":       true,
-	"codexManagedAccounts":                        true,
-	"activeCodexManagedAccountId":                 true,
-	"activeCodexManagedAccountIdsByRuntime":       true,
-	"workspaceDir":                                true,
-	"workspaceDirHistory":                         true,
-	"floatingTerminalCwd":                         true,
-	"floatingTerminalTrustedCwds":                 true,
-	"floatingTerminalCwdMigratedToAppWorkspace":   true,
+	"opencodeWorkspaceId":                       true,
+	"claudeManagedAccounts":                     true,
+	"activeClaudeManagedAccountId":              true,
+	"activeClaudeManagedAccountIdsByRuntime":    true,
+	"codexManagedAccounts":                      true,
+	"activeCodexManagedAccountId":               true,
+	"activeCodexManagedAccountIdsByRuntime":     true,
+	"workspaceDir":                              true,
+	"workspaceDirHistory":                       true,
+	"floatingTerminalCwd":                       true,
+	"floatingTerminalTrustedCwds":               true,
+	"floatingTerminalCwdMigratedToAppWorkspace": true,
 }
 
 // Export extracts keybindings.json and clean settings from orca-data.json into the repo.

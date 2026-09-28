@@ -28,7 +28,7 @@ var disposableDirNames = map[string]bool{
 	".gradle":           true,
 	".mvn":              true,
 	".tox":              true,
-	"__pycache__":        true,
+	"__pycache__":       true,
 	".pytest_cache":     true,
 	".mypy_cache":       true,
 	".ruff_cache":       true,

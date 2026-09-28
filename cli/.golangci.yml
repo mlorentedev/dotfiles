@@ -18,3 +18,10 @@ linters:
       - path-except: internal/cmd/
         linters:
           - gocyclo
+
+# #1154. v2 moved formatting out of `linters:`, so a config without this block
+# checks no formatting at all: four unformatted files sat on main behind a
+# green lint.
+formatters:
+  enable:
+    - gofmt
