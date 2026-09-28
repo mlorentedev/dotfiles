@@ -11,7 +11,7 @@ owner: manu
 
 # ADR-005: Two-Directory Sync Pattern
 
-> **Partially superseded by [ADR-028](adr-028-secrets-two-tier-bitwarden-age.md) / [ADR-030](adr-030-secrets-registry-source-model.md) (both accepted).** The two-directory model itself (repo checkout vs. `~/.dotfiles` deploy target) still stands. But the secrets side of this ADR — `secrets_add`/`secrets_rotate` auto-syncing to the repo, `dotfiles-sync --secrets-only` — describes a retired command surface; secrets now route through `dotf secrets` + `secrets/registry.yaml`, with no auto-sync step. `dotfiles-sync.sh` still exists for non-secrets bidirectional sync.
+> **Partially superseded by [ADR-028](adr-028-secrets-two-tier-bitwarden-age.md) / [ADR-030](adr-030-secrets-registry-source-model.md) (both accepted).** The two-directory model itself (repo checkout vs. `~/.dotfiles` deploy target) still stands. But the secrets side of this ADR — `secrets_add`/`secrets_rotate` auto-syncing to the repo, `dotfiles-sync --secrets-only` — describes a retired command surface; secrets now route through `dotf secrets` + `secrets/registry.yaml`, with no auto-sync step. `dotfiles-sync.sh` still exists for non-secrets sync. The `--secrets-only` flag and its `sensitive/` copy were removed in #1795: the two-way copy resurrected retired blobs.
 
 ## Context
 
