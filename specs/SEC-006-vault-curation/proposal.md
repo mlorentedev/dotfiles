@@ -68,7 +68,7 @@ It is blocked when:
 
 - The plan itself, and the item names. They stay in the private knowledge vault; the repo is public.
 - Any registry-declared item or field, except `hide` and `reprompt`. `reconcile` and `retired:` own the rest. `ZOHO_APP_PASSWORDS` is retired through the registry, not through a curate plan.
-- The policy check (`--check`: folder taxonomy, hidden secret-named fields, reprompt) and the governance guide. They ship in the follow-up governance PR (#600, #1784 AC3).
+- The policy check (`--check`: folder taxonomy, hidden secret-named fields, reprompt): SEC-007 (#1792). The governance guide's rewrite: the follow-up PR that closes #600 (#1784 AC3).
 - Editing items that carry passkeys: refused by construction, see Risks.
 
 ## Risks / open questions
