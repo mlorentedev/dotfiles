@@ -328,3 +328,4 @@ tags: [lessons, index, dotfiles]
 | [308 - A baseline picked by content is a baseline anyone can post](lesson-308-a-baseline-picked-by-content-is-a-baseline-anyone-can-post.md) | 2026-09-27 |  |
 | [309 - A test filter that matches nothing passes](lesson-309-a-test-filter-that-matches-nothing-passes.md) | 2026-09-27 |  |
 | [310 - A comment that grants a safety exemption outlives the ADR it cites](lesson-310-a-comment-that-grants-a-safety-exemption-outlives-the-adr-it-cites.md) | 2026-09-26 |  |
+| [313 - A smoke test that runs the real command cannot fail, and can do damage](lesson-313-a-smoke-test-that-runs-the-real-command-cannot-fail-and-can-do-damage.md) | 2026-09-27 |  |
