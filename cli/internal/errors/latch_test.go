@@ -44,14 +44,14 @@ func TestTerminalFailureFormat(t *testing.T) {
 	}
 
 	jsonPart := strings.TrimPrefix(msg, HandoffPrefix)
-	
+
 	type testPayload struct {
 		SchemaName    string `json:"schemaName"`
 		RetryGuidance string `json:"retryGuidance"`
 		Reason        string `json:"reason"`
 	}
 	var payload testPayload
-	
+
 	if jerr := json.Unmarshal([]byte(jsonPart), &payload); jerr != nil {
 		t.Fatalf("failed to unmarshal JSON payload: %v", jerr)
 	}

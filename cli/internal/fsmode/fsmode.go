@@ -52,4 +52,3 @@ func Needs(path string, mode os.FileMode) (bool, error) {
 	}
 	return !applied, nil
 }
-
