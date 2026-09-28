@@ -722,10 +722,12 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 # with a remedy ("re-run setup") that could not clear them. Idempotent (prints
 # "N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    dotf harness mirror
+    dotf harness mirror --repo $DotfilesDir
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "dotf harness mirror reported a gap (above); 'dotf doctor' will report harness drift"
     }
+} else {
+    Write-Warn "dotf not found; harness inputs were not mirrored"
 }
 
 # Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised

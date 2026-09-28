@@ -17,7 +17,8 @@ import (
 // which is why `dotf doctor` on Windows failed the routing registry and the
 // model-pin checks after every setup, printing "re-run setup" as the remedy.
 func newHarnessMirrorCmd() *cobra.Command {
-	return &cobra.Command{
+	var repo string
+	cmd := &cobra.Command{
 		Use:   "mirror",
 		Short: "Mirror harness/ and every manifest target from the checkout into the deploy dir",
 		Long: "mirror copies the harness inputs the deploy-dir consumers read — the whole\n" +
@@ -31,9 +32,12 @@ func newHarnessMirrorCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repoRoot := env.RepoDir()
+			repoRoot := repo
 			if repoRoot == "" {
-				return fmt.Errorf("cannot locate the dotfiles checkout — set DOTFILES_REPO_DIR or run from inside it")
+				repoRoot = env.RepoDir()
+			}
+			if repoRoot == "" {
+				return fmt.Errorf("cannot locate the dotfiles checkout — pass --repo, set DOTFILES_REPO_DIR, or run from inside it")
 			}
 			deployDir := env.DotfilesDir(env.Home())
 
@@ -55,4 +59,6 @@ func newHarnessMirrorCmd() *cobra.Command {
 			return err
 		},
 	}
+	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout to mirror from")
+	return cmd
 }

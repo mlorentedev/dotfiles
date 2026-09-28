@@ -1,0 +1,23 @@
+[
+  {
+    "id": "WIN-014-f1",
+    "behavior": "An explicit checkout path controls harness mirroring.",
+    "verification": "go test ./internal/cmd ./internal/harness",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-014-f2",
+    "behavior": "Mirror writes preserve executable source modes.",
+    "verification": "go test ./internal/harness",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-014-f3",
+    "behavior": "Both setup twins pass their checkout and warn without dotf.",
+    "verification": "bats tests/setup-linux.bats tests/setup-windows.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

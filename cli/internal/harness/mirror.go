@@ -152,13 +152,20 @@ func mirrorTree(repoRoot, deployDir, sub string, res *MirrorResult) error {
 // (temp file in the destination dir, then rename), so a reader never sees a
 // half-written registry and an identical file keeps its mtime.
 func mirrorFile(src, dst string, res *MirrorResult) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("stating %s: %w", src, err)
+	}
 	want, err := os.ReadFile(src) //nolint:gosec // paths derive from the checkout tree
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", src, err)
 	}
 	if have, err := os.ReadFile(dst); err == nil && bytes.Equal(have, want) { //nolint:gosec // same
-		res.Unchanged++
-		return nil
+		dstInfo, statErr := os.Stat(dst)
+		if statErr == nil && dstInfo.Mode().Perm() == info.Mode().Perm() {
+			res.Unchanged++
+			return nil
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
@@ -177,7 +184,7 @@ func mirrorFile(src, dst string, res *MirrorResult) error {
 		_ = os.Remove(tmpName)
 		return err
 	}
-	if err := os.Chmod(tmpName, 0o644); err != nil {
+	if err := os.Chmod(tmpName, info.Mode().Perm()); err != nil {
 		_ = os.Remove(tmpName)
 		return err
 	}

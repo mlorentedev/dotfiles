@@ -95,3 +95,25 @@ func TestHarnessMirrorCmd_SaysSoWhenTheCheckoutIsTheDeployDir(t *testing.T) {
 		t.Errorf("must state the outcome:\n%s", out)
 	}
 }
+
+func TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout(t *testing.T) {
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[]}`)
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "model-map.json"), `{}`)
+	t.Chdir(t.TempDir())
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("DOTFILES_DIR", deploy)
+
+	var out, errb bytes.Buffer
+	cmd := newHarnessMirrorCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&errb)
+	cmd.SetArgs([]string{"--repo", repo})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("explicit repo: %v\n%s", err, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(deploy, "harness", "model-map.json")); err != nil {
+		t.Fatalf("mirror did not use explicit repo: %v", err)
+	}
+}
