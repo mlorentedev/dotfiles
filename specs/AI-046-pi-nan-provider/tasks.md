@@ -24,25 +24,25 @@ created: "2026-09-26"
 - [x] [AC4] Failing test: the deploy entry for `nan-provider.json` is `merge` and sets `mediaMcp: false`
 - [x] [AC4] `ai/pi/nan-provider.json` plus its `ai/deploy.json` entry
 - [x] Document the package in `ai/pi/README.md`
-- [ ] PR opened, triaged, merged by the owner
+- [x] PR opened, triaged, merged by the owner (#1778)
 
 ## PR-B1: check the ids against the package (additive)
 
 - [x] [AC2] CI job `pi-nan-package`: pinned pi, the pinned package, dummy key, no `models.json`. `tests/pi-nan-package.bats` asserts `enabledModels`, `defaultModel` and the nan reviewer-pool members against the package, and #1772's context-window parity against the package snapshot, failing on an empty intersection
 - [x] Live prompt test without our `timeoutSeconds: 300` and `compat.supportsDeveloperRole`: all six answer, so no `modelOverrides` are needed (`verification.md`)
-- [ ] PR opened, triaged, merged by the owner
+- [x] PR opened, triaged, merged by the owner (#1783)
 
 ## PR-B2: the package owns the ids
 
-- [ ] [AC3] Remove the NaN models from `models.json`, and rework its consumers (`pi-config.bats`, `guard-pi-models-schema.bats`, `reviewer-pool.bats`, `checks_model_limits.go`, `render_test.go`, `deploy_test.go`, `model-pins.json`) with the test-deletion evidence ledger
-- [ ] Delete #1772's `models.json` parity test; PR-B1's package-snapshot twin replaces it
-- [ ] [AC6] Measure the model-switch guard once
-- [ ] Announce the first `dotf pi packages apply` to peers (it also removes pi-memory on msi, HARNESS-139 AC8)
+- [x] [AC3] Remove the NaN models from `models.json`, and rework its consumers (`pi-config.bats`, `reviewer-pool.bats`, `opencode.bats`, `checks_model_limits.go`, the `model-pins.json` comment) with the test-deletion evidence ledger (`verification.md`). `guard-pi-models-schema.bats`, `render_test.go` and `deploy_test.go` needed no change: they check the file generically or use a synthetic fixture
+- [x] Delete #1772's `models.json` parity test; PR-B1's package-snapshot twin replaces it
+- [x] [AC6] Measure the model-switch guard once (`measure-ac6.sh`, `verification.md`)
+- [x] The first `dotf pi packages apply` on msi already ran after #1755 merged: the package is in the live `settings.json` and pi-memory's data sits in `~/.pi/agent/archive/memory-20260928`. Nothing is left to announce; merging this PR changes the deployed `models.json` only
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
+- [x] `verification.md` filled in
 - [ ] Independent adversarial review before archive
 
 ## Machine-readable features

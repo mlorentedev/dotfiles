@@ -47,11 +47,11 @@ After this change, the package owns pi's NaN provider, and every machine gets it
 ## Acceptance criteria
 
 - [x] AC1: `ai/pi/packages.json` declares `npm:@gtrabanco/pi-nan-provider@0.7.0`, and `tests/pi-config.bats` (the pinned-entry contract) passes.
-- [ ] AC2: With the package installed and `ai/pi/models.json` deployed, `pi --list-models nan` lists every id in `ai/pi/settings.json` `enabledModels`. The output is recorded in `verification.md`. (Amended 2026-09-26: `glm5.3` was dropped from this criterion. It is premium, and the package filters it by the member's tier, so a standard key never lists it.)
-- [ ] AC3: `ai/pi/models.json` defines no NaN model the package already registers. A test fails if one comes back.
+- [x] AC2: With the package installed and `ai/pi/models.json` deployed, `pi --list-models nan` lists every id in `ai/pi/settings.json` `enabledModels`. The output is recorded in `verification.md`. (Amended 2026-09-26: `glm5.3` was dropped from this criterion. It is premium, and the package filters it by the member's tier, so a standard key never lists it.)
+- [x] AC3: `ai/pi/models.json` defines no NaN model the package already registers. A test fails if one comes back.
 - [x] AC4: The media bridge is off on every managed launch path, and a test fails if the default flips. (Amended 2026-09-26: through the deployed `nan-provider.json`, which the package reads on every launch, instead of an env var each wrapper would have to carry.)
 - [x] AC5: With `api.nan.builders` unreachable, pi starts and lists the snapshot models. Measured and recorded.
-- [ ] AC6: A model switch from `deepseek-v4-flash` to `qwen3.6` in a session whose history exceeds 262K tokens including reasoning completes without a context overflow. This is the guard the package exists for. Measured once and recorded.
+- [x] AC6: A model switch from `deepseek-v4-flash` to `qwen3.6` in a session whose history exceeds 262K tokens including reasoning completes without a context overflow. This is the guard the package exists for. Measured once and recorded.
 
 ## References
 

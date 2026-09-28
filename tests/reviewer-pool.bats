@@ -11,7 +11,6 @@
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export POOL="$DOTFILES_DIR/harness/reviewer-pool.json"
-    export MODELS="$DOTFILES_DIR/ai/pi/models.json"
 }
 
 @test "the pool is valid JSON with unique, non-blank ids" {
