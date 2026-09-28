@@ -44,11 +44,13 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 - [x] [AC6] Locally, run `bats --jobs 4 --no-parallelize-within-files tests/*.bats` three times under the memory cap. Expected: three green runs, each with the same test count as the serial run.
 - [ ] [AC6] Switch `ci.yml` "Run bats test suite" to `bats --jobs "$(nproc)" --no-parallelize-within-files tests/*.bats`. Record the step time of the PR run, then the mean of the first 5 runs on `main`, in `verification.md`.
 
-### PR 3: P0.7, one reporter for `lint`
+### PR 3: P0.7, one reporter for `lint`, and a real Go gate
 
-- [ ] [AC7] Add `tests/workflow-job-names.bats` with the test `workflow job display names are unique across workflows`. It parses `.github/workflows/*.yml` and asserts that no two jobs report the same name; a matrix `name:` is expanded per value. Expected: it fails on `lint`.
-- [ ] [AC7] Rename `.github/workflows/cli.yml` job `lint` to `name: cli-lint`. Expected: the check passes, and `forge/branch-protection.json` is unchanged (the required `lint` stays `ci.yml`'s).
-- [ ] [AC7] Verify on the PR that the `lint` context appears once in `gh pr checks`.
+- [x] [AC7] Add `tests/workflow-job-names.bats` over `tests/lib/check-workflow-contexts.py`. It asserts two things: no two pull-request jobs (or API-posted statuses) report the same name, with matrix names expanded; and every required context in `forge/branch-protection.json` is reported by a job that reports on every pull request (no `paths` filter on the workflow, not a job-level-skippable matrix job). Expected: it fails on `lint`.
+- [x] [AC7] `cli.yml`: drop the `pull_request` paths filter, add a `cli-changes` job, skip `test`, `cli-lint` and the snapshot when the diff has no Go change, and add `cli-gate` (`if: always()`, red unless every Go job succeeded or was skipped). Add `cli-gate` to the required checks in `forge/branch-protection.json`.
+- [x] [AC7] Mutations: a `paths` filter restored on `pull_request` fails the test on `cli-gate`, and so does requiring `test (ubuntu-latest)` directly.
+- [ ] [AC7] On the PR: `lint` appears once in `gh pr checks`; `cli-gate` is green both with and without a Go change.
+- [ ] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge.
 
 ### PR 4: P0.5, a token for the Windows doctor gate (blocked)
 
