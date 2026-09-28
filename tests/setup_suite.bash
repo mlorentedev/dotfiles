@@ -103,8 +103,8 @@ teardown_suite() {
         printf '\n'
         printf 'GUI GUARD: a test launched a real GUI application and left it running.\n'
         printf '\n'
-        printf 'These carry a bats tmpdir in --user-data-dir, so they came from this suite\n'
-        printf 'rather than from anything you opened:\n\n'
+        printf 'These carry the tmpdir of this bats run in --user-data-dir, so they came from this\n'
+        printf 'suite rather than from anything you opened:\n\n'
         printf '%s\n' "$strays"
         printf '\n'
         printf 'The PATH interceptors did not catch it, which means the call used an\n'
@@ -123,11 +123,16 @@ teardown_suite() {
 }
 
 # _gui_guard_test_shaped_processes lists pid+command for GUI processes whose
-# user-data-dir points inside a bats tmpdir. Matching on that flag rather than
-# on the binary name is what keeps a developer's own open editor out of the
-# result — the check must never kill something a human started.
+# user-data-dir points inside THIS run's bats tmpdir. Matching on that flag
+# rather than on the binary name is what keeps a developer's own open editor out
+# of the result — the check must never kill something a human started. Scoping
+# it to $BATS_RUN_TMPDIR keeps another suite's fixtures out too: under
+# `bats --jobs`, or with several agent sessions on one box, those are alive
+# while this run tears down, and a bare `bats-run` match killed them (CI-004).
 _gui_guard_test_shaped_processes() {
     command -v pgrep >/dev/null 2>&1 || return 0
+    # An empty prefix would match every --user-data-dir, a human's included.
+    [ -n "${BATS_RUN_TMPDIR:-}" ] || return 0
 
     local bin line
     for bin in "${GUI_BINARIES[@]}"; do
@@ -137,7 +142,7 @@ _gui_guard_test_shaped_processes() {
         # incident report three strays that were the measurement itself.
         while IFS= read -r line; do
             case "$line" in
-                *--user-data-dir=*bats-run*) printf '%s\n' "$line" ;;
+                *--user-data-dir="$BATS_RUN_TMPDIR"/*) printf '%s\n' "$line" ;;
             esac
         done < <(pgrep -a "$bin" 2>/dev/null || true)
     done
