@@ -8,7 +8,7 @@ SSOT (see root `AGENTS.md`).
 
 | Source | Deploy target | Notes |
 |--------|---------------|-------|
-| `models.json` | `~/.pi/agent/models.json` | NaN and OpenRouter providers. `apiKey` is `${NAN_API_KEY}` in source; `dotf deploy` renders it into the deployed copy (`ai/deploy.json`: `render: true`, mode `0600`), so the key is never committed. |
+| `models.json` | `~/.pi/agent/models.json` | The OpenRouter provider. NaN's comes from `pi-nan-provider` (see *NaN provider package*). `apiKey` is `${OPENROUTER_API_KEY}`, which pi resolves from its own environment at request time, so the key is in neither the repo nor the deployed file (mode `0600`). |
 | `settings.json` | `~/.pi/agent/settings.json` | UX defaults + curated `enabledModels`. **Seed-if-missing**: pi mutates this file at runtime (`lastChangelogVersion`), so setup deploys it only when absent and never clobbers local edits. |
 | `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup installs the difference against the live `settings.json` on every run, through `pi install`. See below. |
 | `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Tools load on-demand via `pi-mcp-client` meta-tool (`mcp_tools`). Note: `context7` routes context over HTTPS to an external API. |
@@ -68,9 +68,14 @@ on a model switch, and retries truncated streams.
   models (measured 2026-09-26, `specs/AI-046-pi-nan-provider/verification.md`).
 - **Premium models** such as `glm5.3` are filtered by the member's tier, so a
   standard key does not list them.
-- `models.json` still defines the `nan` provider too. A `models` entry replaces
-  the package's model with the same id, and pi lists the union. Moving the ids
-  out of `models.json` is AI-046's second PR.
+- **`models.json` defines no NaN model** (AI-046 AC3, `tests/pi-config.bats`). A
+  `models` entry there would replace the package's model with the same id, and
+  the live catalog would stop applying to it. A per-model change goes in
+  `providers.nan.modelOverrides`, which composes above the package.
+- **The ids are checked against the package,** not against a copy of it: the
+  `pi-nan-package` CI job installs the pinned package and runs
+  `tests/pi-nan-package.bats` (`enabledModels`, `defaultModel`, the reviewer
+  pool, and opencode's context windows).
 
 ## MCP (Model Context Protocol)
 
@@ -112,8 +117,8 @@ admission procedure yet. Neither is wired into `defaultModel`, `harness/model-ma
 One capability nuance for `qwen3.8-flash` specifically: Alibaba's own release notes put its
 *native* context at 262,144 tokens, extended to 1M via YaRN, and YaRN-extended context can
 behave differently at the far end of the window than a natively-1M model
-(`deepseek-v4-flash`, `mimo-v2.5`). `models.json` therefore declares the **native** 262,144
-rather than the served 1M: a declared window the model degrades inside is worse than a
+(`deepseek-v4-flash`, `mimo-v2.5`). The package's snapshot therefore carries the **native** 262,144
+rather than the served 1M, and opencode matches it: a declared window the model degrades inside is worse than a
 smaller honest one, because nothing downstream can tell a degraded answer from a good one.
 `glm5.3-flash`'s 1M is native per Zhipu.
 
@@ -127,10 +132,12 @@ the two sets are curated independently. `tests/pi-config.bats` asserts this list
 `settings.json`'s `enabledModels`.
 
 Default: `nan/deepseek-v4-flash`, thinking level `high`. Change in `settings.json`. (Per-model
-context windows live in `models.json` — the one place they cannot drift from.)
+context windows come from `pi-nan-provider`'s snapshot; `tests/pi-nan-package.bats` holds
+opencode's to the same numbers.)
 
 ## Secret
 
 `NAN_API_KEY` lives only in Bitwarden (item `nan-api-key`, mapped in
-`secrets/registry.yaml`, ADR-028). The literal never appears in a committed file. Rotate it at the
+`secrets/registry.yaml`, ADR-028), and reaches pi only through the `pi` wrapper's
+`dotf secrets run`. The literal never appears in a committed file. Rotate it at the
 NaN dashboard if ever exposed.

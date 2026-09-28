@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
-# Bidirectional sync between dotfiles repo and installation
-# Usage: dotfiles-sync.sh [--secrets-only]
+# Push the dotfiles repo, then copy it to the installation (ADR-005)
+# Usage: dotfiles-sync.sh
 #
-# Syncs:
-#   - Git changes (push from repo, pull to local)
-#   - Secrets: *.secret.age, .secrets-audit.log (registry.yaml is git-tracked)
+# sensitive/ is never touched, in either direction. Secrets live in Bitwarden
+# behind secrets/registry.yaml (ADR-028); the one age blob left is git-tracked
+# and deployed by setup. A two-way copy of sensitive/ used to live here, and it
+# copied retired blobs from the installation back into the repo (#1795).
 
 set -euo pipefail
 
 # Configuration
 DOTFILES_LOCAL="${DOTFILES_DIR:-$HOME/.dotfiles}"
 DOTFILES_REPO="${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"
-SENSITIVE_DIR="sensitive"
 
 # Colors (if terminal supports it)
 if [[ -t 1 ]]; then
@@ -35,67 +35,6 @@ validate_dirs() {
     [[ -d "$DOTFILES_LOCAL" ]] || { log_error "Local dotfiles not found: $DOTFILES_LOCAL"; return 1; }
     [[ -d "$DOTFILES_REPO" ]] || { log_error "Repo dotfiles not found: $DOTFILES_REPO"; return 1; }
     [[ "$DOTFILES_LOCAL" != "$DOTFILES_REPO" ]] || { log_warning "Local and repo are same directory"; return 1; }
-}
-
-# Sync secrets bidirectionally (newest wins)
-sync_secrets() {
-    local_dir="$DOTFILES_LOCAL/$SENSITIVE_DIR"
-    repo_dir="$DOTFILES_REPO/$SENSITIVE_DIR"
-
-    [[ -d "$local_dir" ]] || { log_warning "Local sensitive dir not found"; return 0; }
-    [[ -d "$repo_dir" ]] || { log_warning "Repo sensitive dir not found"; return 0; }
-
-    log_info "Syncing secrets..."
-
-    synced=0
-
-    # Sync .age files and the audit log (the registry.yaml mapping is git-tracked)
-    files_to_sync=(
-        ".secrets-audit.log"
-    )
-
-    # Add all .age files from both directories
-    for f in "$local_dir"/*.secret.age "$repo_dir"/*.secret.age; do
-        [[ -f "$f" ]] || continue
-        basename="${f##*/}"
-        # Add to array if not already present
-        found=0
-        for existing in "${files_to_sync[@]}"; do
-            [[ "$existing" == "$basename" ]] && { found=1; break; }
-        done
-        [[ $found -eq 0 ]] && files_to_sync+=("$basename")
-    done
-
-    for file in "${files_to_sync[@]}"; do
-        local_file="$local_dir/$file"
-        repo_file="$repo_dir/$file"
-
-        # Both exist - sync newer to older
-        if [[ -f "$local_file" && -f "$repo_file" ]]; then
-            if [[ "$local_file" -nt "$repo_file" ]]; then
-                cat "$local_file" > "${repo_file}.tmp" && mv "${repo_file}.tmp" "$repo_file"
-                log_info "  $file (→ repo)"
-                synced=$((synced + 1))
-            elif [[ "$repo_file" -nt "$local_file" ]]; then
-                cat "$repo_file" > "${local_file}.tmp" && mv "${local_file}.tmp" "$local_file"
-                log_info "  $file (repo → local)"
-                synced=$((synced + 1))
-            fi
-        # Only in - copy to repo
-        elif [[ -f "$local_file" ]]; then
-            cat "$local_file" > "${repo_file}.tmp" && mv "${repo_file}.tmp" "$repo_file"
-            log_info "  $file (→ repo) [new]"
-            synced=$((synced + 1))
-        # Only in repo - copy to local
-        elif [[ -f "$repo_file" ]]; then
-            cat "$repo_file" > "${local_file}.tmp" && mv "${local_file}.tmp" "$local_file"
-            log_info "  $file (repo → local) [new]"
-            synced=$((synced + 1))
-        fi
-    done
-
-    [[ $synced -eq 0 ]] && log_info "  All secrets already in sync"
-    return 0
 }
 
 # Push repo to remote, then copy files to local installation (ADR-005)
@@ -129,6 +68,10 @@ sync_repo_to_local() {
 
 # Main
 main() {
+    if [[ $# -gt 0 ]]; then
+        log_error "dotfiles-sync takes no arguments. --secrets-only is gone: sensitive/ no longer syncs here (#1795)."
+        exit 2
+    fi
     echo "Dotfiles Sync"
     echo "============="
     echo "Local: $DOTFILES_LOCAL"
@@ -136,13 +79,6 @@ main() {
     echo ""
 
     validate_dirs || exit 1
-
-    # Sync secrets first (bidirectional)
-    sync_secrets || exit 1
-    echo ""
-
-    # If --secrets-only, stop here
-    [[ "${1:-}" == "--secrets-only" ]] && { log_success "Secrets sync complete"; exit 0; }
 
     # Push repo + copy to local (ADR-005: ~/.dotfiles is not a git repo)
     sync_repo_to_local || exit 1

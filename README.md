@@ -185,8 +185,7 @@ in the vault and re-run setup. Pipeline details: the vault's `pattern-cross-agen
 ### Sync
 
 ```bash
-dotfiles-sync.sh                    # Bidirectional sync + git push/pull
-dotfiles-sync.sh --secrets-only     # Only sync sensitive/ files
+dotfiles-sync.sh                    # Push the repo, then copy it to ~/.dotfiles (never sensitive/)
 ```
 
 ### Diagnostics

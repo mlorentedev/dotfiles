@@ -9,10 +9,10 @@ created: "2026-09-26"
 
 - [x] AC1 -> `ai/pi/packages.json` entry; `bats tests/pi-packages.bats` (pin, uniqueness and `why` contracts) green.
 - [x] AC2 -> `tests/pi-nan-package.bats`, run by the `pi-nan-package` CI job (PR-B1). It lists with the package alone, with no `models.json` in the agent dir, which is stricter than the criterion's wording: with our `models.json` present pi lists the union, and every id would pass on our own definition. Mutations caught: a ghost id in `enabledModels` (tests 2 and 3), a ghost `defaultModel` (3), an opencode window changed from 262144 to 262000 (5), a ghost pool member (4). Without `PI_BIN` the file skips; with `PI_NAN_PACKAGE_REQUIRED=1` a skip fails.
-- [ ] AC3 -> PR-B.
+- [x] AC3 -> `tests/pi-config.bats` "ai/pi/models.json defines no NaN model: pi-nan-provider owns them (AI-046 AC3)" (PR-B2). Mutation M7 below turns it red.
 - [x] AC4 -> `tests/pi-config.bats` "pi-nan-provider's media MCP bridge is deployed OFF, merged into the package's state file". It fails on either mutation: `mediaMcp: true`, or the entry without `strategy: merge`.
 - [x] AC5 -> measured 2026-09-26, below.
-- [ ] AC6 -> PR-B.
+- [x] AC6 -> measured 2026-09-27 with `measure-ac6.sh`, below. It exits non-zero unless the guard-on arm answers and the control overflows.
 
 ## Measurements (pi 0.87.1, package 0.7.0, 2026-09-26)
 
@@ -58,10 +58,43 @@ All six answered (qwen3.8-flash answered "pong — standing by", which is the mo
 
 **Key delivery.** Removing the `nan` block removes `apiKey: "${NAN_API_KEY}"`, and nothing changes: pi resolves that reference from its own process environment at request time (`docs/models.md`), and the package's `envApiKeyAuth` reads the same variable from the same process. The `pi` wrapper (`.zshrc`, `.bashrc`, `profile.ps1`) injects it with `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY`, and `~/.pi/agent/auth.json` is empty on msi, so no stored credential takes precedence.
 
+**Model switch past 262K (AC6, PR-B2, 2026-09-27).** `measure-ac6.sh` writes a synthetic session: 30 turns attributed to `nan/deepseek-v4-flash`, each with a `thinking` block and a short answer, 2,000,000 reasoning characters and 300,000 answer characters. It resumes the session with `--model nan/qwen3.6` in an isolated agent dir holding the package, `nan-provider.json` and `compaction.enabled: false`. Compaction is off so a compact-and-retry cannot make both arms pass. One variable changes between the arms: `NAN_THINKING_GUARD`.
+
+```
+$ dotf secrets run --only NAN_API_KEY -- bash specs/AI-046-pi-nan-provider/measure-ac6.sh
+history: 30 turns, 2000000 thinking chars, 300000 answer chars
+guard-on: exit=0 model=nan/qwen3.6 stopReason=stop input=54184 cacheRead=0 error=none
+guard-off: exit=1 model=nan/qwen3.6 stopReason=error input=0 cacheRead=0 error=Requested token count exceeds the model's maximum context length of 262144 tokens (estimated 677327 input tokens). NaN's gateway answered HTTP 400 "Invalid requ
+AC6: PASS
+```
+
+- With the guard, qwen3.6 answered with 54,184 input tokens: the answers and the system prompt, no replayed reasoning.
+- Without it, NaN refused the request with a 400, which the package's classifier rewrote as a context overflow. The 677,327 figure is the package's own chars/3.47 estimate. From the small run below, this vocabulary tokenizes at about 6.8 characters per token, which puts the real request near 350K tokens: still over 262,144.
+- The verdict is not vacuous. A small history (`AC6_THINK_CHARS=20000 AC6_TEXT_CHARS=4000 AC6_TURNS=4`) fits in both arms, and the script fails: "the control did not overflow, so this history does not test the guard". Guard off used 12,736 input tokens and guard on 9,782.
+- qwen3.6 is unmetered (`harness/nan-quotas.json`), so the measurement costs no quota.
+- A first background run hung for 10 minutes. In print mode pi reads a non-TTY stdin as more prompt, and the runner's stdin was an open socket. The script now redirects stdin from `/dev/null` (lesson 311). The verdict caught that run: the last assistant entry was still the synthetic deepseek turn.
+
+## Test-deletion ledger (PR-B2)
+
+PR-B2 deletes five tests. Each one read `ai/pi/models.json`'s `nan` block, and this PR removes that block, which is the production change that unlocks them. Each replacement is shown by a mutation on this branch (`M1`-`M7`, 2026-09-27). Each mutation was applied, the named suite run, and the file restored.
+
+| Deleted test | What it could detect | Origin | Stronger proof that remains, shown | Focused command |
+|---|---|---|---|---|
+| `pi-config.bats` "models.json uses the `${NAN_API_KEY}` placeholder" | a literal NaN key in `models.json` | #1026 | "every provider in ai/pi/models.json takes its key from a `${VAR}` placeholder" (M5: the openrouter key made literal, red), and "the pi wrapper hands NAN_API_KEY to pi" (M6: `NAN_API_KEY` dropped from the `.zshrc` wrapper, red) | `bats -f 'placeholder\|pi wrapper' tests/pi-config.bats` |
+| `pi-config.bats` "settings.json nan/* models all resolve to an id in models.json" | an `enabledModels` id nothing registers | #749 | `pi-nan-package.bats` test 2, against the package alone (M1: ghost id added, red) | `PI_BIN=~/.local/bin/pi bats tests/pi-nan-package.bats` |
+| `pi-config.bats` "defaultModel resolves to an id in models.json" | a `defaultModel` nothing registers | #749 | `pi-nan-package.bats` test 3 (M2: ghost default, red) | same |
+| `reviewer-pool.bats` "every pi member of the pool is a reasoning-class model in ai/pi/models.json" | a pool member that is not reasoning-class | #1372 | `pi-nan-package.bats` test 4, against the package snapshot (M3: ghost pool member, red) | same |
+| `opencode.bats` "opencode.jsonc and ai/pi/models.json declare the same context window" | opencode and pi disagreeing on a NaN window | #1772 | `pi-nan-package.bats` test 5, against the package snapshot (M4: qwen3.6 262144 to 262000, red) | same |
+
+The old tests would now pass vacuously: with no `nan` block they compare against nothing. M7 (a NaN model put back into `models.json`) turns the new AC3 test red.
+
+`guard-pi-models-schema.bats`, `render_test.go` and `deploy_test.go` also name `models.json` and were left alone. They check the file generically, or use a synthetic fixture, and none reads the `nan` block.
+
 ## Test status
 
 - `bats tests/pi-config.bats tests/pi-packages.bats` -> 0 failures.
 - `PI_BIN=~/.local/bin/pi bats tests/pi-nan-package.bats` -> 5/5 (PR-B1). Without `PI_BIN`: 5 skipped; with `PI_NAN_PACKAGE_REQUIRED=1` and no `PI_BIN`: fails.
+- PR-B2, rebased on `c6f3bcf`: `bats tests/*.bats` -> 1684/1685. The one failure is `vendored oh-my-zsh git-plugin snapshot is still fresh`, environmental and tracked in #1641. `cd cli && go build ./... && go vet ./... && go test ./...` green.
 
 ## Decisions made during implementation
 
@@ -72,9 +105,9 @@ All six answered (qwen3.8-flash answered "pong — standing by", which is the mo
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: lesson 311, pi's print mode waits on an inherited non-TTY stdin.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: who owns the `nan` provider id is decided in `proposal.md` (owner, option A) and is local to pi's config.
+- [x] New pattern candidate for `00_meta/patterns/`? no: nothing here recurs outside this repo yet.
 
 ## Archive checklist
 

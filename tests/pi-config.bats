@@ -20,8 +20,34 @@ setup() {
     refute_grep '"apiKey"[[:space:]]*:[[:space:]]*"sk-' "$PI_MODELS"
 }
 
-@test "ai/pi/models.json uses the \${NAN_API_KEY} placeholder, resolved at runtime" {
-    grep -qF '${NAN_API_KEY}' "$PI_MODELS"
+@test "every provider in ai/pi/models.json takes its key from a \${VAR} placeholder, resolved at runtime" {
+    command -v jq >/dev/null || skip "jq not available"
+    bad="$(jq -r '.providers | to_entries[] | select((.value.apiKey // "") | test("^[$][{][A-Z0-9_]+[}]$") | not) | .key' "$PI_MODELS")"
+    [ -z "$bad" ] || { echo "providers whose apiKey is not a \${VAR} placeholder: $bad"; return 1; }
+}
+
+# AI-046: pi-nan-provider owns the NaN provider and reads NAN_API_KEY from pi's
+# environment, so models.json no longer names the key. What delivers it is the
+# wrapper, which injects it per process (ADR-028); drop NAN_API_KEY from any one
+# of them and pi on that shell loses NaN with no config change to review.
+@test "the pi wrapper hands NAN_API_KEY to pi through dotf secrets run, on every shell" {
+    for f in .zshrc .bashrc; do
+        grep -qE '^[[:space:]]*pi\(\) \{ dotf secrets run --only [A-Z_,]*NAN_API_KEY[A-Z_,]* -- pi "\$@"; \}' "$DOTFILES_DIR/$f" \
+            || { echo "$f: no pi wrapper injecting NAN_API_KEY"; return 1; }
+    done
+    grep -qE '^[[:space:]]*function pi \{ dotf secrets run --only [A-Z_,]*NAN_API_KEY[A-Z_,]* -- pi @args \}' "$DOTFILES_DIR/powershell/profile.ps1" \
+        || { echo "profile.ps1: no pi wrapper injecting NAN_API_KEY"; return 1; }
+}
+
+# AI-046 AC3. A NaN model defined here replaces the package's model with the
+# same id (pi docs/models.md), so the live catalog and the package's limits
+# would silently stop applying to it. Per-model changes belong in
+# providers.nan.modelOverrides, which composes above the package instead.
+@test "ai/pi/models.json defines no NaN model: pi-nan-provider owns them (AI-046 AC3)" {
+    command -v jq >/dev/null || skip "jq not available"
+    run jq -r '.providers.nan.models // [] | .[].id' "$PI_MODELS"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ] || { echo "NaN models defined in ai/pi/models.json: $output"; return 1; }
 }
 
 # The regression guard for BUG-081b itself (ADR-034). pi does NOT implement its own
@@ -75,28 +101,10 @@ setup() {
 # -- a space where the id has a hyphen, so the model never resolved. Every
 # assertion above passed: both files were valid JSON, carried no secret and
 # named no banned provider. Nothing cross-checked one file against the other.
-
-@test "ai/pi/settings.json nan/* models all resolve to an id in models.json" {
-    command -v jq >/dev/null || skip "jq not available"
-    ids="$(jq -r '.. | objects | select(has("id")) | .id' "$PI_MODELS" | LC_ALL=C sort -u)"
-    missing=""
-    # Read line by line: a reference may legitimately contain spaces, and word
-    # splitting would silently report only the fragment after the space.
-    while IFS= read -r ref; do
-        [ -n "$ref" ] || continue
-        printf '%s\n' "$ids" | grep -qxF "${ref#nan/}" || missing="$missing '$ref'"
-    done <<< "$(jq -r '.enabledModels[] | select(startswith("nan/"))' "$PI_SETTINGS")"
-    [ -z "$missing" ] || {
-        echo "enabledModels referencing no model id in models.json:$missing"
-        return 1
-    }
-}
-
-@test "ai/pi/settings.json defaultModel resolves to an id in models.json" {
-    command -v jq >/dev/null || skip "jq not available"
-    want="$(jq -r '.defaultModel' "$PI_SETTINGS")"
-    jq -r '.. | objects | select(has("id")) | .id' "$PI_MODELS" | grep -qxF "$want"
-}
+#
+# Since AI-046 the NaN ids come from pi-nan-provider, not models.json, so the
+# enabledModels and defaultModel checks run against the installed package in
+# tests/pi-nan-package.bats. What stays here is models.json's own consistency.
 
 @test "ai/pi/models.json model ids are unique" {
     command -v jq >/dev/null || skip "jq not available"
