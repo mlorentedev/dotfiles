@@ -73,6 +73,32 @@ type ItemSummary struct {
 	// goes silent after any edit that did not rotate anything. Callers that report
 	// rotation age must say which one they mean.
 	Revised time.Time
+
+	// The members below exist for `curate` (SEC-006), which acts on items by id
+	// and has to know, before it writes, what an item carries that a write could
+	// lose. Every one is a count, a kind or a flag, except URIs: a login's URIs
+	// are metadata a merge has to compare between two items. curate never prints
+	// them.
+
+	// ID is the item's Bitwarden id, the only unique key: names repeat.
+	ID string
+	// Type is Bitwarden's item type: 1 login, 2 secure note, 3 card, 4 identity,
+	// 5 SSH key.
+	Type int
+	// Reprompt is set when viewing the item asks for the master password again.
+	Reprompt bool
+	// FieldTypes maps each custom field name to its Bitwarden type: 0 text,
+	// 1 hidden, 2 boolean, 3 linked.
+	FieldTypes map[string]int
+	// Passkeys counts the login's FIDO2 credentials. They decode into empty
+	// structs, so no key material is held; only the length survives.
+	Passkeys int
+	// Attachments counts the item's attachments, by the same empty-struct decode.
+	Attachments int
+	// HasTOTP records whether the login carries a TOTP seed, without keeping it.
+	HasTOTP bool
+	// URIs are the login's URIs, in stored order.
+	URIs []string
 }
 
 // BWLister reads the vault's inventory as shapes. A seam, so a caller can be
@@ -97,15 +123,28 @@ type BWLister interface {
 // never returned, never logged. If that ever stops being true, the type has
 // stopped being a boundary.
 type itemWire struct {
+	ID           string `json:"id"`
 	Name         string `json:"name"`
+	Type         int    `json:"type"`
+	Reprompt     int    `json:"reprompt"`
 	FolderID     string `json:"folderId"`
 	RevisionDate string `json:"revisionDate"`
 	Notes        string `json:"notes"`
 	Fields       []struct {
 		Name string `json:"name"`
+		Type int    `json:"type"`
 	} `json:"fields"`
-	Login *struct {
+	// Attachments and Login.Fido2 decode into empty structs: encoding/json drops
+	// every member of each element, so a count survives and nothing else does.
+	Attachments []struct{} `json:"attachments"`
+	Login       *struct {
 		Username string `json:"username"`
+		// TOTP is content, like Username: consumed into HasTOTP and dropped.
+		TOTP string `json:"totp"`
+		URIs []struct {
+			URI string `json:"uri"`
+		} `json:"uris"`
+		Fido2 []struct{} `json:"fido2Credentials"`
 	} `json:"login"`
 }
 
@@ -204,8 +243,10 @@ func decodeItems(raw json.RawMessage, folderByID map[string]string) ([]ItemSumma
 	out := make([]ItemSummary, 0, len(wire))
 	for _, w := range wire {
 		names := make([]string, 0, len(w.Fields))
+		types := make(map[string]int, len(w.Fields))
 		for _, f := range w.Fields {
 			names = append(names, f.Name)
+			types[f.Name] = f.Type
 		}
 		sort.Strings(names)
 
@@ -224,7 +265,20 @@ func decodeItems(raw json.RawMessage, folderByID map[string]string) ([]ItemSumma
 			HasLogin:         w.Login != nil,
 			HasUsername:      w.Login != nil && w.Login.Username != "",
 			Revised:          revised,
+			ID:               w.ID,
+			Type:             w.Type,
+			Reprompt:         w.Reprompt != 0,
+			FieldTypes:       types,
+			Attachments:      len(w.Attachments),
 		})
+		if w.Login != nil {
+			it := &out[len(out)-1]
+			it.Passkeys = len(w.Login.Fido2)
+			it.HasTOTP = w.Login.TOTP != ""
+			for _, u := range w.Login.URIs {
+				it.URIs = append(it.URIs, u.URI)
+			}
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil

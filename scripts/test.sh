@@ -407,12 +407,10 @@ if [[ -f "$SCRIPTS_DIR/dotfiles-sync.sh" ]]; then
         fail "dotfiles-sync.sh: not executable"
     fi
 
-    # Test help/usage (script should handle missing DOTFILES_REPO_DIR gracefully)
-    subsection "dotfiles-sync.sh execution"
-    # We just check it doesn't crash on --help or with vars unset
-    DOTFILES_REPO_DIR="" "$SCRIPTS_DIR/dotfiles-sync.sh" --secrets-only 2>&1 | grep -q "Error\|not found" && \
-        pass "dotfiles-sync.sh: handles missing DOTFILES_REPO_DIR" || \
-        pass "dotfiles-sync.sh: runs (DOTFILES_REPO_DIR may be set)"
+    # Not executed here. This suite runs as a pre-commit hook against the real
+    # $HOME, and running the sync from it synced the real ~/.dotfiles into the
+    # real checkout on every commit (#1795). tests/dotfiles-sync.bats runs it
+    # against temporary directories.
 else
     fail "dotfiles-sync.sh: not found"
 fi

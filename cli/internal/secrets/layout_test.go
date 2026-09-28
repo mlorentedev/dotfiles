@@ -621,3 +621,45 @@ func TestLayoutDriftAgreesWithTheReaderOnEveryItemShape(t *testing.T) {
 		}
 	}
 }
+
+// The members curate reads (SEC-006) are counts, kinds and flags. A passkey's key
+// material and a TOTP seed are planted and must not survive, while the counts they
+// produce must.
+func TestDecodeItemsCountsWhatCurateNeedsWithoutKeepingIt(t *testing.T) {
+	const (
+		totp   = "TOTPSEED-must-not-survive-44aa"
+		pkKey  = "PASSKEYMATERIAL-must-not-survive-19bc"
+		attKey = "ATTACHMENTKEY-must-not-survive-7d02"
+	)
+	raw := itemsPayload(t, fmt.Sprintf(`{
+	  "id":"0123abcd-full","name":"shop","type":1,"reprompt":1,
+	  "attachments":[{"id":"a1","key":%q}],
+	  "login":{"totp":%q,"uris":[{"uri":"https://shop.example","match":null}],
+	           "fido2Credentials":[{"keyValue":%q},{"keyValue":%q}]},
+	  "fields":[{"name":"api-key","type":1,"value":"v"},{"name":"account","type":0,"value":"w"}]
+	}`, attKey, totp, pkKey, pkKey))
+
+	got, err := decodeItems(raw, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob, _ := json.Marshal(got)
+	for _, secret := range []string{totp, pkKey, attKey} {
+		if strings.Contains(string(blob), secret) {
+			t.Errorf("%q survived the projection", secret)
+		}
+	}
+	it := got[0]
+	if it.ID != "0123abcd-full" || it.Type != 1 || !it.Reprompt {
+		t.Errorf("identity lost: id=%q type=%d reprompt=%v", it.ID, it.Type, it.Reprompt)
+	}
+	if it.Passkeys != 2 || it.Attachments != 1 || !it.HasTOTP {
+		t.Errorf("counts lost: passkeys=%d attachments=%d totp=%v", it.Passkeys, it.Attachments, it.HasTOTP)
+	}
+	if it.FieldTypes["api-key"] != 1 || it.FieldTypes["account"] != 0 {
+		t.Errorf("field kinds lost: %v", it.FieldTypes)
+	}
+	if len(it.URIs) != 1 || it.URIs[0] != "https://shop.example" {
+		t.Errorf("uris lost: %v", it.URIs)
+	}
+}

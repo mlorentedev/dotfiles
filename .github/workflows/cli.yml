@@ -1,11 +1,11 @@
 name: cli
 
 on:
+  # No paths filter on pull requests: cli-gate is a required check, and a
+  # required check a filtered workflow never reports stays pending. The
+  # `changes` job skips the Go work instead, and a skipped job still lets
+  # cli-gate report (CI-004, #1739).
   pull_request:
-    paths:
-      - "cli/**"
-      - "versions.conf"
-      - ".github/workflows/cli.yml"
   push:
     branches: [main]
     paths:
@@ -27,8 +27,33 @@ defaults:
     working-directory: cli
 
 jobs:
+  changes:
+    name: cli-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      # A push is already path-filtered above, and a tag always builds.
+      go: ${{ github.event_name != 'pull_request' || steps.filter.outputs.go == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: github.event_name == 'pull_request'
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            go:
+              - 'cli/**'
+              - 'versions.conf'
+              - '.github/workflows/cli.yml'
+
   test:
     name: test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -50,8 +75,12 @@ jobs:
           go run ./cmd/dotf --help
           go run ./cmd/dotf version
 
+  # Not `lint`: ci.yml's shell lint reports that name, and two reporters of a
+  # required check make it pass on whichever finished last.
   lint:
-    name: lint
+    name: cli-lint
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -78,8 +107,34 @@ jobs:
           working-directory: cli
           version: ${{ steps.golangci.outputs.version }}
 
+  # The one required check from this workflow. It reports on every pull
+  # request: green when every Go job passed, or was skipped because the diff
+  # has no Go change; red otherwise, including when `changes` itself failed.
+  # Requiring the matrix jobs directly would not work: skipped at job level,
+  # GitHub reports them under the unexpanded name `test (${{ matrix.os }})`.
+  cli-gate:
+    name: cli-gate
+    needs: [changes, test, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every Go job passed, or was skipped for a diff with no Go change
+        working-directory: ${{ github.workspace }}
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a Go job ended '$r' (results: $RESULTS)"; exit 1 ;;
+            esac
+          done
+
   release-snapshot:
     name: goreleaser snapshot
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

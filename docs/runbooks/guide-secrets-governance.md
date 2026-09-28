@@ -116,6 +116,41 @@ reviewed and applied.
    not a deletion, so the DR escrow taken before the apply is the only way back.
    Once the plan reports it gone, delete the entry.
 
+## Protocol — CURATE the items the registry does not declare
+
+Personal logins, cards and identities that no registry entry names. Filing,
+de-duplicating and hardening them is not reconcile's job, and clicking through
+the web vault leaves no review. The change is a plan, reviewed and then applied.
+
+1. **Write the plan outside this repository.** Item names are personal, and this
+   repository is public. The plan lives in the private knowledge vault. It is TSV,
+   one row per operation: `op  target  arg  reason  [flags]`, keyed by item id or a
+   unique id prefix. `dotf secrets curate --help` lists the eight operations and
+   their flags.
+2. **Plan:** `dotf secrets curate --plan <file>` syncs and prints one line per row,
+   `apply`, `done` or `blocked` with its reason, and then a digest. It changes
+   nothing. Output names ids, operations and states. It never names a value, a URI
+   or an item.
+3. **Resolve every `blocked` line.** A blocked line makes the whole plan
+   unappliable. Most of them are the tool refusing a loss:
+   - an item that carries a passkey is never written to;
+   - a delete never touches an item with attachments;
+   - a merge needs equal passwords, equal usernames (or `alias`), no TOTP on the
+     duplicate, and a named `drop=` for whatever the keeper will not receive;
+   - an item the registry declares only takes `hide` and `reprompt`.
+
+   A `gate=<name>` line waits for something outside the vault, such as a key
+   revoked at its provider. Pass `--cleared <name>` once that holds.
+4. **Take a DR escrow first:** `dotf secrets backup`, then check that the escrow's
+   item and passkey counts match the live vault. A removed field and a merged
+   duplicate's notes are recoverable only from the escrow.
+5. **Apply:** `dotf secrets curate --plan <file> --apply --digest <d>` with the
+   digest the dry run printed. It refuses when the vault changed since that
+   dry run. After applying, it re-plans and fails unless every row is `done`, and
+   it fails if the vault's passkey count moved. Running it again plans nothing.
+6. **Check by consequence:** `dotf secrets verify`, then open one reprompted item
+   in the app.
+
 ## Protocol — ROTATE a secret
 
 Scheduled cadence (registry `rotate`), suspected exposure, or offboarding:
@@ -192,7 +227,7 @@ restore from it.
 
 ## Maintainability (what keeps it from drifting)
 
-- `dotf doctor` checks: `bw`/`age` present (#577); DR-export freshness. **Registry ↔ vault consistency** is `dotf secrets drift` (CLI-078), and converging it is `dotf secrets reconcile` (CLI-080).
+- `dotf doctor` checks: `bw`/`age` present (#577); DR-export freshness. **Registry ↔ vault consistency** is `dotf secrets drift` (CLI-078), and converging it is `dotf secrets reconcile` (CLI-080). The items it does not declare are curated from a reviewed plan with `dotf secrets curate` (SEC-006).
 - All adds/rotations go through the **registry** — the single map. No ad-hoc env edits, no second authoritative copy.
 
 ## References
