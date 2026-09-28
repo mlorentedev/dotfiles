@@ -20,15 +20,16 @@ retired in CLI-036.
 ```bash
 dotf secrets ls          # List registry secret ids, plane, and exposed vars
 dotf secrets show VAR    # Show a single secret's decrypted value
-dotf secrets set VAR     # Add or rotate an env var secret
+dotf secrets set VAR     # Add a secret's value (idempotent)
+dotf secrets rotate VAR  # Replace it and prove the replacement took
 dotf secrets run -- CMD  # Inject secrets into a child process only (no ambient env)
 ```
 
 ## Offline copy (USB)
 
-The encrypted USB holds the age key and a copy of `dr/`, and carries its own
-`README.md`. The procedure is being folded into `dotf secrets usb` (#1770).
+The encrypted USB holds the age key and a copy of `dr/`. Refreshing and verifying
+it is the governance guide's OFFLINE COPY protocol; #1770 automates it.
 
 ## Full Documentation
 
-Full secrets management runbook: [`docs/runbooks/secrets-management.md`](../docs/runbooks/secrets-management.md).
+The secrets runbook: [`docs/runbooks/guide-secrets-governance.md`](../docs/runbooks/guide-secrets-governance.md).
