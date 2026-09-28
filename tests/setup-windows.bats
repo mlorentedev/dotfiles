@@ -930,6 +930,11 @@ FIXTURE
     grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 passes its checkout explicitly and warns when dotf is unavailable (WIN-014)" {
+    grep -qF 'dotf harness mirror --repo $DotfilesDir' "$PS1_SCRIPT"
+    grep -qF 'dotf not found; harness inputs were not mirrored' "$PS1_SCRIPT"
+}
+
 @test "parity: both setups mirror the harness through the same dotf command (WIN-007)" {
     grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
     grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"

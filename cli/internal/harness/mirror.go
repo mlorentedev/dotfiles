@@ -29,9 +29,10 @@ var ErrMissingTargets = errors.New("harness/manifest.json declares a target the 
 
 // MirrorResult is what one Mirror run did.
 type MirrorResult struct {
-	// Updated counts files written because their bytes differed or they were
-	// absent; Unchanged counts files left untouched. Updated == 0 on a re-run
-	// is the idempotence evidence a setup run reports (#1266).
+	// Updated counts files written because their bytes or permission bits
+	// differed, or they were absent; Unchanged counts converged files left
+	// untouched. Updated == 0 on a re-run is the idempotence evidence a setup
+	// run reports (#1266).
 	Updated, Unchanged int
 	// Targets are the manifest-declared files mirrored beside harness/.
 	Targets []string
@@ -49,9 +50,9 @@ type MirrorResult struct {
 // failed both checks after every setup, with a remedy ("re-run setup") that
 // could not clear them.
 //
-// Idempotent: a file whose bytes already match is left untouched, mtime
-// included. It never prunes — `dotf doctor --fix` owns orphan removal, the
-// semantic #802 settled for every mirror in this repository.
+// Idempotent: a file whose bytes and permission bits already match is left
+// untouched, mtime included. It never prunes — `dotf doctor --fix` owns orphan
+// removal, the semantic #802 settled for every mirror in this repository.
 //
 // The target list is DERIVED from the manifest, never restated here: the day
 // it was a hardcoded pair, a third target (#1176) needed a copy line nobody
@@ -148,17 +149,24 @@ func mirrorTree(repoRoot, deployDir, sub string, res *MirrorResult) error {
 	return nil
 }
 
-// mirrorFile writes src's bytes to dst only when they differ, atomically
-// (temp file in the destination dir, then rename), so a reader never sees a
-// half-written registry and an identical file keeps its mtime.
+// mirrorFile writes src to dst only when bytes or permission bits differ,
+// atomically (temp file in the destination dir, then rename), so a reader never
+// sees a half-written registry and a converged file keeps its mtime.
 func mirrorFile(src, dst string, res *MirrorResult) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("stating %s: %w", src, err)
+	}
 	want, err := os.ReadFile(src) //nolint:gosec // paths derive from the checkout tree
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", src, err)
 	}
 	if have, err := os.ReadFile(dst); err == nil && bytes.Equal(have, want) { //nolint:gosec // same
-		res.Unchanged++
-		return nil
+		dstInfo, statErr := os.Stat(dst)
+		if statErr == nil && dstInfo.Mode().Perm() == info.Mode().Perm() {
+			res.Unchanged++
+			return nil
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
@@ -177,7 +185,7 @@ func mirrorFile(src, dst string, res *MirrorResult) error {
 		_ = os.Remove(tmpName)
 		return err
 	}
-	if err := os.Chmod(tmpName, 0o644); err != nil {
+	if err := os.Chmod(tmpName, info.Mode().Perm()); err != nil {
 		_ = os.Remove(tmpName)
 		return err
 	}

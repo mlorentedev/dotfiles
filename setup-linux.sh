@@ -564,7 +564,7 @@ elif [ -x "$HOME/.local/bin/dotf" ]; then
     _dotf="$HOME/.local/bin/dotf"
 fi
 if [ -n "$_dotf" ]; then
-    "$_dotf" harness mirror || log_warning "dotf harness mirror reported a gap (above) -- 'dotf doctor' will report harness drift"
+    "$_dotf" harness mirror --repo "$CURRENT_DIR" || log_warning "dotf harness mirror reported a gap (above) -- 'dotf doctor' will report harness drift"
 else
     log_warning "dotf not found (PATH or ~/.local/bin) -- harness not mirrored to $DOTFILES_DIR; 'dotf doctor' will report harness drift"
 fi

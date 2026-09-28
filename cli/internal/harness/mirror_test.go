@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -147,5 +148,33 @@ func TestMirror_FailsLoudWithoutAManifest(t *testing.T) {
 	writeFile(t, filepath.Join(repo, "harness", "model-map.json"), `{}`)
 	if _, err := Mirror(repo, deploy); err == nil || !strings.Contains(err.Error(), ManifestFile) {
 		t.Fatalf("a missing manifest must name itself, got %v", err)
+	}
+}
+
+func TestMirror_PreservesTheSourceMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows filesystems do not expose POSIX executable mode bits")
+	}
+	repo, deploy := mirrorRepo(t), t.TempDir()
+	src := filepath.Join(repo, "harness", "skills", "handoff", "find-polluter.sh")
+	writeFile(t, src, "#!/usr/bin/env bash\n")
+	if err := os.Chmod(src, 0o775); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(deploy, "harness", "skills", "handoff", "find-polluter.sh")
+	writeFile(t, dst, "#!/usr/bin/env bash\n")
+	if err := os.Chmod(dst, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Mirror(repo, deploy); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o775 {
+		t.Fatalf("destination mode = %#o, want %#o", got, 0o775)
 	}
 }
