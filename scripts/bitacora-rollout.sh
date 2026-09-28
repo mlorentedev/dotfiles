@@ -104,7 +104,7 @@ deploy_workflow() {  # $1 = repo, $2 = workflow filename
     fi
 }
 
-deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens an auto-merge PR
+deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR for review (never auto-merge)
     local repo="$1" branch="ci/bitacora-workflows" base base_sha wf path src sha
     base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
     base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
@@ -208,9 +208,10 @@ backfill_repo() {
 # One resolution for the whole run, and a hard stop when it fails: without the
 # project node ID every single mutation below would fail identically, so 27
 # repos' worth of per-item errors would bury the one line that explains them.
-if [ "$BACKFILL_ONLY" = 1 ]; then
-    resolve_project_id || exit 1
-fi
+# Every mode needs it, not only --backfill-only: step 4 runs in a provisioning
+# run too, and there an unset id died under `set -u` at the first repo with an
+# open item, so no workflow update reached any repo after it.
+resolve_project_id || exit 1
 
 for repo in "${REPOS[@]}"; do
     echo

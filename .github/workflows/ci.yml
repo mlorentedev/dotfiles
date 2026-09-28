@@ -284,8 +284,14 @@ jobs:
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         env:
           DOTF_TEST_GH_TOKEN: ${{ github.token }}
+        # One process per file, files in parallel (CI-004, #1739): tests in a
+        # file share setup_file state, so they stay serial. `--jobs` needs GNU
+        # parallel, which the ubuntu runner image ships but nothing here
+        # installs, so its absence fails loudly instead of as a bats error.
+        # Measured locally, 4 jobs: 250 s serial to 89 s, three identical runs.
         run: |
-          bats tests/*.bats
+          command -v parallel >/dev/null 2>&1 || { echo "::error::GNU parallel is missing from the runner image; bats --jobs needs it"; exit 1; }
+          bats --jobs "$(nproc)" --no-parallelize-within-files tests/*.bats
 
   # AI-046 (#1764): the NaN model ids belong to @gtrabanco/pi-nan-provider, so
   # the checks that name one run against the installed package. Its own job
