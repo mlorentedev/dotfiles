@@ -18,7 +18,7 @@ created: "2026-09-27"
 
 - `cd cli && go build ./... && go vet ./... && go test ./...`: exit 0. `GOOS=windows go vet ./...`: ok. `golangci-lint run ./...` (pinned 2.12.2): 0 issues.
 - Mutation check (rerun after `drop=uris`): each of 12 guards was disabled in turn, and every mutant was killed by a failing test. The guards were: the passkey check in `applyMutation`; the passkey check in the planner; the attachments check on a delete; the duplicate's passkeys, attachments and TOTP on a merge; the keeper-passkey rule; `drop=uris`; registry ownership; the revision in the digest; the `--digest` comparison; and the before/after passkey count. The first run found one survivor: no test covered a merge duplicate with attachments. `TestCurateBlocks` gained that case (17 cases now), and the mutant was killed on the rerun.
-- Live dry run, 2026-09-27, against the owner's vault (read-only: sync and list), with the private plan of 89 rows:
+- Live dry run, 2026-09-27, against the owner's vault (read-only: sync and list), with the private plan (91 rows on the first run, 89 after the correction below):
   - First run: `Plan: 82 to apply, 0 done, 9 blocked.` All 9 blocks were real precondition failures, and none was a false positive:
     - a merge whose keeper carries a passkey and would have needed a URI carried to it;
     - a merge whose usernames differ;
