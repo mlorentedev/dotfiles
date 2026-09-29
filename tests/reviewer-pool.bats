@@ -25,6 +25,11 @@ setup() {
     # AI-046 review round 1: the check moved to pi-nan-package.bats filters on
     # provider nan, so without this one an openrouter member would be checked
     # nowhere. The two tests together cover every pi member.
+    # The selection below is empty today (every pi member is NaN), which is
+    # legitimate. A renamed key would also empty it, so assert the fields it
+    # selects on exist before trusting an empty result.
+    jq -e '[.pool[] | select(.runner == "pi")] | length > 0 and all(.[]; .provider != null and .model != null)' "$POOL" >/dev/null \
+        || { echo "no pi member with provider and model in $POOL: the selection below would check nothing"; return 1; }
     while IFS=$'\t' read -r provider model; do
         [ -n "$model" ] || continue
         jq -e --arg p "$provider" --arg m "$model" \
