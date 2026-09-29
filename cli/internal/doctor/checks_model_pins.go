@@ -111,7 +111,11 @@ func checkModelPins(sys *System, cfg *Config, rep *Report) {
 						continue
 					}
 					findings++
-					msg := fmt.Sprintf("%s %s: %q resolves to nothing the routing registry declares", site.File, p.ID, v)
+					// "Unrouted" and "nonexistent" are different claims: the map
+					// routes a chosen subset of what a provider serves (#1244), so
+					// the message must not read as "this model does not exist".
+					msg := fmt.Sprintf("%s %s: %q is not a model harness/model-map.json routes for pool %q\n    It may still exist at the provider. Set a routed id, or route this one in the map.",
+						site.File, p.ID, v, p.Pool)
 					if retired := retiredProvider(v); retired != "" {
 						msg = fmt.Sprintf("%s %s: %q names %q, a provider this repository retired",
 							site.File, p.ID, v, retired)
