@@ -57,9 +57,13 @@ function Test-Dirs {
 # Sync git repos
 function Sync-Git {
     Write-Info "Pushing from repo..."
+    # Each check reads its own exit code: the second call overwrites
+    # $LASTEXITCODE, and reading it once let an unstaged change through.
     $null = & git -C $DotfilesRepo diff --quiet 2>&1
+    $unstaged = $LASTEXITCODE -ne 0
     $null = & git -C $DotfilesRepo diff --cached --quiet 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $staged = $LASTEXITCODE -ne 0
+    if ($unstaged -or $staged) {
         Write-Warn "  Uncommitted changes in repo - commit first"
         return
     }
