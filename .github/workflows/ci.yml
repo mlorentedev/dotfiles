@@ -507,8 +507,9 @@ jobs:
       #
       # With it, an active spec whose issue is closed FAILs here, on main's push
       # run and on every code PR, until the spec is archived. A closing keyword
-      # cannot cause that: spec-gate makes that PR archive the spec. A manual
-      # close can (SDD-041, #1087). The remedy is `dotf spec archive`, or
+      # causes that only under a `skip-archive` label: otherwise spec-gate makes
+      # that PR archive the spec. A manual close can (SDD-041, #1087). The
+      # remedy is `dotf spec archive`, or
       # `--abandoned`, in its own PR. The gate cannot block that PR: its merge
       # ref no longer holds the active spec, and a specs-only diff skips this
       # step.
