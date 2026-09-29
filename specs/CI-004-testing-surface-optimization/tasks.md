@@ -61,21 +61,21 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 
 ### PR 5: P1.3, the integration image cache
 
-- [ ] (housekeeping, a design decision for AC9) Decide between the BuildKit GHA cache (`docker/setup-buildx-action` + `docker/build-push-action` with `cache-from/cache-to: type=gha`, `load: true`, pinned by SHA) and a published base image. Record the choice and its reason in `proposal.md`.
-- [ ] [AC9] Implement it. On a second run with an unchanged `tests/Dockerfile.integration`, the build step takes ≤ 20 s. Record both runs.
+- [x] (housekeeping, a design decision for AC9) Decide between the BuildKit GHA cache (`docker/setup-buildx-action` + `docker/build-push-action` with `cache-from/cache-to: type=gha`, `load: true`, pinned by SHA) and a published base image. Record the choice and its reason in `proposal.md`. (Neither: P1.3 is declined. The reason is in `proposal.md` and the numbers are in `verification.md`.)
+- [x] ~~[AC9] Implement it.~~ Not applicable: declined by the measurement above. On a second run with an unchanged `tests/Dockerfile.integration`, the build step takes ≤ 20 s. Record both runs.
 
 ### PR 6: P1.5, one Go test surface (conditional)
 
-- [ ] [AC10] Measure `go test ./...` on `windows-latest` from `cli.yml` runs, and the `test-windows` p50. If folding the first into the second lengthens the critical path, decline: record the numbers in `verification.md` and close the row.
-- [ ] [AC10] Otherwise, move `go test ./...` into the existing jobs and drop the `cli.yml` test matrix. Show that the `test-windows` p50 did not grow over the next 10 runs.
+- [x] [AC10] Measure `go test ./...` on `windows-latest` from `cli.yml` runs, and the `test-windows` p50. If folding the first into the second lengthens the critical path, decline: record the numbers in `verification.md` and close the row.
+- [x] ~~[AC10] Otherwise, move `go test ./...` into the existing jobs and drop the `cli.yml` test matrix. Show that the `test-windows` p50 did not grow over the next 10 runs.~~ Not applicable: the measurement above declined P1.5.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
 - [ ] `shellcheck` and `bats tests/*.bats` are green; `actionlint` is clean on the edited workflows, if it is installed
-- [ ] No unrelated changes in any PR (no scope creep); every PR body states "no `.sh`/`.ps1` setup script touched"
-- [ ] `verification.md` filled in, with before and after numbers per row
+- [x] No unrelated changes in any PR (no scope creep); every PR body states "no `.sh`/`.ps1` setup script touched" (No CI-004 PR touches a `setup-*.sh` or `.ps1`, checked on the file lists of #1780, #1781, #1782, #1809, #1813 and this one. The bodies of #1809 and #1813 do not say so; the rest do.)
+- [x] `verification.md` filled in, with before and after numbers per row
 - [ ] Independent review through `dotf spec review CI-004-testing-surface-optimization` before archive
 - [x] Lesson in `docs/lessons/` (PR 1, lesson 309): `bats -f` with a filter that matches nothing prints `1..0` and exits 0, so a feature check that selects a test by name passes before the test exists. Measured while writing this spec; the checks require the `ok N <name>` line instead
 

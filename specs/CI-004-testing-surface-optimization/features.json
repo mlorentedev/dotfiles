@@ -50,15 +50,15 @@
   },
   {
     "id": "CI-004-f8",
-    "behavior": "AC9 \u2014 the integration image build reuses a layer cache",
-    "verification": "cd \"$(git rev-parse --show-toplevel)\" && grep -q 'cache-from' .github/workflows/ci.yml",
+    "behavior": "AC9 \u2014 P1.3 declined, with the layer split and the critical-path measurement recorded",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && v=$(git ls-files -- '*CI-004-testing-surface-optimization/verification.md' | head -1) && [ -n \"$v\" ] && grep -Eq 'AC9 .*P1\\.3 declined' \"$v\" && grep -q '26.5 s' \"$v\" && ! grep -q 'cache-from' .github/workflows/ci.yml",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CI-004-f9",
     "behavior": "AC10 \u2014 P1.5 shipped or declined, with the critical-path measurement recorded",
-    "verification": "cd \"$(git rev-parse --show-toplevel)\" && grep -q 'P1.5' specs/CI-004-testing-surface-optimization/verification.md && grep -Eq 'P1\\.5.*(shipped|declined)' specs/CI-004-testing-surface-optimization/verification.md",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && v=$(git ls-files -- '*CI-004-testing-surface-optimization/verification.md' | head -1) && [ -n \"$v\" ] && grep -Eq 'AC10 .*P1\\.5 (shipped|declined)' \"$v\" && grep -q 'p50 of 486 s' \"$v\"",
     "state": "pending",
     "evidence": ""
   }

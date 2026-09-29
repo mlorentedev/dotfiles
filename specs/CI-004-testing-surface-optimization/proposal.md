@@ -41,8 +41,8 @@ evidence can be traced; the order follows readiness.
 | 2 | P0.3 | The stray-GUI detector in `tests/setup_suite.bash` matches only **this run's** `$BATS_RUN_TMPDIR`, and CI runs the Linux suite with `bats --jobs N --no-parallelize-within-files` |
 | 3 | P0.7 | `cli.yml`'s lint job reports as `cli-lint`, so the required context `lint` has one reporter, `ci.yml`. Go gets a real gate instead of the accidental one: `cli.yml` runs on every pull request, skips its Go jobs when the diff has none, and a `cli-gate` job that always reports is added to the required checks (owner decision, 2026-09-27) |
 | 4 | P0.5 | The `test-windows` doctor-gate step gets `GH_TOKEN`, so the remote checks answer instead of reporting "not verified". **Blocked**: see the risks |
-| 5 | P1.3 | The `integration` image build reuses a layer cache between runs |
-| 6 | P1.5 | Go tests run once per OS, **only if** a measurement shows it does not lengthen the critical path (see the risks) |
+| 5 | P1.3 | The `integration` image build reuses a layer cache between runs (**declined**, see AC9) |
+| 6 | P1.5 | Go tests run once per OS, **only if** a measurement shows it does not lengthen the critical path (see the risks; **declined**, see AC10) |
 
 ### Corrections to the synthesis (probed 2026-09-25)
 
@@ -66,7 +66,7 @@ evidence can be traced; the order follows readiness.
 - **P0.3 may expose fixture collisions.** Files that write a fixed path (`/tmp/...`, the real `$HOME`) collide when they run concurrently. #1409 was this class. PR 2 audits for them and runs the parallel suite repeatedly before switching CI.
 - **P0.2's shared homes rely on the tests being read-only.** They are enforced with `chmod -R a-w` rather than trusted; a write fails the test instead of corrupting a sibling.
 - **P0.6 on `main`.** A push still runs the full pi reconcile, which CI-003 measured at 24x variance on identical input. Since 2026-09-05, `push`: n=111, p50 544 s, p99 858 s, max 961 s; `pull_request`: n=198, max 1000 s. 20 minutes is 1200 s: 20% above the overall maximum (25% above push's). The 40 runs after 2026-09-25 peak at 908 s. A slow registry night can still cross it, and that is the signal the ceiling exists to give.
-- **P1.3 adds an action or a registry.** A BuildKit GHA cache needs `docker/setup-buildx-action` plus `docker/build-push-action` (pinned by SHA); a GHCR base image needs a publish workflow. Decide in PR 5.
+- **P1.3 adds an action or a registry.** A BuildKit GHA cache needs `docker/setup-buildx-action` plus `docker/build-push-action` (pinned by SHA); a GHCR base image needs a publish workflow. Decide in PR 5. **Decided in PR 5: neither.** The measurement in `verification.md` shows the bar is out of reach of any layer cache, and `integration` is not on the critical path. P1.3 is declined.
 - **P0.7 turned out to be a gate question, not a rename (found 2026-09-27).** `cli.yml` was path-filtered, and its Go lint gated merges only because it shared the name `lint`. The Go tests gated nothing: no `cli.yml` context was required. A plain rename would have removed the one accidental gate. Requiring `cli-lint` directly would have left every pull request without a Go change pending forever. So would requiring a matrix job skipped at job level, which GitHub reports under its unexpanded name. The owner chose a real gate: an aggregate `cli-gate` job.
 - **P1.5 may be declined.** If measurement confirms that it lengthens the critical path, the row closes as "declined, with numbers" rather than shipping.
 
@@ -80,8 +80,8 @@ evidence can be traced; the order follows readiness.
 - [x] AC6 — CI runs the Linux bats suite with `--jobs`, and the "Run bats test suite" step's mean over the first 5 runs on `main` is at most half the baseline (mean 199 s over 8 runs of `main`, 2026-09-25).
 - [x] AC7 — Exactly one workflow reports a check named `lint`, and `cli.yml`'s lint reports as `cli-lint`. Amended 2026-09-27: every required context is reported by exactly one job that reports on every pull request, and `cli-gate` is one of them.
 - [x] AC8 — The `test-windows` doctor gate runs with `GH_TOKEN`. Its log shows zero "set the GH_TOKEN environment variable" lines (baseline 43), and the gate is green.
-- [ ] AC9 — The `integration` job's "Build integration test container" step takes at most 20 s on a cache hit (baseline mean 72 s over 8 runs).
-- [ ] AC10 — P1.5 ships, or it is declined with the critical-path measurement recorded in `verification.md`.
+- [x] AC9 — ~~The `integration` job's "Build integration test container" step takes at most 20 s on a cache hit (baseline mean 72 s over 8 runs).~~ **Declined in PR 5, with the measurement in `verification.md`.** About 48 s of the step is per-commit work that no cache can reuse, and `integration` never ends a PR run. The criterion was amended from "ships" to "declined with numbers", the exit AC10 already had.
+- [x] AC10 — P1.5 ships, or it is declined with the critical-path measurement recorded in `verification.md`. **Declined.**
 
 ## References
 
