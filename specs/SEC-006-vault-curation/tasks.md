@@ -26,4 +26,4 @@ created: "2026-09-27"
 - [x] `go build`, `go vet` (linux and windows), `go test ./...`, golangci-lint (pinned 2.12.2) green
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened; the live apply (plan in the knowledge vault) is the owner's ceremony, recorded in #1784
+- [x] PR opened (#1790, merged `5fdf472`; the guide in #1794, merged `20aa19e`); the live apply (plan in the knowledge vault) is the owner's ceremony, recorded in #1784
