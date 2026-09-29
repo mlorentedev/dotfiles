@@ -584,3 +584,25 @@ func TestBWServeClient_UnparseableResponseNamesStatusAndSize(t *testing.T) {
 		t.Fatalf("error must NOT echo the response body (it may carry vault material): %s", msg)
 	}
 }
+
+// Sync must FORCE the pull. An unforced `POST /sync` compares the account's
+// revision date with the lastSync the daemon shares with the `bw` CLI, so once
+// any CLI `bw sync` has run (`dotf secrets backup` does one) the daemon skips the
+// pull and keeps answering from its old cache. Measured 2026-09-29: an item
+// edited at 00:30Z still read as its March revision through the daemon after an
+// unforced sync, and matched the escrow only after `?force=true`.
+func TestBWServeClientSyncForcesThePull(t *testing.T) {
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Method+" "+r.URL.Path+"?"+r.URL.RawQuery)
+		_, _ = io.WriteString(w, `{"success":true}`)
+	}))
+	defer srv.Close()
+
+	if err := (BWServeClient{BaseURL: srv.URL}).Sync(); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if len(got) != 1 || got[0] != "POST /sync?force=true" {
+		t.Fatalf("Sync sent %q, want exactly [\"POST /sync?force=true\"]", got)
+	}
+}

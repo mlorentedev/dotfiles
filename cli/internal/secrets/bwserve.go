@@ -410,8 +410,14 @@ func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
 // to `dotf secrets` until this runs. Skipping it produces a correct write and a
 // stale read with no signal that a step is missing, which is the single most
 // confusing state this package can be in (CLI-037).
+//
+// The pull is FORCED. Unforced, the daemon compares the account's revision date
+// with the lastSync it shares with the `bw` CLI, so after any CLI `bw sync` (the
+// one `dotf secrets backup` runs, for instance) it decides it is current and
+// keeps serving its old cache, while reporting success. Measured 2026-09-29: an
+// edited item still read as its March revision until `?force=true`.
 func (c BWServeClient) Sync() error {
-	_, err := c.call(http.MethodPost, "/sync", nil)
+	_, err := c.call(http.MethodPost, "/sync?force=true", nil)
 	return err
 }
 
