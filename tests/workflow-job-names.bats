@@ -18,3 +18,38 @@ setup() {
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$REPO"
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
+
+# The gate rule on fixtures: which jobs count as a gate, and which are exempt.
+gate_fixture() {
+    mkdir -p "$BATS_TEST_TMPDIR/.github/workflows" "$BATS_TEST_TMPDIR/forge"
+    printf '%s\n' '{"repos":{"mlorentedev/dotfiles":{"protection":{"required_status_checks":{"checks":[]}}}}}' \
+        > "$BATS_TEST_TMPDIR/forge/branch-protection.json"
+    cat > "$BATS_TEST_TMPDIR/.github/workflows/g.yml"
+}
+
+@test "gate rule: a gate reading needs.<job>.result must need every pull-request job" {
+    gate_fixture <<'YML'
+on: pull_request
+jobs:
+  a: {runs-on: ubuntu-latest, steps: [{run: "true"}]}
+  b: {runs-on: ubuntu-latest, steps: [{run: "true"}]}
+  gate: {runs-on: ubuntu-latest, needs: [a], steps: [{run: "test '${{ needs.a.result }}' = success"}]}
+YML
+    run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"g.yml:gate does not need 'b'"* ]]
+}
+
+@test "gate rule: only a positive tag-ref if: is exempt, a negated one is not" {
+    gate_fixture <<'YML'
+on: pull_request
+jobs:
+  release: {runs-on: ubuntu-latest, if: "startsWith(github.ref, 'refs/tags/v')", steps: [{run: "true"}]}
+  notag: {runs-on: ubuntu-latest, if: "${{ !startsWith(github.ref, 'refs/tags/') }}", steps: [{run: "true"}]}
+  gate: {runs-on: ubuntu-latest, needs: [], steps: [{run: "echo '${{ join(needs.*.result, ',') }}'"}]}
+YML
+    run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"does not need 'notag'"* ]]
+    [[ "$output" != *"'release'"* ]]
+}

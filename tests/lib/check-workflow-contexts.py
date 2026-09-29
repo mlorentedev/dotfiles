@@ -14,7 +14,10 @@
    needs every other job in its workflow that can run on a pull request. A job
    it does not need is invisible to it: `release-snapshot` was left out of
    `cli-gate`, so a red goreleaser snapshot still let the gate go green (#1782
-   review). Only a job whose `if:` is limited to tag refs is exempt.
+   review). A gate is any job whose steps read a `needs.<job>.result` (or
+   `needs.*.result`, or `toJSON(needs)`). Only a job whose whole `if:` is a
+   positive tag-ref test is exempt; a negated or compound one is not, so the
+   exemption fails closed.
 
 Prints one line per problem and exits 1 if there is any.
 """
@@ -28,6 +31,11 @@ import yaml
 
 REPO_SLUG = "mlorentedev/dotfiles"
 MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}")
+GATE_READ = re.compile(r"needs\.[A-Za-z0-9_*-]+\.result|toJSON\(\s*needs\s*\)")
+TAG_ONLY_IF = re.compile(
+    r"^\s*(\$\{\{\s*)?"
+    r"(startsWith\(\s*github\.ref\s*,\s*'refs/tags/[^']*'\s*\)|github\.ref_type\s*==\s*'tag')"
+    r"(\s*\}\})?\s*$")
 # A commit status a workflow posts through the API, e.g. review-attestation.yml's
 # `gh api .../statuses/... -f context="review-attestation"`.
 STATUS_CONTEXT = re.compile(r"""-f\s+context=["']?([A-Za-z0-9_.-]+)""")
@@ -73,14 +81,14 @@ def gate_gaps(wf_name, jobs):
     """Jobs an aggregate gate in this workflow does not need but should."""
     out = []
     for gate_id, gate in jobs.items():
-        if "needs.*.result" not in yaml.safe_dump(gate.get("steps") or []):
+        if not GATE_READ.search(yaml.safe_dump(gate.get("steps") or [])):
             continue
         needs = gate.get("needs") or []
         needs = {needs} if isinstance(needs, str) else set(needs)
         for job_id, job in jobs.items():
             if job_id == gate_id or job_id in needs:
                 continue
-            if "refs/tags/" in str(job.get("if", "")):
+            if TAG_ONLY_IF.match(str(job.get("if", ""))):
                 continue  # never runs on a pull request
             out.append(f"aggregate gate {wf_name}:{gate_id} does not need {job_id!r}: "
                        "that job can fail on a pull request while the gate goes green")
