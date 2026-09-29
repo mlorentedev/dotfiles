@@ -193,5 +193,5 @@ done
 ## Related
 
 - [AI Tools Setup](ai-tools-setup.md) — Claude Code and Gemini installation
-- [Secrets Management](secrets-management.md) — Requires `age`
+- [Secrets Governance](guide-secrets-governance.md) — Requires `age` and `bw`
 - Project overview — see the repo `README.md` (strategic context lives in the maintainer's knowledge store)

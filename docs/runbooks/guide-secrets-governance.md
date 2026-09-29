@@ -7,9 +7,9 @@ created: "2026-06-25"
 owner: manu
 ---
 
-# Secrets Governance — Add / Rotate / Backup / Recover
+# Secrets Governance — Add / Rotate / Retire / Curate / Backup / Recover
 
-> Operational protocols for the two-tier model in [ADR-028](../adr/adr-028-secrets-two-tier-bitwarden-age.md): **Bitwarden = live SSOT**, **age = DR escrow + bootstrap floor**, behind a `dotf secrets` facade + `secrets/registry.yaml`. As the model rolls out, the `dotf secrets` steps activate (Phase 1-2); until then the **manual `bw`/`age` equivalents** apply (marked _manual today_). Supersedes the age-only flow in `secrets-management.md`.
+> Operational protocols for the two-tier model in [ADR-028](../adr/adr-028-secrets-two-tier-bitwarden-age.md): **Bitwarden = live SSOT**, **age = DR escrow + bootstrap floor**, behind a `dotf secrets` facade + `secrets/registry.yaml`. This is the only secrets runbook. It absorbed `secrets-management.md` (#600); that file's still-current parts, the first-machine key and SSH setup and the offline USB copy, are below.
 
 ## Architecture at a glance
 
@@ -20,7 +20,7 @@ flowchart LR
     classDef target fill:#dcfce7,stroke:#15803d,color:#000
 
     BW[("Bitwarden<br/>live SSOT<br/>{apps,infra,personal,floor}")]:::store
-    AGE[("age floor<br/>sensitive/*.secret.age<br/>+ offline key")]:::store
+    AGE[("age floor<br/>sensitive/id_ed25519.secret.age<br/>+ offline key")]:::store
     REG["secrets/registry.yaml<br/>mapping SSOT<br/>id → backend → expose → consumers"]:::store
 
     RUN["dotf secrets run -- cmd<br/>(child env only)"]:::cmd
@@ -43,9 +43,43 @@ flowchart LR
 
 ## Conventions (from ADR-028)
 
-- Managed secrets live in the Bitwarden folders **`Dotfiles/apps`**, **`Dotfiles/infra`** and **`Dotfiles/personal`**, one per plane. Each is a single folder whose name contains a slash; Bitwarden has no real hierarchy. The ~160 personal logins the registry does not declare are out of `dotf secrets`' bounds.
+- Managed secrets live in the Bitwarden folders **`Dotfiles/apps`**, **`Dotfiles/infra`** and **`Dotfiles/personal`**, one per plane. Each is a single folder whose name contains a slash; Bitwarden has no real hierarchy. The ~160 personal items the registry does not declare are out of `reconcile`'s bounds. `dotf secrets curate` applies a reviewed plan to them (see CURATE below).
+- **Folders by item kind, not by website type** (#1784):
+  - `Dotfiles/*`: the registry's;
+  - `Homelab`: the home lab's hosts, keys and service credentials;
+  - `Dev`: developer accounts and API keys the registry does not declare;
+  - `Cards`: payment cards;
+  - `Identity`: documents and identities.
+
+  A plain web login, banks and insurers included, stays unfoldered: search and autofill find it without a folder.
+- **Hidden, not text,** for every custom field whose name marks a secret: key, token, secret, password, recovery or backup code. Identifiers stay text: account ids, buckets, endpoints, IBAN.
+- **Reprompt on** for every item in `Homelab`, `Cards` and `Identity`, and for any item whose disclosure opens other accounts (the GitHub account, SSH keys). Reprompt is a gate in the Bitwarden apps. Whether `bw serve` reads through it has not been measured yet, so no registry-declared item gets reprompt until it is: after the first curate apply, `dotf secrets verify` must still resolve everything. A field's type does not matter to a read. `dotf secrets` resolves a hidden field exactly like a text one, and it writes new fields as hidden.
+- **One authority per secret.** When another system owns a value (kubelab's SOPS, for example), the Bitwarden copy is removed once parity is measured equal.
 - The **registry** `secrets/registry.yaml` is the SSOT: `id → bw item/field → env|file → consumers → rotate`.
 - **Values never render into an unintended channel** — a log, a chat/AI conversation, a shared terminal, CI output; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`). `dotf secrets show`/`run` are the deliberate, interactive-terminal-only exceptions this convention doesn't forbid — the rule is against accidental exposure, not against the primitives that exist specifically to show or use a value.
+
+## Protocol — FIRST MACHINE (age key + SSH)
+
+These are the two secrets that must exist before Bitwarden is reachable. Both belong to the `floor` plane.
+
+1. **The age identity** `~/.config/age/key.txt`. Every age-encrypted file in the repo is encrypted to it.
+   - A machine that joins an existing setup restores the key from the offline USB (RECOVER, step 1).
+   - Only a brand-new identity is generated. The floor and the escrow must then be re-encrypted to it.
+
+   ```bash
+   mkdir -p ~/.config/age && age-keygen -o ~/.config/age/key.txt && chmod 600 ~/.config/age/key.txt
+   age-keygen -y ~/.config/age/key.txt   # the public recipient; AGE_KEY_PERSONAL declares it
+   ```
+
+   When the key is missing, `setup-linux.sh` and `setup-windows.ps1` warn and point to this section. To keep the key somewhere else, set `AGE_KEY_PATH`.
+2. **The SSH key.**
+   - The setup scripts deploy `ssh/config` and the public key.
+   - The private key is the registry's `SSH_KEY` (`age-offline`, blob `sensitive/id_ed25519.secret.age`).
+   - Resolving it materializes `~/.ssh/id_ed25519` with mode 0600, on Linux and on Windows:
+
+   ```bash
+   dotf secrets run --only SSH_KEY -- ssh -T git@github.com
+   ```
 
 ## Protocol — ADD a secret
 
@@ -153,14 +187,32 @@ the web vault leaves no review. The change is a plan, reviewed and then applied.
 
 ## Protocol — ROTATE a secret
 
-Scheduled cadence (registry `rotate`), suspected exposure, or offboarding:
+When it is due (the registry's `rotate`), when exposure is suspected, or at offboarding:
 
-1. **Map consumers first** (registry `consumers`) — rotation breaks them all at once. Per-purpose items keep the blast radius small (#321). **Never big-bang.**
-2. Generate the new value (`bw generate -uln --length N` or the provider console).
-3. Update the Bitwarden item (_manual today:_ `bw edit item <id> …`), then `bw sync`.
-4. Roll consumers: `dotf secrets sync <target>` re-materializes CI/containers/agents; local picks it up on the next `run --`.
-5. **Verify each consumer works, THEN revoke the old value** at the provider.
-6. Refresh the DR escrow (below) so the new value is recoverable.
+1. **Map the consumers first** (the registry's `consumers`). A rotation breaks all of them at once. Per-purpose items keep the blast radius small (#321). **Never rotate everything at once.**
+2. Generate the new value at the provider.
+3. **Rotate.** `dotf secrets rotate <id> --dry-run` shows the current value's fingerprint and writes nothing. Then run `printf %s "$new" | dotf secrets rotate <id>`, or omit the pipe to get a hidden prompt. The command:
+   - refuses a new value equal to the current one;
+   - writes the new value, syncs the daemon, and re-resolves it through the normal read path;
+   - compares the fingerprints (sha256, never the value);
+   - runs the entry's `validate:` liveness probe, if it declares one.
+
+   The changed fingerprint is the proof. A probe alone cannot tell a rotated credential from an old one that was never revoked.
+4. **Roll the consumers.** `dotf secrets sync <target>` re-materializes CI, containers and agents. A local process picks the new value up on its next `run --`.
+5. **Check that each consumer works. Only then revoke the old value** at the provider.
+6. **Refresh the DR escrow** (below), so that the new value is recoverable.
+
+Rotation age: registry entries declare `rotate:`, but no code reads it yet (#1670), so nothing reports an overdue credential. Until #1670 ships, the QUARTERLY CHECK covers it.
+
+## Protocol — RETIRE a secret
+
+For a credential that is no longer used: a retired project, a closed account, or a copy whose authority lives somewhere else.
+
+1. **Revoke it at the provider first.** Prove it is dead by consequence: the API answers 401, or the login fails. Deleting the vault copy does not revoke the credential. It only removes the record that the credential exists.
+2. **Take a DR escrow** (`dotf secrets backup`). A removed field does not go to the trash.
+3. **If the registry declares it:** remove its entry, and list the item (or its `field:`) under `retired:` in `secrets/registry.yaml`, with a reason. `dotf secrets reconcile --apply` then deletes it (CONVERGE, steps 8–9).
+4. **If the registry does not declare it:** add a `delete` or `delete-field` row to a curate plan, with `gate=<provider>`. The row stays blocked until `--cleared <provider>` records that step 1 holds (see CURATE).
+5. **Remove the retired key from `docs/secrets-inventory.md`,** so the map no longer lists it as live.
 
 ## Protocol — BACKUP / DR escrow
 
@@ -168,8 +220,41 @@ Scheduled (e.g. weekly) + before any big change:
 
 1. **`dotf secrets backup`** — runs `bw sync` + `bw export --format json --raw`, pipes the plaintext **in memory** into `age` (encrypted to your own recipient, `age-keygen -y` of your identity), and writes `sensitive/dr/bitwarden-export.age` atomically (0600). The plaintext **never** touches disk; the artifact is decrypted back and **verified to round-trip** before the command succeeds (a corrupt escrow is removed, never left behind). Then **commit** it — it overwrites the previous export (git history is the version trail; no snapshot pile-up).
    - _Manual equivalent (no `dotf` on PATH):_ `bw sync && bw export --format json --raw | age -r "$(age-keygen -y ~/.config/age/key.txt)" -o sensitive/dr/bitwarden-export.age`.
-2. **Mirror off-box** (#454, follow-up) and ensure the **age key has an OFFLINE authoritative copy** (#518: encrypted USB + paper/OS keychain) — it must NOT live only in Bitwarden (circular dependency).
+2. **Refresh the offline copy** (see OFFLINE COPY below). The age key must have an authoritative copy offline (#518). If it lived only in Bitwarden, restoring Bitwarden would need the key it is supposed to restore.
 3. The escrow covers the **entire** vault (API keys, tokens, logins, TOTP seeds) → losing Bitwarden is fully recoverable with the offline age key + a repo clone.
+
+## Protocol — OFFLINE COPY (USB)
+
+The offline DR copy is a USB stick formatted as one whole-disk VeraCrypt volume. It holds exactly three files (ADR-033 D2; this has been the state since 2026-09-26, #1000):
+
+```text
+<mount>/key.txt                          # the age identity
+<mount>/secrets/dr/bitwarden-export.age  # the escrow
+<mount>/secrets/dr/escrow-manifest.json  # its item count and digest
+```
+
+It never holds anything else:
+- no plaintext;
+- no per-secret blobs (CLI-036 retired them);
+- no `ci-age-key.txt`, which is kubelab's CI identity (kubelab ADR-027).
+
+**Do not run `scripts/backup-secrets-to-usb.sh`.** It copies the plaintext `sensitive/*.secret` files and the retired blobs, and it verifies nothing. #1770 replaces it with a `dotf` command that copies a declared payload and verifies it by consequence. Until that ships, refresh the copy after every escrow:
+
+```bash
+veracrypt /dev/sdX /media/veracrypt1       # lsblk names the device; it is not stable
+install -m 600 -D sensitive/dr/bitwarden-export.age /media/veracrypt1/secrets/dr/bitwarden-export.age
+install -m 600 sensitive/dr/escrow-manifest.json /media/veracrypt1/secrets/dr/escrow-manifest.json
+# Verify by consequence. Only a recipient comparison and two counts are printed.
+[ "$(age-keygen -y /media/veracrypt1/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
+age -d -i /media/veracrypt1/key.txt /media/veracrypt1/secrets/dr/bitwarden-export.age | jq '.items | length'
+jq .count /media/veracrypt1/secrets/dr/escrow-manifest.json      # must equal the line above
+veracrypt -d /media/veracrypt1
+```
+
+**To create a new stick** (one time):
+1. In the VeraCrypt Volume Creation Wizard, choose "Create a volume within a partition/drive", pick the whole device, and select AES and SHA-512.
+2. Mount it, and run `install -m 600 ~/.config/age/key.txt <mount>/key.txt`.
+3. Refresh it as above.
 
 ## Protocol — RECOVER (disaster)
 
@@ -179,7 +264,7 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 
    ```bash
    sudo apt install age veracrypt            # a fresh machine has neither
-   veracrypt /dev/sdX1 /media/secrets        # prompts for the volume password
+   veracrypt /dev/sdX /media/secrets         # prompts for the volume password
    install -m 600 -D /media/secrets/key.txt ~/.config/age/key.txt
    veracrypt -d /media/secrets               # unmount when done
    ```
@@ -199,9 +284,7 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
    that check existed, a replaced or wrongly-restored root was indistinguishable from a
    healthy one until the day it was needed.
 
-   A USB written by `backup-secrets-to-usb.sh` also carries `ci-age-key.txt`, a standalone decrypt script and a `secrets/` mirror, so `cd /media/secrets && ./age-standalone.sh decrypt` recovers everything **without the repo**. A hand-copied USB holds `key.txt` alone — still enough for this chain, which is what matters here.
-
-   Creating and refreshing that USB lives in [`secrets-management.md` § Physical Backup](secrets-management.md#physical-backup-usb--veracrypt). That runbook carries an out-of-date banner scoped to its `env-mapping.conf` workflow; the VeraCrypt procedure is **not** part of what was retired and remains current under ADR-028, which keeps age as the DR floor.
+   The USB also holds the escrow and its manifest (see OFFLINE COPY). If no repo clone can be had, `/media/secrets/secrets/dr/bitwarden-export.age` can stand in for the copy that step 3 reads.
 2. Clone the dotfiles repo.
 3. `age -d -i ~/.config/age/key.txt sensitive/dr/bitwarden-export.age > $TMPDIR/vault.json` (ephemeral / tmpfs) — `sensitive/dr/bitwarden-export.age` is the artifact `dotf secrets backup` produced.
 4. Stand up a fresh Bitwarden (or any manager) and **import** `vault.json` (`bw import bitwardenjson $TMPDIR/vault.json`); or read individual secrets for immediate needs.
@@ -225,6 +308,21 @@ can. This runbook's step 1 had **no instructions at all** until someone ran it
 (#848) — an escrow that exists proves a file was written, never that anyone can
 restore from it.
 
+## Protocol — QUARTERLY CHECK
+
+Once a quarter, and after any large change, check that the vault still matches the conventions. Every check reads names and states, never values.
+
+1. `dotf secrets drift` reports 0 findings, and `dotf secrets verify` reports every registry secret as OK.
+2. **The undeclared items follow the conventions:**
+   - every unfoldered item is a plain login;
+   - secret-named fields are hidden;
+   - reprompt is on in `Homelab`, `Cards` and `Identity`.
+
+   `dotf secrets curate --check` will assert this (#1792). Until it ships, take a value-free inventory (ids, folders, field names and types) and write a curate plan for every violation.
+3. **Bitwarden's Vault Health reports** (web vault → Reports) list exposed, reused and weak passwords, unsecured websites, and inactive two-step login. Each finding goes to ROTATE or RETIRE.
+4. **Rotation age:** compare each entry's `rotate:` with the date of the item's last change (#1670), and ROTATE any that is overdue.
+5. **The drill:** `dotf doctor` warns when the recorded DR drill (`~/.dotfiles/.dr-drill`) is more than 180 days old.
+
 ## Maintainability (what keeps it from drifting)
 
 - `dotf doctor` checks: `bw`/`age` present (#577); DR-export freshness. **Registry ↔ vault consistency** is `dotf secrets drift` (CLI-078), and converging it is `dotf secrets reconcile` (CLI-080). The items it does not declare are curated from a reviewed plan with `dotf secrets curate` (SEC-006).
@@ -234,4 +332,4 @@ restore from it.
 
 - [ADR-028](../adr/adr-028-secrets-two-tier-bitwarden-age.md) (decision + structure), `docs/secrets-inventory.md` (the map), [ADR-002](../adr/adr-002-age-over-gpg.md) (age).
 - [Windows SSH Key Recovery](windows-ssh-key-recovery.md) (dedicated Windows host identity lifecycle).
-- Tickets: #378, #493, #321, #518, #257, #454, #577.
+- Tickets: #378, #493, #321, #518, #257, #454, #577, #600, #1670, #1770, #1784, #1792.
