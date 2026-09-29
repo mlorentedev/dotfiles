@@ -235,5 +235,9 @@ func VerifyReviewProduced(specDir, transcript string) error {
 			"the transcript of the run that wrote nothing: %s",
 			ReviewFile, transcript)
 	}
+	if _, _, err := FindReview(specDir); err != nil {
+		return fmt.Errorf("the reviewer wrote a malformed %s: %w\nreview transcript: %s",
+			ReviewFile, err, transcript)
+	}
 	return nil
 }

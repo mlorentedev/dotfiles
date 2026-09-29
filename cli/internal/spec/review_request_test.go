@@ -227,6 +227,36 @@ func TestVerifyReviewProducedCatchesAnUnchangedVerdict(t *testing.T) {
 	}
 }
 
+// WIN-014 produced this shape: the reviewer changed review.md, but wrote no
+// machine-readable verdict. A changed digest proves activity, not a valid
+// review, so the foreground launcher must fail before reporting success.
+func TestVerifyReviewProducedCatchesAMalformedVerdict(t *testing.T) {
+	dir := seedProvenanceSpec(t, "old content")
+	if err := WriteReviewRequest(dir, "aaaa", "agy/gemini-3.1-pro-high", "basebasebase"); err != nil {
+		t.Fatal(err)
+	}
+	malformed := `---
+reviewer: agy/gemini-3.1-pro-high
+reviewed_sha: aaaa
+---
+
+FAIL
+`
+	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(malformed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := VerifyReviewProduced(dir, "/transcripts/WIN-014.jsonl")
+	if err == nil {
+		t.Fatal("a changed review.md without a verdict must fail")
+	}
+	for _, want := range []string{"review.md", "verdict", "/transcripts/WIN-014.jsonl"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error should mention %q, got %q", want, err)
+		}
+	}
+}
+
 func TestVerifyReviewProducedAcceptsAFreshVerdict(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
 	if err := WriteReviewRequest(dir, "aaaa", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
@@ -241,10 +271,10 @@ func TestVerifyReviewProducedAcceptsAFreshVerdict(t *testing.T) {
 	}
 }
 
-// Without a sidecar there is no digest to compare against, and the check must
-// not invent one. That the file exists is all it can honestly assert -- the same
-// posture checkReviewProvenance takes for a hand-written review.
-func TestVerifyReviewProducedIsSilentWithoutASidecar(t *testing.T) {
+// Without a sidecar there is no digest to compare against, but the artifact's
+// own schema is still observable. A valid hand-written review therefore passes
+// even though launch provenance cannot be asserted.
+func TestVerifyReviewProducedAcceptsAValidVerdictWithoutASidecar(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
 	if err := VerifyReviewProduced(dir, "/transcripts/AI-042.jsonl"); err != nil {
 		t.Errorf("no sidecar must not be an error, got %v", err)
