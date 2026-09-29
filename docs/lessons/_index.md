@@ -328,6 +328,9 @@ tags: [lessons, index, dotfiles]
 | [308 - A baseline picked by content is a baseline anyone can post](lesson-308-a-baseline-picked-by-content-is-a-baseline-anyone-can-post.md) | 2026-09-27 |  |
 | [309 - A test filter that matches nothing passes](lesson-309-a-test-filter-that-matches-nothing-passes.md) | 2026-09-27 |  |
 | [310 - A comment that grants a safety exemption outlives the ADR it cites](lesson-310-a-comment-that-grants-a-safety-exemption-outlives-the-adr-it-cites.md) | 2026-09-26 |  |
+| [316 - A guard keyed on the row's target misses the op's other writes](lesson-316-a-guard-keyed-on-the-row-target-misses-the-ops-other-writes.md) | 2026-09-28 |  |
 | [313 - A smoke test that runs the real command cannot fail, and can do damage](lesson-313-a-smoke-test-that-runs-the-real-command-cannot-fail-and-can-do-damage.md) | 2026-09-27 |  |
+| [314 - A printed remedy is run verbatim, so it must reproduce the invocation that failed](lesson-314-remedies-must-preserve-invocation-flags.md) | 2026-09-24 |  |
+| [315 - A subagent's documentation summary is a claim: check it against what is observable locally before acting on it](lesson-315-verify-delegated-documentation-claims.md) | 2026-09-24 |  |
 | [312 - Refuse by construction what you cannot measure without losing it](lesson-312-refuse-by-construction-what-you-cannot-measure-without-losing-it.md) | 2026-09-27 |  |
 | [311 - pi's print mode waits on an inherited stdin](lesson-311-pi-print-mode-waits-on-an-inherited-stdin.md) | 2026-09-27 |  |

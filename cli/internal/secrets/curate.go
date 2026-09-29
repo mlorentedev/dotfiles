@@ -120,18 +120,8 @@ func parseCurateRow(n int, cols []string) (CurateRow, error) {
 	if strings.TrimSpace(cols[3]) == "" {
 		return row, fmt.Errorf("%s %s: a reason is required", row.Op, row.Target)
 	}
-	if spec.field {
-		id, field, ok := strings.Cut(row.Target, ":")
-		if !ok || id == "" || field == "" {
-			return row, fmt.Errorf("%s needs a target of the form id:field, got %q", row.Op, row.Target)
-		}
-		row.Target, row.Field = id, field
-		if field == "password" || field == "username" || field == "notes" {
-			return row, fmt.Errorf("%s acts on custom fields only, not %q", row.Op, field)
-		}
-	}
-	if row.Target == "" || strings.Contains(row.Target, ":") {
-		return row, fmt.Errorf("%s: bad target %q", row.Op, cols[1])
+	if err := parseCurateTarget(&row, spec.field, cols[1]); err != nil {
+		return row, err
 	}
 	if cols[2] != "-" {
 		row.Arg = cols[2]
@@ -140,24 +130,50 @@ func parseCurateRow(n int, cols []string) (CurateRow, error) {
 		return row, fmt.Errorf("%s %s: the third column is required", row.Op, row.Target)
 	}
 	if len(cols) == 5 {
-		for _, f := range strings.Split(cols[4], ",") {
-			switch k, v, _ := strings.Cut(strings.TrimSpace(f), "="); {
-			case k == "alias":
-				row.Alias = true
-			case k == "drop" && (v == "fields" || v == "notes" || v == "uris"):
-				row.Drop = append(row.Drop, v)
-			case k == "gate" && v != "":
-				row.Gate = v
-			case k == "":
-			default:
-				return row, fmt.Errorf("unknown flag %q", f)
-			}
+		if err := parseCurateFlags(&row, cols[4]); err != nil {
+			return row, err
 		}
 	}
 	if (row.Alias || len(row.Drop) > 0) && row.Op != CurMergeDelete {
 		return row, fmt.Errorf("alias and drop= apply to merge-delete only")
 	}
 	return row, nil
+}
+
+// parseCurateTarget splits an id:field target for the ops that act on a field.
+func parseCurateTarget(row *CurateRow, field bool, raw string) error {
+	if field {
+		id, f, ok := strings.Cut(row.Target, ":")
+		if !ok || id == "" || f == "" {
+			return fmt.Errorf("%s needs a target of the form id:field, got %q", row.Op, row.Target)
+		}
+		row.Target, row.Field = id, f
+		if f == "password" || f == "username" || f == "notes" {
+			return fmt.Errorf("%s acts on custom fields only, not %q", row.Op, f)
+		}
+	}
+	if row.Target == "" || strings.Contains(row.Target, ":") {
+		return fmt.Errorf("%s: bad target %q", row.Op, raw)
+	}
+	return nil
+}
+
+// parseCurateFlags reads the fifth column's comma-separated flags.
+func parseCurateFlags(row *CurateRow, raw string) error {
+	for _, f := range strings.Split(raw, ",") {
+		switch k, v, _ := strings.Cut(strings.TrimSpace(f), "="); {
+		case k == "alias":
+			row.Alias = true
+		case k == "drop" && (v == "fields" || v == "notes" || v == "uris"):
+			row.Drop = append(row.Drop, v)
+		case k == "gate" && v != "":
+			row.Gate = v
+		case k == "":
+		default:
+			return fmt.Errorf("unknown flag %q", f)
+		}
+	}
+	return nil
 }
 
 // CurateState is what a plan says about one row.
@@ -303,73 +319,99 @@ func presentation(op CurateOp) bool { return op == CurHide || op == CurReprompt 
 // that remove an item; for any edit, an absent item blocks, so a typo in an id
 // can never pass as done.
 func planOp(st CurateStep, t, a *ItemSummary, in CurateInputs) CurateStep {
-	row := st.Row
-	switch row.Op {
-	case CurDelete:
-		if t == nil {
-			return done(st, "absent")
-		}
-		if row.Arg != "" && a == nil {
-			return blocked(st, "the item kept instead, %s, is absent", row.Arg)
-		}
-	case CurMergeDelete:
+	if st.Row.Op == CurMergeDelete {
 		return planMerge(st, t, a, in)
-	default:
-		if t == nil {
-			return blocked(st, "the item is absent")
-		}
 	}
-
-	switch row.Op {
-	case CurFolder:
-		if strings.HasPrefix(row.Arg, "Dotfiles/") {
-			return blocked(st, "the Dotfiles/* folders belong to the registry")
-		}
-		if t.FolderUnresolved {
-			return blocked(st, "the item's folder is unknown to the folder list; sync and re-plan")
-		}
-		if t.Folder == row.Arg {
-			return done(st, "in "+row.Arg)
-		}
-	case CurDeleteField:
-		if _, has := t.FieldTypes[row.Field]; !has {
-			return done(st, "field absent")
-		}
-	case CurHide:
-		kind, has := t.FieldTypes[row.Field]
-		switch {
-		case !has:
-			return blocked(st, "field %q is absent", row.Field)
-		case kind == 1:
-			return done(st, "hidden")
-		case kind != 0:
-			return blocked(st, "field %q is not a text field", row.Field)
-		}
-	case CurReprompt:
-		if t.Reprompt {
-			return done(st, "reprompt on")
-		}
-	case CurAddURI:
-		if slices.Contains(t.URIs, row.Arg) {
-			return done(st, "uri present")
-		}
-		if !t.HasLogin {
-			return blocked(st, "the item has no login to carry a URI")
-		}
-	case CurCopyUsername:
-		if st2, settled := planCopyUsername(st, t, a, in); settled {
-			return st2
-		}
+	if st2, settled := planPresence(st, t, a); settled {
+		return st2
 	}
-
+	if st2, settled := planConverged(st, t, a, in); settled {
+		return st2
+	}
 	if t.Passkeys > 0 {
 		return blocked(st, "the item carries %d passkey(s); curate never writes to one", t.Passkeys)
 	}
-	if row.Op == CurDelete && t.Attachments > 0 {
+	if st.Row.Op == CurDelete && t.Attachments > 0 {
 		return blocked(st, "the item carries %d attachment(s)", t.Attachments)
 	}
 	st.State = CurateApply
 	return st
+}
+
+// planPresence settles a row whose item, or whose item kept instead, is absent,
+// and a delete that names the item it deletes as the one it keeps.
+func planPresence(st CurateStep, t, a *ItemSummary) (CurateStep, bool) {
+	row := st.Row
+	if row.Op != CurDelete {
+		if t == nil {
+			return blocked(st, "the item is absent"), true
+		}
+		return st, false
+	}
+	switch {
+	case t == nil:
+		return done(st, "absent"), true
+	case row.Arg != "" && a == nil:
+		return blocked(st, "the item kept instead, %s, is absent", row.Arg), true
+	case a != nil && a.ID == t.ID:
+		return blocked(st, "an item cannot be kept instead of itself"), true
+	}
+	return st, false
+}
+
+// planConverged settles a row whose edit is already made, or cannot be made.
+// settled is false when the edit is still to be made.
+func planConverged(st CurateStep, t, a *ItemSummary, in CurateInputs) (CurateStep, bool) {
+	row := st.Row
+	switch row.Op {
+	case CurFolder:
+		return planFolder(st, t)
+	case CurDeleteField:
+		if _, has := t.FieldTypes[row.Field]; !has {
+			return done(st, "field absent"), true
+		}
+	case CurHide:
+		return planHide(st, t)
+	case CurReprompt:
+		if t.Reprompt {
+			return done(st, "reprompt on"), true
+		}
+	case CurAddURI:
+		if slices.Contains(t.URIs, row.Arg) {
+			return done(st, "uri present"), true
+		}
+		if !t.HasLogin {
+			return blocked(st, "the item has no login to carry a URI"), true
+		}
+	case CurCopyUsername:
+		return planCopyUsername(st, t, a, in)
+	}
+	return st, false
+}
+
+func planFolder(st CurateStep, t *ItemSummary) (CurateStep, bool) {
+	switch {
+	case strings.HasPrefix(st.Row.Arg, "Dotfiles/"):
+		return blocked(st, "the Dotfiles/* folders belong to the registry"), true
+	case t.FolderUnresolved:
+		return blocked(st, "the item's folder is unknown to the folder list; sync and re-plan"), true
+	case t.Folder == st.Row.Arg:
+		return done(st, "in "+st.Row.Arg), true
+	}
+	return st, false
+}
+
+func planHide(st CurateStep, t *ItemSummary) (CurateStep, bool) {
+	kind, has := t.FieldTypes[st.Row.Field]
+	switch {
+	case !has:
+		return blocked(st, "field %q is absent", st.Row.Field), true
+	case kind == 1:
+		return done(st, "hidden"), true
+	case kind != 0:
+		return blocked(st, "field %q is not a text field", st.Row.Field), true
+	}
+	return st, false
 }
 
 // planCopyUsername settles a copy-username that needs no write, or blocks it.
@@ -405,48 +447,89 @@ func planCopyUsername(st CurateStep, t, a *ItemSummary, in CurateInputs) (Curate
 // receives the URIs it lacks. Everything else t carries must be the same as the
 // keeper's, or named by the row as dropped.
 func planMerge(st CurateStep, t, a *ItemSummary, in CurateInputs) CurateStep {
-	row := st.Row
-	if a == nil {
-		return blocked(st, "the keeper %s is absent", row.Arg)
-	}
-	if t == nil {
-		return done(st, "absent")
-	}
-	if t.ID == a.ID {
-		return blocked(st, "an item cannot be merged into itself")
-	}
 	switch {
-	case t.Passkeys > 0:
-		return blocked(st, "the duplicate carries %d passkey(s); a passkey is never deleted", t.Passkeys)
-	case t.Attachments > 0:
-		return blocked(st, "the duplicate carries %d attachment(s)", t.Attachments)
-	case t.HasTOTP:
-		return blocked(st, "the duplicate carries a TOTP seed")
-	case len(t.Fields) > 0 && !slices.Contains(row.Drop, "fields"):
-		return blocked(st, "the duplicate carries %d custom field(s) the row does not drop", len(t.Fields))
-	case t.HasNotes && !slices.Contains(row.Drop, "notes"):
-		return blocked(st, "the duplicate carries notes the row does not drop")
+	case t == nil:
+		return done(st, "absent")
+	case a == nil:
+		return blocked(st, "the keeper %s is absent", st.Row.Arg)
+	case t.ID == a.ID:
+		return blocked(st, "an item cannot be merged into itself")
+	case !t.HasLogin || !a.HasLogin:
+		return blocked(st, "a merge compares the credentials of two logins, and one of the two items is not a login")
 	}
-	if v := compare(in.Values, t.ID, a.ID, "password"); v != "equal" {
-		return blocked(st, "passwords %s", v)
+	if why := duplicateLoss(st.Row, t); why != "" {
+		return blocked(st, "%s", why)
 	}
-	if !row.Alias {
-		if v := compare(in.Values, t.ID, a.ID, "username"); v != "equal" {
-			return blocked(st, "usernames %s (flag alias if they are one account)", v)
-		}
+	if why := mergeMismatch(st.Row, t, a, in.Values); why != "" {
+		return blocked(st, "%s", why)
 	}
-	if !slices.Contains(row.Drop, "uris") {
-		for _, u := range t.URIs {
-			if !slices.Contains(a.URIs, u) && !slices.Contains(st.Carry, u) {
-				st.Carry = append(st.Carry, u)
-			}
-		}
-	}
-	if len(st.Carry) > 0 && a.Passkeys > 0 {
-		return blocked(st, "the keeper carries a passkey and would need an edit to take %d URI(s)", len(st.Carry))
+	st.Carry = carriedURIs(st.Row, t, a)
+	if why := keeperRefusal(len(st.Carry), a, in); why != "" {
+		return blocked(st, "%s", why)
 	}
 	st.State = CurateApply
 	return st
+}
+
+// duplicateLoss names what the duplicate carries that the merge would destroy,
+// or "" when the row accounts for all of it.
+func duplicateLoss(row CurateRow, t *ItemSummary) string {
+	switch {
+	case t.Passkeys > 0:
+		return fmt.Sprintf("the duplicate carries %d passkey(s); a passkey is never deleted", t.Passkeys)
+	case t.Attachments > 0:
+		return fmt.Sprintf("the duplicate carries %d attachment(s)", t.Attachments)
+	case t.HasTOTP:
+		return "the duplicate carries a TOTP seed"
+	case len(t.Fields) > 0 && !slices.Contains(row.Drop, "fields"):
+		return fmt.Sprintf("the duplicate carries %d custom field(s) the row does not drop", len(t.Fields))
+	case t.HasNotes && !slices.Contains(row.Drop, "notes"):
+		return "the duplicate carries notes the row does not drop"
+	}
+	return ""
+}
+
+// mergeMismatch compares the credentials, value-free, and names a difference.
+func mergeMismatch(row CurateRow, t, a *ItemSummary, r BWReader) string {
+	if v := compare(r, t.ID, a.ID, "password"); v != "equal" {
+		return "passwords " + v
+	}
+	if row.Alias {
+		return ""
+	}
+	if v := compare(r, t.ID, a.ID, "username"); v != "equal" {
+		return "usernames " + v + " (flag alias if they are one account)"
+	}
+	return ""
+}
+
+// carriedURIs lists the duplicate's URIs the keeper lacks, unless the row drops them.
+func carriedURIs(row CurateRow, t, a *ItemSummary) []string {
+	if slices.Contains(row.Drop, "uris") {
+		return nil
+	}
+	var carry []string
+	for _, u := range t.URIs {
+		if !slices.Contains(a.URIs, u) && !slices.Contains(carry, u) {
+			carry = append(carry, u)
+		}
+	}
+	return carry
+}
+
+// keeperRefusal applies to the keeper the rules planCurateRow applies to a
+// target, because carrying a URI is a write to the keeper. With nothing to
+// carry the keeper is only read, so neither rule applies.
+func keeperRefusal(carry int, a *ItemSummary, in CurateInputs) string {
+	switch {
+	case carry == 0:
+		return ""
+	case a.Passkeys > 0:
+		return fmt.Sprintf("the keeper carries a passkey and would need an edit to take %d URI(s)", carry)
+	case in.Owned != nil && in.Owned(a.Name):
+		return fmt.Sprintf("the keeper is declared by the registry, which reconcile owns; it cannot take %d URI(s) (drop=uris if they add nothing)", carry)
+	}
+	return ""
 }
 
 // compare reads one field of two items into memory and returns a value-free
