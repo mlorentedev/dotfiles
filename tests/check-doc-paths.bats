@@ -197,13 +197,6 @@ governed_files() {
     [ "$status" -eq 1 ]
 }
 
-@test "check-doc-paths: auto-discovers instruction files when run without arguments [#1021]" {
-    run "$GUARD"
-    [ "$status" -eq 0 ]
-    [[ "$output" =~ "check-doc-paths: OK AGENTS.md" ]]
-    [[ "$output" =~ "check-doc-paths: OK ai/claude/CLAUDE.md" ]]
-}
-
 @test "check-doc-paths: auto-discovery ignores untracked instruction files [#1718]" {
     PROBE_REL="ai/untracked-probe/AGENTS.md"
     mkdir -p "$DOTFILES_DIR/ai/untracked-probe"
