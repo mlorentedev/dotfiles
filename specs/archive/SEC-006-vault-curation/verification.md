@@ -63,7 +63,7 @@ Both new guards were disabled in turn, and both mutants were killed. These fixes
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/SEC-006-vault-curation/` -> `specs/archive/SEC-006-vault-curation/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/SEC-006-vault-curation/` -> `specs/archive/SEC-006-vault-curation/`
+- [x] Bitácora board ticket: #1784 stays In Progress on purpose. The command is done, but the ticket's live apply is the owner's ceremony (backup, revocations, apply with the digest), and it closes when that runs.
+- [x] Promotions above executed: lessons 312 and 316
