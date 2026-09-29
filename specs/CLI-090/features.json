@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-090-f1",
+    "behavior": "A raw POSIX installer stream installs a checksum-verified selected release outside a checkout.",
+    "verification": "bats tests/install-dotf.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-090-f2",
+    "behavior": "Native installers resolve and validate a latest release when no checkout pin is available.",
+    "verification": "bats tests/install-dotf.bats tests/install-dotf-ps1.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-090-f3",
+    "behavior": "Installer failures preserve the prior binary and fail visibly.",
+    "verification": "bats tests/install-dotf.bats tests/install-dotf-ps1.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-090-f4",
+    "behavior": "Documentation distinguishes native release recovery from checkout bootstrap.",
+    "verification": "rg -n \"Recovery|bootstrap|install-dotf\" README.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]

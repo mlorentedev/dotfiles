@@ -61,20 +61,41 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# pre-commit on Windows can invoke this script through WSL Bash with an
+# absolute `C:\...` script path. Bash does not treat backslashes as separators,
+# so normalise only that WSL-specific shape before locating the repository.
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
+case "$SCRIPT_SOURCE" in
+    [[:alpha:]]:\\*)
+        if command -v wslpath >/dev/null 2>&1; then
+            SCRIPT_SOURCE="$(wslpath -u "$SCRIPT_SOURCE")"
+        fi
+        ;;
+esac
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-list_tracked_markdown() {
-    if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        git -C "$REPO_ROOT" ls-files '*.md'
-        return
-    fi
-    if command -v git.exe >/dev/null 2>&1; then
-        (
+list_instruction_files() {
+    (
+        # pre-commit injects temporary Git config through GIT_CONFIG_COUNT.
+        # Its sanitized hook environment can omit a paired value, making every
+        # nested Git command fail before it can inspect this checkout.
+        unset GIT_CONFIG_COUNT
+        if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git -C "$REPO_ROOT" ls-files '*.md'
+            return
+        fi
+        if command -v git.exe >/dev/null 2>&1; then
             cd "$REPO_ROOT"
             git.exe ls-files '*.md'
-        )
-    fi
+        fi
+    )
+}
+
+list_governed_instruction_files() {
+    list_instruction_files |
+        grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md|README\.md)$' |
+        grep -vE '^harness/|^specs/|^docs/' || true
 }
 
 if [ "$#" -eq 0 ]; then
@@ -92,13 +113,9 @@ if [ "$#" -eq 0 ]; then
     #              documented above owns it, not this exclusion.
     #   specs/   — per-feature historical proposals and archived logs, not standing instructions
     #   docs/    — historical decision records/lessons mentioning retired scripts by design
-    if { [ -d "$REPO_ROOT/.git" ] || [ -f "$REPO_ROOT/.git" ]; }; then
-        while IFS= read -r _f; do
-            [ -n "$_f" ] && set -- "$@" "$_f"
-        done < <(list_tracked_markdown 2>/dev/null \
-            | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md|README\.md)$' \
-            | grep -vE '^harness/|^specs/|^docs/' || true)
-    fi
+    while IFS= read -r _f; do
+        [ -n "$_f" ] && set -- "$@" "$_f"
+    done < <(list_governed_instruction_files)
 fi
 
 if [ "$#" -eq 0 ]; then
