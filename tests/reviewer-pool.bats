@@ -5,18 +5,32 @@
 # pi member must be a reasoning-class model -- the line this pool draws (a
 # latency-only daily driver that PASSes cheaply is worse than no gate). Measured
 # on the ids, never on prose. Since AI-046 the NaN models belong to
-# pi-nan-provider, so that check runs against the installed package in
-# tests/pi-nan-package.bats.
+# pi-nan-provider, so for nan members that check runs against the installed
+# package in tests/pi-nan-package.bats; every other pi member is still checked
+# here against ai/pi/models.json.
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export POOL="$DOTFILES_DIR/harness/reviewer-pool.json"
+    export MODELS="$DOTFILES_DIR/ai/pi/models.json"
 }
 
 @test "the pool is valid JSON with unique, non-blank ids" {
     jq -e '.pool | length >= 1' "$POOL" >/dev/null
     [ "$(jq -r '.pool[].id' "$POOL" | grep -c .)" = "$(jq -r '.pool[].id' "$POOL" | sort -u | grep -c .)" ]
     [ "$(jq -r '.pool[] | select(.id == "" or .id == null) | "blank"' "$POOL" | grep -c blank)" = "0" ]
+}
+
+@test "every pi member the package does not own is a reasoning-class model in ai/pi/models.json" {
+    # AI-046 review round 1: the check moved to pi-nan-package.bats filters on
+    # provider nan, so without this one an openrouter member would be checked
+    # nowhere. The two tests together cover every pi member.
+    while IFS=$'\t' read -r provider model; do
+        [ -n "$model" ] || continue
+        jq -e --arg p "$provider" --arg m "$model" \
+            '.providers[$p].models[] | select(.id == $m and .reasoning == true)' "$MODELS" >/dev/null \
+            || { echo "pool member $provider/$model is not a reasoning model in ai/pi/models.json"; return 1; }
+    done < <(jq -r '.pool[] | select(.runner == "pi" and .provider != "nan") | "\(.provider)\t\(.model)"' "$POOL" | tr -d '\r')
 }
 
 @test "the pool draws from at least four members, so a random pick spreads the API buckets (HARNESS-093)" {

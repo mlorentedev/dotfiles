@@ -83,12 +83,22 @@ PR-B2 deletes five tests. Each one read `ai/pi/models.json`'s `nan` block, and t
 | `pi-config.bats` "models.json uses the `${NAN_API_KEY}` placeholder" | a literal NaN key in `models.json` | #1026 | "every provider in ai/pi/models.json takes its key from a `${VAR}` placeholder" (M5: the openrouter key made literal, red), and "the pi wrapper hands NAN_API_KEY to pi" (M6: `NAN_API_KEY` dropped from the `.zshrc` wrapper, red) | `bats -f 'placeholder\|pi wrapper' tests/pi-config.bats` |
 | `pi-config.bats` "settings.json nan/* models all resolve to an id in models.json" | an `enabledModels` id nothing registers | #749 | `pi-nan-package.bats` test 2, against the package alone (M1: ghost id added, red) | `PI_BIN=~/.local/bin/pi bats tests/pi-nan-package.bats` |
 | `pi-config.bats` "defaultModel resolves to an id in models.json" | a `defaultModel` nothing registers | #749 | `pi-nan-package.bats` test 3 (M2: ghost default, red) | same |
-| `reviewer-pool.bats` "every pi member of the pool is a reasoning-class model in ai/pi/models.json" | a pool member that is not reasoning-class | #1372 | `pi-nan-package.bats` test 4, against the package snapshot (M3: ghost pool member, red) | same |
+| `reviewer-pool.bats` "every pi member of the pool is a reasoning-class model in ai/pi/models.json" | a pool member that is not reasoning-class | #1372 | `pi-nan-package.bats` test 4, against the package snapshot, for nan members (M3: ghost pool member, red). Round 1 of the review found this narrower than the deleted test: it filters on provider nan, so a pi member of any other provider was checked nowhere. `reviewer-pool.bats` now checks every other pi member against `ai/pi/models.json` (M8, M9 below) | same |
 | `opencode.bats` "opencode.jsonc and ai/pi/models.json declare the same context window" | opencode and pi disagreeing on a NaN window | #1772 | `pi-nan-package.bats` test 5, against the package snapshot (M4: qwen3.6 262144 to 262000, red) | same |
 
 The old tests would now pass vacuously: with no `nan` block they compare against nothing. M7 (a NaN model put back into `models.json`) turns the new AC3 test red.
 
 `guard-pi-models-schema.bats`, `render_test.go` and `deploy_test.go` also name `models.json` and were left alone. They check the file generically, or use a synthetic fixture, and none reads the `nan` block.
+
+## Review round 1 (FAIL, agy/gemini-3.1-pro-high, 2026-09-28)
+
+The signed verdict is committed as it was written (`83d156d`). Dispositions:
+
+| Severity | Finding | Disposition | Evidence |
+|---|---|---|---|
+| Blocker | The replacement of the deleted reviewer-pool check filters on provider nan, so a non-NaN pi member bypasses the reasoning-class check | **applied** | `reviewer-pool.bats` "every pi member the package does not own is a reasoning-class model in ai/pi/models.json". The two tests now partition the pi members by provider. M8: an `openrouter/no-such-model` member turns it red. M9: `deepseek/deepseek-chat`, added as an openrouter member, is green; flipping that model's `reasoning` to false in `models.json` turns it red. |
+| Major | The media bridge defaults ON in the package and only `nan-provider.json` turns it off. `dotf pi packages apply` does not deploy that file, so a `pi` run before `dotf deploy` gets an unpinned `npx` bridge | **declined** | Setup runs `dotf deploy` before `dotf pi packages apply`: `setup-linux.sh` line 764 before line 854, and `setup-windows.ps1` line 1199 before line 1281. The bridge is not unpinned either: the package spawns `npx -y nan-mcp-server@1.1.2` (`DEFAULT_NAN_MEDIA_MCP_VERSION`, `src/mcp/nan-media.ts`). A missing file is reported: with it moved aside, `dotf doctor` prints `[WARN] drift: pi-nan-provider — … (run: dotf deploy pi-nan-provider)`. The env-var alternative (`NAN_MEDIA_MCP=0` in the wrappers) was weighed and rejected under Decisions below. |
+| Minor | f5's verification ends in `exit 1`, so the harness can never mark it passing | **declined** | f5 records a measurement that needs the network cut, and CI cannot re-run it. `exit 1` states that honestly; `exit 0` after an `echo` would be a check that passes without checking anything, the vacuous-pass class of lesson 309. `dotf spec archive` does not gate on `features.json`. `AI-047-nan-quota-alarm/features.json` uses the same convention for its recorded live measurement. |
 
 ## Test status
 
