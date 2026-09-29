@@ -57,7 +57,7 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 
 - [x] (housekeeping, a gate on AC8) On `main`, `dotf doctor` reports no spec-issue-state `[FAIL]`. The six specs (CLI-057, CLI-062, GUARD-005, GUARD-006, HARNESS-106, WIN-007) must be archived or abandoned first.
 - [x] [AC8] Add `GH_TOKEN: ${{ github.token }}` to the **doctor-gate step's** `env:` in `ci.yml`, not the job's, so no other step inherits it. The workflow already has read permissions for issues; confirm the `permissions:` block covers `issues: read`. (It did not: the workflow grants `contents: read` only. `test-windows` now declares `contents: read` and `issues: read`.)
-- [ ] [AC8] On the PR run, count "set the GH_TOKEN environment variable" in the gate's log. Expected: 0, and the gate is green. Record the count before and after.
+- [x] [AC8] On the PR run, count "set the GH_TOKEN environment variable" in the gate's log. Expected: 0, and the gate is green. Record the count before and after.
 
 ### PR 5: P1.3, the integration image cache
 
