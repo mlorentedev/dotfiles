@@ -500,9 +500,18 @@ jobs:
       # entry that no longer fires (a stale list is a failure too).
       #
       # GH_TOKEN on this step only (CI-004 AC8): without it every gh call in
-      # doctor printed "set the GH_TOKEN environment variable" and
-      # spec-issue-state degraded to 43 unverified WARNs, so a spec whose issue
-      # had closed could never fail the gate. The setup step keeps no token.
+      # doctor printed "set the GH_TOKEN environment variable" (43 lines in this
+      # step: one `not verified` WARN per active spec from spec-issue-state,
+      # plus branch-protection), so a spec whose issue had closed could never
+      # fail the gate. The setup step keeps no token.
+      #
+      # With it, an active spec whose issue is closed FAILs here, on main's push
+      # run and on every code PR, until the spec is archived. A closing keyword
+      # cannot cause that: spec-gate makes that PR archive the spec. A manual
+      # close can (SDD-041, #1087). The remedy is `dotf spec archive`, or
+      # `--abandoned`, in its own PR. The gate cannot block that PR: its merge
+      # ref no longer holds the active spec, and a specs-only diff skips this
+      # step.
       - name: Post-setup doctor gate (TEST-003)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
