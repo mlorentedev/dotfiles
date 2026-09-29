@@ -1,11 +1,12 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 8416f176868419d9
+generated_sha: 97cc048c296c9dd6
 id: handoff-skill
 type: skill
 status: active
 created: '2026-05-31'
+updated: '2026-09-28'
 owner: manu
 name: handoff
 description: Run a complete, standardized session handoff at session end (or on demand).
@@ -55,8 +56,26 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 
 **Rules:**
 - **Dense & Bounded:** ~8 lines. Convert relative dates to absolute.
-- **Markdown hard breaks:** End each handoff field line with two trailing spaces (`  `) for clean rendering in Obsidian.
-- **Path resolution (Target Repo vs Session CWD, HARNESS-066):** Target is `$VAULT_PATH/10_projects/<target-repo>/memory/MEMORY.md`. The `<target-repo>` MUST be resolved from the **repositories actually modified/worked during the session** (via git remotes and worktrees touched), NOT blind session `cwd`. If multiple repos were modified, write the continuity block to the primary worked repo and record an explicit cross-pointer in the others. Resolve `$VAULT_PATH` via: (1) env var, (2) `dotf env path VAULT_PATH`, (3) `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) Fail closed if unset. Never hardcode literal paths.
+- **Markdown hard breaks:** End each handoff field line with `<br>`. Do not use
+  trailing spaces; the vault's whitespace checks reject them.
+- **Target-area resolution (HARNESS-066):** Resolve the target from the
+  **repositories and sources actually worked during the session**, never from
+  the session `cwd` alone. A personal target is
+  `$VAULT_PATH/10_projects/<target-repo>/memory/MEMORY.md`. A work target is
+  the explicit `50_work` area selected through its work-context routing flow;
+  it must never write under `10_projects`. When the validated controller
+  resolver is available, it is authoritative. Before then, present ambiguous
+  work-area candidates to the operator and require a selection. If the
+  domain or target remains unknown, fail closed without writing. If multiple
+  repositories were modified, write to the primary selected area and record
+  explicit cross-pointers in the others. Resolve `$VAULT_PATH` via: (1) env
+  var, (2) `dotf env path VAULT_PATH`, (3)
+  `~/.config/dotfiles/machine.json` `paths.VAULT_PATH`, (4) fail closed if
+  unset. Never hardcode literal paths.
+- **Work-area bootstrap:** The work controller owns the idempotent Python
+  bootstrap that creates the required `memory/` and `sessions/` paths without
+  modifying an existing `MEMORY.md`. Vault skills consume its validated result;
+  they do not embed a parallel bootstrap implementation.
 - **Independence caveat:** Never leak full design rationale or spec argumentation into a repo's auto-memory that would bias an independent `/adversarial-review` (write a pointer and task ref instead).
 - **Placement (Cache-stable, HARNESS-029):** The block is the **LAST** section of `MEMORY.md`, *after* the stable index content. Keeping volatile handoff text out of the prefix prevents prompt cache thrashing.
 - **Write mechanics — RUN THE COMMAND, do not Edit the file (HARNESS-088, #1278):**
@@ -116,7 +135,7 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 
 In ADDITION to the replaced-in-place continuity block, record the session journal:
 
-- **Path:** `<target-repo-area>/sessions/<YYYY-MM-DD>-<target-repo>-<agent>-<thread>.md`, where `<thread>` is what `dotf mem thread` prints. Ask for the whole name rather than assembling it:
+- **Path:** `<target-area>/sessions/<YYYY-MM-DD>-<target-id>-<agent>-<thread>.md`, where `<thread>` is what `dotf mem thread` prints. Ask for the whole name rather than assembling it:
 
   ```bash
   dotf mem thread --date "$(date +%F)" --project <repo> --agent <agent>
@@ -128,8 +147,8 @@ In ADDITION to the replaced-in-place continuity block, record the session journa
   exist across two days, and no session could tell which one was its own. With
   the worktree in the name it is derivable from the working directory.
 
-  Under `10_projects/<target-repo>/sessions/`, derived from the repository where
-  work was executed. Never under `00_meta/sessions/`.
+  Under the selected target area's `sessions/` directory, derived from the
+  resolved personal repository or work area. Never under `00_meta/sessions/`.
 - **Frontmatter Law:**
   ```yaml
   ---
@@ -268,8 +287,8 @@ Deliver the final handoff summary to the user using this standardized block:
 ```markdown
 ### 🏁 Session Handoff Summary
 
-- **Continuity Block:** Updated in `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md`
-- **Session Record:** Written to `10_projects/<repo>/sessions/<YYYY-MM-DD>-<project>-<agent>.md`
+- **Continuity Block:** Updated in `<target-area>/memory/MEMORY.md`
+- **Session Record:** Written to `<target-area>/sessions/<YYYY-MM-DD>-<target-id>-<agent>.md`
 - **PRs & Commits:**
   - `PR #NNN`: `<Title>` (`<state>`)
   - `Commit <hash>`: `<message>`
