@@ -95,8 +95,8 @@ def gate_gaps(wf_name, jobs):
     return out
 
 
-def main(root):
-    root = pathlib.Path(root)
+def collect_reporters(root):
+    """Map every status-check name to the pull-request jobs that report it."""
     problems = []
     reporters = {}  # name -> [(workflow, job_id, always_reports)]
     for wf in sorted((root / ".github" / "workflows").glob("*.yml")):
@@ -115,7 +115,12 @@ def main(root):
             for name in display_names(job_id, job):
                 reporters.setdefault(name, []).append(
                     (wf.name, job_id, not filtered and not skippable_matrix))
+    return problems, reporters
 
+
+def main(root):
+    root = pathlib.Path(root)
+    problems, reporters = collect_reporters(root)
     for name, jobs in sorted(reporters.items()):
         if len(jobs) > 1:
             where = ", ".join(f"{w}:{j}" for w, j, _ in jobs)

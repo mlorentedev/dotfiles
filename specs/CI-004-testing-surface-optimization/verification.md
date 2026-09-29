@@ -22,7 +22,7 @@ created: "2026-09-25"
 
 - `shellcheck -s bash` clean on both edited bats files.
 - `tests/guard-no-gui.bats`, `tests/skills-pipeline.bats` and `tests/guard-lesson-numbers-unique.bats`: green, twice each.
-- `actionlint` on `ci.yml`: one pre-existing SC2129 style note at line 491 (a step this PR does not touch); left as is.
+- `actionlint` on `ci.yml`: clean since PR 5 (#1819), which grouped the `versions` step's redirects (the SC2129 note had been there since `465fd2a`).
 
 ## Decisions made during implementation
 
@@ -32,13 +32,26 @@ created: "2026-09-25"
 - P0.2's `stub_copilot` helper had no caller left once the two copilot tests moved to the shared home; it was removed and its rationale moved into `setup_file`.
 - f1 moved to a lighter companion and millisecond precision: at whole seconds, a 4.6 s run could read as 5 and fail at random.
 
+## Review dispositions
+
+Round 1: `nan/qwen3.8-flash`, **PASS-WITH-GAPS** on `8a88d46`, no Blocker.
+
+- **Major, AC7 guard coverage (non-matrix job with a job-level `if:`): declined.** The premise does not hold on GitHub. A job skipped by its `if:` reports its check run as `skipped`, and a required check that is skipped counts as passing, so it does not stay pending. The case that does stay pending is a skipped *matrix* job, because it reports once under the unexpanded name (`test (${{ matrix.os }})`) and never under the names protection requires. That is the case `skippable_matrix` catches. #1819's own checks show both: `cli-lint` and `goreleaser snapshot` report `skipping`, and `test (${{ matrix.os }})` reports under its template name. The one-line rule proposed would flag `attestation`, `pi-nan-package` and every other conditional job, which all report. The same finding was declined on #1782 for the same reason.
+- **Minor, AC8 outcome not re-verifiable: applied.** Evidence that does not depend on one job's retention: fetch any `main` push run after `1f67339`, `gh api repos/mlorentedev/dotfiles/actions/jobs/<test-windows job>/logs`, and attribute each `set the GH_TOKEN environment variable` line to the step it falls in (`awk '/##\[group\]Run /{s=$0} /set the GH_TOKEN environment variable/{c[s]++} END{for(k in c) print c[k], k}'`). Runs 36511159325 (job 109223397978) and 36513861537 (job 109231917127): 43 lines, all in the `.\setup-windows.ps1` step, which keeps no token by design, and 0 in the `doctor-gate.ps1` step, where `[spec-issue-state]` prints `(1 checks, all ok)`.
+- **Minor, AC6 local figures not reproducible: applied as a note.** The 89/90/89 s local figures came from a host with GNU `parallel` installed, which the machine this spec closed on does not have (`bats --jobs` aborts there). The criterion is the CI measurement: 96.4 s mean over 5 `main` runs against a 99.5 s bar, and against the two adjacent serial runs (172 and 165 s, mean 168.5 s) it is 43% faster.
+- **Minor, AC6 margin: no change.** The bar was fixed against the 199 s baseline before the work began, and the adjacent-serial comparison is recorded above and in the AC6 entry.
+- **Minor, AC2 counter matches only a standalone `--deploy`: declined.** Speculative by the reviewer's own classification, and every `SCRIPT=` in the file pins the wrapper. The reviewer's instruction was to surface it, not gate on it.
+- **Minor, `check-workflow-contexts.py` `main()` at 41 lines: applied** in #1819. The reporter loop moved to `collect_reporters()` (21 lines), and `main()` is now 25. `workflow-job-names.bats` stays green, and a mutation that marks every reporter as not always reporting turns it red.
+- **Minor, contract set edited during the round: no change here.** The reviewer re-verified against the new sha, and the archive's digest check already refuses a review whose contract files changed afterwards. It is a note about the launcher, not about this spec.
+- **Question, review base: tracked** by #1551 and #1727, which cover a base inferred from history spanning other specs' merges.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson for the repo's `docs/lessons/`? Yes: lesson 309 (a test filter that matches nothing passes) and lesson 318 (a speed-up must name the critical path it shortens).
-- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? No: every decision here is local to the CI jobs and is recorded in this spec.
-- [x] New pattern candidate for `00_meta/patterns/`? No: lesson 318 is the first occurrence. Promote it if a second project repeats it.
+- [x] Lesson for the repo's `docs/lessons/`? yes: `docs/lessons/lesson-309-a-test-filter-that-matches-nothing-passes.md` and `docs/lessons/lesson-318-a-speed-up-must-name-the-critical-path-it-shortens.md`
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: every decision here is local to the CI jobs and is recorded in this spec.
+- [x] New pattern candidate for `00_meta/patterns/`? no: lesson 318 is the first occurrence. Promote it if a second project repeats it.
 
 ## Archive checklist
 
