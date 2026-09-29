@@ -1,5 +1,5 @@
 ---
-id: lesson-317
+id: lesson-318
 type: lesson
 status: active
 created: "2026-09-29"
@@ -7,7 +7,7 @@ owner: manu
 tags: [lesson, ci, performance, spec, measurement]
 ---
 
-# 317 — A speed-up must name the critical path it shortens
+# 318 — A speed-up must name the critical path it shortens
 
 ## What happened
 
