@@ -429,20 +429,20 @@ func TestHookBinaryTokenForTargetUsesAgyWindowsCommandSyntax(t *testing.T) {
 	const windowsPath = `C:\Users\m\.local\bin\dotf.exe`
 
 	for _, tc := range []struct {
-		name, goos, format, want string
+		name, path, goos, format, want string
 	}{
-		{"agy on windows is bare", "windows", harness.NamedHooksFormat, windowsPath},
-		{"claude on windows stays quoted", "windows", "command-hook", `"` + windowsPath + `"`},
-		{"agy on linux stays bare", "linux", harness.NamedHooksFormat, "/home/m/.local/bin/dotf"},
+		{"agy on windows is bare", windowsPath, "windows", harness.NamedHooksFormat, windowsPath},
+		{"claude on windows stays quoted", windowsPath, "windows", "command-hook", `"` + windowsPath + `"`},
+		{"agy path with spaces stays quoted until its runner supports escaping",
+			`C:\Users\Two Words\.local\bin\dotf.exe`, "windows", harness.NamedHooksFormat,
+			`"C:\Users\Two Words\.local\bin\dotf.exe"`},
+		{"agy on linux stays bare", "/home/m/.local/bin/dotf", "linux",
+			harness.NamedHooksFormat, "/home/m/.local/bin/dotf"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			path := windowsPath
-			if tc.goos == "linux" {
-				path = tc.want
-			}
-			if got := hookBinaryTokenForTarget(path, tc.goos, tc.format); got != tc.want {
+			if got := hookBinaryTokenForTarget(tc.path, tc.goos, tc.format); got != tc.want {
 				t.Errorf("hookBinaryTokenForTarget(%q, %q, %q) = %q, want %q",
-					path, tc.goos, tc.format, got, tc.want)
+					tc.path, tc.goos, tc.format, got, tc.want)
 			}
 		})
 	}
@@ -579,12 +579,7 @@ func bindAgy(t *testing.T, home, raw string, extra ...string) (string, error) {
 // the payload would not have parsed.
 func TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry(t *testing.T) {
 	home, raw := agyBindFixture(t, liveShapedAgyHooks, liveShapedGeminiSettings)
-	dotf := hookBinaryToken(raw, runtime.GOOS)
-	if runtime.GOOS == "windows" {
-		// agy executes the command token directly on Windows. Quoting a path
-		// without spaces makes the quote characters part of the executable name.
-		dotf = raw
-	}
+	dotf := hookBinaryTokenForTarget(raw, runtime.GOOS, harness.NamedHooksFormat)
 	hooksPath := filepath.Join(home, ".gemini", "config", "hooks.json")
 	settingsPath := filepath.Join(home, ".gemini", "settings.json")
 	orcaBefore, _ := json.Marshal(readJSONFile(t, hooksPath)["orca-status"])
