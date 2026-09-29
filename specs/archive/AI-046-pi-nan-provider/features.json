@@ -37,7 +37,7 @@
   {
     "id": "AI-046-pi-nan-provider-f6",
     "behavior": "a deepseek-v4-flash -> qwen3.6 switch past 262K history does not overflow",
-    "verification": "dotf secrets run --only NAN_API_KEY -- bash specs/AI-046-pi-nan-provider/measure-ac6.sh",
+    "verification": "dotf secrets run --only NAN_API_KEY -- bash specs/archive/AI-046-pi-nan-provider/measure-ac6.sh",
     "state": "pending",
     "evidence": ""
   }
