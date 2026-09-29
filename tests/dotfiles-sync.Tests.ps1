@@ -11,13 +11,17 @@ Describe 'dotfiles-sync.ps1' {
 
         function Invoke-Sync {
             param([string]$Local, [string]$Repo, [string[]]$Arguments = @())
+            # Restore, not remove: a runner that already exported these keeps them.
+            $saved = @{ DOTFILES_DIR = $env:DOTFILES_DIR; DOTFILES_REPO_DIR = $env:DOTFILES_REPO_DIR }
             $env:DOTFILES_DIR = $Local
             $env:DOTFILES_REPO_DIR = $Repo
             try {
                 $out = & pwsh -NoProfile -NonInteractive -File $script:Sync @Arguments 2>&1 | Out-String
                 [pscustomobject]@{ Code = $LASTEXITCODE; Output = $out }
             } finally {
-                Remove-Item Env:DOTFILES_DIR, Env:DOTFILES_REPO_DIR -ErrorAction SilentlyContinue
+                foreach ($name in $saved.Keys) {
+                    [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process')
+                }
             }
         }
     }
@@ -49,6 +53,7 @@ Describe 'dotfiles-sync.ps1' {
         Set-Content -Path (Join-Path $repo 'tracked.txt') -Value 'v2, not staged'
 
         $r = Invoke-Sync -Local $local -Repo $repo
+        $r.Code | Should -Be 1
         $r.Output | Should -Match 'Uncommitted changes in repo'
         $r.Output | Should -Not -Match 'Push complete|Pull complete'
     }

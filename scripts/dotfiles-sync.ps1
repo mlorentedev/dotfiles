@@ -65,7 +65,8 @@ function Sync-Git {
     $staged = $LASTEXITCODE -ne 0
     if ($unstaged -or $staged) {
         Write-Warn "  Uncommitted changes in repo - commit first"
-        return
+        # Fail, as the bash twin does: a sync that pushed nothing is not a success.
+        exit 1
     }
 
     & git -C $DotfilesRepo push 2>$null
