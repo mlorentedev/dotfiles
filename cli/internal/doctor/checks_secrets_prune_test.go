@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,6 +136,61 @@ func TestCheckSecrets_FixRefuses(t *testing.T) {
 			}
 			if !strings.Contains(out, "orphan: chatgpt.api-key.secret.age") || rep.Failures() == 0 {
 				t.Errorf("a refused prune must still FAIL, naming the blob\n%s", out)
+			}
+		})
+	}
+}
+
+// A blob the checkout still holds is either committed (git rm it, in a PR) or an
+// untracked leftover (delete it). #1793: both were reported as "still committed
+// … git rm it there", and `git rm` fails on an untracked path.
+func TestCheckSecrets_OrphanInCheckoutNamesItsGitState(t *testing.T) {
+	const blob = "chatgpt.api-key.secret.age"
+	cases := []struct {
+		name     string
+		lsFiles  func() (string, error)
+		want     string
+		mustMiss string
+	}{
+		{"committed", func() (string, error) { return "sensitive/" + blob + "\n", nil },
+			"still committed in", ""},
+		{"untracked", func() (string, error) { return "", nil },
+			"untracked copy", "git rm"},
+		{"git state unknown", func() (string, error) { return "", errors.New("not a git repository") },
+			"git rm it if tracked, delete it if not", "still committed"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, mirror := pruneFixture(t)
+			writeFile(t, filepath.Join(repo, "sensitive", blob), "x")
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			sys := newSys(map[string]string{"HOME": mirror, "DOTFILES_REPO_DIR": repo}, nil, nil)
+			sys.CommandOutputDir = func(dir, name string, args ...string) (string, error) {
+				if dir == repo && name == "git" && strings.Join(args, " ") == "ls-files -- :(literal)sensitive/"+blob {
+					return tc.lsFiles()
+				}
+				return "", errors.New("unexpected command")
+			}
+			checkSecrets(sys, &Config{DotfilesDir: mirror}, rep, true)
+			out := buf.String()
+			line := ""
+			for _, l := range strings.Split(out, "\n") {
+				if strings.Contains(l, "orphan: "+blob) {
+					line = l
+				}
+			}
+			if line == "" {
+				t.Fatalf("no FAIL line for the blob\n%s", out)
+			}
+			if !strings.Contains(line, tc.want) {
+				t.Errorf("want %q in %q", tc.want, line)
+			}
+			if tc.mustMiss != "" && strings.Contains(line, tc.mustMiss) {
+				t.Errorf("%q must not appear in %q", tc.mustMiss, line)
+			}
+			if !mirrorHas(mirror, blob) {
+				t.Error("a blob the checkout still holds must not be pruned from the mirror")
 			}
 		})
 	}
