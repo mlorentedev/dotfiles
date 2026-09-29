@@ -72,6 +72,11 @@ type fakeBWServe struct {
 
 	unlockPassword string // "" -> any password succeeds
 	failUnlock     bool
+
+	// searchIndexLag models the daemon rebuilding its search index after a forced
+	// sync: a `?search=` query answers an empty list while the unfiltered list is
+	// complete. Measured live during a curate apply (2026-09-29).
+	searchIndexLag bool
 }
 
 func (f *fakeBWServe) handler() http.HandlerFunc {
@@ -163,6 +168,10 @@ func (f *fakeBWServe) handleListItems(w http.ResponseWriter, r *http.Request) {
 	// bwserve_list.go projects at decode time. A fake that answered id+name only
 	// would let a layout test pass against a shape the daemon never sends.
 	search := r.URL.Query().Get("search")
+	if search != "" && f.searchIndexLag {
+		writeEnvelope(w, true, "", map[string]any{"object": "list", "data": []any{}})
+		return
+	}
 	var out []map[string]any
 	for id, name := range f.names {
 		if search != "" && !strings.Contains(name, search) {
@@ -604,5 +613,55 @@ func TestBWServeClientSyncForcesThePull(t *testing.T) {
 	}
 	if len(got) != 1 || got[0] != "POST /sync?force=true" {
 		t.Fatalf("Sync sent %q, want exactly [\"POST /sync?force=true\"]", got)
+	}
+}
+
+// An item lookup must not depend on the daemon's search index. After a forced
+// sync the daemon rebuilds that index, and a `?search=` query answers an empty
+// list meanwhile, while the unfiltered list is complete. Read through search, an
+// existing item then looks absent: curate stopped twice mid-apply on "bw item
+// not found" (2026-09-29), and `set` would take the absence as licence to create
+// a duplicate.
+func TestBWServeReaderLookupSurvivesASearchIndexRebuild(t *testing.T) {
+	const id = "208270d0-bd1e-4748-b5ac-b47200108c6e"
+	f := &fakeBWServe{
+		status:         "unlocked",
+		searchIndexLag: true,
+		names:          map[string]string{id: "my-item", "other": "my-item-backup"},
+		items: map[string]json.RawMessage{
+			id:      json.RawMessage(`{"id":"` + id + `","name":"my-item","notes":"exact"}`),
+			"other": json.RawMessage(`{"id":"other","name":"my-item-backup","notes":"decoy"}`),
+		},
+	}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	r := BWServeReader{Client: BWServeClient{BaseURL: srv.URL}}
+
+	for _, key := range []string{"my-item", id} {
+		got, err := r.Field(key, "notes")
+		if err != nil {
+			t.Fatalf("Field(%q) during an index rebuild: %v", key, err)
+		}
+		if got != "exact" {
+			t.Fatalf("Field(%q) = %q, want the exact match", key, got)
+		}
+	}
+}
+
+// A forced sync pulls the whole vault from the server, so it cannot share the
+// timeout of a local cache read. Measured 2026-09-29: 1.8-3.8 s per forced sync,
+// past the 5 s read timeout often enough that `reconcile` failed with "context
+// deadline exceeded" before reading anything.
+func TestBWServeClientSyncGetsItsOwnTimeout(t *testing.T) {
+	var c BWServeClient
+	if got := c.syncClient().Timeout; got != bwServeSyncTimeout {
+		t.Fatalf("sync timeout = %s, want %s", got, bwServeSyncTimeout)
+	}
+	if bwServeSyncTimeout <= c.httpClient().Timeout {
+		t.Fatalf("sync timeout %s must exceed the read timeout %s", bwServeSyncTimeout, c.httpClient().Timeout)
+	}
+	custom := &http.Client{Timeout: time.Millisecond}
+	if got := (BWServeClient{HTTPClient: custom}).syncClient(); got != custom {
+		t.Fatal("an injected HTTPClient must be used for the sync too")
 	}
 }

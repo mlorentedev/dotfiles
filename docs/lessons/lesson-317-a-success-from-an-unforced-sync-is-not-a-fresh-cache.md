@@ -23,4 +23,10 @@ When a cache shares its freshness marker with another client, an unforced refres
 
 Verify freshness by consequence: compare a digest of `(id, revisionDate)` from each reader, never the refresh's status code.
 
+## The second cache it exposed
+
+Forcing the sync surfaced a second cache. A forced sync makes the daemon rebuild its search index, and while it rebuilds, `GET /list/object/items?search=<key>` answers an empty list although the item exists. The unforced sync had been a no-op, so it had never triggered a rebuild. After the fix, every write ended in a forced sync, and the item lookup that follows went through `?search=`. The first curate apply on 0.61.0 stopped twice on "bw item not found": after 32 rows, then after 24 more. It failed closed, so nothing was written wrongly.
+
+Resolve an item from the unfiltered list and match it locally. That list is answered from the item cache, not from the index. When you fix one cache, look for the next cache the fix now exercises.
+
 Refs: SEC-006 (#1784); `BWServeClient.Sync` in `cli/internal/secrets/bwserve.go`.

@@ -161,6 +161,19 @@ func (c BWServeClient) httpClient() *http.Client {
 	return &http.Client{Timeout: 5 * time.Second}
 }
 
+// bwServeSyncTimeout bounds a forced sync, which pulls the whole vault from the
+// server rather than reading the daemon's cache. Measured 2026-09-29 at 1.8-3.8 s,
+// often enough past the 5 s read timeout to fail a reconcile before it started.
+const bwServeSyncTimeout = 60 * time.Second
+
+// syncClient is httpClient with the sync's own bound; an injected client wins.
+func (c BWServeClient) syncClient() *http.Client {
+	if c.HTTPClient != nil {
+		return c.HTTPClient
+	}
+	return &http.Client{Timeout: bwServeSyncTimeout}
+}
+
 // call issues method to path (optionally with a JSON body), decodes bw
 // serve's envelope, and returns its data on success or a descriptive error
 // on failure. A transport-level failure (connection refused, timeout) is
@@ -374,8 +387,16 @@ func (r BWServeReader) ItemNames() ([]string, error) {
 	return names, nil
 }
 
+// getItemJSON resolves item, an exact name or id, to its full JSON.
+//
+// It reads the UNFILTERED list and matches locally, never `?search=`. The search
+// filter is answered from the daemon's search index, which a forced sync rebuilds
+// (every write here ends in one), and while it rebuilds a search answers an empty
+// list although the item exists. Measured 2026-09-29: a curate apply stopped
+// twice on "bw item not found" for items the unfiltered list held. Absence read
+// that way is the dangerous kind: `set` would create a duplicate.
 func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
-	data, err := r.Client.call(http.MethodGet, "/list/object/items?search="+url.QueryEscape(item), nil)
+	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: %w", item, err)
 	}
@@ -417,7 +438,9 @@ func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
 // keeps serving its old cache, while reporting success. Measured 2026-09-29: an
 // edited item still read as its March revision until `?force=true`.
 func (c BWServeClient) Sync() error {
-	_, err := c.call(http.MethodPost, "/sync?force=true", nil)
+	sc := c
+	sc.HTTPClient = c.syncClient()
+	_, err := sc.call(http.MethodPost, "/sync?force=true", nil)
 	return err
 }
 
