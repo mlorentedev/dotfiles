@@ -73,7 +73,7 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] `shellcheck` and `bats tests/*.bats` are green; `actionlint` is clean on the edited workflows, if it is installed
+- [x] `shellcheck` and `bats tests/*.bats` are green; `actionlint` is clean on the edited workflows, if it is installed — 2026-09-29 on the PR 5 branch: `shellcheck -S warning` exits 0 (CI runs `--severity=error` on the root scripts); `bats tests/*.bats` 1695/1696, the one failure being the known environmental #1641 (the local oh-my-zsh install has `glolm`, the vendored snapshot does not); `actionlint` on `ci.yml` is clean after grouping the `versions` step's redirects (SC2129, pre-existing since 465fd2a)
 - [x] No unrelated changes in any PR (no scope creep); every PR body states "no `.sh`/`.ps1` setup script touched" (No CI-004 PR touches a `setup-*.sh` or `.ps1`, checked on the file lists of #1780, #1781, #1782, #1809, #1813 and this one. The bodies of #1809 and #1813 do not say so; the rest do.)
 - [x] `verification.md` filled in, with before and after numbers per row
 - [ ] Independent review through `dotf spec review CI-004-testing-surface-optimization` before archive
