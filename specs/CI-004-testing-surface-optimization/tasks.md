@@ -51,7 +51,7 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 - [x] [AC7] Mutations: a `paths` filter restored on `pull_request` fails the test on `cli-gate`, and so does requiring `test (ubuntu-latest)` directly.
 - [x] [AC7] On the PR: `lint` appears once in `gh pr checks`; `cli-gate` is green both with and without a Go change.
 - [x] [AC7] Review follow-up (#1782): `cli-gate` needs `release-snapshot`, and `check-workflow-contexts.py` fails an aggregate gate that leaves out a job able to run on a pull request. Mutation: dropping `release-snapshot` from `needs` fails `tests/workflow-job-names.bats`.
-- [ ] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge.
+- [x] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge. (Done 2026-09-28, on the owner's request. Live required checks: `cli-gate,lint,lint-powershell,review-attestation,spec-gate,test,test-windows`; `dotf forge protection check` reports 1 ok, 0 drift.)
 
 ### PR 4: P0.5, a token for the Windows doctor gate
 
