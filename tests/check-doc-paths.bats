@@ -204,6 +204,69 @@ governed_files() {
     [[ "$output" =~ "check-doc-paths: OK ai/claude/CLAUDE.md" ]]
 }
 
+@test "check-doc-paths: auto-discovery ignores untracked instruction files [#1718]" {
+    PROBE_REL="ai/untracked-probe/AGENTS.md"
+    mkdir -p "$DOTFILES_DIR/ai/untracked-probe"
+    printf 'Run `scripts/definitely-not-here.sh` first.\n' > "$DOTFILES_DIR/$PROBE_REL"
+
+    run "$GUARD"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"$PROBE_REL"* ]]
+}
+
+@test "check-doc-paths: Windows worktree falls back to git.exe for tracked files [#1718]" {
+    local worktree="$SCRATCH/windows-worktree"
+    local fake_bin="$SCRATCH/bin"
+    mkdir -p "$worktree/scripts" "$fake_bin"
+    cp "$GUARD" "$worktree/scripts/check-doc-paths.sh"
+    printf 'gitdir: C:\\repo\\.git\\worktrees\\windows-worktree\n' > "$worktree/.git"
+    printf 'See `README.md`.\n' > "$worktree/AGENTS.md"
+    printf '# Fixture\n' > "$worktree/README.md"
+
+    cat > "$fake_bin/git" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+    cat > "$fake_bin/git.exe" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' AGENTS.md
+EOF
+    chmod +x "$fake_bin/git" "$fake_bin/git.exe"
+
+    run bash -c "cd '$worktree' && env PATH='$fake_bin:$PATH' ./scripts/check-doc-paths.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"check-doc-paths: OK AGENTS.md"* ]]
+}
+
+@test "check-doc-paths: nested Git ignores an incomplete hook config override [#1718]" {
+    local worktree="$SCRATCH/hook-config-worktree"
+    local fake_bin="$SCRATCH/hook-config-bin"
+    mkdir -p "$worktree/scripts" "$fake_bin"
+    cp "$GUARD" "$worktree/scripts/check-doc-paths.sh"
+    mkdir -p "$worktree/.git"
+    printf 'See `README.md`.\n' > "$worktree/AGENTS.md"
+    printf '# Fixture\n' > "$worktree/README.md"
+
+    cat > "$fake_bin/git" <<'EOF'
+#!/usr/bin/env bash
+if [ -n "${GIT_CONFIG_COUNT:-}" ]; then
+    printf 'error: missing config value GIT_CONFIG_VALUE_0\n' >&2
+    exit 128
+fi
+case "$*" in
+    *rev-parse*) printf 'true\n' ;;
+    *ls-files*) printf 'AGENTS.md\n' ;;
+esac
+EOF
+    chmod +x "$fake_bin/git"
+
+    run bash -c "cd '$worktree' && env PATH='$fake_bin:$PATH' \
+        GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath \
+        ./scripts/check-doc-paths.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"check-doc-paths: OK AGENTS.md"* ]]
+}
+
 @test "check-doc-paths: rejects a token that escapes the repo root [#916]" {
     # `scripts/../../<something real>` passes is_repo_rooted (first segment is
     # `scripts`) and used to resolve — and be reported OK — outside the repo.
@@ -300,4 +363,3 @@ EOF
     run env -u VAULT_PATH PATH="/usr/bin:/bin" "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 0 ]
 }
-

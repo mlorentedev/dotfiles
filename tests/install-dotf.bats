@@ -327,7 +327,7 @@ teardown() {
     untrusted="$TMP/untrusted-working-directory"
     marker="$TMP/untrusted-utils-was-sourced"
     mkdir -p "$pipe_path" "$untrusted"
-    touch "$untrusted/main"
+    touch "$untrusted/bash"
     cat > "$untrusted/utils.sh" <<'EOF'
 touch "$RAW_INSTALL_MARKER"
 EOF

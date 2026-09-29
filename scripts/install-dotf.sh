@@ -19,7 +19,7 @@
 # never treat its current working directory as a checkout, because that could
 # source an unrelated utils.sh. Raw recovery instead uses local fallbacks and
 # resolves the latest release through DOTF_RELEASE_API.
-_DOTF_SOURCE="${BASH_SOURCE[0]:-$0}"
+_DOTF_SOURCE="${BASH_SOURCE[0]:-}"
 if [ -f "$_DOTF_SOURCE" ]; then
     _DOTF_SCRIPT_DIR="$(cd "$(dirname "$_DOTF_SOURCE")" && pwd)"
 else

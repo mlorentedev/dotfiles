@@ -76,8 +76,24 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 list_instruction_files() {
-    find "$REPO_ROOT" -path "$REPO_ROOT/.git" -prune -o -type f -name '*.md' -print |
-        sed "s|^$REPO_ROOT/||" |
+    (
+        # pre-commit injects temporary Git config through GIT_CONFIG_COUNT.
+        # Its sanitized hook environment can omit a paired value, making every
+        # nested Git command fail before it can inspect this checkout.
+        unset GIT_CONFIG_COUNT
+        if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git -C "$REPO_ROOT" ls-files '*.md'
+            return
+        fi
+        if command -v git.exe >/dev/null 2>&1; then
+            cd "$REPO_ROOT"
+            git.exe ls-files '*.md'
+        fi
+    )
+}
+
+list_governed_instruction_files() {
+    list_instruction_files |
         grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|AGY\.md|GEMINI\.md|copilot-instructions\.md|README\.md)$' |
         grep -vE '^harness/|^specs/|^docs/' || true
 }
@@ -99,7 +115,7 @@ if [ "$#" -eq 0 ]; then
     #   docs/    — historical decision records/lessons mentioning retired scripts by design
     while IFS= read -r _f; do
         [ -n "$_f" ] && set -- "$@" "$_f"
-    done < <(list_instruction_files)
+    done < <(list_governed_instruction_files)
 fi
 
 if [ "$#" -eq 0 ]; then
