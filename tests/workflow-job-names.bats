@@ -4,7 +4,9 @@
 # `lint` was reported by two workflows, `ci.yml`'s shell lint and `cli.yml`'s Go
 # lint, so the required check was satisfied by whichever finished last. And a
 # required check that no job reports on a given pull request stays pending
-# forever. The checker is tests/lib/check-workflow-contexts.py.
+# forever. And an aggregate gate such as `cli-gate` only sees the jobs it
+# needs: `release-snapshot` was left out, so a red snapshot let it go green.
+# The checker is tests/lib/check-workflow-contexts.py.
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."

@@ -77,7 +77,7 @@ evidence can be traced; the order follows readiness.
 - [x] AC3 — A test that writes into a shared `setup_file` home fails. This is shown by a deliberate write under mutation.
 - [x] AC4 — `test-windows` declares `timeout-minutes: 20`, and the CI-001 loan comment is replaced by the measured distribution that justifies it.
 - [x] AC5 — The stray detector ignores a test-shaped process whose `--user-data-dir` lies in a **different** bats run's tmpdir, and still reports one inside its own. Both halves are asserted.
-- [ ] AC6 — CI runs the Linux bats suite with `--jobs`, and the "Run bats test suite" step's mean over the first 5 runs on `main` is at most half the baseline (mean 199 s over 8 runs of `main`, 2026-09-25).
+- [x] AC6 — CI runs the Linux bats suite with `--jobs`, and the "Run bats test suite" step's mean over the first 5 runs on `main` is at most half the baseline (mean 199 s over 8 runs of `main`, 2026-09-25).
 - [x] AC7 — Exactly one workflow reports a check named `lint`, and `cli.yml`'s lint reports as `cli-lint`. Amended 2026-09-27: every required context is reported by exactly one job that reports on every pull request, and `cli-gate` is one of them.
 - [ ] AC8 — The `test-windows` doctor gate runs with `GH_TOKEN`. Its log shows zero "set the GH_TOKEN environment variable" lines (baseline 43), and the gate is green.
 - [ ] AC9 — The `integration` job's "Build integration test container" step takes at most 20 s on a cache hit (baseline mean 72 s over 8 runs).

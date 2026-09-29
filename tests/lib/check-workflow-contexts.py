@@ -10,6 +10,11 @@
    required check that never reports stays pending and blocks the merge; that
    is what a `paths:` filter on the workflow, or a job-level skip of a matrix
    job (GitHub then reports the unexpanded name), would do.
+3. An aggregate gate (a job that reads `needs.*.result`, like `cli-gate`)
+   needs every other job in its workflow that can run on a pull request. A job
+   it does not need is invisible to it: `release-snapshot` was left out of
+   `cli-gate`, so a red goreleaser snapshot still let the gate go green (#1782
+   review). Only a job whose `if:` is limited to tag refs is exempt.
 
 Prints one line per problem and exits 1 if there is any.
 """
@@ -64,6 +69,24 @@ def display_names(job_id, job):
     return out
 
 
+def gate_gaps(wf_name, jobs):
+    """Jobs an aggregate gate in this workflow does not need but should."""
+    out = []
+    for gate_id, gate in jobs.items():
+        if "needs.*.result" not in yaml.safe_dump(gate.get("steps") or []):
+            continue
+        needs = gate.get("needs") or []
+        needs = {needs} if isinstance(needs, str) else set(needs)
+        for job_id, job in jobs.items():
+            if job_id == gate_id or job_id in needs:
+                continue
+            if "refs/tags/" in str(job.get("if", "")):
+                continue  # never runs on a pull request
+            out.append(f"aggregate gate {wf_name}:{gate_id} does not need {job_id!r}: "
+                       "that job can fail on a pull request while the gate goes green")
+    return out
+
+
 def main(root):
     root = pathlib.Path(root)
     problems = []
@@ -75,6 +98,7 @@ def main(root):
         if pr is None:
             continue
         filtered = any(k in pr for k in ("paths", "paths-ignore"))
+        problems.extend(gate_gaps(wf.name, doc.get("jobs") or {}))
         for ctx in sorted(set(STATUS_CONTEXT.findall(text))):
             reporters.setdefault(ctx, []).append((wf.name, "status:" + ctx, not filtered))
         for job_id, job in (doc.get("jobs") or {}).items():
