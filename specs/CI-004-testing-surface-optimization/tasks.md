@@ -51,13 +51,13 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 - [x] [AC7] Mutations: a `paths` filter restored on `pull_request` fails the test on `cli-gate`, and so does requiring `test (ubuntu-latest)` directly.
 - [x] [AC7] On the PR: `lint` appears once in `gh pr checks`; `cli-gate` is green both with and without a Go change.
 - [x] [AC7] Review follow-up (#1782): `cli-gate` needs `release-snapshot`, and `check-workflow-contexts.py` fails an aggregate gate that leaves out a job able to run on a pull request. Mutation: dropping `release-snapshot` from `needs` fails `tests/workflow-job-names.bats`.
-- [ ] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge.
+- [x] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge. (Done 2026-09-28, on the owner's request. Live required checks: `cli-gate,lint,lint-powershell,review-attestation,spec-gate,test,test-windows`; `dotf forge protection check` reports 1 ok, 0 drift.)
 
-### PR 4: P0.5, a token for the Windows doctor gate (blocked)
+### PR 4: P0.5, a token for the Windows doctor gate
 
-- [ ] (housekeeping, a gate on AC8) On `main`, `dotf doctor` reports no spec-issue-state `[FAIL]`. The six specs (CLI-057, CLI-062, GUARD-005, GUARD-006, HARNESS-106, WIN-007) must be archived or abandoned first.
-- [ ] [AC8] Add `GH_TOKEN: ${{ github.token }}` to the **doctor-gate step's** `env:` in `ci.yml`, not the job's, so no other step inherits it. The workflow already has read permissions for issues; confirm the `permissions:` block covers `issues: read`.
-- [ ] [AC8] On the PR run, count "set the GH_TOKEN environment variable" in the gate's log. Expected: 0, and the gate is green. Record the count before and after.
+- [x] (housekeeping, a gate on AC8) On `main`, `dotf doctor` reports no spec-issue-state `[FAIL]`. The six specs (CLI-057, CLI-062, GUARD-005, GUARD-006, HARNESS-106, WIN-007) must be archived or abandoned first.
+- [x] [AC8] Add `GH_TOKEN: ${{ github.token }}` to the **doctor-gate step's** `env:` in `ci.yml`, not the job's, so no other step inherits it. The workflow already has read permissions for issues; confirm the `permissions:` block covers `issues: read`. (It did not: the workflow grants `contents: read` only. `test-windows` now declares `contents: read` and `issues: read`.)
+- [x] [AC8] On the PR run, count "set the GH_TOKEN environment variable" in the gate's log. Expected: 0, and the gate is green. Record the count before and after.
 
 ### PR 5: P1.3, the integration image cache
 
