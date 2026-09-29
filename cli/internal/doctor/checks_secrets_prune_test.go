@@ -167,7 +167,7 @@ func TestCheckSecrets_OrphanInCheckoutNamesItsGitState(t *testing.T) {
 			rep := capture(&buf)
 			sys := newSys(map[string]string{"HOME": mirror, "DOTFILES_REPO_DIR": repo}, nil, nil)
 			sys.CommandOutputDir = func(dir, name string, args ...string) (string, error) {
-				if dir == repo && name == "git" && strings.Join(args, " ") == "ls-files -- sensitive/"+blob {
+				if dir == repo && name == "git" && strings.Join(args, " ") == "ls-files -- :(literal)sensitive/"+blob {
 					return tc.lsFiles()
 				}
 				return "", errors.New("unexpected command")

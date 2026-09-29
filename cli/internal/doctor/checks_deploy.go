@@ -264,7 +264,7 @@ func checkoutCopyRemedy(sys *System, repo, name string) string {
 	if sys.CommandOutputDir == nil {
 		return "still present in " + where + ": git rm it if tracked, delete it if not"
 	}
-	out, err := gitIn(sys, repo, "ls-files", "--", "sensitive/"+name)
+	out, err := gitIn(sys, repo, "ls-files", "--", ":(literal)sensitive/"+name)
 	switch {
 	case err != nil:
 		return "still present in " + where + ": git rm it if tracked, delete it if not"
