@@ -72,33 +72,49 @@ func applyMutation(itemJSON []byte, m Mutation) ([]byte, error) {
 			return nil, fmt.Errorf("curate removes custom fields only, not %q", m.Field)
 		}
 		return removeItemField(itemJSON, m.Field)
+	}
+	if err := mutateItem(item, login, m); err != nil {
+		return nil, err
+	}
+	return json.Marshal(item)
+}
+
+// mutateItem applies the mutations that edit the decoded item in place.
+func mutateItem(item, login map[string]any, m Mutation) error {
+	switch m.Kind {
 	case MutReprompt:
 		item["reprompt"] = 1
 	case MutHide:
-		f, err := customField(item, m.Field)
-		if err != nil {
-			return nil, err
-		}
-		if t, _ := f["type"].(float64); t != 0 && t != 1 {
-			return nil, fmt.Errorf("field %q is not a text field (type %v)", m.Field, f["type"])
-		}
-		f["type"] = 1
+		return hideField(item, m.Field)
 	case MutAddURI:
 		if login == nil {
-			return nil, fmt.Errorf("the item has no login to carry a URI")
+			return fmt.Errorf("the item has no login to carry a URI")
 		}
 		uris, _ := login["uris"].([]any)
 		login["uris"] = append(uris, map[string]any{"uri": m.Value, "match": nil})
 	case MutSetText:
 		if _, err := customField(item, m.Field); err == nil {
-			return nil, fmt.Errorf("field %q already exists; curate never overwrites one", m.Field)
+			return fmt.Errorf("field %q already exists; curate never overwrites one", m.Field)
 		}
 		fields, _ := item["fields"].([]any)
 		item["fields"] = append(fields, map[string]any{"name": m.Field, "value": m.Value, "type": 0})
 	default:
-		return nil, fmt.Errorf("unknown mutation %q", m.Kind)
+		return fmt.Errorf("unknown mutation %q", m.Kind)
 	}
-	return json.Marshal(item)
+	return nil
+}
+
+// hideField turns a text custom field into a hidden one.
+func hideField(item map[string]any, name string) error {
+	f, err := customField(item, name)
+	if err != nil {
+		return err
+	}
+	if t, _ := f["type"].(float64); t != 0 && t != 1 {
+		return fmt.Errorf("field %q is not a text field (type %v)", name, f["type"])
+	}
+	f["type"] = 1
+	return nil
 }
 
 // customField returns the custom field named name, as a live map into item.

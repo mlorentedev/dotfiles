@@ -112,9 +112,11 @@ jobs:
   # has no Go change; red otherwise, including when `changes` itself failed.
   # Requiring the matrix jobs directly would not work: skipped at job level,
   # GitHub reports them under the unexpanded name `test (${{ matrix.os }})`.
+  # `needs` lists every job that can run on a pull request, the goreleaser
+  # snapshot included; tests/workflow-job-names.bats fails on one left out.
   cli-gate:
     name: cli-gate
-    needs: [changes, test, lint]
+    needs: [changes, test, lint, release-snapshot]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

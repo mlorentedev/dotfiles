@@ -4,7 +4,7 @@ Operational guides and procedures for managing the dotfiles environment.
 
 | Runbook | Description | Status |
 |---|---|---|
-| [guide-secrets-governance.md](guide-secrets-governance.md) | Secrets lifecycle, `dotf secrets`, Age encryption & Bitwarden sync | Active |
+| [guide-secrets-governance.md](guide-secrets-governance.md) | Secrets lifecycle: first machine, add, converge, curate, rotate, retire, backup, offline copy, recover, quarterly check | Active |
 | [guide-opencode-go-setup.md](guide-opencode-go-setup.md) | OpenCode setup, NaN provider, models & coexistence rules | Active |
 | [ai-tools-setup.md](ai-tools-setup.md) | AI tools setup: what each setup script deploys per agent, `dotf init`, MCP registration | Active |
 | [guide-cross-agent-memory.md](guide-cross-agent-memory.md) | Cross-agent session memory bridge (handoff threads, vault-linked auto-memory) | Active |
@@ -15,4 +15,3 @@ Operational guides and procedures for managing the dotfiles environment.
 | [guide-self-deploy-timer.md](guide-self-deploy-timer.md) | Self-deploy background timer and autodeploy configuration | Active |
 | [release-dotf.md](release-dotf.md) | Releasing and installing `dotf`: mirror, deploy, install, verify by effect | Active |
 | [tool-installation.md](tool-installation.md) | CLI tool installation and dependency bootstrap | Active |
-| [secrets-management.md](secrets-management.md) | Legacy secrets procedures (historical reference; see governance guide) | Legacy |

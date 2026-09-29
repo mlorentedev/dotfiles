@@ -42,21 +42,22 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 - [x] [AC5] Narrow the match in `tests/setup_suite.bash` (`_gui_guard_test_shaped_processes`) from `*--user-data-dir=*bats-run*` to `*--user-data-dir="$BATS_RUN_TMPDIR"/*`, and move the existing test's fake from `/tmp/bats-run-FAKE` to `$BATS_RUN_TMPDIR`. Expected: both halves pass. Mutation: revert the pattern, and the other-run half fails.
 - [x] [AC6] Fixture-collision audit. Grep `tests/` for writes to a fixed `/tmp/` path, to the real `$HOME`, to a fixed port, or **into the repo checkout itself**. For example, check whether `compile-harness.sh --deploy` or `--refresh` writes rendered files under `$REPO` (catalogs, `.github/copilot-instructions.md`). Two files doing that concurrently collide no matter how `$HOME` is isolated. Fix or isolate each hit, or list it as known-serial in `tests/.bats-serial` if bats supports it; otherwise keep that file out of the parallel set.
 - [x] [AC6] Locally, run `bats --jobs 4 --no-parallelize-within-files tests/*.bats` three times under the memory cap. Expected: three green runs, each with the same test count as the serial run.
-- [ ] [AC6] Switch `ci.yml` "Run bats test suite" to `bats --jobs "$(nproc)" --no-parallelize-within-files tests/*.bats`. Record the step time of the PR run, then the mean of the first 5 runs on `main`, in `verification.md`.
+- [x] [AC6] Switch `ci.yml` "Run bats test suite" to `bats --jobs "$(nproc)" --no-parallelize-within-files tests/*.bats`. Record the step time of the PR run, then the mean of the first 5 runs on `main`, in `verification.md`.
 
 ### PR 3: P0.7, one reporter for `lint`, and a real Go gate
 
 - [x] [AC7] Add `tests/workflow-job-names.bats` over `tests/lib/check-workflow-contexts.py`. It asserts two things: no two pull-request jobs (or API-posted statuses) report the same name, with matrix names expanded; and every required context in `forge/branch-protection.json` is reported by a job that reports on every pull request (no `paths` filter on the workflow, not a job-level-skippable matrix job). Expected: it fails on `lint`.
 - [x] [AC7] `cli.yml`: drop the `pull_request` paths filter, add a `cli-changes` job, skip `test`, `cli-lint` and the snapshot when the diff has no Go change, and add `cli-gate` (`if: always()`, red unless every Go job succeeded or was skipped). Add `cli-gate` to the required checks in `forge/branch-protection.json`.
 - [x] [AC7] Mutations: a `paths` filter restored on `pull_request` fails the test on `cli-gate`, and so does requiring `test (ubuntu-latest)` directly.
-- [ ] [AC7] On the PR: `lint` appears once in `gh pr checks`; `cli-gate` is green both with and without a Go change.
-- [ ] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge.
+- [x] [AC7] On the PR: `lint` appears once in `gh pr checks`; `cli-gate` is green both with and without a Go change.
+- [x] [AC7] Review follow-up (#1782): `cli-gate` needs `release-snapshot`, and `check-workflow-contexts.py` fails an aggregate gate that leaves out a job able to run on a pull request. Mutation: dropping `release-snapshot` from `needs` fails `tests/workflow-job-names.bats`.
+- [x] The owner runs `dotf forge protection apply --repo mlorentedev/dotfiles` after the merge. (Done 2026-09-28, on the owner's request. Live required checks: `cli-gate,lint,lint-powershell,review-attestation,spec-gate,test,test-windows`; `dotf forge protection check` reports 1 ok, 0 drift.)
 
-### PR 4: P0.5, a token for the Windows doctor gate (blocked)
+### PR 4: P0.5, a token for the Windows doctor gate
 
-- [ ] (housekeeping, a gate on AC8) On `main`, `dotf doctor` reports no spec-issue-state `[FAIL]`. The six specs (CLI-057, CLI-062, GUARD-005, GUARD-006, HARNESS-106, WIN-007) must be archived or abandoned first.
-- [ ] [AC8] Add `GH_TOKEN: ${{ github.token }}` to the **doctor-gate step's** `env:` in `ci.yml`, not the job's, so no other step inherits it. The workflow already has read permissions for issues; confirm the `permissions:` block covers `issues: read`.
-- [ ] [AC8] On the PR run, count "set the GH_TOKEN environment variable" in the gate's log. Expected: 0, and the gate is green. Record the count before and after.
+- [x] (housekeeping, a gate on AC8) On `main`, `dotf doctor` reports no spec-issue-state `[FAIL]`. The six specs (CLI-057, CLI-062, GUARD-005, GUARD-006, HARNESS-106, WIN-007) must be archived or abandoned first.
+- [x] [AC8] Add `GH_TOKEN: ${{ github.token }}` to the **doctor-gate step's** `env:` in `ci.yml`, not the job's, so no other step inherits it. The workflow already has read permissions for issues; confirm the `permissions:` block covers `issues: read`. (It did not: the workflow grants `contents: read` only. `test-windows` now declares `contents: read` and `issues: read`.)
+- [x] [AC8] On the PR run, count "set the GH_TOKEN environment variable" in the gate's log. Expected: 0, and the gate is green. Record the count before and after.
 
 ### PR 5: P1.3, the integration image cache
 

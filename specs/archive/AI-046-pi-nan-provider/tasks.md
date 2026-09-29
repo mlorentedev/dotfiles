@@ -43,7 +43,7 @@ created: "2026-09-26"
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test or recorded measurement
 - [x] `verification.md` filled in
-- [ ] Independent adversarial review before archive
+- [x] Independent adversarial review before archive
 
 ## Machine-readable features
 

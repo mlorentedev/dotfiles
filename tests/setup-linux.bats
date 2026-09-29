@@ -479,6 +479,11 @@ setup() {
     grep -qF '"$_dotf" harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+@test "setup-linux.sh passes its checkout explicitly and warns when dotf is unavailable (WIN-014)" {
+    grep -qF '"$_dotf" harness mirror --repo "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qF 'dotf not found (PATH or ~/.local/bin)' "$DOTFILES_DIR/setup-linux.sh"
+}
+
 # CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json
 # declares. Naming one config at the call site meant a new manifest entry
 # (orca-keybindings) was deployed by neither setup until two scripts were
