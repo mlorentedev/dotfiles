@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.61.0](https://github.com/mlorentedev/dotfiles/compare/v0.60.0...v0.61.0) (2026-09-29)
+
+
+### Features
+
+* **pi:** let pi-nan-provider own the NaN model ids ([#1789](https://github.com/mlorentedev/dotfiles/issues/1789)) ([c114094](https://github.com/mlorentedev/dotfiles/commit/c114094003855544fe1d399d4dd996064a2ae52b))
+* **secrets:** curate the items the registry does not declare from a reviewed plan ([#1790](https://github.com/mlorentedev/dotfiles/issues/1790)) ([5fdf472](https://github.com/mlorentedev/dotfiles/commit/5fdf47219476360f9b1e6ef10f43de50311f2871))
+
+
+### Bug Fixes
+
+* **bitacora:** resolve the project id in every rollout mode, not only --backfill-only ([#1788](https://github.com/mlorentedev/dotfiles/issues/1788)) ([98f145e](https://github.com/mlorentedev/dotfiles/commit/98f145ea1fcbd4c0c1f4d6dc888203c2926d114b)), closes [#1786](https://github.com/mlorentedev/dotfiles/issues/1786)
+* **doctor:** name an unrouted default model as unrouted, not missing ([#1816](https://github.com/mlorentedev/dotfiles/issues/1816)) ([d686558](https://github.com/mlorentedev/dotfiles/commit/d6865589e75208ca7518e869f1b5d396ebeb7a62))
+* **doctor:** tell a committed orphan age blob from an untracked copy ([#1807](https://github.com/mlorentedev/dotfiles/issues/1807)) ([7e97e96](https://github.com/mlorentedev/dotfiles/commit/7e97e9663ded83d5c5ecc3c227ebc34c0cbcd90f))
+* **harness:** make mirror checkout explicit ([#1806](https://github.com/mlorentedev/dotfiles/issues/1806)) ([79c89b4](https://github.com/mlorentedev/dotfiles/commit/79c89b438a60e699ad9f34ac20ed39a3ec620fec))
+* **installer:** support checkout-free release recovery ([#1805](https://github.com/mlorentedev/dotfiles/issues/1805)) ([66a90b7](https://github.com/mlorentedev/dotfiles/commit/66a90b758733e109961a803f0a94cfcb30efe393))
+* **lint:** enable the gofmt formatter and format the four files it finds ([#1797](https://github.com/mlorentedev/dotfiles/issues/1797)) ([b15ad97](https://github.com/mlorentedev/dotfiles/commit/b15ad970f98c1ec6de1a2e51defc944cbbb0280a)), closes [#1154](https://github.com/mlorentedev/dotfiles/issues/1154)
+* **secrets:** curate refuses a write to a registry-declared merge keeper ([#1812](https://github.com/mlorentedev/dotfiles/issues/1812)) ([51e3638](https://github.com/mlorentedev/dotfiles/commit/51e3638ece29ca51ee5b80f669bf5f8f25391f13))
+* **secrets:** force the bw serve sync so the daemon never serves a stale cache ([#1821](https://github.com/mlorentedev/dotfiles/issues/1821)) ([9d611cb](https://github.com/mlorentedev/dotfiles/commit/9d611cb9f92bae0524d13c54c70693ff3bbeb600))
+* **sync:** stop dotfiles-sync from copying sensitive/ and stop test.sh running it ([#1796](https://github.com/mlorentedev/dotfiles/issues/1796)) ([c2fed9b](https://github.com/mlorentedev/dotfiles/commit/c2fed9bb0c9855b232fc3b0aedca7f5cb86f9f13)), closes [#1795](https://github.com/mlorentedev/dotfiles/issues/1795)
+
 ## [0.60.0](https://github.com/mlorentedev/dotfiles/compare/v0.59.0...v0.60.0) (2026-09-27)
 
 
