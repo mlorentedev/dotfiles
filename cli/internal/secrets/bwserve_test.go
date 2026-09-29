@@ -647,3 +647,21 @@ func TestBWServeReaderLookupSurvivesASearchIndexRebuild(t *testing.T) {
 		}
 	}
 }
+
+// A forced sync pulls the whole vault from the server, so it cannot share the
+// timeout of a local cache read. Measured 2026-09-29: 1.8-3.8 s per forced sync,
+// past the 5 s read timeout often enough that `reconcile` failed with "context
+// deadline exceeded" before reading anything.
+func TestBWServeClientSyncGetsItsOwnTimeout(t *testing.T) {
+	var c BWServeClient
+	if got := c.syncClient().Timeout; got != bwServeSyncTimeout {
+		t.Fatalf("sync timeout = %s, want %s", got, bwServeSyncTimeout)
+	}
+	if bwServeSyncTimeout <= c.httpClient().Timeout {
+		t.Fatalf("sync timeout %s must exceed the read timeout %s", bwServeSyncTimeout, c.httpClient().Timeout)
+	}
+	custom := &http.Client{Timeout: time.Millisecond}
+	if got := (BWServeClient{HTTPClient: custom}).syncClient(); got != custom {
+		t.Fatal("an injected HTTPClient must be used for the sync too")
+	}
+}
