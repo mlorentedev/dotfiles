@@ -1,0 +1,12 @@
+{
+  "reviewed_sha": "604a501081635e0ff30c593e779b1a4a744d8436",
+  "reviewer": "agy/gemini-3.1-pro-high",
+  "requested_at": "2026-09-29T01:02:43Z",
+  "review_digest_before": "d7ba182f2e6411b59445af73a62b841cfd509a91b34fe5b23190f99b0b59864e",
+  "base_sha": "c114094003855544fe1d399d4dd996064a2ae52b",
+  "contract_digests": {
+    "features.json": "945c3a23326f7e24ae521079157132a56b17f5def3753aa3388e89a949c6061f",
+    "proposal.md": "20bf0c0dadb6389c4c972caeafa5be52239148e4e99e7bee7989012e2a4a1e4b",
+    "tasks.md": "a4b2e66800ea546cc09adf730b7fcb387a781fa7161e8b1b6a4a2d08468fa25e"
+  }
+}

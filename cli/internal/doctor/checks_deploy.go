@@ -242,7 +242,7 @@ func pruneOrReportOrphans(sys *System, cfg *Config, rep *Report, orphans []strin
 		case refusal != "":
 			rep.Fail("orphan: " + name + " (no registry entry; not pruned: " + refusal + ")")
 		case pathExists(filepath.Join(repo, "sensitive", name)):
-			rep.Fail("orphan: " + name + " (no registry entry; still committed in " + repo + "/sensitive, git rm it there)")
+			rep.Fail("orphan: " + name + " (no registry entry; " + checkoutCopyRemedy(sys, repo, name) + ")")
 		case !fix:
 			rep.Fail("orphan: " + name + " (no registry entry, gone from the checkout — run: dotf doctor --fix)")
 		default:
@@ -252,6 +252,26 @@ func pruneOrReportOrphans(sys *System, cfg *Config, rep *Report, orphans []strin
 				rep.Fix("pruned orphan secret blob: sensitive/" + name)
 			}
 		}
+	}
+}
+
+// checkoutCopyRemedy words the FAIL for an orphan the checkout still holds.
+// Existence is not tracked state (#1793): a committed blob needs `git rm` in a
+// PR, an untracked leftover needs deleting, and `git rm` fails on the second.
+// When git cannot answer, the line says so instead of guessing either way.
+func checkoutCopyRemedy(sys *System, repo, name string) string {
+	where := repo + "/sensitive"
+	if sys.CommandOutputDir == nil {
+		return "still present in " + where + ": git rm it if tracked, delete it if not"
+	}
+	out, err := gitIn(sys, repo, "ls-files", "--", ":(literal)sensitive/"+name)
+	switch {
+	case err != nil:
+		return "still present in " + where + ": git rm it if tracked, delete it if not"
+	case strings.TrimSpace(out) != "":
+		return "still committed in " + where + ", git rm it there"
+	default:
+		return "an untracked copy sits in " + where + " and setup copies it back: delete it there, then run dotf doctor --fix"
 	}
 }
 
