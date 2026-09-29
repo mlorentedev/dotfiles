@@ -670,7 +670,7 @@ if (-not (Test-Path -LiteralPath $ageKey)) {
     Write-Warn "  Encrypted secrets will deploy but won't decrypt on demand."
     Write-Warn "  To enable: place your age identity at `$env:USERPROFILE\.config\age\key.txt"
     Write-Warn "  (or set `$env:AGE_KEY_PATH). Generate: age-keygen -o `$HOME\.config\age\key.txt"
-    Write-Warn "  See: docs/runbooks/secrets-management.md"
+    Write-Warn "  See: docs/runbooks/guide-secrets-governance.md#protocol--first-machine-age-key--ssh"
 }
 
 $sensitiveSource = "$DotfilesDir\sensitive"
