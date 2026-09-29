@@ -109,7 +109,7 @@ setup() {
     # deploy so a key imported later works).
     grep -qF 'age identity key not found' "$PS1_SCRIPT"
     grep -qF 'AGE_KEY_PATH' "$PS1_SCRIPT"
-    grep -qF 'docs/runbooks/secrets-management.md' "$PS1_SCRIPT"
+    grep -qF 'docs/runbooks/guide-secrets-governance.md' "$PS1_SCRIPT"
     # Must use Write-Warn (non-fatal), not Write-Err.
     grep -B2 'age identity key not found' "$PS1_SCRIPT" | grep -q 'Test-Path'
 }
@@ -928,6 +928,11 @@ FIXTURE
     # routing registry and the model-pin checks after every setup, with a
     # remedy ("re-run setup") that could not clear them (#1288).
     grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 passes its checkout explicitly and warns when dotf is unavailable (WIN-014)" {
+    grep -qF 'dotf harness mirror --repo $DotfilesDir' "$PS1_SCRIPT"
+    grep -qF 'dotf not found; harness inputs were not mirrored' "$PS1_SCRIPT"
 }
 
 @test "parity: both setups mirror the harness through the same dotf command (WIN-007)" {

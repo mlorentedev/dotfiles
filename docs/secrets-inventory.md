@@ -27,8 +27,8 @@
 | 3 | DockerHub token | `dockerhub.token` | `DOCKERHUB_TOKEN` | app | CI image push | `DOCKERHUB_TOKEN` | Yes — `DockerHub` (PAT field) | |
 | 4 | DockerHub username | `dockerhub.username` | `DOCKERHUB_USERNAME` | app | CI image push | `DOCKERHUB_USERNAME` | Yes — `DockerHub` (login username) | one item with `DOCKERHUB_TOKEN` |
 | 5 | Cloudflare API token | `cloudflare.api-token` | `CLOUDFLARE_API_TOKEN` | app | DNS/infra automation | `CLOUDFLARE_API_TOKEN` | **No** (age-only) | net-new in bw |
-| 6 | Hetzner API key | `hetzner.api-key` | `HETZNER_API_TOKEN` | app | infra provisioning | `HETZNER_API_TOKEN` | Yes — `Hetzner` login (key field) | |
-| 7 | Hetzner SSH key | `hetzner.ssh` | `HETZNER_SSH_KEY` | floor/app | server access | `HETZNER_SSH_KEY` | Yes — `Hetzner` (SSH Key, type 5) | native SSH Key item |
+| 6 | Hetzner API key | `hetzner.api-key` | `HETZNER_API_TOKEN` | app | infra provisioning | `HETZNER_API_TOKEN` | Yes — `Hetzner` login (key field) | **retired** (#1640): 401; the live token is kubelab SOPS `hetzner.api_key` |
+| 7 | Hetzner SSH key | `hetzner.ssh` | `HETZNER_SSH_KEY` | floor/app | server access | `HETZNER_SSH_KEY` | Yes — `Hetzner` (SSH Key, type 5) | native SSH Key item; **retired** (#1640): a public key nothing read |
 | 8 | OpenAI API key | `chatgpt.api-key` | `OPENAI_API_KEY` | app | LLM calls | `OPENAI_API_KEY` | **No** — only `auth.openai.com` account login | **naming drift: store says "chatgpt", service is OpenAI; good canary (net-new)** |
 | 9 | OpenRouter API key | `openrouter.api.key` | `OPENROUTER_API_KEY` | app | LLM router | `OPENROUTER_API_KEY` | Yes — **2 entries**: `OPEN ROUTER API KEY` (note) + `openrouter.ai` (login) → **MERGE** | **naming drift: double-dot `.api.key`** |
 | 10 | NaN API key | `nan.api-key` | `NAN_API_KEY` | app | NaN cloud engine | `NAN_API_KEY` | Yes — `cloud.nan.builders` (api-key field) | |
@@ -40,14 +40,14 @@
 | 16 | Tailscale auth key | `tailscale.auth-key` | `TS_AUTHKEY` | app/infra | VPN join | `TS_AUTHKEY` | Yes — `login.tailscale.com` (auth-key field) | short-lived by nature |
 | 17 | Pollex API key | `pollex.api-key` | `POLLEX_API_KEY` | app | pollex NaN engine (#237) | `POLLEX_API_KEY` | Yes — `POLLEX_API_KEY` (note) | |
 | 18 | X (Twitter) credential | `x.api-key`, `x.api-key-secret`, `x.access-token`, `x.access-token-secret`, `x.bearer-token`, `x.client-id`, `x.client-secret` | `X_*` (7 vars) | app | X API | `X_*` (7 ids) | **No** — only `x.com` personal login (no API item) | **7 files → 1 item with 7 custom fields**; net-new in bw |
-| 19 | Zoho app passwords | `zoho.app-passwords` | `ZOHO_APP_PASSWORDS` | personal | mail clients | `ZOHO_APP_PASSWORDS` | Yes — `mail.zoho.com` (app-specific passwords) | |
+| 19 | Zoho app passwords | `zoho.app-passwords` | `ZOHO_APP_PASSWORDS` | personal | mail clients | `ZOHO_APP_PASSWORDS` | Yes — `mail.zoho.com` (app-specific passwords) | **retired** (SEC-006, #1784): 3/3 stale on IMAP; app passwords live on their devices; `retired:` in the registry |
 | 20 | Kubelab kubeconfig | `kubelab.kubeconfig` | file → `~/.kube/kubelab.config` | app/infra | kubectl | `KUBECONFIG` | **No** — `Kubelab` note holds Slack/Gmail-Authelia only | file secret; `migrate` refuses files |
 | 21 | SSH key (id_ed25519) | `id_ed25519` | file → `~/.ssh/id_ed25519` | **floor** | git clone at bootstrap | `SSH_KEY` | n/a | **age-floor**: keep in floor — boot dependency (needed before bw) |
 | 22 | Gmail backup codes | `gmail.backup-code` | file → `~/.secrets/...` | personal | account recovery | `GMAIL_BACKUP_CODE` | **No** — `Gmail` login exists, no codes field | file secret |
 | 23 | ChatGPT backup code | `chatgpt.backup-code` | file | personal | account recovery | `CHATGPT_BACKUP_CODE` | **No** (age-only) | file secret |
 | 24 | ChatGPT recovery code | `chatgpt.recovery-code` | file | personal | account recovery | `CHATGPT_RECOVERY_CODE` | **No** (age-only) | collapse with #23 |
 | 25 | Stripe backup code | `stripe.backup-code` | file | personal | account recovery | `STRIPE_BACKUP_CODE` | Yes — `Stripe` (backup-codes field) | file secret |
-| 26 | Zoho recovery code | `zoho.recovery-code` | file | personal | account recovery | `ZOHO_RECOVERY_CODE` | **No** — no recovery-code field on `mail.zoho.com` | collapse with #19 |
+| 26 | Zoho recovery code | `zoho.recovery-code` | file | personal | account recovery | `ZOHO_RECOVERY_CODE` | **No** — no recovery-code field on `mail.zoho.com` | collapse with #19; bw-backed on the `zoho` item since 2026-09-23 |
 | — | Ollama API key | (commented out) | `OLLAMA_API_KEY` | app | homelab LLM (VPN) | — (not in the registry) | **No** (not yet encrypted) | not yet encrypted |
 
 **Floor (stays local, never only-in-bw):**
@@ -65,27 +65,27 @@
 | **AGE-SECRET-KEY-PERSONAL** | note | — | **floor/ROOT** | (the key itself) | 🔴 same — offline DR root, bw copy = convenience only |
 | **GitHub** | login | PAT, Runner token, Recovery codes, evalkit-sdk-ci…private-key.pem, hermes-nan-vaule, bitacora token, release-token, kubelab-dispatch-token | app | `github.token`, `github.bitacora` | **split per-purpose (#321)**; bw=SSOT; retire age copies |
 | **DockerHub** | login | PAT | app | `dockerhub.token`, `.username` | bw=SSOT; retire age |
-| **Hetzner** | SSH Key (5) | — | infra | `hetzner.ssh` | bw=SSOT; retire age |
-| **Hetzner** | login | key, login | app | `hetzner.api-key` | bw=SSOT; retire age |
+| **Hetzner** | SSH Key (5) | — | infra | `hetzner.ssh` | bw=SSOT; retire age; **retiring**: SEC-006 curate deletes it by id |
+| **Hetzner** | login | key, login | app | `hetzner.api-key` | bw=SSOT; retire age; **retiring**: SEC-006 curate removes the dead `key` field |
 | **cloud.nan.builders** | login | api-key, telegram_kubelab_bot, chat_id | app | `nan.api-key` | bw=SSOT; retire age |
 | **login.tailscale.com** | login | auth-key | app/infra | `tailscale.auth-key` | bw=SSOT; retire age |
 | **OPEN ROUTER API KEY** + **openrouter.ai** | note + login | — | app | `openrouter.api.key` | **merge the 2 bw entries**; bw=SSOT; retire age |
 | **POLLEX_API_KEY** | note | — | app | `pollex.api-key` | bw=SSOT; retire age |
 | **Stripe** | login | backup-codes | app/personal | `stripe.api-key`, `stripe.backup-code` | bw=SSOT; retire age |
 | **pypi.org** | login | Recovery codes, API token | app | `pypi.token` | bw=SSOT; retire age |
-| **mail.zoho.com** | login | iPhone/Pixel App-Specific Password, client-id, client-secret | personal/app | `zoho.app-passwords`, `zoho.recovery-code` | bw=SSOT; retire age |
+| **mail.zoho.com** | login | iPhone/Pixel App-Specific Password, client-id, client-secret | personal/app | `zoho.app-passwords`, `zoho.recovery-code` | bw=SSOT; retire age; app passwords **retired** (SEC-006); client-id/secret: kubelab SOPS is the authority, and the copy goes |
 | **AWS** + **signin.aws.amazon.com** | login | kubelab-terraform | infra | — | net-new infra (not in age) |
 | **Brightdata** | login | api-key | app | — | net-new |
-| **PEXELS-API-KEY** | note | — | app | — | net-new |
-| **api.wikimedia.org** | login | access-token, client-id, client-secret | app | — | net-new |
-| **dashboard.ngrok.com** | login | Recovery codes, Auth token | app/infra | — | net-new |
+| **PEXELS-API-KEY** | note | — | app | — | net-new; **retiring** (SEC-006): revoke at the provider, then delete |
+| **api.wikimedia.org** | login | access-token, client-id, client-secret | app | — | net-new; **retiring** (SEC-006): revoke the OAuth consumer, then delete the fields |
+| **dashboard.ngrok.com** | login | Recovery codes, Auth token | app/infra | — | net-new; **retiring** (SEC-006): reset the authtoken or close the account, then delete |
 | **Kubelab** | note | Slack Webhook, Gmail-Authelia staging | infra | `kubelab.kubeconfig`(?) | net-new + maybe add kubeconfig |
 | **TS-BRIDGE**, **TS-BRIDGE-HEADSCALE** | note | — | infra | — | net-new |
 | **SSH Key - Dell Work** | SSH Key (5) | — | infra | — | net-new |
 | **grafana/status.kubelab.live** | login | — | infra | — | dashboards |
 
 ### age secrets that were not in bw (June 2026) → migrated
-Done for every one listed here in June (`cloudflare.api-token`, `chatgpt.api-key`, `youtube.api-key`, `beehiiv.api-key` and `.dns-records`, the ChatGPT and Gmail codes, `kubelab.kubeconfig`): on 2026-09-23 each is `backend: bw` in the registry. Still age-backed on that date: `ZOHO_APP_PASSWORDS` and `ZOHO_RECOVERY_CODE` (personal, with dormant `bw:` blocks), and the floor. `dotf secrets ls` prints the live backend of each.
+Done for every one listed here in June (`cloudflare.api-token`, `chatgpt.api-key`, `youtube.api-key`, `beehiiv.api-key` and `.dns-records`, the ChatGPT and Gmail codes, `kubelab.kubeconfig`): on 2026-09-23 each is `backend: bw` in the registry. Still age-backed on that date: `ZOHO_APP_PASSWORDS` and `ZOHO_RECOVERY_CODE` (personal, with dormant `bw:` blocks), and the floor. `dotf secrets ls` prints the live backend of each. On 2026-09-27, `ZOHO_APP_PASSWORDS` was retired (SEC-006, #1784) and `ZOHO_RECOVERY_CODE` was bw-backed.
 
 ### Legacy copies deduplicated (2026-09-24)
 Applied with `dotf secrets reconcile` (CLI-082), each step planned, escrowed and approved before it ran. Every retire was compared at plan time and verified equal; no value was printed.
@@ -102,7 +102,7 @@ Applied with `dotf secrets reconcile` (CLI-083) as field-level `retired:` entrie
 - **`login.tailscale.com`** (`auth-key`): created in 2026-05 or earlier, and Tailscale expires auth keys after at most 90 days. Nothing consumes one (`TS_AUTHKEY` was retired in #1640). The item keeps its login.
 
 Credentials still held in two places (a legacy field beside the canonical item), and why each remains:
-- **`Hetzner`** (`key`): dead (401), but two items are named `Hetzner`, so a delete by name is blocked as ambiguous until an item can be renamed.
+- **`Hetzner`** (`key`): dead (401), but two items are named `Hetzner`, so a delete by name is blocked as ambiguous until an item can be renamed. SEC-006's curate plan addresses both by item id, which sidesteps the ambiguity.
 - **The two items named `Hetzner`**: the SSH key one is orphaned (it opens neither the VPS nor GitHub), and deleting it needs the name disambiguated first.
 
 ### Stays in age (floor — never only-in-bw)

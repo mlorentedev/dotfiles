@@ -2,50 +2,26 @@
 id: "dotfiles-troubleshoot-secrets"
 type: troubleshooting
 status: active
-tags: [troubleshooting, dotfiles, secrets, age]
+tags: [troubleshooting, dotfiles, secrets, age, bitwarden]
 created: "2026-02-22"
 owner: manu
 ---
 
 # Troubleshooting: Secrets
 
-> ⚠️ **Partly out of date — pending rewrite ([#600](https://github.com/mlorentedev/dotfiles/issues/600)).**
-> `sensitive/env-mapping.conf` was retired in #587; the var→file mapping now lives in
-> **`secrets/registry.yaml`** (ADR-028). Commands below that grep `env-mapping.conf` should
-> target the registry (`dotf secrets ls` lists the mapped ids). The age-decrypt steps still apply.
-
-## Secret not loading
+## A secret does not resolve
 
 ```bash
-# Check the secret exists and is mapped
-secrets_list | grep VAR_NAME
-secrets_check
-
-# Check key is accessible
-ls -la ~/.config/age/key.txt
-age-keygen -y ~/.config/age/key.txt  # Should show public key
+dotf secrets verify              # every registry secret: OK / MISSING / FAILED, no values
+dotf secrets drift               # where the vault disagrees with the registry
+dotf secrets probe VAR           # what bw serve answered: status, lengths, fingerprints
 ```
 
 **Common causes:**
-- Missing entry in `sensitive/env-mapping.conf`
-- `.secret.age` file encrypted with a different key
-- Shell not sourcing `load-secrets.sh` (check `.zshrc` / `.bashrc`)
-
-## Sync not working
-
-```bash
-# Verify both directories exist
-ls -la ~/.dotfiles/sensitive/
-ls -la ~/Projects/dotfiles/sensitive/
-
-# Check DOTFILES_REPO_DIR is set
-echo $DOTFILES_REPO_DIR
-```
-
-**Common causes:**
-- `DOTFILES_REPO_DIR` not exported in shell config
-- One of the two directories doesn't exist yet (clone or run setup)
-- File permissions preventing copy
+- The vault is locked (see the next section): `verify` reports FAILED for every bw-backed secret at once.
+- The item or field was renamed or moved in the app. `drift` names it, and `dotf secrets reconcile` converges it back (runbook: CONVERGE).
+- The id is not in `secrets/registry.yaml`. `dotf secrets ls` lists the mapped ids.
+- The daemon answers from a stale cache after an edit in another client. `dotf secrets rotate` syncs for you; after any other edit, run `bw sync`.
 
 ## GitHub upload failing
 
@@ -65,37 +41,32 @@ dotf secrets sync ci --repo OWNER/REPO --dry-run
 - Not inside a git repository
 - Repository doesn't have GitHub Actions enabled
 
-## Key not found
+## Age key not found
+
+The age identity decrypts the floor (`SSH_KEY`) and the DR escrow. Bitwarden-backed secrets do not need it.
 
 ```bash
-# Check default location
-ls -la ~/.config/age/key.txt
-
-# Or set custom location
-export AGE_KEY_PATH=/path/to/key.txt
+ls -la ~/.config/age/key.txt                 # or $AGE_KEY_PATH
+age-keygen -y ~/.config/age/key.txt          # must equal AGE_KEY_PERSONAL's recipient
+dotf secrets verify                          # compares the two, and names both on a mismatch
 ```
 
 **Common causes:**
-- Key file doesn't exist (run `age-keygen -o ~/.config/age/key.txt`)
-- Wrong permissions (`chmod 600 ~/.config/age/key.txt`)
-- Custom `AGE_KEY_PATH` not set in shell config
+- The key was never restored on this machine. Restore it from the offline USB (runbook: RECOVER, step 1). Do not generate a new one: nothing in the repo is encrypted to it.
+- A custom `AGE_KEY_PATH` is not exported in the shell config.
+- Wrong permissions: `chmod 600 ~/.config/age/key.txt`.
 
-## File secret not deploying
+## File secret not materializing
+
+A file secret (`expose: { file: … }`) is written to its `path` with its `mode` when the secret resolves, and its `var` points at that path.
 
 ```bash
-# Check mapping format (must have @ prefix and > separator)
-grep "^@" sensitive/env-mapping.conf
-
-# Force re-deploy
-secrets_refresh
-echo $KUBECONFIG  # Should show dest path
+dotf secrets run --only KUBECONFIG -- sh -c 'ls -la "$KUBECONFIG"'
 ```
 
 **Common causes:**
-- Missing `@` prefix in env-mapping.conf
-- Missing `>` separator between filename and dest path
-- Destination directory doesn't exist (e.g., `~/.kube/` not created)
-- Dest file is newer than `.age` source (caching) — use `secrets_refresh`
+- The secret itself does not resolve: see the first section.
+- The entry declares `env` rather than `file`. `dotf secrets ls` shows the exposed form.
 
 ## Agent wrapper refuses to launch (vault locked)
 
@@ -118,5 +89,5 @@ unlocked daemon answers.
 
 ## Related
 
-- [Runbook: Secrets Management](../runbooks/secrets-management.md)
+- [Runbook: Secrets Governance](../runbooks/guide-secrets-governance.md)
 - [ADR-002: Age Over GPG](../adr/adr-002-age-over-gpg.md)

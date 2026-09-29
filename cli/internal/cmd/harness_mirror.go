@@ -17,23 +17,28 @@ import (
 // which is why `dotf doctor` on Windows failed the routing registry and the
 // model-pin checks after every setup, printing "re-run setup" as the remedy.
 func newHarnessMirrorCmd() *cobra.Command {
-	return &cobra.Command{
+	var repo string
+	cmd := &cobra.Command{
 		Use:   "mirror",
 		Short: "Mirror harness/ and every manifest target from the checkout into the deploy dir",
 		Long: "mirror copies the harness inputs the deploy-dir consumers read — the whole\n" +
 			"harness/ tree and every file harness/manifest.json declares as an injection\n" +
 			"target — from the dotfiles checkout into $DOTFILES_DIR, preserving paths.\n\n" +
-			"Idempotent: a file whose bytes already match is left untouched, so a re-run\n" +
-			"reports 0 updated. It never prunes; `dotf doctor --fix` removes orphans.\n\n" +
+			"Idempotent: a file whose bytes and permission bits already match is left\n" +
+			"untouched, so a converged re-run reports 0 updated. It never prunes;\n" +
+			"`dotf doctor --fix` removes orphans.\n\n" +
 			"A declared target the checkout does not have is named and the command exits 1\n" +
 			"after mirroring everything else — the gap is the finding, not a reason to\n" +
 			"leave the rest of the harness stale.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repoRoot := env.RepoDir()
+			repoRoot := repo
 			if repoRoot == "" {
-				return fmt.Errorf("cannot locate the dotfiles checkout — set DOTFILES_REPO_DIR or run from inside it")
+				repoRoot = env.RepoDir()
+			}
+			if repoRoot == "" {
+				return fmt.Errorf("cannot locate the dotfiles checkout — pass --repo, set DOTFILES_REPO_DIR, or run from inside it")
 			}
 			deployDir := env.DotfilesDir(env.Home())
 
@@ -55,4 +60,6 @@ func newHarnessMirrorCmd() *cobra.Command {
 			return err
 		},
 	}
+	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout to mirror from")
+	return cmd
 }
