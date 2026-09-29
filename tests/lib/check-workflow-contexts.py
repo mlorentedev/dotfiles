@@ -18,6 +18,11 @@
    `needs.*.result`, or `toJSON(needs)`). Only a job whose whole `if:` is a
    positive tag-ref test is exempt; a negated or compound one is not, so the
    exemption fails closed.
+4. A required context is not held by a non-matrix job with a job-level `if:`
+   other than `always()`. When that condition is false the job is skipped, and
+   GitHub counts a skipped required check as passing: the merge is allowed by a
+   check that never ran (CI-004 review, round 2). `cli-gate` is the pattern: it
+   runs under `always()` and decides from its needs' results.
 
 Prints one line per problem and exits 1 if there is any.
 """
@@ -95,10 +100,21 @@ def gate_gaps(wf_name, jobs):
     return out
 
 
-def main(root):
-    root = pathlib.Path(root)
+def vacuous_if(job):
+    """The job's `if:` when it can skip the job, or None (absent, or `always()`)."""
+    cond = job.get("if")
+    if cond is None:
+        return None
+    text = str(cond).strip()
+    if text.startswith("${{") and text.endswith("}}"):
+        text = text[3:-2].strip()
+    return None if text == "always()" else str(cond).strip()
+
+
+def collect_reporters(root):
+    """Map every status-check name to the pull-request jobs that report it."""
     problems = []
-    reporters = {}  # name -> [(workflow, job_id, always_reports)]
+    reporters = {}  # name -> [(workflow, job_id, always_reports, skip_if)]
     for wf in sorted((root / ".github" / "workflows").glob("*.yml")):
         text = wf.read_text()
         doc = yaml.safe_load(text) or {}
@@ -108,17 +124,23 @@ def main(root):
         filtered = any(k in pr for k in ("paths", "paths-ignore"))
         problems.extend(gate_gaps(wf.name, doc.get("jobs") or {}))
         for ctx in sorted(set(STATUS_CONTEXT.findall(text))):
-            reporters.setdefault(ctx, []).append((wf.name, "status:" + ctx, not filtered))
+            reporters.setdefault(ctx, []).append((wf.name, "status:" + ctx, not filtered, None))
         for job_id, job in (doc.get("jobs") or {}).items():
             is_matrix = bool((job.get("strategy") or {}).get("matrix"))
             skippable_matrix = is_matrix and "if" in job
+            skip_if = None if is_matrix else vacuous_if(job)
             for name in display_names(job_id, job):
                 reporters.setdefault(name, []).append(
-                    (wf.name, job_id, not filtered and not skippable_matrix))
+                    (wf.name, job_id, not filtered and not skippable_matrix, skip_if))
+    return problems, reporters
 
+
+def main(root):
+    root = pathlib.Path(root)
+    problems, reporters = collect_reporters(root)
     for name, jobs in sorted(reporters.items()):
         if len(jobs) > 1:
-            where = ", ".join(f"{w}:{j}" for w, j, _ in jobs)
+            where = ", ".join(f"{w}:{j}" for w, j, *_ in jobs)
             problems.append(f"status check {name!r} is reported by {len(jobs)} jobs: {where}")
 
     protection = json.loads((root / "forge" / "branch-protection.json").read_text())
@@ -129,7 +151,11 @@ def main(root):
         if not jobs:
             problems.append(f"required check {ctx!r} is reported by no pull-request job: it would stay pending")
             continue
-        for w, j, always in jobs:
+        for w, j, always, skip_if in jobs:
+            if skip_if is not None:
+                problems.append(
+                    f"required check {ctx!r} comes from {w}:{j}, whose job-level if: {skip_if!r} can skip it, "
+                    "and a skipped required check passes without running (use if: always() and decide in a step)")
             if not always:
                 problems.append(
                     f"required check {ctx!r} comes from {w}:{j}, which does not report on every pull request "

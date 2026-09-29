@@ -20,9 +20,10 @@ setup() {
 }
 
 # The gate rule on fixtures: which jobs count as a gate, and which are exempt.
+# An optional argument is the required-checks array for branch protection.
 gate_fixture() {
     mkdir -p "$BATS_TEST_TMPDIR/.github/workflows" "$BATS_TEST_TMPDIR/forge"
-    printf '%s\n' '{"repos":{"mlorentedev/dotfiles":{"protection":{"required_status_checks":{"checks":[]}}}}}' \
+    printf '{"repos":{"mlorentedev/dotfiles":{"protection":{"required_status_checks":{"checks":%s}}}}}\n' "${1:-[]}" \
         > "$BATS_TEST_TMPDIR/forge/branch-protection.json"
     cat > "$BATS_TEST_TMPDIR/.github/workflows/g.yml"
 }
@@ -52,4 +53,18 @@ YML
     [ "$status" -eq 1 ]
     [[ "$output" == *"does not need 'notag'"* ]]
     [[ "$output" != *"'release'"* ]]
+}
+
+@test "required rule: a required job with a skipping if: is flagged, one under always() is not" {
+    gate_fixture '[{"context":"x"},{"context":"gate"}]' <<'YML'
+on: pull_request
+jobs:
+  c: {runs-on: ubuntu-latest, steps: [{run: "true"}]}
+  x: {runs-on: ubuntu-latest, needs: [c], if: "needs.c.outputs.go == 'true'", steps: [{run: "true"}]}
+  gate: {runs-on: ubuntu-latest, needs: [c, x], if: "${{ always() }}", steps: [{run: "echo '${{ join(needs.*.result, ',') }}'"}]}
+YML
+    run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"required check 'x' comes from g.yml:x, whose job-level if:"* ]]
+    [[ "$output" != *"required check 'gate'"* ]]
 }

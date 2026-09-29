@@ -335,3 +335,4 @@ tags: [lessons, index, dotfiles]
 | [312 - Refuse by construction what you cannot measure without losing it](lesson-312-refuse-by-construction-what-you-cannot-measure-without-losing-it.md) | 2026-09-27 |  |
 | [311 - pi's print mode waits on an inherited stdin](lesson-311-pi-print-mode-waits-on-an-inherited-stdin.md) | 2026-09-27 |  |
 | [317 - A success from an unforced sync is not a fresh cache](lesson-317-a-success-from-an-unforced-sync-is-not-a-fresh-cache.md) | 2026-09-29 |  |
+| [318 - A speed-up must name the critical path it shortens](lesson-318-a-speed-up-must-name-the-critical-path-it-shortens.md) | 2026-09-29 |  |
