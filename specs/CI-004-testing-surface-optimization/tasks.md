@@ -76,7 +76,7 @@ The bats verifications need two files so `setup_suite` loads. The companion for 
 - [x] `shellcheck` and `bats tests/*.bats` are green; `actionlint` is clean on the edited workflows, if it is installed — 2026-09-29 on the PR 5 branch: `shellcheck -S warning` exits 0 (CI runs `--severity=error` on the root scripts); `bats tests/*.bats` 1695/1696, the one failure being the known environmental #1641 (the local oh-my-zsh install has `glolm`, the vendored snapshot does not); `actionlint` on `ci.yml` is clean after grouping the `versions` step's redirects (SC2129, pre-existing since 465fd2a)
 - [x] No unrelated changes in any PR (no scope creep); ~~every PR body states "no `.sh`/`.ps1` setup script touched"~~ no PR touches a `.sh`/`.ps1` setup script, checked on the file lists (amended 2026-09-29: the bodies of #1809 and #1813 do not carry the sentence, so the criterion is checked on what the sentence stood for. `gh pr diff <N> --name-only` shows no `.sh` or `.ps1` in #1780, #1781, #1782, #1809, #1813 or #1819.)
 - [x] `verification.md` filled in, with before and after numbers per row
-- [ ] Independent review through `dotf spec review CI-004-testing-surface-optimization` before archive
+- [x] Independent review through `dotf spec review CI-004-testing-surface-optimization` before archive
 - [x] Lesson in `docs/lessons/` (PR 1, lesson 309): `bats -f` with a filter that matches nothing prints `1..0` and exits 0, so a feature check that selects a test by name passes before the test exists. Measured while writing this spec; the checks require the `ok N <name>` line instead
 
 ## Machine-readable features

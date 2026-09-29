@@ -45,6 +45,16 @@ Round 1: `nan/qwen3.8-flash`, **PASS-WITH-GAPS** on `8a88d46`, no Blocker.
 - **Minor, contract set edited during the round: no change here.** The reviewer re-verified against the new sha, and the archive's digest check already refuses a review whose contract files changed afterwards. It is a note about the launcher, not about this spec.
 - **Question, review base: tracked** by #1551 and #1727, which cover a base inferred from history spanning other specs' merges.
 
+Round 1's verdict could not archive: the launcher had pointed it at `61483f2`, and `8a88d46` was committed while it ran, so the reviewer's `reviewed_sha` did not match. The archive refused, as it should. Round 2 ran against a tree left untouched.
+
+Round 2: `nan/mimo-v2.5`, **PASS-WITH-GAPS** on `302ac3a`, no Blocker and no Major. It upheld round 1's Major decline against GitHub's documentation.
+
+- **Minor, a required job with a skipping `if:` passes without running: applied** in #1819. This is round 1's Major restated with the right mechanism: the check is satisfied vacuously, not left pending. `check-workflow-contexts.py` gains rule 4. A required context held by a non-matrix job whose job-level `if:` is anything but `always()` is reported. A new `workflow-job-names.bats` fixture asserts both halves: `x` under a conditional `if:` is flagged, and `gate` under `${{ always() }}` is not. Mutations: `vacuous_if` returning nothing turns the fixture red, and flagging `always()` too turns both the fixture and the live-repo test red (on `cli-gate`). The live repo passes, because `cli-gate` is the only required job with an `if:`.
+- **Minor, an API-posted status ignores the posting job's `if:`: declined.** The failure it describes is loud, not silent. If `attestation`'s condition ever stopped covering pull requests, `review-attestation` would stay pending and block every merge on the first PR. A checker cannot decide whether an arbitrary expression is true for every pull request without evaluating it, and a rule that flags any `if:` would flag the live one, which is correct.
+- **Minor, `main`'s `integration` red on two consecutive pushes: ticketed**, as #1704 (TEST-012). The reviewer blamed `failed to install: opencode, copilot, bw, yarn`, but that line appears in green runs too. The failing test in both runs (36516883213 and 36518108046) is POLISH-005's idempotence check: the second `setup-linux.sh` run creates `~/.gemini/config/hooks.json`. Both occurrences are recorded on #1704. The job is not a required context.
+- **Minor, the review base spans other specs' merges: tracked** by #1551 and #1727, as in round 1.
+- **Question, tick the review box: applied.** The contract digest folds checkbox state out, which the reviewer checked against `contract_digest_test.go`.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
