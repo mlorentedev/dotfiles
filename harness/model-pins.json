@@ -91,7 +91,7 @@
           "locator": "defaultModel",
           "prefix": "",
           "pool": "nan",
-          "why": "The default a real session runs on, which had drifted to deepseek-v4-flash against the repo's qwen3.6."
+          "why": "The default a real session runs on. It must be a model the map routes: a live but unrouted id fails too, as qwen3.8-flash did once AI-044 unrouted it."
         },
         {
           "id": "pi-deployed-enabled-models",
