@@ -101,9 +101,16 @@ Applied with `dotf secrets reconcile` (CLI-083) as field-level `retired:` entrie
 - **`Stripe`** (`backup-codes`): Stripe issues one backup code, and regenerating it invalidates the old one. The owner regenerated and rotated it on 2026-09-23, and `stripe-backup-code` holds the current code. The item keeps its login.
 - **`login.tailscale.com`** (`auth-key`): created in 2026-05 or earlier, and Tailscale expires auth keys after at most 90 days. Nothing consumes one (`TS_AUTHKEY` was retired in #1640). The item keeps its login.
 
-Credentials still held in two places (a legacy field beside the canonical item), and why each remains:
-- **`Hetzner`** (`key`): dead (401), but two items are named `Hetzner`, so a delete by name is blocked as ambiguous until an item can be renamed. SEC-006's curate plan addresses both by item id, which sidesteps the ambiguity.
-- **The two items named `Hetzner`**: the SSH key one is orphaned (it opens neither the VPS nor GitHub), and deleting it needs the name disambiguated first.
+### Vault curated (2026-09-29, SEC-006)
+Applied with `dotf secrets curate` (#1790, #1812) from an 88-row plan kept in the private knowledge vault, because item names are personal and this repository is public. The plan was escrowed before the apply, approved by its digest, and applied by item id. Every row re-plans as `done`.
+
+- **Rows by operation:** 25 `hide`, 23 `folder`, 18 `reprompt`, 8 `delete`, 6 `delete-field`, 5 `merge-delete`, 2 `add-uri`, 1 `copy-username`.
+- **Passkeys:** 12 before and 12 after. `curate` refuses every write to a passkey item by construction, and counts them on both sides of the apply.
+- **`Hetzner`:** addressed by item id, which sidesteps the two items sharing a name. The dead API `key` field (401) was removed with `delete-field`, and the orphaned SSH key item (it opened neither the VPS nor GitHub) was deleted. The live token is kubelab's SOPS `hetzner.api_key`.
+- **`zoho/app-passwords`:** removed by `dotf secrets reconcile --apply` as a field-level `retired:` entry (the three passwords answered 3/3 DENIED on IMAP). The entry was then dropped from the registry, whose re-plan is empty.
+- **After:** `dotf secrets verify` reports 31 ok, 0 missing and 0 failed. The DR escrow committed with this change was taken after the apply, and it matches the live vault: 169 items, the same `id:revisionDate` digest.
+
+The list of credentials held in two places is now empty.
 
 ### Stays in age (floor — never only-in-bw)
 The **age private key** (offline-rooted), `bw-master-password.age`, `id_ed25519` boot key.
