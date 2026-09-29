@@ -374,8 +374,16 @@ func (r BWServeReader) ItemNames() ([]string, error) {
 	return names, nil
 }
 
+// getItemJSON resolves item, an exact name or id, to its full JSON.
+//
+// It reads the UNFILTERED list and matches locally, never `?search=`. The search
+// filter is answered from the daemon's search index, which a forced sync rebuilds
+// (every write here ends in one), and while it rebuilds a search answers an empty
+// list although the item exists. Measured 2026-09-29: a curate apply stopped
+// twice on "bw item not found" for items the unfiltered list held. Absence read
+// that way is the dangerous kind: `set` would create a duplicate.
 func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
-	data, err := r.Client.call(http.MethodGet, "/list/object/items?search="+url.QueryEscape(item), nil)
+	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: %w", item, err)
 	}
