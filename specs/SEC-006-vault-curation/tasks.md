@@ -17,7 +17,8 @@ created: "2026-09-27"
 - [x] [AC1] [AC2] [AC3] Plan parser and planner: per-op converged predicate, blocking rules, gates (`curate.go`, `TestParseCuratePlan`, `TestCurateBlocks`, `TestCurateAppliesEveryOpAndConverges`)
 - [x] [AC4] Digest over rows, resolved ids, revision dates and states (`TestCurateDigestTracksRevisions`)
 - [x] [AC3] [AC4] [AC5] [AC6] `dotf secrets curate` command: dry run, `--apply --digest`, re-plan to converged, passkey count before/after (`secrets_curate.go`, `secrets_curate_test.go`)
-- [x] Mutation check: disabling each of 12 guards (passkey at plan and at mutation, attachments on delete and merge, merge duplicate passkey and TOTP, keeper passkey, drop=uris, registry ownership, revision in digest, digest check, passkey count) fails a test
+- [x] Mutation check: disabling each of 14 guards (passkey at plan and at mutation, attachments on delete and merge, merge duplicate passkey and TOTP, keeper passkey, drop=uris, registry ownership of a target and of a merge keeper, a delete that keeps itself, revision in digest, digest check, passkey count) fails a test
+- [x] [AC2] Review round 1: a registry-declared merge keeper blocks when it would take a URI, and a `delete` cannot keep itself; the four functions over 40 lines are split
 - [x] [AC2] `drop=uris`: a merge may declare that the duplicate's URIs are not carried, so a keeper with a passkey stays untouched (`TestCurateDropURIsLetsAPasskeyKeeperStandUntouched`)
 
 ## Closing

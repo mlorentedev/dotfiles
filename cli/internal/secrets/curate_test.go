@@ -271,6 +271,11 @@ func TestCurateBlocks(t *testing.T) {
 			[]string{login("aaaa0001", "u", "p", ""), `{"id":"bbbb0002","type":1,"login":{"username":"u","password":"p","uris":[],"fido2Credentials":[{"c":1}]}}`}, nil},
 		{"registry-owned item", "add-uri\taaaa0001\thttps://x\tr", "registry",
 			[]string{`{"id":"aaaa0001","name":"registry-item","type":1}`}, nil},
+		{"a registry-owned keeper takes no carried URI", "merge-delete\taaaa0001\tbbbb0002\tr", "registry",
+			[]string{login("aaaa0001", "u", "p", ""),
+				`{"id":"bbbb0002","name":"registry-item","type":1,"login":{"username":"u","password":"p","uris":[]}}`}, nil},
+		{"a delete cannot keep the item it deletes", "delete\taaaa0001\taaaa0001\tr", "itself",
+			[]string{login("aaaa0001", "u", "p", "")}, nil},
 		{"Dotfiles folders are the registry's", "folder\taaaa0001\tDotfiles/apps\tr", "registry",
 			[]string{login("aaaa0001", "u", "p", "")}, nil},
 		{"ambiguous prefix", "reprompt\taaaa\t-\tr", "more than one",
@@ -315,6 +320,20 @@ func TestCurateDropURIsLetsAPasskeyKeeperStandUntouched(t *testing.T) {
 	p := planOn(t, s, "merge-delete\taaaa0001\tbbbb0002\tr\tdrop=uris")
 	if st := p.Steps[0]; st.State != CurateApply || len(st.Carry) != 0 {
 		t.Fatalf("want apply with nothing carried, got %s (%d carried): %s", st.State, len(st.Carry), st.Detail)
+	}
+	if err := ApplyCurate(p, s, nil); err != nil || s.writes != 1 {
+		t.Fatalf("want the delete alone: err=%v writes=%d", err, s.writes)
+	}
+}
+
+// The registry gate follows the write: a merge that carries nothing leaves a
+// registry-declared keeper untouched, so deleting its duplicate may proceed.
+func TestCurateMergeReadsARegistryKeeperWithoutWritingIt(t *testing.T) {
+	s := newCurateStore(login("aaaa0001", "u", "p", ""),
+		`{"id":"bbbb0002","name":"registry-item","type":1,"login":{"username":"u","password":"p","uris":[]}}`)
+	p := planOn(t, s, "merge-delete\taaaa0001\tbbbb0002\tr\tdrop=uris")
+	if st := p.Steps[0]; st.State != CurateApply {
+		t.Fatalf("want apply, got %s: %s", st.State, st.Detail)
 	}
 	if err := ApplyCurate(p, s, nil); err != nil || s.writes != 1 {
 		t.Fatalf("want the delete alone: err=%v writes=%d", err, s.writes)
