@@ -1,8 +1,8 @@
 {
-  "reviewed_sha": "79c89b438a60e699ad9f34ac20ed39a3ec620fec",
-  "reviewer": "agy/gemini-3.1-pro-high",
-  "requested_at": "2026-09-29T00:13:54Z",
-  "review_digest_before": "",
+  "reviewed_sha": "53e2101a6fbb6958a8f920dbf38f92e0b2223c69",
+  "reviewer": "nan/qwen3.8-flash",
+  "requested_at": "2026-09-29T00:22:10Z",
+  "review_digest_before": "769020959017ba5d15b08f500708dcd34a54dbace30094983c76a54881be1caf",
   "base_sha": "030ade1e1ca5539b1adf7d38eae20ea3524fd957",
   "contract_digests": {
     "features.json": "f37613251227c17b54bc7235862613f928a7580e57567fc3980f0025a9bdd102",

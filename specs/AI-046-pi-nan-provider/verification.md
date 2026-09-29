@@ -100,6 +100,17 @@ The signed verdict is committed as it was written (`83d156d`). Dispositions:
 | Major | The media bridge defaults ON in the package and only `nan-provider.json` turns it off. `dotf pi packages apply` does not deploy that file, so a `pi` run before `dotf deploy` gets an unpinned `npx` bridge | **declined** | Setup runs `dotf deploy` before `dotf pi packages apply`: `setup-linux.sh` line 764 before line 854, and `setup-windows.ps1` line 1199 before line 1281. The bridge is not unpinned either: the package spawns `npx -y nan-mcp-server@1.1.2` (`DEFAULT_NAN_MEDIA_MCP_VERSION`, `src/mcp/nan-media.ts`). A missing file is reported: with it moved aside, `dotf doctor` prints `[WARN] drift: pi-nan-provider — … (run: dotf deploy pi-nan-provider)`. The env-var alternative (`NAN_MEDIA_MCP=0` in the wrappers) was weighed and rejected under Decisions below. |
 | Minor | f5's verification ends in `exit 1`, so the harness can never mark it passing | **declined** | f5 records a measurement that needs the network cut, and CI cannot re-run it. `exit 1` states that honestly; `exit 0` after an `echo` would be a check that passes without checking anything, the vacuous-pass class of lesson 309. `dotf spec archive` does not gate on `features.json`. `AI-047-nan-quota-alarm/features.json` uses the same convention for its recorded live measurement. |
 
+## Review round 2 (PASS, nan/qwen3.8-flash, 2026-09-28)
+
+The review re-verified the round-1 dispositions independently and proved them by mutation. Dispositions of its Minor findings and its question:
+
+| Finding | Disposition | Reason |
+|---|---|---|
+| A missing `nan-provider.json` is only a WARN in `dotf doctor`, so the media bridge can run unnoticed | declined | Every `ai/deploy.json` entry reports drift as a WARN, and the review names the WARN as the intended gate. Promoting one entry to FAIL would single it out. The repo-side contract (deployed off, merged into the package's state file) is mutation-proven in `pi-config.bats`. |
+| AC1 names `tests/pi-config.bats` as the pinned-entry contract, but it lives in `tests/pi-packages.bats` | recorded here | The criterion holds, and both files are green. `proposal.md` stays as reviewed because it is a contract file. The pin check is `tests/pi-packages.bats` "every declared source is pinned to a version". |
+| AC5 (offline start) is not re-runnable in CI | ticketed | #1810 (AI-048): a `pi-nan-package` case with `HTTPS_PROXY` at a dead port. |
+| Question: nothing would verify a future `modelOverrides` entry under `providers.nan` | no action | There is none today. The first change that adds one owns its test. |
+
 ## Test status
 
 - `bats tests/pi-config.bats tests/pi-packages.bats` -> 0 failures.
@@ -121,7 +132,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-046-pi-nan-provider/` -> `specs/archive/AI-046-pi-nan-provider/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/AI-046-pi-nan-provider/` -> `specs/archive/AI-046-pi-nan-provider/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Promotions above executed (if any)
