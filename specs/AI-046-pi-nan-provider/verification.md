@@ -126,7 +126,7 @@ The review re-verified the round-1 dispositions independently and proved them by
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: lesson 311, pi's print mode waits on an inherited non-TTY stdin.
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-311-pi-print-mode-waits-on-an-inherited-stdin.md (pi's print mode waits on an inherited non-TTY stdin)
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: who owns the `nan` provider id is decided in `proposal.md` (owner, option A) and is local to pi's config.
 - [x] New pattern candidate for `00_meta/patterns/`? no: nothing here recurs outside this repo yet.
 
