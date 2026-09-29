@@ -21,7 +21,7 @@ Key incompatibilities discovered:
 |----------|---------------|-----|
 | `echo -e "\033[32m..."` | Prints literal `-e` flag | `printf '%b' "..."` |
 | `&>/dev/null` | Syntax error in strict mode | `>/dev/null 2>&1` |
-| `${BASH_SOURCE[0]}` | Empty string | `${BASH_SOURCE[0]:-$0}` |
+| `${BASH_SOURCE[0]}` | Empty string | File-backed scripts: `${BASH_SOURCE[0]:-$0}`; stdin-capable scripts: `${BASH_SOURCE[0]:-}` with an explicit no-directory path |
 | `declare -g VAR` | Not supported | `eval "VAR=value"` |
 | `((count++))` with `set -e` | Exits when count=0 | `count=$((count + 1))` |
 | `${!var}` (indirect) | Different syntax | Branch: bash `${!var}` / zsh `${(P)var}` |

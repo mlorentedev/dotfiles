@@ -81,8 +81,16 @@ teardown() {
 }
 
 @test "IDEAS-005: install.sh skips setup when DOTFILES_SKIP_SETUP=1" {
+    remote="$TEST_TMPDIR/remote-repo"
+    git init "$remote"
+    git -C "$remote" config user.email "test@example.com"
+    git -C "$remote" config user.name "Test"
+    touch "$remote/file.txt"
+    git -C "$remote" add .
+    git -C "$remote" commit -m "init"
+
     target="$TEST_TMPDIR/skip-setup"
-    run bash -c "DOTFILES_DIR='$target' DOTFILES_REPO='$DOTFILES_DIR' DOTFILES_SKIP_SETUP=1 bash '$INSTALL_SH'"
+    run bash -c "DOTFILES_DIR='$target' DOTFILES_REPO='$remote' DOTFILES_SKIP_SETUP=1 bash '$INSTALL_SH'"
     [ "$status" -eq 0 ]
     [[ "$output" == *"DOTFILES_SKIP_SETUP=1"* ]]
 }

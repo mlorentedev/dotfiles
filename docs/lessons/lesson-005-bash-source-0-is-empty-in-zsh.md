@@ -13,6 +13,6 @@ tags: [lesson, dotfiles]
 
 **Problem**: zsh does not populate `BASH_SOURCE`. Scripts that relied on it for path resolution silently got empty strings, breaking relative path calculations.
 
-**Solution**: Use `${BASH_SOURCE[0]:-$0}` which falls back to `$0` (populated by zsh) when `BASH_SOURCE` is empty.
+**Solution**: For file-backed scripts, use `${BASH_SOURCE[0]:-$0}` so zsh can fall back to `$0`. For scripts that may be streamed through stdin, do not use `$0` as a file path: it names the shell executable and can make the script source files from an attacker-controlled working directory. Treat an empty `BASH_SOURCE` as "no script directory" and use self-contained fallbacks.
 
-**Rule**: Always use `${BASH_SOURCE[0]:-$0}` when a script needs to know its own path. Test path resolution in both bash and zsh.
+**Rule**: Use `${BASH_SOURCE[0]:-$0}` only when the entry point is guaranteed to be file-backed. Stdin-capable entry points must use `${BASH_SOURCE[0]:-}` and explicitly handle the empty case. Test path resolution in bash, zsh, and raw-stdin execution.

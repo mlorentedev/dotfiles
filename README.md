@@ -12,13 +12,24 @@ Personal development environment: shell configs, AI tool integration, and encryp
 
 ### Linux
 
-**One-liner** (factory-fresh machine — needs only `git` and `curl`):
+**Checkout bootstrap** (factory-fresh machine — needs only `git` and `curl`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
 ```
 
 > **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | less`
+
+**CLI recovery or upgrade** (does not clone a checkout or run full setup):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | bash
+dotf version
+```
+
+The recovery installer resolves the latest published release, verifies its
+checksum, and replaces only the user-local `dotf` binary. Use checkout bootstrap
+when you want to deploy the complete dotfiles configuration.
 
 Override the clone target with `DOTFILES_DIR` or the upstream URL with `DOTFILES_REPO`:
 
@@ -39,12 +50,25 @@ source ~/.zshrc
 
 ### Windows (PowerShell)
 
+**Checkout bootstrap:**
+
 ```powershell
 git clone https://github.com/mlorentedev/dotfiles.git
 cd dotfiles
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 # Restart PowerShell after setup
 ```
+
+**CLI recovery or upgrade** (does not clone a checkout or run full setup):
+
+```powershell
+irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.ps1 | iex
+dotf version
+```
+
+The POSIX and PowerShell recovery commands share the same release-install
+contract, but each uses the platform-native interpreter. A factory-fresh Windows
+machine cannot run a Bash payload until Bash has been installed.
 
 Optional: add `-WithDefaults` to also apply ~15 HKCU engineering defaults
 (show file extensions/hidden files, disable advertising ID and Bing-in-Start,
