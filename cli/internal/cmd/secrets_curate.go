@@ -23,87 +23,95 @@ import (
 // exactly what was reviewed. And --apply counts the vault's passkeys before and
 // after, failing on any difference, because a lost passkey is the one loss the
 // escrow cannot give back.
+// curateOpts are the flags of `dotf secrets curate`.
+type curateOpts struct {
+	planPath string
+	apply    bool
+	digest   string
+	cleared  []string
+}
+
+const curateLong = "curate reads a plan, one tab-separated row per operation:\n\n" +
+	"  op  target  arg  reason  [flags]\n\n" +
+	"  folder         <id> <Folder>        file the item (the folder is created if absent)\n" +
+	"  delete         <id> [<kept>]        delete the item (Bitwarden trash, 30 days)\n" +
+	"  merge-delete   <id> <keeper>        carry the URIs the keeper lacks, delete the duplicate\n" +
+	"  delete-field   <id>:<field>         remove one custom field\n" +
+	"  copy-username  <id>:<field> <src>   store src's username as a text field\n" +
+	"  add-uri        <id> <uri>           append a login URI\n" +
+	"  hide           <id>:<field>         turn a text field hidden\n" +
+	"  reprompt       <id>                 ask for the master password to view\n\n" +
+	"An id may be a unique prefix; `-` is an empty arg. Flags are comma-separated:\n" +
+	"alias (a merge whose usernames differ by design), drop=fields|notes|uris (what\n" +
+	"a merge's duplicate carries that the keeper will not receive), gate=<name> (a\n" +
+	"precondition outside the vault; the row blocks until --cleared <name>).\n\n" +
+	"Each row plans apply, done (already converged) or blocked with a reason. A\n" +
+	"blocked row makes the plan unappliable, whole. curate never writes to an item\n" +
+	"that carries a passkey, never deletes one with attachments, never merges items\n" +
+	"whose passwords differ, touches an item the registry declares only to hide a\n" +
+	"field or turn reprompt on, and never prints a value: output names ids,\n" +
+	"operations and states.\n\n" +
+	"--apply requires --digest, the one the dry run printed; it syncs, re-plans,\n" +
+	"refuses on a different digest, applies, and plans again. Anything not done\n" +
+	"after that, or a change in the vault's passkey count, fails the command.\n" +
+	"Take a DR escrow (`dotf secrets backup`) first."
+
 func newSecretsCurateCmd() *cobra.Command {
-	var (
-		planPath string
-		apply    bool
-		digest   string
-		cleared  []string
-	)
+	var o curateOpts
 	c := &cobra.Command{
-		Use:   "curate --plan <file>",
-		Short: "Apply a reviewed plan to the items the registry does not declare (plan by default, --apply to change)",
-		Long: "curate reads a plan, one tab-separated row per operation:\n\n" +
-			"  op  target  arg  reason  [flags]\n\n" +
-			"  folder         <id> <Folder>        file the item (the folder is created if absent)\n" +
-			"  delete         <id> [<kept>]        delete the item (Bitwarden trash, 30 days)\n" +
-			"  merge-delete   <id> <keeper>        carry the URIs the keeper lacks, delete the duplicate\n" +
-			"  delete-field   <id>:<field>         remove one custom field\n" +
-			"  copy-username  <id>:<field> <src>   store src's username as a text field\n" +
-			"  add-uri        <id> <uri>           append a login URI\n" +
-			"  hide           <id>:<field>         turn a text field hidden\n" +
-			"  reprompt       <id>                 ask for the master password to view\n\n" +
-			"An id may be a unique prefix; `-` is an empty arg. Flags are comma-separated:\n" +
-			"alias (a merge whose usernames differ by design), drop=fields|notes|uris (what\n" +
-			"a merge's duplicate carries that the keeper will not receive), gate=<name> (a\n" +
-			"precondition outside the vault; the row blocks until --cleared <name>).\n\n" +
-			"Each row plans apply, done (already converged) or blocked with a reason. A\n" +
-			"blocked row makes the plan unappliable, whole. curate never writes to an item\n" +
-			"that carries a passkey, never deletes one with attachments, never merges items\n" +
-			"whose passwords differ, touches an item the registry declares only to hide a\n" +
-			"field or turn reprompt on, and never prints a value: output names ids,\n" +
-			"operations and states.\n\n" +
-			"--apply requires --digest, the one the dry run printed; it syncs, re-plans,\n" +
-			"refuses on a different digest, applies, and plans again. Anything not done\n" +
-			"after that, or a change in the vault's passkey count, fails the command.\n" +
-			"Take a DR escrow (`dotf secrets backup`) first.",
+		Use:          "curate --plan <file>",
+		Short:        "Apply a reviewed plan to the items the registry does not declare (plan by default, --apply to change)",
+		Long:         curateLong,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			rows, err := readCuratePlan(planPath)
-			if err != nil {
-				return err
-			}
-			reg, err := loadRegistry()
-			if err != nil {
-				return err
-			}
-			gates := map[string]bool{}
-			for _, g := range cleared {
-				gates[g] = true
-			}
-			out := cmd.OutOrStdout()
-
-			items, plan, err := planCurateFromStore(rows, registryItems(reg), gates)
-			if err != nil {
-				return err
-			}
-			printCuratePlan(out, plan)
-			if n := plan.Count(secrets.CurateBlocked); n > 0 {
-				return fmt.Errorf("%d blocked row(s): resolve them before anything can apply", n)
-			}
-			if !apply {
-				if plan.Count(secrets.CurateApply) > 0 {
-					_, _ = fmt.Fprintf(out, "\nNothing was changed. To perform this plan: --apply --digest %s\n", plan.Digest)
-				}
-				return nil
-			}
-			if digest != plan.Digest {
-				return fmt.Errorf("--apply needs --digest %s, the digest of the plan as the store stands now; "+
-					"got %q. Review the plan above, then pass its digest", plan.Digest, digest)
-			}
-			if plan.Count(secrets.CurateApply) == 0 {
-				return nil
-			}
-			return applyCurate(out, rows, registryItems(reg), gates, items, plan)
-		},
+		RunE:         func(cmd *cobra.Command, _ []string) error { return runSecretsCurate(cmd.OutOrStdout(), o) },
 	}
-	c.Flags().StringVar(&planPath, "plan", "", "the plan file (required)")
-	c.Flags().BoolVar(&apply, "apply", false, "perform the plan (default: print it and change nothing)")
-	c.Flags().StringVar(&digest, "digest", "", "the digest the dry run printed; required with --apply")
-	c.Flags().StringSliceVar(&cleared, "cleared", nil, "gates whose outside-the-vault precondition holds")
+	c.Flags().StringVar(&o.planPath, "plan", "", "the plan file (required)")
+	c.Flags().BoolVar(&o.apply, "apply", false, "perform the plan (default: print it and change nothing)")
+	c.Flags().StringVar(&o.digest, "digest", "", "the digest the dry run printed; required with --apply")
+	c.Flags().StringSliceVar(&o.cleared, "cleared", nil, "gates whose outside-the-vault precondition holds")
 	_ = c.MarkFlagRequired("plan")
 	return c
+}
+
+// runSecretsCurate plans the rows against the store, prints the plan, and
+// applies it only with --apply and the digest of the plan as it stands now.
+func runSecretsCurate(out io.Writer, o curateOpts) error {
+	rows, err := readCuratePlan(o.planPath)
+	if err != nil {
+		return err
+	}
+	reg, err := loadRegistry()
+	if err != nil {
+		return err
+	}
+	gates := map[string]bool{}
+	for _, g := range o.cleared {
+		gates[g] = true
+	}
+
+	items, plan, err := planCurateFromStore(rows, registryItems(reg), gates)
+	if err != nil {
+		return err
+	}
+	printCuratePlan(out, plan)
+	if n := plan.Count(secrets.CurateBlocked); n > 0 {
+		return fmt.Errorf("%d blocked row(s): resolve them before anything can apply", n)
+	}
+	if !o.apply {
+		if plan.Count(secrets.CurateApply) > 0 {
+			_, _ = fmt.Fprintf(out, "\nNothing was changed. To perform this plan: --apply --digest %s\n", plan.Digest)
+		}
+		return nil
+	}
+	if o.digest != plan.Digest {
+		return fmt.Errorf("--apply needs --digest %s, the digest of the plan as the store stands now; "+
+			"got %q. Review the plan above, then pass its digest", plan.Digest, o.digest)
+	}
+	if plan.Count(secrets.CurateApply) == 0 {
+		return nil
+	}
+	return applyCurate(out, rows, registryItems(reg), gates, items, plan)
 }
 
 func readCuratePlan(path string) ([]secrets.CurateRow, error) {
