@@ -10,13 +10,19 @@ created: "2026-09-28"
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] Criterion 1 -> `TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout` and `TestHarnessMirrorCmd_ExplicitRepoWinsInsideAnotherRepository`
-- [x] Criterion 2 -> `TestMirror_PreservesTheSourceMode`
+- [x] Criterion 2 -> `TestMirror_PreservesTheSourceMode` and
+  `TestMirror_ReplacesReadOnlyDestinationOnWindows`
 - [x] Criterion 3 -> setup BATS cases named `passes its checkout explicitly and warns when dotf is unavailable`
 
 ## Test status
 
+- Windows regression: `go test ./internal/harness -run '^TestMirror_ReplacesReadOnlyDestinationOnWindows$' -count=1` -> pass.
 - Test suite: `go test ./internal/cmd ./internal/harness` -> pass on Windows.
 - Static checks: `go vet ./internal/cmd ./internal/harness`, `gofmt -l`, PSScriptAnalyzer, and `git diff --check` -> pass.
+- Changed-code lint: `golangci-lint run --new-from-rev=main` -> 0 issues.
+- Full Go suite: all packages pass except the pre-existing Windows symlink
+  privilege failure in `internal/doctor` (`A required privilege is not held by
+  the client`, tracked by #1804); the changed `internal/harness` package passes.
 - Setup contract: targeted WSL BATS cases for Linux and Windows -> 2 passed.
 - Manual smoke test: a source-built `dotf harness mirror --help` lists `--repo string`.
 - Full setup BATS run: 190 passed, 3 dependency skips, and 5 environment failures because WSL lacks `zsh`, `jq`, and `pwsh`; all WIN-014 cases passed.
@@ -31,6 +37,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   already knows the checkout it is configuring.
 - A byte-identical destination with the wrong mode is drift and is rewritten;
   idempotence requires both content and mode convergence.
+- Windows refuses an atomic rename over an existing read-only file. The mirror
+  clears that attribute only on the old destination immediately before rename;
+  if installation fails it restores the old mode, and a successful replacement
+  retains the source mode already applied to the temporary file.
 
 ## Promotion candidates
 
