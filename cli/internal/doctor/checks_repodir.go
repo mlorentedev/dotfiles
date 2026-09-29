@@ -1,8 +1,6 @@
 package doctor
 
 import (
-	"path/filepath"
-
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
@@ -16,7 +14,7 @@ import (
 // where no walk-up saves them (a systemd/Task-Scheduler timer, a session hook),
 // so this check must fail exactly when those consumers would silently no-op on a
 // fresh machine with an unseeded machine.json (#696).
-func checkRepoDirResolves(rep *Report) {
+func checkRepoDirResolves(sys *System, rep *Report) {
 	rep.Section("Repo-dir resolution")
 	repo := envpkg.ResolvePath("DOTFILES_REPO_DIR")
 	switch {
@@ -25,7 +23,7 @@ func checkRepoDirResolves(rep *Report) {
 	case !isDir(repo):
 		rep.Fail("DOTFILES_REPO_DIR resolves to a missing path: " + repo +
 			" — `dotf update`/`mem` will no-op; run setup (seeds machine.json) or `dotf env set DOTFILES_REPO_DIR <checkout>`")
-	case !isDir(filepath.Join(repo, ".git")):
+	case !isGitCheckout(sys, repo):
 		rep.Fail("DOTFILES_REPO_DIR resolves to " + repo +
 			" which is not a git checkout — run setup or `dotf env set DOTFILES_REPO_DIR <checkout>`")
 	default:

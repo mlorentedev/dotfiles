@@ -1,0 +1,9 @@
+[
+  {
+    "id": "CLI-073-worktree-repo-detection-f1",
+    "behavior": "The repo-dir doctor check accepts linked worktrees and normal clones while rejecting non-checkouts.",
+    "verification": "cd cli && go test ./internal/doctor -run '^TestCheckRepoDirResolves$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
