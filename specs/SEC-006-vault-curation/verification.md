@@ -8,7 +8,7 @@ created: "2026-09-27"
 ## Evidence
 
 - [x] AC1 (dry run writes nothing, one line per row): `TestCurateDryRunThenApplyWithTheDigest` asserts zero writes and the `Plan:` summary. Live evidence: the dry run below ran against the real vault through the bw serve daemon, and made no write.
-- [x] AC2 (every blocking rule, whole-plan refusal): `TestCurateBlocks` has 19 table cases, among them a registry-declared merge keeper that would take a carried URI, and a `delete` whose kept item is the item itself (both added after review round 1). Each one asserts the row blocks, and that `ApplyCurate` then refuses with zero writes. Also covered by `TestApplyMutationRefusesAPasskeyItem` (every mutation kind), `TestCurateBlocksRegistryAndPasskeyItems` (through the command) and `TestCurateDropURIsLetsAPasskeyKeeperStandUntouched` (the only way past the keeper-passkey rule is a declared drop, which leads to a delete alone) and `TestCurateMergeReadsARegistryKeeperWithoutWritingIt` (the registry gate follows the write: a keeper that takes nothing is only read).
+- [x] AC2 (every blocking rule, whole-plan refusal): `TestCurateBlocks` has 20 table cases. They include a registry-declared merge keeper that would take a carried URI, and a `delete` whose kept item is the item itself, both added after review round 1. They also include a merge of two items that are not logins, added after round 2. Each one asserts the row blocks, and that `ApplyCurate` then refuses with zero writes. Also covered by `TestApplyMutationRefusesAPasskeyItem` (every mutation kind), `TestCurateBlocksRegistryAndPasskeyItems` (through the command) and `TestCurateDropURIsLetsAPasskeyKeeperStandUntouched` (the only way past the keeper-passkey rule is a declared drop, which leads to a delete alone) and `TestCurateMergeReadsARegistryKeeperWithoutWritingIt` (the registry gate follows the write: a keeper that takes nothing is only read).
 - [x] AC3 (apply, re-plan to done, second run empty): `TestCurateAppliesEveryOpAndConverges` covers all 8 ops. They apply, then re-plan as all `done` with zero further writes. `TestCurateDryRunThenApplyWithTheDigest` checks the same through the command.
 - [x] AC4 (digest): `TestCurateDigestTracksRevisions` checks that the digest is deterministic, that editing an untouched item leaves it unchanged, and that editing a touched item changes it. `TestCurateApplyRefusesAStaleOrMissingDigest` checks that a missing digest and a stale one both refuse, with zero writes.
 - [x] AC5 (no value in any output): `assertNoValue` runs over the dry-run and apply output and over the output of the error paths the command tests drive (a blocked plan, a stale digest), not literally every error path, for the sentinel password, username, token-bearing URI and the fixture item names. `TestDecodeItemsCountsWhatCurateNeedsWithoutKeepingIt` plants TOTP, passkey and attachment key material and asserts that the projection keeps the counts only.
@@ -46,9 +46,18 @@ created: "2026-09-27"
 - **Minor, evidence overclaim: applied** to the AC2, AC5 and mutation-check wording above.
 - **Question, review range: answered.** The launcher diffed from `c114094`, the merge base, so the range also held four PRs merged meanwhile, each with its own review. SEC-006's own changes are `5fdf472` (#1790) and this branch.
 
+## Review round 2 dispositions
+
+`review.md` (PASS WITH GAPS, `agy/gemini-3.1-pro-high`, reviewed `604a501`); each gap:
+
+- **Major (THEORETICAL), a merge of two non-login items blocked as "passwords unreadable": applied.** It already failed closed, but its reason was wrong. `planMerge` now blocks such a merge explicitly: it compares the credentials of two logins, and a secure note has none. Merging notes stays out of scope. Test: the `a merge needs two logins` case.
+- **Minor (THEORETICAL), both items absent blocked instead of converging: applied.** The proposal says a merge converges when its duplicate is absent. `planMerge` now checks the duplicate before the keeper, so a keeper deleted later does not block a row that already did its work. This matches `copy-username`'s "source gone". Test: `TestCurateMergeConvergesOnAnAbsentDuplicateWhateverTheKeeper`.
+
+Both new guards were disabled in turn, and both mutants were killed. These fixes are code and tests only, so no contract file (`proposal.md`, `tasks.md`, `features.json`) changed after the reviewed sha.
+
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-312-refuse-by-construction-what-you-cannot-measure-without-losing-it.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-312-refuse-by-construction-what-you-cannot-measure-without-losing-it.md; docs/lessons/lesson-316-a-guard-keyed-on-the-row-target-misses-the-ops-other-writes.md (review round 1)
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: curate applies ADR-028 (Bitwarden SSOT, reconcile's plan/apply shape) to the items the registry leaves out; it adds a command, not a new architectural decision
 - [x] New pattern candidate for `00_meta/patterns/`? no: the saved-plan digest and the refuse-what-you-cannot-measure rule are recorded in lesson 312; they occur in one project so far
 

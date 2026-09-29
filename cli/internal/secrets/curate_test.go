@@ -274,6 +274,8 @@ func TestCurateBlocks(t *testing.T) {
 		{"a registry-owned keeper takes no carried URI", "merge-delete\taaaa0001\tbbbb0002\tr", "registry",
 			[]string{login("aaaa0001", "u", "p", ""),
 				`{"id":"bbbb0002","name":"registry-item","type":1,"login":{"username":"u","password":"p","uris":[]}}`}, nil},
+		{"a merge needs two logins", "merge-delete\taaaa0001\tbbbb0002\tr", "two logins",
+			[]string{`{"id":"aaaa0001","type":2}`, `{"id":"bbbb0002","type":2}`}, nil},
 		{"a delete cannot keep the item it deletes", "delete\taaaa0001\taaaa0001\tr", "itself",
 			[]string{login("aaaa0001", "u", "p", "")}, nil},
 		{"Dotfiles folders are the registry's", "folder\taaaa0001\tDotfiles/apps\tr", "registry",
@@ -337,6 +339,16 @@ func TestCurateMergeReadsARegistryKeeperWithoutWritingIt(t *testing.T) {
 	}
 	if err := ApplyCurate(p, s, nil); err != nil || s.writes != 1 {
 		t.Fatalf("want the delete alone: err=%v writes=%d", err, s.writes)
+	}
+}
+
+// A merge converges on its duplicate's absence, as the proposal states, even
+// when the keeper has since gone too: a later deletion is not this row's to undo.
+func TestCurateMergeConvergesOnAnAbsentDuplicateWhateverTheKeeper(t *testing.T) {
+	s := newCurateStore(login("cccc0003", "u", "p", ""))
+	p := planOn(t, s, "merge-delete\taaaa0001\tbbbb0002\tr")
+	if st := p.Steps[0]; st.State != CurateDone {
+		t.Fatalf("want done, got %s: %s", st.State, st.Detail)
 	}
 }
 

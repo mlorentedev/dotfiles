@@ -448,12 +448,14 @@ func planCopyUsername(st CurateStep, t, a *ItemSummary, in CurateInputs) (Curate
 // keeper's, or named by the row as dropped.
 func planMerge(st CurateStep, t, a *ItemSummary, in CurateInputs) CurateStep {
 	switch {
-	case a == nil:
-		return blocked(st, "the keeper %s is absent", st.Row.Arg)
 	case t == nil:
 		return done(st, "absent")
+	case a == nil:
+		return blocked(st, "the keeper %s is absent", st.Row.Arg)
 	case t.ID == a.ID:
 		return blocked(st, "an item cannot be merged into itself")
+	case !t.HasLogin || !a.HasLogin:
+		return blocked(st, "a merge compares the credentials of two logins, and one of the two items is not a login")
 	}
 	if why := duplicateLoss(st.Row, t); why != "" {
 		return blocked(st, "%s", why)
