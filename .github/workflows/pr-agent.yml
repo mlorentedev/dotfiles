@@ -258,12 +258,14 @@ jobs:
       - name: PR-Agent
         if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
-        # whoever can move the release tag named by the trailing comment decides
-        # what runs here, and what runs here holds NAN_API_KEY and
-        # `pull-requests: write`. This repository is PUBLIC, so that is not a
-        # theoretical actor. Resolve that tag through
-        # `gh api repos/The-PR-Agent/pr-agent/git/ref/tags/<version>` and verify
-        # `.object.sha` equals the pinned commit before updating this line.
+        # whoever can move it decides what runs here, and what runs here holds
+        # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
+        # is not a theoretical actor. Verify a bump against the API rather than
+        # trusting the annotation, with <tag> the trailing `# vX.Y.Z`:
+        # `gh api repos/The-PR-Agent/pr-agent/git/ref/tags/<tag>` must return this
+        # sha (an annotated tag returns a tag object: dereference it via git/tags).
+        # The tag is not repeated here because Dependabot rewrites only the line
+        # below, and a copy in this comment drifted from v0.42.0 to v0.45.0 unseen.
         uses: The-PR-Agent/pr-agent@1d01f24f455bb879c1d9c557ad7de3d72dcc7975  # v0.46.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

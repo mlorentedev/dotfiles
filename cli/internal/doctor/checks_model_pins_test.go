@@ -120,6 +120,27 @@ func TestModelPinsFailsOnADeadDefaultModel(t *testing.T) {
 	}
 }
 
+// A live provider model the map does not route must read as unrouted, not as
+// nonexistent. Measured 2026-09-29: "qwen3.8-flash resolves to nothing the
+// routing registry declares" read as "the model does not exist", while NaN
+// lists it and the map had unrouted it on purpose (AI-044, #1762).
+func TestModelPinsSaysAnUnroutedDefaultIsUnroutedNotMissing(t *testing.T) {
+	sys, cfg, _ := pinFixture(t, "qwen3.8-flash", []string{"nan/qwen3.6"})
+	out := pinRun(t, sys, cfg)
+
+	if !strings.Contains(out, "[FAIL]") {
+		t.Fatalf("an unrouted defaultModel must FAIL:\n%s", out)
+	}
+	for _, want := range []string{"not a model harness/model-map.json routes", "may still exist at the provider"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the diagnostic lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "resolves to nothing") {
+		t.Errorf("the diagnostic still reads as a missing model:\n%s", out)
+	}
+}
+
 // AC8 — the check never writes. Asserted rather than assumed, because the file
 // it reads is pi's own runtime state and repairing it is an open question, not a
 // default.
