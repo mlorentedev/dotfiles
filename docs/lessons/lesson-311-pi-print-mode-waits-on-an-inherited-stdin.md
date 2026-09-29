@@ -11,7 +11,7 @@ tags: [lesson, pi, stdin, background, measurement]
 
 ## What happened
 
-AI-046's AC6 measurement (`specs/AI-046-pi-nan-provider/measure-ac6.sh`) runs `pi --session <file> --model nan/qwen3.6 -p "<prompt>"` twice. Run in the foreground from the agent's shell, both arms finished in 13 seconds. Run again as a background job, the first arm sat for ten minutes. It had no TCP connection open and used no CPU.
+AI-046's AC6 measurement (`specs/archive/AI-046-pi-nan-provider/measure-ac6.sh`) runs `pi --session <file> --model nan/qwen3.6 -p "<prompt>"` twice. Run in the foreground from the agent's shell, both arms finished in 13 seconds. Run again as a background job, the first arm sat for ten minutes. It had no TCP connection open and used no CPU.
 
 `/proc/<pid>/fd/0` was a socket. In print mode pi reads a piped stdin and prepends it to the first prompt (pi `docs/cli.md`), so it waits for end-of-file. A foreground shell hands pi a stdin that closes. A background runner hands it an open socket or pipe that never does. The same command, in the same script, behaves differently depending on who launched it.
 
@@ -23,4 +23,4 @@ Any non-interactive `pi -p` call from a script, a CI job or a background task ge
 
 When a scripted run stalls with no network activity and no CPU, read `/proc/<pid>/fd/0` before anything else.
 
-Refs: AI-046 (#1764), `specs/AI-046-pi-nan-provider/verification.md` (AC6).
+Refs: AI-046 (#1764), `specs/archive/AI-046-pi-nan-provider/verification.md` (AC6).

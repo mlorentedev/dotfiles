@@ -65,7 +65,7 @@ on a model switch, and retries truncated streams.
   `NAN_MEDIA_MCP`, then `nan-provider.json`, then defaults to on, so the managed
   file is what keeps it off. `NAN_MEDIA_MCP=1 pi` turns it on for one session.
 - **Offline:** with NaN unreachable, pi still starts and lists the snapshot
-  models (measured 2026-09-26, `specs/AI-046-pi-nan-provider/verification.md`).
+  models (measured 2026-09-26, `specs/archive/AI-046-pi-nan-provider/verification.md`).
 - **Premium models** such as `glm5.3` are filtered by the member's tier, so a
   standard key does not list them.
 - **`models.json` defines no NaN model** (AI-046 AC3, `tests/pi-config.bats`). A

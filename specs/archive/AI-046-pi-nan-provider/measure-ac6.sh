@@ -17,14 +17,16 @@
 # Only qwen3.6 is called, and it is unmetered (harness/nan-quotas.json). The
 # key comes from the caller's environment and is never printed:
 #
-#   dotf secrets run --only NAN_API_KEY -- bash specs/AI-046-pi-nan-provider/measure-ac6.sh
+#   dotf secrets run --only NAN_API_KEY -- bash specs/archive/AI-046-pi-nan-provider/measure-ac6.sh
 #
 # Knobs: PI_BIN (default ~/.local/bin/pi), AC6_THINK_CHARS, AC6_TEXT_CHARS,
 # AC6_TURNS. A small run (AC6_THINK_CHARS=20000 AC6_TEXT_CHARS=4000) checks the
 # session format before spending the full request.
 set -eu
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)"
+# The checkout root from git, not a fixed ../..: archiving moves this file one
+# level deeper, and a relative climb would silently land in specs/.
+REPO="$(git -C "$(dirname "${BASH_SOURCE[0]:-$0}")" rev-parse --show-toplevel)"
 PI_BIN="${PI_BIN:-$HOME/.local/bin/pi}"
 THINK_CHARS="${AC6_THINK_CHARS:-2000000}"
 TEXT_CHARS="${AC6_TEXT_CHARS:-300000}"
