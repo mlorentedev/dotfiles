@@ -69,12 +69,13 @@ esac
 # $toplevel/.git is a `gitdir:` pointer FILE, not a directory, so assuming that
 # layout resolved to a path that cannot exist and silently skipped every local
 # hook there (BUG-043). `--git-common-dir` answers relative to the cwd in an
-# ordinary checkout and absolute in a linked worktree; asking from $toplevel
-# makes both forms resolve against the same base, with no need for
-# --path-format=absolute (git 2.31+) and therefore no version floor of our own.
+# ordinary checkout and absolute in a linked worktree; Git for Windows emits
+# that absolute path as `C:/...`, which is absolute despite lacking a leading
+# slash. Asking from $toplevel makes all forms resolve without requiring
+# --path-format=absolute (git 2.31+) and therefore without a version floor.
 common_dir="$(cd "$toplevel" && git rev-parse --git-common-dir 2>/dev/null)"
 case "$common_dir" in
-    /*) ;;                                    # linked worktree: already absolute
+    /*|[[:alpha:]]:/*) ;;                      # POSIX or Windows absolute path
     ?*) common_dir="$toplevel/$common_dir" ;; # ordinary checkout: relative to $toplevel
 esac                                          # empty (probe failed): left empty on purpose
 # Two ways the probe lies, both ending in a silently skipped hook:

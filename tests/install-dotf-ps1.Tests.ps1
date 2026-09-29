@@ -77,6 +77,25 @@ Describe 'Set-DotfBinary' {
         }
     }
 
+    Describe 'Get-DotfVersion' {
+        It 'uses the latest release when no explicit, environment, or checkout pin exists' {
+            $previous = $env:DOTF_VERSION
+            Remove-Item Env:DOTF_VERSION -ErrorAction SilentlyContinue
+            try {
+                Mock Test-Path { $false }
+                Mock Invoke-RestMethod { [pscustomobject]@{ tag_name = 'v9.9.9' } }
+
+                Get-DotfVersion -Version '' | Should -BeExactly '9.9.9'
+            } finally {
+                if ($null -eq $previous) {
+                    Remove-Item Env:DOTF_VERSION -ErrorAction SilentlyContinue
+                } else {
+                    $env:DOTF_VERSION = $previous
+                }
+            }
+        }
+    }
+
     It 'leaves no staging artifact behind after a clean swap' {
         Set-DotfBinary -Source $script:Source -Target $script:Target
         Test-Path -LiteralPath "$($script:Target).new" | Should -BeFalse
