@@ -1,7 +1,7 @@
 ---
 id: "CI-004-testing-surface-optimization"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-25"
 issue: "mlorentedev/dotfiles#1739"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ci, testing, bats]
@@ -88,3 +88,5 @@ evidence can be traced; the order follows readiness.
 - Bitácora: #1739. Related: #1478 (CI-002, P1.2), #1628 (pi reconciler to Go, P0.4 and P1.4), #1472 (CI-001, the ceiling loan), #1486 (CI-003, archived), #1409 (fixture isolation), #1625 (W1.4 review queue).
 - Synthesis: vault `10_projects/dotfiles/research/2026-09-25-ci-testing-surface-synthesis.md`.
 - Patterns: `00_meta/patterns/pattern-spec-driven-development.md`, `00_meta/patterns/pattern-git-workflow.md`.
+
+<!-- archived 2026-09-28 — PR: https://github.com/mlorentedev/dotfiles/pull/1819 -->

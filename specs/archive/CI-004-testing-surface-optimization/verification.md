@@ -65,7 +65,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CI-004-testing-surface-optimization/` -> `specs/archive/CI-004-testing-surface-optimization/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CI-004-testing-surface-optimization/` -> `specs/archive/CI-004-testing-surface-optimization/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1819 carries `Closes #1739`
+- [x] Promotions above executed (if any): lessons 309 and 318 are in `docs/lessons/`
