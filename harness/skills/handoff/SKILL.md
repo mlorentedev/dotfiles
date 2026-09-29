@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 97cc048c296c9dd6
+generated_sha: 89a9eb976c661fd0
 id: handoff-skill
 type: skill
 status: active
@@ -288,7 +288,7 @@ Deliver the final handoff summary to the user using this standardized block:
 ### 🏁 Session Handoff Summary
 
 - **Continuity Block:** Updated in `<target-area>/memory/MEMORY.md`
-- **Session Record:** Written to `<target-area>/sessions/<YYYY-MM-DD>-<target-id>-<agent>.md`
+- **Session Record:** Written to `<target-area>/sessions/<YYYY-MM-DD>-<target-id>-<agent>-<thread>.md`
 - **PRs & Commits:**
   - `PR #NNN`: `<Title>` (`<state>`)
   - `Commit <hash>`: `<message>`
