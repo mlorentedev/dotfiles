@@ -48,7 +48,7 @@ This ADR sets the rules those three findings require before any of track A is bu
    3. Move the binary to the channel's target.
 
    Step 3 never runs unless step 2 succeeded in the same run. A timer or command that moves only the binary is rejected. This is ADR-038 D3 applied to every machine, not only to the release runbook.
-5. **ADR-019 D3 is amended.** "Setup runs only when `HEAD` moved" becomes: a convergence run acts when `HEAD` moved, or when the channel's target binary differs from the installed one. When neither changed, the run is still a no-op.
+5. **ADR-019 D3 is amended.** "Setup runs only when `HEAD` moved" becomes: a convergence run acts when `HEAD` moved, or when the channel's target is newer than the installed binary. When neither holds, the run is a no-op. That includes a `stable` machine whose binary is already above the pin, for example after it leaves `edge`: under decision 6 its target is the installed binary itself.
 6. **Pins are floors on both channels** (ADR-036, `decideAction` in `cli/internal/tools/install.go`). An installed build at or above the pin is never downgraded by convergence. The only way to go down is an explicit rollback (decision 8). Doctor is aligned to the same rule (#1262).
 7. **The shell bootstrap stays** (ADR-020 C7, CLI-090). `install-dotf.sh` and `install-dotf.ps1` remain the install and recovery path on a machine with no working `dotf`. `dotf self-update` is added on top of them and never replaces them. `dotf update` keeps its name and its behaviour, because the systemd unit, the Windows task and the tests call it.
 8. **Nothing automatic before signing and rollback.** Row A5 (the scheduled convergence) ships only after two other rows:

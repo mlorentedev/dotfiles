@@ -66,4 +66,4 @@ a full `setup` blindly is wasteful.
 
 ## Amendment 2026-09-30 (ADR-041, #1843)
 
-Decision 3 is amended by ADR-041 decision 5. A convergence run acts when `HEAD` moved, or when the machine's channel targets a binary other than the installed one. When neither changed, the run is still a no-op. Decision 2 (fast-forward only) is unchanged, and it is the first step of every convergence run.
+Decision 3 is amended by ADR-041 decision 5. A convergence run acts when `HEAD` moved, or when the machine's channel targets a binary newer than the installed one. When neither holds, the run is still a no-op. Decision 2 (fast-forward only) is unchanged, and it is the first step of every convergence run.
