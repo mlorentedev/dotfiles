@@ -429,6 +429,25 @@ func TestReviewerCommandLetsAgyActWithoutAHumanToApprove(t *testing.T) {
 	}
 }
 
+func TestAgyReviewerCommandOmitsSandboxOnWindows(t *testing.T) {
+	argv := agyReviewerCommand("gemini-3.1-pro-high", "p", DefaultReviewerTimeout, `C:\repo`, "windows")
+	if argvIndex(argv, "--sandbox") >= 0 {
+		t.Fatal("forcing agy's AppContainer sandbox on Windows requires unavailable UAC elevation")
+	}
+	for _, flag := range []string{"--dangerously-skip-permissions", "--add-dir", "--model", "--print-timeout"} {
+		if argvIndex(argv, flag) < 0 {
+			t.Errorf("Windows review lost required flag %s", flag)
+		}
+	}
+}
+
+func TestAgyReviewerCommandKeepsSandboxOutsideWindows(t *testing.T) {
+	argv := agyReviewerCommand("gemini-3.1-pro-high", "p", DefaultReviewerTimeout, "/repo", "linux")
+	if argvIndex(argv, "--sandbox") < 0 {
+		t.Fatal("non-Windows agy reviews must retain sandbox isolation")
+	}
+}
+
 // Without --add-dir, agy runs its shell commands in its OWN install directory:
 // `pwd` answers ~/.gemini/antigravity-cli and `git rev-parse HEAD` fails with
 // "not a git repository". A reviewer that cannot reach the tree cannot run the
@@ -447,11 +466,6 @@ func TestReviewerCommandGivesAgyReachIntoTheRepo(t *testing.T) {
 	}
 	if got := argvValue(argv, "--add-dir"); got != "/repo/root" {
 		t.Fatalf("agy must be given the repo as a workspace or it cannot execute in it, got %q", got)
-	}
-	// The auto-approval above is bounded rather than bare. Verified not to cost
-	// the review anything: git, `go test` and file writes all work under it.
-	if argvIndex(argv, "--sandbox") < 0 {
-		t.Error("unattended auto-approval should run inside the sandbox")
 	}
 	// --print must still be last, or it consumes a flag as the prompt.
 	if i := argvIndex(argv, "--print"); i != len(argv)-2 {

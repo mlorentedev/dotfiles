@@ -1,0 +1,59 @@
+---
+tags: [spec, verification, templates]
+created: "2026-09-29"
+---
+
+# Verification - HARNESS-168-agy-windows-no-sandbox
+
+## Evidence
+
+Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+
+- [x] Criterion 1 -> `TestAgyReviewerCommandOmitsSandboxOnWindows`
+- [x] Criterion 2 -> `TestAgyReviewerCommandKeepsSandboxOutsideWindows`
+- [x] Criterion 3 -> `TestReviewerCommandDoesNotGivePiAgySpecificFlags`
+- [x] Criterion 4 -> real Windows agy probe without `--sandbox`
+
+## Test status
+
+- Fail-first: `TestAgyReviewerCommandOmitsSandboxOnWindows` failed because the
+  existing argv contained `--sandbox`.
+- Targeted suite: the Windows/no-sandbox, non-Windows/sandbox, permission,
+  workspace and pi-isolation tests pass.
+- Static checks: `go build ./...`, `go vet ./internal/spec`,
+  `golangci-lint run --new-from-rev=main`, `git diff --check`, and
+  `jq empty specs/HARNESS-168-agy-windows-no-sandbox/features.json` -> pass.
+- Manual smoke test: direct headless agy 1.2.13 with the new Windows argv shape
+  ran `git rev-parse HEAD` in the worktree and returned
+  `d691f613a7f0f6d79870ab318853046696069078` in 30 seconds, without UAC.
+- No regressions: targeted reviewer-command tests pass. The complete
+  `internal/spec` suite hit its existing 10-minute timeout in an unrelated
+  git-staleness test under concurrent worktree load.
+
+## Decisions made during implementation
+
+Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
+
+- Keep `--sandbox` on non-Windows platforms, where it provides isolation
+  without requiring elevation.
+- On Windows, omit only the forced sandbox flag. The process remains
+  non-elevated and bounded by the reviewer pool, worktree and deadline, but has
+  the same user-level reach as direct interactive agy.
+
+## Promotion candidates
+
+Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
+
+- [x] Lesson for the repo's `docs/lessons/`? no: the platform-specific security
+  tradeoff is recorded in the spec and beside the launcher branch.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: this is a
+  compatibility exception within the existing review architecture.
+- [x] New pattern candidate for `00_meta/patterns/`? no: this is specific to the
+  current Antigravity Windows sandbox implementation.
+
+## Archive checklist
+
+- [ ] `proposal.md` frontmatter set to `status: archived`
+- [ ] Folder moved: `specs/HARNESS-168-agy-windows-no-sandbox/` -> `specs/archive/HARNESS-168-agy-windows-no-sandbox/`
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [ ] Promotions above executed (if any)

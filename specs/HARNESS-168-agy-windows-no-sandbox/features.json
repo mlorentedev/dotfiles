@@ -1,0 +1,23 @@
+[
+  {
+    "id": "HARNESS-168-agy-windows-no-sandbox-f1",
+    "behavior": "Windows agy reviews run without AppContainer sandbox elevation while retaining review controls.",
+    "verification": "cd cli && go test ./internal/spec -run '^TestAgyReviewerCommandOmitsSandboxOnWindows$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-168-agy-windows-no-sandbox-f2",
+    "behavior": "Non-Windows agy reviews continue to force sandbox isolation.",
+    "verification": "cd cli && go test ./internal/spec -run '^TestAgyReviewerCommandKeepsSandboxOutsideWindows$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-168-agy-windows-no-sandbox-f3",
+    "behavior": "Pi reviewer arguments remain isolated from agy-specific flags.",
+    "verification": "cd cli && go test ./internal/spec -run '^TestReviewerCommandDoesNotGivePiAgySpecificFlags$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
