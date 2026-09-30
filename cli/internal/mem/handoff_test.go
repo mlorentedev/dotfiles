@@ -138,6 +138,20 @@ func TestWriteThreadRejectsAnEmptyKey(t *testing.T) {
 	}
 }
 
+// A heading is matched by its first word, so a key with whitespace could never
+// find its own block again: every write appended a copy (#1885). A branch name
+// cannot hold whitespace, so only an explicit --thread could reach this.
+func TestWriteThreadRejectsAKeyWithWhitespace(t *testing.T) {
+	for _, key := range []string{"my work", "my\twork"} {
+		if _, _, err := WriteThread(memoryWithTwoThreads, key, "body"); err == nil {
+			t.Errorf("WriteThread accepted %q", key)
+		}
+		if _, err := WriteThreadAs(memoryWithTwoThreads, key, "claude", "body"); err == nil {
+			t.Errorf("WriteThreadAs accepted %q", key)
+		}
+	}
+}
+
 // The written file must still archive correctly: extractHandoffBlock stops at
 // the next "## ", so `###` sub-blocks fall inside it. Asserted rather than
 // assumed — a second boundary rule here would be the fifth silently-divergent

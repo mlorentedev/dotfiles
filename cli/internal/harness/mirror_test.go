@@ -143,6 +143,28 @@ func TestMirror_RefusesWhenTheCheckoutIsTheDeployDir(t *testing.T) {
 	}
 }
 
+// A target is a path inside the checkout, mirrored to the same path inside the
+// deploy dir. One that climbs out with ".." or is absolute would write
+// anywhere the user can (#1872), so the manifest is refused before any write.
+func TestMirror_RefusesATargetThatEscapes(t *testing.T) {
+	for _, target := range []string{"../escaped.md", "ai/../../escaped.md", "/tmp/escaped.md"} {
+		t.Run(target, func(t *testing.T) {
+			parent := t.TempDir()
+			repo, deploy := filepath.Join(parent, "repo"), filepath.Join(parent, "deploy")
+			writeFile(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[{"file":"`+target+`"}]}`)
+			writeFile(t, filepath.Join(parent, "escaped.md"), "outside\n")
+
+			_, err := Mirror(repo, deploy)
+			if err == nil || !strings.Contains(err.Error(), target) {
+				t.Fatalf("an escaping target must be refused by name, got %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(deploy, "harness")); err == nil {
+				t.Error("nothing may be mirrored from a manifest that is refused")
+			}
+		})
+	}
+}
+
 func TestMirror_FailsLoudWithoutAManifest(t *testing.T) {
 	repo, deploy := t.TempDir(), t.TempDir()
 	writeFile(t, filepath.Join(repo, "harness", "model-map.json"), `{}`)
