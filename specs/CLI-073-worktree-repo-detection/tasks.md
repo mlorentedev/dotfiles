@@ -24,10 +24,16 @@ created: "2026-09-29"
 
 - [x] [AC1] Add a failing worktree row to
   `TestCheckRepoDirResolves`.
-- [x] [AC1] Pass the injected `System` into `checkRepoDirResolves` and reuse
-  `isGitCheckout`.
+- [x] [AC1] Pass the injected `System` into `checkRepoDirResolves` and resolve
+  Git's top-level checkout path.
 - [x] [AC2] Re-run the normal-checkout row.
 - [x] [AC3] Re-run the missing and non-checkout rows.
+- [x] [AC4] Add a failing checkout-subdirectory row and compare the configured
+  path with `git rev-parse --show-toplevel`.
+- [x] [AC5] Add a failing session-start regression from a linked worktree root
+  and subdirectory.
+- [x] [AC5] Resolve checkout root and main project identity from the `.git`
+  pointer before emitting hive/specs/lessons/triage context.
 
 ## Closing
 

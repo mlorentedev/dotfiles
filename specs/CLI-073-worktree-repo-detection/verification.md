@@ -13,12 +13,21 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] Criterion 2 -> `TestCheckRepoDirResolves/normal checkout -> pass`
 - [x] Criterion 3 -> the missing-path and non-checkout rows in
   `TestCheckRepoDirResolves`
+- [x] Criterion 4 -> `TestCheckRepoDirResolves/checkout subdirectory -> fail`
+- [x] Criterion 5 ->
+  `TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory`
 
 ## Test status
 
 - Fail-first: `go test ./internal/doctor -run '^TestCheckRepoDirResolves$' -count=1`
   failed only for the linked-worktree row with `not a git checkout`.
-- Targeted suite: the same command passes after reusing `isGitCheckout`.
+- Targeted suite: the same command passes after resolving and comparing Git's
+  top-level path.
+- Checkout-root fail-first: the subdirectory row initially passed because
+  `--is-inside-work-tree` cannot distinguish a root from a descendant; it now
+  fails unless the configured path equals `--show-toplevel`.
+- Session-start fail-first: both the worktree root and `cli/` lacked all four
+  blocks. The focused mem test now passes with the main project name.
 - Static checks: `go build ./...`, `go vet ./internal/doctor`,
   `golangci-lint run --new-from-rev=main`, `git diff --check`, and
   `jq empty specs/CLI-073-worktree-repo-detection/features.json` -> pass.
@@ -33,10 +42,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
-- Reuse `isGitCheckout` instead of adding a second parser for `.git` pointer
-  files; Git remains the authority and the existing seam keeps tests hermetic.
+- Ask Git for `--show-toplevel` instead of parsing `.git` pointer files in the
+  doctor check; Git remains the authority and the existing seam keeps tests
+  hermetic.
 - Keep the cascade-only behavior: this check must validate the configured path,
   not hide a bad default by discovering doctor's current checkout.
+- Session-start is intentionally filesystem-only: it walks to the `.git` entry
+  and resolves a linked worktree's main project name from the pointer, avoiding
+  a subprocess in every session-start hook.
 
 ## Promotion candidates
 

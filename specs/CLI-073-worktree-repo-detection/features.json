@@ -1,8 +1,15 @@
 [
   {
     "id": "CLI-073-worktree-repo-detection-f1",
-    "behavior": "The repo-dir doctor check accepts linked worktrees and normal clones while rejecting non-checkouts.",
+    "behavior": "The repo-dir doctor check accepts checkout roots while rejecting subdirectories and non-checkouts.",
     "verification": "cd cli && go test ./internal/doctor -run '^TestCheckRepoDirResolves$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-073-worktree-repo-detection-f2",
+    "behavior": "Session start emits repository context from a linked worktree root and subdirectory using the main project identity.",
+    "verification": "cd cli && go test ./internal/mem -run '^TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory$' -count=1",
     "state": "pending",
     "evidence": ""
   }

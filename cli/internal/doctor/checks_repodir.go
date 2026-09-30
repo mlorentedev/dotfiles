@@ -1,6 +1,10 @@
 package doctor
 
 import (
+	"path/filepath"
+	"runtime"
+	"strings"
+
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
@@ -17,16 +21,47 @@ import (
 func checkRepoDirResolves(sys *System, rep *Report) {
 	rep.Section("Repo-dir resolution")
 	repo := envpkg.ResolvePath("DOTFILES_REPO_DIR")
-	switch {
-	case repo == "":
+	if repo == "" {
 		rep.Warn("DOTFILES_REPO_DIR does not resolve (no env var, machine.json override, or contract default)")
-	case !isDir(repo):
+		return
+	}
+	if !isDir(repo) {
 		rep.Fail("DOTFILES_REPO_DIR resolves to a missing path: " + repo +
 			" — `dotf update`/`mem` will no-op; run setup (seeds machine.json) or `dotf env set DOTFILES_REPO_DIR <checkout>`")
-	case !isGitCheckout(sys, repo):
+		return
+	}
+	root := gitCheckoutRoot(sys, repo)
+	switch {
+	case root == "":
 		rep.Fail("DOTFILES_REPO_DIR resolves to " + repo +
 			" which is not a git checkout — run setup or `dotf env set DOTFILES_REPO_DIR <checkout>`")
+	case !sameCheckoutRoot(repo, root):
+		rep.Fail("DOTFILES_REPO_DIR resolves to " + repo + " which is not the checkout root " + root +
+			" — run setup or `dotf env set DOTFILES_REPO_DIR <checkout>`")
 	default:
 		rep.Pass("DOTFILES_REPO_DIR cascade resolves to a checkout: " + repo)
 	}
+}
+
+func gitCheckoutRoot(sys *System, path string) string {
+	if sys == nil || sys.CommandOutput == nil {
+		return ""
+	}
+	out, err := sys.CommandOutput("git", "-C", path, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return ""
+	}
+	return filepath.Clean(strings.TrimSpace(out))
+}
+
+func sameCheckoutRoot(configured, actual string) bool {
+	a, errA := filepath.Abs(configured)
+	b, errB := filepath.Abs(actual)
+	if errA != nil || errB != nil {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
 }

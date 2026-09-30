@@ -22,13 +22,16 @@ Git itself recognizes the checkout.
 ## What
 
 The repo-dir doctor check asks Git whether the resolved path is inside a work
-tree, using the existing injected command seam. Normal clones and linked
-worktrees pass; existing directories that are not Git checkouts still fail.
+tree and requires the configured path to equal Git's top level. Normal clones
+and linked worktrees pass; subdirectories and non-checkouts fail. Session start
+resolves a linked worktree back to its checkout root and main project identity
+before emitting hive, specs, lessons and triage context.
 
 ## Out of scope
 
 - Changing `env.RepoDir`, whose worktree precedence already has regression tests.
-- Auditing every historical `.git` directory assumption in unrelated checks.
+- Auditing every historical `.git` directory assumption outside repo-dir and
+  session-start.
 - Treating arbitrary `.git` files as valid without confirmation from Git.
 
 ## Risks / open questions
@@ -37,6 +40,8 @@ worktrees pass; existing directories that are not Git checkouts still fail.
   falling back to doctor's current working directory.
 - Tests must use the existing `System.CommandOutput` seam; invoking the real Git
   binary in a unit test would make the result depend on the host.
+- Session-start resolves the linked-worktree project name from its `.git`
+  pointer; it must not use the `dotfiles-wt-*` directory basename.
 
 ## Acceptance criteria
 
@@ -44,6 +49,10 @@ worktrees pass; existing directories that are not Git checkouts still fail.
 - [x] A normal checkout continues to pass.
 - [x] A missing path or an existing non-checkout continues to fail with the
   current diagnostic class.
+- [x] A checkout subdirectory fails repo-dir validation and names the actual
+  checkout root.
+- [x] Session start from a linked worktree root or subdirectory emits hive,
+  specs, lessons and triage context using the main repository project name.
 
 ## References
 

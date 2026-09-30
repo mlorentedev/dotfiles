@@ -35,11 +35,62 @@ func doctorDrift(doctorQuickOutput string) string {
 // a personal 10_projects/<repo> match, else a 50_work/45-development work-SDK
 // family/component slug match. Empty when neither matches.
 func hiveProject(cwd, vault string) string {
-	repo := filepath.Base(cwd)
+	return hiveProjectNamed(cwd, vault, filepath.Base(cwd))
+}
+
+func hiveProjectNamed(cwd, vault, repo string) string {
 	if isDir(filepath.Join(vault, "10_projects", repo)) {
 		return hiveProjectBlock(repo)
 	}
 	return workSDKBlock(cwd, vault)
+}
+
+func checkoutIdentity(cwd string) (root, project string) {
+	root = findCheckoutRoot(cwd)
+	if root == "" {
+		return "", ""
+	}
+	return root, checkoutProjectName(root)
+}
+
+func findCheckoutRoot(cwd string) string {
+	root, err := filepath.Abs(cwd)
+	if err != nil {
+		return ""
+	}
+	for {
+		if fileExists(filepath.Join(root, ".git")) {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			return ""
+		}
+		root = parent
+	}
+}
+
+func checkoutProjectName(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, ".git"))
+	if err != nil {
+		return filepath.Base(root)
+	}
+	gitDir := strings.TrimSpace(strings.TrimPrefix(string(data), "gitdir:"))
+	if gitDir == "" {
+		return filepath.Base(root)
+	}
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(root, gitDir)
+	}
+	for p := filepath.Clean(gitDir); ; p = filepath.Dir(p) {
+		if filepath.Base(p) == ".git" {
+			return filepath.Base(filepath.Dir(p))
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return filepath.Base(root)
+		}
+	}
 }
 
 func hiveProjectBlock(repo string) string {
