@@ -1,7 +1,7 @@
 ---
 id: "CLI-090"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-28"
 issue: "mlorentedev/dotfiles#1803"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -75,3 +75,5 @@ Observable outcomes. Each must be testable.
 - Related ADR: `docs/adr/adr-036-install-channels.md`
 - Related patterns: `00_meta/patterns/pattern-setup-script-idempotence.md`
 - Related patterns: `00_meta/patterns/pattern-version-single-source.md`
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1805 -->
