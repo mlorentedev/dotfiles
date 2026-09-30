@@ -20,6 +20,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Fail-first: `go test ./internal/spec -run '^TestVerifyReviewProducedCatchesAMalformedVerdict$' -count=1`
   failed because `VerifyReviewProduced` returned nil for the malformed WIN-014
   artifact.
+- Review finding fail-first:
+  `TestVerifyReviewProducedCatchesMalformedVerdictWithoutASidecar` failed
+  because a changed malformed artifact returned success when
+  `review-request.json` was unavailable.
 - Targeted behavior: `go test ./internal/spec ./internal/cmd -run '^(TestVerifyReviewProducedCatchesAMalformedVerdict|TestSpecReviewForegroundRejectsMalformedReview)$' -count=1`
   -> both packages pass.
 - Package suites: `go test ./internal/spec ./internal/cmd` -> pass.
@@ -30,6 +34,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   directly without launching a real external reviewer.
 - No regressions: the pre-existing missing-file, unchanged-file, and fresh
   verdict tests pass in the package suite.
+- Independent code-review disposition: applied the finding that launch-time
+  parsing must not depend on the provenance sidecar. The sidecar now gates only
+  digest comparison; `FindReview` validates the artifact in both paths.
+- The combined `internal/spec` + `internal/cmd` run reached the existing
+  10-minute Windows timeout in an unrelated git-staleness test after the focused
+  spec tests had passed.
 
 ## Decisions made during implementation
 

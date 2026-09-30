@@ -281,6 +281,20 @@ func TestVerifyReviewProducedAcceptsAValidVerdictWithoutASidecar(t *testing.T) {
 	}
 }
 
+func TestVerifyReviewProducedCatchesMalformedVerdictWithoutASidecar(t *testing.T) {
+	dir := seedProvenanceSpec(t, "---\nreviewer: nan/x\nreviewed_sha: aaaa\n---\nFAIL\n")
+
+	err := VerifyReviewProduced(dir, "/transcripts/no-sidecar.jsonl")
+	if err == nil {
+		t.Fatal("a malformed review.md must fail even when provenance is unavailable")
+	}
+	for _, want := range []string{"review.md", "verdict", "/transcripts/no-sidecar.jsonl"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error should mention %q, got %q", want, err)
+		}
+	}
+}
+
 // TestWriteReviewRequestReportsAFailedWrite is GUARD-005 AC8's first half: a
 // sidecar that cannot be written is an error the launcher sees, never a silent
 // success. The launcher turns it into a warning and still launches, because
