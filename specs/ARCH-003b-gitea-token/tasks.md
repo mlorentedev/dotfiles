@@ -1,5 +1,5 @@
 ---
-tags: [spec, tasks, templates]
+tags: [spec, tasks, secrets, gitea]
 created: "2026-09-29"
 ---
 
@@ -33,24 +33,4 @@ created: "2026-09-29"
 - [x] Registry parsing succeeds
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-
-## Machine-readable features
-
-This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
-
-**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
-
-Minimal `features.json` skeleton (drop into `<repo>/specs/ARCH-003b-gitea-token/features.json`):
-
-```json
-[
-  {
-    "id": "ARCH-003b-gitea-token-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+- [x] PR opened referencing this spec folder: `mlorentedev/dotfiles#1846`

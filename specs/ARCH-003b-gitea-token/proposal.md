@@ -14,7 +14,7 @@ template_version: "1.0"
 
 ## Why
 
-<!-- from issue #177: ARCH-003: ADR-004-draft - Write work-context routing governance ADR -->
+<!-- work gate: https://github.com/mlorentedev/knowledge/issues/177 — ARCH-003: ADR-004-draft - Write work-context routing governance ADR -->
 
 The private `teledyne/projects-toolkit` PoC needs API automation without
 embedding a Gitea token in shell history, repository configuration, or scripts.
