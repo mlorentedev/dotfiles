@@ -1,0 +1,23 @@
+[
+  {
+    "id": "GUARD-005a-malformed-review-artifact-f1",
+    "behavior": "A changed but malformed review artifact fails foreground review completion with transcript context.",
+    "verification": "cd cli && go test ./internal/spec ./internal/cmd -run '^(TestVerifyReviewProducedCatchesAMalformedVerdict|TestSpecReviewForegroundRejectsMalformedReview)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005a-malformed-review-artifact-f2",
+    "behavior": "A fresh parseable review artifact passes foreground review completion.",
+    "verification": "cd cli && go test ./internal/spec -run '^TestVerifyReviewProducedAcceptsAFreshVerdict$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-005a-malformed-review-artifact-f3",
+    "behavior": "Missing and unchanged review artifacts retain their existing failure precedence.",
+    "verification": "cd cli && go test ./internal/spec -run '^TestVerifyReviewProducedCatchesA(RunThatWroteNoFile|nUnchangedVerdict)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

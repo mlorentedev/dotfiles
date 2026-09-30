@@ -52,6 +52,34 @@ func TestSpecReviewForegroundDoesNotShellOut(t *testing.T) {
 	}
 }
 
+func TestSpecReviewForegroundRejectsMalformedReview(t *testing.T) {
+	seedReviewFixture(t)
+	withReviewBase(t, "basebasebase", "headheadhead")
+
+	prev := runForeground
+	runForeground = func(dir string, _ []string, _ string) error {
+		review := `---
+reviewer: nan/deepseek-v4-flash
+reviewed_sha: headheadhead
+---
+
+FAIL
+`
+		return os.WriteFile(filepath.Join(dir, "specs", "AI-001-x", "review.md"), []byte(review), 0o600)
+	}
+	t.Cleanup(func() { runForeground = prev })
+
+	_, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground")
+	if err == nil {
+		t.Fatal("a malformed review.md must make the foreground command fail")
+	}
+	for _, want := range []string{"review.md", "verdict", "review-transcript.jsonl"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error should mention %q, got %q", want, err)
+		}
+	}
+}
+
 // The dry-run line has to be runnable as printed. The tmux form's last element
 // is an entire pipeline, so joining the raw elements with spaces yields a line
 // that a human pasting it would hand to tmux as several arguments instead of one.
