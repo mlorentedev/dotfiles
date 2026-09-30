@@ -1,7 +1,7 @@
 ---
 id: "AI-034-opencode-npm-channel"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1294"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -49,3 +49,5 @@ Measured 2026-08-27 on the Windows work box: `setup-windows.ps1` printed *"OpenC
 
 - Bitácora: #1294 (AI-034); #145 (AI-021 umbrella), #791 (AI-028), #1265 / #1262 / #1267 (convergence + pin semantics).
 - ADR-036 (this change), ADR-020, CLI-029 (`packages.json`), `pattern-setup-script-idempotence`.
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1311 -->
