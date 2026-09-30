@@ -97,7 +97,7 @@ func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, c
 			}
 		}
 		if rep.Drift() {
-			return fmt.Errorf("the Orca Copilot hooks need tuning — run `dotf orca tune-hooks` (DX-006)")
+			return fmt.Errorf("the Orca Copilot hooks need tuning — run `dotf orca tune-hooks`")
 		}
 		return nil
 	}
@@ -105,7 +105,7 @@ func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, c
 		_, _ = fmt.Fprintf(w, "backup     %s\n", bak)
 	}
 	if rep.ScriptUnrecognised {
-		_, _ = fmt.Fprintf(w, "unchanged  %s has Invoke-WebRequest but the POST line is unrecognised — review it by hand (DX-006)\n", hookScript)
+		_, _ = fmt.Fprintf(w, "unchanged  %s has Invoke-WebRequest but the POST line is unrecognised — review it by hand\n", hookScript)
 	}
 	if rep.Changed == 0 && rep.ScriptUnrecognised {
 		// Not "in sync": the line above says a file still needs a hand. The
@@ -113,7 +113,7 @@ func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, c
 		return nil
 	}
 	if rep.Changed == 0 {
-		_, _ = fmt.Fprintln(w, "in sync   Orca's Copilot hooks already tuned (DX-006)")
+		_, _ = fmt.Fprintln(w, "in sync   Orca's Copilot hooks already tuned")
 		return nil
 	}
 	_, _ = fmt.Fprintf(w, "tuned      %d fix(es) applied — restart the Copilot CLI session to pick up the new orca.json timeout\n", rep.Changed)

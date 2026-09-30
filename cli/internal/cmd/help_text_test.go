@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"regexp"
 	"sort"
@@ -96,6 +99,41 @@ func TestReadmeHasNoInternalReferences(t *testing.T) {
 	for i, line := range strings.Split(string(data), "\n") {
 		if m := ref.FindString(line); m != "" {
 			t.Errorf("cli/README.md:%d mentions %q: %s", i+1, m, strings.TrimSpace(line))
+		}
+	}
+}
+
+// outputCleanFiles are the sources whose printed strings have been cleaned of
+// internal ids. Output is built inside RunE and the doctor checks, where the
+// cobra walk above cannot reach, so these are read as Go source. A file joins
+// the list once its strings name behaviour; the rest are tracked in #1891.
+var outputCleanFiles = []string{"orca.go", "../doctor/checks_orca.go"}
+
+// TestOutputStringsHaveNoInternalReferences checks every string literal in
+// outputCleanFiles against the same pattern as --help. Comments are not string
+// literals, so they keep their ids.
+func TestOutputStringsHaveNoInternalReferences(t *testing.T) {
+	ref := internalRef(t)
+	for _, file := range outputCleanFiles {
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		literals := 0
+		ast.Inspect(f, func(n ast.Node) bool {
+			lit, ok := n.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			literals++
+			if m := ref.FindString(lit.Value); m != "" {
+				t.Errorf("%s mentions %q: %s", fset.Position(lit.Pos()), m, lit.Value)
+			}
+			return true
+		})
+		if literals == 0 {
+			t.Errorf("%s has no string literals: the path is wrong or the file moved", file)
 		}
 	}
 }
