@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-041-ci-path-filtering"
 type: spec
-status: implementing
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-20"
 issue: "mlorentedev/dotfiles#552"
 tags: [spec, proposal]
@@ -16,7 +16,7 @@ Every `pull_request` to `main` currently runs the full matrix (`lint`, `lint-pow
 
 ## What
 
-Add a `changes` job using `dorny/paths-filter@v3` at the top of `.github/workflows/ci.yml` providing `code` and `powershell` filter outputs. Guard the expensive steps in all matrix jobs with `if: github.event_name == 'push' || needs.changes.outputs.code == 'true'` (or `powershell` for `lint-powershell`). This ensures all required job names run and report green in ~3-5 seconds on docs-only PRs without violating GitHub branch protection requirements.
+Add a `changes` job using a SHA-pinned `dorny/paths-filter` (`@v3` at merge, `@v4` since #1220) at the top of `.github/workflows/ci.yml` providing `code` and `powershell` filter outputs. Guard the expensive steps in all matrix jobs with `if: github.event_name == 'push' || needs.changes.outputs.code == 'true'` (or `powershell` for `lint-powershell`). This ensures all required job names run and report on docs-only PRs, skipping their heavy steps, without violating GitHub branch protection requirements.
 
 ## Out of scope
 
@@ -30,12 +30,14 @@ Add a `changes` job using `dorny/paths-filter@v3` at the top of `.github/workflo
 
 ## Acceptance criteria
 
-- [ ] `changes` job exists in `.github/workflows/ci.yml` using `dorny/paths-filter@v3`.
-- [ ] `lint`, `lint-powershell`, `test`, `test-windows`, `integration` depend on `changes`.
-- [ ] Heavy steps in all matrix jobs carry conditional guards.
-- [ ] Regression suite `tests/ci-path-filtering.bats` passes.
+- [x] `changes` job exists in `.github/workflows/ci.yml` using a SHA-pinned `dorny/paths-filter`.
+- [x] `lint`, `lint-powershell`, `test`, `test-windows`, `integration` depend on `changes`.
+- [x] Every step after checkout in those jobs carries a guard on a `changes` output.
+- [x] Regression suite `tests/ci-path-filtering.bats` passes, and every tracked top-level entry is either in the `code` filter or declared docs-only in it.
 
 ## References
 
 - Issue: https://github.com/mlorentedev/dotfiles/issues/552
 
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1105 -->
