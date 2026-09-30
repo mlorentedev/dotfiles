@@ -143,6 +143,45 @@ func (in *Installer) Install(t Tool) (Result, error) {
 	}
 }
 
+// PlanAction is what Install would do for a tool, without doing it.
+type PlanAction string
+
+const (
+	PlanInstall     PlanAction = "install"
+	PlanUpgrade     PlanAction = "upgrade"
+	PlanSkip        PlanAction = "skip"
+	PlanUnsupported PlanAction = "unsupported" // no release asset for this OS/arch
+)
+
+// Plan is one row of a dry run: the installed version ("" when absent), the pin
+// and the action.
+type Plan struct {
+	Name, Installed, Pin string
+	Action               PlanAction
+}
+
+// Plan reports what Install would do for t. It runs the same probe and the same
+// decideAction as Install, so a dry run cannot disagree with the apply, and it
+// never reaches the Fetch or Run seams.
+func (in *Installer) Plan(t Tool) Plan {
+	in.defaults()
+	p := Plan{Name: t.Name, Pin: t.Version}
+	if t.Source.Type == "github-release" && t.AssetName(in.GOOS, in.GOARCH) == "" {
+		p.Action = PlanUnsupported
+		return p
+	}
+	p.Installed = in.current(t)
+	switch decideAction(p.Installed, t.Version) {
+	case actionSkip:
+		p.Action = PlanSkip
+	case actionUpgrade:
+		p.Action = PlanUpgrade
+	default:
+		p.Action = PlanInstall
+	}
+	return p
+}
+
 // installRelease provisions a github-release tool: download → verify sha256 →
 // place + chmod. A failure at any step leaves Dest untouched (the binary is
 // staged in a temp dir and only moved into place after verification passes).

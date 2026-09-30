@@ -308,3 +308,49 @@ func TestDecideAction(t *testing.T) {
 		}
 	}
 }
+
+// Plan runs the reconcile decision Install runs, and touches nothing: the fetch
+// and npm seams fail the test if the plan reaches them.
+func TestInstallerPlan(t *testing.T) {
+	release := Tool{Name: "sops", Version: "3.13.1", Source: Source{
+		Type: "github-release", Repo: "getsops/sops",
+		Asset:     map[string]string{"linux": "sops-v{version}.linux.{goarch}"},
+		Checksums: "sops-v{version}.checksums.txt",
+	}}
+	npm := Tool{Name: "bw", Version: "2026.9.0", Source: Source{Type: "npm", Package: "@bitwarden/cli"}}
+	cases := []struct {
+		name, goos, installed string
+		tool                  Tool
+		want                  PlanAction
+	}{
+		{"absent", "linux", "", release, PlanInstall},
+		{"below the pin", "linux", "3.12.0", release, PlanUpgrade},
+		{"at the pin", "linux", "3.13.1", release, PlanSkip},
+		{"above the pin is never downgraded", "linux", "3.14.0", release, PlanSkip},
+		{"no build for this platform", "windows", "", release, PlanUnsupported},
+		{"npm below the pin", "linux", "2026.1.0", npm, PlanUpgrade},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &Installer{
+				GOOS: tc.goos, GOARCH: "amd64", Dest: t.TempDir(),
+				CurrentVersion: func(string) string { return tc.installed },
+				Fetch: func(string, string) error {
+					t.Fatal("a plan must not download")
+					return nil
+				},
+				Run: func(string, ...string) error {
+					t.Fatal("a plan must not run a package manager")
+					return nil
+				},
+			}
+			got := in.Plan(tc.tool)
+			if got.Action != tc.want {
+				t.Errorf("Plan(%s).Action = %q, want %q", tc.tool.Name, got.Action, tc.want)
+			}
+			if got.Installed != tc.installed || got.Pin != tc.tool.Version {
+				t.Errorf("Plan(%s) = %+v, want installed %q pin %q", tc.tool.Name, got, tc.installed, tc.tool.Version)
+			}
+		})
+	}
+}
