@@ -2,6 +2,7 @@ package spec
 
 import (
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -466,6 +467,13 @@ func TestReviewerCommandGivesAgyReachIntoTheRepo(t *testing.T) {
 	}
 	if got := argvValue(argv, "--add-dir"); got != "/repo/root" {
 		t.Fatalf("agy must be given the repo as a workspace or it cannot execute in it, got %q", got)
+	}
+	if runtime.GOOS == "windows" {
+		if argvIndex(argv, "--sandbox") >= 0 {
+			t.Error("Windows agy reviews must not request the AppContainer sandbox")
+		}
+	} else if argvIndex(argv, "--sandbox") < 0 {
+		t.Error("non-Windows agy reviews must retain sandbox isolation")
 	}
 	// --print must still be last, or it consumes a flag as the prompt.
 	if i := argvIndex(argv, "--print"); i != len(argv)-2 {

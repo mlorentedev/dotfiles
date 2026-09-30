@@ -29,6 +29,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - No regressions: targeted reviewer-command tests pass. The complete
   `internal/spec` suite hit its existing 10-minute timeout in an unrelated
   git-staleness test under concurrent worktree load.
+- Review round 1 dispositions:
+  - **Applied:** added AC4 to `features.json` with a focused non-vacuous command;
+    the real agy probe remains recorded above as live evidence.
+  - **Applied:** restored the sandbox assertion in
+    `TestReviewerCommandGivesAgyReachIntoTheRepo`, conditional on the platform,
+    so non-Windows retention and the Windows exception are both pinned.
 
 ## Decisions made during implementation
 

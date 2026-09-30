@@ -19,5 +19,12 @@
     "verification": "cd cli && go test ./internal/spec -run '^TestReviewerCommandDoesNotGivePiAgySpecificFlags$' -count=1",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "HARNESS-168-agy-windows-no-sandbox-f4",
+    "behavior": "The Windows reviewer command can execute repository commands without requesting AppContainer elevation.",
+    "verification": "cd cli && go test ./internal/spec -run '^TestAgyReviewerCommandOmitsSandboxOnWindows$' -count=1",
+    "state": "pending",
+    "evidence": ""
   }
 ]
