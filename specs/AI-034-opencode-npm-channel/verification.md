@@ -56,9 +56,20 @@ The last line is the finding this spec makes visible: three copies on the box, w
 - **`ProbeVersion` uses output even on a non-zero exit.** Several tools print the version and then complain about something unrelated; an absent tool is distinguished by having no output at all.
 - **Shadowed copies are a WARN, not a FAIL.** The tool runs; what is wrong is which copy `dotf tools install` can converge, and that is the operator's removal to make (ADR-036 §4).
 
+## Review dispositions (round 1, PASS, `nan/deepseek-v4-flash`, 2026-09-30)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Major (theoretical): the installer's version probes drop output on any non-zero exit, `tools.ProbeVersion` keeps it | defer: #1871. No catalog tool triggers it today; all four npm tools exit 0 |
+| 2 | Minor (theoretical): `dirsProviding` counts a symlinked PATH alias as a second copy | defer: #1871 |
+| 3 | Minor (theoretical): an unreadable catalog makes the pin and shadow checks go quiet | defer: #1871 |
+| 4 | Question: empty prior digest, and a base 262 commits back | no action: a first review has no prior digest, and the reviewer bounded the change to its own commit |
+
 ## Promotion candidates
 
-- None beyond the ADR: the channel policy is a build/operate decision and lives in `docs/adr/`.
+- [x] Lesson for the repo's `docs/lessons/`? no: the channel policy is a decision, recorded in the ADR rather than a lesson
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-036-install-channels.md
+- [x] New pattern candidate for `00_meta/patterns/`? no: one repo's install channels
 
 ## Archive checklist
 
