@@ -19,6 +19,7 @@ created: "2026-08-29"
 - [x] [AC3] `doctor`: `repairProfile` runs the heal through `CommandOutputBounded` (60 s) as `pwsh -NoProfile -File <heal> -ProfilePath <profile>` and re-measures `profile`; the heal test's fakes answer the `$PROFILE` query and assert the new argv; the FAIL and FIX lines say the heal rewrites from the SSOT and keeps the rest only in the backup.
 - [x] [AC4] `scripts/profile-heal.ps1`: `-ProfilePath` parameter, `$PROFILE` when absent; synopsis says so. `tests/profile-heal-ps1.bats` asserts the parameter exists and the default. ASCII only.
 - [x] [AC5] `doctor`: `TestProfileHealThresholdsMatchTheScript` reads `scripts/profile-heal.ps1` and asserts `-gt 1MB` beside `profileMaxBytes == 1<<20`, and `StartMarkers -gt 1 -or $state.EndMarkers -gt 1` beside doctor's `> 1` rule.
+- [x] [AC1][AC3] Review round 1: a target that does not exist is the missing FAIL (`PowerShell profile missing: <path> (<source>) — run setup-windows.ps1`), never BUG-020, and `--fix` does not run the heal for it (tested on both paths, round 2); the heal test's profile lives outside the four enumerated roots with a decoy inside, so a `--fix` that healed the enumerated file goes red; the pwsh answer is its last line and must name a `.ps1` file, else the enumeration answers; the hand-run remedy quotes both paths.
 - [x] [AC6] Box: `dotf doctor` names the pwsh-resolved path; `profile-heal.ps1 -ProfilePath <scratch copy with two marker pairs>` heals the copy; the real profile's hash is unchanged before/after.
 
 ## Closing
