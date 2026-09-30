@@ -156,6 +156,11 @@ type System struct {
 	// answer different questions and one returning the other's shape is how a
 	// consumer gets taught about one and forgotten for the other.
 	BWItemRevisions func() ([]secrets.ItemRevision, error)
+	// BWSync pulls the vault into the bw serve daemon's cache. The daemon answers
+	// every read from that cache, so a listing taken without a sync can be of any
+	// age (#1820). Nil means doctor has no way to sync, and a check that needs a
+	// fresh listing skips.
+	BWSync func() error
 	// BWLastSync returns the timestamp of the last successful Bitwarden sync.
 	// Returns zero time if never synced or unreadable (BUG-087).
 	BWLastSync func() (time.Time, error)
@@ -244,6 +249,9 @@ func realSystem() *System {
 		},
 		BWItemRevisions: func() ([]secrets.ItemRevision, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemRevisions()
+		},
+		BWSync: func() error {
+			return secrets.BWServeClient{}.Sync()
 		},
 		BWLastSync: func() (time.Time, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), bwStatusTimeout)

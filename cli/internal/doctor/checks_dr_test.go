@@ -54,6 +54,7 @@ func drSysExposed(t *testing.T, now time.Time, bwBacked int, regErr error) *Syst
 		LookPath:        func(n string) (string, error) { return "/usr/bin/" + n, nil },
 		Now:             func() time.Time { return now },
 		BWBackedSecrets: func() (int, error) { return bwBacked, regErr },
+		BWSync:          func() error { return nil },
 	}
 }
 
@@ -357,6 +358,69 @@ func TestDR_NoVaultListing_SkipsRatherThanPasses(t *testing.T) {
 	}
 	if !strings.Contains(out, "drift was not checked") || !strings.Contains(out, "locked") {
 		t.Errorf("the skip must say it did not check, and why, got: %s", out)
+	}
+}
+
+// The false pass #1820 measured: bw serve answers from its own cache, so an item
+// deleted in the app after the backup is still listed by an unsynced daemon, and
+// that stale listing equals the old escrow. The listing below answers stale until
+// something syncs, so only a compare made AFTER the sync can see the deletion.
+func TestDR_ComparesTheVaultOnlyAfterSyncingIt(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, storedManifest(t, "1", "2"))
+	sys := drSys(t, time.Now())
+	synced := false
+	sys.BWSync = func() error { synced = true; return nil }
+	stale, fresh := liveVault(t, "1", "2"), liveVault(t, "1")
+	sys.BWItemRevisions = func() ([]secrets.ItemRevision, error) {
+		if synced {
+			return fresh()
+		}
+		return stale()
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(sys, &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if strings.Contains(out, "still describes the vault") {
+		t.Fatalf("the escrow was compared with an unsynced cache and passed:\n%s", out)
+	}
+	if !strings.Contains(out, "DELETED") {
+		t.Errorf("the deletion the synced listing shows must be reported, got: %s", out)
+	}
+}
+
+// A sync that failed leaves a cache of unknown age. Comparing it anyway is how the
+// false pass comes back, so the check refuses to answer rather than guess.
+func TestDR_FailedSyncSkipsRatherThanComparesAStaleCache(t *testing.T) {
+	dir := t.TempDir()
+	escrowWith(t, dir, storedManifest(t, "1", "2"))
+	sys := drSys(t, time.Now())
+	sys.BWSync = func() error { return errors.New("bw serve: sync timed out") }
+	listed := false
+	sys.BWItemRevisions = func() ([]secrets.ItemRevision, error) {
+		listed = true
+		return liveVault(t, "1", "2")()
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkDisasterRecovery(sys, &Config{DotfilesDir: dir}, rep)
+
+	out := buf.String()
+	if strings.Contains(out, "still describes the vault") {
+		t.Fatalf("a check whose sync failed must not report success:\n%s", out)
+	}
+	if listed {
+		t.Errorf("the cache was read after its sync failed")
+	}
+	if !strings.Contains(out, "drift was not checked") || !strings.Contains(out, "timed out") {
+		t.Errorf("the skip must say it did not check, and why, got: %s", out)
+	}
+	if rep.Failures() != 0 {
+		t.Errorf("an unreachable daemon is not a broken escrow; SKIP, not FAIL:\n%s", out)
 	}
 }
 

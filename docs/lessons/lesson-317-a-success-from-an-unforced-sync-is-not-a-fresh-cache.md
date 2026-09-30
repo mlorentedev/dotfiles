@@ -29,4 +29,10 @@ Forcing the sync surfaced a second cache. A forced sync makes the daemon rebuild
 
 Resolve an item from the unfiltered list and match it locally. That list is answered from the item cache, not from the index. When you fix one cache, look for the next cache the fix now exercises.
 
-Refs: SEC-006 (#1784); `BWServeClient.Sync` in `cli/internal/secrets/bwserve.go`.
+## The reader that never refreshed
+
+Forcing the sync fixed every reader that called `Sync()`. Doctor's escrow check never called it. It compared the escrow with whatever the daemon had cached, so the false alarm above could also run the other way. An item deleted in the app after a backup is still listed by an unsynced daemon, that stale listing equals the old escrow, and doctor passed an escrow that no longer described the vault. That false pass is the direction that loses data. Since #1820, the check syncs first and SKIPs when the sync fails.
+
+A fix to the refresh reaches only the readers that call it. List every reader of the cache, not only the ones that refresh.
+
+Refs: SEC-006 (#1784); #1820; `BWServeClient.Sync` in `cli/internal/secrets/bwserve.go`; `checkEscrowDescribesVault` in `cli/internal/doctor/checks_dr.go`.
