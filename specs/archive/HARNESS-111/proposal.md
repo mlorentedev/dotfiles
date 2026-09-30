@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-111"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-05"
 issue: "mlorentedev/dotfiles#1241"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, doctrine]
@@ -43,3 +43,5 @@ Normalise typographic punctuation to ASCII in a **capped** doctrine payload, so 
 - **AC4** — `shellcheck` reports no new findings against `main`, and in particular zero SC1112.
 - **AC5** — `bash -n` and `zsh -n` both parse the script; the deploy is idempotent on a second run.
 - **AC6** — The cap warning reports both units, so the number a reader quotes is the binding one.
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1513 -->
