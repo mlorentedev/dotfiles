@@ -94,6 +94,23 @@ Describe 'Set-DotfBinary' {
                 }
             }
         }
+
+        It 'refuses release metadata whose tag is not a semver version' {
+            $previous = $env:DOTF_VERSION
+            Remove-Item Env:DOTF_VERSION -ErrorAction SilentlyContinue
+            try {
+                Mock Test-Path { $false }
+                Mock Invoke-RestMethod { [pscustomobject]@{ tag_name = 'nightly' } }
+
+                { Get-DotfVersion -Version '' } | Should -Throw '*no semver tag*'
+            } finally {
+                if ($null -eq $previous) {
+                    Remove-Item Env:DOTF_VERSION -ErrorAction SilentlyContinue
+                } else {
+                    $env:DOTF_VERSION = $previous
+                }
+            }
+        }
     }
 
     It 'leaves no staging artifact behind after a clean swap' {

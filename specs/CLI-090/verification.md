@@ -10,7 +10,7 @@ created: "2026-09-28"
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] Criterion 1 -> `tests/install-dotf.bats`: `a raw installer stream installs an explicit release outside a checkout`
-- [x] Criterion 2 -> `tests/install-dotf.bats`: latest-release resolver tests; `tests/install-dotf-ps1.Tests.ps1`: `Get-DotfVersion` fallback test
+- [x] Criterion 2 -> `tests/install-dotf.bats`: latest-release resolver tests; `tests/install-dotf-ps1.Tests.ps1`: `Get-DotfVersion` fallback test, and (added at archive time) the malformed-tag refusal
 - [x] Criterion 3 -> existing checksum/atomic-swap regression cases in both installer test suites
 - [x] Criterion 4 -> `README.md` documents native recovery commands and `dotf version` assertion
 
@@ -39,6 +39,29 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - [x] Lesson for the repo's `docs/lessons/`? no: the behavior and its test fixtures document the checkout-free recovery contract directly.
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-019 and ADR-036 already establish the update and release-channel boundaries; this change implements them.
 - [x] New pattern candidate for `00_meta/patterns/`? no: this is repository-specific installer behavior, not a cross-project mechanism.
+
+## Archive pass (2026-09-30)
+
+Implementation merged in #1805 (`66a90b75`). Re-verified on `main` at archive time:
+
+```
+$ bats tests/install-dotf.bats tests/install-dotf-ps1.bats
+1..30   all ok, exit 0
+$ shellcheck scripts/install-dotf.sh
+exit 0
+```
+
+- **The PowerShell half of AC2 had no test for malformed metadata.** The code
+  throws on a non-semver tag, but only the POSIX side proved it. This pass adds
+  `refuses release metadata whose tag is not a semver version` to
+  `tests/install-dotf-ps1.Tests.ps1`. pwsh is not installed on this Linux box,
+  so the case runs in CI's Windows Pester job; the PR's `test (windows-latest)`
+  result is the evidence.
+- **`features.json` f4 grepped for the words "Recovery", "bootstrap" and
+  "install-dotf" anywhere in the README.** Almost any README matches that. It now
+  checks the two one-line recovery commands, the `dotf version` assertion and
+  the checkout-bootstrap distinction. f5 covers the PowerShell resolver.
+- The lint box was open because ShellCheck was missing in WSL. It passes on Linux.
 
 ## Archive checklist
 

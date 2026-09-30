@@ -23,7 +23,14 @@
   {
     "id": "CLI-090-f4",
     "behavior": "Documentation distinguishes native release recovery from checkout bootstrap.",
-    "verification": "rg -n \"Recovery|bootstrap|install-dotf\" README.md",
+    "verification": "grep -qF 'scripts/install-dotf.sh | bash' README.md && grep -qF 'scripts/install-dotf.ps1 | iex' README.md && grep -q '^dotf version$' README.md && grep -qi 'checkout bootstrap' README.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-090-f5",
+    "behavior": "The PowerShell installer resolves the latest release without a pin and refuses release metadata whose tag is not semver.",
+    "verification": "pwsh -NoProfile -Command \"Invoke-Pester -Path tests/install-dotf-ps1.Tests.ps1 -CI\"",
     "state": "pending",
     "evidence": ""
   }
