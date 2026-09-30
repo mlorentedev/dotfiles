@@ -22,6 +22,7 @@ created: "2026-08-29"
 - [x] [AC3] `env` + `cmd`: `Retired(reader, vars)` for the read-only callers; `dotf env persist --check` prints `retired: NAME` per leftover and exits non-zero; `persist` prints `removed NAME` and counts removals in its summary; `--help` names the marker.
 - [x] [AC4] `doctor`: the adapter satisfies `UserEnvReader` only (its `Set` no-op goes); the row WARNs on leftovers with the remedy; test by status gains the retired case.
 - [x] [AC5] `persist_windows.go`: `Delete` via `DeleteValue`, `ErrNotExist` → nil, broadcasts the change like `Set`.
+- [x] [AC1][AC3][AC4] `env`: `ValidateNames` also refuses a contract name equal (case-insensitively) to the marker; `persist`, `--check` and doctor all call it, so no read path passes or names a remedy on a contract the write refuses (review round 1).
 - [x] [AC6] Box: scratch copy of the real contract minus one name, `DOTFILES_REPO_DIR` pointed at it, `dotf env persist` twice, registry read between; then the real contract again to restore.
 
 ## Closing

@@ -9,12 +9,12 @@ created: "2026-08-29"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [x] AC1 (marker written once, second run inert) -> commit `a1878e0` / `TestPersist_WritesTheMarkerOnce`, `TestPersist_TouchesOnlyWhatDiffers` (now expects the marker as the third write), `TestMarkerValue`
-- [x] AC2 (only the retired name goes, a foreign name never) -> `a1878e0` / `TestPersist_SweepsOnlyWhatTheMarkerOwns`, `TestPersist_DeletesBeforeItWrites`, `TestLeftovers` (8 cases)
-- [x] AC3 (`--check` names `retired: NAME`, non-zero; `persist` prints `removed NAME`) -> `a1878e0` / `TestEnvPersist_CheckAndSweepOfARetiredName` (cmd), `TestRetired` (env)
-- [x] AC4 (doctor WARNs on a leftover with the remedy, PASS once swept) -> `a1878e0` / `TestCheckPersistedEnv_ByStatus` cases "retired name still persisted → WARN naming it", "marker in sync → PASS"
-- [x] AC5 (no marker → nothing deleted, marker written; Delete of an absent name succeeds; off Windows no-op) -> `a1878e0` / `TestPersist_NoMarkerDeletesNothing`, `TestFakeUserEnv_DeleteAbsentSucceeds`, `TestEnvPersist_UnsupportedScopeIsANoOp`; `registryUserEnv.Delete` maps `registry.ErrNotExist` to nil; `GOOS=windows` and `GOOS=linux` vet clean
-- [x] AC6 (box) -> transcript below, Windows work box, 2026-08-29, binary built from `a1878e0`'s tree
+- [x] AC1 (marker written once, second run inert) -> commit `8de1cd1` / `TestPersist_WritesTheMarkerOnce`, `TestPersist_TouchesOnlyWhatDiffers` (now expects the marker as the third write), `TestMarkerValue`
+- [x] AC2 (only the retired name goes, a foreign name never) -> `8de1cd1` / `TestPersist_SweepsOnlyWhatTheMarkerOwns`, `TestPersist_DeletesBeforeItWrites`, `TestLeftovers` (8 cases)
+- [x] AC3 (`--check` names `retired: NAME`, non-zero; `persist` prints `removed NAME`) -> `8de1cd1` / `TestEnvPersist_CheckAndSweepOfARetiredName` (cmd), `TestRetired` (env)
+- [x] AC4 (doctor WARNs on a leftover with the remedy, PASS once swept) -> `8de1cd1` / `TestCheckPersistedEnv_ByStatus` cases "retired name still persisted → WARN naming it", "marker in sync → PASS"
+- [x] AC5 (no marker → nothing deleted, marker written; Delete of an absent name succeeds; off Windows no-op) -> `8de1cd1` / `TestPersist_NoMarkerDeletesNothing`, `TestFakeUserEnv_DeleteAbsentSucceeds`, `TestEnvPersist_UnsupportedScopeIsANoOp`; `registryUserEnv.Delete` maps `registry.ErrNotExist` to nil; `GOOS=windows` and `GOOS=linux` vet clean
+- [x] AC6 (box) -> transcript below, Windows work box, 2026-08-29, binary built from `8de1cd1`'s tree
 
 ## Test status
 
@@ -57,6 +57,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **Reader/store split.** `Drift` and `Retired` take `UserEnvReader`; the doctor adapter loses the `Set` no-op it carried only to satisfy an interface wider than its caller.
 - **The marker is reported as a result line** (`persisted DOTF_MANAGED_ENV` on the run that writes it, an "unchanged" on the others) rather than hidden: a visible store value should have a visible write.
 - **No marker → no sweep**, stated in the proposal as out of scope with the WIN-013 contrast, not silently.
+
+## Review round 1 (FAIL, 2026-09-30) — dispositions
+
+`review.md` round 1 (`nan/deepseek-v4-flash`) failed on one Major. Every finding is dispositioned here:
+
+- **Major, reserved name: applied.** `ValidateNames` (was `checkNames`) now refuses a contract variable spelled like `DOTF_MANAGED_ENV` in any case. Otherwise the marker would overwrite it on every run. Tests: `TestPersist_RefusesTheMarkerNameAsAVariable` (no store op).
+- **Minor, `--check` does not validate names: applied.** `checkPersisted` and doctor's `checkPersistedEnv` call `ValidateNames` first. A check can no longer pass on a contract, or name a remedy, that `persist` then refuses. Tests: `TestEnvPersist_CheckRefusesTheMarkerNameAsPersistDoes` (persist and `--check` both refuse; the store is untouched), and doctor case "reserved contract name → WARN naming the refusal".
+- **Minor, provenance: applied.** `a1878e0` was never an object in this repository, so it was replaced with `8de1cd1` (#1378).
+- **Minor, combined drift + retired doctor case: applied.** Two rows were added to `TestCheckPersistedEnv_ByStatus`, one naming the drifted variable and one naming the retired one.
+- **Minor THEORETICAL, `--check` is not a snapshot: declined.** Each box has one writer: `persist` runs from setup, by hand, or from doctor's remedy, never concurrently with itself. `--check` is advisory, and `persist` is idempotent: a check that raced a run is corrected by the next check. A lock around a per-user registry key would cost more than the state it protects.
 
 ## Promotion candidates
 
