@@ -27,6 +27,41 @@ Otherwise, let it accumulate. Skill records, doctrine, CI, scripts and documenta
 
 While a fix waits, tell live peers about the hazard and its workaround. For #1725, that was a `--dry-run` before `dotf mem handoff-write`.
 
+## Landing several PRs before a release
+
+Merging ready PRs before the release PR puts them in one release instead of several. Branch protection requires a branch to be up to date with main, so each merge puts every other open PR behind. Land them one at a time:
+
+1. **Wait for the merge state to settle.** Right after main moves, `mergeStateStatus` reads `UNKNOWN` for several seconds. Poll until it reads something else:
+
+   ```bash
+   gh pr view <N> --repo mlorentedev/dotfiles --json mergeStateStatus --jq .mergeStateStatus
+   ```
+
+2. **If it reads `BEHIND`, update the branch and read the new head:**
+
+   ```bash
+   gh api -X PUT repos/mlorentedev/dotfiles/pulls/<N>/update-branch -f expected_head_sha=<old sha>
+   gh pr view <N> --repo mlorentedev/dotfiles --json headRefOid --jq .headRefOid
+   ```
+
+3. **Wait for every check on the new head.** Budget 10 to 15 minutes; the Windows test job is the slow one.
+4. **Gate the merge.** Merge only when `dotf pr triage-queue` does not list the PR and every check on the new head passed. The update can bring new reviewer output, so read the queue after CI, not before. If the PR is listed, triage it first.
+5. **Merge on the head you verified:**
+
+   ```bash
+   gh pr merge <N> --repo mlorentedev/dotfiles --squash --match-head-commit <new sha>
+   ```
+
+6. Go back to step 1 for the next PR.
+
+Update only the PR you are about to merge. Updating all of them at once reruns every Windows job on each merge and saves no time. Lesson 324 records why steps 1 and 4 exist.
+
+After the last merge, check the regenerated release PR before its merge:
+
+- Its head sha changed. Re-read its checks for the new head, and look for `action_required` runs: a workflow run on a bot-authored push can wait for approval without any notice.
+- Its CHANGELOG lists each `feat:` and `fix:` that landed. `chore:` commits are left out by design.
+- Its triage record is newer than any reviewer output. CodeRabbit pauses on the release branch and PR-Agent skips release PRs, so a fresh `## Review triage` comment is usually all it needs.
+
 ## Steps
 
 1. **Merge the release PR** (`chore(main): release X.Y.Z`). Manu merges it; an agent does not.
