@@ -1,7 +1,7 @@
 ---
 id: "TOOL-023-pr-agent-incremental-push-review"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-09-25"
 issue: "mlorentedev/dotfiles#1756"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ci, review, pr-agent]
@@ -57,10 +57,10 @@ The rest of the field reviews once and again only on request, or past a bound:
 
 ## Acceptance criteria
 
-- [ ] AC1: the gate returns `run=false` below 3 new non-merge commits and `run=true` at or past it. It finds the previous review as PR-Agent does, ignores merge commits, skips a bot push, runs when there is no previous review, and runs on unreadable input. Tested offline.
-- [ ] AC2: `pr-agent.yml` runs the gate only on `synchronize`. PR-Agent and the guard are skipped when it returns `run=false`, and `push_commands` follows the gate's `mode` output — `["/review -i"]` when it is `incremental`, `["/review"]` otherwise (amended by the #1757 triage follow-up below).
-- [ ] AC3: the registry declares the incremental heading, and the guard accepts any declared marker.
-- [ ] AC4: the #1053 comment is replaced, ADR-040 exists, and `pr-stewardship` names the draft practice.
+- [x] AC1: the gate returns `run=false` below 3 new non-merge commits and `run=true` at or past it. It finds the previous review as PR-Agent does, ignores merge commits, skips a bot push, runs when there is no previous review, and runs on unreadable input. Tested offline.
+- [x] AC2: `pr-agent.yml` runs the gate only on `synchronize`. PR-Agent and the guard are skipped when it returns `run=false`, and `push_commands` follows the gate's `mode` output — `["/review -i"]` when it is `incremental`, `["/review"]` otherwise (amended by the #1757 triage follow-up below).
+- [x] AC3: the registry declares the incremental heading, and the guard accepts any declared marker.
+- [x] AC4: the #1053 comment is replaced, ADR-040 exists, and `pr-stewardship` names the draft practice.
 
 ## Follow-up (triage on #1757, comment 5851151835)
 
