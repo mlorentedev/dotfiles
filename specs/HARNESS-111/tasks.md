@@ -17,3 +17,4 @@ created: "2026-09-05"
 - [x] Prove the byte assertion red with the fold disabled, confirming the mutation landed first.
 - [x] Confirm no new `shellcheck` findings against `main`.
 - [x] Coordinate with the parallel session, since #1495 is parked on the same cap.
+- [x] Review round 1: both cap warnings print `characters / bytes` and compare against the larger. Test: `tests/compile-harness.bats` "the over-cap warning … names characters and bytes" (the generated doctrine, and a user's file whose two counts differ). Amend AC3 to the fixed-table fold #1685 shipped.

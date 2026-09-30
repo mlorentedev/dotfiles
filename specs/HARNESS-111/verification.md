@@ -64,3 +64,17 @@ Running the script *under* `zsh` fails on `main` too; it is `#!/usr/bin/env bash
 ## Not verified, and stated rather than implied
 
 **Which unit Antigravity actually counts.** The manifest declares `char_cap` citing "12000 characters", and nothing in this repository has tested that against the live consumer. This change makes the answer not matter for the payload; it does not establish it. The experiment that would — a marked sentinel at the end of the payload, deployed, then asked for — is recorded on #1241 and is not part of this spec.
+
+## Review round 1 (FAIL, 2026-09-30) — dispositions
+
+`review-round-1.md` (`agy/gemini-3.1-pro-high`):
+
+- **Blocker, the code folds accents and section signs against AC3: resolved by amending the contract, not the code.** The fold was widened on purpose in #1685 (2026-09-24). At that point the deployed file still carried 7 non-ASCII characters, so a cap enforced in two units depended on which unit a consumer counted. The reasoning is at `fold_to_ascii`. What AC3 protected still holds: nothing outside the fixed table is guessed at, and whatever survives is reported by its bytes. `proposal.md` AC3 now says that and names #1685. `features.json` f3 now runs the two tests that assert it. Its old command ended in `rm`, so it always exited 0.
+- **Major, the cap warning printed one unit: applied.** Both warnings now print `N characters / M bytes`, and the comparison uses the larger. Before this, the user-content warning printed the promoted byte count and labelled it "characters". Tests: "the over-cap warning for the generated doctrine names characters and bytes" and "the over-cap warning for a user's file names characters and bytes, and they differ", both red before the fix. f6 runs them. Its old grep matched the fold warning, not a cap warning.
+- Checks: `tests/compile-harness.bats` 83/83; shellcheck has the same 6 SC2016 infos as `main` and no new finding; `bash -n` and `zsh -n` are clean.
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? no: the failure class, a verification command that cannot fail, is lesson 309, already written.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the fold decision is recorded at `fold_to_ascii` and in #1685.
+- [x] New pattern candidate for `00_meta/patterns/`? no: nothing here is cross-project.

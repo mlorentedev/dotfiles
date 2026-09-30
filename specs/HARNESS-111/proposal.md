@@ -39,7 +39,7 @@ Normalise typographic punctuation to ASCII in a **capped** doctrine payload, so 
 
 - **AC1** — After `--deploy`, every `doctrine.deploy` target with a `char_cap` is under that cap in **both** `wc -m` and `wc -c`.
 - **AC2** — The bats assertion fails on a tree where the normalisation is disabled, naming the byte count and the cap. Proven by mutation, not by inspection.
-- **AC3** — Characters that alter the lexicon (accents, section signs) are **not** folded, and any surviving non-ASCII is reported on stderr by the deploy.
+- **AC3** — The fold is a fixed table: a character it does not know is **not** guessed at (no catch-all replacement), and any surviving non-ASCII is reported on stderr by its bytes. *Amended 2026-09-30:* this AC first exempted accents and section signs from the fold. #1685 (2026-09-24) added them to the table deliberately: the deployed file still carried 7 non-ASCII characters, so the invariant was "under the cap in both units" rather than "ASCII". `bitacora` and `Section 4` keep their meaning. The rationale is recorded at `fold_to_ascii` in `scripts/compile-harness.sh`.
 - **AC4** — `shellcheck` reports no new findings against `main`, and in particular zero SC1112.
 - **AC5** — `bash -n` and `zsh -n` both parse the script; the deploy is idempotent on a second run.
 - **AC6** — The cap warning reports both units, so the number a reader quotes is the binding one.

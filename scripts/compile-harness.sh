@@ -1236,7 +1236,7 @@ migrate_legacy_preamble() {
 }
 
 deploy_doctrine() {
-    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars bytes gen_chars gen_bytes ids
+    local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars bytes gen_chars gen_bytes max gen_max ids
     mapfile -t ids < <(jq -r '.doctrine.inject[]' "$MANIFEST")
     while IFS=$'\t' read -r agent file cap shadow; do
         [[ -n "$agent" ]] || continue
@@ -1312,20 +1312,26 @@ deploy_doctrine() {
                 printf '[deploy] WARN %s: generated doctrine is %s chars / %s bytes; non-ASCII survives the fold (utf-8 hex: %s)\n' \
                     "$file_abs" "$gen_chars" "$gen_bytes" "$(non_ascii_hex "$payload")" >&2
                 printf '        extend fold_to_ascii for it, or reword the vault record\n' >&2
-                gen_chars="$gen_bytes"
             fi
-            if (( bytes > chars )); then
-                chars="$bytes"
+            # Compare against the larger unit, and print both: the number a
+            # reader quotes must be the binding one (HARNESS-111 AC6).
+            gen_max="$gen_chars"
+            if (( gen_bytes > gen_max )); then
+                gen_max="$gen_bytes"
             fi
-            if (( gen_chars > cap )); then
-                printf '[deploy] WARN %s: the GENERATED doctrine alone is %s characters, over the %s cap\n' \
-                    "$file_abs" "$gen_chars" "$cap" >&2
+            max="$chars"
+            if (( bytes > max )); then
+                max="$bytes"
+            fi
+            if (( gen_max > cap )); then
+                printf '[deploy] WARN %s: the GENERATED doctrine alone is %s characters / %s bytes, over the %s cap\n' \
+                    "$file_abs" "$gen_chars" "$gen_bytes" "$cap" >&2
                 printf '        this is ours, not the user'"'"'s content — drop an id from doctrine.inject in harness/manifest.json,\n' >&2
                 printf '        or shorten the largest enforced records (wc -m harness/enforced/*.md | sort -rn)\n' >&2
-            elif (( chars > cap )); then
-                printf '[deploy] WARN %s is %s characters, over the %s the platform documents — content past the cap may never be read\n' \
-                    "$file_abs" "$chars" "$cap" >&2
-                printf '        the generated doctrine is %s of that; the rest is the file'"'"'s own content\n' "$gen_chars" >&2
+            elif (( max > cap )); then
+                printf '[deploy] WARN %s is %s characters / %s bytes, over the %s the platform documents — content past the cap may never be read\n' \
+                    "$file_abs" "$chars" "$bytes" "$cap" >&2
+                printf '        the generated doctrine is %s characters / %s bytes of that; the rest is the file'"'"'s own content\n' "$gen_chars" "$gen_bytes" >&2
             fi
         fi
         rm -f "$payload"
