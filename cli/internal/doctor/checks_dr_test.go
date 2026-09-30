@@ -531,3 +531,20 @@ func TestDR_AbsentEscrowWithLeftoverManifest_OnlyReportsEscrowMissing(t *testing
 		t.Errorf("manifest check must not run when escrow is absent, got: %s", out)
 	}
 }
+
+// Two checks read the vault in one doctor run, and a forced sync takes seconds.
+// onceSync gives them one sync and one answer, the error included.
+func TestOnceSyncRunsTheSyncOnce(t *testing.T) {
+	calls := 0
+	boom := errors.New("sync failed")
+	sync := onceSync(func() error { calls++; return boom })
+
+	for i := 0; i < 3; i++ {
+		if err := sync(); !errors.Is(err, boom) {
+			t.Fatalf("call %d: want the first sync's error, got %v", i, err)
+		}
+	}
+	if calls != 1 {
+		t.Errorf("want 1 sync, got %d", calls)
+	}
+}

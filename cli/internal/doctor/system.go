@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	gosync "sync"
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -198,6 +199,18 @@ func resolveSecret(e secrets.Entry) (string, error) {
 }
 
 // realSystem wires System to the live OS.
+// onceSync runs sync at most once and hands every caller its result. A forced
+// bw serve sync takes seconds, and more than one check reads the vault in a
+// doctor run; the first sync already makes the cache as fresh as the run needs.
+func onceSync(sync func() error) func() error {
+	var once gosync.Once
+	var err error
+	return func() error {
+		once.Do(func() { err = sync() })
+		return err
+	}
+}
+
 func realSystem() *System {
 	return &System{
 		Getenv:   os.Getenv,
@@ -250,9 +263,7 @@ func realSystem() *System {
 		BWItemRevisions: func() ([]secrets.ItemRevision, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemRevisions()
 		},
-		BWSync: func() error {
-			return secrets.BWServeClient{}.Sync()
-		},
+		BWSync: onceSync(secrets.BWServeClient{}.Sync),
 		BWLastSync: func() (time.Time, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), bwStatusTimeout)
 			defer cancel()

@@ -40,7 +40,9 @@ const bwMappingStaleSync = 24 * time.Hour
 //
 // Severity mirrors checkBitwardenReach's rule: an unreachable or locked vault is
 // not a finding here (that section owns it). When an item appears missing:
-//   - If the daemon's last sync is fresh (within bwMappingStaleSync), it is a FAIL
+//   - If doctor synced the daemon before listing, it is a FAIL: the synced
+//     listing is the vault (#1820).
+//   - Otherwise, if the daemon's last sync is fresh (within bwMappingStaleSync), it is a FAIL
 //     because the item is genuinely absent from the vault.
 //   - If the daemon's last sync is stale or unknown (never synced), it is a WARN
 //     explaining that the item was not found in the local cache and advising a sync (BUG-087).
@@ -66,6 +68,11 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 
+	// The item list comes from bw serve's own cache, and the freshness judged
+	// below is `bw status`'s lastSync, a different cache. Syncing the daemon first
+	// makes its listing the vault's (#1820). When the sync is unavailable or fails,
+	// the lastSync heuristic below still decides.
+	synced := sys.BWSync != nil && sys.BWSync() == nil
 	present, err := sys.BWItemNames()
 	if err != nil {
 		// Locked, absent daemon, transport error: not this section's finding.
@@ -100,7 +107,7 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 		ids := declared[item]
 		sort.Strings(ids)
 
-		if !lastSync.IsZero() && sys.Now().Sub(lastSync) >= 0 && sys.Now().Sub(lastSync) <= bwMappingStaleSync {
+		if synced || (!lastSync.IsZero() && sys.Now().Sub(lastSync) >= 0 && sys.Now().Sub(lastSync) <= bwMappingStaleSync) {
 			rep.Fail(fmt.Sprintf(
 				"%s: no such item in the vault, named by %s — every `dotf secrets run` without --only fails on it, including `dotf spec review`",
 				item, strings.Join(ids, ", ")))
