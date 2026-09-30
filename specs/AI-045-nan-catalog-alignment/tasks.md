@@ -36,6 +36,12 @@ created: "2026-09-29"
 - [ ] [AC5] Failing test: no `enable_thinking` in opencode, and NaN windows and output caps equal the published figures
 - [ ] [AC5] Move thinking variants to `reasoning_effort`; `qwen3.8-flash` to 1,048,576; README facts
 
+### Prevention (one PR each)
+
+- [ ] [AC6] AI-045b #1858: force streaming for NaN in `.pr_agent.toml`, pin it in a test, measure a real review of #1856's diff
+- [ ] [AC7] AI-045c #1859: confirm the 14-minute wait's cause, then add the time-budget invariant test
+- [ ] [AC8] AI-045d #1860: daily canary workflow over `harness/model-pins.json`, with a stub-transport test and a real sibling
+
 ## Closing
 
 - [x] Every acceptance criterion of PR 1 (AC1-AC3) is covered by at least one test

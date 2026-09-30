@@ -34,6 +34,13 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
   - deepseek raises any `max_tokens` below 16384 to 16384;
   - a reasoning-only stream is closed at 60,000 characters or 420 seconds, and that closure is not billed.
 
+**Prevention: one guard per failure class this incident exposed (sub-issues of #1763).**
+
+- **AI-045b (#1858).** PR-Agent streams its NaN calls. Measured on 2026-09-30: NaN's edge returns 524 at about 125 s to a non-streamed completion, whatever the model.
+- **AI-045c (#1859).** PR-Agent's total wait is bounded by a tested budget. `ai_timeout` times attempts times models, plus setup, stays below the job's `timeout-minutes`. Run 36677077122 waited 14 minutes, and the job timeout ended it.
+- **AI-045d (#1860).** A daily canary sends a minimal call to every bound NaN model, with no PR involved. A retirement opens an issue before a PR finds it.
+- **HARNESS-067 (#902)** gives provider identity one source. Seven files had to be found by grep to move one model.
+
 ## Out of scope
 
 - The other six repositories that bind `mimo-v2.5` (hive, kubelab, web, pollex, iris, garsync). Each one moves in its own pull request under #1763, or through the shared workflow ADR-042 decides.
@@ -54,6 +61,9 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
 - [ ] AC3: the preflight falls through a model that answers non-2xx or times out, and hands PR-Agent the first model that answers. It fails the job when none answers. It never selects a model outside the declared chain. Tests drive it with a stub transport.
 - [ ] AC4: `harness/model-map.json` declares per-model concurrency and the per-key cap as NaN publishes them for the base plan, and the loader validates that shape.
 - [ ] AC5: opencode's and pi's NaN windows and output caps equal NaN's published figures. Thinking variants use `reasoning_effort`, and `enable_thinking` appears nowhere.
+- [ ] AC6 (#1858): PR-Agent's NaN calls stream, and a test pins the setting. A review of #1856's 42K-token diff completes on the primary, measured with PR-Agent's own prompt.
+- [ ] AC7 (#1859): a test fails when `ai_timeout` times attempts times models, plus setup, is not below the job's `timeout-minutes`.
+- [ ] AC8 (#1860): a scheduled workflow probes every model `harness/model-pins.json` lists as bound, and opens or updates one issue when any does not answer. A test drives it with a stub transport.
 
 ## References
 

@@ -33,5 +33,26 @@
     "verification": "echo 'PR 2' && exit 1",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f6",
+    "behavior": "AC6: PR-Agent streams its NaN calls, pinned by a test",
+    "verification": "echo 'pending: #1858' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f7",
+    "behavior": "AC7: PR-Agent's total wait is below the job timeout, asserted by a test",
+    "verification": "echo 'pending: #1859' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f8",
+    "behavior": "AC8: a daily canary probes every bound NaN model and reports the dead ones in one issue",
+    "verification": "echo 'pending: #1860' && exit 1",
+    "state": "pending",
+    "evidence": ""
   }
 ]
