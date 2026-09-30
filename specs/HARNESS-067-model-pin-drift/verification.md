@@ -108,3 +108,22 @@ present in the same array, is correctly silent.
   declared` fires on every legitimate extension; detect the shape that is
   **wrong**, not the shape that is merely **absent**"* — is a strong pattern and
   should wait for a second instance outside this repo before promotion.
+
+## Archive pass (2026-09-30)
+
+Implementation merged in #1256 (`d7e5ddcc`). Re-verified on `main` at archive
+time: every test `features.json` names exists (one `func` each, checked by name,
+since `go test -run` with a name that matches nothing still exits 0), and they
+pass:
+
+```
+$ cd cli && go test ./internal/harness/ ./internal/doctor/ -run 'ModelPins|EveryRepo|GuardRejects|Catalog|ExtractRefuses'
+ok      github.com/mlorentedev/dotfiles/cli/internal/harness
+ok      github.com/mlorentedev/dotfiles/cli/internal/doctor
+```
+
+The proposal's acceptance boxes were never ticked when #1256 merged; this pass
+ticks them against the evidence table above. Generation for the
+pipeline-owned surfaces stays open on #902 as phase 2, so this archive does
+not close that issue.
+

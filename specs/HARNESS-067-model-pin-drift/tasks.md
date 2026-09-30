@@ -36,7 +36,7 @@ created: "2026-08-27"
 - [x] No unrelated changes in the diff — staged by explicit path, because this
       worktree also carries another session's uncommitted work (#1244)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#1256)
 - [ ] Independent adversarial review before archive (`dotf spec review`) — the
       implementing session cannot be the reviewer
 

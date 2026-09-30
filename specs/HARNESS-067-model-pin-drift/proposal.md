@@ -96,21 +96,21 @@ established:
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `harness/model-pins.json` declares every routing pin site, each
+- [x] **AC1** — `harness/model-pins.json` declares every routing pin site, each
       with its normalization rule and a non-empty `why`, and is schema-validated.
-- [ ] **AC2** — every routing pin in a committed file resolves to a pool/model
+- [x] **AC2** — every routing pin in a committed file resolves to a pool/model
       the map declares, proven by a test that runs in CI.
-- [ ] **AC3** — the guard is shown to **fail** on an injected bad pin, so it
+- [x] **AC3** — the guard is shown to **fail** on an injected bad pin, so it
       cannot pass vacuously.
-- [ ] **AC4** — a catalog entry absent from the map is **not** reported as drift
+- [x] **AC4** — a catalog entry absent from the map is **not** reported as drift
       (`qwen3.8-flash`, `glm5.3-flash`), and the test asserts that explicitly.
-- [ ] **AC5** — `dotf doctor` reports a deployed routing pin that no longer
+- [x] **AC5** — `dotf doctor` reports a deployed routing pin that no longer
       resolves, demonstrated against the live `nan/deepseek-v4-flash-0731`.
-- [ ] **AC6** — the deployed check reports a pin naming a retired provider
+- [x] **AC6** — the deployed check reports a pin naming a retired provider
       (`openrouter/*`), distinctly from an unresolvable model id.
-- [ ] **AC7** — an unreadable or malformed registry fails loudly and is never
+- [x] **AC7** — an unreadable or malformed registry fails loudly and is never
       read as "no pin sites declared" (constraint C15).
-- [ ] **AC8** — the doctor check performs no writes, asserted rather than
+- [x] **AC8** — the doctor check performs no writes, asserted rather than
       assumed.
 
 ## References
