@@ -42,6 +42,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - **Declined as independently covered:** the top-level wiring test runs on the
     host OS, while the two explicit `agyReviewerCommand` tests execute both OS
     branches deterministically.
+- PR review dispositions:
+  - **Applied:** archive checklist now reflects the completed mechanical archive
+    and promotion decisions. Issue closure intentionally waits for merge.
+  - **Declined:** `review.md` names the active spec paths that existed at review
+    time. The archive gate subsequently moved those exact artifacts; rewriting
+    an independent verdict after the move would corrupt its historical scope.
+  - **Accepted risk:** Windows reviews run with standard-user access and
+    automatic tool approval. The lost AppContainer boundary is the explicit
+    compatibility decision in #1838; process-tree hardening remains separate.
 
 ## Decisions made during implementation
 
@@ -66,7 +75,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-168-agy-windows-no-sandbox/` -> `specs/archive/HARNESS-168-agy-windows-no-sandbox/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-168-agy-windows-no-sandbox/` -> `specs/archive/HARNESS-168-agy-windows-no-sandbox/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+The issue remains open until the implementation PR merges; closing it earlier
+would make the board report completion before the code reaches `main`.
