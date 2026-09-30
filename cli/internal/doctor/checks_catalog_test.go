@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,8 +87,12 @@ func TestCheckShadowedCatalogTools_NamesAnUnreadableCatalog(t *testing.T) {
 		repo := t.TempDir()
 		writeFile(t, filepath.Join(repo, "packages.json"), `{"tools":[`)
 		out := run(t, repo, t.TempDir())
-		if !strings.Contains(out, "[WARN]") || !strings.Contains(out, filepath.Join(repo, "packages.json")) {
+		// tools.Load quotes the path, which doubles a Windows backslash.
+		if !strings.Contains(out, "[WARN]") || !strings.Contains(out, fmt.Sprintf("%q", filepath.Join(repo, "packages.json"))) {
 			t.Fatalf("expected a WARN naming the unreadable file\n%s", out)
+		}
+		if !strings.Contains(out, "nothing to read") {
+			t.Errorf("with no readable copy the WARN must say the checks have nothing to read\n%s", out)
 		}
 	})
 
@@ -96,11 +101,25 @@ func TestCheckShadowedCatalogTools_NamesAnUnreadableCatalog(t *testing.T) {
 		writeFile(t, filepath.Join(repo, "packages.json"), `{"tools":[`)
 		writeFile(t, filepath.Join(mirror, "packages.json"), catalogWithOpencode)
 		out := run(t, repo, mirror)
-		if !strings.Contains(out, "[WARN]") || !strings.Contains(out, filepath.Join(repo, "packages.json")) {
+		if !strings.Contains(out, "[WARN]") || !strings.Contains(out, fmt.Sprintf("%q", filepath.Join(repo, "packages.json"))) {
 			t.Fatalf("expected a WARN naming the corrupt checkout copy\n%s", out)
+		}
+		if !strings.Contains(out, "pins are read from "+filepath.Join(mirror, "packages.json")) {
+			t.Errorf("the WARN must name the copy the pins come from\n%s", out)
 		}
 		if got := catalogPin(newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, nil, nil), &Config{DotfilesDir: mirror}, "opencode"); got != "1.16.2" {
 			t.Errorf("the mirror's pin must still be read, got %q", got)
+		}
+	})
+
+	// A readable catalog with no tools is still a readable one.
+	t.Run("an empty but valid mirror behind a corrupt checkout is named as the source", func(t *testing.T) {
+		repo, mirror := t.TempDir(), t.TempDir()
+		writeFile(t, filepath.Join(repo, "packages.json"), `{"tools":[`)
+		writeFile(t, filepath.Join(mirror, "packages.json"), `{"tools":[]}`)
+		out := run(t, repo, mirror)
+		if strings.Contains(out, "nothing to read") || !strings.Contains(out, "pins are read from "+filepath.Join(mirror, "packages.json")) {
+			t.Errorf("an empty mirror was read, and the WARN must say so\n%s", out)
 		}
 	})
 
