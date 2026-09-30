@@ -87,13 +87,17 @@ timeout="${PREFLIGHT_TIMEOUT:-90}"
 # probe ID: prints the HTTP status, or 000 when nothing answered in time.
 # A reasoning model spends tokens thinking before it answers; 512 covers the
 # shortest reply on every NaN chat model (mimo-v2.6-flash asks for >= 300).
+# A status line is not an answer: headers can arrive and the body never, and
+# curl then prints 200 and exits 28. Only a completed transfer counts.
 probe() {
     local body code
     body=$(jq -cn --arg m "$1" \
         '{model: $m, max_tokens: 512, messages: [{role: "user", content: "Reply with OK."}]}')
-    code=$(printf 'header = "Authorization: Bearer %s"\n' "$NAN_API_KEY" \
+    if ! code=$(printf 'header = "Authorization: Bearer %s"\n' "$NAN_API_KEY" \
         | curl -sS -K - -o /dev/null -w '%{http_code}' -m "$timeout" \
-            -H 'Content-Type: application/json' -d "$body" "$base/chat/completions" 2>/dev/null)
+            -H 'Content-Type: application/json' -d "$body" "$base/chat/completions" 2>/dev/null); then
+        code=000
+    fi
     printf '%s' "${code:-000}"
 }
 

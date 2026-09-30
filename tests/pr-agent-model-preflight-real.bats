@@ -21,7 +21,8 @@ setup() {
     AUTH_LOG="$BATS_TEST_TMPDIR/auth.log"
     PORT_FILE="$BATS_TEST_TMPDIR/port"
 
-    # alive answers 200, dead answers 401, hang holds the connection open.
+    # alive answers 200, dead answers 401, hang holds the connection open, stall
+    # sends a 200 status line and never the body.
     cat > "$BATS_TEST_TMPDIR/server.py" <<'PY'
 import http.server, json, sys, time
 auth_log, port_file = sys.argv[1], sys.argv[2]
@@ -31,6 +32,14 @@ class H(http.server.BaseHTTPRequestHandler):
         with open(auth_log, "a") as f:
             f.write("%s %s\n" % (body["model"], self.headers.get("Authorization", "<none>")))
         if body["model"] == "hang":
+            time.sleep(30)
+            return
+        if body["model"] == "stall":
+            # Status and headers now, the body never.
+            self.send_response(200)
+            self.send_header("Content-Length", "100")
+            self.end_headers()
+            self.wfile.flush()
             time.sleep(30)
             return
         code = 200 if body["model"] == "alive" else 401
@@ -79,4 +88,11 @@ teardown() {
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/alive' "$OUT"
     [[ "$output" == *"openai/hang gave no answer within 2s"* ]]
+}
+
+@test "preflight-real: a 200 status line whose body never arrives is no answer" {
+    run "$PREFLIGHT" --model openai/stall --fallbacks '["openai/alive"]' --output "$OUT"
+    [ "$status" -eq 0 ]
+    grep -qxF 'model=openai/alive' "$OUT"
+    [[ "$output" == *"openai/stall gave no answer within 2s"* ]]
 }
