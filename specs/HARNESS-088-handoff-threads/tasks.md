@@ -13,31 +13,35 @@ created: "2026-08-27"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/HARNESS-088-handoff-threads`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main: `feat/harness-088-handoff-threads` (#1279), then `feat/harness-088-branch-identity` (#1280)
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
+> Rewritten at archive time. The scaffold placeholders were never replaced while
+> the work ran; these are the tasks as they were actually done, in
+> `cli/internal/mem/` (`handoff.go`, `thread.go`, `identity.go`, `session_end.go`).
 
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+- [x] [AC1] `TestWriteThreadLeavesEveryOtherThreadByteIdentical` on a fixture shaped like the real clobber, then `WriteThread` replaces only the named thread (#1279)
+- [x] [AC2] `TestWriteThreadIsIdempotent`: identical content reports `changed=false` and writes nothing (#1279)
+- [x] [AC3] `TestWriteThreadAppendsANewThreadWithoutReordering`: a new thread is appended, never inserted (#1279)
+- [x] [AC4] `TestWrittenThreadsStayInsideTheArchivedBlock`: the writer shares `extractHandoffBlock`'s boundary (#1279)
+- [x] [AC5] `TestWriteThreadRefusesWhenTheSectionIsAbsent`, `TestWriteThreadRejectsAnEmptyKey`: both are loud errors (#1279)
+- [x] [AC6] `ThreadKey` reads git's on-disk state and resolves from any subdirectory; the key is the branch (#1279, reworked in #1280)
+- [x] [AC7] `JournalName` derives the session filename from the thread; `dotf mem thread` prints both (#1279)
+- [x] ~~[AC8] `dotf doctor` reports a handoff section that lost a live worktree's thread.~~ Not applicable: declined at archive time, tracked as #1881
+- [x] `dotf mem handoff-write` command and the `handoff` skill switched to it (#1279)
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test (AC8 declined, #1881)
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder (#1279, #1280)
 
 ## Machine-readable features
 
@@ -89,7 +93,7 @@ Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-088-handoff-th
 
 ## Found by audit, NOT fixed — recorded rather than folded in
 
-- [ ] ~~**`SessionEnd` resolves the project as `filepath.Base(cwd)`.**~~ Fixed
+- [x] ~~**`SessionEnd` resolves the project as `filepath.Base(cwd)`.**~~ Fixed
       above. Original note: A session
       whose working directory is a subdirectory — `cli/`, where most work in this
       repository happens — resolves the wrong project name, finds no `MEMORY.md`,
@@ -98,7 +102,7 @@ Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-088-handoff-th
       have produced no archive at all. Left out because it changes *which*
       sessions archive, which needs its own measurement and its own evidence, not
       a fold-in at the end of another PR.
-- [ ] **The gate's session state is keyed by session id alone** (`~/.local/state/dotfiles/gate/`).
+- [x] **Ticketed as #1882.** **The gate's session state is keyed by session id alone** (`~/.local/state/dotfiles/gate/`).
       Two harnesses reusing an id (`s1` from pi and `s1` from opencode) would
       share a consumption record. Low exposure today — real harnesses send UUIDs —
       and the same argument the reviewer's collision finding won on #1275, so it

@@ -14,9 +14,9 @@ created: "2026-08-27"
 | AC3 | `TestWriteThreadAppendsANewThreadWithoutReordering` |
 | AC4 | `TestWrittenThreadsStayInsideTheArchivedBlock` — drives `extractHandoffBlock` over the written file |
 | AC5 | `TestWriteThreadRefusesWhenTheSectionIsAbsent`, `TestWriteThreadRejectsAnEmptyKey` |
-| AC6 | `TestThreadKeyDerivesFromTheWorktree`, including three subdirectory cases |
+| AC6 | `TestThreadKeyIsTheBranchSoItTravelsBetweenMachines` and `TestRepoIdentityResolvesTheProjectFromAnywhereInTheTree` (renamed from `TestThreadKeyDerivesFromTheWorktree` in #1280; see Archive below) |
 | AC7 | `TestJournalNameIsDerivableAndDistinctPerWorktree` |
-| AC8 | **Not built.** Recorded in the proposal rather than claimed |
+| AC8 | **Declined at archive time, tracked as #1881.** Never built, and not claimed |
 
 ## Command output
 
@@ -131,3 +131,24 @@ real target, it failed exactly as it should.
 **A mutation test that reports "no change" has not proven the test is weak; it
 has proven nothing at all.** Assert the mutation applied before believing its
 result.
+
+## Archive (2026-09-30)
+
+Closed under the #770 sweep. AC1-AC7 shipped in #1279 (`71a4c39f`) and #1280
+(`4397ba3e`) and still pass on `main`:
+
+```
+$ cd cli && go test ./internal/mem/ -run 'TestWriteThread|TestWrittenThreads|TestThreadKey|TestRepoIdentity|TestJournalName' -v
+(every test listed in the tables above: PASS)
+ok      github.com/mlorentedev/dotfiles/cli/internal/mem
+```
+
+- **AC8 declined, #1881.** The doctor check was never built. It is a separate,
+  read-only feature and does not block what this spec delivered.
+- **Gate session-state key, #1882.** The last unticked audit item now has a ticket.
+- **`features.json` f5 pointed at a test that no longer existed.** #1280 renamed
+  `TestThreadKeyDerivesFromTheWorktree`. `go test -run` with a name that matches
+  nothing still exits 0, so f5 had been passing without running anything. It now
+  names `TestThreadKeyIsTheBranchSoItTravelsBetweenMachines`.
+- `tasks.md`'s Implementation section still held the template placeholders. It
+  now lists the tasks as they were done.

@@ -84,9 +84,11 @@ journal" is derivable from the working directory. `dotf mem thread` prints both.
 - [x] **AC6** — the thread key resolves from any subdirectory of a worktree.
 - [x] **AC7** — a journal filename is derivable from the working directory and
       distinct per worktree.
-- [ ] **AC8** — `dotf doctor` reports a handoff section that lost a thread whose
-      worktree still exists. **Not built** — see Out of scope reasoning above;
-      recorded so it is visible rather than forgotten.
+- [x] **AC8** — ~~`dotf doctor` reports a handoff section that lost a thread whose
+      worktree still exists.~~ **Declined at archive time, tracked as #1881.** It
+      was never built: AC1-AC7 remove the clobber for every writer that goes
+      through `dotf mem handoff-write`, and a doctor check for writers that do not
+      is a separate, read-only feature with its own design.
 
 ## References
 

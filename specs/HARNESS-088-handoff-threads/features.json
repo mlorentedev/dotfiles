@@ -30,7 +30,7 @@
   {
     "id": "HARNESS-088-handoff-threads-f5",
     "behavior": "AC6 + AC7 - the thread key resolves from any subdirectory of a worktree (not just its root), and a journal filename is derivable from the working directory and distinct per worktree",
-    "verification": "cd cli && go test ./internal/mem/ -run 'TestThreadKeyDerivesFromTheWorktree|TestJournalNameIsDerivableAndDistinctPerWorktree'",
+    "verification": "cd cli && go test ./internal/mem/ -run 'TestThreadKeyIsTheBranchSoItTravelsBetweenMachines|TestJournalNameIsDerivableAndDistinctPerWorktree'",
     "state": "pending",
     "evidence": ""
   }
