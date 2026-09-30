@@ -60,3 +60,7 @@ the same box) and is tracked under #1322.
 ## References
 
 - AI-034 (#1294), CLI-029 (`packages.json`, `dotf tools`), AI-028 (#791), #1265 / #1262 / #1267 (convergence and pin semantics), `pattern-setup-script-idempotence`.
+
+## Amendment 2026-09-30 (ADR-041, #1843)
+
+`dotf` itself gains a second channel for its own binary: `stable`, the pinned release, and `edge`, the newest tested build of `main` (ADR-041). The pin is a floor on both: convergence never downgrades an installed build, and only an explicit `dotf self-update --version` goes down.

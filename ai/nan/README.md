@@ -27,7 +27,7 @@
 | `qwen3.6` | 262K | none (per-minute limits only) | `qq` quick questions; opencode titles (`small_model`); `model-map` low tier |
 | `gemma4` | 262K | none | A/B candidate vs qwen3.6 |
 | `qwen3.8-flash` | 262K | 500M | picker only since 2026-09-26: it reached 83% of its quota as the default (AI-044, #1762) |
-| `mimo-v2.5` | 1M | 1B | pr-agent reviewer; `mimo-v2.6-flash` replaces it (AI-045, #1763) |
+| `mimo-v2.6-flash` | 1M | 1B | pr-agent reviewer; reviewer-pool fallback. Replaced `mimo-v2.5`, which NaN retired 2026-09-30 (AI-045, #1763) |
 
 Every chat model reads images. Source: https://nan.builders/docs/models (checked 2026-09-26).
 

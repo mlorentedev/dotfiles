@@ -128,6 +128,12 @@ teardown() {
     run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
     [ "$output" = "dev" ]
 
+    # A `go install …@latest` build prints its pseudo-version. The lookup must
+    # read it as 0.0.0: neither `dev` (which would skip the install) nor the pin.
+    printf '#!/bin/sh\necho "dotf version 0.0.0-20260930012845-db2b904794b4"\n' > "$STUB/dotf"; chmod +x "$STUB/dotf"
+    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    [ "$output" = "0.0.0" ]
+
     # Unrecognisable output must yield empty, so the caller converges rather
     # than matching a branch by accident.
     printf '#!/bin/sh\necho "not a version"\n'           > "$STUB/dotf"; chmod +x "$STUB/dotf"

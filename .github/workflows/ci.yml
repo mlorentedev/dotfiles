@@ -62,6 +62,29 @@ jobs:
               - '.PSScriptAnalyzerSettings.psd1'
               - '.golangci.yml'
               - '.pre-commit-config.yaml'
+              # Read by the suite or deployed by setup, so not docs even though
+              # none of them is code (HARNESS-041 round 1: six PRs touching only
+              # secrets/registry.yaml skipped every test that reads it).
+              # tests/ci-path-filtering.bats fails when a new top-level entry
+              # is in neither this list nor its docs-only list. On a PR that
+              # adds only such an entry that test is itself skipped, so the
+              # failure shows on the push to main (#1879).
+              - 'secrets/**'
+              - 'ssh/**'
+              - 'systemd/**'
+              - 'forge/**'
+              - '.claude/**'
+              - 'AGENTS.md'
+              - 'install.sh'
+              - 'env-contract.json'
+              - 'machine.json.example'
+              - 'session-start-config.json'
+              - '.gitattributes'
+              - '.gitignore'
+              - '.pr_agent.toml'
+              - '.geminiignore'
+              - '.bashrc.local.example'
+              - '.zshrc.local.example'
             powershell:
               - '**/*.ps1'
               - '**/*.psm1'
@@ -152,9 +175,10 @@ jobs:
       #
       # pull_request only, because the rule's unit is the PR's diff against its
       # base. On push there is no base to diff against and the check would either
-      # be vacuous or wrong.
+      # be vacuous or wrong. And only when the diff touches code: retiring a
+      # twin deletes a script, which the `code` filter matches.
       - name: Verify a retired twin took its bats/Pester tests with it
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |

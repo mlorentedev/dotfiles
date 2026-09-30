@@ -26,8 +26,6 @@ upstream, already current, diverged history) is logged and skipped with exit 0.
 A real setup failure is the ONLY non-zero exit, so 'systemctl --user status
 dotfiles-selfupdate' (and the journal) surface it.
 
-It is the Go port of scripts/dotfiles-selfupdate.{sh,ps1} (ADR-020 convergence).
-
 Env:
   DOTFILES_REPO_DIR              repo to update  (default: the env-contract path)
   DOTFILES_SELFUPDATE_SETUP_CMD  setup to re-run (default: <repo>/setup-linux.sh

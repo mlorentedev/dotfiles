@@ -191,9 +191,10 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 //     including the one on this machine until `backup` next runs. FAILing there
 //     would turn doctor red everywhere on merge — the deploy-skew shape measured
 //     twice this week (#992) — so it SKIPs and names the remedy.
-//   - No session: the daemon is locked or absent. An unchecked escrow reported as
-//     fresh is this check's own defect arriving through the check itself, so it
-//     SKIPs with the reason and never passes.
+//   - No session, or no sync: the daemon is locked or absent, or it could not pull
+//     the vault first. An unchecked escrow reported as fresh is this check's own
+//     defect arriving through the check itself, so it SKIPs with the reason and
+//     never passes.
 //   - Compared: silent when the digests agree, and Warn — not Fail — when they do
 //     not. A stale escrow is expected after any mutation and is remediable by one
 //     command; a section that goes red after every `rotate` until someone re-runs
@@ -225,8 +226,16 @@ func checkEscrowDescribesVault(sys *System, escrowDir string, rep *Report) {
 		rep.Warn("escrow manifest carries no digest — re-run `dotf secrets backup`")
 		return
 	}
-	if sys.BWItemRevisions == nil {
-		rep.Skip("no vault listing available, so escrow drift was not checked")
+	if sys.BWItemRevisions == nil || sys.BWSync == nil {
+		rep.Skip("no synced vault listing available, so escrow drift was not checked")
+		return
+	}
+	// bw serve lists from its own cache, so an unsynced listing can equal an old
+	// escrow after the vault has moved on: a false pass, in the direction that
+	// loses data (#1820). A failed sync leaves a cache of unknown age, and that is
+	// refused rather than compared.
+	if err := sys.BWSync(); err != nil {
+		rep.Skip(fmt.Sprintf("could not sync the vault, so escrow drift was not checked: %v", err))
 		return
 	}
 	items, err := sys.BWItemRevisions()

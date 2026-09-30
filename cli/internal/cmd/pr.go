@@ -21,7 +21,7 @@ func newPrCmd() *cobra.Command {
 		Use:   "pr",
 		Short: "Pull-request review loop helpers",
 		Long: "Helpers for the half of the review loop that happens after a reviewer speaks.\n" +
-			"GUARD-002 makes a green check mean reviewed; these answer whether anyone acted on it.",
+			"A green review check says a review ran; these answer whether anyone acted on it.",
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}

@@ -40,7 +40,7 @@ setup() {
 
 @test "the pool draws from at least four members, so a random pick spreads the API buckets (HARNESS-093)" {
     [ "$(jq -r '.pool | length' "$POOL")" -ge 4 ]
-    for id in nan/deepseek-v4-flash nan/mimo-v2.5 nan/glm5.3-flash nan/qwen3.8-flash; do
+    for id in nan/deepseek-v4-flash nan/mimo-v2.6-flash nan/glm5.3-flash nan/qwen3.8-flash; do
         jq -e --arg id "$id" '.pool[] | select(.id == $id)' "$POOL" >/dev/null
     done
 }
