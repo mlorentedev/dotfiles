@@ -252,3 +252,32 @@ func TestCheckBWMapping_SyncedListingIsAuthoritative(t *testing.T) {
 		t.Fatalf("a synced listing without the item proves it absent; want 1 failure, got %d\n%s", rep.Failures(), buf.String())
 	}
 }
+
+// A failed sync leaves the daemon's cache at an unknown age, and the lastSync the
+// heuristic reads is the CLI's, not the daemon's, so it cannot vouch for the
+// listing either. The check refuses to answer rather than report a stale absence
+// as a missing item.
+func TestCheckBWMapping_FailedSyncSkips(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: DOCKERHUB_TOKEN, plane: app, backend: bw, bw: {item: dockerhub, field: PAT}, expose: {env: DOCKERHUB_TOKEN}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.BWSync = func() error { return errors.New("bw serve: sync timed out") }
+	listed := false
+	sys.BWItemNames = func() ([]string, error) { listed = true; return []string{"nan-api-key"}, nil }
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkBWMapping(sys, patCfg(t, registry), rep)
+
+	out := buf.String()
+	if rep.Failures() != 0 || rep.Warnings() != 0 {
+		t.Fatalf("a listing whose sync failed must not be judged:\n%s", out)
+	}
+	if listed {
+		t.Errorf("the cache was read after its sync failed")
+	}
+	if !strings.Contains(out, "mapping unverifiable") || !strings.Contains(out, "timed out") {
+		t.Errorf("the skip must say it did not check, and why, got:\n%s", out)
+	}
+}
