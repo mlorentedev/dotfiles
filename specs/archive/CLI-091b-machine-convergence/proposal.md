@@ -1,7 +1,7 @@
 ---
 id: "CLI-091b-machine-convergence"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-29"
 issue: "mlorentedev/dotfiles#1843"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -47,3 +47,5 @@ Later rows, whose criteria are added when they start: B5 (pins as floors in doct
 
 - EPIC #1843, track B; ADR-041 (convergence order); ADR-036 (pins are floors); ADR-030 (checkout-first resolution)
 - #1381 (CLI-067), #1262, #1265, #1418
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1848 -->
