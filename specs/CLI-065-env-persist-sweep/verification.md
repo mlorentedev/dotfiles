@@ -76,13 +76,19 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **Major, a whitespace-padded name: applied.** `MarkerValue` recorded it raw and `ParseMarker` trimmed it. On retirement the sweep looked up the trimmed name, missed the value, and dropped the name from the record, so `--check` reported clean. `ValidateNames` now refuses any name that differs from its trimmed form. Test: `TestPersist_RefusesANameTheMarkerCannotRoundTrip` (`""`, `" "`, `" FOO"`, `"FOO "`, `"\tFOO"`, with no store operation before the refusal).
 - **Minor THEORETICAL, validation lives at three call sites rather than inside the readers: declined.** All three production readers call `ValidateNames`, and each call is covered by a test that fails without it. Moving the check into `Drift`, `Retired` and `MarkerStale` would run it three times per check to protect a hypothetical fourth reader.
 
+## Review round 3 (PASS, `nan/mimo-v2.6-flash`, 2026-09-30) — dispositions
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Minor (theoretical): the dedup key (`strings.ToUpper`) and the equality (`strings.EqualFold`) disagree for a non-ASCII pair such as `I` and `ı` | decline: contract names are environment variable names, ASCII identifiers in every shipped contract, and no plausible typo produces the pair. Aligning the fold is a code change after a passing review, for an unreachable input |
+| F2 | Minor: the Setup row in `tasks.md` names `feat/env-persist-sweep` | no action: `tasks.md` is in the contract set, and the reviewer advised against staling the verdict for a cosmetic note. The fixes landed on `fix/env-persist-reserved-marker` (#1862) |
+| F3 | Minor (theoretical): the read-path tests feed `ValidateNames` only the reserved name, not a padded or empty one | decline: the guard is one function, covered for every refused shape by `TestPersist_RefusesANameTheMarkerCannotRoundTrip`, and the reviewer's mutations 2 and 3 show each read path's call is pinned |
+
 ## Promotion candidates
 
-Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
-
-- [x] Lesson for the repo's `docs/lessons/`? yes — lesson 244 (written in this PR): a sweep is bounded by the writer's record, and the store's name rules decide the comparison and the order
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no — an application of ADR-025's contract, not a new decision
-- [ ] New pattern candidate for `00_meta/patterns/`? not yet — third instance of "the writer touches only what it owns" in this repo (settings.json hooks, scripts dir, user env); promote when it recurs in another project
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-244-a-sweep-is-bounded-by-what-the-writer-recorded-not-by-what-the-store-holds.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: an application of ADR-025's contract, not a new decision
+- [x] New pattern candidate for `00_meta/patterns/`? no: third instance of "the writer touches only what it owns" in this repo only; promote when it recurs in another project
 
 ## Archive checklist
 
