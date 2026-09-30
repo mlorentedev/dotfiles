@@ -59,6 +59,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **Minor 4, the answer's shape is trusted: applied.** `profileTarget` takes the last non-blank line and accepts it only if it names a `.ps1` file; anything else falls back to the enumeration, with the reason. New cases: noise before the path (resolved, and the noise is not in the row), and noise only (enumerated).
 - **Question 5, the launcher's base range: answered, out of scope.** The reviewer measured the spec's own change (`dab595e`) and found no later edit to its files, so the verdict covers this spec. The stale inferred base is tracked in #1551, and the missing way to target a landed commit in #1645.
 
+## Review round 2 (FAIL, 2026-09-30) — dispositions
+
+`review-round-2.md` (`nan/deepseek-v4-flash`) re-checked every round-1 fix, with mutants M1 to M6 all red. It failed on one Major:
+
+- **Major, the `--fix` half of round-1 Major 1 was untested: applied.** Mutant M7 (the missing-profile guard applies only when `!fix`) passed the whole suite. `TestCheckProfileFiles_FixDoesNotHealAMissingProfile` runs `--fix` against a pwsh-named profile that does not exist. It asserts one `PowerShell profile missing:` FAIL with no BUG-020, and it fails the test if anything but the `$PROFILE` question runs. M7 now fails it.
+- **Minor THEORETICAL, the launcher's base range: answered.** The reviewer checked the spec's own commits and found them intact at HEAD. The inferred base is tracked in #1551 and #1645.
+- **Minor THEORETICAL, f6 exits 1 off Windows: accepted as stated.** AC6 is a box check, and its evidence is the Windows transcript above. On Linux the command fails at its first step, `uname`, which says why it cannot run there.
+- **Minor SPECULATIVE, the fallback row echoes pwsh's first line: declined.** That line is the only clue to why pwsh gave no usable answer. It is printed on the user's own terminal, and no observed banner carries anything sensitive.
+- **Minor, golangci-lint was not run by the reviewer: run.** The pinned `golangci-lint run` reports 0 issues on this head.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.

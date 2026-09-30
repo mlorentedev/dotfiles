@@ -128,3 +128,38 @@ func TestCheckProfileFiles_MeasuresThePwshResolvedProfile(t *testing.T) {
 		})
 	}
 }
+
+// CLI-066 review round 2: under --fix, a pwsh-named profile that was never
+// written is still the missing FAIL, and the heal is never run for it — there
+// is nothing for it to rebuild.
+func TestCheckProfileFiles_FixDoesNotHealAMissingProfile(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".claude", "CLAUDE.md"), "x")
+	writeFile(t, filepath.Join(home, ".gemini", "AGY.md"), "x")
+	missing := filepath.Join(home, "Redirected", "Docs", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+	heal := filepath.Join(home, "scripts", profileHealScript)
+	writeFile(t, heal, "# fake heal\r\n")
+	sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home, "SCRIPTS_DIR": filepath.Dir(heal)}, []string{"pwsh"}, nil)
+	sys.GOOS = "windows"
+	sys.CommandOutput = func(name string, args ...string) (string, error) {
+		t.Fatalf("unbounded CommandOutput reached: %s %v", name, args)
+		return "", nil
+	}
+	sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, string, error) {
+		if name == "pwsh" && strings.Join(args, " ") == "-NoProfile -Command $PROFILE" {
+			return missing + "\r\n", "", nil
+		}
+		t.Fatalf("nothing but the $PROFILE question may run for a missing profile, got %s %v", name, args)
+		return "", "", nil
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkProfileFiles(sys, nil, rep, true)
+	out := buf.String()
+	if rep.Failures() != 1 || !strings.Contains(out, "PowerShell profile missing: "+missing) {
+		t.Fatalf("want one missing FAIL naming %s\n%s", missing, out)
+	}
+	if strings.Contains(out, "BUG-020") {
+		t.Fatalf("a never-written profile is not BUG-020\n%s", out)
+	}
+}
