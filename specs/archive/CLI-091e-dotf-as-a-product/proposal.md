@@ -1,7 +1,7 @@
 ---
 id: "CLI-091e-dotf-as-a-product"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-29"
 issue: "mlorentedev/dotfiles#1843"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -48,3 +48,5 @@ Later rows, whose criteria are added when they start: E2, E5 to E10.
 ## References
 
 - EPIC #1843, track E; #1844 (E4); #1847 (E3, first part)
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1850 -->
