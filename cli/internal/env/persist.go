@@ -166,6 +166,12 @@ func MarkerStale(reader UserEnvReader, vars []ResolvedVar) (bool, error) {
 // or point at a remedy that Persist then refuses.
 func ValidateNames(vars []ResolvedVar) error {
 	for _, v := range vars {
+		// The marker must read back exactly what it recorded. MarkerValue
+		// skips an empty name and ParseMarker trims, so an empty or padded
+		// name would be persisted and then never swept.
+		if v.Name == "" || v.Name != strings.TrimSpace(v.Name) {
+			return fmt.Errorf("contract variable name %q is empty or has surrounding whitespace, which the ownership marker cannot record", v.Name)
+		}
 		if strings.Contains(v.Name, markerSep) {
 			return fmt.Errorf("contract variable name %q contains the marker separator %q and cannot be persisted", v.Name, markerSep)
 		}

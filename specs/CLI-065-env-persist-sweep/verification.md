@@ -68,6 +68,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **Minor, combined drift + retired doctor case: applied.** Two rows were added to `TestCheckPersistedEnv_ByStatus`, one naming the drifted variable and one naming the retired one.
 - **Minor THEORETICAL, `--check` is not a snapshot: declined.** Each box has one writer: `persist` runs from setup, by hand, or from doctor's remedy, never concurrently with itself. `--check` is advisory, and `persist` is idempotent: a check that raced a run is corrected by the next check. A lock around a per-user registry key would cost more than the state it protects.
 
+## Review round 2 (FAIL, 2026-09-30) — dispositions
+
+`review-round-2.md` (`nan/mimo-v2.6-flash`) confirmed every round-1 fix. It then failed on two new Majors from the same class, a contract name the marker cannot record:
+
+- **Major, an empty name: applied.** `Persist` wrote it, but `MarkerValue` skips empty names, so nothing could ever sweep the value. `ValidateNames` now refuses it.
+- **Major, a whitespace-padded name: applied.** `MarkerValue` recorded it raw and `ParseMarker` trimmed it. On retirement the sweep looked up the trimmed name, missed the value, and dropped the name from the record, so `--check` reported clean. `ValidateNames` now refuses any name that differs from its trimmed form. Test: `TestPersist_RefusesANameTheMarkerCannotRoundTrip` (`""`, `" "`, `" FOO"`, `"FOO "`, `"\tFOO"`, with no store operation before the refusal).
+- **Minor THEORETICAL, validation lives at three call sites rather than inside the readers: declined.** All three production readers call `ValidateNames`, and each call is covered by a test that fails without it. Moving the check into `Drift`, `Retired` and `MarkerStale` would run it three times per check to protect a hypothetical fourth reader.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
