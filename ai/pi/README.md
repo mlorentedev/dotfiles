@@ -98,13 +98,13 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 NaN only — the free tier, with no paid fallback in the picker.
 
-- **NaN** (free, primary): `glm5.3-flash`, `deepseek-v4-flash`, `qwen3.8-flash`, `qwen3.6`, `mimo-v2.5`, `gemma4`
+- **NaN** (free, primary): `glm5.3-flash`, `deepseek-v4-flash`, `qwen3.8-flash`, `qwen3.6`, `mimo-v2.6-flash`, `gemma4`
 
 `qwen3.8-flash` and `glm5.3-flash` (added 2026-08-26) are catalog additions only — picker
 availability, not a default or routing change. Both are live, reasoning-class, and
 independently strong: verified via `scripts/nan-debug.sh` on both a smoke prompt
 (surfaced `reasoning_content`) and this repo's own planted `((count++))`/`set -e` bug —
-the same defect that admitted `mimo-v2.5` to `harness/reviewer-pool.json` — which both
+the same defect that admitted `mimo-v2.5` (and on 2026-09-30 its successor `mimo-v2.6-flash`) to `harness/reviewer-pool.json` — which both
 identified correctly. Published third-party benchmarks back that up: Qwen3.8-Flash-Next
 (Alibaba) and GLM-5.3-Flash (Zhipu) both launched 2026-08-26 as genuine frontier-tier
 releases with real 1M context, not marketing inflation — see #1244 for sources. Quality is
@@ -117,7 +117,7 @@ admission procedure yet. Neither is wired into `defaultModel`, `harness/model-ma
 One capability nuance for `qwen3.8-flash` specifically: Alibaba's own release notes put its
 *native* context at 262,144 tokens, extended to 1M via YaRN, and YaRN-extended context can
 behave differently at the far end of the window than a natively-1M model
-(`deepseek-v4-flash`, `mimo-v2.5`). The package's snapshot therefore carries the **native** 262,144
+(`deepseek-v4-flash`, `mimo-v2.6-flash`). The package's snapshot therefore carries the **native** 262,144
 rather than the served 1M, and opencode matches it: a declared window the model degrades inside is worse than a
 smaller honest one, because nothing downstream can tell a degraded answer from a good one.
 `glm5.3-flash`'s 1M is native per Zhipu.

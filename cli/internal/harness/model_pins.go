@@ -199,7 +199,7 @@ type Finding struct {
 
 // Normalize turns a site's spelling into `pool:id` using the pin's declared
 // rule. Declared, never inferred: one model has three correct spellings across
-// these files (`nan:mimo-v2.5`, `openai/mimo-v2.5`, bare `mimo-v2.5`), so a
+// these files (`nan:mimo-v2.6-flash`, `openai/mimo-v2.6-flash`, bare `mimo-v2.6-flash`), so a
 // guess would be wrong for two of them.
 func Normalize(p Pin, raw string) string {
 	id := raw

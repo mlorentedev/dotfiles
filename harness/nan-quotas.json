@@ -15,13 +15,12 @@
     "Image models (flux-2-klein, qwen-image-2.1) are metered in requests, not tokens, and",
     "are left out until something binds them."
   ],
-  "checked": "2026-09-26",
+  "checked": "2026-09-30",
   "source": "https://nan.builders/docs/models",
   "metered": {
     "deepseek-v4-flash": { "tokens": 3000000000, "period": "month" },
     "glm5.3": { "tokens": 3000000000, "period": "month", "note": "premium tier; NaN says 'period', and adds a 400M rolling 4-hour window this check does not watch" },
     "glm5.3-flash": { "tokens": 2000000000, "period": "month" },
-    "mimo-v2.5": { "tokens": 1000000000, "period": "month" },
     "mimo-v2.6-flash": { "tokens": 1000000000, "period": "month" },
     "qwen3.8-flash": { "tokens": 500000000, "period": "month" }
   },

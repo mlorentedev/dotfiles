@@ -8,7 +8,7 @@
     "nan/deepseek-v4-flash",
     "nan/qwen3.8-flash",
     "nan/qwen3.6",
-    "nan/mimo-v2.5",
+    "nan/mimo-v2.6-flash",
     "nan/gemma4"
   ]
 }

@@ -160,7 +160,7 @@ setup() {
 # against the installed package in tests/pi-nan-package.bats.
 
 @test "opencode.jsonc exposes 6 chat NaN models (non-chat models intentionally excluded - opencode schema rejects 'embedding' modality)" {
-    for m in deepseek-v4-flash qwen3.6 gemma4 mimo-v2.5 qwen3.8-flash glm5.3-flash; do
+    for m in deepseek-v4-flash qwen3.6 gemma4 mimo-v2.6-flash qwen3.8-flash glm5.3-flash; do
         grep -qE "\"$m\":" "$OPENCODE_CFG" || { echo "missing chat model $m" >&2; false; }
     done
     # Non-chat models must NOT appear (would break config load)
