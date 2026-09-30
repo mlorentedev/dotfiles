@@ -29,4 +29,4 @@ The tests did not catch it either. They grepped the workflow for the guard's tex
 
 - `.github/workflows/ci.yml`, job `changes`, filter `code`
 - `tests/ci-path-filtering.bats`
-- `specs/HARNESS-041-ci-path-filtering/review-round-1.md`
+- `specs/archive/HARNESS-041-ci-path-filtering/review-round-1.md`

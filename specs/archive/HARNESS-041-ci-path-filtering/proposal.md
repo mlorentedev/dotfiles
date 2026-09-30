@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-041-ci-path-filtering"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-20"
 issue: "mlorentedev/dotfiles#552"
 tags: [spec, proposal]
@@ -39,3 +39,5 @@ Add a `changes` job using a SHA-pinned `dorny/paths-filter` (`@v3` at merge, `@v
 
 - Issue: https://github.com/mlorentedev/dotfiles/issues/552
 
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1105 -->

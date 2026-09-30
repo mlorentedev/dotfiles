@@ -55,7 +55,7 @@ Round 1 ran the same four mutations against the old tests: all four stayed green
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-041-ci-path-filtering/` -> `specs/archive/HARNESS-041-ci-path-filtering/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-041-ci-path-filtering/` -> `specs/archive/HARNESS-041-ci-path-filtering/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1870 carries `Closes #552`
+- [x] Promotions above executed (if any): lesson 322
