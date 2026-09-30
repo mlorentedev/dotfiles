@@ -25,7 +25,7 @@ func newHooksInstallCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Deploy the GUARD dispatcher and wire core.hooksPath at it",
+		Short: "Deploy the git hook dispatcher and wire core.hooksPath at it",
 		Long: `install mirrors the dispatcher tree into $DOTFILES_DIR/git-hooks and points
 git's global core.hooksPath at it.
 

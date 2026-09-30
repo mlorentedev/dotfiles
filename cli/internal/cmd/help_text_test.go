@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -37,4 +38,19 @@ func TestHelpTextHasNoInternalReferences(t *testing.T) {
 		}
 	}
 	walk(New("dev", ""))
+}
+
+// TestReadmeHasNoInternalReferences holds cli/README.md to the same pattern as
+// --help, so the two cannot drift apart: the README is the other thing a new
+// user reads first.
+func TestReadmeHasNoInternalReferences(t *testing.T) {
+	data, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatalf("read cli/README.md: %v", err)
+	}
+	for i, line := range strings.Split(string(data), "\n") {
+		if m := internalRef.FindString(line); m != "" {
+			t.Errorf("cli/README.md:%d mentions %q: %s", i+1, m, strings.TrimSpace(line))
+		}
+	}
 }
