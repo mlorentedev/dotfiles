@@ -53,7 +53,7 @@ The `obsidian` that `dotf vault health` and obs-cli drive is the CLI built into 
 
 ## Review (PASS-WITH-GAPS, 2026-09-30) — dispositions
 
-`review.md` (`nan/qwen3.8-flash`, reviewed `6d1393d`) passed with six Minor gaps. None is fixed in this archive. Editing the contract set or the tested surface after the verdict would leave the archive recording a review of something that changed. So each gap is dispositioned here:
+`review.md` (`nan/qwen3.8-flash`, reviewed `6d1393d`) passed with six Minor gaps. None of the code or test gaps is fixed in this archive; only this record's own stale reference is. Editing the contract set or the tested surface after the verdict would leave the archive recording a review of something that changed. So each gap is dispositioned here:
 
 - **Row 1, the yarn guard is quoting-sensitive (REAL): deferred to #1864 §1.** The guard should match the property, not the historical spelling.
 - **Row 2, AC4 and f4 still name obsidian (REAL): declined for this spec.** AC1 and f1 were amended on 2026-09-23 to assert that obsidian is absent, and `tests/setup-linux.bats` refutes it under either name. Only AC4's wording and f4's alternation still carry the name. Editing them now would void this verdict. The absence is guarded by f1 and the bats test, so the stale wording can no longer let obsidian back in.
