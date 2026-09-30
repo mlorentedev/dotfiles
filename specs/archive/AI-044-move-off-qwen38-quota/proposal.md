@@ -1,7 +1,7 @@
 ---
 id: "AI-044-move-off-qwen38-quota"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-26"
 issue: "mlorentedev/dotfiles#1762"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, nan, opencode, model-map]
@@ -43,3 +43,5 @@ opencode routed its default, title and plan traffic to `qwen3.8-flash`, which Na
 
 - NaN models and quotas: https://nan.builders/docs/models, https://nan.builders/docs/opencode
 - Pin-site registry: `harness/model-pins.json`
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1772 -->
