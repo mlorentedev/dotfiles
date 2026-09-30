@@ -22,6 +22,18 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Manual smoke test: raw local POSIX installer stream into a temporary WSL `$HOME` downloaded, checksum-verified, and ran `dotf version 0.60.0`.
 - No regressions in exercised installer suites: yes.
 
+## Review dispositions (round 1, PASS-WITH-GAPS)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | PowerShell run-guard may exit 0 on a failed install (THEORETICAL Major) | Ticketed, #1890 |
+| 2 | No end-to-end PowerShell recovery test (THEORETICAL Major) | Ticketed, #1890 |
+| 3 | zsh drops the `$0` fallback, so `_DOTF_SCRIPT_DIR` is empty (REAL Minor) | Ticketed, #1890. The executed-under-zsh path was already a no-op, so nothing breaks end to end |
+| 4 | f4's `dotf version` check is not platform-scoped (REAL Minor, contract set) | Ticketed, #1890. The contract is closed by the verdict |
+| 5 | The recovery one-liner lacks the "verify before piping" note | Applied: `README.md` now carries it under the recovery command |
+| 6 | Malformed-metadata error wrapped inside the lookup-failure error (THEORETICAL Minor) | Ticketed, #1890 |
+| 7 | `sed`-based `tag_name` parsing (THEORETICAL Minor) | Ticketed, #1890 |
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
