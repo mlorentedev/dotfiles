@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.62.0](https://github.com/mlorentedev/dotfiles/compare/v0.61.0...v0.62.0) (2026-09-30)
+
+
+### Features
+
+* **spec:** refuse a new spec while the repository is at its WIP limit ([#1861](https://github.com/mlorentedev/dotfiles/issues/1861)) ([9cfecc8](https://github.com/mlorentedev/dotfiles/commit/9cfecc832715679ea72f82e1d013b0cda8e87f16))
+* **tools:** add a dry run and read the catalog from the checkout first ([#1848](https://github.com/mlorentedev/dotfiles/issues/1848)) ([a94ae34](https://github.com/mlorentedev/dotfiles/commit/a94ae3465a245b4a29af25e4b8a056d0f4cd62d0))
+
+
+### Bug Fixes
+
+* **ci:** cover every path the suite reads in the code filter ([#1870](https://github.com/mlorentedev/dotfiles/issues/1870)) ([0013ea5](https://github.com/mlorentedev/dotfiles/commit/0013ea5b8b45cec7ab950e91b93eb8f1defc0025))
+* **cli:** report the module version for go install builds ([#1844](https://github.com/mlorentedev/dotfiles/issues/1844)) ([8a00d89](https://github.com/mlorentedev/dotfiles/commit/8a00d89710e159b00577acde023ec2356bdf0d3c))
+* **doctor:** report a never-written profile as missing, and make the heal test tell its sources apart ([#1863](https://github.com/mlorentedev/dotfiles/issues/1863)) ([1722a9f](https://github.com/mlorentedev/dotfiles/commit/1722a9fdc090190a8e5a14a437c564da7a17848b))
+* **doctor:** skip the mapping check when no sync is wired ([#1841](https://github.com/mlorentedev/dotfiles/issues/1841)) ([db2b904](https://github.com/mlorentedev/dotfiles/commit/db2b904794b4700b1e9b5c784d7b570bdc46fae0))
+* **doctor:** sync the vault before comparing it with the DR escrow ([#1839](https://github.com/mlorentedev/dotfiles/issues/1839)) ([b0782ad](https://github.com/mlorentedev/dotfiles/commit/b0782adc9fac7b70742c39df71747cd467d04906))
+* **env:** reserve the ownership marker's name and validate names on every read path ([#1862](https://github.com/mlorentedev/dotfiles/issues/1862)) ([3cb3077](https://github.com/mlorentedev/dotfiles/commit/3cb307748b91412f3ab374002f7b62b9ff8b60c7)), closes [#1363](https://github.com/mlorentedev/dotfiles/issues/1363)
+* **harness:** emit executable agy hooks on Windows ([#1827](https://github.com/mlorentedev/dotfiles/issues/1827)) ([5c3102a](https://github.com/mlorentedev/dotfiles/commit/5c3102a5584472a402f791433a88d2843cf7040a))
+* **harness:** the doctrine cap warnings name both units, and HARNESS-111's AC3 records the fold [#1685](https://github.com/mlorentedev/dotfiles/issues/1685) shipped ([#1868](https://github.com/mlorentedev/dotfiles/issues/1868)) ([52a09ce](https://github.com/mlorentedev/dotfiles/commit/52a09cebe582b7b23f15bdf4fc12e4669f3bcfb5)), closes [#1241](https://github.com/mlorentedev/dotfiles/issues/1241)
+* **pi:** align OpenRouter DeepSeek limits ([#1831](https://github.com/mlorentedev/dotfiles/issues/1831)) ([e783e47](https://github.com/mlorentedev/dotfiles/commit/e783e47699bb6741e3bb1cac659496f190fa3e0f))
+* **pr-agent:** retire mimo-v2.5 and skip a dead model before the review ([#1856](https://github.com/mlorentedev/dotfiles/issues/1856)) ([0a584d4](https://github.com/mlorentedev/dotfiles/commit/0a584d4ebf173fec0e02d77d70134b7712a3bb3b))
+* **secrets:** resolve bw serve items from the unfiltered list, not the search index ([#1822](https://github.com/mlorentedev/dotfiles/issues/1822)) ([c719016](https://github.com/mlorentedev/dotfiles/commit/c719016ae1691c5df87820ae9270ac45d253f1fc))
+* **specs:** AI-044's parity evidence runs the test that holds the assertion ([#1867](https://github.com/mlorentedev/dotfiles/issues/1867)) ([8a12783](https://github.com/mlorentedev/dotfiles/commit/8a127832da7a034b963353973ab0fcad2a9a2a49))
+
 ## [0.61.0](https://github.com/mlorentedev/dotfiles/compare/v0.60.0...v0.61.0) (2026-09-29)
 
 
