@@ -31,7 +31,7 @@ func newEnvPersistCmd() *cobra.Command {
 			"are written. --check reports drift without writing (non-zero when drifted).\n" +
 			"The names it wrote are recorded in the store as " + env.ManagedMarker + " (';'-joined);\n" +
 			"a name that record lists and the contract no longer names is deleted on the\n" +
-			"next run (CLI-065) — a variable dotf never wrote is never touched.\n" +
+			"next run; a variable dotf never wrote is never touched.\n" +
 			"Where the OS has no such scope (Linux, macOS) it is a no-op: the rc files\n" +
 			"source paths.sh and unit files carry their own environment.",
 		Args:         cobra.NoArgs,

@@ -24,7 +24,7 @@ import (
 func newVaultCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vault",
-		Short: "Scaffold knowledge-vault entries (ADR-021 step 3)",
+		Short: "Scaffold knowledge-vault entries",
 		Long: `vault scaffolds entries in the knowledge vault from templates embedded in the
 binary (drift-tested against the vault SSOT, like dotf spec / dotf init).
 
@@ -89,10 +89,10 @@ func newVaultCrystallizeCmd() *cobra.Command {
   5. Prints the manual AI-workflow checklist
 
 Insertions land BEFORE a "## Session Handoff" block when one is present, so that
-block stays last (HARNESS-029) and does not bust the provider prompt cache.
+block stays last and does not bust the provider prompt cache.
 
 A MEMORY.md whose body sits inside a YAML block scalar is REFUSED rather than
-corrupted (#857); under --all such a project counts as skipped, not processed.
+corrupted; under --all such a project counts as skipped, not processed.
 
 [path] defaults to the current directory.`,
 		Args:         cobra.MaximumNArgs(1),
@@ -162,7 +162,7 @@ func newVaultProjectCmd() *cobra.Command {
 		Short: "Scaffold a personal-project vault entry (10_projects)",
 		Long: `project scaffolds the personal-project vault entry under 10_projects/<repo>/:
 context.md, roadmap.md, and memory/MEMORY.md (with {{repo}}/{{stack}}/{{date}}
-substituted). It is the standalone twin of the entry dotf init writes — same
+substituted). It writes the same entry dotf init writes — same
 embedded templates, same renderer (cli/internal/vault).
 
 <path> defaults to the current directory; the entry name is its basename. On

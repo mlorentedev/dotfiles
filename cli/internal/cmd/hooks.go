@@ -11,7 +11,7 @@ import (
 func newHooksCmd() *cobra.Command {
 	h := &cobra.Command{
 		Use:          "hooks",
-		Short:        "Global git hook dispatcher (GUARD-001)",
+		Short:        "Global git hook dispatcher",
 		Long:         "Manage the machine-wide memory-sink dispatcher wired through git's core.hooksPath.",
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
@@ -29,12 +29,10 @@ func newHooksInstallCmd() *cobra.Command {
 		Long: `install mirrors the dispatcher tree into $DOTFILES_DIR/git-hooks and points
 git's global core.hooksPath at it.
 
-It replaces scripts/install-git-hooks.{sh,ps1} (CLI-072). Those twins carried the
-same guards but not the same tests — 13 bats cases against 9 Pester ones — so the
-self-mirror guard, the dispatcher-equivalence probe and the trailing-slash path
-comparison were verified on Linux only.
+The same code runs on Linux, macOS and Windows, so every guard below is tested
+once for all of them.
 
-Safety, unchanged from the twins: the mirror is a clean one, because a hook
+Safety: the mirror is a clean one, because a hook
 removed upstream must stop firing and a stale security hook is worse than none;
 an unrelated pre-existing core.hooksPath is preserved and reported, never
 clobbered, since a global hooksPath has machine-wide blast radius; and a

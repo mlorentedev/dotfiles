@@ -28,9 +28,8 @@ func newMemCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mem",
 		Short: "Cross-agent memory session hooks (session-end / session-start)",
-		Long: "mem hosts the Claude session hooks as one Go noun (ADR-014, MEMORY-001),\n" +
-			"converging the drifting session-handoff.{sh,ps1} twins. The SessionEnd hook\n" +
-			"becomes a thin `dotf mem session-end` shim.",
+		Long: "mem hosts the agent session hooks and the MEMORY.md handoff commands.\n" +
+			"The SessionEnd hook is a thin `dotf mem session-end` call.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -56,8 +55,8 @@ func newMemProjectKeyCmd() *cobra.Command {
 		Short: "Print Claude Code's per-project auto-memory key for a working directory",
 		Long: "project-key encodes a working directory into Claude Code's per-project key\n" +
 			"(the directory name under ~/.claude/projects) — every '/', '\\' and drive ':'\n" +
-			"maps to '-'. It is the single source the PowerShell setup/crystallize twins\n" +
-			"call so their junction target can never drift from the Go layer again.",
+			"maps to '-'. Setup and crystallize call it on every OS, so the directory\n" +
+			"they link can never drift from the key Claude Code uses.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

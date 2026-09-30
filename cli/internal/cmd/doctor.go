@@ -23,7 +23,7 @@ func newDoctorCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "doctor",
-		Short: "Post-setup diagnostics — the consolidated healthcheck + doctor twins (ADR-021)",
+		Short: "Post-setup diagnostics for this machine's tools, configs and secrets",
 		Long: `doctor runs the post-setup diagnostic sweep: core tools, versioned tool
 paths, version-pin match, key symlinks, environment variables + PATH, optional
 tools, the env-contract, vault presence, secrets integrity, PAT expiry, tmux,

@@ -67,7 +67,7 @@ deterministic behaviour rather than a gap in one:
                               picked, and afterwards indistinguishable from one
                               someone did.
   - the top tier cannot be served → escalates rather than answering from a weaker
-                              model (ADR-032 §4). Inherited, and kept visible.
+                              model. Inherited, and kept visible.
 
 OVERRIDES. --role skips the join entirely and --tier overrides the record. The
 output marks each field inferred or dictated, so a caller can tell a derived
