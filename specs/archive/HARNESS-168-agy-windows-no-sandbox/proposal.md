@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-168-agy-windows-no-sandbox"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-29"
 issue: "mlorentedev/dotfiles#1838"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -55,3 +55,5 @@ macOS continue to force sandbox isolation.
 - Antigravity sandbox docs: `https://antigravity.google/docs/cli/sandbox`
 - Related incident: WIN-014 review transcript, 2026-09-29
 - Related safety issue: #1649
+
+<!-- archived 2026-09-29 — PR: https://github.com/mlorentedev/dotfiles/pull/1840 -->
