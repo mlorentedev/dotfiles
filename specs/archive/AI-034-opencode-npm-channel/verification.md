@@ -73,6 +73,6 @@ The last line is the finding this spec makes visible: three copies on the box, w
 
 ## Archive checklist
 
-- [ ] `dotf spec review AI-034-opencode-npm-channel` — passing `review.md` from the reviewer pool (needs an unlocked Bitwarden vault on the box that runs it)
-- [ ] PR merged; issue #1294 closed
-- [ ] `dotf spec archive AI-034-opencode-npm-channel`
+- [x] `dotf spec review AI-034-opencode-npm-channel` — passing `review.md` from the reviewer pool (needs an unlocked Bitwarden vault on the box that runs it)
+- [x] PR merged; issue #1294 closed: #1311 merged `016bf1a`; the archive PR carries `Closes #1294`
+- [x] `dotf spec archive AI-034-opencode-npm-channel`

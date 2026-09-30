@@ -1,7 +1,7 @@
 ---
 id: "WIN-014"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-28"
 issue: "mlorentedev/dotfiles#1751"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -56,3 +56,5 @@ making that skip visible.
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - Related ADR: `docs/adr/adr-020-tooling-cli-go-convergence.md`
 - Related patterns: `00_meta/patterns/pattern-setup-script-idempotence.md`
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1806 -->
