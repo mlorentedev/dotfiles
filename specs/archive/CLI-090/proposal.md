@@ -1,7 +1,7 @@
 ---
 id: "CLI-090"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-28"
 issue: "mlorentedev/dotfiles#1803"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -57,14 +57,14 @@ Failure modes and constraints:
 
 Observable outcomes. Each must be testable.
 
-- [ ] **AC1:** Piping the POSIX installer into Bash outside a checkout installs
+- [x] **AC1:** Piping the POSIX installer into Bash outside a checkout installs
   a checksum-verified explicitly selected release into an isolated `$HOME`.
-- [ ] **AC2:** When no explicit version or checkout pin exists, both POSIX and
+- [x] **AC2:** When no explicit version or checkout pin exists, both POSIX and
   PowerShell installers resolve the latest release before downloading its
   matching platform artifact; malformed release metadata fails loudly.
-- [ ] **AC3:** A failed metadata, download, checksum, or extraction step leaves
+- [x] **AC3:** A failed metadata, download, checksum, or extraction step leaves
   an already installed binary runnable and exits non-zero.
-- [ ] **AC4:** Documentation names the native one-line recovery command for
+- [x] **AC4:** Documentation names the native one-line recovery command for
   POSIX and Windows, distinguishes it from checkout bootstrap, and states the
   final version assertion.
 
@@ -75,3 +75,5 @@ Observable outcomes. Each must be testable.
 - Related ADR: `docs/adr/adr-036-install-channels.md`
 - Related patterns: `00_meta/patterns/pattern-setup-script-idempotence.md`
 - Related patterns: `00_meta/patterns/pattern-version-single-source.md`
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1805 -->

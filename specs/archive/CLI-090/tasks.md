@@ -38,12 +38,12 @@ created: "2026-09-28"
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command (tightened at archive time, see `verification.md`)
 - [x] Type checks pass
-- [ ] Lint passes (ShellCheck is unavailable in the WSL test environment)
+- [x] Lint passes: `shellcheck scripts/install-dotf.sh` exits 0 on Linux at archive time; CI `lint` was green on #1805
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#1805)
 
 ## Machine-readable features
 
