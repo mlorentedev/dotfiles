@@ -165,12 +165,20 @@ type Plan struct {
 // never reaches the Fetch or Run seams.
 func (in *Installer) Plan(t Tool) Plan {
 	in.defaults()
-	p := Plan{Name: t.Name, Pin: t.Version}
-	if t.Source.Type == "github-release" && t.AssetName(in.GOOS, in.GOARCH) == "" {
+	p := Plan{Name: t.Name, Pin: t.Version, Installed: in.current(t)}
+	// Mirror Install's dispatch: what it refuses, the plan reports as
+	// unsupported, after the probe, so an installed tool never reads as absent.
+	switch t.Source.Type {
+	case "github-release":
+		if t.AssetName(in.GOOS, in.GOARCH) == "" {
+			p.Action = PlanUnsupported
+			return p
+		}
+	case "npm":
+	default:
 		p.Action = PlanUnsupported
 		return p
 	}
-	p.Installed = in.current(t)
 	switch decideAction(p.Installed, t.Version) {
 	case actionSkip:
 		p.Action = PlanSkip

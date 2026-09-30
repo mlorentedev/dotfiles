@@ -185,10 +185,12 @@ func ResolveRegistryPath() string {
 }
 
 // ResolveCatalogPath locates packages.json for READS, the checkout first and the
-// deploy mirror second: the order doctor's catalog checks use, so `dotf tools`
-// and doctor answer "what is in the catalog" from the same file (#1381). Setup
-// copies the catalog into the mirror before it calls `dotf tools install`, so a
-// setup run reads the same file either way.
+// deploy mirror second, like doctor's catalog checks (#1381). The checkout is
+// found the RepoDir way, cwd before DOTFILES_REPO_DIR; doctor still resolves it
+// the other way round, so from a worktree the two can read different catalogs
+// until #1418 gives doctor this order. Setup copies the catalog into the mirror
+// before it calls `dotf tools install`, so a setup run reads the same file
+// either way.
 func ResolveCatalogPath() string {
 	if root := RepoDir(); root != "" {
 		if p := filepath.Join(root, "packages.json"); fileExists(p) {

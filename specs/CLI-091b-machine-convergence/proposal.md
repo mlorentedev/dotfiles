@@ -23,7 +23,7 @@ Track B lands row by row (#1843). Each row adds its acceptance criteria here bef
 Rows B4 and CLI-067 (#1381), in this first PR:
 
 - `dotf tools install --dry-run [name]` prints what `install` would do for each selected tool (the installed version, the pin and the action) and changes nothing.
-- `dotf tools list` and `dotf tools install` read `packages.json` from the checkout first and fall back to the deploy mirror, the order doctor already uses.
+- `dotf tools list` and `dotf tools install` read `packages.json` from the checkout first and fall back to the deploy mirror, as doctor does. The checkout itself is found cwd first (`env.RepoDir`), and doctor still finds it `DOTFILES_REPO_DIR` first, so one shared resolver waits for #1418.
 
 Later rows, whose criteria are added when they start: B5 (pins as floors in doctor and setup, #1262 and #1265), then B1-B3 and B6-B10.
 

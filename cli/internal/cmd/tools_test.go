@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -189,10 +190,12 @@ func TestToolsInstall_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tools install --dry-run: %v", err)
 	}
-	for _, want := range []string{"sops", "absent", "3.13.1"} {
-		if !strings.Contains(stdout, want) {
-			t.Errorf("dry-run output missing %q\n%s", want, stdout)
-		}
+	// The fixture declares a build for linux, darwin and windows, so the action
+	// is install on every CI leg. Match the whole row: a wrong or empty action
+	// cell must fail, not only a missing name.
+	row := regexp.MustCompile(`(?m)^sops\s+absent\s+3\.13\.1\s+install\s*$`)
+	if !row.MatchString(stdout) {
+		t.Errorf("dry-run output has no row `sops absent 3.13.1 install`\n%s", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".local", "bin")); !os.IsNotExist(err) {
 		t.Errorf("dry-run created or touched ~/.local/bin (stat err %v)", err)

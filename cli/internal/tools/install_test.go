@@ -328,6 +328,8 @@ func TestInstallerPlan(t *testing.T) {
 		{"at the pin", "linux", "3.13.1", release, PlanSkip},
 		{"above the pin is never downgraded", "linux", "3.14.0", release, PlanSkip},
 		{"no build for this platform", "windows", "", release, PlanUnsupported},
+		{"no build for this platform, but installed: the probe still runs", "windows", "3.13.1", release, PlanUnsupported},
+		{"a source type Install refuses", "linux", "", Tool{Name: "x", Version: "1.0.0", Source: Source{Type: "homebrew"}}, PlanUnsupported},
 		{"npm below the pin", "linux", "2026.1.0", npm, PlanUpgrade},
 	}
 	for _, tc := range cases {
