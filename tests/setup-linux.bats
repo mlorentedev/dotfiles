@@ -479,9 +479,50 @@ setup() {
     grep -qF '"$_dotf" harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh passes its checkout explicitly and warns when dotf is unavailable (WIN-014)" {
-    grep -qF '"$_dotf" harness mirror --repo "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'dotf not found (PATH or ~/.local/bin)' "$DOTFILES_DIR/setup-linux.sh"
+extract_linux_harness_mirror_block() {
+    awk '
+        /^# Mirror the harness inputs into the deploy dir/ { capture = 1 }
+        capture { print }
+        capture && /^unset _dotf$/ { exit }
+    ' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh executes harness mirror with its checkout path (WIN-014)" {
+    local block command_script
+    block="$(extract_linux_harness_mirror_block)"
+    [ -n "$block" ]
+    command_script='
+log_warning() { printf "WARN:%s\n" "$*"; }
+dotf() {
+    printf "CALL"
+    printf " <%s>" "$@"
+    printf "\n"
+    return 0
+}
+CURRENT_DIR="/checkout with spaces"
+DOTFILES_DIR="/deploy"
+'
+    run bash -c "$command_script
+$block"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"CALL <harness> <mirror> <--repo> </checkout with spaces>"* ]]
+}
+
+@test "setup-linux.sh warns when dotf cannot mirror the harness (WIN-014)" {
+    local block command_script
+    block="$(extract_linux_harness_mirror_block)"
+    [ -n "$block" ]
+    command_script='
+log_warning() { printf "WARN:%s\n" "$*"; }
+PATH="/missing"
+HOME="/home/without-dotf"
+CURRENT_DIR="/checkout"
+DOTFILES_DIR="/deploy"
+'
+    run bash -c "$command_script
+$block"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN:dotf not found (PATH or ~/.local/bin) -- harness not mirrored to /deploy"* ]]
 }
 
 # CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json

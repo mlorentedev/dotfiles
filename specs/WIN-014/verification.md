@@ -12,7 +12,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] Criterion 1 -> `TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout` and `TestHarnessMirrorCmd_ExplicitRepoWinsInsideAnotherRepository`
 - [x] Criterion 2 -> `TestMirror_PreservesTheSourceMode` and
   `TestMirror_ReplacesReadOnlyDestinationOnWindows`
-- [x] Criterion 3 -> setup BATS cases named `passes its checkout explicitly and warns when dotf is unavailable`
+- [x] Criterion 3 -> setup BATS cases named `executes harness mirror with its checkout path`
+  and `warns when dotf cannot mirror the harness` for both Linux and Windows
 
 ## Test status
 
@@ -23,11 +24,33 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Full Go suite: all packages pass except the pre-existing Windows symlink
   privilege failure in `internal/doctor` (`A required privilege is not held by
   the client`, tracked by #1804); the changed `internal/harness` package passes.
-- Setup contract: targeted WSL BATS cases for Linux and Windows -> 2 passed.
+- Setup behavior: `bats --filter 'WIN-014' tests/setup-linux.bats tests/setup-windows.bats`
+  -> 4 passed. Each test extracts and executes the real harness-mirror block;
+  fake `dotf` captures the `--repo` argument, while an empty command path
+  exercises the non-fatal warning branch.
+- TDD red evidence: with temporary local mutations that replaced both checkout
+  arguments and both warning strings, the same command failed all 4 cases.
+  Restoring the production scripts returned the suite to 4 passing cases.
 - Manual smoke test: a source-built `dotf harness mirror --help` lists `--repo string`.
 - Full setup BATS run: 190 passed, 3 dependency skips, and 5 environment failures because WSL lacks `zsh`, `jq`, and `pwsh`; all WIN-014 cases passed.
 - Linux mode test: committed for Linux CI; local WSL has no Go toolchain, while Windows cannot expose POSIX executable bits.
 - No regressions in targeted suites: yes.
+
+## Prior-review dispositions
+
+- **AC3 setup coverage — resolved.** The former source-text-only assertions were
+  replaced with focused execution of the Linux and Windows mirror blocks. The
+  tests prove the checkout path reaches `dotf harness mirror --repo` and that a
+  missing `dotf` emits the documented warning without running either full setup.
+- **Review-base mis-scope — confirmed; fresh review required.**
+  `review-request.json` names `b15ad970f98c1ec6de1a2e51defc944cbbb0280a`,
+  which is 19 commits behind the PR merge base
+  `d691f613a7f0f6d79870ab318853046696069078`. That expands review scope from 6
+  branch files to 92 files and makes the existing request unsuitable as
+  WIN-014 evidence. This branch does not redesign review-base selection. Before
+  archive, regenerate the independent review request from the then-current
+  `git merge-base origin/main HEAD` and require the resulting review to cover
+  only the PR diff plus these remediation changes.
 
 ## Decisions made during implementation
 
