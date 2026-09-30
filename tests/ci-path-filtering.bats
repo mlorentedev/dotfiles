@@ -68,7 +68,9 @@ EOF
 
 # Every tracked top-level entry is either in the `code` filter or declared
 # docs-only here, with the reason. A new directory that is in neither would be
-# classified as docs and skip every test without anyone deciding that.
+# classified as docs and skip every test without anyone deciding that. This test
+# runs behind the same filter, so a PR adding only such an entry skips it too and
+# the failure lands on the push to main (#1879).
 @test "HARNESS-041: every top-level entry is in the code filter or declared docs-only" {
     command -v git >/dev/null 2>&1 || skip "git required to list tracked files"
     run python3 - "$CI_YML" "$DOTFILES_DIR" <<'EOF'

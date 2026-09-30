@@ -66,7 +66,9 @@ jobs:
               # none of them is code (HARNESS-041 round 1: six PRs touching only
               # secrets/registry.yaml skipped every test that reads it).
               # tests/ci-path-filtering.bats fails when a new top-level entry
-              # is in neither this list nor its docs-only list.
+              # is in neither this list nor its docs-only list. On a PR that
+              # adds only such an entry that test is itself skipped, so the
+              # failure shows on the push to main (#1879).
               - 'secrets/**'
               - 'ssh/**'
               - 'systemd/**'
