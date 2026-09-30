@@ -740,3 +740,14 @@ print(guard['env'].get('REVIEW_MODEL', ''))
     [ "${lines[2]}" = '${{ steps.models.outputs.model }}' ]
     grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \]' "$WF"
 }
+
+# AI-045: the guard blamed every silent run on concurrency (#1107). Run
+# 36680454975 disproved that as the only cause: deepseek-v4-flash took a 42K-token
+# review and PR-Agent exited cleanly after 12 minutes with nothing published.
+# The message must name both measured causes, so a reader does not chase the
+# wrong one.
+@test "pr-agent: the no-review guard names both measured causes, not concurrency alone" {
+    grep -q '#1107' "$WF"
+    grep -q 'non-streamed answer.*#1858\|#1858.*non-streamed' "$WF" \
+        || grep -A2 'non-streamed answer' "$WF" | grep -q '#1858'
+}

@@ -490,6 +490,7 @@ jobs:
           fi
           echo "::error::PR-Agent reported success but published no review" \
             "(no github-actions[bot] comment updated since ${STARTED} carries any of ${markers})."
-          echo "::error::Most likely cause: NaN concurrency exhaustion — the cluster allows 5 simultaneous"
-          echo "::error::requests, shared with pi, qq and hive embeddings. See #1107."
+          echo "::error::Two causes are measured. A diff too large for a non-streamed answer: NaN's edge"
+          echo "::error::cuts one at about 125 s, and PR-Agent then exits cleanly (run 36680454975, 42K tokens;"
+          echo "::error::#1858). Or NaN's per-model concurrency limit, shared with pi, qq and hive (#1107)."
           exit 1
