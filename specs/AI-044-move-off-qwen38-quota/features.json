@@ -9,9 +9,9 @@
   {
     "id": "AI-044-move-off-qwen38-quota-f2",
     "behavior": "AC2: opencode and pi declare the same context window for every NaN model both carry",
-    "verification": "bats -f 'context window' tests/opencode.bats",
+    "verification": "PI_BIN=\"${PI_BIN:-$HOME/.local/bin/pi}\" PI_NAN_PACKAGE_REQUIRED=1 bats -f 'same context window' tests/pi-nan-package.bats",
     "state": "passing",
-    "evidence": "exit 0 on 2026-09-26 at 0b18c9a; on main it reports qwen3.8-flash, qwen3.6, mimo-v2.5 and gemma4"
+    "evidence": "exit 0 on 2026-09-30 at 0a584d4 with a real pi; exit 1 when the three opencode windows are set to 999999; exit 1 without a pi (REQUIRED turns the skip into a failure). Runs in CI as the pi-nan-package job. Round 1: the old command selected nothing in tests/opencode.bats and exited 0"
   },
   {
     "id": "AI-044-move-off-qwen38-quota-f3",
