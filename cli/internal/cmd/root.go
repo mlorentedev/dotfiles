@@ -15,8 +15,8 @@ func New(version, commit string) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "dotf",
 		Short: "Single entry point for the dotfiles tooling",
-		Long: "dotf is the cross-platform dotfiles tooling CLI (ADR-020).\n" +
-			"Shell script twins under scripts/ converge here one subcommand at a time.",
+		Long: "dotf is a cross-platform CLI for a dotfiles repository: machine setup checks,\n" +
+			"secrets injection, spec-driven development, and the pull-request review loop.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()

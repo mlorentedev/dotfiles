@@ -23,8 +23,7 @@ func newToolsCmd() *cobra.Command {
 		Use:   "tools",
 		Short: "Declarative cross-OS package catalog (packages.json)",
 		Long: "tools reads packages.json — the tool/install list as data — so a single\n" +
-			"catalog feeds every OS instead of duplicated install blocks in setup-linux.sh\n" +
-			"and setup-windows.ps1 (CLI-029, piloting ADR-021/CLI-028 with sops).",
+			"catalog feeds every OS instead of one install block per OS.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -185,9 +184,8 @@ func newToolsVersionCmd() *cobra.Command {
 		Use:   "version <name>",
 		Short: "Print the semver a tool on PATH reports, or exit 1",
 		Long: "version runs `<name> --version` and prints the first semver in its output —\n" +
-			"the one extraction every caller shares (ADR-036). The setup scripts used to\n" +
-			"parse \"last token of the first line\" in seven places, and on the Windows\n" +
-			"work box that accepted `locked.` as opencode's version (AI-034, #1294).\n" +
+			"the one extraction every caller shares, so no script parses version output\n" +
+			"itself (a tool that prints `locked.` is not read as a version).\n" +
 			"Exits 1 with nothing on stdout when the tool is absent or prints no version,\n" +
 			"so a shell caller can test either.",
 		Args:         cobra.ExactArgs(1),
