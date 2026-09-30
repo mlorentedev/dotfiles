@@ -1,7 +1,7 @@
 ---
 id: "OPS-042-npm-tools-to-catalog"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-29"
 issue: "mlorentedev/dotfiles#1336"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -70,3 +70,5 @@ Observable outcomes. Each must be testable.
 
 - Bitácora board: #1336. ADR-036 (node-distributed tools in packages.json); #1294 (opencode's move, the precedent); #1359 (copilot's move).
 - `cli/internal/tools/install.go` (`installNpm`), `cli/internal/doctor/checks_tools.go` (yarn row), `checks_catalog.go` (`catalogPin`).
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1382 -->
