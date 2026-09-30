@@ -1,0 +1,9 @@
+[
+  {
+    "id": "ARCH-003b-gitea-token-f1",
+    "behavior": "GITEA_TELEDYNE_TOKEN is a valid registry-backed Bitwarden secret and is listed without revealing its value.",
+    "verification": "cd cli && go test ./internal/secrets ./internal/cmd && go run ./cmd/dotf secrets ls | grep -q '^GITEA_TELEDYNE_TOKEN'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
