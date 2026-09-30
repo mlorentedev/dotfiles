@@ -62,7 +62,9 @@ func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
 
 // dirsProviding lists the PATH directories that carry an executable named
 // name (on Windows also name.exe / .cmd / .ps1, the shapes npm, scoop and
-// winget each leave), in PATH order, without duplicates.
+// winget each leave), in PATH order, without duplicates. A directory reached
+// through a symlink (usrmerge's /bin, scoop's current) counts once, under the
+// first spelling PATH gives it.
 func (s *System) dirsProviding(name string) []string {
 	candidates := []string{name}
 	if runtime.GOOS == "windows" || s.GOOS == "windows" {
@@ -75,12 +77,16 @@ func (s *System) dirsProviding(name string) []string {
 			continue
 		}
 		clean := filepath.Clean(dir)
-		if seen[clean] {
+		key := clean
+		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
+			key = resolved
+		}
+		if seen[key] {
 			continue
 		}
 		for _, c := range candidates {
 			if isExecFile(filepath.Join(clean, c)) {
-				seen[clean] = true
+				seen[key] = true
 				dirs = append(dirs, clean)
 				break
 			}
