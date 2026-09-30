@@ -146,3 +146,43 @@ func TestHarnessMirrorCmd_ExplicitRepoWinsInsideAnotherRepository(t *testing.T) 
 		t.Fatalf("mirrored %s, want declared checkout", got)
 	}
 }
+
+// The --repo fixtures above declare no targets; this one mirrors a real target
+// from the explicit checkout, and a checkout with no manifest fails through the
+// command rather than only through harness.Mirror (#1872).
+func TestHarnessMirrorCmd_ExplicitRepoMirrorsADeclaredTarget(t *testing.T) {
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[{"file":"AGENTS.md"}]}`)
+	writeMirrorFixture(t, filepath.Join(repo, "AGENTS.md"), "# declared\n")
+	t.Chdir(t.TempDir())
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("DOTFILES_DIR", deploy)
+
+	cmd := newHarnessMirrorCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--repo", repo})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(deploy, "AGENTS.md")); string(got) != "# declared\n" {
+		t.Fatalf("declared target mirrored as %q", got)
+	}
+}
+
+func TestHarnessMirrorCmd_ExplicitRepoWithoutAManifestFails(t *testing.T) {
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "model-map.json"), `{}`)
+	t.Chdir(t.TempDir())
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("DOTFILES_DIR", deploy)
+
+	cmd := newHarnessMirrorCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--repo", repo})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "manifest.json") {
+		t.Fatalf("a checkout with no manifest must fail naming it, got %v", err)
+	}
+}

@@ -90,7 +90,6 @@ docs_only = {
     ".coderabbit.yaml": "reviewer config, read by no test",
     "release-please-config.json": "release tooling; a release PR's content was tested on main",
     ".release-please-manifest.json": "release tooling; a release PR's content was tested on main",
-    "diff.patch": "stray file, removal tracked in #1869",
 }
 
 tracked = subprocess.run(["git", "-C", sys.argv[2], "ls-files"],

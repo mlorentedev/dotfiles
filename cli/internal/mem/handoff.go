@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // HandoffHeading is the section every session's handoff lives under.
@@ -152,8 +153,10 @@ func writeThread(content, threadKey, stamp, body string) (string, bool, error) {
 	if strings.TrimSpace(threadKey) == "" {
 		return "", false, fmt.Errorf("thread key is empty — a handoff with no thread is the shared slot this replaces")
 	}
-	if strings.Contains(threadKey, "\n") {
-		return "", false, fmt.Errorf("thread key %q spans lines", threadKey)
+	if strings.ContainsFunc(threadKey, unicode.IsSpace) {
+		// A heading is matched by its first word, so a key with whitespace would
+		// never find its own block again and every write would append a copy.
+		return "", false, fmt.Errorf("thread key %q contains whitespace; a thread key is one word, like a branch name", threadKey)
 	}
 
 	lines := strings.Split(content, "\n")
