@@ -82,15 +82,31 @@ func checkoutProjectName(root string) string {
 	if !filepath.IsAbs(gitDir) {
 		gitDir = filepath.Join(root, gitDir)
 	}
-	for p := filepath.Clean(gitDir); ; p = filepath.Dir(p) {
-		if filepath.Base(p) == ".git" {
-			return filepath.Base(filepath.Dir(p))
+	gitDir = filepath.Clean(gitDir)
+	if name := submoduleProjectName(gitDir); name != "" {
+		return name
+	}
+	if filepath.Base(filepath.Dir(gitDir)) == "worktrees" {
+		common := filepath.Dir(filepath.Dir(gitDir))
+		if filepath.Base(common) == ".git" {
+			return filepath.Base(filepath.Dir(common))
 		}
-		parent := filepath.Dir(p)
-		if parent == p {
-			return filepath.Base(root)
+		return strings.TrimSuffix(filepath.Base(common), ".git")
+	}
+	if filepath.Base(gitDir) == ".git" {
+		return filepath.Base(filepath.Dir(gitDir))
+	}
+	return strings.TrimSuffix(filepath.Base(gitDir), ".git")
+}
+
+func submoduleProjectName(gitDir string) string {
+	parts := strings.Split(filepath.ToSlash(gitDir), "/")
+	for i := len(parts) - 2; i >= 0; i-- {
+		if parts[i] == "modules" {
+			return parts[len(parts)-1]
 		}
 	}
+	return ""
 }
 
 func hiveProjectBlock(repo string) string {

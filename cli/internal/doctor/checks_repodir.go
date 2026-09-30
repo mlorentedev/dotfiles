@@ -55,8 +55,8 @@ func gitCheckoutRoot(sys *System, path string) string {
 }
 
 func sameCheckoutRoot(configured, actual string) bool {
-	a, errA := filepath.Abs(configured)
-	b, errB := filepath.Abs(actual)
+	a, errA := canonicalPath(configured)
+	b, errB := canonicalPath(actual)
 	if errA != nil || errB != nil {
 		return false
 	}
@@ -64,4 +64,16 @@ func sameCheckoutRoot(configured, actual string) bool {
 		return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 	}
 	return filepath.Clean(a) == filepath.Clean(b)
+}
+
+func canonicalPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(resolved), nil
 }

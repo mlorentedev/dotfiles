@@ -37,6 +37,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   remain green.
 - Full doctor package: all tests reach completion except the pre-existing
   Windows symlink privilege failure tracked by #1804.
+- Adversarial review round 1 dispositions:
+  - **Applied:** checkout-root comparison now canonicalizes both paths with
+    `filepath.EvalSymlinks`; a symlinked checkout path compares equal to Git's
+    physical top-level path.
+  - **Applied:** submodule `.git/modules/...` pointers resolve to the submodule
+    project name instead of the superproject.
+  - **Applied:** bare-repository worktree pointers derive the project name from
+    the common `project.git` directory.
 
 ## Decisions made during implementation
 

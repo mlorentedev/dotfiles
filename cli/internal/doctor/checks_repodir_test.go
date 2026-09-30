@@ -58,4 +58,14 @@ func TestCheckRepoDirResolves(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("symlinked checkout path equals physical git root", func(t *testing.T) {
+		link := filepath.Join(t.TempDir(), "checkout-link")
+		if err := os.Symlink(realCheckout, link); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		if !sameCheckoutRoot(link, realCheckout) {
+			t.Fatalf("symlink %q and physical root %q must compare equal", link, realCheckout)
+		}
+	})
 }

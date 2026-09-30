@@ -71,6 +71,26 @@ func TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory(t *testing
 	}
 }
 
+func TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers(t *testing.T) {
+	t.Run("submodule", func(t *testing.T) {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join("..", "super", ".git", "modules", "libs", "child")+"\n")
+		if got := checkoutProjectName(root); got != "child" {
+			t.Fatalf("project = %q, want child", got)
+		}
+	})
+
+	t.Run("bare repository worktree", func(t *testing.T) {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join("..", "project.git", "worktrees", "feature")+"\n")
+		if got := checkoutProjectName(root); got != "project" {
+			t.Fatalf("project = %q, want project", got)
+		}
+	})
+}
+
 func TestClaudeContextAssembly(t *testing.T) {
 	now := time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC)
 	scriptsNoHealth := filepath.Join(t.TempDir(), "noscripts") // vault-health.sh absent
