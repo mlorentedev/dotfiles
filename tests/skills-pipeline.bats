@@ -314,9 +314,9 @@ path_without_copilot() {
         # A guard measuring one unit cannot report the other one crossing.
         #
         # deploy_doctrine now normalises typographic punctuation in a capped
-        # payload, so the two measures track each other. This assertion is what
-        # keeps that true: reintroduce a multi-byte character and the byte count
-        # separates from the character count and lands here first.
+        # payload, so the two measures track each other. This assertion is the
+        # backstop: a reintroduced multi-byte character fails the pure-ASCII test
+        # in tests/compile-harness.bats first, and this byte count second.
         bytes="$(wc -c < "$SHARED/$f")"
         [ "$bytes" -lt "$cap" ] || { echo "$f is $bytes BYTES, at or over its $cap cap (chars: $chars)"; return 1; }
     done < <(jq -r '.doctrine.deploy[] | "\(.file)\t\(.char_cap)"' harness/manifest.json)
