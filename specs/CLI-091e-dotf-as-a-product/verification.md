@@ -7,7 +7,7 @@ created: "2026-09-29"
 
 ## Evidence
 
-- [x] AC1 -> test `TestHelpTextHasNoInternalReferences` (49 failures before the rewrite, 0 after)
+- [x] AC1 -> test `TestHelpTextHasNoInternalReferences` (51 failures at the base `0013ea5b` with the shipped pattern, as the round-1 review reproduced; 0 after)
 - [x] AC2 -> `cli/README.md` rewritten; `features.json` f2 checks the three sections and runs `TestReadmeHasNoInternalReferences`, which holds the README to the same pattern as `--help` (added from #1850's review; mutation-checked with an `ADR-041` line)
 
 ## Test status
