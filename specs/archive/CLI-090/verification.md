@@ -34,6 +34,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 | 6 | Malformed-metadata error wrapped inside the lookup-failure error (THEORETICAL Minor) | Ticketed, #1890 |
 | 7 | `sed`-based `tag_name` parsing (THEORETICAL Minor) | Ticketed, #1890 |
 
+**Scope of the ticked boxes.** AC3 and features.json f4 are ticked against what is tested:
+- AC3 holds for the POSIX installer. The PowerShell half, a non-zero process exit on failure, is unproven and possibly false (finding 1).
+- f4 does not tell the POSIX `dotf version` line from the Windows one (finding 4).
+
+Both boxes stay as they are because the review's contract digest pins `proposal.md`, `tasks.md` and `features.json`. Narrowing AC3 or scoping f4 now would invalidate the review that permitted this archive. Both corrections are items on #1890. PR-Agent raised the same two points on #1883.
+
+The Windows run cited above tested `ffa74ae`. It also passed on the archive head `e4b7b1c` (`test-windows`); the Pester file is identical at both.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
