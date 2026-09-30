@@ -30,6 +30,7 @@ var specArea = regexp.MustCompile(`^([A-Z]+[0-9]*(?:-[A-Z]+[0-9]*)*)-[0-9]+`)
 func internalRef(t *testing.T) *regexp.Regexp {
 	t.Helper()
 	seen := map[string]bool{}
+	areas := 0
 	prefixes := append([]string(nil), fixedPrefixes...)
 	for _, p := range prefixes {
 		seen[p] = true
@@ -40,13 +41,18 @@ func internalRef(t *testing.T) *regexp.Regexp {
 			t.Fatalf("read %s: %v", dir, err)
 		}
 		for _, e := range entries {
-			if m := specArea.FindStringSubmatch(e.Name()); e.IsDir() && m != nil && !seen[m[1]] {
+			m := specArea.FindStringSubmatch(e.Name())
+			if !e.IsDir() || m == nil {
+				continue
+			}
+			areas++
+			if !seen[m[1]] {
 				seen[m[1]] = true
 				prefixes = append(prefixes, m[1])
 			}
 		}
 	}
-	if len(prefixes) == len(fixedPrefixes) {
+	if areas == 0 {
 		t.Fatal("no spec area found under specs/: the prefix list would silently stay hand-kept")
 	}
 	sort.Slice(prefixes, func(i, j int) bool { return len(prefixes[i]) > len(prefixes[j]) })
