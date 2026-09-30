@@ -122,7 +122,10 @@ func TestCheckProfileFiles_MeasuresThePwshResolvedProfile(t *testing.T) {
 			if (tc.pwsh != nil) != asked {
 				t.Fatalf("pwsh asked = %v, want %v", asked, tc.pwsh != nil)
 			}
-			if strings.Contains(tc.wantSub, "resolved by pwsh") && !strings.Contains(out, redirected) {
+			// Every case where pwsh answers the path, found or missing, must
+			// name it: a missing-profile FAIL that drops the path would
+			// otherwise pass on its prefix alone.
+			if tc.pwsh != nil && strings.Contains(tc.pwsh.out, "{REDIRECTED}") && !strings.Contains(out, redirected) {
 				t.Fatalf("the row must name the pwsh-resolved path\n%s", out)
 			}
 		})
