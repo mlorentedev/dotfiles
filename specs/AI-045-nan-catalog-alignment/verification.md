@@ -11,13 +11,13 @@ PR 1 (AC1-AC3). AC4 and AC5 land in PR 2.
 
 - [x] AC1 -> `tests/reviewer-pool.bats`, `tests/opencode.bats`, `tests/pi-nan-package.bats` (5/5 against a real pi and the pinned package). Live `dotf doctor --verbose` from this tree, 2026-09-30: `[ OK ] mimo-v2.6-flash: 106.8M / 1000.0M tokens this month (11%)`, no NaN quota FAIL. The same check on `main` reports `[FAIL] mimo-v2.5 is bound in model-map.json but NaN does not serve it`.
 - [x] AC2 -> `tests/pr-agent-config.bats`: "the chain the preflight probes equals the toml's, model and fallbacks". Mutation: a workflow `DECLARED_MODEL` different from the toml's fails it, naming both.
-- [x] AC3 -> `tests/pr-agent-model-preflight.bats` (9/9, stub `curl`), and "the preflight runs wherever PR-Agent runs, and a failed one skips the guard". Mutation: the key moved to curl's argv fails the stdin test.
+- [x] AC3 -> `tests/pr-agent-model-preflight.bats` (10/10, stub `curl`: routing, key on stdin, remedy per status class), `tests/pr-agent-model-preflight-real.bats` (real `curl` against a local server: the key read from `-K -`, the status, a real hang ending at the timeout), and "the preflight runs wherever PR-Agent runs, and a failed one skips the guard". Mutations: the key moved to curl's argv fails the stdin test; a misspelt `-K` directive passes every stub test and fails the real one.
 - [ ] AC4 -> PR 2
 - [ ] AC5 -> PR 2
 
 ## Test status
 
-- `bats tests/*.bats` -> see the PR's `test` job; locally, the full serial run on this tree.
+- `bats tests/*.bats` -> 1714/1716 locally before the real sibling existed: `stub-real-pairing` (fixed by adding the sibling) and `shell-alias-collision`'s oh-my-zsh snapshot freshness, which reads this machine's oh-my-zsh install (new `glolm` alias upstream) and is unrelated to this change.
 - `cd cli && go build ./... && go vet ./... && go test ./... && GOOS=windows go vet ./...` -> all green. `golangci-lint run` -> 0 issues.
 - `shellcheck scripts/pr-agent-model-preflight.sh` and `actionlint .github/workflows/pr-agent.yml` -> clean.
 - Live smoke, 2026-09-30, `dotf secrets run --only NAN_API_KEY -- ./scripts/pr-agent-model-preflight.sh` over the whole catalog, with the retired model as primary:

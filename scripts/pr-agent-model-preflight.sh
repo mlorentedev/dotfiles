@@ -97,6 +97,18 @@ probe() {
     printf '%s' "${code:-000}"
 }
 
+# remedy CODE: what the reader should do about a model that did not answer.
+# Only a refusal means the chain is wrong. Quota and NaN's per-model
+# concurrency limit (#1107) pass on their own, and so does an outage; telling
+# the reader to edit the chain for those would be wrong advice.
+remedy() {
+    case "$1" in
+        401|403|404) printf 'this key cannot call it. Fix the chain in .pr_agent.toml and .github/workflows/pr-agent.yml' ;;
+        402|429) printf 'quota or concurrency limit reached. Nothing to fix; it passes, or the quota resets' ;;
+        *) printf 'NaN did not serve it this time. Nothing to fix unless it persists; check https://nan.builders/docs/models' ;;
+    esac
+}
+
 answered=() summary=()
 while IFS= read -r declared; do
     [ -n "$declared" ] || continue
@@ -107,15 +119,13 @@ while IFS= read -r declared; do
             summary+=("| \`$declared\` | answered (HTTP $code) |")
             ;;
         000)
-            printf '::warning::PR-Agent model %s gave no answer within %ss; it is skipped for this run.' \
-                "$declared" "$timeout"
-            printf ' Fix the chain in .pr_agent.toml and .github/workflows/pr-agent.yml.\n'
+            printf '::warning::PR-Agent model %s gave no answer within %ss and is skipped for this run: %s.\n' \
+                "$declared" "$timeout" "$(remedy "$code")"
             summary+=("| \`$declared\` | no answer within ${timeout}s |")
             ;;
         *)
-            printf '::warning::PR-Agent model %s answered HTTP %s; it is skipped for this run.' \
-                "$declared" "$code"
-            printf ' Fix the chain in .pr_agent.toml and .github/workflows/pr-agent.yml.\n'
+            printf '::warning::PR-Agent model %s answered HTTP %s and is skipped for this run: %s.\n' \
+                "$declared" "$code" "$(remedy "$code")"
             summary+=("| \`$declared\` | HTTP $code |")
             ;;
     esac
@@ -135,7 +145,7 @@ fi
 
 if [ "${#answered[@]}" -eq 0 ]; then
     printf '::error::No model in PR-Agent'\''s declared chain answered, so no review can run.'
-    printf ' Check NaN (https://nan.builders/docs/models) and the chain in .pr_agent.toml.\n'
+    printf ' The warnings above give each model'\''s status and what to do about it.\n'
     exit 1
 fi
 

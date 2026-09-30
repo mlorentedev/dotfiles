@@ -26,6 +26,7 @@ created: "2026-09-29"
 - [x] [AC2] [AC3] Wire the `models` step into `.github/workflows/pr-agent.yml`: one sparse checkout for both scripts, `CONFIG__MODEL` and `CONFIG__FALLBACK_MODELS` from its outputs, the no-review guard skipped when it failed.
 - [x] [AC2] Test that `DECLARED_MODEL` / `DECLARED_FALLBACK_MODELS` equal the toml's `model` / `fallback_models`. Mutation: a mismatched model fails it.
 - [x] [AC1] Move every live binding to `mimo-v2.6-flash`: `.pr_agent.toml`, `harness/model-map.json` (`chains.mid`), `harness/reviewer-pool.json` (re-admitted on the planted-defect bar), `ai/pi/settings.json`, `ai/opencode/opencode.jsonc`; drop `mimo-v2.5` from `harness/nan-quotas.json`. Tests and docs follow.
+- [x] [AC3] Real-dependency sibling `tests/pr-agent-model-preflight-real.bats` (BUG-055 pairing), and the remedy split by status class (401/403/404 fix the chain; 402/429 quota or concurrency; 5xx/000 NaN did not serve it)
 - [x] [AC1] `tests/pi-nan-package.bats` against a real pi: the pinned package registers `mimo-v2.6-flash` as reasoning-class with the same 1M window opencode declares.
 
 ### PR 2: align the consumers with NaN's docs

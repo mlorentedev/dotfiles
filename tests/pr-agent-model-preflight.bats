@@ -68,6 +68,26 @@ run_preflight() {
     [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"no answer within"* ]]
 }
 
+@test "preflight: the warning names the fix by status class, not one remedy for all" {
+    # 401/403/404: the key cannot call it, so the chain is wrong. 402/429: quota
+    # or NaN's per-model concurrency (measured in #1107), where editing the chain
+    # is the wrong advice. 5xx and a hang: NaN did not answer this time.
+    export STUB_CODES="mimo-v2.6-flash=429 deepseek-v4-flash=200"
+    run_preflight
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"openai/mimo-v2.6-flash answered HTTP 429"*"quota or concurrency"* ]]
+    [[ "$output" != *"Fix the chain"* ]]
+
+    export STUB_CODES="mimo-v2.6-flash=401 deepseek-v4-flash=200"
+    run_preflight
+    [[ "$output" == *"HTTP 401"*"Fix the chain"* ]]
+
+    export STUB_CODES="mimo-v2.6-flash=503 deepseek-v4-flash=200"
+    run_preflight
+    [[ "$output" == *"HTTP 503"*"NaN did not serve it"* ]]
+    [[ "$output" != *"Fix the chain"* ]]
+}
+
 @test "preflight: when no declared model answers, the job fails before PR-Agent runs" {
     export STUB_CODES="mimo-v2.6-flash=401 deepseek-v4-flash=429"
     run_preflight
