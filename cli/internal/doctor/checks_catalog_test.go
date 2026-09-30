@@ -60,6 +60,22 @@ func TestCheckShadowedCatalogTools_NamesEveryDirectoryProvidingTheTool(t *testin
 		}
 	})
 
+	// One directory reached through two spellings (usrmerge's /bin -> /usr/bin,
+	// scoop's current -> versioned pair) is one install, not a shadowed copy.
+	t.Run("a symlinked alias of a PATH directory is one directory", func(t *testing.T) {
+		alias := filepath.Join(t.TempDir(), "alias")
+		if err := os.Symlink(a, alias); err != nil {
+			t.Skipf("cannot create a directory symlink here: %v", err)
+		}
+		sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo, "PATH": a + pathSep + alias}, nil, nil)
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkShadowedCatalogTools(sys, &Config{DotfilesDir: t.TempDir()}, rep)
+		if strings.Contains(buf.String(), "opencode") {
+			t.Errorf("a directory and its symlink alias are not two copies\n%s", buf.String())
+		}
+	})
+
 	t.Run("a duplicated PATH entry is one directory", func(t *testing.T) {
 		sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo, "PATH": a + pathSep + a}, nil, nil)
 		var buf bytes.Buffer

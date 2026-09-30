@@ -4,6 +4,10 @@ Thumbs.db
 *.tmp
 *.swp
 *.swo
+# Working diffs left at the root by a person or an agent. Two have landed here
+# already (#1869, and a reviewer's scratch-diff.patch during HARNESS-120).
+/*.patch
+/*.diff
 
 # Sensitive data
 *.secret

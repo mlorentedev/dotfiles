@@ -19,7 +19,7 @@ import (
 // SKIP when Orca is not installed (neither file present), the expected state
 // off-Windows and on any box without Orca.
 func checkOrcaHook(sys *System, rep *Report, fix bool) {
-	rep.Section("Orca Copilot hook (DX-006)")
+	rep.Section("Orca Copilot hook")
 	home := sys.home()
 	orcaJSON := filepath.Join(home, ".copilot", "hooks", "orca.json")
 	orcaHook := filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
@@ -50,23 +50,23 @@ func checkOrcaHook(sys *System, rep *Report, fix bool) {
 				} else if err := os.WriteFile(orcaJSON, tuned, 0o644); err != nil { //nolint:gosec // the user's own hook file
 					rep.Fail("failed to tune orca.json: " + err.Error())
 				} else {
-					rep.Fix("orca.json: bumped hook timeoutSec to 30 (DX-006)")
+					rep.Fix("orca.json: bumped hook timeoutSec to 30")
 				}
 			} else {
-				rep.Fail("orca.json hook timeoutSec < 30 — run `dotf doctor --fix` or `dotf orca tune-hooks` (DX-006)")
+				rep.Fail("orca.json hook timeoutSec < 30 — run `dotf doctor --fix` or `dotf orca tune-hooks`")
 			}
 		default:
-			rep.Pass("orca.json hook timeoutSec >= 30 (DX-006)")
+			rep.Pass("orca.json hook timeoutSec >= 30")
 		}
 	}
 
 	if pathExists(orcaHook) {
 		if !fileContains(orcaHook, "Invoke-WebRequest") {
-			rep.Pass("copilot-hook.ps1 uses fast HttpWebRequest (DX-006)")
+			rep.Pass("copilot-hook.ps1 uses fast HttpWebRequest")
 			return
 		}
 		if !fix {
-			rep.Fail("copilot-hook.ps1 uses slow Invoke-WebRequest — run `dotf doctor --fix` or `dotf orca tune-hooks` (DX-006)")
+			rep.Fail("copilot-hook.ps1 uses slow Invoke-WebRequest — run `dotf doctor --fix` or `dotf orca tune-hooks`")
 			return
 		}
 		// CLI-062: the script half of the repair, once PowerShell-only, through
@@ -76,9 +76,9 @@ func checkOrcaHook(sys *System, rep *Report, fix bool) {
 		case err != nil:
 			rep.Fail("failed to tune copilot-hook.ps1: " + err.Error())
 		case res.Unrecognised:
-			rep.Fail("copilot-hook.ps1 has Invoke-WebRequest but the POST line is unrecognised — left unchanged; review it by hand (DX-006)")
+			rep.Fail("copilot-hook.ps1 has Invoke-WebRequest but the POST line is unrecognised — left unchanged; review it by hand")
 		default:
-			rep.Fix("copilot-hook.ps1: Invoke-WebRequest -> HttpWebRequest (backup " + res.Backup + "; DX-006)")
+			rep.Fix("copilot-hook.ps1: Invoke-WebRequest -> HttpWebRequest (backup " + res.Backup + ")")
 		}
 	}
 }
