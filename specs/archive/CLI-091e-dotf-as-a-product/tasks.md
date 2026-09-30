@@ -28,10 +28,10 @@ Later rows add their tasks here when they start.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test or check
-- [ ] Every acceptance criterion has a matching entry in `features.json`
-- [ ] Lint passes
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test or check
+- [x] Every acceptance criterion has a matching entry in `features.json`
+- [x] Lint passes (golangci-lint 2.12.2, 0 issues; CI `cli-lint` green on #1850)
+- [x] `verification.md` filled in
 
 ## Machine-readable features
 

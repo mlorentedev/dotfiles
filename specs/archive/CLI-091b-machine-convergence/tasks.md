@@ -30,12 +30,12 @@ Later rows add their tasks here when they start: B5 (#1262, #1265), then B1-B3 a
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Lint passes (golangci-lint 2.12.2, 0 issues; CI `cli-lint` green on #1848)
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder (#1848, `a94ae34`)
 
 ## Machine-readable features
 

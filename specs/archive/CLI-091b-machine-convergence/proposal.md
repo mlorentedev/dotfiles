@@ -1,7 +1,7 @@
 ---
 id: "CLI-091b-machine-convergence"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-29"
 issue: "mlorentedev/dotfiles#1843"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -40,10 +40,12 @@ Later rows, whose criteria are added when they start: B5 (pins as floors in doct
 
 ## Acceptance criteria
 
-- [ ] **AC1:** `dotf tools install --dry-run` prints one row per selected tool with its installed version (or `absent`), its pin and the action `install` would take (`install`, `upgrade`, `skip`, or `unsupported` when the tool has no build for this platform). The action comes from the same `decideAction` as the apply path. It fetches nothing, runs no package manager, writes nothing and exits 0.
-- [ ] **AC2:** `dotf tools list` and `dotf tools install` read `packages.json` from the checkout that contains the working directory when it has one, and from the deploy mirror otherwise. A test with different catalogs in the checkout and the mirror shows the checkout wins, and a test with no checkout shows the mirror is used.
+- [x] **AC1:** `dotf tools install --dry-run` prints one row per selected tool with its installed version (or `absent`), its pin and the action `install` would take (`install`, `upgrade`, `skip`, or `unsupported` when the tool has no build for this platform). The action comes from the same `decideAction` as the apply path. It fetches nothing, runs no package manager, writes nothing and exits 0.
+- [x] **AC2:** `dotf tools list` and `dotf tools install` read `packages.json` from the checkout that contains the working directory when it has one, and from the deploy mirror otherwise. A test with different catalogs in the checkout and the mirror shows the checkout wins, and a test with no checkout shows the mirror is used.
 
 ## References
 
 - EPIC #1843, track B; ADR-041 (convergence order); ADR-036 (pins are floors); ADR-030 (checkout-first resolution)
 - #1381 (CLI-067), #1262, #1265, #1418
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1848 -->
