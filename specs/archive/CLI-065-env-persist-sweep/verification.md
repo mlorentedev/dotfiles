@@ -92,7 +92,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-065-env-persist-sweep/` -> `specs/archive/CLI-065-env-persist-sweep/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-065-env-persist-sweep/` -> `specs/archive/CLI-065-env-persist-sweep/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1862 carries `Closes #1363`
+- [x] Promotions above executed (if any): lesson 244

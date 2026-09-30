@@ -1,7 +1,7 @@
 ---
 id: "CLI-065-env-persist-sweep"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-29"
 issue: "mlorentedev/dotfiles#1363"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -98,3 +98,5 @@ Observable outcomes. Each must be testable.
 - Related ADR: `docs/adr/adr-025-cross-machine-paths.md` (the contract and its cascade).
 - The rule this applies: *the writer touches only what it owns* — the shared-surface
   pattern the project memory records across six surfaces.
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1378 -->
