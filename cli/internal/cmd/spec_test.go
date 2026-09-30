@@ -317,3 +317,22 @@ func TestSpecInitReadsTheRepositoryLimit(t *testing.T) {
 		t.Fatalf("want a refusal naming the repository's limit of 3, got %v", err)
 	}
 }
+
+// An override given below the limit is not recorded, and says so rather than
+// dropping the reason silently.
+func TestSpecInitOverrideBelowTheLimitWarns(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedActiveSpecs(t, root, 3)
+
+	_, stderr, err := execute(t, "spec", "init", "BUG-008-demo", "--force-no-gate", "--over-wip-limit", "hotfix")
+	if err != nil {
+		t.Fatalf("spec init: %v", err)
+	}
+	if !strings.Contains(stderr, "was not needed, and nothing was recorded") {
+		t.Errorf("no warning that the override was unused:\n%s", stderr)
+	}
+	if strings.Contains(readFile(t, filepath.Join(root, "specs", "BUG-008-demo", "proposal.md")), "wip_override:") {
+		t.Error("an override below the limit was recorded")
+	}
+}

@@ -573,11 +573,17 @@ agent) or by hand. Do not skip the Why.`,
 			if err != nil {
 				return err
 			}
-			if active >= limit {
+			switch {
+			case active >= limit:
 				if err := spec.RecordWIPOverride(repoRoot, id, reason, active, limit, date); err != nil {
-					return err
+					// The folder is new (Scaffold refuses an existing one), so removing it
+					// lets a retry run instead of hitting "already exists" with no record.
+					_ = os.RemoveAll(filepath.Join(repoRoot, "specs", id))
+					return fmt.Errorf("recording the WIP override: %w; specs/%s was removed, retry", err, id)
 				}
 				cmd.PrintErrf("[WARN] %d active specs, limit %d: started over the WIP limit, reason recorded in proposal.md\n", active, limit)
+			case reason != "":
+				cmd.PrintErrf("[WARN] %d active specs, below the limit of %d: --over-wip-limit was not needed, and nothing was recorded\n", active, limit)
 			}
 
 			cmd.Printf("\n[OK] Created: specs/%s\n", id)
