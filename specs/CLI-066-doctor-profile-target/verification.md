@@ -69,13 +69,24 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **Minor SPECULATIVE, the fallback row echoes pwsh's first line: declined.** That line is the only clue to why pwsh gave no usable answer. It is printed on the user's own terminal, and no observed banner carries anything sensitive.
 - **Minor, golangci-lint was not run by the reviewer: run.** The pinned `golangci-lint run` reports 0 issues on this head.
 
+## Review round 3 (PASS, `nan/deepseek-v4-flash`, 2026-09-30) — dispositions
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Minor: the promotion lines are not archive-ready, and the lesson line contradicts lesson 321 | apply: each line answered, the lesson line names lesson 321 |
+| 2 | Minor: `firstLineOr`'s comment sits on `lastLine` | apply: each function has its own comment (comment-only) |
+| 3 | Minor (theoretical): f6's command exits 1 off Windows | recorded: f6 is a box-only criterion; its command is expected to fail anywhere but the Windows box, and its evidence is the box transcript above |
+| 4 | Minor (speculative): the fallback row echoes pwsh's first line | decline: as in round 2, that line is the only clue to why pwsh did not answer |
+| 5 | Minor (speculative): a dangling symlink at the profile path reads as "missing" | decline: no regression, since the enumeration path did the same, and "run setup-windows.ps1" rewrites the file either way |
+| 6 | Question: the launcher's review base spans 232 commits | no action here: tracked in #1551 and #1645 |
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? no — the class ("detect and heal must name the same target") is CLI-064's review finding, recorded there and in this spec; nothing new was learned beyond applying it
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no
-- [ ] New pattern candidate for `00_meta/patterns/`? no
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-321-a-test-that-proves-which-source-won-needs-them-to-disagree.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the doctor follows the path pwsh names, a fix inside the existing check
+- [x] New pattern candidate for `00_meta/patterns/`? no: lesson 321 is the transferable part, and it has one instance so far
 
 ## Archive checklist
 

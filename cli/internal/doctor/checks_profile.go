@@ -249,9 +249,8 @@ func repairProfile(sys *System, rep *Report, profile, heal string) {
 // rewrite — seconds, not minutes. A minute is generous on a loaded box.
 const profileHealTimeout = 60 * time.Second
 
-// firstLineOr renders a subprocess result as one line: its first line of
-// output when it produced one, else the error, else "no output".
-// lastLine returns the last non-blank line of s, trimmed.
+// lastLine returns the last non-blank line of s, trimmed. pwsh can print a
+// module banner or warning before it answers, so the answer is the last line.
 func lastLine(s string) string {
 	lines := strings.Split(s, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
@@ -262,6 +261,8 @@ func lastLine(s string) string {
 	return ""
 }
 
+// firstLineOr renders a subprocess result as one line: its first line of
+// output when it produced one, else the error, else "no output".
 func firstLineOr(out string, err error) string {
 	if l := firstLine(out); l != "" {
 		return l
