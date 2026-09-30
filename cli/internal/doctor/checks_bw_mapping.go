@@ -40,7 +40,9 @@ const bwMappingStaleSync = 24 * time.Hour
 //
 // Severity mirrors checkBitwardenReach's rule: an unreachable or locked vault is
 // not a finding here (that section owns it). When an item appears missing:
-//   - If the daemon's last sync is fresh (within bwMappingStaleSync), it is a FAIL
+//   - If doctor synced the daemon before listing, it is a FAIL: the synced
+//     listing is the vault (#1820). A sync that failed SKIPs the section.
+//   - With no sync wired, if the daemon's last sync is fresh (within bwMappingStaleSync), it is a FAIL
 //     because the item is genuinely absent from the vault.
 //   - If the daemon's last sync is stale or unknown (never synced), it is a WARN
 //     explaining that the item was not found in the local cache and advising a sync (BUG-087).
@@ -66,14 +68,23 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 
+	// The item list comes from bw serve's own cache, and the freshness judged
+	// below is `bw status`'s lastSync, a different cache. Syncing the daemon first
+	// makes its listing the vault's (#1820). A failed sync leaves that cache at an
+	// unknown age, which the CLI's lastSync cannot vouch for, so it SKIPs. Only
+	// when no sync is wired does the lastSync heuristic below decide.
+	synced := false
+	if sys.BWSync != nil {
+		if err := sys.BWSync(); err != nil {
+			rep.Skip(fmt.Sprintf("could not sync the vault (%s) — mapping unverifiable", daemonReason(err)))
+			return
+		}
+		synced = true
+	}
 	present, err := sys.BWItemNames()
 	if err != nil {
 		// Locked, absent daemon, transport error: not this section's finding.
-		reason := err.Error()
-		if strings.Contains(reason, "connection refused") || strings.Contains(reason, "unreachable") {
-			reason = "bw serve daemon not running"
-		}
-		rep.Skip(fmt.Sprintf("vault item list unavailable (%s) — mapping unverifiable", reason))
+		rep.Skip(fmt.Sprintf("vault item list unavailable (%s) — mapping unverifiable", daemonReason(err)))
 		return
 	}
 	have := make(map[string]bool, len(present))
@@ -100,7 +111,7 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 		ids := declared[item]
 		sort.Strings(ids)
 
-		if !lastSync.IsZero() && sys.Now().Sub(lastSync) >= 0 && sys.Now().Sub(lastSync) <= bwMappingStaleSync {
+		if synced || (!lastSync.IsZero() && sys.Now().Sub(lastSync) >= 0 && sys.Now().Sub(lastSync) <= bwMappingStaleSync) {
 			rep.Fail(fmt.Sprintf(
 				"%s: no such item in the vault, named by %s — every `dotf secrets run` without --only fails on it, including `dotf spec review`",
 				item, strings.Join(ids, ", ")))
@@ -118,4 +129,14 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 	if len(missing) == 0 {
 		rep.Pass(fmt.Sprintf("all %d bw item(s) named by the registry exist in the vault", len(declared)))
 	}
+}
+
+// daemonReason names why bw serve could not answer, in the reader's terms: a
+// refused or unreachable connection means the daemon is not running.
+func daemonReason(err error) string {
+	reason := err.Error()
+	if strings.Contains(reason, "connection refused") || strings.Contains(reason, "unreachable") {
+		return "bw serve daemon not running"
+	}
+	return reason
 }

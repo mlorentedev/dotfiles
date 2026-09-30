@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	gosync "sync"
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -156,6 +157,11 @@ type System struct {
 	// answer different questions and one returning the other's shape is how a
 	// consumer gets taught about one and forgotten for the other.
 	BWItemRevisions func() ([]secrets.ItemRevision, error)
+	// BWSync pulls the vault into the bw serve daemon's cache. The daemon answers
+	// every read from that cache, so a listing taken without a sync can be of any
+	// age (#1820). Nil means doctor has no way to sync, and a check that needs a
+	// fresh listing skips.
+	BWSync func() error
 	// BWLastSync returns the timestamp of the last successful Bitwarden sync.
 	// Returns zero time if never synced or unreadable (BUG-087).
 	BWLastSync func() (time.Time, error)
@@ -193,6 +199,18 @@ func resolveSecret(e secrets.Entry) (string, error) {
 }
 
 // realSystem wires System to the live OS.
+// onceSync runs sync at most once and hands every caller its result. A forced
+// bw serve sync takes seconds, and more than one check reads the vault in a
+// doctor run; the first sync already makes the cache as fresh as the run needs.
+func onceSync(sync func() error) func() error {
+	var once gosync.Once
+	var err error
+	return func() error {
+		once.Do(func() { err = sync() })
+		return err
+	}
+}
+
 func realSystem() *System {
 	return &System{
 		Getenv:   os.Getenv,
@@ -245,6 +263,7 @@ func realSystem() *System {
 		BWItemRevisions: func() ([]secrets.ItemRevision, error) {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemRevisions()
 		},
+		BWSync: onceSync(secrets.BWServeClient{}.Sync),
 		BWLastSync: func() (time.Time, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), bwStatusTimeout)
 			defer cancel()
