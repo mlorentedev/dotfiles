@@ -44,16 +44,21 @@ EOF
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
-@test "HARNESS-041: every step after checkout in a filtered job is guarded by a changes output" {
+@test "HARNESS-041: every step after checkout in a filtered job is guarded by its own changes output" {
     run python3 - "$CI_YML" $FILTERED_JOBS <<'EOF'
 import sys, yaml
 jobs = yaml.safe_load(open(sys.argv[1]))["jobs"]
+# Which filter decides each job. A guard on the wrong output passes a
+# "has any guard" check and still skips the job on the PRs it exists for
+# (round-2 review, mutation 6).
+output = {"lint-powershell": "powershell"}
 bad = []
 for name in sys.argv[2:]:
+    want = f"needs.changes.outputs.{output.get(name, 'code')} =="
     for i, step in enumerate(jobs[name]["steps"]):
         if step.get("uses", "").startswith("actions/checkout@"):
             continue
-        if "needs.changes.outputs." not in str(step.get("if", "")):
+        if want not in str(step.get("if", "")):
             bad.append(f"{name}: {step.get('name') or step.get('uses') or i}")
 print("unguarded steps:", bad)
 sys.exit(1 if bad else 0)
@@ -74,8 +79,8 @@ filters = next(s["with"]["filters"] for s in steps if s.get("id") == "filter")
 code = set(yaml.safe_load(filters)["code"])
 
 docs_only = {
-    "docs/":    "prose; the lesson-index lint runs in pre-commit and on push",
-    "specs/":   "spec records; archive PRs are the common case and the spec-id guard runs in pre-commit and on push",
+    "docs/":    "prose; check-doc-paths and check-lessons run in pre-commit, docs-drift on the push to main",
+    "specs/":   "spec records; archive PRs are the common case, and the spec-id guard runs on the push to main",
     "README.md": "prose",
     "CHANGELOG.md": "written by release-please",
     "LICENSE": "legal text",
