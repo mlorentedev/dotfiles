@@ -283,6 +283,7 @@ jobs:
           ./scripts/pr-agent-model-preflight.sh --model "${DECLARED_MODEL}" \
             --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT"
       - name: PR-Agent
+        id: pr_agent
         if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move it decides what runs here, and what runs here holds
@@ -429,8 +430,20 @@ jobs:
           BASE_REF: ${{ github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          PR_AGENT_OUTCOME: ${{ steps.pr_agent.outcome }}
+          REVIEW_MODEL: ${{ steps.models.outputs.model }}
         run: |
           set -euo pipefail
+          # A cancelled PR-Agent step was stopped by the job's timeout-minutes while
+          # it waited on the model. That is a hang, not concurrency: measured on run
+          # 36677077122, the model accepted a 42K-token review, never answered, and
+          # `ai_timeout` did not fire (AI-045).
+          if [ "${PR_AGENT_OUTCOME:-}" = "cancelled" ]; then
+            echo "::error::PR-Agent was stopped by the job timeout while waiting on ${REVIEW_MODEL:-its model}," \
+              "which accepted the review and never answered. Re-run the job; if it repeats, the model" \
+              "cannot review a diff this size in time (AI-045, #1763)."
+            exit 1
+          fi
           # Every declared marker, as a JSON array: a full review carries "## PR
           # Reviewer Guide", an incremental one "## Incremental PR Reviewer Guide"
           # (TOOL-023). Prints nothing when none is declared; never aborts the step.

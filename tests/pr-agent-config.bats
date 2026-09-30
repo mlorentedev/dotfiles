@@ -720,3 +720,23 @@ print(co['with']['sparse-checkout'].split())
     grep -q -- '--argjson markers' "$WF"
     grep -q 'any($markers\[\]' "$WF"
 }
+
+# AI-045: a PR-Agent step stopped by the job's timeout-minutes was reported as
+# "NaN concurrency exhaustion" (#1107), which is the wrong cause. Measured on run
+# 36677077122: the model accepted a 42K-token review and never answered, and
+# `ai_timeout` did not fire. The guard must say that, naming the model.
+@test "pr-agent: a cancelled PR-Agent step is reported as a hang on the model, not as concurrency" {
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+pa = next(s for s in steps if 'pr-agent' in s.get('uses', ''))
+guard = next(s for s in steps if s.get('name') == 'Fail if no review was published')
+print(pa.get('id', ''))
+print(guard['env'].get('PR_AGENT_OUTCOME', ''))
+print(guard['env'].get('REVIEW_MODEL', ''))
+"
+    [ "${lines[0]}" = "pr_agent" ]
+    [ "${lines[1]}" = '${{ steps.pr_agent.outcome }}' ]
+    [ "${lines[2]}" = '${{ steps.models.outputs.model }}' ]
+    grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \]' "$WF"
+}
