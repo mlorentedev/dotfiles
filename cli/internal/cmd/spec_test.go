@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -217,4 +218,102 @@ func readFile(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(b)
+}
+
+// seedActiveSpecs creates n active specs (a folder with a proposal.md) and one
+// archived spec, which must not count.
+func seedActiveSpecs(t *testing.T, root string, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		dir := filepath.Join(root, "specs", fmt.Sprintf("SEED-%03d-active", i))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "proposal.md"), []byte("---\nstatus: draft\n---\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	arch := filepath.Join(root, "specs", "archive", "SEED-999-done")
+	if err := os.MkdirAll(arch, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(arch, "proposal.md"), []byte("---\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// #770: nothing new starts while the limit's worth of specs is active.
+func TestSpecInitRefusesAtTheWIPLimit(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedActiveSpecs(t, root, 10)
+
+	_, _, err := execute(t, "spec", "init", "BUG-008-demo", "--force-no-gate")
+	if err == nil {
+		t.Fatal("spec init succeeded with 10 active specs; want a refusal")
+	}
+	for _, want := range []string{"10 active", "limit is 10", "--over-wip-limit"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal does not say %q:\n%v", want, err)
+		}
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "specs", "BUG-008-demo")); !os.IsNotExist(statErr) {
+		t.Errorf("a refused init still created the folder (stat err %v)", statErr)
+	}
+}
+
+func TestSpecInitBelowTheWIPLimitScaffolds(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedActiveSpecs(t, root, 9)
+
+	if _, _, err := execute(t, "spec", "init", "BUG-008-demo", "--force-no-gate"); err != nil {
+		t.Fatalf("spec init with 9 active specs: %v", err)
+	}
+}
+
+// An override is allowed, and recorded where the next reader of the spec sees it.
+func TestSpecInitOverWIPLimitRecordsTheReason(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedActiveSpecs(t, root, 12)
+
+	if _, _, err := execute(t, "spec", "init", "BUG-008-demo", "--force-no-gate",
+		"--over-wip-limit", "security fix, cannot wait"); err != nil {
+		t.Fatalf("spec init --over-wip-limit: %v", err)
+	}
+	proposal := readFile(t, filepath.Join(root, "specs", "BUG-008-demo", "proposal.md"))
+	want := `wip_override: "security fix, cannot wait (12 active, limit 10, 2026-06-13)"`
+	if !strings.Contains(proposal, want) {
+		t.Errorf("proposal does not record the override %q:\n%s", want, proposal)
+	}
+	fm := strings.SplitN(proposal, "\n---\n", 2)[0]
+	if !strings.Contains(fm, "wip_override:") {
+		t.Errorf("the override is outside the frontmatter:\n%s", proposal)
+	}
+}
+
+func TestSpecInitBlankOverrideIsNoOverride(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedActiveSpecs(t, root, 10)
+
+	if _, _, err := execute(t, "spec", "init", "BUG-008-demo", "--force-no-gate", "--over-wip-limit", "  "); err == nil {
+		t.Fatal("a blank --over-wip-limit reason was accepted")
+	}
+}
+
+// A repository declares its own limit in specs/.wip-limit.
+func TestSpecInitReadsTheRepositoryLimit(t *testing.T) {
+	root := makeRepo(t)
+	pinClock(t)
+	seedActiveSpecs(t, root, 3)
+	if err := os.WriteFile(filepath.Join(root, "specs", ".wip-limit"), []byte("3\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := execute(t, "spec", "init", "BUG-008-demo", "--force-no-gate")
+	if err == nil || !strings.Contains(err.Error(), "limit is 3") {
+		t.Fatalf("want a refusal naming the repository's limit of 3, got %v", err)
+	}
 }

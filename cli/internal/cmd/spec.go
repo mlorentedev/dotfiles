@@ -468,6 +468,7 @@ func newSpecInitCmd() *cobra.Command {
 		issueNum     int
 		forceNoGate  bool
 		bitacoraRepo string
+		overWIP      string
 	)
 
 	cmd := &cobra.Command{
@@ -482,6 +483,12 @@ recorded in the proposal's frontmatter (issue: owner/repo#N) and ## Why comment.
 The issue's repo defaults to the current repo's origin; override with
 --bitacora-repo owner/repo or $DOTF_BITACORA_REPO for a cross-repo work-gate.
 Use --force-no-gate to scaffold without an issue (NOT RECOMMENDED).
+
+WIP limit (#770): init refuses while the repository already holds its limit
+of active specs, 10 unless specs/.wip-limit declares another. Archive the
+finished ones, or abandon the stalled ones with 'dotf spec archive --abandoned',
+first. --over-wip-limit "<reason>" scaffolds anyway and records the reason in
+the new proposal's frontmatter.
 
 Mechanical only: fill the proposal interactively afterwards ("/spec fill" in an
 agent) or by hand. Do not skip the Why.`,
@@ -501,6 +508,22 @@ agent) or by hand. Do not skip the Why.`,
 			repoRoot, err := spec.RepoRoot(cwd)
 			if err != nil {
 				return err
+			}
+
+			reason := strings.TrimSpace(overWIP)
+			active, err := spec.ActiveSpecs(repoRoot)
+			if err != nil {
+				return err
+			}
+			limit, err := spec.WIPLimit(repoRoot)
+			if err != nil {
+				return err
+			}
+			if active >= limit && reason == "" {
+				return fmt.Errorf("%d active specs, and the limit is %d: finish before starting (#770).\n"+
+					"Archive the finished ones (dotf spec review, then dotf spec archive), or abandon a\n"+
+					"stalled one (dotf spec archive <id> --abandoned). To start anyway, pass\n"+
+					"--over-wip-limit \"<reason>\"; the reason is recorded in the new proposal", active, limit)
 			}
 
 			var issueTitle, repoSlug string
@@ -550,6 +573,12 @@ agent) or by hand. Do not skip the Why.`,
 			if err != nil {
 				return err
 			}
+			if active >= limit {
+				if err := spec.RecordWIPOverride(repoRoot, id, reason, active, limit, date); err != nil {
+					return err
+				}
+				cmd.PrintErrf("[WARN] %d active specs, limit %d: started over the WIP limit, reason recorded in proposal.md\n", active, limit)
+			}
 
 			cmd.Printf("\n[OK] Created: specs/%s\n", id)
 			cmd.Printf("     proposal.md, tasks.md, verification.md, features.json\n")
@@ -564,6 +593,7 @@ agent) or by hand. Do not skip the Why.`,
 
 	cmd.Flags().IntVar(&issueNum, "issue", 0, "GitHub issue number that gates this work (must exist and be OPEN)")
 	cmd.Flags().StringVar(&bitacoraRepo, "bitacora-repo", "", "owner/repo hosting the work-gate issue (default: current repo's origin, or $DOTF_BITACORA_REPO)")
+	cmd.Flags().StringVar(&overWIP, "over-wip-limit", "", "start a spec although the repository is at its WIP limit; the reason is recorded in proposal.md (#770)")
 	cmd.Flags().BoolVar(&forceNoGate, "force-no-gate", false, "skip the open-issue work-gate (NOT RECOMMENDED — the gate is the SSOT)")
 	return cmd
 }
