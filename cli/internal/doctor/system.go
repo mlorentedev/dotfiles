@@ -12,7 +12,6 @@ package doctor
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -117,9 +116,9 @@ type System struct {
 	BWServeReadable func() (string, error)
 	// BWServeLastSync returns when the daemon's OWN cache last pulled from the
 	// server (secrets.BWServeClient.StatusDetail in production); zero when it
-	// never has. It is a different number from BWLastSync — `bw status` reports
-	// the CLI's cache, and the two sync independently (secrets.BWSyncer) — and
-	// it is the one that decides what a daemon-served read returns: on the
+	// never has. It is a different number from `bw status`'s lastSync, which
+	// dates the CLI's cache; the two sync independently (secrets.BWSyncer). This
+	// one decides what a daemon-served read returns: on the
 	// Windows work box a 12-day-old daemon cache resolved a rotated PAT to its
 	// old value and doctor called the token dead (CLI-056, #1316).
 	BWServeLastSync func() (time.Time, error)
@@ -162,9 +161,6 @@ type System struct {
 	// age (#1820). Nil means doctor has no way to sync, and a check that needs a
 	// fresh listing skips.
 	BWSync func() error
-	// BWLastSync returns the timestamp of the last successful Bitwarden sync.
-	// Returns zero time if never synced or unreadable (BUG-087).
-	BWLastSync func() (time.Time, error)
 }
 
 // resolveSecret is the production ResolveSecret: the age store (checkout-first,
@@ -264,24 +260,6 @@ func realSystem() *System {
 			return secrets.BWServeReader{Client: secrets.BWServeClient{}}.ItemRevisions()
 		},
 		BWSync: onceSync(secrets.BWServeClient{}.Sync),
-		BWLastSync: func() (time.Time, error) {
-			ctx, cancel := context.WithTimeout(context.Background(), bwStatusTimeout)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, "bw", "status")
-			var stdout bytes.Buffer
-			cmd.Stdout = &stdout
-			if err := cmd.Run(); err != nil {
-				return time.Time{}, err
-			}
-			var st bwState
-			if err := json.Unmarshal(stdout.Bytes(), &st); err != nil {
-				return time.Time{}, err
-			}
-			if st.LastSync == "" {
-				return time.Time{}, nil
-			}
-			return time.Parse(time.RFC3339, st.LastSync)
-		},
 		CommandOutputBounded: func(d time.Duration, name string, args ...string) (string, string, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), d)
 			defer cancel()
