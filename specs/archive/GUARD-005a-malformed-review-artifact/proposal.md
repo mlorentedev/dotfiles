@@ -1,7 +1,7 @@
 ---
 id: "GUARD-005a-malformed-review-artifact"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-29"
 issue: "mlorentedev/dotfiles#1157"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -54,3 +54,5 @@ malformed artifact and the transcript; a valid fresh verdict remains accepted.
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - Prior spec: `specs/archive/GUARD-005-review-verdict-provenance/`
 - Related lesson: `docs/lessons/lesson-215-a-parser-for-one-runner-reads-the-other-runners-re.md`
+
+<!-- archived 2026-09-29 — PR: https://github.com/mlorentedev/dotfiles/pull/1828 -->

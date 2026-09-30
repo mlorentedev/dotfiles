@@ -40,6 +40,13 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - The combined `internal/spec` + `internal/cmd` run reached the existing
   10-minute Windows timeout in an unrelated git-staleness test after the focused
   spec tests had passed.
+- Adversarial review dispositions:
+  - **Accepted risk:** the theoretical delete-between-digest-and-parse race has
+    no second writer in the synchronous foreground completion path; archive
+    parsing still refuses an absent review later.
+  - **Accepted risk:** reading the bounded Markdown artifact twice is negligible
+    relative to reviewer execution and keeps digest/provenance concerns separate
+    from schema parsing.
 
 ## Decisions made during implementation
 
