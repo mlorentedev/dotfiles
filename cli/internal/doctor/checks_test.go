@@ -420,6 +420,10 @@ func TestCheckOptionalTools_DotfVersion(t *testing.T) {
 		{"exact pin", "0.2.0", StatusPass},
 		{"stale release", "0.1.0", StatusFail},
 		{"source build", "dev", StatusSkip},
+		// `go install …/cli/cmd/dotf@latest` reports its pseudo-version (the
+		// module has no cli/vX.Y.Z tag). It is not the pin, and not a checkout
+		// build CI would run, so it drifts like any stale release.
+		{"module install", "0.0.0-20260930012845-db2b904794b4", StatusFail},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
