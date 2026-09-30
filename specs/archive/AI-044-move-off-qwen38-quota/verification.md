@@ -59,7 +59,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-044-move-off-qwen38-quota/` -> `specs/archive/AI-044-move-off-qwen38-quota/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/AI-044-move-off-qwen38-quota/` -> `specs/archive/AI-044-move-off-qwen38-quota/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1867 carries `Closes #1762`
+- [x] Promotions above executed (if any): none, all three answered no
