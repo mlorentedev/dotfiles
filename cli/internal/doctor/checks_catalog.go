@@ -10,8 +10,16 @@ import (
 )
 
 // loadCatalog reads packages.json checkout-first (ADR-030 precedence), then
-// the deploy mirror. An empty catalog means neither copy was readable.
+// the deploy mirror. An empty catalog means no copy was readable.
 func loadCatalog(sys *System, cfg *Config) tools.Catalog {
+	cat, _ := readPackageCatalog(sys, cfg)
+	return cat
+}
+
+// readPackageCatalog is loadCatalog plus the first copy that exists but could
+// not be read. The pin checks read through loadCatalog; only the catalog check
+// reports the error, so it appears once rather than once per pinned tool.
+func readPackageCatalog(sys *System, cfg *Config) (tools.Catalog, error) {
 	var paths []string
 	if repo := resolveRepoDir(sys); repo != "" {
 		paths = append(paths, filepath.Join(repo, "packages.json"))
@@ -19,12 +27,17 @@ func loadCatalog(sys *System, cfg *Config) tools.Catalog {
 	if cfg != nil && cfg.DotfilesDir != "" {
 		paths = append(paths, filepath.Join(cfg.DotfilesDir, "packages.json"))
 	}
+	var unreadable error
 	for _, p := range paths {
-		if cat, err := tools.Load(p); err == nil {
-			return cat
+		cat, err := tools.Load(p)
+		if err == nil {
+			return cat, unreadable
+		}
+		if unreadable == nil && pathExists(p) {
+			unreadable = err
 		}
 	}
-	return tools.Catalog{}
+	return tools.Catalog{}, unreadable
 }
 
 // catalogPin returns the packages.json pin for name, or "" when the catalog or
@@ -47,8 +60,19 @@ func catalogPin(sys *System, cfg *Config, name string) string {
 // and setup reported "still locked. after winget install 1.16.2" forever. The
 // catalog cannot converge a binary it does not own, so the extra channel is
 // named for the operator to remove. WARN, not FAIL: the tool does run.
+//
+// It also names a catalog copy that exists but cannot be read. Without that, a
+// corrupt packages.json made every pin check SKIP and this check say nothing,
+// which reads as a clean result.
 func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
-	for _, t := range loadCatalog(sys, cfg).Tools {
+	cat, err := readPackageCatalog(sys, cfg)
+	switch {
+	case err != nil && len(cat.Tools) == 0:
+		rep.Warn(fmt.Sprintf("%v — the catalog pin and shadowed-copy checks have nothing to read", err))
+	case err != nil:
+		rep.Warn(fmt.Sprintf("%v — pins are read from the next copy", err))
+	}
+	for _, t := range cat.Tools {
 		if t.Source.Type != "npm" {
 			continue
 		}
