@@ -33,6 +33,8 @@ Resolve an item from the unfiltered list and match it locally. That list is answ
 
 Forcing the sync fixed every reader that called `Sync()`. Doctor's escrow check never called it. It compared the escrow with whatever the daemon had cached, so the false alarm above could also run the other way. An item deleted in the app after a backup is still listed by an unsynced daemon, that stale listing equals the old escrow, and doctor passed an escrow that no longer described the vault. That false pass is the direction that loses data. Since #1820, the check syncs first and SKIPs when the sync fails.
 
+Listing the readers found a second one. Doctor's registry mapping check read item names from the daemon's cache, but judged their freshness by `bw status`'s lastSync, which is the CLI's cache. So an item created after the daemon last synced was reported missing from the vault. Both checks now share one forced sync per doctor run.
+
 A fix to the refresh reaches only the readers that call it. List every reader of the cache, not only the ones that refresh.
 
 Refs: SEC-006 (#1784); #1820; `BWServeClient.Sync` in `cli/internal/secrets/bwserve.go`; `checkEscrowDescribesVault` in `cli/internal/doctor/checks_dr.go`.
