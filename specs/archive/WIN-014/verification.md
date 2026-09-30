@@ -52,6 +52,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   `git merge-base origin/main HEAD` and require the resulting review to cover
   only the PR diff plus these remediation changes.
 
+## Final adversarial-review disposition
+
+- **Deferred to #1551:** the final verdict is PASS-WITH-GAPS only because
+  `dotf spec review` selected an old history-derived base and reviewed unrelated
+  files. The reviewer verified every WIN-014 acceptance criterion and gave
+  Correctness, Verification, Reliability, Maintainability and
+  Handoff-readiness an A. Fixing review-base selection is a global launcher
+  change, not a WIN-014 implementation change.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
