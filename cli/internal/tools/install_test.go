@@ -3,6 +3,7 @@ package tools
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -355,4 +356,47 @@ func TestInstallerPlan(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit pins the
+// installer to ProbeVersion's rule. A tool that prints its version and then
+// exits non-zero is at the pin: `dotf tools version` and the doctor already see
+// it that way, and an installer that saw nothing would reinstall on every run.
+func TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit(t *testing.T) {
+	var probed []string
+	probe := func(tool Tool) Runner {
+		return func(name string, args ...string) ([]byte, error) {
+			probed = append(probed, name)
+			return []byte(tool.Name + " " + tool.Version + "\nwarning: unrelated\n"), errors.New("exit status 1")
+		}
+	}
+
+	t.Run("npm, probed on PATH", func(t *testing.T) {
+		var rec []string
+		in := newNpmInstaller("", &rec, nil)
+		in.CurrentVersion = nil
+		in.Probe = probe(bwTool())
+		res, err := in.Install(bwTool())
+		if err != nil || res != Skipped || len(rec) != 0 {
+			t.Errorf("Install = %v, %v, npm calls %v; want Skipped with no npm call", res, err, rec)
+		}
+	})
+
+	t.Run("github-release, probed in Dest", func(t *testing.T) {
+		in := newTestInstaller(t, "", func(url, _ string) error { return fmt.Errorf("unexpected download %s", url) })
+		in.CurrentVersion = nil
+		in.Probe = probe(sopsTool())
+		bin := filepath.Join(in.Dest, "sops")
+		if err := os.WriteFile(bin, []byte("placed"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		probed = nil
+		res, err := in.Install(sopsTool())
+		if err != nil || res != Skipped {
+			t.Errorf("Install = %v, %v; want Skipped", res, err)
+		}
+		if len(probed) != 1 || probed[0] != bin {
+			t.Errorf("probed %v, want the binary in Dest (%s)", probed, bin)
+		}
+	})
 }
