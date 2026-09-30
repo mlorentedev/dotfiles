@@ -88,8 +88,8 @@ hook does not leave the old entry firing where it no longer parses.`,
 // whose home to write under, and what binary path the hooks will name — so RunE
 // stays a sequence of named steps rather than a wall of defaulting.
 //
-// The dotf path is rendered through hookBinaryToken here, at the single point
-// where runtime.GOOS is read. Everything downstream takes the finished token.
+// The dotf path stays raw here because each harness owns its command parser.
+// bindTargets renders the token once it knows which harness will execute it.
 func resolveBindInputs(repoRoot, homeDir, dotfPath string) (root, home, binary string, err error) {
 	root = repoRoot
 	if root == "" {
@@ -107,7 +107,7 @@ func resolveBindInputs(repoRoot, homeDir, dotfPath string) (root, home, binary s
 	if binary == "" {
 		binary = resolveDotfPath(home)
 	}
-	return root, home, hookBinaryToken(binary, runtime.GOOS), nil
+	return root, home, binary, nil
 }
 
 // bindTargets emits every selected target, reporting one stable status tag per
@@ -128,7 +128,8 @@ func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home,
 				continue
 			}
 		}
-		changed, retired, err := bindOne(t, home, binary, dryRun)
+		hookBinary := hookBinaryTokenForTarget(binary, runtime.GOOS, t.Format)
+		changed, retired, err := bindOne(t, home, hookBinary, dryRun)
 		if err != nil {
 			return fmt.Errorf("%s: %w", t.Agent, err)
 		}
@@ -339,14 +340,23 @@ func resolveDotfPath(home string) string {
 // testable from either OS — the Windows leg of this behaviour cannot be
 // exercised on the machine that develops it otherwise.
 //
-// Windows is quoted unconditionally, matching byte-for-byte what
-// setup-windows.ps1 already deployed, because anything else fails to adopt that
-// entry and duplicates it. Elsewhere the path is bare — the shape setup-linux.sh
-// deployed — unless it contains a space, where quoting is the only correct
-// rendering and the unquoted entry it declines to adopt was broken anyway.
+// Windows command-hook targets are quoted unconditionally, matching byte-for-byte
+// what setup-windows.ps1 already deployed, because anything else fails to adopt
+// that entry and duplicates it. Elsewhere the path is bare unless it contains a
+// space, where quoting is the only correct shell rendering.
 func hookBinaryToken(path, goos string) string {
 	if goos == "windows" || strings.ContainsAny(path, " \t") {
 		return `"` + path + `"`
 	}
 	return path
+}
+
+func hookBinaryTokenForTarget(path, goos, format string) string {
+	// agy's Windows hook runner treats quotes around the first token as literal
+	// executable-name characters. Its default dotf installation path has no spaces.
+	if goos == "windows" && format == harness.NamedHooksFormat &&
+		!strings.ContainsAny(path, " \t") {
+		return path
+	}
+	return hookBinaryToken(path, goos)
 }

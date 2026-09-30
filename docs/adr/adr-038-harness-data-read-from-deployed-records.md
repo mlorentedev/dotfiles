@@ -31,3 +31,7 @@ The binary and the records also deploy on different clocks. After SKILL-001 reti
 - The prompt hook reads about 31 records per prompt. Measured: 14 ms per call before, 18 ms after.
 - A machine whose records are older than its binary sees the older records. The deploy order in decision 3 is what prevents it.
 - Lesson 296 records the failure. The implementation is #1714.
+
+## Amendment 2026-09-30 (ADR-041, #1843)
+
+Decision 3 now binds every machine, not only the release runbook. A convergence run fast-forwards the checkout, then mirrors the records, then moves the binary. The binary step never runs unless the mirror step succeeded in the same run (ADR-041 decision 4).

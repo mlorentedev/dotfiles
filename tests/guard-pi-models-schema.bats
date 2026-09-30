@@ -62,7 +62,15 @@ PY
     # ignores -- so it read the real config and passed while the file under test
     # was broken. It was caught by mutating the fixture, not by reading it.
     cp "$MODELS" "$BATS_TEST_TMPDIR/models.json"
-    run env PI_CODING_AGENT_DIR="$BATS_TEST_TMPDIR" pi --list-models
+    if output="$(env PI_CODING_AGENT_DIR="$BATS_TEST_TMPDIR" pi --list-models 2>&1)"; then
+        status=0
+    else
+        status=$?
+    fi
+    if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
+        skip "pi is visible on PATH but is not executable in this environment"
+    fi
+    [ "$status" -eq 0 ]
     # pi exits 0 even on a rejected file, so assert on the message, not status.
     [[ "$output" != *"Invalid models.json schema"* ]]
 }
