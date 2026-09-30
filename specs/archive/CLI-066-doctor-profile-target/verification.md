@@ -90,7 +90,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-066-doctor-profile-target/` -> `specs/archive/CLI-066-doctor-profile-target/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-066-doctor-profile-target/` -> `specs/archive/CLI-066-doctor-profile-target/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1863 carries `Closes #1364`
+- [x] Promotions above executed (if any): lesson 321
