@@ -58,10 +58,10 @@ setup() {
     #
     # The property: the reviewing model must be reasoning-class. The line
     # reviewer-pool.json draws is context window plus a mandatory reasoning
-    # chain — deepseek-v4-flash and mimo-v2.5 at 1M sit on one side, qwen3.6 and
-    # gemma4 at 262K on the other. A reviewer that PASSes cheaply is worse than
+    # chain — deepseek-v4-flash and mimo-v2.6-flash at 1M sit on one side, qwen3.6
+    # and gemma4 at 262K on the other. A reviewer that PASSes cheaply is worse than
     # no gate.
-    run grep -E '^model = "openai/(deepseek-v4-flash|mimo-v2\.5)"' "$CFG"
+    run grep -E '^model = "openai/(deepseek-v4-flash|mimo-v2\.6-flash)"' "$CFG"
     [ "$status" -eq 0 ]
 
     # And the excluded ones stay impossible in the primary slot, not only in the
@@ -166,10 +166,14 @@ sys.exit(0 if 'AGENTS.md' in files else 1)
     # model, so one broken item mapping takes down authentication for
     # everything. This path must not inherit that shape — the failure surface
     # stays one key wide.
-    local n
-    n=$(grep -cE '\$\{\{ *secrets\.[A-Z_]+ *\}\}' "$WF")
-    [ "$n" -eq 2 ] || {
-        printf 'expected exactly 2 secret references (GITHUB_TOKEN + NAN_API_KEY), found %s:\n' "$n" >&2
+    #
+    # Counted as distinct NAMES, not as references: the model preflight (AI-045)
+    # hands the same NAN_API_KEY to its own step, which is a second use of one
+    # credential, not a second credential.
+    local names
+    names=$(grep -oE '\$\{\{ *secrets\.[A-Z_]+ *\}\}' "$WF" | grep -oE 'secrets\.[A-Z_]+' | sort -u | tr '\n' ' ')
+    [ "$names" = "secrets.GITHUB_TOKEN secrets.NAN_API_KEY " ] || {
+        printf 'expected exactly GITHUB_TOKEN and NAN_API_KEY, found: %s\n' "$names" >&2
         grep -nE '\$\{\{ *secrets\.[A-Z_]+ *\}\}' "$WF" >&2
         return 1
     }
@@ -558,11 +562,44 @@ if bad:
 }
 
 @test "pr-agent: the model travels in the workflow env so bootstrap PRs do not fall back to upstream defaults" {
-    grep -q 'CONFIG__MODEL: openai/mimo-v2.5' "$WF"
-    grep -q 'CONFIG__FALLBACK_MODELS:' "$WF"
-    # the toml and the env must name the same model
-    toml_model=$(grep -E '^model\s*=' "$REPO/.pr_agent.toml" | sed 's/.*"\(.*\)"/\1/')
-    grep -q "CONFIG__MODEL: ${toml_model}" "$WF"
+    # PR-Agent reads .pr_agent.toml from the DEFAULT branch, so the model a PR
+    # declares travels in the workflow, which is read from the PR head. Since
+    # AI-045 it travels through the preflight, which picks from that chain.
+    grep -q 'CONFIG__MODEL: ${{ steps.models.outputs.model }}' "$WF"
+    grep -q 'CONFIG__FALLBACK_MODELS: ${{ steps.models.outputs.fallbacks }}' "$WF"
+}
+
+@test "pr-agent: the chain the preflight probes equals the toml's, model and fallbacks" {
+    # Two declarations of one chain, because the two are read from different
+    # refs. This keeps them one chain: a model changed in one place only fails
+    # here, not as a PR reviewed by a model nobody declared.
+    run python3 -c "
+import json, sys, tomllib, yaml
+cfg = tomllib.load(open('$CFG', 'rb'))['config']
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+env = next(s for s in steps if s.get('id') == 'models')['env']
+bad = []
+if env['DECLARED_MODEL'] != cfg['model']:
+    bad.append('model: workflow %s, toml %s' % (env['DECLARED_MODEL'], cfg['model']))
+if json.loads(env['DECLARED_FALLBACK_MODELS']) != cfg.get('fallback_models', []):
+    bad.append('fallbacks: workflow %s, toml %s' % (env['DECLARED_FALLBACK_MODELS'], cfg.get('fallback_models')))
+print('; '.join(bad)); sys.exit(1 if bad else 0)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+@test "pr-agent: the preflight runs wherever PR-Agent runs, and a failed one skips the guard" {
+    run _step_if "s.get('id') == 'models'"
+    [ "$status" -eq 0 ] || { echo "no step with id models (AI-045)" >&2; false; }
+    local models_if="$output"
+    run _step_if "'pr-agent' in s.get('uses', '')"
+    [ "$models_if" = "$output" ] \
+        || { printf 'preflight if: %s\nPR-Agent if: %s\n' "$models_if" "$output" >&2; false; }
+    grep -q 'scripts/pr-agent-model-preflight.sh' "$WF"
+    # No declared model answered: the preflight already failed the job with the
+    # cause, and the guard's NaN-concurrency diagnosis would be a wrong second one.
+    run _step_if "s.get('name') == 'Fail if no review was published'"
+    [[ "$output" == *"steps.models.outcome != 'failure'"* ]]
 }
 
 @test "pr-agent: the publication guard is skipped after a credential failure" {
@@ -648,10 +685,17 @@ print(s.get('if', ''))
     [ "$status" -eq 0 ] || { echo "no step with id push_gate" >&2; false; }
     [[ "$output" == *"github.event.action == 'synchronize'"* ]]
     grep -q 'scripts/pr-agent-push-gate.sh' "$WF"
-    # The job has no full checkout; the gate script alone is checked out.
+    # The job has no full checkout; the gate script and the model preflight
+    # (AI-045, which runs on every event) are the only files checked out.
     run _step_if "'checkout' in s.get('uses', '') and 'pr-agent-push-gate' in str(s.get('with', {}))"
     [ "$status" -eq 0 ] || { echo "no sparse checkout of the gate script" >&2; false; }
-    [[ "$output" == *"synchronize"* ]]
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+co = next(s for s in steps if 'checkout' in s.get('uses', ''))
+print(co['with']['sparse-checkout'].split())
+"
+    [ "$output" = "['scripts/pr-agent-push-gate.sh', 'scripts/pr-agent-model-preflight.sh']" ]
 }
 
 @test "pr-agent: below the push gate's threshold, neither PR-Agent nor the guard runs" {

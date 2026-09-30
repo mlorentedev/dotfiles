@@ -1,0 +1,37 @@
+[
+  {
+    "id": "AI-045-nan-catalog-alignment-f1",
+    "behavior": "AC1: no live binding names mimo-v2.5, and the pool, chain, pi and opencode name mimo-v2.6-flash",
+    "verification": "! grep -n 'mimo-v2\\.5\"' .pr_agent.toml .github/workflows/pr-agent.yml harness/model-map.json harness/reviewer-pool.json harness/nan-quotas.json ai/pi/settings.json ai/opencode/opencode.jsonc && bats tests/reviewer-pool.bats tests/opencode.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f2",
+    "behavior": "AC2: the workflow's declared model and fallbacks equal .pr_agent.toml's, and PR-Agent reads them from the preflight",
+    "verification": "bats -f 'chain the preflight probes|model travels in the workflow env' tests/pr-agent-config.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f3",
+    "behavior": "AC3: the preflight skips a non-2xx or hanging model, fails when none answers, and never leaves the declared chain",
+    "verification": "bats tests/pr-agent-model-preflight.bats && bats -f 'preflight runs wherever PR-Agent runs' tests/pr-agent-config.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f4",
+    "behavior": "AC4: model-map declares per-model concurrency and the per-key cap, and the loader validates the shape",
+    "verification": "echo 'PR 2' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f5",
+    "behavior": "AC5: opencode and pi NaN windows and caps equal NaN's published figures, and enable_thinking appears nowhere",
+    "verification": "echo 'PR 2' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
