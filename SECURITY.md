@@ -14,7 +14,7 @@ Only the latest release of `dotf` gets security fixes. Fixes ship as a new relea
 Do not open a public issue or pull request for a vulnerability.
 
 1. **Preferred:** report it privately through GitHub, at [Security → Report a vulnerability](https://github.com/mlorentedev/dotfiles/security/advisories/new). The report stays private until a fix is published.
-2. **If you cannot use GitHub:** email mlorentedev@gmail.com with `SECURITY` in the subject.
+2. **If you cannot use GitHub:** email mlorentedev@gmail.com with `SECURITY` in the subject. Email is not encrypted, so send a short summary only. The maintainer replies to agree on a private way to share the full details.
 
 Please include:
 
