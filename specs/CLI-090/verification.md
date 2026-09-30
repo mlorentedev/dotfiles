@@ -55,8 +55,9 @@ exit 0
   throws on a non-semver tag, but only the POSIX side proved it. This pass adds
   `refuses release metadata whose tag is not a semver version` to
   `tests/install-dotf-ps1.Tests.ps1`. pwsh is not installed on this Linux box,
-  so the case runs in CI's Windows Pester job; the PR's `test (windows-latest)`
-  result is the evidence.
+  so the case runs in CI's Windows Pester job. It passed there on #1883:
+  `test-windows` (run 36738902605) reports `install-dotf-ps1.Tests.ps1 (10 tests)`
+  and `Tests Passed: 87, Failed: 0`. The file had 9 cases before this pass.
 - **`features.json` f4 grepped for the words "Recovery", "bootstrap" and
   "install-dotf" anywhere in the README.** Almost any README matches that. It now
   checks the two one-line recovery commands, the `dotf version` assertion and
