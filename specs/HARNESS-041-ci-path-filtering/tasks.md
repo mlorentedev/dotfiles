@@ -24,6 +24,7 @@ created: "2026-08-20"
 - [x] Add `needs: [changes]` to matrix jobs (`lint`, `lint-powershell`, `test`, `test-windows`, `integration`)
 - [x] Add conditional guards to all heavy steps in matrix jobs
 - [x] Verify Bats test suite and Go test suite pass
+- [x] Round-1 fixes: the tests parse the workflow so they fail on a missing `needs:` or guard, the `code` filter covers the paths the suite reads, and a coverage test keeps new top-level entries from being classified as docs silently
 
 ## Closing
 
@@ -32,24 +33,8 @@ created: "2026-08-20"
 - [x] Lint passes
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder: #1105, merged `3dadead`
 
 ## Machine-readable features
 
-This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
-
-**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
-
-Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-041-ci-path-filtering/features.json`):
-
-```json
-[
-  {
-    "id": "HARNESS-041-ci-path-filtering-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+None: this spec predates `features.json`, and its criteria are verified by `tests/ci-path-filtering.bats`, named per criterion in `verification.md`.

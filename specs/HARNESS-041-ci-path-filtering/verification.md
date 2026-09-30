@@ -7,28 +7,42 @@ created: "2026-08-20"
 
 ## Evidence
 
-- [x] Criterion 1 (`changes` job in `ci.yml`) -> `tests/ci-path-filtering.bats` "HARNESS-041: ci.yml defines a changes job with dorny/paths-filter"
-- [x] Criterion 2 (Matrix jobs depend on `changes`) -> `tests/ci-path-filtering.bats` "HARNESS-041: matrix jobs depend on changes job"
-- [x] Criterion 3 (Heavy steps conditional) -> `tests/ci-path-filtering.bats` "HARNESS-041: heavy steps carry changes conditional filter"
-- [x] Criterion 4 (Regression suite) -> `bats tests/ci-path-filtering.bats` (3/3 pass)
+- [x] Criterion 1 (SHA-pinned `dorny/paths-filter` in the `changes` job) -> `tests/ci-path-filtering.bats` "HARNESS-041: the changes job runs a SHA-pinned dorny/paths-filter"
+- [x] Criterion 2 (filtered jobs need `changes`) -> "HARNESS-041: every filtered job needs the changes job". Mutation: `needs: []` on `test-windows` turns it red.
+- [x] Criterion 3 (every step after checkout is guarded) -> "HARNESS-041: every step after checkout in a filtered job is guarded by a changes output". Mutation: deleting the `if:` of "Run bats test suite" turns it red.
+- [x] Criterion 4 (suite passes, filter covers the tree) -> `bats tests/ci-path-filtering.bats`, 4/4 on 2026-09-30. Mutations: deleting `'secrets/**'` from the filter, or misspelling `'setup-windows.ps1'`, turns "every top-level entry is in the code filter or declared docs-only" red.
+
+Round 1 ran the same four mutations against the old tests: all four stayed green.
 
 ## Test status
 
-- Test suite: `bats tests/ci-path-filtering.bats tests/workflow-timeouts.bats` -> 4/4 pass
-- Go test suite: `cd cli && go test ./...` -> all packages pass
+- `bats tests/ci-path-filtering.bats tests/workflow-timeouts.bats tests/workflow-job-names.bats` -> all pass
 - No regressions: yes
 
 ## Decisions made during implementation
 
-- **Step-level conditional guards**: Maintained job-level executions while placing `if: github.event_name == 'push' || needs.changes.outputs.code == 'true'` on resource-intensive steps. This guarantees 100% compliance with GitHub branch protection required status checks while reducing docs-only PR runtimes to ~3-5 seconds.
+- **Step-level conditional guards**: jobs stay active and only their heavy steps skip, so every required check reports on every PR.
+- **The filter is an allow-list, widened by additions** (round 1). A deny-list would fail open on one wrong negation. The docs-only side is declared in the test, with a reason per entry, so the tree is classified in full.
+
+## Round-1 review dispositions (FAIL, `nan/mimo-v2.6-flash`)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Major: the AC2/AC3 tests survive their own mutations | apply: the tests parse the workflow per job and per step; mutations recorded above |
+| 2 | Major: the `code` filter omits paths the suite reads | apply: added `secrets/**`, `ssh/**`, `systemd/**`, `forge/**`, `.claude/**`, `AGENTS.md`, `install.sh`, `env-contract.json`, `machine.json.example`, `session-start-config.json`, `.gitattributes`, `.gitignore`, `.pr_agent.toml`, `.geminiignore` and both `*.local.example`; a coverage test classifies every top-level entry. `docs/` and `specs/` stay docs-only by decision: archive PRs are the common case, and their guards run in pre-commit and on push. Lesson 322 |
+| 3 | Minor: AC1 names `@v3`, HEAD runs a pinned `@v4` | apply: AC1 names a SHA-pinned action; test 1 asserts the pin |
+| 4 | Minor: "3/3" miscount and an unmeasured "~3-5 seconds" | apply: 4/4, and the number is dropped from the proposal |
+| 5 | Minor: ACs unticked, `status: implementing` | apply: ticked, `status: verifying` |
+| 6 | Minor: `tasks.md` promises a `features.json` | apply: the promise is replaced by a line saying the criteria are verified by the named tests |
+| 7 | Minor (theoretical): the retired-twin step runs on docs-only PRs | apply: guarded on `code`, since retiring a twin deletes a script the filter matches |
+| 8 | Minor (theoretical): `pi-nan-package` skips at job level | decline: it is not a required check, and `tests/workflow-job-names.bats` flags a required job with a skipping `if:` |
+| 9 | Minor: stray `diff.patch` at the root | defer: #1869 |
 
 ## Promotion candidates
 
-Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
-
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: `docs/lessons/lesson-322-an-allow-list-filter-classifies-every-unlisted-path-as-safe.md`
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a CI filter's contents, within the existing workflow
+- [x] New pattern candidate for `00_meta/patterns/`? no: one repo's workflow
 
 ## Archive checklist
 
