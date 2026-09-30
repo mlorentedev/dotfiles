@@ -28,8 +28,7 @@ created: "2026-09-29"
 - [x] [AC1] [AC2] Extract agy argv construction behind an explicit OS seam and
   select sandbox only outside Windows.
 - [x] [AC3] Re-run the pi flag-isolation regression.
-- [x] [AC4] Verify the Windows command builder and execute a real short agy
-  probe without UAC.
+- [x] Record a real short Windows agy probe without UAC as manual evidence.
 
 ## Closing
 

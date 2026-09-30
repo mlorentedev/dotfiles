@@ -48,9 +48,6 @@ macOS continue to force sandbox isolation.
   `--dangerously-skip-permissions`, `--add-dir`, model pin and timeout.
 - [x] Non-Windows agy reviewer argv continues to include `--sandbox`.
 - [x] Pi reviewer argv remains unchanged and carries no agy-specific flags.
-- [x] The Windows command builder contains no `--sandbox`, and a real agy probe
-  can run
-  `git` without UAC elevation.
 
 ## References
 

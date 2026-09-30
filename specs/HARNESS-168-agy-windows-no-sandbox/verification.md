@@ -12,7 +12,6 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] Criterion 1 -> `TestAgyReviewerCommandOmitsSandboxOnWindows`
 - [x] Criterion 2 -> `TestAgyReviewerCommandKeepsSandboxOutsideWindows`
 - [x] Criterion 3 -> `TestReviewerCommandDoesNotGivePiAgySpecificFlags`
-- [x] Criterion 4 -> real Windows agy probe without `--sandbox`
 
 ## Test status
 
@@ -35,6 +34,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - **Applied:** restored the sandbox assertion in
     `TestReviewerCommandGivesAgyReachIntoTheRepo`, conditional on the platform,
     so non-Windows retention and the Windows exception are both pinned.
+- Review round 2 dispositions:
+  - **Applied:** removed AC4/F4 from the machine-verifiable contract. A live agy
+    probe depends on local OAuth state and Windows execution policy, so presenting
+    the F1 unit test as that probe was vacuous. The real probe remains explicit
+    manual evidence in this file.
+  - **Declined as independently covered:** the top-level wiring test runs on the
+    host OS, while the two explicit `agyReviewerCommand` tests execute both OS
+    branches deterministically.
 
 ## Decisions made during implementation
 
