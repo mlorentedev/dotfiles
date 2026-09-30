@@ -35,10 +35,19 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - exit 0 with a real pi at `0a584d4`;
   - exit 1 when the reviewer's mutant sets the three opencode windows to `999999`;
   - exit 1 with no pi, instead of a silent skip.
-- **Major F2, no offline guard: deferred to #1866.** The reviewer's own next steps call it "a follow-up ticket, not a blocker". The property is enforced in CI, and #1866 records the root cause and the snapshot design for a local guard.
+- **Major F2, no offline guard: deferred to #1866.** The reviewer's own next steps call it "a follow-up ticket, not a blocker". The property is checked in CI but not enforced. The `pi-nan-package` job runs on every PR that touches `ai/opencode/opencode.jsonc` (its path filter) and on every push to main, but it is not a required check. #1866 records the root cause and the snapshot design for a local guard, and now also whether the job becomes required.
 - **Minor, the evidence named `ai/pi/models.json`: applied.** The AC2 line above now names the test file and the pinned package.
 - **Minor SPECULATIVE, the low chain falls to `claude:haiku` with no alarm: out of scope.** It is declared out of scope in `proposal.md` and tracked in AI-047 (#1766).
 - **Question, the launcher's base range: answered.** The attribution to `75eb855` is right. The inferred base is tracked in #1551 and #1645.
+
+## Review round 2 (PASS-WITH-GAPS, 2026-09-30) — dispositions
+
+`review.md` (`nan/glm5.3-flash`) confirmed that f2 now fails on the mutant, and re-graded F2 from Major to Minor, with the reasoning stated. Its four Minors:
+
+- **`pi-nan-package` is not a required check (REAL): deferred to #1866.** Whether to make it required, or put it behind an aggregate, is recorded there. The path filter and supervised merges make a drift PR visibly red today.
+- **"enforced in CI" overstated it (REAL): applied.** The round-1 disposition above now says "checked in CI but not enforced".
+- **No offline guard (REAL, carried from round 1): deferred to #1866**, as in round 1.
+- **The low chain degrades with no quota alarm (SPECULATIVE): out of scope, tracked in AI-047 (#1766).**
 
 ## Promotion candidates
 
