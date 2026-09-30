@@ -75,6 +75,9 @@ func resolvePersistVars() ([]env.ResolvedVar, error) {
 // the store, an ownership record that lags the contract — and exits non-zero
 // while one remains. A clean --check means a run would change nothing.
 func checkPersisted(cmd *cobra.Command, vars []env.ResolvedVar, store env.UserEnvReader) error {
+	if err := env.ValidateNames(vars); err != nil {
+		return err
+	}
 	drift, err := env.Drift(vars, store)
 	if err != nil {
 		return err

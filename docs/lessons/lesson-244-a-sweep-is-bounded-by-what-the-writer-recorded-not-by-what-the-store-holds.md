@@ -40,6 +40,13 @@ The three readers — `persist`, `persist --check`, `dotf doctor` — share one
 pure `Leftovers(marker, contract)` function, so what the check reports is by
 construction what the write deletes.
 
+Sharing what the write does is not enough; the readers must also share what it
+refuses. The first review (2026-09-30) found that `ValidateNames` ran only
+inside `persist`. A contract naming the marker itself passed `--check` as
+"drift", and doctor sent the user to a `persist` that refused it. Now all
+three readers call `ValidateNames` first. A read path whose remedy is "run the
+write" must reject exactly what the write rejects, or its remedy can be false.
+
 ## The rule
 
 - A sweep needs an **ownership record the writer maintains**, never an
