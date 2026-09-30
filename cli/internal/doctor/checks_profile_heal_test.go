@@ -91,6 +91,11 @@ func TestCheckProfileFiles_DetectsBUG020Corruption(t *testing.T) {
 			if tc.wantFail > 0 && !strings.Contains(buf.String(), "profile-heal.ps1") {
 				t.Fatalf("a corruption FAIL must name the heal script\n%s", buf.String())
 			}
+			// A Windows path can hold a space, and -File binds one token: the
+			// remedy must be pasteable as printed (CLI-066 review round 1).
+			if tc.wantFail > 0 && (!strings.Contains(buf.String(), `-File "`) || !strings.Contains(buf.String(), `-ProfilePath "`)) {
+				t.Fatalf("the remedy must quote both paths\n%s", buf.String())
+			}
 		})
 	}
 }
@@ -161,7 +166,14 @@ func TestCheckProfileFiles_FixRunsTheHealAndVerifiesByConsequence(t *testing.T) 
 		home := t.TempDir()
 		writeFile(t, filepath.Join(home, ".claude", "CLAUDE.md"), "x")
 		writeFile(t, filepath.Join(home, ".gemini", "AGY.md"), "x")
-		profile := profileFixture(t, home, duplicatedProfile)
+		// The measured profile lives outside all four enumerated roots, where
+		// only pwsh can name it, and a decoy sits in the first enumerated root.
+		// With one file in one place, the enumeration and pwsh would agree, and
+		// a --fix that healed the enumerated file would pass (CLI-066 review
+		// round 1, finding 2: that mutant survived).
+		profile := filepath.Join(home, "Redirected", "Docs", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+		writeFile(t, profile, duplicatedProfile)
+		profileFixture(t, home, duplicatedProfile)
 		heal := filepath.Join(home, "scripts", profileHealScript)
 		if deployHeal {
 			writeFile(t, heal, "# fake heal\r\n")

@@ -26,6 +26,7 @@ func TestCheckProfileFiles_MeasuresThePwshResolvedProfile(t *testing.T) {
 		where    string  // profile location relative to home; "" for none on disk
 		wantFail int
 		wantSub  string
+		unwant   string // must not appear in the output
 	}{
 		{
 			name:     "redirected Documents: pwsh names a file outside the four roots, doctor measures it",
@@ -41,7 +42,27 @@ func TestCheckProfileFiles_MeasuresThePwshResolvedProfile(t *testing.T) {
 			pwsh:     &answer{out: "{REDIRECTED}\r\n"},
 			where:    "",
 			wantFail: 1,
+			wantSub:  "PowerShell profile missing: ",
+			// A file that never existed is not BUG-020 corruption, and the
+			// heal has nothing to rebuild (CLI-066 review round 1, finding 1).
+			unwant: "BUG-020",
+		},
+		{
+			name:     "pwsh prints noise before the path: the last line is the answer",
+			onPath:   []string{"pwsh"},
+			pwsh:     &answer{out: "WARNING: some module banner\r\n{REDIRECTED}\r\n"},
+			where:    "Redirected/Docs/PowerShell/Microsoft.PowerShell_profile.ps1",
+			wantFail: 0,
 			wantSub:  "resolved by pwsh $PROFILE",
+			unwant:   "WARNING",
+		},
+		{
+			name:     "pwsh answers something that is not a profile path: the enumeration answers",
+			onPath:   []string{"pwsh"},
+			pwsh:     &answer{out: "WARNING: no profile today\r\n"},
+			where:    "Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
+			wantFail: 0,
+			wantSub:  "enumerated, pwsh did not answer $PROFILE",
 		},
 		{
 			name:     "no pwsh on PATH: the enumeration answers and the row says so",
@@ -95,10 +116,13 @@ func TestCheckProfileFiles_MeasuresThePwshResolvedProfile(t *testing.T) {
 			if !strings.Contains(out, tc.wantSub) {
 				t.Fatalf("row must say how the target was found (%q)\n%s", tc.wantSub, out)
 			}
+			if tc.unwant != "" && strings.Contains(out, tc.unwant) {
+				t.Fatalf("row must not mention %q\n%s", tc.unwant, out)
+			}
 			if (tc.pwsh != nil) != asked {
 				t.Fatalf("pwsh asked = %v, want %v", asked, tc.pwsh != nil)
 			}
-			if tc.pwsh != nil && tc.pwsh.err == nil && !strings.Contains(out, redirected) {
+			if strings.Contains(tc.wantSub, "resolved by pwsh") && !strings.Contains(out, redirected) {
 				t.Fatalf("the row must name the pwsh-resolved path\n%s", out)
 			}
 		})

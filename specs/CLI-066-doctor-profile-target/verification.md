@@ -49,6 +49,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **Bounded, like every other probe.** The heal runs through `CommandOutputBounded` (60 s). The test harness makes the unbounded seam a `t.Fatalf`, so a future edit cannot quietly go back.
 - **Outside-marker content is documented, not preserved.** The heal rewrites the whole file from the SSOT; the FAIL/FIX lines and the script's synopsis say that only the backup keeps what lived outside the markers. Preserving it is a different feature no real profile has asked for.
 
+## Review round 1 (FAIL, 2026-09-30) — dispositions
+
+`review-round-1.md` (`nan/qwen3.8-flash`) failed on two Majors. Every finding is dispositioned here:
+
+- **Major 1, a missing profile reported as corruption: applied.** A pwsh-named `$PROFILE` that does not exist is now `PowerShell profile missing: <path> (resolved by pwsh $PROFILE) — run setup-windows.ps1`. It carries no BUG-020 remedy, and `--fix` does not run the heal. This is what `proposal.md` Risks already stated. The subtest pins `PowerShell profile missing: ` and rejects `BUG-020`. Mutant: dropping the branch turns that subtest red.
+- **Major 2, the `--fix` path could not tell the two sources apart: applied.** The heal fixture's profile is now in `Redirected/Docs/…`, outside the four roots, and a decoy sits in `Documents/PowerShell/`. The review's mutant (`profile = split` before the heal) now fails `heal rewrites the profile → FIX…` on the argv assertion. In round 1 it passed.
+- **Minor 3, unquoted remedy: applied.** Both paths are double-quoted. `TestCheckProfileFiles_DetectsBUG020Corruption` asserts `-File "` and `-ProfilePath "` on every corruption FAIL.
+- **Minor 4, the answer's shape is trusted: applied.** `profileTarget` takes the last non-blank line and accepts it only if it names a `.ps1` file; anything else falls back to the enumeration, with the reason. New cases: noise before the path (resolved, and the noise is not in the row), and noise only (enumerated).
+- **Question 5, the launcher's base range: answered, out of scope.** The reviewer measured the spec's own change (`dab595e`) and found no later edit to its files, so the verdict covers this spec. The stale inferred base is tracked in #1551, and the missing way to target a landed commit in #1645.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.

@@ -67,6 +67,13 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 		rep.Fail("PowerShell profile missing (" + source + ")")
 		return
 	}
+	if !pathExists(profile) {
+		// A profile that was never written is not BUG-020 corruption: the heal
+		// has nothing to rebuild, so --fix would run it for nothing. Setup
+		// writes it (CLI-066 review round 1, finding 1).
+		rep.Fail(fmt.Sprintf("PowerShell profile missing: %s (%s) — run setup-windows.ps1", profile, source))
+		return
+	}
 	reasons := profileCorruption(profile)
 	if len(reasons) == 0 {
 		rep.Pass("PowerShell profile exists (" + profile + "; " + source + ")")
@@ -74,7 +81,7 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 	}
 	heal := profileHealPath(sys, c)
 	if !fix {
-		rep.Fail(fmt.Sprintf("PowerShell profile corrupted (%s; target %s, %s) — BUG-020; run `pwsh -NoProfile -File %s -ProfilePath %s` or `dotf doctor --fix` (backs the profile up, then rebuilds it from powershell/profile.ps1; content outside the dotfiles markers survives only in the backup)",
+		rep.Fail(fmt.Sprintf("PowerShell profile corrupted (%s; target %s, %s) — BUG-020; run `pwsh -NoProfile -File \"%s\" -ProfilePath \"%s\"` or `dotf doctor --fix` (backs the profile up, then rebuilds it from powershell/profile.ps1; content outside the dotfiles markers survives only in the backup)",
 			strings.Join(reasons, "; "), profile, source, heal, profile))
 		return
 	}
@@ -102,7 +109,11 @@ func profileTarget(sys *System, home string) (path, source string) {
 		return p, "enumerated, pwsh not on PATH; checked: " + strings.Join(checked, ", ")
 	}
 	out, _, err := sys.CommandOutputBounded(profileQueryTimeout, "pwsh", "-NoProfile", "-Command", "$PROFILE")
-	if p := strings.TrimSpace(firstLine(out)); err == nil && p != "" {
+	// `$PROFILE` is printed last, so anything pwsh writes first (a module
+	// banner, an engine warning) is noise. An answer that does not name a .ps1
+	// file is not an answer: measuring it, or handing it to the heal, would be
+	// worse than the enumeration.
+	if p := lastLine(out); err == nil && strings.EqualFold(filepath.Ext(p), ".ps1") {
 		return p, "resolved by pwsh $PROFILE"
 	}
 	p, checked := findPowerShellProfile(home)
@@ -240,6 +251,17 @@ const profileHealTimeout = 60 * time.Second
 
 // firstLineOr renders a subprocess result as one line: its first line of
 // output when it produced one, else the error, else "no output".
+// lastLine returns the last non-blank line of s, trimmed.
+func lastLine(s string) string {
+	lines := strings.Split(s, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if t := strings.TrimSpace(lines[i]); t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
 func firstLineOr(out string, err error) string {
 	if l := firstLine(out); l != "" {
 		return l
