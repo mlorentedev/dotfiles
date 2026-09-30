@@ -42,8 +42,8 @@ Later rows, whose criteria are added when they start: E2, E5 to E10.
 
 ## Acceptance criteria
 
-- [ ] **AC1:** `TestHelpTextHasNoInternalReferences` walks every command from the root and fails when a short or long description, an example or a flag usage line contains an internal id, an issue number or "twin". It passes on this tree.
-- [ ] **AC2:** `cli/README.md` covers what `dotf` does, how to install it (the release installer and `go install`), a table of the commands, and how to build and test it. It cites no internal ids.
+- [x] **AC1:** `TestHelpTextHasNoInternalReferences` walks every command from the root and fails when a short or long description, an example or a flag usage line contains an internal id, an issue number or "twin". It passes on this tree.
+- [x] **AC2:** `cli/README.md` covers what `dotf` does, how to install it (the release installer and `go install`), a table of the commands, and how to build and test it. It cites no internal ids.
 
 ## References
 

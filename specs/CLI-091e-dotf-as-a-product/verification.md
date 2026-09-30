@@ -8,7 +8,7 @@ created: "2026-09-29"
 ## Evidence
 
 - [x] AC1 -> test `TestHelpTextHasNoInternalReferences` (49 failures before the rewrite, 0 after)
-- [x] AC2 -> `cli/README.md` rewritten; the `features.json` f2 command checks the sections and the absence of ids
+- [x] AC2 -> `cli/README.md` rewritten; `features.json` f2 checks the three sections and runs `TestReadmeHasNoInternalReferences`, which holds the README to the same pattern as `--help` (added from #1850's review; mutation-checked with an `ADR-041` line)
 
 ## Test status
 
@@ -24,9 +24,9 @@ created: "2026-09-29"
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? no: nothing surprising; the guard's reach (a bare `GUARD` with no number escapes it) is recorded in #1850's review triage
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a documentation and help-text change, with no design decision
+- [x] New pattern candidate for `00_meta/patterns/`? no: one repository's CLI help
 
 ## Archive checklist
 

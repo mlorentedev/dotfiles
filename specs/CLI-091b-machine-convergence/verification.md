@@ -25,9 +25,9 @@ created: "2026-09-29"
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? no: the one non-obvious point, that a resolver test needs the checkout and the mirror to disagree, is lesson 321's, written for #1863
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-041 (#1845) already sets the convergence order this implements
+- [x] New pattern candidate for `00_meta/patterns/`? no: repository-specific CLI behaviour
 
 ## Archive checklist
 
