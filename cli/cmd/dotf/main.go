@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/cmd"
 	"github.com/mlorentedev/dotfiles/cli/internal/errors"
@@ -21,8 +23,36 @@ var version = "dev"
 var commit = ""
 
 func main() {
-	rootCmd := cmd.New(version, commit)
+	info, _ := debug.ReadBuildInfo()
+	rootCmd := cmd.New(resolveVersion(version, info), commit)
 	os.Exit(run(rootCmd, os.Stderr))
+}
+
+// resolveVersion reports what `dotf version` prints when goreleaser did not
+// stamp -X main.version. A binary built by `go install <module>@<query>` carries
+// the module version Go resolved, and nothing else in it says which code it is,
+// so that version is reported (without its "v", like a release).
+//
+// A build from a checkout keeps "dev". Go marks those with vcs.* settings, or
+// with "(devel)" when it cannot read the repository (a linked worktree). "dev"
+// is a contract: install-dotf.{sh,ps1} skip replacing a source build on it, and
+// doctor skips the pin check for it. The commit stays empty either way. A module
+// version holds at most a 12-character hash, and doctor's provenance check reads
+// only a full stamp.
+func resolveVersion(ldflag string, info *debug.BuildInfo) string {
+	if ldflag != "dev" || info == nil {
+		return ldflag
+	}
+	v := info.Main.Version
+	if v == "" || v == "(devel)" {
+		return ldflag
+	}
+	for _, s := range info.Settings {
+		if strings.HasPrefix(s.Key, "vcs.") {
+			return ldflag
+		}
+	}
+	return strings.TrimPrefix(v, "v")
 }
 
 func run(rootCmd *cobra.Command, stderr io.Writer) int {

@@ -425,6 +425,29 @@ func TestHookBinaryTokenMatchesWhatEachSetupScriptDeployed(t *testing.T) {
 	}
 }
 
+func TestHookBinaryTokenForTargetUsesAgyWindowsCommandSyntax(t *testing.T) {
+	const windowsPath = `C:\Users\m\.local\bin\dotf.exe`
+
+	for _, tc := range []struct {
+		name, path, goos, format, want string
+	}{
+		{"agy on windows is bare", windowsPath, "windows", harness.NamedHooksFormat, windowsPath},
+		{"claude on windows stays quoted", windowsPath, "windows", "command-hook", `"` + windowsPath + `"`},
+		{"agy path with spaces stays quoted until its runner supports escaping",
+			`C:\Users\Two Words\.local\bin\dotf.exe`, "windows", harness.NamedHooksFormat,
+			`"C:\Users\Two Words\.local\bin\dotf.exe"`},
+		{"agy on linux stays bare", "/home/m/.local/bin/dotf", "linux",
+			harness.NamedHooksFormat, "/home/m/.local/bin/dotf"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hookBinaryTokenForTarget(tc.path, tc.goos, tc.format); got != tc.want {
+				t.Errorf("hookBinaryTokenForTarget(%q, %q, %q) = %q, want %q",
+					tc.path, tc.goos, tc.format, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestResolveDotfPathCarriesTheWindowsSuffix pins the other half of the same
 // defect: the path itself. `dotf` and `dotf.exe` are different commands to the
 // equality check, so a suffix-less resolve on Windows duplicates just as surely
@@ -556,7 +579,7 @@ func bindAgy(t *testing.T, home, raw string, extra ...string) (string, error) {
 // the payload would not have parsed.
 func TestBindEmitsTheAgyGateIntoHooksJSONAndRetiresTheOldEntry(t *testing.T) {
 	home, raw := agyBindFixture(t, liveShapedAgyHooks, liveShapedGeminiSettings)
-	dotf := hookBinaryToken(raw, runtime.GOOS)
+	dotf := hookBinaryTokenForTarget(raw, runtime.GOOS, harness.NamedHooksFormat)
 	hooksPath := filepath.Join(home, ".gemini", "config", "hooks.json")
 	settingsPath := filepath.Join(home, ".gemini", "settings.json")
 	orcaBefore, _ := json.Marshal(readJSONFile(t, hooksPath)["orca-status"])

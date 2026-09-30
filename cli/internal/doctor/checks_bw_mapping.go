@@ -4,21 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
-
-// bwMappingStaleSync is the threshold beyond which the local vault cache is
-// considered potentially stale when reporting missing items (BUG-087).
-//
-// If the vault was synced within this window, a missing item is considered a
-// genuine absence (FAIL). If the vault has not been synced or is older than
-// this window, doctor emits a WARN indicating the item was not found in the
-// local cache and advising a `dotf secrets unlock`, which syncs the daemon's
-// cache (CLI-056). The remedy used to name `dotf secrets sync`, which
-// materializes CI secrets and refreshes no cache at all.
-const bwMappingStaleSync = 24 * time.Hour
 
 // checkBWMapping asserts that every Bitwarden item the registry names actually
 // exists in the vault — the drift between the mapping SSOT and the store it maps
@@ -39,11 +27,12 @@ const bwMappingStaleSync = 24 * time.Hour
 // so it stays cheap enough for the full sweep and safe to run anywhere.
 //
 // Severity mirrors checkBitwardenReach's rule: an unreachable or locked vault is
-// not a finding here (that section owns it). When an item appears missing:
-//   - If the daemon's last sync is fresh (within bwMappingStaleSync), it is a FAIL
-//     because the item is genuinely absent from the vault.
-//   - If the daemon's last sync is stale or unknown (never synced), it is a WARN
-//     explaining that the item was not found in the local cache and advising a sync (BUG-087).
+// not a finding here (that section owns it). Doctor syncs the daemon before it
+// lists, so the listing is the vault and a missing item is a FAIL (#1820). With
+// no sync wired, or a sync that failed, the listing is a cache of unknown age and
+// the section SKIPs. It used to guess that age from `bw status`'s lastSync and
+// WARN on a stale one (BUG-087), but that dates the CLI's cache, not the
+// daemon's, and once every production run syncs the guess was unreachable.
 func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 	rep.Section("Bitwarden mapping (registry -> vault)")
 
@@ -66,14 +55,21 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 
+	// The item list comes from bw serve's own cache. Syncing the daemon first
+	// makes its listing the vault's (#1820); without that, an absence may only be
+	// an item the cache has not pulled yet.
+	if sys.BWSync == nil {
+		rep.Skip("no way to sync the vault — mapping unverifiable")
+		return
+	}
+	if err := sys.BWSync(); err != nil {
+		rep.Skip(fmt.Sprintf("could not sync the vault (%s) — mapping unverifiable", daemonReason(err)))
+		return
+	}
 	present, err := sys.BWItemNames()
 	if err != nil {
 		// Locked, absent daemon, transport error: not this section's finding.
-		reason := err.Error()
-		if strings.Contains(reason, "connection refused") || strings.Contains(reason, "unreachable") {
-			reason = "bw serve daemon not running"
-		}
-		rep.Skip(fmt.Sprintf("vault item list unavailable (%s) — mapping unverifiable", reason))
+		rep.Skip(fmt.Sprintf("vault item list unavailable (%s) — mapping unverifiable", daemonReason(err)))
 		return
 	}
 	have := make(map[string]bool, len(present))
@@ -89,33 +85,25 @@ func checkBWMapping(sys *System, cfg *Config, rep *Report) {
 	}
 	sort.Strings(missing)
 
-	var lastSync time.Time
-	if sys.BWLastSync != nil {
-		if t, err := sys.BWLastSync(); err == nil {
-			lastSync = t
-		}
-	}
-
 	for _, item := range missing {
 		ids := declared[item]
 		sort.Strings(ids)
 
-		if !lastSync.IsZero() && sys.Now().Sub(lastSync) >= 0 && sys.Now().Sub(lastSync) <= bwMappingStaleSync {
-			rep.Fail(fmt.Sprintf(
-				"%s: no such item in the vault, named by %s — every `dotf secrets run` without --only fails on it, including `dotf spec review`",
-				item, strings.Join(ids, ", ")))
-		} else if lastSync.IsZero() {
-			rep.Warn(fmt.Sprintf(
-				"%s: not found in local vault cache (never synced), named by %s — run `dotf secrets unlock` (syncs the daemon's cache) to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
-				item, strings.Join(ids, ", ")))
-		} else {
-			age := sys.Now().Sub(lastSync).Round(time.Minute)
-			rep.Warn(fmt.Sprintf(
-				"%s: not found in local vault cache (last synced %s ago), named by %s — run `dotf secrets unlock` (syncs the daemon's cache) to refresh; if missing from vault, every unscoped `dotf secrets run` fails on it",
-				item, age, strings.Join(ids, ", ")))
-		}
+		rep.Fail(fmt.Sprintf(
+			"%s: no such item in the vault, named by %s — every `dotf secrets run` without --only fails on it, including `dotf spec review`",
+			item, strings.Join(ids, ", ")))
 	}
 	if len(missing) == 0 {
 		rep.Pass(fmt.Sprintf("all %d bw item(s) named by the registry exist in the vault", len(declared)))
 	}
+}
+
+// daemonReason names why bw serve could not answer, in the reader's terms: a
+// refused or unreachable connection means the daemon is not running.
+func daemonReason(err error) string {
+	reason := err.Error()
+	if strings.Contains(reason, "connection refused") || strings.Contains(reason, "unreachable") {
+		return "bw serve daemon not running"
+	}
+	return reason
 }

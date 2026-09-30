@@ -103,7 +103,8 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		// Default: the vault holds exactly what the registry declares, so the
 		// mapping check is quiet unless a test deliberately introduces drift.
 		BWItemNames: func() ([]string, error) { return nil, errors.New("no vault in tests") },
-		BWLastSync:  func() (time.Time, error) { return fixedTestNow, nil },
+		// Default: a sync succeeds, so a listing a test injects is the vault.
+		BWSync: func() error { return nil },
 		ResolveSecret: func(e secrets.Entry) (string, error) {
 			return "", fmt.Errorf("%w: %s", secrets.ErrSecretAbsent, e.Var)
 		},
