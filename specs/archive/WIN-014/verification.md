@@ -61,6 +61,18 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   Handoff-readiness an A. Fixing review-base selection is a global launcher
   change, not a WIN-014 implementation change.
 
+## PR review dispositions
+
+- **Applied:** the Linux block extractor now requires both start and terminator
+  markers and exits non-zero when either is missing; a named regression removes
+  `unset _dotf` and proves fail-closed behavior.
+- **Applied:** archive checklist and fresh-review task now reflect the completed
+  archive/review state. Issue closure intentionally waits for merge.
+- **Declined:** the Windows warning test is not HOME-dependent. The production
+  block uses only `Get-Command dotf`; clearing PATH exercises the warning branch.
+- **Skipped:** docstring coverage is a generic heuristic over test/helpers, not
+  a repository gate or functional defect.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -84,7 +96,9 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/WIN-014/` -> `specs/archive/WIN-014/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/WIN-014/` -> `specs/archive/WIN-014/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+The issue remains open until PR #1825 merges.

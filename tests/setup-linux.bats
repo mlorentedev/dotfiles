@@ -480,11 +480,20 @@ setup() {
 }
 
 extract_linux_harness_mirror_block() {
+    local script="${1:-$DOTFILES_DIR/setup-linux.sh}"
     awk '
         /^# Mirror the harness inputs into the deploy dir/ { capture = 1 }
         capture { print }
-        capture && /^unset _dotf$/ { exit }
-    ' "$DOTFILES_DIR/setup-linux.sh"
+        capture && /^unset _dotf$/ { ended = 1; exit }
+        END { if (!capture || !ended) exit 1 }
+    ' "$script"
+}
+
+@test "WIN-014 extractor fails closed when the harness block terminator is missing" {
+    local broken="$BATS_TEST_TMPDIR/setup-linux-no-harness-end.sh"
+    grep -v '^unset _dotf$' "$DOTFILES_DIR/setup-linux.sh" > "$broken"
+    run extract_linux_harness_mirror_block "$broken"
+    [ "$status" -ne 0 ]
 }
 
 @test "setup-linux.sh executes harness mirror with its checkout path (WIN-014)" {

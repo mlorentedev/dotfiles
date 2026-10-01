@@ -33,7 +33,7 @@ created: "2026-09-28"
 - [x] [AC2] Add a failing Windows regression for replacing a read-only mirror.
 - [x] [AC2] Make the existing destination replaceable before the atomic rename
   and restore its original mode if installation fails.
-- [ ] Obtain a fresh passing independent review for the remediated head.
+- [x] Obtain a fresh passing independent review for the remediated head.
 
 ## Closing
 
