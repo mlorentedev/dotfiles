@@ -434,3 +434,32 @@ func TestRepoSensitiveDirNoCheckoutFailsLoud(t *testing.T) {
 		t.Fatal("RepoSensitiveDir() = nil error, want fail-loud when no checkout is found")
 	}
 }
+
+func TestResolveCatalogPathPrefersRepoCheckout(t *testing.T) {
+	// The checkout's packages.json wins over the deploy mirror, the order doctor
+	// already reads (#1381).
+	repo := t.TempDir()
+	want := filepath.Join(repo, "packages.json")
+	if err := os.WriteFile(want, []byte(`{"tools":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", repo)
+	t.Setenv("DOTFILES_DIR", t.TempDir())
+	t.Chdir(t.TempDir())
+
+	if got := ResolveCatalogPath(); got != want {
+		t.Errorf("ResolveCatalogPath() = %q, want repo copy %q", got, want)
+	}
+}
+
+func TestResolveCatalogPathFallsBackToDeployed(t *testing.T) {
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	deployed := t.TempDir()
+	t.Setenv("DOTFILES_DIR", deployed)
+	t.Chdir(t.TempDir())
+	want := filepath.Join(deployed, "packages.json")
+
+	if got := ResolveCatalogPath(); got != want {
+		t.Errorf("ResolveCatalogPath() = %q, want deployed copy %q", got, want)
+	}
+}

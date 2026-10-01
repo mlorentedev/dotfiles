@@ -87,6 +87,9 @@ type Installer struct {
 	// Default streams to Out via os/exec; tests inject a recorder so installNpm is
 	// network- and npm-free.
 	Run func(name string, args ...string) error
+	// Probe runs a tool's `--version` for the default version probes. Nil means
+	// ExecRunner; tests inject captured output.
+	Probe Runner
 }
 
 func (in *Installer) defaults() {
@@ -143,6 +146,53 @@ func (in *Installer) Install(t Tool) (Result, error) {
 	}
 }
 
+// PlanAction is what Install would do for a tool, without doing it.
+type PlanAction string
+
+const (
+	PlanInstall     PlanAction = "install"
+	PlanUpgrade     PlanAction = "upgrade"
+	PlanSkip        PlanAction = "skip"
+	PlanUnsupported PlanAction = "unsupported" // no release asset for this OS/arch
+)
+
+// Plan is one row of a dry run: the installed version ("" when absent), the pin
+// and the action.
+type Plan struct {
+	Name, Installed, Pin string
+	Action               PlanAction
+}
+
+// Plan reports what Install would do for t. It runs the same probe and the same
+// decideAction as Install, so a dry run cannot disagree with the apply, and it
+// never reaches the Fetch or Run seams.
+func (in *Installer) Plan(t Tool) Plan {
+	in.defaults()
+	p := Plan{Name: t.Name, Pin: t.Version, Installed: in.current(t)}
+	// Mirror Install's dispatch: what it refuses, the plan reports as
+	// unsupported, after the probe, so an installed tool never reads as absent.
+	switch t.Source.Type {
+	case "github-release":
+		if t.AssetName(in.GOOS, in.GOARCH) == "" {
+			p.Action = PlanUnsupported
+			return p
+		}
+	case "npm":
+	default:
+		p.Action = PlanUnsupported
+		return p
+	}
+	switch decideAction(p.Installed, t.Version) {
+	case actionSkip:
+		p.Action = PlanSkip
+	case actionUpgrade:
+		p.Action = PlanUpgrade
+	default:
+		p.Action = PlanInstall
+	}
+	return p
+}
+
 // installRelease provisions a github-release tool: download → verify sha256 →
 // place + chmod. A failure at any step leaves Dest untouched (the binary is
 // staged in a temp dir and only moved into place after verification passes).
@@ -197,18 +247,13 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 	return res, nil
 }
 
-// pathVersion is the npm default version probe: run `<name> --version`, resolving
-// the binary on PATH (where npm/scoop/choco place globals — not in Dest). Absent
-// or unparseable → "" (decideAction treats that as below-pin → install).
+// pathVersion is the npm default version probe: `<name> --version`, resolving
+// the binary on PATH (where npm/scoop/choco place globals — not in Dest). It
+// shares ProbeVersion with `dotf tools version` and the doctor, so all three
+// agree on what is installed. "" means absent or unparseable, which
+// decideAction treats as below the pin.
 func (in *Installer) pathVersion(name string) string {
-	out, err := exec.Command(name, "--version").CombinedOutput()
-	if err != nil {
-		return ""
-	}
-	if m := semverRE.Find(out); m != nil {
-		return string(m)
-	}
-	return ""
+	return ProbeVersion(name, in.Probe)
 }
 
 // fetchVerifyPlace runs the download → verify → place pipeline and returns res
@@ -247,21 +292,14 @@ func (in *Installer) releaseURL(repo, version, file string) string {
 	return fmt.Sprintf("%s/%s/releases/download/v%s/%s", strings.TrimRight(in.BaseURL, "/"), repo, version, file)
 }
 
-// installedVersion is the default CurrentVersion: run <Dest>/<bin> --version and
-// pull out the first dotted-numeric token. Absent binary or any failure → "".
+// installedVersion is the default CurrentVersion for a github-release tool:
+// ProbeVersion on <Dest>/<bin>. An absent binary is "".
 func (in *Installer) installedVersion(name string) string {
 	bin := filepath.Join(in.Dest, binFilename(name, in.GOOS))
 	if _, err := os.Stat(bin); err != nil {
 		return ""
 	}
-	out, err := exec.Command(bin, "--version").CombinedOutput()
-	if err != nil {
-		return ""
-	}
-	if m := semverRE.Find(out); m != nil {
-		return string(m)
-	}
-	return ""
+	return ProbeVersion(bin, in.Probe)
 }
 
 var semverRE = regexp.MustCompile(`[0-9]+\.[0-9]+\.[0-9]+`)

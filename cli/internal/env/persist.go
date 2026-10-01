@@ -158,14 +158,28 @@ func MarkerStale(reader UserEnvReader, vars []ResolvedVar) (bool, error) {
 	return !ok || cur != MarkerValue(vars), nil
 }
 
-// checkNames refuses a contract name the marker could not round-trip: a name
-// holding the separator would be read back as two names, and the next run
+// ValidateNames refuses a contract name the marker could not round-trip: a
+// name holding the separator would be read back as two names, and the next run
 // could delete two unrelated values. Contract names are identifiers by
-// convention; this is where the convention becomes a guarantee.
-func checkNames(vars []ResolvedVar) error {
+// convention; this is where the convention becomes a guarantee. Persist calls
+// it, and so must every read path (`--check`, doctor), or a check would pass
+// or point at a remedy that Persist then refuses.
+func ValidateNames(vars []ResolvedVar) error {
 	for _, v := range vars {
+		// The marker must read back exactly what it recorded. MarkerValue
+		// skips an empty name and ParseMarker trims, so an empty or padded
+		// name would be persisted and then never swept.
+		if v.Name == "" || v.Name != strings.TrimSpace(v.Name) {
+			return fmt.Errorf("contract variable name %q is empty or has surrounding whitespace, which the ownership marker cannot record", v.Name)
+		}
 		if strings.Contains(v.Name, markerSep) {
 			return fmt.Errorf("contract variable name %q contains the marker separator %q and cannot be persisted", v.Name, markerSep)
+		}
+		// The marker's own name is reserved: a variable spelled like it would be
+		// overwritten by the marker on every run. Registry names are
+		// case-insensitive, so any spelling collides.
+		if strings.EqualFold(v.Name, ManagedMarker) {
+			return fmt.Errorf("contract variable name %q is reserved for the ownership marker and cannot be persisted", v.Name)
 		}
 	}
 	return nil
@@ -189,7 +203,7 @@ func checkNames(vars []ResolvedVar) error {
 // the registry would be the unbounded sweep this exists to avoid.
 func Persist(vars []ResolvedVar, store UserEnvStore) ([]PersistResult, error) {
 	out := make([]PersistResult, 0, len(vars)+1)
-	if err := checkNames(vars); err != nil {
+	if err := ValidateNames(vars); err != nil {
 		return out, err
 	}
 	stored, hasMarker, err := store.Get(ManagedMarker)

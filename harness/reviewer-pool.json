@@ -54,14 +54,14 @@
       "auth": "login"
     },
     {
-      "id": "nan/mimo-v2.5",
+      "id": "nan/mimo-v2.6-flash",
       "runner": "pi",
       "provider": "nan",
-      "model": "mimo-v2.5",
+      "model": "mimo-v2.6-flash",
       "secret_id": "NAN_API_KEY",
       "role": "fallback",
-      "why": "Admitted 2026-08-20 after the evaluation this file's bar requires, and the verdict is recorded honestly rather than as a pass. What WAS established: given the same planted-defect shell snippet, mimo returned a real, correct finding — the `((count++))` exit-1-under-set-e case from this repo's own prohibited-pattern table. It is reasoning-class by profile (1M context, reasoning chain) against qwen3.6 and gemma4's 262K, which is the line this pool draws. What was NOT established: a quality RANKING against deepseek. deepseek never produced content under the same harness — it spent 29,299 characters of reasoning and returned finish_reason=length with an EMPTY body at 8,000 output tokens, so there was nothing to compare against. That is an instrumentation result, not a capability one, and it is stated here so nobody reads this entry as 'mimo matched deepseek'. It is admitted as a SECOND fallback, after the provider-diverse one, because provider diversity remains the stronger property.",
-      "operational_note": "Reasoning models here emit reasoning_content BEFORE content. Under-provisioning max_tokens returns an empty body with finish_reason=length and no error — the same shape as a review that silently did not happen (lesson 213). Provision generously and check finish_reason; deepseek did not answer within 8,000 output tokens on a small prompt."
+      "why": "Re-admitted 2026-09-30 on the bar this file requires, not renamed in. NaN retired its predecessor mimo-v2.5 that day: it hung, then answered 401 'This API key does not have access to the requested model' (AI-045, #1763). mimo-v2.5 had been admitted 2026-08-20 on a planted-defect test, and the successor was given the same one: the `((count++))` exit-status-1 case under `set -e` from this repo's prohibited-pattern table. mimo-v2.6-flash found it in 21 s and 772 completion tokens, named a failing input (count=0), and gave the fix (`count=$((count + 1))`). deepseek-v4-flash, run on the same prompt, found the same defect in 9 s. That is agreement on one planted defect, not a quality ranking, and it is stated as that. It stays a SECOND fallback, after the provider-diverse one, because provider diversity remains the stronger property. Profile: 1M context, reasoning chain, which is this pool's line against qwen3.6 and gemma4 at 262K.",
+      "operational_note": "Reasoning models here emit reasoning_content BEFORE content. Under-provisioning max_tokens returns an empty body with finish_reason=length and no error — the same shape as a review that silently did not happen (lesson 213). Provision generously and check finish_reason. NaN recommends max_tokens >= 300 for this model and publishes a per-model concurrency limit of 5."
     },
     {
       "id": "nan/glm5.3-flash",

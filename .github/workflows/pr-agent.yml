@@ -223,18 +223,22 @@ jobs:
           else
             echo "reviewable=true" >> "$GITHUB_OUTPUT"
           fi
-      # TOOL-023: the push gate decides BEFORE PR-Agent starts. A push PR-Agent
-      # skipped would publish nothing, and the guard below would read that as a
-      # failed inference. The job has no other checkout. The gate script is
-      # fetched from the PR's merge ref, the same trust as this workflow file,
-      # and forks never reach this job.
-      - name: Check out the push gate
-        if: github.event.action == 'synchronize'
+      # The job has no full checkout: only the two scripts that decide, before
+      # PR-Agent starts, whether it runs (TOOL-023's push gate) and on which
+      # model (AI-045's preflight). They are fetched from the PR's merge ref,
+      # the same trust as this workflow file, and forks never reach this job.
+      - name: Check out the reviewer's scripts
+        if: steps.reviewable.outputs.reviewable != 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          sparse-checkout: scripts/pr-agent-push-gate.sh
+          sparse-checkout: |
+            scripts/pr-agent-push-gate.sh
+            scripts/pr-agent-model-preflight.sh
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      # TOOL-023: the push gate decides BEFORE PR-Agent starts. A push PR-Agent
+      # skipped would publish nothing, and the guard below would read that as a
+      # failed inference.
       - name: Decide whether this push is reviewed
         id: push_gate
         if: github.event.action == 'synchronize'
@@ -255,7 +259,31 @@ jobs:
             | jq -s 'add // []' > "$dir/commits.json" || rm -f "$dir/commits.json"
           ./scripts/pr-agent-push-gate.sh --comments "$dir/comments.json" \
             --commits "$dir/commits.json" --sender-type "${SENDER_TYPE}" | tee -a "$GITHUB_OUTPUT"
+      # AI-045: ask NaN which model of the declared chain answers, BEFORE the
+      # review. NaN retired mimo-v2.5 on 2026-09-30. It first hung, so PR-Agent
+      # published nothing and the job still went green, then it answered 401.
+      # PR-Agent's own fallback catches a refusal but not a hang, and neither
+      # case tells anyone the declared model is dead. The script probes each
+      # model once, hands PR-Agent the first one that answers, and names every
+      # one that did not in a warning and in the job summary. It fails the job
+      # when none answers. It only skips dead entries, in declared order; it
+      # never picks a model outside the chain.
+      #
+      # The chain is declared HERE, not read from `.pr_agent.toml`, because
+      # PR-Agent reads that file from the default branch, so a PR changing the
+      # model would still probe the old one. A test holds the two equal.
+      - name: Pick the first declared model that answers
+        id: models
+        if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
+        env:
+          NAN_API_KEY: ${{ secrets.NAN_API_KEY }}
+          DECLARED_MODEL: openai/mimo-v2.6-flash
+          DECLARED_FALLBACK_MODELS: '["openai/deepseek-v4-flash"]'
+        run: |
+          ./scripts/pr-agent-model-preflight.sh --model "${DECLARED_MODEL}" \
+            --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT"
       - name: PR-Agent
+        id: pr_agent
         if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move it decides what runs here, and what runs here holds
@@ -280,9 +308,10 @@ jobs:
           # PR that introduces the file reviews with upstream's gpt-5.6 and NaN rejects
           # the key. The workflow file IS read from the PR head, so the model travels
           # here and the toml keeps every other setting. Env wins over the file in
-          # PR-Agent's settings order; keep the two in step.
-          CONFIG__MODEL: openai/mimo-v2.5
-          CONFIG__FALLBACK_MODELS: '["openai/deepseek-v4-flash"]'
+          # PR-Agent's settings order. The preflight above picks the model from the
+          # chain it declares, which a test keeps equal to the toml's.
+          CONFIG__MODEL: ${{ steps.models.outputs.model }}
+          CONFIG__FALLBACK_MODELS: ${{ steps.models.outputs.fallbacks }}
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
           # the entries whose `consumers` list this repo, so the reviewer holds
@@ -359,8 +388,8 @@ jobs:
       # already forbids it — the top tier "queues or escalates, NEVER degrades
       # silently" — so this makes the degrade loud and does nothing else.
       #
-      # `fallback_models` names mimo-v2.5 for CONCURRENCY (per-model limit,
-      # measured), never to soften the quality bar. The marker comes from the
+      # `fallback_models` names a second NaN model for CONCURRENCY (per-model
+      # limit, measured), never to soften the quality bar. The marker comes from the
       # registry, over the API since this job has no checkout, at the BASE ref
       # since a PR supplying it could redefine it. Two more bindings, both
       # measured as gaps by CodeRabbit on the yt-metrics-cli and svqtriana ports
@@ -379,8 +408,11 @@ jobs:
         # was possible, and the NaN diagnosis below would be false (#1618).
         # And skip it when the push gate held a push below its threshold: no review
         # was asked for (TOOL-023).
+        # And skip it when no declared model answered: the preflight already failed
+        # the job, naming each model and its status (AI-045).
         if: >
           always() && steps.credential.outcome != 'failure'
+            && steps.models.outcome != 'failure'
             && steps.reviewable.outputs.reviewable != 'false'
             && steps.push_gate.outputs.run != 'false'
             && (github.event_name == 'pull_request'
@@ -398,8 +430,20 @@ jobs:
           BASE_REF: ${{ github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          PR_AGENT_OUTCOME: ${{ steps.pr_agent.outcome }}
+          REVIEW_MODEL: ${{ steps.models.outputs.model }}
         run: |
           set -euo pipefail
+          # A cancelled PR-Agent step was stopped by the job's timeout-minutes while
+          # it waited on the model. That is a hang, not concurrency: measured on run
+          # 36677077122, the model accepted a 42K-token review, never answered, and
+          # `ai_timeout` did not fire (AI-045).
+          if [ "${PR_AGENT_OUTCOME:-}" = "cancelled" ]; then
+            echo "::error::PR-Agent was stopped by the job timeout while waiting on ${REVIEW_MODEL:-its model}," \
+              "which accepted the review and never answered. Re-run the job; if it repeats, the model" \
+              "cannot review a diff this size in time (AI-045, #1763)."
+            exit 1
+          fi
           # Every declared marker, as a JSON array: a full review carries "## PR
           # Reviewer Guide", an incremental one "## Incremental PR Reviewer Guide"
           # (TOOL-023). Prints nothing when none is declared; never aborts the step.
@@ -446,6 +490,7 @@ jobs:
           fi
           echo "::error::PR-Agent reported success but published no review" \
             "(no github-actions[bot] comment updated since ${STARTED} carries any of ${markers})."
-          echo "::error::Most likely cause: NaN concurrency exhaustion — the cluster allows 5 simultaneous"
-          echo "::error::requests, shared with pi, qq and hive embeddings. See #1107."
+          echo "::error::Two causes are measured. A diff too large for a non-streamed answer: NaN's edge"
+          echo "::error::cuts one at about 125 s, and PR-Agent then exits cleanly (run 36680454975, 42K tokens;"
+          echo "::error::#1858). Or NaN's per-model concurrency limit, shared with pi, qq and hive (#1107)."
           exit 1

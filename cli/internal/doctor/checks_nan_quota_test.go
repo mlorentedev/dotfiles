@@ -26,7 +26,10 @@ const nanRegistryBW = "version: 1\nsecrets:\n" +
 const nanUsage415 = `{"start_date":"2026-06-01","end_date":"2026-06-23","totals":{"by_model":[` +
 	`{"model":"qwen3.8-flash","total_tokens":415000000},{"model":"deepseek-v4-flash","total_tokens":300000000}]},"has_more":false}`
 
-const nanServed = `{"data":[{"id":"deepseek-v4-flash"},{"id":"qwen3.8-flash"},{"id":"mimo-v2.5"},` +
+// nanServed mirrors what NaN's /v1/models listed on 2026-09-30, after it retired
+// mimo-v2.5 for mimo-v2.6-flash (AI-045). The check reads the repo's real model
+// map, so a model bound there has to be served here.
+const nanServed = `{"data":[{"id":"deepseek-v4-flash"},{"id":"qwen3.8-flash"},{"id":"mimo-v2.6-flash"},` +
 	`{"id":"qwen3.6"},{"id":"qwen3-embedding"},{"id":"rerank"},{"id":"glm5.3-flash"}]}`
 
 // nanCfg builds a dotfiles tree holding the registry, the repo's real model map

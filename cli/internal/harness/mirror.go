@@ -111,6 +111,11 @@ func manifestTargets(path string) ([]string, error) {
 		if t.File == "" || seen[t.File] {
 			continue
 		}
+		// A target is mirrored to the same path under the deploy dir, so one
+		// that is absolute or climbs out with ".." would write outside it.
+		if !filepath.IsLocal(filepath.FromSlash(t.File)) {
+			return nil, fmt.Errorf("%s: target %q is not a path inside the checkout", ManifestFile, t.File)
+		}
 		seen[t.File] = true
 		out = append(out, t.File)
 	}

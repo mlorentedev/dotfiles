@@ -72,9 +72,17 @@ Three things now stand between that and a silent green:
    in-between jobs due to GHA's max pending queue depth of 1. By removing the
    global GHA lock and relying on per-PR concurrency (`group: pr-agent-${{ pr.number }}`),
    batches of PRs review concurrently across NaN's 10 slots.
-3. `fallback_models = ["openai/mimo-v2.5"]` — a second NaN model with its own
-   bucket of five, which is what makes it an automatic fallback under LiteLLM
-   if `deepseek-v4-flash` is saturated.
+3. `fallback_models = ["openai/deepseek-v4-flash"]` behind the primary
+   `openai/mimo-v2.6-flash` — a second NaN model with its own bucket of five,
+   which is what makes it an automatic fallback under LiteLLM when the primary
+   is saturated.
+4. **A model preflight (AI-045)**: before PR-Agent starts,
+   `scripts/pr-agent-model-preflight.sh` sends one minimal call to each model of
+   the declared chain. The review runs on the first one that answers; every one
+   that did not is a `::warning::` and a row in the job summary, and the job
+   fails when none answers. It exists because NaN retired `mimo-v2.5` on
+   2026-09-30: it hung for hours (PR-Agent's fallback does not catch a hang, so
+   every PR got a green job and no review), then answered 401.
 
 The multiplier that matters is still the **push**, not the PR: the workflow fires
 on every push to the branch, so a PR with five pushes is five reviews of the full
@@ -104,8 +112,12 @@ To maximize developer velocity without sacrificing review hygiene:
 - **Attestation under GUARD-002**: PR-Agent posts an issue comment carrying the
   `## PR Reviewer Guide` marker, which `check-review-attestation.sh` recognizes
   as a valid review attestation (`[OK] attested`).
-- **Changing the reviewing model** is one line in `.pr_agent.toml`. There is one
-  fallback, `openai/mimo-v2.5`, and the reason is **concurrency, not quality**:
+- **Changing the reviewing model** takes two edits that must agree: `model` and
+  `fallback_models` in `.pr_agent.toml`, and `DECLARED_MODEL` and
+  `DECLARED_FALLBACK_MODELS` in the workflow's preflight step. A test fails when
+  they differ. The toml is read from the default branch and the workflow from the
+  PR head, which is why both exist. There is one fallback, `openai/deepseek-v4-flash`,
+  and the reason is **concurrency, not quality**:
   the limit is per model, so a second NaN model has its own bucket of five.
   What has not changed is the quality bar — `harness/reviewer-pool.json` excludes
   the latency-optimised models (`qwen3.6`, `gemma4`) **by name**, because a
