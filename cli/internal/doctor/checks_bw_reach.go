@@ -221,7 +221,8 @@ func checkBWSyncAge(sys *System, rep *Report, lastSync string) {
 	}
 	days := int(age.Hours() / 24)
 	if age > bwStaleSync {
-		rep.Warn(fmt.Sprintf("Bitwarden last synced %dd ago (>%dd) — the refresh token expires silently on an idle vault; run `bw sync` (BUG-074)",
+		// BUG-074
+		rep.Warn(fmt.Sprintf("Bitwarden last synced %dd ago (>%dd) — the refresh token expires silently on an idle vault; run `bw sync`",
 			days, int(bwStaleSync.Hours()/24)))
 		return
 	}

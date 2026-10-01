@@ -63,7 +63,8 @@ func checkHomeDeployDrift(sys *System, cfg *Config, rep *Report) {
 	// The Windows deploy targets need their own map and their own join guard —
 	// OPS-046 (#1447), deliberately out of this spec's scope.
 	if sys.GOOS == "windows" {
-		rep.Skip("POSIX-only deploy targets (Windows map tracked by #1447)")
+		// Windows map: #1447
+		rep.Skip("POSIX-only deploy targets (no Windows map yet)")
 		return
 	}
 
@@ -95,7 +96,8 @@ func reportHomeDeployEntry(e homeDeployEntry, deploy, home string, rep *Report) 
 	case !pathExists(src):
 		rep.Skip(e.dst + " not provisioned (" + e.src + " absent from deploy-dir)")
 	case isSymlink(dst):
-		rep.Fail(e.dst + " is a symlink (expected a regular file since ADR-012 — re-run setup)")
+		// ADR-012
+		rep.Fail(e.dst + " is a symlink (expected a regular file — re-run setup)")
 	case !pathExists(dst):
 		rep.Fail(e.dst + " missing at " + dst + " (run setup-linux.sh)")
 	case !e.contentChecked:

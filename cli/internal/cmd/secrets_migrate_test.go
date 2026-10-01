@@ -261,8 +261,8 @@ func TestSecretsMigrate_ScopeGuards(t *testing.T) {
 				t.Fatalf("guard %q: err = %v, want one containing %q", c.name, err, c.wantErr)
 			}
 			if c.name == "shared age source" {
-				if !strings.Contains(err.Error(), "#321") {
-					t.Errorf("shared age error must reference #321, got: %v", err)
+				if !strings.Contains(err.Error(), "split into distinct Bitwarden tokens manually") {
+					t.Errorf("shared age error must name the manual remedy, got: %v", err)
 				}
 				if strings.Contains(err.Error(), "--split") {
 					t.Errorf("shared age error must not reference nonexistent --split flag, got: %v", err)

@@ -145,7 +145,8 @@ func dispatchRoot(explicit string) string {
 // the contract for every command that spends quota, not for `run` alone.
 func requireTimeout(d time.Duration) error {
 	if d <= 0 {
-		return fmt.Errorf("--timeout is required and must be positive: ADR-032 §2 makes a bounded dispatch " +
+		// ADR-032 §2
+		return fmt.Errorf("--timeout is required and must be positive: a bounded dispatch is " +
 			"part of the contract, and a backend that cannot be bounded is not eligible")
 	}
 	return nil
@@ -307,7 +308,7 @@ func summarise(rec agent.Record) error {
 // It names the file, the key and a working value, because a fail-closed
 // refusal whose remedy the operator has to go and look up is a fail-closed
 // refusal people route around.
-const unidentifiedMachine = `this machine has not declared an identity, so every non-local pool is denied (ADR-032 §8)
+const unidentifiedMachine = `this machine has not declared an identity, so every non-local pool is denied
 
 Declare one in %s:
 

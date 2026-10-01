@@ -81,7 +81,8 @@ func checkVault(sys *System, rep *Report) {
 // changed in the contract or the per-machine override but `dotf env generate`
 // was never re-run — the same copy-with-drift-assertion discipline as ADR-012.
 func checkPathFiles(sys *System, cfg *Config, rep *Report) {
-	rep.Section("Generated path files (ADR-025)")
+	// ADR-025
+	rep.Section("Generated path files")
 	if cfg.ContractPath == "" {
 		rep.Skip("env-contract.json not found — path-file drift check skipped")
 		return
@@ -340,7 +341,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	case isExecFile(opencodeBin):
 		// The retired curl-script channel (ADR-036) left a copy behind and
 		// nothing on PATH resolves: the rc files no longer add ~/.opencode/bin.
-		rep.Fail("opencode not on PATH; a legacy curl-script copy sits at " + opencodeBin + " — run `dotf tools install opencode` and delete the legacy copy (ADR-036)")
+		rep.Fail("opencode not on PATH; a legacy curl-script copy sits at " + opencodeBin + " — run `dotf tools install opencode` and delete the legacy copy")
 	default:
 		rep.Fail("opencode missing (run `dotf tools install opencode`)")
 	}
@@ -723,7 +724,8 @@ func checkCompileHarnessDrift(sys *System, cfg *Config, rep *Report) {
 	compile := filepath.Join(cfg.DotfilesDir, "scripts", "compile-harness.sh")
 	switch {
 	case sys.GOOS == "windows":
-		rep.Skip("harness drift gate is Linux-only; Windows deploys committed records, no --check port yet (CLI-035)")
+		// CLI-035
+		rep.Skip("harness drift gate is Linux-only; Windows deploys committed records, no --check port yet")
 	case !isExecFile(compile):
 		rep.Skip("compile-harness.sh not found at " + compile)
 	default:
@@ -783,7 +785,8 @@ func checkDeployedSkillSymlinks(sys *System, cfg *Config, rep *Report) {
 		rep.Pass("deployed skills are regular copies (no symlinks at managed skill names)")
 		return
 	}
-	rep.Fail("deployed skill path(s) are symlinks (must be hard copies — BUG-100):")
+	// BUG-100
+	rep.Fail("deployed skill path(s) are symlinks (must be hard copies):")
 	for _, l := range flagged {
 		rep.Fail("  " + l)
 	}
@@ -882,7 +885,8 @@ func checkAntigravity(sys *System, rep *Report) {
 	case !pathExists(master):
 		rep.Fail("master mcp_config.json missing at " + master + " (run setup)")
 	case isSymlink(master):
-		rep.Fail("master mcp_config.json is a symlink (BUG-100 regression — recursion risk)")
+		// BUG-100 regression
+		rep.Fail("master mcp_config.json is a symlink (recursion risk)")
 	case !isValidJSON(master):
 		rep.Fail("master mcp_config.json at " + master + " is invalid JSON")
 	default:
@@ -891,9 +895,11 @@ func checkAntigravity(sys *System, rep *Report) {
 
 	if isDir(configDir) {
 		if links := findSymlinks([]string{configDir}); len(links) > 0 {
-			rep.Fail("symlinks found under ~/.gemini/config/ (BUG-100 regression): " + strings.Join(links, ", "))
+			// BUG-100 regression
+			rep.Fail("symlinks found under ~/.gemini/config/ (recursion risk): " + strings.Join(links, ", "))
 		} else {
-			rep.Pass("no symlinks under ~/.gemini/config/ (BUG-100 guard)")
+			// BUG-100 guard
+			rep.Pass("no symlinks under ~/.gemini/config/")
 		}
 	}
 }
