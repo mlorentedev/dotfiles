@@ -31,18 +31,20 @@ While a fix waits, tell live peers about the hazard and its workaround. For #172
 
 Merging ready PRs before the release PR puts them in one release instead of several. Branch protection requires a branch to be up to date with main, so each merge puts every other open PR behind. Land them one at a time:
 
-1. **Wait for the merge state to settle.** Right after main moves, `mergeStateStatus` reads `UNKNOWN` for several seconds. Poll until it reads something else:
+1. **Wait for the merge state to settle.** Right after main moves, `mergeStateStatus` reads `UNKNOWN` for several seconds. Poll until it reads something else, and note the head sha it prints with it:
 
    ```bash
-   gh pr view <N> --repo mlorentedev/dotfiles --json mergeStateStatus --jq .mergeStateStatus
+   gh pr view <N> --repo mlorentedev/dotfiles --json mergeStateStatus,headRefOid --jq '"\(.mergeStateStatus) \(.headRefOid)"'
    ```
 
-2. **If it reads `BEHIND`, update the branch and read the new head:**
+2. **If it reads `BEHIND`, update the branch from that sha, then read the new head.** `expected_head_sha` makes the update refuse if someone pushed in between:
 
    ```bash
-   gh api -X PUT repos/mlorentedev/dotfiles/pulls/<N>/update-branch -f expected_head_sha=<old sha>
+   gh api -X PUT repos/mlorentedev/dotfiles/pulls/<N>/update-branch -f expected_head_sha=<sha from step 1>
    gh pr view <N> --repo mlorentedev/dotfiles --json headRefOid --jq .headRefOid
    ```
+
+   The new head can take a few seconds to appear. Poll until the sha differs from step 1's.
 
 3. **Wait for every check on the new head.** Budget 10 to 15 minutes; the Windows test job is the slow one.
 4. **Gate the merge.** Merge only when `dotf pr triage-queue` does not list the PR and every check on the new head passed. The update can bring new reviewer output, so read the queue after CI, not before. If the PR is listed, triage it first.
