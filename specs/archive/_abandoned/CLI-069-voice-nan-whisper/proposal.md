@@ -1,9 +1,11 @@
 ---
 id: "CLI-069-voice-nan-whisper"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-09-01"
 issue: "mlorentedev/dotfiles#1426"   # repo#NNN — GitHub issue / Project item that tracks this spec
+review: waived
+review_waived_reason: "Abandoned in owner triage 2026-10-01 (#770). Nothing was implemented (draft, 0/19 tasks), so there is no change to review. The intent stays on #1426 in the backlog."
 tags: [spec, proposal]
 template_version: "1.0"
 ---
