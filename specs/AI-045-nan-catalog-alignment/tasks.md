@@ -46,6 +46,10 @@ created: "2026-09-29"
       silent minutes, no timeout logged; lesson 327). The invariant test landed with #1913 as "the job outlives both
       attempts": the job's timeout exceeds the attempts' step bounds plus setup
 - [ ] [AC8] AI-045d #1860: daily canary workflow over `harness/model-pins.json`, with a stub-transport test and a real sibling
+- [ ] [AC9] #1923: third attempt outside NaN, gated on its credential (blocked: provider funding and `dotf secrets sync ci`)
+- [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block
+- [x] [AC10] Live run of the PR that adds the queue shows GitHub accepts it: run 36835280780 started its `review` job and published a review (an unknown key fails the workflow before any job starts)
+- [ ] [AC10] On `main`, two reviews that overlap in time both complete and neither is cancelled; record the run ids on #1923. A cancelled review run there means the job-level queue is ignored: revert the block
 
 ## Closing
 

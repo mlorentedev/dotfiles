@@ -854,3 +854,29 @@ print(job['timeout-minutes'] >= sum(s['timeout-minutes'] for s in pa) + 3)
     [ "$status" -eq 0 ]
     [ "$output" = "True" ]
 }
+
+# AI-045 AC10 (#1923, option 3): this repository runs one review at a time. NaN
+# limits concurrency per model and per key, shared with pi, qq, hive and the
+# archive gate, so parallel PRs reviewed together exhaust the bucket that each of
+# them needs. The group is repository-wide and lives on the JOB, because the
+# workflow-level group is per PR with `cancel-in-progress: true` (a push
+# supersedes the review of the push before it), and GitHub refuses `queue: max`
+# beside `cancel-in-progress: true`.
+#
+# `queue: max` is load-bearing. Without it a group holds one running and ONE
+# pending job, and a newer pending job cancels the older one: three PRs at once
+# would lose a review, and the publish guard would never see it because the job
+# never ran.
+@test "pr-agent: reviews queue one at a time across the repository, and none is dropped" {
+    run python3 -c "
+import yaml
+wf = yaml.safe_load(open('$WF'))
+c = wf['jobs']['review'].get('concurrency') or {}
+print(c.get('group'), c.get('cancel-in-progress'), c.get('queue'))
+print(wf['concurrency']['cancel-in-progress'])
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = 'pr-agent-review-${{ github.repository }} False max' ]
+    # The per-PR supersession above stays as it was.
+    [ "${lines[1]}" = "True" ]
+}
