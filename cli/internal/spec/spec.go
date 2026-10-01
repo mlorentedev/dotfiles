@@ -22,7 +22,7 @@ import (
 // the ## Why provenance comment); the others are pure placeholder substitution.
 var templateNames = []string{"proposal.md", "tasks.md", "verification.md", "features.json"}
 
-//go:embed templates/proposal.md templates/tasks.md templates/verification.md templates/features.json
+//go:embed templates/proposal.md templates/tasks.md templates/verification.md templates/features.json templates/spec-fast-track.md
 var templatesFS embed.FS
 
 // idPattern is the canonical feature-id grammar: an AREA-NNN ticket whose AREA
@@ -165,7 +165,60 @@ func Scaffold(repoRoot, id, date, repoSlug string, issueNum int, issueTitle stri
 	if err != nil {
 		return warning, err
 	}
-	if err := os.MkdirAll(specDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(specDir), 0o755); err != nil {
+		return warning, err
+	}
+	if err := os.Mkdir(specDir, 0o755); err != nil {
+		return warning, err
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(specDir, name), []byte(content), 0o644); err != nil {
+			return warning, err
+		}
+	}
+	return warning, nil
+}
+
+// RenderFastTrack returns the fast-track spec file content keyed by filename,
+// with placeholders substituted.
+func RenderFastTrack(id, date, repoSlug string, issueNum int, issueTitle string) (map[string]string, error) {
+	raw, err := templatesFS.ReadFile("templates/spec-fast-track.md")
+	if err != nil {
+		return nil, fmt.Errorf("reading embedded template spec-fast-track.md: %w", err)
+	}
+	s := string(raw)
+	s = strings.ReplaceAll(s, "<feature-id>", id)
+	s = strings.ReplaceAll(s, "{TITLE}", id)
+	s = strings.ReplaceAll(s, "{{date:YYYY-MM-DD}}", date)
+	if issueNum > 0 {
+		s = strings.Replace(s, `issue: ""`,
+			fmt.Sprintf(`issue: "%s#%d"`, repoSlug, issueNum), 1)
+	}
+	if issueNum > 0 && issueTitle != "" {
+		comment := fmt.Sprintf("<!-- from issue #%d: %s -->", issueNum, issueTitle)
+		s = strings.Replace(s, "## Intent\n", "## Intent\n\n"+comment+"\n", 1)
+	}
+	return map[string]string{"spec.md": s}, nil
+}
+
+// ScaffoldFastTrack renders the fast-track spec for id and writes it under repoRoot/specs/<id>.
+// It refuses to overwrite an existing specs/<id>.
+func ScaffoldFastTrack(repoRoot, id, date, repoSlug string, issueNum int, issueTitle string) (warning string, err error) {
+	specDir := filepath.Join(repoRoot, "specs", id)
+	if _, err := os.Stat(specDir); err == nil {
+		return "", fmt.Errorf("already exists: %s", specDir)
+	}
+	if _, err := os.Stat(filepath.Join(repoRoot, "specs", "archive", id)); err == nil {
+		warning = fmt.Sprintf("%s exists in specs/archive/. Possibly reviving.", id)
+	}
+	files, err := RenderFastTrack(id, date, repoSlug, issueNum, issueTitle)
+	if err != nil {
+		return warning, err
+	}
+	if err := os.MkdirAll(filepath.Dir(specDir), 0o755); err != nil {
+		return warning, err
+	}
+	if err := os.Mkdir(specDir, 0o755); err != nil {
 		return warning, err
 	}
 	for name, content := range files {

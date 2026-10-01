@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f1",
+    "behavior": "AC1: apply installs a declared missing entry and removes an undeclared one through pi install/remove only; a second run changes nothing and calls no pi",
+    "verification": "cd cli && go test ./internal/pi ./internal/cmd -count=1 -run '^(TestNewPlan|TestApplyConvergesAndASecondRunCallsNothing|TestPiPackagesApplyRemovesThenInstalls|TestPiPackagesApplyDryRunCallsNothing)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f2",
+    "behavior": "AC2: check exits non-zero naming each missing and undeclared entry, and on an unreadable or empty manifest",
+    "verification": "cd cli && go test ./internal/pi ./internal/cmd -count=1 -run '^(TestPiPackagesCheckExitsNonZeroNamingDrift|TestPiPackagesCheckRefusesAnUnreadableManifest|TestLoadManifestRefusesWhatItCannotRead)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f3",
+    "behavior": "AC3: every install and removal logs its elapsed time; a failed or slow one prints its output in a fence, and the threshold never stops an install",
+    "verification": "cd cli && go test ./internal/pi ./internal/cmd -count=1 -run '^(TestApplyLogsTimeAndFencesTheOutputOfAFailure|TestApplySlowSuccessIsFencedAndStillCounted|TestPiPackagesApplyFailureExitsNonZero)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f4",
+    "behavior": "AC4: DOTFILES_SKIP_PI_PACKAGES skips loudly and exits 0 before any probe; a missing pi or npm warns and exits 0",
+    "verification": "cd cli && go test ./internal/cmd -count=1 -run '^(TestPiPackagesApplySkipIsFirstAndLoud|TestPiPackagesApplyWithoutPiWarnsAndExitsZero|TestPiPackagesApplyWithoutNpmWarnsAndExitsZero)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f5",
+    "behavior": "AC5: a declared retire path moves under ~/.pi/agent/archive/ intact, is never deleted or overwritten, and a second run moves nothing",
+    "verification": "cd cli && go test ./internal/pi -count=1 -run '^(TestApplyMovesRetiredPathsIntact|TestApplyNeverOverwritesAnArchive)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f6",
+    "behavior": "AC6: the doctor check fails on a declared requirement that does not resolve and passes on the shipped manifest",
+    "verification": "cd cli && go test ./internal/doctor -count=1 -run '^(TestPiPackageRequirements_AMissingRequirementFails|TestPiPackageRequirements_AResolvedRequirementPasses|TestPiPackageRequirements_TheShippedManifestPasses|TestPiPackageRequirements_AnUnreadableManifestWarnsNotPasses)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f7",
+    "behavior": "AC7: both setup twins call dotf pi packages apply, neither carries the reconcile loop, and the CI pi filter covers cli/internal/pi/**, the manifest and both twins",
+    "verification": "~/.local/bin/bats -f 'both twins reconcile|neither twin carries|CI pi filter covers the manifest' tests/pi-packages.bats && grep -q \"cli/internal/pi/\\*\\*\" .github/workflows/ci.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-139-pi-package-reconcile-f8",
+    "behavior": "AC8 (live, msi): pi-memory is not installed, its data is archived, a fresh pi session registers no memory_search tool, and a second apply changes nothing",
+    "verification": "test \"$(jq '.packages' ~/.pi/agent/settings.json | grep -c pi-memory)\" = 0 && test ! -e ~/.pi/agent/memory && ls -d ~/.pi/agent/archive/memory-* && out=$(printf '{\"type\":\"get_state\"}\\n' | pi --mode rpc --no-session 2>&1) && printf '%s' \"$out\" | grep -q '\"command\":\"get_state\",\"success\":true' && ! printf '%s' \"$out\" | grep -q memory_search && dotf pi packages apply | grep -q '0 changed'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

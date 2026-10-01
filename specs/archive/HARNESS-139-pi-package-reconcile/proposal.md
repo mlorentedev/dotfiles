@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-139-pi-package-reconcile"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-25"
 issue: "mlorentedev/dotfiles#1628"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -66,14 +66,14 @@ The spec spans both and archives with PR-B.
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `apply` installs a declared missing entry and removes an undeclared live one, through `pi install` and `pi remove` only, and a second run reports `changed=0` with no call to pi. Tested against a fake pi that edits a real `settings.json`.
-- [ ] **AC2** — `check` exits non-zero naming each missing and undeclared entry, and exits non-zero on an unreadable or empty manifest.
-- [ ] **AC3** — Every install and removal logs its elapsed time. A failed or slow one prints its captured output inside a fence, and the threshold never stops an install.
-- [ ] **AC4** — `DOTFILES_SKIP_PI_PACKAGES` skips loudly and exits 0 before any probe. A missing pi or npm is a warning with exit 0.
-- [ ] **AC5** (PR-B) — A declared `retire` path is moved under `~/.pi/agent/archive/` with its contents intact and is never deleted, and a second run moves nothing.
-- [ ] **AC6** (PR-B) — The doctor check FAILs on a fixture that declares a package whose `requires` does not resolve, and PASSes on the shipped manifest.
-- [ ] **AC7** — Both setup twins call `dotf pi packages apply`, and neither carries the reconcile loop any more. The CI path filter that selects the pi job covers `cli/internal/pi/**` as well as the manifest and both twins.
-- [ ] **AC8** (live, msi) — After `apply`: `jq '.packages' ~/.pi/agent/settings.json | grep -c pi-memory` is `0`, `~/.pi/agent/memory` is under `~/.pi/agent/archive/`, a fresh `pi` session registers no `memory_*` tool (by consequence: `printf '{"type":"get_state"}\n' | pi --mode rpc --no-session | grep -c memory_search` gives `0`; it gives `1` while pi-memory is installed, from its startup notice that `memory_search requires qmd`), and a second `apply` reports `changed=0`.
+- [x] **AC1** — `apply` installs a declared missing entry and removes an undeclared live one, through `pi install` and `pi remove` only, and a second run reports `changed=0` with no call to pi. Tested against a fake pi that edits a real `settings.json`.
+- [x] **AC2** — `check` exits non-zero naming each missing and undeclared entry, and exits non-zero on an unreadable or empty manifest.
+- [x] **AC3** — Every install and removal logs its elapsed time. A failed or slow one prints its captured output inside a fence, and the threshold never stops an install.
+- [x] **AC4** — `DOTFILES_SKIP_PI_PACKAGES` skips loudly and exits 0 before any probe. A missing pi or npm is a warning with exit 0.
+- [x] **AC5** (PR-B) — A declared `retire` path is moved under `~/.pi/agent/archive/` with its contents intact and is never deleted, and a second run moves nothing.
+- [x] **AC6** (PR-B) — The doctor check FAILs on a fixture that declares a package whose `requires` does not resolve, and PASSes on the shipped manifest.
+- [x] **AC7** — Both setup twins call `dotf pi packages apply`, and neither carries the reconcile loop any more. The CI path filter that selects the pi job covers `cli/internal/pi/**` as well as the manifest and both twins.
+- [x] **AC8** (live, msi) — After `apply`: `jq '.packages' ~/.pi/agent/settings.json | grep -c pi-memory` is `0`, `~/.pi/agent/memory` is under `~/.pi/agent/archive/`, a fresh `pi` session registers no `memory_*` tool (by consequence: `printf '{"type":"get_state"}\n' | pi --mode rpc --no-session | grep -c memory_search` gives `0`; it gives `1` while pi-memory is installed, from its startup notice that `memory_search requires qmd`), and a second `apply` reports `changed=0`.
 
 ## References
 

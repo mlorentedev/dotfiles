@@ -126,8 +126,8 @@ var journalFile = regexp.MustCompile(`^\s*(?:>\s*)?Journal:.*?\d{4}-\d{2}-\d{2}-
 
 // journalAgents are the agents that write journals: every one the vault's
 // journal names held on 2026-09-25 (claude, pi, antigravity, agy, copilot) and
-// the harness's other targets. No project name contains one, so the first
-// match after the date is the writer, ahead of the thread's words. An agent
+// the harness's other targets. journalWriter skips the project's first word,
+// so its first match is the writer, ahead of the thread's words. An agent
 // missing here reads as unknown, and an unknown writer's block is replaced as it
 // always was.
 var journalAgents = map[string]bool{
@@ -140,7 +140,10 @@ func journalWriter(line, self string) string {
 	if m == nil {
 		return ""
 	}
-	for _, word := range strings.Split(m[1], "-") {
+	// The first word is the project's, never the writer's: JournalName always
+	// leads with it. A project with an agent word AFTER its first segment
+	// (say `my-pi-app`) would still be misread; none exists today.
+	for _, word := range strings.Split(m[1], "-")[1:] {
 		if word == self || journalAgents[word] {
 			return word
 		}

@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-088-handoff-threads"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#1278"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -49,9 +49,14 @@ journal" is derivable from the working directory. `dotf mem thread` prints both.
 
 ## Out of scope
 
-- **A lock file, a daemon, per-session directories.** The shared surfaces are a
-  short knowable list, and one command owning each write is cheaper and more
-  honest than a scheme. The list is written into the skill.
+- **A daemon, per-session directories.** The shared surfaces are a short
+  knowable list, and one command owning each write is cheaper and more honest
+  than a scheme. The list is written into the skill.
+- ~~A lock file.~~ **Reversed 2026-10-01 (#1884, owner decision).** The round-1
+  review measured that one command owning the write still loses a thread when
+  two runs overlap: 58 of 240 writes with 4 writers started together. The
+  command now holds a kernel-released lock (`cli/internal/filelock`) across read,
+  compute and rename. See AC9.
 - **Migrating the existing `-2`/`-3` journals.** They are append-only history;
   renaming them would rewrite a record to match a convention that postdates it.
 
@@ -84,9 +89,18 @@ journal" is derivable from the working directory. `dotf mem thread` prints both.
 - [x] **AC6** — the thread key resolves from any subdirectory of a worktree.
 - [x] **AC7** — a journal filename is derivable from the working directory and
       distinct per worktree.
-- [ ] **AC8** — `dotf doctor` reports a handoff section that lost a thread whose
-      worktree still exists. **Not built** — see Out of scope reasoning above;
-      recorded so it is visible rather than forgotten.
+- [x] **AC8** — ~~`dotf doctor` reports a handoff section that lost a thread whose
+      worktree still exists.~~ **Declined at archive time, tracked as #1881.** It
+      was never built: AC1-AC7 remove the clobber for every writer that goes
+      through `dotf mem handoff-write`, and a doctor check for writers that do not
+      is a separate, read-only feature with its own design.
+- [x] **AC9** — concurrent `handoff-write` runs on one `MEMORY.md` lose no
+      thread: N writers started together all land, and two paths to the same
+      file (the vault path and the symlink under `~/.claude/projects/`) wait on
+      one lock. A lock its holder never frees is reported after a bounded wait,
+      naming the path, never waited on forever.
+- [x] **AC10** — a journal named for a project whose name is an agent word
+      (`pi`, `codex`) is attributed to its real writer, not to the project.
 
 ## References
 

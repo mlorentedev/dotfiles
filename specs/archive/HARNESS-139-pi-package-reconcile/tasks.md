@@ -46,17 +46,17 @@ created: "2026-09-25"
 
 ### Live (msi)
 
-- [ ] [AC8] Peers told first; `check` and `apply --dry-run` recorded in the PR; the first real `apply` agreed with the owner
+- [x] [AC8] Peers told first; `check` and `apply --dry-run` recorded in the PR; the first real `apply` agreed with the owner. The first real `apply` ran from the owner's `setup-linux.sh` on 2026-09-28 (`~/.pi/agent/archive/memory-20260928`). No record shows the peers were told first; `check` and `apply --dry-run` are recorded after the fact in `verification.md`
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 
