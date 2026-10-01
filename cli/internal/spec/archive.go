@@ -366,7 +366,7 @@ func runPreflights(repoRoot, id, specDir string, opts ArchiveOptions) ([]string,
 		}
 		overrode = append(overrode, fmt.Sprintf("%d unresolved draft tag(s)", len(tags)))
 	}
-	
+
 	isFastTrack := false
 	if _, err := os.Stat(filepath.Join(specDir, "spec.md")); err == nil {
 		isFastTrack = true
