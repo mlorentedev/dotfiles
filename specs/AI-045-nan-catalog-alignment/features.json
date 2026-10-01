@@ -37,14 +37,14 @@
   {
     "id": "AI-045-nan-catalog-alignment-f6",
     "behavior": "AC6: PR-Agent streams its NaN calls, pinned by a test",
-    "verification": "echo 'pending: #1858' && exit 1",
+    "verification": "bats tests/pr-agent-config.bats -f 'every attempt streams its NaN calls' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f7",
     "behavior": "AC7: PR-Agent's total wait is below the job timeout, asserted by a test",
-    "verification": "echo 'pending: #1859' && exit 1",
+    "verification": "bats tests/pr-agent-config.bats -f 'the job outlives both attempts' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
@@ -52,6 +52,20 @@
     "id": "AI-045-nan-catalog-alignment-f8",
     "behavior": "AC8: a daily canary probes every bound NaN model and reports the dead ones in one issue",
     "verification": "echo 'pending: #1860' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f9",
+    "behavior": "AC9: after both NaN attempts fail, PR-Agent reviews once more on a provider outside NaN, gated on its credential",
+    "verification": "echo 'pending: #1923 option 1, blocked on the owner' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f10",
+    "behavior": "AC10: reviews queue one at a time across the repository, and none is dropped",
+    "verification": "bats tests/pr-agent-config.bats -f 'reviews queue one at a time' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   }

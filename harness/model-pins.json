@@ -43,6 +43,16 @@
     "                              map's completeness, filed as #1253.",
     "  cli/internal/agent/backends.go  Go rather than JSON on purpose.",
     "  HIVE_EMBED_BASE_URL         an endpoint, not a model id (#1231).",
+    "  ai/agy/settings.json        `modelConfigs.defaultModel` is not read by agy: the",
+    "                              binary carries no `modelConfigs` string, and its log",
+    "                              resolves `model` instead. Recorded under `excluded`.",
+    "  $HOME/.gemini/antigravity-cli/settings.json, $HOME/.claude/settings.json,",
+    "  $HOME/.copilot/settings.json  the deployed copies of three repo sites below.",
+    "                              Not declared yet: agy's picker rewrites `model` at",
+    "                              runtime (measured 2026-10-01 at `Gemini 3.8 Flash",
+    "                              (High)`, which the map does not route), so declaring",
+    "                              it would fail doctor on a choice the user made in",
+    "                              the UI. That is a routing decision, not a registry one.",
     "",
     "Fields:",
     "  file      repo-relative path, or a `$HOME`-rooted one for a deployed file",
@@ -51,19 +61,40 @@
     "            state, checkable only by dotf doctor — CI never sees a machine).",
     "  pins      each routing pin: how to find it and how to normalize it.",
     "    id      stable name for the pin, used in diagnostics.",
-    "    kind    `json-path` (top-level key, or `key[]` for a string array),",
-    "            `toml-key`, `regex` (exactly one match) or `regex-all` (every",
+    "    kind    `json-path` (dotted object keys, `*` for every key at one",
+    "            level, `[]` at the end for a string array), `toml-key` (`key`,",
+    "            or `key[]` for a list), `regex` (exactly one match) or `regex-all` (every",
     "            match must resolve). Both regex kinds need exactly one capture",
     "            group, and both ERROR when the locator matches nothing: a",
     "            pattern that has rotted reports zero values, and zero values",
     "            check clean.",
     "    locator the path/key/pattern that extracts the raw value.",
     "    prefix  the site's provider prefix, stripped and replaced by `pool`.",
-    "            An empty string means the site writes a bare id.",
+    "            An empty string means the site writes a bare id. REQUIRED when",
+    "            declared: a value without it fails as misspelled rather than",
+    "            resolving (round-1 finding 4).",
+    "    suffix  a trailing spelling the site adds, required the same way",
+    "            (`[1m]`, Claude Code's 1M-context form of an alias).",
+    "    spelling  `display-name` when the site writes a picker label rather",
+    "            than an id (`Gemini 3.7 Flash (High)` is `gemini-3.7-flash-high`).",
+    "    catalog `true` for a picker list: checked only for ids that cannot",
+    "            resolve at all, never for being a superset of the map. Declared,",
+    "            not inferred from `[]`: `fallback_models` is a list AND routing.",
     "    pool    the model-map pool the normalized id must resolve in.",
-    "  why       what this pin decides. A pin nobody can justify is one to delete."
+    "  why       what this pin decides. A pin nobody can justify is one to delete.",
+    "",
+    "excluded    routing-shaped keys that are deliberately not pins, each with a",
+    "            why. The coverage sweep in model_pins_coverage_test.go reads every",
+    "            routing-shaped key under ai/ and fails on one that is neither."
   ],
   "version": 1,
+  "excluded": [
+    {
+      "file": "ai/agy/settings.json",
+      "locator": "modelConfigs.defaultModel",
+      "why": "Not read by agy. Measured 2026-10-01: the agy binary carries no `modelConfigs` string, its log resolves the top-level `model`, and `gemini-3.7-flash` is not an id `agy models` lists. A leftover of the gemini-cli schema; ai/agy/AGY.md still calls it the source of truth."
+    }
+  ],
   "sites": [
     {
       "file": "ai/pi/settings.json",
@@ -76,7 +107,7 @@
           "locator": "defaultModel",
           "prefix": "",
           "pool": "nan",
-          "why": "Deliberately `qwen3.6` (the low tier) rather than the mid tier's deepseek-v4-flash: it is the latency-optimised daily driver for interactive use. The divergence from `tiers.mid` is intentional, which is exactly what #902 asked to be declared rather than rediscovered."
+          "why": "`deepseek-v4-flash`, the map's `tiers.mid.nan`, so it no longer diverges from the map. It was `qwen3.6` until #1255 and `qwen3.8-flash` until #1471 moved it here on 2026-09-04, in a change about subagent dispatch that recorded no reason for the model."
         }
       ]
     },
@@ -99,6 +130,7 @@
           "locator": "enabledModels[]",
           "prefix": "nan/",
           "pool": "nan",
+          "catalog": true,
           "why": "The picker catalog. Checked ONLY for ids that cannot resolve at all (a dead dated stamp, a retired provider) — never for being a superset of the map, which is what #1244 makes legitimate."
         }
       ]
@@ -123,6 +155,14 @@
           "prefix": "openai/",
           "pool": "nan",
           "why": "The cheap model for mechanical sub-tasks."
+        },
+        {
+          "id": "pr-agent-fallbacks",
+          "kind": "toml-key",
+          "locator": "fallback_models[]",
+          "prefix": "openai/",
+          "pool": "nan",
+          "why": "The model that reviews a PR when the primary is exhausted or dead. A list and routing at once: every entry decides who reviews, so every entry must resolve (round-1 finding 2)."
         }
       ]
     },
@@ -138,6 +178,85 @@
           "prefix": "nan/",
           "pool": "nan",
           "why": "The model `oc` opens on."
+        },
+        {
+          "id": "opencode-small-model",
+          "kind": "json-path",
+          "locator": "small_model",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "Session titles and other light calls, on every session."
+        },
+        {
+          "id": "opencode-provider-model",
+          "kind": "json-path",
+          "locator": "provider.nan.options.model",
+          "prefix": "",
+          "pool": "nan",
+          "why": "The NaN provider's own default, sent when a request names no model."
+        },
+        {
+          "id": "opencode-agent-models",
+          "kind": "json-path",
+          "locator": "agent.*.model",
+          "prefix": "nan/",
+          "pool": "nan",
+          "why": "Each agent override's model (`plan` today). A wildcard, so an agent added later is checked without a registry edit; one that sets no model inherits the default and is skipped."
+        }
+      ]
+    },
+    {
+      "file": "ai/claude/settings.json",
+      "scope": "repo",
+      "why": "Claude Code's main and advisor models, deployed to ~/.claude/settings.json.",
+      "pins": [
+        {
+          "id": "claude-model",
+          "kind": "json-path",
+          "locator": "model",
+          "prefix": "",
+          "suffix": "[1m]",
+          "pool": "claude",
+          "why": "The model every Claude Code session opens on. `opus[1m]` is the opus alias with the 1M-token context window; the map routes the alias, so the suffix is spelling."
+        },
+        {
+          "id": "claude-advisor-model",
+          "kind": "json-path",
+          "locator": "advisorModel",
+          "prefix": "",
+          "pool": "claude",
+          "why": "The reviewer model the advisor tool consults. Routed as `services.advisor`: a role pinned to one model, which no tier describes."
+        }
+      ]
+    },
+    {
+      "file": "ai/copilot/settings.json",
+      "scope": "repo",
+      "why": "Copilot CLI's default, deployed to ~/.copilot/settings.json.",
+      "pins": [
+        {
+          "id": "copilot-model",
+          "kind": "json-path",
+          "locator": "model",
+          "prefix": "",
+          "pool": "copilot",
+          "why": "The model a Copilot CLI session opens on: the seat default, `tiers.mid.copilot`."
+        }
+      ]
+    },
+    {
+      "file": "ai/agy/settings.json",
+      "scope": "repo",
+      "why": "agy's seed settings, merged into ~/.gemini/antigravity-cli/settings.json. agy owns the keys it writes there (#1414), so this is the value a fresh machine starts on.",
+      "pins": [
+        {
+          "id": "agy-model",
+          "kind": "json-path",
+          "locator": "model",
+          "prefix": "",
+          "spelling": "display-name",
+          "pool": "gemini",
+          "why": "The model agy resolves at start (its log reads `Resolving model Gemini 3.8 Flash (High)`, the deployed value). Written as the picker label, so the rule is declared: `Gemini 3.7 Flash (High)` is `gemini-3.7-flash-high`."
         }
       ]
     },

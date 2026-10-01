@@ -138,6 +138,17 @@ jobs:
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
         && startsWith(github.event.comment.body, '/'))
     runs-on: ubuntu-latest
+    # One review at a time in this repository (AI-045 AC10, #1923). NaN limits
+    # concurrency per model and per key, shared with pi, qq, hive and the archive
+    # gate; parallel PRs reviewed together exhaust the bucket each one needs. On
+    # the job, because the workflow-level group above is per PR and cancels in
+    # progress, which GitHub refuses beside `queue: max`. Without `queue: max` a
+    # group keeps one pending job and a newer one cancels it, so a third PR
+    # would lose its review without the publish guard ever running.
+    concurrency:
+      group: pr-agent-review-${{ github.repository }}
+      cancel-in-progress: false
+      queue: max
     # Both PR-Agent attempts (12 + 12) plus setup; see #1913.
     timeout-minutes: 27
     steps:
@@ -321,6 +332,19 @@ jobs:
           CONFIG__MODEL: ${{ steps.models.outputs.model }}
           CONFIG__FALLBACK_MODELS: ${{ steps.models.outputs.fallbacks }}
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          # AI-045 AC6 (#1858, #1923): stream every NaN call. Non-streamed, NaN's edge
+          # cuts the answer at about 125 s, and a request it holds open sits silent
+          # past `ai_timeout`, which bounds the gap between reads rather than the
+          # call (run 36826726168: 12 minutes, no retry logged). Streamed, the same
+          # timeout measures the gap between chunks. PR-Agent forces streaming only
+          # when both halves match: the request's provider and a substring of its
+          # base URL. Setting the provider explicitly is what makes the first half
+          # true; LiteLLM strips the matching `openai/` prefix from the model id.
+          # Here and not in `.pr_agent.toml`, which PR-Agent reads from the default
+          # branch, so the PR introducing it would not stream.
+          LITELLM__CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
           # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
           # the entries whose `consumers` list this repo, so the reviewer holds
           # one credential rather than an ambient set — the failure surface stays
@@ -408,6 +432,9 @@ jobs:
           CONFIG__MODEL: ${{ steps.models.outputs.retry_model }}
           CONFIG__FALLBACK_MODELS: '[]'
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          LITELLM__CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
           github_action_config.handle_push_trigger: "true"

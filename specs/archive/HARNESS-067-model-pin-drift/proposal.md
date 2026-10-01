@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-067-model-pin-drift"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-27"
 issue: "mlorentedev/dotfiles#902"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -96,22 +96,40 @@ established:
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `harness/model-pins.json` declares every routing pin site, each
-      with its normalization rule and a non-empty `why`, and is schema-validated.
-- [ ] **AC2** — every routing pin in a committed file resolves to a pool/model
-      the map declares, proven by a test that runs in CI.
-- [ ] **AC3** — the guard is shown to **fail** on an injected bad pin, so it
+- [x] **AC1** — `harness/model-pins.json` declares every routing pin site, each
+      with its normalization rule and a non-empty `why`, and the Go loader
+      rejects a malformed registry. *(Reworded 2026-10-01, round-1 finding 7:
+      "schema-validated" overstated it. No `model-pins.schema.json` exists, by
+      the owner's decision on #902: the loader already validates the structure,
+      and a schema would be a second source of truth.)*
+- [x] **AC2** — every routing pin in a committed file resolves to a pool/model
+      the map declares, proven by a test that runs in CI. "Every" is checked
+      from outside the registry by AC9, not taken from the registry's own list.
+- [x] **AC3** — the guard is shown to **fail** on an injected bad pin, so it
       cannot pass vacuously.
-- [ ] **AC4** — a catalog entry absent from the map is **not** reported as drift
+- [x] **AC4** — a catalog entry absent from the map is **not** reported as drift
       (`qwen3.8-flash`, `glm5.3-flash`), and the test asserts that explicitly.
-- [ ] **AC5** — `dotf doctor` reports a deployed routing pin that no longer
+- [x] **AC5** — `dotf doctor` reports a deployed routing pin that no longer
       resolves, demonstrated against the live `nan/deepseek-v4-flash-0731`.
-- [ ] **AC6** — the deployed check reports a pin naming a retired provider
+- [x] **AC6** — the deployed check reports a pin naming a retired provider
       (`openrouter/*`), distinctly from an unresolvable model id.
-- [ ] **AC7** — an unreadable or malformed registry fails loudly and is never
+- [x] **AC7** — an unreadable or malformed registry fails loudly and is never
       read as "no pin sites declared" (constraint C15).
-- [ ] **AC8** — the doctor check performs no writes, asserted rather than
+- [x] **AC8** — the doctor check performs no writes, asserted rather than
       assumed.
+
+Added 2026-10-01 for the round-1 findings (#902, owner decision: path (a)):
+
+- [x] **AC9** — every routing-shaped key under `ai/` (JSON, any depth) and every
+      model key in a TOML pin site is a declared pin, or sits in the registry's
+      `excluded` list with a `why` (finding 1, finding 2).
+- [x] **AC10** — every declared pin, derived from the registry, rejects a dead id
+      written in its own spelling (finding 2).
+- [x] **AC11** — a declared prefix or suffix is required, not trimmed when
+      present, and agy's picker label normalizes to the id `agy models` lists
+      (finding 4, and the precondition for finding 1).
+- [x] **AC12** — in `dotf doctor` a deployed locator that matches nothing fails,
+      and the run makes no "all resolve" claim (finding 6).
 
 ## References
 

@@ -76,51 +76,17 @@ func checkModelPins(sys *System, cfg *Config, rep *Report) {
 			raw, err := harness.Extract(p, content)
 			if err != nil {
 				// A locator that stopped matching reports zero values, and zero
-				// values look exactly like zero drift. Say which one it is.
-				rep.Warn(fmt.Sprintf("%s: %v", site.File, err))
+				// values look exactly like zero drift. It fails, as the repo half
+				// does, and counts as a finding so the run makes no clean claim
+				// (round-1 finding 6: WARN here, then "all resolve" below).
+				findings++
+				rep.Fail(fmt.Sprintf("%s: %v\n    The guard is inspecting less than it declares; fix the locator or the file.", site.File, err))
 				continue
 			}
-			isCatalog := strings.HasSuffix(p.Locator, "[]")
 			for _, v := range raw {
 				values++
-				switch harness.Check(p, v, qualified, bare) {
-				case harness.VerdictOK:
-				case harness.VerdictWrongPool:
+				if reportPinValue(rep, site.File, p, v, qualified, bare) {
 					findings++
-					rep.Warn(fmt.Sprintf("%s %s: %q is a model the map knows, but not under pool %q",
-						site.File, p.ID, v, p.Pool))
-				case harness.VerdictUnknown:
-					if isCatalog {
-						// A CATALOG entry the map does not route is normally
-						// legitimate — that is #1244's whole point, and
-						// `nan/gemma4` is a live NaN model nobody routes. So an
-						// unrouted catalog id is not reported. Only two shapes
-						// are, because only these two mean something is WRONG
-						// rather than merely unrouted.
-						if retired := retiredProvider(v); retired != "" {
-							findings++
-							rep.Warn(fmt.Sprintf("%s %s: %q names %q, a provider this repository retired\n    Catalog entry: a stale picker row, not a broken default.",
-								site.File, p.ID, v, retired))
-							continue
-						}
-						if base := staleSnapshotOf(v, p, bare); base != "" {
-							findings++
-							rep.Warn(fmt.Sprintf("%s %s: %q is a frozen snapshot of %q, and no longer resolves\n    Catalog entry: pi prints `No models match pattern` for it on every start.",
-								site.File, p.ID, v, base))
-						}
-						continue
-					}
-					findings++
-					// "Unrouted" and "nonexistent" are different claims: the map
-					// routes a chosen subset of what a provider serves (#1244), so
-					// the message must not read as "this model does not exist".
-					msg := fmt.Sprintf("%s %s: %q is not a model harness/model-map.json routes for pool %q\n    It may still exist at the provider. Set a routed id, or route this one in the map.",
-						site.File, p.ID, v, p.Pool)
-					if retired := retiredProvider(v); retired != "" {
-						msg = fmt.Sprintf("%s %s: %q names %q, a provider this repository retired",
-							site.File, p.ID, v, retired)
-					}
-					rep.Fail(msg + "\n    This decides what a real session runs on.")
 				}
 			}
 		}
@@ -139,6 +105,58 @@ func checkModelPins(sys *System, cfg *Config, rep *Report) {
 	if findings == 0 {
 		rep.Pass(fmt.Sprintf("%d deployed routing pins across %d files all resolve in the map", values, sites))
 	}
+}
+
+// reportPinValue reports one extracted value and says whether it was a finding.
+func reportPinValue(rep *Report, file string, p harness.Pin, v string, qualified, bare map[string]bool) bool {
+	verdict := harness.Check(p, v, qualified, bare)
+	switch {
+	case verdict == harness.VerdictOK:
+		return false
+	case verdict == harness.VerdictWrongPool:
+		rep.Warn(fmt.Sprintf("%s %s: %q is a model the map knows, but not under pool %q",
+			file, p.ID, v, p.Pool))
+		return true
+	case p.Catalog:
+		return reportCatalogValue(rep, file, p, v, bare)
+	}
+	if retired := retiredProvider(v); retired != "" {
+		rep.Fail(fmt.Sprintf("%s %s: %q names %q, a provider this repository retired\n    This decides what a real session runs on.",
+			file, p.ID, v, retired))
+		return true
+	}
+	if verdict == harness.VerdictMisspelled {
+		rep.Fail(fmt.Sprintf("%s %s: %q is not spelled %q…%q, the form this site declares\n    This decides what a real session runs on.",
+			file, p.ID, v, p.Prefix, p.Suffix))
+		return true
+	}
+	// "Unrouted" and "nonexistent" are different claims: the map routes a
+	// chosen subset of what a provider serves (#1244), so the message must not
+	// read as "this model does not exist".
+	rep.Fail(fmt.Sprintf("%s %s: %q is not a model harness/model-map.json routes for pool %q\n    It may still exist at the provider. Set a routed id, or route this one in the map.\n    This decides what a real session runs on.",
+		file, p.ID, v, p.Pool))
+	return true
+}
+
+// reportCatalogValue handles a picker entry that did not resolve.
+//
+// A CATALOG entry the map does not route is normally legitimate — that is
+// #1244's whole point, and `nan/gemma4` is a live NaN model nobody routes. So an
+// unrouted catalog id is not reported, and neither is one spelled for another
+// provider. Only two shapes are, because only these two mean something is WRONG
+// rather than merely unrouted.
+func reportCatalogValue(rep *Report, file string, p harness.Pin, v string, bare map[string]bool) bool {
+	if retired := retiredProvider(v); retired != "" {
+		rep.Warn(fmt.Sprintf("%s %s: %q names %q, a provider this repository retired\n    Catalog entry: a stale picker row, not a broken default.",
+			file, p.ID, v, retired))
+		return true
+	}
+	if base := staleSnapshotOf(v, p, bare); base != "" {
+		rep.Warn(fmt.Sprintf("%s %s: %q is a frozen snapshot of %q, and no longer resolves\n    Catalog entry: pi prints `No models match pattern` for it on every start.",
+			file, p.ID, v, base))
+		return true
+	}
+	return false
 }
 
 // staleSnapshotOf reports the declared model a catalog id is a frozen snapshot
