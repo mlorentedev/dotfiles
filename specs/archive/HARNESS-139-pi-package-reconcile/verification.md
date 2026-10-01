@@ -77,7 +77,7 @@ pi packages already reconciled (10 declared, 0 changed)   (x3, each exit 0)
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-139-pi-package-reconcile/` -> `specs/archive/HARNESS-139-pi-package-reconcile/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived` (by `dotf spec archive`)
+- [x] Folder moved: `specs/HARNESS-139-pi-package-reconcile/` -> `specs/archive/HARNESS-139-pi-package-reconcile/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1628 closes with #1919
+- [x] Promotions above executed (if any): none, every candidate is answered `no` with a reason
