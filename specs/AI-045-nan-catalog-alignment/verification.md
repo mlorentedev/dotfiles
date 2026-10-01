@@ -36,6 +36,11 @@ PR 2 (AC4-AC5), 2026-09-30:
 - TDD red: the three focused Go tests failed on the old key value (`5`), absent `ModelConcurrency`, and a schema that rejected `model_concurrency`; the focused BATS tests listed all six stale `8192` output caps, `qwen3.8-flash` at `262144`, remaining `enable_thinking`, missing pi overrides, and missing README facts.
 - After fast-forwarding to `origin/main` at `a4ef47ee`, `cd cli && go test ./internal/harness ./internal/cmd ./internal/doctor -count=1` -> PASS (`harness` 28.450s, `cmd` 80.758s, `doctor` 76.068s).
 - Git Bash: `PI_BIN=/c/Users/mlorente/scoop/apps/nodejs-lts/current/bin/pi PI_NAN_PACKAGE_REQUIRED=1 bats tests/opencode.bats tests/pi-config.bats tests/guard-pi-models-schema.bats tests/pi-nan-package.bats tests/reviewer-pool.bats` -> PASS, 79/79. The real-pi guard used pi 0.87.1; the package test installed the pinned `@gtrabanco/pi-nan-provider@0.7.0` in an isolated agent directory.
+- CI initially caught `tests/dotf-agent-run.bats` still saturating the old
+  dispatchable budget (`5 - 2 = 3`). It now holds 5 slots (`7 - 2`) before
+  asserting the chain advances. Git Bash and WSL discover the focused case but
+  skip it locally because their Python lacks `fcntl` / WSL lacks Go; CI Linux is
+  the non-skipped proof.
 - `git diff --check` -> PASS. Executable production delta is 16 added Go lines in `cli/internal/harness/model_map.go`; the remaining production changes are declarative schema/catalog/config records and documentation.
 - Draft PR: #1916.
 
