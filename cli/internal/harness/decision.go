@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -91,6 +92,20 @@ const UnscopedScope = "_unscoped"
 // writes the fail-open discipline depends on being harmless.
 const maxDecisionBytes = 1 << 20
 
+// decisionRetentionDays is how long a scope's journal outlives its last write
+// (#1536). The size cap bounds ONE scope, but every session and dispatch opens
+// a scope and never closes it, so the directory grew to 454 files and 15 MB in
+// a month. Thirty days keeps a month of decisions for the measurements that
+// read them (#1532), and bounds the directory at about a month of sessions.
+//
+// An mtime cannot tell an idle open session from a finished one. A session
+// resumed after 30 idle days therefore loses its old journal and starts a new
+// one with its next write. That loses diagnostics only: the sweep never touches
+// the consumption ledger or the dispatch map, which gate calls and hold a few KB.
+const decisionRetentionDays = 30
+
+const decisionSuffix = ".decisions.jsonl"
+
 // DecisionRecord is one gate decision, durably.
 //
 // IT CARRIES NO TOOL INPUT, and that is a security property rather than an
@@ -142,7 +157,7 @@ func DecisionPath(stateDir, scope string) string {
 	if scope == "" {
 		scope = UnscopedScope
 	}
-	return filepath.Join(stateDir, "gate", scopeKey(scope)+".decisions.jsonl")
+	return filepath.Join(stateDir, "gate", scopeKey(scope)+decisionSuffix)
 }
 
 // RecordDecision appends one decision.
@@ -196,6 +211,14 @@ func RecordDecision(path string, rec DecisionRecord) error {
 	fi, statErr := f.Stat()
 	if err := f.Close(); err != nil {
 		return err
+	}
+
+	// A size equal to the line just written means this write created the
+	// journal: a new session or dispatch. That is the one moment to sweep, and
+	// detecting it reuses the fstat above, so a tool call on an existing scope
+	// does no extra filesystem work (#1536).
+	if statErr == nil && fi.Size() == int64(len(raw)+1) {
+		sweepStaleJournals(filepath.Dir(path), time.Now())
 	}
 
 	// ROTATION HAPPENS AFTER THE WRITE, AND FROM OUR OWN FD. Doing it first —
@@ -260,4 +283,44 @@ func LoadDecisions(path string) ([]DecisionRecord, error) {
 		out = append(out, rec)
 	}
 	return out, sc.Err()
+}
+
+// sweepStaleJournals removes every journal, with its `.1` generation, whose
+// newer file is older than decisionRetentionDays.
+//
+// Age is per SCOPE, the newer of the two files, never per file. A rename keeps
+// the mtime, so a busy scope's `.1` is as old as its last rotation, and judging
+// it alone would delete the kept generation of a live scope.
+//
+// Errors are ignored, as everywhere on this path. A concurrent sweeper may
+// remove a file first (ENOENT), and Windows refuses to remove a file another
+// writer holds open. Either way the file is swept by a later new scope, and a
+// failure here must never reach the tool call.
+func sweepStaleJournals(dir string, now time.Time) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	cutoff := now.Add(-decisionRetentionDays * 24 * time.Hour)
+	newest := map[string]time.Time{}
+	for _, e := range entries {
+		name := e.Name()
+		scope := strings.TrimSuffix(name, ".1")
+		if !strings.HasSuffix(scope, decisionSuffix) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(newest[scope]) {
+			newest[scope] = info.ModTime()
+		}
+	}
+	for scope, mtime := range newest {
+		if mtime.Before(cutoff) {
+			_ = os.Remove(filepath.Join(dir, scope))
+			_ = os.Remove(filepath.Join(dir, scope+".1"))
+		}
+	}
 }
