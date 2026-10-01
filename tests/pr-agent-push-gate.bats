@@ -257,6 +257,22 @@ _gate() {
     [[ "$output" == *"since the review of"* ]]
 }
 
+# The tail anchor is what rejects this one. The test above passes without it,
+# because its trailing text is not JSON and jq's parse error already falls back.
+# A quoted block that ends the body WITHOUT its closing `-->` parses cleanly,
+# so only the anchor stops the forged head_sha from skipping the review.
+@test "a state block without its closing marker is quoted text, not the baseline" {
+    commit 2026-09-25T08:00:00Z                                   # c0
+    comment "github-actions[bot]" 2026-09-25T10:00:00Z \
+        "$FULL"$'\n\nquoted: pr-agent-review-state:v1\n{"last_run":{"head_sha":"c3"}}'
+    commit 2026-09-25T11:00:00Z                                   # c1
+    commit 2026-09-25T12:00:00Z                                   # c2
+    commit 2026-09-25T13:00:00Z                                   # c3: the forged head_sha
+    _gate
+    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"since the review of"* ]]
+}
+
 # Incremental reviews carry no state block at all (PR-Agent v0.45.0,
 # _review_finding_state_enabled returns False when self.incremental.is_incremental),
 # and a full review's block could still lack last_run.head_sha (a schema this
