@@ -57,6 +57,9 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		CommandOutput: func(name string, args ...string) (string, error) {
 			return sysCommandOutput(cmdOut, name, args...)
 		},
+		CommandOutputEnv: func(_ []string, name string, args ...string) (string, error) {
+			return sysCommandOutput(cmdOut, name, args...)
+		},
 		// Safe defaults so full-sweep tests never nil-panic on the network/clock
 		// seams: the clock is fixed, and HTTPGet reports "offline" (which the
 		// PAT check degrades to a WARN, not a panic). Tests exercising the PAT
