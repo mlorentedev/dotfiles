@@ -63,7 +63,7 @@ created: "2026-08-25"
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
 - [x] PR opened referencing this spec folder (#1922)
-- [ ] Independent adversarial review before archive (`dotf spec review`) — the
+- [x] Independent adversarial review before archive (`dotf spec review`) — the
       implementing session cannot be the reviewer
 
 ## Machine-readable features
