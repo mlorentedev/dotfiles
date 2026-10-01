@@ -45,7 +45,7 @@ created: "2026-08-27"
 - [x] [AC12] Doctor: a rotted deployed locator fails, and no pass line follows
 - [x] Finding 5: rewrite `pi-default-model`'s `why` from the file's history
 - [x] Finding 7: reword AC1 (no schema file, owner decision)
-- [ ] Round-2 independent review (the last under the two-round cap)
+- [x] Round-2 independent review (the last under the two-round cap)
 
 ## Closing
 
@@ -61,7 +61,7 @@ created: "2026-08-27"
       worktree also carries another session's uncommitted work (#1244)
 - [x] `verification.md` filled in
 - [x] PR opened referencing this spec folder (#1256)
-- [ ] Independent adversarial review before archive (`dotf spec review`) — the
+- [x] Independent adversarial review before archive (`dotf spec review`) — the
       implementing session cannot be the reviewer
 
 ## Out of this PR, recorded rather than dropped
