@@ -180,7 +180,8 @@ func resolvePersonaForTask(root, task, role, tier string, m map[string]any) (*ha
 			return nil, route{}, fmt.Errorf(
 				"no persona named %q under %s\n\n"+
 					"The roster declares: %s. A dispatch as a persona nobody declares would be a "+
-					"generic agent wearing a name, which is the state HARNESS-120 exists to end",
+					// HARNESS-120
+					"generic agent wearing a name",
 				role, filepath.Join(root, "harness", "agents"), personaNames(personas))
 		}
 	} else {

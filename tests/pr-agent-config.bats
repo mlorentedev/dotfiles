@@ -732,13 +732,16 @@ steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 pa = next(s for s in steps if 'pr-agent' in s.get('uses', ''))
 guard = next(s for s in steps if s.get('name') == 'Fail if no review was published')
 print(pa.get('id', ''))
-print(guard['env'].get('PR_AGENT_OUTCOME', ''))
-print(guard['env'].get('REVIEW_MODEL', ''))
+print(' '.join(guard['env'].get('PR_AGENT_OUTCOME', '').split()))
+print(' '.join(guard['env'].get('REVIEW_MODEL', '').split()))
 "
     [ "${lines[0]}" = "pr_agent" ]
-    [ "${lines[1]}" = '${{ steps.pr_agent.outcome }}' ]
-    [ "${lines[2]}" = '${{ steps.models.outputs.model }}' ]
-    grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \]' "$WF"
+    # The last attempt decides (#1913): the retry's outcome and model when it
+    # ran, else the first attempt's.
+    [ "${lines[1]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && steps.pr_agent_retry.outcome || steps.pr_agent.outcome }}" ]
+    [ "${lines[2]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && steps.models.outputs.retry_model || steps.models.outputs.model }}" ]
+    # A step stopped by its own timeout may end `failure` or `cancelled`.
+    grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \] || \[ "${PR_AGENT_OUTCOME:-}" = "failure" \]' "$WF"
 }
 
 # AI-045: the guard blamed every silent run on concurrency (#1107). Run
@@ -750,4 +753,75 @@ print(guard['env'].get('REVIEW_MODEL', ''))
     grep -q '#1107' "$WF"
     grep -q 'non-streamed answer.*#1858\|#1858.*non-streamed' "$WF" \
         || grep -A2 'non-streamed answer' "$WF" | grep -q '#1858'
+}
+
+# #1913: a hang on the primary blocked the PR until the job timeout (run
+# 36805617985: mimo-v2.6-flash accepted the review and never answered, and
+# `ai_timeout` does not fire on a hang, AI-045). The primary now runs under its
+# own step timeout, and an attempt that does not succeed is retried once on the
+# first fallback the preflight saw answer. Rotating the chain was rejected: it
+# would put CI back on the archive gate's model bucket (#1149).
+@test "pr-agent: a primary attempt that does not succeed is retried once on the first fallback" {
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+pa = [s for s in steps if 'pr-agent' in s.get('uses', '')]
+print(len(pa))
+first, retry = pa[0], pa[-1]
+print(first.get('id'), first.get('timeout-minutes'), first.get('continue-on-error'))
+print(retry.get('id'), retry.get('timeout-minutes'))
+print(retry['env']['CONFIG__MODEL'])
+print(retry['env']['CONFIG__FALLBACK_MODELS'])
+print(' '.join(retry['if'].split()))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "2" ]
+    [ "${lines[1]}" = "pr_agent 12 True" ]
+    [ "${lines[2]}" = "pr_agent_retry 12" ]
+    [ "${lines[3]}" = '${{ steps.models.outputs.retry_model }}' ]
+    [ "${lines[4]}" = '[]' ]
+    [[ "${lines[5]}" == *"steps.pr_agent.outcome"* ]]
+    [[ "${lines[5]}" == *"steps.models.outputs.retry_model != ''"* ]]
+    [[ "${lines[5]}" == *"!cancelled()"* ]]
+}
+
+# Run 36812454370: a merge commit from "update branch" is a push the gate does
+# not review, so the preflight was skipped and its outputs were empty. GitHub
+# evaluates a step's `env` before its `if`, so `fromJSON('')` in the retry's env
+# threw although the step would have been skipped, and the job failed. Parsing a
+# step output inside an expression fails whenever its producer is skipped; the
+# preflight emits a scalar instead.
+@test "pr-agent: no expression parses a step output with fromJSON" {
+    run grep -nE 'fromJSON\(\s*steps\.' "$WF"
+    [ "$status" -eq 1 ]
+}
+
+# The retry is the same review on another model, never a different review: one
+# pinned action, and every setting equal except the two that pick the model.
+@test "pr-agent: both attempts run the same pinned action with the same settings" {
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+first, retry = [s for s in steps if 'pr-agent' in s.get('uses', '')]
+print(first['uses'] == retry['uses'])
+picks = {'CONFIG__MODEL', 'CONFIG__FALLBACK_MODELS'}
+strip = lambda e: {k: v for k, v in e.items() if k not in picks}
+print(strip(first['env']) == strip(retry['env']))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "True" ]
+    [ "${lines[1]}" = "True" ]
+}
+
+# A job timeout shorter than both attempts would cut the retry, which is the
+# hang this replaces under another name.
+@test "pr-agent: the job outlives both attempts" {
+    run python3 -c "
+import yaml
+job = yaml.safe_load(open('$WF'))['jobs']['review']
+pa = [s for s in job['steps'] if 'pr-agent' in s.get('uses', '')]
+print(job['timeout-minutes'] >= sum(s['timeout-minutes'] for s in pa) + 3)
+"
+    [ "$status" -eq 0 ]
+    [ "$output" = "True" ]
 }

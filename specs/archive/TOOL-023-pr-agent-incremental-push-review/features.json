@@ -1,0 +1,58 @@
+[
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f1",
+    "behavior": "AC1: the push gate runs PR-Agent only at 3 or more new non-merge commits since the review PR-Agent would pick, skips bot pushes, and runs when there is no previous review or the input is unreadable",
+    "verification": "bats tests/pr-agent-push-gate.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 7c70d4d: 15 cases under bash and zsh; 9 mutations of the gate each killed"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f2",
+    "behavior": "AC2: the workflow runs the gate only on synchronize, skips PR-Agent and the guard on run=false, and pushes run exactly /review -i",
+    "verification": "bats --filter 'push' tests/pr-agent-config.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 7c70d4d: push path is /review -i, gate on synchronize only, PR-Agent and guard skip on run=false; 4 mutations killed"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f3",
+    "behavior": "AC3: the registry declares the incremental Guide heading and the guard accepts every declared marker",
+    "verification": "bats --filter 'marker' tests/pr-agent-config.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 7c70d4d: registry declares both Guide headings; the guard jq accepts any declared marker, exercised on a fixture"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f4",
+    "behavior": "AC4: ADR-040 records the decision and pr-stewardship names the draft practice",
+    "verification": "test -f docs/adr/adr-040-automatic-reviews-bounded-per-push.md && grep -q 'draft' harness/enforced/pr-stewardship.md",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-25 at 7c70d4d: ADR-040 and the draft line in pr-stewardship"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f5",
+    "behavior": "Follow-up (#1757 triage, CWE-345): the baseline is set only by a comment authored by github-actions[bot]; a marker from any other login is never trusted, and one newer than the real review forces mode=full",
+    "verification": "bats --filter 'CWE-345|forged' tests/pr-agent-push-gate.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-27: 2 cases (no-baseline forgery, newer-than-real-baseline forgery) killed under both bash and zsh"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f6",
+    "behavior": "Follow-up (#1757 triage, rebase blind spot): with a head_sha in the review's persistent state block, new commits are counted by position past it, not by author date; an absent head_sha (rebase/force-push) forces mode=full; a state block without one falls back to the date count; unreadable commits still fail open",
+    "verification": "bats --filter 'head_sha' tests/pr-agent-push-gate.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-27: 5 cases (position count above/below threshold, sha absent -> full, missing head_sha -> date fallback, unreadable commits -> fail open) killed under both bash and zsh"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f7",
+    "behavior": "Follow-up (#1757 triage): the gate outputs mode=full|incremental, and pr-agent.yml's push_commands reads it, defaulting to a full /review unless the mode is exactly incremental",
+    "verification": "bats --filter 'runs /review -i only' tests/pr-agent-config.bats && actionlint .github/workflows/pr-agent.yml",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-09-27: template validated against both branches; actionlint clean"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f8",
+    "behavior": "Archive review round 1 (#1893): the gate follows the pinned PR-Agent v0.46.0. The date fallback compares the committer date, then the author date, so a rebase counts its commits as new; a review identity is recognized in both stored forms, so a forged link-reference marker forces mode=full; and a test fails when the version the gate cites differs from the pinned tag",
+    "verification": "bats --filter 'rebase with no state block|link-reference|cites' tests/pr-agent-push-gate.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-01: 4 cases under bash and zsh, red before the fix; mutating the date basis back to author date and dropping the link-reference identity each fail 1 case"
+  }
+]

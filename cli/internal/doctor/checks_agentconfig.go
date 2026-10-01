@@ -113,7 +113,8 @@ func checkAgentConfigSecrets(sys *System, rep *Report) {
 		rep.Fail(fmt.Sprintf(
 			"%s holds a literal credential for provider(s) %s — a deployed config must "+
 				"reference the environment (\"${VAR}\"), never carry the secret; "+
-				"re-run setup to redeploy from source (BUG-081b)",
+				// BUG-081b
+				"re-run setup to redeploy from source",
 			path, strings.Join(materialised, ", ")))
 	}
 

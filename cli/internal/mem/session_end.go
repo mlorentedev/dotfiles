@@ -77,6 +77,12 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	}
 
 	memory := filepath.Join(vaultPath, "10_projects", project, "memory", "MEMORY.md")
+	unlock, err := LockHandoffMemory(memory)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+
 	content, err := os.ReadFile(memory)
 	if err != nil {
 		return "", nil // absent / unreadable MEMORY.md -> no-op

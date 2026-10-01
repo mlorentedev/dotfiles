@@ -111,7 +111,8 @@ func reportBWServeCacheAge(sys *System, rep *Report) {
 	case age < 0:
 		rep.Warn("daemon lastSync is in the future — check the system clock; cache age cannot be judged")
 	case age > bwServeStaleCache:
-		rep.Warn(fmt.Sprintf("daemon vault cache is %dd old (>%dd) — items created or rotated since resolve as missing or stale; run `dotf secrets unlock` (it syncs) (CLI-056)",
+		// CLI-056
+		rep.Warn(fmt.Sprintf("daemon vault cache is %dd old (>%dd) — items created or rotated since resolve as missing or stale; run `dotf secrets unlock` (it syncs)",
 			days, int(bwServeStaleCache.Hours()/24)))
 	default:
 		rep.Pass(fmt.Sprintf("daemon vault cache synced %dd ago", days))

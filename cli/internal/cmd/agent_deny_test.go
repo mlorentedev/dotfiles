@@ -69,8 +69,11 @@ func TestAgentRun_AnUnidentifiedMachineIsRefused(t *testing.T) {
 					t.Errorf("refusal does not name %q, so it is not actionable:\n%s", want, msg)
 				}
 			}
-			if !strings.Contains(msg, "ADR-032") {
-				t.Errorf("refusal cites no decision record, so it reads as an arbitrary rule:\n%s", msg)
+			// It also says why denial is the default; without the reason it reads
+			// as an arbitrary rule. The reason is written out, not cited by id,
+			// because the operator reading it has no access to the decision log.
+			if !strings.Contains(msg, "on purpose") {
+				t.Errorf("refusal gives no reason for denying by default, so it reads as an arbitrary rule:\n%s", msg)
 			}
 		})
 	}
