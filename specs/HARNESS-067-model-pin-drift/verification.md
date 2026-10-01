@@ -127,3 +127,141 @@ ticks them against the evidence table above. Generation for the
 pipeline-owned surfaces stays open on #902 as phase 2, so this archive does
 not close that issue.
 
+
+## Round-1 review fixes (#902, 2026-10-01)
+
+Round 1 (`nan/deepseek-v4-flash`, sha `f1c2b18`) returned FAIL; its files are
+kept byte-identical as `review-round-1.md` and `review-request-round-1.json`.
+The owner chose path (a) on #902: make "every routing pin" true. Code, tests and
+registry changes landed in `21c3a0f0`; this section and the contract edits are
+the commit after it.
+
+### Disposition of the round-1 findings
+
+| # | Finding | Disposition | Proof |
+|---|---|---|---|
+| 1 | agy, claude and copilot settings carry undeclared pins | Applied: four pins declared (`agy-model`, `claude-model`, `claude-advisor-model`, `copilot-model`). agy's `modelConfigs.defaultModel` is **excluded**, not declared: the agy binary carries no `modelConfigs` string, its log resolves the top-level `model`, and `gemini-3.7-flash` is not an id `agy models` lists | `TestEveryRoutingKeyUnderAIIsDeclared` |
+| 2 | Nested pins and `fallback_models` undeclared; a dead id passed | Applied: `opencode-small-model`, `opencode-provider-model`, `opencode-agent-models` (`agent.*.model`), `pr-agent-fallbacks`; extraction reaches dotted paths, wildcards and TOML lists | `TestEveryModelKeyInATOMLSiteIsDeclared`, `TestEveryDeclaredPinRejectsADeadID`, `TestExtractReachesNestedAndArrayPins` |
+| 3 | `cli.yml` skips the Go guard on data-only changes | Out of this spec: **#1888** (P1), wider than model pins | — |
+| 4 | `Normalize` trims an absent prefix | Applied: a declared prefix or suffix is required (`VerdictMisspelled`), and the repo guard fails on it and on any verdict it does not handle | `TestNormalizeRequiresTheDeclaredPrefix`, `TestDeclaredSuffixIsSpellingNotPartOfTheID`, and the reviewer's own mutation through `TestEveryRepoRoutingPinResolvesInTheMap` (below) |
+| 5 | `pi-default-model`'s `why` describes `qwen3.6` | Applied: rewritten from the file's history (`qwen3.6` until #1255, `qwen3.8-flash` until #1471) | data |
+| 6 | doctor prints WARN, then "all resolve" | Applied: a rotted deployed locator FAILs and counts as a finding | `TestModelPinsFailsOnARottedLocatorAndClaimsNothingClean` |
+| 7 | AC1 says "schema-validated" | Applied: AC1 reworded, no schema file (owner decision) | `proposal.md` |
+| 8 | `retiredProvider` hardcodes two providers | Declined as a gate (round 1's own disposition) | — |
+
+### Spelling decided before declaring (the precondition for finding 1)
+
+- **`opus[1m]`**: a declared `suffix: "[1m]"`, required like the prefix. The map
+  routes the `opus` alias; `[1m]` is Claude Code's 1M-context spelling of it.
+- **`Gemini 3.7 Flash (High)`**: a declared `spelling: display-name`. Measured
+  2026-10-01 with `agy models`: every gemini row maps label to id by lowercasing,
+  dropping the parentheses and joining with `-` (`Gemini 3.1 Pro (High)` is
+  `gemini-3.1-pro-high`). The rule does not hold for every row
+  (`Claude Sonnet 4.6 (Thinking)` is `claude-sonnet-4-6`), which is why a pin
+  opts in rather than the guard applying it.
+
+### Two routing additions the pins needed
+
+Both values were already in use; the map did not route them.
+
+- `tiers.mid.gemini = gemini-3.7-flash-high`, agy's interactive default.
+- `services.advisor = {pool: claude, model: fable}`, Claude Code's
+  `advisorModel`. No tier describes a role pinned to one model, and a new tier
+  would need a chain; the schema's `services` description now names it.
+
+No chain changed, so `dotf agent run` dispatch is untouched.
+
+### Catalog is declared, not inferred
+
+`fallback_models` is a list and a routing decision, so "a `[]` locator is a
+catalog" stopped holding. `pi-deployed-enabled-models` now carries
+`catalog: true`, the loader rejects `catalog` on a scalar locator, and doctor
+reads the field instead of the locator's suffix.
+
+A side effect, covered by the existing tests: a deployed catalog entry such as
+`openrouter/minimax/minimax-m3` is now `VerdictMisspelled` (it lacks `nan/`)
+rather than `VerdictUnknown`. Doctor names a retired provider before it reports
+spelling, so `TestModelPinsDistinguishesARetiredProvider` still reads "retired".
+
+### Not declared, recorded
+
+The deployed copies of the agy, claude and copilot settings stay out. The live
+`~/.gemini/antigravity-cli/settings.json` carries `Gemini 3.8 Flash (High)`,
+which agy's picker wrote and the map does not route. Declaring it would fail
+doctor on a choice made in the UI, and that is a routing decision for the
+owner, not a registry edit.
+
+### Evidence
+
+RED before the fix (the sweeps reproduce findings 1 and 2 by name; finding 6's
+contradiction verbatim):
+
+```
+--- FAIL: TestEveryRoutingKeyUnderAIIsDeclared
+    ai/agy/settings.json: "model" is a routing-shaped key that no pin in harness/model-pins.json locates.
+    ai/agy/settings.json: "modelConfigs.defaultModel" is a routing-shaped key ...
+    ai/claude/settings.json: "advisorModel" ...      ai/claude/settings.json: "model" ...
+    ai/copilot/settings.json: "model" ...            ai/opencode/opencode.jsonc: "agent.plan.model" ...
+    ai/opencode/opencode.jsonc: "provider.nan.options.model" ...   ai/opencode/opencode.jsonc: "small_model" ...
+--- FAIL: TestEveryModelKeyInATOMLSiteIsDeclared
+    .pr_agent.toml: "fallback_models" carries a model id that no pin locates
+--- FAIL: TestNormalizeRequiresTheDeclaredPrefix
+    "mimo-v2.6-flash" dropped the declared prefix "openai/" and came back 0, want VerdictMisspelled
+--- FAIL: TestModelPinsFailsOnARottedLocatorAndClaimsNothingClean
+  [WARN] $HOME/.pi/agent/settings.json: pin "pi-deployed-default-model": key "defaultModel" not present — the file changed shape
+  [ OK ] 1 deployed routing pins across 1 files all resolve in the map
+```
+
+Finding 4 re-run the way the reviewer ran it: `.pr_agent.toml`'s
+`model = "openai/mimo-v2.6-flash"` edited to `model = "mimo-v2.6-flash"`, then
+restored with `git checkout`. A first cut taught `Check` the new verdict but
+left the guard's switch without a case for it, and the mutation still passed:
+
+```
+--- PASS: TestEveryRepoRoutingPinResolvesInTheMap
+    resolved 18 routing pins across 9 repo files
+```
+
+With the case added, and a `default` that fails on any verdict the switch does
+not know:
+
+```
+--- FAIL: TestEveryRepoRoutingPinResolvesInTheMap
+    .pr_agent.toml pin "pr-agent-primary": "mimo-v2.6-flash" is not spelled "openai/"…"", the form this site declares
+```
+
+The map additions are load-bearing. With `harness/model-map.json` reverted to
+`HEAD~1` and everything else kept:
+
+```
+--- FAIL: TestEveryRepoRoutingPinResolvesInTheMap
+    ai/claude/settings.json pin "claude-advisor-model": "fable" normalizes to "claude:fable", which harness/model-map.json does not declare
+    ai/agy/settings.json pin "agy-model": "Gemini 3.7 Flash (High)" normalizes to "gemini:gemini-3.7-flash-high", which harness/model-map.json does not declare
+```
+
+GREEN at `21c3a0f0`:
+
+```
+$ cd cli && go test ./internal/harness/ ./internal/doctor/ -run '<the nine tests above>' -v -count=1
+--- PASS: TestEveryRoutingKeyUnderAIIsDeclared
+--- PASS: TestEveryModelKeyInATOMLSiteIsDeclared
+--- PASS: TestEveryDeclaredPinRejectsADeadID        (19 subtests, one per declared pin)
+    resolved 18 routing pins across 9 repo files
+--- PASS: TestEveryRepoRoutingPinResolvesInTheMap
+--- PASS: TestNormalizeRequiresTheDeclaredPrefix
+--- PASS: TestDeclaredSuffixIsSpellingNotPartOfTheID
+--- PASS: TestDisplayNameSpellingMatchesTheAgyCatalog
+--- PASS: TestExtractReachesNestedAndArrayPins
+--- PASS: TestModelPinsFailsOnARottedLocatorAndClaimsNothingClean
+ok  github.com/mlorentedev/dotfiles/cli/internal/harness
+ok  github.com/mlorentedev/dotfiles/cli/internal/doctor
+
+$ go build ./... && go vet ./...            # exit 0
+$ go test ./...                             # exit 0, 27 packages ok
+$ GOOS=windows go vet ./...                 # exit 0
+$ golangci-lint run                         # 2.12.2 (the pin), 0 issues
+$ bats tests/model-map.bats tests/triggers-registry.bats \
+       tests/compile-harness-real.bats tests/compile-harness.bats   # exit 0, 105 ok
+```
+
+Round 1 measured 10 pins across 6 repo files; there are now 18 across 9.

@@ -23,6 +23,30 @@ created: "2026-08-27"
 - [x] [AC4] Narrow the catalog rule after a live run reported `nan/gemma4` — an
       unrouted catalog model is not drift; a dated snapshot of a routed one is
 
+## Round-1 review fixes (#902, 2026-10-01)
+
+- [x] [AC11] Spelling before declaration: a declared `prefix`/`suffix` is
+      required (`VerdictMisspelled`), `suffix` covers `opus[1m]`, and
+      `spelling: display-name` covers agy's `Gemini 3.7 Flash (High)`, measured
+      against `agy models`
+- [x] [AC9] Declare `ai/claude/settings.json` (`model`, `advisorModel`),
+      `ai/copilot/settings.json` (`model`) and `ai/agy/settings.json` (`model`);
+      exclude agy's `modelConfigs.defaultModel`, which agy never reads
+- [x] [AC9] [AC11] Nested and list extraction: dotted `json-path` with `*`,
+      `toml-key` lists; declare opencode `small_model`,
+      `provider.nan.options.model`, `agent.*.model` and `.pr_agent.toml`
+      `fallback_models`
+- [x] [AC4] Declare a catalog on the pin (`catalog: true`) instead of inferring
+      it from `[]`, since `fallback_models` is a list and routing at once
+- [x] [AC2] Route the two ids the new pins needed: `tiers.mid.gemini =
+      gemini-3.7-flash-high` and `services.advisor = claude:fable`; no chain
+      changes
+- [x] [AC9] [AC10] Sweep tests and the per-pin dead-id injection test
+- [x] [AC12] Doctor: a rotted deployed locator fails, and no pass line follows
+- [x] Finding 5: rewrite `pi-default-model`'s `why` from the file's history
+- [x] Finding 7: reword AC1 (no schema file, owner decision)
+- [ ] Round-2 independent review (the last under the two-round cap)
+
 ## Closing
 
 - [x] Every acceptance criterion is covered by at least one test or a recorded
