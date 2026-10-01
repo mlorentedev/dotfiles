@@ -145,3 +145,17 @@ Verdict FAIL (`nan/qwen3.8-flash`). The spec text still declares removal out of 
 | Unnumbered Minor SPECULATIVE: `Identity()` and dist-tags or paths | Declined. The CI pin guard admits only `npm:<name>@<semver>`, so the case cannot reach the parser. |
 | F-06 Minor REAL: `ai/pi/README.md` says install-only | Applied: both README sentences name the removal |
 | Question: `features.json` all `pending` | The harness writes `passing`; the commands were run by hand and exit 0 |
+
+## Round-2 review (2026-10-01)
+
+The contract was amended to the bidirectional reconcile the owner accepted on 2026-10-01 (F-01). AC12 was added for removal, and f2 now runs the named bats test (F-04). Verdict: PASS-WITH-GAPS (`nan/glm5.3-flash` on `fb88359c`), with no Blocker and no REAL Major.
+
+| Finding | Disposition |
+|---|---|
+| Minor REAL: Windows twin has no `dotf.exe` fallback | Ticketed: #1925 (round-1 F-02) |
+| Minor REAL: `LiveSources` drops an unknown entry shape | Ticketed: #1926 (round-1 F-05) |
+| Minor REAL: `tasks.md` shellcheck count 20, now 15 | Recorded: a historical count from a different shellcheck version. The binding half (nothing in the new block) still holds. |
+| Minor REAL: `tasks.md` says nine entries, the manifest has ten | Recorded: historical. `proposal.md` says ten, and the guards bind on pinned, unique and `why`, not on a count. |
+| Question: Windows passes no `--pi` | Folded into #1925 (comment there) |
+
+Promotion candidates stand as answered above.
