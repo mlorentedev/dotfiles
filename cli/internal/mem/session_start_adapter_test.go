@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,6 +30,112 @@ func TestClaudeEnvelope(t *testing.T) {
 		// escaped, this exact substring would not appear.
 		if !strings.Contains(got, "cp <newest-backup> & retry > log") {
 			t.Errorf("literal <>& not preserved (HTML-escaped, diverges from jq): %q", got)
+		}
+	})
+}
+
+func TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory(t *testing.T) {
+	parent := t.TempDir()
+	mainRepo := filepath.Join(parent, "dotfiles")
+	worktree := filepath.Join(parent, "dotfiles-wt-feature")
+	mustMkdirAll(t, filepath.Join(mainRepo, ".git", "worktrees", "feature"))
+	mustMkdirAll(t, filepath.Join(worktree, "cli"))
+	mustWrite(t, filepath.Join(worktree, ".git"),
+		"gitdir: "+filepath.Join(mainRepo, ".git", "worktrees", "feature")+"\n")
+	mustWrite(t, filepath.Join(worktree, "specs", "FOO-1", "proposal.md"), "[AGENT-DRAFT] todo\n")
+	lessons := filepath.Join(worktree, "docs", "lessons.md")
+	mustWrite(t, lessons, "old\n")
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	if err := os.Chtimes(lessons, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	vault := t.TempDir()
+	mustMkdirAll(t, filepath.Join(vault, "10_projects", "dotfiles"))
+	for _, cwd := range []string{worktree, filepath.Join(worktree, "cli")} {
+		ctx := ClaudeContext(ClaudeContextInput{
+			Cwd: cwd, Vault: vault, ScriptsDir: filepath.Join(t.TempDir(), "absent"),
+			Home: t.TempDir(), Now: time.Now(),
+			TriageQueue: func() (string, error) { return "#1085", nil },
+		})
+		for _, want := range []string{
+			"[hive] Project 'dotfiles'",
+			"[specs] 1 active",
+			"[lessons] docs/lessons.md not updated",
+			"[pr-triage]",
+		} {
+			if !strings.Contains(ctx, want) {
+				t.Errorf("cwd %s: context missing %q\n%s", cwd, want, ctx)
+			}
+		}
+	}
+}
+
+func TestClaudeContextRecognizesSymlinkToCheckoutSubdirectory(t *testing.T) {
+	parent := t.TempDir()
+	repo := filepath.Join(parent, "dotfiles")
+	mustMkdirAll(t, filepath.Join(repo, ".git"))
+	mustMkdirAll(t, filepath.Join(repo, "cli"))
+	link := filepath.Join(t.TempDir(), "checkout-subdir")
+	if err := os.Symlink(filepath.Join(repo, "cli"), link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	vault := t.TempDir()
+	mustMkdirAll(t, filepath.Join(vault, "10_projects", "dotfiles"))
+
+	ctx := ClaudeContext(ClaudeContextInput{
+		Cwd: link, Vault: vault, ScriptsDir: filepath.Join(t.TempDir(), "absent"),
+		Home: t.TempDir(), Now: time.Now(),
+	})
+	if !strings.Contains(ctx, "[hive] Project 'dotfiles'") {
+		t.Fatalf("symlinked checkout subdirectory lost project context:\n%s", ctx)
+	}
+}
+
+func TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers(t *testing.T) {
+	t.Run("submodule", func(t *testing.T) {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join("..", "super", ".git", "modules", "libs", "child")+"\n")
+		if got := checkoutProjectName(root); got != "child" {
+			t.Fatalf("project = %q, want child", got)
+		}
+	})
+
+	t.Run("submodule worktree", func(t *testing.T) {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join("..", "super", ".git", "modules", "libs", "child", "worktrees", "feature")+"\n")
+		if got := checkoutProjectName(root); got != "child" {
+			t.Fatalf("project = %q, want child", got)
+		}
+	})
+
+	t.Run("ordinary worktree below a parent named modules", func(t *testing.T) {
+		parent := filepath.Join(t.TempDir(), "modules", "repo")
+		root := filepath.Join(t.TempDir(), "worktree")
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join(parent, ".git", "worktrees", "feature")+"\n")
+		if got := checkoutProjectName(root); got != "repo" {
+			t.Fatalf("project = %q, want repo", got)
+		}
+	})
+
+	t.Run("bare repository worktree", func(t *testing.T) {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join("..", "project.git", "worktrees", "feature")+"\n")
+		if got := checkoutProjectName(root); got != "project" {
+			t.Fatalf("project = %q, want project", got)
+		}
+	})
+
+	t.Run("separate git directory keeps checkout name", func(t *testing.T) {
+		root := filepath.Join(t.TempDir(), "dotfiles")
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join(t.TempDir(), "metadata", "storage")+"\n")
+		if got := checkoutProjectName(root); got != "dotfiles" {
+			t.Fatalf("project = %q, want dotfiles", got)
 		}
 	})
 }
