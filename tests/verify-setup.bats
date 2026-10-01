@@ -449,6 +449,16 @@ setup() {
     local snap1="/tmp/snap1-$$.sha256"
     local snap2="/tmp/snap2-$$.sha256"
 
+    # Idempotence is defined on a CONVERGED first run. A tool whose install
+    # warned and continued is installed by the second run, and what it brings in
+    # (agy's hooks.json via `dotf harness bind`) then reads as drift (#1704).
+    # Name that cause instead of printing a hash diff.
+    # A path, not `command -v`: ~/.local/bin is not on the bats-time PATH here.
+    [ -x "$HOME/.local/bin/agy" ] || {
+        echo "the first setup run did not install agy, so the second run is a repair, not a re-run" >&2
+        return 1
+    }
+
     # Collect hashes of deployed dotfiles and configs before second run
     find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
          "$HOME/.zsh" "$HOME/.bash" "$HOME/.ssh" \
