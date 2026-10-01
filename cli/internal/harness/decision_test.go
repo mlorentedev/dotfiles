@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestDecisionRecordSchemaIsPinned fixes the wire field names.
@@ -321,5 +322,108 @@ func TestTheRecordThatTriggersRotationIsInTheRotatedFile(t *testing.T) {
 		t.Errorf("the record that triggered rotation (%s) is not in the rotated file. "+
 			"That means rotation ran BEFORE the write, which is the ordering that drops a "+
 			"record when another writer rotates in between", trigger)
+	}
+}
+
+// #1536: every session and dispatch opens a journal that outlives it, so the
+// state dir grew to 454 files (15 MB) in a month. These pin the retention sweep.
+
+// backdate plants a file and sets its mtime age days ago.
+func backdate(t *testing.T, path string, days int) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func TestANewScopeSweepsJournalsPastRetention(t *testing.T) {
+	state := t.TempDir()
+	stale := DecisionPath(state, "dead-session")
+	if err := os.MkdirAll(filepath.Dir(stale), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	backdate(t, stale, decisionRetentionDays+1)
+	backdate(t, stale+".1", decisionRetentionDays+5)
+	recent := DecisionPath(state, "recent-session")
+	backdate(t, recent, decisionRetentionDays-1)
+
+	if err := RecordDecision(DecisionPath(state, "new-session"), DecisionRecord{Outcome: OutcomeNoRole}); err != nil {
+		t.Fatal(err)
+	}
+	if exists(stale) || exists(stale+".1") {
+		t.Error("a journal and its .1 past retention must be removed when a new scope opens")
+	}
+	if !exists(recent) {
+		t.Error("a journal inside the retention window must be kept")
+	}
+}
+
+// AC3: the sweep is not per-tool-call work. Writing to a journal that already
+// exists must not sweep; only the write that creates one does.
+func TestWritingToAnExistingScopeDoesNotSweep(t *testing.T) {
+	state := t.TempDir()
+	live := DecisionPath(state, "live-session")
+	if err := RecordDecision(live, DecisionRecord{Outcome: OutcomeNoRole}); err != nil {
+		t.Fatal(err)
+	}
+	stale := DecisionPath(state, "dead-session")
+	backdate(t, stale, decisionRetentionDays+1)
+
+	for i := 0; i < 3; i++ {
+		if err := RecordDecision(live, DecisionRecord{Outcome: OutcomeNoRole}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !exists(stale) {
+		t.Error("a write to an existing journal swept the state dir: that is per-tool-call work")
+	}
+}
+
+// Rename keeps the mtime, so a busy scope's .1 is as old as its last rotation.
+// Age is the scope's newest file, never each file alone.
+func TestALiveScopeKeepsAnOldRotatedGeneration(t *testing.T) {
+	state := t.TempDir()
+	busy := DecisionPath(state, "busy-session")
+	if err := os.MkdirAll(filepath.Dir(busy), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	backdate(t, busy+".1", decisionRetentionDays+10)
+	backdate(t, busy, 0)
+
+	if err := RecordDecision(DecisionPath(state, "new-session"), DecisionRecord{Outcome: OutcomeNoRole}); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(busy + ".1") {
+		t.Error("the kept generation of a live scope was removed because its own mtime was old")
+	}
+}
+
+// The consumption ledger and the dispatch map gate calls; the sweep never
+// touches them, however old.
+func TestTheSweepNeverRemovesGatingState(t *testing.T) {
+	state := t.TempDir()
+	dir := filepath.Join(state, "gate")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	ledger := filepath.Join(dir, "old-session.json")
+	dispatch := filepath.Join(dir, "old-session.dispatch.json")
+	backdate(t, ledger, decisionRetentionDays+100)
+	backdate(t, dispatch, decisionRetentionDays+100)
+
+	if err := RecordDecision(DecisionPath(state, "new-session"), DecisionRecord{Outcome: OutcomeNoRole}); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(ledger) || !exists(dispatch) {
+		t.Error("the sweep removed gating state; only journals are swept")
 	}
 }
