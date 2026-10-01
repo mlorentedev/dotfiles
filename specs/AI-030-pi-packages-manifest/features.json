@@ -9,7 +9,7 @@
   {
     "id": "AI-030-pi-packages-manifest-f2",
     "behavior": "AC2 - every declared source is pinned to an explicit version",
-    "verification": "jq -r '.packages[].source' ai/pi/packages.json | grep -vcE '^npm:@?[a-z0-9._/-]+@[0-9]+\\.[0-9]+\\.[0-9]+' | grep -qx 0",
+    "verification": "bats tests/pi-packages.bats -f 'every declared source is pinned to a version' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
@@ -73,6 +73,13 @@
     "id": "AI-030-pi-packages-manifest-f11",
     "behavior": "AC11 - a package that is installed and declared is also LOADED: doctor detects a hand-wired extension symlink shadowing it, quarantines it under --fix outside the tree pi auto-discovers, refuses to clobber an earlier quarantine, and leaves an external writer's plain files alone",
     "verification": "cd cli && go test ./internal/doctor/ -run TestPiExtensions",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-030-pi-packages-manifest-f12",
+    "behavior": "AC12 - an undeclared live package is removed before the declared ones install, and an empty manifest is refused",
+    "verification": "cd cli && go test ./internal/pi ./internal/cmd -count=1 -v -run '^(TestPiPackagesApplyRemovesThenInstalls|TestLoadManifestRefusesWhatItCannotRead)$' | grep -c '^--- PASS' | grep -qx 2",
     "state": "pending",
     "evidence": ""
   }
