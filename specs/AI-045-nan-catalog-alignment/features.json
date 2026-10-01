@@ -51,7 +51,7 @@
   {
     "id": "AI-045-nan-catalog-alignment-f8",
     "behavior": "AC8: a daily canary probes every bound NaN model and reports the dead ones in one issue",
-    "verification": "echo 'pending: #1860' && exit 1",
+    "verification": "(cd cli && go test ./internal/nanprobe/ && go test ./internal/cmd/ -run 'HarnessCanary') && bats tests/model-canary.bats",
     "state": "pending",
     "evidence": ""
   },
