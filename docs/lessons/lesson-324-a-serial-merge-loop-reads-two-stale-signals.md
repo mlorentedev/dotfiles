@@ -21,7 +21,7 @@ Two signals were read at the wrong moment.
 ## Rule
 
 - After main moves, poll `mergeStateStatus` until it is no longer `UNKNOWN` before deciding whether to update the branch.
-- Gate the merge on the queue: refuse when `dotf pr triage-queue` lists the PR, or when any check on the current head is not passing. A queue printed next to a merge is not a gate.
+- Gate the merge on the queue: refuse when `dotf pr triage-queue` lists the PR, or when any check on the current head is not passing. A queue printed next to a merge is not a gate. The command exits 1 both when the queue lists PRs and when it could not be computed. A list without this PR lets the merge go ahead; an error with no list blocks it.
 - Re-read the head sha after update-branch and pass it to `gh pr merge --match-head-commit`. The sha from before the update names a commit that is no longer the PR.
 - Update one PR at a time. Updating them all at once runs the Windows job for every PR on every merge, and saves no time.
 
