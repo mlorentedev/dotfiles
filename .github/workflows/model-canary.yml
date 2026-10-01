@@ -1,0 +1,48 @@
+name: NaN model canary
+
+# AI-045 AC8 (#1860). NaN retired `mimo-v2.5` on 2026-09-30 without notice at
+# the call site; it hung for hours, then answered 401, and seven files bound it.
+# It was found by PRs whose review job went green with no review. This finds a
+# retirement first: once a day, with no PR involved, `dotf harness canary` sends
+# one minimal call to every NaN model the routing map and the pin registry bind,
+# and scripts/model-canary.sh keeps one labelled issue in step with the result.
+#
+# dotf is built from this checkout, so the canary reads the registry it ships
+# with. Deployed pin sites (under $HOME) do not exist on a runner; the report
+# lists them as not read. Run it locally to include them.
+
+on:
+  schedule:
+    - cron: '29 5 * * *' # 05:29 UTC daily, clear of the bitácora and pat-expiry crons
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: model-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    # Each model may take 90 s and is probed twice at most, one at a time: a
+    # full outage of the nine bound today is 27 minutes.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: Build dotf from this checkout
+        working-directory: cli
+        run: go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf
+      - name: Probe every bound model and keep the canary issue current
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NAN_API_KEY: ${{ secrets.NAN_API_KEY }}
+        # One line on purpose: the exit status IS the result (BUG-063).
+        run: ./scripts/model-canary.sh "$RUNNER_TEMP/dotf" .
