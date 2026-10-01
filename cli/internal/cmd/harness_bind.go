@@ -168,7 +168,7 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, []ha
 	}
 	path := filepath.Join(home, filepath.FromSlash(t.File))
 
-		var doc map[string]any
+	var doc map[string]any
 	if t.Format != "ts-extension" {
 		var readErr error
 		doc, readErr = readSettingsDoc(path)
