@@ -12,7 +12,7 @@
 //   Titles (small_model): nan/qwen3.6 — 262K, no monthly quota; titles are the
 //                                       highest-volume, lowest-value calls.
 //   Long-context / general: nan/deepseek-v4-flash (via `qf`) — 1M, 3B/month.
-//   Picker only: nan/qwen3.8-flash (262K served, 500M/month: it reached 83% on
+//   Picker only: nan/qwen3.8-flash (1M served, 500M/month: it reached 83% on
 //                2026-09-26 as the default, which is why it no longer is),
 //                nan/gemma4, nan/mimo-v2.6-flash (successor of mimo-v2.5,
 //                retired by NaN 2026-09-30; AI-045).
@@ -63,27 +63,18 @@
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
-            "output": 8192
+            "output": 131072
           },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
           },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
           "variants": {
             "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
+              "reasoning_effort": "low"
             },
             "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
+              "reasoning_effort": "high"
             }
           }
         },
@@ -92,57 +83,23 @@
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1000000,
-            "output": 8192
+            "output": 384000
           },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
-          },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
-          "variants": {
-            "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
-            },
-            "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
-            }
           }
         },
         "qwen3.8-flash": {
-          "name": "Qwen 3.8 Flash Next (Alibaba - 262K)",
+          "name": "Qwen 3.8 Flash Next (Alibaba - 1M)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
-            "context": 262144,
-            "output": 8192
+            "context": 1048576,
+            "output": 131072
           },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
-          },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
-          "variants": {
-            "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
-            },
-            "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
-            }
           }
         },
         "qwen3.6": {
@@ -150,27 +107,18 @@
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 262144,
-            "output": 8192
+            "output": 65536
           },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
           },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
           "variants": {
             "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
+              "reasoning_effort": "none"
             },
             "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
+              "reasoning_effort": "high"
             }
           }
         },
@@ -179,28 +127,11 @@
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1048576,
-            "output": 8192
+            "output": 131072
           },
           "modalities": {
             "input": ["text", "image", "audio"],
             "output": ["text"]
-          },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
-          "variants": {
-            "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
-            },
-            "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
-            }
           }
         },
         "gemma4": {
@@ -208,27 +139,18 @@
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 262144,
-            "output": 8192
+            "output": 32768
           },
           "modalities": {
             "input": ["text", "image"],
             "output": ["text"]
           },
-          "options": {
-            "chat_template_kwargs": {
-              "enable_thinking": true
-            }
-          },
           "variants": {
             "fast": {
-              "chat_template_kwargs": {
-                "enable_thinking": false
-              }
+              "reasoning_effort": "none"
             },
             "thinking": {
-              "chat_template_kwargs": {
-                "enable_thinking": true
-              }
+              "reasoning_effort": "high"
             }
           }
         }

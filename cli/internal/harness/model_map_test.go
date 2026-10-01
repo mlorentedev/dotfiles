@@ -257,11 +257,27 @@ func TestModelMapBudgetIsDeclarationOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeclaredBudget: %v", err)
 	}
-	if b.Concurrency != 5 || b.ReserveInteractive != 2 {
-		t.Errorf("nan budget = %+v, want concurrency 5 reserve 2 (measured 2026-08-20)", b)
+	if b.Concurrency != 7 || b.ReserveInteractive != 2 {
+		t.Errorf("nan budget = %+v, want per-key concurrency 7 reserve 2 (NaN base plan)", b)
 	}
 	if len(b.SharedWith) == 0 {
 		t.Error("the nan pool is shared, and a budget that does not say so overstates its own guarantee")
+	}
+	wantModelConcurrency := map[string]int{
+		"deepseek-v4-flash": 7,
+		"glm5.3-flash":      7,
+		"qwen3.8-flash":     7,
+		"mimo-v2.6-flash":   5,
+		"qwen3.6":           5,
+		"gemma4":            5,
+	}
+	if len(b.ModelConcurrency) != len(wantModelConcurrency) {
+		t.Fatalf("nan model concurrency = %v, want %v", b.ModelConcurrency, wantModelConcurrency)
+	}
+	for model, want := range wantModelConcurrency {
+		if got := b.ModelConcurrency[model]; got != want {
+			t.Errorf("nan model concurrency %s = %d, want %d", model, got, want)
+		}
 	}
 	// A pool with no declared concurrency must report absence, never zero — zero
 	// reads as "no capacity" and absence means "not declared".
@@ -271,6 +287,69 @@ func TestModelMapBudgetIsDeclarationOnly(t *testing.T) {
 	}
 	if b2.ConcurrencyDeclared {
 		t.Error("copilot declares no concurrency; the budget must report it undeclared, not 0")
+	}
+}
+
+func TestModelMapSchemaAcceptsPerModelConcurrency(t *testing.T) {
+	root := repoRootForTest(t)
+	doc, err := os.ReadFile(filepath.Join(root, ModelMapFile))
+	if err != nil {
+		t.Fatalf("read map: %v", err)
+	}
+	schema, err := os.ReadFile(filepath.Join(root, ModelMapSchemaFile))
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(doc, &m); err != nil {
+		t.Fatalf("parse map: %v", err)
+	}
+	pools := m["pools"].(map[string]any)
+	nan := pools["nan"].(map[string]any)
+	nan["concurrency"] = float64(7)
+	nan["model_concurrency"] = map[string]any{
+		"deepseek-v4-flash": float64(7),
+		"mimo-v2.6-flash":   float64(5),
+	}
+	candidate, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal candidate: %v", err)
+	}
+	if err := ValidateModelMap(candidate, schema); err != nil {
+		t.Fatalf("published per-key plus per-model concurrency shape must validate: %v", err)
+	}
+}
+
+func TestModelMapSchemaRejectsMalformedPerModelConcurrency(t *testing.T) {
+	root := repoRootForTest(t)
+	doc, err := os.ReadFile(filepath.Join(root, ModelMapFile))
+	if err != nil {
+		t.Fatalf("read map: %v", err)
+	}
+	schema, err := os.ReadFile(filepath.Join(root, ModelMapSchemaFile))
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(doc, &m); err != nil {
+		t.Fatalf("parse map: %v", err)
+	}
+	nan := m["pools"].(map[string]any)["nan"].(map[string]any)
+	nan["model_concurrency"] = map[string]any{"deepseek-v4-flash": "seven"}
+	candidate, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal candidate: %v", err)
+	}
+	err = ValidateModelMap(candidate, schema)
+	if err == nil {
+		t.Fatal("a non-integer per-model concurrency must be rejected")
+	}
+	for _, want := range []string{"model_concurrency", "integer"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("malformed concurrency error must contain %q, got: %v", want, err)
+		}
 	}
 }
 

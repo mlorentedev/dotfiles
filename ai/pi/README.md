@@ -115,13 +115,11 @@ vote on whether/how they stay, and neither has been run through `reviewer-pool.j
 admission procedure yet. Neither is wired into `defaultModel`, `harness/model-map.json`,
 `.pr_agent.toml` or `harness/reviewer-pool.json` — see #1244.
 
-One capability nuance for `qwen3.8-flash` specifically: Alibaba's own release notes put its
-*native* context at 262,144 tokens, extended to 1M via YaRN, and YaRN-extended context can
-behave differently at the far end of the window than a natively-1M model
-(`deepseek-v4-flash`, `mimo-v2.6-flash`). The package's snapshot therefore carries the **native** 262,144
-rather than the served 1M, and opencode matches it: a declared window the model degrades inside is worse than a
-smaller honest one, because nothing downstream can tell a degraded answer from a good one.
-`glm5.3-flash`'s 1M is native per Zhipu.
+One capability nuance for `qwen3.8-flash` specifically: the pinned package snapshot still
+carries its 262,144-token native window, while NaN publishes and serves a 1,048,576-token
+window. `ai/pi/models.json` composes a `modelOverrides` correction above the package, and
+opencode declares the same served limit. `tests/pi-nan-package.bats` compares the effective
+package-plus-override values so a stale upstream snapshot cannot silently shrink the picker.
 
 The three paid OpenRouter models (`deepseek-v4-pro`, `qwen3-coder-plus`, `minimax-m3`) were
 dropped from the picker: a paid model one keystroke away in a model list is a cost you take by

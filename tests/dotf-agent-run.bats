@@ -143,7 +143,7 @@ print(r["pool"])
     python3 -c "import fcntl" 2>/dev/null || skip "python3 fcntl unavailable"
     # Hold every dispatchable nan slot with real flocks, then dispatch at the
     # low tier, whose chain is nan:qwen3.6 -> claude:haiku. nan declares
-    # concurrency 5 with reserve_interactive 2, so 3 are takeable. This proves
+    # concurrency 7 with reserve_interactive 2, so 5 are takeable. This proves
     # the semaphore through the compiled binary and the real lock primitive, not
     # only through the Go-level seam.
     local helper="$BATS_TEST_TMPDIR/saturate.py" rec="$BATS_TEST_TMPDIR/saturated.json"
@@ -153,7 +153,7 @@ sem_dir, dotf, repo_root, out = sys.argv[1:5]
 pool_dir = os.path.join(sem_dir, "nan")
 os.makedirs(pool_dir, exist_ok=True)
 held = []
-for i in range(3):                                  # concurrency 5 - reserve 2
+for i in range(5):                                  # concurrency 7 - reserve 2
     f = open(os.path.join(pool_dir, "slot-%d.lock" % i), "a+b")
     fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     held.append(f)
