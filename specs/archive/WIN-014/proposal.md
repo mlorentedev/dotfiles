@@ -40,6 +40,8 @@ Things this PR explicitly does NOT include:
 The explicit repository path must still fail clearly when it lacks the manifest.
 Mode preservation must not rewrite destination files when both bytes and mode
 match; it must rewrite byte-identical destinations when their mode differs.
+On Windows, a read-only destination must remain replaceable on later runs
+without weakening the mode of the newly mirrored file.
 Setup must preserve its current non-fatal behavior for a missing CLI while
 making that skip visible.
 
@@ -47,7 +49,8 @@ making that skip visible.
 
 - [ ] A mirror invoked outside a checkout or from inside another repository
   uses `--repo` and copies the named checkout's harness and manifest targets.
-- [ ] An executable source file remains executable in the mirror.
+- [ ] Source permission bits survive mirroring, and a Windows read-only
+  destination can be replaced on a later run while remaining read-only.
 - [ ] Linux and Windows setup pass their checkout paths to the mirror command
   and both warn when `dotf` is unavailable.
 
@@ -57,4 +60,4 @@ making that skip visible.
 - Related ADR: `docs/adr/adr-020-tooling-cli-go-convergence.md`
 - Related patterns: `00_meta/patterns/pattern-setup-script-idempotence.md`
 
-<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1806 -->
+<!-- archived 2026-09-29 — PR: https://github.com/mlorentedev/dotfiles/pull/1825 -->

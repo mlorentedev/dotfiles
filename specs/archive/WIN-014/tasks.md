@@ -28,6 +28,13 @@ created: "2026-09-28"
 - [x] [AC2] Preserve source modes during atomic mirror writes.
 - [x] [AC3] Add setup-twin tests for the explicit path and missing-CLI warning.
 
+## Review remediation
+
+- [x] [AC2] Add a failing Windows regression for replacing a read-only mirror.
+- [x] [AC2] Make the existing destination replaceable before the atomic rename
+  and restore its original mode if installation fails.
+- [x] Obtain a fresh passing independent review for the remediated head.
+
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test

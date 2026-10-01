@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 )
 
@@ -176,30 +177,73 @@ func mirrorFile(src, dst string, res *MirrorResult) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(dst), ".mirror-*")
+	tmpName, err := writeMirrorTemp(filepath.Dir(dst), want, info.Mode().Perm())
 	if err != nil {
 		return err
 	}
-	tmpName := tmp.Name()
-	if _, err := tmp.Write(want); err != nil {
-		_ = tmp.Close()
+	if err := replaceMirrorDestination(tmpName, dst); err != nil {
 		_ = os.Remove(tmpName)
 		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return err
-	}
-	if err := os.Chmod(tmpName, info.Mode().Perm()); err != nil {
-		_ = os.Remove(tmpName)
-		return err
-	}
-	if err := os.Rename(tmpName, dst); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("installing %s: %w", dst, err)
 	}
 	res.Updated++
 	return nil
+}
+
+func writeMirrorTemp(dir string, content []byte, mode os.FileMode) (string, error) {
+	tmp, err := os.CreateTemp(dir, ".mirror-*")
+	if err != nil {
+		return "", err
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(content); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return "", err
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
+		_ = os.Remove(tmpName)
+		return "", err
+	}
+	return tmpName, nil
+}
+
+func replaceMirrorDestination(tmpName, dst string) error {
+	restoreMode, restore, err := makeDestinationReplaceable(dst)
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, dst); err != nil {
+		if restore {
+			_ = os.Chmod(dst, restoreMode)
+		}
+		return fmt.Errorf("installing %s: %w", dst, err)
+	}
+	return nil
+}
+
+func makeDestinationReplaceable(path string) (os.FileMode, bool, error) {
+	if runtime.GOOS != "windows" {
+		return 0, false, nil
+	}
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("stating destination %s: %w", path, err)
+	}
+	mode := info.Mode().Perm()
+	if mode&0o200 != 0 {
+		return mode, false, nil
+	}
+	if err := os.Chmod(path, mode|0o200); err != nil {
+		return mode, false, fmt.Errorf("making destination replaceable %s: %w", path, err)
+	}
+	return mode, true, nil
 }
 
 func sameDir(a, b string) bool {
