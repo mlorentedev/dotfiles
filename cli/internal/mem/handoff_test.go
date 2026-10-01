@@ -430,3 +430,21 @@ func TestHandoffThreadKeepsTheCwdKeyOutsideTheProjectLayout(t *testing.T) {
 		t.Fatalf("want the cwd key %q for a path outside the layout, got %q, %v", ThreadKey(vault), got, err)
 	}
 }
+
+// A journal name is <project>-<agent>[-<thread>], so its first word is always
+// the project's. The writer scan used to read it as a candidate too, so a
+// project named like an agent (`pi`, `codex`, `gemini`) attributed every block
+// to that agent (HARNESS-088 review, round 1).
+func TestJournalWriterSkipsTheProjectWord(t *testing.T) {
+	cases := []struct{ line, want string }{
+		{"Journal: sessions/2026-09-30-pi-claude-main.md", "claude"},
+		{"Journal: sessions/2026-09-30-codex-copilot.md", "copilot"},
+		{"Journal: sessions/2026-09-30-dotfiles-claude-wt-pi.md", "claude"},
+		{"Journal: sessions/2026-09-30-yt-metrics-cli-agy-feat-x.md", "agy"},
+	}
+	for _, c := range cases {
+		if got := journalWriter(c.line, ""); got != c.want {
+			t.Errorf("journalWriter(%q) = %q, want %q", c.line, got, c.want)
+		}
+	}
+}

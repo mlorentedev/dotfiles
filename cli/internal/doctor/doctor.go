@@ -127,7 +127,7 @@ func Run(opts Options) (int, error) {
 		checkAgentPresence(sys, rep)
 		checkAgentSkillsMigrated(cfg, rep)
 		checkDotfProvenance(sys, cfg, rep)
-		checkRepoDirResolves(rep)
+		checkRepoDirResolves(sys, rep)
 		checkSpecIssueState(sys, rep)
 		checkBranchProtection(sys, rep)
 		checkAntigravity(sys, rep)

@@ -131,12 +131,17 @@ archive a spec. CLI subcommands via `dotf spec …` (Go CLI, works in CI/Windows
 (`SDD-012b`). Verbatim copy of `idPattern` in `cli/internal/spec/spec.go`, held
 to it by `TestIDPatternProseMatchesCode`; do not reword it.
 
-**Skip SDD for**: typos, comment-only edits, mechanical refactors, bug fixes
-<20 lines with obvious cause, doc-only changes.
+**The Lane Decisor Rule:** The agent MUST declare the chosen lane on the VERY FIRST LINE of its response before taking any action (e.g., `Lane: Fast-Track Development`).
+
+**Implementation Lanes:**
+- **0. Answer:** Read-only questions, codebase exploration, debugging without writing code.
+- **1. Inline Direct:** <30 LOC diff, understood change, single component.
+- **2. Fast-Track Development (FTD):** 30–150 LOC, ordinary changes, low ambiguity. 1 document `spec.md`, simple branch, no worktree overhead, observable evidence required.
+- **3. Full SDD:** >150 LOC, public contracts, architecture, or high ambiguity. Triad of docs (`proposal.md`, `tasks.md`, `verification.md`).
 
 ### Discipline Gate (NON-NEGOTIABLE)
 
-Before creating ANY branch for code changes, SDD is mandatory if ANY apply:
+Before creating ANY branch for code changes, Full SDD or FTD is mandatory if ANY apply:
 
 - ~50–300 LOC of production diff (excluding tests, generated files, lockfiles). **The count is
   EXECUTABLE lines** — declarative data, schemas and comment blocks are excluded, because the cap

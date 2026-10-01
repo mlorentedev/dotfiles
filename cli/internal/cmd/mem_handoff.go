@@ -24,12 +24,7 @@ import (
 // This command makes each session write only its own thread, so overwriting a
 // peer stops being something to remember not to do.
 func newMemHandoffWriteCmd() *cobra.Command {
-	var (
-		memoryPath string
-		thread     string
-		agent      string
-		dryRun     bool
-	)
+	var w handoffWrite
 
 	cmd := &cobra.Command{
 		Use:   "handoff-write",
@@ -61,70 +56,107 @@ Skills should call this instead of instructing an Edit: the merge is the part th
 was being got wrong, and it belongs where it can be tested.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if memoryPath == "" {
-				return fmt.Errorf("--memory is required (the project's MEMORY.md)")
-			}
-			wd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("resolve the current directory: %w", err)
-			}
-			if thread, err = mem.HandoffThread(thread, memoryPath, wd); err != nil {
-				return err
-			}
-
-			body, err := io.ReadAll(cmd.InOrStdin())
-			if err != nil {
-				return fmt.Errorf("read handoff body from stdin: %w", err)
-			}
-			if len(body) == 0 {
-				return fmt.Errorf("empty handoff body — refusing to blank a thread, which is the clobber this command exists to prevent")
-			}
-			for _, w := range mem.ThreadWarnings(string(body)) {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning    %s\n", w)
-			}
-
-			current, err := os.ReadFile(memoryPath) // #nosec G304 -- operator-supplied path
-			if err != nil {
-				return fmt.Errorf("read %s: %w", memoryPath, err)
-			}
-
-			res, err := mem.WriteThreadAs(string(current), thread, agent, string(body))
-			if err != nil {
-				return err
-			}
-			updated := res.Content
-			// The one outcome where the handoff is not where its writer asked,
-			// so it is said every time, written or unchanged (#1690).
-			if res.Kept != "" {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
-					thread, res.Kept, agent, res.Key)
-			}
-			if !res.Changed {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
-				return nil
-			}
-			// A block nobody wrote this session moves, so say so (#1651). On stderr,
-			// because under --dry-run stdout is the document itself.
-			if legacy, ok := mem.LegacyThreadKey(string(current)); ok {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
-			}
-			if dryRun {
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), updated)
-				return nil
-			}
-			if err := replaceMemoryFile(memoryPath, updated); err != nil {
-				return err
-			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, memoryPath)
-			return nil
+			return w.run(cmd)
 		},
 	}
 
-	cmd.Flags().StringVar(&memoryPath, "memory", "", "path to the project's MEMORY.md")
-	cmd.Flags().StringVar(&thread, "thread", "", "thread key (default: this checkout's branch)")
-	cmd.Flags().StringVar(&agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the result instead of writing it")
+	cmd.Flags().StringVar(&w.memoryPath, "memory", "", "path to the project's MEMORY.md")
+	cmd.Flags().StringVar(&w.thread, "thread", "", "thread key (default: this checkout's branch)")
+	cmd.Flags().StringVar(&w.agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
+	cmd.Flags().BoolVar(&w.dryRun, "dry-run", false, "print the result instead of writing it")
 	return cmd
+}
+
+// handoffWrite holds the flags of one handoff-write run.
+type handoffWrite struct {
+	memoryPath string
+	thread     string
+	agent      string
+	dryRun     bool
+}
+
+func (w *handoffWrite) run(cmd *cobra.Command) error {
+	if w.memoryPath == "" {
+		return fmt.Errorf("--memory is required (the project's MEMORY.md)")
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("resolve the current directory: %w", err)
+	}
+	thread, err := mem.HandoffThread(w.thread, w.memoryPath, wd)
+	if err != nil {
+		return err
+	}
+	body, err := readHandoffBody(cmd)
+	if err != nil {
+		return err
+	}
+
+	// The lock spans read -> compute -> rename. Without it two writers at
+	// the same moment each renamed their own update over the file and the
+	// later one erased the other's thread, both exiting 0 (#1884). A dry
+	// run writes nothing, so it does not wait on a writer.
+	if !w.dryRun {
+		unlock, err := mem.LockHandoffMemory(w.memoryPath)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
+
+	current, err := os.ReadFile(w.memoryPath) // #nosec G304 -- operator-supplied path
+	if err != nil {
+		return fmt.Errorf("read %s: %w", w.memoryPath, err)
+	}
+	res, err := mem.WriteThreadAs(string(current), thread, w.agent, body)
+	if err != nil {
+		return err
+	}
+	return w.publish(cmd, thread, string(current), res)
+}
+
+// readHandoffBody reads the thread body from stdin and refuses an empty one.
+func readHandoffBody(cmd *cobra.Command) (string, error) {
+	body, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return "", fmt.Errorf("read handoff body from stdin: %w", err)
+	}
+	if len(body) == 0 {
+		return "", fmt.Errorf("empty handoff body — refusing to blank a thread, which is the clobber this command exists to prevent")
+	}
+	for _, warning := range mem.ThreadWarnings(string(body)) {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning    %s\n", warning)
+	}
+	return string(body), nil
+}
+
+// publish reports what the write did and, unless this is a dry run, replaces
+// the file.
+func (w *handoffWrite) publish(cmd *cobra.Command, thread, current string, res mem.ThreadWrite) error {
+	// The one outcome where the handoff is not where its writer asked,
+	// so it is said every time, written or unchanged (#1690).
+	if res.Kept != "" {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
+			thread, res.Kept, w.agent, res.Key)
+	}
+	if !res.Changed {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
+		return nil
+	}
+	// A block nobody wrote this session moves, so say so (#1651). On stderr,
+	// because under --dry-run stdout is the document itself.
+	if legacy, ok := mem.LegacyThreadKey(current); ok {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
+	}
+	if w.dryRun {
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), res.Content)
+		return nil
+	}
+	if err := replaceMemoryFile(w.memoryPath, res.Content); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, w.memoryPath)
+	return nil
 }
 
 // replaceMemoryFile writes content over path through a temp file in the same
