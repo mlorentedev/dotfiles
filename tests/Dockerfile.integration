@@ -76,6 +76,27 @@ RUN mkdir -p /home/testuser/.local/bin \
     && go build -o /home/testuser/.local/bin/dotf ./cmd/dotf \
     && /home/testuser/.local/bin/dotf version
 
+# agy, installed before setup the way bats is above, so setup-linux.sh finds it
+# and reports "already installed". Its own install is a vendor `curl | bash` that
+# warns and continues on failure; when it failed fast on the first run, the
+# second run installed agy, `dotf harness bind` then wrote
+# ~/.gemini/config/hooks.json, and the idempotence test read that repair as
+# drift (#1704). Here a vendor outage fails the build at this step, by name.
+# The retry wraps the whole install: the installer makes its own downloads, which
+# a `curl --retry` on the outer fetch would not cover. It is fetched to a file
+# rather than piped, because `sh` has no pipefail and `bash` reading an empty
+# pipe from a failed curl exits 0.
+RUN for attempt in 1 2 3 4 5; do \
+        curl -fsSL https://antigravity.google/cli/install.sh -o /tmp/agy-install.sh \
+            && bash /tmp/agy-install.sh \
+            && test -x /home/testuser/.local/bin/agy \
+            && break; \
+        echo "agy install attempt $attempt failed; retrying in $((attempt * 5))s" >&2; \
+        sleep $((attempt * 5)); \
+    done \
+    && rm -f /tmp/agy-install.sh \
+    && test -x /home/testuser/.local/bin/agy
+
 # Marker for verify-setup.bats to detect it's running inside the container
 ENV DOTFILES_INTEGRATION_TEST=1
 
