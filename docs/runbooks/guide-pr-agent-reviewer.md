@@ -64,14 +64,20 @@ busy session exhausts it — six PRs in one session received no review at all
 (#1096, #1100, #1101, #1103, #1104, #1105), every one of them reporting a green
 `review` job.
 
-Three things now stand between that and a silent green:
+Six things now stand between that and a silent green:
 
 1. `auto_improve = false` halves what this workflow asks for (#1107).
-2. **Parallel execution across NaN slots without GHA job locks (#1135)**:
-   A job-level GHA concurrency group previously throttled runs to 1 and cancelled
-   in-between jobs due to GHA's max pending queue depth of 1. By removing the
-   global GHA lock and relying on per-PR concurrency (`group: pr-agent-${{ pr.number }}`),
-   batches of PRs review concurrently across NaN's 10 slots.
+2. **One review at a time across the repository, none dropped (AI-045 AC10, #1923)**:
+   the `review` job joins `pr-agent-review-${{ github.repository }}` with
+   `cancel-in-progress: false` and `queue: max`. Without `queue`, GitHub keeps one
+   pending run per group and cancels the older one, which is why #1135 removed an
+   earlier repository-wide group; `queue: max` keeps up to 100 pending, in order.
+   Parallel reviews were measured contending for the same NaN model, so they now
+   wait instead. The per-PR workflow group still supersedes a PR's own older
+   push. GitHub accepted the job-level key (run 36835280780); that two
+   overlapping runs on `main` both complete is the open measurement in AI-045
+   `tasks.md`, and a cancelled review run there means the key is ignored: revert
+   the block.
 3. `fallback_models = ["openai/deepseek-v4-flash"]` behind the primary
    `openai/mimo-v2.6-flash` — a second NaN model with its own bucket of five,
    which is what makes it an automatic fallback under LiteLLM when the primary
@@ -83,6 +89,26 @@ Three things now stand between that and a silent green:
    fails when none answers. It exists because NaN retired `mimo-v2.5` on
    2026-09-30: it hung for hours (PR-Agent's fallback does not catch a hang, so
    every PR got a green job and no review), then answered 401.
+5. **Streaming (AI-045 AC6, #1858)**: every attempt sets
+   `LITELLM__CUSTOM_LLM_PROVIDER`, `LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER`
+   and `LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS` in its env, so PR-Agent
+   streams its NaN calls. A non-streamed answer is cut at the edge after about
+   125 s, and a held request sat silent for the step's whole timeout although
+   `ai_timeout` was 120 (lesson 327). The pinned PR-Agent build streams only when
+   all three are set; re-check that when the pin moves.
+6. **A daily canary (AI-045 AC8, #1860)**: `.github/workflows/model-canary.yml`
+   runs `dotf harness canary` once a day with no PR involved. It probes every NaN
+   model that `harness/model-map.json` and the pin sites in
+   `harness/model-pins.json` bind, and keeps one `model-canary` issue current:
+   opened or rewritten when a model is refused or stays unavailable, closed by
+   the first run in which every model answers. Over-quota answers do not open
+   it. Run it locally, where it also reads the deployed pin sites:
+   `dotf secrets run --only NAN_API_KEY -- dotf harness canary`.
+   Each model is called through the API it serves: the map's `services.rerank`
+   and `services.embeddings` answer 404 on `/chat/completions` (measured
+   2026-10-01), which a chat-only probe would report as a retirement every day.
+   A new non-chat service needs its entry in `serviceAPIs`
+   (`cli/internal/nanprobe/bindings.go`); until then its row reads "refused".
 
 The multiplier that matters is still the **push**, not the PR: the workflow fires
 on every push to the branch, so a PR with five pushes is five reviews of the full
