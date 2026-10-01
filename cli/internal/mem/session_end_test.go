@@ -123,7 +123,7 @@ func TestSessionEndWaitsForConcurrentHandoffWrite(t *testing.T) {
 	case got := <-done:
 		unlock()
 		t.Fatalf("SessionEnd read MEMORY.md while a handoff writer held its lock: %+v", got)
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(250 * time.Millisecond):
 	}
 	unlock()
 

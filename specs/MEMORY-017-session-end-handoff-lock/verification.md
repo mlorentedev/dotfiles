@@ -37,6 +37,16 @@ created: "2026-09-30"
   deny the writer's rename while another goroutine briefly resolves the target
   file before taking the lock.
 
+## Review dispositions
+
+- Verdict: **PASS** at `36b92fdd`.
+- **Applied (Minor):** increased the blocking assertion window from 50 ms to
+  250 ms to reduce scheduler-driven false passes on loaded CI runners.
+- **Declined (Minor):** the proposal's preservation requirement means preserving
+  the lock key/directory contract for existing `MEMORY.md` files. Parent-only
+  canonicalization differs only when the target does not exist; both callers
+  then fail or no-op before any competing replacement can occur.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
