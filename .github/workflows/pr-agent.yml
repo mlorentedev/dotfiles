@@ -138,6 +138,17 @@ jobs:
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
         && startsWith(github.event.comment.body, '/'))
     runs-on: ubuntu-latest
+    # One review at a time in this repository (AI-045 AC10, #1923). NaN limits
+    # concurrency per model and per key, shared with pi, qq, hive and the archive
+    # gate; parallel PRs reviewed together exhaust the bucket each one needs. On
+    # the job, because the workflow-level group above is per PR and cancels in
+    # progress, which GitHub refuses beside `queue: max`. Without `queue: max` a
+    # group keeps one pending job and a newer one cancels it, so a third PR
+    # would lose its review without the publish guard ever running.
+    concurrency:
+      group: pr-agent-review-${{ github.repository }}
+      cancel-in-progress: false
+      queue: max
     # Both PR-Agent attempts (12 + 12) plus setup; see #1913.
     timeout-minutes: 27
     steps:
