@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-139-pi-package-reconcile"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-25"
 issue: "mlorentedev/dotfiles#1628"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
