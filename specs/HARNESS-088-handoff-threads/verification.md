@@ -99,6 +99,14 @@ input the author was imagining.
   one (the handoff block). A third from outside this repo would make it a
   pattern; two is already enough to stop writing the rule as prose.
 
+- [x] Lesson for the repo's `docs/lessons/`? no: the lost update that exits 0 is
+  recorded in the handoff skill and in this spec, and the regression test now
+  guards it
+- [x] ADR-worthy decision? no: the kernel lock over O_EXCL is recorded on #1884,
+  and `cli/internal/filelock` already followed it in two packages
+- [x] New pattern candidate for `00_meta/patterns/`? no: merge-by-marker has two
+  instances, both in this repository; the bar above is a third from outside it
+
 ## Second sitting — the debt, and cross-machine identity
 
 | AC | Proof |
