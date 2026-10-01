@@ -81,6 +81,25 @@ func TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers(t *testing.T
 		}
 	})
 
+	t.Run("submodule worktree", func(t *testing.T) {
+		root := t.TempDir()
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join("..", "super", ".git", "modules", "libs", "child", "worktrees", "feature")+"\n")
+		if got := checkoutProjectName(root); got != "child" {
+			t.Fatalf("project = %q, want child", got)
+		}
+	})
+
+	t.Run("ordinary worktree below a parent named modules", func(t *testing.T) {
+		parent := filepath.Join(t.TempDir(), "modules", "repo")
+		root := filepath.Join(t.TempDir(), "worktree")
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join(parent, ".git", "worktrees", "feature")+"\n")
+		if got := checkoutProjectName(root); got != "repo" {
+			t.Fatalf("project = %q, want repo", got)
+		}
+	})
+
 	t.Run("bare repository worktree", func(t *testing.T) {
 		root := t.TempDir()
 		mustWrite(t, filepath.Join(root, ".git"),

@@ -45,6 +45,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
     project name instead of the superproject.
   - **Applied:** bare-repository worktree pointers derive the project name from
     the common `project.git` directory.
+- Adversarial review round 2 dispositions:
+  - **Applied:** submodule worktree pointers now anchor on the exact
+    `.git/modules/` sequence and select the component immediately before
+    `worktrees/`, rather than returning the worktree name.
+  - **Applied:** paths containing an unrelated parent directory named
+    `modules` are not classified as submodules.
+  - Named regressions:
+    `TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers/submodule_worktree`
+    and `/ordinary_worktree_below_a_parent_named_modules`.
 
 ## Decisions made during implementation
 

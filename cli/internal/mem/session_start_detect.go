@@ -101,9 +101,19 @@ func checkoutProjectName(root string) string {
 
 func submoduleProjectName(gitDir string) string {
 	parts := strings.Split(filepath.ToSlash(gitDir), "/")
-	for i := len(parts) - 2; i >= 0; i-- {
-		if parts[i] == "modules" {
-			return parts[len(parts)-1]
+	for i := 0; i+2 < len(parts); i++ {
+		if parts[i] != ".git" || parts[i+1] != "modules" {
+			continue
+		}
+		end := len(parts)
+		for j := i + 2; j < len(parts); j++ {
+			if parts[j] == "worktrees" {
+				end = j
+				break
+			}
+		}
+		if end > i+2 {
+			return parts[end-1]
 		}
 	}
 	return ""
