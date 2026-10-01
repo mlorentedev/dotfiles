@@ -1,0 +1,16 @@
+[
+  {
+    "id": "CLI-073-worktree-repo-detection-f1",
+    "behavior": "The repo-dir doctor check accepts checkout roots, ignores inherited repository-local Git overrides, and rejects subdirectories and non-checkouts.",
+    "verification": "cd cli && go test ./internal/doctor -run '^TestCheckRepoDirResolves$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-073-worktree-repo-detection-f2",
+    "behavior": "Session start emits repository context from linked or symlinked checkout paths using the checkout project identity, including separate Git directories.",
+    "verification": "cd cli && go test ./internal/mem -run '^(TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory|TestClaudeContextRecognizesSymlinkToCheckoutSubdirectory|TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

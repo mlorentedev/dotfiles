@@ -55,10 +55,11 @@ func ClaudeContext(in ClaudeContextInput) string {
 
 	vaultRoot := findVaultRoot(in.Cwd)
 
-	if isDir(filepath.Join(in.Cwd, ".git")) {
-		ctx += hiveProject(in.Cwd, in.Vault)
-		ctx += specs(in.Cwd)
-		ctx += lessonsStaleness(in.Cwd, lessonsStaleDays, in.Now)
+	checkoutRoot, project := checkoutIdentity(in.Cwd)
+	if checkoutRoot != "" {
+		ctx += hiveProjectNamed(checkoutRoot, in.Vault, project)
+		ctx += specs(checkoutRoot)
+		ctx += lessonsStaleness(checkoutRoot, lessonsStaleDays, in.Now)
 		if in.TriageQueue != nil {
 			ctx += triageQueue(in.TriageQueue())
 		}
