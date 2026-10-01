@@ -19,5 +19,5 @@
 
 - **Default (Interactive ops):** `deepseek-v4-flash` (1M context)
 - **Async / Cron / Low-cost:** `qwen3.6` (unlimited token pool)
-- **Fast / Backup:** `mimo-v2.5` / `gemma4`
+- **Fast / Backup:** `mimo-v2.6-flash` / `gemma4`
 

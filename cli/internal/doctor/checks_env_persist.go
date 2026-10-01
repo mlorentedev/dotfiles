@@ -36,6 +36,10 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		rep.Warn("contract variables unresolvable (" + err.Error() + ")")
 		return
 	}
+	if err := envpkg.ValidateNames(vars); err != nil {
+		rep.Warn(err.Error() + " — fix env-contract.json; `dotf env persist` refuses it")
+		return
+	}
 	reader := userEnvAdapter{sys.UserEnv}
 	drift, err := envpkg.Drift(vars, reader)
 	if err != nil {

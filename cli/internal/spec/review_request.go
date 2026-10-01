@@ -224,16 +224,15 @@ func VerifyReviewProduced(specDir, transcript string) error {
 	if err != nil {
 		return err
 	}
-	if !found {
-		// No sidecar means no digest to compare against. The file exists, which
-		// is all this check can honestly assert without one.
-		return nil
-	}
-	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == digest {
+	if found && req.ReviewDigestBefore != "" && req.ReviewDigestBefore == digest {
 		return fmt.Errorf("%s is byte-identical to what it held before this run -- the reviewer wrote no verdict\n"+
 			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
 			"the transcript of the run that wrote nothing: %s",
 			ReviewFile, transcript)
+	}
+	if _, _, err := FindReview(specDir); err != nil {
+		return fmt.Errorf("the reviewer wrote a malformed %s: %w\nreview transcript: %s",
+			ReviewFile, err, transcript)
 	}
 	return nil
 }

@@ -14,7 +14,8 @@
 //   Long-context / general: nan/deepseek-v4-flash (via `qf`) — 1M, 3B/month.
 //   Picker only: nan/qwen3.8-flash (262K served, 500M/month: it reached 83% on
 //                2026-09-26 as the default, which is why it no longer is),
-//                nan/gemma4, nan/mimo-v2.5.
+//                nan/gemma4, nan/mimo-v2.6-flash (successor of mimo-v2.5,
+//                retired by NaN 2026-09-30; AI-045).
 //   Quotas and windows: https://nan.builders/docs/models. A spent quota answers
 //   402 until the month resets.
 //   Embeddings / Audio: qwen3-embedding, kokoro (TTS), whisper (STT) — not
@@ -173,8 +174,8 @@
             }
           }
         },
-        "mimo-v2.5": {
-          "name": "MiMo V2.5 (Xiaomi - 1M)",
+        "mimo-v2.6-flash": {
+          "name": "MiMo V2.6 Flash (Xiaomi - 1M)",
           "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 1048576,

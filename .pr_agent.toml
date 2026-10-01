@@ -12,7 +12,13 @@
 # is NaN's, set as OPENAI.API_BASE in the workflow. The model itself is not the
 # hosted OpenAI one.
 #
-# mimo-v2.5, and the reason is LANE SEPARATION rather than quality (#1149).
+# mimo-v2.6-flash, and the reason is LANE SEPARATION rather than quality (#1149).
+#
+# It replaced mimo-v2.5 on 2026-09-30, when NaN retired that model: it hung,
+# then answered 401, and every PR got a green job with no review (AI-045). The
+# successor was re-admitted to the reviewer pool on the same planted-defect bar,
+# not renamed into it. The workflow's preflight step now skips a dead entry of
+# this chain loudly, so the next retirement is a warning, not a silent gap.
 #
 # deepseek-v4-flash held this slot until 2026-08-21 and earned it; nothing about
 # that record is retracted. What changed is that deepseek is ALSO the primary in
@@ -27,7 +33,7 @@
 # which is the right way round, because the gate is blocking and CI review is
 # advisory. Visibly weaker reviews here are the signal to revisit, NOT to move
 # back on top of the gate. Full measurement trail in #1149.
-model = "openai/mimo-v2.5"
+model = "openai/mimo-v2.6-flash"
 
 # ONE fallback, now deepseek-v4-flash — the reverse of the pre-2026-08-21
 # arrangement (#1149). It reintroduces contention with the gate on exactly the
@@ -40,6 +46,9 @@ model = "openai/mimo-v2.5"
 #   8 concurrent -> deepseek-v4-flash :  5 x 200,  3 x 429
 #   2 concurrent -> mimo-v2.5, fired WHILE deepseek was saturated :  2 x 200
 #
+# (mimo-v2.5 is the retired predecessor; NaN publishes a per-model limit of 5
+# for mimo-v2.6-flash too, so the measurement's conclusion carries over.)
+#
 # The limit is PER MODEL, not per API key: each carries its own bucket of five.
 # So a second NaN model genuinely dodges the exhaustion that left six PRs
 # unreviewed in a single session, and it costs no new CI credential — which
@@ -48,12 +57,12 @@ model = "openai/mimo-v2.5"
 # This does NOT reopen the contradiction review-attestation.json flags on #786.
 # That one is specific: #786 proposed qwen3.6, which reviewer-pool.json excludes
 # BY NAME on the grounds that "a reviewer that PASSes cheaply is worse than no
-# gate". mimo-v2.5 is excluded by neither name nor class — the pool's line is
+# gate". mimo-v2.6-flash is excluded by neither name nor class — the pool's line is
 # drawn around the latency-optimised daily models, and the local capability
 # record puts mimo on deepseek's side of it:
 #
 #   deepseek-v4-flash  1,048,576 ctx  reasoning
-#   mimo-v2.5          1,048,576 ctx  reasoning
+#   mimo-v2.6-flash    1,048,576 ctx  reasoning
 #   qwen3.6              262,144 ctx
 #   gemma4               262,144 ctx
 #
@@ -82,7 +91,7 @@ model_weak = "openai/qwen3.6"
 
 # NaN models are absent from LiteLLM's registry, so the token budget must be
 # stated explicitly or LiteLLM assumes a small default and truncates the diff.
-# Both models here advertise 1M context — deepseek-v4-flash and mimo-v2.5 alike,
+# Both models here advertise 1M context — deepseek-v4-flash and mimo-v2.6-flash,
 # which is the line reviewer-pool.json draws around reasoning-class — so 200k is
 # a deliberate floor well inside either, raised only against measured need.
 custom_model_max_tokens = 200000

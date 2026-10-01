@@ -3,6 +3,7 @@ package tools
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -307,4 +308,95 @@ func TestDecideAction(t *testing.T) {
 			t.Errorf("decideAction(%q,%q) = %v, want %v", tc.installed, tc.pin, got, tc.want)
 		}
 	}
+}
+
+// Plan runs the reconcile decision Install runs, and touches nothing: the fetch
+// and npm seams fail the test if the plan reaches them.
+func TestInstallerPlan(t *testing.T) {
+	release := Tool{Name: "sops", Version: "3.13.1", Source: Source{
+		Type: "github-release", Repo: "getsops/sops",
+		Asset:     map[string]string{"linux": "sops-v{version}.linux.{goarch}"},
+		Checksums: "sops-v{version}.checksums.txt",
+	}}
+	npm := Tool{Name: "bw", Version: "2026.9.0", Source: Source{Type: "npm", Package: "@bitwarden/cli"}}
+	cases := []struct {
+		name, goos, installed string
+		tool                  Tool
+		want                  PlanAction
+	}{
+		{"absent", "linux", "", release, PlanInstall},
+		{"below the pin", "linux", "3.12.0", release, PlanUpgrade},
+		{"at the pin", "linux", "3.13.1", release, PlanSkip},
+		{"above the pin is never downgraded", "linux", "3.14.0", release, PlanSkip},
+		{"no build for this platform", "windows", "", release, PlanUnsupported},
+		{"no build for this platform, but installed: the probe still runs", "windows", "3.13.1", release, PlanUnsupported},
+		{"a source type Install refuses", "linux", "", Tool{Name: "x", Version: "1.0.0", Source: Source{Type: "homebrew"}}, PlanUnsupported},
+		{"npm below the pin", "linux", "2026.1.0", npm, PlanUpgrade},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &Installer{
+				GOOS: tc.goos, GOARCH: "amd64", Dest: t.TempDir(),
+				CurrentVersion: func(string) string { return tc.installed },
+				Fetch: func(string, string) error {
+					t.Fatal("a plan must not download")
+					return nil
+				},
+				Run: func(string, ...string) error {
+					t.Fatal("a plan must not run a package manager")
+					return nil
+				},
+			}
+			got := in.Plan(tc.tool)
+			if got.Action != tc.want {
+				t.Errorf("Plan(%s).Action = %q, want %q", tc.tool.Name, got.Action, tc.want)
+			}
+			if got.Installed != tc.installed || got.Pin != tc.tool.Version {
+				t.Errorf("Plan(%s) = %+v, want installed %q pin %q", tc.tool.Name, got, tc.installed, tc.tool.Version)
+			}
+		})
+	}
+}
+
+// TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit pins the
+// installer to ProbeVersion's rule. A tool that prints its version and then
+// exits non-zero is at the pin: `dotf tools version` and the doctor already see
+// it that way, and an installer that saw nothing would reinstall on every run.
+func TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit(t *testing.T) {
+	var probed []string
+	probe := func(tool Tool) Runner {
+		return func(name string, args ...string) ([]byte, error) {
+			probed = append(probed, name)
+			return []byte(tool.Name + " " + tool.Version + "\nwarning: unrelated\n"), errors.New("exit status 1")
+		}
+	}
+
+	t.Run("npm, probed on PATH", func(t *testing.T) {
+		var rec []string
+		in := newNpmInstaller("", &rec, nil)
+		in.CurrentVersion = nil
+		in.Probe = probe(bwTool())
+		res, err := in.Install(bwTool())
+		if err != nil || res != Skipped || len(rec) != 0 {
+			t.Errorf("Install = %v, %v, npm calls %v; want Skipped with no npm call", res, err, rec)
+		}
+	})
+
+	t.Run("github-release, probed in Dest", func(t *testing.T) {
+		in := newTestInstaller(t, "", func(url, _ string) error { return fmt.Errorf("unexpected download %s", url) })
+		in.CurrentVersion = nil
+		in.Probe = probe(sopsTool())
+		bin := filepath.Join(in.Dest, "sops")
+		if err := os.WriteFile(bin, []byte("placed"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		probed = nil
+		res, err := in.Install(sopsTool())
+		if err != nil || res != Skipped {
+			t.Errorf("Install = %v, %v; want Skipped", res, err)
+		}
+		if len(probed) != 1 || probed[0] != bin {
+			t.Errorf("probed %v, want the binary in Dest (%s)", probed, bin)
+		}
+	})
 }

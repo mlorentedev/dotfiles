@@ -1,0 +1,16 @@
+[
+  {
+    "id": "CLI-091e-dotf-as-a-product-f1",
+    "behavior": "AC1: no --help text in the command tree cites an internal id, an issue number or 'twin'",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestHelpTextHasNoInternalReferences",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-091e-dotf-as-a-product-f2",
+    "behavior": "AC2: cli/README.md has install, commands and develop sections and cites no internal id",
+    "verification": "grep -q '^## Install' cli/README.md && grep -q '^## Commands' cli/README.md && grep -q '^## Develop' cli/README.md && cd cli && go test ./internal/cmd/ -run TestReadmeHasNoInternalReferences",
+    "state": "pending",
+    "evidence": ""
+  }
+]

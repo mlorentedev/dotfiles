@@ -10,8 +10,17 @@ import (
 )
 
 // loadCatalog reads packages.json checkout-first (ADR-030 precedence), then
-// the deploy mirror. An empty catalog means neither copy was readable.
+// the deploy mirror. An empty catalog means no copy was readable.
 func loadCatalog(sys *System, cfg *Config) tools.Catalog {
+	cat, _, _ := readPackageCatalog(sys, cfg)
+	return cat
+}
+
+// readPackageCatalog is loadCatalog plus the path the catalog was read from (""
+// when no copy loaded) and the first copy that exists but could not be read.
+// The pin checks read through loadCatalog; only the catalog check reports the
+// error, so it appears once rather than once per pinned tool.
+func readPackageCatalog(sys *System, cfg *Config) (tools.Catalog, string, error) {
 	var paths []string
 	if repo := resolveRepoDir(sys); repo != "" {
 		paths = append(paths, filepath.Join(repo, "packages.json"))
@@ -19,12 +28,17 @@ func loadCatalog(sys *System, cfg *Config) tools.Catalog {
 	if cfg != nil && cfg.DotfilesDir != "" {
 		paths = append(paths, filepath.Join(cfg.DotfilesDir, "packages.json"))
 	}
+	var unreadable error
 	for _, p := range paths {
-		if cat, err := tools.Load(p); err == nil {
-			return cat
+		cat, err := tools.Load(p)
+		if err == nil {
+			return cat, p, unreadable
+		}
+		if unreadable == nil && pathExists(p) {
+			unreadable = err
 		}
 	}
-	return tools.Catalog{}
+	return tools.Catalog{}, "", unreadable
 }
 
 // catalogPin returns the packages.json pin for name, or "" when the catalog or
@@ -47,8 +61,19 @@ func catalogPin(sys *System, cfg *Config, name string) string {
 // and setup reported "still locked. after winget install 1.16.2" forever. The
 // catalog cannot converge a binary it does not own, so the extra channel is
 // named for the operator to remove. WARN, not FAIL: the tool does run.
+//
+// It also names a catalog copy that exists but cannot be read. Without that, a
+// corrupt packages.json made every pin check SKIP and this check say nothing,
+// which reads as a clean result.
 func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
-	for _, t := range loadCatalog(sys, cfg).Tools {
+	cat, from, err := readPackageCatalog(sys, cfg)
+	switch {
+	case err != nil && from == "":
+		rep.Warn(fmt.Sprintf("%v — the catalog pin and shadowed-copy checks have nothing to read", err))
+	case err != nil:
+		rep.Warn(fmt.Sprintf("%v — pins are read from %s instead", err, from))
+	}
+	for _, t := range cat.Tools {
 		if t.Source.Type != "npm" {
 			continue
 		}
@@ -62,7 +87,9 @@ func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
 
 // dirsProviding lists the PATH directories that carry an executable named
 // name (on Windows also name.exe / .cmd / .ps1, the shapes npm, scoop and
-// winget each leave), in PATH order, without duplicates.
+// winget each leave), in PATH order, without duplicates. A directory reached
+// through a symlink (usrmerge's /bin, scoop's current) counts once, under the
+// first spelling PATH gives it.
 func (s *System) dirsProviding(name string) []string {
 	candidates := []string{name}
 	if runtime.GOOS == "windows" || s.GOOS == "windows" {
@@ -75,12 +102,16 @@ func (s *System) dirsProviding(name string) []string {
 			continue
 		}
 		clean := filepath.Clean(dir)
-		if seen[clean] {
+		key := clean
+		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
+			key = resolved
+		}
+		if seen[key] {
 			continue
 		}
 		for _, c := range candidates {
 			if isExecFile(filepath.Join(clean, c)) {
-				seen[clean] = true
+				seen[key] = true
 				dirs = append(dirs, clean)
 				break
 			}

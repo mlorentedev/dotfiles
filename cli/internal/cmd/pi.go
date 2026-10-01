@@ -123,7 +123,7 @@ func newPiPackagesApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Converge pi's packages on the manifest, both ways",
-		Long: `Converge pi on ` + pi.ManifestFile + ` (HARNESS-139): remove each
+		Long: `Converge pi on ` + pi.ManifestFile + `: remove each
 package the manifest does not declare at any version, install each declared one
 that is not live at exactly its source, then move each retired path to
 ~/.pi/agent/archive/. Every change goes through pi's own CLI; pi owns its

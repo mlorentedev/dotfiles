@@ -337,3 +337,6 @@ tags: [lessons, index, dotfiles]
 | [317 - A success from an unforced sync is not a fresh cache](lesson-317-a-success-from-an-unforced-sync-is-not-a-fresh-cache.md) | 2026-09-29 |  |
 | [318 - A speed-up must name the critical path it shortens](lesson-318-a-speed-up-must-name-the-critical-path-it-shortens.md) | 2026-09-29 |  |
 | [319 - A go build says (devel); a go install says a pseudo-version](lesson-319-a-go-build-says-devel-and-a-go-install-says-a-pseudo-version.md) | 2026-09-30 |  |
+| [320 - A retired model hangs before it refuses, and only a refusal reaches the fallback](lesson-320-a-retired-model-hangs-before-it-refuses.md) | 2026-09-30 |  |
+| [321 - A test that proves which source won needs the sources to disagree](lesson-321-a-test-that-proves-which-source-won-needs-them-to-disagree.md) | 2026-09-30 |  |
+| [322 - An allow-list path filter classifies every unlisted path as safe to skip](lesson-322-an-allow-list-filter-classifies-every-unlisted-path-as-safe.md) | 2026-09-30 |  |

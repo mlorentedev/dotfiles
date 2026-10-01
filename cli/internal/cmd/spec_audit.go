@@ -49,7 +49,7 @@ checkout by the state of the issue its proposal.md tracks.
 
 This exists because archive-on-merge only sees an issue closed by a PR's
 closing keyword. An issue closed any other way leaves its spec active forever
-(#1087), and only asking the forge can find it.
+and only asking the forge can find it.
 
   FAIL          the issue is CLOSED (a zombie), or the link resolves to no
                 issue, to a pull request, or is malformed

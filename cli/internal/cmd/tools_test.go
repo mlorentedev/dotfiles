@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -24,6 +25,7 @@ func TestToolsList(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DOTFILES_DIR", dir)
+	outsideCheckout(t)
 
 	stdout, _, err := execute(t, "tools", "list")
 	if err != nil {
@@ -38,6 +40,7 @@ func TestToolsList(t *testing.T) {
 
 func TestToolsList_MissingCatalog(t *testing.T) {
 	t.Setenv("DOTFILES_DIR", t.TempDir()) // empty dir → no packages.json
+	outsideCheckout(t)
 	if _, _, err := execute(t, "tools", "list"); err == nil {
 		t.Fatal("expected an error when packages.json is absent")
 	}
@@ -45,6 +48,7 @@ func TestToolsList_MissingCatalog(t *testing.T) {
 
 func TestToolsInstall_MissingCatalog(t *testing.T) {
 	t.Setenv("DOTFILES_DIR", t.TempDir())
+	outsideCheckout(t)
 	if _, _, err := execute(t, "tools", "install"); err == nil {
 		t.Fatal("expected an error when packages.json is absent")
 	}
@@ -114,5 +118,86 @@ func TestRunToolsInstall_AggregatesFailure(t *testing.T) {
 	}
 	if !strings.Contains(errs.String(), "warning:") {
 		t.Errorf("expected a per-tool warning on stderr, got %q", errs.String())
+	}
+}
+
+// outsideCheckout runs the test from a directory with no checkout above it, so
+// the catalog resolves from DOTFILES_DIR alone. Without it the resolver walks up
+// from the package directory and finds this repository's packages.json.
+func outsideCheckout(t *testing.T) {
+	t.Helper()
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Chdir(t.TempDir())
+}
+
+// writeCatalog writes a one-tool catalog naming tool into dir/packages.json.
+func writeCatalog(t *testing.T, dir, tool string) {
+	t.Helper()
+	cat := strings.Replace(testCatalog, `"name":"sops"`, `"name":"`+tool+`"`, 1)
+	if err := os.WriteFile(filepath.Join(dir, "packages.json"), []byte(cat), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The checkout's catalog wins over a stale deploy mirror, the order doctor
+// reads (#1381).
+func TestToolsList_CheckoutCatalogWins(t *testing.T) {
+	checkout, mirror := t.TempDir(), t.TempDir()
+	if err := os.Mkdir(filepath.Join(checkout, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeCatalog(t, checkout, "fromcheckout")
+	writeCatalog(t, mirror, "frommirror")
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("DOTFILES_DIR", mirror)
+	t.Chdir(checkout)
+
+	stdout, _, err := execute(t, "tools", "list")
+	if err != nil {
+		t.Fatalf("tools list: %v", err)
+	}
+	if !strings.Contains(stdout, "fromcheckout") || strings.Contains(stdout, "frommirror") {
+		t.Errorf("want the checkout catalog, got\n%s", stdout)
+	}
+}
+
+func TestToolsList_MirrorWithoutCheckout(t *testing.T) {
+	mirror := t.TempDir()
+	writeCatalog(t, mirror, "frommirror")
+	t.Setenv("DOTFILES_DIR", mirror)
+	outsideCheckout(t)
+
+	stdout, _, err := execute(t, "tools", "list")
+	if err != nil {
+		t.Fatalf("tools list: %v", err)
+	}
+	if !strings.Contains(stdout, "frommirror") {
+		t.Errorf("want the mirror catalog, got\n%s", stdout)
+	}
+}
+
+// --dry-run reports the plan and changes nothing: the tool is absent, so the
+// plan says install, and Dest stays empty.
+func TestToolsInstall_DryRun(t *testing.T) {
+	mirror, home := t.TempDir(), t.TempDir()
+	writeCatalog(t, mirror, "sops")
+	t.Setenv("DOTFILES_DIR", mirror)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	outsideCheckout(t)
+
+	stdout, _, err := execute(t, "tools", "install", "--dry-run")
+	if err != nil {
+		t.Fatalf("tools install --dry-run: %v", err)
+	}
+	// The fixture declares a build for linux, darwin and windows, so the action
+	// is install on every CI leg. Match the whole row: a wrong or empty action
+	// cell must fail, not only a missing name.
+	row := regexp.MustCompile(`(?m)^sops\s+absent\s+3\.13\.1\s+install\s*$`)
+	if !row.MatchString(stdout) {
+		t.Errorf("dry-run output has no row `sops absent 3.13.1 install`\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".local", "bin")); !os.IsNotExist(err) {
+		t.Errorf("dry-run created or touched ~/.local/bin (stat err %v)", err)
 	}
 }
