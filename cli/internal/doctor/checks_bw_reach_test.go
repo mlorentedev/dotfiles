@@ -260,7 +260,7 @@ func TestBWReach_StaleSyncWarnsWhileStatusLooksHealthy(t *testing.T) {
 	if fails != 0 {
 		t.Fatalf("staleness is a WARN, not a FAIL; got %d\n%s", fails, out)
 	}
-	if !strings.Contains(out, "45d ago") || !strings.Contains(out, "BUG-074") {
+	if !strings.Contains(out, "45d ago") || !strings.Contains(out, "run `bw sync`") {
 		t.Fatalf("expected a staleness warning citing the age; got:\n%s", out)
 	}
 }
@@ -550,7 +550,7 @@ func TestBWReach_DeclaredNoIdentity(t *testing.T) {
 			name:   "locked vault with a stale sync → the BUG-074 WARN still fires",
 			status: "locked", lastSync: bwSyncStale, live: 28,
 			wantFail: 0, wantWarn: 1,
-			wantSub: "BUG-074",
+			wantSub: "run `bw sync`",
 			notSub:  "declared",
 		},
 		{

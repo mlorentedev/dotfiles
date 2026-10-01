@@ -133,7 +133,8 @@ func migrateGuard(reg *secrets.Registry, s *secrets.Secret) error {
 			}
 		}
 		if shared > 1 {
-			return fmt.Errorf("%q shares its age source %q with another entry — split into distinct Bitwarden tokens manually (tracked by #321)", s.ID, s.Age)
+			// #321
+			return fmt.Errorf("%q shares its age source %q with another entry — split into distinct Bitwarden tokens manually", s.ID, s.Age)
 		}
 	}
 	return nil
