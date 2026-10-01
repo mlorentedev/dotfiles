@@ -91,6 +91,7 @@ RUN for attempt in 1 2 3 4 5; do \
             && bash /tmp/agy-install.sh \
             && test -x /home/testuser/.local/bin/agy \
             && break; \
+        [ "$attempt" -eq 5 ] && break; \
         echo "agy install attempt $attempt failed; retrying in $((attempt * 5))s" >&2; \
         sleep $((attempt * 5)); \
     done \
