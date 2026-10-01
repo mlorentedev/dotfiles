@@ -26,3 +26,5 @@ So a smaller `ai_timeout` would have changed nothing. Why it does not fire is no
 ## Guard
 
 `tests/pr-agent-config.bats`: "every attempt streams its NaN calls" pins the setting on both attempts and checks its substring against the base URL each step sends. Whether streaming bounds the wait is AC6's live measurement, recorded on #1858.
+
+That the pinned build reads the three keys was checked against the code, not the logs. The action never logs `litellm_ai_handler` records (zero in run 36834986053), so the absence of "Using streaming mode" there proves nothing. PR-Agent at the pinned commit was installed in a scratch venv and run with the workflow's env. Its `_acompletion` was replaced with a function that records the keyword arguments. With the three `LITELLM__*` keys set, the call went out with `stream=True`, provider `openai`, and `api_base` NaN's. Without them, it went out with `stream=None`. Run the same check again whenever the pin moves, because the condition is upstream code.
