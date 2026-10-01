@@ -32,7 +32,7 @@ func newSecretsBackupCmd() *cobra.Command {
 	var out string
 	c := &cobra.Command{
 		Use:   "backup",
-		Short: "Escrow the whole Bitwarden vault, age-encrypted, to sensitive/dr (ADR-028 §5)",
+		Short: "Escrow the whole Bitwarden vault, age-encrypted, to sensitive/dr",
 		Long: "backup runs the disaster-recovery escrow: `bw sync` + `bw export` (the entire\n" +
 			"vault — keys, tokens, TOTP seeds) piped in memory into age, encrypted to your own\n" +
 			"recipient (`age-keygen -y` of your identity), and written atomically (0600) to\n" +

@@ -124,6 +124,34 @@ func TestEnvPersist_CheckAndSweepOfARetiredName(t *testing.T) {
 	}
 }
 
+// CLI-065 review F2: --check refuses the same contract names persist refuses,
+// so a check can never pass on a contract the write would reject.
+func TestEnvPersist_CheckRefusesTheMarkerNameAsPersistDoes(t *testing.T) {
+	dir := t.TempDir()
+	contract := `{"env_vars":[{"name":"` + env.ManagedMarker + `","required":false,"default":{"linux":"x","windows":"x"}}]}`
+	if err := os.WriteFile(filepath.Join(dir, "env-contract.json"), []byte(contract), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", dir)
+	t.Setenv("DOTFILES_DIR", dir)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	store := &memUserEnv{values: map[string]string{}}
+	seam := func() (env.UserEnvStore, error) { return store, nil }
+
+	for _, args := range [][]string{nil, {"--check"}} {
+		out, err := runEnvPersist(t, seam, args...)
+		if err == nil || !strings.Contains(err.Error(), "reserved") {
+			t.Fatalf("args %v: want the reserved-name refusal, got err=%v\n%s", args, err, out)
+		}
+	}
+	if len(store.values) != 0 || len(store.deletes) != 0 {
+		t.Fatalf("a refused contract touched the store: %v %v", store.values, store.deletes)
+	}
+}
+
 // AC5: where the OS has no per-user persistent scope the command is a no-op
 // that says so, and never reaches the store — the sweep included.
 func TestEnvPersist_UnsupportedScopeIsANoOp(t *testing.T) {

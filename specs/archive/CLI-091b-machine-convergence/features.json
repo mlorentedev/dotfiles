@@ -1,0 +1,16 @@
+[
+  {
+    "id": "CLI-091b-machine-convergence-f1",
+    "behavior": "AC1: dotf tools install --dry-run prints installed version, pin and action per tool from the same decideAction as install, and changes nothing",
+    "verification": "cd cli && go test ./internal/tools/ -run TestInstallerPlan && go test ./internal/cmd/ -run TestToolsInstall_DryRun",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-091b-machine-convergence-f2",
+    "behavior": "AC2: dotf tools list and install read packages.json from the checkout first, the deploy mirror otherwise",
+    "verification": "cd cli && go test ./internal/env/ -run TestResolveCatalogPath && go test ./internal/cmd/ -run 'TestToolsList_(CheckoutCatalogWins|MirrorWithoutCheckout)'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -166,5 +167,30 @@ func TestRunKeepsDiagnosticsAlongsideASilencedError(t *testing.T) {
 	}
 	if strings.Contains(out, "Error: boom") {
 		t.Errorf("a SilenceErrors command must not get Cobra's wrapper: %q", out)
+	}
+}
+
+func TestResolveVersion(t *testing.T) {
+	pseudo := "v0.0.0-20260930012845-db2b904794b4"
+	vcs := []debug.BuildSetting{{Key: "vcs.revision", Value: "db2b904794b4700b1e9b5c784d7b570bdc46fae0"}}
+	cases := []struct {
+		name, ldflag string
+		info         *debug.BuildInfo
+		want         string
+	}{
+		{"release stamp wins", "0.61.1", &debug.BuildInfo{Main: debug.Module{Version: pseudo}}, "0.61.1"},
+		{"no build info", "dev", nil, "dev"},
+		{"checkout build", "dev", &debug.BuildInfo{Main: debug.Module{Version: "(devel)"}, Settings: vcs}, "dev"},
+		{"checkout build without vcs", "dev", &debug.BuildInfo{Main: debug.Module{Version: "(devel)"}}, "dev"},
+		{"empty module version", "dev", &debug.BuildInfo{}, "dev"},
+		{"versioned checkout build", "dev", &debug.BuildInfo{Main: debug.Module{Version: pseudo}, Settings: vcs}, "dev"},
+		{"module install", "dev", &debug.BuildInfo{Main: debug.Module{Version: pseudo}}, "0.0.0-20260930012845-db2b904794b4"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveVersion(tc.ldflag, tc.info); got != tc.want {
+				t.Errorf("resolveVersion(%q) = %q, want %q", tc.ldflag, got, tc.want)
+			}
+		})
 	}
 }

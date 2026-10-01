@@ -23,8 +23,7 @@ func newToolsCmd() *cobra.Command {
 		Use:   "tools",
 		Short: "Declarative cross-OS package catalog (packages.json)",
 		Long: "tools reads packages.json — the tool/install list as data — so a single\n" +
-			"catalog feeds every OS instead of duplicated install blocks in setup-linux.sh\n" +
-			"and setup-windows.ps1 (CLI-029, piloting ADR-021/CLI-028 with sops).",
+			"catalog feeds every OS instead of one install block per OS.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -37,22 +36,21 @@ func newToolsCmd() *cobra.Command {
 }
 
 func newToolsInstallCmd() *cobra.Command {
-	return &cobra.Command{
+	var dryRun bool
+	c := &cobra.Command{
 		Use:   "install [name]",
 		Short: "Download, verify (sha256), and install catalog tools to ~/.local/bin",
 		Long: "install downloads each catalog tool's pinned release binary, verifies its\n" +
 			"sha256 against the release checksums, and places it in ~/.local/bin. It is\n" +
 			"idempotent: a tool already at or above its pin is skipped, a below-pin one is\n" +
 			"upgraded (never downgraded). With no [name] it installs every catalog tool;\n" +
-			"with a name it installs just that one.",
+			"with a name it installs just that one.\n\n" +
+			"--dry-run prints the action install would take for each tool and changes\n" +
+			"nothing.",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := filepath.Join(env.DotfilesDir(env.Home()), "packages.json")
-			if _, err := os.Stat(path); err != nil {
-				return fmt.Errorf("packages.json not found at %s — set DOTFILES_DIR or run from the repo", path)
-			}
-			cat, err := tools.Load(path)
+			cat, err := loadToolsCatalog()
 			if err != nil {
 				return err
 			}
@@ -64,9 +62,43 @@ func newToolsInstallCmd() *cobra.Command {
 				Dest: filepath.Join(env.Home(), ".local", "bin"),
 				Out:  cmd.OutOrStdout(),
 			}
+			if dryRun {
+				return planToolsInstall(in, cat, name, cmd.OutOrStdout())
+			}
 			return runToolsInstall(in, cat, name, cmd.ErrOrStderr())
 		},
 	}
+	c.Flags().BoolVar(&dryRun, "dry-run", false, "print what install would do, and change nothing")
+	return c
+}
+
+// loadToolsCatalog reads packages.json from the checkout, else the deploy mirror
+// (env.ResolveCatalogPath), the file doctor reads too.
+func loadToolsCatalog() (tools.Catalog, error) {
+	path := env.ResolveCatalogPath()
+	if _, err := os.Stat(path); err != nil {
+		return tools.Catalog{}, fmt.Errorf("packages.json not found in the checkout or at %s — run from the repo or set DOTFILES_DIR", path)
+	}
+	return tools.Load(path)
+}
+
+// planToolsInstall prints one row per selected tool: what install would do.
+func planToolsInstall(in *tools.Installer, cat tools.Catalog, name string, out io.Writer) error {
+	selected, err := selectTools(cat, name)
+	if err != nil {
+		return err
+	}
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "NAME\tINSTALLED\tPIN\tACTION")
+	for _, t := range selected {
+		p := in.Plan(t)
+		installed := p.Installed
+		if installed == "" {
+			installed = "absent"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Name, installed, p.Pin, p.Action)
+	}
+	return w.Flush()
 }
 
 // runToolsInstall selects the requested tools and installs them. Split from the
@@ -123,11 +155,7 @@ func newToolsListCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			path := filepath.Join(env.DotfilesDir(env.Home()), "packages.json")
-			if _, err := os.Stat(path); err != nil {
-				return fmt.Errorf("packages.json not found at %s — set DOTFILES_DIR or run from the repo", path)
-			}
-			cat, err := tools.Load(path)
+			cat, err := loadToolsCatalog()
 			if err != nil {
 				return err
 			}
@@ -156,9 +184,8 @@ func newToolsVersionCmd() *cobra.Command {
 		Use:   "version <name>",
 		Short: "Print the semver a tool on PATH reports, or exit 1",
 		Long: "version runs `<name> --version` and prints the first semver in its output —\n" +
-			"the one extraction every caller shares (ADR-036). The setup scripts used to\n" +
-			"parse \"last token of the first line\" in seven places, and on the Windows\n" +
-			"work box that accepted `locked.` as opencode's version (AI-034, #1294).\n" +
+			"the one extraction every caller shares, so no script parses version output\n" +
+			"itself (a tool that prints `locked.` is not read as a version).\n" +
 			"Exits 1 with nothing on stdout when the tool is absent or prints no version,\n" +
 			"so a shell caller can test either.",
 		Args:         cobra.ExactArgs(1),

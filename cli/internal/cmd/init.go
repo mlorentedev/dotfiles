@@ -32,7 +32,7 @@ func newInitCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init [path]",
-		Short: "Scaffold a fully-practiced repo from embedded templates (ADR-022)",
+		Short: "Scaffold a repo with AGENTS.md, specs and guardrail CI from embedded templates",
 		Long: `init scaffolds a repo (the current dir, or [path]) with the cross-project
 practice stack baked in: the placement-model structure, AGENTS.md + the
 Spec-Driven Development section, a CLAUDE.md pointer, stack-appropriate CI,
@@ -127,7 +127,7 @@ func newInitAgentsCmd() *cobra.Command {
 		Short: "Bootstrap or refresh AGENTS.md + the Spec-Driven Development section",
 		Long: `agents seeds (or refreshes) the target repo's AGENTS.md with the self-contained
 Spec-Driven Development section, from the template embedded in the binary — no
-vault required and no $VAULT_PATH leak (#248).
+vault required and no $VAULT_PATH leak.
 
 Idempotent: a re-run is a safe no-op when the section is already present. Pass
 --force to replace an existing section in place. Without --repo it operates on
@@ -205,7 +205,7 @@ currently delete_branch_on_merge=true, which auto-deletes a PR's head branch on
 merge (the orphan-branch hygiene fix). Idempotent: a no-op when already enabled.
 
 Without --repo it derives owner/name from the current repo's origin remote.
-Host-coupling degrades gracefully (ADR-022): a missing gh, missing remote, or an
+Host-coupling degrades gracefully: a missing gh, missing remote, or an
 unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 		Example:      "  dotf init github\n  dotf init github --repo owner/name --dry-run",
 		Args:         cobra.NoArgs,

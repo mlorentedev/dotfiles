@@ -2,9 +2,12 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -103,6 +106,9 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 				p := filepath.Join(home, filepath.FromSlash(dst))
 				mkdirAll(t, filepath.Dir(p))
 				if err := os.Symlink(filepath.Join(deploy, filepath.FromSlash(src)), p); err != nil {
+					if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(1314)) {
+						t.Skipf("Windows symlink privilege unavailable: %v", err)
+					}
 					t.Fatalf("symlink: %v", err)
 				}
 			}

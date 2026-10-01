@@ -184,6 +184,22 @@ func ResolveRegistryPath() string {
 	return filepath.Join(DotfilesDir(Home()), "secrets", "registry.yaml")
 }
 
+// ResolveCatalogPath locates packages.json for READS, the checkout first and the
+// deploy mirror second, like doctor's catalog checks (#1381). The checkout is
+// found the RepoDir way, cwd before DOTFILES_REPO_DIR; doctor still resolves it
+// the other way round, so from a worktree the two can read different catalogs
+// until #1418 gives doctor this order. Setup copies the catalog into the mirror
+// before it calls `dotf tools install`, so a setup run reads the same file
+// either way.
+func ResolveCatalogPath() string {
+	if root := RepoDir(); root != "" {
+		if p := filepath.Join(root, "packages.json"); fileExists(p) {
+			return p
+		}
+	}
+	return filepath.Join(DotfilesDir(Home()), "packages.json")
+}
+
 // ResolveSensitiveDir locates the age secret store (sensitive/) for READS. Like
 // ResolveRegistryPath (ADR-030), it prefers the dotfiles checkout — the version-
 // controlled SSOT where rotations land — falling back to the deployed copy under
