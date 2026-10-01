@@ -101,13 +101,14 @@ present in the same array, is correctly silent.
 
 ## Promotion candidates
 
-- **Nothing for the vault yet.** The pin sites, the litellm `openai/` prefix and
-  the seed-if-missing constraint are all specific to this repository's
-  deployment.
-- The one genuinely cross-project candidate — *"a guard that detects `not
-  declared` fires on every legitimate extension; detect the shape that is
-  **wrong**, not the shape that is merely **absent**"* — is a strong pattern and
-  should wait for a second instance outside this repo before promotion.
+- [x] Lesson for the repo's `docs/lessons/`? no - the pin sites, the litellm
+  `openai/` prefix and the seed-if-missing constraint are all specific to this
+  repository's deployment, and the decisions are recorded in this file.
+- [x] ADR-worthy decision? no - the guard follows ADR-025's render-at-setup
+  model and `model-map.json` as the SSOT; it does not change either.
+- [x] New pattern candidate? no: the one cross-project candidate (detect the
+  shape that is wrong, not the shape that is merely absent) waits for a second
+  instance outside this repo before promotion.
 
 ## Archive pass (2026-09-30)
 
