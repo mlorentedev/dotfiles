@@ -200,3 +200,51 @@ func TestMirror_PreservesTheSourceMode(t *testing.T) {
 		t.Fatalf("destination mode = %#o, want %#o", got, 0o775)
 	}
 }
+
+func TestMirror_ReplacesReadOnlyDestinationOnWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows refuses to rename over an existing read-only file")
+	}
+	repo, deploy := mirrorRepo(t), t.TempDir()
+	src := filepath.Join(repo, "harness", "model-map.json")
+	if err := os.Chmod(src, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Mirror(repo, deploy); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chmod(src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, src, `{"pools":{"updated":{}}}`)
+	if err := os.Chmod(src, 0o444); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Mirror(repo, deploy); err != nil {
+		t.Fatalf("replacing a read-only destination: %v", err)
+	}
+	dst := filepath.Join(deploy, "harness", "model-map.json")
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `{"pools":{"updated":{}}}` {
+		t.Fatalf("destination content = %s", got)
+	}
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o444 {
+		t.Fatalf("destination mode = %#o, want %#o", got, 0o444)
+	}
+	res, err := Mirror(repo, deploy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Updated != 0 || res.Unchanged != 5 {
+		t.Fatalf("converged re-run: want 0 updated / 5 unchanged, got %d / %d", res.Updated, res.Unchanged)
+	}
+}

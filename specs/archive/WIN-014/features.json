@@ -8,7 +8,7 @@
   },
   {
     "id": "WIN-014-f2",
-    "behavior": "Mirror writes preserve executable source modes.",
+    "behavior": "Mirror writes preserve source modes and can replace a Windows read-only destination on later runs.",
     "verification": "go test ./internal/harness",
     "state": "pending",
     "evidence": ""

@@ -930,9 +930,45 @@ FIXTURE
     grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 passes its checkout explicitly and warns when dotf is unavailable (WIN-014)" {
-    grep -qF 'dotf harness mirror --repo $DotfilesDir' "$PS1_SCRIPT"
-    grep -qF 'dotf not found; harness inputs were not mirrored' "$PS1_SCRIPT"
+run_windows_harness_mirror_block() { # <dotf-present> <checkout>
+    local script_path="$(_winpath "$PS1_SCRIPT")"
+    run pwsh -NoProfile -NonInteractive -Command "
+        \$source = Get-Content -LiteralPath '$script_path' -Raw
+        \$match = [regex]::Match(
+            \$source,
+            '(?ms)^# Mirror the harness inputs into the deploy dir .*?(?=^# Phase C daemon supervision)'
+        )
+        if (-not \$match.Success) { throw 'harness mirror block not found' }
+        function Write-Warn([string]\$Message) { Write-Output \"WARN:\$Message\" }
+        \$DotfilesDir = '$2'
+        if ('$1' -eq 'yes') {
+            function dotf {
+                Write-Output ('CALL <' + (\$args -join '> <') + '>')
+                \$global:LASTEXITCODE = 0
+            }
+        } else {
+            \$env:PATH = ''
+        }
+        Invoke-Expression \$match.Value
+    "
+}
+
+@test "setup-windows.ps1 executes harness mirror with its checkout path (WIN-014)" {
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+    run_windows_harness_mirror_block yes 'C:\checkout with spaces'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'CALL <harness> <mirror> <--repo> <C:\checkout with spaces>'* ]]
+}
+
+@test "setup-windows.ps1 warns when dotf cannot mirror the harness (WIN-014)" {
+    if ! command -v pwsh >/dev/null 2>&1; then
+        skip "pwsh not available"
+    fi
+    run_windows_harness_mirror_block no 'C:\checkout'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'WARN:dotf not found; harness inputs were not mirrored'* ]]
 }
 
 @test "parity: both setups mirror the harness through the same dotf command (WIN-007)" {
