@@ -119,7 +119,8 @@ func reportDeclaredBudgets(parsed map[string]any, pools map[string]any, rep *Rep
 		return
 	}
 	rep.Info("declared concurrency: " + strings.Join(declared, ", ") +
-		" — DECLARED, not enforced: nothing decrements these today (ADR-035 level 1)")
+		// ADR-035 level 1
+		" — DECLARED, not enforced: nothing decrements these today")
 
 	for _, name := range names {
 		if with, ok := shared[name]; ok {

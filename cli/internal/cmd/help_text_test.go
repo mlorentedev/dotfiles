@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -59,12 +60,12 @@ func internalRef(t *testing.T) *regexp.Regexp {
 		t.Fatal("no spec area found under specs/: the prefix list would silently stay hand-kept")
 	}
 	sort.Slice(prefixes, func(i, j int) bool { return len(prefixes[i]) > len(prefixes[j]) })
-	return regexp.MustCompile(`\b(` + strings.Join(prefixes, "|") + `)-[0-9]+|#[0-9]{2,5}\b|\blessons? [0-9]+\b|\btwins?\b`)
+	return regexp.MustCompile(`\b(` + strings.Join(prefixes, "|") + `)-[0-9]+|#[0-9]+\b|\blessons? [0-9]+\b|\btwins?\b`)
 }
 
 // TestHelpTextHasNoInternalReferences walks every command and checks each piece
-// of text `--help` prints: the short and long descriptions, the examples and
-// every flag's usage line.
+// of text `--help` prints: the usage line, aliases, descriptions, examples and
+// deprecation notice, and every flag's usage line, default and deprecation.
 func TestHelpTextHasNoInternalReferences(t *testing.T) {
 	ref := internalRef(t)
 	var walk func(c *cobra.Command)
@@ -76,10 +77,17 @@ func TestHelpTextHasNoInternalReferences(t *testing.T) {
 				}
 			}
 		}
+		check("Use", c.Use)
+		check("Aliases", strings.Join(c.Aliases, "\n"))
 		check("Short", c.Short)
 		check("Long", c.Long)
 		check("Example", c.Example)
-		c.LocalFlags().VisitAll(func(f *pflag.Flag) { check("flag --"+f.Name, f.Usage) })
+		check("Deprecated", c.Deprecated)
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			check("flag --"+f.Name, f.Usage)
+			check("flag --"+f.Name+" default", f.DefValue)
+			check("flag --"+f.Name+" deprecation", f.Deprecated)
+		})
 		for _, sub := range c.Commands() {
 			walk(sub)
 		}
@@ -103,37 +111,50 @@ func TestReadmeHasNoInternalReferences(t *testing.T) {
 	}
 }
 
-// outputCleanFiles are the sources whose printed strings have been cleaned of
-// internal ids. Output is built inside RunE and the doctor checks, where the
-// cobra walk above cannot reach, so these are read as Go source. A file joins
-// the list once its strings name behaviour; the rest are tracked in #1891.
-var outputCleanFiles = []string{"orca.go", "../doctor/checks_orca.go"}
+// outputPackages hold the strings dotf prints at run time. Output is built
+// inside RunE and the doctor checks, where the cobra walk above cannot reach, so
+// every non-test source file in them is read as Go. A new file is covered the
+// day it lands, with no list to update.
+var outputPackages = []string{".", "../doctor"}
 
 // TestOutputStringsHaveNoInternalReferences checks every string literal in
-// outputCleanFiles against the same pattern as --help. Comments are not string
+// outputPackages against the same pattern as --help. Comments are not string
 // literals, so they keep their ids.
 func TestOutputStringsHaveNoInternalReferences(t *testing.T) {
 	ref := internalRef(t)
-	for _, file := range outputCleanFiles {
-		fset := token.NewFileSet()
-		f, err := parser.ParseFile(fset, file, nil, 0)
+	files := 0
+	for _, dir := range outputPackages {
+		matches, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		if err != nil {
-			t.Fatalf("parse %s: %v", file, err)
+			t.Fatalf("list %s: %v", dir, err)
 		}
-		literals := 0
-		ast.Inspect(f, func(n ast.Node) bool {
-			lit, ok := n.(*ast.BasicLit)
-			if !ok || lit.Kind != token.STRING {
-				return true
+		for _, file := range matches {
+			if strings.HasSuffix(file, "_test.go") {
+				continue
 			}
-			literals++
+			files++
+			checkOutputLiterals(t, ref, file)
+		}
+	}
+	if files == 0 {
+		t.Fatal("no source file found: the package paths are wrong or moved")
+	}
+}
+
+// checkOutputLiterals reports each string literal in file that ref matches.
+func checkOutputLiterals(t *testing.T, ref *regexp.Regexp, file string) {
+	t.Helper()
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, file, nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v", file, err)
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 			if m := ref.FindString(lit.Value); m != "" {
 				t.Errorf("%s mentions %q: %s", fset.Position(lit.Pos()), m, lit.Value)
 			}
-			return true
-		})
-		if literals == 0 {
-			t.Errorf("%s has no string literals: the path is wrong or the file moved", file)
 		}
-	}
+		return true
+	})
 }

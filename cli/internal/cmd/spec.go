@@ -529,7 +529,8 @@ agent) or by hand. Do not skip the Why.`,
 			if !forceNoGate {
 				if issueNum == 0 {
 					return fmt.Errorf("no work-gate given: pass --issue <number>.\n" +
-						"Per ADR-018 every spec is downstream of an OPEN GitHub issue on the\n" +
+						// ADR-018
+						"Every spec is downstream of an OPEN GitHub issue on the\n" +
 						"bitácora Project. Options: (a) open/find the issue, re-run with --issue;\n" +
 						"(b) re-run with --force-no-gate (NOT RECOMMENDED)")
 				}

@@ -435,7 +435,8 @@ func newSecretsShowCmd() *cobra.Command {
 			}
 
 			if isAgentSession() {
-				return fmt.Errorf("refusing to print secret %q to stdout in an agent environment (ADR-028 doctrine); inject it via 'dotf secrets run -- <cmd>' instead", args[0])
+				// ADR-028 doctrine
+				return fmt.Errorf("refusing to print secret %q to stdout in an agent environment; inject it via 'dotf secrets run -- <cmd>' instead", args[0])
 			}
 
 			if stdoutIsTerminal() && !reveal {
@@ -753,7 +754,8 @@ func assertSafeChildCommand(argv []string) error {
 	}
 	base := commandName(argv[0])
 	if base == "env" || base == "printenv" || base == "export" {
-		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", base)
+		// ADR-028 doctrine
+		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout", base)
 	}
 	// busybox is a multi-call binary whose first argument is the command it runs,
 	// so `busybox env` is `env` and `busybox sh -c` is a shell (round 2, F5).
@@ -765,7 +767,8 @@ func assertSafeChildCommand(argv []string) error {
 	if slices.Contains(inspectedShells, base) {
 		for _, snippet := range shellSnippets(argv[1:]) {
 			if word, ok := snippetIntrospection(snippet); ok {
-				return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout (ADR-028 doctrine)", word)
+				// ADR-028 doctrine
+				return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout", word)
 			}
 		}
 	}

@@ -45,7 +45,7 @@ func TestCheckProfileFiles_MeasuresThePwshResolvedProfile(t *testing.T) {
 			wantSub:  "PowerShell profile missing: ",
 			// A file that never existed is not BUG-020 corruption, and the
 			// heal has nothing to rebuild (CLI-066 review round 1, finding 1).
-			unwant: "BUG-020",
+			unwant: "corrupted",
 		},
 		{
 			name:     "pwsh prints noise before the path: the last line is the answer",
@@ -162,7 +162,7 @@ func TestCheckProfileFiles_FixDoesNotHealAMissingProfile(t *testing.T) {
 	if rep.Failures() != 1 || !strings.Contains(out, "PowerShell profile missing: "+missing) {
 		t.Fatalf("want one missing FAIL naming %s\n%s", missing, out)
 	}
-	if strings.Contains(out, "BUG-020") {
+	if strings.Contains(out, "corrupted") {
 		t.Fatalf("a never-written profile is not BUG-020\n%s", out)
 	}
 }
