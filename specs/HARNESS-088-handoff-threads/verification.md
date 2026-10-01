@@ -184,3 +184,31 @@ $ cd cli && go build ./... && go vet ./... && go test ./... && GOOS=windows go v
 ok (every package); 0 issues.
 ```
 
+
+## Round-2 findings (agy/gemini-3.1-pro-high, FAIL)
+
+The review read the range from the commit that added this spec, so it saw code
+other PRs shipped since then (#1551).
+
+- **SessionEnd stamps `claude` (Major), declined.** The `mem session-end` hook is
+  registered only in Claude's binding (`harness/manifest.json`,
+  `agents.bind[0].emit_hooks`), so the agent it names is the one running. Other
+  agents write their journal through `/handoff` and `dotf mem thread --agent`.
+- **Cyclomatic complexity (Major), fixed for this change.** This spec's lock
+  raised `newMemHandoffWriteCmd` from 14 to 16. Its body is now split into
+  `handoffWrite.run`, `readHandoffBody` and `handoffWrite.publish`, all under 10.
+  `SessionEnd` (14) is unchanged by this spec and sits in `internal/mem`, outside
+  the HARNESS-150 gocyclo ratchet, which only moves down one extraction at a time.
+- **Per-user lock directory (Minor, THEORETICAL), declined.** One OS user owns a
+  vault checkout and its sessions. A lock shared across users would need a
+  world-writable directory, which is the symlink attack the per-user one avoids.
+- **The fallback record copies every thread (Minor, THEORETICAL), declined.**
+  Shipped in #1701 and outside this diff; the hook writes only where no journal
+  exists, and says it is a copy of the block.
+
+```
+$ cd cli && gocyclo -over 9 ./internal/cmd/mem_handoff.go
+(no output)
+$ go test ./internal/cmd ./internal/mem ./internal/filelock -count=1 && GOOS=windows go vet ./internal/cmd ./internal/filelock && golangci-lint run ./internal/cmd/... ./internal/mem/... ./internal/filelock/...
+ok (every package); 0 issues.
+```
