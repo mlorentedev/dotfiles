@@ -26,8 +26,8 @@ import (
 //
 // WHY THE EXISTING VERIFICATION COULD NOT SEE IT. AI-030's reconcile proves the
 // `packages` array of the live settings.json converges on the manifest, and
-// specs/AI-030-pi-packages-manifest/verify-reconcile.sh drives the real block to
-// prove it. Both are correct and both are blind here: a package can be
+// its tests (now in cli/internal/pi, since HARNESS-139) prove it. Both are
+// correct and both are blind here: a package can be
 // installed, declared, and counted while a file elsewhere stops it loading.
 // Counting declarations is not observing effect — the failure this repository
 // has now catalogued seven times inside this one spec family.

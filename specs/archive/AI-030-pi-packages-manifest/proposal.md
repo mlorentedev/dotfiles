@@ -1,7 +1,7 @@
 ---
 id: "AI-030-pi-packages-manifest"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-25"
 issue: "mlorentedev/dotfiles#1224"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -27,23 +27,27 @@ will not happen.
 ## What
 
 `ai/pi/packages.json` declares the wanted packages, each pinned to a version.
-`setup-linux.sh` and `setup-windows.ps1` reconcile that declaration against the
-live `~/.pi/agent/settings.json` on **every** run and install the difference
-through `pi install`. A machine that already has pi converges on the next setup
-run; a fresh machine converges on its first. Re-running changes nothing and says
-so.
+`setup-linux.sh` and `setup-windows.ps1` both call `dotf pi packages apply` on
+**every** run, which reconciles that declaration against the live
+`~/.pi/agent/settings.json` in both directions: it installs what is declared and
+missing, and removes what is live and undeclared (HARNESS-139). A machine that
+already has pi converges on the next setup run; a fresh machine converges on its
+first. Re-running changes nothing and says so.
+
+> Amended 2026-10-01 after the round-1 review. The original reconcile was
+> additive, and this section declared removal out of scope. HARNESS-139 (#1628)
+> replaced the shell twins with `dotf pi packages apply`, which removes
+> undeclared packages so that a manifest edit can purge one (D-2 on #1625,
+> pi-memory). On 2026-10-01 the owner accepted the general rule: whatever the
+> manifest does not declare is removed, including a package installed by hand.
 
 ## Out of scope
 
-- **Removing packages.** The reconcile is additive: it installs what is declared
-  and missing. It never uninstalls what is present and undeclared, because a
-  package installed deliberately outside this manifest is not evidence of drift
-  and `pi remove` on a human's own extension is not setup's decision to make.
 - **Version convergence.** A declared `@0.4.6` against a live `@0.5.0` is a
   different entry, so the reconcile installs the declared one; it does not
   compare or downgrade. Upgrades are a manifest edit, which is the point —
   a diff and a reviewer between upstream's publish and this machine.
-- **Auditing the nine packages.** Pinning bounds the risk; it does not review
+- **Auditing the ten packages.** Pinning bounds the risk; it does not review
   the code. The `why` field is where that review will be recorded when it
   happens.
 - **Project-scoped packages** (`.pi/settings.json`, `pi install -l`). User scope
@@ -57,7 +61,7 @@ so.
   executables."* That is inside an agent holding `NAN_API_KEY` with write access
   to these repositories. Pinning is the floor, not the answer. **Resolved for
   this PR**: every entry pinned, guard refuses an unpinned one, `why` recorded
-  per entry. **Left open**: no code review of the nine.
+  per entry. **Left open**: no code review of the ten.
 - **`pi install` on Linux must not need an unlocked vault.** `pi` is a shell
   function wrapping `dotf secrets run` and fails on a locked Bitwarden vault.
   **Resolved**: the reconcile calls `$PI_BIN` (the raw binary), as the existing
@@ -67,6 +71,14 @@ so.
   `{"source": "npm:pkg", ...}`. A reader handling only strings would reinstall
   every filtered entry on every run. **Resolved**: both forms read on both
   platforms, verified by scenario.
+- **Removal is total.** The manifest is the whole declaration, so a package
+  installed by hand and not declared is removed on the next setup run. That is
+  the accepted cost of convergence (owner, 2026-10-01): a package worth keeping
+  is declared. **Mitigated**: an empty manifest is refused rather than read as
+  "remove everything", an unparseable live `settings.json` is an error rather
+  than an empty list, and both setup twins pass `--repo` so a worktree's own
+  manifest drives the run. `dotf pi packages check` shows the plan without
+  applying it.
 - **Open**: whether pi auto-installs missing packages declared in **user**-scoped
   settings at startup. Upstream documents that only for project scope. The
   reconcile loop does not depend on the answer, which is why it is the mechanism
@@ -92,9 +104,11 @@ so.
       reports a missing toolchain as N separate package failures.
 - [x] **AC8** — an unreadable or empty manifest is reported, never treated as
       "nothing to do".
-- [x] **AC9** — Linux installs through `$PI_BIN`, not the `pi` shell function.
-- [x] **AC10** — `setup-windows.ps1` reconciles the same manifest with the same
-      semantics (parity), and adds no non-ASCII to the file.
+- [x] **AC9** — Linux setup hands `$PI_BIN` (the raw binary) to
+      `dotf pi packages apply --pi`, not the `pi` shell function.
+- [x] **AC10** — `setup-windows.ps1` reconciles the same manifest through the
+      same `dotf pi packages apply`, naming its own checkout (parity), and adds
+      no non-ASCII to the file.
 - [x] **AC11** — a package that is installed and declared is also **loaded**.
       Added 2026-08-26 for #1243, and it is the criterion whose absence this
       spec's own verification demonstrated: AC1–AC10 all hold while pi refuses
@@ -108,6 +122,12 @@ so.
       repaired under `--fix`), which is the durable surface: this is machine
       state, so CI cannot observe it and a doctor check is the only thing that
       runs where the defect lives.
+
+- [x] **AC12** — a live package that the manifest does not declare at any
+      version is removed before the declared ones are installed, and an empty
+      manifest is refused rather than read as "remove everything". Added
+      2026-10-01 so the removal the code performs is a criterion, not a
+      side effect.
 
 ## References
 
