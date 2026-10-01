@@ -332,6 +332,19 @@ jobs:
           CONFIG__MODEL: ${{ steps.models.outputs.model }}
           CONFIG__FALLBACK_MODELS: ${{ steps.models.outputs.fallbacks }}
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          # AI-045 AC6 (#1858, #1923): stream every NaN call. Non-streamed, NaN's edge
+          # cuts the answer at about 125 s, and a request it holds open sits silent
+          # past `ai_timeout`, which bounds the gap between reads rather than the
+          # call (run 36826726168: 12 minutes, no retry logged). Streamed, the same
+          # timeout measures the gap between chunks. PR-Agent forces streaming only
+          # when both halves match: the request's provider and a substring of its
+          # base URL. Setting the provider explicitly is what makes the first half
+          # true; LiteLLM strips the matching `openai/` prefix from the model id.
+          # Here and not in `.pr_agent.toml`, which PR-Agent reads from the default
+          # branch, so the PR introducing it would not stream.
+          LITELLM__CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
           # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
           # the entries whose `consumers` list this repo, so the reviewer holds
           # one credential rather than an ambient set — the failure surface stays
@@ -419,6 +432,9 @@ jobs:
           CONFIG__MODEL: ${{ steps.models.outputs.retry_model }}
           CONFIG__FALLBACK_MODELS: '[]'
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          LITELLM__CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
+          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
           github_action_config.handle_push_trigger: "true"

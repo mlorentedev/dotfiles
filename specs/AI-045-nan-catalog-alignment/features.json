@@ -37,14 +37,14 @@
   {
     "id": "AI-045-nan-catalog-alignment-f6",
     "behavior": "AC6: PR-Agent streams its NaN calls, pinned by a test",
-    "verification": "echo 'pending: #1858' && exit 1",
+    "verification": "bats tests/pr-agent-config.bats -f 'every attempt streams its NaN calls' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f7",
     "behavior": "AC7: PR-Agent's total wait is below the job timeout, asserted by a test",
-    "verification": "echo 'pending: #1859' && exit 1",
+    "verification": "bats tests/pr-agent-config.bats -f 'the job outlives both attempts' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },

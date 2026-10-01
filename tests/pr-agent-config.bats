@@ -813,6 +813,35 @@ print(strip(first['env']) == strip(retry['env']))
     [ "${lines[1]}" = "True" ]
 }
 
+# AI-045 AC6 (#1858, #1923): every attempt streams its NaN call. Non-streamed, a
+# review-sized request sat silent for 12 minutes with `ai_timeout: 120` in the
+# effective config and no retry logged (run 36826726168): the timeout bounds the
+# gap between reads, and a held connection never trips it. Streamed, the same
+# timeout measures the gap between chunks, and NaN's edge stops cutting the
+# answer at about 125 s.
+#
+# PR-Agent forces streaming only when BOTH halves match: the request's
+# `custom_llm_provider` equals `force_streaming_custom_llm_provider`, and its
+# `api_base` contains one of the substrings. The substring is checked against
+# the base URL the step really sends, so moving NaN's endpoint fails here
+# instead of silently turning streaming off.
+@test "pr-agent: every attempt streams its NaN calls" {
+    run python3 -c "
+import json, yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
+    e = s['env']
+    subs = json.loads(e.get('LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS', '[]'))
+    print(s['id'],
+          e.get('LITELLM__CUSTOM_LLM_PROVIDER') == 'openai',
+          e.get('LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER') == 'openai',
+          bool(subs) and all(x in e['OPENAI__API_BASE'] for x in subs))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "pr_agent True True True" ]
+    [ "${lines[1]}" = "pr_agent_retry True True True" ]
+}
+
 # A job timeout shorter than both attempts would cut the retry, which is the
 # hang this replaces under another name.
 @test "pr-agent: the job outlives both attempts" {
