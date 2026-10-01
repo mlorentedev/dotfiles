@@ -1,7 +1,7 @@
 ---
 id: "CLI-073-worktree-repo-detection"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-29"
 issue: "mlorentedev/dotfiles#1358"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -60,3 +60,5 @@ before emitting hive, specs, lessons and triage context.
 - Related lesson: `docs/lessons/lesson-161-a-linked-worktree-s-checkout-is-not-self-contained.md`
 - Related implementation: `cli/internal/env/env.go` (`RepoDir`) and
   `cli/internal/doctor/hookprobe.go` (`isGitCheckout`)
+
+<!-- archived 2026-09-30 — PR: https://github.com/mlorentedev/dotfiles/pull/1835 -->
