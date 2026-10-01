@@ -206,6 +206,15 @@ setup() {
     done
 }
 
+@test "~/.pi/agent/extensions/dynamic-compaction.ts is deployed" {
+    [ -f "$HOME/.pi/agent/extensions/dynamic-compaction.ts" ]
+}
+
+@test "~/.pi/agent/settings.json is deployed and auto-compaction is disabled" {
+    [ -f "$HOME/.pi/agent/settings.json" ]
+    grep -q '"enabled": false' "$HOME/.pi/agent/settings.json"
+}
+
 # =============================================================================
 # Section 6: Generated files
 # =============================================================================

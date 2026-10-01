@@ -628,6 +628,13 @@ else
     log_info "poetry already installed"
 fi
 
+# Pi Coding Agent
+log_info "Setting up Pi configuration..."
+ensure_directory "$HOME/.pi/agent"
+ensure_directory "$HOME/.pi/agent/extensions"
+cp -rf "$CURRENT_DIR/ai/pi/"* "$HOME/.pi/agent/" 2>/dev/null || true
+log_success "Pi configured"
+
 # Claude Code (primary AI coding agent — see ADR-009)
 log_info "Setting up Claude Code CLI..."
 if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then

@@ -601,3 +601,7 @@ $block"
     grep -q 'dotf env set DOTFILES_REPO_DIR "\$SEED_REPO_DIR"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
 }
+
+@test "setup-linux.sh configures Pi Coding Agent" {
+    grep -q 'Setting up Pi configuration' "$DOTFILES_DIR/setup-linux.sh"
+}
