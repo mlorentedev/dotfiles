@@ -73,7 +73,7 @@ pi packages already reconciled (10 declared, 0 changed)   (x3, each exit 0)
   common practice in this repo's specs.
 - [x] ADR-worthy decision? no - the declaration semantics were the owner's
   decision on epic #1625, recorded there.
-- [x] New pattern candidate? no.
+- [x] New pattern candidate? no: the reconcile is specific to pi's package manager.
 
 ## Archive checklist
 
