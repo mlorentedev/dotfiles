@@ -142,6 +142,6 @@ Verdict FAIL (`nan/qwen3.8-flash`). The spec text still declares removal out of 
 | F-03 Minor REAL: `1..16` and the retired `verify-reconcile.sh` block shown as current | Applied: "Test status" now shows the current `1..14` and labels the old block as historical |
 | F-04 Minor REAL: f2 duplicates the pin regex | Open, in the same contract round as F-01 |
 | F-05 Minor THEORETICAL: `LiveSources` drops a source-less object entry | Ticketed: #1926 |
-| F-06 Minor SPECULATIVE: `Identity()` and dist-tags or paths | Declined. The CI pin guard admits only `npm:<name>@<semver>`, so the case cannot reach the parser. |
-| F-07 Minor REAL: `ai/pi/README.md` says install-only | Applied: both README sentences name the removal |
+| Unnumbered Minor SPECULATIVE: `Identity()` and dist-tags or paths | Declined. The CI pin guard admits only `npm:<name>@<semver>`, so the case cannot reach the parser. |
+| F-06 Minor REAL: `ai/pi/README.md` says install-only | Applied: both README sentences name the removal |
 | Question: `features.json` all `pending` | The harness writes `passing`; the commands were run by hand and exit 0 |
