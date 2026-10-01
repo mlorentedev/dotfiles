@@ -132,3 +132,38 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// CLI-065 review: a contract variable named like the ownership marker would be
+// written and then overwritten by the marker on every run, so Persist never
+// converged and --check never came back clean. The name is reserved, in any
+// case spelling, since registry names are case-insensitive.
+// CLI-065 review round 2: a name the marker cannot round-trip byte for byte is
+// refused. An empty name is persisted but never recorded (MarkerValue skips
+// it), and a padded name is recorded raw but parsed back trimmed, so the sweep
+// looks up a name that is not in the store. Either way the value is dotf's and
+// nothing can ever sweep it.
+func TestPersist_RefusesANameTheMarkerCannotRoundTrip(t *testing.T) {
+	for _, name := range []string{"", " ", " FOO", "FOO ", "\tFOO"} {
+		store := &fakeUserEnv{}
+		_, err := Persist([]ResolvedVar{{Name: "A", Value: "1"}, {Name: name, Value: "x"}}, store)
+		if err == nil {
+			t.Fatalf("Persist accepted a contract variable named %q", name)
+		}
+		if len(store.ops) != 0 {
+			t.Errorf("%q: Persist wrote %v before refusing", name, store.ops)
+		}
+	}
+}
+
+func TestPersist_RefusesTheMarkerNameAsAVariable(t *testing.T) {
+	for _, name := range []string{ManagedMarker, "dotf_managed_env"} {
+		store := &fakeUserEnv{}
+		_, err := Persist([]ResolvedVar{{Name: "A", Value: "1"}, {Name: name, Value: "x"}}, store)
+		if err == nil {
+			t.Fatalf("Persist accepted a contract variable named %q", name)
+		}
+		if len(store.ops) != 0 {
+			t.Errorf("%q: Persist wrote %v before refusing", name, store.ops)
+		}
+	}
+}

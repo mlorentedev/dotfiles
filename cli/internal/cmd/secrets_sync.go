@@ -39,7 +39,7 @@ func newSecretsSyncCmd() *cobra.Command {
 		Short: "Materialize a scoped secret set for a headless consumer (CI, …)",
 		Long: "sync resolves a scoped secret set backend-agnostically (age|bw, via the same\n" +
 			"Loader as `run`) and pushes it to a headless consumer's delivery surface, ahead\n" +
-			"of time — the consumer never talks to Bitwarden at runtime (ADR-028/ADR-029).\n" +
+			"of time — the consumer never talks to Bitwarden at runtime.\n" +
 			"This slice implements the `ci` target (GitHub Actions secrets).",
 	}
 	c.AddCommand(newSecretsSyncCiCmd())

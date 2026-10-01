@@ -16,7 +16,7 @@ func newEnvCmd() *cobra.Command {
 		Short: "Per-machine path resolution (paths.sh / paths.ps1)",
 		Long: "env renders the per-machine path file from env-contract.json (defaults)\n" +
 			"+ ~/.config/dotfiles/machine.json (overrides). Shells source the result, so a\n" +
-			"machine that relocates a repo edits machine.json and re-runs generate (ADR-025).",
+			"machine that relocates a repo edits machine.json and re-runs generate.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -39,7 +39,7 @@ func newEnvSetCmd() *cobra.Command {
 			"so a typo cannot create a dead override no resolver reads); every other\n" +
 			"override is preserved and re-setting the same value is a no-op. First-run\n" +
 			"setup uses this to seed DOTFILES_REPO_DIR to the checkout it runs from, so the\n" +
-			"ADR-025 cascade resolves the real repo instead of the contract default.",
+			"path cascade resolves the real repo instead of the contract default.",
 		Args:         cobra.ExactArgs(2),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,7 +67,7 @@ func newEnvPathCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "path <KEY>",
 		Short: "Print the cascade-resolved value of one path key",
-		Long: "path resolves a single structural path through the ADR-025 cascade\n" +
+		Long: "path resolves a single structural path through the path cascade\n" +
 			"(env -> machine.json -> contract default[GOOS]) and prints it. Used by\n" +
 			"setup scripts to provision service environments (e.g. the hive daemon)\n" +
 			"that do not source the shell path file. Prints an empty line + exits 0\n" +

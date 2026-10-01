@@ -25,10 +25,9 @@ var now = func() time.Time { return time.Now() }
 func newSpecCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "spec",
-		Short: "Spec-driven development scaffolding (ADR-020)",
+		Short: "Spec-driven development scaffolding",
 		Long: "spec scaffolds and manages per-feature SDD spec folders.\n" +
-			"The Go twin of scripts/init-spec.sh + scripts/archive-spec.sh; templates\n" +
-			"are embedded, so init works without the vault checked out.",
+			"Templates are embedded, so init works without the vault checked out.",
 	}
 	cmd.AddCommand(newSpecInitCmd())
 	cmd.AddCommand(newSpecReviewCmd())
@@ -134,7 +133,7 @@ harness/reviewer-pool.json, and write its verdict to the spec folder.
 
 The point is that the model is not the launcher's choice, nor the caller's habit:
 it comes from the pool, and dotf spec archive refuses a review signed outside it.
-One pool member is drawn at random by default (HARNESS-093) — the launch line
+One pool member is drawn at random by default — the launch line
 says which, and review.md records it; --reviewer selects a member deliberately, which
 is how the fallback gets exercised deliberately rather than only in an outage.
 
@@ -149,7 +148,7 @@ launch. Without tmux (Windows, or a machine that lacks it) the run goes to the
 foreground and says so. A machine-readable transcript is written beside the
 review, because the verdict records what a reviewer concluded and the transcript
 is the only record of how.`,
-		Example:      "  dotf spec review HARNESS-071-reviewer-pool\n  dotf spec review AI-001-ollama-public --reviewer agy/gemini-3.1-pro-high",
+		Example:      "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.1-pro-high",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -312,7 +311,7 @@ The live tmux pane wants every frame — the incremental deltas are the visible
 progress. The transcript on disk wants the events, because its purpose is that a
 finished review can be audited. One raw file cannot serve both: a real 25-minute
 review streamed 527 MB, of which 525 MB was the same message re-emitted at every
-growing length (#995).`,
+growing length.`,
 		Hidden: true,
 		Args:   cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -468,6 +467,7 @@ func newSpecInitCmd() *cobra.Command {
 		issueNum     int
 		forceNoGate  bool
 		bitacoraRepo string
+		overWIP      string
 	)
 
 	cmd := &cobra.Command{
@@ -476,16 +476,22 @@ func newSpecInitCmd() *cobra.Command {
 		Long: `Scaffold specs/<feature-id>/{proposal,tasks,verification}.md from the
 embedded SDD templates.
 
-Work-gate (ADR-018): the spec must be downstream of an OPEN GitHub issue.
+Work-gate: the spec must be downstream of an OPEN GitHub issue.
 Pass --issue <N>; the issue is verified via 'gh issue view' and its title is
 recorded in the proposal's frontmatter (issue: owner/repo#N) and ## Why comment.
 The issue's repo defaults to the current repo's origin; override with
 --bitacora-repo owner/repo or $DOTF_BITACORA_REPO for a cross-repo work-gate.
 Use --force-no-gate to scaffold without an issue (NOT RECOMMENDED).
 
+WIP limit: init refuses while the repository already holds its limit
+of active specs, 10 unless specs/.wip-limit declares another. Archive the
+finished ones, or abandon the stalled ones with 'dotf spec archive --abandoned',
+first. --over-wip-limit "<reason>" scaffolds anyway and records the reason in
+the new proposal's frontmatter.
+
 Mechanical only: fill the proposal interactively afterwards ("/spec fill" in an
 agent) or by hand. Do not skip the Why.`,
-		Example:      "  dotf spec init AI-001-ollama-public --issue 42",
+		Example:      "  dotf spec init FEAT-001-dark-mode --issue 42",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -501,6 +507,22 @@ agent) or by hand. Do not skip the Why.`,
 			repoRoot, err := spec.RepoRoot(cwd)
 			if err != nil {
 				return err
+			}
+
+			reason := strings.TrimSpace(overWIP)
+			active, err := spec.ActiveSpecs(repoRoot)
+			if err != nil {
+				return err
+			}
+			limit, err := spec.WIPLimit(repoRoot)
+			if err != nil {
+				return err
+			}
+			if active >= limit && reason == "" {
+				return fmt.Errorf("%d active specs, and the limit is %d: finish before starting.\n"+
+					"Archive the finished ones (dotf spec review, then dotf spec archive), or abandon a\n"+
+					"stalled one (dotf spec archive <id> --abandoned). To start anyway, pass\n"+
+					"--over-wip-limit \"<reason>\"; the reason is recorded in the new proposal", active, limit)
 			}
 
 			var issueTitle, repoSlug string
@@ -550,6 +572,18 @@ agent) or by hand. Do not skip the Why.`,
 			if err != nil {
 				return err
 			}
+			switch {
+			case active >= limit:
+				if err := spec.RecordWIPOverride(repoRoot, id, reason, active, limit, date); err != nil {
+					// The folder is new (Scaffold refuses an existing one), so removing it
+					// lets a retry run instead of hitting "already exists" with no record.
+					_ = os.RemoveAll(filepath.Join(repoRoot, "specs", id))
+					return fmt.Errorf("recording the WIP override: %w; specs/%s was removed, retry", err, id)
+				}
+				cmd.PrintErrf("[WARN] %d active specs, limit %d: started over the WIP limit, reason recorded in proposal.md\n", active, limit)
+			case reason != "":
+				cmd.PrintErrf("[WARN] %d active specs, below the limit of %d: --over-wip-limit was not needed, and nothing was recorded\n", active, limit)
+			}
 
 			cmd.Printf("\n[OK] Created: specs/%s\n", id)
 			cmd.Printf("     proposal.md, tasks.md, verification.md, features.json\n")
@@ -564,6 +598,7 @@ agent) or by hand. Do not skip the Why.`,
 
 	cmd.Flags().IntVar(&issueNum, "issue", 0, "GitHub issue number that gates this work (must exist and be OPEN)")
 	cmd.Flags().StringVar(&bitacoraRepo, "bitacora-repo", "", "owner/repo hosting the work-gate issue (default: current repo's origin, or $DOTF_BITACORA_REPO)")
+	cmd.Flags().StringVar(&overWIP, "over-wip-limit", "", "start a spec although the repository is at its WIP limit; the reason is recorded in proposal.md")
 	cmd.Flags().BoolVar(&forceNoGate, "force-no-gate", false, "skip the open-issue work-gate (NOT RECOMMENDED — the gate is the SSOT)")
 	return cmd
 }
@@ -583,12 +618,12 @@ func newSpecArchiveCmd() *cobra.Command {
 		Long: `Move specs/<feature-id>/ into specs/archive/ (or specs/archive/_abandoned/
 under --abandoned) and rewrite the proposal status to archived/abandoned.
 
-Mechanical only — the Go twin of scripts/archive-spec.sh. A pre-flight refuses to
+Mechanical only. A pre-flight refuses to
 archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain. A second
 pre-flight refuses without a fresh, passing review.md from /adversarial-review, or
 a "review: waived" declaration with a reason in proposal.md. Freshness is decided
 by the content digests the review launcher recorded, so a squash-merge or rebase
-of the reviewed commit does not stale a review (SDD-042).
+of the reviewed commit does not stale a review.
 
 --force-with-drafts and --force-without-review override those checks. Both
 require --reason, and an override is RECORDED: the archived proposal.md gains a
@@ -600,7 +635,7 @@ A third pre-flight reads verification.md's "Promotion candidates": each line mus
 be answered "yes: <path>", with the promoted lesson, ADR or pattern existing
 (a 00_meta/ path in the vault), or "no: <reason>". No flag skips it; write the
 promoted file, or the reason, first.`,
-		Example:      "  dotf spec archive AI-001-ollama-public --pr https://github.com/owner/repo/pull/42",
+		Example:      "  dotf spec archive FEAT-001-dark-mode --pr https://github.com/owner/repo/pull/42",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

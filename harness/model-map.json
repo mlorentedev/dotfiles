@@ -15,7 +15,7 @@
     "Level 2 will bound only what dotf itself launches, and the honest guarantee stays narrow:",
     "'dotf alone will never be the cause of exhaustion', never 'exhaustion will not happen'.",
     "",
-    "As of #1150 PR-Agent runs on mimo-v2.5, so `pr-agent-ci` below still shares this",
+    "As of #1150 PR-Agent runs on mimo (mimo-v2.6-flash since AI-045), so `pr-agent-ci` below still shares this",
     "subscription but no longer contends for the deepseek bucket that `dotf spec review`",
     "draws on. The sharing stays declared; the contention it caused does not.",
     "",
@@ -157,7 +157,7 @@
     "mid": [
       "claude:sonnet",
       "nan:deepseek-v4-flash",
-      "nan:mimo-v2.5"
+      "nan:mimo-v2.6-flash"
     ],
     "low": [
       "nan:qwen3.6",

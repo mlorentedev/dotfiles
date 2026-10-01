@@ -26,7 +26,7 @@ comment 5851151835):
 - [x] AC4 -> `7ca394c`: `test -f docs/adr/adr-040-automatic-reviews-bounded-per-push.md`
   (present) && `grep -q 'draft' harness/enforced/pr-stewardship.md` (present).
 
-Follow-up findings (this branch, not yet merged):
+Follow-up findings (merged in #1773, `94c9e6b`):
 
 - [x] f5 (CWE-345) -> `bats --filter 'CWE-345|forged' tests/pr-agent-push-gate.bats`, exit
   0, 2/2 passing: a marker from a non-bot login is never a baseline, and one newer than a
@@ -62,6 +62,38 @@ Follow-up findings (this branch, not yet merged):
   incremental review comment once one exists in the wild; a PR-Agent timeout on a gated push
   still fails the "no review published" guard. None of these are new to this follow-up — the
   same three were already deferred by #1757 and remain open.
+
+## Archive pass (2026-09-30)
+
+Re-verified on `main`:
+
+```
+$ bats tests/pr-agent-push-gate.bats tests/pr-agent-config.bats
+1..74   all ok
+$ bats --filter <each features.json filter> ...
+push 3, marker 6, CWE-345|forged 2, head_sha 5, "runs /review -i only" 1   (none empty)
+```
+
+Each `bats --filter` in `features.json` matches at least one case. A filter that matches
+nothing runs zero tests and still exits 0.
+
+**One of the three deferred live checks now has evidence.** On #1850, a one-commit push
+(`0206468`) after a full review of `93139a1` produced this, in pr-agent run 36739357766:
+
+```
+run=false
+reason=1 new commit(s) since the reviewed commit 93139a1620aec016a812acd55c878b10277ffab6, below the threshold of 3; comment /review to ask for one now
+```
+
+PR-Agent and the no-review guard were skipped, and the run concluded `success`. The
+count came from the reviewed sha, which is f6's position path, not the date fallback.
+The other two deferred checks have not occurred in the wild yet:
+- `dotf pr triage-queue` reading an incremental review;
+- a timeout on a gated push.
+
+Both remain covered only offline.
+
+The upstream finding is ticketed as #1889 for the owner.
 
 ## Decisions made during implementation
 
@@ -103,14 +135,14 @@ Follow-up findings (this branch, not yet merged):
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`? No — this follow-up applies a pattern this repo
+- [x] Lesson for the repo's `docs/lessons/`? no: this follow-up applies a pattern this repo
   already has lessons for (a check that predicts another component uses that component's own
   rule, lesson 303; a guard that skips is a guard that passes, lesson 287). No new defect
   class.
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? No — ADR-040 already records
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-040 already records
   the incremental-review decision; this refines its baseline-trust and rebase handling
   in-place rather than deciding something new.
-- [ ] New pattern candidate for `00_meta/patterns/`? No — specific to this one script.
+- [x] New pattern candidate for `00_meta/patterns/`? no: specific to this one script.
 
 ## Archive checklist
 

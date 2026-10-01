@@ -35,6 +35,9 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 		{"registry unreadable → WARN", nil, errors.New("access denied"), StatusWarn, "unreadable"},
 		// CLI-065 (#1363): the marker still lists a name the contract retired.
 		{"retired name still persisted → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "OLD_NAME"},
+		// Review finding: drift and a retired name at once — both are named.
+		{"drift and retired together → WARN naming the drift", map[string]string{"DOTFILES_REPO_DIR": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "VAULT_PATH"},
+		{"drift and retired together → WARN naming the retired", map[string]string{"DOTFILES_REPO_DIR": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "OLD_NAME"},
 		{"marker in sync → PASS", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;VAULT_PATH"}, nil, StatusPass, "persisted at user scope"},
 	}
 	for _, tc := range cases {
@@ -76,6 +79,23 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 			}
 		})
 	}
+
+	// Review finding F2: a contract persist would refuse is reported, not
+	// compared — doctor agrees with persist and --check.
+	t.Run("reserved contract name → WARN naming the refusal", func(t *testing.T) {
+		home := t.TempDir()
+		mirror := filepath.Join(home, ".dotfiles")
+		writeFile(t, filepath.Join(mirror, "env-contract.json"),
+			`{"env_vars":[{"name":"`+envpkg.ManagedMarker+`","required":false,"default":{"linux":"x","windows":"x"}}]}`)
+		sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home}, nil, nil)
+		sys.GOOS = "windows"
+		sys.UserEnv = func(string) (string, bool, error) { return "", false, nil }
+		var buf bytes.Buffer
+		checkPersistedEnv(sys, &Config{DotfilesDir: mirror}, capture(&buf))
+		if got := statusOfLine(buf.String(), "reserved"); got != StatusWarn {
+			t.Fatalf("want a WARN naming the reserved name, got %q\n%s", tagOf(got), buf.String())
+		}
+	})
 
 	t.Run("no seam → no section", func(t *testing.T) {
 		sys := newSys(nil, nil, nil)

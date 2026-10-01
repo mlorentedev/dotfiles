@@ -1434,6 +1434,41 @@ EOF
     [ "$(LC_ALL=C wc -c < "$f" | tr -d ' ')" -eq "$(LC_ALL=C wc -m < "$f" | tr -d ' ')" ]
 }
 
+# HARNESS-111 AC6: a cap warning names both units. A reader who quotes the
+# characters of a file whose bytes are the binding count is quoting the number
+# that is not the problem (review round 1 found both warnings printed one unit).
+set_agy_cap() {
+    local tmp
+    tmp="$(mktemp)"
+    jq --argjson c "$1" '(.doctrine.deploy[] | select(.agent == "agy") | .char_cap) = $c' \
+        "$REPO/harness/manifest.json" > "$tmp" && mv "$tmp" "$REPO/harness/manifest.json"
+}
+
+@test "doctrine: the over-cap warning for the generated doctrine names characters and bytes" {
+    seed_doctrine_fixture
+    set_agy_cap 10
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+    [[ "$output" =~ GENERATED\ doctrine\ alone\ is\ [0-9]+\ characters\ /\ [0-9]+\ bytes,\ over\ the\ 10\ cap ]]
+}
+
+@test "doctrine: the over-cap warning for a user's file names characters and bytes, and they differ" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+    local f="$FAKEHOME/.gemini/GEMINI.md" gen
+    gen="$(LC_ALL=C wc -c < "$f" | tr -d ' ')"
+    # The user's own content is theirs and is never folded: 300 two-byte
+    # characters make the file's bytes exceed its characters by 300.
+    local i
+    for i in $(seq 1 300); do printf '\xc3\xa9'; done >> "$f"
+    printf '\n' >> "$f"
+    set_agy_cap $((gen + 100))
+    run_deploy;  [ "$status" -eq 0 ]
+    [[ "$output" =~ is\ ([0-9]+)\ characters\ /\ ([0-9]+)\ bytes,\ over\ the ]]
+    [ "${BASH_REMATCH[1]}" -lt "${BASH_REMATCH[2]}" ]
+}
+
 # GUARD: what the fold does not know is reported, never guessed at.
 #
 # A catch-all that replaced unknown bytes with `?` would corrupt a word silently

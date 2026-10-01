@@ -27,6 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/i
 dotf version
 ```
 
+> **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | less`
+
 The recovery installer resolves the latest published release, verifies its
 checksum, and replaces only the user-local `dotf` binary. Use checkout bootstrap
 when you want to deploy the complete dotfiles configuration.

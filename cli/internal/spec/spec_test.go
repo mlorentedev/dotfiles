@@ -237,3 +237,17 @@ func TestValidateIDErrorNamesTheRule(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordWIPOverrideRefusesAProposalWithoutFrontmatter(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "specs", "BUG-001-x")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "proposal.md"), []byte("# no frontmatter\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordWIPOverride(root, "BUG-001-x", "r", 10, 10, "2026-09-30"); err == nil {
+		t.Error("RecordWIPOverride accepted a proposal with no frontmatter")
+	}
+}

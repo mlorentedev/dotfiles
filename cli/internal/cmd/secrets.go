@@ -30,13 +30,13 @@ import (
 func newSecretsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secrets",
-		Short: "On-demand secrets — inject into a child process, never the shell (ADR-028)",
+		Short: "On-demand secrets — inject into a child process, never the shell",
 		Long: "secrets reads the registry (secrets/registry.yaml) and exposes the mapped\n" +
 			"secrets on demand. `run` injects them into one child process only (never the\n" +
 			"ambient shell); `show` prints one value; `set` writes one value into Bitwarden\n" +
 			"(idempotent); `migrate` cuts a secret over age→bw behind a parity gate; `render`\n" +
 			"materializes {env:VAR} placeholders in a config file; `verify` health-checks\n" +
-			"resolution without printing values; `ls` lists ids (ADR-028 §2).",
+			"resolution without printing values; `ls` lists ids.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -408,7 +408,7 @@ func newSecretsShowCmd() *cobra.Command {
 			"  --reveal      explicitly print the decrypted value to stdout\n\n" +
 			"When stdout is an interactive terminal (TTY) and neither --reveal nor -c is given,\n" +
 			"show masks the secret and guides you to use -c or --reveal (1Password op style).\n" +
-			"In agent environments, printing to stdout is refused per ADR-028 doctrine.",
+			"In agent environments, printing to stdout is refused.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

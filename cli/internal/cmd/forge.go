@@ -70,7 +70,7 @@ func newForgeProtectionCheckCmd() *cobra.Command {
 
 This exists because branch protection leaves no trace in git: a required
 context that is dropped or renamed is invisible until a merge that should
-have been impossible (GUARD-017, #1451). It READS only; nothing here changes
+have been impossible. It READS only; nothing here changes
 a repository.
 
   DRIFT         live differs from the declaration (each field is named)
@@ -135,7 +135,7 @@ func newForgeProtectionApplyCmd() *cobra.Command {
 		Use:   "apply",
 		Short: "Converge every declared repository's live branch protection on the declaration",
 		Long: `Write the branch protection declared in ` + forge.DeclarationFile + ` to every
-declared repository whose live protection differs (GUARD-017, #1451).
+declared repository whose live protection differs.
 
 It writes only on a difference, so a second run reports changed=0. The write
 is the COMPLETE object, because the endpoint replaces the whole of it and an
