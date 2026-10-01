@@ -144,6 +144,40 @@ The upstream finding is ticketed as #1889 for the owner.
   in-place rather than deciding something new.
 - [x] New pattern candidate for `00_meta/patterns/`? no: specific to this one script.
 
+## Archive review round 1 fixes (#1893, 2026-10-01)
+
+Round 1 (`review.md`, FAIL) found the gate mirroring v0.45.0 while the workflow pins
+v0.46.0 (`pr-agent.yml`: `The-PR-Agent/pr-agent@1d01f24…  # v0.46.0`). Read at that sha:
+
+- `github_provider._commit_timeline_date` prefers `commit.committer.date` and falls back to
+  `commit.author.date`; `get_commit_range` compares that against the previous review's
+  `created_at`. The gate's date fallback now does the same.
+- `get_previous_review(full=True, incremental=True)` accepts either kind, as the gate does.
+  The kind filtering did not change. What changed is `comment_identity.comment_matches_identity`:
+  each identity matches in two stored forms (`hidden_marker_forms`), the HTML comment and
+  `[pr-agent:review:<kind>]: https://github.com/The-PR-Agent/pr-agent`, within the first
+  5 lines. The gate's identity predicate now accepts both, so a forged link-reference marker
+  is caught.
+
+The owner first chose to drop the date fallback and read `head_sha` always, then reverted
+to matching v0.46.0 after a wider sample (#1893 comment 5923326337): 23 of 71 recent full
+reviews carry no state block, so "no head_sha means review" would review a third of PRs on
+every push.
+
+```
+$ bats tests/pr-agent-push-gate.bats          # before the fix
+not ok 23 a rebase with no state block: old author dates, new committer dates count as new
+not ok 24 a forged review marker in the link-reference form is caught too
+not ok 25 the bot's own review in the link-reference form is a baseline
+not ok 26 every PR-Agent version the gate cites is the one the workflow pins
+$ bats tests/pr-agent-push-gate.bats tests/pr-agent-config.bats   # after
+1..78   all ok
+```
+
+Mutations, each on a copy and restored: the date basis back to `.commit.author.date` fails
+case 23; dropping the link-reference identity fails case 24. `shellcheck`, `bash -n`,
+`zsh -n` and `actionlint .github/workflows/pr-agent.yml` exit 0.
+
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
