@@ -48,6 +48,7 @@ run_preflight() {
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/mimo-v2.6-flash' "$OUT"
     grep -qxF 'fallbacks=["openai/deepseek-v4-flash"]' "$OUT"
+    grep -qxF 'retry_model=openai/deepseek-v4-flash' "$OUT"
     [[ "$output" != *"::warning::"* ]]
 }
 
@@ -57,6 +58,7 @@ run_preflight() {
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/deepseek-v4-flash' "$OUT"
     grep -qxF 'fallbacks=[]' "$OUT"
+    grep -qxF 'retry_model=' "$OUT"
     [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"HTTP 401"*"openai/deepseek-v4-flash"* ]]
 }
 

@@ -38,13 +38,17 @@ var (
 // against vaultRoot; every other path against repoRoot. A nil or failing
 // vaultRoot refuses a vault path rather than passing it unchecked.
 func CheckPromotions(repoRoot, specDir string, vaultRoot func() (string, error)) []string {
-	data, err := os.ReadFile(filepath.Join(specDir, "verification.md"))
+	fileToRead := "verification.md"
+	if _, err := os.Stat(filepath.Join(specDir, "spec.md")); err == nil {
+		fileToRead = "spec.md"
+	}
+	data, err := os.ReadFile(filepath.Join(specDir, fileToRead))
 	if err != nil {
-		return []string{fmt.Sprintf("verification.md cannot be read (%v); it carries the %q the archive checks", err, PromotionHeading)}
+		return []string{fmt.Sprintf("%s cannot be read (%v); it carries the %q the archive checks", fileToRead, err, PromotionHeading)}
 	}
 	lines, found := promotionSection(string(data))
 	if !found {
-		return []string{fmt.Sprintf("verification.md has no %q section", PromotionHeading)}
+		return []string{fmt.Sprintf("%s has no %q section", fileToRead, PromotionHeading)}
 	}
 	var problems []string
 	candidates := 0

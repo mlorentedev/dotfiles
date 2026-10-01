@@ -14,9 +14,9 @@ created: "2026-08-27"
 | AC3 | `TestWriteThreadAppendsANewThreadWithoutReordering` |
 | AC4 | `TestWrittenThreadsStayInsideTheArchivedBlock` — drives `extractHandoffBlock` over the written file |
 | AC5 | `TestWriteThreadRefusesWhenTheSectionIsAbsent`, `TestWriteThreadRejectsAnEmptyKey` |
-| AC6 | `TestThreadKeyDerivesFromTheWorktree`, including three subdirectory cases |
+| AC6 | `TestThreadKeyIsTheBranchSoItTravelsBetweenMachines` and `TestRepoIdentityResolvesTheProjectFromAnywhereInTheTree` (renamed from `TestThreadKeyDerivesFromTheWorktree` in #1280; see Archive below) |
 | AC7 | `TestJournalNameIsDerivableAndDistinctPerWorktree` |
-| AC8 | **Not built.** Recorded in the proposal rather than claimed |
+| AC8 | **Declined at archive time, tracked as #1881.** Never built, and not claimed |
 
 ## Command output
 
@@ -99,6 +99,14 @@ input the author was imagining.
   one (the handoff block). A third from outside this repo would make it a
   pattern; two is already enough to stop writing the rule as prose.
 
+- [x] Lesson for the repo's `docs/lessons/`? no: the lost update that exits 0 is
+  recorded in the handoff skill and in this spec, and the regression test now
+  guards it
+- [x] ADR-worthy decision? no: the kernel lock over O_EXCL is recorded on #1884,
+  and `cli/internal/filelock` already followed it in two packages
+- [x] New pattern candidate for `00_meta/patterns/`? no: merge-by-marker has two
+  instances, both in this repository; the bar above is a third from outside it
+
 ## Second sitting — the debt, and cross-machine identity
 
 | AC | Proof |
@@ -131,3 +139,84 @@ real target, it failed exactly as it should.
 **A mutation test that reports "no change" has not proven the test is weak; it
 has proven nothing at all.** Assert the mutation applied before believing its
 result.
+
+## Archive (2026-09-30)
+
+Closed under the #770 sweep. AC1-AC7 shipped in #1279 (`71a4c39f`) and #1280
+(`4397ba3e`) and still pass on `main`:
+
+```
+$ cd cli && go test ./internal/mem/ -run 'TestWriteThread|TestWrittenThreads|TestThreadKey|TestRepoIdentity|TestJournalName' -v
+(every test listed in the tables above: PASS)
+ok      github.com/mlorentedev/dotfiles/cli/internal/mem
+```
+
+- **AC8 declined, #1881.** The doctor check was never built. It is a separate,
+  read-only feature and does not block what this spec delivered.
+- **Gate session-state key, #1882.** The last unticked audit item now has a ticket.
+- **`features.json` f5 pointed at a test that no longer existed.** #1280 renamed
+  `TestThreadKeyDerivesFromTheWorktree`. `go test -run` with a name that matches
+  nothing still exits 0, so f5 had been passing without running anything. It now
+  names `TestThreadKeyIsTheBranchSoItTravelsBetweenMachines`.
+- `tasks.md`'s Implementation section still held the template placeholders. It
+  now lists the tasks as they were done.
+
+## Round-1 review fixes (#1884, 2026-10-01)
+
+Round 1 (`nan/deepseek-v4-flash`, FAIL) found the lost update, measured on the
+built binary. Its record is kept as `review-round-1.md`.
+
+- **Lost update, AC9.** The owner reversed the lock-file non-goal and picked a
+  lock the kernel releases over O_EXCL: a writer killed while holding an O_EXCL
+  file leaves it behind, and every later handoff waits on it. `cli/internal/filelock`
+  is extracted from the pattern `worktree` and `agent` already use (`flock`; an
+  unshared `CreateFile` on Windows). The lock file lives under
+  `XDG_RUNTIME_DIR` or the user cache dir, outside the vault, and its name hashes
+  the canonical path. Moving the two older copies onto the package is a separate
+  ticket.
+- **The test fails without the fix.** `TestConcurrentWritesDoNotLoseAThread`
+  starts 8 writers together, 5 rounds. Before the lock, every run lost threads:
+  `thread feat-w0 is missing after 8 concurrent writes`, and more. After it, the
+  test passes under `-race`, `-count=3`.
+- **Two paths, one lock.** With `EvalSymlinks` removed,
+  `TestTwoPathsToOneMemoryShareTheLock` fails (mutation applied and observed).
+  Restored, it passes. Whether `EvalSymlinks` resolves a Windows junction is
+  not measured; the test skips on Windows and says so.
+- **`journalWriter`, AC10.** The SPECULATIVE finding is fixed, not just stated.
+  The scan skips the journal name's first word, which is always the project's.
+  Residual: a project with an agent word after its first segment (`my-pi-app`).
+  None exists.
+
+```
+$ cd cli && go build ./... && go vet ./... && go test ./... && GOOS=windows go vet ./... && golangci-lint run
+ok (every package); 0 issues.
+```
+
+
+## Round-2 findings (agy/gemini-3.1-pro-high, FAIL)
+
+The review read the range from the commit that added this spec, so it saw code
+other PRs shipped since then (#1551).
+
+- **SessionEnd stamps `claude` (Major), declined.** The `mem session-end` hook is
+  registered only in Claude's binding (`harness/manifest.json`,
+  `agents.bind[0].emit_hooks`), so the agent it names is the one running. Other
+  agents write their journal through `/handoff` and `dotf mem thread --agent`.
+- **Cyclomatic complexity (Major), fixed for this change.** This spec's lock
+  raised `newMemHandoffWriteCmd` from 14 to 16. Its body is now split into
+  `handoffWrite.run`, `readHandoffBody` and `handoffWrite.publish`, all under 10.
+  `SessionEnd` (14) is unchanged by this spec and sits in `internal/mem`, outside
+  the HARNESS-150 gocyclo ratchet, which only moves down one extraction at a time.
+- **Per-user lock directory (Minor, THEORETICAL), declined.** One OS user owns a
+  vault checkout and its sessions. A lock shared across users would need a
+  world-writable directory, which is the symlink attack the per-user one avoids.
+- **The fallback record copies every thread (Minor, THEORETICAL), declined.**
+  Shipped in #1701 and outside this diff; the hook writes only where no journal
+  exists, and says it is a copy of the block.
+
+```
+$ cd cli && gocyclo -over 9 ./internal/cmd/mem_handoff.go
+(no output)
+$ go test ./internal/cmd ./internal/mem ./internal/filelock -count=1 && GOOS=windows go vet ./internal/cmd ./internal/filelock && golangci-lint run ./internal/cmd/... ./internal/mem/... ./internal/filelock/...
+ok (every package); 0 issues.
+```
