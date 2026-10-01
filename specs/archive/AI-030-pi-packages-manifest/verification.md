@@ -12,18 +12,42 @@ created: "2026-08-25"
 | AC1 manifest is well-formed, unique, justified | `tests/pi-packages.bats` — "valid JSON", "no source is declared twice", "every entry says what it is for" |
 | AC2 every source pinned | `tests/pi-packages.bats` — "every declared source is pinned to a version", **plus** "the pin guard rejects an unpinned source" |
 | AC3 array absent from the seed, never written by setup | `tests/pi-packages.bats` — "the array is NOT declared in the seed settings.json", "setup-linux never writes the packages array itself" |
-| AC4 first run installs all | `verify-reconcile.sh` — `[OK] AC4 first run installed all 9 declared packages` |
-| AC5 second run changes nothing | `verify-reconcile.sh` — `[OK] AC5 second run installed 0 (changed=0)` |
-| AC6 object-form entries recognised | `verify-reconcile.sh` — `[OK] AC6 object-form entries recognised, 0 reinstalled` |
-| AC7 pi absent warns, never aborts | `verify-reconcile.sh` — `[OK] AC7 pi absent: warned, exit 0, bootstrap continues` |
-| AC8 unreadable manifest is loud | `tests/pi-packages.bats` — "refuses an unreadable manifest instead of reading it empty" |
-| AC9 Linux uses `$PI_BIN` | `tests/pi-packages.bats` — "installs through $PI_BIN, not the shell function" |
-| AC10 Windows parity, no new non-ASCII | `tests/pi-packages.bats` — three `setup-windows` cases; non-ASCII line count 10 before and 10 after |
+| AC4 first run installs all | `TestNewPlan`, `TestApplyConvergesAndASecondRunCallsNothing`, `TestPiPackagesApplyRemovesThenInstalls` (was `verify-reconcile.sh`, see below) |
+| AC5 second run changes nothing | `TestApplyConvergesAndASecondRunCallsNothing`: the second run makes no call to pi |
+| AC6 object-form entries recognised | `TestLiveSourcesReadsBothEntryForms`, `TestIdentityIgnoresTheVersion` |
+| AC7 pi absent warns, never aborts | `TestPiPackagesApplyWithoutPiWarnsAndExitsZero`, `TestPiPackagesApplyWithoutNpmWarnsAndExitsZero` |
+| AC8 unreadable manifest is loud | `TestLoadManifestRefusesWhatItCannotRead`, `TestPiPackagesCheckRefusesAnUnreadableManifest` |
+| AC9 Linux uses `$PI_BIN` | `tests/pi-packages.bats` — "setup-linux hands the command $PI_BIN, not the shell function" |
+| AC10 Windows parity, no new non-ASCII | `tests/pi-packages.bats` — "both twins reconcile through dotf pi packages apply"; `setup-windows.ps1` now has 0 non-ASCII lines |
 | AC11 a declared package actually **loads** | `dotf doctor` on the real machine — `[FAIL] extension "subagent" shadows the installed package of the same name`, then `[FIX ] quarantined ~/.pi/agent/extensions/subagent/index.ts`; effect confirmed by `pi -p` going from **exit 1** (`Failed to load extension … Tool "subagent" conflicts`) to **exit 0** answering `OK`, and a third `dotf doctor` run then reporting `[pi extensions] (1 checks, all ok)`. Unit-covered by `cli/internal/doctor/checks_pi_extensions_test.go` (6 cases: FAIL on collision, WARN without, the scoping rule that leaves an external writer's files alone, SKIP with no extensions dir, quarantine landing outside the auto-discovered tree, and no-clobber on a second `--fix`) |
 
 All on commit `2c20332` plus the spec commit that follows it.
 
+### Re-pointed after HARNESS-139 (2026-10-01)
+
+HARNESS-139 (#1754, #1755) moved the reconcile out of both setup scripts into
+`dotf pi packages apply`. `verify-reconcile.sh` drove the shell block it
+deleted, so it is retired here, and AC4-AC10 point at the tests that now hold
+them. The table above lists them; `features.json` carries one command per
+criterion. Each Go command names its tests with `-run '^(...)$'`, and `go test
+-v` confirmed each named test ran: a `-run` or `bats -f` that matches nothing
+exits 0, which is how three of these commands had been passing without running
+anything since #1754. AC10's ASCII count is now 0, since the file has none.
+
 ## Test status
+
+Current, at the archive head (after the HARNESS-139 re-point):
+
+```
+$ bats tests/pi-packages.bats
+1..14   all ok
+```
+
+The `features.json` commands f1-f10 each exit 0 when run by hand at the same head.
+
+Historical, from the original implementation (2026-08). `verify-reconcile.sh` and
+the shell block it drove were retired by HARNESS-139, so this output can no longer
+be reproduced. It is kept as the record of what was measured then:
 
 ```
 $ bats tests/pi-packages.bats
@@ -36,15 +60,6 @@ $ specs/AI-030-pi-packages-manifest/verify-reconcile.sh
 [OK] AC7  pi absent: warned, exit 0, bootstrap continues
 [OK] AC4-AC7 verified against the block extracted from setup-linux.sh:954-1003
 exit 0
-
-$ bash -n setup-linux.sh && zsh -n setup-linux.sh
-OK / OK
-
-$ shellcheck setup-linux.sh
-20 findings before the change, 20 after, none in the new block (lines 954-1003)
-
-$ shellcheck specs/AI-030-pi-packages-manifest/verify-reconcile.sh
-clean
 ```
 
 **No regressions**: the full suite is green on this branch (see the PR body for
@@ -111,3 +126,36 @@ limitation `tests/stub-real-pairing.bats` exists to keep visible (BUG-055).
   cannot carry new declarations to an existing machine"* — is already the
   generalisation of `pattern-decision-persistence` rather than a new pattern, and
   a second instance should exist before it is promoted.
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-231-a-hand-wired-dev-symlink-outranks-the-managed-instal.md
+- [x] ADR-worthy decision? no: the manifest and its declaration semantics are recorded in `ai/pi/README.md` and on epic #1625
+- [x] New pattern candidate for `00_meta/patterns/`? no: the one cross-project candidate needs a second instance first, as said above
+
+## Round-1 review (2026-10-01)
+
+Verdict FAIL (`nan/qwen3.8-flash`). The spec text still declares removal out of scope, while the code removes undeclared packages since HARNESS-139 (D-2 on #1625).
+
+| Finding | Disposition |
+|---|---|
+| F-01 Major REAL: "Removing packages" declared out of scope, code removes | Open. A contract edit to `proposal.md`, followed by round 2. |
+| F-02 Major REAL: Windows twin has no `~\.local\bin\dotf.exe` fallback | Ticketed: #1925 |
+| F-03 Minor REAL: `1..16` and the retired `verify-reconcile.sh` block shown as current | Applied: "Test status" now shows the current `1..14` and labels the old block as historical |
+| F-04 Minor REAL: f2 duplicates the pin regex | Open, in the same contract round as F-01 |
+| F-05 Minor THEORETICAL: `LiveSources` drops a source-less object entry | Ticketed: #1926 |
+| Unnumbered Minor SPECULATIVE: `Identity()` and dist-tags or paths | Declined. The CI pin guard admits only `npm:<name>@<semver>`, so the case cannot reach the parser. |
+| F-06 Minor REAL: `ai/pi/README.md` says install-only | Applied: both README sentences name the removal |
+| Question: `features.json` all `pending` | The harness writes `passing`; the commands were run by hand and exit 0 |
+
+## Round-2 review (2026-10-01)
+
+The contract was amended to the bidirectional reconcile the owner accepted on 2026-10-01 (F-01). AC12 was added for removal, and f2 now runs the named bats test (F-04). Verdict: PASS-WITH-GAPS (`nan/glm5.3-flash` on `fb88359c`), with no Blocker and no REAL Major.
+
+| Finding | Disposition |
+|---|---|
+| Minor REAL: Windows twin has no `dotf.exe` fallback | Ticketed: #1925 (round-1 F-02) |
+| Minor REAL: `LiveSources` drops an unknown entry shape | Ticketed: #1926 (round-1 F-05) |
+| Minor REAL: `tasks.md` shellcheck count 20, now 15 | Recorded: a historical count from a different shellcheck version. The binding half (nothing in the new block) still holds. |
+| Minor REAL: `tasks.md` says nine entries, the manifest has ten | Recorded: historical. `proposal.md` says ten, and the guards bind on pinned, unique and `why`, not on a count. |
+| Question: Windows passes no `--pi` | Folded into #1925 (comment there) |
+
+Promotion candidates stand as answered above.
