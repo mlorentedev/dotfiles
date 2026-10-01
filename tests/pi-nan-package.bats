@@ -49,9 +49,10 @@ setup_file() {
     PKG="${PKG%@*}"
     cp "$AGENT/npm/node_modules/$PKG/scripts/models.generated.ts" "$BATS_FILE_TMPDIR/snapshot.ts"
     node --input-type=module -e "
-        const m = await import('$BATS_FILE_TMPDIR/snapshot.ts');
+        const { pathToFileURL } = await import('node:url');
+        const m = await import(pathToFileURL(process.argv[1]).href);
         console.log(JSON.stringify(m.NAN_GENERATED_MODELS));
-    " >"$BATS_FILE_TMPDIR/snapshot.json"
+    " "$BATS_FILE_TMPDIR/snapshot.ts" >"$BATS_FILE_TMPDIR/snapshot.json"
 }
 
 setup() {
@@ -74,7 +75,7 @@ setup() {
     while IFS= read -r ref; do
         [ -n "$ref" ] || continue
         grep -qxF "${ref#nan/}" "$LISTED" || missing="$missing $ref"
-    done <<< "$(jq -r '.enabledModels[] | select(startswith("nan/"))' "$PI_SETTINGS")"
+    done <<< "$(jq -r '.enabledModels[] | select(startswith("nan/"))' "$PI_SETTINGS" | tr -d '\r')"
     [ -z "$missing" ] || { echo "enabledModels the package does not register:$missing"; return 1; }
 }
 
@@ -94,11 +95,15 @@ setup() {
 # #1772: opencode and pi describe the same endpoint, so a context window they
 # disagree on is wrong in one of them. Since AI-046, pi's side is the package.
 @test "pi-nan-package: opencode.jsonc and the package snapshot declare the same context window for every NaN model both carry" {
-    run python3 - "$REPO/ai/opencode/opencode.jsonc" "$SNAPSHOT" <<'PY'
+    run python3 - "$REPO/ai/opencode/opencode.jsonc" "$REPO/ai/pi/models.json" "$SNAPSHOT" <<'PY'
 import json, re, sys
 src = "".join(l for l in open(sys.argv[1]) if not l.lstrip().startswith("//"))
 oc = json.loads(re.sub(r",(\s*[}\]])", r"\1", src))["provider"]["nan"]["models"]
-pkg = {m["id"]: m for m in json.load(open(sys.argv[2]))}
+overrides = json.load(open(sys.argv[2]))["providers"]["nan"]["modelOverrides"]
+pkg = {m["id"]: m for m in json.load(open(sys.argv[3]))}
+for model, override in overrides.items():
+    if model in pkg:
+        pkg[model].update(override)
 both = sorted(set(oc) & set(pkg))
 if not both:
     print("no NaN model is carried by both, so the comparison would be vacuous")
@@ -109,4 +114,29 @@ print("\n".join(bad))
 sys.exit(1 if bad else 0)
 PY
     [ "$status" -eq 0 ] || { echo "context windows disagree: $output"; false; }
+}
+
+@test "pi-nan-package: effective package limits equal NaN's published windows and output caps" {
+    run python3 - "$REPO/ai/pi/models.json" "$SNAPSHOT" <<'PY'
+import json, sys
+overrides = json.load(open(sys.argv[1]))["providers"]["nan"]["modelOverrides"]
+models = {m["id"]: m for m in json.load(open(sys.argv[2]))}
+for model, override in overrides.items():
+    if model in models:
+        models[model].update(override)
+want = {
+    "glm5.3-flash": (1000000, 131072),
+    "deepseek-v4-flash": (1000000, 384000),
+    "qwen3.8-flash": (1048576, 131072),
+    "qwen3.6": (262144, 65536),
+    "mimo-v2.6-flash": (1048576, 131072),
+    "gemma4": (262144, 32768),
+}
+bad = [f"{model}: got context={models.get(model, {}).get('contextWindow')} output={models.get(model, {}).get('maxTokens')}"
+       for model, limits in want.items()
+       if (models.get(model, {}).get("contextWindow"), models.get(model, {}).get("maxTokens")) != limits]
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+PY
+    [ "$status" -eq 0 ] || { echo "effective pi limits disagree: $output"; false; }
 }

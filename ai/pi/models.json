@@ -1,5 +1,33 @@
 {
   "providers": {
+    "nan": {
+      "modelOverrides": {
+        "glm5.3-flash": {
+          "contextWindow": 1000000,
+          "maxTokens": 131072
+        },
+        "deepseek-v4-flash": {
+          "contextWindow": 1000000,
+          "maxTokens": 384000
+        },
+        "qwen3.8-flash": {
+          "contextWindow": 1048576,
+          "maxTokens": 131072
+        },
+        "qwen3.6": {
+          "contextWindow": 262144,
+          "maxTokens": 65536
+        },
+        "mimo-v2.6-flash": {
+          "contextWindow": 1048576,
+          "maxTokens": 131072
+        },
+        "gemma4": {
+          "contextWindow": 262144,
+          "maxTokens": 32768
+        }
+      }
+    },
     "openrouter": {
       "baseUrl": "https://openrouter.ai/api/v1",
       "api": "openai-completions",
