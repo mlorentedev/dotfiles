@@ -99,6 +99,47 @@ func TestSessionEnd_HappyPath(t *testing.T) {
 	}
 }
 
+func TestSessionEndWaitsForConcurrentHandoffWrite(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	vault := t.TempDir()
+	writeMemory(t, vault, "## Session Handoff\n\n**Next action:** preserve this handoff.\n")
+	memory := filepath.Join(vault, "10_projects", "proj", "memory", "MEMORY.md")
+	unlock, err := LockHandoffMemory(memory)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type result struct {
+		path string
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		path, err := SessionEnd([]byte(`{"cwd":"/x/proj","session_id":"sid"}`), vault, fixedNow)
+		done <- result{path: path, err: err}
+	}()
+
+	select {
+	case got := <-done:
+		unlock()
+		t.Fatalf("SessionEnd read MEMORY.md while a handoff writer held its lock: %+v", got)
+	case <-time.After(50 * time.Millisecond):
+	}
+	unlock()
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatal(got.err)
+		}
+		if got.path == "" {
+			t.Fatal("SessionEnd did not archive after the handoff lock was released")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SessionEnd did not resume after the handoff lock was released")
+	}
+}
+
 // TestSessionEnd_UsesLocalCalendarDate pins the CLI-043 contract: the record's
 // date is the calendar date of the `now` it is handed, in that value's own
 // location — never normalised to UTC. An 18:30 session in a -0600 zone is
