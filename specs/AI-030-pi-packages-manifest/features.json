@@ -30,42 +30,42 @@
   {
     "id": "AI-030-pi-packages-manifest-f5",
     "behavior": "AC4 + AC5 - a first run installs every declared package and a second run installs nothing (idempotent)",
-    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh",
+    "verification": "cd cli && go test ./internal/pi ./internal/cmd -count=1 -run '^(TestNewPlan|TestApplyConvergesAndASecondRunCallsNothing|TestPiPackagesApplyRemovesThenInstalls)$'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-030-pi-packages-manifest-f6",
     "behavior": "AC6 - entries present in the live array in the object form are recognised and not reinstalled",
-    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh",
+    "verification": "cd cli && go test ./internal/pi -count=1 -run '^(TestLiveSourcesReadsBothEntryForms|TestIdentityIgnoresTheVersion)$'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-030-pi-packages-manifest-f7",
     "behavior": "AC7 - with pi or npm absent the reconcile warns once and setup continues with exit 0",
-    "verification": "specs/AI-030-pi-packages-manifest/verify-reconcile.sh && bats tests/pi-packages.bats -f 'guard on npm'",
+    "verification": "cd cli && go test ./internal/cmd -count=1 -run '^(TestPiPackagesApplyWithoutPiWarnsAndExitsZero|TestPiPackagesApplyWithoutNpmWarnsAndExitsZero|TestPiPackagesApplySkipIsFirstAndLoud)$'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-030-pi-packages-manifest-f8",
     "behavior": "AC8 - an unreadable or empty manifest is reported, never read as nothing-to-do",
-    "verification": "bats tests/pi-packages.bats -f 'refuses an unreadable manifest'",
+    "verification": "cd cli && go test ./internal/pi ./internal/cmd -count=1 -run '^(TestLoadManifestRefusesWhatItCannotRead|TestPiPackagesCheckRefusesAnUnreadableManifest)$'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-030-pi-packages-manifest-f9",
     "behavior": "AC9 - the Linux reconcile installs through $PI_BIN, not the pi shell function that fails on a locked vault",
-    "verification": "bats tests/pi-packages.bats -f 'not the shell function'",
+    "verification": "bats tests/pi-packages.bats -f 'setup-linux hands the command' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-030-pi-packages-manifest-f10",
     "behavior": "AC10 - setup-windows.ps1 reconciles the same manifest with the same semantics, adding no non-ASCII",
-    "verification": "bats tests/pi-packages.bats -f 'setup-windows' && python3 -c \"import sys; sys.exit(0 if sum(1 for l in open('setup-windows.ps1',encoding='utf-8') if any(ord(c)>126 for c in l)) == 10 else 1)\"",
+    "verification": "bats tests/pi-packages.bats -f 'both twins reconcile through dotf pi packages apply' | grep -q '^ok 1 ' && python3 -c \"import sys; sys.exit(0 if sum(1 for l in open('setup-windows.ps1',encoding='utf-8') if any(ord(c)>126 for c in l)) == 0 else 1)\"",
     "state": "pending",
     "evidence": ""
   },

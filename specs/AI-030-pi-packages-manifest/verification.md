@@ -12,16 +12,27 @@ created: "2026-08-25"
 | AC1 manifest is well-formed, unique, justified | `tests/pi-packages.bats` — "valid JSON", "no source is declared twice", "every entry says what it is for" |
 | AC2 every source pinned | `tests/pi-packages.bats` — "every declared source is pinned to a version", **plus** "the pin guard rejects an unpinned source" |
 | AC3 array absent from the seed, never written by setup | `tests/pi-packages.bats` — "the array is NOT declared in the seed settings.json", "setup-linux never writes the packages array itself" |
-| AC4 first run installs all | `verify-reconcile.sh` — `[OK] AC4 first run installed all 9 declared packages` |
-| AC5 second run changes nothing | `verify-reconcile.sh` — `[OK] AC5 second run installed 0 (changed=0)` |
-| AC6 object-form entries recognised | `verify-reconcile.sh` — `[OK] AC6 object-form entries recognised, 0 reinstalled` |
-| AC7 pi absent warns, never aborts | `verify-reconcile.sh` — `[OK] AC7 pi absent: warned, exit 0, bootstrap continues` |
-| AC8 unreadable manifest is loud | `tests/pi-packages.bats` — "refuses an unreadable manifest instead of reading it empty" |
-| AC9 Linux uses `$PI_BIN` | `tests/pi-packages.bats` — "installs through $PI_BIN, not the shell function" |
-| AC10 Windows parity, no new non-ASCII | `tests/pi-packages.bats` — three `setup-windows` cases; non-ASCII line count 10 before and 10 after |
+| AC4 first run installs all | `TestNewPlan`, `TestApplyConvergesAndASecondRunCallsNothing`, `TestPiPackagesApplyRemovesThenInstalls` (was `verify-reconcile.sh`, see below) |
+| AC5 second run changes nothing | `TestApplyConvergesAndASecondRunCallsNothing`: the second run makes no call to pi |
+| AC6 object-form entries recognised | `TestLiveSourcesReadsBothEntryForms`, `TestIdentityIgnoresTheVersion` |
+| AC7 pi absent warns, never aborts | `TestPiPackagesApplyWithoutPiWarnsAndExitsZero`, `TestPiPackagesApplyWithoutNpmWarnsAndExitsZero` |
+| AC8 unreadable manifest is loud | `TestLoadManifestRefusesWhatItCannotRead`, `TestPiPackagesCheckRefusesAnUnreadableManifest` |
+| AC9 Linux uses `$PI_BIN` | `tests/pi-packages.bats` — "setup-linux hands the command $PI_BIN, not the shell function" |
+| AC10 Windows parity, no new non-ASCII | `tests/pi-packages.bats` — "both twins reconcile through dotf pi packages apply"; `setup-windows.ps1` now has 0 non-ASCII lines |
 | AC11 a declared package actually **loads** | `dotf doctor` on the real machine — `[FAIL] extension "subagent" shadows the installed package of the same name`, then `[FIX ] quarantined ~/.pi/agent/extensions/subagent/index.ts`; effect confirmed by `pi -p` going from **exit 1** (`Failed to load extension … Tool "subagent" conflicts`) to **exit 0** answering `OK`, and a third `dotf doctor` run then reporting `[pi extensions] (1 checks, all ok)`. Unit-covered by `cli/internal/doctor/checks_pi_extensions_test.go` (6 cases: FAIL on collision, WARN without, the scoping rule that leaves an external writer's files alone, SKIP with no extensions dir, quarantine landing outside the auto-discovered tree, and no-clobber on a second `--fix`) |
 
 All on commit `2c20332` plus the spec commit that follows it.
+
+### Re-pointed after HARNESS-139 (2026-10-01)
+
+HARNESS-139 (#1754, #1755) moved the reconcile out of both setup scripts into
+`dotf pi packages apply`. `verify-reconcile.sh` drove the shell block it
+deleted, so it is retired here, and AC4-AC10 point at the tests that now hold
+them. The table above lists them; `features.json` carries one command per
+criterion. Each Go command names its tests with `-run '^(...)$'`, and `go test
+-v` confirmed each named test ran: a `-run` or `bats -f` that matches nothing
+exits 0, which is how three of these commands had been passing without running
+anything since #1754. AC10's ASCII count is now 0, since the file has none.
 
 ## Test status
 
@@ -111,3 +122,7 @@ limitation `tests/stub-real-pairing.bats` exists to keep visible (BUG-055).
   cannot carry new declarations to an existing machine"* — is already the
   generalisation of `pattern-decision-persistence` rather than a new pattern, and
   a second instance should exist before it is promoted.
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-231-a-hand-wired-dev-symlink-outranks-the-managed-instal.md
+- [x] ADR-worthy decision? no: the manifest and its declaration semantics are recorded in `ai/pi/README.md` and on epic #1625
+- [x] New pattern candidate for `00_meta/patterns/`? no: the one cross-project candidate needs a second instance first, as said above
