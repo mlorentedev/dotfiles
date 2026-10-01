@@ -340,3 +340,5 @@ tags: [lessons, index, dotfiles]
 | [320 - A retired model hangs before it refuses, and only a refusal reaches the fallback](lesson-320-a-retired-model-hangs-before-it-refuses.md) | 2026-09-30 |  |
 | [321 - A test that proves which source won needs the sources to disagree](lesson-321-a-test-that-proves-which-source-won-needs-them-to-disagree.md) | 2026-09-30 |  |
 | [322 - An allow-list path filter classifies every unlisted path as safe to skip](lesson-322-an-allow-list-filter-classifies-every-unlisted-path-as-safe.md) | 2026-09-30 |  |
+| [323 - A path quoted with %q doubles every Windows backslash](lesson-323-a-quoted-path-doubles-every-windows-backslash.md) | 2026-09-30 |  |
+| [324 - A serial merge loop reads two stale signals](lesson-324-a-serial-merge-loop-reads-two-stale-signals.md) | 2026-09-30 |  |
