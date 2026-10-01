@@ -1,7 +1,7 @@
 ---
 id: "TOOL-023-pr-agent-incremental-push-review"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-25"
 issue: "mlorentedev/dotfiles#1756"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ci, review, pr-agent]
