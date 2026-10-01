@@ -342,3 +342,4 @@ tags: [lessons, index, dotfiles]
 | [322 - An allow-list path filter classifies every unlisted path as safe to skip](lesson-322-an-allow-list-filter-classifies-every-unlisted-path-as-safe.md) | 2026-09-30 |  |
 | [323 - A path quoted with %q doubles every Windows backslash](lesson-323-a-quoted-path-doubles-every-windows-backslash.md) | 2026-09-30 |  |
 | [324 - A serial merge loop reads two stale signals](lesson-324-a-serial-merge-loop-reads-two-stale-signals.md) | 2026-09-30 |  |
+| [326 - A step env is evaluated before its if, so parsing a skipped step output throws](lesson-326-a-step-env-is-evaluated-before-its-if.md) | 2026-10-01 |  |
