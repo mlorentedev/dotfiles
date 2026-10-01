@@ -10,18 +10,68 @@ created: "2026-09-28"
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] Criterion 1 -> `TestHarnessMirrorCmd_UsesExplicitRepoOutsideTheCheckout` and `TestHarnessMirrorCmd_ExplicitRepoWinsInsideAnotherRepository`
-- [x] Criterion 2 -> `TestMirror_PreservesTheSourceMode`
-- [x] Criterion 3 -> setup BATS cases named `passes its checkout explicitly and warns when dotf is unavailable`
+- [x] Criterion 2 -> `TestMirror_PreservesTheSourceMode` and
+  `TestMirror_ReplacesReadOnlyDestinationOnWindows`
+- [x] Criterion 3 -> setup BATS cases named `executes harness mirror with its checkout path`
+  and `warns when dotf cannot mirror the harness` for both Linux and Windows
 
 ## Test status
 
+- Windows regression: `go test ./internal/harness -run '^TestMirror_ReplacesReadOnlyDestinationOnWindows$' -count=1` -> pass.
 - Test suite: `go test ./internal/cmd ./internal/harness` -> pass on Windows.
 - Static checks: `go vet ./internal/cmd ./internal/harness`, `gofmt -l`, PSScriptAnalyzer, and `git diff --check` -> pass.
-- Setup contract: targeted WSL BATS cases for Linux and Windows -> 2 passed.
+- Changed-code lint: `golangci-lint run --new-from-rev=main` -> 0 issues.
+- Full Go suite: all packages pass except the pre-existing Windows symlink
+  privilege failure in `internal/doctor` (`A required privilege is not held by
+  the client`, tracked by #1804); the changed `internal/harness` package passes.
+- Setup behavior: `bats --filter 'WIN-014' tests/setup-linux.bats tests/setup-windows.bats`
+  -> 4 passed. Each test extracts and executes the real harness-mirror block;
+  fake `dotf` captures the `--repo` argument, while an empty command path
+  exercises the non-fatal warning branch.
+- TDD red evidence: with temporary local mutations that replaced both checkout
+  arguments and both warning strings, the same command failed all 4 cases.
+  Restoring the production scripts returned the suite to 4 passing cases.
 - Manual smoke test: a source-built `dotf harness mirror --help` lists `--repo string`.
 - Full setup BATS run: 190 passed, 3 dependency skips, and 5 environment failures because WSL lacks `zsh`, `jq`, and `pwsh`; all WIN-014 cases passed.
 - Linux mode test: committed for Linux CI; local WSL has no Go toolchain, while Windows cannot expose POSIX executable bits.
 - No regressions in targeted suites: yes.
+
+## Prior-review dispositions
+
+- **AC3 setup coverage — resolved.** The former source-text-only assertions were
+  replaced with focused execution of the Linux and Windows mirror blocks. The
+  tests prove the checkout path reaches `dotf harness mirror --repo` and that a
+  missing `dotf` emits the documented warning without running either full setup.
+- **Review-base mis-scope — confirmed; fresh review required.**
+  `review-request.json` names `b15ad970f98c1ec6de1a2e51defc944cbbb0280a`,
+  which is 19 commits behind the PR merge base
+  `d691f613a7f0f6d79870ab318853046696069078`. That expands review scope from 6
+  branch files to 92 files and makes the existing request unsuitable as
+  WIN-014 evidence. This branch does not redesign review-base selection. Before
+  archive, regenerate the independent review request from the then-current
+  `git merge-base origin/main HEAD` and require the resulting review to cover
+  only the PR diff plus these remediation changes.
+
+## Final adversarial-review disposition
+
+- **Deferred to #1551:** the final verdict is PASS-WITH-GAPS only because
+  `dotf spec review` selected an old history-derived base and reviewed unrelated
+  files. The reviewer verified every WIN-014 acceptance criterion and gave
+  Correctness, Verification, Reliability, Maintainability and
+  Handoff-readiness an A. Fixing review-base selection is a global launcher
+  change, not a WIN-014 implementation change.
+
+## PR review dispositions
+
+- **Applied:** the Linux block extractor now requires both start and terminator
+  markers and exits non-zero when either is missing; a named regression removes
+  `unset _dotf` and proves fail-closed behavior.
+- **Applied:** archive checklist and fresh-review task now reflect the completed
+  archive/review state. Issue closure intentionally waits for merge.
+- **Declined:** the Windows warning test is not HOME-dependent. The production
+  block uses only `Get-Command dotf`; clearing PATH exercises the warning branch.
+- **Skipped:** docstring coverage is a generic heuristic over test/helpers, not
+  a repository gate or functional defect.
 
 ## Decisions made during implementation
 
@@ -31,19 +81,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   already knows the checkout it is configuring.
 - A byte-identical destination with the wrong mode is drift and is rewritten;
   idempotence requires both content and mode convergence.
-
-## Review dispositions (round 1, PASS, `nan/deepseek-v4-flash`, 2026-09-30)
-
-| # | Finding | Disposition |
-|---|---|---|
-| 1 | Minor (theoretical): the `--repo` tests use an empty manifest, so its target half is not exercised | defer: #1872 |
-| 2 | Minor (theoretical): no command-level test for `--repo` at a checkout without a manifest | defer: #1872 |
-| 3 | Minor: the Linux half of the setup bats case greps a string that predates the change | defer: #1872 |
-| 4 | Minor: `features.json` is still `pending` | recorded below: the three commands were run, and `features.json` stays untouched because it is in the contract set |
-| 5 | Minor (pre-existing): a manifest target with `..` escapes the deploy dir | defer: #1872, with its root cause |
-| 6 | Question: `os.Chmod` on a filesystem without POSIX modes | no action: no deployment target on such a filesystem is named |
-
-`features.json` commands run on 2026-09-30 at `902f64a`: `go test ./internal/cmd ./internal/harness` exit 0; `go test ./internal/harness` exit 0; `bats tests/setup-linux.bats tests/setup-windows.bats` exit 0, 195/195. The Windows half runs in CI (`test-windows`, green on #1806).
+- Windows refuses an atomic rename over an existing read-only file. The mirror
+  clears that attribute only on the old destination immediately before rename;
+  if installation fails it restores the old mode, and a successful replacement
+  retains the source mode already applied to the temporary file.
 
 ## Promotion candidates
 
@@ -57,5 +98,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/WIN-014/` -> `specs/archive/WIN-014/`
-- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): the archive PR carries `Closes #1751`
-- [x] Promotions above executed (if any): none, all three answered no
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Promotions above executed (if any)
+
+The issue remains open until PR #1825 merges.
