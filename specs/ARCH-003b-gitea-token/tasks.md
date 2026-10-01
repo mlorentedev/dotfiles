@@ -24,6 +24,9 @@ created: "2026-09-29"
 - [x] [AC2] Verify `dotf secrets ls` exposes only the ID and environment name
 - [x] [AC3] Store the operator-created token through the hidden `set` prompt
 - [x] [AC3] Verify resolution with `verify --require-all`
+- [x] Relink the work gate from private controller issue
+  `mlorentedev/knowledge#177` to CI-resolvable Bitácora issue
+  `mlorentedev/dotfiles#1912`
 
 ## Closing
 

@@ -23,6 +23,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   `GITEA_TELEDYNE_TOKEN infra GITEA_TELEDYNE_TOKEN` without a value
 - Secret write: hidden `dotf secrets set GITEA_TELEDYNE_TOKEN` updated
   `gitea-teledyne-bot/api-token`
+- Work gate: `mlorentedev/dotfiles#1912` is open, assigned, on the Bitácora,
+  and resolvable by this repository's CI; `mlorentedev/knowledge#177` remains
+  the controller decision reference.
+- Relink validation:
+  - `go test ./internal/secrets ./internal/cmd -count=1` -> pass.
+  - `go run ./cmd/dotf secrets ls` -> lists the ID and environment name only.
+  - `go run ./cmd/dotf spec audit` -> `[OK] 25 active spec(s), every one
+    tracking an open issue`.
+  - `git diff --check` -> pass.
 - No regressions in targeted suite: yes
 
 ## Decisions made during implementation

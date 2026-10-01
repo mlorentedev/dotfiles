@@ -3,7 +3,7 @@ id: "ARCH-003b-gitea-token"
 type: spec
 status: verifying # draft | implementing | verifying | archived
 created: "2026-09-29"
-issue: "mlorentedev/knowledge#177"   # repo#NNN — GitHub issue / Project item that tracks this spec
+issue: "mlorentedev/dotfiles#1912"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
 ---
@@ -14,7 +14,7 @@ template_version: "1.0"
 
 ## Why
 
-<!-- work gate: https://github.com/mlorentedev/knowledge/issues/177 — ARCH-003: ADR-004-draft - Write work-context routing governance ADR -->
+<!-- work gate: https://github.com/mlorentedev/dotfiles/issues/1912 — ARCH-003b: Register the Gitea automation token -->
 
 The private `teledyne/projects-toolkit` PoC needs API automation without
 embedding a Gitea token in shell history, repository configuration, or scripts.
@@ -65,6 +65,7 @@ Observable outcomes. Each must be testable.
 
 ## References
 
-- Bitácora: `mlorentedev/knowledge#177`
+- Bitácora: `mlorentedev/dotfiles#1912`
+- Controller decision: `mlorentedev/knowledge#177`
 - Controller ADR: `projects-toolkit/docs/adr/adr-004-private-controller-and-work-context-routing.md`
 - Secret doctrine: `docs/adr/adr-028-secrets-two-tier-bitwarden-age.md`
