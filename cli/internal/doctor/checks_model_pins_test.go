@@ -203,3 +203,25 @@ func TestModelPinsSkipsWhenNotDeployed(t *testing.T) {
 		t.Fatalf("an undeployed site must SKIP:\n%s", out)
 	}
 }
+
+// Round-1 finding 6: a deployed locator that stopped matching was a WARN, and
+// when the other pins resolved the same run then printed "all resolve" — two
+// lines contradicting each other under -v. A rotted locator is the guard
+// inspecting less than it claims, so it fails, as it does in the repo half, and
+// the run makes no clean claim.
+func TestModelPinsFailsOnARottedLocatorAndClaimsNothingClean(t *testing.T) {
+	sys, cfg, settings := pinFixture(t, "qwen3.6", []string{"nan/qwen3.6"})
+	// pi rewrote the file without `defaultModel`: that pin now locates nothing,
+	// while `enabledModels[]` still resolves.
+	if err := os.WriteFile(settings, []byte(`{"enabledModels":["nan/qwen3.6"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := pinRun(t, sys, cfg)
+
+	if !strings.Contains(out, "[FAIL]") || !strings.Contains(out, "pi-deployed-default-model") {
+		t.Fatalf("a rotted locator must FAIL and name its pin:\n%s", out)
+	}
+	if strings.Contains(out, "all resolve") {
+		t.Errorf("a run with a rotted locator still claimed every pin resolves:\n%s", out)
+	}
+}
