@@ -20,10 +20,12 @@ setup() {
     export GH_REPO="owner/repo"
     unset GITHUB_STEP_SUMMARY GITHUB_RUN_ID GITHUB_SERVER_URL
 
-    # gh stub: records every call; `issue list` answers STUB_EXISTING.
+    # gh stub: records every call; `issue list` answers STUB_EXISTING, and the
+    # subcommand named in STUB_FAIL (e.g. "issue close") exits 1.
     cat > "$FIX/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GH_LOG"
+[ "$1 $2" = "${STUB_FAIL:-}" ] && exit 1
 case "$1 $2" in
     "issue list") printf '%s' "${STUB_EXISTING:-}" ;;
 esac
@@ -69,6 +71,18 @@ teardown() {
     [ "$status" -eq 0 ]
     grep -q '^issue comment 42 ' "$GH_LOG"
     grep -q '^issue close 42$' "$GH_LOG"
+}
+
+@test "canary: a clean run whose issue cannot be closed says so instead of exiting bare" {
+    STUB_RC=0 STUB_EXISTING=42 STUB_FAIL="issue close" run bash -e "$SCRIPT" "$CANARY" .
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"::error::every bound model answered, but #42 could not be closed"* ]]
+}
+
+@test "canary: a failing run whose issue cannot be written says so instead of exiting bare" {
+    STUB_RC=1 STUB_EXISTING=42 STUB_FAIL="api -X" run bash -e "$SCRIPT" "$CANARY" .
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"::error::a bound model is not answering, but #42 could not be updated"* ]]
 }
 
 @test "canary: a clean run with no open issue touches nothing" {

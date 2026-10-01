@@ -122,7 +122,13 @@ func (p Prober) Probe(ctx context.Context, t Target) Result {
 
 	resp, err := p.Client.Do(req)
 	if err != nil {
-		return Result{Model: model, Class: Unavailable, Detail: fmt.Sprintf("no answer within %s", p.Timeout)}
+		// A refused connection, a DNS or TLS failure returns in milliseconds;
+		// calling it a timeout sends the reader to NaN's status page when the
+		// runner never reached it.
+		if ctx.Err() != nil {
+			return Result{Model: model, Class: Unavailable, Detail: fmt.Sprintf("no answer within %s", p.Timeout)}
+		}
+		return Result{Model: model, Class: Unavailable, Detail: "could not reach the endpoint: " + err.Error()}
 	}
 	defer func() { _ = resp.Body.Close() }()
 

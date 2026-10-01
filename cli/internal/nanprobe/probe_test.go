@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -104,6 +105,28 @@ func TestProbeCountsOnlyACompletedReply(t *testing.T) {
 	// The case curl reported as 200 then timed out: a status line is not an answer.
 	if got := p.Probe(context.Background(), Target{Model: "headers-only"}); got.Class != Unavailable || got.Status != 200 {
 		t.Errorf("200 with a body that never completes: got %q status %d, want unavailable at 200", got.Class, got.Status)
+	}
+}
+
+func TestProbeTellsATimeoutFromAnUnreachableEndpoint(t *testing.T) {
+	s := newStub()
+	s.hang["held"] = true
+	p := proberFor(t, s)
+	if got := p.Probe(context.Background(), Target{Model: "held"}); !strings.Contains(got.Detail, "no answer within") {
+		t.Errorf("a request NaN holds: detail %q, want it to name the timeout", got.Detail)
+	}
+
+	// Refused in milliseconds: telling the reader to wait out 90s sends them
+	// to NaN's status page when the runner never reached it.
+	srv := httptest.NewServer(newStub())
+	srv.Close()
+	p.BaseURL = srv.URL + "/v1"
+	got := p.Probe(context.Background(), Target{Model: "ok"})
+	if got.Class != Unavailable || strings.Contains(got.Detail, "no answer within") || !strings.Contains(got.Detail, "could not reach") {
+		t.Errorf("a closed endpoint: got %q detail %q, want unavailable naming the transport error", got.Class, got.Detail)
+	}
+	if strings.Contains(got.Detail, p.Key) {
+		t.Errorf("the detail leaks the key: %q", got.Detail)
 	}
 }
 

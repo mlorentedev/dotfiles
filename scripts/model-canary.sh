@@ -15,6 +15,9 @@
 #   anything else  the canary could not look: exit with its status and leave the
 #                  issue untouched, because it says nothing about the models
 #
+# A gh write that fails exits 2 with an annotation naming the issue and what the
+# canary did find, so a healthy run is never read as one that could not look.
+#
 # The classification lives here rather than in the workflow's `run:` block,
 # because Actions runs that block under `bash -e`, which would make the exit-1
 # branch unreachable (BUG-063). bats drives it with a stub `gh` and a stub
@@ -77,8 +80,11 @@ fi
 
 if [ "$rc" -eq 0 ]; then
     if [ -n "$existing" ]; then
-        gh issue comment "$existing" --body "Every bound NaN model answered on $(date -u +%F)${run_url:+ ($run_url)}. Closing." >/dev/null &&
-            gh issue close "$existing" >/dev/null || exit 2
+        if ! { gh issue comment "$existing" --body "Every bound NaN model answered on $(date -u +%F)${run_url:+ ($run_url)}. Closing." >/dev/null &&
+            gh issue close "$existing" >/dev/null; }; then
+            printf '::error::every bound model answered, but #%s could not be closed; it stays open until the next clean run\n' "$existing"
+            exit 2
+        fi
         printf '::notice::every bound model answered; closed #%s\n' "$existing"
     fi
     exit 0
@@ -95,12 +101,18 @@ fi
 if [ -n "$existing" ]; then
     # REST, not `gh issue edit`: the CLI's edit path queries the retired
     # projectCards field and fails.
-    gh api -X PATCH "repos/${GH_REPO}/issues/${existing}" -F "body=@${body}" >/dev/null || exit 2
+    gh api -X PATCH "repos/${GH_REPO}/issues/${existing}" -F "body=@${body}" >/dev/null || {
+        printf '::error::a bound model is not answering, but #%s could not be updated; see the job summary\n' "$existing"
+        exit 2
+    }
     printf '::warning::a bound NaN model is not answering; updated #%s\n' "$existing"
 else
-    gh label create "$label" --description "A NaN model this repository binds is not answering" \
-        --color D93F0B --force >/dev/null || exit 2
-    gh issue create --title "$title" --label "$label" --body-file "$body" >/dev/null || exit 2
+    if ! { gh label create "$label" --description "A NaN model this repository binds is not answering" \
+        --color D93F0B --force >/dev/null &&
+        gh issue create --title "$title" --label "$label" --body-file "$body" >/dev/null; }; then
+        printf '::error::a bound model is not answering, but the %s issue could not be opened; see the job summary\n' "$label"
+        exit 2
+    fi
     printf '::warning::a bound NaN model is not answering; opened a %s issue\n' "$label"
 fi
 exit 1

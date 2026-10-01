@@ -50,7 +50,8 @@ setup() {
 #   model-canary              stubs `gh` and the canary: a real run opens, rewrites or closes a
 #                             live issue, and the real canary needs the NaN key. The Go probe is
 #                             driven by its own stub-server tests. The API's verdict on the gh
-#                             calls comes from the workflow_dispatch run recorded on #1860.
+#                             calls is owed by a workflow_dispatch run after merge (a dispatch
+#                             needs the workflow on main), recorded on #1860.
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
