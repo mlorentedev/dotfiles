@@ -1,0 +1,12 @@
+{
+  "compaction": {
+    "modelOverrides": {
+      "nan/glm5.3-flash": { "reserveTokens": 600000 },
+      "nan/deepseek-v4-flash": { "reserveTokens": 600000 },
+      "nan/qwen3.8-flash": { "reserveTokens": 629146 },
+      "nan/qwen3.6": { "reserveTokens": 157286 },
+      "nan/mimo-v2.6-flash": { "reserveTokens": 629146 },
+      "nan/gemma4": { "reserveTokens": 157286 }
+    }
+  }
+}

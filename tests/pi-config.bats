@@ -240,6 +240,65 @@ assert_absent() {
     assert_absent '-Force' "Copy-Item still passes -Force"
 }
 
+# --- #1938: declarative compaction, merged into the seeded settings.json ---
+# pi auto-compacts when contextTokens > contextWindow - reserveTokens, so a 40%
+# trigger is reserveTokens = round(0.6 x contextWindow). The window lives in
+# models.json; deriving the expectation from it means a window change that
+# forgets compaction.json fails here instead of silently moving the trigger.
+
+@test "ai/pi/compaction.json holds only the compaction key (it is merged into a pi-owned file)" {
+    command -v jq >/dev/null || skip "jq not available"
+    keys="$(jq -c 'keys' "$DOTFILES_DIR/ai/pi/compaction.json")"
+    [ "$keys" = '["compaction"]' ] || { echo "top-level keys: $keys"; return 1; }
+    # enabled is global in pi; owning it here would override a box's own choice.
+    run jq -e '.compaction | has("enabled")' "$DOTFILES_DIR/ai/pi/compaction.json"
+    [ "$status" -ne 0 ] || { echo "compaction.json sets enabled -- native auto-compaction stays the box's"; return 1; }
+}
+
+@test "every enabled NaN model compacts at 40% of its models.json window (#1938)" {
+    command -v jq >/dev/null || skip "jq not available"
+    diff="$(jq -rn \
+        --slurpfile s "$PI_SETTINGS" \
+        --slurpfile m "$PI_MODELS" \
+        --slurpfile c "$DOTFILES_DIR/ai/pi/compaction.json" '
+        ($c[0].compaction.modelOverrides) as $o
+        | ($m[0].providers.nan.modelOverrides) as $w
+        | ($s[0].enabledModels | map(select(startswith("nan/")))) as $enabled
+        | ([$enabled[] | . as $k | ($k | ltrimstr("nan/")) as $id
+            | if ($w[$id].contextWindow | type) != "number" then "\($k): no contextWindow in models.json"
+              elif $o[$k].reserveTokens != ($w[$id].contextWindow * 6 / 10 | round)
+              then "\($k): reserveTokens \($o[$k].reserveTokens), want \($w[$id].contextWindow * 6 / 10 | round)"
+              else empty end]
+          + [$o | keys[] | select(. as $k | $enabled | index($k) | not) | "\(.): override for a model not in enabledModels"])
+        | .[]')"
+    [ -z "$diff" ] || { echo "$diff"; return 1; }
+    # Pin two values by hand, so a broken derivation cannot agree with itself.
+    [ "$(jq '.compaction.modelOverrides["nan/qwen3.8-flash"].reserveTokens' "$DOTFILES_DIR/ai/pi/compaction.json")" = 629146 ]
+    [ "$(jq '.compaction.modelOverrides["nan/qwen3.6"].reserveTokens' "$DOTFILES_DIR/ai/pi/compaction.json")" = 157286 ]
+}
+
+@test "ai/deploy.json merges compaction.json into pi's settings.json" {
+    command -v jq >/dev/null || skip "jq not available"
+    entry="$(jq -c '.configs[] | select(.name == "pi-compaction") | [.src, .dst, .strategy]' "$DOTFILES_DIR/ai/deploy.json")"
+    [ "$entry" = '["ai/pi/compaction.json","{HOME}/.pi/agent/settings.json","merge"]' ] \
+        || { echo "pi-compaction entry: ${entry:-missing}"; return 1; }
+}
+
+# A merge onto a missing destination creates it, so if `dotf deploy` ran first
+# on a fresh box it would write a settings.json holding only compaction, and
+# the seed above would then see a file and never write defaultModel. The order
+# of two blocks in a script is incidental until something asserts it.
+@test "both setups seed pi settings.json BEFORE dotf deploy merges compaction into it" {
+    seed="$(grep -n '^PI_SETTINGS_SRC=' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
+    deploy="$(grep -n '"$_dotf" deploy' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
+    [ -n "$seed" ] && [ -n "$deploy" ] || { echo "linux anchors missing: seed=$seed deploy=$deploy"; return 1; }
+    [ "$seed" -lt "$deploy" ] || { echo "setup-linux.sh: seed at $seed, dotf deploy at $deploy"; return 1; }
+    seed="$(grep -n '^\$piSettingsSrc = ' "$DOTFILES_DIR/setup-windows.ps1" | cut -d: -f1)"
+    deploy="$(grep -n '& dotf deploy' "$DOTFILES_DIR/setup-windows.ps1" | cut -d: -f1)"
+    [ -n "$seed" ] && [ -n "$deploy" ] || { echo "windows anchors missing: seed=$seed deploy=$deploy"; return 1; }
+    [ "$seed" -lt "$deploy" ] || { echo "setup-windows.ps1: seed at $seed, dotf deploy at $deploy"; return 1; }
+}
+
 # --- AI-032 (#1247): enabledModels field-level sync on an EXISTING settings.json ---
 # The two tests above guard the whole-file seed-if-missing contract; these guard
 # the layer on top of it that lets a catalog addition (e.g. #1254's

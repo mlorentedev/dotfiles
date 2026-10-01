@@ -168,13 +168,9 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, []ha
 	}
 	path := filepath.Join(home, filepath.FromSlash(t.File))
 
-	var doc map[string]any
-	if t.Format != "ts-extension" {
-		var readErr error
-		doc, readErr = readSettingsDoc(path)
-		if readErr != nil {
-			return false, nil, readErr
-		}
+	doc, err := readSettingsDoc(path)
+	if err != nil {
+		return false, nil, err
 	}
 
 	var (
@@ -189,18 +185,6 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, []ha
 		merged, changed, err = harness.MergeHooks(doc, cmds)
 	case harness.NamedHooksFormat:
 		merged, changed, err = harness.MergeNamedHooks(doc, harness.BindMarker, cmds)
-	case "ts-extension":
-		raw, generated, err2 := harness.GenerateTSExtension(t.Agent, cmds)
-		if err2 != nil {
-			return false, nil, err2
-		}
-		if generated && !dryRun {
-			if err3 := os.MkdirAll(filepath.Dir(path), 0o755); err3 != nil {
-				return false, nil, err3
-			}
-			err = os.WriteFile(path, raw, 0o644)
-		}
-		return generated, nil, err
 	default:
 		return false, nil, fmt.Errorf("unsupported bind format %q for %s", t.Format, t.Agent)
 	}
@@ -214,15 +198,13 @@ func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, []ha
 	}
 
 	var retired []harness.RetiredHook
-	if t.Format != "ts-extension" {
-		for _, r := range t.Retire {
-			did, err := retireOne(home, r, dryRun)
-			if err != nil {
-				return changed, retired, err
-			}
-			if did {
-				retired = append(retired, r)
-			}
+	for _, r := range t.Retire {
+		did, err := retireOne(home, r, dryRun)
+		if err != nil {
+			return changed, retired, err
+		}
+		if did {
+			retired = append(retired, r)
 		}
 	}
 	return changed, retired, nil

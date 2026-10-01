@@ -10,8 +10,5 @@
     "nan/qwen3.6",
     "nan/mimo-v2.6-flash",
     "nan/gemma4"
-  ],
-  "compaction": {
-    "enabled": false
-  }
+  ]
 }

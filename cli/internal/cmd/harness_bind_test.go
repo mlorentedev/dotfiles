@@ -291,7 +291,6 @@ func TestBindIsIdempotent(t *testing.T) {
 // TestBindSkipsWhatTheManifestSaysNotToEmit pins that emit:false is honoured and
 // SAID OUT LOUD. A silent skip is how a gap stops being visible.
 func TestBindSkipsWhatTheManifestSaysNotToEmit(t *testing.T) {
-	t.Skip("Skipping because no agents use emit:false anymore")
 	home, raw, _ := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
 

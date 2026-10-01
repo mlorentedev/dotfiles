@@ -286,7 +286,7 @@
         "agent": "pi",
         "file": ".pi/agent/extensions/dotfiles-gate.ts",
         "format": "ts-extension",
-        "emit": true,
+        "emit": false,
         "events": {
           "presence": "session_start",
           "action": "tool_call"
@@ -296,7 +296,7 @@
         "agent": "opencode",
         "file": ".config/opencode/plugin/dotfiles-gate.ts",
         "format": "ts-extension",
-        "emit": true,
+        "emit": false,
         "events": {
           "presence": "chat.system.transform",
           "action": "permission.ask"
