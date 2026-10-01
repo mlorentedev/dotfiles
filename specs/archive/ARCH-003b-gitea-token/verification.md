@@ -43,6 +43,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - HTTPS Git authentication uses an environment-only `http.extraHeader` inside
   `dotf secrets run`; the token is not persisted in the remote URL or Git
   configuration.
+- Independent review scope gap: accepted and tracked by #1551. The launcher
+  selected historical base `d691f613`, inflating the review with merged `main`
+  history; the reviewer still mapped the branch-owned registry/spec changes to
+  every acceptance criterion and returned `PASS WITH GAPS`.
 
 ## Promotion candidates
 
@@ -56,7 +60,9 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/ARCH-003b-gitea-token/` -> `specs/archive/ARCH-003b-gitea-token/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/ARCH-003b-gitea-token/` -> `specs/archive/ARCH-003b-gitea-token/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+The issue remains open until PR #1846 merges.
