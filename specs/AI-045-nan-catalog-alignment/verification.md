@@ -37,6 +37,7 @@ PR 2 (AC4-AC5), 2026-09-30:
 - After fast-forwarding to `origin/main` at `a4ef47ee`, `cd cli && go test ./internal/harness ./internal/cmd ./internal/doctor -count=1` -> PASS (`harness` 28.450s, `cmd` 80.758s, `doctor` 76.068s).
 - Git Bash: `PI_BIN=/c/Users/mlorente/scoop/apps/nodejs-lts/current/bin/pi PI_NAN_PACKAGE_REQUIRED=1 bats tests/opencode.bats tests/pi-config.bats tests/guard-pi-models-schema.bats tests/pi-nan-package.bats tests/reviewer-pool.bats` -> PASS, 79/79. The real-pi guard used pi 0.87.1; the package test installed the pinned `@gtrabanco/pi-nan-provider@0.7.0` in an isolated agent directory.
 - `git diff --check` -> PASS. Executable production delta is 16 added Go lines in `cli/internal/harness/model_map.go`; the remaining production changes are declarative schema/catalog/config records and documentation.
+- Draft PR: #1916.
 
 ## Decisions made during implementation
 

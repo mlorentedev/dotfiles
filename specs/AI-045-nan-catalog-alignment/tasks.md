@@ -48,8 +48,8 @@ created: "2026-09-29"
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
 - [x] Lint passes (shellcheck, actionlint)
 - [x] No unrelated changes in the diff
-- [ ] `verification.md` filled in (PR 1 part done; PR 2 pending)
-- [ ] PR opened referencing this spec folder
+- [ ] `verification.md` filled in (PR 1 and PR 2 done; prevention PRs pending)
+- [x] PRs opened referencing this spec folder: PR 1 #1856, PR 2 #1916
 
 ## Machine-readable features
 
