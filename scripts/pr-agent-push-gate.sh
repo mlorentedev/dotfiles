@@ -151,13 +151,22 @@ if [ "$forged" -gt 0 ]; then
     decide true "a review marker from a non-bot commenter is newer than the review of $baseline by github-actions[bot]; PR-Agent's own incremental baseline is not author-checked either, so this is reviewed in full" full
 fi
 
-# The state block is the last thing PR-Agent appends to a full review's body
+# The state block is the last thing PR-Agent appends to a FULL review's body
 # (append_review_state), so everything after the marker, with the trailing
-# "-->" trimmed, is its JSON verbatim.
+# "-->" trimmed, is its JSON verbatim. Anything else that carries the marker is
+# text the review quoted, which a PR author can supply: a block in an
+# incremental review (which never appends one) or one with more text after it.
+# Trusting it would let that author point head_sha at their newest commit and
+# skip the review, so those fall back to counting by date.
 state_tail=$(printf '%s' "$baseline_json" | jq -r '
     (.body // "") as $b
-    | if ($b | test("pr-agent-review-state:v1"))
+    | ($b | split("\n")[:5] | map(gsub("^\\s+|\\s+$"; ""))
+        | any(. == "<!-- pr-agent:review:full -->"
+              or . == "[pr-agent:review:full]: https://github.com/The-PR-Agent/pr-agent")
+      or ($b | startswith("## PR Reviewer Guide"))) as $full
+    | if $full and ($b | test("pr-agent-review-state:v1"))
       then ($b | split("pr-agent-review-state:v1") | last
+                | select(test("^\\s*\\{[\\s\\S]*\\}\\s*-->\\s*$"))
                 | sub("^\\s*"; "") | sub("\\s*-->\\s*$"; ""))
       else empty end' 2>/dev/null) || state_tail=""
 
