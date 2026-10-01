@@ -63,7 +63,7 @@ func TestEveryRepoRoutingPinResolvesInTheMap(t *testing.T) {
 			}
 			for _, raw := range values {
 				checked++
-				switch Check(p, raw, qualified, bare) {
+				switch got := Check(p, raw, qualified, bare); got {
 				case VerdictOK:
 				case VerdictWrongPool:
 					t.Errorf("%s pin %q: %q normalizes to %q — the map knows the model but not under pool %q",
@@ -71,6 +71,15 @@ func TestEveryRepoRoutingPinResolvesInTheMap(t *testing.T) {
 				case VerdictUnknown:
 					t.Errorf("%s pin %q: %q normalizes to %q, which harness/model-map.json does not declare",
 						site.File, p.ID, raw, Normalize(p, raw))
+				case VerdictMisspelled:
+					t.Errorf("%s pin %q: %q is not spelled %q…%q, the form this site declares",
+						site.File, p.ID, raw, p.Prefix, p.Suffix)
+				default:
+					// A verdict this switch does not know would otherwise fall
+					// through silently — how round-1 finding 4's mutation would
+					// have kept passing here after Check learned to catch it.
+					t.Errorf("%s pin %q: %q came back verdict %v, which this guard does not handle",
+						site.File, p.ID, raw, got)
 				}
 			}
 		}
@@ -95,9 +104,10 @@ func TestGuardRejectsAnUnresolvablePin(t *testing.T) {
 	if got := Check(p, "nan/deepseek-v4-flash-0731", qualified, bare); got != VerdictUnknown {
 		t.Errorf("a dead dated id must be VerdictUnknown, got %v", got)
 	}
-	// A retired provider's model.
-	if got := Check(p, "openrouter/deepseek/deepseek-v4-pro", qualified, bare); got != VerdictUnknown {
-		t.Errorf("a retired-provider id must be VerdictUnknown, got %v", got)
+	// A retired provider's model. It does not carry the declared `nan/`, so it
+	// fails on spelling before the map is asked (finding 4).
+	if got := Check(p, "openrouter/deepseek/deepseek-v4-pro", qualified, bare); got != VerdictMisspelled {
+		t.Errorf("a retired-provider id must be VerdictMisspelled, got %v", got)
 	}
 	// And the control: a live one still passes, so the check is not simply
 	// failing everything.
@@ -113,6 +123,10 @@ func TestGuardRejectsAnUnresolvablePin(t *testing.T) {
 // pending a community vote (#1244). The guard must not fire on a recorded
 // decision, and the way it does not is by checking only the pins the registry
 // declares — never the catalogs those files also carry.
+//
+// A catalog is declared (`catalog: true`), not inferred from an array locator:
+// `.pr_agent.toml`'s `fallback_models` is an array and an ordered routing list,
+// so "array means catalog" stopped holding once finding 2 declared it.
 func TestCatalogEntriesAreNotCheckedAsRouting(t *testing.T) {
 	pins, err := LoadModelPins(repoRootForTest(t))
 	if err != nil {
@@ -123,11 +137,12 @@ func TestCatalogEntriesAreNotCheckedAsRouting(t *testing.T) {
 			continue
 		}
 		for _, p := range site.Pins {
-			if strings.HasSuffix(p.Locator, "[]") {
-				t.Errorf("%s pin %q locates an array in a repo-scoped site: catalogs are not routing, and checking one would fire on #1244's recorded decision",
+			if p.Catalog {
+				t.Errorf("%s pin %q is a catalog in a repo-scoped site: catalogs are not routing, and checking one would fire on #1244's recorded decision",
 					site.File, p.ID)
 			}
-			if p.Locator == "enabledModels" || p.Locator == "models" {
+			last := p.Locator[strings.LastIndex(p.Locator, ".")+1:]
+			if last = strings.TrimSuffix(last, "[]"); last == "enabledModels" || last == "models" {
 				t.Errorf("%s pin %q points at a catalog key", site.File, p.ID)
 			}
 		}
@@ -144,6 +159,9 @@ func TestModelPinsRefusesToReadAsEmpty(t *testing.T) {
 		{"pin with no why", `{"version":1,"sites":[{"file":"x","scope":"repo","pins":[{"id":"a","kind":"regex","locator":"(x)","pool":"nan"}]}]}`, "no why"},
 		{"bad scope", `{"version":1,"sites":[{"file":"x","scope":"elsewhere","pins":[{"id":"a","kind":"regex","locator":"(x)","pool":"nan","why":"w"}]}]}`, "scope"},
 		{"unknown kind", `{"version":1,"sites":[{"file":"x","scope":"repo","pins":[{"id":"a","kind":"telepathy","locator":"x","pool":"nan","why":"w"}]}]}`, "unknown kind"},
+		{"catalog on a scalar", `{"version":1,"sites":[{"file":"x","scope":"deployed","pins":[{"id":"a","kind":"json-path","locator":"m","pool":"nan","why":"w","catalog":true}]}]}`, "catalog"},
+		{"unknown spelling", `{"version":1,"sites":[{"file":"x","scope":"repo","pins":[{"id":"a","kind":"json-path","locator":"m","pool":"nan","why":"w","spelling":"vibes"}]}]}`, "spelling"},
+		{"exclusion with no why", `{"version":1,"sites":[{"file":"x","scope":"repo","pins":[{"id":"a","kind":"json-path","locator":"m","pool":"nan","why":"w"}]}],"excluded":[{"file":"x","locator":"y"}]}`, "no why"},
 		{"locator without a capture", `{"version":1,"sites":[{"file":"x","scope":"repo","pins":[{"id":"a","kind":"regex","locator":"x","pool":"nan","why":"w"}]}]}`, "capture group"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -257,5 +275,131 @@ func TestDeclaredModelsDoesNotInventPoolsFromHarnessKeys(t *testing.T) {
 		if _, ok := pools[pool]; !ok {
 			t.Errorf("qualified entry %q names %q, which is not a declared pool", q, pool)
 		}
+	}
+}
+
+// Round-1 finding 4: Normalize used TrimPrefix, a no-op when the prefix is
+// absent, so `.pr_agent.toml` could drop the `openai/` that litellm needs to
+// reach NaN and the guard still passed. The declared spelling is now required.
+// The mutation is the reviewer's own, run against the real file.
+func TestNormalizeRequiresTheDeclaredPrefix(t *testing.T) {
+	root := repoRootForTest(t)
+	m, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("model map does not load: %v", err)
+	}
+	qualified, bare := DeclaredModels(m)
+	p := Pin{ID: "pr-agent-primary", Kind: "toml-key", Locator: "model", Prefix: "openai/", Pool: "nan"}
+
+	real, err := os.ReadFile(filepath.Join(root, ".pr_agent.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values, err := Extract(p, real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Check(p, values[0], qualified, bare); got != VerdictOK {
+		t.Fatalf("the shipped value %q must resolve, got %v", values[0], got)
+	}
+
+	dropped := strings.Replace(string(real), `model = "openai/`, `model = "`, 1)
+	values, err = Extract(p, []byte(dropped))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Check(p, values[0], qualified, bare); got != VerdictMisspelled {
+		t.Errorf("%q dropped the declared prefix %q and came back %v, want VerdictMisspelled", values[0], p.Prefix, got)
+	}
+}
+
+// A declared suffix is required the same way. Claude Code reads `opus[1m]` as
+// the opus alias with the 1M-token context window; the map routes `opus`, so the
+// suffix is spelling, and dropping it is a registry edit rather than a pass.
+func TestDeclaredSuffixIsSpellingNotPartOfTheID(t *testing.T) {
+	m, err := LoadModelMap(repoRootForTest(t))
+	if err != nil {
+		t.Fatalf("model map does not load: %v", err)
+	}
+	qualified, bare := DeclaredModels(m)
+	p := Pin{ID: "claude-model", Kind: "json-path", Locator: "model", Suffix: "[1m]", Pool: "claude"}
+
+	if got := Normalize(p, "opus[1m]"); got != "claude:opus" {
+		t.Errorf("Normalize(opus[1m]) = %q, want claude:opus", got)
+	}
+	if got := Check(p, "opus[1m]", qualified, bare); got != VerdictOK {
+		t.Errorf("opus[1m] must resolve, got %v", got)
+	}
+	if got := Check(p, "opus", qualified, bare); got != VerdictMisspelled {
+		t.Errorf("opus without the declared suffix came back %v, want VerdictMisspelled", got)
+	}
+}
+
+// agy writes the display name its model picker shows, while `agy --model`
+// takes the id. The pairs below are the gemini rows of `agy models`, measured
+// 2026-10-01; the rule holds for that family only (`Claude Sonnet 4.6
+// (Thinking)` is `claude-sonnet-4-6`), which is why a pin declares it rather
+// than the guard applying it everywhere.
+func TestDisplayNameSpellingMatchesTheAgyCatalog(t *testing.T) {
+	for display, id := range map[string]string{
+		"Gemini 3.8 Flash (High)":   "gemini-3.8-flash-high",
+		"Gemini 3.8 Flash (Medium)": "gemini-3.8-flash-medium",
+		"Gemini 3.8 Flash (Low)":    "gemini-3.8-flash-low",
+		"Gemini 3.7 Flash (High)":   "gemini-3.7-flash-high",
+		"Gemini 3.7 Flash (Medium)": "gemini-3.7-flash-medium",
+		"Gemini 3.7 Flash (Low)":    "gemini-3.7-flash-low",
+		"Gemini 3.6 Flash (High)":   "gemini-3.6-flash-high",
+		"Gemini 3.1 Pro (High)":     "gemini-3.1-pro-high",
+		"Gemini 3.1 Pro (Low)":      "gemini-3.1-pro-low",
+	} {
+		p := Pin{ID: "agy-model", Kind: "json-path", Locator: "model", Spelling: "display-name", Pool: "gemini"}
+		if got := Normalize(p, display); got != "gemini:"+id {
+			t.Errorf("Normalize(%q) = %q, want gemini:%s", display, got, id)
+		}
+	}
+}
+
+// Finding 2's pins are nested (opencode's `agent.plan.model`) or arrays in TOML
+// (`fallback_models`), which the top-level extractors could not reach.
+func TestExtractReachesNestedAndArrayPins(t *testing.T) {
+	doc := []byte(`{
+  // a comment, as opencode.jsonc carries
+  "provider": {"nan": {"options": {"model": "glm5.3-flash"}}},
+  "agent": {"plan": {"model": "nan/a"}, "build": {"model": "nan/b"}, "review": {"permission": {}}}
+}`)
+	for _, tc := range []struct {
+		locator string
+		want    []string
+	}{
+		{"provider.nan.options.model", []string{"glm5.3-flash"}},
+		// An agent without a model inherits the default: skipped under a
+		// wildcard, never an error.
+		{"agent.*.model", []string{"nan/b", "nan/a"}},
+	} {
+		got, err := Extract(Pin{ID: "x", Kind: "json-path", Locator: tc.locator}, doc)
+		if err != nil {
+			t.Errorf("%s: %v", tc.locator, err)
+			continue
+		}
+		if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("%s = %v, want %v", tc.locator, got, tc.want)
+		}
+	}
+	for _, rotted := range []string{"provider.nan.options.gone", "agent.*.nothing", "nowhere.*.model"} {
+		if _, err := Extract(Pin{ID: "x", Kind: "json-path", Locator: rotted}, doc); err == nil {
+			t.Errorf("%s matched nothing and did not error", rotted)
+		}
+	}
+
+	toml := []byte("model = \"openai/a\"\nfallback_models = [\n  \"openai/b\",\n  \"openai/c\",\n]\n")
+	got, err := Extract(Pin{ID: "x", Kind: "toml-key", Locator: "fallback_models[]"}, toml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != "openai/b,openai/c" {
+		t.Errorf("fallback_models[] = %v", got)
+	}
+	if _, err := Extract(Pin{ID: "x", Kind: "toml-key", Locator: "fallback_models[]"}, []byte("fallback_models = []\n")); err == nil {
+		t.Error("an empty fallback list extracted nothing and did not error")
 	}
 }

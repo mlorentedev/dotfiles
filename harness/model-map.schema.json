@@ -173,7 +173,7 @@
       }
     },
     "services": {
-      "description": "Non-chat endpoints (embeddings, rerank). They are provider surfaces the map is responsible for, and they fit neither tiers nor chains.",
+      "description": "Single-purpose surfaces that fit neither tiers nor chains: non-chat endpoints (embeddings, rerank), and one role pinned to one model (the claude advisor, `advisorModel` in ai/claude/settings.json). The map is responsible for them all the same.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
