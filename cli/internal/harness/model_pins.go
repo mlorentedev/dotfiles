@@ -16,8 +16,18 @@ const ModelPinsFile = "harness/model-pins.json"
 // ModelPins is harness/model-pins.json: where a model id is pinned for ROUTING
 // outside the map, and how each site spells it.
 type ModelPins struct {
-	Version int       `json:"version"`
-	Sites   []PinSite `json:"sites"`
+	Version  int         `json:"version"`
+	Sites    []PinSite   `json:"sites"`
+	Excluded []Exclusion `json:"excluded"`
+}
+
+// Exclusion is a routing-shaped key that is deliberately not a pin, with the
+// reason. The coverage sweep reads it, so an absence is a decision on record
+// rather than a gap nobody saw.
+type Exclusion struct {
+	File    string `json:"file"`
+	Locator string `json:"locator"`
+	Why     string `json:"why"`
 }
 
 // PinSite is one file carrying routing pins.
@@ -30,12 +40,15 @@ type PinSite struct {
 
 // Pin is one routing decision inside a site.
 type Pin struct {
-	ID      string `json:"id"`
-	Kind    string `json:"kind"` // "json-path" | "toml-key" | "regex" | "regex-all"
-	Locator string `json:"locator"`
-	Prefix  string `json:"prefix"`
-	Pool    string `json:"pool"`
-	Why     string `json:"why"`
+	ID       string `json:"id"`
+	Kind     string `json:"kind"` // "json-path" | "toml-key" | "regex" | "regex-all"
+	Locator  string `json:"locator"`
+	Prefix   string `json:"prefix"`
+	Suffix   string `json:"suffix"`
+	Spelling string `json:"spelling"` // "" | "display-name"
+	Catalog  bool   `json:"catalog"`
+	Pool     string `json:"pool"`
+	Why      string `json:"why"`
 }
 
 // LoadModelPins reads and validates the registry.
@@ -79,6 +92,14 @@ func LoadModelPins(repoRoot string) (*ModelPins, error) {
 			default:
 				return nil, fmt.Errorf("%s: pin %q has unknown kind %q", ModelPinsFile, p.ID, p.Kind)
 			}
+			switch p.Spelling {
+			case "", "display-name":
+			default:
+				return nil, fmt.Errorf("%s: pin %q has unknown spelling %q", ModelPinsFile, p.ID, p.Spelling)
+			}
+			if p.Catalog && !strings.HasSuffix(p.Locator, "[]") {
+				return nil, fmt.Errorf("%s: pin %q is a catalog but locates a scalar — a catalog is a list a picker offers", ModelPinsFile, p.ID)
+			}
 			if p.Kind == "regex" || p.Kind == "regex-all" {
 				re, err := regexp.Compile(p.Locator)
 				if err != nil {
@@ -88,6 +109,11 @@ func LoadModelPins(repoRoot string) (*ModelPins, error) {
 					return nil, fmt.Errorf("%s: pin %q locator needs exactly one capture group, has %d", ModelPinsFile, p.ID, re.NumSubexp())
 				}
 			}
+		}
+	}
+	for _, x := range pins.Excluded {
+		if x.Why == "" {
+			return nil, fmt.Errorf("%s: exclusion %s %q has no why — an absence nobody can justify is a gap", ModelPinsFile, x.File, x.Locator)
 		}
 	}
 	return &pins, nil
@@ -186,6 +212,9 @@ const (
 	// `nan/deepseek-v4-flash-0731` and the retired `openrouter/*` ids both land
 	// here.
 	VerdictUnknown
+	// VerdictMisspelled — the value does not carry the prefix or suffix its pin
+	// declares, so it is not the spelling the site needs.
+	VerdictMisspelled
 )
 
 // Finding is one pin value that did not resolve cleanly.
@@ -201,19 +230,43 @@ type Finding struct {
 // rule. Declared, never inferred: one model has three correct spellings across
 // these files (`nan:mimo-v2.6-flash`, `openai/mimo-v2.6-flash`, bare `mimo-v2.6-flash`), so a
 // guess would be wrong for two of them.
+//
+// It assumes the value is Spelled; Check asks that first.
 func Normalize(p Pin, raw string) string {
-	id := raw
-	if p.Prefix != "" {
-		id = strings.TrimPrefix(id, p.Prefix)
+	id := strings.TrimSuffix(strings.TrimPrefix(raw, p.Prefix), p.Suffix)
+	if p.Spelling == "display-name" {
+		id = displayNameID(id)
 	}
-	// A site may still qualify with some other provider prefix — a retired one,
-	// for instance. Keep it in the id so the diagnostic names what is actually
-	// written rather than a silently trimmed version of it.
 	return p.Pool + ":" + id
+}
+
+// Spelled reports whether raw carries the prefix and suffix its pin declares.
+//
+// Required, not trimmed when present (round-1 finding 4): TrimPrefix is a no-op
+// on a value without the prefix, so `.pr_agent.toml` could drop the `openai/`
+// litellm needs to reach NaN and still resolve. A value with some other prefix —
+// a retired provider's, for instance — fails here, and the diagnostic names what
+// is actually written.
+func Spelled(p Pin, raw string) bool {
+	return strings.HasPrefix(raw, p.Prefix) && strings.HasSuffix(raw, p.Suffix) &&
+		len(raw) > len(p.Prefix)+len(p.Suffix)
+}
+
+// displayNameID turns agy's picker label into the id `agy --model` takes:
+// `Gemini 3.7 Flash (High)` is `gemini-3.7-flash-high`. Measured against
+// `agy models` on 2026-10-01 for the gemini family only; it does not hold for
+// every row there (`Claude Sonnet 4.6 (Thinking)` is `claude-sonnet-4-6`), so a
+// pin opts in to it rather than the guard applying it everywhere.
+func displayNameID(name string) string {
+	name = strings.NewReplacer("(", "", ")", "").Replace(strings.ToLower(name))
+	return strings.Join(strings.Fields(name), "-")
 }
 
 // Check resolves one raw value against the map.
 func Check(p Pin, raw string, qualified, bare map[string]bool) Verdict {
+	if !Spelled(p, raw) {
+		return VerdictMisspelled
+	}
 	norm := Normalize(p, raw)
 	if qualified[norm] {
 		return VerdictOK
@@ -258,51 +311,102 @@ func Extract(p Pin, content []byte) ([]string, error) {
 	return nil, fmt.Errorf("pin %q: unknown kind %q", p.ID, p.Kind)
 }
 
-// extractJSONPath supports a top-level key, and `key[]` for a top-level array of
-// strings. Deliberately not a JSONPath engine: every pin site here is a flat
-// top-level key, and a general query language would be more surface than the
-// registry needs.
+// extractJSONPath walks a dotted path of object keys, where a `*` segment
+// stands for every key at that level and a trailing `[]` reads a string array.
+// Deliberately not a JSONPath engine: opencode's `agent.*.model` and
+// `provider.nan.options.model` are the deepest pins here, and a general query
+// language would be more surface than the registry needs.
+//
+// A missing key is an error on a literal path and skipped under a wildcard,
+// because an opencode agent that sets no model inherits the default. Matching
+// nothing at all is an error either way.
 //
 // The content is read as JSONC-tolerant — opencode.jsonc carries comments.
 func extractJSONPath(p Pin, content []byte) ([]string, error) {
-	var doc map[string]any
+	var doc any
 	if err := json.Unmarshal(stripJSONComments(content), &doc); err != nil {
 		return nil, fmt.Errorf("pin %q: %w", p.ID, err)
 	}
-	key, isArray := strings.CutSuffix(p.Locator, "[]")
-	v, ok := doc[key]
-	if !ok {
-		return nil, fmt.Errorf("pin %q: key %q not present — the file changed shape", p.ID, key)
-	}
-	if isArray {
-		out := toStrings(v)
-		if len(out) == 0 {
-			return nil, fmt.Errorf("pin %q: %q is empty or not a string array", p.ID, key)
+	path, isArray := strings.CutSuffix(p.Locator, "[]")
+	nodes := []any{doc}
+	wild := false
+	for _, seg := range strings.Split(path, ".") {
+		var next []any
+		for _, n := range nodes {
+			obj, ok := n.(map[string]any)
+			if !ok {
+				continue
+			}
+			if seg == "*" {
+				for _, k := range sortedKeys(obj) {
+					next = append(next, obj[k])
+				}
+				continue
+			}
+			v, ok := obj[seg]
+			if !ok && !wild {
+				return nil, fmt.Errorf("pin %q: key %q not present — the file changed shape", p.ID, path)
+			}
+			if ok {
+				next = append(next, v)
+			}
 		}
-		return out, nil
+		wild = wild || seg == "*"
+		nodes = next
 	}
-	s, ok := v.(string)
-	if !ok {
-		return nil, fmt.Errorf("pin %q: %q is not a string", p.ID, key)
+	var out []string
+	for _, n := range nodes {
+		if isArray {
+			out = append(out, toStrings(n)...)
+			continue
+		}
+		s, ok := n.(string)
+		if !ok {
+			return nil, fmt.Errorf("pin %q: %q is not a string", p.ID, path)
+		}
+		out = append(out, s)
 	}
-	return []string{s}, nil
+	if len(out) == 0 {
+		return nil, fmt.Errorf("pin %q: %q matched nothing — empty, not a string array, or the file changed shape", p.ID, p.Locator)
+	}
+	return out, nil
 }
 
-var tomlKeyLine = `(?m)^\s*%s\s*=\s*"([^"]+)"`
+var (
+	tomlKeyLine  = `(?m)^\s*%s\s*=\s*"([^"]+)"`
+	tomlListLine = `(?ms)^\s*%s\s*=\s*\[(.*?)\]`
+	tomlString   = regexp.MustCompile(`"([^"]+)"`)
+)
 
-// extractTOMLKey reads a bare `key = "value"` line. `.pr_agent.toml` puts these
-// at section scope, and pulling in a TOML parser to read two string keys would
-// be a dependency this check does not need.
+// extractTOMLKey reads a bare `key = "value"` line, or `key = [ ... ]` for a
+// locator ending in `[]` (`fallback_models`, which may span lines).
+// `.pr_agent.toml` puts these at section scope, and pulling in a TOML parser to
+// read three keys would be a dependency this check does not need.
 func extractTOMLKey(p Pin, content []byte) ([]string, error) {
-	re, err := regexp.Compile(fmt.Sprintf(tomlKeyLine, regexp.QuoteMeta(p.Locator)))
+	key, isArray := strings.CutSuffix(p.Locator, "[]")
+	line := tomlKeyLine
+	if isArray {
+		line = tomlListLine
+	}
+	re, err := regexp.Compile(fmt.Sprintf(line, regexp.QuoteMeta(key)))
 	if err != nil {
 		return nil, fmt.Errorf("pin %q: %w", p.ID, err)
 	}
 	m := re.FindStringSubmatch(string(content))
 	if m == nil {
-		return nil, fmt.Errorf("pin %q: key %q not found", p.ID, p.Locator)
+		return nil, fmt.Errorf("pin %q: key %q not found", p.ID, key)
 	}
-	return []string{m[1]}, nil
+	if !isArray {
+		return []string{m[1]}, nil
+	}
+	var out []string
+	for _, s := range tomlString.FindAllStringSubmatch(m[1], -1) {
+		out = append(out, s[1])
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("pin %q: %q is an empty list", p.ID, key)
+	}
+	return out, nil
 }
 
 var (

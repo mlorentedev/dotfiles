@@ -23,28 +23,28 @@
   {
     "id": "AI-045-nan-catalog-alignment-f4",
     "behavior": "AC4: model-map declares per-model concurrency and the per-key cap, and the loader validates the shape",
-    "verification": "echo 'PR 2' && exit 1",
+    "verification": "cd cli && go test ./internal/harness -run 'TestModelMap(BudgetIsDeclarationOnly|SchemaAcceptsPerModelConcurrency|SchemaRejectsMalformedPerModelConcurrency)$' -count=1",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f5",
     "behavior": "AC5: opencode and pi NaN windows and caps equal NaN's published figures, and enable_thinking appears nowhere",
-    "verification": "echo 'PR 2' && exit 1",
+    "verification": "bats -f 'published windows|effective reasoning_effort|README records' tests/opencode.bats && bats -f 'model overrides carry' tests/pi-config.bats",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f6",
     "behavior": "AC6: PR-Agent streams its NaN calls, pinned by a test",
-    "verification": "echo 'pending: #1858' && exit 1",
+    "verification": "bats tests/pr-agent-config.bats -f 'every attempt streams its NaN calls' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f7",
     "behavior": "AC7: PR-Agent's total wait is below the job timeout, asserted by a test",
-    "verification": "echo 'pending: #1859' && exit 1",
+    "verification": "bats tests/pr-agent-config.bats -f 'the job outlives both attempts' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   },
@@ -52,6 +52,20 @@
     "id": "AI-045-nan-catalog-alignment-f8",
     "behavior": "AC8: a daily canary probes every bound NaN model and reports the dead ones in one issue",
     "verification": "echo 'pending: #1860' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f9",
+    "behavior": "AC9: after both NaN attempts fail, PR-Agent reviews once more on a provider outside NaN, gated on its credential",
+    "verification": "echo 'pending: #1923 option 1, blocked on the owner' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-045-nan-catalog-alignment-f10",
+    "behavior": "AC10: reviews queue one at a time across the repository, and none is dropped",
+    "verification": "bats tests/pr-agent-config.bats -f 'reviews queue one at a time' | grep -q '^ok 1 '",
     "state": "pending",
     "evidence": ""
   }
