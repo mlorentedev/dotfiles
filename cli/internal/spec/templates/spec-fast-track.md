@@ -4,6 +4,7 @@ type: template
 status: active
 created: "{{date:YYYY-MM-DD}}"
 owner: manu
+issue: ""
 ---
 # {TITLE}
 

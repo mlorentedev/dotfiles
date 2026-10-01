@@ -165,7 +165,10 @@ func Scaffold(repoRoot, id, date, repoSlug string, issueNum int, issueTitle stri
 	if err != nil {
 		return warning, err
 	}
-	if err := os.MkdirAll(specDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(specDir), 0o755); err != nil {
+		return warning, err
+	}
+	if err := os.Mkdir(specDir, 0o755); err != nil {
 		return warning, err
 	}
 	for name, content := range files {
@@ -212,7 +215,10 @@ func ScaffoldFastTrack(repoRoot, id, date, repoSlug string, issueNum int, issueT
 	if err != nil {
 		return warning, err
 	}
-	if err := os.MkdirAll(specDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(specDir), 0o755); err != nil {
+		return warning, err
+	}
+	if err := os.Mkdir(specDir, 0o755); err != nil {
 		return warning, err
 	}
 	for name, content := range files {
