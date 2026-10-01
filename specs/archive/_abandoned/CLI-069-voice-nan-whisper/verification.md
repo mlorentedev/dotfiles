@@ -28,9 +28,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`? Push-to-talk audio streaming with fallback display typing in Wayland/X11
-- [ ] ADR-worthy decision for the repo's `docs/adr/`? Centralized remote STT gateway vs local Whisper models in developer tooling
-- [ ] New pattern candidate for `00_meta/patterns/`? No (covered by `pattern-nan-builders-gateway.md`)
+- [x] Lesson for the repo's `docs/lessons/`? no: abandoned before any implementation, so nothing was learned by building it
+- [x] ADR-worthy decision for the repo's `docs/adr/`? no: the gateway-vs-local question was never decided; it stays open on #1426
+- [x] New pattern candidate for `00_meta/patterns/`? no: covered by `pattern-nan-builders-gateway.md`
 
 ## Archive checklist
 
