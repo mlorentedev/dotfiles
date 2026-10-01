@@ -193,6 +193,36 @@ _commit() {
     [ "$status" -eq 0 ]
 }
 
+# #1904: #1898 deleted a stray 407-line diff.patch at the root, and the gate
+# counted it as production code. Patch-tool output (.patch, .diff, and the
+# .orig/.rej a failed apply leaves behind) is never source, whether added or
+# removed.
+@test "excludes patch-tool output, added or deleted, from LOC count (#1904)" {
+    printf 'line %d\n' {1..200} > stray.patch
+    printf 'line %d\n' {1..200} > stray.diff
+    git add stray.patch stray.diff
+    git commit -q -m "stray patches on main"
+    git branch -f main HEAD
+    git rm -q stray.patch stray.diff
+    printf 'orig %d\n' {1..200} > leftover.go.orig
+    printf 'rej %d\n' {1..200} > leftover.go.rej
+    _commit "delete the patches, leave a failed apply's output"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 0 ]
+}
+
+@test "deleting a source file still counts as production LOC (#1904 stays narrow)" {
+    printf 'line %d\n' {1..200} > tool.sh
+    git add tool.sh
+    git commit -q -m "a script on main"
+    git branch -f main HEAD
+    git rm -q tool.sh
+    _commit "delete the script"
+    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]]
+}
+
 @test "--explain prints LOC breakdown" {
     printf 'line %d\n' {1..10} > small.txt
     _commit "small"

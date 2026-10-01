@@ -537,6 +537,11 @@ _excluded() {
         *.lock|*.lockb) return 0 ;;
         package-lock.json|pnpm-lock.yaml|go.sum) return 0 ;;
         .gitignore|CHANGELOG.md) return 0 ;;
+        # Patch-tool output is never source, added or deleted: a stray 407-line
+        # diff.patch removed in #1898 counted as production code (#1904). By
+        # extension, not by "deleted lines don't count": deleting a script is
+        # still a production change.
+        *.patch|*.diff|*.orig|*.rej) return 0 ;;
     esac
     return 1
 }
