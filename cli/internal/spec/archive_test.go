@@ -521,7 +521,7 @@ func TestDraftTagInProposalStillBlocksAfterReview(t *testing.T) {
 	if len(tags) != 1 || !strings.HasPrefix(tags[0], "proposal.md:") {
 		t.Fatalf("want exactly the proposal.md hit, got %v", tags)
 	}
-	for _, name := range []string{"proposal.md", "tasks.md", "verification.md", "features.json", "design.md"} {
+	for _, name := range []string{"proposal.md", "tasks.md", "verification.md", "features.json", "design.md", "spec.md"} {
 		if IsReviewState(name) {
 			t.Errorf("%s is an authored artifact and must not be review state", name)
 		}
@@ -591,7 +591,7 @@ func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
 			return true
 		})
 	}
-	authored := map[string]bool{"proposal.md": true, "tasks.md": true, "verification.md": true, "features.json": true}
+	authored := map[string]bool{"proposal.md": true, "tasks.md": true, "verification.md": true, "features.json": true, "spec.md": true}
 	checked := 0
 	names := literals
 	for _, id := range joined {

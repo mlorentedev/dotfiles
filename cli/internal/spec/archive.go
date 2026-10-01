@@ -302,7 +302,11 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 
 	// Update the moved proposal.md (best-effort: a spec missing proposal.md
 	// still archives, matching the shell's `if -f` guard).
+	// For Fast-Track Development, update spec.md instead.
 	proposal := filepath.Join(target, "proposal.md")
+	if _, err := os.Stat(filepath.Join(target, "spec.md")); err == nil {
+		proposal = filepath.Join(target, "spec.md")
+	}
 	if data, readErr := os.ReadFile(proposal); readErr == nil {
 		out := setStatus(string(data), newStatus)
 		if bypass {
@@ -312,7 +316,7 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 			out += fmt.Sprintf("\n<!-- archived %s — PR: %s -->\n", opts.Date, opts.PRURL)
 		}
 		if err := os.WriteFile(proposal, []byte(out), 0o644); err != nil {
-			return target, fmt.Errorf("updating %s: %w", proposal, err)
+			return target, fmt.Errorf("updating %s: %w", filepath.Base(proposal), err)
 		}
 	}
 
@@ -330,8 +334,12 @@ func checkBypassRequest(specDir string, opts ArchiveOptions) (bool, error) {
 		return true, errors.New(`--force-with-drafts and --force-without-review require --reason "<why>": ` +
 			"a bypass is recorded in the archived proposal.md as review_bypass:, and the reason is what makes it auditable")
 	}
-	if _, err := os.Stat(filepath.Join(specDir, "proposal.md")); err != nil {
-		return true, errors.New("a bypass is recorded in proposal.md, and this spec has none: add one, or satisfy the checks instead")
+	proposal := "proposal.md"
+	if _, err := os.Stat(filepath.Join(specDir, "spec.md")); err == nil {
+		proposal = "spec.md"
+	}
+	if _, err := os.Stat(filepath.Join(specDir, proposal)); err != nil {
+		return true, fmt.Errorf("a bypass is recorded in %s, and this spec has none: add one, or satisfy the checks instead", proposal)
 	}
 	return true, nil
 }
@@ -358,17 +366,30 @@ func runPreflights(repoRoot, id, specDir string, opts ArchiveOptions) ([]string,
 		}
 		overrode = append(overrode, fmt.Sprintf("%d unresolved draft tag(s)", len(tags)))
 	}
-	if gateErr := checkReviewGate(repoRoot, id, specDir, opts.Staleness); gateErr != nil {
-		if !opts.ForceWithoutReview {
-			return nil, gateErr
-		}
-		headline, _, _ := strings.Cut(gateErr.Error(), "\n")
-		overrode = append(overrode, headline)
+
+	isFastTrack := false
+	if _, err := os.Stat(filepath.Join(specDir, "spec.md")); err == nil {
+		isFastTrack = true
 	}
+
+	if !isFastTrack {
+		if gateErr := checkReviewGate(repoRoot, id, specDir, opts.Staleness); gateErr != nil {
+			if !opts.ForceWithoutReview {
+				return nil, gateErr
+			}
+			headline, _, _ := strings.Cut(gateErr.Error(), "\n")
+			overrode = append(overrode, headline)
+		}
+	}
+
 	if problems := CheckPromotions(repoRoot, specDir, opts.VaultRoot); len(problems) > 0 {
-		return nil, fmt.Errorf("promotion candidates in verification.md are not all answered:\n  %s\n"+
+		docName := "verification.md"
+		if isFastTrack {
+			docName = "spec.md"
+		}
+		return nil, fmt.Errorf("promotion candidates in %s are not all answered:\n  %s\n"+
 			`answer each as "yes: <path of the promoted file>" or "no: <reason>"; no flag skips this check`,
-			strings.Join(problems, "\n  "))
+			docName, strings.Join(problems, "\n  "))
 	}
 	return overrode, nil
 }
