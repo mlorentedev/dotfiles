@@ -24,7 +24,7 @@ setup() {
 
 @test "guard: ai/pi/models.json exists and is valid JSON" {
     [ -f "$MODELS" ]
-    run python3 -c "import json,sys; json.load(open('$MODELS'))"
+    run python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$MODELS"
     [ "$status" -eq 0 ]
 }
 

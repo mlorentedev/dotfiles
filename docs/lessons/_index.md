@@ -345,3 +345,4 @@ tags: [lessons, index, dotfiles]
 | [325 - A gate that mirrors an upstream tool drifts with the pin, and trusts whatever the tool quotes](lesson-325-a-gate-that-mirrors-upstream-drifts-with-the-pin.md) | 2026-09-30 |  |
 | [326 - A step env is evaluated before its if, so parsing a skipped step output throws](lesson-326-a-step-env-is-evaluated-before-its-if.md) | 2026-10-01 |  |
 | [327 - A configured timeout is not a bound until a run shows it firing](lesson-327-a-configured-timeout-is-not-a-bound-until-a-run-shows-it-firing.md) | 2026-10-01 |  |
+| [328 - An idempotence test presumes the first run converged](lesson-328-an-idempotence-test-presumes-the-first-run-converged.md) | 2026-10-01 |  |

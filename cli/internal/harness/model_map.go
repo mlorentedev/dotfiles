@@ -419,6 +419,7 @@ type Budget struct {
 	// answer for a seat-based pool where concurrency is a fleet property.
 	ConcurrencyDeclared bool
 	Concurrency         int
+	ModelConcurrency    map[string]int
 	ReserveInteractive  int
 	RPM                 int
 	// SharedWith names the consumers that draw on the same quota and that dotf
@@ -441,8 +442,23 @@ func DeclaredBudget(m map[string]any, pool string) (Budget, error) {
 	if c, ok := toInt(p["concurrency"]); ok {
 		b.Concurrency, b.ConcurrencyDeclared = c, true
 	}
+	b.ModelConcurrency = toIntMap(p["model_concurrency"])
 	b.ReserveInteractive, _ = toInt(p["reserve_interactive"])
 	b.RPM, _ = toInt(p["rpm"])
 	b.SharedWith = toStrings(p["shared_with"])
 	return b, nil
+}
+
+func toIntMap(v any) map[string]int {
+	raw, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]int, len(raw))
+	for key, value := range raw {
+		if n, ok := toInt(value); ok {
+			out[key] = n
+		}
+	}
+	return out
 }

@@ -23,14 +23,14 @@
   {
     "id": "AI-045-nan-catalog-alignment-f4",
     "behavior": "AC4: model-map declares per-model concurrency and the per-key cap, and the loader validates the shape",
-    "verification": "echo 'PR 2' && exit 1",
+    "verification": "cd cli && go test ./internal/harness -run 'TestModelMap(BudgetIsDeclarationOnly|SchemaAcceptsPerModelConcurrency|SchemaRejectsMalformedPerModelConcurrency)$' -count=1",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f5",
     "behavior": "AC5: opencode and pi NaN windows and caps equal NaN's published figures, and enable_thinking appears nowhere",
-    "verification": "echo 'PR 2' && exit 1",
+    "verification": "bats -f 'published windows|effective reasoning_effort|README records' tests/opencode.bats && bats -f 'model overrides carry' tests/pi-config.bats",
     "state": "pending",
     "evidence": ""
   },

@@ -79,7 +79,7 @@
       "model": "qwen3.8-flash",
       "secret_id": "NAN_API_KEY",
       "role": "member",
-      "why": "Admitted 2026-08-29 by owner decision (HARNESS-093, #1370) to spread reviews across NaN's PER-MODEL concurrency buckets and exercise more than one model on the gate. What IS established: reasoning-class by profile — pi-nan-provider's snapshot marks qwen3.8-flash reasoning: true with a native 262K context, the line this pool draws (tests/pi-nan-package.bats holds it). What is NOT established: a calibration against a review of known outcome (e.g. CLI-050 round 1's real Major); recorded here so nobody reads this entry as measured equivalence to deepseek. Drawn at random like every member; --reviewer names it deliberately."
+      "why": "Admitted 2026-08-29 by owner decision (HARNESS-093, #1370) to spread reviews across NaN's per-model concurrency buckets and exercise more than one model on the gate. What IS established: reasoning-class by profile — pi-nan-provider's snapshot marks qwen3.8-flash reasoning: true, and ai/pi/models.json corrects its stale native-window snapshot to NaN's served 1,048,576-token window (tests/pi-nan-package.bats holds the effective values). What is NOT established: a calibration against a review of known outcome (e.g. CLI-050 round 1's real Major); recorded here so nobody reads this entry as measured equivalence to deepseek. Drawn at random like every member; --reviewer names it deliberately."
     }
   ]
 }

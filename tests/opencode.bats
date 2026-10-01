@@ -167,6 +167,68 @@ setup() {
     refute_grep '"qwen3-embedding":|"kokoro":|"whisper":' "$OPENCODE_CFG"
 }
 
+@test "opencode.jsonc carries NaN's published windows and output caps (AI-045 AC5)" {
+    run python3 - "$OPENCODE_CFG" <<'PY'
+import json, re, sys
+src = "".join(line for line in open(sys.argv[1]) if not line.lstrip().startswith("//"))
+models = json.loads(re.sub(r",(\s*[}\]])", r"\1", src))["provider"]["nan"]["models"]
+want = {
+    "glm5.3-flash": (1000000, 131072),
+    "deepseek-v4-flash": (1000000, 384000),
+    "qwen3.8-flash": (1048576, 131072),
+    "qwen3.6": (262144, 65536),
+    "mimo-v2.6-flash": (1048576, 131072),
+    "gemma4": (262144, 32768),
+}
+bad = []
+for model, (context, output) in want.items():
+    got = models.get(model, {}).get("limit", {})
+    if (got.get("context"), got.get("output")) != (context, output):
+        bad.append(f"{model}: got {got}, want context={context} output={output}")
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+PY
+    [ "$status" -eq 0 ] || { echo "NaN limits disagree: $output"; false; }
+}
+
+@test "opencode.jsonc uses only effective reasoning_effort variants (AI-045 AC5)" {
+    run python3 - "$OPENCODE_CFG" <<'PY'
+import json, re, sys
+text = open(sys.argv[1]).read()
+if "enable_thinking" in text:
+    print("enable_thinking remains in opencode.jsonc")
+    sys.exit(1)
+src = "".join(line for line in text.splitlines(True) if not line.lstrip().startswith("//"))
+models = json.loads(re.sub(r",(\s*[}\]])", r"\1", src))["provider"]["nan"]["models"]
+want = {
+    "glm5.3-flash": {"fast": "low", "thinking": "high"},
+    "qwen3.6": {"fast": "none", "thinking": "high"},
+    "gemma4": {"fast": "none", "thinking": "high"},
+}
+bad = []
+for model, variants in want.items():
+    got = {name: value.get("reasoning_effort")
+           for name, value in models[model].get("variants", {}).items()}
+    if got != variants:
+        bad.append(f"{model}: variants {got}, want {variants}")
+for model in ("deepseek-v4-flash", "qwen3.8-flash", "mimo-v2.6-flash"):
+    if "variants" in models[model]:
+        bad.append(f"{model}: reasoning depth is not adjustable, but variants remain")
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+PY
+    [ "$status" -eq 0 ] || { echo "NaN reasoning variants disagree: $output"; false; }
+}
+
+@test "NaN README records the published catalog and reasoning limits (AI-045 AC5)" {
+    readme="$DOTFILES_DIR/ai/nan/README.md"
+    grep -qF '`GET /v1/models` lists what the cluster runs, not what this key can call.' "$readme"
+    grep -qF '`glm5.3` requires the premium membership tier.' "$readme"
+    grep -qF '`max_tokens` below 16,384 is raised to 16,384' "$readme"
+    grep -qF '60,000 reasoning characters or 420 seconds' "$readme"
+    grep -qF 'The closed reasoning-only turn is not billed.' "$readme"
+}
+
 @test "opencode.jsonc no longer references opencode-go (Go subscription cancelled per SDD-007)" {
     refute_grep_fixed '"opencode-go":' "$OPENCODE_CFG"
 }
