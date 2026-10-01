@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -164,28 +165,36 @@ func ReviewerCommand(e ReviewerEntry, prompt string, timeout time.Duration, repo
 		// run the suite or mutate anything, so it reviews by reading and grades
 		// generously — which is exactly what the first Gemini review did.
 		//
-		// --sandbox bounds what the auto-approval above can touch. Verified not
-		// to cost anything the review needs: under it, git, `go test` and file
-		// writes all still work.
-		agyArgs := []string{
-			"agy",
-			"--model", e.Model,
-			"--output-format", "stream-json",
-			"--print-timeout", timeout.String(),
-			"--dangerously-skip-permissions",
-			"--sandbox",
-		}
-		if strings.TrimSpace(repoRoot) != "" {
-			agyArgs = append(agyArgs, "--add-dir", repoRoot)
-		}
-		// --print goes LAST and carries the prompt as its value.
-		agyArgs = append(agyArgs, "--print", prompt)
+		agyArgs := agyReviewerCommand(e.Model, prompt, timeout, repoRoot, runtime.GOOS)
 		return append(base, agyArgs...), nil
 
 	default:
 		return nil, fmt.Errorf("pool entry %q names runner %q, which the launcher does not know how to invoke\n"+
 			"known runners: pi, agy", e.ID, e.Runner)
 	}
+}
+
+func agyReviewerCommand(model, prompt string, timeout time.Duration, repoRoot, goos string) []string {
+	args := []string{
+		"agy",
+		"--model", model,
+		"--output-format", "stream-json",
+		"--print-timeout", timeout.String(),
+		"--dangerously-skip-permissions",
+	}
+	// Antigravity's Windows sandbox creates an AppContainer through an elevated
+	// operation. Standard corporate accounts cannot approve that UAC prompt, so
+	// every run_command is cancelled. Omit only that unavailable isolation layer:
+	// the reviewer still runs under the caller's non-elevated token, in an
+	// isolated worktree, on an allow-listed model, and under the deadline.
+	if goos != "windows" {
+		args = append(args, "--sandbox")
+	}
+	if strings.TrimSpace(repoRoot) != "" {
+		args = append(args, "--add-dir", repoRoot)
+	}
+	// --print goes LAST and carries the prompt as its value.
+	return append(args, "--print", prompt)
 }
 
 // TranscriptPath is where the launched reviewer's event stream lands for a spec.
