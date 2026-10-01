@@ -12,7 +12,7 @@
 | Base URL | `https://api.nan.builders/v1` |
 | Auth header | `Authorization: Bearer sk-...` |
 | API style | OpenAI-compatible (chat, embeddings, audio, completions, responses) |
-| Rate limit | 60 requests/minute per key · 1.5M tokens/minute per model · 5-7 concurrent per model |
+| Rate limit | 60 requests/minute per key · 1.5M tokens/minute per model · 7 simultaneous requests per base-plan key · per-model caps: 7 for glm5.3-flash/deepseek-v4-flash/qwen3.8-flash, 5 for mimo-v2.6-flash/qwen3.6/gemma4 |
 | Quota | Monthly tokens per model (see the catalog); a spent quota answers `402` until the month resets. Own usage: `GET /v1/usage` |
 | Pricing | Community subscription (fixed, not per-token PAYG) |
 
@@ -26,10 +26,13 @@
 | `deepseek-v4-flash` | 1M | 3B | pi default; long-context via `qf` |
 | `qwen3.6` | 262K | none (per-minute limits only) | `qq` quick questions; opencode titles (`small_model`); `model-map` low tier |
 | `gemma4` | 262K | none | A/B candidate vs qwen3.6 |
-| `qwen3.8-flash` | 262K | 500M | picker only since 2026-09-26: it reached 83% of its quota as the default (AI-044, #1762) |
+| `qwen3.8-flash` | 1,048,576 | 500M | picker only since 2026-09-26: it reached 83% of its quota as the default (AI-044, #1762) |
 | `mimo-v2.6-flash` | 1M | 1B | pr-agent reviewer; reviewer-pool fallback. Replaced `mimo-v2.5`, which NaN retired 2026-09-30 (AI-045, #1763) |
 
-Every chat model reads images. Source: https://nan.builders/docs/models (checked 2026-09-26).
+Every chat model reads images. Source: https://nan.builders/docs/models (checked 2026-09-30).
+
+`GET /v1/models` lists what the cluster runs, not what this key can call. In
+particular, `glm5.3` requires the premium membership tier.
 
 ### Non-chat models (NO en opencode picker — usar curl/SDK directos)
 
@@ -118,9 +121,11 @@ Empirically measured with `scripts/nan-bench.sh` (2026-05-25):
 
 | Gotcha | Detail | Mitigation |
 |---|---|---|
-| **Thinking is controlled by `reasoning_effort`** | `chat_template_kwargs.enable_thinking` is ignored (same reasoning output, measured 2026-09-26) | Send `reasoning_effort` (`none` to disable); the opencode variants move to it in AI-045 (#1763) |
+| **Thinking is controlled by `reasoning_effort`** | The accepted values are model-specific: glm5.3-flash accepts low/medium/high/max; qwen3.6 and gemma4 also accept none/minimal; deepseek-v4-flash, qwen3.8-flash and mimo-v2.6-flash accept the parameter but do not adjust depth | Use only variants the selected model can apply |
+| **DeepSeek reserves reasoning output** | `max_tokens` below 16,384 is raised to 16,384, so a prompt inside that final slice of the context window is rejected | Leave at least 16,384 tokens of output room |
+| **Reasoning-only stream ceiling** | A stream that emits no content or tool call is closed after 60,000 reasoning characters or 420 seconds with `finish_reason: length` and a `nan_truncation` marker. The closed reasoning-only turn is not billed. | Lower `reasoning_effort` where supported or restructure the prompt |
 | **Monthly quota per model** | 500M to 3B depending on the model; spent answers `402` until the month resets | Read `GET /v1/usage`; do not route a high-volume path to a 500M model (AI-047, #1766) |
-| **Rate limits per key and per model** | 60 RPM per key, shared by `qq` / TUI / curl / Hermes; 5-7 concurrent per model | Parallel agentic loops hit 429: back off, or spread across models |
+| **Rate limits per key and per model** | 60 RPM and 7 simultaneous requests per base-plan key, shared by `qq` / TUI / curl / Hermes; per-model concurrency is 5 or 7 | Parallel agentic loops hit 429: back off; another model is another lane only until the key-wide cap is reached |
 | **`/v1/responses` streaming roto** | Emite solo `response.completed`, no deltas | Usar `/v1/chat/completions` (opencode default) |
 | **whisper file cap 25MB / 2min** | Audios largos → HTTP 524. NO WAV | OGG/Opus o MP3 |
 | **kokoro 15 RPM** | TTS batch se bloquea | Serializar |
@@ -134,7 +139,7 @@ Empirically measured with `scripts/nan-bench.sh` (2026-05-25):
 {
   "temperature": 0.6,
   "top_p": 0.95,
-  "max_tokens": "500-16000 (no doc'd cap)",
+  "max_tokens": "model-specific; deepseek-v4-flash raises values below 16384",
   "stream": "true on /v1/chat/completions only"
 }
 ```

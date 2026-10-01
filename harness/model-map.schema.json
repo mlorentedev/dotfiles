@@ -64,9 +64,21 @@
             ]
           },
           "concurrency": {
-            "description": "Level 1 declaration only. NOTHING decrements this today — a dispatcher would, and there is none. Declaring it makes the budget legible, which is more than existed before; it does not make it enforced.",
+            "description": "Level 1 per-key declaration only. NOTHING decrements this today — a dispatcher would, and there is none. Declaring it makes the budget legible, which is more than existed before; it does not make it enforced.",
             "type": "integer",
             "minimum": 0
+          },
+          "model_concurrency": {
+            "description": "Per-model concurrency limits inside the pool. These coexist with the pool-wide per-key cap in `concurrency`; the lower applicable limit wins.",
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+              "pattern": "^\\S.*$"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
           },
           "concurrency_note": {
             "type": "string"

@@ -19,10 +19,9 @@
     "subscription but no longer contends for the deepseek bucket that `dotf spec review`",
     "draws on. The sharing stays declared; the contention it caused does not.",
     "",
-    "NaN's limit is PER MODEL, not per API key — measured 2026-08-20: eight concurrent requests to",
-    "deepseek returned 5x200 and 3x429 while mimo answered 200 throughout that saturation. So a",
-    "second NaN model is a second lane, and a chain that falls through to one is not merely",
-    "retrying into the same wall. The reserve is static; adaptive reservation is out of scope.",
+    "NaN publishes both limits for the base nan_member plan: seven simultaneous requests across",
+    "the whole key, plus the per-model limits declared below. A second model is another lane only",
+    "until the key-wide cap is reached. The reserve is static; adaptive reservation is out of scope.",
     "",
     "THE `top` TIER HAS NO FALLBACK, on purpose (ADR-032 section 4). Degrading the top tier silently is",
     "how a gate becomes a green checkmark. It queues or escalates; it does not quietly get cheaper.",
@@ -59,8 +58,16 @@
     },
     "nan": {
       "auth": "subscription",
-      "concurrency": 5,
-      "concurrency_note": "per model, not per API key — measured 2026-08-20",
+      "concurrency": 7,
+      "model_concurrency": {
+        "deepseek-v4-flash": 7,
+        "glm5.3-flash": 7,
+        "qwen3.8-flash": 7,
+        "mimo-v2.6-flash": 5,
+        "qwen3.6": 5,
+        "gemma4": 5
+      },
+      "concurrency_note": "base nan_member plan: 7 simultaneous requests per key; per-model caps also apply",
       "rpm": 60,
       "reserve_interactive": 2,
       "shared_with": [

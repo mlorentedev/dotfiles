@@ -20,9 +20,9 @@ setup() {
     refute_grep '"apiKey"[[:space:]]*:[[:space:]]*"sk-' "$PI_MODELS"
 }
 
-@test "every provider in ai/pi/models.json takes its key from a \${VAR} placeholder, resolved at runtime" {
+@test "every standalone provider in ai/pi/models.json takes its key from a \${VAR} placeholder, resolved at runtime" {
     command -v jq >/dev/null || skip "jq not available"
-    bad="$(jq -r '.providers | to_entries[] | select((.value.apiKey // "") | test("^[$][{][A-Z0-9_]+[}]$") | not) | .key' "$PI_MODELS")"
+    bad="$(jq -r '.providers | to_entries[] | select(.value.models) | select((.value.apiKey // "") | test("^[$][{][A-Z0-9_]+[}]$") | not) | .key' "$PI_MODELS")"
     [ -z "$bad" ] || { echo "providers whose apiKey is not a \${VAR} placeholder: $bad"; return 1; }
 }
 
@@ -48,6 +48,20 @@ setup() {
     run jq -r '.providers.nan.models // [] | .[].id' "$PI_MODELS"
     [ "$status" -eq 0 ]
     [ -z "$output" ] || { echo "NaN models defined in ai/pi/models.json: $output"; return 1; }
+}
+
+@test "pi model overrides carry NaN's published windows and output caps (AI-045 AC5)" {
+    command -v jq >/dev/null || skip "jq not available"
+    run jq -e '
+      .providers.nan.modelOverrides as $m
+      | ($m["glm5.3-flash"]      == {"contextWindow":1000000,"maxTokens":131072})
+      and ($m["deepseek-v4-flash"] == {"contextWindow":1000000,"maxTokens":384000})
+      and ($m["qwen3.8-flash"]     == {"contextWindow":1048576,"maxTokens":131072})
+      and ($m["qwen3.6"]           == {"contextWindow":262144,"maxTokens":65536})
+      and ($m["mimo-v2.6-flash"]   == {"contextWindow":1048576,"maxTokens":131072})
+      and ($m["gemma4"]            == {"contextWindow":262144,"maxTokens":32768})
+    ' "$PI_MODELS"
+    [ "$status" -eq 0 ] || { echo "pi NaN modelOverrides do not match the published limits"; false; }
 }
 
 # The regression guard for BUG-081b itself (ADR-034). pi does NOT implement its own
@@ -147,11 +161,11 @@ setup() {
                 print p "/" substr(line, RSTART + 1, RLENGTH - 2)
                 line = substr(line, RSTART + RLENGTH)
             }
-        }' | LC_ALL=C sort -u)"
+        }' | tr -d '\r' | LC_ALL=C sort -u)"
     # `openrouter/deepseek/deepseek-v4-pro` -> `openrouter/deepseek-v4-pro`:
     # the README names the bare id under its tier, not the vendor path.
     cfg="$(jq -r '.enabledModels[] | split("/") | .[0] + "/" + .[-1]' "$PI_SETTINGS" \
-        | LC_ALL=C sort -u)"
+        | tr -d '\r' | LC_ALL=C sort -u)"
     # Set equality, not containment: one-directional would have missed the
     # model added to the config in #749 and never listed in the README.
     [ "$doc" = "$cfg" ] || {

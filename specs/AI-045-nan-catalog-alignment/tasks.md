@@ -31,10 +31,10 @@ created: "2026-09-29"
 
 ### PR 2: align the consumers with NaN's docs
 
-- [ ] [AC4] Failing loader test for per-model concurrency plus the per-key cap in `harness/model-map.json`
-- [ ] [AC4] Declare them as NaN publishes them for `nan_member`, and validate the shape in the loader
-- [ ] [AC5] Failing test: no `enable_thinking` in opencode, and NaN windows and output caps equal the published figures
-- [ ] [AC5] Move thinking variants to `reasoning_effort`; `qwen3.8-flash` to 1,048,576; README facts
+- [x] [AC4] Failing loader test for per-model concurrency plus the per-key cap in `harness/model-map.json`
+- [x] [AC4] Declare them as NaN publishes them for `nan_member`, and validate the shape in the loader
+- [x] [AC5] Failing test: no `enable_thinking` in opencode, and NaN windows and output caps equal the published figures
+- [x] [AC5] Move thinking variants to `reasoning_effort`; `qwen3.8-flash` to 1,048,576; README facts
 
 ### Prevention (one PR each)
 
