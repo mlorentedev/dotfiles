@@ -1,13 +1,19 @@
 package cmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
@@ -24,12 +30,7 @@ import (
 // This command makes each session write only its own thread, so overwriting a
 // peer stops being something to remember not to do.
 func newMemHandoffWriteCmd() *cobra.Command {
-	var (
-		memoryPath string
-		thread     string
-		agent      string
-		dryRun     bool
-	)
+	var w handoffWrite
 
 	cmd := &cobra.Command{
 		Use:   "handoff-write",
@@ -61,70 +62,107 @@ Skills should call this instead of instructing an Edit: the merge is the part th
 was being got wrong, and it belongs where it can be tested.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if memoryPath == "" {
-				return fmt.Errorf("--memory is required (the project's MEMORY.md)")
-			}
-			wd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("resolve the current directory: %w", err)
-			}
-			if thread, err = mem.HandoffThread(thread, memoryPath, wd); err != nil {
-				return err
-			}
-
-			body, err := io.ReadAll(cmd.InOrStdin())
-			if err != nil {
-				return fmt.Errorf("read handoff body from stdin: %w", err)
-			}
-			if len(body) == 0 {
-				return fmt.Errorf("empty handoff body — refusing to blank a thread, which is the clobber this command exists to prevent")
-			}
-			for _, w := range mem.ThreadWarnings(string(body)) {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning    %s\n", w)
-			}
-
-			current, err := os.ReadFile(memoryPath) // #nosec G304 -- operator-supplied path
-			if err != nil {
-				return fmt.Errorf("read %s: %w", memoryPath, err)
-			}
-
-			res, err := mem.WriteThreadAs(string(current), thread, agent, string(body))
-			if err != nil {
-				return err
-			}
-			updated := res.Content
-			// The one outcome where the handoff is not where its writer asked,
-			// so it is said every time, written or unchanged (#1690).
-			if res.Kept != "" {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
-					thread, res.Kept, agent, res.Key)
-			}
-			if !res.Changed {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
-				return nil
-			}
-			// A block nobody wrote this session moves, so say so (#1651). On stderr,
-			// because under --dry-run stdout is the document itself.
-			if legacy, ok := mem.LegacyThreadKey(string(current)); ok {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
-			}
-			if dryRun {
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), updated)
-				return nil
-			}
-			if err := replaceMemoryFile(memoryPath, updated); err != nil {
-				return err
-			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, memoryPath)
-			return nil
+			return w.run(cmd)
 		},
 	}
 
-	cmd.Flags().StringVar(&memoryPath, "memory", "", "path to the project's MEMORY.md")
-	cmd.Flags().StringVar(&thread, "thread", "", "thread key (default: this checkout's branch)")
-	cmd.Flags().StringVar(&agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the result instead of writing it")
+	cmd.Flags().StringVar(&w.memoryPath, "memory", "", "path to the project's MEMORY.md")
+	cmd.Flags().StringVar(&w.thread, "thread", "", "thread key (default: this checkout's branch)")
+	cmd.Flags().StringVar(&w.agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
+	cmd.Flags().BoolVar(&w.dryRun, "dry-run", false, "print the result instead of writing it")
 	return cmd
+}
+
+// handoffWrite holds the flags of one handoff-write run.
+type handoffWrite struct {
+	memoryPath string
+	thread     string
+	agent      string
+	dryRun     bool
+}
+
+func (w *handoffWrite) run(cmd *cobra.Command) error {
+	if w.memoryPath == "" {
+		return fmt.Errorf("--memory is required (the project's MEMORY.md)")
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("resolve the current directory: %w", err)
+	}
+	thread, err := mem.HandoffThread(w.thread, w.memoryPath, wd)
+	if err != nil {
+		return err
+	}
+	body, err := readHandoffBody(cmd)
+	if err != nil {
+		return err
+	}
+
+	// The lock spans read -> compute -> rename. Without it two writers at
+	// the same moment each renamed their own update over the file and the
+	// later one erased the other's thread, both exiting 0 (#1884). A dry
+	// run writes nothing, so it does not wait on a writer.
+	if !w.dryRun {
+		unlock, err := lockMemoryFile(w.memoryPath)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
+
+	current, err := os.ReadFile(w.memoryPath) // #nosec G304 -- operator-supplied path
+	if err != nil {
+		return fmt.Errorf("read %s: %w", w.memoryPath, err)
+	}
+	res, err := mem.WriteThreadAs(string(current), thread, w.agent, body)
+	if err != nil {
+		return err
+	}
+	return w.publish(cmd, thread, string(current), res)
+}
+
+// readHandoffBody reads the thread body from stdin and refuses an empty one.
+func readHandoffBody(cmd *cobra.Command) (string, error) {
+	body, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return "", fmt.Errorf("read handoff body from stdin: %w", err)
+	}
+	if len(body) == 0 {
+		return "", fmt.Errorf("empty handoff body — refusing to blank a thread, which is the clobber this command exists to prevent")
+	}
+	for _, warning := range mem.ThreadWarnings(string(body)) {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning    %s\n", warning)
+	}
+	return string(body), nil
+}
+
+// publish reports what the write did and, unless this is a dry run, replaces
+// the file.
+func (w *handoffWrite) publish(cmd *cobra.Command, thread, current string, res mem.ThreadWrite) error {
+	// The one outcome where the handoff is not where its writer asked,
+	// so it is said every time, written or unchanged (#1690).
+	if res.Kept != "" {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
+			thread, res.Kept, w.agent, res.Key)
+	}
+	if !res.Changed {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
+		return nil
+	}
+	// A block nobody wrote this session moves, so say so (#1651). On stderr,
+	// because under --dry-run stdout is the document itself.
+	if legacy, ok := mem.LegacyThreadKey(current); ok {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
+	}
+	if w.dryRun {
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), res.Content)
+		return nil
+	}
+	if err := replaceMemoryFile(w.memoryPath, res.Content); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, w.memoryPath)
+	return nil
 }
 
 // replaceMemoryFile writes content over path through a temp file in the same
@@ -198,4 +236,65 @@ resolves to the same journal. See handoff-write for the full rule.`,
 	cmd.Flags().StringVar(&project, "project", "", "project slug")
 	cmd.Flags().StringVar(&agent, "agent", "", "agent name")
 	return cmd
+}
+
+// memoryLockWait bounds how long a writer waits for another. A write holds the
+// lock for milliseconds, so ten seconds means the holder is stuck, and saying so
+// beats waiting forever.
+const memoryLockWait = 10 * time.Second
+
+// lockMemoryFile takes the cross-process lock for one MEMORY.md.
+//
+// The lock file lives outside the vault, in the runtime or cache directory: a
+// file beside MEMORY.md would be committed by the vault's auto-commit. Its name
+// is a hash of the file's canonical path, because one MEMORY.md is reached by
+// two paths (the vault one, and the symlink or junction under
+// ~/.claude/projects/<key>/memory), and two writers holding different paths to
+// the same file must still meet at one lock. EvalSymlinks resolves the Unix
+// symlink; whether it resolves a Windows junction is not yet measured.
+func lockMemoryFile(memoryPath string) (func(), error) {
+	return lockMemoryFileWithin(memoryPath, memoryLockWait)
+}
+
+func lockMemoryFileWithin(memoryPath string, wait time.Duration) (func(), error) {
+	canon, err := filepath.Abs(memoryPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", memoryPath, err)
+	}
+	if real, err := filepath.EvalSymlinks(canon); err == nil {
+		canon = real
+	}
+	if runtime.GOOS == "windows" {
+		canon = strings.ToLower(canon) // one file, whatever case each writer typed
+	}
+	dir, err := memoryLockDir()
+	if err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256([]byte(canon))
+	unlock, err := filelock.Lock(filepath.Join(dir, "handoff-"+hex.EncodeToString(sum[:8])+".lock"), wait)
+	if err != nil {
+		return nil, fmt.Errorf("another handoff-write is still writing %s: %w", memoryPath, err)
+	}
+	return unlock, nil
+}
+
+// memoryLockDir is where handoff locks live: the runtime directory on Linux,
+// tmpfs and cleared at boot, else the user cache directory. The kernel releases
+// the lock either way, so the choice is about keeping files out of the vault,
+// not about correctness.
+func memoryLockDir() (string, error) {
+	base := os.Getenv("XDG_RUNTIME_DIR")
+	if base == "" {
+		cache, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("no runtime or cache directory for the handoff lock: %w", err)
+		}
+		base = cache
+	}
+	dir := filepath.Join(base, "dotf", "locks")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create the handoff lock directory %s: %w", dir, err)
+	}
+	return dir, nil
 }

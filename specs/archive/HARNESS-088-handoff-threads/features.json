@@ -30,7 +30,21 @@
   {
     "id": "HARNESS-088-handoff-threads-f5",
     "behavior": "AC6 + AC7 - the thread key resolves from any subdirectory of a worktree (not just its root), and a journal filename is derivable from the working directory and distinct per worktree",
-    "verification": "cd cli && go test ./internal/mem/ -run 'TestThreadKeyDerivesFromTheWorktree|TestJournalNameIsDerivableAndDistinctPerWorktree'",
+    "verification": "cd cli && go test ./internal/mem/ -run 'TestThreadKeyIsTheBranchSoItTravelsBetweenMachines|TestJournalNameIsDerivableAndDistinctPerWorktree'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-088-handoff-threads-f6",
+    "behavior": "AC9 - N concurrent handoff-write runs on one MEMORY.md all land, two paths to one file share the lock, and a held lock is reported after a bounded wait naming its path",
+    "verification": "cd cli && go test -race ./internal/cmd/ -run 'TestConcurrentWritesDoNotLoseAThread|TestTwoPathsToOneMemoryShareTheLock' -count=3 && go test ./internal/filelock/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-088-handoff-threads-f7",
+    "behavior": "AC10 - journalWriter skips the project's word, so a project named like an agent does not take the writer's place",
+    "verification": "cd cli && go test ./internal/mem/ -run TestJournalWriterSkipsTheProjectWord",
     "state": "pending",
     "evidence": ""
   }
