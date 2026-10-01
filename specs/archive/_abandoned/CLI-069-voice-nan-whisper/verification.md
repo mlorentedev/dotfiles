@@ -30,7 +30,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] Lesson for the repo's `docs/lessons/`? no: abandoned before any implementation, so nothing was learned by building it
 - [x] ADR-worthy decision for the repo's `docs/adr/`? no: the gateway-vs-local question was never decided; it stays open on #1426
-- [ ] New pattern candidate for `00_meta/patterns/`? No (covered by `pattern-nan-builders-gateway.md`)
+- [x] New pattern candidate for `00_meta/patterns/`? no: covered by `pattern-nan-builders-gateway.md`
 
 ## Archive checklist
 
