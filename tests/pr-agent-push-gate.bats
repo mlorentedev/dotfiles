@@ -360,8 +360,10 @@ _gate() {
 @test "every PR-Agent version the gate cites is the one the workflow pins" {
     local wf="$BATS_TEST_DIRNAME/../.github/workflows/pr-agent.yml"
     local pinned cited
-    pinned=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@[0-9a-f]\{40\} *# *\(v[0-9][0-9.]*\).*|\1|p' "$wf")
+    # Both attempts (#1913) pin the action; another test holds the two equal.
+    pinned=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@[0-9a-f]\{40\} *# *\(v[0-9][0-9.]*\).*|\1|p' "$wf" | sort -u)
     [ -n "$pinned" ]
+    [ "$(printf '%s\n' "$pinned" | wc -l)" -eq 1 ]
     cited=$(grep -o 'v0\.[0-9][0-9]*\.[0-9][0-9]*' "$GATE" | sort -u)
     [ -n "$cited" ]
     [ "$cited" = "$pinned" ] || { printf 'workflow pins %s, gate cites:\n%s\n' "$pinned" "$cited"; return 1; }
