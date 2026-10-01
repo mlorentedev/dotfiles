@@ -43,16 +43,23 @@ created: "2026-09-29"
 
 - [x] [AC6] AI-045b #1858: force streaming for NaN, pinned in a test. In the workflow env on both attempts, not in
       `.pr_agent.toml`, which PR-Agent reads from the default branch (the introducing PR would not stream)
-- [ ] [AC6] Measure a real review of a diff of #1856's size (42K tokens) on the primary, streamed. #1856 has merged,
-      so the measurement is a `/review` on the largest open PR after this lands; result recorded on #1858
+- [x] [AC6] Measure a real review of a diff of #1856's size (42K tokens) on the primary, streamed. #1856 has merged,
+      so the measurement is a `/review` on the largest open PR after this lands; result recorded on #1858. #1938
+      (31,381 tokens): streamed, the primary answered in 3 min 19 s (run 36838016719); unstreamed, it failed after
+      255 s and the fallback ran 362 s against a 120 s timeout (run 36835026463)
 - [x] [AC7] AI-045c #1859: the wait's cause is confirmed (run 36826726168: `ai_timeout: 120` configured, twelve
       silent minutes, no timeout logged; lesson 327). The invariant test landed with #1913 as "the job outlives both
       attempts": the job's timeout exceeds the attempts' step bounds plus setup
-- [ ] [AC8] AI-045d #1860: daily canary workflow over `harness/model-pins.json`, with a stub-transport test and a real sibling
+- [x] [AC8] AI-045d #1860: `dotf harness canary` (`cli/internal/nanprobe`) probes the map's NaN models and every
+      `harness/model-pins.json` site, each on its own API (rerank answers 404 on chat), one at a time, retrying an
+      unavailable one once. Stub-transport tests in Go; `scripts/model-canary.sh` keeps one issue, tested under `bash -e`
+- [x] [AC8] Real sibling, local: against NaN on 2026-10-01, nine models, 26 s; it found `mimo-v2.5` (401) still
+      offered by the deployed `~/.pi/agent/settings.json` `enabledModels`
+- [x] [AC8] Real sibling, CI: a `workflow_dispatch` run of `model-canary.yml` after merge; run id recorded on #1860 (run 36887489906, green, 6/6 answered)
 - [ ] [AC9] #1923: third attempt outside NaN, gated on its credential (blocked: provider funding and `dotf secrets sync ci`)
 - [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block
 - [x] [AC10] Live run of the PR that adds the queue shows GitHub accepts it: run 36835280780 started its `review` job and published a review (an unknown key fails the workflow before any job starts)
-- [ ] [AC10] On `main`, two reviews that overlap in time both complete and neither is cancelled; record the run ids on #1923. A cancelled review run there means the job-level queue is ignored: revert the block
+- [x] [AC10] On `main`, two reviews that overlap in time both complete and neither is cancelled; record the run ids on #1923. A cancelled review run there means the job-level queue is ignored: revert the block (runs 36881054024, 36881389377, 36881441749 queued together, ran in turn, none cancelled; #1923 comment 5934615584)
 
 ## Closing
 
