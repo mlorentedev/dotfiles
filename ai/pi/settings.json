@@ -1,4 +1,16 @@
 {
+  "defaultProvider": "nan",
+  "defaultModel": "deepseek-v4-flash",
+  "defaultThinkingLevel": "high",
+  "temperature": 0.2,
+  "enabledModels": [
+    "nan/glm5.3-flash",
+    "nan/deepseek-v4-flash",
+    "nan/qwen3.8-flash",
+    "nan/qwen3.6",
+    "nan/mimo-v2.6-flash",
+    "nan/gemma4"
+  ],
   "compaction": {
     "enabled": false
   }

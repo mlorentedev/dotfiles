@@ -29,14 +29,6 @@ Pass `--force` to overwrite an existing SDD section in place. On Windows, until 
 
 ## Spec-Driven Development
 
-**The Lane Decisor Rule:** The agent MUST declare the chosen lane on the VERY FIRST LINE of its response before taking any action (e.g., `Lane: Fast-Track Development`).
-
-**Implementation Lanes:**
-- **0. Answer:** Read-only questions, codebase exploration, debugging without writing code.
-- **1. Inline Direct:** <30 LOC diff, understood change, single component.
-- **2. Fast-Track Development (FTD):** 30–150 LOC, ordinary changes, low ambiguity. 1 document `spec.md`, simple branch, no worktree overhead, observable evidence required.
-- **3. Full SDD:** >150 LOC, public contracts, architecture, or high ambiguity. Triad of docs (`proposal.md`, `tasks.md`, `verification.md`).
-
 This repo follows the **Spec-Driven Development per feature** pattern: non-trivial changes are specified before they are implemented.
 
 When the user asks to **create, fill, or archive a spec**, follow this workflow. The `dotf` CLI (installed via dotfiles, on PATH) is the canonical, self-contained interface — run `dotf spec --help` for the full surface.
@@ -50,20 +42,6 @@ When the user asks to **create, fill, or archive a spec**, follow this workflow.
 Per-feature specs live at `specs/<feature-id>/` in this repo; archived at `specs/archive/<feature-id>/` (never deleted — audit trail).
 
 **Skip SDD for**: typo fixes, comment-only edits, mechanical refactors, bug fixes <20 lines with obvious cause, doc-only changes.
-
-### Discipline Gate (NON-NEGOTIABLE)
-
-Before creating ANY branch for code changes, Full SDD or FTD is mandatory if ANY apply:
-
-- ~50–300 LOC of production diff (excluding tests, generated files, lockfiles). **The count is
-  EXECUTABLE lines** — declarative data, schemas and comment blocks are excluded, because the cap
-  rations the control flow a reviewer holds in their head, and a table is read as a table. Excluded
-  is not free: declare the breakdown in the PR body whenever total added lines exceed the cap. Nor
-  is it "cheap to review" — a registry where one wrong entry silently grants or denies deserves more
-  care than most code. SSOT: `00_meta/patterns/pattern-git-workflow.md` §10.
-- touches a public contract (API, CLI flag, exported type, alias, file path, deployed config schema)
-- adds or removes a dependency
-- is the first step of a multi-PR sequence
 
 `<feature-id>` format: `^([A-Z]+[0-9]*(-[A-Z]+[0-9]*)*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$` (e.g., `AI-001-ollama-public`, `APP-CONFIG-015`, `ADR028-004`, `SDD-012b-guard`, `2026-05-13-cleanup`). This string is `idPattern` in dotfiles `cli/internal/spec/spec.go` verbatim; a drift test asserts every copy matches, so do not reword it.
 
