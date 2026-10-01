@@ -739,7 +739,7 @@ print(' '.join(guard['env'].get('REVIEW_MODEL', '').split()))
     # The last attempt decides (#1913): the retry's outcome and model when it
     # ran, else the first attempt's.
     [ "${lines[1]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && steps.pr_agent_retry.outcome || steps.pr_agent.outcome }}" ]
-    [ "${lines[2]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && fromJSON(steps.models.outputs.fallbacks)[0] || steps.models.outputs.model }}" ]
+    [ "${lines[2]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && steps.models.outputs.retry_model || steps.models.outputs.model }}" ]
     # A step stopped by its own timeout may end `failure` or `cancelled`.
     grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \] || \[ "${PR_AGENT_OUTCOME:-}" = "failure" \]' "$WF"
 }
@@ -778,11 +778,22 @@ print(' '.join(retry['if'].split()))
     [ "${lines[0]}" = "2" ]
     [ "${lines[1]}" = "pr_agent 12 True" ]
     [ "${lines[2]}" = "pr_agent_retry 12" ]
-    [ "${lines[3]}" = '${{ fromJSON(steps.models.outputs.fallbacks)[0] }}' ]
+    [ "${lines[3]}" = '${{ steps.models.outputs.retry_model }}' ]
     [ "${lines[4]}" = '[]' ]
     [[ "${lines[5]}" == *"steps.pr_agent.outcome"* ]]
-    [[ "${lines[5]}" == *"steps.models.outputs.fallbacks != '[]'"* ]]
+    [[ "${lines[5]}" == *"steps.models.outputs.retry_model != ''"* ]]
     [[ "${lines[5]}" == *"!cancelled()"* ]]
+}
+
+# Run 36812454370: a merge commit from "update branch" is a push the gate does
+# not review, so the preflight was skipped and its outputs were empty. GitHub
+# evaluates a step's `env` before its `if`, so `fromJSON('')` in the retry's env
+# threw although the step would have been skipped, and the job failed. Parsing a
+# step output inside an expression fails whenever its producer is skipped; the
+# preflight emits a scalar instead.
+@test "pr-agent: no expression parses a step output with fromJSON" {
+    run grep -nE 'fromJSON\(\s*steps\.' "$WF"
+    [ "$status" -eq 1 ]
 }
 
 # The retry is the same review on another model, never a different review: one

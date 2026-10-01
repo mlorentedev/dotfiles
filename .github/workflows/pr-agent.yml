@@ -398,14 +398,14 @@ jobs:
         id: pr_agent_retry
         if: >
           !cancelled() && contains(fromJSON('["failure", "cancelled"]'), steps.pr_agent.outcome)
-            && steps.models.outputs.fallbacks != '' && steps.models.outputs.fallbacks != '[]'
+            && steps.models.outputs.retry_model != ''
         timeout-minutes: 12
         uses: The-PR-Agent/pr-agent@1d01f24f455bb879c1d9c557ad7de3d72dcc7975  # v0.46.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI__KEY: ${{ secrets.NAN_API_KEY }}
           OPENAI__API_BASE: https://api.nan.builders/v1
-          CONFIG__MODEL: ${{ fromJSON(steps.models.outputs.fallbacks)[0] }}
+          CONFIG__MODEL: ${{ steps.models.outputs.retry_model }}
           CONFIG__FALLBACK_MODELS: '[]'
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
@@ -476,7 +476,7 @@ jobs:
                 && steps.pr_agent_retry.outcome || steps.pr_agent.outcome }}
           REVIEW_MODEL: >-
             ${{ steps.pr_agent_retry.outcome != 'skipped'
-                && fromJSON(steps.models.outputs.fallbacks)[0] || steps.models.outputs.model }}
+                && steps.models.outputs.retry_model || steps.models.outputs.model }}
           FIRST_OUTCOME: ${{ steps.pr_agent.outcome }}
           FIRST_MODEL: ${{ steps.models.outputs.model }}
         run: |
