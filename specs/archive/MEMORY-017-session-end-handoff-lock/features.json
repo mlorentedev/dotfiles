@@ -1,0 +1,16 @@
+[
+  {
+    "id": "MEMORY-017-session-end-handoff-lock-f1",
+    "behavior": "AC1 + AC2: handoff-write and SessionEnd share one canonical MEMORY.md lock, and SessionEnd waits for a writer before archiving",
+    "verification": "cd cli && go test ./internal/mem -run '^TestSessionEndWaitsForConcurrentHandoffWrite$' -count=1 && go test ./internal/cmd -run '^Test(ConcurrentWritesDoNotLoseAThread|TwoPathsToOneMemoryShareTheLock)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-017-session-end-handoff-lock-f2",
+    "behavior": "AC3: the shared lock preserves HARNESS-088 regressions and compiles on Windows and Unix",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd ./internal/filelock -count=1 && go vet ./internal/mem ./internal/cmd ./internal/filelock",
+    "state": "pending",
+    "evidence": ""
+  }
+]
