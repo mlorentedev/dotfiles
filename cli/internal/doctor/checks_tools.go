@@ -190,7 +190,8 @@ func checkGitWindowsFloor(sys *System, cfg *Config, rep *Report) {
 	pin := cfg.Versions[gitFloorKey]
 	switch {
 	case sys.GOOS != "windows":
-		rep.Skip("git-for-windows floor (Windows-only; the C:/ hooksPath defect was git-for-windows', #912)")
+		// #912
+		rep.Skip("git-for-windows floor (Windows-only; the C:/ hooksPath defect is in git-for-windows)")
 	case pin == "":
 		rep.Skip(gitFloorKey + " not set in versions.conf — git-for-windows floor not verified")
 	case !sys.has("git"):
@@ -205,10 +206,12 @@ func checkGitWindowsFloor(sys *System, cfg *Config, rep *Report) {
 			return
 		}
 		if atLeast(m[1], pin) {
-			rep.Pass(fmt.Sprintf("git %s meets the git-for-windows floor %s (#912)", m[1], pin))
+			// #912
+			rep.Pass(fmt.Sprintf("git %s meets the git-for-windows floor %s", m[1], pin))
 			return
 		}
-		rep.Warn(fmt.Sprintf("git %s is below the git-for-windows floor %s — before 2.55 MSYS bash could not open a C:/-form core.hooksPath, so the GUARD hooks fail on every commit; upgrade with `winget upgrade Git.Git` (#912, lesson 239)", m[1], pin))
+		// #912, lesson 239
+		rep.Warn(fmt.Sprintf("git %s is below the git-for-windows floor %s — before 2.55 MSYS bash could not open a C:/-form core.hooksPath, so the GUARD hooks fail on every commit; upgrade with `winget upgrade Git.Git`", m[1], pin))
 	}
 }
 

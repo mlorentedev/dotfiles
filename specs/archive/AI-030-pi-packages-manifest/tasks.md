@@ -45,6 +45,10 @@ created: "2026-08-25"
 - [x] [AC11] Add a doctor check that observes LOADING rather than declaration
       (`cli/internal/doctor/checks_pi_extensions.go` + `_repair.go`), and prove
       it against the live defect: `pi -p` exit 1 → exit 0 (#1243)
+- [x] [AC4] [AC9] [AC10] [AC12] Re-pointed by HARNESS-139 (#1628): the shell
+      blocks above were replaced by `dotf pi packages apply`, which also removes
+      undeclared packages. Removal is held by `TestPiPackagesApplyRemovesThenInstalls`,
+      and an empty manifest is refused by `TestLoadManifestRefusesWhatItCannotRead`.
 
 ## Closing
 
@@ -58,8 +62,8 @@ created: "2026-08-25"
 - [x] PowerShell adds no non-ASCII (10 non-ASCII lines before, 10 after)
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-- [ ] Independent adversarial review before archive (`dotf spec review`) — the
+- [x] PR opened referencing this spec folder (#1922)
+- [x] Independent adversarial review before archive (`dotf spec review`) — the
       implementing session cannot be the reviewer
 
 ## Machine-readable features

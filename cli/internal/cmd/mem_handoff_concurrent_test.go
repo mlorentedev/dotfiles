@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
 // #1884: two handoff-write runs at the same moment lost a thread. Each read
@@ -82,13 +84,13 @@ func TestTwoPathsToOneMemoryShareTheLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unlock, err := lockMemoryFile(memory)
+	unlock, err := mem.LockHandoffMemory(memory)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer unlock()
 	start := time.Now()
-	if _, err := lockMemoryFileWithin(filepath.Join(link, "MEMORY.md"), 100*time.Millisecond); err == nil {
+	if _, err := mem.LockHandoffMemoryWithin(filepath.Join(link, "MEMORY.md"), 100*time.Millisecond); err == nil {
 		t.Fatal("the symlinked path took the lock while the vault path held it")
 	}
 	if time.Since(start) < 100*time.Millisecond {

@@ -41,7 +41,8 @@ func checkSecretsTooling(sys *System, cfg *Config, rep *Report) {
 		// Reachability is a separate claim, made by checkBitwardenReach.
 		rep.Pass("bw (Bitwarden CLI) installed — reachability checked separately")
 	} else {
-		rep.Fail("bw not in PATH — run 'dotf tools install' (ADR-028 live SSOT)")
+		// ADR-028 live SSOT
+		rep.Fail("bw not in PATH — run 'dotf tools install' (Bitwarden is the live secrets source)")
 	}
 
 	hasAge := sys.has("age")
@@ -56,7 +57,8 @@ func checkSecretsTooling(sys *System, cfg *Config, rep *Report) {
 			}
 		}
 	} else {
-		rep.Fail("age not in PATH — re-run setup (ADR-028 DR floor)")
+		// ADR-028 DR floor
+		rep.Fail("age not in PATH — re-run setup (the offline secrets recovery needs it)")
 	}
 
 	keyPath := sys.Getenv("AGE_KEY_PATH")

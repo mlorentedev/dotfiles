@@ -81,7 +81,8 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 	}
 	heal := profileHealPath(sys, c)
 	if !fix {
-		rep.Fail(fmt.Sprintf("PowerShell profile corrupted (%s; target %s, %s) — BUG-020; run `pwsh -NoProfile -File \"%s\" -ProfilePath \"%s\"` or `dotf doctor --fix` (backs the profile up, then rebuilds it from powershell/profile.ps1; content outside the dotfiles markers survives only in the backup)",
+		// BUG-020
+		rep.Fail(fmt.Sprintf("PowerShell profile corrupted (%s; target %s, %s) — run `pwsh -NoProfile -File \"%s\" -ProfilePath \"%s\"` or `dotf doctor --fix` (backs the profile up, then rebuilds it from powershell/profile.ps1; content outside the dotfiles markers survives only in the backup)",
 			strings.Join(reasons, "; "), profile, source, heal, profile))
 		return
 	}
@@ -224,12 +225,14 @@ func contractDefault(sys *System, c *Contract, name string) string {
 // shells out; a heal that hangs must not hang doctor.
 func repairProfile(sys *System, rep *Report, profile, heal string) {
 	if !isRegularFile(heal) {
-		rep.Fail(fmt.Sprintf("PowerShell profile corrupted, and %s is not deployed at %s — run setup-windows.ps1 to deploy scripts/, then `dotf doctor --fix` again (BUG-020)",
+		// BUG-020
+		rep.Fail(fmt.Sprintf("PowerShell profile corrupted, and %s is not deployed at %s — run setup-windows.ps1 to deploy scripts/, then `dotf doctor --fix` again",
 			profileHealScript, heal))
 		return
 	}
 	if !sys.has("pwsh") {
-		rep.Fail("PowerShell profile corrupted, and pwsh is not in PATH to run " + profileHealScript + " (BUG-020)")
+		// BUG-020
+		rep.Fail("PowerShell profile corrupted, and pwsh is not in PATH to run " + profileHealScript)
 		return
 	}
 	out, _, err := sys.CommandOutputBounded(profileHealTimeout, "pwsh", "-NoProfile", "-File", heal, "-ProfilePath", profile)

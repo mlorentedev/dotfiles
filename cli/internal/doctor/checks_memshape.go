@@ -79,7 +79,8 @@ func checkMemoryShape(sys *System, rep *Report, fix bool) {
 		if len(wrapped) == 1 {
 			noun = "MEMORY.md holds"
 		}
-		rep.Fail(fmt.Sprintf("%d %s their body inside a YAML block scalar — crystallize cannot stamp them (#857). Run `dotf doctor --fix` to migrate.", len(wrapped), noun))
+		// #857
+		rep.Fail(fmt.Sprintf("%d %s their body inside a YAML block scalar — crystallize cannot stamp them. Run `dotf doctor --fix` to migrate.", len(wrapped), noun))
 		for _, p := range wrapped {
 			rep.Info("wrapped: " + p)
 		}

@@ -1,19 +1,13 @@
 package cmd
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
@@ -103,7 +97,7 @@ func (w *handoffWrite) run(cmd *cobra.Command) error {
 	// later one erased the other's thread, both exiting 0 (#1884). A dry
 	// run writes nothing, so it does not wait on a writer.
 	if !w.dryRun {
-		unlock, err := lockMemoryFile(w.memoryPath)
+		unlock, err := mem.LockHandoffMemory(w.memoryPath)
 		if err != nil {
 			return err
 		}
@@ -236,65 +230,4 @@ resolves to the same journal. See handoff-write for the full rule.`,
 	cmd.Flags().StringVar(&project, "project", "", "project slug")
 	cmd.Flags().StringVar(&agent, "agent", "", "agent name")
 	return cmd
-}
-
-// memoryLockWait bounds how long a writer waits for another. A write holds the
-// lock for milliseconds, so ten seconds means the holder is stuck, and saying so
-// beats waiting forever.
-const memoryLockWait = 10 * time.Second
-
-// lockMemoryFile takes the cross-process lock for one MEMORY.md.
-//
-// The lock file lives outside the vault, in the runtime or cache directory: a
-// file beside MEMORY.md would be committed by the vault's auto-commit. Its name
-// is a hash of the file's canonical path, because one MEMORY.md is reached by
-// two paths (the vault one, and the symlink or junction under
-// ~/.claude/projects/<key>/memory), and two writers holding different paths to
-// the same file must still meet at one lock. EvalSymlinks resolves the Unix
-// symlink; whether it resolves a Windows junction is not yet measured.
-func lockMemoryFile(memoryPath string) (func(), error) {
-	return lockMemoryFileWithin(memoryPath, memoryLockWait)
-}
-
-func lockMemoryFileWithin(memoryPath string, wait time.Duration) (func(), error) {
-	canon, err := filepath.Abs(memoryPath)
-	if err != nil {
-		return nil, fmt.Errorf("resolve %s: %w", memoryPath, err)
-	}
-	if real, err := filepath.EvalSymlinks(canon); err == nil {
-		canon = real
-	}
-	if runtime.GOOS == "windows" {
-		canon = strings.ToLower(canon) // one file, whatever case each writer typed
-	}
-	dir, err := memoryLockDir()
-	if err != nil {
-		return nil, err
-	}
-	sum := sha256.Sum256([]byte(canon))
-	unlock, err := filelock.Lock(filepath.Join(dir, "handoff-"+hex.EncodeToString(sum[:8])+".lock"), wait)
-	if err != nil {
-		return nil, fmt.Errorf("another handoff-write is still writing %s: %w", memoryPath, err)
-	}
-	return unlock, nil
-}
-
-// memoryLockDir is where handoff locks live: the runtime directory on Linux,
-// tmpfs and cleared at boot, else the user cache directory. The kernel releases
-// the lock either way, so the choice is about keeping files out of the vault,
-// not about correctness.
-func memoryLockDir() (string, error) {
-	base := os.Getenv("XDG_RUNTIME_DIR")
-	if base == "" {
-		cache, err := os.UserCacheDir()
-		if err != nil {
-			return "", fmt.Errorf("no runtime or cache directory for the handoff lock: %w", err)
-		}
-		base = cache
-	}
-	dir := filepath.Join(base, "dotf", "locks")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("create the handoff lock directory %s: %w", dir, err)
-	}
-	return dir, nil
 }
