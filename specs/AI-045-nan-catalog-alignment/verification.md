@@ -44,6 +44,11 @@ PR 2 (AC4-AC5), 2026-09-30:
 - `git diff --check` -> PASS. Executable production delta is 16 added Go lines in `cli/internal/harness/model_map.go`; the remaining production changes are declarative schema/catalog/config records and documentation.
 - Draft PR: #1916.
 
+Prevention PRs (AC6-AC10), 2026-10-01:
+
+- AC8 -> `tests/model-canary.bats` (9/9, stub `gh` and stub canary under `bash -e`: open, rewrite in place, close, untouched on a canary that could not run, an annotation on every failed issue write) and the `cli/internal/nanprobe` tests (per-API routing, a completed body as the only answer, a timeout told apart from an unreachable endpoint). Real sibling: `workflow_dispatch` run 36887489906 on `main` at `f8c1d76e`, green in 46 s, 6/6 bound models answered, recorded on #1860. That run proves the key reaches every API and `gh issue list` works with the workflow token. The issue writes are proven only by the stub suite until the first red run.
+- AC10 -> on `main` after #1940, three review runs from two PRs were queued at once: 36881054024 (`/review` on #1944) ran 15:05:42-15:09:14, 36881389377 (#1944) ran 15:09:56-15:10:41, and 36881441749 (#1943) ran 15:10:45-15:18:08. All three succeeded and none was cancelled. Without `queue: max`, the older pending run would have been dropped. One earlier run (36880519025) was cancelled by the per-PR workflow group when a newer push to the same PR arrived. That is the intended supersede, not the job queue. Recorded on #1923.
+
 ## Decisions made during implementation
 
 - The chain is declared twice (workflow and toml) and a test holds them equal, rather than the preflight reading the toml. PR-Agent reads the toml from the default branch, so a PR changing the model would otherwise probe the old one.
