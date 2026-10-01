@@ -32,6 +32,9 @@ created: "2026-08-27"
 - [x] [AC7] `JournalName` derives the session filename from the thread; `dotf mem thread` prints both (#1279)
 - [x] ~~[AC8] `dotf doctor` reports a handoff section that lost a live worktree's thread.~~ Not applicable: declined at archive time, tracked as #1881
 - [x] `dotf mem handoff-write` command and the `handoff` skill switched to it (#1279)
+- [x] [AC9] `TestConcurrentWritesDoNotLoseAThread` (8 writers started together) failed before the lock; `cli/internal/filelock` (kernel-released) now spans read -> rename in `handoff-write`, with a bounded wait (#1884)
+- [x] [AC9] `TestTwoPathsToOneMemoryShareTheLock`: the lock key is the canonical (`EvalSymlinks`) path, and the test fails with that line removed (#1884)
+- [x] [AC10] `TestJournalWriterSkipsTheProjectWord`: `journalWriter` skips the journal name's first word (#1884)
 
 ## Closing
 

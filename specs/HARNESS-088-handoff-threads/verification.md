@@ -152,3 +152,35 @@ ok      github.com/mlorentedev/dotfiles/cli/internal/mem
   names `TestThreadKeyIsTheBranchSoItTravelsBetweenMachines`.
 - `tasks.md`'s Implementation section still held the template placeholders. It
   now lists the tasks as they were done.
+
+## Round-1 review fixes (#1884, 2026-10-01)
+
+Round 1 (`nan/deepseek-v4-flash`, FAIL) found the lost update, measured on the
+built binary. Its record is kept as `review-round-1.md`.
+
+- **Lost update, AC9.** The owner reversed the lock-file non-goal and picked a
+  lock the kernel releases over O_EXCL: a writer killed while holding an O_EXCL
+  file leaves it behind, and every later handoff waits on it. `cli/internal/filelock`
+  is extracted from the pattern `worktree` and `agent` already use (`flock`; an
+  unshared `CreateFile` on Windows). The lock file lives under
+  `XDG_RUNTIME_DIR` or the user cache dir, outside the vault, and its name hashes
+  the canonical path. Moving the two older copies onto the package is a separate
+  ticket.
+- **The test fails without the fix.** `TestConcurrentWritesDoNotLoseAThread`
+  starts 8 writers together, 5 rounds. Before the lock, every run lost threads:
+  `thread feat-w0 is missing after 8 concurrent writes`, and more. After it, the
+  test passes under `-race`, `-count=3`.
+- **Two paths, one lock.** With `EvalSymlinks` removed,
+  `TestTwoPathsToOneMemoryShareTheLock` fails (mutation applied and observed).
+  Restored, it passes. Whether `EvalSymlinks` resolves a Windows junction is
+  not measured; the test skips on Windows and says so.
+- **`journalWriter`, AC10.** The SPECULATIVE finding is fixed, not just stated.
+  The scan skips the journal name's first word, which is always the project's.
+  Residual: a project with an agent word after its first segment (`my-pi-app`).
+  None exists.
+
+```
+$ cd cli && go build ./... && go vet ./... && go test ./... && GOOS=windows go vet ./... && golangci-lint run
+ok (every package); 0 issues.
+```
+
