@@ -41,6 +41,9 @@ type System struct {
 	// CommandOutput runs name with args and returns combined stdout+stderr.
 	// Used for the `<tool> --version` probes; faked in tests.
 	CommandOutput func(name string, args ...string) (string, error)
+	// CommandOutputEnv is CommandOutput with an explicit environment. Checks use
+	// it when inherited process state could redirect a probe to another target.
+	CommandOutputEnv func(env []string, name string, args ...string) (string, error)
 	// CommandOutputDir is CommandOutput with a working directory — for tools that
 	// resolve their target from the process cwd rather than an argument (e.g.
 	// `pre-commit install`, which locates the git repo relative to where it runs).
@@ -213,6 +216,12 @@ func realSystem() *System {
 		LookPath: exec.LookPath,
 		CommandOutput: func(name string, args ...string) (string, error) {
 			out, err := exec.Command(name, args...).CombinedOutput()
+			return string(out), err
+		},
+		CommandOutputEnv: func(env []string, name string, args ...string) (string, error) {
+			cmd := exec.Command(name, args...)
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
 			return string(out), err
 		},
 		CommandOutputDir: func(dir, name string, args ...string) (string, error) {
