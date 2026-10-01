@@ -47,5 +47,12 @@
     "verification": "bats --filter 'runs /review -i only' tests/pr-agent-config.bats && actionlint .github/workflows/pr-agent.yml",
     "state": "passing",
     "evidence": "exit 0 on 2026-09-27: template validated against both branches; actionlint clean"
+  },
+  {
+    "id": "TOOL-023-pr-agent-incremental-push-review-f8",
+    "behavior": "Archive review round 1 (#1893): the gate follows the pinned PR-Agent v0.46.0. The date fallback compares the committer date, then the author date, so a rebase counts its commits as new; a review identity is recognized in both stored forms, so a forged link-reference marker forces mode=full; and a test fails when the version the gate cites differs from the pinned tag",
+    "verification": "bats --filter 'rebase with no state block|link-reference|cites' tests/pr-agent-push-gate.bats",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-01: 4 cases under bash and zsh, red before the fix; mutating the date basis back to author date and dropping the link-reference identity each fail 1 case"
   }
 ]

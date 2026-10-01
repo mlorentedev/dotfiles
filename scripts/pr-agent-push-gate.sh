@@ -11,10 +11,12 @@
 # (mode=full): PR-Agent's own incremental range is not safe to hand a review it
 # did not earn.
 #
-# "The previous review" is the one PR-Agent itself picks (v0.45.0,
-# github_provider.get_previous_review and utils.comment_matches_identity): the
-# LAST issue comment carrying a review identity line within its first 5 lines,
-# or starting with a Guide heading — by BODY alone, with no author check. This
+# "The previous review" is the one PR-Agent itself picks (v0.46.0,
+# github_provider.get_previous_review and comment_identity.comment_matches_identity):
+# the LAST issue comment carrying a review identity line within its first 5
+# lines, in either stored form (an HTML comment, or the link reference used
+# where HTML comments are escaped), or starting with a Guide heading — by BODY
+# alone, with no author check. This
 # gate only trusts a review posted by github-actions[bot] (CWE-345: on a public
 # repo anyone can comment the same marker text), and if a comment from anyone
 # else, newer than that review, still carries one, the push is reviewed in
@@ -29,12 +31,14 @@
 # range cannot be trusted: review in full. If no state block carries a
 # head_sha at all — true of every INCREMENTAL review, which never writes one
 # (_review_finding_state_enabled returns False once self.incremental.is_incremental) —
-# this falls back to the original author-date count, so a PR whose latest
-# review was incremental is exposed to the same rebase blind spot until its
-# next FULL one.
+# this falls back to counting by date, the committer date first and the author
+# date only when there is none, as PR-Agent's own _commit_timeline_date does. A
+# rebase rewrites committer dates, so rebased commits count as new and the push
+# is reviewed: the fallback errs toward reviewing. Counting by author date, as
+# this gate did before #1893, saw 0 new commits after a rebase and skipped the review.
 #
 # Counting by SHA position can disagree with PR-Agent's own get_commit_range,
-# which still walks by author date: if every commit after the reviewed sha
+# which walks by date: if every commit after the reviewed sha
 # happens to be dated AT OR BEFORE the review's created_at (a cherry-pick with
 # a preserved old author date, not a plain rebase), PR-Agent computes an empty
 # range, `_can_run_incremental_review` declines, and it publishes nothing. That
@@ -109,10 +113,14 @@ fi
 
 # Shared predicate: true when a comment body carries a review identity (in its
 # first 5 lines, compared after trimming) or either Guide heading (a prefix of
-# the whole body), as PR-Agent v0.45.0 matches them (comment_matches_identity).
+# the whole body), as PR-Agent v0.46.0 matches them (comment_matches_identity).
+# Each identity has two stored forms (hidden_marker_forms): the HTML comment,
+# and a link reference to the project for providers that escape HTML comments.
 # shellcheck disable=SC2016  # single-quoted on purpose: this is jq source, $b is its variable
 JQ_IS_REVIEW='
-    def identity: . == "<!-- pr-agent:review:full -->" or . == "<!-- pr-agent:review:incremental -->";
+    def identity: . == "<!-- pr-agent:review:full -->" or . == "<!-- pr-agent:review:incremental -->"
+      or . == "[pr-agent:review:full]: https://github.com/The-PR-Agent/pr-agent"
+      or . == "[pr-agent:review:incremental]: https://github.com/The-PR-Agent/pr-agent";
     def is_review: (.body // "") as $b
       | ($b | split("\n")[:5] | map(gsub("^\\s+|\\s+$"; "")) | any(identity))
         or ($b | startswith("## PR Reviewer Guide"))
@@ -179,9 +187,11 @@ if [ -n "$head_sha" ]; then
 fi
 
 # No state block, or one without a head_sha (every incremental review, and any
-# full review whose block does not carry one): fall back to counting by date.
+# full review whose block does not carry one): fall back to counting by date,
+# committer date first, as get_commit_range does (see the header).
 new=$(jq --arg since "$baseline" \
-    '[ .[] | select((.parents | length) < 2) | select(.commit.author.date > $since) ] | length' \
+    '[ .[] | select((.parents | length) < 2)
+      | select((.commit.committer.date // .commit.author.date) > $since) ] | length' \
     "$COMMITS" 2>/dev/null) \
     || decide true "the PR commits cannot be read, so the push is reviewed" full
 
