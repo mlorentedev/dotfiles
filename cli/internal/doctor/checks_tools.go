@@ -191,7 +191,7 @@ func checkGitWindowsFloor(sys *System, cfg *Config, rep *Report) {
 	switch {
 	case sys.GOOS != "windows":
 		// #912
-		rep.Skip("git-for-windows floor (Windows-only; the C:/ hooksPath defect was git-for-windows')")
+		rep.Skip("git-for-windows floor (Windows-only; the C:/ hooksPath defect is in git-for-windows)")
 	case pin == "":
 		rep.Skip(gitFloorKey + " not set in versions.conf — git-for-windows floor not verified")
 	case !sys.has("git"):

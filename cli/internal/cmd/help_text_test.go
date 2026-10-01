@@ -122,12 +122,14 @@ var outputPackages = []string{".", "../doctor"}
 // literals, so they keep their ids.
 func TestOutputStringsHaveNoInternalReferences(t *testing.T) {
 	ref := internalRef(t)
-	files := 0
 	for _, dir := range outputPackages {
 		matches, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		if err != nil {
 			t.Fatalf("list %s: %v", dir, err)
 		}
+		// Counted per package: a glob over a moved directory matches nothing
+		// without an error, and a total across packages would hide that.
+		files := 0
 		for _, file := range matches {
 			if strings.HasSuffix(file, "_test.go") {
 				continue
@@ -135,9 +137,9 @@ func TestOutputStringsHaveNoInternalReferences(t *testing.T) {
 			files++
 			checkOutputLiterals(t, ref, file)
 		}
-	}
-	if files == 0 {
-		t.Fatal("no source file found: the package paths are wrong or moved")
+		if files == 0 {
+			t.Fatalf("no source file found in %s: the package path is wrong or moved", dir)
+		}
 	}
 }
 
