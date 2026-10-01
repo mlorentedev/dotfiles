@@ -71,6 +71,27 @@ func TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory(t *testing
 	}
 }
 
+func TestClaudeContextRecognizesSymlinkToCheckoutSubdirectory(t *testing.T) {
+	parent := t.TempDir()
+	repo := filepath.Join(parent, "dotfiles")
+	mustMkdirAll(t, filepath.Join(repo, ".git"))
+	mustMkdirAll(t, filepath.Join(repo, "cli"))
+	link := filepath.Join(t.TempDir(), "checkout-subdir")
+	if err := os.Symlink(filepath.Join(repo, "cli"), link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	vault := t.TempDir()
+	mustMkdirAll(t, filepath.Join(vault, "10_projects", "dotfiles"))
+
+	ctx := ClaudeContext(ClaudeContextInput{
+		Cwd: link, Vault: vault, ScriptsDir: filepath.Join(t.TempDir(), "absent"),
+		Home: t.TempDir(), Now: time.Now(),
+	})
+	if !strings.Contains(ctx, "[hive] Project 'dotfiles'") {
+		t.Fatalf("symlinked checkout subdirectory lost project context:\n%s", ctx)
+	}
+}
+
 func TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers(t *testing.T) {
 	t.Run("submodule", func(t *testing.T) {
 		root := t.TempDir()
@@ -106,6 +127,15 @@ func TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers(t *testing.T
 			"gitdir: "+filepath.Join("..", "project.git", "worktrees", "feature")+"\n")
 		if got := checkoutProjectName(root); got != "project" {
 			t.Fatalf("project = %q, want project", got)
+		}
+	})
+
+	t.Run("separate git directory keeps checkout name", func(t *testing.T) {
+		root := filepath.Join(t.TempDir(), "dotfiles")
+		mustWrite(t, filepath.Join(root, ".git"),
+			"gitdir: "+filepath.Join(t.TempDir(), "metadata", "storage")+"\n")
+		if got := checkoutProjectName(root); got != "dotfiles" {
+			t.Fatalf("project = %q, want dotfiles", got)
 		}
 	})
 }

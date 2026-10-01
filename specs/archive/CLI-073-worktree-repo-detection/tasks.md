@@ -34,6 +34,13 @@ created: "2026-09-29"
   and subdirectory.
 - [x] [AC5] Resolve checkout root and main project identity from the `.git`
   pointer before emitting hive/specs/lessons/triage context.
+- [x] Add a failing doctor regression for inherited `GIT_DIR` /
+  `GIT_WORK_TREE`, then run the Git probe with repository-local variables
+  removed from its subprocess environment.
+- [x] Add a failing session-start regression for a symlink to a checkout
+  subdirectory, then resolve the physical path before walking ancestors.
+- [x] Add a failing `--separate-git-dir` identity regression, then keep the
+  checkout directory name for generic pointer layouts.
 
 ## Closing
 

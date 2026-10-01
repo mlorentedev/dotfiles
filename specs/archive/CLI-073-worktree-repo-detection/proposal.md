@@ -42,6 +42,11 @@ before emitting hive, specs, lessons and triage context.
   binary in a unit test would make the result depend on the host.
 - Session-start resolves the linked-worktree project name from its `.git`
   pointer; it must not use the `dotfiles-wt-*` directory basename.
+- Git probes must discard inherited repository-local variables so `GIT_DIR` or
+  `GIT_WORK_TREE` from the caller cannot redirect validation to another checkout.
+- Session-start must resolve a symlinked working directory before walking its
+  ancestors, and a separate Git metadata directory must not replace the checkout
+  directory's project identity.
 
 ## Acceptance criteria
 
@@ -53,6 +58,11 @@ before emitting hive, specs, lessons and triage context.
   checkout root.
 - [x] Session start from a linked worktree root or subdirectory emits hive,
   specs, lessons and triage context using the main repository project name.
+- [x] Inherited repository-local Git variables cannot redirect the doctor probe
+  away from the configured checkout.
+- [x] Session start recognizes a symlink to a checkout subdirectory.
+- [x] A checkout using `--separate-git-dir` keeps the checkout directory name as
+  its project identity.
 
 ## References
 

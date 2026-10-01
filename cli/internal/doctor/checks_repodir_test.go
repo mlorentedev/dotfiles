@@ -68,4 +68,24 @@ func TestCheckRepoDirResolves(t *testing.T) {
 			t.Fatalf("symlink %q and physical root %q must compare equal", link, realCheckout)
 		}
 	})
+
+	t.Run("git probe clears inherited repository overrides", func(t *testing.T) {
+		t.Setenv("DOTFILES_REPO_DIR", worktree)
+		sys := newSys(nil, nil, nil)
+		sys.CommandOutputEnv = func(env []string, name string, args ...string) (string, error) {
+			for _, entry := range env {
+				if strings.HasPrefix(entry, "GIT_DIR=") || strings.HasPrefix(entry, "GIT_WORK_TREE=") {
+					t.Fatalf("repository-local Git override leaked into probe: %q", entry)
+				}
+			}
+			return worktree + "\n", nil
+		}
+
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkRepoDirResolves(sys, rep)
+		if rep.Failures() != 0 {
+			t.Fatalf("valid worktree rejected under inherited Git overrides:\n%s", buf.String())
+		}
+	})
 }

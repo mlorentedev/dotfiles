@@ -54,6 +54,23 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - Named regressions:
     `TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers/submodule_worktree`
     and `/ordinary_worktree_below_a_parent_named_modules`.
+- Post-archive CodeRabbit review dispositions:
+  - **Applied:** the doctor Git probe now strips repository-local Git variables
+    from only its subprocess environment; the parent process is unchanged.
+  - **Applied:** checkout discovery resolves symlinked working directories before
+    walking ancestors.
+  - **Applied:** generic `--separate-git-dir` layouts keep the checkout directory
+    name instead of treating the metadata directory as project identity.
+  - **Skipped:** CodeRabbit's docstring coverage warning is not a repository gate
+    and adding comments to self-explanatory unexported helpers would conflict with
+    the repository's comment policy.
+  - **Skipped:** `features.json` remains `pending` with empty evidence by design;
+    only the harness may write terminal feature state, and recent archived specs
+    such as WIN-014 and HARNESS-168 retain the same harness-owned state.
+- Post-review validation:
+  - `go test ./internal/doctor ./internal/mem ./internal/cmd -count=1` -> pass.
+  - `go vet ./internal/doctor ./internal/mem ./internal/cmd` -> pass.
+  - `git diff --check` -> pass.
 
 ## Decisions made during implementation
 
@@ -81,7 +98,9 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-073-worktree-repo-detection/` -> `specs/archive/CLI-073-worktree-repo-detection/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-073-worktree-repo-detection/` -> `specs/archive/CLI-073-worktree-repo-detection/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+The issue remains open until PR #1835 merges.

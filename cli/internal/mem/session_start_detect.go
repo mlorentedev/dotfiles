@@ -58,6 +58,10 @@ func findCheckoutRoot(cwd string) string {
 	if err != nil {
 		return ""
 	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return ""
+	}
 	for {
 		if fileExists(filepath.Join(root, ".git")) {
 			return root
@@ -96,7 +100,7 @@ func checkoutProjectName(root string) string {
 	if filepath.Base(gitDir) == ".git" {
 		return filepath.Base(filepath.Dir(gitDir))
 	}
-	return strings.TrimSuffix(filepath.Base(gitDir), ".git")
+	return filepath.Base(root)
 }
 
 func submoduleProjectName(gitDir string) string {

@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -44,14 +45,51 @@ func checkRepoDirResolves(sys *System, rep *Report) {
 }
 
 func gitCheckoutRoot(sys *System, path string) string {
-	if sys == nil || sys.CommandOutput == nil {
+	if sys == nil {
 		return ""
 	}
-	out, err := sys.CommandOutput("git", "-C", path, "rev-parse", "--show-toplevel")
+	var (
+		out string
+		err error
+	)
+	if sys.CommandOutputEnv != nil {
+		out, err = sys.CommandOutputEnv(cleanGitRepositoryEnv(os.Environ()),
+			"git", "-C", path, "rev-parse", "--show-toplevel")
+	} else if sys.CommandOutput != nil {
+		out, err = sys.CommandOutput("git", "-C", path, "rev-parse", "--show-toplevel")
+	} else {
+		return ""
+	}
 	if err != nil {
 		return ""
 	}
 	return filepath.Clean(strings.TrimSpace(out))
+}
+
+func cleanGitRepositoryEnv(environ []string) []string {
+	repositoryLocal := map[string]bool{
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES": true,
+		"GIT_COMMON_DIR":                   true,
+		"GIT_DIR":                          true,
+		"GIT_GRAFT_FILE":                   true,
+		"GIT_IMPLICIT_WORK_TREE":           true,
+		"GIT_INDEX_FILE":                   true,
+		"GIT_INTERNAL_SUPER_PREFIX":        true,
+		"GIT_NO_REPLACE_OBJECTS":           true,
+		"GIT_OBJECT_DIRECTORY":             true,
+		"GIT_PREFIX":                       true,
+		"GIT_REPLACE_REF_BASE":             true,
+		"GIT_SHALLOW_FILE":                 true,
+		"GIT_WORK_TREE":                    true,
+	}
+	clean := make([]string, 0, len(environ))
+	for _, entry := range environ {
+		key, _, _ := strings.Cut(entry, "=")
+		if !repositoryLocal[strings.ToUpper(key)] {
+			clean = append(clean, entry)
+		}
+	}
+	return clean
 }
 
 func sameCheckoutRoot(configured, actual string) bool {
