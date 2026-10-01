@@ -10,7 +10,7 @@ SSOT (see root `AGENTS.md`).
 |--------|---------------|-------|
 | `models.json` | `~/.pi/agent/models.json` | The OpenRouter provider. NaN's comes from `pi-nan-provider` (see *NaN provider package*). `apiKey` is `${OPENROUTER_API_KEY}`, which pi resolves from its own environment at request time, so the key is in neither the repo nor the deployed file (mode `0600`). |
 | `settings.json` | `~/.pi/agent/settings.json` | UX defaults + curated `enabledModels`. **Seed-if-missing**: pi mutates this file at runtime (`lastChangelogVersion`), so setup deploys it only when absent and never clobbers local edits. |
-| `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup installs the difference against the live `settings.json` on every run, through `pi install`. See below. |
+| `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup runs `dotf pi packages apply` on every run: it removes live packages that are not declared and installs declared ones that are missing. See below. |
 | `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Tools load on-demand via `pi-mcp-client` meta-tool (`mcp_tools`). Note: `context7` routes context over HTTPS to an external API. |
 | `nan-provider.json` | `~/.pi/agent/nan-provider.json` | `pi-nan-provider`'s own state file. Only `mediaMcp: false` is managed (`strategy: merge`); `webSearch` stays the box's own `/nan-mcp` toggle. See *NaN provider package* below. |
 | (canonical `AGENTS.md`) | `~/.pi/agent/AGENTS.md` | Cross-agent SSOT system prompt, deployed verbatim (same as opencode). |
@@ -29,7 +29,8 @@ because the deployed file always differs, overwrote it on every run.
 
 `packages.json` declares the pi packages (extensions, skills, prompts, themes)
 this environment wants. `setup-{linux,windows}` reconciles it against the live
-`~/.pi/agent/settings.json` on **every** run and installs what is missing, so an
+`~/.pi/agent/settings.json` on **every** run, through `dotf pi packages apply`. It
+installs what is missing and **removes what is not declared** (HARNESS-139), so an
 existing machine converges on the next setup and a fresh one on its first
 (AI-030, #1224).
 

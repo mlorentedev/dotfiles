@@ -36,6 +36,19 @@ anything since #1754. AC10's ASCII count is now 0, since the file has none.
 
 ## Test status
 
+Current, at the archive head (after the HARNESS-139 re-point):
+
+```
+$ bats tests/pi-packages.bats
+1..14   all ok
+```
+
+The `features.json` commands f1-f10 each exit 0 when run by hand at the same head.
+
+Historical, from the original implementation (2026-08). `verify-reconcile.sh` and
+the shell block it drove were retired by HARNESS-139, so this output can no longer
+be reproduced. It is kept as the record of what was measured then:
+
 ```
 $ bats tests/pi-packages.bats
 1..16   all ok
@@ -47,15 +60,6 @@ $ specs/AI-030-pi-packages-manifest/verify-reconcile.sh
 [OK] AC7  pi absent: warned, exit 0, bootstrap continues
 [OK] AC4-AC7 verified against the block extracted from setup-linux.sh:954-1003
 exit 0
-
-$ bash -n setup-linux.sh && zsh -n setup-linux.sh
-OK / OK
-
-$ shellcheck setup-linux.sh
-20 findings before the change, 20 after, none in the new block (lines 954-1003)
-
-$ shellcheck specs/AI-030-pi-packages-manifest/verify-reconcile.sh
-clean
 ```
 
 **No regressions**: the full suite is green on this branch (see the PR body for
@@ -126,3 +130,18 @@ limitation `tests/stub-real-pairing.bats` exists to keep visible (BUG-055).
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-231-a-hand-wired-dev-symlink-outranks-the-managed-instal.md
 - [x] ADR-worthy decision? no: the manifest and its declaration semantics are recorded in `ai/pi/README.md` and on epic #1625
 - [x] New pattern candidate for `00_meta/patterns/`? no: the one cross-project candidate needs a second instance first, as said above
+
+## Round-1 review (2026-10-01)
+
+Verdict FAIL (`nan/qwen3.8-flash`). The spec text still declares removal out of scope, while the code removes undeclared packages since HARNESS-139 (D-2 on #1625).
+
+| Finding | Disposition |
+|---|---|
+| F-01 Major REAL: "Removing packages" declared out of scope, code removes | Open. A contract edit to `proposal.md`, followed by round 2. |
+| F-02 Major REAL: Windows twin has no `~\.local\bin\dotf.exe` fallback | Ticketed: #1925 |
+| F-03 Minor REAL: `1..16` and the retired `verify-reconcile.sh` block shown as current | Applied: "Test status" now shows the current `1..14` and labels the old block as historical |
+| F-04 Minor REAL: f2 duplicates the pin regex | Open, in the same contract round as F-01 |
+| F-05 Minor THEORETICAL: `LiveSources` drops a source-less object entry | Ticketed: #1926 |
+| F-06 Minor SPECULATIVE: `Identity()` and dist-tags or paths | Declined. The CI pin guard admits only `npm:<name>@<semver>`, so the case cannot reach the parser. |
+| F-07 Minor REAL: `ai/pi/README.md` says install-only | Applied: both README sentences name the removal |
+| Question: `features.json` all `pending` | The harness writes `passing`; the commands were run by hand and exit 0 |
