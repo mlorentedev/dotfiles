@@ -265,3 +265,14 @@ $ bats tests/model-map.bats tests/triggers-registry.bats \
 ```
 
 Round 1 measured 10 pins across 6 repo files; there are now 18 across 9.
+
+## Round-2 review (2026-10-01)
+
+Verdict PASS-WITH-GAPS (`nan/glm5.3-flash`, reviewed `7a018fca`). This is the last round under the two-round cap. No Blocker, and no REAL Major.
+
+| Finding | Disposition |
+|---|---|
+| Major, THEORETICAL: `toml-key` takes the first match file-wide | Ticketed: #1924. Today's `.pr_agent.toml` has one `model` key. |
+| Minor, THEORETICAL: an unreadable deployed site ends as a Skip | Ticketed: folded into #1924. |
+| Minor, SPECULATIVE: `staleSnapshotOf` numeric-tail false positive | Declined. The WARN names the base id it assumed, so a misclassification shows. No such id exists in the map. |
+| Question: AC5/AC6 not re-run live | Accepted. The named unit tests pass, and the live findings were recorded before round 1. |
