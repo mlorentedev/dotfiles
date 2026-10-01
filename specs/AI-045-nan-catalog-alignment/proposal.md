@@ -41,6 +41,11 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
 - **AI-045d (#1860).** A daily canary sends a minimal call to every bound NaN model, with no PR involved. A retirement opens an issue before a PR finds it.
 - **HARNESS-067 (#902)** gives provider identity one source. Seven files had to be found by grep to move one model.
 
+**Amendment, 2026-10-01 (#1923): CI review survives a saturated NaN.** The owner chose three remedies on #1923. A shorter timeout is AC6's streaming, because the configured `ai_timeout` never fired (run 36826726168, lesson 327). The other two are new:
+
+- **AC9.** A third attempt on a provider outside NaN, run only when both NaN attempts fail, so a NaN-wide saturation still ends in a review or a reported reason.
+- **AC10.** One review at a time across the repository, queued rather than dropped, so parallel PRs stop competing for the bucket each of them needs.
+
 ## Out of scope
 
 - The other six repositories that bind `mimo-v2.5` (hive, kubelab, web, pollex, iris, garsync). Each one moves in its own pull request under #1763, or through the shared workflow ADR-042 decides.
@@ -53,6 +58,8 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
 - `mimo-v2.6-flash` has 5 concurrent requests per model and PR-Agent is its main consumer. Several parallel PRs can exhaust that bucket. The fallback to `deepseek-v4-flash` is the existing answer, and the preflight makes it visible.
 - The preflight spends one minimal request per model per run, about 20 to 800 completion tokens depending on the reasoning. That is negligible against the quotas, but it is not zero.
 - An early-failover preflight means the review can run on a fallback without anyone choosing it. The job summary names the model that reviewed, and PR-Agent records the same in its own run.
+- AC9 reverses a recorded decision: `harness/model-map.json`'s `$comment` lists the openrouter pool as retired. The OpenRouter key authenticates, but its credit is spent (5.03 used of 5.00, measured 2026-10-01). AC9 therefore stays blocked on the owner: fund that provider or name another, then deliver the key with `dotf secrets sync ci`. Until then the step is gated on the credential and never runs.
+- AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 27 minutes per PR ahead in the queue.
 
 ## Acceptance criteria
 
@@ -62,8 +69,10 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
 - [ ] AC4: `harness/model-map.json` declares per-model concurrency and the per-key cap as NaN publishes them for the base plan, and the loader validates that shape.
 - [ ] AC5: opencode's and pi's NaN windows and output caps equal NaN's published figures. Thinking variants use `reasoning_effort`, and `enable_thinking` appears nowhere.
 - [ ] AC6 (#1858): PR-Agent's NaN calls stream, and a test pins the setting. A review of #1856's 42K-token diff completes on the primary, measured with PR-Agent's own prompt.
-- [ ] AC7 (#1859): a test fails when `ai_timeout` times attempts times models, plus setup, is not below the job's `timeout-minutes`.
+- [ ] AC7 (#1859): a test fails when the job's `timeout-minutes` does not exceed the sum of the attempts' step `timeout-minutes` plus setup. Amended 2026-10-01: the step bound is the one measured to hold, and `ai_timeout` never fired on a held request (lesson 327).
 - [ ] AC8 (#1860): a scheduled workflow probes every model `harness/model-pins.json` lists as bound, and opens or updates one issue when any does not answer. A test drives it with a stub transport.
+- [ ] AC9 (#1923): when both NaN attempts fail, PR-Agent reviews once more on a provider outside NaN. A missing credential warns and skips that attempt, never fails the job, and the publish guard reports the last attempt that ran. A test pins the gating and the outcome chain.
+- [ ] AC10 (#1923): the review job runs in one repository-wide concurrency group with `cancel-in-progress: false` and `queue: max`, and the per-PR workflow group keeps superseding pushes. A test pins both, and a live run shows GitHub accepts the job-level queue.
 
 ## References
 
