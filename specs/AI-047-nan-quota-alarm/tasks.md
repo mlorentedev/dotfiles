@@ -25,6 +25,13 @@ created: "2026-09-26"
 - [x] [AC2] Live run, recorded
 - [ ] PR opened, triaged, merged by the owner (#1772, which it depended on, merged 2026-09-27)
 
+## PR-1b: watch the account, not the bindings (2026-10-01)
+
+- [x] [AC7] Failing tests: an unbound metered model at 83% WARNs, an undeclared model with usage WARNs, a tier-hidden unbound model is ignored
+- [x] [AC1] [AC2] Metered under the threshold is INFO (shown by default), unmetered is PASS (shown with `--verbose`)
+- [x] [AC7] Doctor test at default verbosity: `TestCheckNaNQuota_WatchesMeteredModelsNothingBinds`
+- [x] [AC2] Live run, recorded
+
 ## PR-2: hermes
 
 - [ ] [AC6] Vault: remove the single-pool quota section from `00_meta/agents/scripts/budget-report.sh` and its false "no usage endpoint" header; point the digest reader at `dotf doctor`

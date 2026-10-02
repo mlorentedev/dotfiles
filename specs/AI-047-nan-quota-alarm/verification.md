@@ -13,6 +13,7 @@ created: "2026-09-26"
 - [x] AC4 -> `TestCheckNaNQuota_SkipsWhenNaNIsUnreachable`, `TestCheckNaNQuota_SkipsWithoutAKey`, `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon`.
 - [x] AC5 -> `TestCheckNaNQuota_NeverPrintsTheKey`, on the rejected, unparseable and transport branches, each with the key planted where a careless message would echo it.
 - [ ] AC6 -> PR-2.
+- [x] AC7 -> `TestEvaluateWatchesEveryMeteredModelNotOnlyBindings`, `TestEvaluateWatchesAnUndeclaredModelWithUsage`, `TestEvaluateIgnoresAMeteredModelTheKeyCannotSee`, `TestEvaluateIgnoresARetiredModelNothingCanReach`, `TestCheckNaNQuota_WatchesMeteredModelsNothingBinds`. Mutation: dropping the metered and used sets from the watched union fails the first two and the doctor test.
 
 Mutations applied one at a time, each caught by the named test: transport error as FAIL; the usage body echoed into the parse warning; unserved id as WARN; the warn threshold moved to 90%; the key not sent; the bw daemon gate removed. The gate mutation survived the first version of the tests, because the default resolver already answers "absent". `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon` was added for it.
 
@@ -54,6 +55,20 @@ After rebasing on main with #1772 merged (`qwen3.8-flash` unbound, rerank named 
 ```
 
 The rebase also broke `TestCheckNaNQuota_ReportsEachBoundModel`. It had read the `qwen3.8-flash` binding from the repo's map, and #1772 removed that binding. The fixture now pins `tiers.low.nan` itself.
+
+## Live run (AC2, AC7), 2026-10-01
+
+`DOTFILES_REPO_DIR=<this worktree> dotf doctor` from a scratch build, default verbosity:
+
+```
+[NaN quota]
+  [INFO] deepseek-v4-flash: 61.6M / 3000.0M tokens this month (2%)
+  [INFO] glm5.3-flash: 14.4M / 2000.0M tokens this month (1%)
+  [INFO] mimo-v2.6-flash: 19.3M / 1000.0M tokens this month (2%)
+  [INFO] qwen3.8-flash: 12.6M / 500.0M tokens this month (3%)
+```
+
+`qwen3.8-flash` is bound nowhere in `model-map.json`; the bound-only check never showed it. A first cut warned that `glm5.3` was "no longer served". That was wrong: `/v1/models` filters premium models by the key's tier (`ai/pi/README.md`), so absence there is not retirement, and the warning was dropped.
 
 ## Test status
 

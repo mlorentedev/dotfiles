@@ -43,12 +43,14 @@ A check that answers "which bound NaN model is near its quota" from NaN's own nu
 
 ## Acceptance criteria
 
-- [x] AC1: A Go test feeds a recorded `/v1/usage` fixture and a declared table, and gets WARN for a model at 83% of its quota, PASS for one at 10%, and nothing for an unmetered model.
-- [ ] AC2: With the live endpoint, `dotf doctor` reports each metered model bound in `model-map.json` with used / quota / percent. The output is recorded in `verification.md`.
+- [x] AC1: A Go test feeds a recorded `/v1/usage` fixture and a declared table, and gets WARN for a model at 83% of its quota, a visible report (INFO) for one at 10%, and nothing above PASS for an unmetered model.
+- [x] AC2: With the live endpoint, `dotf doctor` reports each metered model with used / quota / percent, without `--verbose`. The output is recorded in `verification.md`.
 - [x] AC3: A model id in `model-map.json` missing from `/v1/models` is a FAIL naming the id. A test mutates `rerank` back to `qwen3-rerank` and sees it fail.
 - [x] AC4: With NaN unreachable, the check SKIPs with a reason and doctor's exit code is unchanged.
 - [x] AC5: No key or header value appears in output or in the error path (a test asserts this on the error branch).
 - [ ] AC6: hermes's digest no longer states a single 500M pool. It calls the new check, or its quota section is removed (vault change, same arc). Resolved 2026-09-26: the hermes-nan MicroVM carries no `dotf`, registry or age key (`80_agents/hermes-nan/context.md`), so the quota section is removed rather than wired to a check it cannot run.
+
+- [x] AC7: The quota is the account's, not a binding's. The check watches every model the table meters and every model with usage this period, as well as the bound ones. A test with nothing binding `qwen3.8-flash` at 83% still gets its WARN. Added 2026-10-01: on 2026-09-26 `qwen3.8-flash` reached 83% while pi, not `model-map.json`, was spending it, and the bound-only check could not have seen it. An unbound model the key cannot see (`/v1/models` hides premium models by tier) spends nothing and is not reported.
 
 ## References
 

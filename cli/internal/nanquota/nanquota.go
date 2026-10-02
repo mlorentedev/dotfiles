@@ -185,44 +185,89 @@ func BoundModels(m map[string]any, pool string) []string {
 	return out
 }
 
-// Evaluate classifies each bound model. warnPct is the share of the quota at
-// which a metered model WARNs; at 100% it FAILs, because NaN then answers 402.
+// Evaluate classifies every model that can spend the account's quota. The
+// quota belongs to the API key, not to a binding, so the watched set is the
+// union of what model-map.json binds, what the table meters, and what has
+// usage this period: a consumer outside model-map.json (pi, opencode, a
+// one-shot wrapper) spends the same budget. warnPct is the share of the quota
+// at which a metered model WARNs; at 100% it FAILs, because NaN then answers
+// 402.
 func Evaluate(bound []string, served map[string]bool, u Usage, t Table, warnPct float64) []Finding {
 	used := map[string]int64{}
 	for _, mt := range u.Totals.ByModel {
-		used[mt.Model] = mt.TotalTokens
+		used[mt.Model] += mt.TotalTokens
 	}
 	unmetered := map[string]bool{}
 	for _, id := range t.Unmetered {
 		unmetered[id] = true
 	}
-	out := make([]Finding, 0, len(bound))
+	isBound := map[string]bool{}
 	for _, id := range bound {
-		out = append(out, classify(id, served[id], used[id], t.Metered, unmetered[id], warnPct))
+		isBound[id] = true
+	}
+	watched := map[string]bool{}
+	for _, id := range bound {
+		watched[id] = true
+	}
+	for id := range t.Metered {
+		watched[id] = true
+	}
+	for id, n := range used {
+		if n > 0 {
+			watched[id] = true
+		}
+	}
+	ids := make([]string, 0, len(watched))
+	for id := range watched {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	out := make([]Finding, 0, len(ids))
+	for _, id := range ids {
+		m := model{id: id, bound: isBound[id], served: served[id], used: used[id], unmetered: unmetered[id]}
+		m.quota, m.metered = t.Metered[id]
+		if f, ok := classify(m, warnPct); ok {
+			out = append(out, f)
+		}
 	}
 	return out
 }
 
-func classify(id string, served bool, used int64, metered map[string]Quota, unmetered bool, warnPct float64) Finding {
-	if !served {
-		return Finding{id, Fail, fmt.Sprintf("%s is bound in model-map.json but NaN does not serve it (absent from /v1/models)", id)}
+type model struct {
+	id                                string
+	bound, served, unmetered, metered bool
+	used                              int64
+	quota                             Quota
+}
+
+// classify reports one watched model. ok is false for an unbound model the key
+// cannot see: it spends nothing, and nothing routes to it.
+func classify(m model, warnPct float64) (f Finding, ok bool) {
+	id := m.id
+	if !m.served {
+		if m.bound {
+			return Finding{id, Fail, fmt.Sprintf("%s is bound in model-map.json but NaN does not serve it (absent from /v1/models)", id)}, true
+		}
+		// /v1/models filters premium models by the key's tier, so absence is not
+		// retirement; either way this key cannot spend it.
+		return Finding{}, false
 	}
-	if unmetered {
-		return Finding{id, Info, fmt.Sprintf("%s: unmetered, %s tokens this period", id, millions(used))}
+	if m.unmetered {
+		return Finding{id, Pass, fmt.Sprintf("%s: unmetered, %s tokens this period", id, millions(m.used))}, true
 	}
-	q, ok := metered[id]
-	if !ok {
-		return Finding{id, Warn, fmt.Sprintf("%s is neither metered nor unmetered in harness/nan-quotas.json — declare it, or its quota is never watched", id)}
+	if !m.metered {
+		return Finding{id, Warn, fmt.Sprintf("%s is neither metered nor unmetered in harness/nan-quotas.json — declare it, or its quota is never watched", id)}, true
 	}
-	pct := float64(used) * 100 / float64(q.Tokens)
-	msg := fmt.Sprintf("%s: %s / %s tokens this %s (%.0f%%)", id, millions(used), millions(q.Tokens), q.Period, pct)
+	pct := float64(m.used) * 100 / float64(m.quota.Tokens)
+	msg := fmt.Sprintf("%s: %s / %s tokens this %s (%.0f%%)", id, millions(m.used), millions(m.quota.Tokens), m.quota.Period, pct)
 	switch {
 	case pct >= 100:
-		return Finding{id, Fail, msg + " — spent: NaN answers 402 until the period resets"}
+		return Finding{id, Fail, msg + " — spent: NaN answers 402 until the period resets"}, true
 	case pct >= warnPct:
-		return Finding{id, Warn, msg + " — move routed traffic off it before it runs out"}
+		return Finding{id, Warn, msg + " — move routed traffic off it before it runs out"}, true
 	}
-	return Finding{id, Pass, msg}
+	return Finding{id, Info, msg}, true
 }
 
 func millions(n int64) string { return fmt.Sprintf("%.1fM", float64(n)/1e6) }

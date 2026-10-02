@@ -125,6 +125,35 @@ func TestCheckNaNQuota_ReportsEachBoundModel(t *testing.T) {
 	}
 }
 
+// AC7 at the doctor's default verbosity: nothing binds qwen3.8-flash, pi spends
+// it anyway, and its 83% still WARNs. Metered usage under the threshold is shown
+// without --verbose; an unmetered model is not.
+func TestCheckNaNQuota_WatchesMeteredModelsNothingBinds(t *testing.T) {
+	cfg := nanCfg(t, nanRegistryAge, "rerank", "2026-06-10")
+	mapPath := filepath.Join(cfg.DotfilesDir, "harness", "model-map.json")
+	var m map[string]any
+	readJSON(t, mapPath, &m)
+	m["tiers"].(map[string]any)["low"].(map[string]any)["nan"] = "deepseek-v4-flash"
+	writeJSON(t, mapPath, m)
+
+	var buf bytes.Buffer
+	rep := NewReport(&buf, false)
+	checkNaNQuota(nanSys(nanUsage415, nanServed, nil), cfg, rep)
+	out := buf.String()
+
+	for _, want := range []string{"qwen3.8-flash: 415.0M / 500.0M tokens this month (83%)", "deepseek-v4-flash: 300.0M / 3000.0M"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("default output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "rerank: unmetered") {
+		t.Errorf("an unmetered model should only show with --verbose:\n%s", out)
+	}
+	if rep.Failures() != 0 {
+		t.Errorf("failures = %d, want 0:\n%s", rep.Failures(), out)
+	}
+}
+
 // AC3: a bound id NaN does not serve fails doctor, by name.
 func TestCheckNaNQuota_FailsOnAnUnservedBinding(t *testing.T) {
 	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, nil), nanCfg(t, nanRegistryAge, "qwen3-rerank", "2026-06-10"))

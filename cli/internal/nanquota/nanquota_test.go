@@ -63,8 +63,8 @@ func byModel(fs []Finding) map[string]Finding {
 	return out
 }
 
-// AC1: 83% of a metered quota WARNs, 10% PASSes, an unmetered model is never
-// flagged however much it used.
+// AC1: 83% of a metered quota WARNs, 10% is reported (INFO, visible without
+// --verbose, AC2), an unmetered model is never flagged however much it used.
 func TestEvaluateClassifiesByShareOfQuota(t *testing.T) {
 	served := map[string]bool{"qwen3.8-flash": true, "deepseek-v4-flash": true, "qwen3.6": true}
 	got := byModel(Evaluate([]string{"qwen3.8-flash", "deepseek-v4-flash", "qwen3.6"}, served, mustUsage(t), mustTable(t), 80))
@@ -72,18 +72,18 @@ func TestEvaluateClassifiesByShareOfQuota(t *testing.T) {
 	if f := got["qwen3.8-flash"]; f.Level != Warn || !strings.Contains(f.Msg, "83%") {
 		t.Errorf("qwen3.8-flash at 415M/500M: got %v %q, want WARN naming 83%%", f.Level, f.Msg)
 	}
-	if f := got["deepseek-v4-flash"]; f.Level != Pass || !strings.Contains(f.Msg, "10%") {
-		t.Errorf("deepseek-v4-flash at 300M/3000M: got %v %q, want PASS naming 10%%", f.Level, f.Msg)
+	if f := got["deepseek-v4-flash"]; f.Level != Info || !strings.Contains(f.Msg, "10%") {
+		t.Errorf("deepseek-v4-flash at 300M/3000M: got %v %q, want INFO naming 10%%", f.Level, f.Msg)
 	}
-	if f := got["qwen3.6"]; f.Level != Info {
-		t.Errorf("qwen3.6 is unmetered: got %v %q, want INFO whatever it used", f.Level, f.Msg)
+	if f := got["qwen3.6"]; f.Level != Pass {
+		t.Errorf("qwen3.6 is unmetered: got %v %q, want PASS whatever it used", f.Level, f.Msg)
 	}
 }
 
 func TestEvaluateFailsAtTheQuota(t *testing.T) {
 	u := mustUsage(t)
 	u.Totals.ByModel = []ModelTotal{{Model: "qwen3.8-flash", TotalTokens: 500000000}}
-	f := Evaluate([]string{"qwen3.8-flash"}, map[string]bool{"qwen3.8-flash": true}, u, mustTable(t), 80)[0]
+	f := byModel(Evaluate([]string{"qwen3.8-flash"}, map[string]bool{"qwen3.8-flash": true}, u, mustTable(t), 80))["qwen3.8-flash"]
 	if f.Level != Fail {
 		t.Errorf("a spent quota answers 402: got %v %q, want FAIL", f.Level, f.Msg)
 	}
@@ -92,16 +92,16 @@ func TestEvaluateFailsAtTheQuota(t *testing.T) {
 // A metered model the member has not touched this period is absent from
 // by_model. It is at 0%, not unknown.
 func TestEvaluateTreatsAnAbsentModelAsUnused(t *testing.T) {
-	f := Evaluate([]string{"glm5.3-flash"}, map[string]bool{"glm5.3-flash": true}, mustUsage(t), mustTable(t), 80)[0]
-	if f.Level != Pass || !strings.Contains(f.Msg, "0%") {
-		t.Errorf("got %v %q, want PASS at 0%%", f.Level, f.Msg)
+	f := byModel(Evaluate([]string{"glm5.3-flash"}, map[string]bool{"glm5.3-flash": true}, mustUsage(t), mustTable(t), 80))["glm5.3-flash"]
+	if f.Level != Info || !strings.Contains(f.Msg, "0%") {
+		t.Errorf("got %v %q, want INFO at 0%%", f.Level, f.Msg)
 	}
 }
 
 // The table is closed-world: a bound model NaN meters that nobody declared must
 // not read as unmetered, or the first model NaN adds is never alarmed.
 func TestEvaluateWarnsOnAnUndeclaredModel(t *testing.T) {
-	f := Evaluate([]string{"mimo-v2.5"}, map[string]bool{"mimo-v2.5": true}, mustUsage(t), mustTable(t), 80)[0]
+	f := byModel(Evaluate([]string{"mimo-v2.5"}, map[string]bool{"mimo-v2.5": true}, mustUsage(t), mustTable(t), 80))["mimo-v2.5"]
 	if f.Level != Warn || !strings.Contains(f.Msg, "neither metered nor unmetered") {
 		t.Errorf("got %v %q, want WARN naming the undeclared model", f.Level, f.Msg)
 	}
@@ -110,9 +110,56 @@ func TestEvaluateWarnsOnAnUndeclaredModel(t *testing.T) {
 // AC3: a bound id NaN does not serve is the class that bound qwen3-rerank for
 // weeks while NaN answered 401.
 func TestEvaluateFailsOnAnIDNaNDoesNotServe(t *testing.T) {
-	f := Evaluate([]string{"qwen3-rerank"}, map[string]bool{"rerank": true}, mustUsage(t), mustTable(t), 80)[0]
+	f := byModel(Evaluate([]string{"qwen3-rerank"}, map[string]bool{"rerank": true}, mustUsage(t), mustTable(t), 80))["qwen3-rerank"]
 	if f.Level != Fail || !strings.Contains(f.Msg, "qwen3-rerank") {
 		t.Errorf("got %v %q, want FAIL naming qwen3-rerank", f.Level, f.Msg)
+	}
+}
+
+// AC7: the quota is the account's, not a binding's. qwen3.8-flash reached 83%
+// unnoticed on 2026-09-26 while pi, not model-map.json, was spending it; a
+// watch over bindings alone still missed it after AI-047 shipped.
+func TestEvaluateWatchesEveryMeteredModelNotOnlyBindings(t *testing.T) {
+	served := map[string]bool{"qwen3.8-flash": true, "deepseek-v4-flash": true, "glm5.3-flash": true, "qwen3.6": true}
+	got := byModel(Evaluate([]string{"qwen3.6"}, served, mustUsage(t), mustTable(t), 80))
+
+	if f, ok := got["qwen3.8-flash"]; !ok || f.Level != Warn || !strings.Contains(f.Msg, "83%") {
+		t.Errorf("unbound qwen3.8-flash at 83%%: got %+v, want WARN", f)
+	}
+	if f, ok := got["glm5.3-flash"]; !ok || f.Level != Info {
+		t.Errorf("unbound, unused metered glm5.3-flash: got %+v, want INFO at 0%%", f)
+	}
+}
+
+// A model with usage this period that the table does not declare is spending
+// the account whoever routes to it.
+func TestEvaluateWatchesAnUndeclaredModelWithUsage(t *testing.T) {
+	u := mustUsage(t)
+	u.Totals.ByModel = append(u.Totals.ByModel, ModelTotal{Model: "brand-new", TotalTokens: 10000000})
+	served := map[string]bool{"brand-new": true, "qwen3.8-flash": true, "deepseek-v4-flash": true, "glm5.3-flash": true}
+	f, ok := byModel(Evaluate(nil, served, u, mustTable(t), 80))["brand-new"]
+	if !ok || f.Level != Warn || !strings.Contains(f.Msg, "neither metered nor unmetered") {
+		t.Errorf("got %+v, want WARN naming the undeclared model", f)
+	}
+}
+
+// /v1/models hides premium models from a key without the tier (glm5.3, AI-045):
+// a metered model nothing binds and the key cannot see spends nothing.
+func TestEvaluateIgnoresAMeteredModelTheKeyCannotSee(t *testing.T) {
+	served := map[string]bool{"qwen3.8-flash": true, "deepseek-v4-flash": true}
+	if f, ok := byModel(Evaluate(nil, served, mustUsage(t), mustTable(t), 80))["glm5.3-flash"]; ok {
+		t.Errorf("got %+v, want no finding", f)
+	}
+}
+
+// A retired model with leftover usage, which nothing binds, the table does not
+// declare and NaN no longer serves, can spend nothing more: no finding.
+func TestEvaluateIgnoresARetiredModelNothingCanReach(t *testing.T) {
+	u := mustUsage(t)
+	u.Totals.ByModel = append(u.Totals.ByModel, ModelTotal{Model: "mimo-v2.5", TotalTokens: 5})
+	served := map[string]bool{"qwen3.8-flash": true, "deepseek-v4-flash": true, "glm5.3-flash": true}
+	if f, ok := byModel(Evaluate(nil, served, u, mustTable(t), 80))["mimo-v2.5"]; ok {
+		t.Errorf("got %+v, want no finding", f)
 	}
 }
 
