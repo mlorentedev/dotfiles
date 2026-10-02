@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.63.0](https://github.com/mlorentedev/dotfiles/compare/v0.62.0...v0.63.0) (2026-10-02)
+
+
+### Features
+
+* **secrets:** let backup acquire its own bw CLI session ([#1958](https://github.com/mlorentedev/dotfiles/issues/1958)) ([378f3f0](https://github.com/mlorentedev/dotfiles/commit/378f3f034b796b7ddcde16c394ea7a5048a789c4))
+
+
+### Bug Fixes
+
+* **deploy:** re-tune Orca's Copilot hooks on every bare deploy ([#1960](https://github.com/mlorentedev/dotfiles/issues/1960)) ([5c0215c](https://github.com/mlorentedev/dotfiles/commit/5c0215ce4c46e2415225f6835813291b7ecb7a53))
+* **doctor:** watch every metered NaN model, not only the bound ones ([#1956](https://github.com/mlorentedev/dotfiles/issues/1956)) ([01133f7](https://github.com/mlorentedev/dotfiles/commit/01133f74c25e2f065fe08f8a4c860dd6ed476a79))
+* **harness:** fail on an unclosed full-only region and keep doctrine file modes; archive HARNESS-084 ([#1964](https://github.com/mlorentedev/dotfiles/issues/1964)) ([b366af4](https://github.com/mlorentedev/dotfiles/commit/b366af47dbb7b46dbac73be975d44e46b87e788f))
+* **harness:** run the roster drift guard from bats; archive HARNESS-046 ([#1965](https://github.com/mlorentedev/dotfiles/issues/1965)) ([b73267a](https://github.com/mlorentedev/dotfiles/commit/b73267a0fb530aaf299ebdc008bb4fd82d464d34))
+* **pi:** declare openrouter deepseek-chat at the provider's limits ([#1952](https://github.com/mlorentedev/dotfiles/issues/1952)) ([883d3ed](https://github.com/mlorentedev/dotfiles/commit/883d3eda6e4dea112949a4e76263ee162b6e8ba0))
+* prevent bw serve window popup and fix deepseek limits ([#1969](https://github.com/mlorentedev/dotfiles/issues/1969)) ([6630be9](https://github.com/mlorentedev/dotfiles/commit/6630be91c073972f9336c60e87216ca612520a02))
+* resolve pi extension loading conflicts (typebox/mcp) ([#1967](https://github.com/mlorentedev/dotfiles/issues/1967)) ([c8ebfec](https://github.com/mlorentedev/dotfiles/commit/c8ebfec16b5359f76e9c490a0c47f0f2649dcd23))
+* **secrets:** wait out bw serve's empty listing during a forced sync ([#1950](https://github.com/mlorentedev/dotfiles/issues/1950)) ([fcc78ee](https://github.com/mlorentedev/dotfiles/commit/fcc78eea2b64b9b0c5b73f0b8550c59e8c2dad6d))
+
 ## [0.62.0](https://github.com/mlorentedev/dotfiles/compare/v0.61.0...v0.62.0) (2026-10-02)
 
 
