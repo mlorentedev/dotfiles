@@ -1,7 +1,4 @@
 ---
-generated: true
-generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: e236eb8557cd780e
 id: spec-skill
 type: skill
 status: active
@@ -26,7 +23,7 @@ requires: [adversarial-review]
 # Spec Workflow
 
 > Implements `pattern-spec-driven-development`. Six subcommands: `init`, `fast`, `bootstrap` (optional), `fill`, `check`, `archive`.
-> **Core principle:** every spec is downstream of an OPEN GitHub issue on the bitácora Project — the work-gate per ADR-018. The vault keeps templates and patterns; task state lives in GitHub. (Exception: The `fast` subcommand permits omitting the issue blocker for fast-track items.)
+> **Core principle:** every spec is downstream of an OPEN GitHub issue on the bitácora Project — the work-gate per ADR-018. The vault keeps templates and patterns; task state lives in GitHub. (Exception: The `fast` subcommand permits omitting the issue blocker only for fast-track items under 50 LOC.)
 
 ## When to use
 
@@ -137,7 +134,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 
 ## Subcommand: fast
 
-**Purpose:** Scaffold `$REPO_ROOT/specs/<feature-id>/spec.md` from the Fast-Track Development template. Unlike `init`, this lane does NOT strictly require a pre-existing GitHub issue, though one can be supplied. This is meant for features in the 30-150 LOC range.
+**Purpose:** Scaffold `$REPO_ROOT/specs/<feature-id>/spec.md` from the Fast-Track Development template. This is meant for features in the 30-150 LOC range. Unlike `init`, this lane permits omitting the pre-existing GitHub issue ONLY if the change is under 50 LOC. For 50 LOC or more, the work gate applies and the issue must be supplied.
 
 **Signature:** `/spec fast <feature-id> [--issue <number>]`
 
