@@ -63,7 +63,7 @@ func (s BWCLISync) Sync() error {
 	if bin == "" {
 		bin = "bw"
 	}
-	if _, err := bwRun(bin, "sync"); err != nil {
+	if _, err := bwRun(bin, nil, "sync"); err != nil {
 		return fmt.Errorf("bw sync: %w", err)
 	}
 	return nil

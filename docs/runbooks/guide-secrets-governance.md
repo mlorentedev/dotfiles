@@ -218,7 +218,7 @@ For a credential that is no longer used: a retired project, a closed account, or
 
 Scheduled (e.g. weekly) + before any big change:
 
-1. **`dotf secrets backup`** — runs `bw sync` + `bw export --format json --raw`, pipes the plaintext **in memory** into `age` (encrypted to your own recipient, `age-keygen -y` of your identity), and writes `sensitive/dr/bitwarden-export.age` atomically (0600). The plaintext **never** touches disk; the artifact is decrypted back and **verified to round-trip** before the command succeeds (a corrupt escrow is removed, never left behind). Then **commit** it — it overwrites the previous export (git history is the version trail; no snapshot pile-up).
+1. **`dotf secrets backup`** — runs `bw sync` + `bw export --format json --raw`, pipes the plaintext **in memory** into `age` (encrypted to your own recipient, `age-keygen -y` of your identity), and writes `sensitive/dr/bitwarden-export.age` atomically (0600). The plaintext **never** touches disk; the artifact is decrypted back and **verified to round-trip** before the command succeeds (a corrupt escrow is removed, never left behind). Then **commit** it — it overwrites the previous export (git history is the version trail; no snapshot pile-up). `bw serve` has no export route, so the export needs the bw CLI's own session: on a terminal, `backup` prompts once for the master password and hands the session to its own `bw` children only (#1008). Without a terminal nothing prompts. An unattended run has no password source (ADR-033), and the master password is not stored in the environment (ADR-028).
    - _Manual equivalent (no `dotf` on PATH):_ `bw sync && bw export --format json --raw | age -r "$(age-keygen -y ~/.config/age/key.txt)" -o sensitive/dr/bitwarden-export.age`.
 2. **Refresh the offline copy** (see OFFLINE COPY below). The age key must have an authoritative copy offline (#518). If it lived only in Bitwarden, restoring Bitwarden would need the key it is supposed to restore.
 3. The escrow covers the **entire** vault (API keys, tokens, logins, TOTP seeds) → losing Bitwarden is fully recoverable with the offline age key + a repo clone.
@@ -241,14 +241,15 @@ It never holds anything else:
 **Do not run `scripts/backup-secrets-to-usb.sh`.** It copies the plaintext `sensitive/*.secret` files and the retired blobs, and it verifies nothing. #1770 replaces it with a `dotf` command that copies a declared payload and verifies it by consequence. Until that ships, refresh the copy after every escrow:
 
 ```bash
-veracrypt /dev/sdX /media/veracrypt1       # lsblk names the device; it is not stable
-install -m 600 -D sensitive/dr/bitwarden-export.age /media/veracrypt1/secrets/dr/bitwarden-export.age
-install -m 600 sensitive/dr/escrow-manifest.json /media/veracrypt1/secrets/dr/escrow-manifest.json
+sudo mkdir -p /media/secrets               # veracrypt does not create the mount point
+veracrypt /dev/sdX /media/secrets          # lsblk names the device; it is not stable
+install -m 600 -D sensitive/dr/bitwarden-export.age /media/secrets/secrets/dr/bitwarden-export.age
+install -m 600 sensitive/dr/escrow-manifest.json /media/secrets/secrets/dr/escrow-manifest.json
 # Verify by consequence. Only a recipient comparison and two counts are printed.
-[ "$(age-keygen -y /media/veracrypt1/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
-age -d -i /media/veracrypt1/key.txt /media/veracrypt1/secrets/dr/bitwarden-export.age | jq '.items | length'
-jq .count /media/veracrypt1/secrets/dr/escrow-manifest.json      # must equal the line above
-veracrypt -d /media/veracrypt1
+[ "$(age-keygen -y /media/secrets/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
+age -d -i /media/secrets/key.txt /media/secrets/secrets/dr/bitwarden-export.age | jq '.items | length'
+jq .count /media/secrets/secrets/dr/escrow-manifest.json      # must equal the line above
+veracrypt -d /media/secrets
 ```
 
 **To create a new stick** (one time):
@@ -264,6 +265,7 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 
    ```bash
    sudo apt install age veracrypt            # a fresh machine has neither
+   sudo mkdir -p /media/secrets              # veracrypt does not create the mount point
    veracrypt /dev/sdX /media/secrets         # prompts for the volume password
    install -m 600 -D /media/secrets/key.txt ~/.config/age/key.txt
    veracrypt -d /media/secrets               # unmount when done
@@ -296,10 +298,25 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 ### Drill it
 
 Run this chain against the real offline backup periodically — not as an incident,
-as a rehearsal — then record it:
+as a rehearsal — then record it. This form proves the offline key opens the
+repo's escrow, which is what RECOVER steps 1-3 rely on, without restoring anything or
+writing plaintext to disk. The stick's own copy of the escrow is checked by the
+OFFLINE COPY refresh, not here. The marker is touched only when every check passes,
+so a failed drill cannot record itself as a pass:
 
 ```sh
-touch ~/.dotfiles/.dr-drill
+sudo mkdir -p /media/secrets
+veracrypt /dev/sdX /media/secrets
+usb=$(age-keygen -y /media/secrets/key.txt); here=$(age-keygen -y ~/.config/age/key.txt)
+same=$([ -n "$usb" ] && [ "$usb" = "$here" ] && echo yes)   # two failed reads must not compare equal
+n=$(age -d -i /media/secrets/key.txt sensitive/dr/bitwarden-export.age | jq '.items | length')
+m=$(jq .count sensitive/dr/escrow-manifest.json)
+veracrypt -d /media/secrets
+if [ "$same" = yes ] && [ -n "$n" ] && [ "$n" = "$m" ]; then
+  touch ~/.dotfiles/.dr-drill && echo "drill passed: $n items"
+else
+  echo "drill FAILED: recipient same=${same:-no}, decrypted=${n:-none}, manifest=$m"
+fi
 ```
 
 `dotf doctor` reads that marker and warns when no drill is recorded, or when the

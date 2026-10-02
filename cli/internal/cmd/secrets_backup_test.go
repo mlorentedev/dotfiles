@@ -28,7 +28,12 @@ func (f fakeExp) Export() ([]byte, error) { return f.data, f.err }
 func stubBackupSeams(t *testing.T, exp secrets.BWExporter) {
 	t.Helper()
 	oe, oen, orc, od := bwExporter, ageEncryptor, ageRecipient, ageDecryptor
+	ose, ou, ot, orp := bwSessionExporter, bwUnlock, stdinIsTerminal, readPassword
 	bwExporter = exp
+	bwSessionExporter = func(string) secrets.BWExporter { return exp }
+	bwUnlock = func([]byte) (string, error) { return "", fmt.Errorf("bwUnlock not stubbed") }
+	stdinIsTerminal = func() bool { return false }
+	readPassword = func() ([]byte, error) { return nil, fmt.Errorf("readPassword not stubbed") }
 	ageEncryptor = func(pt []byte, _ string) ([]byte, error) {
 		enc := make([]byte, base64.StdEncoding.EncodedLen(len(pt)))
 		base64.StdEncoding.Encode(enc, pt)
@@ -47,7 +52,10 @@ func stubBackupSeams(t *testing.T, exp secrets.BWExporter) {
 		}
 		return dec[:n], nil
 	}
-	t.Cleanup(func() { bwExporter, ageEncryptor, ageRecipient, ageDecryptor = oe, oen, orc, od })
+	t.Cleanup(func() {
+		bwExporter, ageEncryptor, ageRecipient, ageDecryptor = oe, oen, orc, od
+		bwSessionExporter, bwUnlock, stdinIsTerminal, readPassword = ose, ou, ot, orp
+	})
 }
 
 func useRepoSensitiveDir(t *testing.T, dir string, err error) {
@@ -172,5 +180,85 @@ func TestRerunLine_RendersFlagsThatParseBack(t *testing.T) {
 	want := `x --apply='true' --tag='a' --tag='b c'`
 	if got := rerunLine(c); got != want {
 		t.Fatalf("want %s\ngot  %s", want, got)
+	}
+}
+
+// #1008 option 3: on a terminal, a locked bw CLI is unlocked by the command
+// itself. One hidden prompt, the session handed to the exporter alone, and the
+// password buffer scrubbed afterwards.
+func TestSecretsBackup_LockedOnATerminal_AcquiresItsOwnSession(t *testing.T) {
+	dir := t.TempDir()
+	stubBackupSeams(t, fakeExp{err: fmt.Errorf("bw export: %w", secrets.ErrBWVaultLocked)})
+	useRepoSensitiveDir(t, dir, nil)
+
+	pw := []byte("hunter2")
+	var unlocks int
+	var gotPW, gotSession string
+	stdinIsTerminal = func() bool { return true }
+	readPassword = func() ([]byte, error) { return pw, nil }
+	bwUnlock = func(p []byte) (string, error) { unlocks++; gotPW = string(p); return "sess-123", nil }
+	bwSessionExporter = func(s string) secrets.BWExporter {
+		gotSession = s
+		return fakeExp{data: []byte(`{"items":[{"id":"11111111-2222-3333-4444-555555555555","revisionDate":"2026-08-15T03:07:00.000Z","name":"a"}]}`)}
+	}
+
+	var out, errOut bytes.Buffer
+	cmd := newSecretsBackupCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("backup: %v", err)
+	}
+	if unlocks != 1 || gotPW != "hunter2" || gotSession != "sess-123" {
+		t.Errorf("unlocks=%d pw=%q session=%q, want one unlock with the typed password and its session", unlocks, gotPW, gotSession)
+	}
+	if !strings.Contains(errOut.String(), "master password") {
+		t.Errorf("no prompt on stderr: %q", errOut.String())
+	}
+	if strings.Contains(out.String()+errOut.String(), "sess-123") || strings.Contains(out.String()+errOut.String(), "hunter2") {
+		t.Errorf("a credential reached the output:\n%s%s", out.String(), errOut.String())
+	}
+	if string(pw) != string(make([]byte, len(pw))) {
+		t.Errorf("password buffer not scrubbed: %q", pw)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "dr", secrets.EscrowFileName)); err != nil {
+		t.Errorf("escrow not written: %v", err)
+	}
+}
+
+// Without a terminal (a scheduler) nothing prompts: the remedy line stays.
+func TestSecretsBackup_LockedWithoutATerminal_NeverPrompts(t *testing.T) {
+	stubBackupSeams(t, fakeExp{err: fmt.Errorf("bw export: %w", secrets.ErrBWVaultLocked)})
+	useRepoSensitiveDir(t, t.TempDir(), nil)
+	readPassword = func() ([]byte, error) { t.Fatal("prompted without a terminal"); return nil, nil }
+
+	cmd := newSecretsBackupCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), `BW_SESSION="$(bw unlock --raw)"`) {
+		t.Errorf("want the remedy line, got %v", err)
+	}
+}
+
+// A wrong password is bw's answer, surfaced; no escrow, no retry loop.
+func TestSecretsBackup_UnlockFailureSurfaces(t *testing.T) {
+	dir := t.TempDir()
+	stubBackupSeams(t, fakeExp{err: fmt.Errorf("bw export: %w", secrets.ErrBWVaultLocked)})
+	useRepoSensitiveDir(t, dir, nil)
+	stdinIsTerminal = func() bool { return true }
+	readPassword = func() ([]byte, error) { return []byte("wrong"), nil }
+	var unlocks int
+	bwUnlock = func([]byte) (string, error) { unlocks++; return "", fmt.Errorf("Invalid master password.") }
+
+	cmd := newSecretsBackupCmd()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "Invalid master password.") || unlocks != 1 {
+		t.Errorf("err=%v unlocks=%d, want bw's message after one attempt", err, unlocks)
+	}
+	if _, serr := os.Stat(filepath.Join(dir, "dr", secrets.EscrowFileName)); !os.IsNotExist(serr) {
+		t.Errorf("an escrow was written after a failed unlock")
 	}
 }
