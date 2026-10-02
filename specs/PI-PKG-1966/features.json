@@ -1,0 +1,9 @@
+[
+  {
+    "id": "PI-PKG-1966-f1",
+    "behavior": "Resolve pi extension loading conflicts",
+    "verification": "pi -v",
+    "state": "verified",
+    "evidence": "1.0.0 (no warnings)"
+  }
+]
