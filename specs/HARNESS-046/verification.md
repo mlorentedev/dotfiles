@@ -45,6 +45,11 @@ Two earlier launches produced no verdict. `nan/deepseek-v4-flash` was refused wi
 
 All five `features.json` verifications exit 0 after the fixes (f4 now also runs the fixture suite).
 
+## Review dispositions (round 2, agy/gemini-3.1-pro-high, PASS WITH GAPS)
+
+- **Minor, THEORETICAL, `IndexError` on an `AGENT.md` without frontmatter: declined.** The guard exits non-zero with a traceback that names the line. That is a loud failure, which is what this guard owes; it never reports a clean pass. A friendlier message would change only the wording.
+- **Minor, THEORETICAL, malformed roster rows are skipped silently: declined.** A role whose row fails to parse is still reported, from the other side: its invocable definition then has no row, and the guard says `invocable definition has no ROSTER.md row`. The drift is caught, just named from the definition.
+
 ## Since this landed
 
 - `hermes-nan` was retired on 2026-09-30 (its next home is decided under kubelab#1933). The catalog entry now carries `status: retired` and still points at `80_agents/hermes-nan/` without duplicating its state, so AC5 holds for the retired record.
