@@ -61,11 +61,11 @@
       "why": "/rewind checkpoint navigation -- undo a turn without discarding the session."
     },
     {
-      "source": "npm:@narumitw/pi-plan-mode@0.58.4",
+      "source": "npm:@narumitw/pi-plan-mode@0.53.0",
       "why": "Read-only /plan collaboration mode. The Socratic Guardrail in AGENTS.md asks for a plan before code on high-load work; this is the surface for it."
     },
     {
-      "source": "npm:@narumitw/pi-goal@0.54.8",
+      "source": "npm:@narumitw/pi-goal@0.53.1",
       "why": "Autonomous single-objective /goal completion loop."
     },
     {
@@ -81,7 +81,7 @@
       "why": "Adds external directories to a session and loads their AGENTS.md -- the cross-repo case this multi-repo setup hits constantly."
     },
     {
-      "source": "npm:@gtrabanco/pi-nan-provider@1.0.0",
+      "source": "npm:@gtrabanco/pi-nan-provider@0.7.0",
       "why": "Registers pi's NaN provider from a models.dev snapshot merged with NaN's live /models, drops cross-model reasoning replays that overflow qwen3.6's 262K window, and retries truncated streams (AI-046, #1764). Its media MCP bridge spawns an unpinned-by-us npx server, so ai/pi/nan-provider.json turns it off."
     }
   ],
