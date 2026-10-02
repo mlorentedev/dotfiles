@@ -37,7 +37,7 @@
   {
     "id": "AI-047-nan-quota-alarm-f6",
     "behavior": "hermes's digest no longer states a single 500M pool",
-    "verification": "echo 'PR-2: vault change' && exit 1",
+    "verification": "! grep -Eq 'BUDGET_QUOTA|500000000' \"$(dotf env path VAULT_PATH)/00_meta/agents/scripts/budget-report.sh\"",
     "state": "pending",
     "evidence": ""
   },

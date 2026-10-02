@@ -1,7 +1,7 @@
 ---
 id: "AI-047-nan-quota-alarm"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-09-26"
 issue: "mlorentedev/dotfiles#1766"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, nan, quota, doctor]
@@ -36,7 +36,7 @@ A check that answers "which bound NaN model is near its quota" from NaN's own nu
   - **(A) `dotf` subcommand plus a `dotf doctor` check. Recommended.** It is agent-agnostic and runs on every machine and in CI, the declared table lives in the repo next to `model-map.json`, and it is testable in Go against a recorded `/v1/usage` fixture. hermes's cron then calls it, or its digest drops the quota section.
   - (B) Rework hermes's `budget-report.sh` to read `/v1/usage`. It reuses the existing Telegram delivery, but it only runs on hermes, keeps the logic in shell in the vault, and does not reach `dotf doctor`.
   - (A) and (B) are not exclusive: A is the source, and B can become a thin caller of it.
-- **Whose usage the endpoint reports.** Per API key, or per member? If hermes and the workstation use different keys, one reading covers one key. Measure this by comparing the endpoint's totals with a known burst, before relying on it. Still unmeasured after PR-1; `verification.md` records it as open.
+- **Whose usage the endpoint reports.** Per API key, or per member? If hermes and the workstation use different keys, one reading covers one key. Measure this by comparing the endpoint's totals with a known burst, before relying on it. Still unmeasured after PR-1; `verification.md` records it as open. **Resolved 2026-10-01 by inspection:** the question is moot as deployed. `secrets/registry.yaml` holds one NaN key (`NAN_API_KEY`, also exposed as `HIVE_WORKER_API_KEY`), kubelab's pr-agent copy holds the same value, and hermes is retired, so per key and per member are the same reading. If a second key is ever issued, measure it then.
 - **Quota period boundaries.** The docs say "month"; `glm5.3` says "period", and premium adds a rolling 4-hour window. The table records the period per model. The first cut handles calendar months only and says so for `glm5.3`. Measured 2026-09-26: `/v1/usage` takes `start_date` and `end_date` as UTC dates and defaults to a rolling 30-day window, which does not say which period NaN meters against. The check asks for the UTC calendar month and names that as an assumption.
 - **Declared limits go stale.** The table carries a `checked` date, and doctor WARNs when it is older than 90 days. It fails soft (SKIP, not FAIL) when NaN is unreachable, so an outage does not read as a quota breach.
 - **Rate limit.** One call per doctor run is well under 60 RPM.
@@ -48,7 +48,7 @@ A check that answers "which bound NaN model is near its quota" from NaN's own nu
 - [x] AC3: A model id in `model-map.json` missing from `/v1/models` is a FAIL naming the id. A test mutates `rerank` back to `qwen3-rerank` and sees it fail.
 - [x] AC4: With NaN unreachable, the check SKIPs with a reason and doctor's exit code is unchanged.
 - [x] AC5: No key or header value appears in output or in the error path (a test asserts this on the error branch).
-- [ ] AC6: hermes's digest no longer states a single 500M pool. It calls the new check, or its quota section is removed (vault change, same arc). Resolved 2026-09-26: the hermes-nan MicroVM carries no `dotf`, registry or age key (`80_agents/hermes-nan/context.md`), so the quota section is removed rather than wired to a check it cannot run.
+- [x] AC6: hermes's digest no longer states a single 500M pool. It calls the new check, or its quota section is removed (vault change, same arc). Resolved 2026-09-26: the hermes-nan MicroVM carries no `dotf`, registry or age key (`80_agents/hermes-nan/context.md`), so the quota section is removed rather than wired to a check it cannot run.
 
 - [x] AC7: The quota is the account's, not a binding's. The check watches every model the table meters and every model with usage this period, as well as the bound ones. A test with nothing binding `qwen3.8-flash` at 83% still gets its WARN. Added 2026-10-01: on 2026-09-26 `qwen3.8-flash` reached 83% while pi, not `model-map.json`, was spending it, and the bound-only check could not have seen it. An unbound model the key cannot see (`/v1/models` hides premium models by tier) is not reported unless the table meters it and it has usage this period.
 
