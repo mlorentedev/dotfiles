@@ -1,0 +1,9 @@
+[
+  {
+    "id": "PI-PKG-1966-f1",
+    "behavior": "Outcome 1",
+    "verification": "echo 'not implemented' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

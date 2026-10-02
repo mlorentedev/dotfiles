@@ -53,7 +53,7 @@
       "why": "Controls thinking effort per model. settings.json already sets defaultThinkingLevel; this makes it steerable in session."
     },
     {
-      "source": "npm:pi-web-access@0.24.2",
+      "source": "npm:pi-web-access@0.35.0",
       "why": "Web search, URL fetch, repo clone, PDF extraction. The capability opencode reaches through MCP; pi has no equivalent built in."
     },
     {
@@ -61,15 +61,15 @@
       "why": "/rewind checkpoint navigation -- undo a turn without discarding the session."
     },
     {
-      "source": "npm:@narumitw/pi-plan-mode@0.53.0",
+      "source": "npm:@narumitw/pi-plan-mode@0.58.4",
       "why": "Read-only /plan collaboration mode. The Socratic Guardrail in AGENTS.md asks for a plan before code on high-load work; this is the surface for it."
     },
     {
-      "source": "npm:@narumitw/pi-goal@0.53.1",
+      "source": "npm:@narumitw/pi-goal@0.54.8",
       "why": "Autonomous single-objective /goal completion loop."
     },
     {
-      "source": "npm:pi-subagents@0.56.0",
+      "source": "npm:pi-subagents@0.74.0",
       "why": "Single-agent delegation and scripted multi-agent runs. Adjacent to CLI-042's executor seam -- worth comparing before either hardens."
     },
     {
@@ -81,11 +81,7 @@
       "why": "Adds external directories to a session and loads their AGENTS.md -- the cross-repo case this multi-repo setup hits constantly."
     },
     {
-      "source": "npm:pi-mcp-client@0.8.0",
-      "why": "Model Context Protocol client for Pi; exposes Hive, context7, and sequential-thinking tools."
-    },
-    {
-      "source": "npm:@gtrabanco/pi-nan-provider@0.7.0",
+      "source": "npm:@gtrabanco/pi-nan-provider@1.0.0",
       "why": "Registers pi's NaN provider from a models.dev snapshot merged with NaN's live /models, drops cross-model reasoning replays that overflow qwen3.6's 262K window, and retries truncated streams (AI-046, #1764). Its media MCP bridge spawns an unpinned-by-us npx server, so ai/pi/nan-provider.json turns it off."
     }
   ],
@@ -93,6 +89,10 @@
     {
       "path": "memory",
       "why": "pi-memory's data. The package was purged (HARNESS-139, decision D-2 on #1625): its retrieval dependency qmd was never provisioned, and a third memory store sits outside the single sink (GUARD-001)."
+    },
+    {
+      "path": "pi-mcp-client",
+      "why": "Replaced by builtin:mcp extension in Pi natively."
     }
   ]
 }
