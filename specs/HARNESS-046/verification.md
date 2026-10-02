@@ -35,6 +35,12 @@ Every criterion was exercised on `msi`, 2026-08-25. Machine-checkable form and p
 
 `dotf agent run --role X` does not read these definitions. Nothing under `cli/internal/agent` references `harness/agents/`; `role` is passed through as a string, which is why a dispatch with `--role reviewer` succeeded before any reviewer persona existed. These records deploy as harness subagents and give the doctor tier check something real to validate. **"The personas render and deploy" and "the executor consumes them" are different claims, and only the first is made here.**
 
+## Since this landed
+
+- `hermes-nan` was retired on 2026-09-30 (its next home is decided under kubelab#1933). The catalog entry now carries `status: retired` and still points at `80_agents/hermes-nan/` without duplicating its state, so AC5 holds for the retired record.
+
 ## Promotion candidates
 
-- The consistency guard's shape — *check the source of record, never the generated copy* — generalizes past this spec and is a candidate for the shared library if a second generator needs the same protection.
+- [x] Lesson for the repo's `docs/lessons/`? no: the guard's shape, *check the source of record, never the generated copy*, is recorded above and has one generator so far.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: role definitions inside the existing harness compile contract.
+- [x] New pattern candidate for `00_meta/patterns/`? no: a candidate only once a second generator needs the same protection.

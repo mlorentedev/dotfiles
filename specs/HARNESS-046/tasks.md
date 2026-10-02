@@ -33,5 +33,5 @@ created: "2026-08-25"
 
 ## Out of scope, tracked elsewhere
 
-- [ ] Wire `dotf agent run --role X` to read the persona definitions — nothing under `cli/internal/agent` references `harness/agents/` today
-- [ ] Give `tiers.top` a second entry so `architect` and `curator` have a fallback
+- Wire `dotf agent run --role X` to read the persona definitions: #1548, which asks whether that boundary holds.
+- Give `tiers.top` a second entry so `architect` and `curator` have a fallback: overtaken. `harness/model-map.json` now binds `top` per harness (claude, copilot, gemini), so a role on one harness no longer depends on another's single entry.
