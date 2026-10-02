@@ -304,6 +304,9 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
             $env:NAN_API_KEY = $keys[0]
             $env:OPENROUTER_API_KEY = $keys[1]
             $env:OPENAI_API_KEY = $keys[2]
+        } else {
+            Write-Error "Failed to resolve API keys (is the vault unlocked?). Run 'dotf secrets unlock' first."
+            return
         }
         try {
             & (Get-Command opencode -CommandType Application | Select-Object -First 1) @args
@@ -319,6 +322,9 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
             $keys = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env_b64)) -split '::::'
             $env:NAN_API_KEY = $keys[0]
             $env:OPENROUTER_API_KEY = $keys[1]
+        } else {
+            Write-Error "Failed to resolve API keys (is the vault unlocked?). Run 'dotf secrets unlock' first."
+            return
         }
         try {
             & (Get-Command pi -CommandType Application | Select-Object -First 1) @args
