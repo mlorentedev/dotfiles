@@ -22,16 +22,16 @@ created: "2026-08-25"
 - [x] [AC1] Render with `scripts/compile-harness.sh --refresh`; never hand-write a record (they carry `generated_sha`)
 - [x] [AC2] Confirm a second refresh pass is byte-identical
 - [x] [AC3] Confirm `dotf doctor`'s agent-tier check reads the new records and every tier resolves
-- [x] [AC4] Write `check-roster-consistency.py` so the next drift is caught by a check rather than by hand
+- [x] [AC4] Write `check-roster-consistency.py` so the next drift is caught by a check rather than by hand (now `scripts/check-roster-consistency.py`, run by `tests/roster-consistency.bats`)
 - [x] [AC4] Confirm that guard can fail — plant a divergence, observe exit 1, restore
 
 ## Verification
 
 - [x] All five acceptance criteria exercised and evidence recorded in `features.json`
 - [x] `dotf doctor` full sweep unaffected on main: 152 passed, 0 failed
-- [ ] Independent review before archive — must not be the implementing session
+- [x] Independent review before archive — must not be the implementing session (`review.md`, agy/gemini-3.1-pro-high; findings dispositioned in `verification.md`)
 
 ## Out of scope, tracked elsewhere
 
-- [ ] Wire `dotf agent run --role X` to read the persona definitions — nothing under `cli/internal/agent` references `harness/agents/` today
-- [ ] Give `tiers.top` a second entry so `architect` and `curator` have a fallback
+- Wire `dotf agent run --role X` to read the persona definitions: #1548, which asks whether that boundary holds.
+- Give `tiers.top` a second entry so `architect` and `curator` have a fallback: overtaken. `harness/model-map.json` now binds `top` per harness (claude, copilot, gemini), so a role on one harness no longer depends on another's single entry.

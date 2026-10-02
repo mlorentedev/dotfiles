@@ -35,6 +35,27 @@ Every criterion was exercised on `msi`, 2026-08-25. Machine-checkable form and p
 
 `dotf agent run --role X` does not read these definitions. Nothing under `cli/internal/agent` references `harness/agents/`; `role` is passed through as a string, which is why a dispatch with `--role reviewer` succeeded before any reviewer persona existed. These records deploy as harness subagents and give the doctor tier check something real to validate. **"The personas render and deploy" and "the executor consumes them" are different claims, and only the first is made here.**
 
+## Review dispositions (agy/gemini-3.1-pro-high, FAIL)
+
+Two earlier launches produced no verdict. `nan/deepseek-v4-flash` was refused with `403 This request is not permitted` (evidence on #1923), and `nan/glm5.3-flash` hit the 45-minute deadline.
+
+- **Blocker, REAL: the guard ran nowhere automatically. Applied.** It moved to `scripts/check-roster-consistency.py`; leaving it in the spec folder would have broken f4 the moment the spec archived. It is wired through two suites. `tests/roster-consistency.bats` runs everywhere, CI included, against a throwaway vault and a stubbed `dotf`: a reordering passes, a missing skill fails naming the role, a duplicated skill fails, and fewer than three skills fails. `tests/roster-consistency-real.bats` is the real-dependency sibling that `stub-real-pairing.bats` requires. It drives the real `dotf harness resolve-skills` over both `skills:` forms, and it runs the guard against the live vault wherever one resolves. Each case skips by name where its dependency is absent. So CI enforces the comparison logic, and the live comparison runs wherever the vault exists. The pre-commit hook runs the legacy `scripts/test.sh` smoke suite, not bats, so this does not run on every commit.
+- **Blocker, REAL: strict list equality failed on a reordering. Applied.** The guard now compares `sorted()` lists, a multiset: forced skills are consumed as a set, so order carries no meaning, and sorting still catches an id listed twice. It was red on HEAD for `curator` (same 8 ids, different order) and is green after. Mutation: restoring `!=` turns the reorder fixture and the live case red.
+- **Major, REAL: the `AGENTS.md` payload exceeds agy's limit and is truncated. Deferred to #1241.** That is the doctrine-budget arc. HARNESS-084 shipped the `full-only` mechanism for it (#1964), and #1241 stays open for the policy. It is not a change this spec made.
+
+All five `features.json` verifications exit 0 after the fixes (f4 now also runs the fixture suite).
+
+## Review dispositions (round 2, agy/gemini-3.1-pro-high, PASS WITH GAPS)
+
+- **Minor, THEORETICAL, `IndexError` on an `AGENT.md` without frontmatter: declined.** The guard exits non-zero with a traceback that names the line. That is a loud failure, which is what this guard owes; it never reports a clean pass. A friendlier message would change only the wording.
+- **Minor, THEORETICAL, malformed roster rows are skipped silently: declined.** A role whose row fails to parse is still reported, from the other side: its invocable definition then has no row, and the guard says `invocable definition has no ROSTER.md row`. The drift is caught, just named from the definition.
+
+## Since this landed
+
+- `hermes-nan` was retired on 2026-09-30 (its next home is decided under kubelab#1933). The catalog entry now carries `status: retired` and still points at `80_agents/hermes-nan/` without duplicating its state, so AC5 holds for the retired record.
+
 ## Promotion candidates
 
-- The consistency guard's shape — *check the source of record, never the generated copy* — generalizes past this spec and is a candidate for the shared library if a second generator needs the same protection.
+- [x] Lesson for the repo's `docs/lessons/`? no: the guard's shape, *check the source of record, never the generated copy*, is recorded above and has one generator so far.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: role definitions inside the existing harness compile contract.
+- [x] New pattern candidate for `00_meta/patterns/`? no: a candidate only once a second generator needs the same protection.

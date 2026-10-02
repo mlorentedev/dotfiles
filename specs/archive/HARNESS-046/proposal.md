@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-046"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-25"
 issue: "mlorentedev/dotfiles#562"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -32,11 +32,11 @@ template_version: "1.0"
 
 ## Acceptance criteria
 
-- [ ] All six invocable definitions plus the `hermes-nan` catalog entry render via `compile-harness.sh --refresh`
-- [ ] A second `--refresh` pass is byte-identical (`changed=0`) — a generator that changes something every run is not one
-- [ ] `dotf doctor`'s agent-tier check validates seven records and every declared tier resolves
-- [ ] `ROSTER.md` and the definitions agree on forced skills, and no role bundles fewer than three
-- [ ] `hermes-nan` points at `80_agents/hermes-nan/` and duplicates none of its state
+- [x] All six invocable definitions plus the `hermes-nan` catalog entry render via `compile-harness.sh --refresh`
+- [x] A second `--refresh` pass is byte-identical (`changed=0`) — a generator that changes something every run is not one
+- [x] `dotf doctor`'s agent-tier check validates seven records and every declared tier resolves
+- [x] `ROSTER.md` and the definitions agree on forced skills, and no role bundles fewer than three
+- [x] `hermes-nan` points at `80_agents/hermes-nan/` and duplicates none of its state
 
 ## References
 
