@@ -152,6 +152,16 @@ func TestEvaluateIgnoresAMeteredModelTheKeyCannotSee(t *testing.T) {
 	}
 }
 
+// A metered model with usage this period is reported even when the key's
+// /v1/models does not list it: the usage is the evidence something spends it.
+func TestEvaluateReportsUsageOnAMeteredModelTheKeyCannotSee(t *testing.T) {
+	served := map[string]bool{"deepseek-v4-flash": true}
+	f, ok := byModel(Evaluate(nil, served, mustUsage(t), mustTable(t), 80))["qwen3.8-flash"]
+	if !ok || f.Level != Warn || !strings.Contains(f.Msg, "83%") {
+		t.Errorf("unlisted qwen3.8-flash at 83%%: got %+v, want WARN", f)
+	}
+}
+
 // A retired model with leftover usage, which nothing binds, the table does not
 // declare and NaN no longer serves, can spend nothing more: no finding.
 func TestEvaluateIgnoresARetiredModelNothingCanReach(t *testing.T) {

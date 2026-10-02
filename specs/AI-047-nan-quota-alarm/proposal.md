@@ -50,7 +50,7 @@ A check that answers "which bound NaN model is near its quota" from NaN's own nu
 - [x] AC5: No key or header value appears in output or in the error path (a test asserts this on the error branch).
 - [ ] AC6: hermes's digest no longer states a single 500M pool. It calls the new check, or its quota section is removed (vault change, same arc). Resolved 2026-09-26: the hermes-nan MicroVM carries no `dotf`, registry or age key (`80_agents/hermes-nan/context.md`), so the quota section is removed rather than wired to a check it cannot run.
 
-- [x] AC7: The quota is the account's, not a binding's. The check watches every model the table meters and every model with usage this period, as well as the bound ones. A test with nothing binding `qwen3.8-flash` at 83% still gets its WARN. Added 2026-10-01: on 2026-09-26 `qwen3.8-flash` reached 83% while pi, not `model-map.json`, was spending it, and the bound-only check could not have seen it. An unbound model the key cannot see (`/v1/models` hides premium models by tier) spends nothing and is not reported.
+- [x] AC7: The quota is the account's, not a binding's. The check watches every model the table meters and every model with usage this period, as well as the bound ones. A test with nothing binding `qwen3.8-flash` at 83% still gets its WARN. Added 2026-10-01: on 2026-09-26 `qwen3.8-flash` reached 83% while pi, not `model-map.json`, was spending it, and the bound-only check could not have seen it. An unbound model the key cannot see (`/v1/models` hides premium models by tier) is not reported unless the table meters it and it has usage this period.
 
 ## References
 

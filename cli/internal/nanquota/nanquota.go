@@ -242,7 +242,7 @@ type model struct {
 }
 
 // classify reports one watched model. ok is false for an unbound model the key
-// cannot see: it spends nothing, and nothing routes to it.
+// cannot see and that has no metered usage: nothing routes to it.
 func classify(m model, warnPct float64) (f Finding, ok bool) {
 	id := m.id
 	if !m.served {
@@ -250,8 +250,11 @@ func classify(m model, warnPct float64) (f Finding, ok bool) {
 			return Finding{id, Fail, fmt.Sprintf("%s is bound in model-map.json but NaN does not serve it (absent from /v1/models)", id)}, true
 		}
 		// /v1/models filters premium models by the key's tier, so absence is not
-		// retirement; either way this key cannot spend it.
-		return Finding{}, false
+		// retirement. Unless the table meters it and usage says something spent
+		// it, this key cannot reach it.
+		if !m.metered || m.used == 0 {
+			return Finding{}, false
+		}
 	}
 	if m.unmetered {
 		return Finding{id, Pass, fmt.Sprintf("%s: unmetered, %s tokens this period", id, millions(m.used))}, true

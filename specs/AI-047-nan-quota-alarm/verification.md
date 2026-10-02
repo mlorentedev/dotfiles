@@ -13,7 +13,7 @@ created: "2026-09-26"
 - [x] AC4 -> `TestCheckNaNQuota_SkipsWhenNaNIsUnreachable`, `TestCheckNaNQuota_SkipsWithoutAKey`, `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon`.
 - [x] AC5 -> `TestCheckNaNQuota_NeverPrintsTheKey`, on the rejected, unparseable and transport branches, each with the key planted where a careless message would echo it.
 - [ ] AC6 -> PR-2.
-- [x] AC7 -> `TestEvaluateWatchesEveryMeteredModelNotOnlyBindings`, `TestEvaluateWatchesAnUndeclaredModelWithUsage`, `TestEvaluateIgnoresAMeteredModelTheKeyCannotSee`, `TestEvaluateIgnoresARetiredModelNothingCanReach`, `TestCheckNaNQuota_WatchesMeteredModelsNothingBinds`. Mutation: dropping the metered and used sets from the watched union fails the first two and the doctor test.
+- [x] AC7 -> `TestEvaluateWatchesEveryMeteredModelNotOnlyBindings`, `TestEvaluateWatchesAnUndeclaredModelWithUsage`, `TestEvaluateIgnoresAMeteredModelTheKeyCannotSee`, `TestEvaluateReportsUsageOnAMeteredModelTheKeyCannotSee` (from pr-agent's review of #1956), `TestEvaluateIgnoresARetiredModelNothingCanReach`, `TestCheckNaNQuota_WatchesMeteredModelsNothingBinds`. Mutation: dropping the metered and used sets from the watched union fails the first two and the doctor test.
 
 Mutations applied one at a time, each caught by the named test: transport error as FAIL; the usage body echoed into the parse warning; unserved id as WARN; the warn threshold moved to 90%; the key not sent; the bw daemon gate removed. The gate mutation survived the first version of the tests, because the default resolver already answers "absent". `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon` was added for it.
 
