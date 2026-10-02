@@ -10,6 +10,10 @@ import "syscall"
 // worth the diff — the value is documented and fixed.
 const detachedProcess = 0x00000008
 
+// createNoWindow suppresses the console window entirely when the executed binary
+// is a console application (e.g. node.exe, or a scoop shim).
+const createNoWindow = 0x08000000
+
 // bwServeDetachAttr detaches the daemon from this process's console so it
 // outlives the terminal that started it — the whole point of one unlock
 // serving every later `dotf` call (bwserve.go). Two flags, two different
@@ -29,5 +33,8 @@ const detachedProcess = 0x00000008
 //
 // TestBWServeDetachAttr_ChildHasNoConsole asserts the property by effect.
 func bwServeDetachAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | detachedProcess}
+	return &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | detachedProcess | createNoWindow,
+	}
 }
