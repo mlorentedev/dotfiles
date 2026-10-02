@@ -86,13 +86,18 @@ The rebase also broke `TestCheckNaNQuota_ReportsEachBoundModel`. It had read the
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes — lesson 331, a shared budget is watched at the account, not the binding (#1956).
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-331-a-shared-budget-is-watched-at-the-account-not-the-binding.md (#1956).
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no — a doctor check inside an existing contract; the declared table carries its own rationale.
 - [x] New pattern candidate for `00_meta/patterns/`? no — one project so far.
 
+## Review dispositions (round 1, agy/gemini-3.1-pro-high, PASS WITH GAPS)
+
+- **Major, `/v1/models` pagination (`nanquota.go:85`): declined on measurement.** On 2026-10-01, through `dotf secrets run`, only metadata was printed. `GET /v1/models` answers 200 with exactly the keys `data` and `object`: 13 models, no `has_more`, no cursor. `?limit=2` is ignored, and the same 13 come back. The endpoint is the unpaginated OpenAI list shape. If NaN ever adds paging, the first symptom is a bound model reported as not served, which is a loud FAIL rather than a silent pass.
+- **Minor, first `NAN_API_KEY` entry (`checks_nan_quota.go:115`): declined.** `secrets/registry.yaml` declares one entry whose var is `NAN_API_KEY` (id `NAN_API_KEY`, also exposing `HIVE_WORKER_API_KEY`). There is no second, scoped key to pick wrongly. The same single-key fact settles AC6's per-key question above.
+
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-047-nan-quota-alarm/` -> `specs/archive/AI-047-nan-quota-alarm/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/AI-047-nan-quota-alarm/` -> `specs/archive/AI-047-nan-quota-alarm/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)

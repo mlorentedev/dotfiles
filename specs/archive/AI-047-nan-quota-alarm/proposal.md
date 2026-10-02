@@ -1,7 +1,7 @@
 ---
 id: "AI-047-nan-quota-alarm"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-26"
 issue: "mlorentedev/dotfiles#1766"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, nan, quota, doctor]
