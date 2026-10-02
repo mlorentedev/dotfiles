@@ -55,12 +55,12 @@ func newOrcaTuneHooksCmd() *cobra.Command {
 			"--check reports drift without writing and exits non-zero while any remains.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			home := env.Home()
+			defConfig, defScript := orcaHookPaths(env.Home())
 			if hookConfig == "" {
-				hookConfig = filepath.Join(home, ".copilot", "hooks", "orca.json")
+				hookConfig = defConfig
 			}
 			if hookScript == "" {
-				hookScript = filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
+				hookScript = defScript
 			}
 			return runOrcaTuneHooks(cmd.OutOrStdout(), hookConfig, hookScript, timeout, check)
 		},
@@ -70,6 +70,41 @@ func newOrcaTuneHooksCmd() *cobra.Command {
 	c.Flags().StringVar(&hookConfig, "hook-config", "", "path to Orca's orca.json (default ~/.copilot/hooks/orca.json)")
 	c.Flags().StringVar(&hookScript, "hook-script", "", "path to Orca's copilot-hook.ps1 (default ~/.orca/agent-hooks/copilot-hook.ps1)")
 	return c
+}
+
+// orcaHookPaths is where Orca writes its generated Copilot hooks for home.
+func orcaHookPaths(home string) (config, script string) {
+	return filepath.Join(home, ".copilot", "hooks", "orca.json"),
+		filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
+}
+
+// deployOrcaHooks is the converge step `dotf deploy` runs after the declared
+// configs (CLI-093, #1953). Orca regenerates its hooks on every install, so a
+// setup that deploys configs has to re-tune them; doing it here reaches both
+// setups through the one call they already make.
+func deployOrcaHooks(w io.Writer, home string, dryRun bool) error {
+	config, script := orcaHookPaths(home)
+	rep, err := orca.TuneHooks(config, script, orca.DefaultHookTimeout, dryRun, time.Now)
+	if err != nil {
+		return fmt.Errorf("orca-hooks: %w", err)
+	}
+	switch {
+	case rep.Nothing():
+		_, _ = fmt.Fprintf(w, "skipped   %-10s (Orca not installed)\n", "orca-hooks")
+	case dryRun && rep.Drift():
+		_, _ = fmt.Fprintf(w, "would tune %-9s %s\n", "orca-hooks", config)
+	case rep.Changed == 0:
+		_, _ = fmt.Fprintf(w, "in sync   %-10s %s\n", "orca-hooks", config)
+	default:
+		for _, bak := range rep.Backups {
+			_, _ = fmt.Fprintf(w, "backup    %-10s %s\n", "orca-hooks", bak)
+		}
+		_, _ = fmt.Fprintf(w, "tuned     %-10s %d fix(es) — restart the Copilot CLI session to pick them up\n", "orca-hooks", rep.Changed)
+	}
+	if rep.ScriptUnrecognised {
+		_, _ = fmt.Fprintf(w, "unchanged %-10s %s has an unrecognised POST line — review it by hand\n", "orca-hooks", script)
+	}
+	return nil
 }
 
 func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, check bool) error {
