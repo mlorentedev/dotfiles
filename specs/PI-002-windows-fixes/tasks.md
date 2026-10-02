@@ -1,0 +1,2 @@
+- [x] Apply CREATE_NO_WINDOW fix in cli/internal/secrets/bwserve_windows.go
+- [x] Update limits in ai/pi/models.json
