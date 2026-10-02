@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.62.0](https://github.com/mlorentedev/dotfiles/compare/v0.61.0...v0.62.0) (2026-10-02)
+
+
+### Features
+
+* **harness:** daily canary that probes every bound NaN model ([#1943](https://github.com/mlorentedev/dotfiles/issues/1943)) ([f8c1d76](https://github.com/mlorentedev/dotfiles/commit/f8c1d76e329d0a8980faa1783b353422cd99a45f))
+* **harness:** guard every model pin site and archive HARNESS-067 ([#1887](https://github.com/mlorentedev/dotfiles/issues/1887)) ([fe34286](https://github.com/mlorentedev/dotfiles/commit/fe3428610ed86da8727d2a4a6e119f8b4ffbaa81))
+* implement Fast-Track spec archiving in CLI ([#1918](https://github.com/mlorentedev/dotfiles/issues/1918)) ([bac2196](https://github.com/mlorentedev/dotfiles/commit/bac2196af150b9d7a7dd47a94b2b1b6132d53e19))
+* **pi:** compact at 40% of each model window via native overrides ([#1938](https://github.com/mlorentedev/dotfiles/issues/1938)) ([598f608](https://github.com/mlorentedev/dotfiles/commit/598f608e53e95c9e4eb94e8ca4f630baadfdcc38))
+* **secrets:** register Gitea token ([#1846](https://github.com/mlorentedev/dotfiles/issues/1846)) ([cc25a0c](https://github.com/mlorentedev/dotfiles/commit/cc25a0c41970a098897baac0cf23f1ba2e3de07c))
+* **secrets:** register the leaving-denver seller passphrase ([#1936](https://github.com/mlorentedev/dotfiles/issues/1936)) ([118ab0f](https://github.com/mlorentedev/dotfiles/commit/118ab0f62a0fe5c5d80caf9341433799ee2d1767))
+* **spec:** refuse a new spec while the repository is at its WIP limit ([#1861](https://github.com/mlorentedev/dotfiles/issues/1861)) ([9cfecc8](https://github.com/mlorentedev/dotfiles/commit/9cfecc832715679ea72f82e1d013b0cda8e87f16))
+* **tools:** add a dry run and read the catalog from the checkout first ([#1848](https://github.com/mlorentedev/dotfiles/issues/1848)) ([a94ae34](https://github.com/mlorentedev/dotfiles/commit/a94ae3465a245b4a29af25e4b8a056d0f4cd62d0))
+
+
+### Bug Fixes
+
+* **ai:** align NaN base-plan catalog limits ([#1916](https://github.com/mlorentedev/dotfiles/issues/1916)) ([67ed3b2](https://github.com/mlorentedev/dotfiles/commit/67ed3b2a866499d889af1ab5c34f54fd9cf46a77))
+* **ci:** cover every path the suite reads in the code filter ([#1870](https://github.com/mlorentedev/dotfiles/issues/1870)) ([0013ea5](https://github.com/mlorentedev/dotfiles/commit/0013ea5b8b45cec7ab950e91b93eb8f1defc0025))
+* **cli:** drop the spec id from the Orca hook output and guard the cleaned files ([#1899](https://github.com/mlorentedev/dotfiles/issues/1899)) ([61db65a](https://github.com/mlorentedev/dotfiles/commit/61db65ac2dc3daa941f0aad4e351987209bc571e))
+* **cli:** keep internal ids out of everything dotf prints ([#1917](https://github.com/mlorentedev/dotfiles/issues/1917)) ([bad66a0](https://github.com/mlorentedev/dotfiles/commit/bad66a0158449ae9d13a6cfb2e41e3ffb9f32c6d))
+* **cli:** report the module version for go install builds ([#1844](https://github.com/mlorentedev/dotfiles/issues/1844)) ([8a00d89](https://github.com/mlorentedev/dotfiles/commit/8a00d89710e159b00577acde023ec2356bdf0d3c))
+* **doctor:** count a PATH directory reached through a symlink once ([#1901](https://github.com/mlorentedev/dotfiles/issues/1901)) ([bf2023c](https://github.com/mlorentedev/dotfiles/commit/bf2023cadafd406a5da709d5f3a59d70ddb21c5f))
+* **doctor:** recognize linked worktree checkouts ([#1835](https://github.com/mlorentedev/dotfiles/issues/1835)) ([934e4a7](https://github.com/mlorentedev/dotfiles/commit/934e4a76e13228d9d84ab943ce4bd52b72e3aa3d))
+* **doctor:** report a never-written profile as missing, and make the heal test tell its sources apart ([#1863](https://github.com/mlorentedev/dotfiles/issues/1863)) ([1722a9f](https://github.com/mlorentedev/dotfiles/commit/1722a9fdc090190a8e5a14a437c564da7a17848b))
+* **doctor:** skip the mapping check when no sync is wired ([#1841](https://github.com/mlorentedev/dotfiles/issues/1841)) ([db2b904](https://github.com/mlorentedev/dotfiles/commit/db2b904794b4700b1e9b5c784d7b570bdc46fae0))
+* **doctor:** sync the vault before comparing it with the DR escrow ([#1839](https://github.com/mlorentedev/dotfiles/issues/1839)) ([b0782ad](https://github.com/mlorentedev/dotfiles/commit/b0782adc9fac7b70742c39df71747cd467d04906))
+* **doctor:** warn when a package catalog copy exists but cannot be read ([#1902](https://github.com/mlorentedev/dotfiles/issues/1902)) ([8670f87](https://github.com/mlorentedev/dotfiles/commit/8670f87e79537cc0712d4011540c6f9f9436afbf))
+* **env:** reserve the ownership marker's name and validate names on every read path ([#1862](https://github.com/mlorentedev/dotfiles/issues/1862)) ([3cb3077](https://github.com/mlorentedev/dotfiles/commit/3cb307748b91412f3ab374002f7b62b9ff8b60c7)), closes [#1363](https://github.com/mlorentedev/dotfiles/issues/1363)
+* **harness:** emit executable agy hooks on Windows ([#1827](https://github.com/mlorentedev/dotfiles/issues/1827)) ([5c3102a](https://github.com/mlorentedev/dotfiles/commit/5c3102a5584472a402f791433a88d2843cf7040a))
+* **harness:** refuse a manifest target that escapes the checkout ([#1897](https://github.com/mlorentedev/dotfiles/issues/1897)) ([0954368](https://github.com/mlorentedev/dotfiles/commit/09543686fc21fde2b5a864cb29a953f464ccfb3c))
+* **harness:** replace read-only Windows mirrors ([#1825](https://github.com/mlorentedev/dotfiles/issues/1825)) ([64eb589](https://github.com/mlorentedev/dotfiles/commit/64eb589d72f5986e81b6819628e7237f90870bc9))
+* **harness:** sweep gate journals past a 30-day retention when a new scope opens ([#1945](https://github.com/mlorentedev/dotfiles/issues/1945)) ([5fcaf18](https://github.com/mlorentedev/dotfiles/commit/5fcaf18f0f2c9ca7bb3e3d454c6b51b5da195118))
+* **harness:** the doctrine cap warnings name both units, and HARNESS-111's AC3 records the fold [#1685](https://github.com/mlorentedev/dotfiles/issues/1685) shipped ([#1868](https://github.com/mlorentedev/dotfiles/issues/1868)) ([52a09ce](https://github.com/mlorentedev/dotfiles/commit/52a09cebe582b7b23f15bdf4fc12e4669f3bcfb5)), closes [#1241](https://github.com/mlorentedev/dotfiles/issues/1241)
+* **mem:** lock handoff-write against lost threads and archive HARNESS-088 ([#1886](https://github.com/mlorentedev/dotfiles/issues/1886)) ([512cd05](https://github.com/mlorentedev/dotfiles/commit/512cd05751bf7dfd626fb2432ae55602407ad264))
+* **mem:** lock session-end handoff reads ([#1933](https://github.com/mlorentedev/dotfiles/issues/1933)) ([e5541c6](https://github.com/mlorentedev/dotfiles/commit/e5541c6a304a8350edda16efa90a2adea0859af3))
+* **mem:** refuse a handoff thread key that contains whitespace ([#1896](https://github.com/mlorentedev/dotfiles/issues/1896)) ([1cfceaa](https://github.com/mlorentedev/dotfiles/commit/1cfceaa07ab360fd1f3ed7a4effd255719fc7507))
+* **pi:** align OpenRouter DeepSeek limits ([#1831](https://github.com/mlorentedev/dotfiles/issues/1831)) ([e783e47](https://github.com/mlorentedev/dotfiles/commit/e783e47699bb6741e3bb1cac659496f190fa3e0f))
+* **pr-agent:** bound the primary's attempt and retry once on the fallback ([#1914](https://github.com/mlorentedev/dotfiles/issues/1914)) ([ac9e186](https://github.com/mlorentedev/dotfiles/commit/ac9e186a273abdcb7f5169bafac7f9d13001eca5))
+* **pr-agent:** count rebased pushes and ignore quoted review state in the push gate ([#1895](https://github.com/mlorentedev/dotfiles/issues/1895)) ([aa1c497](https://github.com/mlorentedev/dotfiles/commit/aa1c497903d6fdc1d0660464ddb83d10925cf917))
+* **pr-agent:** retire mimo-v2.5 and skip a dead model before the review ([#1856](https://github.com/mlorentedev/dotfiles/issues/1856)) ([0a584d4](https://github.com/mlorentedev/dotfiles/commit/0a584d4ebf173fec0e02d77d70134b7712a3bb3b))
+* **pr-agent:** stream every NaN call so a held review cannot sit silent ([#1939](https://github.com/mlorentedev/dotfiles/issues/1939)) ([ebe2c05](https://github.com/mlorentedev/dotfiles/commit/ebe2c05458b07b3ae7aab3f0005a652fd66b6f57))
+* **secrets:** resolve bw serve items from the unfiltered list, not the search index ([#1822](https://github.com/mlorentedev/dotfiles/issues/1822)) ([c719016](https://github.com/mlorentedev/dotfiles/commit/c719016ae1691c5df87820ae9270ac45d253f1fc))
+* **spec-gate:** exclude patch-tool output from production LOC ([#1944](https://github.com/mlorentedev/dotfiles/issues/1944)) ([b664be6](https://github.com/mlorentedev/dotfiles/commit/b664be60043cd25569463c5f1a25d0052e314d02))
+* **spec:** avoid agy sandbox elevation on Windows ([#1840](https://github.com/mlorentedev/dotfiles/issues/1840)) ([db6e30f](https://github.com/mlorentedev/dotfiles/commit/db6e30f7aeac77f7595c7ae5591b6ed4c4c15ff6))
+* **spec:** reject malformed review artifacts ([#1828](https://github.com/mlorentedev/dotfiles/issues/1828)) ([cba58e6](https://github.com/mlorentedev/dotfiles/commit/cba58e6f6c8aa3fd6cb97240e5faeee3b2fe0d4a))
+* **specs:** AI-044's parity evidence runs the test that holds the assertion ([#1867](https://github.com/mlorentedev/dotfiles/issues/1867)) ([8a12783](https://github.com/mlorentedev/dotfiles/commit/8a127832da7a034b963353973ab0fcad2a9a2a49))
+* **tools:** probe installed versions with the same rule as tools version ([#1900](https://github.com/mlorentedev/dotfiles/issues/1900)) ([2356fd4](https://github.com/mlorentedev/dotfiles/commit/2356fd42563af2f4925f6ffa754e9786ad98e821))
+
 ## [0.61.0](https://github.com/mlorentedev/dotfiles/compare/v0.60.0...v0.61.0) (2026-09-29)
 
 
