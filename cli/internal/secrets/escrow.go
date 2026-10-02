@@ -31,6 +31,10 @@ type BWExporter interface {
 // BWGet). The raw JSON is returned in memory; Backup pipes it straight into the encryptor.
 type BWExport struct {
 	Bin string // bw binary name/path; "" → "bw"
+	// Session, when set, is a session key `dotf secrets backup` acquired itself
+	// (#1008). It reaches the bw children's environment and nothing else; empty
+	// means the children inherit whatever the caller's environment holds.
+	Session string
 }
 
 // Export refreshes the local cache then returns the full vault export. A failed sync
@@ -40,10 +44,11 @@ func (e BWExport) Export() ([]byte, error) {
 	if bin == "" {
 		bin = "bw"
 	}
-	if _, err := bwRun(bin, "sync"); err != nil {
+	env := sessionEnv(os.Environ(), e.Session)
+	if _, err := bwRun(bin, env, "sync"); err != nil {
 		return nil, fmt.Errorf("bw sync: %w", exportLockHint(err))
 	}
-	out, err := bwRun(bin, "export", "--format", "json", "--raw")
+	out, err := bwRun(bin, env, "export", "--format", "json", "--raw")
 	if err != nil {
 		return nil, fmt.Errorf("bw export: %w", exportLockHint(err))
 	}
@@ -79,11 +84,13 @@ func exportLockHint(err error) error {
 		ErrBWVaultLocked, err)
 }
 
-// bwRun executes `bw <args...> --nointeraction`, returning stdout or an error carrying
-// bw's stderr (parity with BWGet/BWPut — never a bare "exit status 1"). --nointeraction
-// guarantees no prompt blocks a non-interactive escrow run.
-func bwRun(bin string, args ...string) ([]byte, error) {
+// bwRun executes `bw <args...> --nointeraction` with the given environment,
+// returning stdout or an error carrying bw's stderr (parity with BWGet/BWPut —
+// never a bare "exit status 1"). --nointeraction guarantees no prompt blocks a
+// non-interactive escrow run.
+func bwRun(bin string, env []string, args ...string) ([]byte, error) {
 	cmd := exec.Command(bin, append(args, "--nointeraction")...) //nolint:gosec // args are fixed escrow subcommands
+	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
@@ -94,6 +101,55 @@ func bwRun(bin string, args ...string) ([]byte, error) {
 		return nil, errors.New(msg)
 	}
 	return stdout.Bytes(), nil
+}
+
+// bwUnlockPasswordVar names the variable `bw unlock --passwordenv` reads. The
+// password travels there, in the one child's environment, never on argv where
+// any process listing would show it.
+const bwUnlockPasswordVar = "DOTF_BW_UNLOCK_PASSWORD"
+
+// BWUnlockSession unlocks the bw CLI with password and returns the session key,
+// held by the caller in memory (#1008). Export has no bw serve route, so the
+// escrow needs the CLI's own session; acquiring it here replaces the
+// BW_SESSION="$(bw unlock --raw)" prefix with the same one prompt every other
+// `dotf secrets` command uses.
+func BWUnlockSession(password []byte) (string, error) {
+	out, err := bwRun("bw", unlockEnv(os.Environ(), password), "unlock", "--raw", "--passwordenv", bwUnlockPasswordVar)
+	if err != nil {
+		return "", fmt.Errorf("bw unlock: %w", err)
+	}
+	session := strings.TrimSpace(string(out))
+	if session == "" {
+		return "", errors.New("bw unlock: no session key on stdout")
+	}
+	return session, nil
+}
+
+// sessionEnv is base with BW_SESSION set to session, replacing any ambient value
+// (case-insensitively, as Windows compares names). An empty session returns base
+// unchanged, so a caller-supplied BW_SESSION keeps working.
+func sessionEnv(base []string, session string) []string {
+	if session == "" {
+		return base
+	}
+	return append(withoutVar(base, "BW_SESSION"), "BW_SESSION="+session)
+}
+
+// unlockEnv is base with the password in bwUnlockPasswordVar and no BW_SESSION:
+// a stale session would make `bw unlock` answer about it instead of unlocking.
+func unlockEnv(base []string, password []byte) []string {
+	env := withoutVar(withoutVar(base, "BW_SESSION"), bwUnlockPasswordVar)
+	return append(env, bwUnlockPasswordVar+"="+string(password))
+}
+
+func withoutVar(env []string, name string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if k, _, _ := strings.Cut(kv, "="); !strings.EqualFold(k, name) {
+			out = append(out, kv)
+		}
+	}
+	return out
 }
 
 // Encryptor encrypts plaintext to the given age recipient, returning ciphertext. The seam
