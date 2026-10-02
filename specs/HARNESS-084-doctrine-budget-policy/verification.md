@@ -53,4 +53,6 @@ near-miss is more useful than the fix.
 
 ## Promotion candidates
 
-- None. The mechanism is repo-specific; the reasoning behind it is already lesson 268's.
+- [x] Lesson for the repo's `docs/lessons/`? no: the near-miss above is lesson 268's class, already recorded.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a render mechanism inside the existing harness compile contract.
+- [x] New pattern candidate for `00_meta/patterns/`? no: the mechanism is repo-specific.
