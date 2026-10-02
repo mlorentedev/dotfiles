@@ -299,16 +299,24 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 
 Run this chain against the real offline backup periodically — not as an incident,
 as a rehearsal — then record it. This form proves the offline key opens the
-escrow without restoring anything or writing plaintext to disk:
+repo's escrow, which is what RECOVER steps 1-3 rely on, without restoring anything or
+writing plaintext to disk. The stick's own copy of the escrow is checked by the
+OFFLINE COPY refresh, not here. The marker is touched only when every check passes,
+so a failed drill cannot record itself as a pass:
 
 ```sh
 sudo mkdir -p /media/secrets
 veracrypt /dev/sdX /media/secrets
-[ "$(age-keygen -y /media/secrets/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
-age -d -i /media/secrets/key.txt sensitive/dr/bitwarden-export.age | jq '.items | length'
-jq .count sensitive/dr/escrow-manifest.json      # must equal the line above
+usb=$(age-keygen -y /media/secrets/key.txt); here=$(age-keygen -y ~/.config/age/key.txt)
+same=$([ -n "$usb" ] && [ "$usb" = "$here" ] && echo yes)   # two failed reads must not compare equal
+n=$(age -d -i /media/secrets/key.txt sensitive/dr/bitwarden-export.age | jq '.items | length')
+m=$(jq .count sensitive/dr/escrow-manifest.json)
 veracrypt -d /media/secrets
-touch ~/.dotfiles/.dr-drill
+if [ "$same" = yes ] && [ -n "$n" ] && [ "$n" = "$m" ]; then
+  touch ~/.dotfiles/.dr-drill && echo "drill passed: $n items"
+else
+  echo "drill FAILED: recipient same=${same:-no}, decrypted=${n:-none}, manifest=$m"
+fi
 ```
 
 `dotf doctor` reads that marker and warns when no drill is recorded, or when the
