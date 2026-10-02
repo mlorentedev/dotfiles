@@ -23,7 +23,7 @@ created: "2026-09-26"
 - [x] Declared table `harness/nan-quotas.json`, closed-world (metered + unmetered)
 - [x] [AC3] [AC4] [AC5] Failing doctor tests against fixtures (unserved id, outage, no key, bw gate, key never printed), then `checks_nan_quota.go` and the `HTTPGetBody` seam
 - [x] [AC2] Live run, recorded
-- [ ] PR opened, triaged, merged by the owner (#1772, which it depended on, merged 2026-09-27)
+- [x] PR opened, triaged, merged by the owner (#1772, which it depended on, merged 2026-09-27)
 
 ## PR-1b: watch the account, not the bindings (2026-10-01)
 
@@ -34,13 +34,13 @@ created: "2026-09-26"
 
 ## PR-2: hermes
 
-- [ ] [AC6] Vault: remove the single-pool quota section from `00_meta/agents/scripts/budget-report.sh` and its false "no usage endpoint" header; point the digest reader at `dotf doctor`
-- [ ] Measure whether `/v1/usage` is per key or per member
+- [x] [AC6] Vault: remove the single-pool quota section from `00_meta/agents/scripts/budget-report.sh` and its false "no usage endpoint" header; point the digest reader at `dotf doctor`
+- [x] Measure whether `/v1/usage` is per key or per member — moot as deployed: one key (resolved by inspection, `proposal.md` Risks)
 
 ## Closing
 
-- [ ] Every acceptance criterion covered by a test or a recorded measurement
-- [ ] Independent adversarial review before archive
+- [x] Every acceptance criterion covered by a test or a recorded measurement
+- [x] Independent adversarial review before archive (`review.md`, agy/gemini-3.1-pro-high, PASS WITH GAPS)
 
 ## Machine-readable features
 
