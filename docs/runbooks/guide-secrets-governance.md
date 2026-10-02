@@ -241,14 +241,15 @@ It never holds anything else:
 **Do not run `scripts/backup-secrets-to-usb.sh`.** It copies the plaintext `sensitive/*.secret` files and the retired blobs, and it verifies nothing. #1770 replaces it with a `dotf` command that copies a declared payload and verifies it by consequence. Until that ships, refresh the copy after every escrow:
 
 ```bash
-veracrypt /dev/sdX /media/veracrypt1       # lsblk names the device; it is not stable
-install -m 600 -D sensitive/dr/bitwarden-export.age /media/veracrypt1/secrets/dr/bitwarden-export.age
-install -m 600 sensitive/dr/escrow-manifest.json /media/veracrypt1/secrets/dr/escrow-manifest.json
+sudo mkdir -p /media/secrets               # veracrypt does not create the mount point
+veracrypt /dev/sdX /media/secrets          # lsblk names the device; it is not stable
+install -m 600 -D sensitive/dr/bitwarden-export.age /media/secrets/secrets/dr/bitwarden-export.age
+install -m 600 sensitive/dr/escrow-manifest.json /media/secrets/secrets/dr/escrow-manifest.json
 # Verify by consequence. Only a recipient comparison and two counts are printed.
-[ "$(age-keygen -y /media/veracrypt1/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
-age -d -i /media/veracrypt1/key.txt /media/veracrypt1/secrets/dr/bitwarden-export.age | jq '.items | length'
-jq .count /media/veracrypt1/secrets/dr/escrow-manifest.json      # must equal the line above
-veracrypt -d /media/veracrypt1
+[ "$(age-keygen -y /media/secrets/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
+age -d -i /media/secrets/key.txt /media/secrets/secrets/dr/bitwarden-export.age | jq '.items | length'
+jq .count /media/secrets/secrets/dr/escrow-manifest.json      # must equal the line above
+veracrypt -d /media/secrets
 ```
 
 **To create a new stick** (one time):
@@ -264,6 +265,7 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 
    ```bash
    sudo apt install age veracrypt            # a fresh machine has neither
+   sudo mkdir -p /media/secrets              # veracrypt does not create the mount point
    veracrypt /dev/sdX /media/secrets         # prompts for the volume password
    install -m 600 -D /media/secrets/key.txt ~/.config/age/key.txt
    veracrypt -d /media/secrets               # unmount when done
@@ -296,9 +298,16 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 ### Drill it
 
 Run this chain against the real offline backup periodically — not as an incident,
-as a rehearsal — then record it:
+as a rehearsal — then record it. This form proves the offline key opens the
+escrow without restoring anything or writing plaintext to disk:
 
 ```sh
+sudo mkdir -p /media/secrets
+veracrypt /dev/sdX /media/secrets
+[ "$(age-keygen -y /media/secrets/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
+age -d -i /media/secrets/key.txt sensitive/dr/bitwarden-export.age | jq '.items | length'
+jq .count sensitive/dr/escrow-manifest.json      # must equal the line above
+veracrypt -d /media/secrets
 touch ~/.dotfiles/.dr-drill
 ```
 
