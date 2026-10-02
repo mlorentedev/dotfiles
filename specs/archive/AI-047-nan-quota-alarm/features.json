@@ -3,49 +3,49 @@
     "id": "AI-047-nan-quota-alarm-f1",
     "behavior": "A recorded /v1/usage fixture and the declared table give WARN at 83%, INFO at 10%, nothing above PASS for an unmetered model",
     "verification": "cd cli && go test ./internal/nanquota/ -run 'TestEvaluate'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification command exit 0 at 9222e9f5, 2026-10-01"
   },
   {
     "id": "AI-047-nan-quota-alarm-f2",
     "behavior": "dotf doctor reports each metered bound NaN model with used / quota / percent, live",
     "verification": "echo 'Live measurement recorded in verification.md; it needs NAN_API_KEY' && exit 1",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "dotf doctor --verbose, 2026-10-01: [ OK ] deepseek-v4-flash: 61.7M / 3000.0M tokens this month (2%); glm5.3-flash and mimo-v2.6-flash likewise"
   },
   {
     "id": "AI-047-nan-quota-alarm-f3",
     "behavior": "A bound id missing from /v1/models is a FAIL naming it",
     "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckNaNQuota_FailsOnAnUnservedBinding' && go test ./internal/nanquota/ -run 'TestEvaluateFailsOnAnIDNaNDoesNotServe'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification command exit 0 at 9222e9f5, 2026-10-01"
   },
   {
     "id": "AI-047-nan-quota-alarm-f4",
     "behavior": "NaN unreachable, or no key on the box, is a SKIP with a reason and no failure",
     "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckNaNQuota_SkipsWhenNaNIsUnreachable|TestCheckNaNQuota_SkipsWithoutAKey|TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification command exit 0 at 9222e9f5, 2026-10-01"
   },
   {
     "id": "AI-047-nan-quota-alarm-f5",
     "behavior": "No key reaches the report on any error branch",
     "verification": "cd cli && go test ./internal/doctor/ -run 'TestCheckNaNQuota_NeverPrintsTheKey'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification command exit 0 at 9222e9f5, 2026-10-01"
   },
   {
     "id": "AI-047-nan-quota-alarm-f6",
     "behavior": "hermes's digest no longer states a single 500M pool",
-    "verification": "echo 'PR-2: vault change' && exit 1",
-    "state": "pending",
-    "evidence": ""
+    "verification": "f=\"$(dotf env path VAULT_PATH)/00_meta/agents/scripts/budget-report.sh\"; [ -f \"$f\" ] && ! grep -Eq 'BUDGET_QUOTA|500000000' \"$f\"",
+    "state": "passing",
+    "evidence": "verification command exit 0 at 9222e9f5, 2026-10-01"
   },
   {
     "id": "AI-047-nan-quota-alarm-f7",
     "behavior": "Every metered model and every model with usage is watched, bound or not",
     "verification": "cd cli && go test ./internal/nanquota/ -run 'TestEvaluateWatches|TestEvaluateIgnores' && go test ./internal/doctor/ -run 'TestCheckNaNQuota_WatchesMeteredModelsNothingBinds'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification command exit 0 at 9222e9f5, 2026-10-01"
   }
 ]

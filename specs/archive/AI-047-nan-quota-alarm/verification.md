@@ -12,7 +12,7 @@ created: "2026-09-26"
 - [x] AC3 -> `TestCheckNaNQuota_FailsOnAnUnservedBinding` (a copy of the real model map with `services.rerank` set to `qwen3-rerank`), `TestEvaluateFailsOnAnIDNaNDoesNotServe`.
 - [x] AC4 -> `TestCheckNaNQuota_SkipsWhenNaNIsUnreachable`, `TestCheckNaNQuota_SkipsWithoutAKey`, `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon`.
 - [x] AC5 -> `TestCheckNaNQuota_NeverPrintsTheKey`, on the rejected, unparseable and transport branches, each with the key planted where a careless message would echo it.
-- [ ] AC6 -> PR-2.
+- [x] AC6 -> vault `3bad279a` (knowledge): `00_meta/agents/scripts/budget-report.sh` lost its quota knobs, per-model percentages, single-pool total and warning, and the false "no usage endpoint" header. It now reports the agent's footprint and points at `dotf doctor`. Run against a one-row `state.db` fixture, it prints the per-model tokens and the metered cost, and nothing about quota. hermes-nan is retired (2026-09-30), so the digest has no running instance.
 - [x] AC7 -> `TestEvaluateWatchesEveryMeteredModelNotOnlyBindings`, `TestEvaluateWatchesAnUndeclaredModelWithUsage`, `TestEvaluateIgnoresAMeteredModelTheKeyCannotSee`, `TestEvaluateReportsUsageOnAMeteredModelTheKeyCannotSee` (from pr-agent's review of #1956), `TestEvaluateIgnoresARetiredModelNothingCanReach`, `TestCheckNaNQuota_WatchesMeteredModelsNothingBinds`. Mutation: dropping the metered and used sets from the watched union fails the first two and the doctor test.
 
 Mutations applied one at a time, each caught by the named test: transport error as FAIL; the usage body echoed into the parse warning; unserved id as WARN; the warn threshold moved to 90%; the key not sent; the bw daemon gate removed. The gate mutation survived the first version of the tests, because the default resolver already answers "absent". `TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon` was added for it.
@@ -23,7 +23,7 @@ Mutations applied one at a time, each caught by the named test: transport error 
 - `start_date` and `end_date` are accepted.
 - `totals.by_model` covers the whole window when `data` is paged: under `limit=3` it equals the unpaged totals.
 - NaN answers 403 to the `Python-urllib` User-Agent on `/v1/usage` and `/v1/models`. It answers 200 to Go's default UA (1.1 and 2.0) and to curl. The check sends `User-Agent: dotf-doctor`.
-- Open: whether the endpoint reports per key or per member. It is not measured yet.
+- Per key vs per member: moot as deployed, resolved by inspection on 2026-10-01. One NaN key exists (`secrets/registry.yaml`), and every consumer and kubelab's pr-agent copy use it.
 - Open: which period NaN meters against. The 83% figure in AI-044 was computed from the calendar month, so it cannot settle this.
 
 ## Live run (AC2)
@@ -86,13 +86,18 @@ The rebase also broke `TestCheckNaNQuota_ReportsEachBoundModel`. It had read the
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-331-a-shared-budget-is-watched-at-the-account-not-the-binding.md (#1956).
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no — a doctor check inside an existing contract; the declared table carries its own rationale.
+- [x] New pattern candidate for `00_meta/patterns/`? no — one project so far.
+
+## Review dispositions (round 1, agy/gemini-3.1-pro-high, PASS WITH GAPS)
+
+- **Major, `/v1/models` pagination (`nanquota.go:85`): declined on measurement.** On 2026-10-01, through `dotf secrets run`, only metadata was printed. `GET /v1/models` answers 200 with exactly the keys `data` and `object`: 13 models, no `has_more`, no cursor. `?limit=2` is ignored, and the same 13 come back. The endpoint is the unpaginated OpenAI list shape. If NaN ever adds paging, the first symptom is a bound model reported as not served, which is a loud FAIL rather than a silent pass.
+- **Minor, first `NAN_API_KEY` entry (`checks_nan_quota.go:115`): declined.** `secrets/registry.yaml` declares one entry whose var is `NAN_API_KEY` (id `NAN_API_KEY`, also exposing `HIVE_WORKER_API_KEY`). There is no second, scoped key to pick wrongly. The same single-key fact settles AC6's per-key question above.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-047-nan-quota-alarm/` -> `specs/archive/AI-047-nan-quota-alarm/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/AI-047-nan-quota-alarm/` -> `specs/archive/AI-047-nan-quota-alarm/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1766 closes through #1961
+- [x] Promotions above executed (if any)
