@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: eb201e30adbe6067
+generated_sha: e236eb8557cd780e
 id: spec-skill
 type: skill
 status: active
@@ -146,7 +146,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 2. **No clobber:** fail if `$REPO_ROOT/specs/<feature-id>/` exists. Warn if `specs/archive/<feature-id>/` exists.
 3. `mkdir -p $REPO_ROOT/specs/<feature-id>/`.
 4. Read template from `$VAULT_PATH/00_meta/templates/spec-fast-track.md`.
-5. Substitute placeholders: `<feature-id>` -> actual id, `{TITLE}` -> derived from id, `{{date:YYYY-MM-DD}}` -> today (UTC).
+5. Substitute placeholders: `<feature-id>` -> actual id, `{TITLE}` -> derived from id, `{{date:YYYY-MM-DD}}` -> today (UTC). When `--issue <number>` is supplied, set `issue:` to `<repo>#<number>` (what `RenderFastTrack` does).
 6. Write to `$REPO_ROOT/specs/<feature-id>/spec.md`.
 7. **Output:** Paths created. Next step: Fill the single document and proceed with execution.
 
