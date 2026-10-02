@@ -35,8 +35,10 @@ setup() {
         grep -qE '^[[:space:]]*pi\(\) \{ dotf secrets run --only [A-Z_,]*NAN_API_KEY[A-Z_,]* -- pi "\$@"; \}' "$DOTFILES_DIR/$f" \
             || { echo "$f: no pi wrapper injecting NAN_API_KEY"; return 1; }
     done
-    grep -qE '^[[:space:]]*function pi \{ dotf secrets run --only [A-Z_,]*NAN_API_KEY[A-Z_,]* -- pi @args \}' "$DOTFILES_DIR/powershell/profile.ps1" \
-        || { echo "profile.ps1: no pi wrapper injecting NAN_API_KEY"; return 1; }
+    grep -qE '^[[:space:]]*function pi \{' "$DOTFILES_DIR/powershell/profile.ps1" \
+        || { echo "profile.ps1: no pi wrapper"; return 1; }
+    grep -qE '^[[:space:]]*\$env_b64 = \(dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- powershell -NoProfile -Command "\[Convert\]::ToBase64String' "$DOTFILES_DIR/powershell/profile.ps1" \
+        || { echo "profile.ps1: pi wrapper does not extract NAN_API_KEY through secrets run"; return 1; }
 }
 
 # AI-046 AC3. A NaN model defined here replaces the package's model with the
