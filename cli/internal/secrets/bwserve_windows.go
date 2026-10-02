@@ -10,31 +10,26 @@ import "syscall"
 // worth the diff — the value is documented and fixed.
 const detachedProcess = 0x00000008
 
-// createNoWindow suppresses the console window entirely when the executed binary
-// is a console application (e.g. node.exe, or a scoop shim).
-const createNoWindow = 0x08000000
-
 // bwServeDetachAttr detaches the daemon from this process's console so it
-// outlives the terminal that started it — the whole point of one unlock
-// serving every later `dotf` call (bwserve.go). Two flags, two different
-// properties, and only together do they give the Windows analogue of
-// bwserve_unix.go's Setsid:
+// outlives the terminal that started it (the whole point of one unlock serving
+// every later `dotf` call). Three properties give the Windows analogue of Setsid
+// plus hidden execution for shim binaries:
 //
 //   - CREATE_NEW_PROCESS_GROUP re-routes Ctrl+C so a Ctrl+C to the CLI does
 //     not also hit the daemon. It does NOT detach from the console.
 //   - DETACHED_PROCESS creates the child with no console at all. Without it a
 //     console-subsystem child stays attached to its parent's console, and when
 //     that console closes Windows delivers CTRL_CLOSE_EVENT and terminates the
-//     child — measured on the Windows work box (WIN-012/#1293): unlock in one
-//     terminal, close it, and every wrapper in every other terminal failed at
-//     once with "no bw serve daemon is running". The CLI exiting was never the
-//     problem (stdio is NUL, and Windows has no parent→child kill); the
-//     terminal closing was.
+//     child.
+//   - HideWindow: true passes SW_HIDE to STARTF_USESHOWWINDOW, which suppresses
+//     the visible console window when executing through a GUI/Shim boundary
+//     (like Scoop wrappers). CREATE_NO_WINDOW is ignored when combined with
+//     DETACHED_PROCESS, making HideWindow the correct semantic flag.
 //
 // TestBWServeDetachAttr_ChildHasNoConsole asserts the property by effect.
 func bwServeDetachAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
 		HideWindow:    true,
-		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | detachedProcess | createNoWindow,
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | detachedProcess,
 	}
 }
