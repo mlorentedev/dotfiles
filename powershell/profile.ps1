@@ -294,8 +294,45 @@ $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 # the agent had no use for it (#976). Scoping is least privilege and startup
 # time at once.
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    function opencode { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode @args }
-    function pi { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi @args }
+    # On Windows, dotf secrets run passes a pipe (no PTY support, Lesson 270)
+    # which breaks Node TUIs like opencode and pi. We bypass dotf secrets run
+    # and temporarily inject/cleanup the environment so they retain the console.
+    function opencode {
+        $env_b64 = (dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- powershell -NoProfile -Command "[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((`"{0}::::{1}::::{2}`" -f `$env:NAN_API_KEY, `$env:OPENROUTER_API_KEY, `$env:OPENAI_API_KEY)))")
+        if ($env_b64) {
+            $keys = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env_b64)) -split '::::'
+            $env:NAN_API_KEY = $keys[0]
+            $env:OPENROUTER_API_KEY = $keys[1]
+            $env:OPENAI_API_KEY = $keys[2]
+        } else {
+            Write-Error "Failed to resolve API keys (is the vault unlocked?). Run 'dotf secrets unlock' first."
+            return
+        }
+        try {
+            & (Get-Command opencode -CommandType Application | Select-Object -First 1) @args
+        } finally {
+            Remove-Item Env:\NAN_API_KEY -ErrorAction SilentlyContinue
+            Remove-Item Env:\OPENROUTER_API_KEY -ErrorAction SilentlyContinue
+            Remove-Item Env:\OPENAI_API_KEY -ErrorAction SilentlyContinue
+        }
+    }
+    function pi {
+        $env_b64 = (dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- powershell -NoProfile -Command "[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((`"{0}::::{1}`" -f `$env:NAN_API_KEY, `$env:OPENROUTER_API_KEY)))")
+        if ($env_b64) {
+            $keys = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env_b64)) -split '::::'
+            $env:NAN_API_KEY = $keys[0]
+            $env:OPENROUTER_API_KEY = $keys[1]
+        } else {
+            Write-Error "Failed to resolve API keys (is the vault unlocked?). Run 'dotf secrets unlock' first."
+            return
+        }
+        try {
+            & (Get-Command pi -CommandType Application | Select-Object -First 1) @args
+        } finally {
+            Remove-Item Env:\NAN_API_KEY -ErrorAction SilentlyContinue
+            Remove-Item Env:\OPENROUTER_API_KEY -ErrorAction SilentlyContinue
+        }
+    }
     # agy is deliberately NOT wrapped. It authenticates with its own stored
     # credentials and reads no variable this registry exposes, verified against
     # both its settings files and the strings of the binary itself. Wrapping it
