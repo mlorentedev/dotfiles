@@ -199,6 +199,12 @@ func (w *recordingWriter) DeleteItem(item string) error {
 func TestBWServeWriter_DeleteItem(t *testing.T) {
 	f, w, closeSrv := newWriterFake(t)
 	defer closeSrv()
+	// Absence first, while the vault still lists an item: once the only item is
+	// gone the listing is empty, and an empty listing is the sync window, not
+	// absence (BUG-113).
+	if err := w.DeleteItem("never-there"); !errors.Is(err, ErrBWItemNotFound) {
+		t.Errorf("deleting an absent item must say so, got %v", err)
+	}
 	syncs := f.syncs
 	if err := w.DeleteItem("dockerhub"); err != nil {
 		t.Fatalf("DeleteItem: %v", err)
@@ -208,9 +214,6 @@ func TestBWServeWriter_DeleteItem(t *testing.T) {
 	}
 	if f.syncs == syncs {
 		t.Error("a delete must sync, or the next plan still lists the item")
-	}
-	if err := w.DeleteItem("never-there"); !errors.Is(err, ErrBWItemNotFound) {
-		t.Errorf("deleting an absent item must say so, got %v", err)
 	}
 }
 

@@ -201,7 +201,7 @@ func (c BWServeClient) ListItems() ([]ItemSummary, error) {
 		return nil, err
 	}
 
-	rawItems, err := c.call("GET", "/list/object/items", nil)
+	rawItems, err := c.listItems()
 	if err != nil {
 		return nil, err
 	}
