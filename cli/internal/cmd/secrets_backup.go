@@ -47,7 +47,9 @@ func newSecretsBackupCmd() *cobra.Command {
 			"bw serve has no export route, so the export needs the bw CLI's own session. On a\n" +
 			"terminal with the CLI locked, backup prompts once for the master password and\n" +
 			"keeps the session in memory for its own bw children only. Without a terminal\n" +
-			"(a scheduler), prefix the run with BW_SESSION=\"$(bw unlock --raw)\".",
+			"nothing prompts and the command says so; an unattended run has no password\n" +
+			"source (ADR-033), and the master password is never stored in the environment\n" +
+			"(ADR-028).",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {

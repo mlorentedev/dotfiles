@@ -91,8 +91,9 @@ func reportAbsentEscrow(rep *Report, escrow string, live int, regErr error) {
 		rep.Fail(fmt.Sprintf(
 			"no DR escrow at %s — %d secret(s) resolve through Bitwarden and have no local copy, "+
 				"so the remote account is their only copy; create one with "+
-				"`dotf secrets backup` (it prompts for the master password: the export "+
-				"path has no bw serve endpoint, so it unlocks the bw CLI for that one run)",
+				"`dotf secrets backup` from a terminal (it prompts for the master password: "+
+				"the export path has no bw serve endpoint, so it unlocks the bw CLI for that "+
+				"one run; elsewhere, prefix BW_SESSION=\"$(bw unlock --raw)\" from a shell that has one)",
 			escrow, live))
 		return
 	}
