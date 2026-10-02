@@ -350,3 +350,5 @@ tags: [lessons, index, dotfiles]
 | [330 - An empty answer from a cache that is syncing is not absence](lesson-330-an-empty-answer-from-a-syncing-cache-is-not-absence.md) | 2026-10-01 |  |
 | [331 - A shared budget is watched at the account, not the binding](lesson-331-a-shared-budget-is-watched-at-the-account-not-the-binding.md) | 2026-10-01 |  |
 | [332 - A guard kept in a spec folder runs nowhere](lesson-332-a-guard-kept-in-a-spec-folder-runs-nowhere.md) | 2026-10-02 |  |
+| [333 - CreateProcess DETACHED_PROCESS ignores CREATE_NO_WINDOW](lesson-333-createprocess-detached-ignores-no-window.md) | 2026-10-02 |  |
+| [334 - Windows prompts to open extensionless bash scripts](lesson-334-windows-prompts-to-open-extensionless-scripts.md) | 2026-10-02 |  |
