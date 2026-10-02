@@ -89,7 +89,8 @@ func TestSelectBWBackend_ReadAndWriteAlwaysAgree(t *testing.T) {
 // consult the daemon exactly once, so a daemon that changes state cannot split a
 // command across two subjects. A per-call design would probe on every operation.
 func TestSelectBWBackend_ProbesOnce(t *testing.T) {
-	f := &fakeBWServe{status: "unlocked"}
+	// One unrelated item: an empty listing is waited out as a sync window (BUG-113).
+	f := &fakeBWServe{status: "unlocked", names: map[string]string{"id-other": "some-other-item"}}
 	var probes int
 	srv := httptest.NewServer(countingHandler(&probes, "/list/object/folders", f))
 	defer srv.Close()
