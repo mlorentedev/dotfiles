@@ -135,6 +135,23 @@ func (c BWServeClient) StatusDetail() (BWServeStatus, error) {
 // loop retries the former, never the latter).
 var ErrBWServeUnreachable = errors.New("bw serve daemon unreachable")
 
+// ErrBWServeEmptyList marks an item listing that stayed empty for the whole
+// emptyListBackoff budget. It is deliberately NOT ErrBWItemNotFound: an empty
+// answer is what the daemon serves while a forced sync replaces its cache, so it
+// says nothing about whether any item exists, and `set` reads ErrBWItemNotFound
+// as "create it" (BUG-113).
+var ErrBWServeEmptyList = errors.New("bw serve listed no items")
+
+// emptyListBackoff is the wait before each re-read while the daemon answers an
+// empty item list. A forced sync empties the listing for a fraction of a second
+// (measured 2026-10-01: 3 of 40 reads, 100 ms apart, during one sync of a
+// 170-item vault), and a sync takes 1.8-3.8 s end to end, so the budget (~5.5 s)
+// outlasts a whole sync rather than the window one machine happened to show.
+var emptyListBackoff = []time.Duration{
+	100 * time.Millisecond, 200 * time.Millisecond, 400 * time.Millisecond, 800 * time.Millisecond,
+	time.Second, time.Second, time.Second, time.Second,
+}
+
 // BWServeClient talks to an already-running bw serve daemon over its local
 // REST API. Every method here is unit-tested against an httptest.Server
 // fake — no real bw process, no unlocked vault — mirroring how fieldFromItem
@@ -145,6 +162,51 @@ type BWServeClient struct {
 	// HTTPClient is overridable in tests; nil -> a client with a short,
 	// bounded timeout (a hung daemon must not hang the whole CLI).
 	HTTPClient *http.Client
+
+	// Sleep is overridable in tests; nil -> time.Sleep.
+	Sleep func(time.Duration)
+}
+
+func (c BWServeClient) sleep(d time.Duration) {
+	if c.Sleep != nil {
+		c.Sleep(d)
+		return
+	}
+	time.Sleep(d)
+}
+
+// listItems is the one read of /list/object/items every reader goes through.
+//
+// While bw serve runs a forced sync it answers that endpoint with success and an
+// EMPTY list, whoever started the sync — another dotf process, the desktop app,
+// a reconcile in another session. Taken at face value that is an empty vault:
+// doctor reported every registry item missing, and a lookup reported
+// ErrBWItemNotFound for an item that existed (BUG-113). The `?search=` index has
+// the same window, which is why getItemJSON stopped using it (2026-09-29).
+//
+// So an empty answer is never trusted on first sight: it is re-read on
+// emptyListBackoff, and one that stays empty becomes ErrBWServeEmptyList. A
+// genuinely empty vault therefore costs one bounded wait and an error naming it,
+// which is the right trade for a tool whose registry always names items.
+func (c BWServeClient) listItems() (json.RawMessage, error) {
+	for attempt := 0; ; attempt++ {
+		data, err := c.call(http.MethodGet, "/list/object/items", nil)
+		if err != nil {
+			return nil, err
+		}
+		var probe struct {
+			Data []json.RawMessage `json:"data"`
+		}
+		// An unparseable shape is the caller's to describe; only a parsed, empty
+		// list is the sync window.
+		if json.Unmarshal(data, &probe) != nil || len(probe.Data) > 0 {
+			return data, nil
+		}
+		if attempt == len(emptyListBackoff) {
+			return nil, fmt.Errorf("%w after %d reads: a forced sync is probably in flight; retry, or check the vault is not empty", ErrBWServeEmptyList, attempt+1)
+		}
+		c.sleep(emptyListBackoff[attempt])
+	}
 }
 
 func (c BWServeClient) baseURL() string {
@@ -356,7 +418,7 @@ type bwServeListData struct {
 // name merely failed to match — which is precisely the mutation this comparison
 // exists to catch.
 func (r BWServeReader) ItemRevisions() ([]ItemRevision, error) {
-	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
+	data, err := r.Client.listItems()
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items: %w", err)
 	}
@@ -372,7 +434,7 @@ func (r BWServeReader) ItemRevisions() ([]ItemRevision, error) {
 }
 
 func (r BWServeReader) ItemNames() ([]string, error) {
-	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
+	data, err := r.Client.listItems()
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items: %w", err)
 	}
@@ -396,7 +458,7 @@ func (r BWServeReader) ItemNames() ([]string, error) {
 // twice on "bw item not found" for items the unfiltered list held. Absence read
 // that way is the dangerous kind: `set` would create a duplicate.
 func (r BWServeReader) getItemJSON(item string) ([]byte, error) {
-	data, err := r.Client.call(http.MethodGet, "/list/object/items", nil)
+	data, err := r.Client.listItems()
 	if err != nil {
 		return nil, fmt.Errorf("bw serve list items %q: %w", item, err)
 	}

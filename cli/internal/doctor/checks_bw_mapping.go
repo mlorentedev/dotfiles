@@ -28,7 +28,10 @@ import (
 //
 // Severity mirrors checkBitwardenReach's rule: an unreachable or locked vault is
 // not a finding here (that section owns it). Doctor syncs the daemon before it
-// lists, so the listing is the vault and a missing item is a FAIL (#1820). With
+// lists, so the listing is the vault and a missing item is a FAIL (#1820) — with
+// one exception the reader owns: a sync started by ANY other client empties the
+// listing while it runs, and the reader waits that window out and reports one
+// that never closes as an error, which SKIPs here (BUG-113). With
 // no sync wired, or a sync that failed, the listing is a cache of unknown age and
 // the section SKIPs. It used to guess that age from `bw status`'s lastSync and
 // WARN on a stale one (BUG-087), but that dates the CLI's cache, not the
