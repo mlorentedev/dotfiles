@@ -180,13 +180,12 @@ func TestDR_EscrowSeverityFollowsExposure(t *testing.T) {
 			if !strings.Contains(escrowLine, "28") {
 				t.Errorf("the FAIL must name how many secrets have no local copy, got: %s", escrowLine)
 			}
-			// A bare `dotf secrets backup` fails with "Vault is locked": its
-			// export path has no bw serve endpoint (verified against the shipped
-			// @bitwarden/cli bundle -- the serve router has no export route), so
-			// it needs a CLI session. Permanent, not pending #993, which is why
-			// the message names it plainly and must not cite that issue.
-			if !strings.Contains(escrowLine, "BW_SESSION") {
-				t.Errorf("the FAIL must name the invocation that actually creates an escrow, got: %s", escrowLine)
+			// Export has no bw serve endpoint (the shipped @bitwarden/cli serve
+			// router has no export route), so the escrow needs a bw CLI session.
+			// Since #1008 a bare `dotf secrets backup` acquires it with one
+			// prompt, so the remedy is the bare command and says it prompts.
+			if !strings.Contains(escrowLine, "`dotf secrets backup`") || !strings.Contains(escrowLine, "prompts") {
+				t.Errorf("the FAIL must name the bare command and that it prompts, got: %s", escrowLine)
 			}
 			if strings.Contains(escrowLine, "#993") {
 				t.Errorf("the remedy is permanent, not blocked on #993; citing it dates the message: %s", escrowLine)

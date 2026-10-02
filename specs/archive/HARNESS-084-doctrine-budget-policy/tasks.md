@@ -15,8 +15,8 @@ created: "2026-09-05"
       markers reach no surface.
 - [x] Remove the pipe from `render_region` so a missing source-of-record still fails.
 
-## Not done, deliberately
+## Not done, deliberately (deferred to #1241, which stays open for them)
 
-- [ ] The budget POLICY #1241 asks for. This is the mechanism a policy would need; deciding
-      which records may mark regions is a separate judgement.
-- [ ] Any enforcement of *which* regions qualify. The boundary is stated, not checked.
+- The budget POLICY #1241 asks for. This spec ships the mechanism a policy would need; deciding
+  which records may mark regions is a separate judgement.
+- Any enforcement of *which* regions qualify. The boundary is stated, not checked.

@@ -947,6 +947,22 @@ DIAG
     [ "$(stat -c '%a' "$F")" = "$(stat -c '%a' "$FAKEHOME/.probe-umask")" ]
 }
 
+@test "doctrine: the deployed file keeps umask permissions, not a temp file's 0600" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+    # A second deploy rewrites an EXISTING file, the path that used to stage the
+    # new content with mktemp in $TMPDIR and mv it over the target: 0600, and a
+    # copy instead of a rename when $TMPDIR is another filesystem (HARNESS-084
+    # review, round 2). Same yardstick as the agents test above.
+    printf 'user line\n' >> "$FAKEHOME/.gemini/GEMINI.md"
+    run_deploy;  [ "$status" -eq 0 ]
+    printf 'probe\n' > "$FAKEHOME/.probe-umask"
+    [ "$(stat -c '%a' "$FAKEHOME/.gemini/GEMINI.md")" = "$(stat -c '%a' "$FAKEHOME/.probe-umask")" ]
+    # and the sibling temp is gone
+    [ -z "$(find "$FAKEHOME/.gemini" -name '*.tmp.*')" ]
+}
+
 @test "agents: a failed render leaves no temp file beside the target" {
     seed_agents_fixture
     run_refresh; [ "$status" -eq 0 ]
@@ -1401,6 +1417,27 @@ EOF
     # The markers are machinery, not content: they reach no surface.
     refute_grep_fixed 'full-only:' "$FAKEHOME/.gemini/GEMINI.md"
     refute_grep_fixed 'full-only:' "$REPO/TARGET.md"
+}
+
+# GUARD: an unclosed full-only region fails the deploy instead of truncating it.
+#
+# The test above proves a CLOSED region ends where it should. Without the end
+# marker, the compactor used to skip every line after the begin marker -- the
+# rest of that record and every record after it -- and exit 0, so the capped
+# payload only got smaller. No cap assertion can tell that apart from the
+# marker working (HARNESS-084 review, round 1).
+@test "HARNESS-056: an unclosed full-only region fails the deploy instead of truncating the payload" {
+    seed_doctrine_fixture
+    cat > "$REPO/harness/enforced/demo.md" <<'EOF'
+- rule one
+<!-- full-only:begin -->
+- the exception a human decides
+- rule two that an unclosed region would swallow
+EOF
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"full-only:begin has no matching full-only:end"* ]]
 }
 
 
