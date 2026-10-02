@@ -21,7 +21,7 @@ We will bypass \dotf secrets run\'s stdout redaction mechanism via a Base64 extr
 
 The wrappers in \powershell/profile.ps1\ for \opencode\ and \pi\ will:
 1. Call \dotf secrets run --only ...\ but pass it a PowerShell one-liner that encodes the environment variables to a Base64 string.
-2. Since the string is encoded, the \edactWriter\ doesn't intercept it.
+2. Since the string is encoded, the \edactWriter\ doesn't intercept it.
 3. The parent shell captures the Base64 string, decodes it into the API keys, and temporarily places them in the \$env\ variables.
 4. Execute the raw binaries (\pi.cmd\, \opencode.cmd\) which now retain full interactive TTY console capabilities.
 5. Use a \	ry/finally\ block to guarantee the injected secrets are scrubbed from the session environment variable block upon exit.
