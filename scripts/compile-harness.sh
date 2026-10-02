@@ -213,6 +213,15 @@ render_region_compact() {
         # The blank line that followed it would otherwise leave a double gap.
         skipped && /^[[:space:]]*$/ { skipped = 0; next }
         { skipped = 0; print }
+        # An unclosed region would skip every line after it -- the rest of the
+        # record and every record after it -- and only make the payload
+        # smaller, which no cap check can tell from success. Fail instead.
+        END {
+            if (full_only) {
+                print "[deploy] ERROR a full-only:begin has no matching full-only:end -- the capped payload would lose every rule after it" > "/dev/stderr"
+                exit 1
+            }
+        }
     '
 }
 
@@ -229,7 +238,8 @@ cap_for() {
 # Args: <file> <begin_marker> <content_file>
 replace_region() {
     local file="$1" begin_marker="$2" content_file="$3" tmp rc=0
-    tmp="$(mktemp)"
+    # Beside the target, not mktemp in $TMPDIR: see sibling-temp note at deploy_agents.
+    tmp="$file.tmp.$$"
     if awk -v beginm="$begin_marker" -v endm="$END_MARKER" -v bp="$BEGIN_PREFIX" -v cf="$content_file" '
         index($0,bp)==1 {
             print beginm
@@ -258,14 +268,14 @@ target_inject() { jq -r --arg f "$1" '.targets[] | select(.file==$f) | .inject[]
 # time (the field says "this is what I was refreshed from"), not of the record.
 inject_record_provenance() {
     local file="$1" srcpath="$2" sha="$3" tmp
-    tmp="$(mktemp)"
+    tmp="$file.tmp.$$"
     awk -v gf="$srcpath" -v gs="$sha" '
         /^---[[:space:]]*$/ {
             fm++
             if (fm==1) { print; print "generated: true"; print "generated_from: " gf; print "generated_sha: " gs; next }
         }
         { print }
-    ' "$file" > "$tmp"
+    ' "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
     mv "$tmp" "$file"
 }
 
@@ -1231,8 +1241,12 @@ migrate_legacy_preamble() {
     local file="$1" legacy tmp
     legacy="> Cross-agent doctrine. The marked region is generated $(printf '\xe2\x80\x94') edit the vault pattern and re-run setup."
     grep -qxF -- "$legacy" "$file" 2>/dev/null || return 0
-    tmp="$(mktemp)"
-    awk -v old="$legacy" -v new="$DOCTRINE_PREAMBLE" '$0 == old { print new; next } { print }' "$file" > "$tmp" && mv "$tmp" "$file"
+    tmp="$file.tmp.$$"
+    if awk -v old="$legacy" -v new="$DOCTRINE_PREAMBLE" '$0 == old { print new; next } { print }' "$file" > "$tmp"; then
+        mv "$tmp" "$file"
+    else
+        rm -f "$tmp"; return 1
+    fi
 }
 
 deploy_doctrine() {
@@ -1270,14 +1284,16 @@ deploy_doctrine() {
 
         sha="$(sha_of "$payload")"
         begin="$BEGIN_PREFIX (sha256:$sha) -- vault $(jq -r '.vault_subpath' "$MANIFEST"); edit there + re-run setup, do NOT edit between markers -->"
-        tmp="$(mktemp)"
+        # A sibling temp, not mktemp: a deployed file keeps umask permissions and
+        # the mv stays a same-filesystem rename (see deploy_agents' note).
+        tmp="$file_abs.tmp.$$"
         if grep -q "^$BEGIN_PREFIX" "$file_abs" && grep -qF "$END_MARKER" "$file_abs"; then
             awk -v beginm="$begin" -v endm="$END_MARKER" -v bp="$BEGIN_PREFIX" -v cf="$payload" '
                 index($0,bp)==1 { print beginm; while ((getline l < cf) > 0) print l; close(cf); skip=1; next }
                 $0==endm { if (skip){ print; skip=0; next } }
                 skip { next }
                 { print }
-            ' "$file_abs" > "$tmp"
+            ' "$file_abs" > "$tmp" || { rm -f "$tmp"; return 1; }
         else
             cat "$file_abs" > "$tmp"
             { printf '\n%s\n' "$begin"; cat "$payload"; printf '%s\n' "$END_MARKER"; } >> "$tmp"
