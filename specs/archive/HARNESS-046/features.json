@@ -25,7 +25,7 @@
     "behavior": "ROSTER.md and the definitions agree on forced skills, and no invocable role bundles fewer than three",
     "verification": "python3 scripts/check-roster-consistency.py && ~/.local/bin/bats tests/roster-consistency.bats tests/roster-consistency-real.bats",
     "state": "verified",
-    "evidence": "2026-08-25 on msi: 'roster and definitions consistent (6 invocable roles, all >= 3 skills)', exit 0. Confirmed the guard can fail: removing read-all-adrs from the architect row made it exit 1 naming the divergence; restoring returned it to exit 0. A check never observed failing is not a verified check."
+    "evidence": "2026-10-02: python3 scripts/check-roster-consistency.py -> \"roster and definitions consistent (6 invocable roles, all >= 3 skills)\", exit 0; bats tests/roster-consistency.bats tests/roster-consistency-real.bats tests/stub-real-pairing.bats -> 11/11 ok; mutation (list != restored) turns the reorder fixture and the live case red"
   },
   {
     "id": "HARNESS-046-f5",
