@@ -50,7 +50,15 @@
     "opencode and the MCP registration blocks are deliberately absent — they are",
     "slices 2 and 3, and opencode's is gated on testing whether it resolves",
     "{env:VAR} itself rather than assuming it, which is the assumption that made",
-    "#987 expensive."
+    "#987 expensive.",
+    "",
+    "pi-compaction merges ONLY the compaction key into pi's settings.json, a file",
+    "pi rewrites at runtime. The rest of that file is seeded once by the setup",
+    "scripts, which run the seed BEFORE `dotf deploy`: the other order lets this",
+    "merge create a settings.json holding nothing but compaction, and the seed then",
+    "sees a file and never writes defaultProvider/defaultModel (#1938). reserveTokens",
+    "is round(0.6 x contextWindow) from ai/pi/models.json, so compaction triggers at",
+    "40% of the window; tests/pi-config.bats derives and asserts every value."
   ],
   "version": 3,
   "configs": [
@@ -119,6 +127,14 @@
       "render": false,
       "mode": "0644",
       "paths": "slash",
+      "strategy": "merge"
+    },
+    {
+      "name": "pi-compaction",
+      "src": "ai/pi/compaction.json",
+      "dst": "{HOME}/.pi/agent/settings.json",
+      "render": false,
+      "mode": "0644",
       "strategy": "merge"
     }
   ]

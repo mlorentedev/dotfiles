@@ -206,6 +206,26 @@ setup() {
     done
 }
 
+# #1938: the seed writes pi's settings.json, then `dotf deploy` merges the
+# compaction overrides into it. Both halves must land on a fresh box: the
+# overrides prove the merge ran, defaultModel proves it ran onto the seed and
+# did not create the file itself (the reverse order leaves defaultModel out).
+@test "pi settings.json is seeded and carries the compaction overrides [#1938]" {
+    local jq_bin=""
+    if command -v jq >/dev/null 2>&1; then
+        jq_bin="jq"
+    elif [ -x "$HOME/.local/bin/jq" ]; then
+        jq_bin="$HOME/.local/bin/jq"
+    else
+        echo "jq is absent from PATH and ~/.local/bin"
+        return 1
+    fi
+    local settings="$HOME/.pi/agent/settings.json"
+    [ -f "$settings" ]
+    "$jq_bin" -e '.defaultModel | type == "string"' "$settings"
+    "$jq_bin" -e '.compaction.modelOverrides["nan/deepseek-v4-flash"].reserveTokens == 600000' "$settings"
+}
+
 # =============================================================================
 # Section 6: Generated files
 # =============================================================================

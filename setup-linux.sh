@@ -748,6 +748,27 @@ fi
 
 ensure_directory "$PI_AGENT_DIR"
 
+# settings.json is SEED-IF-MISSING, unlike models.json/tui.json (dotf deploy): pi
+# rewrites this file at runtime (lastChangelogVersion, theme, the model picked
+# in the TUI), so it is the one deployed config the user's own tool edits.
+# It previously used the same "copy unless identical" shape as its neighbours,
+# which for a self-mutating file means copy ALWAYS -- tests/pi-config.bats
+# forbids lastChangelogVersion in the committed copy, so `cmp` could never
+# match once pi had run, and every setup run silently reset the user's theme
+# and default model. Seed it, then never touch it again. The seed runs BEFORE
+# `dotf deploy`: its pi-compaction entry merges into this file, and a merge
+# onto a missing file would create one the seed then never fills (#1938).
+PI_SETTINGS_SRC="$CURRENT_DIR/ai/pi/settings.json"
+PI_SETTINGS_DST="$PI_AGENT_DIR/settings.json"
+if [ -f "$PI_SETTINGS_SRC" ]; then
+    if [ -f "$PI_SETTINGS_DST" ]; then
+        log_info "pi settings.json present, preserving local edits"
+    else
+        cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
+        log_success "Seeded pi settings.json at $PI_SETTINGS_DST"
+    fi
+fi
+
 # Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
 # every OS, replacing the per-config copies that lived here and their twins in
 # setup-windows.ps1. ADR-020 C7 keeps this script on the thin bootstrap; staging,
@@ -774,25 +795,6 @@ if [ -f "$AGENTS_SRC" ]; then
     else
         cp "$AGENTS_SRC" "$PI_AGENTS_DST"
         log_success "Deployed AGENTS.md to $PI_AGENTS_DST"
-    fi
-fi
-
-# settings.json is SEED-IF-MISSING, unlike models.json/tui.json above: pi
-# rewrites this file at runtime (lastChangelogVersion, theme, the model picked
-# in the TUI), so it is the one deployed config the user's own tool edits.
-# It previously used the same "copy unless identical" shape as its neighbours,
-# which for a self-mutating file means copy ALWAYS -- tests/pi-config.bats
-# forbids lastChangelogVersion in the committed copy, so `cmp` could never
-# match once pi had run, and every setup run silently reset the user's theme
-# and default model. Seed it, then never touch it again.
-PI_SETTINGS_SRC="$CURRENT_DIR/ai/pi/settings.json"
-PI_SETTINGS_DST="$PI_AGENT_DIR/settings.json"
-if [ -f "$PI_SETTINGS_SRC" ]; then
-    if [ -f "$PI_SETTINGS_DST" ]; then
-        log_info "pi settings.json present, preserving local edits"
-    else
-        cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
-        log_success "Seeded pi settings.json at $PI_SETTINGS_DST"
     fi
 fi
 

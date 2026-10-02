@@ -1187,6 +1187,23 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 }
 Ensure-Directory $piAgentDir
 
+# settings.json is SEED-IF-MISSING (Linux parity: setup-linux.sh pi settings
+# block). pi rewrites this file at runtime -- lastChangelogVersion, theme, the
+# model picked in the TUI -- so a "copy unless identical" check can never match
+# and would reset those on every setup run. The seed runs BEFORE `dotf deploy`:
+# its pi-compaction entry merges into this file, and a merge onto a missing
+# file would create one the seed then never fills (#1938).
+$piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
+$piSettingsDst = Join-Path $piAgentDir 'settings.json'
+if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
+    if (Test-Path -LiteralPath $piSettingsDst) {
+        Write-Info "pi settings.json present, preserving local edits"
+    } else {
+        Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst
+        Write-Success "Seeded pi settings.json at $piSettingsDst"
+    }
+}
+
 # Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
 # every OS, replacing the per-config copies that lived here and their twins in
 # setup-linux.sh. ADR-020 C7 keeps this script on the thin bootstrap; staging,
@@ -1211,21 +1228,6 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     } else {
         Copy-Item -LiteralPath $agentsSrc -Destination $piAgentsDst -Force
         Write-Success "Deployed AGENTS.md to $piAgentsDst (fallback)"
-    }
-}
-
-# settings.json is SEED-IF-MISSING (Linux parity: setup-linux.sh pi settings
-# block). pi rewrites this file at runtime -- lastChangelogVersion, theme, the
-# model picked in the TUI -- so a "copy unless identical" check can never match
-# and would reset those on every setup run.
-$piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
-$piSettingsDst = Join-Path $piAgentDir 'settings.json'
-if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
-    if (Test-Path -LiteralPath $piSettingsDst) {
-        Write-Info "pi settings.json present, preserving local edits"
-    } else {
-        Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst
-        Write-Success "Seeded pi settings.json at $piSettingsDst"
     }
 }
 
