@@ -57,6 +57,14 @@ near-miss is more useful than the fix.
 - **Minor, `fold_to_ascii` and `migrate_legacy_preamble` undocumented: declined.** Neither is this spec's change. Both landed in #1685 (`ebc2e20c`), and they reached the reviewed diff because the review base (`4d0ffa99`) predates that merge.
 - **Minor, command substitution strips trailing newlines in `render_region`: declined.** The full surface is a managed region that `replace_region` writes line by line, so trailing blank lines carry nothing. The reviewer marked it "no action required".
 
+## Review dispositions (round 2, agy/gemini-3.1-pro-high, FAIL)
+
+The round-2 `review.md` is not in this branch. The implementer ran `git checkout --` over the spec folder to drop a reviewer scratch file, and that reverted the uncommitted round-2 verdict to the committed round-1 file. Its transcript holds the reviewer's summary, not the file. Its one finding, as the verdict stated it:
+
+> Major, REAL, Reliability: both `migrate_legacy_preamble` and the main `deploy_doctrine` update loop use `mktemp` (creates a `/tmp` file with `0600`) and `mv` over the deployed artifact. This breaks atomic rename (cross-filesystem) and overwrites the user's file permissions to `0600`. The same defect was already documented and avoided elsewhere in the script, but was reintroduced and expanded here. Fix: code + tests (use a neighbor temp file, add a `stat` check).
+
+- **Applied.** Every writer that renames over a real file now stages beside it (`<file>.tmp.$$`) and removes the temp on failure: `replace_region`, `inject_record_provenance`, `migrate_legacy_preamble` and `deploy_doctrine`. `fold_to_ascii` still uses `mktemp`, because its target is itself a temp payload. Guard: `doctrine: the deployed file keeps umask permissions, not a temp file's 0600`. It was red before the fix (the mode check failed) and green after. `tests/compile-harness.bats` and `tests/skills-pipeline.bats` pass 111/111, and `shellcheck` still reports 6 findings, none of them new.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: the near-miss above is lesson 268's class, already recorded.

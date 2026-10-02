@@ -947,6 +947,22 @@ DIAG
     [ "$(stat -c '%a' "$F")" = "$(stat -c '%a' "$FAKEHOME/.probe-umask")" ]
 }
 
+@test "doctrine: the deployed file keeps umask permissions, not a temp file's 0600" {
+    seed_doctrine_fixture
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy;  [ "$status" -eq 0 ]
+    # A second deploy rewrites an EXISTING file, the path that used to stage the
+    # new content with mktemp in $TMPDIR and mv it over the target: 0600, and a
+    # copy instead of a rename when $TMPDIR is another filesystem (HARNESS-084
+    # review, round 2). Same yardstick as the agents test above.
+    printf 'user line\n' >> "$FAKEHOME/.gemini/GEMINI.md"
+    run_deploy;  [ "$status" -eq 0 ]
+    printf 'probe\n' > "$FAKEHOME/.probe-umask"
+    [ "$(stat -c '%a' "$FAKEHOME/.gemini/GEMINI.md")" = "$(stat -c '%a' "$FAKEHOME/.probe-umask")" ]
+    # and the sibling temp is gone
+    [ -z "$(find "$FAKEHOME/.gemini" -name '*.tmp.*')" ]
+}
+
 @test "agents: a failed render leaves no temp file beside the target" {
     seed_agents_fixture
     run_refresh; [ "$status" -eq 0 ]
