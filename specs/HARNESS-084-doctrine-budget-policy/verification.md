@@ -51,6 +51,12 @@ This is lesson 268 and the repo's own prohibited-pattern table — *"drop the pi
 met while adding a feature to the script that generates those very rules. Recorded because the
 near-miss is more useful than the fix.
 
+## Review dispositions (round 1, agy/gemini-3.1-pro-high, FAIL)
+
+- **Blocker, unclosed `full-only` region truncates silently: applied.** `render_region_compact`'s awk now ends with an `END` check that prints `a full-only:begin has no matching full-only:end` and exits 1, and `set -euo pipefail` carries that out of `deploy_doctrine`. Guard: `HARNESS-056: an unclosed full-only region fails the deploy instead of truncating the payload`. It was red before the fix (`[ "$status" -ne 0 ]` failed) and green after; `tests/compile-harness.bats` and `tests/skills-pipeline.bats` 110/110. This corrects the earlier claim that the guard "asserts the region closes": it asserted that a *closed* region ends, which is not the same thing.
+- **Minor, `fold_to_ascii` and `migrate_legacy_preamble` undocumented: declined.** Neither is this spec's change. Both landed in #1685 (`ebc2e20c`), and they reached the reviewed diff because the review base (`4d0ffa99`) predates that merge.
+- **Minor, command substitution strips trailing newlines in `render_region`: declined.** The full surface is a managed region that `replace_region` writes line by line, so trailing blank lines carry nothing. The reviewer marked it "no action required".
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: the near-miss above is lesson 268's class, already recorded.

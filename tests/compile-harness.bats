@@ -1403,6 +1403,27 @@ EOF
     refute_grep_fixed 'full-only:' "$REPO/TARGET.md"
 }
 
+# GUARD: an unclosed full-only region fails the deploy instead of truncating it.
+#
+# The test above proves a CLOSED region ends where it should. Without the end
+# marker, the compactor used to skip every line after the begin marker -- the
+# rest of that record and every record after it -- and exit 0, so the capped
+# payload only got smaller. No cap assertion can tell that apart from the
+# marker working (HARNESS-084 review, round 1).
+@test "HARNESS-056: an unclosed full-only region fails the deploy instead of truncating the payload" {
+    seed_doctrine_fixture
+    cat > "$REPO/harness/enforced/demo.md" <<'EOF'
+- rule one
+<!-- full-only:begin -->
+- the exception a human decides
+- rule two that an unclosed region would swallow
+EOF
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"full-only:begin has no matching full-only:end"* ]]
+}
+
 
 # GUARD: a capped surface receives pure ASCII, so the cap's unit cannot matter.
 #

@@ -213,6 +213,15 @@ render_region_compact() {
         # The blank line that followed it would otherwise leave a double gap.
         skipped && /^[[:space:]]*$/ { skipped = 0; next }
         { skipped = 0; print }
+        # An unclosed region would skip every line after it -- the rest of the
+        # record and every record after it -- and only make the payload
+        # smaller, which no cap check can tell from success. Fail instead.
+        END {
+            if (full_only) {
+                print "[deploy] ERROR a full-only:begin has no matching full-only:end -- the capped payload would lose every rule after it" > "/dev/stderr"
+                exit 1
+            }
+        }
     '
 }
 
