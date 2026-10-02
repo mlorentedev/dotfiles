@@ -3,8 +3,11 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // The exact live state that took the archive gate down on 2026-08-15: the
@@ -83,6 +86,31 @@ func TestCheckBWMapping_UnavailableVaultSkips(t *testing.T) {
 
 	if rep.Failures() != 0 {
 		t.Fatalf("an unavailable vault is not a mapping failure; got %d\n%s", rep.Failures(), buf.String())
+	}
+	if !strings.Contains(buf.String(), "mapping unverifiable") {
+		t.Errorf("expected the unverifiable SKIP\n%s", buf.String())
+	}
+}
+
+// BUG-113: a listing that stays empty is the daemon mid-sync, not a vault with
+// none of the registry's items. Before the reader waited that window out and
+// named it, `dotf doctor --fix` reported 22 FAILs, one per item, for a vault that
+// held all of them.
+func TestCheckBWMapping_EmptyListingSkipsInsteadOfFailingEveryItem(t *testing.T) {
+	registry := "version: 1\nsecrets:\n" +
+		"  - {id: NAN_API_KEY, plane: app, backend: bw, bw: {item: nan-api-key, field: api-key}, expose: {env: NAN_API_KEY}}\n"
+
+	sys := newSys(nil, nil, nil)
+	sys.BWItemNames = func() ([]string, error) {
+		return nil, fmt.Errorf("bw serve list items: %w after 9 reads", secrets.ErrBWServeEmptyList)
+	}
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkBWMapping(sys, patCfg(t, registry), rep)
+
+	if rep.Failures() != 0 {
+		t.Fatalf("an empty listing is not a missing item; got %d FAIL(s)\n%s", rep.Failures(), buf.String())
 	}
 	if !strings.Contains(buf.String(), "mapping unverifiable") {
 		t.Errorf("expected the unverifiable SKIP\n%s", buf.String())

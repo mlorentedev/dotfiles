@@ -77,6 +77,11 @@ type fakeBWServe struct {
 	// sync: a `?search=` query answers an empty list while the unfiltered list is
 	// complete. Measured live during a curate apply (2026-09-29).
 	searchIndexLag bool
+
+	// emptyListReads models the daemon mid forced sync: the next N unfiltered
+	// item listings answer success with an EMPTY list although the vault holds
+	// items. Measured live 2026-10-01 (BUG-113): 3 of 40 reads during one sync.
+	emptyListReads int
 }
 
 func (f *fakeBWServe) handler() http.HandlerFunc {
@@ -169,6 +174,11 @@ func (f *fakeBWServe) handleListItems(w http.ResponseWriter, r *http.Request) {
 	// would let a layout test pass against a shape the daemon never sends.
 	search := r.URL.Query().Get("search")
 	if search != "" && f.searchIndexLag {
+		writeEnvelope(w, true, "", map[string]any{"object": "list", "data": []any{}})
+		return
+	}
+	if search == "" && f.emptyListReads > 0 {
+		f.emptyListReads--
 		writeEnvelope(w, true, "", map[string]any{"object": "list", "data": []any{}})
 		return
 	}
@@ -469,7 +479,9 @@ func TestBWServeReader_Field_MatchesBWGetShape(t *testing.T) {
 }
 
 func TestBWServeReader_Field_NotFound(t *testing.T) {
-	f := &fakeBWServe{status: "unlocked", names: map[string]string{}}
+	// A vault holding OTHER items: an empty listing is the sync window, not
+	// absence (BUG-113), so absence is only provable against a non-empty one.
+	f := &fakeBWServe{status: "unlocked", names: map[string]string{"id-other": "some-other-item"}}
 	srv := httptest.NewServer(f.handler())
 	defer srv.Close()
 	r := BWServeReader{Client: BWServeClient{BaseURL: srv.URL}}
