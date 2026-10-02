@@ -65,6 +65,13 @@ The round-2 `review.md` is not in this branch. The implementer ran `git checkout
 
 - **Applied.** Every writer that renames over a real file now stages beside it (`<file>.tmp.$$`) and removes the temp on failure: `replace_region`, `inject_record_provenance`, `migrate_legacy_preamble` and `deploy_doctrine`. `fold_to_ascii` still uses `mktemp`, because its target is itself a temp payload. Guard: `doctrine: the deployed file keeps umask permissions, not a temp file's 0600`. It was red before the fix (the mode check failed) and green after. `tests/compile-harness.bats` and `tests/skills-pipeline.bats` pass 111/111, and `shellcheck` still reports 6 findings, none of them new.
 
+## Review dispositions (round 3, agy/gemini-3.1-pro-high, PASS WITH GAPS)
+
+- **Major, THEORETICAL, a marker sharing a line with doctrine drops that text: deferred to #1963 (HARNESS-173).**
+- **Major, THEORETICAL, an unclosed region closed by a later record's end marker: deferred to #1963 (HARNESS-173).**
+
+Both have one root cause: the markers have no line grammar and no per-record scope. Neither shape exists in any record today, since the only markers are balanced and sit on their own lines in `harness/enforced/no-auto-merge.md`. This spec has already been through two fix rounds.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: the near-miss above is lesson 268's class, already recorded.
