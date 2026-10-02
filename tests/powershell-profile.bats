@@ -71,14 +71,15 @@ setup() {
     # are wrapped to launch through `dotf secrets run`, so the secret lives only
     # in their child process — never the session.
     refute_grep 'load-secrets\.ps1' "$PROFILE_SCRIPT"
-    grep -qE 'function opencode \{ dotf secrets run' "$PROFILE_SCRIPT"
+    grep -qE 'function opencode \{' "$PROFILE_SCRIPT"
+    grep -qE 'dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY' "$PROFILE_SCRIPT"
 }
 
 @test "parity: neither .bashrc nor profile.ps1 auto-loads secrets; both wrap the AI CLIs" {
     refute_grep 'source .*load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
     refute_grep 'load-secrets\.ps1' "$PROFILE_SCRIPT"
     grep -qE 'opencode\(\) \{ dotf secrets run' "$DOTFILES_DIR/.bashrc"
-    grep -qE 'function opencode \{ dotf secrets run' "$PROFILE_SCRIPT"
+    grep -qE 'function opencode \{' "$PROFILE_SCRIPT"
 }
 
 # --- Cross-OS oc behaviour (intentional asymmetry, documented) ---
