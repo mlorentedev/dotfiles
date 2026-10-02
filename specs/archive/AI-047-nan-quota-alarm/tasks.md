@@ -40,7 +40,7 @@ created: "2026-09-26"
 ## Closing
 
 - [x] Every acceptance criterion covered by a test or a recorded measurement
-- [ ] Independent adversarial review before archive
+- [x] Independent adversarial review before archive (`review.md`, agy/gemini-3.1-pro-high, PASS WITH GAPS)
 
 ## Machine-readable features
 

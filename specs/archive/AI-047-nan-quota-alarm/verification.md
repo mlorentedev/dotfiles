@@ -99,5 +99,5 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/AI-047-nan-quota-alarm/` -> `specs/archive/AI-047-nan-quota-alarm/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1766 closes through #1961
 - [x] Promotions above executed (if any)
