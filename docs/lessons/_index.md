@@ -348,3 +348,4 @@ tags: [lessons, index, dotfiles]
 | [328 - An idempotence test presumes the first run converged](lesson-328-an-idempotence-test-presumes-the-first-run-converged.md) | 2026-10-01 |  |
 | [329 - A git fixture whose new files repeat the deleted ones' content is a rename, and counts zero lines](lesson-329-a-git-fixture-with-identical-content-is-a-rename.md) | 2026-10-01 |  |
 | [330 - An empty answer from a cache that is syncing is not absence](lesson-330-an-empty-answer-from-a-syncing-cache-is-not-absence.md) | 2026-10-01 |  |
+| [331 - A shared budget is watched at the account, not the binding](lesson-331-a-shared-budget-is-watched-at-the-account-not-the-binding.md) | 2026-10-01 |  |

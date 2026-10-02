@@ -1,7 +1,7 @@
 [
   {
     "id": "AI-047-nan-quota-alarm-f1",
-    "behavior": "A recorded /v1/usage fixture and the declared table give WARN at 83%, PASS at 10%, nothing for an unmetered model",
+    "behavior": "A recorded /v1/usage fixture and the declared table give WARN at 83%, INFO at 10%, nothing above PASS for an unmetered model",
     "verification": "cd cli && go test ./internal/nanquota/ -run 'TestEvaluate'",
     "state": "pending",
     "evidence": ""
@@ -38,6 +38,13 @@
     "id": "AI-047-nan-quota-alarm-f6",
     "behavior": "hermes's digest no longer states a single 500M pool",
     "verification": "echo 'PR-2: vault change' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "AI-047-nan-quota-alarm-f7",
+    "behavior": "Every metered model and every model with usage is watched, bound or not",
+    "verification": "cd cli && go test ./internal/nanquota/ -run 'TestEvaluateWatches|TestEvaluateIgnores' && go test ./internal/doctor/ -run 'TestCheckNaNQuota_WatchesMeteredModelsNothingBinds'",
     "state": "pending",
     "evidence": ""
   }
