@@ -75,8 +75,8 @@ func reportAbsentEscrow(rep *Report, escrow string, live int, regErr error) {
 		// exist only on a remote server you do not control" is what makes an
 		// operator act.
 		//
-		// The BW_SESSION form is named plainly, because for `backup` it is not a
-		// workaround — it is the invocation, permanently.
+		// The escrow permanently needs a bw CLI session; since #1008 the command
+		// acquires it itself with one prompt, so the remedy is the bare command.
 		//
 		// Everything else in the write path is moving to the bw serve daemon
 		// (#993), and it was tempting to phrase this as "broken until that
@@ -91,8 +91,8 @@ func reportAbsentEscrow(rep *Report, escrow string, live int, regErr error) {
 		rep.Fail(fmt.Sprintf(
 			"no DR escrow at %s — %d secret(s) resolve through Bitwarden and have no local copy, "+
 				"so the remote account is their only copy; create one with "+
-				"`BW_SESSION=\"$(bw unlock --raw)\" dotf secrets backup` "+
-				"(the export path has no bw serve endpoint, so it needs a CLI session)",
+				"`dotf secrets backup` (it prompts for the master password: the export "+
+				"path has no bw serve endpoint, so it unlocks the bw CLI for that one run)",
 			escrow, live))
 		return
 	}

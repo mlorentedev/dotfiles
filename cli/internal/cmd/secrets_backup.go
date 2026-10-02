@@ -17,10 +17,14 @@ import (
 // network) — the same pattern as ageDecryptor/bwReader in secrets.go. Production wires the
 // real shell-outs (BWExport, AgeEncrypt, AgeRecipient) and the checkout-resolving dest.
 var (
-	bwExporter       secrets.BWExporter  = secrets.BWExport{}
-	ageEncryptor     secrets.Encryptor   = secrets.AgeEncrypt
-	ageRecipient     secrets.RecipientFn = secrets.AgeRecipient
-	repoSensitiveDir                     = env.RepoSensitiveDir
+	bwExporter secrets.BWExporter = secrets.BWExport{}
+	// bwSessionExporter and bwUnlock are the #1008 seams: the exporter bound to a
+	// session the command acquired, and the unlock that acquires it.
+	bwSessionExporter                     = func(session string) secrets.BWExporter { return secrets.BWExport{Session: session} }
+	bwUnlock                              = secrets.BWUnlockSession
+	ageEncryptor      secrets.Encryptor   = secrets.AgeEncrypt
+	ageRecipient      secrets.RecipientFn = secrets.AgeRecipient
+	repoSensitiveDir                      = env.RepoSensitiveDir
 )
 
 // newSecretsBackupCmd is `dotf secrets backup`: the disaster-recovery escrow of ADR-028
@@ -39,7 +43,11 @@ func newSecretsBackupCmd() *cobra.Command {
 			"sensitive/dr/bitwarden-export.age in the dotfiles checkout. The plaintext is never\n" +
 			"written to disk. The artifact is decrypted back and verified to round-trip before\n" +
 			"the command succeeds; a corrupt escrow is removed, never committed. Recover with\n" +
-			"the offline age key + a repo clone (docs/runbooks/guide-secrets-governance.md).",
+			"the offline age key + a repo clone (docs/runbooks/guide-secrets-governance.md).\n\n" +
+			"bw serve has no export route, so the export needs the bw CLI's own session. On a\n" +
+			"terminal with the CLI locked, backup prompts once for the master password and\n" +
+			"keeps the session in memory for its own bw children only. Without a terminal\n" +
+			"(a scheduler), prefix the run with BW_SESSION=\"$(bw unlock --raw)\".",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -51,14 +59,23 @@ func newSecretsBackupCmd() *cobra.Command {
 				}
 				destDir = filepath.Join(dir, "dr")
 			}
-			path, manifestWarn, err := secrets.Backup(secrets.BackupConfig{
+			cfg := secrets.BackupConfig{
 				Exporter:  bwExporter,
 				Recipient: ageRecipient,
 				Encrypt:   ageEncryptor,
 				Decrypt:   ageDecryptor, // nil in prod → Backup falls back to AgeDecrypt
 				KeyPath:   ageKeyPath(),
 				DestDir:   destDir,
-			})
+			}
+			path, manifestWarn, err := secrets.Backup(cfg)
+			if errors.Is(err, secrets.ErrBWVaultLocked) && stdinIsTerminal() {
+				session, uerr := promptBWSession(cmd)
+				if uerr != nil {
+					return uerr
+				}
+				cfg.Exporter = bwSessionExporter(session)
+				path, manifestWarn, err = secrets.Backup(cfg)
+			}
 			if errors.Is(err, secrets.ErrBWVaultLocked) {
 				return fmt.Errorf("%w\nRun:\n    BW_SESSION=\"$(bw unlock --raw)\" %s", err, rerunLine(cmd))
 			}
@@ -78,6 +95,21 @@ func newSecretsBackupCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&out, "out", "", "destination dir for the escrow (default: <checkout>/sensitive/dr)")
 	return c
+}
+
+// promptBWSession acquires the bw CLI session the escrow needs (#1008): one
+// hidden prompt, as `dotf secrets unlock` does, and the session kept in memory
+// for this process's bw children. bw serve has no export route, so the daemon
+// that unlock starts cannot serve this command.
+func promptBWSession(cmd *cobra.Command) (string, error) {
+	_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Bitwarden master password (the escrow exports through the bw CLI): ")
+	pw, err := readPassword()
+	_, _ = fmt.Fprintln(cmd.ErrOrStderr())
+	if err != nil {
+		return "", fmt.Errorf("read password: %w", err)
+	}
+	defer scrubBytes(pw)
+	return bwUnlock(pw)
 }
 
 // rerunLine renders the invocation that failed as a line to paste: the command path
