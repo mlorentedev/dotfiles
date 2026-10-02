@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: a23fca6ece0d2971
+generated_sha: eb201e30adbe6067
 id: spec-skill
 type: skill
 status: active
@@ -25,13 +25,14 @@ requires: [adversarial-review]
 ---
 # Spec Workflow
 
-> Implements `pattern-spec-driven-development`. Five subcommands: `init`, `bootstrap` (optional), `fill`, `check`, `archive`.
-> **Core principle:** every spec is downstream of an OPEN GitHub issue on the bitácora Project — the work-gate per ADR-018. The vault keeps templates and patterns; task state lives in GitHub.
+> Implements `pattern-spec-driven-development`. Six subcommands: `init`, `fast`, `bootstrap` (optional), `fill`, `check`, `archive`.
+> **Core principle:** every spec is downstream of an OPEN GitHub issue on the bitácora Project — the work-gate per ADR-018. The vault keeps templates and patterns; task state lives in GitHub. (Exception: The `fast` subcommand permits omitting the issue blocker for fast-track items.)
 
 ## When to use
 
-- `/spec init|bootstrap|fill|archive <feature-id>` explicitly.
+- `/spec init|fast|bootstrap|fill|archive <feature-id>` explicitly.
 - "Create a spec for X" / "scaffold spec X" / "start working on X" -> `init`.
+- "Fast track X" / "quick spec X" / "FTD for X" -> `fast`.
 - "Bootstrap substrate for X" / "the substrate for X doesn't exist yet" / "new runtime needed before features" -> `bootstrap`.
 - "Fill in proposal for X" / "help me write the proposal" -> `fill`.
 - "Check spec X" / "lint spec X" / "does my spec cover everything" -> `check`.
@@ -131,6 +132,23 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 - Templates missing in vault -> fail with path hint.
 - Id collides with archived spec -> warn but allow (user may be reviving).
 - Mechanical fallback: `dotf spec init <id> --issue <N>` implements this same gate for non-interactive use (cross-platform Go CLI on PATH).
+
+---
+
+## Subcommand: fast
+
+**Purpose:** Scaffold `$REPO_ROOT/specs/<feature-id>/spec.md` from the Fast-Track Development template. Unlike `init`, this lane does NOT strictly require a pre-existing GitHub issue, though one can be supplied. This is meant for features in the 30-150 LOC range.
+
+**Signature:** `/spec fast <feature-id> [--issue <number>]`
+
+**Steps:**
+1. **Validate id** similarly to `init`. Defaults to `YYYY-MM-DD-<slug>` if no issue is provided.
+2. **No clobber:** fail if `$REPO_ROOT/specs/<feature-id>/` exists. Warn if `specs/archive/<feature-id>/` exists.
+3. `mkdir -p $REPO_ROOT/specs/<feature-id>/`.
+4. Read template from `$VAULT_PATH/00_meta/templates/spec-fast-track.md`.
+5. Substitute placeholders: `<feature-id>` -> actual id, `{TITLE}` -> derived from id, `{{date:YYYY-MM-DD}}` -> today (UTC).
+6. Write to `$REPO_ROOT/specs/<feature-id>/spec.md`.
+7. **Output:** Paths created. Next step: Fill the single document and proceed with execution.
 
 ---
 
