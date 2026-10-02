@@ -180,7 +180,10 @@ def main() -> int:
         if name not in roster:
             errors.append(f"{name}: invocable definition has no ROSTER.md row")
             continue
-        if roster[name] != skills:
+        # A multiset, not a list: forced skills are consumed as a set, so order
+        # carries no meaning and reordering one file is not drift. Sorting rather
+        # than set() still catches an id listed twice (HARNESS-046 review).
+        if sorted(roster[name]) != sorted(skills):
             errors.append(
                 f"{name}: skills diverge\n"
                 f"    roster:     {roster[name]}\n"
