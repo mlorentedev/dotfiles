@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 079833aea12572b7
+generated_sha: d221e6a0da05e84f
 id: insights-skill
 type: skill
 status: active
@@ -72,7 +72,9 @@ git -C "$V" log --since="14 days ago" --name-only --pretty=format: \
   | grep -E '/sessions/' | sort -u                                           # session journals
 git -C "$V" log --since="14 days ago" --name-only --pretty=format: \
   | grep -E '90-lessons|00_meta/lessons/|/decisions/|adr-' | sort -u          # lessons + decisions written
-grep -h '^\*\*Decisions:\*\*' "$V"/10_projects/*/memory/MEMORY.md            # decisions named in handoffs
+SINCE=$(date -d '14 days ago' +%F)                                           # handoff decisions in the window:
+awk -v s="$SINCE" 'FNR==1{d=""} /^> Updated: /{d=$3} /^\*\*Decisions:\*\*/ && d>=s' \
+  "$V"/10_projects/*/memory/MEMORY.md                                         # only threads whose Updated date is inside it
 ```
 
 - Report: commits, session journals, lessons and decision artifacts touched, and handoff decisions found.
@@ -81,7 +83,7 @@ grep -h '^\*\*Decisions:\*\*' "$V"/10_projects/*/memory/MEMORY.md            # d
 ### Step 5 -- Vault Gap Analysis (full mode)
 
 - Read the repo's `docs/lessons/` (and `docs/lessons/_index.md`) (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
-- Identify fixes and decisions named in session journals or handoff blocks that are NOT documented in the repo's lessons
+- Identify project-specific fixes and decisions named in session journals or handoff blocks that are NOT documented in the repo's lessons. Skip cross-project or methodology items already captured in `00_meta/` (patterns, lessons).
 - List each gap: source (journal or thread), type, title
 
 ### Step 6 -- Decision Persistence Check (full mode)

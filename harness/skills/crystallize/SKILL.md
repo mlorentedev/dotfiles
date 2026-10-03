@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: d8f36cb4f8ffbeb5
+generated_sha: 69649d81cdefa7e1
 id: crystallize-skill
 type: skill
 status: active
@@ -33,7 +33,8 @@ There is no observation store; the continuity layer is the vault (see [[pattern-
 V="$VAULT_PATH"
 git -C "$V" log --since="<Last Crystallized>" --name-only --pretty=format: \
   | grep -E '/sessions/|/memory/' | sort -u              # journals + memory files to read
-grep -h -A0 '^\*\*Decisions:\*\*' "$V"/10_projects/*/memory/MEMORY.md   # decisions named in handoffs
+awk -v s="<Last Crystallized>" 'FNR==1{d=""} /^> Updated: /{d=$3} /^\*\*Decisions:\*\*/ && d>=s' \
+  "$V"/10_projects/*/memory/MEMORY.md                   # handoff decisions from threads updated since then
 ```
 
 - Read the journals and list each fix or decision with its source (journal path or thread name)
