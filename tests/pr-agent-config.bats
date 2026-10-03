@@ -666,22 +666,34 @@ _reviewable_kept() { # $1 = newline-separated file list; prints how many survive
 # lockfile-only dependabot bump reached it as an empty diff and went red.
 _upstream_ext='[bad_extensions]
 default = ["gitignore", "lock", "png"]'
+# The shape of upstream's is_valid_file: two literals the step reads by name.
+_upstream_handler='def is_valid_file(filename, bad_extensions=None):
+    auto_generated_files_exact = {"uv.lock", "go.sum"}
+    auto_generated_suffixes = (".min.js", ".js.map")
+    computed = sorted(bad_extensions)
+    return True'
 
 @test "pr-agent: a PR of file types PR-Agent never reads is recognised as empty (#1417)" {
-    UPSTREAM_EXT="$_upstream_ext" run _reviewable_kept $'.gitignore\nsite/uv.lock\ngo.sum\nassets/Logo.PNG\nweb/app.min.js'
+    UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="$_upstream_handler" \
+        run _reviewable_kept $'.gitignore\nsite/uv.lock\ngo.sum\nassets/Logo.PNG\nweb/app.min.js'
     [ "$status" -eq 0 ] && [ "$output" = "0" ] \
         || { echo "type-filtered PR: expected 0 reviewable files, got '$output'" >&2; false; }
 }
 
 @test "pr-agent: a readable file next to type-filtered ones keeps the review (#1417)" {
-    UPSTREAM_EXT="$_upstream_ext" run _reviewable_kept $'.gitignore\nscripts/utils.sh'
+    UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="$_upstream_handler" \
+        run _reviewable_kept $'.gitignore\nscripts/utils.sh'
     [ "$status" -eq 0 ] && [ "$output" = "1" ]
 }
 
-@test "pr-agent: without upstream's extension list the lockfile list still applies (#1417)" {
-    # The list is fetched at run time; a failed fetch must narrow the skip, never widen it.
-    UPSTREAM_EXT="" run _reviewable_kept $'.gitignore\ngo.sum'
+@test "pr-agent: a failed read of either upstream list narrows the skip, never widens it (#1417)" {
+    # Both lists are fetched at run time. Whichever read fails contributes nothing.
+    UPSTREAM_EXT="" UPSTREAM_HANDLER="$_upstream_handler" run _reviewable_kept $'.gitignore\ngo.sum'
     [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="" run _reviewable_kept $'.gitignore\ngo.sum'
+    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    UPSTREAM_EXT="" UPSTREAM_HANDLER="" run _reviewable_kept $'.gitignore\ngo.sum'
+    [ "$status" -eq 0 ] && [ "$output" = "2" ]
 }
 
 @test "pr-agent: the extension list is read at the same commit the action is pinned to (#1417)" {

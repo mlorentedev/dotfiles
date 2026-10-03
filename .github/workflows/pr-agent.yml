@@ -202,9 +202,10 @@ jobs:
       # PR-Agent also drops files by TYPE (`is_valid_file`): its bad_extensions
       # list (`.gitignore`, `.lock`, images) and an exact lockfile list. A
       # `.gitignore`-only PR (#1977) and lockfile-only dependabot bumps hit the
-      # same empty diff (#1417). The extension list is read at PR_AGENT_REF, which
-      # a test pins to the action's own SHA; if that read fails, only the lockfile
-      # list below applies, so the skip narrows and never widens.
+      # same empty diff (#1417). Both lists are read from upstream at PR_AGENT_REF,
+      # which a test pins to the action's own SHA, so nothing here is a copy that
+      # can drift. If either read fails, that list is empty: the skip narrows and
+      # never widens.
       - name: Skip when PR-Agent would receive an empty diff
         id: reviewable
         if: steps.credential.outcome == 'success'
@@ -217,14 +218,17 @@ jobs:
           set -uo pipefail
           CFG=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.pr_agent.toml?ref=${DEFAULT_BRANCH}" \
             --jq '.content' 2>/dev/null | base64 -d 2>/dev/null) || CFG=""
-          EXT_PATH="pr_agent/settings/language_extensions.toml"
-          UPSTREAM_EXT=$(gh api "repos/The-PR-Agent/pr-agent/contents/${EXT_PATH}?ref=${PR_AGENT_REF}" \
-            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null) || UPSTREAM_EXT=""
+          upstream() { # $1 = path in The-PR-Agent/pr-agent at PR_AGENT_REF; empty on failure
+            gh api "repos/The-PR-Agent/pr-agent/contents/$1?ref=${PR_AGENT_REF}" \
+              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true
+          }
+          UPSTREAM_EXT=$(upstream pr_agent/settings/language_extensions.toml)
+          UPSTREAM_HANDLER=$(upstream pr_agent/algo/language_handler.py)
           FILES=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
             --jq '.[].filename' 2>/dev/null) || FILES=""
-          export CFG FILES UPSTREAM_EXT
+          export CFG FILES UPSTREAM_EXT UPSTREAM_HANDLER
           kept=$(python3 - <<'PY'
-          import fnmatch, os, re, tomllib
+          import ast, fnmatch, os, re, tomllib
           ignore = tomllib.loads(os.environ["CFG"]).get("ignore", {})
           patterns = list(ignore.get("regex", []) or [])
           for glob in ignore.get("glob", []) or []:
@@ -234,11 +238,17 @@ jobs:
           compiled = [re.compile(p) for p in patterns]
           ext = os.environ.get("UPSTREAM_EXT", "")
           bad = {str(e).lower() for e in tomllib.loads(ext).get("bad_extensions", {}).get("default", [])} if ext else set()
-          locks = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "composer.lock", "Gemfile.lock",
-                   "poetry.lock", "go.sum", ".terraform.lock.hcl", "uv.lock", "Cargo.lock",
-                   "Pipfile.lock", "mix.lock", "pubspec.lock", "bun.lockb"}
+          lits = {}  # is_valid_file's literal lockfile set and suffix tuple, by name
+          for node in ast.walk(ast.parse(os.environ.get("UPSTREAM_HANDLER", ""))):
+              if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+                  try:
+                      lits[node.targets[0].id] = ast.literal_eval(node.value)
+                  except (ValueError, TypeError, SyntaxError):
+                      pass
+          locks = set(lits.get("auto_generated_files_exact", ()))
+          suffixes = tuple(lits.get("auto_generated_suffixes", ()))
           def typed_out(f):  # is_valid_file at PR_AGENT_REF, inverted
-              return (f.split("/")[-1] in locks or f.endswith((".min.js", ".min.css", ".js.map", ".ts.map", ".css.map"))
+              return (f.split("/")[-1] in locks or (bool(suffixes) and f.endswith(suffixes))
                       or f.split(".")[-1].lower() in bad)
           files = [f for f in os.environ["FILES"].splitlines() if f]
           if not files:
