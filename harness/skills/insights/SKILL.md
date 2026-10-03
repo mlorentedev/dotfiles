@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 5d5cf25c6c860a18
+generated_sha: 079833aea12572b7
 id: insights-skill
 type: skill
 status: active
@@ -11,7 +11,7 @@ name: insights
 targets: [claude]
 description: Use when checking AI workflow health, vault structural integrity, or
   knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale
-  MEMORY.md, unvaulted observations, vault structural issues, or before starting a
+  MEMORY.md, unpersisted decisions, vault structural issues, or before starting a
   major sprint.
 keywords: [insights, vault insights, graph insights, knowledge stats]
 paths: [00_meta/**]
@@ -23,7 +23,7 @@ Quick, read-only audit of the Neural Hive knowledge loop and vault structural he
 ## Modes
 
 - **Quick** (default): MEMORY.md health + vault structural health + backlog snapshot. ~2 minutes.
-- **Full** (`/insights full`): Everything in quick + observation inventory + vault gap analysis + decision persistence + pattern coverage. ~5 minutes.
+- **Full** (`/insights full`): Everything in quick + activity inventory + vault gap analysis + decision persistence + pattern coverage. ~5 minutes.
 
 ## Protocol
 
@@ -61,21 +61,32 @@ If failures detected -> recommend `/vault-doctor`.
 
 ### -- Quick mode stops here --
 
-### Step 4 -- Observation Inventory (full mode)
+### Step 4 -- Activity Inventory (full mode)
 
-- Run `mem-search` to count recent observations by type (past 14 days):
-  - Discovery, Change, Bugfix, Decision, Feature
-- Show counts and highlight unvaulted bugfixes and decisions
+There is no observation store. The continuity layer is the vault itself (see [[pattern-dual-memory]]), so mine the last 14 days from its history:
+
+```bash
+V="$VAULT_PATH"
+git -C "$V" log --since="14 days ago" --oneline | wc -l                       # activity volume
+git -C "$V" log --since="14 days ago" --name-only --pretty=format: \
+  | grep -E '/sessions/' | sort -u                                           # session journals
+git -C "$V" log --since="14 days ago" --name-only --pretty=format: \
+  | grep -E '90-lessons|00_meta/lessons/|/decisions/|adr-' | sort -u          # lessons + decisions written
+grep -h '^\*\*Decisions:\*\*' "$V"/10_projects/*/memory/MEMORY.md            # decisions named in handoffs
+```
+
+- Report: commits, session journals, lessons and decision artifacts touched, and handoff decisions found.
+- Any other source this step reads must first prove it is alive (its newest record is inside the window). Otherwise report it as **unavailable**, never as zero (lesson-009).
 
 ### Step 5 -- Vault Gap Analysis (full mode)
 
 - Read the repo's `docs/lessons/` (and `docs/lessons/_index.md`) (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
-- Identify bugfix and decision observations NOT documented in the repo's lessons
-- List each gap: ID, type, title
+- Identify fixes and decisions named in session journals or handoff blocks that are NOT documented in the repo's lessons
+- List each gap: source (journal or thread), type, title
 
 ### Step 6 -- Decision Persistence Check (full mode)
 
-- For each decision, verify it was written to the affected artifact (repo ADR, context, pattern)
+- For each handoff decision from Step 4, verify it was written to the affected artifact (repo ADR, context, pattern), **in the scope of every consumer**. A decision about a shared component that lives in only one project's memory is NOT PERSISTED ([[pattern-decision-persistence]]).
 
 ```
 Decision persistence:
@@ -108,8 +119,8 @@ Vault structural health:
 Backlog: X active items (Progress: [====......] 40%)
 
 [Full mode only:]
-Observation inventory (last 14 days):
-  Discoveries: N | Changes: N | Bugfixes: N (X unvaulted) | Decisions: N (X unvaulted) | Features: N
+Activity inventory (last 14 days):
+  Commits: N | Session journals: N | Lessons/decisions written: N | Handoff decisions: N (X unpersisted)
 
 Project-lesson gaps (not in the repo's docs/lessons/):
   - #ID: <title>
