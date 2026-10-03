@@ -75,15 +75,38 @@ Two things make it hard to catch:
 
 ## What to do instead
 
-**Never write `grep -q -v`.** Negate the pipeline, not the match:
+**Never write `grep -q -v`.** Ask "is any line dirty?" with a plain `grep -q`,
+and do the negation in the shell. But do not negate a **pipeline**: capture the
+output first, then test it.
 
 ```sh
 # wrong: asks "is some line clean?", and implementations disagree
 ... | grep -qvE 'FAIL|WARN'
 
-# right: asks "is any line dirty?", and `!` inverts the answer
+# also wrong under `set -o pipefail` (#1978): grep -q exits at the first FAIL,
+# the producer dies of SIGPIPE (141), pipefail reports 141, and `!` makes it 0
 ! ( ... | grep -qE 'FAIL|WARN' )
+
+# right: capture, then test the captured text
+out=$(...)
+! grep -qE 'FAIL|WARN' <<< "$out"
 ```
+
+**Amended 2026-10-03 (#1978).** This section first recommended the negated
+pipeline. Under `pipefail` it passes on a broken tree whenever the producer is
+still writing when grep exits, which happens reliably once the output is past the
+pipe buffer:
+
+```
+$ bash -c 'set -o pipefail; ! ( yes FAIL | grep -qE "FAIL|WARN" ); echo $?'
+0
+```
+
+This is lesson 302's failure mode, pointing in the passing direction. A
+here-string (`<<<`) is bash/zsh only. In POSIX `sh`, `printf '%s\n' "$out" | grep`
+is safe only while `$out` fits in the 64 KB pipe buffer, because then `printf` has
+written everything before grep can exit. Past that size, write the output to a
+file and grep the file.
 
 `-q` without `-v` means the same thing everywhere, so the negation belongs in the
 shell where it is unambiguous. Note `!` legally negates a **whole pipeline**;
