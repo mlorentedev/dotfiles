@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: 1b585b8def0a52a1
+generated_sha: d8f36cb4f8ffbeb5
 id: crystallize-skill
 type: skill
 status: active
@@ -9,9 +9,9 @@ created: '2026-05-30'
 owner: manu
 name: crystallize
 targets: [claude]
-description: Use when /insights shows unvaulted observations, stale MEMORY.md, or
+description: Use when /insights shows unpersisted decisions, stale MEMORY.md, or
   after completing a significant sprint. Addresses knowledge gaps between session
-  observations and vault lessons.
+  journals and vault lessons.
 keywords: [crystallize, cristalizar, promote lesson, pattern promotion, leccion aprendida]
 paths: [00_meta/patterns/**, docs/lessons/**]
 ---
@@ -26,12 +26,20 @@ Full maintenance ritual for the Neural Hive knowledge loop. Run when `/insights`
 - Note: line count, Last Crystallized date, days elapsed since last run
 - Read the repo's `docs/lessons/` and `docs/lessons/_index.md` for current **project** lesson state (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/patterns/` for cross-project state
 
-### Step 2 — Mine Observations
-- Run `/mem-search` filtering for 🔴 (bugfix) and ⚖️ (decision) type observations from the past 14 days
-- List each unvaulted observation with its ID and title
+### Step 2 — Mine Recent Activity
+There is no observation store; the continuity layer is the vault (see [[pattern-dual-memory]]). Mine the window since the last crystallization:
+
+```bash
+V="$VAULT_PATH"
+git -C "$V" log --since="<Last Crystallized>" --name-only --pretty=format: \
+  | grep -E '/sessions/|/memory/' | sort -u              # journals + memory files to read
+grep -h -A0 '^\*\*Decisions:\*\*' "$V"/10_projects/*/memory/MEMORY.md   # decisions named in handoffs
+```
+
+- Read the journals and list each fix or decision with its source (journal path or thread name)
 
 ### Step 3 — Gap Detection
-- Compare mined observations against the repo's `docs/lessons/` (project lessons) and `00_meta/` (cross-project)
+- Compare mined fixes and decisions against the repo's `docs/lessons/` (project lessons) and `00_meta/` (cross-project)
 - Identify which bugs/decisions are NOT yet documented in the vault
 - These become new lesson candidates
 
@@ -84,7 +92,7 @@ Crystallization complete:
 
 | Trigger | Action |
 |---------|--------|
-| `/insights` shows unvaulted 🔴/⚖️ obs | Run `/crystallize` |
+| `/insights` shows unpersisted decisions or lesson gaps | Run `/crystallize` |
 | MEMORY.md > 150 lines | Run `/crystallize` |
 | Last Crystallized > 14 days ago | Run `/crystallize` |
 | After completing a major sprint | Run `/crystallize` |
