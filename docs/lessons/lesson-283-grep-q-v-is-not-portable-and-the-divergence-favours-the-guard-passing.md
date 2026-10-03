@@ -88,7 +88,7 @@ output first, then test it.
 ! ( ... | grep -qE 'FAIL|WARN' )
 
 # right: capture, then test the captured text
-out=$(...)
+out=$(...) || true   # `|| true` under `set -e`, if the producer may exit non-zero
 ! grep -qE 'FAIL|WARN' <<< "$out"
 ```
 
@@ -109,8 +109,9 @@ written everything before grep can exit. Past that size, write the output to a
 file and grep the file.
 
 `-q` without `-v` means the same thing everywhere, so the negation belongs in the
-shell where it is unambiguous. Note `!` legally negates a **whole pipeline**;
-`a | ! b` is a syntax error, which is its own small trap.
+shell where it is unambiguous. Note `!` legally negates a **whole pipeline**
+(legal, but unsafe under `pipefail`, as above); `a | ! b` is a syntax error,
+which is its own small trap.
 
 **Better still, assert the positive.** The rewrite above was still not good
 enough. Asserting *absence of findings* passes when the check never ran at all —
