@@ -12,6 +12,13 @@ Thumbs.db
 # Sensitive data
 *.secret
 *.dec
+# Key material must never reach the commit path (ADR-028). Root-anchored on
+# purpose: sensitive/dr/.gitignore deliberately UN-ignores its own escrow
+# artefacts, so a broad `*.key` would reach into a rule that is load-bearing.
+# Two empty ones (`.nan.key`, `nan.key`) were left here while testing the
+# doctor's secrets checks; nothing in this repo tracks a `*.key`.
+/*.key
+/.*.key
 .venv/
 .env
 .env.local
@@ -41,6 +48,11 @@ node_modules/
 # `go build` in cli/ leaves an untracked binary that must never be committed.
 /cli/dotf
 /cli/dotf.exe
+# …and the same binary when `go build -o dotf.exe ./cmd/dotf` is run from the
+# repo root instead of cli/. CI writes its binary to a temp dir (ci.yml), so a
+# root-level one is always a local build; `dotf worktree clean` already calls it
+# disposable. Nothing tracked in this repo has a .exe extension.
+/*.exe
 # `go test -coverprofile` writes here. It was tracked from #1404 until #1408
 # untracked it: a profile is a measurement of one run on one machine, so it
 # conflicts on every branch that touches cli/ and its diff says nothing.
@@ -50,6 +62,12 @@ node_modules/
 .vscode/
 .idea/
 *.sublime-*
+
+# Test reports dropped at the root by an ad-hoc run (`testResults.xml`). No
+# workflow or script in this repo writes that name any more, so it can only
+# arrive here by hand; a report is a measurement of one run, like coverage.out.
+# Nothing tracked has an .xml extension.
+/*.xml
 
 # Cache directories
 .cache/
