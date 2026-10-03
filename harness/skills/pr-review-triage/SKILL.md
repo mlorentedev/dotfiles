@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 412771d21d35ded3
+generated_sha: 4c62c8c6dd5f684f
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -193,7 +193,7 @@ gh pr comment <N> --repo <owner>/<repo> --body-file <file>
 
 **Record the empty case too.** *"CI green, no review findings"* is a disposition and it must be written down like any other — one row saying so is enough. Skipping it because there was nothing to apply leaves the PR in the queue forever, and a queue that never drains is one nobody reads. The queue re-opens by itself the moment a reviewer speaks again, so recording early costs nothing.
 
-**Edit an existing table when re-triaging.** If a `## Review triage` comment already exists from this session, edit it (using `gh pr comment <N> --edit-last` or by comment ID) rather than posting a second identical table, avoiding duplicate comment noise on the PR.
+**Re-triage with a new comment, never an edit.** `dotf pr triage-queue` dates a triage by when its comment was *created*: an edit must not be able to clear findings a reviewer added after the table was written, so an edited table never takes a PR out of the queue (measured on #1974, #1985). When a reviewer speaks again after your triage, post a fresh `## Review triage` comment covering the new output.
 
 ### 8. Never
 
