@@ -119,13 +119,14 @@ func (in *Installer) defaults() {
 
 // current resolves the installed version of t, dispatching the default probe by
 // source type when CurrentVersion is not injected: a github-release tool is
-// probed at Dest/<bin> (where the installer places it), an npm tool on PATH
-// (where npm/scoop/choco place globals). "" means absent/unparseable.
+// probed at Dest/<bin> (where the installer places it), an npm or uv tool on
+// PATH (where npm/scoop/choco place globals and uv links its tools). "" means
+// absent/unparseable.
 func (in *Installer) current(t Tool) string {
 	if in.CurrentVersion != nil {
 		return in.CurrentVersion(t.Name)
 	}
-	if t.Source.Type == "npm" {
+	if t.Source.Type == "npm" || t.Source.Type == "uv-tool" {
 		return in.pathVersion(t.Name)
 	}
 	return in.installedVersion(t.Name)
@@ -136,11 +137,17 @@ func (in *Installer) current(t Tool) string {
 // at or above the pin, never a downgrade.
 func (in *Installer) Install(t Tool) (Result, error) {
 	in.defaults()
+	if !t.SupportsOS(in.GOOS) {
+		_, _ = fmt.Fprintf(in.Out, "%s is not installed on %s by this catalog; skipping\n", t.Name, in.GOOS)
+		return Skipped, nil
+	}
 	switch t.Source.Type {
 	case "github-release":
 		return in.installRelease(t)
 	case "npm":
 		return in.installNpm(t)
+	case "uv-tool":
+		return in.installUvTool(t)
 	default:
 		return Skipped, fmt.Errorf("%s: unsupported source type %q", t.Name, t.Source.Type)
 	}
@@ -171,13 +178,17 @@ func (in *Installer) Plan(t Tool) Plan {
 	p := Plan{Name: t.Name, Pin: t.Version, Installed: in.current(t)}
 	// Mirror Install's dispatch: what it refuses, the plan reports as
 	// unsupported, after the probe, so an installed tool never reads as absent.
+	if !t.SupportsOS(in.GOOS) {
+		p.Action = PlanUnsupported
+		return p
+	}
 	switch t.Source.Type {
 	case "github-release":
 		if t.AssetName(in.GOOS, in.GOARCH) == "" {
 			p.Action = PlanUnsupported
 			return p
 		}
-	case "npm":
+	case "npm", "uv-tool":
 	default:
 		p.Action = PlanUnsupported
 		return p
@@ -244,6 +255,34 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 		res = Upgraded
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s via npm (%s)\n", t.Name, t.Version, res, pkg)
+	return res, nil
+}
+
+// installUvTool provisions a PyPI-distributed tool (source.type "uv-tool") with
+// `uv tool install <package>==<version>`. uv replaces an installed version that
+// differs from the pin and exits 0 when the pin is already there (measured,
+// uv 0.9.29), so one argv covers install and upgrade. The reconcile policy is
+// the shared one, so a version the user upgraded to on purpose is never rolled
+// back: hive's upgrades are opt-in (hive ADR-020), and the pin is a floor.
+func (in *Installer) installUvTool(t Tool) (Result, error) {
+	pkg := t.Source.Package
+	if pkg == "" {
+		return Skipped, fmt.Errorf("%s: uv-tool source declares no package", t.Name)
+	}
+	action := decideAction(in.current(t), t.Version)
+	if action == actionSkip {
+		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
+		return Skipped, nil
+	}
+	spec := pkg + "==" + t.Version
+	if err := in.Run("uv", "tool", "install", spec); err != nil {
+		return Skipped, fmt.Errorf("%s: uv tool install %s: %w", t.Name, spec, err)
+	}
+	res := Installed
+	if action == actionUpgrade {
+		res = Upgraded
+	}
+	_, _ = fmt.Fprintf(in.Out, "%s %s %s via uv (%s)\n", t.Name, t.Version, res, pkg)
 	return res, nil
 }
 

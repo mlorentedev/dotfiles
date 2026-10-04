@@ -20,5 +20,5 @@ setup() {
 }
 
 @test "every packages.json tool declares name, version, profile and a typed source" {
-    jq -e 'all(.tools[]; (.name | type == "string") and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.profile | type == "string") and (.source.type | IN("npm", "github-release")))' "$CATALOG" >/dev/null
+    jq -e 'all(.tools[]; (.name | type == "string") and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.profile | type == "string") and (.source.type | IN("npm", "github-release", "uv-tool")))' "$CATALOG" >/dev/null
 }

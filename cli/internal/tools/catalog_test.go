@@ -113,3 +113,49 @@ func TestAssetName(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_Platforms(t *testing.T) {
+	ok := `{"tools":[{"name":"hive","version":"4.2.2","profile":"full","source":{"type":"uv-tool","package":"hive-vault","platforms":["linux","darwin"]}}]}`
+	c, err := Load(writeCatalog(t, ok))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	hive := c.Tools[0]
+	for goos, want := range map[string]bool{"linux": true, "darwin": true, "windows": false} {
+		if got := hive.SupportsOS(goos); got != want {
+			t.Errorf("SupportsOS(%s) = %v, want %v", goos, got, want)
+		}
+	}
+	if !(Tool{}).SupportsOS("windows") {
+		t.Error("a tool that lists no platforms must support every OS")
+	}
+
+	// A misspelt platform would make the tool unsupported everywhere, in silence.
+	typo := strings.Replace(ok, `"darwin"`, `"macos"`, 1)
+	if _, err := Load(writeCatalog(t, typo)); err == nil || !strings.Contains(err.Error(), "macos") {
+		t.Errorf("Load accepted an unknown platform: %v", err)
+	}
+}
+
+// The shipped catalog declares hive as a uv tool on POSIX only. On Windows hive
+// owns its install layout (hive ADR-019), so the catalog must never put a uv
+// copy there.
+func TestTheRepoCatalogDeclaresHiveForPosixOnly(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "hive" {
+			continue
+		}
+		if tool.Source.Type != "uv-tool" || tool.Source.Package != "hive-vault" {
+			t.Errorf("hive source = %+v, want uv-tool hive-vault", tool.Source)
+		}
+		if tool.SupportsOS("windows") || !tool.SupportsOS("linux") || !tool.SupportsOS("darwin") {
+			t.Errorf("hive platforms = %v, want linux and darwin only", tool.Source.Platforms)
+		}
+		return
+	}
+	t.Fatal("packages.json declares no hive tool")
+}
