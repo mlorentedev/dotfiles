@@ -52,7 +52,7 @@
     "id": "CLI-063-dotf-deploy-claude-f8",
     "behavior": "No twin is deleted and no caller repointed: the diff touches nothing under setup-*.{sh,ps1} or scripts/",
     "verification": "test -z \"$(git diff --name-only origin/main...HEAD -- 'setup-*.sh' 'setup-*.ps1' 'scripts/')\"",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "Increment 1: the merge-base diff against origin/main (e4bedb26) touches nothing under setup-*.{sh,ps1} or scripts/. Re-check per increment."
   }
 ]

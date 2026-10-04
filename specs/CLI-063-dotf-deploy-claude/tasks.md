@@ -63,7 +63,7 @@ Nothing here is a golden file. Do not add one.
       increment 1 even though increment 1 does not write settings — the proposal names this as the
       single most likely way to cause an incident, so the assertion predates the code that could
       violate it
-- [ ] Refactor; `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`,
+- [x] Refactor; `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`,
       pinned `golangci-lint`, `bats tests/*.bats`
 
 ## Increment 2 — MCP registration
