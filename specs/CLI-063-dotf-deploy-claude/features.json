@@ -54,5 +54,12 @@
     "verification": "test -z \"$(git diff --name-only origin/main...HEAD -- 'setup-*.sh' 'setup-*.ps1' 'scripts/')\"",
     "state": "passing",
     "evidence": "Increment 1: the merge-base diff against origin/main (e4bedb26) touches nothing under setup-*.{sh,ps1} or scripts/. Re-check per increment."
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f9",
+    "behavior": "A bare dotf deploy registers every mcp-servers.json server claude lacks, skips one whose prerequisite binary is absent, migrates a stale uvx hive-vault entry, and names a failed add",
+    "verification": "cd cli && go test ./internal/claude/ ./internal/cmd/ -run 'TestRegister|TestTheRepoListsLoad|TestDeployCmd_.*MCP|TestDeployCmd_StaleHive|TestMcpAddArgv'",
+    "state": "passing",
+    "evidence": "verification exit 0, 13 PASS (2026-10-03). Mutations killed 10/10: the hive regex, absent-on-get-error, the prerequisite check, dry-run remove, the hive name scope, sequential MCP->plugins, step order, the PATH seam, whitespace-only args, migration claimed before the re-add. Real dry run on msi: in sync claude-mcp 0 added, 4 already present"
   }
 ]
