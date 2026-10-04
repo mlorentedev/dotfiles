@@ -58,3 +58,12 @@ func (c *adapterConfig) injectorEnabled(key string) bool {
 	}
 	return *inj.Enabled
 }
+
+// ClaudeJSONFloor is the configured claude_json_min_bytes from the
+// session-start config at path, or ClaudeJSONMinBytes when the file or key is
+// absent. Exported so `dotf deploy`'s snapshot guard (CLI-063) reads the same
+// threshold the session-start canary does, override included, rather than a
+// second copy of the number.
+func ClaudeJSONFloor(configPath string) int {
+	return loadAdapterConfig(configPath).threshold("claude_json_min_bytes", ClaudeJSONMinBytes)
+}

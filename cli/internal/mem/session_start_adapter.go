@@ -23,6 +23,13 @@ const sddReminder = "[sdd] Before your first tool call, read `AGENTS.md` at the 
 // lessonsStaleDays is the sb_lessons_staleness threshold (session-brief.sh default).
 const lessonsStaleDays = 14
 
+// ClaudeJSONMinBytes is the size below which ~/.claude/.claude.json counts as
+// truncated by the upstream strip bug (anthropics/claude-code#59870): the
+// session-start canary warns under it, and `dotf deploy`'s snapshot guard
+// (CLI-063) restores only a snapshot at least this large. One constant, so the
+// two cannot disagree about what a healthy file is.
+const ClaudeJSONMinBytes = 10240
+
 // ClaudeContextInput injects every path/clock the adapter touches, so the assembly
 // is hermetically testable; the command wiring resolves them from the env-contract.
 type ClaudeContextInput struct {
@@ -81,7 +88,7 @@ func ClaudeContext(in ClaudeContextInput) string {
 	ctx += memoryTemperature(memoryDir,
 		cfg.threshold("memory_temp_hot_days", 7), cfg.threshold("memory_temp_warm_days", 30),
 		cfg.threshold("memory_temp_cold_days", 60), in.Now)
-	ctx += claudeJSONSize(in.ClaudeJSON, cfg.threshold("claude_json_min_bytes", 10240))
+	ctx += claudeJSONSize(in.ClaudeJSON, cfg.threshold("claude_json_min_bytes", ClaudeJSONMinBytes))
 
 	return ctx
 }

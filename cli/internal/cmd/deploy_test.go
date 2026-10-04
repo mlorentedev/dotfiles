@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 )
 
 // runDeploy runs `dotf deploy [args]` the way the setup scripts do: from inside
@@ -14,6 +16,15 @@ import (
 // runHarnessMirror); HOME is a temp dir so {HOME} destinations land in it.
 func runDeploy(t *testing.T, repo, home string, args []string) (string, error) {
 	t.Helper()
+	return runDeployWithClaude(t, repo, home, args, nil)
+}
+
+// runDeployWithClaude is runDeploy with the claude CLI answered by run; nil
+// means "claude not installed". runDeploy passes nil because a bare deploy
+// installs plugins through the real claude when it is on PATH, and no test may
+// drive the box's own install.
+func runDeployWithClaude(t *testing.T, repo, home string, args []string, run claude.Runner) (string, error) {
+	t.Helper()
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -21,6 +32,9 @@ func runDeploy(t *testing.T, repo, home string, args []string) (string, error) {
 	t.Setenv("DOTFILES_REPO_DIR", repo)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	orig := deployClaudeRunner
+	t.Cleanup(func() { deployClaudeRunner = orig })
+	deployClaudeRunner = func() claude.Runner { return run }
 	var out bytes.Buffer
 	cmd := newDeployCmd()
 	cmd.SetOut(&out)

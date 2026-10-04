@@ -9,9 +9,9 @@
   {
     "id": "CLI-063-dotf-deploy-claude-f2",
     "behavior": "ai/claude/plugins.json is the sole plugin list; the test fails if either twin's hardcoded ids drift from it",
-    "verification": "bats tests/claude-plugins-drift.bats",
-    "state": "pending",
-    "evidence": ""
+    "verification": "bats tests/claude-plugins.bats",
+    "state": "passing",
+    "evidence": "bats tests/claude-plugins.bats: 3/3 ok; adding an id to the Linux twin's loop fails 1 test (mutation run 2026-10-04)"
   },
   {
     "id": "CLI-063-dotf-deploy-claude-f3",
@@ -37,16 +37,16 @@
   {
     "id": "CLI-063-dotf-deploy-claude-f6",
     "behavior": "The Go path emits no hooks key under any input; dotf harness bind remains the only hooks writer",
-    "verification": "cd cli && go test ./internal/deploy/... -run TestNeverEmitsHooks",
+    "verification": "cd cli && go test ./internal/claude/ -run TestGuardNeverAddsAHooksKey",
     "state": "pending",
-    "evidence": ""
+    "evidence": "Increment 1 part only: --- PASS TestGuardNeverAddsAHooksKey (the only file increment 1 writes is .claude.json, as a byte copy of its snapshot). Passes in full once increment 3 asserts it on the settings.json writer."
   },
   {
     "id": "CLI-063-dotf-deploy-claude-f7",
     "behavior": "A plugin is counted as added only when its install succeeded (Linux reference behaviour); #1491's Windows divergence is recorded, not silently absorbed",
-    "verification": "cd cli && go test ./internal/deploy/... -run TestPluginCountOnSuccessOnly",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/claude/ ./internal/cmd/ -run 'TestSyncCountsOnlySuccessfulInstalls|TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun'",
+    "state": "passing",
+    "evidence": "both PASS; mutation 'count attempts' killed. #1491 divergence recorded in divergences.md row 1"
   },
   {
     "id": "CLI-063-dotf-deploy-claude-f8",

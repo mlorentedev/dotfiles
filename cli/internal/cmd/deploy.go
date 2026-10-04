@@ -55,7 +55,8 @@ func newDeployCmd() *cobra.Command {
 			"writes, such as Copilot's settings.json). An entry that `requires` a command\n" +
 			"is skipped, and says so, when that command is not on PATH.\n\n" +
 			"A bare deploy also re-tunes Orca's generated Copilot hooks (`dotf orca\n" +
-			"tune-hooks`), which Orca reverts on every install.\n\n" +
+			"tune-hooks`), which Orca reverts on every install, and installs the Claude\n" +
+			"Code plugins in ai/claude/plugins.json that the box lacks.\n\n" +
 			"  dotf deploy              # every declared config\n" +
 			"  dotf deploy pi           # one\n" +
 			"  dotf deploy --dry-run    # report what would change, touch nothing",
@@ -111,9 +112,13 @@ func newDeployCmd() *cobra.Command {
 				}
 			}
 			// A bare deploy converges everything the setups own, including the
-			// Orca hooks Orca rewrites on every install (CLI-093, #1953).
+			// Orca hooks Orca rewrites on every install (CLI-093, #1953) and the
+			// Claude Code plugins (CLI-063, #1339).
 			if len(args) == 0 {
-				return deployOrcaHooks(w, env.Home(), dryRun)
+				if err := deployOrcaHooks(w, env.Home(), dryRun); err != nil {
+					return err
+				}
+				return deployClaudePlugins(w, repoRoot, env.Home(), dryRun)
 			}
 			return nil
 		},
