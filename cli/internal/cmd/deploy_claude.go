@@ -132,8 +132,12 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	s.HasCommand = deployCommandAvailable
 	rep := s.Register(servers, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
+	migrated := "migrated  %-10s %s (stale uvx hive-vault entry replaced by the SSOT one)\n"
+	if dryRun {
+		migrated = "would migrate %-6s %s (stale uvx hive-vault entry)\n"
+	}
 	for _, name := range rep.Migrated {
-		_, _ = fmt.Fprintf(w, "migrated  %-10s %s (stale uvx hive-vault entry replaced by the SSOT one)\n", step, name)
+		_, _ = fmt.Fprintf(w, migrated, step, name)
 	}
 	for _, sk := range rep.Skipped {
 		_, _ = fmt.Fprintf(w, "skipped   %-10s %s (%s not on PATH)\n", step, sk.Name, sk.Missing)

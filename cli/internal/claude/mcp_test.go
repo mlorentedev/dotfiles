@@ -16,6 +16,7 @@ type mcpFake struct {
 	fakeRunner
 	registered map[string]string
 	failing    map[string]bool
+	failRemove bool
 	added      []string
 	removed    []string
 }
@@ -38,6 +39,9 @@ func (f *mcpFake) McpAdd(name, transport string, args []string) error {
 
 func (f *mcpFake) McpRemove(name string) error {
 	f.removed = append(f.removed, name)
+	if f.failRemove {
+		return errors.New("remove failed")
+	}
 	delete(f.registered, name)
 	return nil
 }
@@ -169,5 +173,21 @@ func TestTheRepoListsLoad(t *testing.T) {
 	}
 	if _, err := LoadPlugins(filepath.Join(root, filepath.FromSlash(PluginsRel))); err != nil {
 		t.Error(err)
+	}
+}
+
+// A migration is claimed only when the replacement landed. A failed remove
+// leaves the stale entry; a failed re-add leaves hive unregistered. Either way
+// hive is in Failed and not in Migrated.
+func TestRegisterReportsAMigrationOnlyWhenItCompleted(t *testing.T) {
+	stale := map[string]string{"context7": "ok", "hive": "Command: uvx hive-vault"}
+	for name, f := range map[string]*mcpFake{
+		"remove fails": {registered: stale, failRemove: true},
+		"re-add fails": {registered: map[string]string{"context7": "ok", "hive": "uvx"}, failing: map[string]bool{"hive": true}},
+	} {
+		rep := mcpSyncer(f, "uv").Register(servers, false)
+		if len(rep.Migrated) != 0 || !reflect.DeepEqual(rep.Failed, []string{"hive"}) {
+			t.Errorf("%s: report %+v, want hive Failed and not Migrated", name, rep)
+		}
 	}
 }

@@ -67,7 +67,7 @@ type Skip struct{ Name, Missing string }
 // MCPReport is what one Register found and did.
 type MCPReport struct {
 	Present, Added, Failed []string
-	Migrated               []string // stale entries removed so the loop re-adds them
+	Migrated               []string // stale entries replaced (or, in a dry run, that would be)
 	Skipped                []Skip
 	Restored               int
 }
@@ -96,25 +96,27 @@ func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 		var out string
 		getErr := guard(func() error { var err error; out, err = s.Run.McpGet(srv.Name); return err })
 		registered := getErr == nil
-		if registered && srv.Name == "hive" && staleHive.MatchString(out) {
-			rep.Migrated = append(rep.Migrated, srv.Name)
-			if !dryRun {
-				if err := guard(func() error { return s.Run.McpRemove(srv.Name) }); err != nil {
-					rep.Failed = append(rep.Failed, srv.Name)
-					continue
-				}
+		stale := registered && srv.Name == "hive" && staleHive.MatchString(out)
+		if stale && !dryRun {
+			if err := guard(func() error { return s.Run.McpRemove(srv.Name) }); err != nil {
+				rep.Failed = append(rep.Failed, srv.Name)
+				continue
 			}
-			registered = false
 		}
+		// A migration is reported only once the replacement is in: a remove
+		// whose re-add failed left hive unregistered, and says so in Failed.
 		switch {
-		case registered:
+		case registered && !stale:
 			rep.Present = append(rep.Present, srv.Name)
+			continue
 		case dryRun:
-			rep.Added = append(rep.Added, srv.Name)
 		case guard(func() error { return s.Run.McpAdd(srv.Name, srv.Transport, strings.Fields(srv.Args)) }) != nil:
 			rep.Failed = append(rep.Failed, srv.Name)
-		default:
-			rep.Added = append(rep.Added, srv.Name)
+			continue
+		}
+		rep.Added = append(rep.Added, srv.Name)
+		if stale {
+			rep.Migrated = append(rep.Migrated, srv.Name)
 		}
 	}
 	return rep
