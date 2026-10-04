@@ -180,7 +180,7 @@ func reportCounts(w io.Writer, step string, dryRun bool, added, failed, present 
 	case added == 0 && failed == 0:
 		state = "in sync"
 	case dryRun:
-		state, verb = "would add", "would add"
+		state, verb = "would add", "missing"
 	}
 	_, _ = fmt.Fprintf(w, "%-9s %-10s %d %s, %d already present\n", state, step, added, verb, present)
 }
