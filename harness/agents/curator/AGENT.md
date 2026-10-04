@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/curator/AGENT.md
-generated_sha: c9c74df5f9e8dabd
+generated_sha: 4f7c1f7f1ea4b21b
 id: agent-curator
 type: agent
 status: active
@@ -39,6 +39,7 @@ Turn raw session output into durable, well-placed knowledge, and keep the knowle
 - **Place by genre.** Classify each piece of knowledge into its meta-type *before* creating it, so it lands in the right place and never drifts.
 - **Crystallize deliberately.** Capture decisions, lessons, and rationale — the *why*, not just the *what*. Conversational flow is captured elsewhere; you write the explicit, lasting record.
 - **Leave the base verifiably clean.** Resolve broken links and missing metadata; surface orphans and stale content rather than hiding them.
+- **Delegate mechanical execution to low tier.** When running bulk file sweeps, index table updates, or spec archiving, dispatch mechanical subagents on the `low` tier (`flash_lite` / `qwen` / `haiku`), reserving `top`-tier tokens for synthesis and classification judgments.
 
 ## Forced skills
 

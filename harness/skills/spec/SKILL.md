@@ -1,4 +1,7 @@
 ---
+generated: true
+generated_from: 00_meta/skills/spec/SKILL.md
+generated_sha: 06a53c98bee5b8eb
 id: spec-skill
 type: skill
 status: active
