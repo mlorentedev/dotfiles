@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -55,8 +56,9 @@ func newDeployCmd() *cobra.Command {
 			"writes, such as Copilot's settings.json). An entry that `requires` a command\n" +
 			"is skipped, and says so, when that command is not on PATH.\n\n" +
 			"A bare deploy also re-tunes Orca's generated Copilot hooks (`dotf orca\n" +
-			"tune-hooks`), which Orca reverts on every install, and installs the Claude\n" +
-			"Code plugins in ai/claude/plugins.json that the box lacks.\n\n" +
+			"tune-hooks`), which Orca reverts on every install, registers the MCP\n" +
+			"servers in mcp-servers.json with Claude Code, and installs the Claude Code\n" +
+			"plugins in ai/claude/plugins.json that the box lacks.\n\n" +
 			"  dotf deploy              # every declared config\n" +
 			"  dotf deploy pi           # one\n" +
 			"  dotf deploy --dry-run    # report what would change, touch nothing",
@@ -113,12 +115,16 @@ func newDeployCmd() *cobra.Command {
 			}
 			// A bare deploy converges everything the setups own, including the
 			// Orca hooks Orca rewrites on every install (CLI-093, #1953) and the
-			// Claude Code plugins (CLI-063, #1339).
+			// Claude Code MCP servers and plugins (CLI-063, #1339). The two
+			// Claude steps are independent, so one failing still runs the other.
 			if len(args) == 0 {
 				if err := deployOrcaHooks(w, env.Home(), dryRun); err != nil {
 					return err
 				}
-				return deployClaudePlugins(w, repoRoot, env.Home(), dryRun)
+				return errors.Join(
+					deployClaudeMCP(w, repoRoot, env.Home(), dryRun),
+					deployClaudePlugins(w, repoRoot, env.Home(), dryRun),
+				)
 			}
 			return nil
 		},

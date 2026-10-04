@@ -68,9 +68,22 @@ Nothing here is a golden file. Do not add one.
 
 ## Increment 2 — MCP registration
 
-- [ ] [P] Failing test with a fake `claude` on PATH: an entry already registered is skipped
-- [ ] Failing test: `claude mcp add` non-zero is surfaced, not swallowed
-- [ ] Implement reading `mcp-servers.json`; carry HIVE-118's remove-then-re-add for `uvx hive-vault`
+- [x] [P] [AC1] Failing test with a fake `claude`: an entry already registered is skipped
+      *Done as:* the fake answers through the `claude.Runner` seam increment 1 introduced, not a
+      script on PATH; the real argv is pinned separately (`TestMcpAddArgvMatchesTheTwins`)
+- [x] [AC1] Failing test: `claude mcp add` non-zero is surfaced, not swallowed
+- [x] [AC1] Implement reading `mcp-servers.json`; carry HIVE-118's remove-then-re-add for `uvx hive-vault`
+      **Decision (2026-10-04):** the Go path honours `prerequisite_binary` (skip and report, the
+      `requires` idiom) and does **not** run `prerequisite_command`. The only such command is
+      `uv tool install --upgrade hive-vault`. That is a tool install, not a registration, and an
+      upgrade on every run is not idempotent. uv owns hive on msi (`uv tool list` → `hive-vault
+      v4.2.2`), but `packages.json` does not declare it, so the twins' MCP loop is hive's only
+      installer. Filed as #1993; it must land before the cutover deletes the twins. Nothing
+      regresses meanwhile, because the shell twins still run the command.
+      **Shipped (2026-10-04)** as the `claude-mcp` converge step, before `claude-plugins`, as in
+      both twins. The two steps are joined, so one failing still runs the other. The npx gate the
+      twins put around the whole loop is now `prerequisite_binary: npx` on `sequential-thinking`,
+      which both twins already honour per server.
 
 ## Increment 3 — per-key merge policy
 

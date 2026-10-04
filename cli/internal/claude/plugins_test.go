@@ -28,6 +28,10 @@ func (f *fakeRunner) Install(id string) error {
 	return nil
 }
 
+func (f *fakeRunner) McpGet(string) (string, error)         { return "", errors.New("not registered") }
+func (f *fakeRunner) McpAdd(string, string, []string) error { return nil }
+func (f *fakeRunner) McpRemove(string) error                { return nil }
+
 func newSyncer(r Runner) Syncer {
 	return Syncer{Run: r, ClaudeJSON: filepath.Join(os.TempDir(), "absent-claude-json-for-test"), Floor: 10240}
 }

@@ -30,7 +30,25 @@ Linux is the reference unless the row says otherwise.
 | 8 | Which `.claude.json` is guarded | `$HOME/.claude/.claude.json`, hardcoded | `$USERPROFILE\.claude\.claude.json`, hardcoded | `$CLAUDE_CONFIG_DIR/.claude.json`, with the directory resolved through the env contract (default `~/.claude` on both OSes). The child `claude` is run with that same `CLAUDE_CONFIG_DIR`, so the guard and the CLI agree on the file by construction. The twins are right only while the rc files export the default; Claude Code writes `~/.claude.json` when the variable is unset. Found by PR-Agent on #1992. |
 | 9 | "Already installed" test | `grep -qF` for the id anywhere in the list output | `-match [regex]::Escape($plugin)` on the output, also a substring match | The id must equal a whole whitespace-separated token. A declared `lsp@m` is not "present" just because `gopls-lsp@m` is installed. |
 
+## Divergences (increment 2)
+
+Same method, at `origin/main` `614ae4ed`: `setup-linux.sh` lines 983-1046, `setup-windows.ps1`
+lines 522-600.
+
+| # | Behaviour | `.sh` | `.ps1` | Go (`dotf deploy`) |
+|---|---|---|---|---|
+| 10 | Gate on the whole loop | `claude`, `npx` and `jq` | `claude` and `npx` | `claude` only. `npx` is now `sequential-thinking`'s declared `prerequisite_binary`, the one server that needs it; `jq` was the shell's JSON reader. Without npx the other servers still register. |
+| 11 | `prerequisite_command` | Run before the server's `get` | Run before the server's `get` | **Not run** (#1993). Installing a tool is not a registration, and `--upgrade` on every run is not idempotent. hive must reach the catalog before the cutover deletes the twins. |
+| 12 | Missing prerequisite binary | Warn, skip, counted as skipped | Same | `skipped claude-mcp <name> (<bin> not on PATH)`. Not a failure: the server cannot run here, and that is not the deploy's fault. |
+| 13 | HIVE-118 migration when `uv` is absent | The stale entry is removed, then the loop skips hive, so hive ends unregistered | Same | The prerequisite is checked first, so the stale entry stays. Neither works without `uv`; Go does not destroy what it cannot replace. |
+| 14 | HIVE-118 remove fails | Silent; the loop then finds hive registered and skips it, so the stale entry stays | Same | `failed claude-mcp hive`, and the run fails |
+| 15 | Failed `mcp add` | Warned with the CLI's output, counted, exit 0 | Same | Named on its own line and fails the run, as plugins do (row 2). The plugin step still runs. |
+| 16 | Where the list is read | `$DOTFILES_DIR/mcp-servers.json`, the deploy dir copy | `$DotfilesDir\mcp-servers.json` | The repo root, like every `ai/deploy.json` source |
+| 17 | Reading the file | `jq` with `// ""` defaults; an unknown field is ignored | `ConvertFrom-Json`; an unknown field is ignored | Strict: an unknown field, an empty name or args, a duplicate, or a transport other than stdio/http fails the step. A test loads the repo's own file. |
+
 ## Not a divergence
 
 - **Which calls are guarded.** All three paths wrap both the `plugin list` pre-fetch and every
-  `plugin install` (BUG-004, BUG-011).
+  `plugin install` (BUG-004, BUG-011), and every `mcp get`, `mcp add` and `mcp remove`.
+- **Args splitting.** All three split `args` on whitespace with no quoting.
+- **MCP before plugins.** Both twins register servers first; so does Go.

@@ -54,5 +54,12 @@
     "verification": "test -z \"$(git diff --name-only origin/main...HEAD -- 'setup-*.sh' 'setup-*.ps1' 'scripts/')\"",
     "state": "passing",
     "evidence": "Increment 1: the merge-base diff against origin/main (e4bedb26) touches nothing under setup-*.{sh,ps1} or scripts/. Re-check per increment."
+  },
+  {
+    "id": "CLI-063-dotf-deploy-claude-f9",
+    "behavior": "A bare dotf deploy registers every mcp-servers.json server claude lacks, skips one whose prerequisite binary is absent, migrates a stale uvx hive-vault entry, and names a failed add",
+    "verification": "cd cli && go test ./internal/claude/ ./internal/cmd/ -run 'TestRegister|TestTheRepoListsLoad|TestDeployCmd_.*MCP|TestDeployCmd_StaleHive|TestMcpAddArgv'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

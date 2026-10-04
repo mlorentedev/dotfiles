@@ -41,11 +41,14 @@ func LoadPlugins(path string) ([]string, error) {
 	return doc.Plugins, nil
 }
 
-// Runner is the claude CLI as the sync uses it: the seam a test fills with a
+// Runner is the claude CLI as the deploy uses it: the seam a test fills with a
 // fake instead of a real install.
 type Runner interface {
-	List() (string, error)   // `claude plugin list` output
-	Install(id string) error // `claude plugin install <id>`
+	List() (string, error)                              // `claude plugin list` output
+	Install(id string) error                            // `claude plugin install <id>`
+	McpGet(name string) (string, error)                 // `claude mcp get <name>`
+	McpAdd(name, transport string, args []string) error // `claude mcp add --transport <t> <name> --scope user -- <args>`
+	McpRemove(name string) error                        // `claude mcp remove <name> --scope user`
 }
 
 // Syncer installs the declared plugins a box lacks, each claude call inside
@@ -54,6 +57,7 @@ type Syncer struct {
 	Run        Runner
 	ClaudeJSON string
 	Floor      int
+	HasCommand func(string) bool // PATH lookup for an MCP server's prerequisite binary
 }
 
 // PluginReport is what one Sync found and did. Added holds only installs that
