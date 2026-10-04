@@ -66,6 +66,18 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   change existing boxes: the template's deny rules arrive, and `attribution` merges instead of being
   replaced whole.
 
+## Review dispositions
+
+Independent review `nan/qwen3.8-flash`, verdict PASS at `e04ca960` (`review.md`).
+
+| Finding | Disposition | Reason |
+|---|---|---|
+| Minor: dry run prints `would add` twice | apply | `reportCounts` now prints `would add claude-mcp 2 missing, 0 already present`; the pin in `deploy_claude_test.go` moved with it |
+| Minor: AC8 against the stated base | recorded | The base `ecd20efe` includes #1991, which edits `setup-windows.ps1` for the Orca hook call (CLI-093). That PR touched no file of this spec. f8 walks this spec's own commits, and none of them touches a twin |
+| Minor (theoretical): `staleHive` matches path text in `mcp get` | skip | Measured on msi: `claude mcp get hive` matches neither `uvx` nor `hive-vault`. If it ever did, the cost is one re-add that then converges |
+| Minor (speculative): ANSI colour breaks the plugin token match | skip | `dotf` reads `plugin list` through a pipe, where the CLI prints no colour. No reproduction |
+| Question: review base is the fork point, 246 commits deep | defer | Already #1551; this run added as a data point there |
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
