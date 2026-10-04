@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.64.0](https://github.com/mlorentedev/dotfiles/compare/v0.63.0...v0.64.0) (2026-10-04)
+
+
+### Features
+
+* **deploy:** declare Claude Code's settings.json as a merge entry ([#1996](https://github.com/mlorentedev/dotfiles/issues/1996)) ([944993e](https://github.com/mlorentedev/dotfiles/commit/944993e258822e620e38e2f06a3ac4ed245fd836))
+* **deploy:** install Claude Code plugins from a bare dotf deploy ([#1992](https://github.com/mlorentedev/dotfiles/issues/1992)) ([614ae4e](https://github.com/mlorentedev/dotfiles/commit/614ae4ede087c705cb94c5d7891f7f4b9a1d4747)), closes [#1339](https://github.com/mlorentedev/dotfiles/issues/1339)
+* **deploy:** register Claude Code MCP servers from mcp-servers.json ([#1994](https://github.com/mlorentedev/dotfiles/issues/1994)) ([0f67099](https://github.com/mlorentedev/dotfiles/commit/0f67099a4909b22a217467c882695138ce468391))
+* **secrets:** declare kubelab's restic passwords as escrow entries ([#1998](https://github.com/mlorentedev/dotfiles/issues/1998)) ([66da55b](https://github.com/mlorentedev/dotfiles/commit/66da55b58a244286869d1e30eb7fddc1e7e7da95))
+* **tools:** install hive through a uv-tool catalog source on POSIX ([#2001](https://github.com/mlorentedev/dotfiles/issues/2001)) ([eb14b0d](https://github.com/mlorentedev/dotfiles/commit/eb14b0df8783ecb4b9ddb492739c588423ff951a))
+
+
+### Bug Fixes
+
+* **ci:** skip PR-Agent when every file is of a type it never reads ([#1986](https://github.com/mlorentedev/dotfiles/issues/1986)) ([b0fcfb7](https://github.com/mlorentedev/dotfiles/commit/b0fcfb7822b6da69d0fb76b6a29556dbf2cea0b5))
+* **harness:** narrow fast-track issue exception to &lt;50 LOC ([#1954](https://github.com/mlorentedev/dotfiles/issues/1954)) ([#1972](https://github.com/mlorentedev/dotfiles/issues/1972)) ([e6e894d](https://github.com/mlorentedev/dotfiles/commit/e6e894d05ee4faafca2f229f7e4dcc3009034cad))
+* **harness:** window insights handoff decisions by thread date ([#1984](https://github.com/mlorentedev/dotfiles/issues/1984)) ([8bb09c2](https://github.com/mlorentedev/dotfiles/commit/8bb09c2f63f5b83212ceb7904a19492b8f2c8633))
+* **windows:** bypass dotf secrets run pipe limitation for TUIs ([#1970](https://github.com/mlorentedev/dotfiles/issues/1970)) ([#1971](https://github.com/mlorentedev/dotfiles/issues/1971)) ([be386de](https://github.com/mlorentedev/dotfiles/commit/be386de1ee930b8a50f6619d9659ce97bf0b76d0))
+
 ## [0.63.0](https://github.com/mlorentedev/dotfiles/compare/v0.62.0...v0.63.0) (2026-10-02)
 
 
