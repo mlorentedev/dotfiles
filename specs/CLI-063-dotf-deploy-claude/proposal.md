@@ -161,14 +161,23 @@ the shell behaviour the port must reproduce, so they are the *last* thing to go.
 ## Acceptance criteria
 
 - [ ] Claude's four capabilities are reachable through `dotf deploy`, declared in `ai/deploy.json`.
+      *Amended 2026-10-03:* `settings.json` is the declared entry; MCP and plugins are converge
+      steps of a bare `dotf deploy`, since an action cannot be declared without new manifest
+      vocabulary. See `tasks.md`, increment 3.
 - [ ] `ai/claude/plugins.json` is the sole plugin list read by the Go path, and a test fails if the
       twins' hardcoded lists drift from it.
 - [ ] `env`, `enabledPlugins` (nested merge) and `permissions.allow` (deduped union) are preserved
       per the table above, each with a test that fails under top-level replace.
 - [ ] The per-key policy is declared in the manifest, and an unrecognised template key **fails
       loudly** rather than being silently skipped.
+      *Amended 2026-10-03:* there is no per-key policy to declare and no key to skip: the merge
+      writes every template key, so the template is the allow-list. What this criterion guarded
+      is now asserted the other way round: every template key reaches an existing box, and the
+      template carries no `hooks`.
 - [ ] `ai/deploy.json` `version` is bumped, and an older decoder refuses the file rather than
       misreading it.
+      *Amended 2026-10-03:* no field is added, so the version stays 3; the freeze test keeps
+      the rule for whoever adds one.
 - [ ] The Go path emits no `hooks` key under any input — asserted, not merely omitted.
 - [ ] Plugin counting reflects install success (Linux behaviour), with #1491's divergence recorded.
 - [ ] **No twin deleted, no caller repointed** — nothing under `setup-*.{sh,ps1}` or `scripts/`.

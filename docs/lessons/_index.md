@@ -353,3 +353,4 @@ tags: [lessons, index, dotfiles]
 | [333 - CreateProcess DETACHED_PROCESS ignores CREATE_NO_WINDOW](lesson-333-createprocess-detached-ignores-no-window.md) | 2026-10-02 |  |
 | [334 - Windows prompts to open extensionless bash scripts](lesson-334-windows-prompts-to-open-extensionless-scripts.md) | 2026-10-02 |  |
 | [335 - A converge step that shells out is stubbed in the shared test helper](lesson-335-a-converge-step-is-stubbed-in-the-shared-test-helper.md) | 2026-10-04 |  |
+| [336 - A spec's measurement goes stale when another change moves the engine under it](lesson-336-a-spec-measurement-goes-stale-when-another-change-moves-the-engine.md) | 2026-10-03 |  |

@@ -47,6 +47,21 @@ lines 522-600.
 | 16 | Where the list is read | `$DOTFILES_DIR/mcp-servers.json`, the deploy dir copy | `$DotfilesDir\mcp-servers.json` | The repo root, like every `ai/deploy.json` source |
 | 17 | Reading the file | `jq` with `// ""` defaults; an unknown field is ignored | `ConvertFrom-Json`; an unknown field is ignored | Strict: an unknown field, an empty name or args, a duplicate, or a transport other than stdio/http fails the step. A test loads the repo's own file. |
 
+## Divergences (increment 3)
+
+Same method, plus a measurement: the Go merge deployed onto a copy of msi's own
+`~/.claude/settings.json`.
+
+| # | Behaviour | `.sh` | `.ps1` | Go (`dotf deploy claude-settings`) |
+|---|---|---|---|---|
+| 18 | `permissions.deny` on an existing box | Never written; only a fresh bootstrap gets it | Same | Unioned in. msi had 0 of the template's 17 deny rules, including the secrets defenses (`dotf secrets show`, `env`, `printenv`). Same defect class as `outputStyle`, closed by the same change. |
+| 19 | `attribution` | Replaced whole, so a stale subkey cannot reinstate a trailer | Same | Merged: the template's three subkeys win, a subkey only the box has survives. Accepted: the template names every subkey Claude Code documents, and the values that hide the trailer are the template's. |
+| 20 | A template key the policy does not name | Silently skipped on an existing box (the allow-list) | Same | Written. The template is the allow-list now; `hooks` is kept out of it by test. |
+| 21 | `$schema` | Not in the policy, so never written on an existing box | Same | Written. Harmless: an editor hint. |
+| 22 | `permissions.allow` order | `unique` sorts the whole list | `Select-Object -Unique` keeps first-seen order | Box order kept, new entries appended. Membership is what Claude reads, and neither path rewrites the other's output: after the jq merge, Go reports `in sync`. |
+| 23 | Destination | `$HOME/.claude/settings.json` | `$USERPROFILE\.claude\settings.json` | `{CLAUDE_CONFIG_DIR}/settings.json`, as row 8 |
+| 24 | File formatting on first write | `jq` keeps key order | `ConvertTo-Json` keeps hashtable order | Keys sorted, two-space indent. One-time, cosmetic. |
+
 ## Not a divergence
 
 - **Which calls are guarded.** All three paths wrap both the `plugin list` pre-fetch and every
