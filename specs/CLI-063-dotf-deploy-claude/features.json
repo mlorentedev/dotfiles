@@ -25,7 +25,7 @@
     "behavior": "The template is the allow-list: every template key reaches an existing box (outputStyle's defect cannot recur), and the template carries no hooks key (AC4 as inverted 2026-10-03)",
     "verification": "cd cli && go test ./internal/deploy/ -run 'TestClaudeSettingsTemplateHasNoHooks|TestClaudeEntriesDeclared'",
     "state": "passing",
-    "evidence": "exit 0 (2026-10-03); adding a hooks key to the template is killed"
+    "evidence": "exit 0 (2026-10-03). TestClaudeEntriesDeclared asserts every template key reaches the box (deepMerge skipping outputStyle is killed); adding a hooks key to the template is killed"
   },
   {
     "id": "CLI-063-dotf-deploy-claude-f5",

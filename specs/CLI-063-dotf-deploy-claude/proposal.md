@@ -170,6 +170,10 @@ the shell behaviour the port must reproduce, so they are the *last* thing to go.
       per the table above, each with a test that fails under top-level replace.
 - [ ] The per-key policy is declared in the manifest, and an unrecognised template key **fails
       loudly** rather than being silently skipped.
+      *Amended 2026-10-03:* there is no per-key policy to declare and no key to skip: the merge
+      writes every template key, so the template is the allow-list. What this criterion guarded
+      is now asserted the other way round: every template key reaches an existing box, and the
+      template carries no `hooks`.
 - [ ] `ai/deploy.json` `version` is bumped, and an older decoder refuses the file rather than
       misreading it.
       *Amended 2026-10-03:* no field is added, so the version stays 3; the freeze test keeps

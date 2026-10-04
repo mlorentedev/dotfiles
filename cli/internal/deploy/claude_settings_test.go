@@ -123,6 +123,13 @@ func TestClaudeEntriesDeclared(t *testing.T) {
 
 	got := readObject(t, dst)
 	tmpl := readObject(t, filepath.Join(root, cfg.Src))
+	// Every template key reaches the box: the allow-list defect (outputStyle)
+	// is closed only if no key, present or future, is skipped.
+	for key, want := range tmpl {
+		if !contains(got[key], want) {
+			t.Errorf("template key %q did not reach the box: got %v", key, got[key])
+		}
+	}
 	if got["model"] != tmpl["model"] {
 		t.Errorf("model = %v, the template declares %v", got["model"], tmpl["model"])
 	}
@@ -153,4 +160,42 @@ func jsonRoundTrip(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// contains reports whether got holds everything want declares: objects by key,
+// recursively; lists by membership; anything else by equality.
+func contains(got, want any) bool {
+	switch w := want.(type) {
+	case map[string]any:
+		g, ok := got.(map[string]any)
+		if !ok {
+			return false
+		}
+		for k, v := range w {
+			if !contains(g[k], v) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		g, ok := got.([]any)
+		if !ok {
+			return false
+		}
+		for _, v := range w {
+			found := false
+			for _, x := range g {
+				if jsonEqual(x, v) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+		return true
+	default:
+		return jsonEqual(got, want)
+	}
 }
