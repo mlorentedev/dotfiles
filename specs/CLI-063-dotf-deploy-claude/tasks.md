@@ -50,7 +50,7 @@ Nothing here is a golden file. Do not add one.
       (override included) with `mem.ClaudeJSONMinBytes` as its default, and the session-start
       canary uses that same constant. The predicate itself is new (`claude.Truncated`): the canary
       asks "below an absolute floor", the guard asks "snapshot ≥ floor and more than half lost".
-- [x] [AC1] Plan/apply for the plugin capability; counts a plugin only on install success (#1491
+- [x] [AC1] Plan/apply for the plugin capability (plan/apply only; the declaration is increment 3); counts a plugin only on install success (#1491
       divergence recorded in `divergences.md`, NOT fixed in the `.ps1`)
       **Sequencing (2026-10-04):** increment 1 ships plugin sync as a converge step of a bare
       `dotf deploy`, in the slot CLI-093 (#1953) opened for the Orca hooks after this spec was
