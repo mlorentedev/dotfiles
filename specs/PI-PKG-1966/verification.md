@@ -34,3 +34,16 @@ hive: connected, 13 tools (codemode, global)
 context7: connected, 2 tools (codemode, global)
 sequential-thinking: connected, 1 tool (codemode, global)
 ```
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? no: an upstream pi 1.0 breaking change fixed by a manifest bump; the one misreading (`retire` takes data paths, not packages) is already stated in `cli/internal/pi/packages.go` and in the manifest's own entries
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: dropping an extension pi now provides natively follows the existing package-manifest design, no new decision
+- [x] New pattern candidate for `00_meta/patterns/`? no: single-project, single occurrence
+
+## Archive checklist
+
+- [ ] `proposal.md` frontmatter set to `status: archived`
+- [ ] Folder moved: `specs/<feature-id>/` -> `specs/archive/<feature-id>/`
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [ ] Promotions above executed (if any)
