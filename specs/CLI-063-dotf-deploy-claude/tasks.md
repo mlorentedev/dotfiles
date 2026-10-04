@@ -52,7 +52,7 @@ Nothing here is a golden file. Do not add one.
       asks "below an absolute floor", the guard asks "snapshot ≥ floor and more than half lost".
 - [x] [AC1] Plan/apply for the plugin capability (plan/apply only; the declaration is increment 3); counts a plugin only on install success (#1491
       divergence recorded in `divergences.md`, NOT fixed in the `.ps1`)
-      **Sequencing (2026-10-04):** increment 1 ships plugin sync as a converge step of a bare
+      **Sequencing (2026-10-03):** increment 1 ships plugin sync as a converge step of a bare
       `dotf deploy`, in the slot CLI-093 (#1953) opened for the Orca hooks after this spec was
       written. Declaring it in `ai/deploy.json` needs new entry vocabulary, and the strict decoder
       refuses an unknown field before it reads `version`, so every installed `dotf` older than the
@@ -73,14 +73,14 @@ Nothing here is a golden file. Do not add one.
       script on PATH; the real argv is pinned separately (`TestMcpAddArgvMatchesTheTwins`)
 - [x] [AC1] Failing test: `claude mcp add` non-zero is surfaced, not swallowed
 - [x] [AC1] Implement reading `mcp-servers.json`; carry HIVE-118's remove-then-re-add for `uvx hive-vault`
-      **Decision (2026-10-04):** the Go path honours `prerequisite_binary` (skip and report, the
+      **Decision (2026-10-03):** the Go path honours `prerequisite_binary` (skip and report, the
       `requires` idiom) and does **not** run `prerequisite_command`. The only such command is
       `uv tool install --upgrade hive-vault`. That is a tool install, not a registration, and an
       upgrade on every run is not idempotent. uv owns hive on msi (`uv tool list` → `hive-vault
       v4.2.2`), but `packages.json` does not declare it, so the twins' MCP loop is hive's only
       installer. Filed as #1993; it must land before the cutover deletes the twins. Nothing
       regresses meanwhile, because the shell twins still run the command.
-      **Shipped (2026-10-04)** as the `claude-mcp` converge step, before `claude-plugins`, as in
+      **Shipped (2026-10-03)** as the `claude-mcp` converge step, before `claude-plugins`, as in
       both twins. The two steps are joined, so one failing still runs the other. The npx gate the
       twins put around the whole loop is now `prerequisite_binary: npx` on `sequential-thinking`,
       which both twins already honour per server.

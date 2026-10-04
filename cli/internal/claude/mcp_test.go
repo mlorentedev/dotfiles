@@ -62,10 +62,7 @@ var servers = []Server{
 
 func TestRegisterAddsOnlyWhatIsMissing(t *testing.T) {
 	f := &mcpFake{registered: map[string]string{"context7": "context7:\n  Type: http\n"}}
-	rep, err := mcpSyncer(f, "uv").Register(servers, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := mcpSyncer(f, "uv").Register(servers, false)
 	if !reflect.DeepEqual(f.added, []string{"hive stdio hive client"}) {
 		t.Fatalf("added %v, want only hive, split on whitespace", f.added)
 	}
@@ -78,10 +75,7 @@ func TestRegisterAddsOnlyWhatIsMissing(t *testing.T) {
 // counted, and never swallowed.
 func TestRegisterSurfacesAFailedAdd(t *testing.T) {
 	f := &mcpFake{failing: map[string]bool{"context7": true}}
-	rep, err := mcpSyncer(f, "uv").Register(servers, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := mcpSyncer(f, "uv").Register(servers, false)
 	if !reflect.DeepEqual(rep.Failed, []string{"context7"}) || !reflect.DeepEqual(rep.Added, []string{"hive"}) {
 		t.Fatalf("report %+v, want Failed [context7] Added [hive]", rep)
 	}
@@ -94,10 +88,7 @@ func TestRegisterMigratesAStaleHiveEntry(t *testing.T) {
 		"context7": "ok",
 		"hive":     "hive:\n  Command: uvx\n  Args: hive-vault\n",
 	}}
-	rep, err := mcpSyncer(f, "uv").Register(servers, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := mcpSyncer(f, "uv").Register(servers, false)
 	if !reflect.DeepEqual(f.removed, []string{"hive"}) || !reflect.DeepEqual(rep.Added, []string{"hive"}) {
 		t.Fatalf("removed %v, report %+v; want hive removed then re-added", f.removed, rep)
 	}
@@ -106,9 +97,7 @@ func TestRegisterMigratesAStaleHiveEntry(t *testing.T) {
 	}
 
 	f = &mcpFake{registered: map[string]string{"context7": "ok", "hive": "hive:\n  Command: hive\n  Args: client\n"}}
-	if _, err := mcpSyncer(f, "uv").Register(servers, false); err != nil {
-		t.Fatal(err)
-	}
+	mcpSyncer(f, "uv").Register(servers, false)
 	if len(f.removed) != 0 || len(f.added) != 0 {
 		t.Fatalf("a current hive entry was touched: removed %v added %v", f.removed, f.added)
 	}
@@ -118,10 +107,7 @@ func TestRegisterMigratesAStaleHiveEntry(t *testing.T) {
 // its prerequisite command is never run by the Go path (#1993).
 func TestRegisterSkipsAServerWhosePrerequisiteIsMissing(t *testing.T) {
 	f := &mcpFake{}
-	rep, err := mcpSyncer(f).Register(servers, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := mcpSyncer(f).Register(servers, false)
 	if !reflect.DeepEqual(rep.Skipped, []Skip{{Name: "hive", Missing: "uv"}}) {
 		t.Fatalf("skipped %+v, want hive for uv", rep.Skipped)
 	}
@@ -132,10 +118,7 @@ func TestRegisterSkipsAServerWhosePrerequisiteIsMissing(t *testing.T) {
 
 func TestRegisterDryRunChangesNothing(t *testing.T) {
 	f := &mcpFake{registered: map[string]string{"hive": "Command: uvx hive-vault"}}
-	rep, err := mcpSyncer(f, "uv").Register(servers, true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := mcpSyncer(f, "uv").Register(servers, true)
 	if len(f.added) != 0 || len(f.removed) != 0 {
 		t.Fatalf("dry run added %v removed %v", f.added, f.removed)
 	}
@@ -171,10 +154,7 @@ func TestLoadServers(t *testing.T) {
 func TestRegisterLeavesOtherUvxServersAlone(t *testing.T) {
 	pdf := []Server{{Name: "pdf-modifier", Transport: "stdio", Args: "uvx pdf-modifier-mcp", PrerequisiteBinary: "uv"}}
 	f := &mcpFake{registered: map[string]string{"pdf-modifier": "Command: uvx\n  Args: pdf-modifier-mcp\n"}}
-	rep, err := mcpSyncer(f, "uv").Register(pdf, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rep := mcpSyncer(f, "uv").Register(pdf, false)
 	if len(f.removed) != 0 || len(f.added) != 0 || !reflect.DeepEqual(rep.Present, []string{"pdf-modifier"}) {
 		t.Fatalf("removed %v added %v report %+v; a current uvx server was churned", f.removed, f.added, rep)
 	}

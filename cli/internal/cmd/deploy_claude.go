@@ -130,11 +130,8 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 		return fmt.Errorf("%s: %w", step, err)
 	}
 	s.HasCommand = deployCommandAvailable
-	rep, err := s.Register(servers, dryRun)
+	rep := s.Register(servers, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
-	if err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
 	for _, name := range rep.Migrated {
 		_, _ = fmt.Fprintf(w, "migrated  %-10s %s (stale uvx hive-vault entry replaced by the SSOT one)\n", step, name)
 	}

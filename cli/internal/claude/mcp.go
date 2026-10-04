@@ -79,8 +79,9 @@ var staleHive = regexp.MustCompile(`uvx|hive-vault`)
 // Register adds every server `claude mcp get` does not know, each claude call
 // inside the snapshot guard. A get that exits non-zero means "not registered",
 // as in both twins; a CLI that is broken outright then fails on the add, where
-// it is reported. An add that fails is named in Failed and never counted.
-func (s Syncer) Register(servers []Server, dryRun bool) (MCPReport, error) {
+// it is reported. An add or remove that fails is named in Failed and never
+// counted, so unlike Sync there is no error a caller could act on.
+func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 	var rep MCPReport
 	guard := func(fn func() error) error {
 		restored, err := Guard(s.ClaudeJSON, s.Floor, fn)
@@ -116,5 +117,5 @@ func (s Syncer) Register(servers []Server, dryRun bool) (MCPReport, error) {
 			rep.Added = append(rep.Added, srv.Name)
 		}
 	}
-	return rep, nil
+	return rep
 }
