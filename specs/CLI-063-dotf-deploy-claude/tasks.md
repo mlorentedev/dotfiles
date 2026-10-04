@@ -123,12 +123,12 @@ now reach existing boxes (msi had 0), and `attribution` merges instead of being 
 
 ## Closing
 
-- [ ] Every acceptance criterion covered by ≥1 test and ≥1 `features.json` entry with a
+- [x] Every acceptance criterion covered by ≥1 test and ≥1 `features.json` entry with a
       non-vacuous verification command
-- [ ] Lint + both layers green; `GOOS=windows go vet ./...` clean
-- [ ] `verification.md` filled in
+- [x] Lint + both layers green; `GOOS=windows go vet ./...` clean
+- [x] `verification.md` filled in
 - [ ] **Independent adversarial review** (reviewer ≠ implementer) before `dotf spec archive`
-- [ ] No twin deleted, no caller repointed — verified by `git diff --stat` showing nothing under
+- [x] No twin deleted, no caller repointed — verified by `git diff --stat` showing nothing under
       `setup-*.{sh,ps1}` or `scripts/`
 
 ## Machine-readable features

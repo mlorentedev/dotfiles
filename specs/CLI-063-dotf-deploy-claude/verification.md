@@ -7,17 +7,35 @@ created: "2026-09-04"
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+Every criterion maps to a `features.json` entry whose `verification` command was run on
+`origin/main` at `66da55b5` on 2026-10-03 and exited 0.
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] AC1 (as amended) -> f1, f9. `TestClaudeEntriesDeclared`, `TestDeployCmd_BareDeployRegistersMissingMCPServers`,
+      `TestDeployCmd_BareDeployInstallsMissingClaudePlugins`, `TestRegister*`. Commits `614ae4ed` (#1992),
+      `0f67099a` (#1994), `944993e2` (#1996)
+- [x] AC2 -> f2. `tests/claude-plugins.bats`, commit `614ae4ed`
+- [x] AC3 -> f3. `TestPerKeyMergePolicy`, commit `944993e2`
+- [x] AC4 (as inverted) -> f4. `TestClaudeEntriesDeclared` (every template key reaches the box),
+      `TestClaudeSettingsTemplateHasNoHooks`, commit `944993e2`
+- [x] AC5 (as amended) -> f5. `TestManifestVersion_FreezesTheFieldSet`, `TestParseManifest_RefusesWhatItCannotFullyRead`
+- [x] AC6 -> f6. `TestGuardNeverAddsAHooksKey`, `TestClaudeSettingsTemplateHasNoHooks`, `TestClaudeEntriesDeclared`
+- [x] AC7 -> f7. `TestSyncCountsOnlySuccessfulInstalls`, `TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun`;
+      #1491 recorded as `divergences.md` row 1
+- [x] AC8 -> f8. No commit that touched this spec changed `setup-*.{sh,ps1}` or `scripts/`. The check now walks
+      every such commit; the old `origin/main...HEAD` form is empty by construction on a closing branch.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Go: `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`, pinned `golangci-lint` -> all green; `golangci-lint` 2.12.2 (the pin) on a cleaned cache: 0 issues
+- Shell: `bats tests/*.bats` -> 1775/1776; the one failure is #1641 (test 1364, the oh-my-zsh snapshot against the local install), environmental and unrelated
+- Manual smoke test on msi:
+  - `dotf deploy --dry-run` -> `claude-mcp 0 added, 4 already present`.
+  - Deploying `claude-settings` onto a copy of `~/.claude/settings.json` adds `$schema` and the
+    template's 17 `permissions.deny` rules and changes nothing else (`hooks` identical, 45 allow
+    entries unchanged).
+  - A second run reports `in sync`. So does a re-plan after the twin's jq merge has run over the
+    result.
+- No regressions in the existing suite: yes.
 
 ## Decisions made during implementation
 
@@ -36,13 +54,25 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   running at four points of a setup, two of them shelling out to `claude`, have no single
   capturable stream. See `tasks.md` for the per-capability oracle chosen instead.
 
+- **Increment 3 needed no new manifest vocabulary.** AI-042 had already made `deepMerge` granular
+  after this proposal measured it as a top-level replace, so `strategy: merge` expresses Claude's
+  policy as is. AC1, AC4 and AC5 were amended (2026-10-03); the version stays 3 and no release is
+  needed before the entry takes effect. Lesson 336 records how the measurement went stale.
+- **MCP and plugins are converge steps, not declared entries**: declaring an action needs vocabulary
+  the re-scope avoided adding.
+- **`prerequisite_command` is not run by the Go path** (#1993). That issue must land before any
+  cutover deletes the twins, since the twins' MCP loop is hive's only installer today.
+- **24 behaviour differences against the twins** are recorded in `divergences.md`. Rows 18 and 19
+  change existing boxes: the template's deny rules arrive, and `attribution` merges instead of being
+  replaced whole.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: lesson 336, a spec measurement goes stale when another change moves the engine (landed in #1996)
+- [x] ADR-worthy decision? no: the command home follows ADR-032 and the converge-step slot already exists (CLI-093)
+- [x] New pattern candidate? no: lesson 336 is local to this engine
 
 ## Archive checklist
 
