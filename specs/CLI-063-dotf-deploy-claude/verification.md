@@ -82,7 +82,7 @@ Independent review `nan/qwen3.8-flash`, verdict PASS at `e04ca960` (`review.md`)
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: lesson 336, a spec measurement goes stale when another change moves the engine (landed in #1996)
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-336-a-spec-measurement-goes-stale-when-another-change-moves-the-engine.md
 - [x] ADR-worthy decision? no: the command home follows ADR-032 and the converge-step slot already exists (CLI-093)
 - [x] New pattern candidate? no: lesson 336 is local to this engine
 
