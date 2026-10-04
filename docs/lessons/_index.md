@@ -352,3 +352,4 @@ tags: [lessons, index, dotfiles]
 | [332 - A guard kept in a spec folder runs nowhere](lesson-332-a-guard-kept-in-a-spec-folder-runs-nowhere.md) | 2026-10-02 |  |
 | [333 - CreateProcess DETACHED_PROCESS ignores CREATE_NO_WINDOW](lesson-333-createprocess-detached-ignores-no-window.md) | 2026-10-02 |  |
 | [334 - Windows prompts to open extensionless bash scripts](lesson-334-windows-prompts-to-open-extensionless-scripts.md) | 2026-10-02 |  |
+| [335 - A converge step that shells out is stubbed in the shared test helper](lesson-335-a-converge-step-is-stubbed-in-the-shared-test-helper.md) | 2026-10-04 |  |

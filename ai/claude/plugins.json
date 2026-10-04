@@ -1,0 +1,18 @@
+{
+  "$comment": [
+    "Claude Code plugins a bare `dotf deploy` installs (CLI-063, #1339).",
+    "",
+    "The SSOT for the list. Each id is <plugin>@<marketplace>, the form",
+    "`claude plugin install` takes. A plugin already in `claude plugin list` is",
+    "left alone; one the box lacks is installed, and counted only when the",
+    "install succeeds.",
+    "",
+    "setup-linux.sh and setup-windows.ps1 still carry the same list hardcoded",
+    "until the cutover; tests/claude-plugins.bats fails when the three disagree."
+  ],
+  "plugins": [
+    "gopls-lsp@claude-plugins-official",
+    "security-guidance@claude-plugins-official",
+    "frontend-design@claude-plugins-official"
+  ]
+}

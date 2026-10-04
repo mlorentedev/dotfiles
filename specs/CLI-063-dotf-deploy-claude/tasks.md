@@ -37,22 +37,33 @@ Nothing here is a golden file. Do not add one.
 - [x] `proposal.md` complete, acceptance criteria testable
 - [x] Command home settled against ADR-032 — `dotf deploy`, not `dotf agent` (owner decision 2026-09-05)
 - [x] Oracle question settled (above)
-- [ ] Branch off `main`, spec folder committed, #1339 set to In Progress
+- [x] Branch off `main`, spec folder committed, #1339 set to In Progress
 
 ## Increment 1 — snapshot guard + plugin sync (first PR, ≤300 LOC)
 
-- [ ] [P] [AC2] Failing bats: both twins' hardcoded plugin ids equal `ai/claude/plugins.json`
-- [ ] [AC2] Add `ai/claude/plugins.json` with the ids read out of the twins verbatim
-- [ ] [P] [AC7] Failing Go test: truncation predicate at the `claude_json_min_bytes` boundary
-- [ ] [AC7] Implement the predicate by **calling** the existing threshold in
+- [x] [P] [AC2] Failing bats: both twins' hardcoded plugin ids equal `ai/claude/plugins.json`
+- [x] [AC2] Add `ai/claude/plugins.json` with the ids read out of the twins verbatim
+- [x] [P] [AC7] Failing Go test: truncation predicate at the `claude_json_min_bytes` boundary
+- [x] [AC7] Implement the predicate by **calling** the existing threshold in
       `cli/internal/mem/session_start_adapter.go:83` — a second literal `10240` is the defect
-- [ ] [AC1] Plan/apply for the plugin capability; counts a plugin only on install success (#1491
+      *Done as:* `mem.ClaudeJSONFloor(configPath)` returns the configured `claude_json_min_bytes`
+      (override included) with `mem.ClaudeJSONMinBytes` as its default, and the session-start
+      canary uses that same constant. The predicate itself is new (`claude.Truncated`): the canary
+      asks "below an absolute floor", the guard asks "snapshot ≥ floor and more than half lost".
+- [x] [AC1] Plan/apply for the plugin capability (plan/apply only; the declaration is increment 3); counts a plugin only on install success (#1491
       divergence recorded in `divergences.md`, NOT fixed in the `.ps1`)
-- [ ] [AC6] **Negative test: the Go path emits no `hooks` key under any input.** Written in
+      **Sequencing (2026-10-04):** increment 1 ships plugin sync as a converge step of a bare
+      `dotf deploy`, in the slot CLI-093 (#1953) opened for the Orca hooks after this spec was
+      written. Declaring it in `ai/deploy.json` needs new entry vocabulary, and the strict decoder
+      refuses an unknown field before it reads `version`, so every installed `dotf` older than the
+      change stops deploying *all* configs (and the Orca heal) until a release ships. That break is
+      paid once: the declaration moves to increment 3, next to the version bump it requires. AC1
+      closes there, not here.
+- [x] [AC6] **Negative test: the Go path emits no `hooks` key under any input.** Written in
       increment 1 even though increment 1 does not write settings — the proposal names this as the
       single most likely way to cause an incident, so the assertion predates the code that could
       violate it
-- [ ] Refactor; `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`,
+- [x] Refactor; `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`,
       pinned `golangci-lint`, `bats tests/*.bats`
 
 ## Increment 2 — MCP registration
