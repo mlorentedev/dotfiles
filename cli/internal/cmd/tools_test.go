@@ -213,7 +213,7 @@ func TestListAsset(t *testing.T) {
 		goos, want string
 	}{
 		{hive, "linux", "uv:hive-vault"},
-		{hive, "windows", "(not installed on this platform)"},
+		{hive, "windows", "(not in the catalog on this platform)"},
 		{sops, "linux", "sops-v3.13.1.linux.amd64"},
 		{sops, "windows", "(no build for this platform)"},
 		{bw, "windows", "npm:@bitwarden/cli"},

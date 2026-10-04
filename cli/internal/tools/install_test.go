@@ -217,6 +217,7 @@ func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
 			*rec = append(*rec, name+" "+strings.Join(args, " "))
 			return runErr
 		},
+		HasCommand: func(string) bool { return true },
 	}
 }
 
@@ -341,6 +342,7 @@ func TestInstallerPlan(t *testing.T) {
 			in := &Installer{
 				GOOS: tc.goos, GOARCH: "amd64", Dest: t.TempDir(),
 				CurrentVersion: func(string) string { return tc.installed },
+				HasCommand:     func(string) bool { return true },
 				Fetch: func(string, string) error {
 					t.Fatal("a plan must not download")
 					return nil
@@ -487,5 +489,31 @@ func TestInstall_PlatformsGateIsASkipNotAFailure(t *testing.T) {
 	in.GOOS = "darwin"
 	if res, err := in.Install(hiveTool()); err != nil || res != Installed {
 		t.Errorf("Install on darwin = %v, %v; want Installed", res, err)
+	}
+}
+
+// setup-linux.sh runs `dotf tools install` before it installs uv, so on a fresh
+// box the first run finds no uv. That is a named skip, as a missing
+// prerequisite_binary is on the MCP path, not a failure; the next run installs
+// hive. The plan says the same thing the apply does.
+func TestInstallUvTool_MissingUvIsANamedSkip(t *testing.T) {
+	var rec []string
+	var out strings.Builder
+	in := newNpmInstaller("", &rec, nil)
+	in.Out = &out
+	in.HasCommand = func(name string) bool { return name != "uv" }
+	res, err := in.Install(hiveTool())
+	if err != nil || res != Skipped || len(rec) != 0 {
+		t.Fatalf("Install without uv = %v, %v, calls %v; want Skipped, nil, none", res, err, rec)
+	}
+	if !strings.Contains(out.String(), "uv is not on PATH") {
+		t.Errorf("the skip does not name uv:\n%s", out.String())
+	}
+	if got := in.Plan(hiveTool()).Action; got != PlanMissingManager {
+		t.Errorf("Plan without uv = %q, want %q", got, PlanMissingManager)
+	}
+	in.CurrentVersion = func(string) string { return "4.2.2" }
+	if got := in.Plan(hiveTool()).Action; got != PlanSkip {
+		t.Errorf("Plan at the pin without uv = %q, want %q: an installed tool needs no manager", got, PlanSkip)
 	}
 }

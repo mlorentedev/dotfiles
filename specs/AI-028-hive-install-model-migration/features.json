@@ -1,8 +1,8 @@
 [
   {
     "id": "AI-028-hive-install-model-migration-f8",
-    "behavior": "On Linux and macOS dotf tools install converges hive-vault to the packages.json pin via uv (install, upgrade, never downgrade); on Windows the tool is unsupported and skipped, never failed",
-    "verification": "cd cli && go test ./internal/tools/ ./internal/cmd/ -run 'TestInstallUvTool|TestInstall_PlatformsGateIsASkipNotAFailure|TestInstallerPlan|TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit|TestLoad_Platforms|TestTheRepoCatalogDeclaresHiveForPosixOnly|TestListAsset'",
+    "behavior": "On Linux and macOS dotf tools install converges hive-vault to the packages.json pin via uv (install, upgrade, never downgrade); on Windows the tool is unsupported and skipped, never failed; a box without uv yet gets a named skip, not a failure",
+    "verification": "cd cli && go test ./internal/tools/ ./internal/cmd/ -run 'TestInstallUvTool|TestInstallUvTool_MissingUvIsANamedSkip|TestInstall_PlatformsGateIsASkipNotAFailure|TestInstallerPlan|TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit|TestLoad_Platforms|TestTheRepoCatalogDeclaresHiveForPosixOnly|TestListAsset'",
     "state": "passing",
     "evidence": "verification exit 0 (2026-10-03). Mutations killed 6/6: the PATH probe for uv-tool, the platforms gate in Install and in Plan, the unknown-platform check, the ==pin in the argv, the Upgraded result"
   }

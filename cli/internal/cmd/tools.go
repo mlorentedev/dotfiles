@@ -175,7 +175,7 @@ func newToolsListCmd() *cobra.Command {
 func listAsset(t tools.Tool, goos, goarch string) string {
 	switch {
 	case !t.SupportsOS(goos):
-		return "(not installed on this platform)"
+		return "(not in the catalog on this platform)"
 	case t.Source.Type == "npm":
 		return "npm:" + t.Source.Package
 	case t.Source.Type == "uv-tool":

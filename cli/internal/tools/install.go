@@ -90,6 +90,9 @@ type Installer struct {
 	// Probe runs a tool's `--version` for the default version probes. Nil means
 	// ExecRunner; tests inject captured output.
 	Probe Runner
+	// HasCommand reports whether a package manager is on PATH. Nil means
+	// exec.LookPath; tests inject the answer.
+	HasCommand func(name string) bool
 }
 
 func (in *Installer) defaults() {
@@ -107,6 +110,12 @@ func (in *Installer) defaults() {
 	}
 	if in.Out == nil {
 		in.Out = os.Stdout
+	}
+	if in.HasCommand == nil {
+		in.HasCommand = func(name string) bool {
+			_, err := exec.LookPath(name)
+			return err == nil
+		}
 	}
 	if in.Run == nil {
 		in.Run = func(name string, args ...string) error {
@@ -161,6 +170,9 @@ const (
 	PlanUpgrade     PlanAction = "upgrade"
 	PlanSkip        PlanAction = "skip"
 	PlanUnsupported PlanAction = "unsupported" // no release asset for this OS/arch
+	// PlanMissingManager: the tool needs installing but its package manager is
+	// not on PATH yet (uv, before setup has installed it). Install skips it.
+	PlanMissingManager PlanAction = "missing-manager"
 )
 
 // Plan is one row of a dry run: the installed version ("" when absent), the pin
@@ -193,15 +205,25 @@ func (in *Installer) Plan(t Tool) Plan {
 		p.Action = PlanUnsupported
 		return p
 	}
-	switch decideAction(p.Installed, t.Version) {
-	case actionSkip:
+	action := decideAction(p.Installed, t.Version)
+	switch {
+	case action == actionSkip:
 		p.Action = PlanSkip
-	case actionUpgrade:
+	case in.missingManager(t):
+		p.Action = PlanMissingManager
+	case action == actionUpgrade:
 		p.Action = PlanUpgrade
 	default:
 		p.Action = PlanInstall
 	}
 	return p
+}
+
+// missingManager reports a uv tool whose package manager is not on PATH. On a
+// fresh Linux box setup runs `dotf tools install` before it installs uv, so the
+// first run meets exactly this; the next run installs the tool.
+func (in *Installer) missingManager(t Tool) bool {
+	return t.Source.Type == "uv-tool" && !in.HasCommand("uv")
 }
 
 // installRelease provisions a github-release tool: download → verify sha256 →
@@ -272,6 +294,10 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	action := decideAction(in.current(t), t.Version)
 	if action == actionSkip {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
+		return Skipped, nil
+	}
+	if in.missingManager(t) {
+		_, _ = fmt.Fprintf(in.Out, "%s: uv is not on PATH; skipping (the next run installs it once uv is there)\n", t.Name)
 		return Skipped, nil
 	}
 	spec := pkg + "==" + t.Version

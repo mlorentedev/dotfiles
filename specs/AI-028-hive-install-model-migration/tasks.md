@@ -58,6 +58,7 @@ Ships on its own. AI-028 still cannot archive until PR2's Windows check, but the
 - [x] [AC8] Implement the `uv-tool` source and `Source.Platforms`; `dotf tools list` shows `uv:<package>` or `(not installed on this platform)`
 - [x] [AC8] Declare `hive` in `packages.json`: `uv-tool`, `hive-vault` 4.2.2, `platforms: [linux, darwin]` (`TestTheRepoCatalogDeclaresHiveForPosixOnly`)
 - [x] Update the `tests/packages-json.bats` source-type guard to admit `uv-tool`
+- [x] [AC8] Review fix (PR-Agent on #2001): `setup-linux.sh` runs `dotf tools install` before it installs uv, so a fresh box's first run has no uv. That is now a named skip, and the plan reports `missing-manager`, as a missing `prerequisite_binary` is on the MCP path (`TestInstallUvTool_MissingUvIsANamedSkip`)
 - [x] Measured: uv 0.9.29 replaces a different installed version with the pin in either direction and exits 0 when the pin is already there, so one argv covers install and upgrade. On msi, `dotf tools install --dry-run` plans `hive 4.2.2 4.2.2 skip`
 
 ## Closing
