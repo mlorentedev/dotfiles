@@ -11,7 +11,7 @@ SSOT (see root `AGENTS.md`).
 | `models.json` | `~/.pi/agent/models.json` | The OpenRouter provider. NaN's comes from `pi-nan-provider` (see *NaN provider package*). `apiKey` is `${OPENROUTER_API_KEY}`, which pi resolves from its own environment at request time, so the key is in neither the repo nor the deployed file (mode `0600`). |
 | `settings.json` | `~/.pi/agent/settings.json` | UX defaults + curated `enabledModels`. **Seed-if-missing**: pi mutates this file at runtime (`lastChangelogVersion`), so setup deploys it only when absent and never clobbers local edits. |
 | `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup runs `dotf pi packages apply` on every run: it removes live packages that are not declared and installs declared ones that are missing. See below. |
-| `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Tools load on-demand via `pi-mcp-client` meta-tool (`mcp_tools`). Note: `context7` routes context over HTTPS to an external API. |
+| `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Pi's native MCP support reads it; no extension package is needed. Note: `context7` routes context over HTTPS to an external API. |
 | `nan-provider.json` | `~/.pi/agent/nan-provider.json` | `pi-nan-provider`'s own state file. Only `mediaMcp: false` is managed (`strategy: merge`); `webSearch` stays the box's own `/nan-mcp` toggle. See *NaN provider package* below. |
 | (canonical `AGENTS.md`) | `~/.pi/agent/AGENTS.md` | Cross-agent SSOT system prompt, deployed verbatim (same as opencode). |
 
@@ -80,12 +80,14 @@ on a model switch, and retries truncated streams.
 
 ## MCP (Model Context Protocol)
 
-Pi integrates MCP servers via `npm:pi-mcp-client@0.8.0` (`packages.json`) and `mcp.json` (`ai/deploy.json`, `requires: "pi"`):
+Pi 1.0 connects to MCP servers natively, from `~/.pi/agent/mcp.json` (deployed from `mcp.json` by `ai/deploy.json`, `requires: "pi"`). The `pi-mcp-client` extension that used to do this was dropped from `packages.json` (PI-PKG-1966, #1966): it conflicted with the built-in client.
+
+The deployed servers:
 - `hive`: stdio client (`hive client`), connects to the supervised `hive.service` daemon for vault access (`/home/manu/Projects/knowledge`).
 - `context7`: remote HTTP endpoint (`https://mcp.context7.com/mcp`).
 - `sequential-thinking`: pinned calver package (`@modelcontextprotocol/server-sequential-thinking@2026.8.31`).
 
-`pi-mcp-client` uses deferred tool loading: it injects a single `mcp_tools` meta-tool into the initial prompt (~350 tokens) rather than eagerly loading all schemas. Models discover tools via `mcp_tools({ query: "..." })` and activate them via `mcp_tools({ activate: ["hive.vault_query"] })`. Once activated, tools are callable under their namespaced prefix `mcp__<server>__<tool>`.
+Tools are named `mcp__<server>__<tool>`. `/mcp` in a session lists each server's state and tool count, and `pi mcp list` checks the connections from a shell. Upstream reference: the MCP page of pi's own documentation, shipped inside the installed `@earendil-works/pi-coding-agent` package.
 
 ## Install
 

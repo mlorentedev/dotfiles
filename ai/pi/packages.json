@@ -89,10 +89,6 @@
     {
       "path": "memory",
       "why": "pi-memory's data. The package was purged (HARNESS-139, decision D-2 on #1625): its retrieval dependency qmd was never provisioned, and a third memory store sits outside the single sink (GUARD-001)."
-    },
-    {
-      "path": "pi-mcp-client",
-      "why": "Replaced by builtin:mcp extension in Pi natively."
     }
   ]
 }
