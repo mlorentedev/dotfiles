@@ -48,6 +48,19 @@ func TestSyncInstallsOnlyWhatIsMissing(t *testing.T) {
 
 // AC7: a plugin counts as added only when its install succeeded (the Linux
 // twin's behaviour; the PowerShell twin counts attempts, #1491).
+// A declared id that is a substring of an installed one is still missing: the
+// twins' substring grep would report it present and never install it.
+func TestSyncMatchesWholeIDsNotSubstrings(t *testing.T) {
+	r := &fakeRunner{listed: "Installed plugins:\n\n  ❯ gopls-lsp@m\n    Version: 1.0.0\n"}
+	rep, err := newSyncer(r).Sync([]string{"lsp@m", "gopls-lsp@m"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(r.installed, []string{"lsp@m"}) || !reflect.DeepEqual(rep.Present, []string{"gopls-lsp@m"}) {
+		t.Fatalf("installed %v, report %+v; want lsp@m installed, gopls-lsp@m present", r.installed, rep)
+	}
+}
+
 func TestSyncCountsOnlySuccessfulInstalls(t *testing.T) {
 	r := &fakeRunner{failing: map[string]bool{"b@m": true}}
 	rep, err := newSyncer(r).Sync([]string{"a@m", "b@m"}, false)

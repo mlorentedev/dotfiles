@@ -64,10 +64,12 @@ type PluginReport struct {
 	Restored               int // .claude.json restores the guard made
 }
 
-// Sync installs every id in ids that `claude plugin list` does not mention.
-// A plugin counts as present when its id appears in the list output, which is
-// the test both twins use. A list that fails is returned, not read as empty:
-// treating a broken CLI as "nothing installed" reinstalls everything.
+// Sync installs every id in ids that `claude plugin list` does not name.
+// A plugin counts as present when its id is a whole whitespace-separated token
+// of the list output (the CLI prints one `<glyph> <id>` line per plugin). The
+// twins grep for a substring, under which a declared `lsp@m` reads as present
+// on a box that only has `gopls-lsp@m`. A list that fails is returned, not read
+// as empty: treating a broken CLI as "nothing installed" reinstalls everything.
 func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 	var rep PluginReport
 	var listed string
@@ -80,9 +82,13 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 	if err != nil {
 		return rep, fmt.Errorf("claude plugin list: %w", err)
 	}
+	installed := map[string]bool{}
+	for _, tok := range strings.Fields(listed) {
+		installed[tok] = true
+	}
 	for _, id := range ids {
 		switch {
-		case strings.Contains(listed, id):
+		case installed[id]:
 			rep.Present = append(rep.Present, id)
 		case dryRun:
 			rep.Added = append(rep.Added, id)

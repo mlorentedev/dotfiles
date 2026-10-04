@@ -76,10 +76,11 @@ func TestGuardNeverAddsAHooksKey(t *testing.T) {
 	if err := os.WriteFile(path, healthyClaudeJSON(t), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Guard(path, mem.ClaudeJSONMinBytes, func() error {
+	restored, err := Guard(path, mem.ClaudeJSONMinBytes, func() error {
 		return os.WriteFile(path, []byte(`{}`), 0o600)
-	}); err != nil {
-		t.Fatal(err)
+	})
+	if err != nil || !restored {
+		t.Fatalf("Guard = (%v, %v), want (true, nil): the restore is the write under test", restored, err)
 	}
 	var doc map[string]any
 	data, _ := os.ReadFile(path)

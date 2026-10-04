@@ -3,38 +3,61 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
-// claudeCLI is the production claude.Runner: the real `claude` on PATH.
-type claudeCLI struct{}
+// claudeCLI is the production claude.Runner: the real `claude` on PATH, run
+// with CLAUDE_CONFIG_DIR pinned to the directory the snapshot guard watches.
+// Claude Code keeps .claude.json in $CLAUDE_CONFIG_DIR when it is set and in
+// the home root when it is not, so a guard that resolved the directory one way
+// and a child that inherited a different environment would protect a file the
+// CLI never writes. Passing the value down makes them agree by construction.
+type claudeCLI struct{ configDir string }
 
-func (claudeCLI) List() (string, error) {
-	out, err := exec.Command("claude", "plugin", "list").Output()
+func (c claudeCLI) command(args ...string) *exec.Cmd {
+	cmd := exec.Command("claude", args...)
+	cmd.Env = append(os.Environ(), "CLAUDE_CONFIG_DIR="+c.configDir)
+	return cmd
+}
+
+func (c claudeCLI) List() (string, error) {
+	out, err := c.command("plugin", "list").Output()
 	return string(out), err
 }
 
-func (claudeCLI) Install(id string) error {
-	out, err := exec.Command("claude", "plugin", "install", id).CombinedOutput() //nolint:gosec // id comes from the validated plugins.json
+func (c claudeCLI) Install(id string) error {
+	out, err := c.command("plugin", "install", id).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
+// claudeConfigDir is CLAUDE_CONFIG_DIR through the env contract: the process
+// value, else the machine override, else the contract default (~/.claude on
+// every OS, the value the rc files export).
+func claudeConfigDir(home string) string {
+	if dir := env.ResolvePath("CLAUDE_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+	return filepath.Join(home, ".claude")
+}
+
 // deployClaudeRunner is the seam behind the plugin step: nil when claude is
 // not installed, so the step is skipped and says so. A test answers for it, and
 // runDeploy defaults it to nil, so no test ever drives the box's real claude.
-var deployClaudeRunner = func() claude.Runner {
+var deployClaudeRunner = func(configDir string) claude.Runner {
 	if !deployCommandAvailable("claude") {
 		return nil
 	}
-	return claudeCLI{}
+	return claudeCLI{configDir: configDir}
 }
 
 // deployClaudePlugins is the converge step a bare `dotf deploy` runs for the
@@ -44,7 +67,8 @@ var deployClaudeRunner = func() claude.Runner {
 // a plugin that silently did not install is the #1491 miscount in another form.
 func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error {
 	const step = "claude-plugins"
-	run := deployClaudeRunner()
+	configDir := claudeConfigDir(home)
+	run := deployClaudeRunner(configDir)
 	if run == nil {
 		_, _ = fmt.Fprintf(w, "skipped   %-10s (claude not installed)\n", step)
 		return nil
@@ -55,7 +79,7 @@ func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error 
 	}
 	s := claude.Syncer{
 		Run:        run,
-		ClaudeJSON: filepath.Join(home, ".claude", ".claude.json"),
+		ClaudeJSON: filepath.Join(configDir, ".claude.json"),
 		Floor:      mem.ClaudeJSONFloor(memConfigPath()),
 	}
 	rep, err := s.Sync(ids, dryRun)

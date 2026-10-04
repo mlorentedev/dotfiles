@@ -34,7 +34,7 @@ func runDeployWithClaude(t *testing.T, repo, home string, args []string, run cla
 	t.Setenv("USERPROFILE", home)
 	orig := deployClaudeRunner
 	t.Cleanup(func() { deployClaudeRunner = orig })
-	deployClaudeRunner = func() claude.Runner { return run }
+	deployClaudeRunner = func(string) claude.Runner { return run }
 	var out bytes.Buffer
 	cmd := newDeployCmd()
 	cmd.SetOut(&out)

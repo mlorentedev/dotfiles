@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,12 +14,16 @@ type fakeClaude struct {
 	listed    string
 	failing   map[string]bool
 	installed []string
+	onInstall func() // runs inside the guard, where the real CLI would write
 }
 
 func (f *fakeClaude) List() (string, error) { return f.listed, nil }
 
 func (f *fakeClaude) Install(id string) error {
 	f.installed = append(f.installed, id)
+	if f.onInstall != nil {
+		f.onInstall()
+	}
 	if f.failing[id] {
 		return errors.New("marketplace unreachable")
 	}
@@ -101,5 +106,45 @@ func TestDeployCmd_ClaudePluginsDryRunInstallsNothing(t *testing.T) {
 	}
 	if len(fake.installed) != 0 || !strings.Contains(out, "2 would add") {
 		t.Errorf("dry run installed %v:\n%s", fake.installed, out)
+	}
+}
+
+// The guard must watch the .claude.json the CLI actually writes, which lives in
+// CLAUDE_CONFIG_DIR. A guard pointed elsewhere finds no file, takes its
+// unguarded branch, and every unit test still passes.
+func TestDeployCmd_GuardWatchesTheClaudeConfigDir(t *testing.T) {
+	cfg := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	claudeJSON := filepath.Join(cfg, ".claude.json")
+	healthy := []byte(`{"oauthAccount":{},"pad":"` + strings.Repeat("a", 20000) + `"}`)
+	if err := os.WriteFile(claudeJSON, healthy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeClaude{onInstall: func() { _ = os.WriteFile(claudeJSON, []byte(`{}`), 0o600) }}
+	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if got, _ := os.ReadFile(claudeJSON); string(got) != string(healthy) {
+		t.Fatalf("%s was not restored after the install truncated it:\n%s", claudeJSON, out)
+	}
+	if !strings.Contains(out, "restored  claude-plugins "+claudeJSON) {
+		t.Errorf("the restore must be reported with the path:\n%s", out)
+	}
+}
+
+// The child claude runs with the CLAUDE_CONFIG_DIR the guard resolved, even
+// when the parent's environment says otherwise; exec keeps the last duplicate.
+func TestClaudeCLIPinsTheConfigDirOnTheChild(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", "/somewhere/else")
+	env := claudeCLI{configDir: "/guarded"}.command("plugin", "list").Env
+	var last string
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "CLAUDE_CONFIG_DIR=") {
+			last = kv
+		}
+	}
+	if last != "CLAUDE_CONFIG_DIR=/guarded" {
+		t.Fatalf("effective CLAUDE_CONFIG_DIR = %q, want the guarded dir", last)
 	}
 }

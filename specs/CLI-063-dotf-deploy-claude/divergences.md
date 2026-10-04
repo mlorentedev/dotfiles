@@ -27,11 +27,10 @@ Linux is the reference unless the row says otherwise.
 | 5 | Snapshot storage | A tempfile from `mktemp`, removed after the call | A tempfile from `GetTempFileName`, removed in `finally` | Held in memory. Nothing is left behind if the process is killed mid-call. |
 | 6 | Restore write | `cp -f` over the file | `Copy-Item -Force` over the file | Rewritten in place, so the file keeps its own mode and ACL, as both twins do |
 | 7 | Threshold source | Literal `10240` | Literal `10240` | `claude_json_min_bytes` from `session-start-config.json`, the value the session-start canary reads, falling back to `mem.ClaudeJSONMinBytes` |
+| 8 | Which `.claude.json` is guarded | `$HOME/.claude/.claude.json`, hardcoded | `$USERPROFILE\.claude\.claude.json`, hardcoded | `$CLAUDE_CONFIG_DIR/.claude.json`, with the directory resolved through the env contract (default `~/.claude` on both OSes). The child `claude` is run with that same `CLAUDE_CONFIG_DIR`, so the guard and the CLI agree on the file by construction. The twins are right only while the rc files export the default; Claude Code writes `~/.claude.json` when the variable is unset. Found by PR-Agent on #1992. |
+| 9 | "Already installed" test | `grep -qF` for the id anywhere in the list output | `-match [regex]::Escape($plugin)` on the output, also a substring match | The id must equal a whole whitespace-separated token. A declared `lsp@m` is not "present" just because `gopls-lsp@m` is installed. |
 
 ## Not a divergence
 
 - **Which calls are guarded.** All three paths wrap both the `plugin list` pre-fetch and every
   `plugin install` (BUG-004, BUG-011).
-- **`.claude.json` location.** All three use `<home>/.claude/.claude.json`, and none of them honors
-  `CLAUDE_CONFIG_DIR` there. The Linux twin reads `CLAUDE_CONFIG_DIR` only for the claude-mem
-  cleanup, which is out of this spec's scope.
