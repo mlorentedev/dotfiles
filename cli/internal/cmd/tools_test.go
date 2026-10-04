@@ -201,3 +201,26 @@ func TestToolsInstall_DryRun(t *testing.T) {
 		t.Errorf("dry-run created or touched ~/.local/bin (stat err %v)", err)
 	}
 }
+
+func TestListAsset(t *testing.T) {
+	hive := tools.Tool{Name: "hive", Version: "4.2.2", Source: tools.Source{
+		Type: "uv-tool", Package: "hive-vault", Platforms: []string{"linux", "darwin"}}}
+	sops := tools.Tool{Name: "sops", Version: "3.13.1", Source: tools.Source{
+		Type: "github-release", Asset: map[string]string{"linux": "sops-v{version}.linux.{goarch}"}}}
+	bw := tools.Tool{Name: "bw", Source: tools.Source{Type: "npm", Package: "@bitwarden/cli"}}
+	cases := []struct {
+		tool       tools.Tool
+		goos, want string
+	}{
+		{hive, "linux", "uv:hive-vault"},
+		{hive, "windows", "(not in the catalog on this platform)"},
+		{sops, "linux", "sops-v3.13.1.linux.amd64"},
+		{sops, "windows", "(no build for this platform)"},
+		{bw, "windows", "npm:@bitwarden/cli"},
+	}
+	for _, tc := range cases {
+		if got := listAsset(tc.tool, tc.goos, "amd64"); got != tc.want {
+			t.Errorf("listAsset(%s, %s) = %q, want %q", tc.tool.Name, tc.goos, got, tc.want)
+		}
+	}
+}

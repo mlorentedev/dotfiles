@@ -25,7 +25,7 @@ type Tool struct {
 	Source  Source `json:"source"`
 }
 
-// Source declares how to fetch a tool. Two kinds:
+// Source declares how to fetch a tool. Three kinds:
 //   - "github-release": a pinned per-OS/arch release binary, verified against the
 //     release checksums by the installer (CLI-029 PR-B), mirroring the
 //     deterministic age/install-dotf pattern rather than relying on winget/apt.
@@ -34,12 +34,21 @@ type Tool struct {
 //     raw, checksum-manifested github-release binary — e.g. the Bitwarden CLI
 //     (@bitwarden/cli), whose releases are zip archives under a cli-v{date} tag
 //     with no sha256 manifest (#577, ADR-028 Phase 0).
+//   - "uv-tool": a Python package installed with `uv tool install`, pinned by
+//     Version. Package is the PyPI name; the tool's Name is the binary it puts
+//     on PATH (hive-vault installs hive, #1993).
 type Source struct {
 	Type string `json:"type"`
 	Repo string `json:"repo"`
 	// Package is the npm package name for source.type "npm" (e.g.
-	// "@bitwarden/cli"). Unused by github-release sources.
+	// "@bitwarden/cli") and the PyPI name for "uv-tool" (e.g. "hive-vault").
+	// Unused by github-release sources.
 	Package string `json:"package,omitempty"`
+	// Platforms lists the GOOS values the tool installs on; absent means all of
+	// them. A github-release tool gets this from its Asset map. Other sources
+	// need it to name a tool that belongs to one OS family: hive is a uv tool on
+	// POSIX, while on Windows hive owns its install layout (hive ADR-019).
+	Platforms []string `json:"platforms,omitempty"`
 	// Asset maps GOOS -> a release-asset filename template. A per-OS map (not a
 	// single template) is required because release naming is irregular across OSes
 	// — e.g. sops is "sops-v{version}.linux.{goarch}" but "sops-v{version}.{goarch}.exe"
@@ -75,8 +84,32 @@ func Load(path string) (Catalog, error) {
 			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q is listed more than once", path, t.Name)
 		}
 		seen[t.Name] = struct{}{}
+		// A misspelt platform makes the tool unsupported everywhere, and the
+		// installer reports an unsupported tool as a skip, so nothing else
+		// would ever say so.
+		for _, p := range t.Source.Platforms {
+			if _, ok := knownPlatforms[p]; !ok {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q lists unknown platform %q (want linux, darwin or windows)", path, t.Name, p)
+			}
+		}
 	}
 	return c, nil
+}
+
+var knownPlatforms = map[string]struct{}{"linux": {}, "darwin": {}, "windows": {}}
+
+// SupportsOS reports whether the tool installs on goos: true when Platforms is
+// empty, otherwise only for a listed GOOS.
+func (t Tool) SupportsOS(goos string) bool {
+	if len(t.Source.Platforms) == 0 {
+		return true
+	}
+	for _, p := range t.Source.Platforms {
+		if p == goos {
+			return true
+		}
+	}
+	return false
 }
 
 // AssetName resolves the release-asset filename for the given OS/arch, or "" when

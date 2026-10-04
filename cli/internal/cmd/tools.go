@@ -162,18 +162,29 @@ func newToolsListCmd() *cobra.Command {
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, "NAME\tVERSION\tPROFILE\tASSET ("+runtime.GOOS+"/"+runtime.GOARCH+")")
 			for _, t := range cat.Tools {
-				asset := t.AssetName(runtime.GOOS, runtime.GOARCH)
-				switch {
-				case t.Source.Type == "npm":
-					asset = "npm:" + t.Source.Package // npm tools are platform-agnostic
-				case asset == "":
-					asset = "(no build for this platform)"
-				}
+				asset := listAsset(t, runtime.GOOS, runtime.GOARCH)
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", t.Name, t.Version, t.Profile, asset)
 			}
 			return w.Flush()
 		},
 	}
+}
+
+// listAsset is the ASSET cell of `dotf tools list`: what this OS/arch would
+// install, or why nothing would.
+func listAsset(t tools.Tool, goos, goarch string) string {
+	switch {
+	case !t.SupportsOS(goos):
+		return "(not in the catalog on this platform)"
+	case t.Source.Type == "npm":
+		return "npm:" + t.Source.Package
+	case t.Source.Type == "uv-tool":
+		return "uv:" + t.Source.Package
+	}
+	if asset := t.AssetName(goos, goarch); asset != "" {
+		return asset
+	}
+	return "(no build for this platform)"
 }
 
 // toolsVersionRunner is the exec seam for `dotf tools version`; tests inject a fake.

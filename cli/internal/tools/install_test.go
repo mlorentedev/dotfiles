@@ -217,6 +217,7 @@ func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
 			*rec = append(*rec, name+" "+strings.Join(args, " "))
 			return runErr
 		},
+		HasCommand: func(string) bool { return true },
 	}
 }
 
@@ -332,12 +333,16 @@ func TestInstallerPlan(t *testing.T) {
 		{"no build for this platform, but installed: the probe still runs", "windows", "3.13.1", release, PlanUnsupported},
 		{"a source type Install refuses", "linux", "", Tool{Name: "x", Version: "1.0.0", Source: Source{Type: "homebrew"}}, PlanUnsupported},
 		{"npm below the pin", "linux", "2026.1.0", npm, PlanUpgrade},
+		{"uv-tool below the pin", "linux", "4.1.0", hiveTool(), PlanUpgrade},
+		{"uv-tool at the pin", "darwin", "4.2.2", hiveTool(), PlanSkip},
+		{"a platform the tool does not list", "windows", "", hiveTool(), PlanUnsupported},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			in := &Installer{
 				GOOS: tc.goos, GOARCH: "amd64", Dest: t.TempDir(),
 				CurrentVersion: func(string) string { return tc.installed },
+				HasCommand:     func(string) bool { return true },
 				Fetch: func(string, string) error {
 					t.Fatal("a plan must not download")
 					return nil
@@ -382,6 +387,23 @@ func TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit(t *testing.T
 		}
 	})
 
+	// A uv tool lives on PATH like an npm global, not in Dest. Probing Dest would
+	// read it as absent and reinstall it on every run.
+	t.Run("uv-tool, probed on PATH", func(t *testing.T) {
+		var rec []string
+		in := newNpmInstaller("", &rec, nil)
+		in.CurrentVersion = nil
+		in.Probe = probe(hiveTool())
+		probed = nil
+		res, err := in.Install(hiveTool())
+		if err != nil || res != Skipped || len(rec) != 0 {
+			t.Errorf("Install = %v, %v, uv calls %v; want Skipped with no uv call", res, err, rec)
+		}
+		if len(probed) != 1 || probed[0] != "hive" {
+			t.Errorf("probed %v, want hive on PATH", probed)
+		}
+	})
+
 	t.Run("github-release, probed in Dest", func(t *testing.T) {
 		in := newTestInstaller(t, "", func(url, _ string) error { return fmt.Errorf("unexpected download %s", url) })
 		in.CurrentVersion = nil
@@ -399,4 +421,99 @@ func TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit(t *testing.T
 			t.Errorf("probed %v, want the binary in Dest (%s)", probed, bin)
 		}
 	})
+}
+
+func hiveTool() Tool {
+	return Tool{Name: "hive", Version: "4.2.2", Profile: "full", Source: Source{
+		Type: "uv-tool", Package: "hive-vault", Platforms: []string{"linux", "darwin"},
+	}}
+}
+
+// uv replaces a different installed version with the pinned one, in either
+// direction, and exits 0 when the pin is already installed (measured with uv
+// 0.9.29), so one argv covers install and upgrade.
+func TestInstallUvTool(t *testing.T) {
+	const want = "uv tool install hive-vault==4.2.2"
+	cases := []struct {
+		name, current string
+		want          Result
+		calls         int
+	}{
+		{"absent", "", Installed, 1},
+		{"below the pin", "4.1.0", Upgraded, 1},
+		{"at the pin", "4.2.2", Skipped, 0},
+		{"above the pin is never downgraded", "4.3.0", Skipped, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var rec []string
+			res, err := newNpmInstaller(tc.current, &rec, nil).Install(hiveTool())
+			if err != nil {
+				t.Fatalf("Install: %v", err)
+			}
+			if res != tc.want || len(rec) != tc.calls {
+				t.Fatalf("Install = %v with calls %v, want %v with %d call(s)", res, rec, tc.want, tc.calls)
+			}
+			if tc.calls == 1 && rec[0] != want {
+				t.Errorf("Run = %q, want %q", rec[0], want)
+			}
+		})
+	}
+}
+
+func TestInstallUvTool_Failures(t *testing.T) {
+	var rec []string
+	_, err := newNpmInstaller("", &rec, errors.New("exit status 2")).Install(hiveTool())
+	if err == nil || !strings.Contains(err.Error(), "uv tool install hive-vault==4.2.2") {
+		t.Errorf("a failed uv run returned %v, want the argv named", err)
+	}
+	noPkg := hiveTool()
+	noPkg.Source.Package = ""
+	rec = nil
+	if _, err := newNpmInstaller("", &rec, nil).Install(noPkg); err == nil || len(rec) != 0 {
+		t.Errorf("a uv-tool without a package returned %v and ran %v, want an error and no run", err, rec)
+	}
+}
+
+// A tool whose platforms exclude this OS is not a failure: hive is a uv tool on
+// POSIX only, and Windows installs it through hive's own layout (hive ADR-019).
+// Counting it as failed would turn every Windows `dotf tools install` red.
+func TestInstall_PlatformsGateIsASkipNotAFailure(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS = "windows"
+	res, err := in.Install(hiveTool())
+	if err != nil || res != Skipped || len(rec) != 0 {
+		t.Errorf("Install on windows = %v, %v, calls %v; want Skipped, nil, none", res, err, rec)
+	}
+	in.GOOS = "darwin"
+	if res, err := in.Install(hiveTool()); err != nil || res != Installed {
+		t.Errorf("Install on darwin = %v, %v; want Installed", res, err)
+	}
+}
+
+// setup-linux.sh runs `dotf tools install` before it installs uv, so on a fresh
+// box the first run finds no uv. That is a named skip, as a missing
+// prerequisite_binary is on the MCP path, not a failure; the next run installs
+// hive. The plan says the same thing the apply does.
+func TestInstallUvTool_MissingUvIsANamedSkip(t *testing.T) {
+	var rec []string
+	var out strings.Builder
+	in := newNpmInstaller("", &rec, nil)
+	in.Out = &out
+	in.HasCommand = func(name string) bool { return name != "uv" }
+	res, err := in.Install(hiveTool())
+	if err != nil || res != Skipped || len(rec) != 0 {
+		t.Fatalf("Install without uv = %v, %v, calls %v; want Skipped, nil, none", res, err, rec)
+	}
+	if !strings.Contains(out.String(), "uv is not on PATH") {
+		t.Errorf("the skip does not name uv:\n%s", out.String())
+	}
+	if got := in.Plan(hiveTool()).Action; got != PlanMissingManager {
+		t.Errorf("Plan without uv = %q, want %q", got, PlanMissingManager)
+	}
+	in.CurrentVersion = func(string) string { return "4.2.2" }
+	if got := in.Plan(hiveTool()).Action; got != PlanSkip {
+		t.Errorf("Plan at the pin without uv = %q, want %q: an installed tool needs no manager", got, PlanSkip)
+	}
 }

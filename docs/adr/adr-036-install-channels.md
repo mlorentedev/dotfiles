@@ -51,6 +51,26 @@ shadowed-install WARN for a leftover winget copy. Turning the CLI's own
 repo does not deploy yet — `config.json` is rewritten by the CLI, measured on
 the same box) and is tracked under #1322.
 
+## Amendment 2026-10-03 (#1993, AI-028)
+
+A fourth class: **PyPI-distributed tools**, installed with `uv tool install
+<package>==<pin>` (source type `uv-tool`). The first one is `hive`
+(`hive-vault`), whose only installer until now was a side effect of Claude's MCP
+registration (`prerequisite_command` in `mcp-servers.json`).
+
+The class has one twist that the first two do not: its channel is not the same
+on every OS. On Windows hive owns a versioned install layout, because Windows
+cannot replace an executable that is in use (hive ADR-019). So the source
+declares `platforms: [linux, darwin]`. On a platform it does not list, `dotf
+tools install` reports the tool as unsupported and skips it; a skip is not a
+failure. `Source.Platforms` is available to every source type. A
+`github-release` tool already gets the same effect from its `asset` map.
+
+The pin is a floor, as for every catalog tool. That matches hive ADR-020, under
+which hive notifies and the user upgrades: setup no longer upgrades hive on
+every run. The twins keep running `prerequisite_command` until the cutover
+deletes their MCP loops.
+
 ## Consequences
 
 - `setup-linux.sh` and `setup-windows.ps1` lose their opencode install blocks and the winget loop's version-pin machinery (no winget tool carries a pin any more). The hive `hive service` gate probes `hive --version` through `dotf tools version` instead of `uv tool list`, which stopped seeing a healthy install when hive moved to its own installer (AI-028, #791).
