@@ -1,7 +1,7 @@
 ---
 id: "AI-028-hive-install-model-migration"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-08-07"
 issue: "dotfiles#791"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -38,6 +38,7 @@ The install model stops being "a uv tool that dotfiles upgrades in place" and be
 - **Bootstrap chicken-and-egg — RESOLVED, verified empirically.** `pyproject.toml:77-78` ships both a `hive` and a `hive-vault` console script for the same `hive.server:main`, so `uvx --from hive-vault hive --version` works with no prior install (`hive-vault 1.43.0`, rc=0, 2026-08-07). `_runtime.build_version()` is pure `uv venv` + `uv pip install --python <venv> hive-vault==<v>`, so the only prerequisite is `uv` — which `mcp-servers.json` already declares via `prerequisite_binary`.
 - **The script under test is a deployed copy.** `~/.claude/scripts/hive-upgrade.ps1` is deployed by setup from the SSOT at `windows/hive-upgrade.ps1`. Verification must exercise the SSOT (or re-deploy first), or a stale copy will read as a pass.
 - **Linux path — RESOLVED 2026-08-07.** Linux **keeps `uv tool install --upgrade`**. A3 exists solely to work around Windows' inability to replace an in-use executable; POSIX has no such constraint, so the versioned-dir + junction machinery would buy nothing and would add a second install model to maintain. `ai/hermes/setup.sh:83` and `setup-linux.sh` are unchanged by this spec. Recorded in the amended `AI-022/tasks.md` as well, so the decision is visible from the spec that made the original A1 call rather than only from here.
+  *Amended 2026-10-03 (#1993):* Linux and macOS keep `uv tool`, but the version is pinned in `packages.json` and `dotf tools install` installs it. Upgrading on every setup run (`--upgrade`) is no longer the target. The pin is a floor: a version the user upgraded to on purpose is never rolled back. This follows hive ADR-020, under which hive notifies and the user upgrades. The entry lists `platforms: [linux, darwin]`, so the catalog never puts a uv copy on Windows, where hive owns its layout (hive ADR-019). The `prerequisite_command` keeps running from the twins until the cutover deletes their MCP loops.
 - **Blast radius.** This changes how the maintainer's daily hive install resolves on Windows. Mitigated by the stdio fallback remaining available throughout, and by PR1 landing independently of the model change.
 
 ## Acceptance criteria
@@ -48,6 +49,7 @@ The install model stops being "a uv tool that dotfiles upgrades in place" and be
 - [ ] **AC4** — No mechanism in this repo infers "hive is installed" from `uv tool list` alone on the Windows path.
 - [ ] **AC5** — `AI-022`'s A1 decision is reconciled with hive's shipped A3, and archived `AI-023` carries a forward pointer; ADR-015 is referenced consistently.
 - [ ] **AC6** — The Linux path is explicitly decided and documented, not left implicit.
+- [ ] **AC8** — *Added 2026-10-03 (#1993).* On Linux and macOS, `dotf tools install` installs `hive-vault` at the version pinned in `packages.json`. It upgrades a lower version and never downgrades a higher one. On Windows the tool is reported as unsupported, never installed and never failed.
 - [ ] **AC7** — On the maintainer's currently-broken Windows box, all four before-state symptoms flip (see `verification.md`), and Claude Code's `hive` MCP entry resolves to a working binary.
 
 ## References

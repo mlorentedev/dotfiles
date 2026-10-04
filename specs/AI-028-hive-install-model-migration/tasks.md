@@ -32,6 +32,7 @@ created: "2026-08-07"
 - [ ] **GATE:** hive#328 shipped (PATH launcher installed by `self_upgrade`; `_resolve_exec()` no longer selects a dead binary) and published to PyPI.
 - [ ] [P] [AC2] Write failing test: on a machine with no `hive` on PATH, the bootstrap command is the `uvx --from hive-vault hive self-upgrade` form (verified working 2026-08-07: `uvx --from hive-vault hive --version` → `hive-vault 1.43.0`, rc=0).
 - [ ] [AC2] `mcp-servers.json`: replace `prerequisite_command` `uv tool install --upgrade hive-vault` with the bootstrap form. Keep `prerequisite_binary: uv` — it is the real and only prerequisite.
+      **Constraint (2026-10-03):** both twins run `prerequisite_command` on every OS. Changing it to the A3 bootstrap would build hive's own layout on Linux too, which hive ADR-019 rules out. So scope this change to Windows, or do it together with #1993's retirement of `prerequisite_command`.
 - [ ] [P] [AC3] Write failing test: the upgrade trigger invokes a bare `hive self-upgrade` with no `Stop-ScheduledTask` / `Start-ScheduledTask` around it.
 - [ ] [AC3] `windows/hive-upgrade.ps1`: drop the A1 stop-before-upgrade orchestration (the A3 junction swap needs no daemon stop) and the defer-if-locked branch it existed to protect.
 - [ ] [AC4] `setup-windows.ps1`: replace the `uv tool list` version gate before `hive service install` with a check against the resolved install, so a machine without a uv tool is bootstrapped rather than skipped.
@@ -45,6 +46,19 @@ created: "2026-08-07"
 - [x] [AC6] Record the Linux decision explicitly (resolved: Linux keeps `uv tool`) in this spec and in the amended `AI-022`.
 - [x] Update `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`: either retire it (if the new model makes the failure unreachable) or point it at the new install model and at #574 for repair.
 - [ ] **Deferred to PR2 (deliberately).** Document the install model in one place — what owns the layout, what bootstraps it, what triggers upgrades, and which OS uses which mechanism. Writing it now would document the A1 state that PR2 replaces; the doc lands with the change it describes.
+
+### PR4 — POSIX install pinned in the catalog (AC8, #1993) — independent of PR2
+
+Ships on its own. AI-028 still cannot archive until PR2's Windows check, but the Linux half is done once this lands.
+
+- [x] [P] [AC8] Failing tests: a `uv-tool` source installs with `uv tool install <package>==<pin>`, upgrades a lower version, skips one at or above the pin, and names the argv on failure (`TestInstallUvTool*`)
+- [x] [P] [AC8] Failing test: a tool whose `platforms` exclude this OS is a skip, not a failure, and plans as `unsupported` (`TestInstall_PlatformsGateIsASkipNotAFailure`, `TestInstallerPlan`)
+- [x] [AC8] Failing test: the uv tool is probed on PATH, not in `Dest`; probing `Dest` would read it as absent and reinstall it on every run
+- [x] [AC8] Failing test: an unknown platform in the catalog fails the load (`TestLoad_Platforms`), since a typo would silently make the tool unsupported everywhere
+- [x] [AC8] Implement the `uv-tool` source and `Source.Platforms`; `dotf tools list` shows `uv:<package>` or `(not installed on this platform)`
+- [x] [AC8] Declare `hive` in `packages.json`: `uv-tool`, `hive-vault` 4.2.2, `platforms: [linux, darwin]` (`TestTheRepoCatalogDeclaresHiveForPosixOnly`)
+- [x] Update the `tests/packages-json.bats` source-type guard to admit `uv-tool`
+- [x] Measured: uv 0.9.29 replaces a different installed version with the pin in either direction and exits 0 when the pin is already there, so one argv covers install and upgrade. On msi, `dotf tools install --dry-run` plans `hive 4.2.2 4.2.2 skip`
 
 ## Closing
 
