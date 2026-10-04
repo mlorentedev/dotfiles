@@ -1094,11 +1094,14 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 }
 
 # CLI-062 (#1338): the DX-006 Orca hook repair is `dotf orca tune-hooks`, the
-# port of scripts/orca-hook-tune.ps1. setup-windows.ps1 calls the command where
-# it copied and ran the script, and sweeps the old deployed copy (WIN-013's
-# retired list) so a stale ~\.dotfiles\scripts\orca-hook-tune.ps1 cannot linger.
-@test "setup-windows.ps1 repairs the Orca hooks through dotf orca tune-hooks, and retires the script (CLI-062)" {
-    grep -qE '^\s*& dotf orca tune-hooks\s*$' "$PS1_SCRIPT"
+# port of scripts/orca-hook-tune.ps1. CLI-093 (#1953): a bare `dotf deploy` runs
+# the repair on every OS (#1960, shipped in 0.63.0), so setup-windows.ps1 no
+# longer calls it directly; a direct call would be a second, Windows-only path.
+# The old deployed copy is still swept (WIN-013's retired list) so a stale
+# ~\.dotfiles\scripts\orca-hook-tune.ps1 cannot linger.
+@test "setup-windows.ps1 repairs the Orca hooks only through bare dotf deploy, and retires the script (CLI-062, CLI-093)" {
+    refute_grep 'dotf orca tune-hooks' "$PS1_SCRIPT"
+    grep -qE '^\s*& dotf deploy\s*$' "$PS1_SCRIPT"
     grep -A3 '^\$retiredScripts = @(' "$PS1_SCRIPT" | grep -q '"orca-hook-tune.ps1"'
     grep -A2 '^\$deployedScripts = @(' "$PS1_SCRIPT" | refute_grep_fixed 'orca-hook-tune.ps1' /dev/stdin
     [ ! -e "$DOTFILES_DIR/scripts/orca-hook-tune.ps1" ]
