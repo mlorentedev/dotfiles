@@ -220,7 +220,7 @@ func TestDeployCmd_ClaudePluginsDryRunInstallsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if len(fake.installed) != 0 || !strings.Contains(out, "2 missing") {
+	if len(fake.installed) != 0 || !strings.Contains(out, "would add claude-plugins 2 missing") {
 		t.Errorf("dry run installed %v:\n%s", fake.installed, out)
 	}
 	if len(fake.added) != 0 || !strings.Contains(out, "would add claude-mcp 2 missing") {

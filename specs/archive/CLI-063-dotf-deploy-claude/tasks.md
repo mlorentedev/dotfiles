@@ -127,7 +127,7 @@ now reach existing boxes (msi had 0), and `attribution` merges instead of being 
       non-vacuous verification command
 - [x] Lint + both layers green; `GOOS=windows go vet ./...` clean
 - [x] `verification.md` filled in
-- [ ] **Independent adversarial review** (reviewer ≠ implementer) before `dotf spec archive`
+- [x] **Independent adversarial review** (reviewer ≠ implementer) before `dotf spec archive`
 - [x] No twin deleted, no caller repointed — verified by `git diff --stat` showing nothing under
       `setup-*.{sh,ps1}` or `scripts/`
 
