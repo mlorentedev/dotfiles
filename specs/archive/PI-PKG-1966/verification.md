@@ -43,7 +43,7 @@ sequential-thinking: connected, 1 tool (codemode, global)
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/<feature-id>/` -> `specs/archive/<feature-id>/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/<feature-id>/` -> `specs/archive/<feature-id>/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1966 closes with #1989 (`Closes #1966`)
+- [x] Promotions above executed (if any): none, every candidate answered `no`
