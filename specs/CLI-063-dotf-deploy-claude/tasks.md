@@ -87,19 +87,39 @@ Nothing here is a golden file. Do not add one.
 
 ## Increment 3 — per-key merge policy
 
-> **Coordination point, not a blocker:** this increment edits `harness/manifest.json`'s neighbour
-> `ai/deploy.json` and bumps its `version`. `harness/manifest.json` itself is another session's
-> declared surface — if this increment ends up touching it, coordinate before editing.
+**Re-scoped (2026-10-03): no new manifest vocabulary, no version bump, no release dependency.**
+The proposal (2026-09-05) measured `mergeInto` as a *top-level* replace. AI-042's review round 3
+later made it granular: `deepMerge` recurses into objects and `unionLists` unions lists. That is
+already the policy `env`, `enabledPlugins` and `permissions.allow` need, so Claude's
+`settings.json` is declared with the vocabulary that exists (`strategy: merge`). Every released
+`dotf` reads the manifest, so the 3a/3b split and its release in between are not needed.
 
-- [ ] [P] [AC3] Failing table test: `env` nested merge preserves a box-only key
-- [ ] [AC3] Failing table test: `enabledPlugins` nested merge preserves a box-only plugin
-- [ ] [AC3] Failing table test: `permissions.allow` unions and dedupes
-- [ ] [AC4] Failing test: a template key absent from the policy **errors**, not skipped silently
-      (this is the `outputStyle` defect; a passing test here is the whole point of the increment)
-- [ ] [AC3] Implement per-key policy declaration — recommended shape (a) from `proposal.md`:
-      `strategy: merge` plus a sibling `keys:` map
-- [ ] [AC5] Bump `ai/deploy.json` `version` to 4; failing test first that an older decoder refuses
-- [ ] Declare Claude's `settings.json` entry against the new policy
+What that does to the criteria:
+
+- **AC1** — amended: the capabilities are reachable through `dotf deploy`. `settings.json` is a
+  declared entry; MCP and plugins stay converge steps, because declaring an action would need the
+  vocabulary this re-scope avoids adding. The proposal records the amendment.
+- **AC3** — already satisfied by the engine. The tests are still written, as the regression guard.
+- **AC4** — inverted. There is no allow-list in code any more: every template key is written, so
+  `outputStyle`'s defect class cannot recur. The template is now the allow-list, and the guard
+  is that it never carries `hooks` (also AC6's settings-writer half).
+- **AC5** — not needed: no field is added, and `TestManifestVersion_FreezesTheFieldSet` already
+  fails if one ever is without a bump.
+
+Two behaviour changes against the twins, measured on msi by deploying onto a copy of
+`~/.claude/settings.json`, are divergences 18 and 19: the template's 17 `permissions.deny` rules
+now reach existing boxes (msi had 0), and `attribution` merges instead of being replaced whole.
+
+- [x] [P] [AC3] Table test: `env` and `enabledPlugins` merge nested and `permissions.allow` unions, each
+      keeping a box-only key (`TestPerKeyMergePolicy`); turning off the recursion or the union is killed
+- [x] [AC4] [AC6] The template carries no `hooks` (`TestClaudeSettingsTemplateHasNoHooks`)
+- [x] [AC1] Declare `claude-settings` in `ai/deploy.json`: `strategy: merge`, into
+      `{CLAUDE_CONFIG_DIR}/settings.json`, requiring `claude` (`TestClaudeEntriesDeclared` deploys
+      the shipped entry over a box holding hooks, a status line and box-only keys)
+- [x] Fix the manifest `$comment`, which still described merge as a top-level replace
+- [x] Parity on msi: the merge onto a copy of the real file adds `$schema` and 17 deny rules and
+      changes nothing else (`hooks` identical, 45 allow entries unchanged); a second run is
+      `in sync`, and so is a re-plan after the twin's jq merge ran over the result (no flapping)
 
 ## Closing
 
