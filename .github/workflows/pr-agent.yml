@@ -343,7 +343,7 @@ jobs:
         # sha (an annotated tag returns a tag object: dereference it via git/tags).
         # The tag is not repeated here because Dependabot rewrites only the line
         # below, and a copy in this comment drifted from v0.42.0 to v0.45.0 unseen.
-        uses: The-PR-Agent/pr-agent@1d01f24f455bb879c1d9c557ad7de3d72dcc7975  # v0.46.0
+        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
@@ -454,7 +454,7 @@ jobs:
           !cancelled() && contains(fromJSON('["failure", "cancelled"]'), steps.pr_agent.outcome)
             && steps.models.outputs.retry_model != ''
         timeout-minutes: 12
-        uses: The-PR-Agent/pr-agent@1d01f24f455bb879c1d9c557ad7de3d72dcc7975  # v0.46.0
+        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI__KEY: ${{ secrets.NAN_API_KEY }}
