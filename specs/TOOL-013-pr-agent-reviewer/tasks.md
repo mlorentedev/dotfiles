@@ -80,6 +80,24 @@ the same PR:
       against HEAD — a dirty tree makes the latter report an invalid mutation as
       applied.
 
+## Upstream update contract (#2010)
+
+- [x] [AC8] Add a failing BATS test in `tests/pr-agent-config.bats` proving
+      the workflow pin is checked against approved upstream source identities
+      instead of a manually copied version string; run it before adding the
+      approved manifest.
+- [x] [AC8] Add the approved source identities and remove stale version claims
+      from `scripts/pr-agent-push-gate.sh`; derive the filter's upstream ref
+      from the executing workflow. Verify an unchanged upstream file passes
+      and a changed file or failed API read fails closed.
+- [x] [AC9] Add a failing BATS test proving `pr-agent.yml` explicitly fails on
+      tool errors, executes at most one Action, and retains its internal model
+      fallback; run it before changing the workflow.
+- [x] [AC9] Remove the unconditional second Action and update the publication
+      guard and affected tests without weakening ADR-040's three-commit gate.
+- [ ] [AC8] [AC9] Run targeted BATS tests and lint; record results in
+      `verification.md` and disposition the two #2010 reviewer findings.
+
 ## Deliberately not done here
 
 Rollout to other repos, retiring CodeRabbit, the parallel-measurement window,

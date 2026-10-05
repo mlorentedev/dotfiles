@@ -11,7 +11,8 @@
 # (mode=full): PR-Agent's own incremental range is not safe to hand a review it
 # did not earn.
 #
-# "The previous review" is the one PR-Agent itself picks (v0.46.0,
+# "The previous review" is the one PR-Agent itself picks (see the audited
+# source identities in harness/pr-agent-upstream-contract.json,
 # github_provider.get_previous_review and comment_identity.comment_matches_identity):
 # the LAST issue comment carrying a review identity line within its first 5
 # lines, in either stored form (an HTML comment, or the link reference used
@@ -113,7 +114,7 @@ fi
 
 # Shared predicate: true when a comment body carries a review identity (in its
 # first 5 lines, compared after trimming) or either Guide heading (a prefix of
-# the whole body), as PR-Agent v0.46.0 matches them (comment_matches_identity).
+# the whole body), as the audited upstream comment_matches_identity matches them.
 # Each identity has two stored forms (hidden_marker_forms): the HTML comment,
 # and a link reference to the project for providers that escape HTML comments.
 # shellcheck disable=SC2016  # single-quoted on purpose: this is jq source, $b is its variable

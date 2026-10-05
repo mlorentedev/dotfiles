@@ -335,8 +335,8 @@ _gate() {
 # #1893: with no head_sha to anchor on, the gate counts by date. A rebase keeps
 # author dates and rewrites committer dates, so counting by author date saw 0
 # new commits and returned run=false, skipping the review and the "no review
-# published" guard with it. PR-Agent v0.46.0 orders commits by committer date
-# (_commit_timeline_date), and so does the gate now.
+# published" guard with it. The audited PR-Agent _commit_timeline_date orders
+# commits by committer date, and so does the gate now.
 @test "a rebase with no state block: old author dates, new committer dates count as new" {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z "$FULL"
     commit_rebased 2026-09-25T08:00:00Z 2026-09-25T11:00:00Z
@@ -347,7 +347,7 @@ _gate() {
     [[ "$output" == *"3 new commit"* ]]
 }
 
-# v0.46.0 also stores a review identity as a link reference, for providers
+# The audited upstream also stores a review identity as a link reference, for providers
 # that escape HTML comments (comment_identity.hidden_marker_forms), and its
 # get_previous_review accepts either form. A forged comment in that form must
 # be caught like the HTML one, or PR-Agent takes it as its baseline unnoticed.
@@ -370,17 +370,9 @@ _gate() {
     [[ "$output" == *"1 new commit"* ]]
 }
 
-# The gate copies PR-Agent's selection rules, so the version it cites must be
-# the version the workflow runs. #1893 was that drift: the gate cited v0.45.0
-# while the workflow had moved to v0.46.0, whose rule had changed.
-@test "every PR-Agent version the gate cites is the one the workflow pins" {
-    local wf="$BATS_TEST_DIRNAME/../.github/workflows/pr-agent.yml"
-    local pinned cited
-    # Both attempts (#1913) pin the action; another test holds the two equal.
-    pinned=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@[0-9a-f]\{40\} *# *\(v[0-9][0-9.]*\).*|\1|p' "$wf" | sort -u)
-    [ -n "$pinned" ]
-    [ "$(printf '%s\n' "$pinned" | wc -l)" -eq 1 ]
-    cited=$(grep -o 'v0\.[0-9][0-9]*\.[0-9][0-9]*' "$GATE" | sort -u)
-    [ -n "$cited" ]
-    [ "$cited" = "$pinned" ] || { printf 'workflow pins %s, gate cites:\n%s\n' "$pinned" "$cited"; return 1; }
+# The gate's semantics are audited against upstream source identities, not
+# another manually maintained copy of the action version (#1893, #2010).
+@test "the push gate does not duplicate PR-Agent's version" {
+    ! grep -Eq 'v0\.[0-9]+\.[0-9]+' "$GATE"
+    grep -q 'pr-agent-upstream-contract.json' "$GATE"
 }

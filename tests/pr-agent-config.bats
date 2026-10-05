@@ -697,12 +697,53 @@ _upstream_handler='def is_valid_file(filename, bad_extensions=None):
 }
 
 @test "pr-agent: the extension list is read at the same commit the action is pinned to (#1417)" {
-    local ref pins
-    ref=$(sed -n 's/^ *PR_AGENT_REF: \([0-9a-f]\{40\}\)$/\1/p' "$WF")
-    [ -n "$ref" ] || { echo "PR_AGENT_REF is missing from $WF" >&2; false; }
+    local pins
     pins=$(grep -o 'The-PR-Agent/pr-agent@[0-9a-f]\{40\}' "$WF" | sort -u)
-    [ "$pins" = "The-PR-Agent/pr-agent@$ref" ] \
-        || { echo "PR_AGENT_REF $ref does not match the action pin(s): $pins" >&2; false; }
+    [ "$(printf '%s\n' "$pins" | wc -l)" -eq 1 ]
+    ! grep -qE '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
+    grep -qF 'WORKFLOW_SHA: ${{ github.workflow_sha }}' "$WF"
+}
+
+@test "pr-agent: the filter derives its upstream ref from the executing action pin" {
+    run python3 -c "
+import sys, yaml
+steps = yaml.safe_load(open(sys.argv[1]))['jobs']['review']['steps']
+filter_step = next(s for s in steps if s.get('id') == 'reviewable')
+print(filter_step['env'].get('WORKFLOW_SHA') == '\${{ github.workflow_sha }}')
+print('PR_AGENT_REF=' in filter_step['run'])
+print('The-PR-Agent/pr-agent@' in filter_step['run'])
+print('PR_AGENT_REF' not in filter_step['env'])
+" "$WF"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]%$'\r'}" = "True" ]
+    [ "${lines[1]%$'\r'}" = "True" ]
+    [ "${lines[2]%$'\r'}" = "True" ]
+    [ "${lines[3]%$'\r'}" = "True" ]
+}
+
+@test "pr-agent: pinned upstream review contracts match their approved source identities" {
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref path expected actual
+    [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
+    for path in action.yaml pr_agent/settings/configuration.toml \
+        pr_agent/agent/pr_agent.py pr_agent/algo/comment_identity.py \
+        pr_agent/algo/file_filter.py pr_agent/algo/review_finding_state.py \
+        pr_agent/git_providers/github_provider.py pr_agent/servers/github_action_runner.py \
+        pr_agent/tools/pr_reviewer.py; do
+        jq -e --arg path "$path" '.files[$path] | test("^[0-9a-f]{40}$")' \
+            "$contract" >/dev/null || { echo "missing audited source: $path" >&2; return 1; }
+    done
+    ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
+    [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
+    if [ -n "${DOTF_TEST_GH_TOKEN:-}" ]; then
+        export GH_TOKEN="$DOTF_TEST_GH_TOKEN"
+    fi
+    while IFS=$'\t' read -r path expected; do
+        expected=${expected%$'\r'}
+        actual=$(gh api "repos/The-PR-Agent/pr-agent/contents/$path?ref=$ref" --jq '.sha') \
+            || { echo "cannot verify $path at $ref" >&2; return 1; }
+        [ "$actual" = "$expected" ] \
+            || { echo "$path changed since the approved upstream contract" >&2; return 1; }
+    done < <(jq -r '.files | to_entries[] | [.key, .value] | @tsv' "$contract")
 }
 
 @test "pr-agent: no ignore glob relies on negation, which PR-Agent does not implement" {
@@ -766,11 +807,9 @@ print(co['with']['sparse-checkout'].split())
     grep -q 'any($markers\[\]' "$WF"
 }
 
-# AI-045: a PR-Agent step stopped by the job's timeout-minutes was reported as
-# "NaN concurrency exhaustion" (#1107), which is the wrong cause. Measured on run
-# 36677077122: the model accepted a 42K-token review and never answered, and
-# `ai_timeout` did not fire. The guard must say that, naming the model.
-@test "pr-agent: a cancelled PR-Agent step is reported as a hang on the model, not as concurrency" {
+# AI-045: timeouts must not be mislabeled as concurrency (#1107); failures
+# can also be tool errors. Report the actual outcome and selected model.
+@test "pr-agent: a cancelled or failed Action reports its outcome and model" {
     run python3 -c "
 import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
@@ -781,11 +820,8 @@ print(' '.join(guard['env'].get('PR_AGENT_OUTCOME', '').split()))
 print(' '.join(guard['env'].get('REVIEW_MODEL', '').split()))
 "
     [ "${lines[0]}" = "pr_agent" ]
-    # The last attempt decides (#1913): the retry's outcome and model when it
-    # ran, else the first attempt's.
-    [ "${lines[1]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && steps.pr_agent_retry.outcome || steps.pr_agent.outcome }}" ]
-    [ "${lines[2]}" = "\${{ steps.pr_agent_retry.outcome != 'skipped' && steps.models.outputs.retry_model || steps.models.outputs.model }}" ]
-    # A step stopped by its own timeout may end `failure` or `cancelled`.
+    [ "${lines[1]}" = "\${{ steps.pr_agent.outcome }}" ]
+    [ "${lines[2]}" = "\${{ steps.models.outputs.model }}" ]
     grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \] || \[ "${PR_AGENT_OUTCOME:-}" = "failure" \]' "$WF"
 }
 
@@ -800,34 +836,45 @@ print(' '.join(guard['env'].get('REVIEW_MODEL', '').split()))
         || grep -A2 'non-streamed answer' "$WF" | grep -q '#1858'
 }
 
-# #1913: a hang on the primary blocked the PR until the job timeout (run
-# 36805617985: mimo-v2.6-flash accepted the review and never answered, and
-# `ai_timeout` does not fire on a hang, AI-045). The primary now runs under its
-# own step timeout, and an attempt that does not succeed is retried once on the
-# first fallback the preflight saw answer. Rotating the chain was rejected: it
-# would put CI back on the archive gate's model bucket (#1149).
-@test "pr-agent: a primary attempt that does not succeed is retried once on the first fallback" {
+# A failed Action is not a classified model failure: a second run could publish
+# the same review twice. The guard must turn the swallowed step outcome red.
+@test "pr-agent: a failed attempt is reported rather than retried" {
     run python3 -c "
 import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 pa = [s for s in steps if 'pr-agent' in s.get('uses', '')]
 print(len(pa))
-first, retry = pa[0], pa[-1]
-print(first.get('id'), first.get('timeout-minutes'), first.get('continue-on-error'))
-print(retry.get('id'), retry.get('timeout-minutes'))
-print(retry['env']['CONFIG__MODEL'])
-print(retry['env']['CONFIG__FALLBACK_MODELS'])
-print(' '.join(retry['if'].split()))
+print(pa[0].get('id'), pa[0].get('timeout-minutes'), pa[0].get('continue-on-error', False))
+guard = next(s for s in steps if s.get('name') == 'Fail if no review was published')
+print('failure' in guard['run'] and 'PR_AGENT_OUTCOME' in guard['run'])
 "
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "2" ]
-    [ "${lines[1]}" = "pr_agent 12 True" ]
-    [ "${lines[2]}" = "pr_agent_retry 12" ]
-    [ "${lines[3]}" = '${{ steps.models.outputs.retry_model }}' ]
-    [ "${lines[4]}" = '[]' ]
-    [[ "${lines[5]}" == *"steps.pr_agent.outcome"* ]]
-    [[ "${lines[5]}" == *"steps.models.outputs.retry_model != ''"* ]]
-    [[ "${lines[5]}" == *"!cancelled()"* ]]
+    [ "${lines[0]}" = "1" ]
+    [ "${lines[1]}" = "pr_agent 12 False" ]
+    [ "${lines[2]}" = "True" ]
+}
+
+@test "pr-agent: ambiguous failures fail closed without invoking a second Action" {
+    run python3 -c "
+import sys, yaml
+job = yaml.safe_load(open(sys.argv[1]))['jobs']['review']
+pa = [s for s in job['steps'] if 'pr-agent' in s.get('uses', '')]
+print(len(pa))
+if pa:
+    print(pa[0]['env'].get('github_action_config.fail_on_tool_errors'))
+    print(pa[0]['env'].get('CONFIG__FALLBACK_MODELS'))
+    print(pa[0].get('continue-on-error', False))
+guard = next(s for s in job['steps'] if s.get('name') == 'Fail if no review was published')
+print('steps.pr_agent.outcome' in guard['env']['PR_AGENT_OUTCOME'])
+print(\"steps.reviewable.outcome != 'failure'\" in guard['if'])
+" "$WF"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]%$'\r'}" = "1" ]
+    [ "${lines[1]%$'\r'}" = "true" ]
+    [ "${lines[2]%$'\r'}" = '${{ steps.models.outputs.fallbacks }}' ]
+    [ "${lines[3]%$'\r'}" = "False" ]
+    [ "${lines[4]%$'\r'}" = "True" ]
+    [ "${lines[5]%$'\r'}" = "True" ]
 }
 
 # Run 36812454370: a merge commit from "update branch" is a push the gate does
@@ -839,23 +886,6 @@ print(' '.join(retry['if'].split()))
 @test "pr-agent: no expression parses a step output with fromJSON" {
     run grep -nE 'fromJSON\(\s*steps\.' "$WF"
     [ "$status" -eq 1 ]
-}
-
-# The retry is the same review on another model, never a different review: one
-# pinned action, and every setting equal except the two that pick the model.
-@test "pr-agent: both attempts run the same pinned action with the same settings" {
-    run python3 -c "
-import yaml
-steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
-first, retry = [s for s in steps if 'pr-agent' in s.get('uses', '')]
-print(first['uses'] == retry['uses'])
-picks = {'CONFIG__MODEL', 'CONFIG__FALLBACK_MODELS'}
-strip = lambda e: {k: v for k, v in e.items() if k not in picks}
-print(strip(first['env']) == strip(retry['env']))
-"
-    [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "True" ]
-    [ "${lines[1]}" = "True" ]
 }
 
 # AI-045 AC6 (#1858, #1923): every attempt streams its NaN call. Non-streamed, a
@@ -870,7 +900,7 @@ print(strip(first['env']) == strip(retry['env']))
 # `api_base` contains one of the substrings. The substring is checked against
 # the base URL the step really sends, so moving NaN's endpoint fails here
 # instead of silently turning streaming off.
-@test "pr-agent: every attempt streams its NaN calls" {
+@test "pr-agent: the single attempt streams its NaN calls" {
     run python3 -c "
 import json, yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
@@ -884,17 +914,16 @@ for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
 "
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "pr_agent True True True" ]
-    [ "${lines[1]}" = "pr_agent_retry True True True" ]
+    [ "${#lines[@]}" -eq 1 ]
 }
 
-# A job timeout shorter than both attempts would cut the retry, which is the
-# hang this replaces under another name.
-@test "pr-agent: the job outlives both attempts" {
+# A job timeout shorter than its Action step would hide the Action's own bound.
+@test "pr-agent: the job outlives the bounded Action" {
     run python3 -c "
 import yaml
 job = yaml.safe_load(open('$WF'))['jobs']['review']
 pa = [s for s in job['steps'] if 'pr-agent' in s.get('uses', '')]
-print(job['timeout-minutes'] >= sum(s['timeout-minutes'] for s in pa) + 3)
+print(len(pa) == 1 and job['timeout-minutes'] >= pa[0]['timeout-minutes'] + 3)
 "
     [ "$status" -eq 0 ]
     [ "$output" = "True" ]

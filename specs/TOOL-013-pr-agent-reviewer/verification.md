@@ -5,38 +5,47 @@ created: "2026-08-16"
 
 # Verification - TOOL-013-pr-agent-reviewer
 
-## Evidence
+## Evidence for the #2010 update
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
-
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- AC5: `pr-agent-config.bats` confirms the Action is pinned to a commit; the
+  v0.47.0 pin resolves at `The-PR-Agent/pr-agent`.
+- AC8: BATS cases for the executing workflow pin, the remote Git blob identities,
+  and the absence of copied versions passed. A synthetic changed blob SHA failed
+  with `pr_agent/agent/pr_agent.py changed since the approved upstream contract`;
+  a synthetic invalid token failed with HTTP 401 and `cannot verify ...`.
+- AC9: BATS confirms one Action, `fail_on_tool_errors: "true"`, retained internal
+  fallbacks, no `continue-on-error`, and a guard bound to the Action outcome.
+  The previous unconditional second Action is gone. Live publication behavior
+  awaits CI on the pushed commit.
+- AC1-AC4, AC6-AC7: existing behavior and earlier checks remain in place; this
+  update does not claim fresh live-review or secrets-delivery evidence.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Git Bash on Windows: `bats --filter "extension list is read|filter derives|pinned upstream|ambiguous failures|no expression parses|push gate does not duplicate" tests/pr-agent-config.bats tests/pr-agent-push-gate.bats` -> 6/6 passed.
+- `bats tests/pr-agent-config.bats tests/pr-agent-model-preflight.bats tests/pr-agent-push-gate.bats` -> exit 1 locally (103 cases). Git Bash paths embedded in Python strings are not readable by Windows Python, and `zsh` is absent; this is not evidence of a Linux CI regression.
+- `shellcheck -S warning scripts/pr-agent-push-gate.sh scripts/pr-agent-model-preflight.sh` -> exit 0.
+- `actionlint -color=false -ignore 'unexpected key "queue"' .github/workflows/pr-agent.yml` -> exit 0. Local actionlint reports `concurrency.queue` without this ignore on both the old and new workflow.
+- CI Linux on the new commit: pending until push. Do not infer a green result from local checks.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- A step failure does not distinguish a model outage from a tool error in this
+  Action. Fail closed rather than retrying an Action that may already have
+  published; the model fallback stays inside its single attempt.
+- Compare Git blob identities of the upstream files the gate relies on instead
+  of copying the Action version into the gate. The workflow at
+  `github.workflow_sha` supplies the effective runtime pin.
 
 ## Promotion candidates
 
-Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
-
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [ ] Lesson for the repo's `docs/lessons.md`? no: the operational update procedure is in `docs/runbooks/guide-pr-agent-reviewer.md`.
+- [ ] ADR-worthy decision for the repo's `docs/adr/`? no: the review-bounding decision remains ADR-040.
+- [ ] New pattern candidate for `00_meta/patterns/`? no: this is a repository-specific dependency contract.
 
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved: `specs/TOOL-013-pr-agent-reviewer/` -> `specs/archive/TOOL-013-pr-agent-reviewer/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [ ] Independent adversarial review passes for the final contract
