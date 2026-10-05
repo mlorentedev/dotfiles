@@ -213,7 +213,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          PR_AGENT_REF: 1d01f24f455bb879c1d9c557ad7de3d72dcc7975
+          PR_AGENT_REF: 8e5a9295973b24af4b70cafd0b660a230811ef9e
         run: |
           set -uo pipefail
           CFG=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.pr_agent.toml?ref=${DEFAULT_BRANCH}" \
