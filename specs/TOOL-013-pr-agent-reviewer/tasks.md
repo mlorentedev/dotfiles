@@ -95,7 +95,7 @@ the same PR:
       fallback; run it before changing the workflow.
 - [x] [AC9] Remove the unconditional second Action and update the publication
       guard and affected tests without weakening ADR-040's three-commit gate.
-- [ ] [AC8] [AC9] Run targeted BATS tests and lint; record results in
+- [x] [AC8] [AC9] Run targeted BATS tests and lint; record results in
       `verification.md` and disposition the two #2010 reviewer findings.
 
 ## Deliberately not done here

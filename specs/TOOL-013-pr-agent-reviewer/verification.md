@@ -7,6 +7,9 @@ created: "2026-08-16"
 
 ## Evidence for the #2010 update
 
+- Implementation commit: `54811ad3c9ffc8ef896a3bad07b0856015e98247`
+  on #2010; [review triage](https://github.com/mlorentedev/dotfiles/pull/2010#issuecomment-6001736990)
+  disposes both PR-Agent findings.
 - AC5: `pr-agent-config.bats` confirms the Action is pinned to a commit; the
   v0.47.0 pin resolves at `The-PR-Agent/pr-agent`.
 - AC8: BATS cases for the executing workflow pin, the remote Git blob identities,
