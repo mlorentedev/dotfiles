@@ -1,21 +1,21 @@
 ---
 generated: true
 generated_from: 00_meta/skills/teardown/SKILL.md
-generated_sha: 66723ae46739ae19
+generated_sha: 9789e43dfada974f
 id: teardown-skill
 type: skill
 status: active
 created: '2026-10-03'
 owner: manu
 name: teardown
-description: Use when performing a full 360-degree teardown of an external product, repository, tool, framework, or business idea, combining deep technical architecture with product, UX, monetization, and master sales/business frameworks (Hormozi, Dunford, Cagan, Walling, Levels, Naval, Welsh).
+description: Use when performing a full 360-degree teardown of an external product, repository, tool, framework, or business idea, combining deep technical architecture with product, UX, monetization, and master sales/business frameworks (Hormozi, Dunford, Cagan, Walling, Levels, Naval, Welsh, Kendall).
 keywords: [teardown, product teardown, tech teardown, evaluate product, business model, hormozi, dunford, cagan, walling, naval, welsh, kendall, analisis de producto, desglosar herramienta]
 paths: ['10_projects/**/research/**', '00_meta/research/**', 'research/**']
 ---
 
 # Teardown — 360° Technical, Product & Business Evaluation
 
-> Perform evidence-based, 360-degree teardowns of external technologies, libraries, tools, frameworks, and products. Evaluates both **deep engineering architecture** (protocols, concurrency, secrets, failure modes) and **product/business viability** through the mental models of leading product, sales, and bootstrapping masters (Hormozi, Dunford, Cagan, Walling, Levels, Naval, Welsh). Supports parallel multi-model benchmarking in the vault.
+> Perform evidence-based, 360-degree teardowns of external technologies, libraries, tools, frameworks, and products. Evaluates both **deep engineering architecture** (protocols, concurrency, secrets, failure modes) and **product/business viability** through the mental models of leading product, sales, and bootstrapping masters (Hormozi, Dunford, Cagan, Walling, Levels, Naval, Welsh, Kendall). Supports parallel multi-model benchmarking in the vault.
 
 ---
 
@@ -41,11 +41,14 @@ paths: ['10_projects/**/research/**', '00_meta/research/**', 'research/**']
 3. **"A mention in conversation is not an exit" & Closed-Loop Actionability**:
    - Research must NEVER end as dead notes in the vault.
    - Every teardown must culminate in a concrete, actionable verdict: **Adopt (ticketed)**, **Extract Mechanism (ticketed)**, **Queue Execution Task (roadmapped)**, or **Pass/Reject (with stated rationale)**.
-   - **Board Pre-Flight (mandatory, and it comes BEFORE any proposal)**: Query the target repository's board for the topic before composing anything — `gh issue list --state all --search "<topic>"`, plus a scan of the identifier stream. Two outcomes, and only two:
+   - **Board Pre-Flight (mandatory, and it comes BEFORE any proposal)**: Run **both** queries, always, and paste their output. One search is not a detector, and a negative is only established by the scan:
+     1. `gh issue list --state all --limit 500 --search "<topic>"`
+     2. `gh issue list --state all --limit 500 --json number,title` — read the `<STREAM>-<NUM>` ids on the stream, open and closed.
+     The `--limit` is not optional: the CLI default is 30, so a matching issue at position 31 or later is invisible to a query that omits it. Two outcomes, and only two — and the second is reachable only once step 2 has been run:
      - **A ticket already exists**: the deliverable is to **execute or extend it**, never to propose a second one. Report its number, state, and what is missing from it.
-     - **No ticket exists**: allocate the `<STREAM>-<NUM>` id **from that live query**, never from memory or a cached list, and say which query produced it.
-     Proposing an id that is already taken, for work whose ticket is already open, is a failed teardown regardless of the analysis quality.
-   - **Proactive Ticket Proposal**: Whenever a mechanism donor is extracted or adoption is recommended, the agent MUST formulate a ready-to-file ticket proposal directly in the chat synthesis (Repo, `<STREAM>-<NUM>` title, labels, problem, proposed scope, acceptance criteria) and ask the user for confirmation to open it.
+     - **No ticket exists**: allocate the `<STREAM>-<NUM>` id from the scan in step 2, never from memory or a cached list, and name the query that produced it.
+     A text search that finds nothing does **not** establish that nothing exists: a ticket whose title and body omit the topic's wording is precisely the miss that produces a duplicate. Proposing an id that is already taken, for work whose ticket is already open, is a failed teardown regardless of the analysis quality.
+   - **Proactive Ticket Proposal (only when the pre-flight found nothing)**: When a mechanism donor is extracted or adoption is recommended **and the Board Pre-Flight reached "No ticket exists"**, the agent MUST formulate a ready-to-file ticket proposal directly in the chat synthesis (Repo, `<STREAM>-<NUM>` title, labels, problem, proposed scope, acceptance criteria) and ask the user for confirmation to open it. When the pre-flight found a ticket, the deliverable is that ticket — not a proposal, and not a proposal plus a note.
    - If an operational pipeline action is identified (e.g. applying to a network, submitting a profile, running an experiment when entering a project phase): add a concrete task to the target project's `roadmap.md` or `sources-inbox.md`.
 4. **Sovereign Stack Alignment**: Does it respect our foundational doctrine: Zero AI attribution, Zero manual ops, Frontmatter Law, JIT secrets isolation (ADR-028), one writer per worktree with external-sibling placement (dotfiles `AGENTS.md` Standing Order #9, `using-git-worktrees`, `runbook-worktree-safety` — **not** ADR-032, which is cross-harness agent orchestration), and progressive disclosure?
 5. **The Vault as SSOT for Domain Auto-Discovery (NEVER Default Lazily to `dotfiles`)**:
@@ -58,7 +61,7 @@ paths: ['10_projects/**/research/**', '00_meta/research/**', 'research/**']
         - Extract from each project's `context.md`: `id`, frontmatter `tags`, declared stack, and strategic scope.
      2. **Semantic Affinity Matching Against Vault SSOT**:
         - If the candidate topic matches the scope and tags of an active project in the vault SSOT (e.g. ATS scrapers/CV builders -> discovered `resume`; Kubernetes/homelab -> discovered `kubelab`; autonomous agent broker -> discovered `iris`; camera sensors -> discovered `imagingsuite`; personal portfolio/blog -> discovered `web`; shell/workstation CLI -> discovered `dotfiles`):
-          - Route the teardown report to `10_projects/<discovered-project>/research/YYYY-MM-DD-<topic>-<model>.md` — one naming rule, stated once in full under Parallel Multi-Model Benchmarking below. A `-synthesis.md` is a later pass, never the first one and never this pass's filename.
+          - Route the teardown report to `10_projects/<discovered-project>/research/YYYY-MM-DD-<topic>-<model-token>.md` — one naming rule, stated once in full under Parallel Multi-Model Benchmarking below. A `-synthesis.md` is a later pass, never the first one and never this pass's filename.
           - Route follow-up tickets, mechanisms, and tasks to that project's issue tracker or `roadmap.md`.
         - If the topic aligns with personal career strategy, compensation, or job search: route to `30_career/`.
         - If the topic represents a **completely new domain / product venture** not registered in the vault SSOT:
@@ -133,9 +136,14 @@ Map the findings against our sovereign portfolio dynamically discovered via `10_
 1. **Is a pass already here?** Read the target's `research/` directory **and** its `_index.md` — in practice the directory and the index disagree, so reading one is not reading the other. If a pass on this target already exists, the default deliverable is an **independent evaluation of it or a verification of it**, not a near-duplicate.
 2. **Is the ticket already open?** See Board Pre-Flight under Core Principle 3.
 
-**The naming rule, stated once — this is its SSOT.** Every evaluation pass is `10_projects/<project>/research/YYYY-MM-DD-<topic>-<model>.md`. The `<model>` token is required: it is what keeps parallel writers from colliding, and it is what carries authoring provenance into the durable record.
+**The naming rule, stated once — this is its SSOT.** Every evaluation pass is `10_projects/<project>/research/YYYY-MM-DD-<topic>-<model-token>.md`.
 
-**`<model>` and the template's `Evaluator:` are resolved from the harness, never self-described.** Read `PI_PROVIDER` / `PI_MODEL` (under pi) or the local equivalent, and record the exact runtime. A model cannot observe its own identity, so anything it writes about itself is a guess. This is not tidiness: `harness/reviewer-pool.json` is an allow-list of models permitted to sign a `review.md`, and `dotfiles#1907` binds reviewer identity to runtime provenance — a provenance field that can be invented is not a provenance field. If the runtime cannot be resolved, write `unresolved` and the reason.
+**`<model-token>` is provider-qualified and path-safe; `Evaluator:` carries the exact runtime.** They are two encodings of one fact, and collapsing them is a defect in either direction:
+
+- **`<model-token>`** — `<PI_PROVIDER>-<PI_MODEL>` with every `/` replaced by `-`. Provider `nan` + model `deepseek-v4-flash` → `nan-deepseek-v4-flash`. The provider is the segment before the first `-`, so the token is reversible and two providers serving one model name cannot collide. A `/` in a filename is a path separator: using the runtime verbatim writes the file into a subdirectory that does not exist.
+- **`Evaluator:`** — the exact runtime as the harness declares it, e.g. `nan/deepseek-v4-flash`. Never abbreviated, never a family name.
+
+Both are **resolved from the harness, never self-described**: read `PI_PROVIDER` / `PI_MODEL` (under pi) or the local equivalent. A model cannot observe its own identity, so anything it writes about itself is a guess. This is not tidiness: `harness/reviewer-pool.json` is an allow-list of models permitted to sign a `review.md`, and `dotfiles#1907` binds reviewer identity to runtime provenance — a provenance field that can be invented is not a provenance field. When the runtime cannot be resolved, write `unresolved` plus the reason in `Evaluator:` and `unresolved` as the token; never guess a family or a vendor.
 
 **The synthesis is a different pass, and it has a precondition.** `YYYY-MM-DD-<topic>-synthesis.md` merges consensus and the union of adversarial and business findings across passes, and it may be authored **only once the set of passes is closed and every pass read**. A `-synthesis.md` carries no `<model>` token (it merges several) and is never the artifact of a single evaluation run. Declaring a synthesis early closes the set by implication and silently promotes one model's pass into the repository's voice.
 
@@ -147,7 +155,7 @@ Map the findings against our sovereign portfolio dynamically discovered via `10_
 - **Resumen Ejecutivo**: Problema real, JTBD y veredicto.
 - **Radiografía Técnica**: Puntos clave de arquitectura, seguridad y fallos ocultos.
 - **Análisis de Producto & Negocio**: UX, modelo de monetización y fricción.
-- **Tabla del Consejo de Referentes**: Qué dirían Hormozi, Dunford, Cagan, Walling, Levels, Naval y Welsh.
+- **Tabla del Consejo de Referentes**: Qué dirían Hormozi, Dunford, Cagan, Walling, Levels, Naval, Welsh y Kendall.
 - **Oportunidad Estratégica para Nuestro Portfolio**: Qué aprendemos comparado contra el portfolio vivo descubierto en el Vault.
 - **Propuesta de Ticket(s) Lista para Abrir (Obligatorio en Adopt / Extract Mechanism)**:
   - Repositorio de destino y Stream ID: e.g. `mlorentedev/kubelab`, `CI-RUNNER-002: ...`
@@ -160,7 +168,7 @@ Map the findings against our sovereign portfolio dynamically discovered via `10_
 
 ```markdown
 ---
-id: <topic>-analysis-<model>
+id: <topic>-analysis-<model-token>
 type: analysis
 status: active
 created: "YYYY-MM-DD"
@@ -168,10 +176,10 @@ owner: manu
 tags: [research, <project>, <topic>, product, business, <keywords>]
 ---
 
-# <Topic / Product Name> — Technical, Product & Business Analysis (<Model>)
+# <Topic / Product Name> — Technical, Product & Business Analysis (<exact runtime, e.g. nan/deepseek-v4-flash>)
 
 > **Source:** Web & codebase inspection of `<URL / Repo>` (inspected YYYY-MM-DD).
-> **Evaluator:** <resolved runtime, e.g. `nan/deepseek-v4-flash` — read from the harness environment, never self-described>
+> **Evaluator:** <the exact provider-qualified runtime, e.g. `nan/deepseek-v4-flash` — read from the harness environment, never self-described>
 > **Target Scope:** <10_projects/<project> or 00_meta>
 > **Classification:** **<Architecture Donor | Mechanism Donor | Incompatible | Reference>** — <Rationale>.
 
@@ -228,6 +236,7 @@ tags: [research, <project>, <topic>, product, business, <keywords>]
 | **Pieter Levels** | Solo Velocity & Scrappiness | ... |
 | **Naval Ravikant** | Leverage & Specific Knowledge | ... |
 | **Justin Welsh** | Distribution & Content Loops | ... |
+| **Larry Kendall** | Ninja Selling (Value First) | ... |
 
 ---
 
