@@ -177,7 +177,7 @@ STUB
 
 @test "AC1: --check fails after a deployed block is hand-edited" {
     run_refresh; [ "$status" -eq 0 ]
-    sed -i 's/rule line one/TAMPERED/' "$REPO/TARGET.md"
+    sed -i.bak 's/rule line one/TAMPERED/' "$REPO/TARGET.md" && rm -f "$REPO/TARGET.md.bak"
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
     [[ "$output" == *"DRIFT"* ]]
@@ -708,7 +708,7 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    sed -i 's/rule line one/TAMPERED/' "$REPO/TARGET.md"
+    sed -i.bak 's/rule line one/TAMPERED/' "$REPO/TARGET.md" && rm -f "$REPO/TARGET.md.bak"
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
     [[ "$output" == *"DRIFT"* ]]
@@ -773,7 +773,7 @@ seed_doctrine_fixture() {
     seed_agents_fixture
     # a persona with no targets[] is universal, so presence reaches every surface
     # including the two this fixture adds
-    sed -i '/^targets: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    sed -i.bak '/^targets: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md" && rm -f "$VAULT/00_meta/agents/definitions/curator/AGENT.md.bak"
     mkdir -p "$REPO/harness/enforced"
     printf -- '- rule one\n- rule two\n' > "$REPO/harness/enforced/demo.md"
     local tmp
@@ -902,7 +902,7 @@ seed_doctrine_fixture() {
 
 @test "agents: --deploy passes the record's own tier through to the resolver" {
     seed_agents_fixture
-    sed -i 's/^model: top$/model: low/' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    sed -i.bak 's/^model: top$/model: low/' "$VAULT/00_meta/agents/definitions/curator/AGENT.md" && rm -f "$VAULT/00_meta/agents/definitions/curator/AGENT.md.bak"
     run_refresh; [ "$status" -eq 0 ]
     STUB_TIER_MODEL=haiku run_deploy; [ "$status" -eq 0 ]
     grep -q '^model: haiku' "$FAKEHOME/.claude/agents/curator.md"
@@ -977,7 +977,7 @@ DIAG
 
 @test "agents: a record declaring no tier renders without a model line" {
     seed_agents_fixture
-    sed -i '/^model: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    sed -i.bak '/^model: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md" && rm -f "$VAULT/00_meta/agents/definitions/curator/AGENT.md.bak"
     run_refresh; [ "$status" -eq 0 ]
     run_deploy; [ "$status" -eq 0 ]
     F="$FAKEHOME/.claude/agents/curator.md"
@@ -1109,7 +1109,7 @@ EOF
 
 @test "agents: a record declaring no capabilities renders without the field" {
     seed_agents_fixture
-    sed -i '/^capabilities: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md"
+    sed -i.bak '/^capabilities: /d' "$VAULT/00_meta/agents/definitions/curator/AGENT.md" && rm -f "$VAULT/00_meta/agents/definitions/curator/AGENT.md.bak"
     run_refresh; [ "$status" -eq 0 ]
     run_deploy; [ "$status" -eq 0 ]
     F="$FAKEHOME/.claude/agents/curator.md"

@@ -76,7 +76,7 @@ require_tools() {
 
 # The winget Windows build of jq emits CRLF line terminators (even for a single
 # value). MSYS command-substitution `$(jq …)` silently strips the trailing CRLF,
-# but `read`/`mapfile`/`for` fed via `< <(jq …)` keep the bare `\r` in the last
+# but `read`/`read_array`/`for` fed via `< <(jq …)` keep the bare `\r` in the last
 # field — which broke slug/path matching on Windows (the "section not found"
 # refresh failure). Shadow `jq` with a CR-stripping wrapper so every call yields
 # LF output regardless of platform, while preserving jq's own exit status
@@ -84,6 +84,20 @@ require_tools() {
 # `type -P` above to verify the real binary, not this function. (Superseded once
 # CLI-026 ports the engine to Go.)
 jq() { command jq "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
+
+# read_array NAME: read stdin into the indexed array NAME, one element per line
+# (the `mapfile -t NAME` this replaces). macOS ships bash 3.2, which has no
+# mapfile, and ADR-003 holds every script to it: under 3.2 the harness refresh,
+# deploy and check all died at their first mapfile, and setup only warned, so no
+# skill reached any agent (PLAT-001 W3, #2013). Callers expand the result as
+# ${NAME[@]+"${NAME[@]}"}: 3.2 treats an empty "${NAME[@]}" as unbound under set -u.
+read_array() {
+    local __ra_line
+    eval "$1=()"
+    while IFS= read -r __ra_line || [[ -n "$__ra_line" ]]; do
+        eval "$1+=(\"\$__ra_line\")"
+    done
+}
 
 # --- helpers ---
 
@@ -758,10 +772,10 @@ EOF
     # 2. inject into each target
     local file ids tmpc sha begin cap lines
     while IFS= read -r file; do
-        mapfile -t ids < <(target_inject "$file")
+        read_array ids < <(target_inject "$file")
         validate_markers "$REPO_ROOT/$file"
         tmpc="$(mktemp)"
-        render_region "${ids[@]}" > "$tmpc"
+        render_region ${ids[@]+"${ids[@]}"} > "$tmpc"
         sha="$(sha_of "$tmpc")"
         begin="$BEGIN_PREFIX (sha256:$sha) — SSOT: vault $vsub; edit there + re-run setup, do NOT edit between markers -->"
         replace_region "$REPO_ROOT/$file" "$begin" "$tmpc"
@@ -1251,14 +1265,14 @@ migrate_legacy_preamble() {
 
 deploy_doctrine() {
     local ag_recdir="$1" agent file cap shadow file_abs payload sha begin tmp chars bytes gen_chars gen_bytes max gen_max ids
-    mapfile -t ids < <(jq -r '.doctrine.inject[]' "$MANIFEST")
+    read_array ids < <(jq -r '.doctrine.inject[]' "$MANIFEST")
     while IFS=$'\t' read -r agent file cap shadow; do
         [[ -n "$agent" ]] || continue
         file_abs="$HOME/$file"
         payload="$(mktemp)"
         {
             printf '## Non-negotiable rules (harness-enforced)\n\n'
-            render_region_compact "${ids[@]}"
+            render_region_compact ${ids[@]+"${ids[@]}"}
             printf '\n'
             build_agent_presence "$ag_recdir" "$agent"
         } > "$payload"
@@ -1402,12 +1416,12 @@ deploy_agent_presence() {
 # shared inject list feeding every doctrine payload.
 check_coverage() {
     local id surfaces surface injected reason gap=0
-    mapfile -t surfaces < <(
+    read_array surfaces < <(
         jq -r '.targets[].file' "$MANIFEST"
         jq -e '.doctrine' "$MANIFEST" >/dev/null 2>&1 && printf 'doctrine\n'
     )
     while IFS= read -r id; do
-        for surface in "${surfaces[@]}"; do
+        for surface in ${surfaces[@]+"${surfaces[@]}"}; do
             if [[ "$surface" == doctrine ]]; then
                 injected="$(jq -r --arg i "$id" \
                     '[.doctrine.inject[]? | select(. == $i)] | length' "$MANIFEST")"
@@ -1436,9 +1450,9 @@ do_check() {
     check_coverage || drift=1
     while IFS= read -r file; do
         if ! validate_markers "$REPO_ROOT/$file"; then drift=1; continue; fi
-        mapfile -t ids < <(target_inject "$file")
+        read_array ids < <(target_inject "$file")
         expected="$(mktemp)"; actual="$(mktemp)"
-        if ! render_region "${ids[@]}" > "$expected"; then drift=1; rm -f "$expected" "$actual"; continue; fi
+        if ! render_region ${ids[@]+"${ids[@]}"} > "$expected"; then drift=1; rm -f "$expected" "$actual"; continue; fi
         region_content "$REPO_ROOT/$file" > "$actual"
         if ! diff -u "$expected" "$actual" >/dev/null 2>&1; then
             printf '[DRIFT] %s: managed region differs from harness/enforced/ (run --refresh)\n' "$file" >&2

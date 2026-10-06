@@ -60,6 +60,8 @@ One PR per row of #2013 track W. Each fix lands with the guard that would have c
 - [ ] AC2: a github-release install whose binary reports a version below the pin fails with an error and leaves `Dest` untouched.
 - [ ] AC3: an npm or uv-tool install that exits 0 but whose tool does not run on PATH afterwards fails with an error naming the tool.
 - [ ] AC4: the existing happy paths (install, upgrade, skip, missing-manager) keep their results and messages.
+- [ ] AC5: no shell file bash runs uses a bash-4-only construct, enforced by a static guard on every OS; `compile-harness.sh --check/--refresh/--deploy` run under macOS `/bin/bash` 3.2.
+- [ ] AC6: the harness bats suites pass on macOS for every failure caused by bash 3.2 or BSD sed.
 
 ## References
 
