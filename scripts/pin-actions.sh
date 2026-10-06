@@ -18,12 +18,15 @@ while IFS= read -r -d '' f; do files+=("$f"); done < <(
 )
 [ "${#files[@]}" -gt 0 ] || { echo "pin-actions: no workflows"; exit 0; }
 
-declare -A cache
+# Run-scoped cache as "<owner/repo@ref>\t<resolution>" lines, not an associative
+# array: macOS bash 3.2 has none (ADR-003, PLAT-001 W3).
+cache=""
 RESOLVED=""
 resolve() { # sets RESOLVED to "<sha> <kind>" (kind: tag|branch) or "" when unresolvable
   local repo="$1" ref="$2" key="$1@$2" obj type sha
   RESOLVED=""
-  if [ -n "${cache[$key]:-}" ]; then RESOLVED="${cache[$key]}"; return; fi
+  RESOLVED=$(printf '%s' "$cache" | awk -F'\t' -v k="$key" '$1 == k { print $2; exit }')
+  [ -n "$RESOLVED" ] && return
   if obj=$(gh api "repos/$repo/git/ref/tags/$ref" --jq '.object | "\(.type) \(.sha)"' 2>/dev/null); then
     type=${obj%% *}; sha=${obj##* }
     [ "$type" = "tag" ] && sha=$(gh api "repos/$repo/git/tags/$sha" --jq '.object.sha')
@@ -31,7 +34,7 @@ resolve() { # sets RESOLVED to "<sha> <kind>" (kind: tag|branch) or "" when unre
   elif sha=$(gh api "repos/$repo/git/ref/heads/$ref" --jq '.object.sha' 2>/dev/null); then
     RESOLVED="$sha branch"
   fi
-  [ -n "$RESOLVED" ] && cache[$key]="$RESOLVED"
+  [ -n "$RESOLVED" ] && cache="$cache$key"$'\t'"$RESOLVED"$'\n'
 }
 
 rc=0

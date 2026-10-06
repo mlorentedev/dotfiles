@@ -20,6 +20,20 @@ _extensionless_tracked_files() {
     git -C "$REPO" ls-files | awk -F/ '{n=$NF; if (n !~ /\./) print $0}'
 }
 
+# `git check-attr --stdin text eol` prints "<path>: <attr>: <value>", one line per
+# attribute per path. This folds it into one "<path>|<text>|<eol>" row per path,
+# in first-seen order: bash 3.2 (macOS) has no associative array to index by path
+# (ADR-003, PLAT-001 W3). '|' rather than a tab, because read collapses runs of a
+# whitespace IFS and would shift an empty field.
+_attr_rows() {
+    awk '{
+        i = index($0, ": "); p = substr($0, 1, i - 1); r = substr($0, i + 2)
+        j = index(r, ": "); a = substr(r, 1, j - 1); v = substr(r, j + 2)
+        if (!(p in seen)) { seen[p] = 1; order[++n] = p }
+        if (a == "eol") e[p] = v; else if (a == "text") t[p] = v
+    } END { for (k = 1; k <= n; k++) { p = order[k]; printf "%s|%s|%s\n", p, t[p], e[p] } }'
+}
+
 @test "every tracked extensionless file has an explicit eol (or is declared binary)" {
     cd "$REPO" || return 1
     local files
@@ -36,29 +50,16 @@ _extensionless_tracked_files() {
     # One process for the whole set (not one `check-attr` per file): --stdin
     # emits "<path>: <attr>: <value>" per attribute per path, two lines per
     # file for the two attributes requested here.
-    local -A eol_of text_of
-    local line path rest attr val
-    while IFS= read -r line; do
-        path="${line%%: *}"
-        rest="${line#*: }"
-        attr="${rest%%: *}"
-        val="${rest#*: }"
-        case "$attr" in
-            eol) eol_of["$path"]="$val" ;;
-            text) text_of["$path"]="$val" ;;
-        esac
-    done < <(printf '%s\n' "$files" | git check-attr --stdin text eol)
-
     # "unspecified" eol is only acceptable when text itself is explicitly
     # unset (`binary`) -- a deliberate escape hatch for a future extensionless
     # fixture that genuinely is binary, not a way to silence this guard for a
     # text file someone forgot to cover.
-    local unresolved=() p
-    for p in "${!eol_of[@]}"; do
-        if [ "${eol_of[$p]}" = "unspecified" ] && [ "${text_of[$p]:-}" != "unset" ]; then
+    local unresolved=() p text eol
+    while IFS='|' read -r p text eol; do
+        if [ "$eol" = "unspecified" ] && [ "$text" != "unset" ]; then
             unresolved+=("$p")
         fi
-    done
+    done < <(printf '%s\n' "$files" | git check-attr --stdin text eol | _attr_rows)
 
     if [ ${#unresolved[@]} -ne 0 ]; then
         printf 'Tracked extensionless files with no explicit eol -- a Windows\n' >&2
@@ -91,29 +92,16 @@ _declared_eol_files() {
 @test "every tracked file whose eol is declared has a working tree that obeys it" {
     cd "$REPO" || return 1
 
-    local -A eol_of text_of
-    local line path rest attr val
-    while IFS= read -r line; do
-        path="${line%%: *}"
-        rest="${line#*: }"
-        attr="${rest%%: *}"
-        val="${rest#*: }"
-        case "$attr" in
-            eol) eol_of["$path"]="$val" ;;
-            text) text_of["$path"]="$val" ;;
-        esac
-    done < <(_declared_eol_files)
-
-    local lf=() crlf=() p
-    for p in "${!eol_of[@]}"; do
+    local lf=() crlf=() p text eol
+    while IFS='|' read -r p text eol; do
         # `binary` (text unset) is exempt: it is never converted either way.
-        [ "${text_of[$p]:-}" = "unset" ] && continue
+        [ "$text" = "unset" ] && continue
         [ -f "$p" ] || continue
-        case "${eol_of[$p]}" in
+        case "$eol" in
             lf)   lf+=("$p") ;;
             crlf) crlf+=("$p") ;;
         esac
-    done
+    done < <(_declared_eol_files | _attr_rows)
 
     # Same fixture-drift guard as the test above: an empty set here would pass
     # vacuously, and an empty result reading as a finding is the failure class

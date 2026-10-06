@@ -354,3 +354,4 @@ tags: [lessons, index, dotfiles]
 | [334 - Windows prompts to open extensionless bash scripts](lesson-334-windows-prompts-to-open-extensionless-scripts.md) | 2026-10-02 |  |
 | [335 - A converge step that shells out is stubbed in the shared test helper](lesson-335-a-converge-step-is-stubbed-in-the-shared-test-helper.md) | 2026-10-04 |  |
 | [336 - A spec's measurement goes stale when another change moves the engine under it](lesson-336-a-spec-measurement-goes-stale-when-another-change-moves-the-engine.md) | 2026-10-03 |  |
+| [337 - A checksum proves the bytes, not that they run here](lesson-337-a-checksum-proves-the-bytes-not-that-they-run-here.md) | 2026-10-05 |  |

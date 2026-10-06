@@ -27,8 +27,15 @@ BASE_URL="${NAN_BASE_URL:-https://api.nan.builders/v1}"
 MODELS=(qwen3.6 gemma4 deepseek-v4-flash)
 
 # Representative prompts: real workloads, not toy.
-declare -A PROMPTS=(
-    [01-code-review]="Revisa este código Go y di si tiene problemas de concurrencia. Sé conciso:
+# Representative prompts. The names are the positional parameters (OUT has already
+# read $1) and each text comes from a case, so nothing below needs an associative
+# array (macOS bash 3.2 has none) or an index expansion ("${!arr[@]}" is a bad
+# substitution in zsh, and the two shells index arrays from 0 and 1), and "$@"
+# splits the same way in both. ADR-003, PLAT-001 W3.
+set -- 01-code-review 02-architecture 03-refactor 04-debug
+prompt_text() {
+    case "$1" in
+        01-code-review) printf '%s' "Revisa este código Go y di si tiene problemas de concurrencia. Sé conciso:
 \`\`\`go
 type Counter struct { count int }
 func (c *Counter) Inc() { c.count++ }
@@ -38,9 +45,9 @@ func main() {
     time.Sleep(time.Second)
     fmt.Println(c.count)
 }
-\`\`\`"
-    [02-architecture]="Diseña en 3 párrafos la arquitectura de un sistema de pagos que: (1) acepta tarjeta y transferencia, (2) procesa 1000 tps, (3) cumple PCI-DSS. Habla de servicios, base de datos, y un trade-off importante."
-    [03-refactor]="Refactoriza esta función Python para mejor legibilidad SIN cambiar el comportamiento. Devuelve solo el código:
+\`\`\`" ;;
+        02-architecture) printf '%s' "Diseña en 3 párrafos la arquitectura de un sistema de pagos que: (1) acepta tarjeta y transferencia, (2) procesa 1000 tps, (3) cumple PCI-DSS. Habla de servicios, base de datos, y un trade-off importante." ;;
+        03-refactor) printf '%s' "Refactoriza esta función Python para mejor legibilidad SIN cambiar el comportamiento. Devuelve solo el código:
 \`\`\`python
 def f(l):
     r=[]
@@ -48,23 +55,24 @@ def f(l):
         if l[i]%2==0 and l[i]>10:
             r.append(l[i]*2)
     return r
-\`\`\`"
-    [04-debug]="Tengo un test que falla intermitentemente solo en CI, nunca local. Es un test de integración con Postgres. ¿Cuáles son las 3 causas más probables y cómo las debugeo? Sé conciso."
-)
+\`\`\`" ;;
+        04-debug) printf '%s' "Tengo un test que falla intermitentemente solo en CI, nunca local. Es un test de integración con Postgres. ¿Cuáles son las 3 causas más probables y cómo las debugeo? Sé conciso." ;;
+    esac
+}
 
 echo "Output dir: $OUT"
 echo "Models: ${MODELS[*]}"
-echo "Prompts: ${#PROMPTS[@]}"
+echo "Prompts: $#"
 echo ""
 
 # Save prompts
-for name in "${!PROMPTS[@]}"; do
-    printf '%s\n' "${PROMPTS[$name]}" > "$OUT/prompt-$name.txt"
+for name in "$@"; do
+    printf '%s\n' "$(prompt_text "$name")" > "$OUT/prompt-$name.txt"
 done
 
 # Run each prompt × model with throttle (avoid 100rpm/5concurrent rate limit)
-for prompt_name in $(printf '%s\n' "${!PROMPTS[@]}" | sort); do
-    prompt="${PROMPTS[$prompt_name]}"
+for prompt_name in "$@"; do
+    prompt="$(prompt_text "$prompt_name")"
     echo "========================================================"
     echo "[$prompt_name]"
     echo "========================================================"

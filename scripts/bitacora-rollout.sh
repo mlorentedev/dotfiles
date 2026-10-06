@@ -56,7 +56,8 @@ run() { if [ "$CHECK" = 1 ]; then echo "   (dry-run) $*"; else "$@"; fi; }
 
 # ── Repo discovery: every non-archived, non-fork repo (forks never run our CI) ──
 if [ "${#REPOS[@]}" -eq 0 ]; then
-    mapfile -t REPOS < <(gh repo list "$OWNER" --limit 100 \
+    # A read loop, not mapfile: macOS bash 3.2 has none (ADR-003, PLAT-001 W3).
+    while IFS= read -r repo; do REPOS+=("$repo"); done < <(gh repo list "$OWNER" --limit 100 \
         --json name,isArchived,isFork \
         -q '.[] | select(.isArchived == false and .isFork == false) | .name' | sort)
 fi

@@ -91,12 +91,11 @@ _stubs_a_binary_in_file() {
 # Deliberately one level: this resolves what THE SUITE sources, not what a
 # sourced library goes on to source itself.
 _sourced_test_libs() {
-    local f="$1" line name val target rest
-    local -A vars=()
+    local f="$1" line name target rest vars val
 
-    while read -r name val; do
-        vars["$name"]="$val"
-    done < <(
+    # "<name> <value>" lines, looked up with awk below: bash 3.2 (macOS) has no
+    # associative array (ADR-003, PLAT-001 W3). The last assignment wins, as it did.
+    vars=$(
         # shellcheck disable=SC2016  # the $BATS_TEST_DIRNAME is a literal
         # pattern matched against the source file's text, not an expansion here.
         grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="\$BATS_TEST_DIRNAME/[^"]*"' "$f" |
@@ -110,8 +109,9 @@ _sourced_test_libs() {
         rest="${target#*/}"
         if [ "$name" = "BATS_TEST_DIRNAME" ]; then
             printf '%s/%s\n' "$TESTS" "$rest"
-        elif [ -n "${vars[$name]:-}" ]; then
-            printf '%s/%s/%s\n' "$TESTS" "${vars[$name]}" "$rest"
+        elif val=$(printf '%s\n' "$vars" | awk -v n="$name" '$1 == n { v = substr($0, length(n) + 2) } END { print v }') &&
+             [ -n "$val" ]; then
+            printf '%s/%s/%s\n' "$TESTS" "$val" "$rest"
         fi
     done < <(grep -E '(^|[^A-Za-z_])(\.|source)[[:space:]]+"\$[A-Za-z_]' "$f")
 }
