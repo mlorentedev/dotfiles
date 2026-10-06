@@ -1,0 +1,23 @@
+[
+  {
+    "id": "PLAT-001a-silent-failures-f1",
+    "behavior": "AC1/AC2: a github-release install whose staged binary does not run, prints no version, or reports below the pin fails and leaves Dest untouched",
+    "verification": "cd cli && go test ./internal/tools/ -run '^TestInstall_StagedBinaryMustExecuteAtThePin$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001a-silent-failures-f2",
+    "behavior": "AC3: an npm or uv-tool install that exits 0 but whose tool does not run on PATH afterwards fails, naming the tool",
+    "verification": "cd cli && go test ./internal/tools/ -run '^TestInstall_PackageManagerToolMustRunOnPathAfterward$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001a-silent-failures-f3",
+    "behavior": "AC4: the existing install/upgrade/skip/missing-manager paths keep their results",
+    "verification": "cd cli && go test ./internal/tools/ ./internal/cmd/ -run 'TestInstall|TestRunToolsInstall|TestDecideAction' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

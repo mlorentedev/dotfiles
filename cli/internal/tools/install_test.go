@@ -63,7 +63,9 @@ func fakeRelease(t *testing.T, asset string, binary []byte, corrupt bool) Fetche
 }
 
 // newTestInstaller wires an Installer for linux/amd64 with the given current
-// version (empty = absent) and fetcher, writing into a temp dest dir.
+// version (empty = absent) and fetcher, writing into a temp dest dir. The staged
+// binary's post-checksum probe answers with the sops pin, so a happy-path test
+// models a release binary that executes; the probe tests override Probe.
 func newTestInstaller(t *testing.T, current string, fetch Fetcher) *Installer {
 	t.Helper()
 	return &Installer{
@@ -74,6 +76,7 @@ func newTestInstaller(t *testing.T, current string, fetch Fetcher) *Installer {
 		Fetch:          fetch,
 		Out:            io.Discard,
 		CurrentVersion: func(string) string { return current },
+		Probe:          func(string, ...string) ([]byte, error) { return []byte("sops 3.13.1 (latest)\n"), nil },
 	}
 }
 
@@ -105,6 +108,9 @@ func TestInstall_Fresh(t *testing.T) {
 	// it, so assert it only when the test host itself is non-Windows.
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
 		t.Errorf("binary not executable: mode %v", info.Mode())
+	}
+	if left, _ := os.ReadDir(in.Dest); len(left) != 1 {
+		t.Errorf("Dest holds %d entries, want only the placed binary (the stage dir must be removed)", len(left))
 	}
 }
 
@@ -205,7 +211,9 @@ func bwTool() Tool {
 
 // newNpmInstaller wires an Installer whose npm Run is recorded into rec and whose
 // PATH version probe is faked via CurrentVersion (current = installed version,
-// "" = absent). Dest is irrelevant — npm globals never touch it.
+// "" = absent). Dest is irrelevant — npm globals never touch it. A successful Run
+// installs the version its argv names, as npm and uv do, so the post-install
+// probe sees the tool on PATH; the probe tests override CurrentVersion.
 func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
 	return &Installer{
 		GOOS:           "linux",
@@ -215,6 +223,10 @@ func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
 		CurrentVersion: func(string) string { return current },
 		Run: func(name string, args ...string) error {
 			*rec = append(*rec, name+" "+strings.Join(args, " "))
+			if runErr == nil {
+				spec := args[len(args)-1]
+				current = spec[strings.LastIndexAny(spec, "@=")+1:]
+			}
 			return runErr
 		},
 		HasCommand: func(string) bool { return true },
@@ -515,5 +527,94 @@ func TestInstallUvTool_MissingUvIsANamedSkip(t *testing.T) {
 	in.CurrentVersion = func(string) string { return "4.2.2" }
 	if got := in.Plan(hiveTool()).Action; got != PlanSkip {
 		t.Errorf("Plan at the pin without uv = %q, want %q: an installed tool needs no manager", got, PlanSkip)
+	}
+}
+
+// PLAT-001a W1: an install is a success only once the tool executes. Setup used
+// to log SUCCESS for a linux-amd64 binary placed on darwin/arm64 (an ELF that
+// cannot exec), which then shadowed a working copy on PATH. The staged binary is
+// probed after the checksum gate and before it is placed, so a binary that does
+// not run, or runs an older version than the pin, never reaches Dest.
+func TestInstall_StagedBinaryMustExecuteAtThePin(t *testing.T) {
+	cases := []struct {
+		name   string
+		probe  Runner
+		reason string
+	}{
+		{"exec format error", func(string, ...string) ([]byte, error) {
+			return nil, errors.New("fork/exec: exec format error")
+		}, "does not run"},
+		{"runs but prints no version", func(string, ...string) ([]byte, error) {
+			return []byte("usage: sops [options]\n"), nil
+		}, "does not run"},
+		{"runs below the pin", func(string, ...string) ([]byte, error) {
+			return []byte("sops 3.12.0\n"), nil
+		}, "below the pin"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := newTestInstaller(t, "", fakeRelease(t, "sops-v3.13.1.linux.amd64", []byte("elf"), false))
+			var staged string
+			in.Probe = func(name string, args ...string) ([]byte, error) {
+				staged = name
+				return tc.probe(name, args...)
+			}
+			res, err := in.Install(sopsTool())
+			if err == nil || res != Skipped {
+				t.Fatalf("Install = %v, %v; want Skipped and an error", res, err)
+			}
+			if !strings.Contains(err.Error(), "sops") || !strings.Contains(err.Error(), tc.reason) {
+				t.Errorf("error %q does not name the tool and %q", err, tc.reason)
+			}
+			if _, err := os.Stat(filepath.Join(in.Dest, "sops")); !os.IsNotExist(err) {
+				t.Error("a binary that failed its probe must not be placed in Dest")
+			}
+			// Staged on Dest's own mount (a noexec /tmp must not refuse a binary
+			// that runs from Dest), never at the final path, and cleaned up.
+			if filepath.Dir(filepath.Dir(staged)) != in.Dest || staged == filepath.Join(in.Dest, "sops") {
+				t.Errorf("probed %q, want a staged copy in a hidden dir inside Dest", staged)
+			}
+			if left, _ := os.ReadDir(in.Dest); len(left) != 0 {
+				t.Errorf("Dest holds %d leftover entries after a refused install", len(left))
+			}
+		})
+	}
+}
+
+// npm and uv exit 0 and still leave nothing runnable when their global bin dir
+// is not on PATH (an nvm/prefix mismatch), or when an older copy shadows the new
+// one. Both used to read as "installed".
+func TestInstall_PackageManagerToolMustRunOnPathAfterward(t *testing.T) {
+	cases := []struct {
+		name   string
+		tool   Tool
+		after  string
+		reason string
+	}{
+		{"npm, not on PATH", bwTool(), "", "does not run on PATH"},
+		{"npm, shadowed by an older copy", bwTool(), "2026.1.0", "below the pin"},
+		{"uv-tool, not on PATH", hiveTool(), "", "does not run on PATH"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var rec []string
+			in := newNpmInstaller("", &rec, nil)
+			in.CurrentVersion = func(string) string {
+				if len(rec) == 0 {
+					return ""
+				}
+				return tc.after
+			}
+			res, err := in.Install(tc.tool)
+			if len(rec) != 1 {
+				t.Fatalf("package manager calls = %v, want one", rec)
+			}
+			if err == nil || res != Skipped {
+				t.Fatalf("Install = %v, %v; want Skipped and an error", res, err)
+			}
+			if !strings.Contains(err.Error(), tc.tool.Name) || !strings.Contains(err.Error(), tc.reason) {
+				t.Errorf("error %q does not name %s and %q", err, tc.tool.Name, tc.reason)
+			}
+		})
 	}
 }

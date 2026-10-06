@@ -69,8 +69,9 @@ func loadTestCatalog(t *testing.T) tools.Catalog {
 }
 
 // fakeInstaller wires an Installer whose seams avoid the network: every fetch
-// writes a fixed payload, the checksums file lists its real hash, and the tool
-// reports as absent so Install always proceeds to place it.
+// writes a fixed payload, the checksums file lists its real hash, the tool
+// reports as absent so Install always proceeds to place it, and the staged
+// binary's post-checksum probe answers with the pin (the payload cannot exec).
 func fakeInstaller(t *testing.T, fail bool) *tools.Installer {
 	t.Helper()
 	const payload = "payload"
@@ -92,6 +93,7 @@ func fakeInstaller(t *testing.T, fail bool) *tools.Installer {
 		Fetch:          fetch,
 		Out:            io.Discard,
 		CurrentVersion: func(string) string { return "" }, // always absent → install
+		Probe:          func(string, ...string) ([]byte, error) { return []byte("sops 3.13.1\n"), nil },
 	}
 }
 
