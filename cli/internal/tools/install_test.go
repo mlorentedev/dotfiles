@@ -109,6 +109,9 @@ func TestInstall_Fresh(t *testing.T) {
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
 		t.Errorf("binary not executable: mode %v", info.Mode())
 	}
+	if left, _ := os.ReadDir(in.Dest); len(left) != 1 {
+		t.Errorf("Dest holds %d entries, want only the placed binary (the stage dir must be removed)", len(left))
+	}
 }
 
 func TestInstall_ChecksumMismatch(t *testing.T) {
@@ -566,8 +569,13 @@ func TestInstall_StagedBinaryMustExecuteAtThePin(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(in.Dest, "sops")); !os.IsNotExist(err) {
 				t.Error("a binary that failed its probe must not be placed in Dest")
 			}
-			if staged == "" || strings.HasPrefix(staged, in.Dest) {
-				t.Errorf("probed %q, want the staged copy outside Dest", staged)
+			// Staged on Dest's own mount (a noexec /tmp must not refuse a binary
+			// that runs from Dest), never at the final path, and cleaned up.
+			if filepath.Dir(filepath.Dir(staged)) != in.Dest || staged == filepath.Join(in.Dest, "sops") {
+				t.Errorf("probed %q, want a staged copy in a hidden dir inside Dest", staged)
+			}
+			if left, _ := os.ReadDir(in.Dest); len(left) != 0 {
+				t.Errorf("Dest holds %d leftover entries after a refused install", len(left))
 			}
 		})
 	}

@@ -354,8 +354,19 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 	// the bytes are the release's, not that they run here: a linux-amd64 asset on
 	// darwin/arm64 passes the checksum, fails exec, and used to land in Dest ahead
 	// of a working copy on PATH. Staged under its command name so it runs as it
-	// will once placed (.exe on Windows).
-	staged := filepath.Join(tmp, "stage", binFilename(t.Name, in.GOOS))
+	// will once placed (.exe on Windows), and inside Dest rather than the system
+	// temp dir: a noexec /tmp (hardened images, some CI runners) would refuse a
+	// binary that runs fine from Dest, and blame the OS/arch for it. A hidden
+	// sibling dir on Dest's own mount fails exactly when the placed binary would.
+	if err := os.MkdirAll(in.Dest, 0o755); err != nil {
+		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
+	}
+	stageDir, err := os.MkdirTemp(in.Dest, ".dotf-stage-")
+	if err != nil {
+		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
+	}
+	defer func() { _ = os.RemoveAll(stageDir) }()
+	staged := filepath.Join(stageDir, binFilename(t.Name, in.GOOS))
 	if err := placeBinary(assetPath, staged); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}

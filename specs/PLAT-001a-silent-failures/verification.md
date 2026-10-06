@@ -30,6 +30,7 @@ created: "2026-10-05"
 ## Decisions made during implementation
 
 - The probe runs the **staged** copy (in the temp dir, under its command name) rather than the placed one. A failing binary therefore never shadows a working copy on PATH, even briefly.
+- The staged copy lives in a hidden dir **inside Dest** (`.dotf-stage-*`), not the system temp dir. pr-agent review on #2014 pointed out that a `noexec` `/tmp` would refuse a binary that runs fine from Dest and blame the OS/arch. Staging on Dest's own mount fails exactly when the placed binary would, and the dir is removed on both success and refusal; the tests assert an empty or single-entry Dest.
 - A version below the pin after install is an error on all three channels. For npm/uv it means another copy earlier on PATH answers, so the next command would not get the pin either.
 
 ## Promotion candidates
