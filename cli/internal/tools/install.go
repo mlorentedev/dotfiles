@@ -272,6 +272,9 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 	if err := in.Run("npm", "install", "-g", spec); err != nil {
 		return Skipped, fmt.Errorf("%s: npm install -g %s: %w", t.Name, spec, err)
 	}
+	if err := in.verifyOnPath(t, "npm"); err != nil {
+		return Skipped, err
+	}
 	res := Installed
 	if action == actionUpgrade {
 		res = Upgraded
@@ -303,6 +306,9 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	spec := pkg + "==" + t.Version
 	if err := in.Run("uv", "tool", "install", spec); err != nil {
 		return Skipped, fmt.Errorf("%s: uv tool install %s: %w", t.Name, spec, err)
+	}
+	if err := in.verifyOnPath(t, "uv"); err != nil {
+		return Skipped, err
 	}
 	res := Installed
 	if action == actionUpgrade {
@@ -344,12 +350,46 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
 
+	// Execute the staged copy before placing it (PLAT-001a W1). A checksum proves
+	// the bytes are the release's, not that they run here: a linux-amd64 asset on
+	// darwin/arm64 passes the checksum, fails exec, and used to land in Dest ahead
+	// of a working copy on PATH. Staged under its command name so it runs as it
+	// will once placed (.exe on Windows).
+	staged := filepath.Join(tmp, "stage", binFilename(t.Name, in.GOOS))
+	if err := placeBinary(assetPath, staged); err != nil {
+		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
+	}
+	if err := checkProbed(t, ProbeVersion(staged, in.Probe), "the downloaded "+asset+" does not run on "+in.GOOS+"/"+in.GOARCH); err != nil {
+		return Skipped, err
+	}
+
 	dst := filepath.Join(in.Dest, binFilename(t.Name, in.GOOS))
-	if err := placeBinary(assetPath, dst); err != nil {
+	if err := placeBinary(staged, dst); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s to %s\n", t.Name, t.Version, res, dst)
 	return res, nil
+}
+
+// verifyOnPath is the post-condition of a package-manager install: the manager
+// exiting 0 is not the tool being usable. Its global bin dir may be missing from
+// PATH, or an older copy earlier on PATH may shadow the new one; either way the
+// next command would not get the pinned tool, so neither is a success.
+func (in *Installer) verifyOnPath(t Tool, manager string) error {
+	return checkProbed(t, in.current(t), manager+" exited 0 but "+t.Name+" does not run on PATH (is "+manager+"'s global bin dir on PATH?)")
+}
+
+// checkProbed turns a post-install probe into the install's verdict: no version
+// means the tool does not run (absentMsg says why), and a version below the pin
+// means something other than the pinned build answers.
+func checkProbed(t Tool, version, absentMsg string) error {
+	if version == "" {
+		return fmt.Errorf("%s: %s", t.Name, absentMsg)
+	}
+	if !atLeast(version, t.Version) {
+		return fmt.Errorf("%s: reports %s after install, below the pin %s", t.Name, version, t.Version)
+	}
+	return nil
 }
 
 // releaseURL builds the GitHub release download URL: <base>/<repo>/releases/download/v<version>/<file>.
