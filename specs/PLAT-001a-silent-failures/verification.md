@@ -19,6 +19,15 @@ created: "2026-10-05"
   | `sops-v{version}.darwin.{goarch}` (correct) | installed, exit 0 | installed, exit 0, `sops 3.13.1` runs |
   | `sops-v{version}.linux.{goarch}` (the F-030 mistake) | **installed, exit 0**; places an ELF; `exec format error` on first use | `the downloaded sops-v3.13.1.linux.arm64 does not run on darwin/arm64`, exit 1, nothing placed |
 
+### W3
+
+- [x] AC5: `tests/bash32-portable.bats`. It is red on `main` (6 sites across 4 scripts) and green on the branch. Its self-test checks that the pattern catches each construct and spares 3.2 code.
+- [x] AC5: `/bin/bash scripts/compile-harness.sh --check` on macOS bash 3.2.57. `main` dies with `line 1439: mapfile: command not found`; the branch prints `[check] OK: no harness drift`.
+- [x] AC6: the 15 bats files that exercise compile-harness pass 481/485 on darwin. The 4 left also fail on `main` and are outside W3. Two read this machine's real `~/.gemini` (F-008); two are the over-cap char/byte warning on darwin (F-054 triage).
+- [x] Ported scripts keep their behaviour:
+  - `nan-quality-bench.sh`: the 4 prompt literals are byte-identical to `main` and come out in the same order.
+  - `pin-actions.sh`: with a stub `gh` under bash 3.2, a repeated key makes no second API call and an unresolvable ref stays empty.
+
 ## Test status
 
 - `cd cli && go build ./... && go vet ./... && go test ./...`: all packages ok (darwin/arm64).

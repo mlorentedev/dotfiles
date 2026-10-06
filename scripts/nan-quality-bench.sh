@@ -27,8 +27,12 @@ BASE_URL="${NAN_BASE_URL:-https://api.nan.builders/v1}"
 MODELS=(qwen3.6 gemma4 deepseek-v4-flash)
 
 # Representative prompts: real workloads, not toy.
-declare -A PROMPTS=(
-    [01-code-review]="Revisa este código Go y di si tiene problemas de concurrencia. Sé conciso:
+# Representative prompts as two parallel indexed arrays (name, text), not an
+# associative array: macOS bash 3.2 has none (ADR-003, PLAT-001 W3).
+PROMPT_NAMES=()
+PROMPT_TEXTS=()
+add_prompt() { PROMPT_NAMES+=("$1"); PROMPT_TEXTS+=("$2"); }
+add_prompt 01-code-review "Revisa este código Go y di si tiene problemas de concurrencia. Sé conciso:
 \`\`\`go
 type Counter struct { count int }
 func (c *Counter) Inc() { c.count++ }
@@ -39,8 +43,8 @@ func main() {
     fmt.Println(c.count)
 }
 \`\`\`"
-    [02-architecture]="Diseña en 3 párrafos la arquitectura de un sistema de pagos que: (1) acepta tarjeta y transferencia, (2) procesa 1000 tps, (3) cumple PCI-DSS. Habla de servicios, base de datos, y un trade-off importante."
-    [03-refactor]="Refactoriza esta función Python para mejor legibilidad SIN cambiar el comportamiento. Devuelve solo el código:
+add_prompt 02-architecture "Diseña en 3 párrafos la arquitectura de un sistema de pagos que: (1) acepta tarjeta y transferencia, (2) procesa 1000 tps, (3) cumple PCI-DSS. Habla de servicios, base de datos, y un trade-off importante."
+add_prompt 03-refactor "Refactoriza esta función Python para mejor legibilidad SIN cambiar el comportamiento. Devuelve solo el código:
 \`\`\`python
 def f(l):
     r=[]
@@ -49,22 +53,22 @@ def f(l):
             r.append(l[i]*2)
     return r
 \`\`\`"
-    [04-debug]="Tengo un test que falla intermitentemente solo en CI, nunca local. Es un test de integración con Postgres. ¿Cuáles son las 3 causas más probables y cómo las debugeo? Sé conciso."
-)
+add_prompt 04-debug "Tengo un test que falla intermitentemente solo en CI, nunca local. Es un test de integración con Postgres. ¿Cuáles son las 3 causas más probables y cómo las debugeo? Sé conciso."
 
 echo "Output dir: $OUT"
 echo "Models: ${MODELS[*]}"
-echo "Prompts: ${#PROMPTS[@]}"
+echo "Prompts: ${#PROMPT_NAMES[@]}"
 echo ""
 
 # Save prompts
-for name in "${!PROMPTS[@]}"; do
-    printf '%s\n' "${PROMPTS[$name]}" > "$OUT/prompt-$name.txt"
+for i in "${!PROMPT_NAMES[@]}"; do
+    printf '%s\n' "${PROMPT_TEXTS[$i]}" > "$OUT/prompt-${PROMPT_NAMES[$i]}.txt"
 done
 
 # Run each prompt × model with throttle (avoid 100rpm/5concurrent rate limit)
-for prompt_name in $(printf '%s\n' "${!PROMPTS[@]}" | sort); do
-    prompt="${PROMPTS[$prompt_name]}"
+for i in "${!PROMPT_NAMES[@]}"; do
+    prompt_name="${PROMPT_NAMES[$i]}"
+    prompt="${PROMPT_TEXTS[$i]}"
     echo "========================================================"
     echo "[$prompt_name]"
     echo "========================================================"

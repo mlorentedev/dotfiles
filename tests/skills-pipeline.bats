@@ -358,7 +358,7 @@ path_without_copilot() {
     local victim="harness/skills/test/SKILL.md" backup
     backup="$(mktemp)"
     cp "$victim" "$backup"
-    sed -i '/^owner: /d' "$victim"
+    sed -i.bak '/^owner: /d' "$victim" && rm -f "$victim.bak"
     run bash scripts/compile-harness.sh --check
     cp "$backup" "$victim"; rm -f "$backup"
     [ "$status" -ne 0 ]

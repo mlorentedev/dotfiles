@@ -19,5 +19,19 @@
     "verification": "cd cli && go test ./internal/tools/ ./internal/cmd/ -run 'TestInstall|TestRunToolsInstall|TestDecideAction' -count=1",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001a-silent-failures-f4",
+    "behavior": "AC5: no shell file bash runs uses a bash-4-only construct (static guard, every OS)",
+    "verification": "bats tests/bash32-portable.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001a-silent-failures-f5",
+    "behavior": "AC5: compile-harness.sh --check passes under the system bash (3.2 on macOS)",
+    "verification": "/bin/bash scripts/compile-harness.sh --check",
+    "state": "pending",
+    "evidence": ""
   }
 ]
