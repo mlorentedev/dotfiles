@@ -10,18 +10,25 @@ setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 }
 
-# bash-4+ only: mapfile/readarray, associative arrays and namerefs, case-changing
-# expansions, the |& and &>> redirections, coproc and the ;;& / ;& case fallthroughs.
-BASH4_ONLY='(^|[^[:alnum:]_])(mapfile|readarray|coproc)([^[:alnum:]_]|$)|(declare|local|typeset)[[:space:]]+-[[:alpha:]]*[An]|\$\{[[:alpha:]_][[:alnum:]_]*(\[[^]]*\])?(,,?|\^\^?)\}|&>>|\|&|;;&|;&'
+# Not in bash 3.2: mapfile/readarray, associative arrays, namerefs and declare -g
+# (4.2), case-changing and @-operator expansions (4.4), [[ -v ]] (4.2), the |& and
+# &>> redirections, coproc, and the ;;& / ;& case fallthroughs (a ;& only at the
+# end of a case arm, so a bracket expression like [^|;&] is not one).
+BASH4_ONLY='(^|[^[:alnum:]_])(mapfile|readarray|coproc)([^[:alnum:]_]|$)|(declare|local|typeset)[[:space:]]+-[[:alpha:]]*[Ang]|\$\{[[:alpha:]_][[:alnum:]_]*(\[[^]]*\])?(,,?|\^\^?|@[[:alpha:]])\}|\[\[[[:space:]]+-v[[:space:]]|&>>|\|&|;;&|[^;[];&[[:space:]]*$'
 
 # Every shell file bash runs: the scripts dir, the root bootstrap scripts, the
-# global git hooks and their library, and the bash rc file. .zsh/ is zsh-only.
+# global git hooks and their library, the bash rc file, and the test suite itself
+# (bats sources every .bats file with the bash on PATH, 3.2 on a Mac). .zsh/ is
+# zsh-only, and this file is skipped because its pattern table names every
+# construct on purpose.
 bash_files() {
     local f
     for f in "$DOTFILES_DIR"/scripts/*.sh "$DOTFILES_DIR"/setup-linux.sh \
              "$DOTFILES_DIR"/install.sh "$DOTFILES_DIR"/.bashrc \
-             "$DOTFILES_DIR"/git-hooks/* "$DOTFILES_DIR"/git-hooks/lib/*.sh; do
+             "$DOTFILES_DIR"/git-hooks/* "$DOTFILES_DIR"/git-hooks/lib/*.sh \
+             "$DOTFILES_DIR"/tests/*.bats "$DOTFILES_DIR"/tests/*.bash; do
         [[ -f "$f" ]] || continue
+        [[ "$f" -ef "$BATS_TEST_FILENAME" ]] && continue
         case "$(head -n 1 "$f")" in
             '#!'*zsh*) continue ;;
         esac
@@ -42,17 +49,21 @@ offenders() {
     run bash_files
     [[ $status -eq 0 ]]
     [[ $(printf '%s\n' "$output" | grep -c 'compile-harness.sh') -eq 1 ]]
+    [[ $(printf '%s\n' "$output" | grep -c 'tests/compile-harness.bats') -eq 1 ]]
+    [[ $(printf '%s\n' "$output" | grep -c 'bash32-portable.bats') -eq 0 ]]
     [[ $(printf '%s\n' "$output" | wc -l) -gt 20 ]]
 }
 
 @test "the pattern catches each bash-4-only construct and spares bash 3.2 code" {
     for bad in 'mapfile -t ids < <(jq .)' 'readarray x' 'declare -A map' \
                'local -n ref=$1' 'echo ${name,,}' 'echo ${name^^}' 'cmd &>> log' \
-               'cmd |& tee' 'coproc foo'; do
+               'cmd |& tee' 'coproc foo' 'declare -g VAR=x' 'local -A eol_of text_of' \
+               '[[ -v name ]]' 'echo ${name@Q}' '    a) echo x ;&'; do
         printf '%s\n' "$bad" | grep -qE "$BASH4_ONLY" || { echo "missed: $bad"; return 1; }
     done
     for ok in 'read_array ids < <(jq .)' 'local -a list' 'echo ${name}' \
-              'cmd >>log 2>&1' 'x="mapfiles"' 'declare -r CONST=1'; do
+              'cmd >>log 2>&1' 'x="mapfiles"' 'declare -r CONST=1' \
+              "grep -E 'install[^|;&]*age'" 'echo "${name:-x}"' 'a) echo x ;;'; do
         if printf '%s\n' "$ok" | grep -qE "$BASH4_ONLY"; then echo "false positive: $ok"; return 1; fi
     done
 }

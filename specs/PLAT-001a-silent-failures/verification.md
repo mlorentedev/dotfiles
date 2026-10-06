@@ -23,9 +23,13 @@ created: "2026-10-05"
 
 - [x] AC5: `tests/bash32-portable.bats`. It is red on `main` (6 sites across 4 scripts) and green on the branch. Its self-test checks that the pattern catches each construct and spares 3.2 code.
 - [x] AC5: `/bin/bash scripts/compile-harness.sh --check` on macOS bash 3.2.57. `main` dies with `line 1439: mapfile: command not found`; the branch prints `[check] OK: no harness drift`.
-- [x] AC6: the 15 bats files that exercise compile-harness pass 481/485 on darwin. The 4 left also fail on `main` and are outside W3. Two read this machine's real `~/.gemini` (F-008); two are the over-cap char/byte warning on darwin (F-054 triage).
+- [x] AC6: the 17 affected bats files (the 15 that exercise compile-harness, plus the two ported eol and stub-pairing suites) pass 489/493 on darwin. The 4 left also fail on `main` and are outside W3. Two read this machine's real `~/.gemini` (F-008); two are the over-cap char/byte warning on darwin (F-054 triage).
+- [x] Review round (pr-agent on #2015):
+  - The guard now also scans `tests/*.bats` and `tests/*.bash`, since bats sources them with the bash on PATH, which is 3.2 on this Mac (`bash --version` measured). That found `local -A` in `gitattributes-eol.bats` and `stub-real-pairing.bats`, which failed on darwin with `local: -A: invalid option` (part of F-054). Both are ported and pass on 3.2. A mutation that adds an extensionless file with no eol rule is still caught.
+  - The pattern also covers `declare -g`, `[[ -v ]]` and `${var@op}` (bash 4.2/4.4). The `;&` fallthrough only matches at the end of a case arm, so the bracket expression `[^|;&]` in `ci-age-pin.bats` is no longer a false positive. The guard skips its own file.
+  - `nan-quality-bench.sh` no longer uses `${!arr[@]}`, which is a `bad substitution` in zsh. The names are now the positional parameters and the texts come from a `case`. bash 3.2 and zsh produce byte-identical output, and the evaluated texts equal `main`'s.
 - [x] Ported scripts keep their behaviour:
-  - `nan-quality-bench.sh`: the 4 prompt literals are byte-identical to `main` and come out in the same order.
+  - `nan-quality-bench.sh`: the 4 prompts are identical to `main` and come out in the same order, under bash 3.2 and zsh.
   - `pin-actions.sh`: with a stub `gh` under bash 3.2, a repeated key makes no second API call and an unresolvable ref stays empty.
 
 ## Test status
