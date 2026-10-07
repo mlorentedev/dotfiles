@@ -112,7 +112,9 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		return Result{}, err
 	}
 	res := Result{HeadSHA: f.HeadSHA, Reasons: Decide(f)}
-	if o.UpdateBranch && onlyBehind(res.Reasons) {
+	// Again while the base moves under the new head's CI, which a busy queue
+	// does: one update left the PR behind the next merge (#2041).
+	for i := 0; o.UpdateBranch && onlyBehind(res.Reasons) && i < maxUpdates; i++ {
 		// A merge of the base, not a rebase: one merge commit, which the
 		// reviewer's push gate does not count, and the squash flattens anyway.
 		if _, err := gh("pr", "update-branch", n); err != nil {
@@ -182,6 +184,10 @@ func restoreDependents(gh ghFunc, moved []int, head string) error {
 	}
 	return errors.Join(errs...)
 }
+
+// maxUpdates bounds --update-branch: a base that keeps moving is a refusal
+// that names BEHIND, not an endless chase.
+const maxUpdates = 3
 
 func onlyBehind(reasons []string) bool {
 	return len(reasons) == 1 && reasons[0] == "merge state is BEHIND"

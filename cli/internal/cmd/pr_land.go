@@ -69,7 +69,8 @@ GitHub closes a PR whose base branch is deleted. The merge is a squash with
 one condition that time alone cannot fix: when BEHIND is the only reason
 against the PR, it merges the base into the branch (a merge, not a rebase, so
 the reviewer's push gate does not re-review), waits for the new CI and decides
-again on the new head. A refusal lists every failed condition and exits 1.`,
+again on the new head. A base that moves again during that wait is merged in
+again, up to three times. A refusal lists every failed condition and exits 1.`,
 		Example:       "  dotf pr land 2030 --wait",
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,

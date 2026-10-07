@@ -217,6 +217,72 @@ func TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead(t *testing.T) {
 	}
 }
 
+// Another PR lands on the base while the updated head's CI runs, so the PR is
+// behind again when its checks go green: it is updated again, not given up on.
+func TestLand_UpdateBranchUpdatesAgainWhenTheBaseMovesDuringTheWait(t *testing.T) {
+	behind := strings.Replace(readyView, `"CLEAN"`, `"BEHIND"`, 1)
+	views := []string{
+		strings.Replace(behind, "abc123", "def456", 1),
+		strings.Replace(readyView, "abc123", "fed789", 1),
+	}
+	view := behind
+	var calls []string
+	run := func(_ context.Context, args ...string) ([]byte, error) {
+		line := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(line, "pr view"):
+			return []byte(view), nil
+		case strings.HasPrefix(line, "pr update-branch"):
+			calls = append(calls, line)
+			view, views = views[0], views[1:]
+			return nil, nil
+		case strings.HasPrefix(line, "pr checks") && strings.Contains(line, "--json"):
+			return []byte(greenChecks), nil
+		case strings.HasPrefix(line, "pr list"):
+			return []byte(`[]`), nil
+		case strings.HasPrefix(line, "pr merge"):
+			calls = append(calls, line)
+		}
+		return nil, nil
+	}
+	o := Options{Run: run, Untriaged: noneUntriaged, UpdateBranch: true, Sleep: func(time.Duration) {}}
+
+	res, err := Land(context.Background(), o, 30)
+	if err != nil || !res.Merged {
+		t.Fatalf("want two updates then a merge, got %+v, %v", res, err)
+	}
+	want := "pr update-branch 30\npr update-branch 30\npr merge 30 --squash --delete-branch --match-head-commit fed789"
+	if got := strings.Join(calls, "\n"); got != want {
+		t.Errorf("calls:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// A base that never stops moving is a refusal after maxUpdates, not a loop.
+func TestLand_UpdateBranchGivesUpAfterMaxUpdates(t *testing.T) {
+	behind := strings.Replace(readyView, `"CLEAN"`, `"BEHIND"`, 1)
+	updates := 0
+	run := func(_ context.Context, args ...string) ([]byte, error) {
+		line := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(line, "pr view"):
+			return []byte(behind), nil
+		case strings.HasPrefix(line, "pr update-branch"):
+			updates++
+		case strings.HasPrefix(line, "pr checks") && strings.Contains(line, "--json"):
+			return []byte(greenChecks), nil
+		case strings.HasPrefix(line, "pr merge"):
+			t.Error("merged a PR that is still behind")
+		}
+		return nil, nil
+	}
+	o := Options{Run: run, Untriaged: noneUntriaged, UpdateBranch: true, Sleep: func(time.Duration) {}}
+
+	res, err := Land(context.Background(), o, 30)
+	if err != nil || res.Merged || !onlyBehind(res.Reasons) || updates != maxUpdates {
+		t.Errorf("want a BEHIND refusal after %d updates, got %+v, %v, %d updates", maxUpdates, res, err, updates)
+	}
+}
+
 // Behind AND another failing condition: updating cannot make it landable, so
 // nothing is pushed.
 func TestLand_UpdateBranchDoesNotTouchAPRThatFailsForAnotherReason(t *testing.T) {
