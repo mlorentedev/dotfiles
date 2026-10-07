@@ -325,3 +325,88 @@ func TestSessionEndLeavesAnAuthoredJournalByteIdentical(t *testing.T) {
 		t.Errorf("the authored journal was changed:\n--- got ---\n%s\n--- want ---\n%s", got, authored)
 	}
 }
+
+// MEMORY-012 (#1920): the fallback journal is named for one thread, so it holds
+// that thread only. It used to copy the whole section, every peer's handoff
+// included, into a record named for one of them.
+func TestSessionEndArchivesOnlyItsOwnThread(t *testing.T) {
+	const memory = "# M\n\n## Session Handoff\n\n" +
+		"### thread: feat-a (writer: claude)\n\nfrom a\n\n" +
+		"### thread: feat-b (writer: claude)\n\nfrom b\n\n" +
+		"### thread: feat-c (writer: pi)\n\nfrom pi on c\n\n" +
+		"### thread: feat-c+claude (writer: claude)\n\nfrom claude on c\n\n" +
+		"### thread: feat-d (writer: pi)\n\nfrom pi on d\n\n" +
+		"## Index\n\n- tail\n"
+	for _, tc := range []struct {
+		branch, want string
+		others       []string
+	}{
+		{"feat/a", "from a", []string{"from b", "from pi on c", "from claude on c", "- tail"}},
+		{"feat/b", "from b", []string{"from a", "from pi on c", "from claude on c"}},
+		// Claude's fork of a key pi holds is Claude's thread.
+		{"feat/c", "from claude on c", []string{"from pi on c", "from a", "from b"}},
+		// A key only another agent wrote is not this session's to archive.
+		{"feat/d", "", nil},
+		// A thread this session never wrote archives nothing.
+		{"feat/none", "", nil},
+	} {
+		t.Run(tc.branch, func(t *testing.T) {
+			vault := t.TempDir()
+			writeMemory(t, vault, memory)
+			wt := gitFixture(t, "proj", "wt", tc.branch)
+			payload, err := json.Marshal(map[string]string{"cwd": wt, "session_id": "s"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			written, err := SessionEnd(payload, vault, fixedNow)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if written != "" {
+					t.Fatalf("archived %s for a thread this session does not own", written)
+				}
+				return
+			}
+			got := readFileT(t, written)
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("own thread missing (%q):\n%s", tc.want, got)
+			}
+			for _, o := range tc.others {
+				if strings.Contains(got, o) {
+					t.Errorf("record carries %q, which is not this thread's:\n%s", o, got)
+				}
+			}
+		})
+	}
+}
+
+// A second session ending on the same thread and day keeps the first record:
+// scoping the block did not loosen O_EXCL's refusal to replace one (#1620).
+func TestSessionEndThreadScopedArchiveKeepsNoOverwrite(t *testing.T) {
+	vault := t.TempDir()
+	writeMemory(t, vault, "# M\n\n## Session Handoff\n\n### thread: feat-a (writer: claude)\n\nfirst\n")
+	wt := gitFixture(t, "proj", "wt", "feat/a")
+	payload, _ := json.Marshal(map[string]string{"cwd": wt, "session_id": "s1"})
+	first, err := SessionEnd(payload, vault, fixedNow)
+	if err != nil || first == "" {
+		t.Fatalf("first archive: %q, %v", first, err)
+	}
+	writeMemory(t, vault, "# M\n\n## Session Handoff\n\n### thread: feat-a (writer: claude)\n\nsecond\n")
+	again, err := SessionEnd(payload, vault, fixedNow)
+	if err != nil || again != "" {
+		t.Fatalf("second archive replaced the first: %q, %v", again, err)
+	}
+	if got := readFileT(t, first); !strings.Contains(got, "first") || strings.Contains(got, "second") {
+		t.Errorf("the first record changed:\n%s", got)
+	}
+}
+
+func readFileT(t *testing.T, p string) string {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}

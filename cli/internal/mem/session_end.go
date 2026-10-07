@@ -88,7 +88,8 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 		return "", nil // absent / unreadable MEMORY.md -> no-op
 	}
 
-	block := extractHandoffBlock(string(content))
+	thread := ThreadKey(p.Cwd)
+	block := threadHandoffBlock(string(content), thread, sessionEndAgent)
 	if strings.TrimSpace(block) == "" {
 		return "", nil // trivial session -> no-op
 	}
@@ -122,7 +123,7 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	// block, reporting success. O_EXCL makes the hook write only where no journal
 	// exists yet. A later session on the same day and thread keeps the first
 	// record; the block it would have copied is still in MEMORY.md and its history.
-	out := filepath.Join(outDir, JournalName(date, project, "claude", ThreadKey(p.Cwd)))
+	out := filepath.Join(outDir, JournalName(date, project, sessionEndAgent, thread))
 	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if errors.Is(err, fs.ErrExist) {
 		return "", nil // a journal is already there: not ours to replace
@@ -140,6 +141,57 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 		return "", err
 	}
 	return out, nil
+}
+
+// sessionEndAgent is the writer the fallback journal is named for. The hook
+// payload carries no agent, so it is Claude's (MEMORY-015, #1929, carries it).
+const sessionEndAgent = "claude"
+
+// threadHandoffBlock is what a session's fallback journal archives: the
+// session's OWN thread, because the journal is named for that thread
+// (MEMORY-012, #1920). Archiving the whole section copied every peer's handoff
+// into a record named for one thread, so a fallback journal held duplicated and
+// unrelated work.
+//
+// The block is the thread written under this agent's fork (`<key>+<agent>`)
+// when there is one, else the key's own block unless another agent's stamp is
+// on it: the same ownership rule WriteThreadAs applies when it writes.
+// Ownership is per agent, not per session: a thread is a line of work (the
+// branch), so a later session of the same agent on that branch archives the
+// block an earlier one wrote. A thread no block of this agent holds archives
+// nothing, which is the no-op the contract already gives a trivial session.
+//
+// A section with no thread marker at all is the pre-thread format, one shared
+// handoff, and is archived whole as it always was. A line that opens with a
+// thread marker is structure, never content: handoff-write refuses one in a
+// body (MEMORY-014, #1928), so its presence decides the format.
+func threadHandoffBlock(content, key, agent string) string {
+	lines := strings.Split(content, "\n")
+	start, end := handoffSection(lines)
+	if start < 0 {
+		return ""
+	}
+	threaded := false
+	for _, l := range lines[start+1 : end] {
+		if _, ok := threadHeadingKey(l); ok {
+			threaded = true
+			break
+		}
+	}
+	if !threaded {
+		return extractHandoffBlock(content)
+	}
+	for _, k := range []string{key + "+" + agent, key} {
+		s, e := threadSpan(lines, start, end, k)
+		if s < 0 {
+			continue
+		}
+		if m := writerStamp.FindStringSubmatch(lines[s]); m != nil && m[1] != agent {
+			continue // another agent's block: not this session's to archive
+		}
+		return strings.Join(trimBlankEdges(lines[s:e]), "\n")
+	}
+	return ""
 }
 
 // extractHandoffBlock returns the lines after a "## Session Handoff" heading up to
