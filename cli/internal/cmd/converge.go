@@ -46,7 +46,11 @@ func newConvergeCmd() *cobra.Command {
 			if plan {
 				return err
 			}
-			path := filepath.Join(env.StateDir(), "converge", "last.json")
+			state, serr := env.StateDir()
+			if serr != nil {
+				return errors.Join(err, fmt.Errorf("writing the converge report: %w", serr))
+			}
+			path := filepath.Join(state, "converge", "last.json")
 			if werr := converge.WriteReport(path, rep, err); werr != nil {
 				return errors.Join(err, fmt.Errorf("writing the converge report: %w", werr))
 			}

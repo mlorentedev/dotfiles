@@ -26,7 +26,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (PR 3, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./... -count=1` -> ok; golangci-lint 2.12.2 -> 0 issues; feature f3 -> PASS
 - `TestReadmeHasNoInternalReferences` caught an ADR id in the new `converge` README section before push; removed
 - Manual run (PR 3): `dotf converge` on the Mac printed `report: ~/.local/state/dotfiles/converge/last.json`; the file holds `"result": "ok"`, `"changed": 0`, `"goos": "darwin"` and the `records-mirror` entry with its detail
-- Review hardening (PR 3): `env.Home()` falls back to the user database when HOME and USERPROFILE are both empty, so the report path (and every path built on Home) is never relative to the working directory; test `TestHome_FallsBackToTheUserDatabase`
+- Review hardening (PR 3): `env.Home()` falls back to the user database when HOME and USERPROFILE are both empty (`TestHome_FallsBackToTheUserDatabase`), and `env.StateDir()` returns an error instead of a path relative to the working directory when no absolute home resolves, or when XDG_STATE_HOME is relative (`TestStateDir_RefusesWhenNoAbsoluteHomeResolves`, `TestStateDir_IgnoresARelativeXDGStateHome`). The converge apply fails loudly on it; the skill gate fails open with the reason on stderr
 
 ## Decisions made during implementation
 

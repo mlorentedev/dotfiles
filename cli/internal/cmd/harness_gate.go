@@ -76,7 +76,15 @@ A blocked call is answered "deny" with the reason.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload, _ := io.ReadAll(cmd.InOrStdin())
 			if stateDir == "" {
-				stateDir = env.StateDir()
+				dir, err := env.StateDir()
+				if err != nil {
+					// Fail open, like an unreadable payload: a gate that blocks on
+					// its own setup blocks every call. Nothing can be recorded
+					// without a state dir, so the reason goes to stderr.
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow:", err)
+					return gateAnswer(cmd.OutOrStdout(), harnessName, false, "")
+				}
+				stateDir = dir
 			}
 			// One closure, used by every exit below, because the requirement is
 			// that NO path returns without leaving a record. Writing it at each
