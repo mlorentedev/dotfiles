@@ -430,6 +430,53 @@ setup() {
     [ "$status" -eq 0 ] || { echo "a setup twin installs a catalog-owned npm tool: $output"; false; }
 }
 
+# The scan's own contract, on fixtures rather than on the twins, so it holds
+# when the twins carry no global npm install at all (ADR-036's end state).
+@test "npm-global-scan: every hostile spelling fails and every benign one passes (#1864)" {
+    scan="$DOTFILES_DIR/tests/lib/npm-global-scan.py"
+    fixture="$BATS_TEST_TMPDIR/twin"
+    hostile=(
+        'npm install -g yarn@1.22.22'
+        'npm install -g "yarn@${YARN_VERSION}" || true'
+        'npm i --global @bitwarden/cli@2025.1.0'
+        'npm install -g --ignore-scripts @github/copilot;'
+        $'npm install -g \\\n    yarn@1.22.22'
+        $'& npm install -g `\n    opencode-ai'
+        'npm -g install yarn'
+        'npm --prefix /x install -g yarn'
+        'npm dedupe && npm install -g yarn'
+        'X=$(npm install -g yarn@1.22.22)'
+        'npm.cmd install -g opencode-ai'
+        $'export YARN_ALT=yarn\nnpm install -g "$YARN_ALT"'
+        $'BASE=yarn\nTOOL=$BASE\nnpm install -g "$TOOL"'
+        $'$yarnPkg = "yarn@1.22.22"\n& npm install -g $yarnPkg'
+        $'if ($x) { $alt = "opencode-ai" }\n& npm install -g $alt'
+        'npm install -g "$NEVER_ASSIGNED"'
+        $'TOOL=$1\nnpm install -g "$TOOL"'
+        'npm install -g $(cat pkgs)'
+        'npm install -g `cat pkgs`'
+        '& npm install -g $env:SOME_PKG'
+    )
+    benign=(
+        'npm install -g yarnish'
+        'npm install yarn'
+        '# was: npm install -g yarn'
+        'npm install -g foo || log_warning "yarn failed"'
+        'echo "nothing installs here"'
+        $'PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"\nnpm install -g --prefix "$HOME/.local" "$PI_PKG"'
+    )
+    for snippet in "${hostile[@]}"; do
+        printf '%s\n' "$snippet" >"$fixture"
+        run python3 "$scan" "$DOTFILES_DIR/packages.json" "$fixture"
+        [ "$status" -eq 1 ] || { echo "passed, but should fail: $snippet"; false; }
+    done
+    for snippet in "${benign[@]}"; do
+        printf '%s\n' "$snippet" >"$fixture"
+        run python3 "$scan" "$DOTFILES_DIR/packages.json" "$fixture"
+        [ "$status" -eq 0 ] || { echo "failed, but should pass: $snippet: $output"; false; }
+    done
+}
+
 # MEM-002: the claude-mem install-state assertions that lived in
 # cli/internal/doctor (checkClaudeMem / resolveClaudeMemHook) were removed with
 # the rest of the claude-mem wiring (ADR-016 Q2). `dotf doctor` no longer probes

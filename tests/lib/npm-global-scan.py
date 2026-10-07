@@ -10,23 +10,28 @@ This matches the property instead. For each global npm install command in a twin
 
 - continuation lines are joined first (a trailing backslash in sh, a trailing
   backtick in PowerShell), so a package on the next line is still seen;
+- every `npm` on a line starts a command, including one after `&&` and one
+  opening a command substitution (`X=$(npm install -g yarn)`);
 - the verb (`install`, `i`, `add`) may sit anywhere after `npm`, so
   `npm -g install yarn` counts, and the command ends at a shell operator;
 - the value of a flag that takes one (`--prefix "$HOME/.local"`) is not a
   package;
 - a `$var` argument is resolved through every assignment to it in the same file,
   `export`/`local`/`readonly` forms and PowerShell's `$x = if (..) { "a" } else
-  { "b" }` included: every string literal on the right-hand side is a candidate.
-  A variable with no assignment in the file FAILS the check rather than passing
-  it, since the guard cannot say what it installs.
+  { "b" }` included: every string literal on the right-hand side is a candidate,
+  and a value that is itself a variable is followed in turn. An argument that
+  cannot be followed (no assignment in the file, `$1`, `$env:X`, a command
+  substitution) FAILS the check rather than passing it, since the guard cannot
+  say what it installs.
 
 Comment lines are skipped. Usage:
 
     python3 tests/lib/npm-global-scan.py <packages.json> <twin>...
 
 Exit 0 with a count of the global installs checked, or 1 naming every offender.
-Exit 1 also when no global install with a package argument was found, so the
-scan cannot pass by matching nothing.
+A twin with no global npm install at all passes: that is ADR-036's end state.
+That the scan sees the spellings it claims to is pinned by the fixture test in
+tests/setup-linux.bats, not by requiring the twins to carry an install.
 """
 
 import json
@@ -90,21 +95,33 @@ def package(arg):
     return arg.split("@", 1)[0]
 
 
-def command_tokens(line):
-    """The tokens of the npm command on line, from `npm` to its end, or None."""
-    tokens = line.split()
-    for i, tok in enumerate(tokens):
-        if tok.strip("\"'&") in ("npm", "npm.cmd") or tok.endswith("/npm"):
-            out = []
-            for t in tokens[i + 1:]:
-                if t in OPERATORS or re.match(r"^\d?>", t):
-                    break
-                ends = t.endswith(";")
-                out.append(t.rstrip(";").strip("\"'()"))
-                if ends:
-                    break
-            return out
-    return None
+NPM_RE = re.compile(r"(?:^|[=(`&])npm(?:\.cmd)?$")
+
+
+def npm_commands(line):
+    """The tokens of every npm command on line, each from `npm` to its end.
+
+    A line can hold several (`npm dedupe && npm install -g x`), and npm can
+    open a command substitution (`X=$(npm install -g x)`), so every token that
+    ends in `npm` starts one.
+    """
+    tokens, out, i = line.split(), [], 0
+    while i < len(tokens):
+        if not (NPM_RE.search(tokens[i].strip("\"'")) or tokens[i].endswith("/npm")):
+            i += 1
+            continue
+        cmd, i = [], i + 1
+        while i < len(tokens):
+            t = tokens[i]
+            if t in OPERATORS or re.match(r"^\d?>", t):
+                break
+            i += 1
+            ends = t.endswith(";")
+            cmd.append(t.rstrip(";").strip("\"'()"))
+            if ends:
+                break
+        out.append(cmd)
+    return out
 
 
 def package_args(tokens):
@@ -126,15 +143,29 @@ def package_args(tokens):
     return args
 
 
-def candidates(arg, assigned):
-    """What arg may install; None when it is a variable with no assignment."""
+def candidates(arg, assigned, depth=0):
+    """What arg may install, or None when that cannot be known.
+
+    A variable resolves through its assignments, and a value that is itself a
+    variable resolves in turn. Unknown is anything that cannot be followed: a
+    variable with no assignment in the file, a positional or environment
+    parameter (`$1`, `$env:X`), a command substitution, or a chain too deep.
+    """
+    if arg.startswith("$(") or "`" in arg:
+        return None
     m = VAR_RE.match(arg)
     if not m:
-        return [arg]
+        return None if arg.startswith("$") else [arg]
     values = assigned.get(m.group(1).lower())
-    if not values:
+    if not values or depth >= 8:
         return None
-    return [v + m.group(2) for v in values]
+    out = []
+    for v in values:
+        resolved = candidates(v.strip("\"'") + m.group(2), assigned, depth + 1)
+        if resolved is None:
+            return None
+        out += resolved
+    return out
 
 
 def scan(owned, path):
@@ -144,20 +175,20 @@ def scan(owned, path):
     for n, line in lines:
         if line.lstrip().startswith("#"):
             continue
-        tokens = command_tokens(line)
-        args = package_args(tokens) if tokens is not None else None
-        if not args:
-            continue
-        seen += 1
-        for arg in args:
-            cands = candidates(arg, assigned)
-            if cands is None:
-                bad.append(f"{name}:{n}: {arg} has no assignment in the file, so what it installs is unknown")
+        for tokens in npm_commands(line):
+            args = package_args(tokens)
+            if not args:
                 continue
-            for c in cands:
-                pkg = package(c.strip("\"'"))
-                if pkg in owned:
-                    bad.append(f"{name}:{n}: {pkg}")
+            seen += 1
+            for arg in args:
+                cands = candidates(arg, assigned)
+                if cands is None:
+                    bad.append(f"{name}:{n}: what {arg} installs cannot be resolved from the file")
+                    continue
+                for c in cands:
+                    pkg = package(c.strip("\"'"))
+                    if pkg in owned:
+                        bad.append(f"{name}:{n}: {pkg}")
     return bad, seen
 
 
@@ -172,9 +203,6 @@ def main(argv):
         b, s = scan(owned, path)
         bad += b
         seen += s
-    if not seen:
-        print("no global npm install with a package argument in any twin, so the scan matched nothing real")
-        return 1
     if bad:
         print("\n".join(bad))
         return 1
