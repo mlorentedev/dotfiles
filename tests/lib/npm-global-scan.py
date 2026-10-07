@@ -21,10 +21,12 @@ This matches the property instead. For each global npm install command in a twin
   { "b" }` included: every string literal on the right-hand side is a candidate,
   and a value that is itself a variable is followed in turn. An argument that
   cannot be followed (no assignment in the file, `$1`, `$env:X`, a command
-  substitution) FAILS the check rather than passing it, since the guard cannot
-  say what it installs.
+  substitution, a `${VAR:-x}`-style expansion) FAILS the check rather than
+  passing it, since the guard cannot say what it installs;
+- variable names are case-sensitive in sh and case-insensitive in PowerShell,
+  so only a `.ps1` file's names are folded.
 
-Comment lines are skipped. Usage:
+Comment lines and trailing comments are skipped. Usage:
 
     python3 tests/lib/npm-global-scan.py <packages.json> <twin>...
 
@@ -49,7 +51,9 @@ ASSIGN_RE = re.compile(
     r"(?:^|[\s;{(])(?:export\s+|local\s+|readonly\s+|declare\s+(?:-\w+\s+)?)?"
     r"\$?([A-Za-z_]\w*)\s*=(?!=)\s*(.*)$")
 LITERAL_RE = re.compile(r"\"([^\"]*)\"|'([^']*)'")
-VAR_RE = re.compile(r"^\$\{?([A-Za-z_]\w*)\}?(.*)$")
+# `$VAR` or `${VAR}`, plus whatever follows it. Any other `${...}` form is an
+# expansion the scan does not evaluate, so it does not match and fails closed.
+VAR_RE = re.compile(r"^\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))(.*)$")
 
 
 def logical_lines(text):
@@ -69,8 +73,8 @@ def logical_lines(text):
         yield start, " ".join(buf)
 
 
-def assignments(lines):
-    """Map each lower-cased variable name to every value assigned to it."""
+def assignments(lines, key):
+    """Map each variable name, through key, to every value assigned to it."""
     values = {}
     for _, line in lines:
         if line.lstrip().startswith("#"):
@@ -83,7 +87,7 @@ def assignments(lines):
         bare = rhs.split()[0] if rhs.split() else ""
         if bare and bare[0] not in "\"'":
             cands.append(bare.rstrip(";"))
-        values.setdefault(m.group(1).lower(), []).extend(cands)
+        values.setdefault(key(m.group(1)), []).extend(cands)
     return values
 
 
@@ -113,7 +117,7 @@ def npm_commands(line):
         cmd, i = [], i + 1
         while i < len(tokens):
             t = tokens[i]
-            if t in OPERATORS or re.match(r"^\d?>", t):
+            if t in OPERATORS or t.startswith("#") or re.match(r"^\d?>", t):
                 break
             i += 1
             ends = t.endswith(";")
@@ -143,7 +147,7 @@ def package_args(tokens):
     return args
 
 
-def candidates(arg, assigned, depth=0):
+def candidates(arg, assigned, key, depth=0):
     """What arg may install, or None when that cannot be known.
 
     A variable resolves through its assignments, and a value that is itself a
@@ -156,12 +160,12 @@ def candidates(arg, assigned, depth=0):
     m = VAR_RE.match(arg)
     if not m:
         return None if arg.startswith("$") else [arg]
-    values = assigned.get(m.group(1).lower())
+    values = assigned.get(key(m.group(1) or m.group(2)))
     if not values or depth >= 8:
         return None
     out = []
     for v in values:
-        resolved = candidates(v.strip("\"'") + m.group(2), assigned, depth + 1)
+        resolved = candidates(v.strip("\"'") + m.group(3), assigned, key, depth + 1)
         if resolved is None:
             return None
         out += resolved
@@ -170,7 +174,9 @@ def candidates(arg, assigned, depth=0):
 
 def scan(owned, path):
     lines = list(logical_lines(open(path, encoding="utf-8").read()))
-    assigned = assignments(lines)
+    # PowerShell names are case-insensitive; sh names are not.
+    key = str.lower if path.lower().endswith(".ps1") else str
+    assigned = assignments(lines, key)
     bad, seen, name = [], 0, path.rsplit("/", 1)[-1]
     for n, line in lines:
         if line.lstrip().startswith("#"):
@@ -181,7 +187,7 @@ def scan(owned, path):
                 continue
             seen += 1
             for arg in args:
-                cands = candidates(arg, assigned)
+                cands = candidates(arg, assigned, key)
                 if cands is None:
                     bad.append(f"{name}:{n}: what {arg} installs cannot be resolved from the file")
                     continue

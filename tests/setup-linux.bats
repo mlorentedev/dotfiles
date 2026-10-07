@@ -456,6 +456,8 @@ setup() {
         'npm install -g $(cat pkgs)'
         'npm install -g `cat pkgs`'
         '& npm install -g $env:SOME_PKG'
+        $'TOOL=yarn\nnpm install -g "${TOOL:-x}"'
+        $'foo=unrelated\nnpm install -g "$FOO"'
     )
     benign=(
         'npm install -g yarnish'
@@ -463,6 +465,7 @@ setup() {
         '# was: npm install -g yarn'
         'npm install -g foo || log_warning "yarn failed"'
         'echo "nothing installs here"'
+        'npm install -g foo  # yarn would be the other choice'
         $'PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"\nnpm install -g --prefix "$HOME/.local" "$PI_PKG"'
     )
     # The hostile fixtures are hostile only while packages.json owns these
