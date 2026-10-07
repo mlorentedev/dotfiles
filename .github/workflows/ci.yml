@@ -494,6 +494,7 @@ jobs:
           "version=$($v.Trim())" >> $env:GITHUB_OUTPUT
           "prefix=$prefix" >> $env:GITHUB_OUTPUT
           "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+          Write-Output "pi CLI cache: prefix=$prefix image=$env:ImageVersion version=$($v.Trim())"
 
       - name: Restore the pinned pi CLI (pull requests; a lookup on main)
         id: picli-cache
