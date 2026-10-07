@@ -74,12 +74,18 @@ load 'lib/refute'
     [ "$(jq -r '.configs[] | select(.name=="copilot-mcp") | "\(.src) \(.dst) \(.strategy // "replace") \(.requires)"' "$MANIFEST")" = "ai/copilot/mcp-config.json {HOME}/.copilot/mcp-config.json replace copilot" ]
 }
 
-@test "neither setup copies ai/copilot by glob; both copy copilot-instructions.md explicitly (the JSON is dotf deploy's)" {
+@test "neither setup copies ai/copilot by glob; copilot-instructions.md is a gated presence entry (the JSON is dotf deploy's)" {
     # Measured on the invocation shape (the cp / Copy-Item line), not on any
     # mention: the comments name the old form on purpose.
     refute_grep 'cp -rf "\$CURRENT_DIR/ai/copilot/"\*' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'cp -f "$CURRENT_DIR/ai/copilot/copilot-instructions.md"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'Copy-Item "\$copilotSource\\\*"' "$DOTFILES_DIR/setup-windows.ps1"
+    # Linux and macOS: compile-harness.sh --deploy (and dotf converge) deploy it
+    # from agents.presence[], gated on copilot being on PATH (PLAT-001b), so the
+    # setup script no longer copies it.
+    [ "$(jq -r '.agents.presence[] | select(.agent=="copilot") | "\(.source) \(.requires_command)"' "$DOTFILES_DIR/harness/manifest.json")" = "ai/copilot/copilot-instructions.md copilot" ]
+    refute_grep 'cp -f "\$CURRENT_DIR/ai/copilot/copilot-instructions.md"' "$DOTFILES_DIR/setup-linux.sh"
+    # Windows keeps its explicit copy until the Go deploy of the instruction
+    # files ships in a release (PLAT-001b PR 2c).
     grep -qF 'Copy-Item "$copilotSource\copilot-instructions.md"' "$DOTFILES_DIR/setup-windows.ps1"
 }
 

@@ -39,20 +39,22 @@ created: "2026-10-06"
 - [x] [AC1] `cmd/converge.go`: `dotf converge [--plan] [--repo]`; a plan on an empty HOME writes nothing, a second apply reports 0 changed
 - [x] On the Mac: `go run ./cmd/dotf converge --plan` reports `records-mirror` with 70 files to write and leaves `~/.dotfiles` untouched
 
-### PR 2b — the agent instruction files, driven by `agents.presence[]` (#2016, #1843 B11)
+### PR 2b — the instructions-first records step: `records-harness` (#2016)
 
-> Pivot from the first plan: no `ai/deploy.json` entry. A new deploy field needs a manifest version the installed `dotf` cannot read (#1814 class), and a `replace` entry would rewrite the `AGENT-PRESENCE` region `dotf harness presence` owns on every run, so a second converge could never report zero changes (AC3). `harness/manifest.json` `agents.presence[]` already declares each instruction file (`source`, `file`, `requires_command`); it is the registry.
+> Second pivot, after reading `compile-harness.sh`: its `--deploy` already deploys every `agents.presence[]` instruction file, then the skill catalog and the presence regions, in the order they need, on Linux and macOS. 2b runs it as a reconciler with a Go plan and probe instead of porting it, so there is no new marker parser and no coupling to a `dotf` release. The Go port of `deploy_instructions` is PR 2c.
 
-- [ ] [AC2] Failing test, then the `records-instructions` reconciler: for each presence entry, the deployed file outside the `AGENT-PRESENCE` markers must equal `source`; a change writes `source` plus the existing region byte for byte; `requires_command` absent → `skipped`. It reuses the existing marker split, not a second parser
-- [ ] [AC3] Failing test: a HOME holding base plus region plans 0 changes
-- [ ] [AC2] The probe is "outside-marker content equals `source`", which subsumes the shell's `grep 'First, read AGENTS.md'` check
-- [ ] [AC2] `records-presence`: the presence injection in-process, after the instruction files (it skips a file that does not exist yet). It also runs on Linux, where `setup-linux.sh` never ran it
-- [ ] Delete the CLAUDE.md force-copy and the bulk `ai/claude/*` copy from both twins (ADR-020 §5). The opencode, pi and copilot copy blocks follow in their own B11 rows if the cap is reached
-- [ ] [AC2] Doctor FAIL when an agent binary is on PATH without its instruction file (#2016's guard; it covers copilot, whose file is deployed only once copilot exists)
+- [x] [AC2] Move doctor's region stripper to `harness.StripRegions` (one comparator for doctor and converge); `harness.PresenceTarget` gains `Source`
+- [x] [AC2] [AC3] Failing tests, then `records-harness` (linux, darwin): the plan counts instruction files that are missing or differ from their source outside the harness regions, honouring `requires_command`, and writes nothing; the apply runs `compile-harness.sh --deploy` through an injected runner (lesson 335), which fails loudly when none is wired; the probe requires every file current and every rendered presence region `current`
+- [x] [AC2] The apply runs the deploy even when the instruction files are current, so a changed skill record is deployed (skills are not planned yet)
+- [x] [AC2] Doctor: an installed agent without its instruction file is a FAIL naming both (#2016); the unconditional CLAUDE.md existence FAIL is removed, and AGY.md's is gated on `agy` being installed (#843)
+- [x] Delete from `setup-linux.sh` the CLAUDE.md force copy, the bulk `ai/claude/*` copy and the copilot-instructions copy: `compile-harness.sh --deploy`, already run by the script, deploys all three (ADR-020 §5). The bats tests that pinned the copies now pin the manifest entries
+- [x] On the Mac: `dotf converge` deployed `~/.claude/CLAUDE.md`, the opencode and pi instruction files and 33 skills; a second run reported `0 changed`; doctor went from 51 to 59 passing
 
-### PR 2c — skills and hook bindings
+### PR 2c — instruction files in Go, then the twins' copies go (F-064)
 
-- [ ] [AC2] `records-skills` (feature f11): `compile-harness.sh --deploy`, planned with `--check`, behind the shared seam that defaults to "not run" (lesson 335); recorded as a port target
+- [ ] Port `deploy_instructions` to Go (`dotf harness instructions`): a deployed region is deploy-only only when its begin line is absent from the source, so a changed enforced GENERATED region in the source is drift (F-064); `records-harness` plans and probes with it
+- [ ] Gated on the release that ships the subcommand and the `DOTF_VERSION` bump (#1814 class): `compile-harness.sh` delegates `deploy_instructions` to it, and `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for it
+- [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [ ] `records-bind`: the `harness bind` logic with its dry-run
 
 ### PR 3 — the persisted report (#1843 B7)
