@@ -45,6 +45,25 @@ type sessionEndPayload struct {
 // the ADR-025 cascade and retires the old hardcoded ~/Projects/knowledge literal,
 // #463); "" means no vault → no-op. now is injected for deterministic stamping.
 func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error) {
+	return SessionEndAs(payload, vaultPath, DefaultSessionEndAgent, now)
+}
+
+// DefaultSessionEndAgent is the writer a hook that names none is taken to be.
+// Claude's SessionEnd payload carries no agent, and its hook predates the
+// --agent flag, so an unnamed caller keeps the name it always had.
+const DefaultSessionEndAgent = "claude"
+
+// SessionEndAs is SessionEnd for a named agent (MEMORY-015, #1929). The agent
+// names the fallback journal, stamps its frontmatter, and decides which thread
+// block is this session's. It comes from the caller, never from the handoff
+// text: a body can say anything. Two agents ending sessions on one thread and
+// day therefore write two journals, where a hardcoded name made the second a
+// no-op and misattributed the first. An agent that is not one lower-case word
+// is refused, the rule WriteThreadAs applies, because the name becomes a path.
+func SessionEndAs(payload []byte, vaultPath, agent string, now time.Time) (string, error) {
+	if !writerName.MatchString(agent) {
+		return "", fmt.Errorf("agent %q: a writer is one lower-case word, such as claude or pi", agent)
+	}
 	if len(payload) == 0 || vaultPath == "" {
 		return "", nil
 	}
@@ -89,7 +108,7 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	}
 
 	thread := ThreadKey(p.Cwd)
-	block := threadHandoffBlock(string(content), thread, sessionEndAgent)
+	block := threadHandoffBlock(string(content), thread, agent)
 	if strings.TrimSpace(block) == "" {
 		return "", nil // trivial session -> no-op
 	}
@@ -123,7 +142,7 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	// block, reporting success. O_EXCL makes the hook write only where no journal
 	// exists yet. A later session on the same day and thread keeps the first
 	// record; the block it would have copied is still in MEMORY.md and its history.
-	out := filepath.Join(outDir, JournalName(date, project, sessionEndAgent, thread))
+	out := filepath.Join(outDir, JournalName(date, project, agent, thread))
 	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if errors.Is(err, fs.ErrExist) {
 		return "", nil // a journal is already there: not ours to replace
@@ -131,7 +150,7 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	if err != nil {
 		return "", err
 	}
-	if _, err := f.WriteString(buildRecord(date, project, sid, block)); err != nil {
+	if _, err := f.WriteString(buildRecord(date, project, agent, sid, block)); err != nil {
 		_ = f.Close()
 		_ = os.Remove(out) // never leave a half-written record where a journal belongs
 		return "", err
@@ -142,10 +161,6 @@ func SessionEnd(payload []byte, vaultPath string, now time.Time) (string, error)
 	}
 	return out, nil
 }
-
-// sessionEndAgent is the writer the fallback journal is named for. The hook
-// payload carries no agent, so it is Claude's (MEMORY-015, #1929, carries it).
-const sessionEndAgent = "claude"
 
 // threadHandoffBlock is what a session's fallback journal archives: the
 // session's OWN thread, because the journal is named for that thread
@@ -228,21 +243,21 @@ func isHandoffHeading(line string) bool {
 // The frontmatter satisfies the vault Frontmatter Law (id, type, status, created,
 // owner) with id/type/status as the first three keys, per handoff/SKILL.md §1b —
 // vault_health and vault-validate.py §1 both report a missing field as an error.
-func buildRecord(date, project, sid, block string) string {
+func buildRecord(date, project, agent, sid, block string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
-	fmt.Fprintf(&b, "id: \"session-%s-%s-claude\"\n", date, project)
+	fmt.Fprintf(&b, "id: \"session-%s-%s-%s\"\n", date, project, agent)
 	b.WriteString("type: session\n")
 	b.WriteString("status: active\n")
 	fmt.Fprintf(&b, "created: \"%s\"\n", date)
 	b.WriteString("owner: manu\n")
 	fmt.Fprintf(&b, "session_id: %s\n", sid)
-	b.WriteString("agent: claude\n")
+	fmt.Fprintf(&b, "agent: %s\n", agent)
 	fmt.Fprintf(&b, "project: %s\n", project)
 	fmt.Fprintf(&b, "date: \"%s\"\n", date)
 	fmt.Fprintf(&b, "tags: [session, handoff, %s]\n", project)
 	b.WriteString("---\n\n")
-	fmt.Fprintf(&b, "# Session %s — %s (claude)\n\n", date, project)
+	fmt.Fprintf(&b, "# Session %s — %s (%s)\n\n", date, project, agent)
 	b.WriteString(block)
 	b.WriteByte('\n')
 	return b.String()

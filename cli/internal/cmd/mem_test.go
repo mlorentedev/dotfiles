@@ -39,6 +39,48 @@ func TestMemSessionEnd_WritesRecordAndExitsZero(t *testing.T) {
 	}
 }
 
+// --agent names the record (MEMORY-015, #1929), and a refused one is reported
+// on stderr while the hook still exits 0: a misconfigured hook must say so, not
+// leave every session of that harness without a record in silence.
+func TestMemSessionEnd_AgentFlag(t *testing.T) {
+	vault := t.TempDir()
+	t.Setenv("VAULT_PATH", vault)
+	memDir := filepath.Join(vault, "10_projects", "proj", "memory")
+	if err := os.MkdirAll(memDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(memDir, "MEMORY.md"),
+		[]byte("## Session Handoff\n\nshipped it\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ agent, glob, stderr string }{
+		{"opencode", "*-proj-opencode.md", ""},
+		{"Not One Word", "*-proj-*.md", "one lower-case word"},
+	} {
+		var stderr bytes.Buffer
+		cmd := newMemCmd()
+		cmd.SetArgs([]string{"session-end", "--agent", tc.agent})
+		cmd.SetIn(bytes.NewBufferString(`{"cwd":"/x/proj","session_id":"s1"}`))
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(&stderr)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%s: session-end must exit 0, got %v", tc.agent, err)
+		}
+		matches, _ := filepath.Glob(filepath.Join(vault, "10_projects", "proj", "sessions", tc.glob))
+		if tc.stderr == "" && len(matches) != 1 {
+			t.Errorf("%s: want one record matching %s, got %v", tc.agent, tc.glob, matches)
+		}
+		// A refused agent writes nothing: the opencode record from the case
+		// before is the only one there.
+		if all, _ := filepath.Glob(filepath.Join(vault, "10_projects", "proj", "sessions", "*.md")); tc.stderr != "" && len(all) != 1 {
+			t.Errorf("%s: a refused agent must write no record, got %v", tc.agent, all)
+		}
+		if !strings.Contains(stderr.String(), tc.stderr) {
+			t.Errorf("%s: stderr %q lacks %q", tc.agent, stderr.String(), tc.stderr)
+		}
+	}
+}
+
 // TestMemSessionEnd_MalformedInputExitsZero pins the resilience contract: even
 // garbage on stdin must never crash the session (exit 0, no file).
 func TestMemSessionEnd_MalformedInputExitsZero(t *testing.T) {
