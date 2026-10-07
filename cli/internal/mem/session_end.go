@@ -155,12 +155,16 @@ const sessionEndAgent = "claude"
 //
 // The block is the thread written under this agent's fork (`<key>+<agent>`)
 // when there is one, else the key's own block unless another agent's stamp is
-// on it: the same ownership rule WriteThreadAs applies when it writes. A
-// thread this session never wrote archives nothing, which is the no-op the
-// contract already gives a trivial session.
+// on it: the same ownership rule WriteThreadAs applies when it writes.
+// Ownership is per agent, not per session: a thread is a line of work (the
+// branch), so a later session of the same agent on that branch archives the
+// block an earlier one wrote. A thread no block of this agent holds archives
+// nothing, which is the no-op the contract already gives a trivial session.
 //
 // A section with no thread marker at all is the pre-thread format, one shared
-// handoff, and is archived whole as it always was.
+// handoff, and is archived whole as it always was. A line that opens with a
+// thread marker is structure, never content: handoff-write refuses one in a
+// body (MEMORY-014, #1928), so its presence decides the format.
 func threadHandoffBlock(content, key, agent string) string {
 	lines := strings.Split(content, "\n")
 	start, end := handoffSection(lines)
