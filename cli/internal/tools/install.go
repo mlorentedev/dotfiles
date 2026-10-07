@@ -232,7 +232,10 @@ func (in *Installer) missingManager(t Tool) bool {
 func (in *Installer) installRelease(t Tool) (Result, error) {
 	asset := t.AssetName(in.GOOS, in.GOARCH)
 	if asset == "" {
-		return Skipped, fmt.Errorf("%s: no release asset for %s/%s", t.Name, in.GOOS, in.GOARCH)
+		// Plan reports this as unsupported; Install agrees, so the two cannot
+		// disagree and an entry for one platform never fails the others.
+		_, _ = fmt.Fprintf(in.Out, "%s: no release asset for %s/%s; skipping\n", t.Name, in.GOOS, in.GOARCH)
+		return Skipped, nil
 	}
 	sumsName := t.ChecksumsName(in.GOARCH)
 	if sumsName == "" {
@@ -473,7 +476,9 @@ func expectedChecksum(sumsPath, assetName string) (string, error) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[1] == assetName {
+		// sha256sum writes "*name" in binary mode, and a manifest generated
+		// from the release dir lists "./name" (mise's SHASUMS256.txt).
+		if len(fields) == 2 && strings.TrimPrefix(strings.TrimPrefix(fields[1], "*"), "./") == assetName {
 			return fields[0], nil
 		}
 	}
