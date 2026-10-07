@@ -97,3 +97,98 @@ func TestTurnCapHintNeedsAgentEnd(t *testing.T) {
 		t.Errorf("a run with no agent_end got a hint: %q", hint)
 	}
 }
+
+// archiveCapFixture is a repo whose pool holds one pi reviewer and a spec that
+// review was launched for: the sidecar names the reviewer, and the transcript
+// of that run sits beside it. withReview leaves the previous round's review.md
+// in place, unchanged since launch; without it the run left no review.md.
+func archiveCapFixture(t *testing.T, lastOutput int, withReview bool) (repoRoot, specDir string) {
+	t.Helper()
+	repoRoot = t.TempDir()
+	pool := `{"pool":[{"id":"nan/deepseek-v4-flash","runner":"pi","provider":"nan","model":"deepseek-v4-flash","role":"primary"}]}`
+	if err := os.MkdirAll(filepath.Join(repoRoot, "harness"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoRoot, ReviewerPoolFile), []byte(pool), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// "X" is the spec provenanceReviewDoc declares.
+	specDir = filepath.Join(repoRoot, "specs", "X")
+	if err := os.MkdirAll(specDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if withReview {
+		if err := os.WriteFile(filepath.Join(specDir, ReviewFile), []byte(provenanceReviewDoc), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := WriteReviewRequest(specDir, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
+		t.Fatal(err)
+	}
+	transcript, err := os.ReadFile(piTranscript(t, 25, lastOutput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Written through the launcher's own helper, so the test and the code
+	// cannot share a private assumption about where the transcript lives.
+	if err := os.WriteFile(TranscriptPath(repoRoot, "X"), transcript, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return repoRoot, specDir
+}
+
+// #2132: a detached review stopped by pi's turn cap is found at archive time,
+// in both shapes the missing verdict takes there. The refusal must name the
+// cap, as the foreground launcher does.
+func TestArchiveGateNamesATurnCapOnADetachedRun(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		withReview bool
+	}{
+		{"no review.md", false},
+		{"previous round's review.md unchanged", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repoRoot, specDir := archiveCapFixture(t, 0, tc.withReview)
+			err := checkReviewGate(repoRoot, "X", specDir, nil)
+			if err == nil {
+				t.Fatal("a review that wrote no verdict must not archive")
+			}
+			if !strings.Contains(err.Error(), "after 25 turns") || !strings.Contains(err.Error(), "turn cap") {
+				t.Errorf("the refusal does not name the turn cap: %v", err)
+			}
+		})
+	}
+}
+
+// The same refusals over a run that finished on its own say nothing about a cap.
+func TestArchiveGateIsSilentAboutACapForAFinishedRun(t *testing.T) {
+	for _, withReview := range []bool{false, true} {
+		repoRoot, specDir := archiveCapFixture(t, 460, withReview)
+		err := checkReviewGate(repoRoot, "X", specDir, nil)
+		if err == nil {
+			t.Fatal("a review that wrote no verdict must not archive")
+		}
+		if strings.Contains(err.Error(), "turn cap") {
+			t.Errorf("a finished run got a turn-cap hint: %v", err)
+		}
+	}
+}
+
+// A run that did write a verdict is refused for other reasons (here, a sha
+// other than the launched one), and the cap is not the cause of those even
+// when the transcript carries the signature.
+func TestArchiveGateNamesTheCapOnlyForAMissingVerdict(t *testing.T) {
+	repoRoot, specDir := archiveCapFixture(t, 0, false)
+	fresh := strings.Replace(provenanceReviewDoc, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cccccccccccccccccccccccccccccccccccccccc", 1)
+	if err := os.WriteFile(filepath.Join(specDir, ReviewFile), []byte(fresh), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := checkReviewGate(repoRoot, "X", specDir, nil)
+	if err == nil || !strings.Contains(err.Error(), "reviewed_sha") {
+		t.Fatalf("want the reviewed_sha refusal, got %v", err)
+	}
+	if strings.Contains(err.Error(), "turn cap") {
+		t.Errorf("a written verdict's refusal got a turn-cap hint: %v", err)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // TurnCapHint names the cause when a review failed because the runner stopped
@@ -33,6 +34,33 @@ func TurnCapHint(runner, transcript string) string {
 		return ""
 	}
 	return fmt.Sprintf("the reviewer ended after %d turns on a message with no output, which is how pi's turn cap stops a run; re-run the review", turns)
+}
+
+// withTurnCapHint adds TurnCapHint's line to err for a review launched earlier,
+// typically detached, whose missing verdict is only found when `spec archive`
+// runs. The runner is the one the review-request sidecar says was launched,
+// resolved through the pool, and the transcript is read where the launcher
+// writes it (TranscriptPath). Without a sidecar, a pool entry or a transcript
+// there is nothing to read, and err is returned as it was.
+func withTurnCapHint(err error, repoRoot, specID, specDir string) error {
+	req, found, rerr := ReadReviewRequest(specDir)
+	if rerr != nil || !found || req.Reviewer == "" {
+		return err
+	}
+	entries, perr := loadReviewerPoolEntries(repoRoot)
+	if perr != nil {
+		return err
+	}
+	for _, e := range entries {
+		if strings.TrimSpace(e.ID) != req.Reviewer {
+			continue
+		}
+		if hint := TurnCapHint(e.Runner, TranscriptPath(repoRoot, specID)); hint != "" {
+			return fmt.Errorf("%w\n%s", err, hint)
+		}
+		break
+	}
+	return err
 }
 
 // piTurnCap reads a pi --mode json transcript and reports how many turns ran
