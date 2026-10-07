@@ -80,6 +80,7 @@ func TestCheckDeployManifest_ByStatus(t *testing.T) {
 		repo, home := deployManifestRepo(t), t.TempDir()
 		writeFile(t, filepath.Join(home, ".m", "settings.json"), `{"effortLevel":"max","model":"m","autoUpdate":false}`)
 		writeFile(t, filepath.Join(home, ".r", "config.json"), `{"r":true}`)
+		writeFile(t, filepath.Join(home, ".p", "models.json"), `{"k":"rendered"}`)
 
 		out := runCheckDeployManifest(t, repo, home, nil)
 		if got := statusOfLine(out, "in sync"); got != StatusPass {
@@ -89,6 +90,24 @@ func TestCheckDeployManifest_ByStatus(t *testing.T) {
 			t.Errorf("the PASS line must count compared and not-compared entries:\n%s", out)
 		}
 		assertNoDir(t, filepath.Join(home, ".g"))
+	})
+
+	// #2100: a rendered entry's content is not comparable, its absence is.
+	t.Run("rendered entry that was never deployed → WARN naming the remedy", func(t *testing.T) {
+		repo, home := deployManifestRepo(t), t.TempDir()
+		writeFile(t, filepath.Join(home, ".m", "settings.json"), `{"model":"m","autoUpdate":false}`)
+		writeFile(t, filepath.Join(home, ".r", "config.json"), `{"r":true}`)
+
+		out := runCheckDeployManifest(t, repo, home, nil)
+		if got := statusOfLine(out, "dotf deploy p"); got != StatusWarn {
+			t.Errorf("want WARN for the undeployed rendered p, got %v\n%s", got, out)
+		}
+		if !strings.Contains(out, "models.json not deployed") {
+			t.Errorf("the WARN must say the file is not deployed:\n%s", out)
+		}
+		if statusOfLine(out, "in sync") == StatusPass {
+			t.Errorf("a missing rendered config must not PASS:\n%s", out)
+		}
 		assertNoDir(t, filepath.Join(home, ".p"))
 	})
 
