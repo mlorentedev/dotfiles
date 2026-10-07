@@ -388,13 +388,10 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 				return err
 			}
 
-			// An unreadable cwd leaves the ancestor walk as the only check;
-			// the refusal never depends on it alone.
-			cwd, _ := os.Getwd()
 			opts := worktree.DoneOptions{
 				RepoRoot:     root,
 				WorktreePath: target,
-				Cwd:          cwd,
+				Cwd:          callerCwd(os.Getwd, os.Getenv),
 				Force:        force,
 			}
 
@@ -412,4 +409,15 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "force removal even if there are uncommitted changes")
 
 	return cmd
+}
+
+// callerCwd is the directory `worktree done` checks it is not removing from
+// under its caller. When the cwd cannot be read, the launching shell's $PWD
+// stands in, so the check does not silently drop out: off Linux there is no
+// ancestor walk behind it.
+func callerCwd(getwd func() (string, error), getenv func(string) string) string {
+	if cwd, err := getwd(); err == nil {
+		return cwd
+	}
+	return getenv("PWD")
 }
