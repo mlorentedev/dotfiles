@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -328,5 +329,67 @@ func TestInstallAll_NeedsSudoDoesNotFailTheRun(t *testing.T) {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
+	}
+}
+
+// dryRunCatalog writes a catalog of the given tool objects and points the
+// command at it.
+func dryRunCatalog(t *testing.T, toolsJSON ...string) {
+	t.Helper()
+	mirror, home := t.TempDir(), t.TempDir()
+	cat := `{"tools":[` + strings.Join(toolsJSON, ",") + `]}`
+	if err := os.WriteFile(filepath.Join(mirror, "packages.json"), []byte(cat), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_DIR", mirror)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	outsideCheckout(t)
+}
+
+// otherOS is a platform this test is not running on.
+func otherOS() string {
+	if runtime.GOOS == "linux" {
+		return "darwin"
+	}
+	return "linux"
+}
+
+// An unsupported row is not a failure: it exits 0 and says why. The single-name
+// form plans that one tool only (#1892).
+func TestToolsInstall_DryRunUnsupportedRowForOneNamedTool(t *testing.T) {
+	dryRunCatalog(t,
+		`{"name":"elsewhere","version":"1.0.0","source":{"type":"npm","package":"x","platforms":["`+otherOS()+`"]}}`,
+		`{"name":"other","version":"1.0.0","source":{"type":"npm","package":"y"}}`)
+
+	stdout, _, err := execute(t, "tools", "install", "--dry-run", "elsewhere")
+	if err != nil {
+		t.Fatalf("an unsupported row must exit 0: %v", err)
+	}
+	row := regexp.MustCompile(`(?m)^elsewhere\s+absent\s+1\.0\.0\s+unsupported \(not installed on ` + runtime.GOOS + ` by this catalog\)\s*$`)
+	if !row.MatchString(stdout) {
+		t.Errorf("want an unsupported row saying why\n%s", stdout)
+	}
+	if strings.Contains(stdout, "other") {
+		t.Errorf("the single-name form planned a tool it was not asked about\n%s", stdout)
+	}
+}
+
+// What install refuses, the dry run refuses: the row says why, and the command
+// fails after printing every row, the way install would.
+func TestToolsInstall_DryRunFailsOnAnEntryInstallRefuses(t *testing.T) {
+	dryRunCatalog(t,
+		`{"name":"nopkg","version":"1.0.0","source":{"type":"npm"}}`,
+		`{"name":"fine","version":"1.0.0","source":{"type":"npm","package":"y"}}`)
+
+	stdout, _, err := execute(t, "tools", "install", "--dry-run")
+	if err == nil || !strings.Contains(err.Error(), "install would refuse: nopkg") {
+		t.Fatalf("want the dry run to refuse nopkg, got %v", err)
+	}
+	if !regexp.MustCompile(`(?m)^nopkg\s+absent\s+1\.0\.0\s+refused \(npm source declares no package\)\s*$`).MatchString(stdout) {
+		t.Errorf("want a refused row saying why\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "fine") {
+		t.Errorf("a refusal must not hide the rows after it\n%s", stdout)
 	}
 }
