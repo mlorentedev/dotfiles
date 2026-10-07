@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 )
 
 // convergeFixture is a checkout with a harness tree and one manifest target,
@@ -25,6 +27,11 @@ func convergeFixture(t *testing.T) (repo, home string) {
 			t.Fatal(err)
 		}
 	}
+	// The real deploy runs scripts/compile-harness.sh, which this fixture does
+	// not have; a test that needs it opts in with its own runner (lesson 335).
+	saved := convergeOptions
+	convergeOptions = converge.Options{RunHarnessDeploy: func(converge.Env) error { return nil }}
+	t.Cleanup(func() { convergeOptions = saved })
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DOTFILES_DIR", "")

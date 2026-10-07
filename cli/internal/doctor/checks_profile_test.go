@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestCheckProfileFiles drives the healthcheck.ps1 §4 residual port: CLAUDE.md +
+// TestCheckProfileFiles drives the healthcheck.ps1 §4 residual port:
 // AGY.md existence (cross-OS) and the Windows-only PowerShell profile, whose
 // $PROFILE resolves under Documents (pwsh 7 / WinPS 5.1) including the
 // OneDrive-redirected root. One row per branch.
@@ -17,6 +17,7 @@ func TestCheckProfileFiles(t *testing.T) {
 		goos         string
 		files        []string // paths (slash-separated, relative to home) to create
 		wantFailures int
+		commands     []string
 		wantSubstr   string
 	}{
 		{
@@ -27,18 +28,28 @@ func TestCheckProfileFiles(t *testing.T) {
 			wantSubstr:   "Windows-only",
 		},
 		{
-			name:         "posix: CLAUDE.md missing → fail naming it",
+			// CLAUDE.md belongs to checkInstructionDrift, which fails it only
+			// when claude is installed (#2016); this check no longer reports it.
+			name:         "posix: CLAUDE.md missing → not this check's to fail",
 			goos:         "linux",
 			files:        []string{".gemini/AGY.md"},
-			wantFailures: 1,
-			wantSubstr:   "CLAUDE.md",
+			wantFailures: 0,
+			wantSubstr:   "AGY.md) exists",
 		},
 		{
-			name:         "posix: AGY.md missing → fail naming it",
+			name:         "posix: AGY.md missing, agy installed → fail naming it and its remedy",
 			goos:         "linux",
 			files:        []string{".claude/CLAUDE.md"},
+			commands:     []string{"agy"},
 			wantFailures: 1,
-			wantSubstr:   "AGY.md",
+			wantSubstr:   "(agy is installed; re-run setup-linux.sh)",
+		},
+		{
+			name:         "posix: AGY.md missing, agy not installed → skip, not fail (#843)",
+			goos:         "linux",
+			files:        []string{".claude/CLAUDE.md"},
+			wantFailures: 0,
+			wantSubstr:   "agy is not installed",
 		},
 		{
 			name:         "windows: pwsh 7 profile location → pass",
@@ -76,7 +87,7 @@ func TestCheckProfileFiles(t *testing.T) {
 			for _, rel := range tc.files {
 				writeFile(t, filepath.Join(home, filepath.FromSlash(rel)), "x")
 			}
-			sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home}, nil, nil)
+			sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home}, tc.commands, nil)
 			sys.GOOS = tc.goos
 
 			var buf bytes.Buffer
@@ -90,5 +101,14 @@ func TestCheckProfileFiles(t *testing.T) {
 				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
 			}
 		})
+	}
+}
+
+func TestSetupRemedy_NamesTheSetupScriptForTheOS(t *testing.T) {
+	if got := setupRemedy("darwin"); got != "re-run setup-linux.sh" {
+		t.Errorf("darwin: %q", got)
+	}
+	if got := setupRemedy("windows"); got != "re-run setup-windows.ps1" {
+		t.Errorf("windows: %q", got)
 	}
 }

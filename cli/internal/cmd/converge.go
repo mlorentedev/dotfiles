@@ -41,7 +41,7 @@ func newConvergeCmd() *cobra.Command {
 			}
 			home := env.Home()
 			e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
-			rep, err := converge.Run(converge.Registry(), e, plan)
+			rep, err := converge.Run(converge.Registry(convergeOptions), e, plan)
 			printConvergeReport(cmd.OutOrStdout(), rep)
 			if plan {
 				return err
@@ -58,6 +58,9 @@ func newConvergeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout to converge from")
 	return cmd
 }
+
+// convergeOptions wires the registry's side effects; tests replace it.
+var convergeOptions = converge.Options{RunHarnessDeploy: converge.CompileHarnessDeploy}
 
 var convergeTag = map[converge.Status]string{
 	converge.StatusOK:      "[ OK ]",
