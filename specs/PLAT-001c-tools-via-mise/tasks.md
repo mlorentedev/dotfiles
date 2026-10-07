@@ -52,7 +52,8 @@ created: "2026-10-06"
 
 - [x] `mise activate` in `.zshrc`, `.bashrc` and the PowerShell profile, guarded on mise, before direnv and zoxide (#2013 P6, PR #2043)
 - [ ] The shims directory for non-interactive callers (setup, cron, an agent's shell), which read no rc file
-- [x] The doctor check: T3 below
+- [x] The doctor's pin half: the pinned CLIs resolve through `mise which`, T3 below. That answers from the mise config whatever the caller's PATH, so it does NOT show the shims directory reaches PATH
+- [ ] The doctor probe that the shims directory is on PATH for a non-interactive caller; lands with the shims directory above, and until it does a green "at their pin through mise" says nothing about cron or an agent's shell
 
 ### T3 — doctor reads a darwin machine as darwin, and checks the mise CLIs (stacked on #2043)
 
