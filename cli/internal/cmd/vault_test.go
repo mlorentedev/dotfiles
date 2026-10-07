@@ -157,3 +157,38 @@ func TestVaultProjectForceFlagPlumbed(t *testing.T) {
 		t.Errorf("--force should regenerate, not skip:\n%s", stdout)
 	}
 }
+
+// TestVaultHealthWiring covers what the golden corpus in
+// cli/internal/vault/health_golden_test.go cannot, because it calls RunHealth
+// directly: $VAULT_DIR resolution, the --vault override, the --verbose flag,
+// and RunHealth's code reaching the process exit status. Obsidian is made
+// absent (PATH holds nothing), which is the documented exit-1 abort, so the
+// run touches no GUI and needs no stub.
+func TestVaultHealthWiring(t *testing.T) {
+	vaultDir := t.TempDir()
+	t.Setenv("VAULT_DIR", vaultDir)
+	t.Setenv("VAULT_NAME", "")
+	t.Setenv("PATH", t.TempDir())
+
+	cases := []struct {
+		args     []string
+		wantName string
+	}{
+		{[]string{"vault", "health"}, "knowledge"},
+		{[]string{"vault", "health", "--vault", "other", "--verbose"}, "other"},
+		{[]string{"vault", "health", "-v"}, "knowledge"},
+	}
+	for _, c := range cases {
+		stdout, _, err := execute(t, c.args...)
+		if got := ExitCode(err); got != 1 {
+			t.Errorf("%v: exit %d (err %v), want 1: obsidian absent from PATH", c.args, got, err)
+		}
+		if want := "Vault: " + c.wantName + " (" + vaultDir + ")"; !strings.Contains(stdout, want) {
+			t.Errorf("%v: report lacks %q:\n%s", c.args, want, stdout)
+		}
+		// Exit 1 has other causes; this line names the abort the test is about.
+		if want := "Obsidian CLI not found in PATH"; !strings.Contains(stdout, want) {
+			t.Errorf("%v: exit 1 was not the obsidian-absent abort, report lacks %q:\n%s", c.args, want, stdout)
+		}
+	}
+}
