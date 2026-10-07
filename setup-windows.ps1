@@ -1337,12 +1337,9 @@ $env:GEMINI_DIR = "$GeminiHome"
 #    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
 #    which a verbatim copy could not do (SDD-007: no legacy Gemini-CLI write).
 
-# Deploy .geminiignore
-$geminiIgnoreSrc = "$DotfilesDir\.geminiignore"
-if (Test-Path $geminiIgnoreSrc) {
-    Copy-Item $geminiIgnoreSrc "$GeminiHome\.geminiignore" -Force
-    Write-Success "Deployed .geminiignore"
-}
+# .geminiignore and AGY.md are `dotf deploy` entries (ai/deploy.json
+# `agy-geminiignore`, `agy-instructions`; #1843 B11), deployed by the bare
+# `dotf deploy` this script makes: one implementation for every OS.
 
 # 2. Consolidate MCP servers - master at ~/.gemini/config/mcp_config.json (agy's canonical read path)
 $mcpServersSrc = "$DotfilesDir\ai\agy\mcp_servers.json"
@@ -1417,16 +1414,6 @@ $projAgyBak = Join-Path $DotfilesDir ".antigravitycli.bak"
 if (Test-Path $projAgyCli) { Remove-Item -Recurse -Force $projAgyCli -ErrorAction SilentlyContinue }
 if (Test-Path $projAgyBak) { Remove-Item -Recurse -Force $projAgyBak -ErrorAction SilentlyContinue }
 
-# Deploy AGY.md (Neural Hive Protocol pointer to AGENTS.md). Linux-parity.
-$agyMdSource = Join-Path $DotfilesDir 'ai\agy\AGY.md'
-if (Test-Path $agyMdSource) {
-    Copy-Item -LiteralPath $agyMdSource -Destination (Join-Path $GeminiHome 'AGY.md') -Force
-    if (Select-String -Path (Join-Path $GeminiHome 'AGY.md') -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet) {
-        Write-Success "AGY.md deployed successfully (verified pointer to AGENTS.md)"
-    } else {
-        Write-Err "AGY.md deployment failed verification (expected pointer to AGENTS.md)"
-    }
-}
 
 # Agy skills (native Shared skills under $GeminiHome\skills and frontmatter-
 # stripped flat prompts under $GeminiHome\prompts) are deployed from the
