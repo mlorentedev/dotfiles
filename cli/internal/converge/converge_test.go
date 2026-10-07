@@ -2,6 +2,8 @@ package converge
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -103,4 +105,25 @@ func statuses(rep Report) string {
 		parts = append(parts, e.Name+"="+e.Status.String())
 	}
 	return strings.Join(parts, " ")
+}
+
+func TestWriteReport_RecordsTheRunAndItsOutcome(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "converge", "last.json")
+	rep := Report{GOOS: "darwin", Entries: []Entry{
+		{Name: "records-mirror", Status: StatusChange, Changes: 3, Detail: "d"},
+		{Name: "records-harness", Status: StatusFailed, Detail: "boom"},
+	}}
+
+	if err := WriteReport(path, rep, errors.New("converge: records-harness: boom")); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"result": "failed"`, `"error": "converge: records-harness: boom"`, `"goos": "darwin"`, `"changed": 3`, `"status": "change"`, `"status": "failed"`, `"finished_at"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("report lacks %s:\n%s", want, raw)
+		}
+	}
 }
