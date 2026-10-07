@@ -37,8 +37,8 @@ usage() {
     cat <<'EOF'
 Usage: spec-gate-prepush.sh [args forwarded to check-spec-gate.sh]
 
-Resolves the current branch's PR labels/body/author live via `gh`, when one
-exists, then forwards every argument to check-spec-gate.sh. Falls through to
+Resolves the labels/body/author of the open PR for the branch being pushed
+live via `gh`, when one exists, then forwards every argument to check-spec-gate.sh. Falls through to
 running the gate with no PR context (today's local behaviour) when `gh`/`jq`
 are unavailable, the developer is unauthenticated, or no PR is open yet for
 this branch — never fails on that account. e.g.
@@ -57,9 +57,20 @@ _run_gate() {
 command -v gh >/dev/null 2>&1 || _run_gate "$@"
 command -v jq >/dev/null 2>&1 || _run_gate "$@"
 
-if ! meta=$(gh pr view --json labels,body,author 2>/dev/null); then
-    # No PR for this branch yet, or the developer is unauthenticated. Both are
-    # the ordinary local baseline, not an error this wrapper reports on.
+# The PR is the open one whose head is the branch being PUSHED. pre-commit
+# exports that ref as PRE_COMMIT_REMOTE_BRANCH; outside a hook, the current
+# branch stands in. A bare `gh pr view` does neither: it infers a PR from the
+# checkout, so it returned a MERGED PR on a reused branch (#1152), and the PR
+# of the branch this one was created from when that was its upstream (#1473).
+branch=${PRE_COMMIT_REMOTE_BRANCH:-$(git branch --show-current 2>/dev/null || true)}
+branch=${branch#refs/heads/}
+[ -n "$branch" ] || _run_gate "$@"
+
+# `.[0] // empty`: no open PR prints nothing, which is the fall-through below.
+if ! meta=$(gh pr list --head "$branch" --state open --limit 1 \
+        --json labels,body,author --jq '.[0] // empty' 2>/dev/null) || [ -z "$meta" ]; then
+    # No open PR for this branch yet, or the developer is unauthenticated. Both
+    # are the ordinary local baseline, not an error this wrapper reports on.
     _run_gate "$@"
 fi
 
