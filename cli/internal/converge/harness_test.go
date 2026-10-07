@@ -220,3 +220,26 @@ func TestRecordsHarness_ProbeRequiresTheRenderedPresenceRegion(t *testing.T) {
 		}
 	})
 }
+
+// F-064 on the converge path: the source's enforced region was refreshed and
+// the deployed copy still carries the old one. The plan must report the file
+// and the probe must fail, not read it as converged.
+func TestRecordsHarness_ARefreshedSourceRegionIsPlannedAndFailsTheProbe(t *testing.T) {
+	env := harnessEnv(t)
+	oldRegion := "<!-- BEGIN HARNESS GENERATED (sha256:aaa) -->\nrule one\n<!-- END HARNESS GENERATED -->\n"
+	newRegion := "<!-- BEGIN HARNESS GENERATED (sha256:bbb) -->\nrule one\nrule two\n<!-- END HARNESS GENERATED -->\n"
+	writeFixture(t, env.RepoRoot, map[string]string{"ai/claude/CLAUDE.md": "# CLAUDE\n\n" + newRegion, "AGENTS.md": "# AGENTS\n"})
+	writeFixture(t, env.Home, map[string]string{
+		".claude/CLAUDE.md":          "# CLAUDE\n\n" + oldRegion,
+		".config/opencode/AGENTS.md": "# AGENTS\n",
+	})
+	r := recordsHarness{run: func(Env) error { return nil }, has: noCommands}
+
+	plan, err := r.Reconcile(env, true)
+	if err != nil || plan.Changes != 1 || !strings.Contains(plan.Detail, ".claude/CLAUDE.md") {
+		t.Fatalf("want the stale CLAUDE.md planned, got %+v, %v", plan, err)
+	}
+	if err := r.Probe(env); err == nil {
+		t.Fatal("the probe passed on a stale source region")
+	}
+}

@@ -67,8 +67,8 @@ func (r recordsHarness) Probe(env Env) error {
 }
 
 // staleInstructions lists the home-relative instruction files that are missing
-// or differ from their source, ignoring every harness-managed region on both
-// sides (the comparison doctor's instruction-drift check makes).
+// or do not hold their source (harness.DeployedMatchesSource, the comparison
+// doctor's instruction-drift check makes).
 func (r recordsHarness) staleInstructions(env Env) ([]string, error) {
 	_, targets, err := harness.LoadPresence(filepath.Join(env.RepoRoot, filepath.FromSlash(harness.ManifestFile)))
 	if err != nil {
@@ -87,17 +87,11 @@ func (r recordsHarness) staleInstructions(env Env) ([]string, error) {
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
-		if err != nil || comparable(dst) != comparable(src) {
+		if err != nil || !harness.DeployedMatchesSource(string(dst), string(src)) {
 			stale = append(stale, t.File)
 		}
 	}
 	return stale, nil
-}
-
-// comparable is a file's content outside the harness regions, without the
-// trailing newlines a writer may or may not leave (#1308).
-func comparable(b []byte) string {
-	return strings.TrimRight(harness.StripRegions(string(b)), "\n")
 }
 
 func instructionsDetail(stale []string, dryRun bool) string {
