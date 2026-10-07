@@ -28,6 +28,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - PR 2 was split into 2a and 2b to stay under the size cap. Apply mode landed with the engine in 2a, because plan and apply are one code path (`Reconcile(env, dryRun)`); only the persisted report moves to PR 3.
 - The `platforms` matcher moved from the tool catalog into `internal/platform`, so the catalog and the reconcilers cannot drift apart (ADR-045 decision 7).
+- PR 2b drives the instruction files from `harness/manifest.json` `agents.presence[]`, not from new `ai/deploy.json` entries. A new deploy field needs a manifest version the installed `dotf` cannot read, and a `replace` entry would fight `harness presence` over the same file, so AC3 could never pass. Skills and bindings move to a PR 2c.
 
 ## Promotion candidates
 

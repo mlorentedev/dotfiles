@@ -39,12 +39,21 @@ created: "2026-10-06"
 - [x] [AC1] `cmd/converge.go`: `dotf converge [--plan] [--repo]`; a plan on an empty HOME writes nothing, a second apply reports 0 changed
 - [x] On the Mac: `go run ./cmd/dotf converge --plan` reports `records-mirror` with 70 files to write and leaves `~/.dotfiles` untouched
 
-### PR 2b — the instruction files and the hook bindings (#1843 B11 Claude row, #2016)
+### PR 2b — the agent instruction files, driven by `agents.presence[]` (#2016, #1843 B11)
 
-- [ ] [AC2] Declare `claude-instructions` in `ai/deploy.json` (`ai/claude/CLAUDE.md` → `~/.claude/CLAUDE.md`) and delete the copy block from both setup twins in the same change (ADR-020 §5)
-- [ ] [AC2] Failing test, then the `records-instructions` reconciler over `deploy.PlanConfig`/`deploy.Deploy` by entry name; its probe checks the deployed file points at `AGENTS.md`, the check the shell block made
-- [ ] [AC2] The `records-skills` step runs `compile-harness.sh --deploy`, behind the shared test seam that defaults to "not run" (lesson 335); recorded as a port target
-- [ ] [AC2] The `records-bind` reconciler over `harness bind` and its dry-run
+> Pivot from the first plan: no `ai/deploy.json` entry. A new deploy field needs a manifest version the installed `dotf` cannot read (#1814 class), and a `replace` entry would rewrite the `AGENT-PRESENCE` region `dotf harness presence` owns on every run, so a second converge could never report zero changes (AC3). `harness/manifest.json` `agents.presence[]` already declares each instruction file (`source`, `file`, `requires_command`); it is the registry.
+
+- [ ] [AC2] Failing test, then the `records-instructions` reconciler: for each presence entry, the deployed file outside the `AGENT-PRESENCE` markers must equal `source`; a change writes `source` plus the existing region byte for byte; `requires_command` absent → `skipped`. It reuses the existing marker split, not a second parser
+- [ ] [AC3] Failing test: a HOME holding base plus region plans 0 changes
+- [ ] [AC2] The probe is "outside-marker content equals `source`", which subsumes the shell's `grep 'First, read AGENTS.md'` check
+- [ ] [AC2] `records-presence`: the presence injection in-process, after the instruction files (it skips a file that does not exist yet). It also runs on Linux, where `setup-linux.sh` never ran it
+- [ ] Delete the CLAUDE.md force-copy and the bulk `ai/claude/*` copy from both twins (ADR-020 §5). The opencode, pi and copilot copy blocks follow in their own B11 rows if the cap is reached
+- [ ] [AC2] Doctor FAIL when an agent binary is on PATH without its instruction file (#2016's guard; it covers copilot, whose file is deployed only once copilot exists)
+
+### PR 2c — skills and hook bindings
+
+- [ ] `records-skills`: `compile-harness.sh --deploy`, planned with `--check`, behind the shared seam that defaults to "not run" (lesson 335); recorded as a port target
+- [ ] `records-bind`: the `harness bind` logic with its dry-run
 
 ### PR 3 — the persisted report (#1843 B7)
 
