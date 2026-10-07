@@ -29,9 +29,12 @@ const (
 
 // checkProfileFiles ports the healthcheck.ps1 §4 residual the .sh→Go
 // consolidation (CLI-012) left behind: existence of deployed config files that
-// checkSymlinks does not already cover. CLAUDE.md and AGY.md are deployed on both
-// OSes; the PowerShell profile is Windows-only ($PROFILE) — on POSIX the
-// equivalent rc files (.zshrc/.bashrc) are already checked by checkSymlinks.
+// checkSymlinks does not already cover. AGY.md is deployed on both OSes; the
+// PowerShell profile is Windows-only ($PROFILE) — on POSIX the equivalent rc
+// files (.zshrc/.bashrc) are already checked by checkSymlinks. CLAUDE.md and
+// the other agents.presence instruction files are checked by
+// checkInstructionDrift, which fails a missing file only when its agent is
+// installed (#2016).
 //
 // A missing file is a FAIL, matching checkSymlinks' treatment of a missing
 // deployed file (both reproduce the same healthcheck §4 Write-Fail semantics).
@@ -45,15 +48,20 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 	rep.Section("Deployed config files")
 	home := sys.home()
 
-	for _, f := range []struct{ rel, name string }{
-		{".claude/CLAUDE.md", "Claude global instructions (CLAUDE.md)"},
-		{".gemini/AGY.md", "Antigravity instructions (AGY.md)"},
+	// A missing file for an agent that is not installed is a file nobody reads,
+	// not a failure (#843); an installed agent without it runs on its harness
+	// defaults (#2016).
+	for _, f := range []struct{ rel, name, agent string }{
+		{".gemini/AGY.md", "Antigravity instructions (AGY.md)", "agy"},
 	} {
 		p := filepath.Join(home, filepath.FromSlash(f.rel))
-		if pathExists(p) {
+		switch {
+		case pathExists(p):
 			rep.Pass(f.name + " exists")
-		} else {
-			rep.Fail(f.name + " missing: " + p)
+		case !sys.has(f.agent):
+			rep.Skip(f.name + " not deployed: " + f.agent + " is not installed")
+		default:
+			rep.Fail(f.name + " missing: " + p + " (" + f.agent + " is installed; " + setupRemedy(sys.GOOS) + ")")
 		}
 	}
 
@@ -274,4 +282,13 @@ func firstLineOr(out string, err error) string {
 		return err.Error()
 	}
 	return "no output"
+}
+
+// setupRemedy names the setup script that deploys AGY.md on goos: it is not an
+// agents.presence[] file, so `dotf converge` does not deploy it yet.
+func setupRemedy(goos string) string {
+	if goos == "windows" {
+		return "re-run setup-windows.ps1"
+	}
+	return "re-run setup-linux.sh"
 }

@@ -573,28 +573,13 @@ unset _dotf
 # Claude Code
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
-# Bulk copy ai/claude/* EXCEPT settings.json (SDD-002: handled by
-# merge_claude_settings below, which applies the per-key merge policy preserving
-# user customizations; its hooks come from `dotf harness bind`).
-for _claude_src in "$CURRENT_DIR/ai/claude/"*; do
-    [ "$(basename "$_claude_src")" = "settings.json" ] && continue
-    cp -rf "$_claude_src" "$HOME/.claude/" 2>/dev/null || true
-done
-unset _claude_src
-# Claude skills are deployed from the vault skill records by
-# `compile-harness.sh --deploy` (SDD-008): each committed record under
-# harness/skills/ is rendered (with provenance) to ~/.claude/skills/<n>/,
-# de-symlinking any pre-existing vault symlink first (BUG-100). The single
-# --deploy call near the end of this script handles every agent at once.
-# Force copy master files (Neural Hive Protocol)
-rm -f "$HOME/.claude/CLAUDE.md"
-cp "$CURRENT_DIR/ai/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-if grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"; then
-    log_success "CLAUDE.md deployed successfully (verified pointer to AGENTS.md)"
-else
-    echo "❌ Error: CLAUDE.md deployment failed verification"
-fi
-log_success "Claude Code configured with skills"
+# The Claude instruction file (~/.claude/CLAUDE.md) and its skills are deployed
+# by the single `compile-harness.sh --deploy` call near the end of this script,
+# which copies every harness/manifest.json agents.presence[] file and then
+# injects the skill catalog and the persona presence regions into it (SDD-008,
+# HARNESS-058). `dotf converge` runs the same deploy with a content-comparing
+# plan and a post-condition probe (PLAT-001b). settings.json is merged by
+# `dotf deploy` (claude-settings), and its hooks come from `dotf harness bind`.
 
 # Python tooling (uv + poetry) — used by hive MCP server (uvx hive-vault) and general Python workflows
 # Install uv (Python package manager — provides uvx)
@@ -909,23 +894,12 @@ fi
 # .zshrc/.bashrc lived here until OPS-040. Probed absent from both files on the
 # only OS it ran on before removal.
 
-if command -v copilot >/dev/null 2>&1; then
-    log_info "GitHub Copilot CLI detected, deploying configuration..."
-    ensure_directory "$HOME/.copilot"
-    # Only the instructions file is copied here. settings.json, config.json and
-    # mcp-config.json are `dotf deploy` entries (ai/deploy.json, AI-039/#1322):
-    # the first two by MERGE, because the CLI writes both files itself and a
-    # verbatim copy wiped the box's own keys (allowedUrls, effortLevel, ...).
-    cp -f "$CURRENT_DIR/ai/copilot/copilot-instructions.md" "$HOME/.copilot/copilot-instructions.md" 2>/dev/null || true
-    if [ -f "$HOME/.copilot/copilot-instructions.md" ] && grep -q 'First, read `AGENTS.md`' "$HOME/.copilot/copilot-instructions.md"; then
-        log_success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
-    else
-        log_warning "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
-    fi
-    log_success "GitHub Copilot CLI configured (aliases cop/cops in .zsh/aliases.zsh)"
-else
-    log_info "GitHub Copilot CLI not installed, skipping Copilot config (re-run 'dotf tools install copilot' once Node.js is on PATH)"
-fi
+# Its instruction file (~/.copilot/copilot-instructions.md) is an
+# agents.presence[] entry gated on `requires_command: copilot`, deployed by the
+# `compile-harness.sh --deploy` call near the end of this script. settings.json,
+# config.json and mcp-config.json are `dotf deploy` entries (ai/deploy.json,
+# AI-039/#1322): the first two by MERGE, because the CLI writes both files itself
+# and a verbatim copy wiped the box's own keys (allowedUrls, effortLevel, ...).
 
 # SDD-005 parity (.github/copilot-instructions.md vs ai/copilot/): NOT synced here.
 # Setup deploys to $HOME only and MUST NEVER write into the checkout — a checkout
