@@ -463,3 +463,31 @@ func TestDecide_AnUnwaitedUnknownStateIsPlain(t *testing.T) {
 		t.Errorf("reasons = %q", r)
 	}
 }
+
+// #2105: no pull_request workflow ran on the head while its merge state was
+// uncomputed, so the checks list stayed empty. That is GitHub's wait too.
+func TestLand_AnUncomputedStateWithNoChecksGetsTheUnknownBudget(t *testing.T) {
+	g := &fakeGH{checks: `[]`, deps: `[]`}
+	var slept time.Duration
+	o := Options{Run: unknownViews(g, 1000), Untriaged: noneUntriaged, Wait: true, UnknownWait: 10 * time.Minute, Sleep: func(d time.Duration) { slept += d }}
+	res, err := Land(context.Background(), o, 30)
+	if err != nil || res.Merged {
+		t.Fatalf("want a refusal, got %+v, %v", res, err)
+	}
+	if slept != 10*time.Minute {
+		t.Errorf("waited %s, want the 10m unknown budget", slept)
+	}
+}
+
+func TestLand_TheUnknownBudgetIsExactWhenNotAWholeNumberOfPauses(t *testing.T) {
+	g := &fakeGH{checks: greenChecks, deps: `[]`}
+	var slept time.Duration
+	o := Options{Run: unknownViews(g, 1000), Untriaged: noneUntriaged, Wait: true, UnknownWait: 45 * time.Second, Sleep: func(d time.Duration) { slept += d }}
+	res, _ := Land(context.Background(), o, 30)
+	if slept != 45*time.Second {
+		t.Errorf("waited %s, want exactly 45s", slept)
+	}
+	if len(res.Reasons) != 1 || !strings.Contains(res.Reasons[0], "after waiting 45s") {
+		t.Errorf("reasons = %q", res.Reasons)
+	}
+}

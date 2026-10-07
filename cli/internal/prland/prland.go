@@ -160,18 +160,22 @@ func settle(ctx context.Context, gh ghFunc, o Options, number int, wait bool) (F
 		// in minutes or fail; a merge state GitHub has not computed was
 		// measured null for 27 minutes with every check green (#2118), and
 		// six rounds gave up long before it was computed.
+		pause := waitPause
 		if uncomputed(f) {
 			if uncomputedFor >= budget {
 				break
 			}
-			uncomputedFor += waitPause
+			// The last pause is cut to what is left, so --unknown-wait 45s
+			// waits 45s, not two whole pauses.
+			pause = min(pause, budget-uncomputedFor)
+			uncomputedFor += pause
 		} else {
 			if rounds >= maxWaitRounds {
 				break
 			}
 			rounds++
 		}
-		sleep(waitPause)
+		sleep(pause)
 		_, _ = gh("pr", "checks", strconv.Itoa(number), "--watch", "--interval", "30") // the facts below decide
 		f, err = readFacts(ctx, gh, o.Untriaged, number)
 	}
@@ -257,11 +261,13 @@ func unsettled(f Facts) bool {
 	return false
 }
 
-// uncomputed reports the wait only GitHub can end: every check is green and
-// the merge state is still UNKNOWN. BLOCKED is not this case, since a PR can
-// be blocked for good with every check green.
+// uncomputed reports the wait only GitHub can end: the merge state is still
+// UNKNOWN and no check is pending or failing. No checks at all counts too: on
+// #2105 no pull_request workflow ran on the head until GitHub computed it, so
+// waiting for checks could never end that wait. BLOCKED is not this case,
+// since a PR can be blocked for good with every check green.
 func uncomputed(f Facts) bool {
-	return f.MergeState == "UNKNOWN" && len(f.Checks) > 0 && allGreen(f.Checks)
+	return f.MergeState == "UNKNOWN" && allGreen(f.Checks)
 }
 
 func allGreen(cs []Check) bool {

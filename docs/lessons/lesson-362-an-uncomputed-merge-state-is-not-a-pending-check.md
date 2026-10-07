@@ -25,7 +25,8 @@ and it gave no hint that waiting, or a new head, would end it.
 
 ## The Solution
 Give the uncomputed state its own budget (`--unknown-wait`, 20 minutes by default), counted only
-while every check is green and the state is UNKNOWN. BLOCKED keeps the short budget, because a PR
+while the state is UNKNOWN and no check is pending or failing. No checks at all counts too, because
+#2105 had none until GitHub computed it. BLOCKED keeps the short budget, because a PR
 can be blocked for good with every check green. When the budget runs out, the refusal says how long
 it waited and names the remedy that worked both times: a new head. Re-create the base merge with
 the same tree and `--force-with-lease`. A merge commit does not count toward PR-Agent's push gate.
