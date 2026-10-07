@@ -59,6 +59,7 @@ func setupTestGitRepoAndWorktree(t *testing.T) (repoDir, wtDir, lockPath string)
 
 func TestDoneRefusesUnpushedCommitsWithNoUpstream(t *testing.T) {
 	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	stubMergedPRHeads(t, nil, nil)
 
 	// Add an unpushed commit on feat/test (which has no upstream)
 	filePath := filepath.Join(wtDir, "wip.txt")

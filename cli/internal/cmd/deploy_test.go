@@ -148,3 +148,38 @@ func TestDeployCmd_UnknownNameFailsAndListsDeclared(t *testing.T) {
 		t.Errorf("the error must name the declared configs, got: %v", err)
 	}
 }
+
+// #1664 (2): a mode-only fix has its own two lines, one per run kind. Swapping
+// them told a dry run's reader the mode was fixed, and a real run's that it
+// would be.
+func TestDeployCmd_AModeOnlyFixIsReportedAsOne(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "deploy.json"), `{
+  "version": 3,
+  "configs": [
+    {"name": "sec", "src": "ai/sec.json", "dst": "{HOME}/.sec/config.json", "render": false, "mode": "0600"}
+  ]
+}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "sec.json"), `{"sec":true}`)
+	// Same bytes, looser than declared; on Windows, the DACL it inherits.
+	writeMirrorFixture(t, filepath.Join(home, ".sec", "config.json"), `{"sec":true}`)
+	if err := os.Chmod(filepath.Join(home, ".sec", "config.json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		args      []string
+		want, not string
+	}{
+		{[]string{"sec", "--dry-run"}, "would fix mode", "mode fixed"},
+		{[]string{"sec"}, "mode fixed", "would fix mode"},
+	} {
+		out, err := runDeploy(t, repo, home, tc.args)
+		if err != nil {
+			t.Fatalf("dotf deploy %v: %v\n%s", tc.args, err, out)
+		}
+		if !strings.Contains(out, tc.want+" ") || strings.Contains(out, tc.not) {
+			t.Errorf("dotf deploy %v must say %q, not %q:\n%s", tc.args, tc.want, tc.not, out)
+		}
+	}
+}

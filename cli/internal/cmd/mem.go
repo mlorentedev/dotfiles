@@ -68,21 +68,25 @@ func newMemProjectKeyCmd() *cobra.Command {
 
 // newMemSessionEndCmd wires the SessionEnd hook. Per the resilience contract a
 // session-end hook must NEVER crash a session, so it reads the payload, persists
-// the handoff record best-effort, and ALWAYS exits 0 — every error is swallowed.
+// the handoff record best-effort, and ALWAYS exits 0 — an error is reported on
+// stderr, never returned.
 func newMemSessionEndCmd() *cobra.Command {
-	return &cobra.Command{
+	agent := mem.DefaultSessionEndAgent
+	cmd := &cobra.Command{
 		Use:   "session-end",
 		Short: "Archive the /handoff block into a durable session record (SessionEnd hook)",
-		Long: "session-end reads the SessionEnd hook JSON on stdin and archives the\n" +
-			"`## Session Handoff` block from the project's MEMORY.md into\n" +
-			"<vault>/10_projects/<project>/sessions/<date>-<project>-claude.md. Every\n" +
-			"trivial / missing / malformed input is a clean no-op; it never errors.",
+		Long: "session-end reads the SessionEnd hook JSON on stdin and archives this\n" +
+			"agent's thread of the `## Session Handoff` block from the project's MEMORY.md\n" +
+			"into <vault>/10_projects/<project>/sessions/<date>-<project>-<agent>-<thread>.md,\n" +
+			"unless a journal is already there. --agent names the harness (default claude,\n" +
+			"whose payload names none). Every trivial / missing / malformed input is a\n" +
+			"clean no-op, and it always exits 0.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload, _ := io.ReadAll(cmd.InOrStdin())
 			// Best-effort by contract: a SessionEnd hook must never crash a
-			// session, so the write result is intentionally discarded — exit 0.
+			// session, so no error becomes the exit status — exit 0.
 			//
 			// Local time, not UTC: `now` is formatted down to a calendar date
 			// that becomes the record's filename and its human-facing heading,
@@ -90,10 +94,19 @@ func newMemSessionEndCmd() *cobra.Command {
 			// UTC filed every post-18:00 session in America/Denver under the
 			// next day and collided with the following morning's record.
 			// session-start below is already local; this keeps the pair consistent.
-			_, _ = mem.SessionEnd(payload, vault.ResolveVault(), time.Now())
+			//
+			// Every error SessionEndAs returns is printed: a refused --agent (the
+			// hook's own configuration) and a failed write alike. Swallowing
+			// either would leave the session without a record and nothing saying
+			// why. Trivial, missing and malformed input are no-ops, not errors.
+			if _, err := mem.SessionEndAs(payload, vault.ResolveVault(), agent, time.Now()); err != nil {
+				cmd.PrintErrf("dotf mem session-end: %v\n", err)
+			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&agent, "agent", agent, "the harness ending the session; names the fallback journal and selects its thread block")
+	return cmd
 }
 
 // newMemSessionStartCmd wires the session-start noun (CLI-025), ported from
@@ -134,7 +147,7 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 		cwd, _ = os.Getwd()
 	}
 	brief := mem.Brief(mem.BriefOptions{
-		Cwd: cwd, ScriptsDir: memScriptsDir(), StaleDays: 14, Now: time.Now(),
+		Cwd: cwd, VaultHealth: memVaultHealth, StaleDays: 14, Now: time.Now(),
 		// The file-based agents get the same probe as the Claude hook. Wiring it
 		// on one path only would rebuild the asymmetry this CLI exists to remove:
 		// opencode, agy and copilot read this brief, and a triage loop that only
@@ -161,7 +174,7 @@ func runClaudeHook(cmd *cobra.Command) error {
 	ctx := mem.ClaudeContext(mem.ClaudeContextInput{
 		Cwd:          cwd,
 		Vault:        vault.ResolveVault(),
-		ScriptsDir:   memScriptsDir(),
+		VaultHealth:  memVaultHealth,
 		Home:         home,
 		ContractPath: filepath.Join(env.DotfilesDir(home), "env-contract.json"),
 		ClaudeJSON:   filepath.Join(home, ".claude", ".claude.json"),
@@ -239,10 +252,22 @@ func memRepoDir() string {
 	return env.RepoDir()
 }
 
-// memScriptsDir locates the scripts/ dir hosting the sibling vault-health.sh —
-// the Go equivalent of session-brief.sh's $(dirname "$0") sibling lookup. ""
-// when unresolved, which makes vaultHealth emit the same "not found" line the
-// shell does.
+// memVaultHealth is the session brief's vault health section: vault.RunHealth
+// in-process, resolved as `dotf vault health` resolves it (healthOptions), with
+// the vault detected from the session's cwd taking precedence. It replaced a
+// bash run of scripts/vault-health.sh (CLI-023), so the banner and the
+// command now report from the same code.
+func memVaultHealth(w io.Writer, vaultDir, vaultName string) (int, error) {
+	opts := healthOptions(vaultName, false)
+	if vaultDir != "" {
+		opts.VaultDir = vaultDir
+	}
+	return vault.RunHealth(w, opts)
+}
+
+// memScriptsDir locates the checkout's scripts/ dir, which hosts the two
+// backlog scripts the health report's last section runs. "" when unresolved;
+// that section then reports the unresolved dir as a FAIL.
 func memScriptsDir() string {
 	repo := memRepoDir()
 	if repo == "" {

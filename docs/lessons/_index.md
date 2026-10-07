@@ -371,4 +371,10 @@ tags: [lessons, index, dotfiles]
 | [351 - A seam OR'd with the host check only fails on that host](lesson-351-a-seam-ored-with-the-host-check-only-fails-on-that-host.md) | 2026-10-07 |
 | [352 - A mid-test [[ ]] assertion is a no-op under bash 3.2](lesson-352-a-mid-test-double-bracket-assertion-is-a-no-op-under-bash-3-2.md) | 2026-10-07 |
 | [353 - golangci-lint's cache reports another worktree's results](lesson-353-golangci-lint-s-cache-reports-another-worktree-s-results.md) | 2026-10-07 |
+| [354 - A skip reason covers only the question it answers](lesson-354-a-skip-reason-covers-only-the-question-it-answers.md) | 2026-10-07 |
+| [355 - After a squash merge, ask the merged head by containment](lesson-355-after-a-squash-merge-ask-the-merged-head-by-containment.md) | 2026-10-07 |
+| [356 - A required check is only as required as its needs](lesson-356-a-required-check-is-only-as-required-as-its-needs.md) | 2026-10-07 |
+| [357 - A pull request closed after a force-push reopens only at its old head](lesson-357-a-pull-request-closed-after-a-force-push-reopens-only-at-its-old-head.md) | 2026-10-07 |
+| [358 - A mode convergence must only narrow](lesson-358-a-mode-convergence-must-only-narrow.md) | 2026-10-07 |
+| [359 - A gate must read every input the platform acts on](lesson-359-a-gate-must-read-every-input-the-platform-acts-on.md) | 2026-10-07 |
 <!-- END GENERATED -->
