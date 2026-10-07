@@ -30,10 +30,12 @@ CI had no per-file bats timing for the #1744 budget guard to read.
   (`tests/lib/dotf-bin.bash`) makes the five files use it. Without `DOTF_BIN`, a file builds once
   and a failed build FAILS (locally too); a missing Go toolchain skips on a developer machine and
   fails when `$CI` is set.
-- **N5.** Eleven of the twelve `dotf-agent-run.bats` cases are deleted, each after its Go twin was
+- **N5.** Ten of the twelve `dotf-agent-run.bats` cases are deleted, each after its Go twin was
   shown to fail when the behaviour breaks; three twins that did not exist (the shipped top chain, the
   saturated pool through the command, the probe reaching a stub harness) were added first. The pipe
-  case stays: it is the property only a real binary and a real pipe show.
+  case stays: it is the property only a real binary and a real pipe show. So does the refusal
+  case (`--timeout` named on stderr, nothing on stdout): only the compiled binary shows that `main()`
+  binds `run` to `os.Stderr`, and mutating that binding turned no other test red.
 - **N7.** The Linux bats step writes a junit report with timing and uploads it as an artifact.
 
 ## Out of scope

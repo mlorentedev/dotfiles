@@ -9,9 +9,10 @@
 # removed them, and the twins are in cli/internal/cmd/agent_test.go,
 # agent_deny_test.go, agent_wiring_test.go and agent_probe_unix_test.go.
 #
-# What is left is the case the Go tests cannot assert. captureRealStreams swaps
-# os.Stdout for a pipe inside one process; this runs the compiled binary and
-# pipes it into a separate consumer, which is how every dispatcher reaches it.
+# What is left are the two cases the Go tests cannot assert. captureRealStreams
+# swaps os.Stdout for a pipe inside one process; the first runs the compiled
+# binary and pipes it into a separate consumer, which is how every dispatcher
+# reaches it. The second pins that main() sends a refusal to stderr.
 #
 # The binary is DOTF_BIN when CI built it, otherwise one build per file run.
 # Skips when the Go toolchain is absent locally, fails in CI and on a build
@@ -44,4 +45,19 @@ setup() {
         --backend dry-run --timeout 30s --repo-root '$REPO_ROOT' --semaphore-dir '$SEM_DIR' | jq -r .status"
     [ "$status" -eq 0 ]
     [ "$output" = "dry_run" ]
+}
+
+# The Go tests hand `run` an injected writer; only the compiled binary shows
+# that main() binds it to os.Stderr. Without this case, a refusal could move to
+# stdout (into a dispatcher's JSON stream) with every other test still green.
+@test "agent run: a missing --timeout is refused on stderr, with nothing on stdout" {
+    dotf_bin_resolve "${BATS_FILE_TMPDIR:-/tmp}/dotf-agent-run"
+    run bash -c "'$DOTF_BIN' agent run --role r --task t --tier mid \
+        --backend dry-run --repo-root '$REPO_ROOT' --semaphore-dir '$SEM_DIR' 2>&1 >/dev/null"
+    [ "$status" -eq 1 ]
+    printf '%s' "$output" | grep -q -- '--timeout is required'
+    run bash -c "'$DOTF_BIN' agent run --role r --task t --tier mid \
+        --backend dry-run --repo-root '$REPO_ROOT' --semaphore-dir '$SEM_DIR' 2>/dev/null"
+    [ "$status" -eq 1 ]
+    [ -z "$output" ]
 }

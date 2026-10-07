@@ -12,7 +12,7 @@ This spec tracks #2059 across several PRs; the entries below are the rows landed
 - [x] AC1 -> `tests/dotf-bin-helper.bats` ("a build that fails fails, locally as well as in CI", "no toolchain in CI fails rather than skipping") and the guard "no bats file skips when a build fails". Observed on a tree with a syntax error in `cli/cmd/dotf/`: on `main`, `compile-harness-real.bats` reports `ok 1 ... # skip dotf failed to build` for all 9 cases; on this branch the same files report `not ok` with `go build ./cmd/dotf failed`.
 - [x] AC2 -> `DOTF_BIN=/nonexistent bats tests/compile-harness-real.bats` fails with `DOTF_BIN is set to /nonexistent, which is not an executable file`; `DOTF_BIN=/usr/bin/true` is honoured (the case fails on its output, proving the build was not used).
 - [x] AC3 -> mutation table in the PR body: 13 one-line production mutations, each turns its Go twin red (`TestAgentRun_*` in `cli/internal/cmd`).
-- [x] AC4 -> `tests/dotf-bin-helper.bats` "ci: ..." cases pin the build-before-bats order and the junit/timing/upload flags; `bats --jobs 4 --no-parallelize-within-files --report-formatter junit --timing --output <dir>` writes a `report.xml` with a `time=` per file (checked locally). Whether the artifact appears is only observable on the first CI run of this PR.
+- [x] AC4 -> `tests/dotf-bin-helper.bats` "ci: ..." cases pin the build-before-bats order and the junit/timing/upload flags; `bats --jobs 4 --no-parallelize-within-files --report-formatter junit --timing --output <dir>` writes a `report.xml` with a `time=` per file (checked locally). The `bats-junit` artifact appears on the CI run of head 8e6de61d (and the earlier heads): `gh api 'repos/mlorentedev/dotfiles/actions/artifacts?name=bats-junit'` lists it, tracked as f5.
 
 ## Test status
 
@@ -23,7 +23,7 @@ This spec tracks #2059 across several PRs; the entries below are the rows landed
 ## Decisions made during implementation
 
 - `harness-suggest.bats` and `dotf-search.bats` were not trimmed. The audit marks them "probable"; `harness suggest` asserts the shipped trigger data and `search` the CLI wrapper's `--type`/`--json` output, and no Go test pins either. Deleting without a twin would lose coverage.
-- Three of the eleven `dotf-agent-run.bats` cases had no Go twin (top tier through the command, saturated pool through the command, probe reaching a stub harness) and a fourth was weaker (the `exit` key). The twins were written first, and mutated red, rather than keeping the bats cases.
+- Three of the eleven `dotf-agent-run.bats` cases had no Go twin (top tier through the command, saturated pool through the command, probe reaching a stub harness) and a fourth was weaker (the `exit` key). The twins were written first, and mutated red, rather than keeping the bats cases. One more case is kept, not deleted: the refusal on stderr, since binding `run` to `os.Stderr` in `main()` is covered by no Go test (mutating it to `os.Stdout` left every other test green; the kept case goes red).
 - A missing Go toolchain still skips on a developer machine: the file headers promise a shell-only checkout runs the rest of the suite. In CI it fails.
 - The spec was scaffolded with `--over-wip-limit` (19 active against a limit of 10): the rows are independent of the other specs and a block in an unrelated one would have mislabelled both.
 

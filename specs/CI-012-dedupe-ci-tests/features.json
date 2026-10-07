@@ -22,8 +22,15 @@
   },
   {
     "id": "CI-012-dedupe-ci-tests-f4",
-    "behavior": "The Linux bats step writes a junit timing report that is uploaded, keeping its parallelism flags",
+    "behavior": "The Linux bats step is wired to write a junit timing report and upload it, keeping its parallelism flags (wiring only; that the artifact exists is f5)",
     "verification": "cd \"$(git rev-parse --show-toplevel)\" && bats --filter 'ci:' tests/dotf-bin-helper.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-012-dedupe-ci-tests-f5",
+    "behavior": "A CI run of this change uploaded the bats-junit artifact",
+    "verification": "gh api 'repos/mlorentedev/dotfiles/actions/artifacts?name=bats-junit' --jq '[.artifacts[] | select(.workflow_run.head_branch == \"ci/dedupe-bats-build\" and (.expired | not))] | length > 0' | grep -qx true",
     "state": "pending",
     "evidence": ""
   }

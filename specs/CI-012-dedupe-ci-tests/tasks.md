@@ -23,7 +23,7 @@ Rows N4, N5 and N7 of #2059 (this PR). N1, N2, N3, N6 and N8 follow as their own
 
 - [x] [AC3] Add the Go twins that did not exist: top tier through the command, saturated pool through the command, probe reaching a stub harness; pin `exit` presence in the record test
 - [x] [AC3] Mutate production code once per deleted case and confirm its twin goes red (table in the PR body)
-- [x] [AC3] Delete 11 of 12 `dotf-agent-run.bats` cases, keep the pipe case
+- [x] [AC3] Delete 10 of 12 `dotf-agent-run.bats` cases, keep the pipe case and the stderr refusal case
 - [x] [AC1] Write `tests/dotf-bin-helper.bats` (helper outcomes, fail-open detector with negative control) before the helper
 - [x] [AC1] [AC2] `tests/lib/dotf-bin.bash`; five files resolve the binary through it
 - [x] [AC2] [AC4] `ci.yml` test job: build once and export `DOTF_BIN`; junit report with timing; upload artifact
