@@ -454,3 +454,63 @@ big_change() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"FOO-001-demo"* ]]
 }
+
+# #1878: the squash merge commit carries every branch commit message
+# (squash_merge_commit_message=COMMIT_MESSAGES), and GitHub closes issues from
+# it as well as from the PR body. #1868 said `Refs #1241` in its body and one
+# commit said `Closes #1241`; the merge closed #1241 with its spec active.
+commit_closing() {
+    echo "more" >> seed.txt
+    git add -A
+    git commit -q -m "fix a thing" -m "$1"
+}
+
+@test "#1878: a closing keyword in a branch commit message fails the gate even when the body only refs" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    commit_closing "Closes #123"
+    export SDD_PR_BODY="Refs #123"
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FOO-001-demo (#123)"* ]]
+    [[ "$output" == *"every commit message"* ]]
+}
+
+@test "#1878: a commit keyword is enforced with no PR body (a pre-push before the PR exists)" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    commit_closing "Fixes #123"
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FOO-001-demo"* ]]
+}
+
+@test "#1878: a commit keyword credits the archive like a body keyword" {
+    # Over the LOC threshold, so the archive credit (BUG-050) is what passes it.
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    big_change
+    commit_closing "Closes #123"
+    archive_spec FOO-001-demo
+
+    run_gate
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"spec folder touched"* ]]
+}
+
+@test "#1878: a closing keyword in a commit that came from the base is not this PR's" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    git checkout -q main
+    echo "base" > base.txt
+    git add base.txt
+    git commit -q -m "base work" -m "Closes #123"
+    git checkout -q feature
+    git merge -q --no-edit main
+
+    run_gate
+    [ "$status" -eq 0 ]
+}
