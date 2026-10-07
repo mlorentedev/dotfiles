@@ -1149,6 +1149,6 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     # activation; each shell guards it on mise being installed.
     grep -qF 'command -v mise >/dev/null && eval "$(mise activate zsh)"' "$DOTFILES_DIR/.zshrc"
     grep -qF 'command -v mise >/dev/null && eval "$(mise activate bash)"' "$DOTFILES_DIR/.bashrc"
-    grep -qF '(& mise activate pwsh) | Out-String | Invoke-Expression' "$DOTFILES_DIR/powershell/profile.ps1"
+    grep -qF '. ([ScriptBlock]::Create((& mise activate pwsh | Out-String)))' "$DOTFILES_DIR/powershell/profile.ps1"
     grep -qF 'if (Get-Command mise -ErrorAction SilentlyContinue)' "$DOTFILES_DIR/powershell/profile.ps1"
 }
