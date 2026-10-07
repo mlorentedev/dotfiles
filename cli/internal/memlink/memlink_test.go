@@ -140,6 +140,7 @@ func TestResolveVaultMemory_RepoURL(t *testing.T) {
 func TestEnsure_LinksByRepoURL(t *testing.T) {
 	vault := t.TempDir()
 	src := vaultProject(t, vault, "suite", "ssh://git@host:2222/owner/sensortool.git", true)
+	writeFile(t, filepath.Join(src, "MEMORY.md"), "suite-memory")
 	cwd := filepath.Join(t.TempDir(), "sensortool")
 	target := filepath.Join(t.TempDir(), "memory")
 
@@ -147,13 +148,14 @@ func TestEnsure_LinksByRepoURL(t *testing.T) {
 	if err != nil || msg == "" {
 		t.Fatalf("Ensure: msg=%q err=%v, want a created link", msg, err)
 	}
-	if !isLink(target) {
-		t.Fatalf("target %s is not a link", target)
+	// Read through the link rather than resolving it: EvalSymlinks does not follow
+	// a Windows junction.
+	got, err := os.ReadFile(filepath.Join(target, "MEMORY.md"))
+	if err != nil {
+		t.Fatalf("link did not read through: %v", err)
 	}
-	got, _ := filepath.EvalSymlinks(target)
-	want, _ := filepath.EvalSymlinks(src)
-	if got != want {
-		t.Errorf("link resolves to %q, want %q", got, want)
+	if string(got) != "suite-memory" {
+		t.Errorf("read %q through link, want suite-memory", got)
 	}
 }
 
