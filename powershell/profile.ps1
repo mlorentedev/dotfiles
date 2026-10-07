@@ -197,11 +197,11 @@ function hc {
 # mise first: the pinned CLIs `dotf tools sync` installs reach PATH through it
 # (ADR-044, #2013 W2b), the same activation .zshrc and .bashrc make.
 if (Get-Command mise -ErrorAction SilentlyContinue) {
-    (& mise activate pwsh) | Out-String | Invoke-Expression
+    . ([ScriptBlock]::Create((& mise activate pwsh | Out-String)))
 }
 # zoxide: installed on Windows too, so initialised here as in .zshrc.
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
-    (& zoxide init powershell) | Out-String | Invoke-Expression
+    . ([ScriptBlock]::Create((& zoxide init powershell | Out-String)))
 }
 
 if (Get-Command eza -ErrorAction SilentlyContinue) {
