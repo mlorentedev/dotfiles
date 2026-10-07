@@ -235,23 +235,44 @@ func FindUnresolvedTags(specDir string) ([]string, error) {
 // Content without frontmatter is returned unchanged.
 func setStatus(content, newStatus string) string {
 	lines := strings.Split(content, "\n")
+	if i := frontmatterStatusLine(lines); i >= 0 {
+		m := statusLinePattern.FindStringSubmatch(lines[i])
+		lines[i] = m[1] + newStatus + m[2]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// frontmatterStatusLine returns the index of the first `status:` line inside the
+// first frontmatter block, or -1. Fences are compared trimmed, as in
+// withFrontmatterField: a CRLF checkout's fence is "---\r", and an exact match
+// never saw the block, so the archive reported a rewrite it had not made
+// (CLI-095, #1976).
+func frontmatterStatusLine(lines []string) int {
 	fences := 0
 	for i, line := range lines {
-		if line == "---" {
+		if strings.TrimSpace(line) == "---" {
 			fences++
 			if fences == 2 {
-				break // end of the first frontmatter block
+				return -1 // end of the first frontmatter block
 			}
 			continue
 		}
-		if fences == 1 {
-			if m := statusLinePattern.FindStringSubmatch(line); m != nil {
-				lines[i] = m[1] + newStatus + m[2]
-				break // only the first status: line in the block
-			}
+		if fences == 1 && statusLinePattern.MatchString(line) {
+			return i
 		}
 	}
-	return strings.Join(lines, "\n")
+	return -1
+}
+
+// withStatus is setStatus that cannot report a rewrite it did not make: a
+// proposal whose first frontmatter block has no status: line gets one, and one
+// with no frontmatter at all (a pre-template proposal) gets a block, so the
+// status the archive prints is always the status the file carries (CLI-095).
+func withStatus(content, newStatus string) string {
+	if frontmatterStatusLine(strings.Split(content, "\n")) >= 0 {
+		return setStatus(content, newStatus)
+	}
+	return withFrontmatterLine(content, "status: "+newStatus)
 }
 
 // Archive performs the mechanical spec archive, the Go twin of archive-spec.sh:
@@ -308,7 +329,7 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 		proposal = filepath.Join(target, "spec.md")
 	}
 	if data, readErr := os.ReadFile(proposal); readErr == nil {
-		out := setStatus(string(data), newStatus)
+		out := withStatus(string(data), newStatus)
 		if bypass {
 			out = withFrontmatterField(out, "review_bypass", bypassRecord(opts, overrode))
 		}
@@ -419,9 +440,18 @@ func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 // verbatim, `#` included.
 func withFrontmatterField(content, key, value string) string {
 	quoted := `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value) + `"`
-	line := key + ": " + quoted
+	return withFrontmatterLine(content, key+": "+quoted)
+}
+
+// withFrontmatterLine appends line as the last line of content's frontmatter
+// block, creating the block when the file has none. A CRLF block gets a CRLF
+// line, so the insertion does not leave mixed line endings behind.
+func withFrontmatterLine(content, line string) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
+		if strings.HasSuffix(lines[0], "\r") {
+			line += "\r"
+		}
 		for i := 1; i < len(lines); i++ {
 			if strings.TrimSpace(lines[i]) == "---" {
 				return strings.Join(append(lines[:i:i], append([]string{line}, lines[i:]...)...), "\n")
