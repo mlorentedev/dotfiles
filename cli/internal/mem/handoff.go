@@ -503,12 +503,17 @@ func ThreadKey(cwd string) string {
 }
 
 // ThreadKeyForCwd is ThreadKey over the process's working directory.
-func ThreadKeyForCwd() string {
+//
+// An unreadable working directory (deleted under the process, or permissions)
+// is an error, not "main": "main" is the ambient thread, and pooling every
+// failure into it hands an unrelated session somebody else's handoff
+// (MEMORY-016, #1930).
+func ThreadKeyForCwd() (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
-		return "main"
+		return "", fmt.Errorf("resolve the thread from the working directory: %w", err)
 	}
-	return ThreadKey(wd)
+	return ThreadKey(wd), nil
 }
 
 // HandoffThread is the thread key handoff-write uses for memoryPath (#1606).
