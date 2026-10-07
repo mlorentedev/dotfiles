@@ -162,15 +162,18 @@
       }
     },
 
-    // OpenRouter — curated to the shared free+NaN set (#300; matches pi's
-    // ai/pi/settings.json enabledModels) so opencode and pi are interchangeable.
+    // OpenRouter — a curated picker (#300), independent of pi's (ai/pi/README.md).
     // An explicit models map restricts the /models picker to exactly these,
-    // whereas an empty {} loads OpenRouter's entire catalog. 3 most-powerful
-    // free + 3 paid non-OpenAI/Google/Anthropic.
+    // whereas an empty {} loads OpenRouter's entire catalog. Free + paid
+    // non-OpenAI/Google/Anthropic.
+    //
+    // The list is a snapshot of a third-party catalog that retires slugs without
+    // notice, and nothing probes it: on 2026-10-07 two of the three `:free`
+    // entries (qwen3-coder, kimi-k2.6) were absent from /api/v1/models, and
+    // qwen3-coder had answered 404 (#1937). Re-measure before adding one, keyless:
+    //   curl -s https://openrouter.ai/api/v1/models | jq -r '.data[].id' | grep -Fx '<slug>'
     "openrouter": {
       "models": {
-        "qwen/qwen3-coder:free": { "name": "Qwen3 Coder (free)" },
-        "moonshotai/kimi-k2.6:free": { "name": "Kimi K2.6 (free)" },
         "nvidia/nemotron-3-ultra-550b-a55b:free": { "name": "Nemotron 3 Ultra (free)" },
         "deepseek/deepseek-v4-pro": { "name": "DeepSeek V4 Pro" },
         "qwen/qwen3-coder-plus": { "name": "Qwen3 Coder Plus" },
