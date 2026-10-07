@@ -1,0 +1,58 @@
+name: cli-smoke
+
+# The built dotf binary under a clean HOME, from a directory outside any git
+# repository (CLI-100, #2081): what a user outside this checkout runs. Every
+# command's --help and `dotf version`, so a command whose construction needs a
+# machine.json, a vault or a checkout fails here, not on a user's machine.
+#
+# Its own workflow, and not a required check yet: non-blocking until it has run
+# clean for a while (epic #1843, row E2). Inside cli.yml every pull-request job
+# must be in cli-gate's needs (tests/lib/check-workflow-contexts.py), which
+# would make it blocking at once; continue-on-error would instead report a
+# failure as green. Making it required is a line in forge/branch-protection.json.
+#
+# No paths filter: a filtered workflow never reports on an unlisted diff, so once
+# required its check would stay pending there (CI-004, #1739).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: cli
+
+jobs:
+  smoke:
+    name: cli-smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: Build the binary
+        shell: bash
+        run: go build -o "$RUNNER_TEMP/dotf-smoke/dotf$(go env GOEXE)" ./cmd/dotf
+      - name: Every command under a clean HOME
+        shell: bash
+        # A -run pattern that matches nothing passes with "no tests to run", so
+        # the step also asserts the test ran (bash here runs with pipefail).
+        run: |
+          DOTF_SMOKE_BIN="$RUNNER_TEMP/dotf-smoke/dotf$(go env GOEXE)" \
+            go test ./cmd/dotf -run '^TestCleanHomeSmoke$' -count=1 -v | tee "$RUNNER_TEMP/smoke.log"
+          grep -q -- '--- PASS: TestCleanHomeSmoke ' "$RUNNER_TEMP/smoke.log" \
+            || { echo "::error::TestCleanHomeSmoke did not run"; exit 1; }
