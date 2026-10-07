@@ -9,14 +9,14 @@
   {
     "id": "PLAT-001b-one-entrypoint-f2",
     "behavior": "AC2: the records reconciler deploys the agent instruction files and skills first, and fails if they are absent afterwards",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsReconciler_DeploysInstructionsFirst$' -count=1",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsInstructions_DeploysInstructionsFirst$' -count=1 -v | grep -q -- '--- PASS: TestRecordsInstructions_DeploysInstructionsFirst'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "PLAT-001b-one-entrypoint-f3",
     "behavior": "AC3: a second converge on a converged HOME reports zero native changes and persists the report",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestConverge_SecondRunIsANoOpAndPersistsTheReport$' -count=1",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestConverge_SecondRunIsANoOpAndPersistsTheReport$' -count=1 -v | grep -q -- '--- PASS: TestConverge_SecondRunIsANoOpAndPersistsTheReport'",
     "state": "pending",
     "evidence": ""
   },
@@ -58,7 +58,7 @@
   {
     "id": "PLAT-001b-one-entrypoint-f9",
     "behavior": "AC8: dotf update runs converge and keeps its exit semantics",
-    "verification": "cd cli && go test ./internal/update/ -count=1",
+    "verification": "cd cli && go test ./internal/update/ -count=1 && go test ./internal/update/ -run '^TestUpdate_RunsConvergeAfterAFastForward$' -count=1 -v | grep -q -- '--- PASS: TestUpdate_RunsConvergeAfterAFastForward'",
     "state": "pending",
     "evidence": ""
   },

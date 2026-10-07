@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,5 +65,26 @@ func TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers(t *testing.T) {
 
 	if err := (recordsMirror{}).Probe(env); err == nil {
 		t.Fatal("probe passed on a deploy dir that was never mirrored")
+	}
+}
+
+// A target the manifest declares but the checkout lacks is never reported as
+// converged: Mirror and PlanMirror both return ErrMissingTargets, so the plan,
+// the apply and the probe all fail and name the gap.
+func TestRecordsMirror_ADeclaredTargetTheCheckoutLacksFails(t *testing.T) {
+	env := recordsEnv(t)
+	if err := os.Remove(filepath.Join(env.RepoRoot, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	r := recordsMirror{}
+
+	if _, err := r.Reconcile(env, true); err == nil || !strings.Contains(err.Error(), "AGENTS.md") {
+		t.Errorf("plan: want an error naming AGENTS.md, got %v", err)
+	}
+	if _, err := r.Reconcile(env, false); err == nil {
+		t.Error("apply reported success with a declared target missing")
+	}
+	if err := r.Probe(env); err == nil {
+		t.Error("probe passed with a declared target missing")
 	}
 }
