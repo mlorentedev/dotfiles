@@ -315,8 +315,11 @@ func newWorktreeDoneCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "done [path]",
 		Short: "Tear down a completed worktree cleanly",
-		Long: `done removes a completed worktree and prunes git metadata. Refuses if there are
-uncommitted changes unless --force is passed.`,
+		Long: `done removes a completed worktree and prunes git metadata. Unless --force is
+passed, it refuses on uncommitted changes, and on commits that are neither on
+the upstream nor contained in the head of a merged pull request for the branch
+(how a squash-merged branch looks once its remote is deleted). When that pull
+request cannot be listed (no gh, offline), it refuses and says so.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			target, err := resolveDoneTarget(args, worktreePath)
