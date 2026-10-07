@@ -458,6 +458,9 @@ setup() {
         '& npm install -g $env:SOME_PKG'
         $'TOOL=yarn\nnpm install -g "${TOOL:-x}"'
         $'foo=unrelated\nnpm install -g "$FOO"'
+        'npm install -g yarn${SUFFIX}'
+        'npm install -g "@github/copilot$SUFFIX"'
+        'npm install --location global yarn@1.22.22'
     )
     benign=(
         'npm install -g yarnish'

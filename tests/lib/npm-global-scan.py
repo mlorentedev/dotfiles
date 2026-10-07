@@ -15,7 +15,7 @@ This matches the property instead. For each global npm install command in a twin
 - the verb (`install`, `i`, `add`) may sit anywhere after `npm`, so
   `npm -g install yarn` counts, and the command ends at a shell operator;
 - the value of a flag that takes one (`--prefix "$HOME/.local"`) is not a
-  package;
+  package, and `--location global` is as global as `-g`;
 - a `$var` argument is resolved through every assignment to it in the same file,
   `export`/`local`/`readonly` forms and PowerShell's `$x = if (..) { "a" } else
   { "b" }` included: every string literal on the right-hand side is a candidate,
@@ -23,6 +23,8 @@ This matches the property instead. For each global npm install command in a twin
   cannot be followed (no assignment in the file, `$1`, `$env:X`, a command
   substitution, a `${VAR:-x}`-style expansion) FAILS the check rather than
   passing it, since the guard cannot say what it installs;
+- an expansion inside an argument (`yarn${SUFFIX}`) may be empty, so the
+  argument is also compared with every expansion removed;
 - variable names are case-sensitive in sh and case-insensitive in PowerShell,
   so only a `.ps1` file's names are folded.
 
@@ -91,6 +93,10 @@ def assignments(lines, key):
     return values
 
 
+# An expansion inside an argument, `${...}` (one level of nesting) or `$VAR`.
+EMBEDDED_RE = re.compile(r"\$\{[^{}]*\}|\$[A-Za-z_]\w*")
+
+
 def package(arg):
     """The package name of an npm argument, without its version."""
     if arg.startswith("@"):
@@ -131,7 +137,9 @@ def npm_commands(line):
 def package_args(tokens):
     """The package arguments of a global install, or None if it is not one."""
     verb = next((i for i, t in enumerate(tokens) if t in VERBS), None)
-    if verb is None or not any(t in GLOBAL_FLAGS for t in tokens):
+    is_global = any(t in GLOBAL_FLAGS or (t == "--location" and nxt == "global")
+                    for t, nxt in zip(tokens, tokens[1:] + [""]))
+    if verb is None or not is_global:
         return None
     args, skip = [], False
     for t in tokens[verb + 1:]:
@@ -192,9 +200,10 @@ def scan(owned, path):
                     bad.append(f"{name}:{n}: what {arg} installs cannot be resolved from the file")
                     continue
                 for c in cands:
-                    pkg = package(c.strip("\"'"))
-                    if pkg in owned:
-                        bad.append(f"{name}:{n}: {pkg}")
+                    c = c.strip("\"'")
+                    for pkg in {package(c), package(EMBEDDED_RE.sub("", c))}:
+                        if pkg in owned:
+                            bad.append(f"{name}:{n}: {pkg}")
     return bad, seen
 
 
