@@ -9,8 +9,16 @@ export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
 plugins=(git)
 
-# Load Oh My Zsh
-source $ZSH/oh-my-zsh.sh
+# Load Oh My Zsh when it is installed; without it, initialise completion
+# directly, so a machine that has not run setup still gets a working shell
+# (#2013 W6).
+if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
+    source "$ZSH/oh-my-zsh.sh"
+else
+    autoload -Uz compinit && compinit -C
+fi
+# Case-insensitive, partial-word completion.
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 
 # ==========================
 #       ENVIRONMENT
@@ -101,12 +109,17 @@ export NINJA_HOME="$HOME/.console-ninja"
 # Tool Versions (single source of truth)
 [[ -f "$DOTFILES_DIR/versions.conf" ]] && . "$DOTFILES_DIR/versions.conf"
 
-# Tool Homes (constructed from versions.conf)
-export JAVA_HOME="$APPS_HOME/jdk-${JAVA_VERSION}"
-export MAVEN_HOME="$APPS_HOME/apache-maven-${MAVEN_VERSION}"
-export PYTHON_HOME="$APPS_HOME/python-${PYTHON_VERSION}"
-export MINIKUBE_HOME="$APPS_HOME/minikube-${MINIKUBE_VERSION}"
-export GO_HOME="$APPS_HOME/go-${GO_VERSION}"
+# Tool Homes (constructed from versions.conf), exported only when the
+# directory exists. A JAVA_HOME naming a directory that is not there breaks
+# macOS's /usr/bin/java stub, and on a machine whose toolchains come from mise
+# (ADR-044) none of these exist (#2013 F-041).
+_dotfiles_home() { [[ -d "$2" ]] && export "$1=$2"; }
+_dotfiles_home JAVA_HOME "$APPS_HOME/jdk-${JAVA_VERSION}"
+_dotfiles_home MAVEN_HOME "$APPS_HOME/apache-maven-${MAVEN_VERSION}"
+_dotfiles_home PYTHON_HOME "$APPS_HOME/python-${PYTHON_VERSION}"
+_dotfiles_home MINIKUBE_HOME "$APPS_HOME/minikube-${MINIKUBE_VERSION}"
+_dotfiles_home GO_HOME "$APPS_HOME/go-${GO_VERSION}"
+unset -f _dotfiles_home
 
 # ==========================
 #    PATH CONFIGURATION
@@ -114,12 +127,18 @@ export GO_HOME="$APPS_HOME/go-${GO_VERSION}"
 # Start with system paths or current path
 # export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Prepend Tool Paths (priority over system)
-export PATH="$JAVA_HOME/bin:$PATH"
-export PATH="$MAVEN_HOME/bin:$PATH"
-export PATH="$PYTHON_HOME/bin:$PATH"
-export PATH="$MINIKUBE_HOME:$PATH"
-export PATH="$GO_HOME/bin:$PATH"
+# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel.
+for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+done
+unset _brew
+
+# Prepend Tool Paths (priority over system), for the homes that exist
+[[ -n "${JAVA_HOME:-}" ]] && export PATH="$JAVA_HOME/bin:$PATH"
+[[ -n "${MAVEN_HOME:-}" ]] && export PATH="$MAVEN_HOME/bin:$PATH"
+[[ -n "${PYTHON_HOME:-}" ]] && export PATH="$PYTHON_HOME/bin:$PATH"
+[[ -n "${MINIKUBE_HOME:-}" ]] && export PATH="$MINIKUBE_HOME:$PATH"
+[[ -n "${GO_HOME:-}" ]] && export PATH="$GO_HOME/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"          # Go workspace bin
 export PATH="$NINJA_HOME/.bin:$PATH"      # Console Ninja
 export PATH="$DOTFILES_DIR/scripts:$PATH"
@@ -167,13 +186,17 @@ alias obsidian='obsidian --no-sandbox'
 [[ -f ~/.zsh/functions.sh ]] && source ~/.zsh/functions.sh
 [[ -f ~/.zsh/nvm.zsh ]] && source ~/.zsh/nvm.zsh
 
-# Initialize tools
+# Initialize tools. mise first: the pinned CLIs it installs (direnv, zoxide,
+# ...) reach PATH through it (ADR-044, #2013 W2b).
+command -v mise >/dev/null && eval "$(mise activate zsh)"
 command -v direnv >/dev/null && eval "$(direnv hook zsh)"
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 
-# Terraform Autocomplete
-autoload -U +X bashcompinit && bashcompinit
-complete -o nospace -C /usr/bin/terraform terraform
+# Terraform Autocomplete, from whichever terraform is on PATH (#2013 F-042)
+if command -v terraform >/dev/null; then
+    autoload -U +X bashcompinit && bashcompinit
+    complete -o nospace -C "$(command -v terraform)" terraform
+fi
 
 # Dump zprof results at end of startup if profiling is enabled
 [[ -n "${DOTFILES_PROFILE:-}" ]] && zprof | head -25
