@@ -137,20 +137,55 @@ const BackupSuffix = ".pre-dotf"
 // The backup takes the narrower of the file's own mode and the config's
 // declared one: a 0644 settings file that held a credential must not leave a
 // 0644 copy of it beside the 0600 file that replaces it.
+//
+// A symlink (the pre-ADR-012 leftover) is kept as a link: what the machine had
+// there was a pointer, and the rename that installs the config replaces the
+// pointer, not the file it named (#2054).
 func backupOnce(dst string, declared os.FileMode) (string, error) {
 	info, err := os.Lstat(dst)
-	if err != nil || !info.Mode().IsRegular() {
-		return "", nil //nolint:nilerr // nothing to keep: absent, or not a regular file
+	if err != nil {
+		return "", nil //nolint:nilerr // nothing to keep: absent
 	}
 	backup := dst + BackupSuffix
 	if _, err := os.Lstat(backup); err == nil {
 		return "", nil
 	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return backupLink(dst, backup, declared)
+	}
+	if !info.Mode().IsRegular() {
+		return "", nil // nothing to keep: a directory or device is not a config
+	}
+	return backupContent(dst, backup, info.Mode().Perm()&declared.Perm())
+}
+
+// backupLink re-creates the link at backup, so `ls -l` shows where it pointed
+// and restoring it is a rename. Where links cannot be created (Windows without
+// the privilege) it keeps the content the link resolved to instead, and a
+// dangling link there leaves nothing to keep: the file it named is untouched.
+func backupLink(dst, backup string, declared os.FileMode) (string, error) {
+	target, err := os.Readlink(dst)
+	if err != nil {
+		return "", fmt.Errorf("back up %s: %w", dst, err)
+	}
+	if err := symlink(target, backup); err == nil {
+		return backup, nil
+	}
+	if _, err := os.Stat(dst); err != nil {
+		return "", nil //nolint:nilerr // dangling: no content to keep
+	}
+	return backupContent(dst, backup, declared.Perm())
+}
+
+// symlink is os.Symlink, swappable so the fallback above runs on every host.
+var symlink = os.Symlink
+
+func backupContent(dst, backup string, mode os.FileMode) (string, error) {
 	data, err := os.ReadFile(dst) //nolint:gosec // a manifest-declared destination
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(backup, data, info.Mode().Perm()&declared.Perm()); err != nil {
+	if err := os.WriteFile(backup, data, mode); err != nil {
 		return "", fmt.Errorf("back up %s: %w", dst, err)
 	}
 	return backup, nil
@@ -165,6 +200,11 @@ type Plan struct {
 	Dst     string
 	Content []byte // what the destination holds after the deploy
 	Changed bool
+	// Symlink: the destination is a link (the pre-ADR-012 leftover), so it is
+	// Changed whatever it resolves to. Reading through it would compare the
+	// link's target, and an alias of the right bytes is still not the regular
+	// file a deploy installs (#2054).
+	Symlink bool
 }
 
 var (
@@ -403,7 +443,7 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 	if err != nil {
 		return Plan{}, err
 	}
-	p := Plan{Dst: dst}
+	p := Plan{Dst: dst, Symlink: isSymlink(dst)}
 	switch c.strategy() {
 	case StrategyMerge:
 		p.Content, p.Changed, err = mergeInto(dst, srcData)
@@ -415,6 +455,7 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 		existing, readErr := os.ReadFile(dst) //nolint:gosec // manifest-declared destination
 		p.Changed = readErr != nil || !bytes.Equal(existing, srcData)
 	}
+	p.Changed = p.Changed || p.Symlink
 	return p, nil
 }
 
@@ -482,7 +523,7 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 	if err != nil {
 		return out, fmt.Errorf("config %q: re-read staged copy: %w", c.Name, err)
 	}
-	if existing, err := os.ReadFile(dst); err == nil && bytes.Equal(existing, stagedData) { //nolint:gosec // manifest-declared destination
+	if existing, err := os.ReadFile(dst); err == nil && !isSymlink(dst) && bytes.Equal(existing, stagedData) { //nolint:gosec // manifest-declared destination
 		return ensureMode(c, out, dst, mode, dryRun) // in sync by content; the mode may still be off
 	}
 	out.Changed = true
@@ -577,6 +618,12 @@ func stage(c Config, dst string, data []byte, mode os.FileMode) (string, error) 
 		return staged, fmt.Errorf("config %q: stage mode: %w", c.Name, err)
 	}
 	return staged, nil
+}
+
+// isSymlink reports whether path is itself a link, without following it.
+func isSymlink(path string) bool {
+	info, err := os.Lstat(path)
+	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
 
 // commit moves the staged file over the destination atomically.
