@@ -23,16 +23,30 @@ branch reports commits "not in main", so `git log origin/main..<branch>` alone c
 finished branch from a stranded one.
 
 ## The Solution
-Compare the branch tip with the PR's **head commit at merge**, not with the PR's state:
+Fetch first, then compare the **remote** branch tip with the PR's **head commit at merge**, not
+with the PR's state. A local branch can be behind its remote and pass the test while
+`origin/<branch>` carries the post-merge commit:
 
 ```bash
+git fetch --prune origin
+ref=origin/<branch>
 head=$(gh pr view <N> --json headRefOid -q .headRefOid)
-git merge-base --is-ancestor <branch> "$head" && echo "nothing after the PR" \
-  || git log --oneline "$head..<branch>"        # commits pushed after the merge
+git merge-base --is-ancestor "$ref" "$head" && echo "nothing after the PR" \
+  || git log --oneline "$head..$ref"            # commits pushed after the merge
 ```
 
-When the branch has commits beyond the PR head, check their content against `main` (for a
-squash merge, reverse-apply the branch's diff against `main`'s tree with
-`git apply --cached --check -R`). Land anything missing through a new PR before deleting the
-branch. The same test applies to local branches, stray refs (`refs/tmp/*`, `refs/remotes/pr/*`)
+When the branch has commits beyond the PR head, check whether their content is already in
+`main`. For a squash merge, reverse-apply the branch's diff against a throwaway index loaded from
+`origin/main`, so neither the working tree nor the real index affects the answer:
+
+```bash
+export GIT_INDEX_FILE=$(mktemp -u)
+git read-tree origin/main
+git diff --binary "$(git merge-base origin/main "$ref")" "$ref" \
+  | git apply --cached --check -R && echo "already in main"
+rm -f "$GIT_INDEX_FILE"; unset GIT_INDEX_FILE
+```
+
+A failed check is not proof of loss either (a later change to the same lines also fails it), so
+read the diff before deciding. Land anything missing through a new PR before deleting the branch. The same test applies to local branches, stray refs (`refs/tmp/*`, `refs/remotes/pr/*`)
 and worktrees: "its PR merged" is a claim about the PR, not about the commits on the ref.
