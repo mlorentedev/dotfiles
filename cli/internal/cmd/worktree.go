@@ -369,6 +369,11 @@ the upstream nor contained in the head of a merged pull request for the branch
 (how a squash-merged branch looks once its remote is deleted). When that pull
 request cannot be listed (no gh, offline), it refuses and says so.
 
+Whatever --force says, it also refuses a worktree that contains the current
+directory or, on Linux, the working directory of a process it runs under: the
+removal would strand that shell or agent, and a Claude Code session launched
+from the worktree could not be resumed. Run it from outside the worktree.
+
 The argument is the worktree's path, or the slug given to add: a name that is
 not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 		Args: cobra.MaximumNArgs(1),
@@ -386,6 +391,7 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 			opts := worktree.DoneOptions{
 				RepoRoot:     root,
 				WorktreePath: target,
+				Cwd:          callerCwd(os.Getwd, os.Getenv),
 				Force:        force,
 			}
 
@@ -399,8 +405,19 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 	}
 
 	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
-	cmd.Flags().StringVar(&worktreePath, "path", "", "path to worktree to remove (defaults to current directory)")
+	cmd.Flags().StringVar(&worktreePath, "path", "", "path to worktree to remove (defaults to the one holding the current directory, which done then refuses)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "force removal even if there are uncommitted changes")
 
 	return cmd
+}
+
+// callerCwd is the directory `worktree done` checks it is not removing from
+// under its caller. When the cwd cannot be read, the launching shell's $PWD
+// stands in, so the check does not silently drop out: off Linux there is no
+// ancestor walk behind it.
+func callerCwd(getwd func() (string, error), getenv func(string) string) string {
+	if cwd, err := getwd(); err == nil {
+		return cwd
+	}
+	return getenv("PWD")
 }

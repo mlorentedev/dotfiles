@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,5 +141,23 @@ func TestWorktreeDoneNamesASiblingThatIsNotAWorktree(t *testing.T) {
 	_, err := executeWorktree(t, "done", "stray", "--repo", repo)
 	if err == nil || !strings.Contains(err.Error(), stray) || !strings.Contains(err.Error(), "not a git worktree") {
 		t.Fatalf("got %v, want an error naming %s as not a git worktree", err, stray)
+	}
+}
+
+// A cwd that cannot be read must not switch the caller check off: the shell's
+// $PWD stands in for it.
+func TestCallerCwdFallsBackToPWD(t *testing.T) {
+	env := func(k string) string {
+		if k == "PWD" {
+			return "/repo-wt-x/sub"
+		}
+		return ""
+	}
+	if got := callerCwd(func() (string, error) { return "/elsewhere", nil }, env); got != "/elsewhere" {
+		t.Fatalf("a readable cwd must win, got %q", got)
+	}
+	unreadable := func() (string, error) { return "", errors.New("getwd: permission denied") }
+	if got := callerCwd(unreadable, env); got != "/repo-wt-x/sub" {
+		t.Fatalf("an unreadable cwd must fall back to $PWD, got %q", got)
 	}
 }

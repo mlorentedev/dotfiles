@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // processDiscoverySupported reports whether Gate f can actually observe running
@@ -130,7 +129,7 @@ func inspectProcessCwd(pidName, absTarget string) cwdVerdict {
 	if err != nil {
 		return cwdUnreadable
 	}
-	if absDest == absTarget || strings.HasPrefix(absDest, absTarget+string(filepath.Separator)) {
+	if pathWithin(absDest, absTarget) {
 		return cwdInside
 	}
 	return cwdOutside

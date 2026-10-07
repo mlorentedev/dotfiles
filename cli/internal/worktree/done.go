@@ -11,13 +11,19 @@ type DoneOptions struct {
 	RepoRoot     string
 	WorktreePath string
 	LockPath     string
-	Force        bool
+	// Cwd is the caller's working directory. done refuses a worktree that
+	// contains it; empty skips that one check (the ancestor walk still runs).
+	Cwd   string
+	Force bool
 }
 
 // Done tears down a completed worktree safely.
 func Done(opts DoneOptions) error {
 	absRepo, absWT, err := validateDoneOptions(opts)
 	if err != nil {
+		return err
+	}
+	if err := checkCallerOutside(absWT, opts.Cwd); err != nil {
 		return err
 	}
 
@@ -59,6 +65,57 @@ func validateDoneOptions(opts DoneOptions) (string, string, error) {
 		return "", "", fmt.Errorf("cannot remove main repository: %s", absRepo)
 	}
 	return absRepo, absWT, nil
+}
+
+// callerInside is the ancestor walk of done_proc_linux.go / done_proc_other.go,
+// behind a variable so a test can drive the refusal on every platform.
+var callerInside = isCallerInside
+
+// ancestor is a process the caller runs under, named in a refusal so the
+// operator can tell which one sits in the worktree.
+type ancestor struct {
+	PID  int
+	Comm string
+	Cwd  string
+}
+
+// checkCallerOutside refuses a worktree that holds the caller's working
+// directory, or that of a process the caller runs under (#1653). It takes no
+// force flag on purpose: --force is about uncommitted changes and gets passed
+// routinely, while removing the directory a session lives in strands it, and a
+// Claude Code session launched from the worktree cannot be resumed once the
+// directory is gone. The way out is to run done from somewhere else.
+func checkCallerOutside(absWT, cwd string) error {
+	target := resolvedPath(absWT)
+	if cwd != "" && pathWithin(resolvedPath(cwd), target) {
+		return fmt.Errorf("the current directory %s is inside the worktree %s; run done from outside it, naming the worktree by path or slug", cwd, absWT)
+	}
+	if a, inside := callerInside(target); inside {
+		return fmt.Errorf("process %d (%s), which this command runs under, works in %s inside the worktree %s; "+
+			"removing it would strand that process, and a Claude Code session launched there could not be resumed. "+
+			"Remove the worktree from a session that was not started inside it", a.PID, a.Comm, a.Cwd, absWT)
+	}
+	return nil
+}
+
+// resolvedPath is path made absolute and symlink-resolved, so it compares
+// equal to what the kernel reports for a process cwd. A path that cannot be
+// resolved is compared as given.
+func resolvedPath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	if r, err := filepath.EvalSymlinks(abs); err == nil {
+		return r
+	}
+	return abs
+}
+
+// pathWithin reports whether path is root or below it. The separator matters:
+// repo-wt-feat-2 shares a prefix with repo-wt-feat and is not inside it.
+func pathWithin(path, root string) bool {
+	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
 }
 
 func checkUncommittedChanges(absWT string, force bool) error {
