@@ -30,7 +30,9 @@ func convergeFixture(t *testing.T) (repo, home string) {
 	// The real deploy runs scripts/compile-harness.sh, which this fixture does
 	// not have; a test that needs it opts in with its own runner (lesson 335).
 	saved := convergeOptions
-	convergeOptions = converge.Options{RunHarnessDeploy: func(converge.Env) error { return nil }}
+	convergeOptions = func() converge.Options {
+		return converge.Options{RunHarnessDeploy: func(converge.Env) error { return nil }}
+	}
 	t.Cleanup(func() { convergeOptions = saved })
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)

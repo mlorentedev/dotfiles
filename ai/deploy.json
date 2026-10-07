@@ -136,6 +136,20 @@
       "strategy": "merge"
     },
     {
+      "name": "agy-instructions",
+      "src": "ai/agy/AGY.md",
+      "dst": "{HOME}/.gemini/AGY.md",
+      "render": false,
+      "mode": "0644"
+    },
+    {
+      "name": "agy-geminiignore",
+      "src": ".geminiignore",
+      "dst": "{HOME}/.gemini/.geminiignore",
+      "render": false,
+      "mode": "0644"
+    },
+    {
       "name": "pi-compaction",
       "src": "ai/pi/compaction.json",
       "dst": "{HOME}/.pi/agent/settings.json",

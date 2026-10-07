@@ -364,3 +364,26 @@ func TestCheckInstructionDrift_TheRemedyFitsTheOS(t *testing.T) {
 		})
 	}
 }
+
+// F-064: the source's enforced region was refreshed (new sha, new rule) and the
+// deployed copy still carries the old region. Stripping every region on both
+// sides read this as in sync; only deploy-only regions may be ignored.
+func TestCheckInstructionDrift_ARefreshedSourceRegionIsDrift(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	oldRegion := "<!-- BEGIN HARNESS GENERATED (sha256:aaa) -->\nrule one\n<!-- END HARNESS GENERATED -->\n"
+	newRegion := "<!-- BEGIN HARNESS GENERATED (sha256:bbb) -->\nrule one\nrule two\n<!-- END HARNESS GENERATED -->\n"
+	for _, tgt := range deployedInstructionTargets {
+		writeFile(t, filepath.Join(repo, tgt.repoRel), "# head\n\n"+newRegion)
+		writeFile(t, filepath.Join(home, tgt.homeRel), "# head\n\n"+newRegion)
+	}
+	writeFile(t, filepath.Join(home, ".claude", "CLAUDE.md"), "# head\n\n"+oldRegion)
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkInstructionDrift(sys, rep)
+
+	if rep.Failures() != 1 || !strings.Contains(buf.String(), "stale: .claude/CLAUDE.md") {
+		t.Fatalf("want the stale CLAUDE.md reported\n%s", buf.String())
+	}
+}
