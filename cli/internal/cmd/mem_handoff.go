@@ -138,6 +138,10 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current string, res m
 	if res.Kept != "" {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "forked     thread %q is %s's, so this %s handoff went to %q\n",
 			thread, res.Kept, w.agent, res.Key)
+		if project, ok := mem.MemoryProject(w.memoryPath); ok {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "journal    sessions/%s\n",
+				mem.JournalName(now().Format("2006-01-02"), project, w.agent, res.Key))
+		}
 	}
 	if !res.Changed {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)

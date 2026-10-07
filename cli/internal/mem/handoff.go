@@ -498,7 +498,7 @@ func HandoffThread(explicit, memoryPath, cwd string) (string, error) {
 		return explicit, nil
 	}
 	key := ThreadKey(cwd)
-	project, ok := memoryProject(memoryPath)
+	project, ok := MemoryProject(memoryPath)
 	if !ok {
 		return key, nil
 	}
@@ -515,9 +515,9 @@ func HandoffThread(explicit, memoryPath, cwd string) (string, error) {
 		"pass --thread with the branch the work is on", memoryPath, project, here, key)
 }
 
-// memoryProject returns <project> for a path ending in
+// MemoryProject returns <project> for a path ending in
 // 10_projects/<project>/memory/MEMORY.md, the vault's project layout.
-func memoryProject(memoryPath string) (string, bool) {
+func MemoryProject(memoryPath string) (string, bool) {
 	p := filepath.Clean(memoryPath)
 	memDir := filepath.Dir(p)
 	projDir := filepath.Dir(memDir)
@@ -537,8 +537,14 @@ func memoryProject(memoryPath string) (string, bool) {
 // it is noise — and the collision being fixed only ever occurred between
 // worktrees.
 func JournalName(date, project, agent, thread string) string {
-	if thread == "" || thread == "main" {
-		return fmt.Sprintf("%s-%s-%s.md", date, project, agent)
+	stem := fmt.Sprintf("%s-%s-%s", date, project, agent)
+	if thread != "" && thread != "main" {
+		stem += "-" + thread
 	}
-	return fmt.Sprintf("%s-%s-%s-%s.md", date, project, agent, thread)
+	return journalUnsafe.ReplaceAllString(stem, "-") + ".md"
 }
+
+// journalUnsafe is what vault-validate's session-name rule rejects. A forked
+// key's '+' is the case that bit (#1980): the name was valid as a key and not
+// as a file, so the agent built one by hand and the vault refused it.
+var journalUnsafe = regexp.MustCompile(`[^A-Za-z0-9._@-]`)
