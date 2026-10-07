@@ -7,6 +7,7 @@ package prland
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -155,14 +156,30 @@ func merge(gh ghFunc, n string, f Facts, res Result) (Result, error) {
 		res.Reasons = []string{fmt.Sprintf("head moved from %s to %s while the facts were read", short(f.HeadSHA), short(again.HeadSHA))}
 		return res, nil
 	}
-	if res.Retargeted, err = retargetDependents(gh, f.HeadRef, f.BaseRef); err != nil {
-		return res, err
+	moved, err := retargetDependents(gh, f.HeadRef, f.BaseRef)
+	if err != nil {
+		return res, errors.Join(err, restoreDependents(gh, moved, f.HeadRef))
 	}
+	// The retarget and the merge are one step: a merge that fails (the head
+	// moved, the base moved, a permission) puts the dependents back on the
+	// head branch, so a refused landing leaves the stack as it found it.
 	if _, err := gh("pr", "merge", n, "--squash", "--delete-branch", "--match-head-commit", f.HeadSHA); err != nil {
-		return res, fmt.Errorf("gh pr merge: %w", err)
+		return res, errors.Join(fmt.Errorf("gh pr merge: %w", err), restoreDependents(gh, moved, f.HeadRef))
 	}
-	res.Merged = true
+	res.Retargeted, res.Merged = moved, true
 	return res, nil
+}
+
+// restoreDependents points each PR back at the head branch it was stacked on.
+// A PR it cannot restore is named in the error, never left silently.
+func restoreDependents(gh ghFunc, moved []int, head string) error {
+	var errs []error
+	for _, d := range moved {
+		if _, err := gh("pr", "edit", strconv.Itoa(d), "--base", head); err != nil {
+			errs = append(errs, fmt.Errorf("#%d is left based on the target branch, not %s: %w", d, head, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func onlyBehind(reasons []string) bool {

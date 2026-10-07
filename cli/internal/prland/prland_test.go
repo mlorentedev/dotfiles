@@ -228,3 +228,69 @@ func TestLand_UpdateBranchDoesNotTouchAPRThatFailsForAnotherReason(t *testing.T)
 		t.Errorf("updated or merged a PR with a failing check: %+v %v", res, g.calls)
 	}
 }
+
+// failingMergeGH serves a landable PR with one dependent, fails the merge, and
+// optionally fails restoring the dependent's base.
+func failingMergeGH(restoreFails bool) (Runner, *[]string) {
+	var calls []string
+	run := func(_ context.Context, args ...string) ([]byte, error) {
+		line := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(line, "pr view"):
+			return []byte(readyView), nil
+		case strings.HasPrefix(line, "pr checks"):
+			return []byte(greenChecks), nil
+		case strings.HasPrefix(line, "pr list"):
+			return []byte(`[{"number":31}]`), nil
+		case strings.HasPrefix(line, "pr merge"):
+			calls = append(calls, line)
+			return nil, errors.New("head branch was modified")
+		case strings.HasPrefix(line, "pr edit"):
+			calls = append(calls, line)
+			if restoreFails && strings.HasSuffix(line, "--base feat/x") {
+				return nil, errors.New("permission denied")
+			}
+			return nil, nil
+		}
+		return nil, errors.New("unexpected gh call: " + line)
+	}
+	return run, &calls
+}
+
+// A merge that fails after the dependents were retargeted puts them back on
+// the head branch, so the stack is as it was before land ran.
+func TestLand_AFailedMergeRestoresTheRetargetedDependents(t *testing.T) {
+	run, calls := failingMergeGH(false)
+
+	res, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged}, 30)
+	if err == nil || !strings.Contains(err.Error(), "head branch was modified") {
+		t.Fatalf("want the merge error, got %v", err)
+	}
+	want := []string{
+		"pr edit 31 --base main",
+		"pr merge 30 --squash --delete-branch --match-head-commit abc123",
+		"pr edit 31 --base feat/x",
+	}
+	if strings.Join(*calls, "\n") != strings.Join(want, "\n") {
+		t.Errorf("calls:\n%s\nwant:\n%s", strings.Join(*calls, "\n"), strings.Join(want, "\n"))
+	}
+	if res.Merged || len(res.Retargeted) != 0 {
+		t.Errorf("a failed merge reported %+v", res)
+	}
+}
+
+// When the restore fails too, both errors surface and the dependent left on
+// the wrong base is named.
+func TestLand_AFailedRestoreNamesTheDependentLeftRetargeted(t *testing.T) {
+	run, _ := failingMergeGH(true)
+
+	_, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged}, 30)
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	for _, want := range []string{"head branch was modified", "#31", "feat/x", "permission denied"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error lacks %q: %v", want, err)
+		}
+	}
+}
