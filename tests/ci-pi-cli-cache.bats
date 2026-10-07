@@ -27,7 +27,11 @@ setup() {
 
 @test "ci: the pi CLI cache steps exist, restore before setup and save as the job's last step" {
     [ -n "$STEPS" ] || { echo "no 'Resolve the pi CLI cache key' step in ci.yml" >&2; return 1; }
-    order=$(grep -nE 'name: (Resolve the pi CLI cache key|Restore the pinned pi CLI|Run setup-windows.ps1|Post-setup doctor gate|Run PowerShell bats subset|Save the pi CLI)' "$CI" | cut -d: -f2- | sed 's/^ *- name: //')
+    # Scoped to the test-windows job, comments dropped: a comment or a
+    # same-named step in another job must not reorder or pad this list.
+    order=$(awk '/^  test-windows:/,/^  integration:/' "$CI" | grep -vE '^[[:space:]]*#' |
+        grep -E 'name: (Resolve the pi CLI cache key|Restore the pinned pi CLI|Run setup-windows.ps1|Post-setup doctor gate|Run PowerShell bats subset|Save the pi CLI)' |
+        sed 's/^ *- name: //')
     expected=$(printf '%s\n' \
         'Resolve the pi CLI cache key' \
         'Restore the pinned pi CLI (pull requests; a lookup on main)' \
@@ -65,6 +69,12 @@ setup() {
     narrowed=${cond/"(github.event_name == 'push' || needs.changes.outputs.code == 'true')"/}
     printf '%s\n' "$narrowed" | grep -qF "&& github.event_name == 'push' &&" || { echo "the save can run outside a push to main: $cond" >&2; return 1; }
     printf '%s\n' "$narrowed" | grep -qF "steps.picli-cache.outputs.cache-hit != 'true'"
+    # A status function replaces the implicit success(): with one, a red or
+    # cancelled main run would write the cache every PR then restores.
+    if printf '%s\n' "$cond" | grep -qE '(always|failure|cancelled)\(\)'; then
+        echo "the save must not run after a failed step: $cond" >&2
+        return 1
+    fi
 }
 
 @test "ci: the pi CLI cache holds the package and its shims, not the whole npm prefix" {
