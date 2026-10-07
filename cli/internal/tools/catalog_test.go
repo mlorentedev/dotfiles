@@ -225,6 +225,7 @@ func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
 		{"a platforms list is not a manager", `{"type":"system","platforms":["linux"]}`, "", "names no package manager"},
 		{"an unknown manager key", `{"type":"system","apt":"gh","pacman":"github-cli"}`, "", `"pacman"`},
 		{"a key of another source kind", `{"type":"system","apt":"gh","package":"gh"}`, "", `"package"`},
+		{"platforms that exclude every named manager", `{"type":"system","apt":"gh","platforms":["darwin","windows"]}`, "", "names no package for any"},
 		{"a version", `{"type":"system","apt":"gh"}`, `"version":"2.40.0",`, "not pinned"},
 		{"a name that is a flag", `{"type":"system","apt":"-y"}`, "", "apt"},
 		{"a name with a space", `{"type":"system","brew":"gh cli"}`, "", "brew"},
@@ -264,5 +265,25 @@ func TestSystemSupportsOnlyTheOSesItNamesAPackageFor(t *testing.T) {
 	listed := Tool{Name: "gh", Source: Source{Type: "system", Apt: "gh", Brew: "gh", Platforms: []string{"darwin"}}}
 	if listed.SupportsOS("linux") || !listed.SupportsOS("darwin") {
 		t.Error("a platforms list narrows a system entry further")
+	}
+}
+
+// An unknown source type is a skip with a warning at install time, so a typo in
+// the shipped catalog ("npn") would skip a tool on every machine and exit 0. The
+// reader cannot tell it from a type a newer dotf adds; this guard can, for the
+// one catalog the repository ships.
+func TestTheRepoCatalogUsesOnlyKnownSourceTypes(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	known := map[string]bool{}
+	for _, k := range KnownSourceTypes {
+		known[k] = true
+	}
+	for _, tool := range c.Tools {
+		if !known[tool.Source.Type] {
+			t.Errorf("tool %q has source type %q, which this dotf would skip (known: %v)", tool.Name, tool.Source.Type, KnownSourceTypes)
+		}
 	}
 }

@@ -140,6 +140,11 @@ func Load(path string) (Catalog, error) {
 	return c, nil
 }
 
+// KnownSourceTypes are the source.type values this dotf reads. Install skips any
+// other with a warning, so a guard (not the reader) is what catches a misspelt
+// type in the catalog that ships.
+var KnownSourceTypes = []string{"github-release", "npm", "uv-tool", "system"}
+
 // systemKeys are the source keys a "system" entry may carry. The typed decoder
 // drops any other key without a word, so a misspelt or unsupported manager
 // (pacman, dnf) would read as "no name for this OS" and skip in silence.
@@ -173,6 +178,19 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	}
 	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Winget == "" {
 		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew or winget)", t.Name)
+	}
+	// platforms narrows the OSes an entry names a package for; when it leaves
+	// none, the entry loads and then skips everywhere without a word.
+	if len(t.Source.Platforms) > 0 {
+		reachable := false
+		for _, goos := range t.Source.Platforms {
+			if _, pkg := t.Source.SystemPackage(goos); pkg != "" {
+				reachable = true
+			}
+		}
+		if !reachable {
+			return fmt.Errorf("tool %q: system source lists platforms %v but names no package for any of them", t.Name, t.Source.Platforms)
+		}
 	}
 	if t.Version != "" {
 		return fmt.Errorf("tool %q: system packages are not pinned, so version %q has no effect; remove it", t.Name, t.Version)
