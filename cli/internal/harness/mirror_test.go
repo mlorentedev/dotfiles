@@ -248,3 +248,33 @@ func TestMirror_ReplacesReadOnlyDestinationOnWindows(t *testing.T) {
 		t.Fatalf("converged re-run: want 0 updated / 5 unchanged, got %d / %d", res.Updated, res.Unchanged)
 	}
 }
+
+// PlanMirror answers "what would Mirror write" through the same comparison
+// Mirror uses, and writes nothing — not even the deploy dir. A plan that
+// creates directories has answered a different question than it was asked.
+func TestPlanMirror_CountsWhatMirrorWouldWriteAndWritesNothing(t *testing.T) {
+	repo := mirrorRepo(t)
+	deploy := filepath.Join(t.TempDir(), "absent")
+
+	plan, err := PlanMirror(repo, deploy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Updated != 5 || plan.Unchanged != 0 {
+		t.Errorf("plan on an empty deploy dir: want 5 to write / 0 unchanged, got %d / %d", plan.Updated, plan.Unchanged)
+	}
+	if _, err := os.Stat(deploy); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("PlanMirror created the deploy dir: %v", err)
+	}
+
+	if _, err := Mirror(repo, deploy); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = PlanMirror(repo, deploy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Updated != 0 || plan.Unchanged != 5 {
+		t.Errorf("plan after a mirror: want 0 to write / 5 unchanged, got %d / %d", plan.Updated, plan.Unchanged)
+	}
+}

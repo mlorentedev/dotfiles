@@ -27,19 +27,27 @@ created: "2026-10-06"
 - [x] This spec: proposal, tasks, features
 - [ ] Merge = acceptance of ADR-045 (owner)
 
-### PR 2 — `dotf converge --plan` and the records reconciler (#1843 B6, #2016)
+### PR 2a — the engine: `dotf converge [--plan]` and the records-mirror reconciler (#1843 B6)
 
-- [ ] [AC1] Failing test: `--plan` over a fake registry lists each reconciler that applies to the OS with its action, and the temp HOME is byte-identical afterwards
-- [ ] [AC1] Implement `internal/converge`: the `Reconciler` interface (name, platforms, plan, apply, probe), the ordered registry, and `cmd/converge.go` with `--plan`
-- [ ] [AC5] Failing test: a reconciler that does not list `runtime.GOOS` is reported `skipped` naming the OS; implement through the `platforms` vocabulary `packages.json` uses (#2001)
-- [ ] [AC2] Failing test: the records reconciler on a HOME without `~/.claude/CLAUDE.md` plans `mirror`, `instructions` and `bind`
-- [ ] [AC2] Implement the records reconciler over `harness.Mirror`, the instruction-file deploy and `harness bind`; the `compile-harness.sh --deploy` call is its one shell step, recorded as a port target
-- [ ] Refactor: one report type shared with `dotf deploy`'s `Outcome` where the fields match; no second status enum next to doctor's
+> Split from the original PR 2, which did not fit the ~300-line cap: the engine and one reconciler here, the instruction files and the bindings in 2b. Apply mode landed with the engine because plan and apply are one code path; the persisted report stays in PR 3.
 
-### PR 3 — apply mode and the persisted report (#1843 B7)
+- [x] [AC1] Failing test: `PlanMirror` counts what `Mirror` would write and creates nothing, the deploy dir included; implemented on `Mirror`'s own walk with a `dryRun` flag
+- [x] [AC5] Extract `internal/platform` (`Supports`, `Unknown`) from the tool catalog, so the catalog and the reconcilers share one matcher; the catalog's tests still pass
+- [x] [AC1] [AC4] [AC5] Failing tests for the runner: a plan applies and probes nothing; an unlisted OS is `skipped` naming it; a failed probe fails the run naming the reconciler and the reconcilers after it are not reached
+- [x] Implement `internal/converge`: `Reconciler` (name, platforms, `Reconcile(env, dryRun)`, mandatory `Probe`), `Run`, `Report`, and the ordered `Registry`
+- [x] [AC1] [AC3] Failing tests, then the `records-mirror` reconciler: the plan writes nothing, the apply passes its probe, a second plan reports 0 changes
+- [x] [AC1] `cmd/converge.go`: `dotf converge [--plan] [--repo]`; a plan on an empty HOME writes nothing, a second apply reports 0 changed
+- [x] On the Mac: `go run ./cmd/dotf converge --plan` reports `records-mirror` with 70 files to write and leaves `~/.dotfiles` untouched
 
-- [ ] [AC4] Failing test: a reconciler whose probe fails makes `converge` exit non-zero, names it, and stops the reconcilers after it
-- [ ] [AC4] Implement apply: plan, apply, probe, in registry order (ADR-041 decision 4)
+### PR 2b — the instruction files and the hook bindings (#1843 B11 Claude row, #2016)
+
+- [ ] [AC2] Declare `claude-instructions` in `ai/deploy.json` (`ai/claude/CLAUDE.md` → `~/.claude/CLAUDE.md`) and delete the copy block from both setup twins in the same change (ADR-020 §5)
+- [ ] [AC2] Failing test, then the `records-instructions` reconciler over `deploy.PlanConfig`/`deploy.Deploy` by entry name; its probe checks the deployed file points at `AGENTS.md`, the check the shell block made
+- [ ] [AC2] The `records-skills` step runs `compile-harness.sh --deploy`, behind the shared test seam that defaults to "not run" (lesson 335); recorded as a port target
+- [ ] [AC2] The `records-bind` reconciler over `harness bind` and its dry-run
+
+### PR 3 — the persisted report (#1843 B7)
+
 - [ ] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
 - [ ] [AC3] Implement the report (JSON, one entry per reconciler, the run's exit status)
 - [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file

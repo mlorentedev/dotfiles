@@ -2,7 +2,7 @@
   {
     "id": "PLAT-001b-one-entrypoint-f1",
     "behavior": "AC1: converge --plan lists each applicable reconciler with its action and changes nothing",
-    "verification": "cd cli && go test ./internal/converge/ ./internal/cmd/ -run '^TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing$' -count=1",
+    "verification": "cd cli && go test ./internal/cmd/ -run '^TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing$' -count=1 -v | grep -q -- '--- PASS: TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing'",
     "state": "pending",
     "evidence": ""
   },
@@ -23,14 +23,14 @@
   {
     "id": "PLAT-001b-one-entrypoint-f4",
     "behavior": "AC4: a reconciler whose probe fails makes converge exit non-zero and names it",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestConverge_FailedProbeFailsTheRunNamingTheReconciler$' -count=1",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRun_FailedProbeFailsTheRunNamingTheReconciler$' -count=1 -v | grep -q -- '--- PASS: TestRun_FailedProbeFailsTheRunNamingTheReconciler'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "PLAT-001b-one-entrypoint-f5",
     "behavior": "AC5: a reconciler that does not list the current OS is reported skipped with the OS named",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestConverge_UnlistedPlatformIsSkippedNotPassed$' -count=1",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRun_UnlistedPlatformIsSkippedNotPassed$' -count=1 -v | grep -q -- '--- PASS: TestRun_UnlistedPlatformIsSkippedNotPassed'",
     "state": "pending",
     "evidence": ""
   },
