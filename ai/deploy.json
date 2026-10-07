@@ -79,7 +79,8 @@
       "src": "ai/pi/models.json",
       "dst": "{HOME}/.pi/agent/models.json",
       "render": true,
-      "mode": "0600"
+      "mode": "0600",
+      "requires": "pi"
     },
     {
       "name": "pi-mcp",
