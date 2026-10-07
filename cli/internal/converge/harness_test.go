@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
 // harnessEnv is a checkout whose manifest declares three instruction files:
@@ -163,4 +165,58 @@ func TestRecordsHarness_ProbeIgnoresTargetsThePlanSkipped(t *testing.T) {
 	if err := (recordsHarness{has: noCommands}).Probe(env); err != nil {
 		t.Fatalf("probe failed on a target the plan skips: %v", err)
 	}
+}
+
+// presenceEnv is harnessEnv plus an agent record that targets claude, so the
+// records render a non-empty roster for the claude instruction file.
+func presenceEnv(t *testing.T) Env {
+	t.Helper()
+	env := harnessEnv(t)
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"harness/agents/reviewer/AGENT.md": "---\nname: reviewer\nkind: invocable\ntargets: [claude]\nskills: []\n---\n",
+		"harness/manifest.json": `{"agents":{"record_dir":"harness/agents","presence":[
+			{"agent":"claude","file":".claude/CLAUDE.md","source":"ai/claude/CLAUDE.md"}
+		]}}`,
+	})
+	return env
+}
+
+// copyingRunner deploys the claude instruction file verbatim and, when
+// withPresence is set, injects the roster the way compile-harness.sh does.
+func copyingRunner(t *testing.T, withPresence bool) func(Env) error {
+	return func(env Env) error {
+		body, err := os.ReadFile(filepath.Join(env.RepoRoot, "ai/claude/CLAUDE.md"))
+		if err != nil {
+			return err
+		}
+		writeFixture(t, env.Home, map[string]string{".claude/CLAUDE.md": string(body)})
+		if withPresence {
+			_, err = harness.DeployPresence(env.RepoRoot, env.Home)
+		}
+		return err
+	}
+}
+
+func TestRecordsHarness_ProbeRequiresTheRenderedPresenceRegion(t *testing.T) {
+	t.Run("current region passes", func(t *testing.T) {
+		env := presenceEnv(t)
+		r := recordsHarness{run: copyingRunner(t, true), has: noCommands}
+		if _, err := r.Reconcile(env, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Probe(env); err != nil {
+			t.Fatalf("probe with a current presence region: %v", err)
+		}
+	})
+	t.Run("missing region fails, naming the file", func(t *testing.T) {
+		env := presenceEnv(t)
+		r := recordsHarness{run: copyingRunner(t, false), has: noCommands}
+		if _, err := r.Reconcile(env, false); err != nil {
+			t.Fatal(err)
+		}
+		err := r.Probe(env)
+		if err == nil || !strings.Contains(err.Error(), ".claude/CLAUDE.md is missing") {
+			t.Fatalf("want the probe to fail on the missing region, got %v", err)
+		}
+	})
 }
