@@ -19,7 +19,8 @@ import (
 //
 // Two kinds of entry are not compared, and the PASS line says how many: a
 // rendered one (its installed content is only known after `secrets render`,
-// which needs the daemon; doctor stays read-only) and one whose `requires`
+// which needs the daemon; doctor stays read-only, though an absent rendered
+// destination is still a WARN) and one whose `requires`
 // command is absent (deploy skips it too, and a row for a tool the box does
 // not carry is a WARN no remedy can clear — #843). Drift is a WARN, not a
 // FAIL: a tool that co-owns its file (Copilot's `/model` writes `model`) may
@@ -49,8 +50,26 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 	home := sys.home()
 	inSync, drifted, notCompared := 0, 0, 0
 	for _, c := range man.Configs {
-		if c.Render || !c.AppliesOn(sys.GOOS) || (c.Requires != "" && !sys.has(c.Requires)) {
+		if !c.AppliesOn(sys.GOOS) || (c.Requires != "" && !sys.has(c.Requires)) {
 			notCompared++
+			continue
+		}
+		if c.Render {
+			// Its content is only comparable after `secrets render`, but its
+			// existence is not: an absent destination is a deploy that never
+			// ran, and a SKIP there let pi on a fresh Mac start with no models
+			// and a doctor that read healthy (#2100).
+			dst, err := deploy.ExpandDst(c.Dst, home, env.ResolvePath)
+			switch {
+			case err != nil:
+				rep.Warn(fmt.Sprintf("%s: %v (run: dotf deploy %s)", c.Name, err, c.Name))
+				drifted++
+			case !pathExists(dst):
+				rep.Warn(fmt.Sprintf("%s: %s not deployed (run: dotf deploy %s)", c.Name, dst, c.Name))
+				drifted++
+			default:
+				notCompared++
+			}
 			continue
 		}
 		p, err := deploy.PlanConfig(c, repo, home, env.ResolvePath)
