@@ -99,24 +99,57 @@ func isBranchAncestor(repoRoot, branch string) bool {
 }
 
 func queryGHPRMerged(repoRoot, branch string) bool {
-	slug := ""
+	tip, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", branch+"^{commit}").Output()
+	if err != nil {
+		return false
+	}
+	landed, _ := landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)))
+	return landed
+}
+
+// mergedPRHeads returns the head commit of every merged pull request whose head
+// branch is branch. A variable so tests answer without reaching GitHub.
+var mergedPRHeads = ghMergedPRHeads
+
+func ghMergedPRHeads(repoRoot, branch string) ([]string, error) {
+	args := []string{"pr", "list", "--head", branch, "--state", "merged", "--json", "headRefOid", "--jq", ".[].headRefOid"}
 	if out, err := exec.Command("git", "-C", repoRoot, "config", "--get", "remote.origin.url").Output(); err == nil {
-		slug = ParseGitHubSlug(string(out))
+		if slug := ParseGitHubSlug(string(out)); slug != "" {
+			args = append(args, "--repo", slug)
+		}
 	}
+	cmd := exec.Command("gh", args...)
+	cmd.Dir = repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("gh pr list --head %s: %w", branch, err)
+	}
+	return strings.Fields(string(out)), nil
+}
 
-	var ghCmd *exec.Cmd
-	if slug != "" {
-		ghCmd = exec.Command("gh", "pr", "view", branch, "--repo", slug, "--json", "state", "--jq", ".state")
-	} else {
-		ghCmd = exec.Command("gh", "pr", "view", branch, "--json", "state", "--jq", ".state")
-		ghCmd.Dir = repoRoot
+// landedInMergedPR reports whether tip is contained in the head of a merged
+// pull request for branch (#1608). A squash merge puts a new commit on the
+// base, so the branch is never an ancestor of it and ancestry cannot answer;
+// containment in the head that merged can. Containment, not equality: a
+// checkout behind its PR head (the PR took a rebase or a merge of main from
+// elsewhere) has nothing unpushed, while a commit made after the merge is in
+// no merged head and still reads as unpushed.
+func landedInMergedPR(repoRoot, branch, tip string) (bool, error) {
+	heads, err := mergedPRHeads(repoRoot, branch)
+	if err != nil {
+		return false, err
 	}
-
-	if out, err := ghCmd.Output(); err == nil {
-		state := strings.TrimSpace(string(out))
-		return state == "MERGED"
+	for _, head := range heads {
+		if exec.Command("git", "-C", repoRoot, "cat-file", "-e", head+"^{commit}").Run() != nil {
+			// The head may exist only on the remote; GitHub serves a merged
+			// PR's head by its SHA. A failed fetch leaves it unanswerable.
+			_ = exec.Command("git", "-C", repoRoot, "fetch", "--quiet", "--no-tags", "origin", head).Run()
+		}
+		if exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", tip, head).Run() == nil {
+			return true, nil
+		}
 	}
-	return false
+	return false, nil
 }
 
 func (r *RealGitRunner) cachePRResult(branch string, merged bool) {
