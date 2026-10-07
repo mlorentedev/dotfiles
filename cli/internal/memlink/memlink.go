@@ -166,7 +166,8 @@ func resolveByRepoURL(repo, vault string) string {
 }
 
 // repoURLName reads the repo_url field from a note's leading frontmatter block and
-// returns the repository name it ends in, or "" when the field is absent.
+// returns the repository name it ends in, or "" when the field is absent. A block
+// with no closing delimiter is not frontmatter, so a body line can never match.
 func repoURLName(path string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -176,14 +177,15 @@ func repoURLName(path string) string {
 	if strings.TrimSpace(lines[0]) != "---" {
 		return ""
 	}
+	name := ""
 	for _, line := range lines[1:] {
 		if strings.TrimSpace(line) == "---" {
-			return ""
+			return name
 		}
-		if v, ok := strings.CutPrefix(line, "repo_url:"); ok {
+		if v, ok := strings.CutPrefix(line, "repo_url:"); ok && name == "" {
 			v, _, _ = strings.Cut(v, " #") // a trailing YAML comment
 			url := strings.TrimSuffix(strings.Trim(strings.TrimSpace(v), `"'`), "/")
-			return strings.TrimSuffix(url[strings.LastIndexAny(url, "/:")+1:], ".git")
+			name = strings.TrimSuffix(url[strings.LastIndexAny(url, "/:")+1:], ".git")
 		}
 	}
 	return ""

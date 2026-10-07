@@ -137,6 +137,16 @@ func TestResolveVaultMemory_RepoURL(t *testing.T) {
 		}
 	})
 
+	t.Run("unterminated frontmatter is not read as frontmatter", func(t *testing.T) {
+		vault := t.TempDir()
+		writeFile(t, filepath.Join(vault, "10_projects", "suite", "context.md"),
+			"---\nid: suite\n\n# body\nrepo_url: https://example.com/owner/tool.git\n")
+		mkdirAll(t, filepath.Join(vault, "10_projects", "suite", "memory"))
+		if got := resolveVaultMemory("/x/tool", "tool", vault); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
+
 	t.Run("repo_url outside the frontmatter is ignored", func(t *testing.T) {
 		vault := t.TempDir()
 		writeFile(t, filepath.Join(vault, "10_projects", "suite", "context.md"),
