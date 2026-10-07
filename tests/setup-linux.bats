@@ -136,8 +136,17 @@ setup() {
     grep -q 'dotf tools install' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh deploys tmux.conf to ~/.tmux.conf via deploy_file (SDD-007)" {
-    grep -qE 'deploy_file "\$DOTFILES_DIR/tmux\.conf" "\$HOME/\.tmux\.conf"' "$DOTFILES_DIR/setup-linux.sh"
+@test "tmux.conf deploys to ~/.tmux.conf through dotf deploy, only where tmux is installed (#1843 B2)" {
+    [ "$(jq -r '.configs[] | select(.name=="tmux") | "\(.src) \(.dst) \(.requires)"' "$DOTFILES_DIR/ai/deploy.json")" = "tmux.conf {HOME}/.tmux.conf tmux" ]
+    refute_grep 'deploy_file "\$DOTFILES_DIR/tmux\.conf"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "the zsh rc files deploy through dotf deploy, only where zsh is installed (#1843 B2)" {
+    for name in zshrc zsh-aliases zsh-functions zsh-functions-sh zsh-nvm; do
+        [ "$(jq -r --arg n "$name" '.configs[] | select(.name==$n) | .requires' "$DOTFILES_DIR/ai/deploy.json")" = "zsh" ]
+    done
+    refute_grep 'deploy_file "\$DOTFILES_DIR/\.zshrc"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'deploy_file "\$DOTFILES_DIR/\.zsh/' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh checks for tmux presence" {

@@ -239,3 +239,61 @@ func TestParseManifest_ShippedManifestIsValid(t *testing.T) {
 		t.Errorf("pi may carry a credential; want mode 0600, got %q", pi.Mode)
 	}
 }
+
+// The first deploy over a file the machine already had keeps that file once as
+// <dst>.pre-dotf, so adopting a hand-made config (an rc file, say) never loses
+// it. A later deploy never overwrites the backup: it holds the machine's own
+// version, not dotf's.
+func TestDeploy_KeepsThePreviousFileOnceBeforeReplacingIt(t *testing.T) {
+	root := repoWithSource(t, "repo v1\n")
+	home := t.TempDir()
+	c := piConfig()
+	dst, err := ExpandDst(c.Dst, home, noResolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte("hand-made\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Deploy(c, root, home, noResolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup := dst + BackupSuffix
+	if res.BackedUp != backup {
+		t.Errorf("outcome names backup %q, want %q", res.BackedUp, backup)
+	}
+	if got, _ := os.ReadFile(backup); string(got) != "hand-made\n" {
+		t.Errorf("backup holds %q", got)
+	}
+
+	// A changed source redeploys; the machine's original stays the backup.
+	if err := os.WriteFile(filepath.Join(root, c.Src), []byte("repo v2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err = Deploy(c, root, home, noResolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.BackedUp != "" {
+		t.Errorf("a second replacement made another backup: %q", res.BackedUp)
+	}
+	if got, _ := os.ReadFile(backup); string(got) != "hand-made\n" {
+		t.Errorf("the backup was overwritten: %q", got)
+	}
+}
+
+func TestDeploy_AFreshDestinationNeedsNoBackup(t *testing.T) {
+	root := repoWithSource(t, "repo\n")
+	res, err := Deploy(piConfig(), root, t.TempDir(), noResolve, nil, false)
+	if err != nil || res.BackedUp != "" {
+		t.Fatalf("want no backup on a fresh destination, got %q, %v", res.BackedUp, err)
+	}
+	if _, err := os.Stat(res.Dst + BackupSuffix); !os.IsNotExist(err) {
+		t.Error("a backup file was created for a destination that did not exist")
+	}
+}

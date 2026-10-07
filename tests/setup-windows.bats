@@ -1143,3 +1143,12 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .src' "$DOTFILES_DIR/ai/deploy.json")" = "ai/claude/settings.json" ]
     grep -qF 'PluginsRel = "ai/claude/plugins.json"' "$DOTFILES_DIR/cli/internal/claude/plugins.go"
 }
+
+@test "parity: every shell activates mise when it is installed (#2013 W2b)" {
+    # The pinned CLIs dotf tools sync installs reach PATH only through mise's
+    # activation; each shell guards it on mise being installed.
+    grep -qF 'command -v mise >/dev/null && eval "$(mise activate zsh)"' "$DOTFILES_DIR/.zshrc"
+    grep -qF 'command -v mise >/dev/null && eval "$(mise activate bash)"' "$DOTFILES_DIR/.bashrc"
+    grep -qF '(& mise activate pwsh) | Out-String | Invoke-Expression' "$DOTFILES_DIR/powershell/profile.ps1"
+    grep -qF 'if (Get-Command mise -ErrorAction SilentlyContinue)' "$DOTFILES_DIR/powershell/profile.ps1"
+}

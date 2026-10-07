@@ -150,6 +150,54 @@
       "mode": "0644"
     },
     {
+      "name": "zshrc",
+      "src": ".zshrc",
+      "dst": "{HOME}/.zshrc",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-aliases",
+      "src": ".zsh/aliases.zsh",
+      "dst": "{HOME}/.zsh/aliases.zsh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-functions",
+      "src": ".zsh/functions.zsh",
+      "dst": "{HOME}/.zsh/functions.zsh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-functions-sh",
+      "src": ".zsh/functions.sh",
+      "dst": "{HOME}/.zsh/functions.sh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-nvm",
+      "src": ".zsh/nvm.zsh",
+      "dst": "{HOME}/.zsh/nvm.zsh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "tmux",
+      "src": "tmux.conf",
+      "dst": "{HOME}/.tmux.conf",
+      "render": false,
+      "mode": "0644",
+      "requires": "tmux"
+    },
+    {
       "name": "pi-compaction",
       "src": "ai/pi/compaction.json",
       "dst": "{HOME}/.pi/agent/settings.json",

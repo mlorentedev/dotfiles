@@ -112,6 +112,9 @@ func newDeployCmd() *cobra.Command {
 				default:
 					_, _ = fmt.Fprintf(w, "deployed  %-10s %s\n", res.Name, res.Dst)
 				}
+				if res.BackedUp != "" {
+					_, _ = fmt.Fprintf(w, "          kept the previous file at %s\n", res.BackedUp)
+				}
 			}
 			// A bare deploy converges everything the setups own, including the
 			// Orca hooks Orca rewrites on every install (CLI-093, #1953) and the
