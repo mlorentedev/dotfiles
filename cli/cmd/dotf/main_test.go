@@ -306,3 +306,55 @@ func TestAnUnknownTopLevelCommandIsReported(t *testing.T) {
 		t.Errorf("dotf nosuch did not report the command; stderr: %q", stderr.String())
 	}
 }
+
+// Every command group refuses an unknown subcommand, and still prints its help
+// with no argument (#2091). Measured before the fix: `dotf pr nosuch`,
+// `dotf vault nosuch` and the rest printed help and exited 0.
+//
+// A group that declares its own Args takes positional arguments on purpose
+// (`dotf init [path]` scaffolds a project), so it is never run here. The rest
+// run in a scratch cwd and HOME, so a group whose RunE ever does more than
+// print help cannot write into the checkout.
+func TestEveryCommandGroupRefusesAnUnknownSubcommand(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	groups := 0
+	for _, path := range commandPaths(cmd.New("test", "")) {
+		root := cmd.New("test", "")
+		found, _, err := root.Find(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !found.HasSubCommands() || found.Args != nil {
+			continue
+		}
+		groups++
+		name := strings.Join(path, " ")
+		t.Run(name, func(t *testing.T) {
+			root.SetArgs(append(append([]string{}, path...), "nosuch"))
+			var stderr bytes.Buffer
+			root.SetOut(&stderr)
+			if code := run(root, &stderr); code == 0 {
+				t.Errorf("dotf %s nosuch exited 0", name)
+			}
+			if want := fmt.Sprintf("unknown command %q for %q", "nosuch", "dotf "+name); !strings.Contains(stderr.String(), want) {
+				t.Errorf("dotf %s nosuch: want %q, stderr: %q", name, want, stderr.String())
+			}
+
+			bare := cmd.New("test", "")
+			bare.SetArgs(path)
+			var out bytes.Buffer
+			bare.SetOut(&out)
+			if code := run(bare, &out); code != 0 {
+				t.Errorf("dotf %s with no argument exited %d; want its help and 0", name, code)
+			}
+			if !strings.Contains(out.String(), "Available Commands:") {
+				t.Errorf("dotf %s with no argument did not print its help: %q", name, out.String())
+			}
+		})
+	}
+	if groups == 0 {
+		t.Fatal("found no command groups; the walk is broken")
+	}
+}

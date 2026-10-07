@@ -50,8 +50,9 @@ node_modules/
 /cli/dotf.exe
 # …and the same binary when `go build -o dotf.exe ./cmd/dotf` is run from the
 # repo root instead of cli/. CI writes its binary to a temp dir (ci.yml), so a
-# root-level one is always a local build; `dotf worktree clean` already calls it
-# disposable. Nothing tracked in this repo has a .exe extension.
+# root-level one is always a local build; the dirty check behind `dotf worktree
+# done`, `sweep` and `list` already treats it as disposable. Nothing tracked
+# in this repo has a .exe extension.
 /*.exe
 # `go test -coverprofile` writes here. It was tracked from #1404 until #1408
 # untracked it: a profile is a measurement of one run on one machine, so it
