@@ -7,7 +7,6 @@ package spec
 
 import (
 	"embed"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/execerr"
 )
 
 // templateNames are the spec files rendered into specs/<id>/, in a stable
@@ -94,8 +95,8 @@ func Gate(num int, repo string) (title string, err error) {
 	}
 	out, err := exec.Command("gh", args...).Output()
 	if err != nil {
-		return "", fmt.Errorf("work-gate issue #%d not found (or gh failed): %s",
-			num, strings.TrimSpace(stderrOf(err)))
+		return "", fmt.Errorf("work-gate issue #%d not found (or gh failed): %v",
+			num, execerr.WithStderr(err))
 	}
 	state, title, ok := strings.Cut(strings.TrimRight(string(out), "\n"), "\t")
 	if !ok {
@@ -106,16 +107,6 @@ func Gate(num int, repo string) (title string, err error) {
 			"the work-gate is an OPEN issue; reopen it or pick the right one", num, state)
 	}
 	return title, nil
-}
-
-// stderrOf extracts captured stderr from an *exec.ExitError, falling back to the
-// error string. It keeps Gate's message useful when gh fails.
-func stderrOf(err error) string {
-	var ee *exec.ExitError
-	if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-		return string(ee.Stderr)
-	}
-	return err.Error()
 }
 
 // Render returns each spec file's content keyed by filename, with placeholders

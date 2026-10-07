@@ -206,6 +206,15 @@ jobs:
       # which a test pins to the action's own SHA, so nothing here is a copy that
       # can drift. If either read fails, that list is empty: the skip narrows and
       # never widens.
+      #
+      # The same output also skips a PR that was MERGED, CLOSED or turned back
+      # into a draft while its run waited in the one-at-a-time lane (`queue: max`
+      # above). The run's event is a snapshot from when it was queued, so nothing
+      # else notices. Measured 2026-10-07: a merged PR's review held the lane
+      # 18 minutes while eight open PRs waited behind it (#1923). A draft gets
+      # its review from `ready_for_review`. Only a definite answer skips:
+      # if the read fails, the review runs, as before. Only `pull_request`
+      # runs skip, because a human typing /review on a merged PR means it.
       - name: Skip when PR-Agent would receive an empty diff
         id: reviewable
         if: steps.credential.outcome == 'success'
@@ -216,6 +225,18 @@ jobs:
           WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
           set -uo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            pr_state=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+              --jq 'if .merged then "merged" elif .state == "closed" then "closed" elif .draft then "draft" else "open" end' \
+              2>/dev/null) || pr_state=""
+            case "$pr_state" in
+              merged|closed|draft)
+                echo "::notice::PR #${PR_NUMBER} became ${pr_state} while this review waited in the queue; not reviewing it."
+                echo "reviewable=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+          fi
           workflow=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/pr-agent.yml?ref=${WORKFLOW_SHA}" \
             --jq '.content' | base64 -d) || {
               echo "::error::cannot read the executing PR-Agent workflow"

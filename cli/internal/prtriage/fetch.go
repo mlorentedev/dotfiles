@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/execerr"
 )
 
 // ghRunner runs a `gh` subcommand and returns its stdout.
@@ -19,7 +21,8 @@ import (
 type ghRunner func(ctx context.Context, args ...string) ([]byte, error)
 
 func execGH(ctx context.Context, args ...string) ([]byte, error) {
-	return exec.CommandContext(ctx, "gh", args...).Output()
+	out, err := exec.CommandContext(ctx, "gh", args...).Output()
+	return out, execerr.WithStderr(err)
 }
 
 const (
