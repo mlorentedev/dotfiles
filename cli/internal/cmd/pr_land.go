@@ -47,7 +47,7 @@ var prLandOptions = func(repo, registry string) prland.Options {
 func newPrLandCmd() *cobra.Command {
 	var (
 		repo, registry string
-		wait           bool
+		wait, update   bool
 	)
 	cmd := &cobra.Command{
 		Use:   "land <number>",
@@ -65,8 +65,11 @@ Every PR based on this one's branch is pointed at its base first, because
 GitHub closes a PR whose base branch is deleted. The merge is a squash with
 --match-head-commit, never --auto.
 
---wait waits for the checks before reading them. A refusal lists every failed
-condition and exits 1.`,
+--wait waits for the checks before reading them. --update-branch handles the
+one condition that time alone cannot fix: when BEHIND is the only reason
+against the PR, it merges the base into the branch (a merge, not a rebase, so
+the reviewer's push gate does not re-review), waits for the new CI and decides
+again on the new head. A refusal lists every failed condition and exits 1.`,
 		Example:       "  dotf pr land 2030 --wait",
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
@@ -77,7 +80,7 @@ condition and exits 1.`,
 				return fmt.Errorf("pr land: %q is not a PR number", args[0])
 			}
 			o := prLandOptions(repo, registry)
-			o.Wait = wait
+			o.Wait, o.UpdateBranch = wait, update
 			res, err := prland.Land(c.Context(), o, number)
 			if err != nil {
 				c.PrintErrln("pr land:", err)
@@ -89,6 +92,7 @@ condition and exits 1.`,
 	cmd.Flags().StringVar(&repo, "repo", "", "owner/name (default: the current repository)")
 	cmd.Flags().StringVar(&registry, "registry", filepath.Join("harness", "review-attestation.json"), "path to the reviewer registry")
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the checks before reading them")
+	cmd.Flags().BoolVar(&update, "update-branch", false, "when BEHIND is the only failing condition, merge the base in, wait for CI and decide again")
 	return cmd
 }
 
@@ -100,6 +104,9 @@ func printLandResult(c *cobra.Command, number int, res prland.Result) error {
 			_, _ = fmt.Fprintf(w, "  - %s\n", r)
 		}
 		return errNotLanded
+	}
+	if res.Updated {
+		_, _ = fmt.Fprintf(w, "merged the base into #%d first\n", number)
 	}
 	for _, d := range res.Retargeted {
 		_, _ = fmt.Fprintf(w, "retargeted #%d before the merge deleted its base branch\n", d)

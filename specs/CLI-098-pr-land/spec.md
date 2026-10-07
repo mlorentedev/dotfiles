@@ -30,7 +30,9 @@ During the PLAT-001 macOS session, this check was done with a throwaway script i
 5. It squash-merges with `--match-head-commit <sha> --delete-branch`.
 6. Otherwise it exits 1 and names every condition that failed. It never uses `--auto`.
 
-Out of scope: rebasing a BEHIND branch (`--rebase-behind`), and landing every PR of the user (`--all-mine`).
+With `--update-branch`, when BEHIND is the only failing condition, it merges the base into the branch (`gh pr update-branch`: a merge, not a rebase, so the reviewer's push gate does not re-review and the squash flattens it anyway), waits for the new CI and decides again on the new head. Measured need: in the PLAT-001 merge chain on 2026-10-06, every merge into `main` from a parallel session left the next PR BEHIND, and each rebase re-triggered a full review.
+
+Out of scope: landing every PR of the user (`--all-mine`).
 
 ## Checklist
 
@@ -43,6 +45,7 @@ Out of scope: rebasing a BEHIND branch (`--rebase-behind`), and landing every PR
 
 - `go test ./internal/prland/ ./internal/cmd/ -count=1` -> ok (Decide: every failed condition named; Land: retarget-then-merge with `--match-head-commit`, refusal without mutation, untriaged refusal, moved head, unanswerable triage queue is an error; cmd: refusal output and exit 1, non-number rejected)
 - Measured on #2025: `--wait` returned before a push's checks were registered, so the merge state read BLOCKED with every reported check green; the refusal was correct but premature. `--wait` now pauses and re-reads while a check is pending or the state is BLOCKED/UNKNOWN/UNSTABLE with every check green, up to 6 rounds (`TestLand_WaitReadsAgainUntilTheStateSettles`, `TestLand_WithoutWaitABlockedStateIsARefusal`)
+- `--update-branch`: `TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead` (merges the base, then merges the new head with `--match-head-commit`), `TestLand_UpdateBranchDoesNotTouchAPRThatFailsForAnotherReason`
 - Real PR, read-only: `dotf pr land 2033` -> `[NOT MERGED] #2033 at e656207: spec-gate: fail; merge state is UNKNOWN; reviewer output awaits triage`, exit 1, nothing changed
 
 ## Next

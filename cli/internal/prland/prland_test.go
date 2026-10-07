@@ -181,3 +181,50 @@ func TestLand_WithoutWaitABlockedStateIsARefusal(t *testing.T) {
 		t.Errorf("merged a BLOCKED PR without --wait: %+v", res)
 	}
 }
+
+func TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead(t *testing.T) {
+	behind := strings.Replace(readyView, `"CLEAN"`, `"BEHIND"`, 1)
+	updated := strings.Replace(readyView, "abc123", "def456", 1)
+	view := behind
+	var calls []string
+	run := func(_ context.Context, args ...string) ([]byte, error) {
+		line := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(line, "pr view"):
+			return []byte(view), nil
+		case strings.HasPrefix(line, "pr update-branch"):
+			calls = append(calls, line)
+			view = updated
+			return nil, nil
+		case strings.HasPrefix(line, "pr checks") && strings.Contains(line, "--json"):
+			return []byte(greenChecks), nil
+		case strings.HasPrefix(line, "pr list"):
+			return []byte(`[]`), nil
+		case strings.HasPrefix(line, "pr merge"):
+			calls = append(calls, line)
+		}
+		return nil, nil
+	}
+	o := Options{Run: run, Untriaged: noneUntriaged, UpdateBranch: true, Sleep: func(time.Duration) {}}
+
+	res, err := Land(context.Background(), o, 30)
+	if err != nil || !res.Merged || !res.Updated {
+		t.Fatalf("want an update then a merge, got %+v, %v", res, err)
+	}
+	want := "pr update-branch 30\npr merge 30 --squash --delete-branch --match-head-commit def456"
+	if got := strings.Join(calls, "\n"); got != want {
+		t.Errorf("calls:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// Behind AND another failing condition: updating cannot make it landable, so
+// nothing is pushed.
+func TestLand_UpdateBranchDoesNotTouchAPRThatFailsForAnotherReason(t *testing.T) {
+	behind := strings.Replace(readyView, `"CLEAN"`, `"BEHIND"`, 1)
+	g := &fakeGH{view: behind, checks: `[{"name":"lint","bucket":"fail"}]`, deps: `[]`}
+
+	res, _ := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged, UpdateBranch: true}, 30)
+	if res.Merged || res.Updated || len(g.calls) != 0 {
+		t.Errorf("updated or merged a PR with a failing check: %+v %v", res, g.calls)
+	}
+}

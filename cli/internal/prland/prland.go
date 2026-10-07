@@ -78,11 +78,15 @@ type Options struct {
 	// Sleep pauses between --wait rounds, so checks a push has not registered
 	// yet get time to appear; nil means time.Sleep.
 	Sleep func(time.Duration)
+	// UpdateBranch merges the base into a PR whose only failing condition is
+	// BEHIND, waits for the new CI, and decides again on the new head.
+	UpdateBranch bool
 }
 
 // Result is what Land did.
 type Result struct {
 	Merged     bool
+	Updated    bool // the base was merged into the branch first
 	HeadSHA    string
 	Reasons    []string // why it did not merge
 	Retargeted []int    // dependents pointed at the base before the merge
@@ -101,23 +105,48 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		return o.Run(ctx, args...)
 	}
 	n := strconv.Itoa(number)
-	f, err := readFacts(ctx, gh, o.Untriaged, number)
-	sleep := o.Sleep
-	if sleep == nil {
-		sleep = time.Sleep
-	}
-	for round := 0; o.Wait && err == nil && unsettled(f) && round < maxWaitRounds; round++ {
-		sleep(waitPause)
-		_, _ = gh("pr", "checks", n, "--watch", "--interval", "30") // the facts below decide
-		f, err = readFacts(ctx, gh, o.Untriaged, number)
-	}
+	f, err := settle(ctx, gh, o, number, o.Wait)
 	if err != nil {
 		return Result{}, err
 	}
 	res := Result{HeadSHA: f.HeadSHA, Reasons: Decide(f)}
+	if o.UpdateBranch && onlyBehind(res.Reasons) {
+		// A merge of the base, not a rebase: one merge commit, which the
+		// reviewer's push gate does not count, and the squash flattens anyway.
+		if _, err := gh("pr", "update-branch", n); err != nil {
+			return res, fmt.Errorf("gh pr update-branch: %w", err)
+		}
+		res.Updated = true
+		if f, err = settle(ctx, gh, o, number, true); err != nil {
+			return res, err
+		}
+		res.HeadSHA, res.Reasons = f.HeadSHA, Decide(f)
+	}
 	if len(res.Reasons) > 0 {
 		return res, nil
 	}
+	return merge(gh, n, f, res)
+}
+
+// settle reads the facts and, when wait is set, keeps pausing and re-reading
+// while more waiting can still change them.
+func settle(ctx context.Context, gh ghFunc, o Options, number int, wait bool) (Facts, error) {
+	sleep := o.Sleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	f, err := readFacts(ctx, gh, o.Untriaged, number)
+	for round := 0; wait && err == nil && unsettled(f) && round < maxWaitRounds; round++ {
+		sleep(waitPause)
+		_, _ = gh("pr", "checks", strconv.Itoa(number), "--watch", "--interval", "30") // the facts below decide
+		f, err = readFacts(ctx, gh, o.Untriaged, number)
+	}
+	return f, err
+}
+
+// merge re-reads the head, refuses if it moved, retargets the dependents and
+// squash-merges the head it checked.
+func merge(gh ghFunc, n string, f Facts, res Result) (Result, error) {
 	again, err := readView(gh, n)
 	if err != nil {
 		return res, err
@@ -134,6 +163,10 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	}
 	res.Merged = true
 	return res, nil
+}
+
+func onlyBehind(reasons []string) bool {
+	return len(reasons) == 1 && reasons[0] == "merge state is BEHIND"
 }
 
 // maxWaitRounds bounds --wait: each round is a pause and one
