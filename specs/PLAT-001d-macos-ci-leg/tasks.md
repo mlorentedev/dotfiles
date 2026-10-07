@@ -33,7 +33,7 @@ created: "2026-10-07"
 
 - [x] [AC5] `ci.yml`: `test` calls `run-bats.sh`; new non-required `test-macos` on the `code` filter
 - [x] [AC5] Assert bash 3.2 and zsh in the job rather than assume them
-- [ ] [AC5] First green run of `test-macos` on this PR, then on main (needs the runner; recorded in the PR)
+- [x] [AC5] First green run of `test-macos` on this PR (run 37590992834); the main-only full-suite step runs after merge
 
 ## Closing
 

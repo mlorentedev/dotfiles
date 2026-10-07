@@ -11,7 +11,7 @@ created: "2026-10-07"
 - [x] AC2 (tier tagged, non-empty, passes under bash 3.2 with no `sha256sum`) -> `PATH="/bin:...(no /sbin)" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` -> `bash 3.2.57 at /bin/bash`, `285 test(s) tagged os-sensitive`, 285 ok, 0 not ok
 - [x] AC3 (tag mistakes fail) -> `tests/guard-bats-tags.bats` (mutation: `file_tag=` in `tests/utils.bats` turns test 2 red), `tests/run-bats-real.bats` ("a tag no test carries fails the run")
 - [x] AC4 (classified and resolved) -> table below; `bats --jobs 8 --no-parallelize-within-files tests/*.bats` -> 1797 tests, 0 failed, 102 skipped (each with a reason)
-- [ ] AC5 (workflow) -> job declared and checked by `tests/workflow-job-names.bats`, `tests/workflow-timeouts.bats`, `tests/ci-path-filtering.bats`; the first run on a real runner is recorded in the PR, not here
+- [x] AC5 (workflow) -> job declared and checked by `tests/workflow-job-names.bats`, `tests/workflow-timeouts.bats`, `tests/ci-path-filtering.bats`; first hosted run on PR #2063 (run 37590992834, job `test-macos`): pass in 4m19s, every step success (age, bats, GNU parallel install, shells, Go build/vet/`GOOS=darwin` vet/test, tier under bash 3.2); the full-suite step is `push`-only and ran skipped, so its first hosted run is the merge to main
 - [x] AC6 (one script) -> `tests/run-bats.bats`, `tests/run-bats-real.bats`; mutation: putting `$(nproc)` back into `ci.yml` turns the `refute_grep` test red
 
 ### Classification of the 88 failures (macOS 26, arm64, bash 3.2, 2026-10-07)
