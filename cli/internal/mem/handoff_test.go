@@ -616,6 +616,7 @@ func TestThreadKeyQualifiesTheRemotesDefaultBranchWithTheHost(t *testing.T) {
 		{"trunk as the default, linked worktree", "trunk", "trunk", true, true},
 		{"develop when the default is main", "develop", "main", true, false},
 		{"a feature branch", "feat/x", "develop", true, false},
+		{"a slashed default", "release/1.2", "release/1.2", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var cwd, common string
@@ -637,6 +638,11 @@ func TestThreadKeyQualifiesTheRemotesDefaultBranchWithTheHost(t *testing.T) {
 			got := ThreadKey(cwd)
 			if qualified := strings.HasSuffix(got, host); qualified != tc.qualified {
 				t.Errorf("ThreadKey = %q; host-qualified = %v, want %v", got, qualified, tc.qualified)
+			}
+			// The key is a filename component: no derived default may put a
+			// separator in it.
+			if strings.ContainsAny(got, `/\`) {
+				t.Errorf("ThreadKey = %q carries a path separator", got)
 			}
 		})
 	}
