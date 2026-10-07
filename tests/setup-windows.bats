@@ -735,7 +735,7 @@ FIXTURE
     # compile-harness.sh --deploy, and settings.json only from the
     # claude-settings merge entry of `dotf deploy`.
     refute_grep 'cp -rf "\$_claude_src"' "$DOTFILES_DIR/setup-linux.sh"
-    refute_grep 'cp[^\n]*ai/claude/settings\.json' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'cp .*ai/claude/settings\.json' "$DOTFILES_DIR/setup-linux.sh"
     [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .strategy' "$DOTFILES_DIR/ai/deploy.json")" = "merge" ]
 }
 
