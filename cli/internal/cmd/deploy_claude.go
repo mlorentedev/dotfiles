@@ -107,7 +107,7 @@ func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error 
 	}
 	reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
 	for _, id := range rep.Failed {
-		_, _ = fmt.Fprintf(w, "failed    %-10s %s did not install\n", step, id)
+		deployRow(w, "failed", step, "%s did not install", id)
 	}
 	if len(rep.Failed) > 0 {
 		return fmt.Errorf("%s: %d plugin(s) failed to install: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", "))
@@ -132,19 +132,19 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	s.HasCommand = deployCommandAvailable
 	rep := s.Register(servers, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
-	migrated := "migrated  %-10s %s (stale uvx hive-vault entry replaced by the SSOT one)\n"
+	verb, why := "migrated", "(stale uvx hive-vault entry replaced by the SSOT one)"
 	if dryRun {
-		migrated = "would migrate %-6s %s (stale uvx hive-vault entry)\n"
+		verb, why = "would migrate", "(stale uvx hive-vault entry)"
 	}
 	for _, name := range rep.Migrated {
-		_, _ = fmt.Fprintf(w, migrated, step, name)
+		deployRow(w, verb, step, "%s %s", name, why)
 	}
 	for _, sk := range rep.Skipped {
-		_, _ = fmt.Fprintf(w, "skipped   %-10s %s (%s not on PATH)\n", step, sk.Name, sk.Missing)
+		deployRow(w, "skipped", step, "%s (%s not on PATH)", sk.Name, sk.Missing)
 	}
 	reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
 	for _, name := range rep.Failed {
-		_, _ = fmt.Fprintf(w, "failed    %-10s %s did not register\n", step, name)
+		deployRow(w, "failed", step, "%s did not register", name)
 	}
 	if len(rep.Failed) > 0 {
 		return fmt.Errorf("%s: %d server(s) failed to register: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", "))
@@ -158,7 +158,7 @@ func claudeSyncer(w io.Writer, step, home string) (claude.Syncer, bool) {
 	configDir := claudeConfigDir(home)
 	run := deployClaudeRunner(configDir)
 	if run == nil {
-		_, _ = fmt.Fprintf(w, "skipped   %-10s (claude not installed)\n", step)
+		deployRow(w, "skipped", step, "(claude not installed)")
 		return claude.Syncer{}, false
 	}
 	return claude.Syncer{
@@ -170,7 +170,7 @@ func claudeSyncer(w io.Writer, step, home string) (claude.Syncer, bool) {
 
 func reportRestored(w io.Writer, step, path string, n int) {
 	if n > 0 {
-		_, _ = fmt.Fprintf(w, "restored  %-10s %s shrank during a claude call (a known Claude Code truncation bug); restored it from the snapshot\n", step, path)
+		deployRow(w, "restored", step, "%s shrank during a claude call (a known Claude Code truncation bug); restored it from the snapshot", path)
 	}
 }
 
@@ -182,5 +182,5 @@ func reportCounts(w io.Writer, step string, dryRun bool, added, failed, present 
 	case dryRun:
 		state, verb = "would add", "missing"
 	}
-	_, _ = fmt.Fprintf(w, "%-9s %-10s %d %s, %d already present\n", state, step, added, verb, present)
+	deployRow(w, state, step, "%d %s, %d already present", added, verb, present)
 }

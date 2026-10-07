@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,21 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
+
+// The `dotf deploy` report's columns: a verb, the entry, then what the line is
+// about. Every step of a bare deploy (the manifest entries, Orca's hooks, Claude
+// Code's servers and plugins) writes through deployRow, so the third column
+// starts at one place on every line (#1664). A name longer than the column
+// would push its own line out; TestDeployRow_EveryShippedNameFits keeps the
+// manifest inside it.
+const (
+	deployVerbWidth = len("would fix mode") // the longest verb
+	deployNameWidth = 16                    // the longest manifest name
+)
+
+func deployRow(w io.Writer, verb, name, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, "%-*s %-*s %s\n", deployVerbWidth, verb, deployNameWidth, name, fmt.Sprintf(format, args...))
+}
 
 // deployRenderer is the render seam. Production calls the SAME secrets.Render
 // the setup scripts called; a test injects a no-op. Deliberately a call and not
@@ -92,11 +108,11 @@ func newDeployCmd() *cobra.Command {
 			w := cmd.OutOrStdout()
 			for _, target := range targets {
 				if !target.AppliesOn(runtime.GOOS) {
-					_, _ = fmt.Fprintf(w, "skipped   %-10s (not for %s)\n", target.Name, runtime.GOOS)
+					deployRow(w, "skipped", target.Name, "(not for %s)", runtime.GOOS)
 					continue
 				}
 				if target.Requires != "" && !deployCommandAvailable(target.Requires) {
-					_, _ = fmt.Fprintf(w, "skipped   %-10s (%s not installed)\n", target.Name, target.Requires)
+					deployRow(w, "skipped", target.Name, "(%s not installed)", target.Requires)
 					continue
 				}
 				res, err := deploy.Deploy(target, repoRoot, env.Home(), env.ResolvePath, deployRenderer, dryRun)
@@ -105,20 +121,20 @@ func newDeployCmd() *cobra.Command {
 				}
 				switch {
 				case !res.Changed:
-					_, _ = fmt.Fprintf(w, "in sync   %-10s %s\n", res.Name, res.Dst)
+					deployRow(w, "in sync", res.Name, "%s", res.Dst)
 				case res.ModeFixed && dryRun:
-					_, _ = fmt.Fprintf(w, "would fix mode %-5s %s\n", res.Name, res.Dst)
+					deployRow(w, "would fix mode", res.Name, "%s", res.Dst)
 				case res.ModeFixed:
 					// Content was in sync; only the declared mode was missing on
 					// the file (CLI-055: an inherited ACL on a 0600).
-					_, _ = fmt.Fprintf(w, "mode fixed %-9s %s\n", res.Name, res.Dst)
+					deployRow(w, "mode fixed", res.Name, "%s", res.Dst)
 				case dryRun:
-					_, _ = fmt.Fprintf(w, "would deploy %-7s %s\n", res.Name, res.Dst)
+					deployRow(w, "would deploy", res.Name, "%s", res.Dst)
 				default:
-					_, _ = fmt.Fprintf(w, "deployed  %-10s %s\n", res.Name, res.Dst)
+					deployRow(w, "deployed", res.Name, "%s", res.Dst)
 				}
 				if res.BackedUp != "" {
-					_, _ = fmt.Fprintf(w, "          kept the previous file at %s\n", res.BackedUp)
+					deployRow(w, "", "", "kept the previous file at %s", res.BackedUp)
 				}
 			}
 			// A bare deploy converges everything the setups own, including the
