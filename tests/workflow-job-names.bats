@@ -82,9 +82,9 @@ jobs:
 YML
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"required check 'x' comes from g.yml:x, which needs 'a', and 'a' is not required"* ]]
-    [[ "$output" == *"required check 'b' comes from g.yml:b, which needs 'a'"* ]]
-    [[ "$output" != *"which needs 'b'"* ]]
+    [[ "$output" == *"required check 'x' comes from g.yml:x, which needs 'a', and 'a' is not required"* ]] || false
+    [[ "$output" == *"required check 'b' comes from g.yml:b, which needs 'a'"* ]] || false
+    [[ "$output" != *"which needs 'b'"* ]] || false
     [[ "$output" != *"required check 'gate'"* ]]
 }
 
