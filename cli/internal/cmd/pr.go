@@ -26,6 +26,7 @@ func newPrCmd() *cobra.Command {
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
 	pr.AddCommand(newTriageQueueCmd())
+	pr.AddCommand(newPrLandCmd())
 	return pr
 }
 

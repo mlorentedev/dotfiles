@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
@@ -75,7 +76,15 @@ A blocked call is answered "deny" with the reason.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload, _ := io.ReadAll(cmd.InOrStdin())
 			if stateDir == "" {
-				stateDir = defaultGateStateDir()
+				dir, err := env.StateDir()
+				if err != nil {
+					// Fail open, like an unreadable payload: a gate that blocks on
+					// its own setup blocks every call. Nothing can be recorded
+					// without a state dir, so the reason goes to stderr.
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow:", err)
+					return gateAnswer(cmd.OutOrStdout(), harnessName, false, "")
+				}
+				stateDir = dir
 			}
 			// One closure, used by every exit below, because the requirement is
 			// that NO path returns without leaving a record. Writing it at each
@@ -454,13 +463,6 @@ func effectiveRole(flag, fromPayload string) string {
 		return r
 	}
 	return strings.TrimSpace(fromPayload)
-}
-
-func defaultGateStateDir() string {
-	if x := os.Getenv("XDG_STATE_HOME"); x != "" {
-		return filepath.Join(x, "dotfiles")
-	}
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "dotfiles")
 }
 
 // harnessAgy names Antigravity's CLI.
