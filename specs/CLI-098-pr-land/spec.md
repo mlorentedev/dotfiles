@@ -34,12 +34,32 @@ With `--update-branch`, when BEHIND is the only failing condition, it merges the
 
 Out of scope: landing every PR of the user (`--all-mine`).
 
+## Queue and lock (#2066)
+
+`dotf pr land <n> [<n>...]` lands several PRs as one queue. Measured on 2026-10-07: four concurrent `pr land --wait --update-branch` processes against five PRs. Every merge marked the others BEHIND, every running process then pushed a merge commit of its own, and each push started a full CI run and a reviewer re-review. That is O(n^2) CI for n PRs, and with `maxUpdates = 3` the last PR in line can exhaust its updates and exit unmerged.
+
+Scope:
+
+1. The PRs land in the order given, one at a time. A PR is updated only during its own turn, so each PR pays one update per base move while it is the one landing.
+2. A PR that stops for any reason (a failed check, DIRTY, reviewer output awaiting triage, an error reading a fact) is reported and the queue moves on. Only a cancelled context ends the queue; the PRs after it are reported as not attempted.
+3. At the end one summary lists the merged PRs and, for each PR not merged, its reasons. It reuses `prland.Result`, which gains the PR number. The exit status is non-zero when any PR was not merged.
+4. One PR keeps the output and the exit contract it had.
+5. A per-repo lock under the state dir (`<state>/pr-land/<owner>-<name>.lock`). The lock is a kernel lock (`internal/filelock`), so the mutual exclusion has no race and a killed process cannot leave it held. A sibling `.pid` file records the holder. A second `pr land` that finds the lock held refuses and names the holder's PID. A `.pid` file left by a holder that is no longer alive is taken over with a note on stderr. The lock is released, and the `.pid` file removed, on every exit path.
+
+Failing tests first (written before the code, run red, then green):
+
+- `TestLandQueue_LandsInTheOrderGiven`, `TestLandQueue_UpdatesAPROnlyDuringItsOwnTurn`
+- `TestLandQueue_ContinuesPastAStoppedPR`, `TestLandQueue_AnErrorStopsThatPRNotTheQueue`, `TestLandQueue_ACancelledContextLeavesTheRestNotAttempted`
+- `TestAcquireLock_RefusesWhileHeldAndNamesThePID`, `TestAcquireLock_TakesOverAStaleLockWithANote`, `TestAcquireLock_ReleaseFreesTheLockAndRemovesThePIDFile`, `TestAcquireLock_LocksAreIndependentPerRepo`
+- `TestPrLand_AQueueLandsInOrderAndSummarisesWithExitOne`, `TestPrLand_ASecondLandRefusesWhileTheLockIsHeld`, `TestPrLand_AStaleLockIsTakenOverWithANote`, `TestPrLand_ReleasesTheLockAfterAnError`, `TestPrLand_OnePRPrintsNoSummary`
+
 ## Checklist
 
 - [x] Failing tests with a fake `gh` runner: lands when every condition holds; refuses and names each failed condition (a failing or pending check, BEHIND, DIRTY, untriaged review, draft, closed, release-please branch); refuses when the head moves between reads; retargets dependents before the merge; passes `--match-head-commit` with the SHA it checked
 - [x] `internal/prland`: the decision as a pure function over the facts read, and the gh calls behind an injected runner
 - [x] `cmd/pr.go`: `land` subcommand; `cli/README.md` row for `pr`
 - [x] Verified on a real PR of this repository
+- [x] Queue and lock (#2066): `LandQueue`, `AcquireLock`, `pr land <n> [<n>...]`, tests below, runbook `release-dotf.md`, lesson 344
 
 ## Evidence
 
@@ -49,6 +69,7 @@ Out of scope: landing every PR of the user (`--all-mine`).
 - Transactional retarget (pr-agent on #2037): a merge that fails after the dependents were retargeted restores each to the head branch; a restore that fails is named in the error with the merge error (`TestLand_AFailedMergeRestoresTheRetargetedDependents`, `TestLand_AFailedRestoreNamesTheDependentLeftRetargeted`)
 - Measured on #2033/#2037/#2039: right after a push gh reports no checks (non-zero exit, empty output), which `land` read as an error. Empty output is now "no checks reported" (a refusal) and keeps `--wait` waiting (`TestLand_NoChecksYetIsARefusalNotAnError`)
 - Real PR, read-only: `dotf pr land 2033` -> `[NOT MERGED] #2033 at e656207: spec-gate: fail; merge state is UNKNOWN; reviewer output awaits triage`, exit 1, nothing changed
+- Queue and lock (#2066): `go test ./internal/prland/ ./internal/cmd/` -> ok; mutation checks: reversing the loop in `LandQueue` fails all five `TestLandQueue_*`, dropping `defer release()` fails `TestPrLand_ReleasesTheLockAfterAnError` and `...AfterAQueue`; `GOOS=windows go vet ./...` and `GOOS=darwin go vet ./...` clean; `golangci-lint run` -> 0 issues
 
 ## Next
 
