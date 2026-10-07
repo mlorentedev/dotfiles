@@ -84,7 +84,8 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE=fail:504 STUB_HEAD=fail:504
     _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"the GitHub API failed while reading harness/review-attestation.json"* ]]
+    [[ "$output" == *"the GitHub API failed while determining whether a review marker is declared"* ]]
+    [[ "$output" == *"review-attestation.json?ref=main"* ]]
     [[ "$output" == *"HTTP 504"* ]]
     [[ "$output" != *"no review marker declared"* ]]
     [ "$(calls_to BASE)" -eq 3 ]
@@ -118,8 +119,9 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE="$NO_ENTRY" STUB_PULL=fail:503
     HEAD_SHA="" _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"the GitHub API failed"* ]]
+    [[ "$output" == *"the GitHub API failed while determining whether a review marker is declared"* ]]
     [[ "$output" == *"pulls/7"* ]]
+    [[ "$output" != *"no review marker declared"* ]]
     [ "$(calls_to PULL)" -eq 3 ]
 }
 
@@ -129,6 +131,15 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     [ "$status" -eq 1 ]
     [[ "$output" == *"the GitHub API failed while listing the PR's comments"* ]]
     [[ "$output" != *"published no review"* ]]
+}
+
+@test "a comment listing that answers 404 is reported as such: no retry, no empty outage report" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS=fail:404
+    _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"listing the PR's comments answered 404"* ]]
+    [ "$(calls_to COMMENTS)" -eq 1 ]
+    [[ "$output" != *"GitHub API failed"* ]]
 }
 
 @test "with every call answering and no review comment, the published-no-review diagnosis stands" {

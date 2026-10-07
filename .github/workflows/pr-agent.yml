@@ -564,8 +564,10 @@ jobs:
             fi
           fi
           if [ -z "$markers" ] && [ -s "$api_errors" ]; then
-            echo "::error::the GitHub API failed while reading harness/review-attestation.json," \
-              "so whether a review marker is declared is unknown. Re-run the job once the API answers."
+            # The failed call may be the registry read or the head-SHA lookup; the
+            # detail lines below name it, so the headline names neither.
+            echo "::error::the GitHub API failed while determining whether a review marker is" \
+              "declared, so that is unknown. Re-run the job once the API answers."
             sed 's/^/::error::/' "$api_errors"
             exit 1
           fi
@@ -578,6 +580,13 @@ jobs:
           # array of arrays so the count spans every page (gh's own --slurp flag is
           # not present on the runner's gh 2.46 and printed usage instead).
           comments=$(gh_api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate) || {
+            # gh_api records an outage in $api_errors and returns 1 silently on a 404,
+            # so no line for this call means the endpoint answered 404.
+            if ! grep -q "/issues/${PR_NUMBER}/comments" "$api_errors"; then
+              echo "::error::listing the PR's comments answered 404: the PR, or this token's" \
+                "read access to it, is gone, so no published review can be verified."
+              exit 1
+            fi
             echo "::error::the GitHub API failed while listing the PR's comments, so whether" \
               "a review was published is unknown. Re-run the job once the API answers."
             sed 's/^/::error::/' "$api_errors"
