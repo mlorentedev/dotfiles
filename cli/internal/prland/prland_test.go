@@ -69,6 +69,9 @@ func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
 		}
 		return []byte(g.view), nil
 	case strings.HasPrefix(line, "pr checks") && strings.Contains(line, "--json"):
+		if g.checks == "" {
+			return nil, errors.New("exit status 1: no checks reported on the 'feat/x' branch")
+		}
 		return []byte(g.checks), errors.New("exit status 8") // gh exits non-zero while a check is pending
 	case strings.HasPrefix(line, "pr checks"):
 		return nil, nil
@@ -489,5 +492,44 @@ func TestLand_TheUnknownBudgetIsExactWhenNotAWholeNumberOfPauses(t *testing.T) {
 	}
 	if len(res.Reasons) != 1 || !strings.Contains(res.Reasons[0], "after waiting 45s") {
 		t.Errorf("reasons = %q", res.Reasons)
+	}
+}
+
+// #2056: gh 2.46 has no `pr checks --json`. Its usage error left stdout empty
+// and read as "no checks reported", refusing a PR with every check green for
+// a reason that was not true.
+func TestLand_AGhWithoutChecksJSONIsAnErrorNamingTheRemedy(t *testing.T) {
+	g := &fakeGH{view: readyView, deps: `[]`}
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		if args[0] == "pr" && args[1] == "checks" {
+			return nil, errors.New("exit status 1: unknown flag: --json")
+		}
+		return g.run(ctx, args...)
+	}
+	res, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged}, 30)
+	if err == nil {
+		t.Fatalf("want an error, got a result %+v", res)
+	}
+	for _, want := range []string{"unknown flag: --json", "install a newer gh"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	if len(g.calls) != 0 {
+		t.Errorf("acted on a PR it could not read: %v", g.calls)
+	}
+}
+
+func TestLand_AnyOtherChecksFailureWithNoOutputIsAnError(t *testing.T) {
+	g := &fakeGH{view: readyView, deps: `[]`}
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		if args[0] == "pr" && args[1] == "checks" {
+			return nil, errors.New("exit status 1: HTTP 502: Bad Gateway")
+		}
+		return g.run(ctx, args...)
+	}
+	_, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged}, 30)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 502") || strings.Contains(err.Error(), "newer gh") {
+		t.Errorf("err = %v, want the gh failure without the version remedy", err)
 	}
 }
