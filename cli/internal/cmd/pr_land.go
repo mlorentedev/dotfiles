@@ -131,7 +131,7 @@ func parseLandNumbers(args []string) ([]int, error) {
 	seen := map[int]bool{}
 	for _, a := range args {
 		n, err := strconv.Atoi(strings.TrimPrefix(a, "#"))
-		if err != nil {
+		if err != nil || n <= 0 {
 			return nil, fmt.Errorf("pr land: %q is not a PR number", a)
 		}
 		if seen[n] {

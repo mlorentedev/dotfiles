@@ -45,6 +45,26 @@ func TestAcquireLock_LocksAreIndependentPerRepo(t *testing.T) {
 	other()
 }
 
+// A slashless --repo of "." or ".." would make filepath.Join collapse the lock
+// path into the state dir or its parent, outside the pr-land directory.
+func TestAcquireLock_RefusesARepoThatWouldEscapeItsDirectory(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "pr-land")
+	for _, repo := range []string{".", ".."} {
+		release, err := AcquireLock(dir, repo, func(int) bool { return true }, new(bytes.Buffer))
+		if err == nil {
+			release()
+			t.Fatalf("repo %q was accepted", repo)
+		}
+	}
+	entries, _ := os.ReadDir(root)
+	for _, e := range entries {
+		if e.Name() != "pr-land" {
+			t.Errorf("a lock file escaped to %s", filepath.Join(root, e.Name()))
+		}
+	}
+}
+
 // A holder that died leaves its PID file behind; the kernel freed the lock.
 func TestAcquireLock_TakesOverAStaleLockWithANote(t *testing.T) {
 	dir := t.TempDir()

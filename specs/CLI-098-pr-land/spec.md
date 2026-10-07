@@ -44,7 +44,7 @@ Scope:
 2. A PR that stops for any reason (a failed check, DIRTY, reviewer output awaiting triage, an error reading a fact) is reported and the queue moves on. Only a cancelled context ends the queue; the PRs after it are reported as not attempted.
 3. At the end one summary lists the merged PRs and, for each PR not merged, its reasons. It reuses `prland.Result`, which gains the PR number. The exit status is non-zero when any PR was not merged.
 4. One PR keeps the output and the exit contract it had.
-5. A per-repo lock under the state dir (`<state>/pr-land/<owner>-<name>.lock`). The lock is a kernel lock (`internal/filelock`), so the mutual exclusion has no race and a killed process cannot leave it held. A sibling `.pid` file records the holder. A second `pr land` that finds the lock held refuses and names the holder's PID. A `.pid` file left by a holder that is no longer alive is taken over with a note on stderr. The lock is released, and the `.pid` file removed, on every exit path.
+5. A per-repo lock under the state dir (`<state>/pr-land/<owner>+<name>.lock`, lowercased; `+` keeps `a-b/c` and `a/b-c` on separate locks). The lock is a kernel lock (`internal/filelock`), so the mutual exclusion has no race and a killed process cannot leave it held. A sibling `.pid` file records the holder. A second `pr land` that finds the lock held refuses and names the holder's PID. A `.pid` file left by a holder that is no longer alive is taken over with a note on stderr. The lock is released, and the `.pid` file removed, on every exit path.
 
 Failing tests first (written before the code, run red, then green):
 

@@ -44,7 +44,13 @@ func AcquireLock(dir, repo string, alive func(pid int) bool, note io.Writer) (fu
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create the pr land lock directory: %w", err)
 	}
-	base := filepath.Join(dir, lockName(repo))
+	name := lockName(repo)
+	if name == "." || name == ".." {
+		// filepath.Join would fold these into dir or its parent, and the lock
+		// would land outside the directory it is meant to live in.
+		return nil, fmt.Errorf("cannot lock %q: not a repository name (want owner/name)", repo)
+	}
+	base := filepath.Join(dir, name)
 	pidPath := base + ".pid"
 	unlock, err := filelock.TryLock(base + ".lock")
 	if errors.Is(err, filelock.ErrLocked) {

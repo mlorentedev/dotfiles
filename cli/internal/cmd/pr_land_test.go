@@ -45,6 +45,19 @@ func TestPrLand_RejectsANonNumber(t *testing.T) {
 	}
 }
 
+// 0 and negative numbers parse as integers but name no PR; they must be refused
+// when the arguments are read, before the lock is taken or gh is asked.
+func TestParseLandNumbers_RejectsANonPositiveNumber(t *testing.T) {
+	for _, a := range []string{"0", "-5", "#0"} {
+		if _, err := parseLandNumbers([]string{a}); err == nil {
+			t.Errorf("%q was accepted as a PR number", a)
+		}
+	}
+	if got, err := parseLandNumbers([]string{"#7", "8"}); err != nil || len(got) != 2 {
+		t.Errorf("valid numbers = %v, %v", got, err)
+	}
+}
+
 // queueFake answers gh for a queue of PRs: a PR with no entry in states is
 // CLEAN and green, and the ones in broken fail to be read at all. merges lists
 // the PRs merged, in order.
