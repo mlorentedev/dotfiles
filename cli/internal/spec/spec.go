@@ -77,23 +77,26 @@ func RepoRoot(start string) (string, error) {
 	}
 }
 
-// Gate verifies that issue #num exists and is OPEN, returning its title. It
-// shells out to `gh issue view` — a faithful twin of init-spec.sh, and the same
-// path the bitácora workflow uses — rather than reimplementing the GitHub API.
-// When repo ("owner/name") is non-empty it is passed as --repo so the gate is
-// checked against the issue's actual home, not the current git repo's default
-// (HARNESS-023). Callers skip Gate entirely under --force-no-gate.
+// Gate verifies that issue #num exists and is open, returning its title. It
+// asks GitHub's REST API through `gh api`, not `gh issue view`: the latter goes
+// through GraphQL, whose rate limit every session on the account shares, and
+// a gate that cannot answer when REST still can gets forced with
+// --force-no-gate, which records nothing (#1452). When repo ("owner/name") is
+// non-empty the issue is looked up there, its actual home rather than the
+// current git repo (HARNESS-023); otherwise gh fills {owner}/{repo} from the
+// current repo. As with `gh issue view`, a pull request number resolves too.
+// Callers skip Gate entirely under --force-no-gate.
 func Gate(num int, repo string) (title string, err error) {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return "", fmt.Errorf("gh CLI not found — cannot verify work-gate issue #%d "+
 			"(install gh, or use --force-no-gate)", num)
 	}
-	args := []string{"issue", "view", strconv.Itoa(num),
-		"--json", "state,title", "--jq", `.state + "\t" + .title`}
-	if repo != "" {
-		args = append(args, "--repo", repo)
+	home := repo
+	if home == "" {
+		home = "{owner}/{repo}"
 	}
-	out, err := exec.Command("gh", args...).Output()
+	out, err := exec.Command("gh", "api", "repos/"+home+"/issues/"+strconv.Itoa(num),
+		"--jq", `.state + "\t" + .title`).Output()
 	if err != nil {
 		return "", fmt.Errorf("work-gate issue #%d not found (or gh failed): %v",
 			num, execerr.WithStderr(err))
@@ -102,7 +105,9 @@ func Gate(num int, repo string) (title string, err error) {
 	if !ok {
 		return "", fmt.Errorf("unexpected gh output verifying issue #%d: %q", num, string(out))
 	}
-	if state != "OPEN" {
+	// REST spells the state in lower case, GraphQL in upper case. Folding keeps
+	// the comparison from turning every open issue into a refusal.
+	if !strings.EqualFold(state, "open") {
 		return "", fmt.Errorf("work-gate issue #%d is not open (state: %s) — "+
 			"the work-gate is an OPEN issue; reopen it or pick the right one", num, state)
 	}
