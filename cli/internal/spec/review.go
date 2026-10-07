@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -329,9 +330,9 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 
 	review, found, err := FindReview(specDir)
 	if !found {
-		return fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
+		return withTurnCapHint(fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
 			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
-			ReviewFile)
+			ReviewFile), repoRoot, specDir)
 	}
 	if err != nil {
 		return fmt.Errorf("%w\nfix the artifact, or declare `review: waived` with a reason in proposal.md", err)
@@ -349,6 +350,9 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// repository asked. Put it after, and a stale PASS left behind by a reviewer
 	// that wrote nothing would be accepted before anything looked.
 	if err := checkReviewProvenance(specDir, review); err != nil {
+		if errors.Is(err, errNoNewVerdict) {
+			err = withTurnCapHint(err, repoRoot, specDir)
+		}
 		return err
 	}
 	if review.Verdict.Blocks() {
@@ -443,10 +447,10 @@ func checkReviewProvenance(specDir string, review Review) error {
 	// reviewer that wrote nothing leaves the PREVIOUS round's sha in place, and
 	// "the shas differ" would send the reader hunting for a rebase.
 	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == fileDigest(filepath.Join(specDir, ReviewFile)) {
-		return fmt.Errorf("%s has not changed since the review was launched — the reviewer wrote no verdict\n"+
+		return fmt.Errorf("%s has not changed since the review was launched — %w\n"+
 			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
 			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state)",
-			ReviewFile)
+			ReviewFile, errNoNewVerdict)
 	}
 
 	if req.ReviewedSHA != "" && review.ReviewedSHA != "" && req.ReviewedSHA != review.ReviewedSHA {
@@ -467,6 +471,10 @@ func checkReviewProvenance(specDir string, review Review) error {
 	}
 	return nil
 }
+
+// errNoNewVerdict marks the provenance failure where the launched reviewer wrote
+// nothing, the one case whose cause the transcript can name.
+var errNoNewVerdict = errors.New("the reviewer wrote no verdict")
 
 // short renders a sha for a human-readable error without hiding a short input.
 func short(sha string) string {
