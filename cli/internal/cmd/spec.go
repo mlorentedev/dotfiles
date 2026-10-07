@@ -195,9 +195,15 @@ is the only record of how.`,
 			baseSHA := resolveReviewBase(repoRoot, specDir)
 			headSHA := headSHAOf(repoRoot)
 			if baseSHA == "" {
-				return fmt.Errorf("cannot resolve a review base for specs/%s: no commit adds that folder.\n"+
+				return fmt.Errorf("cannot resolve a review base for specs/%s. One of:\n"+
+					"  - no commit adds that folder: commit the spec first;\n"+
+					"  - it was first added, under this or an earlier name, in the repository's root\n"+
+					"    commit, so there is no commit before the work to diff against;\n"+
+					"  - it was renamed in a way that cannot be traced back to where it began, or created\n"+
+					"    in the same commit that deleted another spec folder holding the same file names,\n"+
+					"    which looks the same as a move git did not pair and is refused for that reason.\n"+
 					"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
-					"call that a review. Commit the spec first", id)
+					"call that a review", id)
 			}
 			if baseSHA == headSHA {
 				return fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
