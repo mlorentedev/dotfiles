@@ -209,7 +209,7 @@ _test_job() {
     job="$(_test_job)"
     build=$(printf '%s\n' "$job" | grep -n 'go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf' | head -1 | cut -d: -f1)
     export_line=$(printf '%s\n' "$job" | grep -n 'DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"' | head -1 | cut -d: -f1)
-    run_line=$(printf '%s\n' "$job" | grep -n 'bats --jobs' | head -1 | cut -d: -f1)
+    run_line=$(printf '%s\n' "$job" | grep -n 'run-bats.sh' | head -1 | cut -d: -f1)
     [ -n "$build" ] && [ -n "$export_line" ] && [ -n "$run_line" ]
     [ "$build" -lt "$run_line" ]
     [ "$export_line" -lt "$run_line" ]
@@ -217,8 +217,11 @@ _test_job() {
 
 @test "ci: the bats step keeps its parallelism flags and adds a junit timing report that is uploaded" {
     job="$(_test_job)"
-    printf '%s\n' "$job" | grep -qF -- '--no-parallelize-within-files'
-    printf '%s\n' "$job" | grep -qF -- '--report-formatter junit --timing --output "$RUNNER_TEMP/bats-report"'
+    # The flags live in scripts/run-bats.sh, the one place bats runs on every OS
+    # (PLAT-001d); the job passes the report directory through it.
+    grep -qF -- '--no-parallelize-within-files' "$REPO/scripts/run-bats.sh"
+    grep -qF -- '--report-formatter junit --timing --output' "$REPO/scripts/run-bats.sh"
+    printf '%s\n' "$job" | grep -qF -- 'run-bats.sh --report-dir "$RUNNER_TEMP/bats-report"'
     printf '%s\n' "$job" | grep -qE 'uses: actions/upload-artifact@[0-9a-f]{40}'
     printf '%s\n' "$job" | grep -qF 'path: ${{ runner.temp }}/bats-report/report.xml'
     # A red run is the one whose timings are wanted; a plain `success()` upload

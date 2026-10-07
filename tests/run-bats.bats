@@ -47,3 +47,20 @@ link_basics() {
 @test "ci.yml counts CPUs through run-bats.sh, not nproc, which macOS does not have" {
     refute_grep '(\$\(|`)[[:space:]]*nproc' "$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
 }
+
+@test "ci.yml: every job that runs the bats suite builds dotf once and exports DOTF_BIN" {
+    run python3 -c "
+import sys, yaml
+jobs = yaml.safe_load(open('$BATS_TEST_DIRNAME/../.github/workflows/ci.yml'))['jobs']
+bad = []
+for name, job in jobs.items():
+    steps = job.get('steps', [])
+    runs_suite = any('run-bats.sh' in (s.get('run') or '') for s in steps)
+    builds = any('DOTF_BIN=' in (s.get('run') or '') for s in steps)
+    if runs_suite and not builds:
+        bad.append(name)
+if bad:
+    print('no build-once DOTF_BIN step in: ' + ', '.join(bad)); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}

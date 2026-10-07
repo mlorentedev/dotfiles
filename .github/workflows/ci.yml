@@ -530,6 +530,15 @@ jobs:
           GOOS=darwin go vet ./...
           go test ./...
 
+      # One `dotf` for every bats file that runs the real binary, as in `test`
+      # (CI-012, #2059): a build failure fails the job instead of skipping tests,
+      # and a missing DOTF_BIN would let each file rebuild its own.
+      - name: Build dotf once for the bats suite
+        working-directory: cli
+        run: |
+          go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf
+          echo "DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"
+
       # `/bin` first so bats' `#!/usr/bin/env bash` finds 3.2; run-bats.sh fails
       # the step when it does not, and when no test carries the tag.
       - name: bats, os-sensitive tier (bash 3.2)
