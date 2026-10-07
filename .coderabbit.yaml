@@ -47,6 +47,18 @@ reviews:
   # A closed PR's review is spend with nothing to spend it on.
   abort_on_close: true
 
+  # No status blocks. With `auto_incremental_review: false` below, every push
+  # after the first review produces only a "Review skipped" / "Reviews paused"
+  # block, written by EDITING the summary comment that still carries the
+  # registry's review marker. `dotf pr triage-queue` counts an edit as new
+  # review output on purpose (TOOL-019, #1422), so each push re-opened a
+  # triaged PR, and `dotf pr land --update-branch` re-opened it with its own
+  # merge commit and then refused it (#2122). The notice tells nobody anything
+  # this file does not already say. Cost: the rate-limit notice the
+  # attestation gate reads as a decline may go too. That reviewer is advisory
+  # (harness/review-attestation.json), so its decline never refused a PR.
+  review_status: false
+
   auto_review:
     enabled: true
 
