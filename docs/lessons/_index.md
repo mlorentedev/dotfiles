@@ -378,4 +378,5 @@ tags: [lessons, index, dotfiles]
 | [358 - A mode convergence must only narrow](lesson-358-a-mode-convergence-must-only-narrow.md) | 2026-10-07 |
 | [359 - A gate must read every input the platform acts on](lesson-359-a-gate-must-read-every-input-the-platform-acts-on.md) | 2026-10-07 |
 | [360 - A PR inferred from the checkout is not the PR being pushed](lesson-360-a-pr-inferred-from-the-checkout-is-not-the-pr-being-pushed.md) | 2026-10-07 |
+| [362 - An uncomputed merge state is not a pending check](lesson-362-an-uncomputed-merge-state-is-not-a-pending-check.md) | 2026-10-07 |
 <!-- END GENERATED -->

@@ -26,6 +26,9 @@ type Facts struct {
 	MergeState string // CLEAN | BEHIND | DIRTY | BLOCKED | UNSTABLE | ...
 	Checks     []Check
 	Untriaged  bool // the triage queue lists this PR
+	// UnknownFor is how long --wait waited on an UNKNOWN merge state with
+	// every check green, so a refusal can say that waiting was tried.
+	UnknownFor time.Duration
 }
 
 // Check is one status check and gh's bucket for it: pass, fail, pending,
@@ -59,7 +62,10 @@ func Decide(f Facts) []string {
 			r = append(r, c.Name+": "+c.Bucket)
 		}
 	}
-	if f.MergeState != "CLEAN" {
+	switch {
+	case f.MergeState == "UNKNOWN" && f.UnknownFor > 0:
+		r = append(r, fmt.Sprintf("merge state is UNKNOWN after waiting %s for GitHub to compute it; a new head (a re-created merge of the base) makes it compute again", f.UnknownFor))
+	case f.MergeState != "CLEAN":
 		r = append(r, "merge state is "+f.MergeState)
 	}
 	if f.Untriaged {
@@ -83,6 +89,9 @@ type Options struct {
 	// UpdateBranch merges the base into a PR whose only failing condition is
 	// BEHIND, waits for the new CI, and decides again on the new head.
 	UpdateBranch bool
+	// UnknownWait bounds how long --wait waits for GitHub to compute the merge
+	// state of a PR whose checks are all green; 0 means DefaultUnknownWait.
+	UnknownWait time.Duration
 }
 
 // Result is what Land did.
@@ -140,11 +149,34 @@ func settle(ctx context.Context, gh ghFunc, o Options, number int, wait bool) (F
 	if sleep == nil {
 		sleep = time.Sleep
 	}
+	budget := o.UnknownWait
+	if budget <= 0 {
+		budget = DefaultUnknownWait
+	}
 	f, err := readFacts(ctx, gh, o.Untriaged, number)
-	for round := 0; wait && err == nil && unsettled(f) && round < maxWaitRounds; round++ {
+	rounds, uncomputedFor := 0, time.Duration(0)
+	for wait && err == nil && unsettled(f) {
+		// Two budgets, because the two waits fail differently. Checks finish
+		// in minutes or fail; a merge state GitHub has not computed was
+		// measured null for 27 minutes with every check green (#2118), and
+		// six rounds gave up long before it was computed.
+		if uncomputed(f) {
+			if uncomputedFor >= budget {
+				break
+			}
+			uncomputedFor += waitPause
+		} else {
+			if rounds >= maxWaitRounds {
+				break
+			}
+			rounds++
+		}
 		sleep(waitPause)
 		_, _ = gh("pr", "checks", strconv.Itoa(number), "--watch", "--interval", "30") // the facts below decide
 		f, err = readFacts(ctx, gh, o.Untriaged, number)
+	}
+	if f.MergeState == "UNKNOWN" {
+		f.UnknownFor = uncomputedFor
 	}
 	return f, err
 }
@@ -194,11 +226,15 @@ func onlyBehind(reasons []string) bool {
 	return len(reasons) == 1 && reasons[0] == "merge state is BEHIND"
 }
 
-// maxWaitRounds bounds --wait: each round is a pause and one
-// `gh pr checks --watch`.
+// maxWaitRounds bounds --wait while checks settle: each round is a pause and
+// one `gh pr checks --watch`. DefaultUnknownWait bounds the separate wait for a
+// merge state GitHub has not computed; it is 20 minutes because the longest
+// measured on 2026-10-07 was 27, and past that a new head is the remedy, not
+// more waiting.
 const (
-	maxWaitRounds = 6
-	waitPause     = 30 * time.Second
+	maxWaitRounds      = 6
+	waitPause          = 30 * time.Second
+	DefaultUnknownWait = 20 * time.Minute
 )
 
 // unsettled reports facts that more waiting can still change: a check still
@@ -219,6 +255,13 @@ func unsettled(f Facts) bool {
 		return len(f.Checks) == 0 || allGreen(f.Checks)
 	}
 	return false
+}
+
+// uncomputed reports the wait only GitHub can end: every check is green and
+// the merge state is still UNKNOWN. BLOCKED is not this case, since a PR can
+// be blocked for good with every check green.
+func uncomputed(f Facts) bool {
+	return f.MergeState == "UNKNOWN" && len(f.Checks) > 0 && allGreen(f.Checks)
 }
 
 func allGreen(cs []Check) bool {

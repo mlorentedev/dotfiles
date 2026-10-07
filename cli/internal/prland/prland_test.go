@@ -380,3 +380,86 @@ func TestLand_NoChecksYetIsARefusalNotAnError(t *testing.T) {
 		}
 	}
 }
+
+// unknownViews answers UNKNOWN for n reads, then CLEAN.
+func unknownViews(g *fakeGH, n int) Runner {
+	unknown := strings.Replace(readyView, `"CLEAN"`, `"UNKNOWN"`, 1)
+	reads := 0
+	return func(ctx context.Context, args ...string) ([]byte, error) {
+		if args[0] == "pr" && args[1] == "view" {
+			reads++
+			if reads <= n {
+				return []byte(unknown), nil
+			}
+			return []byte(readyView), nil
+		}
+		return g.run(ctx, args...)
+	}
+}
+
+// #2118: GitHub left a green PR's merge state UNKNOWN for 27 minutes, and the
+// six rounds that bound the checks wait gave up after about three.
+func TestLand_WaitOutlastsTheChecksBudgetForAnUncomputedMergeState(t *testing.T) {
+	g := &fakeGH{checks: greenChecks, deps: `[]`}
+	run := unknownViews(g, 3*maxWaitRounds)
+
+	res, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged, Wait: true, Sleep: func(time.Duration) {}}, 30)
+	if err != nil || !res.Merged {
+		t.Fatalf("want a merge once GitHub computes the state, got %+v, %v", res, err)
+	}
+}
+
+func TestLand_AnUncomputedMergeStateGivesUpAtItsBudgetAndSaysHowLong(t *testing.T) {
+	g := &fakeGH{checks: greenChecks, deps: `[]`}
+	run := unknownViews(g, 1000)
+
+	var slept time.Duration
+	o := Options{Run: run, Untriaged: noneUntriaged, Wait: true, UnknownWait: 5 * time.Minute, Sleep: func(d time.Duration) { slept += d }}
+	res, err := Land(context.Background(), o, 30)
+	if err != nil || res.Merged {
+		t.Fatalf("want a refusal, got %+v, %v", res, err)
+	}
+	if slept != 5*time.Minute {
+		t.Errorf("waited %s, want the 5m budget", slept)
+	}
+	want := "merge state is UNKNOWN after waiting 5m0s"
+	if len(res.Reasons) != 1 || !strings.HasPrefix(res.Reasons[0], want) {
+		t.Errorf("reasons = %q, want one starting %q", res.Reasons, want)
+	}
+}
+
+func TestLand_TheDefaultUnknownBudgetIsTheMeasuredOne(t *testing.T) {
+	g := &fakeGH{checks: greenChecks, deps: `[]`}
+	var slept time.Duration
+	o := Options{Run: unknownViews(g, 1000), Untriaged: noneUntriaged, Wait: true, Sleep: func(d time.Duration) { slept += d }}
+	if _, err := Land(context.Background(), o, 30); err != nil {
+		t.Fatal(err)
+	}
+	if slept != DefaultUnknownWait || DefaultUnknownWait < 20*time.Minute {
+		t.Errorf("waited %s with the default budget %s, want 20m or more", slept, DefaultUnknownWait)
+	}
+}
+
+// BLOCKED with every check green can be a PR blocked for good (a required
+// review), so it keeps the short budget rather than borrowing UNKNOWN's.
+func TestLand_ABlockedStateKeepsTheChecksBudget(t *testing.T) {
+	blocked := strings.Replace(readyView, `"CLEAN"`, `"BLOCKED"`, 1)
+	g := &fakeGH{view: blocked, checks: greenChecks, deps: `[]`}
+	pauses := 0
+	res, _ := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged, Wait: true, Sleep: func(time.Duration) { pauses++ }}, 30)
+	if pauses != maxWaitRounds {
+		t.Errorf("paused %d times on BLOCKED, want %d", pauses, maxWaitRounds)
+	}
+	if len(res.Reasons) != 1 || res.Reasons[0] != "merge state is BLOCKED" {
+		t.Errorf("reasons = %q", res.Reasons)
+	}
+}
+
+// Without --wait nothing was waited for, so the refusal must not claim it was.
+func TestDecide_AnUnwaitedUnknownStateIsPlain(t *testing.T) {
+	f := readyFacts()
+	f.MergeState = "UNKNOWN"
+	if r := Decide(f); len(r) != 1 || r[0] != "merge state is UNKNOWN" {
+		t.Errorf("reasons = %q", r)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
 )
@@ -254,5 +255,33 @@ func TestPrLand_AnUnreadablePRHasNoHeadToName(t *testing.T) {
 
 	if !strings.Contains(stdout, "[NOT MERGED] #12:\n") || !strings.Contains(stdout, "    #12:\n") || !strings.Contains(stdout, "error: gh pr view: HTTP 502") {
 		t.Errorf("output:\n%s", stdout)
+	}
+}
+
+func TestPrLand_UnknownWaitBoundsTheWaitOnAnUncomputedMergeState(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	saved := prLandOptions
+	var slept time.Duration
+	prLandOptions = func(repo, _ string) prland.Options {
+		return prland.Options{
+			Repo: repo,
+			Run: func(_ context.Context, args ...string) ([]byte, error) {
+				if args[1] == "view" {
+					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"UNKNOWN"}`), nil
+				}
+				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+			},
+			Untriaged: func(context.Context) ([]int, error) { return nil, nil },
+			Sleep:     func(d time.Duration) { slept += d },
+		}
+	}
+	t.Cleanup(func() { prLandOptions = saved })
+
+	stdout, _, err := execute(t, "pr", "land", "30", "--repo", "o/r", "--wait", "--unknown-wait", "2m")
+	if err == nil {
+		t.Fatal("a refusal exited 0")
+	}
+	if slept != 2*time.Minute || !strings.Contains(stdout, "after waiting 2m0s") {
+		t.Errorf("slept %s, output:\n%s", slept, stdout)
 	}
 }

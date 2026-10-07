@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -53,6 +54,7 @@ func newPrLandCmd() *cobra.Command {
 	var (
 		repo, registry string
 		wait, update   bool
+		unknownWait    time.Duration
 	)
 	cmd := &cobra.Command{
 		Use:   "land <number> [<number>...]",
@@ -70,7 +72,10 @@ Every PR based on this one's branch is pointed at its base first, because
 GitHub closes a PR whose base branch is deleted. The merge is a squash with
 --match-head-commit, never --auto.
 
---wait waits for the checks before reading them. --update-branch handles the
+--wait waits for the checks before reading them, and then for GitHub to compute
+the merge state of a PR whose checks are all green: that state can stay UNKNOWN
+for many minutes after a push, so it has its own budget (--unknown-wait, 20m by
+default). --update-branch handles the
 one condition that time alone cannot fix: when BEHIND is the only reason
 against the PR, it merges the base into the branch (a merge, not a rebase, so
 the reviewer's push gate does not re-review), waits for the new CI and decides
@@ -105,7 +110,7 @@ with a note.`,
 				return err
 			}
 			o := prLandOptions(repo, registry)
-			o.Wait, o.UpdateBranch = wait, update
+			o.Wait, o.UpdateBranch, o.UnknownWait = wait, update, unknownWait
 			release, err := lockLand(c, o)
 			if err != nil {
 				c.PrintErrln("pr land:", err)
@@ -126,6 +131,7 @@ with a note.`,
 	cmd.Flags().StringVar(&repo, "repo", "", "owner/name (default: the current repository)")
 	cmd.Flags().StringVar(&registry, "registry", filepath.Join("harness", "review-attestation.json"), "path to the reviewer registry")
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the checks before reading them")
+	cmd.Flags().DurationVar(&unknownWait, "unknown-wait", prland.DefaultUnknownWait, "with --wait, how long to wait for GitHub to compute the merge state of a PR whose checks are all green")
 	cmd.Flags().BoolVar(&update, "update-branch", false, "when BEHIND is the only failing condition, merge the base in, wait for CI and decide again")
 	return cmd
 }
