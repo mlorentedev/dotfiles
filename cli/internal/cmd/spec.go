@@ -199,7 +199,9 @@ is the only record of how.`,
 					"  - no commit adds that folder: commit the spec first;\n"+
 					"  - it was first added, under this or an earlier name, in the repository's root\n"+
 					"    commit, so there is no commit before the work to diff against;\n"+
-					"  - it was renamed in a way that cannot be traced back to where it began.\n"+
+					"  - it was renamed in a way that cannot be traced back to where it began, or created\n"+
+					"    in the same commit that deleted another spec folder holding the same file names,\n"+
+					"    which looks the same as a move git did not pair and is refused for that reason.\n"+
 					"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
 					"call that a review", id)
 			}
