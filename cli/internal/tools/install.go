@@ -180,7 +180,7 @@ func (in *Installer) Install(t Tool) (Result, error) {
 		// A catalog written for a newer dotf may carry a type this one has never
 		// heard of. Failing would turn every sync red on a machine that cannot
 		// have the new dotf yet; skipping says so and keeps the other tools
-		// converging. Plan still reports it unsupported, so the two agree.
+		// converging. Plan reports the same skip, so the two agree.
 		_, _ = fmt.Fprintf(in.Out, "warning: %s: %s; skipping (upgrade dotf to install it)\n", t.Name, unknownTypeNote(t))
 		return Skipped, nil
 	}
@@ -241,8 +241,10 @@ func (in *Installer) refusal(t Tool) string {
 func (in *Installer) Plan(t Tool) Plan {
 	in.defaults()
 	p := Plan{Name: t.Name, Pin: t.Version, Installed: in.current(t)}
-	// Mirror Install's dispatch: what it refuses, the plan reports as
-	// unsupported, after the probe, so an installed tool never reads as absent.
+	// Mirror Install's dispatch, after the probe, so an installed tool never
+	// reads as absent: no build for this platform is unsupported, an entry
+	// Install refuses is refused with Install's own reason, and an unknown
+	// source type is the skip Install makes.
 	if !t.SupportsOS(in.GOOS) {
 		p.Action = PlanUnsupported
 		p.Note = "not installed on " + in.GOOS + " by this catalog"
