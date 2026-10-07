@@ -11,7 +11,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] AC1 (plan lists and writes nothing) -> commit `b70aa63` / tests `TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing`, `TestRun_PlanReportsEveryReconcilerAndAppliesNothing`, `TestPlanMirror_CountsWhatMirrorWouldWriteAndWritesNothing`
 - [ ] AC2 (instruction files first) -> PR 2b
-- [ ] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63` (`TestConverge_AppliesThenASecondRunChangesNothing`, `TestRecordsMirror_PlanWritesNothingApplyConvergesAndRerunIsANoOp`); the persisted report is PR 3
+- [x] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63`; the report in PR 3 / tests `TestConverge_SecondRunIsANoOpAndPersistsTheReport`, `TestWriteReport_RecordsTheRunAndItsOutcome`
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
 - [ ] AC6–AC9 -> PRs 4 to 6

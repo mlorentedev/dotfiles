@@ -90,6 +90,16 @@ func Home() string {
 	return os.Getenv("USERPROFILE")
 }
 
+// StateDir is where dotf keeps per-machine state it writes itself (the converge
+// report, the skill-gate ledger): $XDG_STATE_HOME/dotfiles, else
+// <home>/.local/state/dotfiles.
+func StateDir() string {
+	if x := os.Getenv("XDG_STATE_HOME"); x != "" {
+		return filepath.Join(x, "dotfiles")
+	}
+	return filepath.Join(Home(), ".local", "state", "dotfiles")
+}
+
 // DotfilesDir resolves DOTFILES_DIR, defaulting to <home>/.dotfiles — the
 // deployed location where the generated path file lands.
 func DotfilesDir(home string) string {

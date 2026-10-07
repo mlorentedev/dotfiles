@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,5 +67,44 @@ func TestConverge_AppliesThenASecondRunChangesNothing(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "0 changed") || !strings.Contains(stdout, "[ OK ]") {
 		t.Errorf("second run should change nothing:\n%s", stdout)
+	}
+}
+
+// An apply persists what it did under the user state directory, and a second
+// run on a converged machine records zero changes. A plan persists nothing.
+func TestConverge_SecondRunIsANoOpAndPersistsTheReport(t *testing.T) {
+	repo, home := convergeFixture(t)
+	state := filepath.Join(home, "state")
+	t.Setenv("XDG_STATE_HOME", state)
+	report := filepath.Join(state, "dotfiles", "converge", "last.json")
+
+	if _, _, err := execute(t, "converge", "--plan", "--repo", repo); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(report); !os.IsNotExist(err) {
+		t.Fatalf("a plan persisted a report: %v", err)
+	}
+	for range 2 {
+		if _, _, err := execute(t, "converge", "--repo", repo); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile(report)
+	if err != nil {
+		t.Fatalf("no report after an apply: %v", err)
+	}
+	var got struct {
+		Result  string `json:"result"`
+		Changed int    `json:"changed"`
+		Entries []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"entries"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("report is not JSON: %v\n%s", err, raw)
+	}
+	if got.Result != "ok" || got.Changed != 0 || len(got.Entries) == 0 || got.Entries[0].Status != "ok" {
+		t.Errorf("second run's report should record a converged machine:\n%s", raw)
 	}
 }

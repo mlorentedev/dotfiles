@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -41,6 +43,14 @@ func newConvergeCmd() *cobra.Command {
 			e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
 			rep, err := converge.Run(converge.Registry(), e, plan)
 			printConvergeReport(cmd.OutOrStdout(), rep)
+			if plan {
+				return err
+			}
+			path := filepath.Join(env.StateDir(), "converge", "last.json")
+			if werr := converge.WriteReport(path, rep, err); werr != nil {
+				return errors.Join(err, fmt.Errorf("writing the converge report: %w", werr))
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "report: %s\n", path)
 			return err
 		},
 	}
