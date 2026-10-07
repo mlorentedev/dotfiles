@@ -465,10 +465,22 @@ setup() {
         'echo "nothing installs here"'
         $'PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"\nnpm install -g --prefix "$HOME/.local" "$PI_PKG"'
     )
+    # The hostile fixtures are hostile only while packages.json owns these
+    # through npm. Say so here, so a catalog migration reads as one, not as a
+    # broken scan.
+    for pkg in yarn opencode-ai @bitwarden/cli @github/copilot; do
+        run python3 -c 'import json, sys
+sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") == sys.argv[2]
+                  for t in json.load(open(sys.argv[1]))["tools"]) else 1)' "$DOTFILES_DIR/packages.json" "$pkg"
+        [ "$status" -eq 0 ] || { echo "the fixtures assume packages.json owns $pkg through npm; pick another owned package"; false; }
+    done
+    # A rejection is a verdict naming the line, not just exit 1: a traceback
+    # exits 1 too.
     for snippet in "${hostile[@]}"; do
         printf '%s\n' "$snippet" >"$fixture"
         run python3 "$scan" "$DOTFILES_DIR/packages.json" "$fixture"
-        [ "$status" -eq 1 ] || { echo "passed, but should fail: $snippet"; false; }
+        [ "$status" -eq 1 ] && [[ "$output" =~ twin:[0-9]+:\  ]] && [[ "$output" != *Traceback* ]] ||
+            { echo "not rejected with a verdict: $snippet: $output"; false; }
     done
     for snippet in "${benign[@]}"; do
         printf '%s\n' "$snippet" >"$fixture"
