@@ -49,6 +49,10 @@ type System struct {
 	// `pre-commit install`, which locates the git repo relative to where it runs).
 	// Faked in tests.
 	CommandOutputDir func(dir, name string, args ...string) (string, error)
+	// CommandStdoutDir is CommandOutputDir returning stdout alone, for a command
+	// whose stdout is the answer (`mise which` prints a path there and its
+	// warnings on stderr). Faked in tests.
+	CommandStdoutDir func(dir, name string, args ...string) (string, error)
 	// HTTPGet issues a GET with the given request headers and returns the status
 	// code + response headers (the body is never needed — the PAT-expiry check
 	// reads only the status and the github-authentication-token-expiration
@@ -228,6 +232,12 @@ func realSystem() *System {
 			cmd := exec.Command(name, args...)
 			cmd.Dir = dir
 			out, err := cmd.CombinedOutput()
+			return string(out), err
+		},
+		CommandStdoutDir: func(dir, name string, args ...string) (string, error) {
+			cmd := exec.Command(name, args...)
+			cmd.Dir = dir
+			out, err := cmd.Output()
 			return string(out), err
 		},
 		HTTPGet: func(url string, headers map[string]string) (int, http.Header, error) {
