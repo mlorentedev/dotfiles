@@ -23,6 +23,11 @@
    GitHub counts a skipped required check as passing: the merge is allowed by a
    check that never ran (CI-004 review, round 2). `cli-gate` is the pattern: it
    runs under `always()` and decides from its needs' results.
+5. Every job a required job transitively needs is itself required, unless the
+   required job runs under `always()`. A job whose needs did not succeed is
+   skipped, and the skip passes: `lint`, `test` and `test-windows` all needed
+   `changes`, which was not required, so a failed `changes` would have let
+   every one of them pass without running (#1877).
 
 Prints one line per problem and exits 1 if there is any.
 """
@@ -111,6 +116,45 @@ def vacuous_if(job):
     return None if text == "always()" else str(cond).strip()
 
 
+def needs_of(job):
+    needs = job.get("needs") or []
+    return [needs] if isinstance(needs, str) else list(needs)
+
+
+def needs_gaps(root, required):
+    """Required jobs that a failed upstream job can skip (#1877).
+
+    A job whose needs did not all succeed is skipped unless its if: is
+    always(), and GitHub counts a skipped required check as passing. So every
+    job that a required job transitively needs must be required too.
+    """
+    out = []
+    for wf in sorted((root / ".github" / "workflows").glob("*.yml")):
+        doc = yaml.safe_load(wf.read_text()) or {}
+        if pr_trigger(doc) is None:
+            continue
+        jobs = doc.get("jobs") or {}
+        for job_id, job in jobs.items():
+            held = [n for n in display_names(job_id, job) if n in required]
+            if not held or ("if" in job and vacuous_if(job) is None):
+                continue  # not required, or runs under always()
+            seen, stack = set(), needs_of(job)
+            while stack:
+                up = stack.pop()
+                if up in seen or up not in jobs:
+                    continue
+                seen.add(up)
+                stack.extend(needs_of(jobs[up]))
+            for up in sorted(seen):
+                missing = [n for n in display_names(up, jobs[up]) if n not in required]
+                if missing:
+                    out.append(
+                        f"required check {held[0]!r} comes from {wf.name}:{job_id}, which needs {up!r}, "
+                        f"and {missing[0]!r} is not required: if it fails, {job_id!r} is skipped and "
+                        "the skipped required check passes (require it, or run the job under if: always())")
+    return out
+
+
 def collect_reporters(root):
     """Map every status-check name to the pull-request jobs that report it."""
     problems = []
@@ -160,6 +204,7 @@ def main(root):
                 problems.append(
                     f"required check {ctx!r} comes from {w}:{j}, which does not report on every pull request "
                     "(a paths filter, or a skippable matrix job): it would stay pending")
+    problems.extend(needs_gaps(root, {c["context"] for c in checks}))
 
     for p in problems:
         print(p)

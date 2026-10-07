@@ -68,3 +68,33 @@ YML
     [[ "$output" == *"required check 'x' comes from g.yml:x, whose job-level if:"* ]]
     [[ "$output" != *"required check 'gate'"* ]]
 }
+
+# #1877: `lint` and `test` needed `changes`, which was not required. A failed
+# `changes` skips its dependents, and a skipped required check passes.
+@test "needs rule: a required job needing an unrequired job, even transitively, is flagged" {
+    gate_fixture '[{"context":"x"},{"context":"b"},{"context":"gate"}]' <<'YML'
+on: pull_request
+jobs:
+  a: {runs-on: ubuntu-latest, steps: [{run: "true"}]}
+  b: {runs-on: ubuntu-latest, needs: a, steps: [{run: "true"}]}
+  x: {runs-on: ubuntu-latest, needs: [b], steps: [{run: "true"}]}
+  gate: {runs-on: ubuntu-latest, needs: [a, b, x], if: always(), steps: [{run: "echo '${{ join(needs.*.result, ',') }}'"}]}
+YML
+    run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"required check 'x' comes from g.yml:x, which needs 'a', and 'a' is not required"* ]] || false
+    [[ "$output" == *"required check 'b' comes from g.yml:b, which needs 'a'"* ]] || false
+    [[ "$output" != *"which needs 'b'"* ]] || false
+    [[ "$output" != *"required check 'gate'"* ]]
+}
+
+@test "needs rule: requiring the upstream job clears it" {
+    gate_fixture '[{"context":"c"},{"context":"x"}]' <<'YML'
+on: pull_request
+jobs:
+  c: {runs-on: ubuntu-latest, steps: [{run: "true"}]}
+  x: {runs-on: ubuntu-latest, needs: [c], steps: [{run: "true"}]}
+YML
+    run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
