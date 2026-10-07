@@ -119,7 +119,14 @@ setup() {
     # suite can only approximate.
     FAKEHOME="${BATS_TEST_TMPDIR:-/tmp}/home_real_$$"
     mkdir -p "$FAKEHOME"
-    run env HOME="$FAKEHOME" PATH="$BIN_DIR:$PATH" "$SCRIPT" --deploy
+    # The script finds `dotf` on PATH, by that name. $DOTF may be a prebuilt
+    # binary under any name and in any directory (CI exports DOTF_BIN), so link
+    # it as `dotf` into a directory of its own rather than assuming $BIN_DIR holds
+    # one: without that the script resolves a different dotf, or none, and
+    # deploys without a model line.
+    mkdir -p "$FAKEHOME/bin"
+    ln -s "$DOTF" "$FAKEHOME/bin/dotf"
+    run env HOME="$FAKEHOME" PATH="$FAKEHOME/bin:$PATH" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     F="$FAKEHOME/.claude/agents/curator.md"
     [ -f "$F" ]

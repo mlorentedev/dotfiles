@@ -24,8 +24,10 @@ setup() {
 # Run dotf_bin_resolve in a clean shell. `skip` is replaced by a marker and a
 # distinct status, because the real one only means something inside bats.
 _resolve() {
-    run env -i PATH="$STUBS" BATS_TEST_DIRNAME="$REPO/tests" ${DOTF_BIN:+DOTF_BIN="$DOTF_BIN"} \
-        ${CI:+CI="$CI"} "$BASH_BIN" -c '
+    # Hermetic: the caller's DOTF_BIN and CI (the job exports both) must not leak
+    # in, so each case names the ones it wants through CASE_DOTF_BIN / CASE_CI.
+    run env -i PATH="$STUBS" BATS_TEST_DIRNAME="$REPO/tests" ${CASE_DOTF_BIN:+DOTF_BIN="$CASE_DOTF_BIN"} \
+        ${CASE_CI:+CI="$CASE_CI"} "$BASH_BIN" -c '
         skip() { printf "SKIPPED: %s\n" "$1"; exit 77; }
         . "$BATS_TEST_DIRNAME/lib/dotf-bin.bash"
         dotf_bin_resolve "$1" || exit 1
@@ -58,21 +60,21 @@ EOF2
 
 @test "dotf-bin: DOTF_BIN set to an executable is used, with no toolchain needed" {
     printf '#!/bin/sh\n' > "$BATS_TEST_TMPDIR/prebuilt"; chmod +x "$BATS_TEST_TMPDIR/prebuilt"
-    DOTF_BIN="$BATS_TEST_TMPDIR/prebuilt" _resolve
+    CASE_DOTF_BIN="$BATS_TEST_TMPDIR/prebuilt" _resolve
     [ "$status" -eq 0 ]
     [ "$output" = "RESOLVED: $BATS_TEST_TMPDIR/prebuilt" ]
 }
 
 @test "dotf-bin: DOTF_BIN set but missing fails, and never falls through to a build" {
     _fake_go_ok
-    DOTF_BIN="$BATS_TEST_TMPDIR/nope" _resolve
+    CASE_DOTF_BIN="$BATS_TEST_TMPDIR/nope" _resolve
     [ "$status" -eq 1 ]
     [[ "$output" == *"DOTF_BIN is set to $BATS_TEST_TMPDIR/nope"* ]]
     [ ! -e "$CALLS" ]
 }
 
 @test "dotf-bin: DOTF_BIN naming a directory is not an executable and fails" {
-    DOTF_BIN="$BATS_TEST_TMPDIR" _resolve
+    CASE_DOTF_BIN="$BATS_TEST_TMPDIR" _resolve
     [ "$status" -eq 1 ]
 }
 
@@ -83,7 +85,7 @@ EOF2
 }
 
 @test "dotf-bin: no toolchain in CI fails rather than skipping" {
-    CI=true _resolve
+    CASE_CI=true _resolve
     [ "$status" -eq 1 ]
     [[ "$output" != *SKIPPED* ]]
     [[ "$output" == *"missing in CI"* ]]
