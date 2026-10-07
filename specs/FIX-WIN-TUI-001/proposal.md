@@ -4,7 +4,8 @@ type: proposal
 status: draft
 owner: "@mlorentedev"
 created: "2026-10-02"
-wip-limit-reason: "critical fix for interactive CLIs on Windows"
+issue: "mlorentedev/dotfiles#2019"   # the fix merged as #1971 (issue #1970, closed); #2019 tracks review and archive
+wip_override: "critical fix for interactive CLIs on Windows"
 ---
 
 # Fix Windows TTY failure for interactive Node CLIs (pi, opencode)
