@@ -143,11 +143,57 @@ func TestInstall_DownloadFailure(t *testing.T) {
 	}
 }
 
-func TestInstall_UnsupportedOS(t *testing.T) {
+// A github-release tool with no asset for this OS/arch is not installable here,
+// which Plan reports as "unsupported". Install agrees: a skip that says so, not
+// a failure, so `dotf tools install` and `--dry-run` cannot disagree, and a
+// catalog entry for one platform never fails the others.
+func TestInstall_NoAssetForThisPlatformIsSkippedNotFailed(t *testing.T) {
 	in := newTestInstaller(t, "", fakeRelease(t, "x", []byte("x"), false))
 	in.GOOS = "plan9"
-	if _, err := in.Install(sopsTool()); err == nil {
-		t.Fatal("expected error for an OS with no declared asset")
+	var out strings.Builder
+	in.Out = &out
+
+	res, err := in.Install(sopsTool())
+	if err != nil || res != Skipped {
+		t.Fatalf("want a skip without an error, got %v, %v", res, err)
+	}
+	if !strings.Contains(out.String(), "no release asset for plan9/amd64") {
+		t.Errorf("the skip must say why: %q", out.String())
+	}
+	if entries, _ := os.ReadDir(in.Dest); len(entries) != 0 {
+		t.Errorf("a skipped tool placed files: %v", entries)
+	}
+}
+
+// Plan and Install read the same tool the same way: no asset for the platform
+// is "unsupported" to the plan and a skip to the install, never an install
+// that then fails or a plan that promises one.
+func TestPlanAndInstallAgreeOnAPlatformWithNoAsset(t *testing.T) {
+	in := newTestInstaller(t, "", fakeRelease(t, "x", []byte("x"), false))
+	in.GOOS = "plan9"
+
+	if p := in.Plan(sopsTool()); p.Action != PlanUnsupported {
+		t.Errorf("plan: want %q, got %q", PlanUnsupported, p.Action)
+	}
+	if res, err := in.Install(sopsTool()); err != nil || res != Skipped {
+		t.Errorf("install: want a skip without an error, got %v, %v", res, err)
+	}
+}
+
+func TestExpectedChecksum_AcceptsSha256sumNameForms(t *testing.T) {
+	sums := filepath.Join(t.TempDir(), "SHASUMS256.txt")
+	content := "aaa  ./mise-v1-linux-x64\nbbb *mise-v1-macos-arm64\nccc  plain-asset\n"
+	if err := os.WriteFile(sums, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for asset, want := range map[string]string{"mise-v1-linux-x64": "aaa", "mise-v1-macos-arm64": "bbb", "plain-asset": "ccc"} {
+		got, err := expectedChecksum(sums, asset)
+		if err != nil || got != want {
+			t.Errorf("%s: got %q, %v; want %q", asset, got, err, want)
+		}
+	}
+	if _, err := expectedChecksum(sums, "linux-x64"); err == nil {
+		t.Error("a name must match whole, not as a suffix of a listed path")
 	}
 }
 

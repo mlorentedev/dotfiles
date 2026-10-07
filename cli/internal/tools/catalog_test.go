@@ -159,3 +159,56 @@ func TestTheRepoCatalogDeclaresHiveForPosixOnly(t *testing.T) {
 	}
 	t.Fatal("packages.json declares no hive tool")
 }
+
+// A goos/goarch key states the exact asset for one platform and wins over the
+// goos key; the goos key still answers alone. mise needs this: it names its
+// arches x64/arm64 and its OS macos, which {goarch} cannot express.
+func TestAssetName_PrefersGoosGoarchOverGoos(t *testing.T) {
+	tool := Tool{Version: "2026.10.3", Source: Source{Asset: map[string]string{
+		"linux/amd64":  "mise-v{version}-linux-x64",
+		"darwin/arm64": "mise-v{version}-macos-arm64",
+		"linux":        "generic-{goarch}",
+	}}}
+	cases := []struct{ goos, goarch, want string }{
+		{"linux", "amd64", "mise-v2026.10.3-linux-x64"},
+		{"darwin", "arm64", "mise-v2026.10.3-macos-arm64"},
+		{"linux", "arm64", "generic-arm64"}, // no specific key: the goos key answers
+		{"darwin", "amd64", ""},             // neither: unsupported
+	}
+	for _, tc := range cases {
+		if got := tool.AssetName(tc.goos, tc.goarch); got != tc.want {
+			t.Errorf("AssetName(%q,%q) = %q, want %q", tc.goos, tc.goarch, got, tc.want)
+		}
+	}
+}
+
+// With a missing asset now a skip, a misspelt key would silently install
+// nothing anywhere; Load refuses it instead.
+func TestLoad_RejectsAnUnknownAssetKey(t *testing.T) {
+	for _, key := range []string{"macos", "linux/x64", "darwin/arm64/extra"} {
+		path := filepath.Join(t.TempDir(), "packages.json")
+		body := `{"tools":[{"name":"t","version":"1.0.0","source":{"type":"github-release","repo":"o/r","asset":{"` + key + `":"a"},"checksums":"s"}}]}`
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), key) {
+			t.Errorf("asset key %q: want an error naming it, got %v", key, err)
+		}
+	}
+}
+
+func TestLoad_RejectsAReleaseToolWithNoAsset(t *testing.T) {
+	for name, source := range map[string]string{
+		"no asset map":       `{"type":"github-release","repo":"o/r","checksums":"s"}`,
+		"misspelt as assets": `{"type":"github-release","repo":"o/r","assets":{"linux":"a"},"checksums":"s"}`,
+	} {
+		path := filepath.Join(t.TempDir(), "packages.json")
+		body := `{"tools":[{"name":"t","version":"1.0.0","source":` + source + `}]}`
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "declares no asset") {
+			t.Errorf("%s: want a load error, got %v", name, err)
+		}
+	}
+}

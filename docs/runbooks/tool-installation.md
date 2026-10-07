@@ -2,196 +2,81 @@
 id: "dotfiles-runbook-tool-installation"
 type: runbook
 status: active
-tags: [runbook, dotfiles, tools, installation]
+tags: [runbook, dotfiles, tools, installation, catalog, mise]
 created: "2026-02-22"
+updated: "2026-10-06"
 owner: manu
 ---
 
 # Tool Installation
 
-Installation instructions for development tools used with the dotfiles.
+How the tools this repository depends on reach a machine, and how to add one. None of the steps here is manual. Every tool has exactly one channel, declared in the repository and converged by `dotf` (ADR-036, ADR-044). If you find yourself typing `apt install`, `brew install` or `curl | sh` for a tool listed below, its declaration is missing: add it instead.
 
-## Essential
+## Channels
 
-| Tool | Purpose |
-|------|---------|
-| `git` | Version control |
-| `bash` | Shell (backup) |
-| `zsh` | Primary shell |
+| Tool class | Channel | Declared in | Converged by |
+|---|---|---|---|
+| Pinned single-binary CLIs (age, jq, shellcheck, bats, golangci-lint, direnv, zoxide, fzf, lazygit, herdr) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf` | `dotf tools sync` (spec PLAT-001c, not shipped yet) |
+| The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
+| Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
+| PyPI tools (hive) | `uv tool` | `packages.json` | `dotf tools install` |
+| Tools with no cross-OS channel (git, gh, uv, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | the setup script for each OS | setup |
 
-## Shell Improvements
+The pin is a floor, not an exact match. An installed version at or above the pin is left alone, and nothing is downgraded (ADR-036 decision 1, ADR-041 decision 6).
 
-| Tool | Purpose |
-|------|---------|
-| `oh-my-zsh` | Zsh themes and plugins |
-| `eza` | Better `ls` with colors |
-| `zoxide` | Smart directory jumping (`z project` instead of `cd ~/work/project`) |
-| `direnv` | Auto-load environment variables per project |
+`setup-linux.sh` still installs some CLIs from fixed URLs. Those blocks are #2013 row W2 and are removed once `dotf tools sync` lands.
 
-## Development Tools
-
-| Tool | Purpose |
-|------|---------|
-| `node` + `npm` | JavaScript runtime |
-| `nvm` | Node version manager |
-| `python3` + `pip` | Python development |
-| `docker` | Containerization |
-| `docker-compose` | Multi-container apps |
-
-## DevOps Tools
-
-| Tool | Purpose |
-|------|---------|
-| `kubectl` | Kubernetes management |
-| `helm` | Kubernetes packages |
-| `terraform` | Infrastructure as code |
-| `ansible` | Server configuration |
-| `gh` | GitHub CLI |
-| `minikube` | Local Kubernetes development |
-
-## Other
-
-| Tool | Purpose |
-|------|---------|
-| `age` | File encryption (secrets system) |
-| `pre-commit` | Git hooks |
-
-## Installation Commands
-
-### Basics
+## Day to day
 
 ```bash
-# Git
-sudo apt update && sudo apt install git       # Ubuntu/Debian
-brew install git                               # macOS
-
-# Zsh
-sudo apt install zsh                           # Ubuntu/Debian
-# macOS: already installed
-
-# Oh My Zsh
-sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+dotf tools list                 # the catalog, with the asset resolved for this OS/arch
+dotf tools install --dry-run    # what install would do, tool by tool
+dotf tools install              # converge every catalog tool
+dotf tools install sops         # one tool
+dotf tools version sops         # the version the tool on PATH reports
+dotf doctor                     # pins, drift and leftovers, per tool
 ```
 
-### Shell Improvements
+`install` checks each release asset against the release's checksum manifest. It then runs the staged binary before placing it: a binary that does not execute here, or that reports a version below the pin, is refused and nothing is placed (lesson 337). A tool with no asset for this OS/arch is skipped, with a message saying so, and does not fail the run.
 
-```bash
-# eza
-sudo apt install cargo && cargo install eza    # Ubuntu/Debian
-brew install eza                               # macOS
+## Adding a GitHub-release tool to the catalog
 
-# zoxide
-curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
-brew install zoxide                            # macOS
+This channel is only for `dotf`, mise, and tools mise cannot install. Everything else goes through mise (ADR-044).
 
-# direnv
-sudo apt install direnv                        # Ubuntu/Debian
-brew install direnv                            # macOS
+```json
+{
+  "name": "mise",
+  "version": "2026.10.3",
+  "profile": "full",
+  "source": {
+    "type": "github-release",
+    "repo": "jdx/mise",
+    "asset": {
+      "linux/amd64":   "mise-v{version}-linux-x64",
+      "linux/arm64":   "mise-v{version}-linux-arm64",
+      "darwin/amd64":  "mise-v{version}-macos-x64",
+      "darwin/arm64":  "mise-v{version}-macos-arm64",
+      "windows/amd64": "mise-v{version}-windows-x64.exe",
+      "windows/arm64": "mise-v{version}-windows-arm64.exe"
+    },
+    "checksums": "SHASUMS256.txt"
+  }
+}
 ```
 
-### Development
+- **`asset`** maps a platform to the release's raw-binary filename.
+  - A key is either a GOOS (`linux`, `darwin`, `windows`) or a GOOS/GOARCH pair, where GOARCH is `amd64` or `arm64`. The pair wins over the GOOS key.
+  - Templates expand `{version}` and `{goarch}`, using Go's arch names.
+  - Use pairs when the release spells arches or OSes its own way (`x64`, `macos`).
+  - A platform with no key is not supported. `dotf` rejects a key that names no known platform, so a typo fails loudly instead of being skipped everywhere.
+- **`checksums`** is the release's sha256 manifest. Its lines may list the asset as `name`, `./name` or `*name`. A tool whose release publishes no manifest cannot use this channel.
+- **`platforms`** (optional) limits a tool to some OSes. It is meant for npm and uv-tool sources; a release tool expresses the same thing through its `asset` keys.
+- Before relying on the entry, check it with `dotf tools list` and `dotf tools install --dry-run` on each OS you declared.
 
-```bash
-# Node.js (via nvm - recommended)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install --lts
-
-# Python
-sudo apt install python3 python3-pip          # Ubuntu/Debian
-brew install python3                           # macOS
-
-# Docker
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-
-# Docker Compose
-sudo apt install docker-compose-plugin         # Ubuntu (as plugin)
-```
-
-### DevOps
-
-```bash
-# kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-# Helm
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-# Minikube
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
-
-# Terraform
-brew tap hashicorp/tap && brew install hashicorp/tap/terraform   # macOS
-
-# Ansible
-sudo apt install ansible                       # Ubuntu/Debian
-pip3 install ansible                           # anywhere
-
-# GitHub CLI
-brew install gh                                # macOS
-# Ubuntu: see https://cli.github.com for apt setup
-```
-
-### Encryption
-
-```bash
-# age
-brew install age                               # macOS
-go install filippo.io/age/cmd/...@latest       # with Go
-
-# pre-commit
-pip3 install pre-commit
-```
-
-### Language-Specific
-
-```bash
-# Java (via SDKMAN)
-curl -s "https://get.sdkman.io" | bash
-sdk install java 21.0.1-open
-sdk install maven 3.9.4
-
-# Go
-brew install go                                # macOS
-sudo apt install golang-go                     # Ubuntu
-
-# Ruby (via rbenv)
-git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
-rbenv install 3.1.4 && rbenv global 3.1.4
-```
-
-## Post-Installation
-
-```bash
-# Make Zsh default shell
-chsh -s $(which zsh)
-
-# Add to ~/.zshrc
-eval "$(zoxide init zsh)"     # smart cd
-eval "$(direnv hook zsh)"     # auto env loading
-
-# Configure Git
-git config --global user.name "Your Name"
-git config --global user.email "you@example.com"
-```
-
-## Check What's Installed
-
-```bash
-for tool in git zsh node docker kubectl terraform minikube age gh pre-commit; do
-    if command -v $tool >/dev/null 2>&1; then
-        echo "+ $tool"
-    else
-        echo "- $tool"
-    fi
-done
-```
+**Coupling to the installed `dotf`.** Setup runs the `dotf` pinned in `versions.conf`, not the one in your checkout. An entry that uses a catalog feature the pinned release lacks (for example, GOOS/GOARCH keys before the release that added them) reads as "no asset" on every machine, and before that release it also failed the run. The order is: land the reader first, release it, bump `DOTF_VERSION`, and only then add the entry (#1814).
 
 ## Related
 
-- [AI Tools Setup](ai-tools-setup.md) — Claude Code and Gemini installation
-- [Secrets Governance](guide-secrets-governance.md) — Requires `age` and `bw`
-- Project overview — see the repo `README.md` (strategic context lives in the maintainer's knowledge store)
+- ADR-036 (install channels, pins as floors) and its 2026-10-06 amendment; ADR-044 (mise); ADR-041 (update channels and convergence order).
+- Spec `PLAT-001c-tools-via-mise`; epic #2013.
+- [guide-secrets-governance.md](guide-secrets-governance.md) for the tools the secrets system needs (age, bw).
