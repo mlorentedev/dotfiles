@@ -197,3 +197,15 @@ func TestSync_ReadsTheToolPathFromStdoutOnly(t *testing.T) {
 		t.Fatalf("want age at its pin through the stdout runner, got %+v, %v", p, err)
 	}
 }
+
+// A comment that reads like the marker but is not it would otherwise be an
+// ordinary comment: the pin under it never installs while sync reports success.
+func TestParseMiseTools_RejectsANearMissMarker(t *testing.T) {
+	for _, marker := range []string{"#mise: cli", "# MISE: cli", "# mise:cli"} {
+		body := "# mise: cli\nAGE_VERSION=1.3.1\n" + marker + "\nJQ_VERSION=1.8.2\n"
+		_, err := ParseMiseTools([]byte(body))
+		if err == nil || !strings.Contains(err.Error(), "line 3") {
+			t.Errorf("%q: want an error naming line 3, got %v", marker, err)
+		}
+	}
+}

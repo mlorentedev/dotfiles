@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -17,6 +18,11 @@ import (
 // trailing comment as part of the version.
 const MiseMarker = "# mise: cli"
 
+// nearMissRE matches a comment that reads like the marker (`#mise: cli`,
+// `# MISE: cli`, `# mise:cli`). Left alone it would be an ordinary comment and
+// the pin under it would silently never install.
+var nearMissRE = regexp.MustCompile(`(?i)^\s*#\s*mise\s*:`)
+
 // MiseTool is one pinned CLI: the mise tool name and its pin.
 type MiseTool struct {
 	Name    string
@@ -26,13 +32,17 @@ type MiseTool struct {
 // ParseMiseTools returns the pins versions.conf marks with MiseMarker, sorted
 // by name. The tool name comes from the variable: FOO_BAR_VERSION is mise's
 // `foo-bar`, whose short name resolves to the aqua backend. A marker that is
-// not directly followed by a non-empty *_VERSION pin is an error, so a marker
-// can never silently mark nothing.
+// not directly followed by a non-empty *_VERSION pin is an error, and so is a
+// comment that reads like the marker but is not exactly it, so a marker can
+// never silently mark nothing.
 func ParseMiseTools(versionsConf []byte) ([]MiseTool, error) {
 	lines := strings.Split(strings.ReplaceAll(string(versionsConf), "\r\n", "\n"), "\n")
 	var out []MiseTool
 	for i, l := range lines {
 		if strings.TrimSpace(l) != MiseMarker {
+			if nearMissRE.MatchString(l) {
+				return nil, fmt.Errorf("versions.conf line %d: %q looks like the marker but is not %q; fix it, or the pin under it is never installed", i+1, strings.TrimSpace(l), MiseMarker)
+			}
 			continue
 		}
 		if i+1 >= len(lines) {
