@@ -18,9 +18,10 @@ const ReviewFile = "review.md"
 //
 // review.md is excluded because its own commit always postdates the sha it
 // records, so including it would make every review stale by construction.
-// verification.md is excluded because its archive checklist is ticked AT
-// archive time, which would false-positive on every archive. Both exclusions
-// are deliberate and specified in the proposal.
+// verification.md is excluded because `dotf spec archive` ticks its archive
+// checklist AT archive time (tickArchiveChecklist), which would false-positive
+// on every archive. Both exclusions are deliberate and specified in the
+// proposal.
 var contractFiles = []string{"proposal.md", "tasks.md", "features.json"}
 
 // Verdict is the adversarial-review outcome recorded in review.md frontmatter.
