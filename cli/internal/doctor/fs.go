@@ -77,6 +77,12 @@ func filesEqual(a, b string) bool {
 }
 
 // isValidJSON reports whether p contains parseable JSON (replaces `jq '.'`).
+// isEmptyFile reports whether p is a regular file of zero bytes.
+func isEmptyFile(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.Mode().IsRegular() && info.Size() == 0
+}
+
 func isValidJSON(p string) bool {
 	raw, err := os.ReadFile(p)
 	if err != nil {

@@ -2,6 +2,8 @@ package doctor
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -31,5 +33,42 @@ func TestCheckAntigravity_AbsolutePathAccepted(t *testing.T) {
 	}
 	if !strings.Contains(out, "AGY_APP_DATA is absolute") {
 		t.Errorf("absolute path %q should report absolute:\n%s", abs, out)
+	}
+}
+
+// Every FAIL on the master config names its remedy. An empty master is what
+// agy leaves on its first run before setup, and reporting it as "invalid
+// JSON" with no remedy sent the Mac bring-up looking for a corrupt write.
+func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
+	for name, content := range map[string]string{
+		"empty":   "",
+		"invalid": "{not json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			gemini := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(gemini, "config"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(gemini, "config", "mcp_config.json"), []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			sys := newSys(map[string]string{"GEMINI_HOME": gemini, "AGY_APP_DATA": gemini}, []string{"agy"}, nil)
+			var buf bytes.Buffer
+			checkAntigravity(sys, capture(&buf))
+
+			out := buf.String()
+			var line string
+			for _, l := range strings.Split(out, "\n") {
+				if strings.Contains(l, "master mcp_config.json") {
+					line = l
+				}
+			}
+			if !strings.Contains(line, "FAIL") || !strings.HasSuffix(strings.TrimSpace(line), "(run setup)") {
+				t.Errorf("want a FAIL naming the remedy, got %q in:\n%s", line, out)
+			}
+			if name == "empty" && !strings.Contains(line, "is empty") {
+				t.Errorf("an empty master was not reported as empty: %q", line)
+			}
+		})
 	}
 }
