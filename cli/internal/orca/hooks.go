@@ -175,9 +175,8 @@ func readOptional(path string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	if content == nil {
-		content = []byte{} // present but empty is still present
-	}
+	// Present but empty is still present: os.ReadFile returns a non-nil slice
+	// on success, so nil means absent and nothing else.
 	return content, nil
 }
 
@@ -267,8 +266,13 @@ func writeTuned(path string, original, tuned []byte, now func() time.Time) (stri
 	if werr != nil {
 		return bak, fmt.Errorf("write %s: %w", tmpName, werr)
 	}
-	// CreateTemp makes the file 0600; the hook keeps the mode it was written with.
-	if err := os.Chmod(tmpName, 0o644); err != nil { //nolint:gosec // the user's own hook file, readable as before
+	// CreateTemp makes the file 0600; the hook keeps the mode it already had,
+	// so a restrictive umask or a hand-tightened file stays as it was.
+	info, err := os.Stat(path)
+	if err != nil {
+		return bak, fmt.Errorf("stat %s: %w", path, err)
+	}
+	if err := os.Chmod(tmpName, info.Mode().Perm()); err != nil {
 		return bak, fmt.Errorf("chmod %s: %w", tmpName, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {

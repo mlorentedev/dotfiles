@@ -231,6 +231,35 @@ func TestTuneHooks_StagesEachWriteInItsOwnTempFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
-		t.Fatalf("the tuned file must stay 0644, got %v", info.Mode().Perm())
+		t.Fatalf("the tuned file must keep its 0644, got %v", info.Mode().Perm())
+	}
+}
+
+// The tuned file keeps the mode it had, whatever CreateTemp gave the staging
+// file and whatever the umask: a hook an operator tightened stays tight, and a
+// readable one stays readable.
+func TestTuneHooks_KeepsEachFilesMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	for _, mode := range []os.FileMode{0o600, 0o640, 0o644} {
+		c, s := hookFixture(t, orcaJSON5s, copilotHookIWR)
+		for _, p := range []string{c, s} {
+			if err := os.Chmod(p, mode); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := TuneHooks(c, s, DefaultHookTimeout, false, fixedNow); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []string{c, s} {
+			info, err := os.Stat(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.Mode().Perm() != mode {
+				t.Errorf("%s: mode %v, want %v", filepath.Base(p), info.Mode().Perm(), mode)
+			}
+		}
 	}
 }
