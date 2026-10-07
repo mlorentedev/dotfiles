@@ -117,42 +117,50 @@ func runOrcaTuneHooks(w io.Writer, hookConfig, hookScript string, timeout int, c
 		return nil
 	}
 	if check {
-		if rep.ConfigExists {
-			if rep.ConfigDrift {
-				_, _ = fmt.Fprintf(w, "drift: %s has a hook timeoutSec < %d\n", hookConfig, timeout)
-			} else {
-				_, _ = fmt.Fprintf(w, "ok: orca.json hook timeouts >= %d\n", timeout)
-			}
-		}
-		if rep.ScriptExists {
-			if rep.ScriptDrift {
-				_, _ = fmt.Fprintf(w, "drift: %s still uses Invoke-WebRequest\n", hookScript)
-			} else {
-				_, _ = fmt.Fprintln(w, "ok: copilot-hook.ps1 uses HttpWebRequest")
-			}
-		}
-		if rep.Drift() {
-			return fmt.Errorf("the Orca Copilot hooks need tuning — run `dotf orca tune-hooks`")
-		}
-		return nil
+		return reportOrcaHookCheck(w, rep, hookConfig, hookScript, timeout)
 	}
+	reportOrcaHookTune(w, rep, hookScript)
+	return nil
+}
+
+// reportOrcaHookCheck prints what --check measured and fails on drift, which
+// is what makes --check the gate.
+func reportOrcaHookCheck(w io.Writer, rep *orca.HookTuneReport, hookConfig, hookScript string, timeout int) error {
+	switch {
+	case rep.ConfigExists && rep.ConfigDrift:
+		_, _ = fmt.Fprintf(w, "drift: %s has a hook timeoutSec < %d\n", hookConfig, timeout)
+	case rep.ConfigExists:
+		_, _ = fmt.Fprintf(w, "ok: orca.json hook timeouts >= %d\n", timeout)
+	}
+	switch {
+	case rep.ScriptExists && rep.ScriptDrift:
+		_, _ = fmt.Fprintf(w, "drift: %s still uses Invoke-WebRequest\n", hookScript)
+	case rep.ScriptExists:
+		_, _ = fmt.Fprintln(w, "ok: copilot-hook.ps1 uses HttpWebRequest")
+	}
+	if rep.Drift() {
+		return fmt.Errorf("the Orca Copilot hooks need tuning — run `dotf orca tune-hooks`")
+	}
+	return nil
+}
+
+// reportOrcaHookTune prints what a repair run did. An unrecognised POST exits
+// 0, as the retired script did; --check is the gate.
+func reportOrcaHookTune(w io.Writer, rep *orca.HookTuneReport, hookScript string) {
 	for _, bak := range rep.Backups {
 		_, _ = fmt.Fprintf(w, "backup     %s\n", bak)
 	}
 	if rep.ScriptUnrecognised {
 		_, _ = fmt.Fprintf(w, "unchanged  %s has Invoke-WebRequest but the POST line is unrecognised — review it by hand\n", hookScript)
 	}
-	if rep.Changed == 0 && rep.ScriptUnrecognised {
-		// Not "in sync": the line above says a file still needs a hand. The
-		// exit stays 0, as the retired script's did; --check is the gate.
-		return nil
-	}
-	if rep.Changed == 0 {
+	switch {
+	case rep.Changed == 0 && rep.ScriptUnrecognised:
+		// Not "in sync": the line above says a file still needs a hand.
+	case rep.Changed == 0:
 		_, _ = fmt.Fprintln(w, "in sync   Orca's Copilot hooks already tuned")
-		return nil
+	default:
+		_, _ = fmt.Fprintf(w, "tuned      %d fix(es) applied — restart the Copilot CLI session to pick up the new orca.json timeout\n", rep.Changed)
 	}
-	_, _ = fmt.Fprintf(w, "tuned      %d fix(es) applied — restart the Copilot CLI session to pick up the new orca.json timeout\n", rep.Changed)
-	return nil
 }
 
 func newOrcaExportCmd() *cobra.Command {
