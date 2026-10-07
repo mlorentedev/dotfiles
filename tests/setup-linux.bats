@@ -415,10 +415,58 @@ setup() {
     [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"
-    refute_grep 'npm install -g "yarn' "$DOTFILES_DIR/setup-linux.sh"
-    refute_grep 'npm install -g \$yarnPkg' "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep '^OBSIDIAN_VERSION=' "$DOTFILES_DIR/versions.conf"
     refute_grep '^YARN_VERSION=' "$DOTFILES_DIR/versions.conf"
+}
+
+# ADR-036: a tool packages.json installs through npm is converged by
+# `dotf tools install`, so neither setup twin may `npm install -g` it as well.
+# This matches the property, not a spelling: OPS-042's guard grepped for the two
+# forms it had deleted, and `npm install -g yarn@1.22.22` passed it (#1864). A
+# `$var` argument resolves through the file's own simple assignment, which is
+# how the Windows twin used to spell it (`$yarnPkg`).
+@test "parity: neither setup twin npm-installs a tool packages.json owns (ADR-036, #1864)" {
+    run python3 - "$DOTFILES_DIR/packages.json" "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1" <<'PY'
+import json, re, sys
+owned = {t["source"]["package"] for t in json.load(open(sys.argv[1]))["tools"]
+         if t["source"]["type"] == "npm"}
+if not owned:
+    print("packages.json owns no npm tool, so the check would be vacuous")
+    sys.exit(1)
+
+def package(arg):
+    """The package name of an npm argument, without its version."""
+    if arg.startswith("@"):
+        scope, _, rest = arg[1:].partition("/")
+        return "@" + scope + "/" + rest.split("@", 1)[0]
+    return arg.split("@", 1)[0]
+
+bad, seen = [], 0
+for path in sys.argv[2:]:
+    text = open(path).read()
+    assigned = {m.group(1).lower(): m.group(2) for m in re.finditer(
+        r"""^\s*\$?([A-Za-z_]\w*)\s*=\s*["']?([^"'\s]+)""", text, re.M)}
+    for n, line in enumerate(text.splitlines(), 1):
+        m = re.search(r"\bnpm(?:\.cmd)?\s+(?:install|i|add)\s(.*)", line)
+        if not m:
+            continue
+        args = [a.strip("'\";|&()") for a in m.group(1).split()]
+        if not any(a in ("-g", "--global") for a in args):
+            continue
+        seen += 1
+        for arg in args:
+            var = re.fullmatch(r"\$\{?([A-Za-z_]\w*)\}?", arg)
+            if var:
+                arg = assigned.get(var.group(1).lower(), arg).strip("'\"")
+            if not arg.startswith("-") and package(arg) in owned:
+                bad.append(f"{path.rsplit('/', 1)[-1]}:{n}: {package(arg)}")
+if not seen:
+    print("no global npm install found in either twin, so the pattern matches nothing real")
+    sys.exit(1)
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+PY
+    [ "$status" -eq 0 ] || { echo "a setup twin installs a catalog-owned npm tool: $output"; false; }
 }
 
 # MEM-002: the claude-mem install-state assertions that lived in
