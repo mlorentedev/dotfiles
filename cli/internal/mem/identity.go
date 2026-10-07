@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -87,27 +88,32 @@ func (id Identity) isDefaultBranch() bool {
 // remoteDefaultBranches reads the symbolic ref git writes for each remote's
 // default branch, `ref: refs/remotes/<remote>/<branch>`, from a common git dir:
 // on clone for the remote it cloned from, and on `git remote set-head` for any
-// other. Only the loose file exists, because packed-refs holds no symrefs. A
-// HEAD that does not point into its own remote names nothing, and a remote
-// whose name contains a slash is not read.
+// other. Only the loose file exists, because packed-refs holds no symrefs. The
+// walk is recursive because a remote's name may contain a slash (`foo/bar`
+// keeps its HEAD at refs/remotes/foo/bar/HEAD). A HEAD that is not a symref
+// into its own remote names nothing, which also rules out a remote-tracking
+// branch that merely ends in `/HEAD`: that file holds a sha.
 func remoteDefaultBranches(commonDir string) []string {
-	remotes, err := os.ReadDir(filepath.Join(commonDir, "refs", "remotes"))
-	if err != nil {
-		return nil
-	}
+	root := filepath.Join(commonDir, "refs", "remotes")
 	var branches []string
-	for _, r := range remotes {
-		if !r.IsDir() {
-			continue
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || d.Name() != "HEAD" {
+			return nil
 		}
-		raw, err := os.ReadFile(filepath.Join(commonDir, "refs", "remotes", r.Name(), "HEAD")) // #nosec G304 -- inside the resolved git dir
+		rel, err := filepath.Rel(root, filepath.Dir(p))
+		if err != nil || rel == "." {
+			return nil
+		}
+		raw, err := os.ReadFile(p) // #nosec G304 -- inside the resolved git dir
 		if err != nil {
-			continue
+			return nil
 		}
-		if b, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), "ref: refs/remotes/"+r.Name()+"/"); ok && b != "" {
+		remote := filepath.ToSlash(rel)
+		if b, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), "ref: refs/remotes/"+remote+"/"); ok && b != "" {
 			branches = append(branches, b)
 		}
-	}
+		return nil
+	})
 	return branches
 }
 

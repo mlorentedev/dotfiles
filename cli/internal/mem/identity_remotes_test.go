@@ -37,6 +37,7 @@ func TestThreadKeyQualifiesADefaultBranchRecordedByAnyRemote(t *testing.T) {
 		{"a fork: origin main, upstream develop", "develop", map[string]string{"origin": "main", "upstream": "develop"}, true},
 		{"a feature branch in that fork", "feat/x", map[string]string{"origin": "main", "upstream": "develop"}, false},
 		{"no remote recorded a HEAD", "develop", nil, false},
+		{"a remote whose name has a slash", "develop", map[string]string{"foo/bar": "develop"}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cwd := mainFixture(t, "proj", tc.branch)
@@ -92,5 +93,21 @@ func TestRepoIdentityResolvesASubmoduleToItsSuperproject(t *testing.T) {
 	id, ok := RepoIdentity(sub)
 	if !ok || id.Project != "super" || id.Branch != "main" {
 		t.Errorf("RepoIdentity(submodule) = %+v, %v; want the superproject super on main", id, ok)
+	}
+}
+
+// A remote-tracking branch named `<something>/HEAD` is a file called HEAD
+// holding a sha, not a symref, and names no default.
+func TestRemoteDefaultBranchesIgnoresABranchThatEndsInHead(t *testing.T) {
+	common := filepath.Join(t.TempDir(), ".git")
+	dir := filepath.Join(common, "refs", "remotes", "origin", "feature")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "HEAD"), []byte("0123456789abcdef0123456789abcdef01234567\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := remoteDefaultBranches(common); len(got) != 0 {
+		t.Errorf("remoteDefaultBranches = %v, want none", got)
 	}
 }
