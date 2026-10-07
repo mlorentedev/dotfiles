@@ -124,7 +124,8 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: Decide(f)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
-	for i := 0; o.UpdateBranch && onlyBehind(res.Reasons) && i < maxUpdates; i++ {
+	updates := 0
+	for ; o.UpdateBranch && onlyBehind(res.Reasons) && updates < maxUpdates; updates++ {
 		// A merge of the base, not a rebase: one merge commit, which the
 		// reviewer's push gate does not count, and the squash flattens anyway.
 		if _, err := gh("pr", "update-branch", n); err != nil {
@@ -138,8 +139,8 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	}
 	// A bare "BEHIND" after three updates reads as if none was tried. Say the
 	// base outran CI, which is the race #2083 describes, not a stale branch.
-	if res.Updated && onlyBehind(res.Reasons) {
-		res.Reasons = []string{fmt.Sprintf("merge state is BEHIND after merging the base in %d times: the base moved again during each CI run (#2083)", maxUpdates)}
+	if updates > 0 && onlyBehind(res.Reasons) {
+		res.Reasons = []string{fmt.Sprintf("merge state is BEHIND after merging the base in %d times: the base moved again during each CI run (#2083)", updates)}
 	}
 	if len(res.Reasons) > 0 {
 		return res, nil
