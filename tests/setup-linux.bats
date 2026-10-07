@@ -154,6 +154,22 @@ setup() {
     [ "$(jq -r '.configs[] | select(.name=="zsh-functions-sh") | .requires // "none"' "$DOTFILES_DIR/ai/deploy.json")" = "none" ]
 }
 
+@test "the ssh config and public key deploy through dotf deploy on every OS (#2013 P7)" {
+    [ "$(jq -r '.configs[] | select(.name=="ssh-config") | "\(.src) \(.dst) \(.mode) \(.requires // "")"' "$DOTFILES_DIR/ai/deploy.json")" = "ssh/config {HOME}/.ssh/config 0600 " ]
+    [ "$(jq -r '.configs[] | select(.name=="ssh-pubkey") | "\(.src) \(.dst) \(.mode)"' "$DOTFILES_DIR/ai/deploy.json")" = "ssh/id_ed25519.pub {HOME}/.ssh/id_ed25519.pub 0644" ]
+    refute_grep 'deploy_file "\$DOTFILES_DIR/ssh/config"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'id_ed25519\.pub" "\$HOME/\.ssh' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test ".gitconfig resolves gh through PATH, not a Linux path (#2013 W6)" {
+    # gh is /opt/homebrew/bin/gh on macOS and gh.exe on Windows: an absolute
+    # /usr/bin/gh fails every https push there.
+    run git config -f "$DOTFILES_DIR/.gitconfig" --get-all 'credential.https://github.com.helper'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'!gh auth git-credential'* ]]
+    refute_grep '/usr/bin/gh' "$DOTFILES_DIR/.gitconfig"
+}
+
 @test "setup-linux.sh checks for tmux presence" {
     grep -qE 'command -v tmux' "$DOTFILES_DIR/setup-linux.sh"
 }

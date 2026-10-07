@@ -551,10 +551,6 @@ FIXTURE
     refute_grep_fixed 'PSVersion' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-windows.ps1 deploys SSH config" {
-    grep -q 'Setting up SSH config' "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 configures PATH" {
     grep -q 'Configuring PATH' "$PS1_SCRIPT"
 }
@@ -1151,4 +1147,10 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     grep -qF 'command -v mise >/dev/null && eval "$(mise activate bash)"' "$DOTFILES_DIR/.bashrc"
     grep -qF '. ([ScriptBlock]::Create((& mise activate pwsh | Out-String)))' "$DOTFILES_DIR/powershell/profile.ps1"
     grep -qF 'if (Get-Command mise -ErrorAction SilentlyContinue)' "$DOTFILES_DIR/powershell/profile.ps1"
+}
+
+@test "parity: setup-windows.ps1 leaves the ssh config and public key to dotf deploy (#2013 P7)" {
+    refute_grep_fixed '$sshConfigSource' "$PS1_SCRIPT"
+    refute_grep_fixed '$sshPubKeySource' "$PS1_SCRIPT"
+    jq -e '.configs[] | select(.name=="ssh-config" and .platforms == null)' "$DOTFILES_DIR/ai/deploy.json" >/dev/null
 }
