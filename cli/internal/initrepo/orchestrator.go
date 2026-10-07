@@ -71,7 +71,11 @@ func Init(opts InitOptions) (InitReport, error) {
 	if action, err := WriteCIOpts(opts.Root, opts.Stack, opts.DryRun); err != nil {
 		report.add("ci", "warn", err.Error())
 	} else {
-		report.add("ci", okOrSkip(action != "created"), "ci.yml "+action)
+		detail := "ci.yml " + action
+		if action == "created" {
+			detail += " in " + filepath.ToSlash(WorkflowDir(opts.Root)) + ", push on " + DefaultBranch(opts.Root)
+		}
+		report.add("ci", okOrSkip(action != "created"), detail)
 	}
 
 	// 4. Stack init (lightweight, offline).
@@ -148,9 +152,16 @@ func Init(opts InitOptions) (InitReport, error) {
 }
 
 func initGithubWithDryRun(root string, dryRun bool) (status, detail string) {
+	switch forge, url := ClassifyOrigin(root); forge {
+	case ForgeAbsent:
+		return "skipped", "no origin remote yet (run `dotf init github` after adding one)"
+	case ForgeGitHub:
+	default:
+		return "skipped", "origin is not a GitHub remote (" + string(forge) + " at " + originHost(url) + "); GitHub repo defaults do not apply"
+	}
 	repo, err := OriginRepo(root)
 	if err != nil {
-		return "skipped", "no origin remote yet (run `dotf init github` after adding one)"
+		return "warn", err.Error()
 	}
 	res, err := ApplyDeleteBranchOnMerge(repo, dryRun)
 	if err != nil {
