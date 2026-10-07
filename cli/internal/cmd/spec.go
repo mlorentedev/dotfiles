@@ -279,13 +279,7 @@ is the only record of how.`,
 			// reported here, with the transcript still in hand, instead of being left
 			// for whoever next tries to archive.
 			runErr := runForeground(repoRoot, launch, transcript)
-			if err := spec.VerifyReviewProduced(specDir, transcript); err != nil {
-				if runErr != nil {
-					return fmt.Errorf("%w\nthe runner also exited with: %v", err, runErr)
-				}
-				return err
-			}
-			return runErr
+			return foregroundOutcome(specDir, transcript, chosen.Runner, runErr)
 		},
 	}
 
@@ -295,6 +289,23 @@ is the only record of how.`,
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
 	return cmd
+}
+
+// foregroundOutcome is how a foreground review ended: a missing or stale verdict
+// is the error, with the turn cap named when the runner's transcript shows one
+// (GUARD-005b), and the runner's own exit status is carried alongside it.
+func foregroundOutcome(specDir, transcript, runner string, runErr error) error {
+	err := spec.VerifyReviewProduced(specDir, transcript)
+	if err == nil {
+		return runErr
+	}
+	if hint := spec.TurnCapHint(runner, transcript); hint != "" {
+		err = fmt.Errorf("%w\n%s", err, hint)
+	}
+	if runErr != nil {
+		return fmt.Errorf("%w\nthe runner also exited with: %v", err, runErr)
+	}
+	return err
 }
 
 // newSpecTranscriptSinkCmd is plumbing, not a user command: `spec review` pipes

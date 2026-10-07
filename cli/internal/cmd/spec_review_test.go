@@ -80,6 +80,32 @@ FAIL
 	}
 }
 
+// GUARD-005b: a pi reviewer stopped by its turn cap writes no verdict, and the
+// launcher's error must say that was the cause, so the operator re-runs instead
+// of distrusting the model. The stub writes the capped run's last events only.
+func TestSpecReviewForegroundNamesATurnCap(t *testing.T) {
+	seedReviewFixture(t)
+	withReviewBase(t, "basebasebase", "headheadhead")
+
+	prev := runForeground
+	runForeground = func(_ string, _ []string, transcript string) error {
+		capped := strings.Repeat(`{"type":"turn_end"}`+"\n", 24) +
+			`{"type":"message_end","message":{"role":"assistant","usage":{"input":58743,"output":0}}}` + "\n" +
+			`{"type":"turn_end"}` + "\n" +
+			`{"type":"agent_end","willRetry":false}` + "\n"
+		return os.WriteFile(transcript, []byte(capped), 0o600)
+	}
+	t.Cleanup(func() { runForeground = prev })
+
+	_, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground")
+	if err == nil {
+		t.Fatal("a review that wrote no review.md must fail")
+	}
+	if !strings.Contains(err.Error(), "cut off after 25 turns") {
+		t.Errorf("the error does not name the turn cap: %v", err)
+	}
+}
+
 // The dry-run line has to be runnable as printed. The tmux form's last element
 // is an entire pipeline, so joining the raw elements with spaces yields a line
 // that a human pasting it would hand to tmux as several arguments instead of one.
