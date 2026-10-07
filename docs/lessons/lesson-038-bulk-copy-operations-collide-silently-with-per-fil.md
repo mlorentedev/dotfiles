@@ -1,13 +1,14 @@
 ---
-id: lesson-038-bulk-copy-operations-collide-silently-with-per-fil
+id: "lesson-038-bulk-copy-operations-collide-silently-with-per-fil"
 type: lesson
 status: active
+title: "Bulk-copy operations collide silently with per-file deploy logic"
 created: "2026-05-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 038: Bulk-copy operations collide silently with per-file deploy logic
+# Bulk-copy operations collide silently with per-file deploy logic
 
 **Context:** SDD-002 (PR #51) introduced a per-file deploy for `ai/claude/settings.json`: read template, substitute `__HOOK_COMMAND__` placeholder, merge with existing target using per-key policy. Both setup scripts also had a pre-existing bulk-copy `Copy-Item ai/claude/* ~/.claude/` (PowerShell) / `cp -rf ai/claude/* ~/.claude/` (bash) that would copy ALL files from the source dir, including the new `settings.json` template -- which contained the literal `__HOOK_COMMAND__` placeholder AND would have wiped the user's customizations.
 

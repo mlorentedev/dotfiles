@@ -1,13 +1,14 @@
 ---
-id: lesson-033-bash-ifs-t-read-collapses-consecutive-tabs-whitesp
+id: "lesson-033-bash-ifs-t-read-collapses-consecutive-tabs-whitesp"
 type: lesson
 status: active
+title: "bash `IFS=$'\\t' read` collapses consecutive tabs (whitespace IFS chars never preserve empty fields)"
 created: "2026-05-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 033: bash `IFS=$'\t' read` collapses consecutive tabs (whitespace IFS chars never preserve empty fields)
+# bash `IFS=$'\t' read` collapses consecutive tabs (whitespace IFS chars never preserve empty fields)
 
 **Context:** Building `scripts/doctor.sh` to iterate `env-contract.json` entries. Used jq's `@tsv` to emit one TSV record per env-var, with `(.required_on // "")` for an optional column, then parsed with `while IFS=$'\t' read -r name required required_on default validation`. On entries where `required_on` was empty (most of them), every subsequent column shifted by one — `$default` got the validation value, `$validation` got an empty string, and the script ran silently wrong for ~10 minutes before a `bash -x` trace pinpointed it. Raw TSV had the right columns (`cat -A` confirmed); the read loop was eating them.
 

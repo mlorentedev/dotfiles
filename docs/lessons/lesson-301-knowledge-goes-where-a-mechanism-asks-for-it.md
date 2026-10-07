@@ -1,13 +1,14 @@
 ---
-id: lesson-301
+id: "lesson-301-knowledge-goes-where-a-mechanism-asks-for-it"
 type: lesson
 status: active
+title: "Knowledge goes where a mechanism asks for it"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, harness, lessons, adr, definition-of-done, ci]
 ---
 
-# 301 — Knowledge goes where a mechanism asks for it
+# Knowledge goes where a mechanism asks for it
 
 ## What happened
 

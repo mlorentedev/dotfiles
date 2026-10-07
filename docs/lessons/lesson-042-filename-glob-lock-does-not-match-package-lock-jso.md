@@ -1,13 +1,14 @@
 ---
-id: lesson-042-filename-glob-lock-does-not-match-package-lock-jso
+id: "lesson-042-filename-glob-lock-does-not-match-package-lock-jso"
 type: lesson
 status: active
+title: "Filename glob *.lock does NOT match package-lock.json (basename matters)"
 created: "2026-05-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 042: Filename glob *.lock does NOT match package-lock.json (basename matters)
+# Filename glob *.lock does NOT match package-lock.json (basename matters)
 
 **Context:** Building scripts/check-spec-gate.sh for SDD-003: the LOC-exclusion list needed to skip lockfiles. Initial regex used a single glob pattern `*.lock` in a bash `case` statement. A bats test for `package-lock.json` failed because the file ends in `.json`, not `.lock` — the npm convention puts the lock-marker in the middle of the name, not the suffix.</context>
 <problem>The naive pattern `*.lock` only matches files whose filename ends in literal `.lock`. It matches `Cargo.lock`, `poetry.lock`, `Pipfile.lock`, `yarn.lock`, `Gemfile.lock` — all the suffix-style conventions. It does NOT match npm's `package-lock.json`, pnpm's `pnpm-lock.yaml`, or Go's `go.sum`. Lockfile filtering with `*.lock` alone produces silent false negatives — exactly the kind of bug that ships green and breaks in production.</problem>

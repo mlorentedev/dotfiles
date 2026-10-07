@@ -1,13 +1,14 @@
 ---
-id: lesson-191-continuing-work-on-a-branch-after-its-pr-squash-me
+id: "lesson-191-continuing-work-on-a-branch-after-its-pr-squash-me"
 type: lesson
 status: active
+title: "Continuing work on a branch after its PR squash-merged reopens the whole original diff"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 191: Continuing work on a branch after its PR squash-merged reopens the whole original diff
+# Continuing work on a branch after its PR squash-merged reopens the whole original diff
 
 **Context**: HARNESS-069 (#917, PR #927) merged via squash, producing commit `147e4ed` on `main`. Adversarial review round 1 then found a real Blocker in the merged code (`setup-windows.ps1`'s twin never got the strip-rule fix). Rather than branching fresh off the now-updated `main`, the fix was committed directly on top of the *same local branch* (`feat/harness-record-provenance`) whose earlier commits had already been merged.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-089-a-bats-teardown-s-last-command-classifies-even-ski
+id: "lesson-089-a-bats-teardown-s-last-command-classifies-even-ski"
 type: lesson
 status: active
+title: "A bats teardown's last command classifies even *skipped* tests — never end it with a bare `[ cond ] && cmd`"
 created: "2026-06-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 089: A bats teardown's last command classifies even *skipped* tests — never end it with a bare `[ cond ] && cmd`
+# A bats teardown's last command classifies even *skipped* tests — never end it with a bare `[ cond ] && cmd`
 
 **Context**: Six `tests/claude-mem-heal-ps1.bats` tests reported as `not ok N … # skip` locally (no `pwsh` installed), which reads as six failures. CI was green because the runner has `pwsh`, so the tests actually run instead of skipping. This failure-shaped skip had previously derailed reasoning about local suite health.
 

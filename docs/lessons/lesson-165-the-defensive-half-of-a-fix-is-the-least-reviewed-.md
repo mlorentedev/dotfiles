@@ -1,13 +1,14 @@
 ---
-id: lesson-165-the-defensive-half-of-a-fix-is-the-least-reviewed-
+id: "lesson-165-the-defensive-half-of-a-fix-is-the-least-reviewed-"
 type: lesson
 status: active
+title: "The defensive half of a fix is the least-reviewed code in the PR, and its failures are silent by construction"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 165: The defensive half of a fix is the least-reviewed code in the PR, and its failures are silent by construction
+# The defensive half of a fix is the least-reviewed code in the PR, and its failures are silent by construction
 
 **Context**: Two fixes in one session, both to guards, both with a hole in the code added to *protect* the guard rather than in the guard itself. `#805` resolved a worktree's hook dir via `git rev-parse --git-common-dir` and validated the answer with `[ -d "$common_dir" ]`. `#814` excluded quoted agent markers by stripping inline code spans with `` `+[^`]*`+ ``.
 

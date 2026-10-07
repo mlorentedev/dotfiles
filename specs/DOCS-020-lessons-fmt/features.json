@@ -1,0 +1,44 @@
+[
+  {
+    "id": "DOCS-020-lessons-fmt-f1",
+    "behavior": "AC1: every measured lesson shape normalises to the canonical form, idempotently",
+    "verification": "cd cli && go test ./internal/lessons/ -run '^TestNormalize_EveryShapeReachesTheCanonicalForm$' -count=1 -v | grep -q -- '--- PASS: TestNormalize_EveryShapeReachesTheCanonicalForm'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f2",
+    "behavior": "AC2: the index table is generated between markers and the prose kept",
+    "verification": "cd cli && go test ./internal/lessons/ -run '^TestRenderIndex_ReplacesTheHandKeptTableOnceThenItsMarkers$' -count=1 -v | grep -q -- '--- PASS: TestRenderIndex_ReplacesTheHandKeptTableOnceThenItsMarkers'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f3",
+    "behavior": "AC3: a duplicate number is an error",
+    "verification": "cd cli && go test ./internal/lessons/ -run '^TestPlan_RefusesANumberUsedTwice$' -count=1 -v | grep -q -- '--- PASS: TestPlan_RefusesANumberUsedTwice'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f4",
+    "behavior": "AC4: the repository's lessons are in their canonical form",
+    "verification": "cd cli && go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f5",
+    "behavior": "AC5: the init index template is what fmt renders",
+    "verification": "cd cli && go test ./internal/initrepo/ -run '^TestLessonsIndexTemplateIsWhatFmtRenders$' -count=1 -v | grep -q -- '--- PASS: TestLessonsIndexTemplateIsWhatFmtRenders'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f6",
+    "behavior": "AC6: CI runs fmt --check",
+    "verification": "grep -qF 'lessons fmt --check' .github/workflows/repo-hygiene.yml",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -1,13 +1,14 @@
 ---
-id: lesson-161-a-linked-worktree-s-checkout-is-not-self-contained
+id: "lesson-161-a-linked-worktree-s-checkout-is-not-self-contained"
 type: lesson
 status: active
+title: "A linked worktree's checkout is not self-contained — its `.git` is a file, and tools that assume a directory all fail together"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 161: A linked worktree's checkout is not self-contained — its `.git` is a file, and tools that assume a directory all fail together
+# A linked worktree's checkout is not self-contained — its `.git` is a file, and tools that assume a directory all fail together
 
 **Context**: Working the dotfiles repo through `git worktree`, the standing convention here because parallel sessions share the main checkout. Two unrelated attempts hit the same wall the same day: bind-mounting a worktree into a Linux container to run git commands, and copying a worktree on Windows with `robocopy /XD .git`.
 

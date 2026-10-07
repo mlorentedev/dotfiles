@@ -1,13 +1,14 @@
 ---
-id: lesson-156-a-pr-that-documents-its-own-text-scanning-gate-can
+id: "lesson-156-a-pr-that-documents-its-own-text-scanning-gate-can"
 type: lesson
 status: active
+title: "A PR that documents its own text-scanning gate can trip that gate with its own prose"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 156: A PR that documents its own text-scanning gate can trip that gate with its own prose
+# A PR that documents its own text-scanning gate can trip that gate with its own prose
 
 **Context**: #767 introduced `check-spec-gate.sh`'s archive-on-merge check, keyed on GitHub closing-keyword regex over the raw PR body. Its own PR body demonstrated the feature with a worked example (a fenced `$ SDD_PR_BODY='Closes #670' ...` transcript) and, separately, a sentence describing a *future* PR: "...is the next PR — the one that closes #670."
 

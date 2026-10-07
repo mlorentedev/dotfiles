@@ -1,13 +1,14 @@
 ---
-id: lesson-016-grep-c-counts-1-on-empty-input-newline-matches-dot
+id: "lesson-016-grep-c-counts-1-on-empty-input-newline-matches-dot"
 type: lesson
 status: active
+title: "grep -c '.' counts 1 on empty input (newline matches dot)"
 created: "2026-03-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 016: grep -c '.' counts 1 on empty input (newline matches dot)
+# grep -c '.' counts 1 on empty input (newline matches dot)
 
 **Context**: `vault-health.sh` counted orphan/dead-end links with `echo "$output" | grep -c '.'`. When output was empty, the count should be 0.
 

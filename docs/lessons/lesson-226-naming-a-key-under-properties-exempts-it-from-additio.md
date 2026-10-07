@@ -1,6 +1,13 @@
-# Lesson 226 — Naming a key under `properties` exempts it from `additionalProperties`, so adding a constraint there can loosen the schema
+---
+id: "lesson-226-naming-a-key-under-properties-exempts-it-from-additio"
+type: lesson
+status: active
+title: "Naming a key under `properties` exempts it from `additionalProperties`, so adding a constraint there can loosen the schema"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# Naming a key under `properties` exempts it from `additionalProperties`, so adding a constraint there can loosen the schema
+
 **Area:** registries / JSON Schema / guards
 **Severity:** medium — the edit reads as a tightening in review and in the diff, and it is a loosening
 

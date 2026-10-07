@@ -1,13 +1,14 @@
 ---
-id: lesson-292
+id: "lesson-292-the-file-that-declares-an-event-describes-its-owner-not-the-tool-you-bind"
 type: lesson
 status: active
+title: "The file that declares an event describes its owner, not the tool you bind"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, harness, agy, hooks, verification]
 ---
 
-# 292 — The file that declares an event describes its owner, not the tool you are binding
+# The file that declares an event describes its owner, not the tool you bind
 
 ## What happened
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-198-a-pr-s-head-sha-not-matching-your-latest-push-can-
+id: "lesson-198-a-pr-s-head-sha-not-matching-your-latest-push-can-"
 type: lesson
 status: active
+title: "A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging"
 created: "2026-08-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 198: A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging
+# A PR's `head.sha` not matching your latest push can mean the PR is already merged, not that the API is lagging
 
 **Context**: HARNESS-070 (#843/#869/#828, PR #948). After pushing a commit addressing CodeRabbit's review findings, `gh api .../pulls/948 --jq '.head.sha'` kept returning the previous commit even though `git fetch` confirmed the remote branch ref had the new one. The first read was "GitHub API/webhook propagation lag" — plausible after a session that had already hit a real rate-limit earlier — and a background poll was armed to wait for the field to catch up.
 

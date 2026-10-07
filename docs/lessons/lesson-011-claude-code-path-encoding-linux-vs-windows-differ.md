@@ -1,13 +1,14 @@
 ---
-id: lesson-011-claude-code-path-encoding-linux-vs-windows-differ
+id: "lesson-011-claude-code-path-encoding-linux-vs-windows-differ"
 type: lesson
 status: active
+title: "Claude Code path encoding: Linux vs Windows differ"
 created: "2026-02-28"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 011: Claude Code path encoding: Linux vs Windows differ
+# Claude Code path encoding: Linux vs Windows differ
 
 **Context**: Implementing `--all` auto-discovery in `knowledge-crystallize.sh/.ps1`. Both scripts need to decode `~/.claude/projects/<encoded>/` back to real project paths.
 

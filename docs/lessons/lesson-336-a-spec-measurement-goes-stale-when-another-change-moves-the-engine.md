@@ -1,6 +1,9 @@
 ---
+id: "lesson-336-a-spec-measurement-goes-stale-when-another-change-moves-the-engine"
+type: lesson
+status: active
 title: "A spec's measurement goes stale when another change moves the engine under it"
-date: "2026-10-03"
+created: "2026-10-03"
 ---
 
 # A spec's measurement goes stale when another change moves the engine under it

@@ -1,13 +1,14 @@
 ---
-id: lesson-331
+id: "lesson-331-a-shared-budget-is-watched-at-the-account-not-the-binding"
 type: lesson
 status: active
+title: "A shared budget is watched at the account, not the binding"
 created: "2026-10-01"
 owner: manu
 tags: [lesson, doctor, nan, quota, monitoring]
 ---
 
-# 331 — A shared budget is watched at the account, not at the binding
+# A shared budget is watched at the account, not the binding
 
 ## What happened
 

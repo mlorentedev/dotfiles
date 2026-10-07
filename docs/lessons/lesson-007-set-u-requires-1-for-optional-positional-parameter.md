@@ -1,13 +1,14 @@
 ---
-id: lesson-007-set-u-requires-1-for-optional-positional-parameter
+id: "lesson-007-set-u-requires-1-for-optional-positional-parameter"
 type: lesson
 status: active
+title: "set -u requires ${1:-} for optional positional parameters"
 created: "2026-02-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 007: set -u requires ${1:-} for optional positional parameters
+# set -u requires ${1:-} for optional positional parameters
 
 **Context**: Adding `set -euo pipefail` to all standalone scripts. Several scripts used bare `$1` in argument parsing (e.g., `case "$1" in`, `[[ -z "$1" ]]`).
 

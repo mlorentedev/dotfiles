@@ -1,13 +1,14 @@
 ---
-id: lesson-321
+id: "lesson-321-a-test-that-proves-which-source-won-needs-them-to-disagree"
 type: lesson
 status: active
+title: "A test that proves which source won needs the sources to disagree"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, testing, mutation, doctor, fixtures]
 ---
 
-# 321 — A test that proves which source won needs the sources to disagree
+# A test that proves which source won needs the sources to disagree
 
 ## What happened
 

@@ -1,7 +1,8 @@
 ---
-id: lesson-272
+id: "lesson-272-fail-closed-worktree-garbage-collection-and-in-tree-leases"
 type: lesson
 status: active
+title: "Fail-closed worktree garbage collection requires in-tree leases and positive confirmation"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, git, worktrees, lifecycle, garbage-collection, fail-closed, agents]

@@ -1,13 +1,14 @@
 ---
-id: lesson-128-a-new-top-level-dir-backing-a-dotf-runtime-read-mu
+id: "lesson-128-a-new-top-level-dir-backing-a-dotf-runtime-read-mu"
 type: lesson
 status: active
+title: "A new top-level dir backing a dotf runtime read must be deployed by setup"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 128: A new top-level dir backing a dotf runtime read must be deployed by setup
+# A new top-level dir backing a dotf runtime read must be deployed by setup
 
 **Context**: #584 added secrets/registry.yaml and made deployed `dotf secrets {ls,show,run}` read it from $DOTFILES_DIR/secrets/registry.yaml. 0.19.0 shipped it.
 

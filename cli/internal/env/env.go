@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 )
@@ -80,14 +81,42 @@ func loadMachine(path string) (*machine, error) {
 	return &m, nil
 }
 
+// currentUser looks the user up in the user database; a seam so a test can
+// make the lookup fail.
+var currentUser = user.Current
+
 // Home resolves the user's home directory, preferring HOME (POSIX) then
 // USERPROFILE (Windows) — matching the env-contract's OS-scoped vars and
-// doctor's System.home().
+// doctor's System.home() — and then the user database, for a service or timer
+// environment that sets neither. It returns "" only when none of the three
+// resolves, so a caller that builds a path on it must handle "": StateDir
+// does, and refuses rather than return a path relative to the working dir.
 func Home() string {
 	if h := os.Getenv("HOME"); h != "" {
 		return h
 	}
-	return os.Getenv("USERPROFILE")
+	if h := os.Getenv("USERPROFILE"); h != "" {
+		return h
+	}
+	if u, err := currentUser(); err == nil {
+		return u.HomeDir
+	}
+	return ""
+}
+
+// StateDir is where dotf keeps per-machine state it writes itself (the converge
+// report, the skill-gate ledger): $XDG_STATE_HOME/dotfiles, else
+// <home>/.local/state/dotfiles. It is always absolute: when no absolute home
+// resolves, it is an error, never a path under the working directory.
+func StateDir() (string, error) {
+	if x := os.Getenv("XDG_STATE_HOME"); x != "" && filepath.IsAbs(x) {
+		return filepath.Join(x, "dotfiles"), nil
+	}
+	home := Home()
+	if !filepath.IsAbs(home) {
+		return "", fmt.Errorf("cannot place dotf's state: no absolute home from HOME, USERPROFILE or the user database (got %q); set XDG_STATE_HOME or HOME", home)
+	}
+	return filepath.Join(home, ".local", "state", "dotfiles"), nil
 }
 
 // DotfilesDir resolves DOTFILES_DIR, defaulting to <home>/.dotfiles — the
@@ -192,12 +221,25 @@ func ResolveRegistryPath() string {
 // before it calls `dotf tools install`, so a setup run reads the same file
 // either way.
 func ResolveCatalogPath() string {
+	return resolveInCheckout("packages.json", fileExists)
+}
+
+// ResolveVersionsPath locates versions.conf for READS, the same way: the
+// checkout first, else the copy setup deploys under DOTFILES_DIR.
+func ResolveVersionsPath() string {
+	return resolveInCheckout("versions.conf", fileExists)
+}
+
+// resolveInCheckout returns rel inside the dotfiles checkout when the checkout
+// is found and has it, else rel under the deploy dir. One rule for every
+// checkout-first read, so the readers cannot drift apart.
+func resolveInCheckout(rel string, exists func(string) bool) string {
 	if root := RepoDir(); root != "" {
-		if p := filepath.Join(root, "packages.json"); fileExists(p) {
+		if p := filepath.Join(root, filepath.FromSlash(rel)); exists(p) {
 			return p
 		}
 	}
-	return filepath.Join(DotfilesDir(Home()), "packages.json")
+	return filepath.Join(DotfilesDir(Home()), filepath.FromSlash(rel))
 }
 
 // ResolveSensitiveDir locates the age secret store (sensitive/) for READS. Like
@@ -207,12 +249,7 @@ func ResolveCatalogPath() string {
 // registry and the values it maps on the same source avoids the split-brain where a
 // repo-side rotation stays invisible until a redeploy (the #635 class, for secret files).
 func ResolveSensitiveDir() string {
-	if root := RepoDir(); root != "" {
-		if p := filepath.Join(root, "sensitive"); isDir(p) {
-			return p
-		}
-	}
-	return filepath.Join(DotfilesDir(Home()), "sensitive")
+	return resolveInCheckout("sensitive", isDir)
 }
 
 // ResolveHarnessRoot locates the root that CONTAINS harness/ — the directory to

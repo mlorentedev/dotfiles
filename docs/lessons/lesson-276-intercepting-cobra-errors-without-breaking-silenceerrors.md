@@ -1,14 +1,14 @@
 ---
-id: lesson-276
-status: active
+id: "lesson-276-intercepting-cobra-errors-without-breaking-silenceerrors"
 type: lesson
-title: Intercepting Cobra Errors without Breaking SilenceErrors
+status: active
+title: "Intercepting Cobra Errors without Breaking SilenceErrors"
 created: "2026-08-30"
 owner: manu
 tags: [go, cobra, cli, errors]
 ---
 
-# 276 — Intercepting Cobra errors without breaking `SilenceErrors`
+# Intercepting Cobra Errors without Breaking SilenceErrors
 
 **Context:** We needed to intercept specific errors (`TerminalFailureError`) at the top level of the `dotf` CLI to print a clean JSON latch for AI agents, bypassing Cobra's default `"Error: ..."` prefix.
 

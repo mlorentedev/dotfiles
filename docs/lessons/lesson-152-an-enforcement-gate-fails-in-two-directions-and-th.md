@@ -1,13 +1,14 @@
 ---
-id: lesson-152-an-enforcement-gate-fails-in-two-directions-and-th
+id: "lesson-152-an-enforcement-gate-fails-in-two-directions-and-th"
 type: lesson
 status: active
+title: "An enforcement gate fails in two directions, and the cheap one is the refusal"
 created: "2026-08-06"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 152: An enforcement gate fails in two directions, and the cheap one is the refusal
+# An enforcement gate fails in two directions, and the cheap one is the refusal
 
 **Context**: Adding the archive-on-merge half of the SDD Discipline Gate (#670) to `check-spec-gate.sh`, which runs under `set -euo pipefail`. The suite was written first and deliberately covered both directions: ten tests asserting the gate *fires* on a violation, ten asserting it stays silent on `Refs #N`, on a prose mention, on a cross-repo reference, on an empty PR body, on a spec with no `issue:` frontmatter.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-137-same-set-as-the-script-it-replaces-is-the-wrong-pa
+id: "lesson-137-same-set-as-the-script-it-replaces-is-the-wrong-pa"
 type: lesson
 status: active
+title: "\"Same set as the script it replaces\" is the wrong parity gate when the old tool was itself wrong"
 created: "2026-06-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 137: "Same set as the script it replaces" is the wrong parity gate when the old tool was itself wrong
+# "Same set as the script it replaces" is the wrong parity gate when the old tool was itself wrong
 
 **Context**: `dotf secrets sync ci` replaces `github-secrets-manager.sh` as the path that uploads secrets to a repo's GitHub Actions. The instinct when retiring the script was to gate the cutover on "the new command uploads the same set of secrets the script did" — set-equality as the parity proof.
 

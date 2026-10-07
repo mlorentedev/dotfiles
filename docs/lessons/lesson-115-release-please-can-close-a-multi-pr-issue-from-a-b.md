@@ -1,13 +1,14 @@
 ---
-id: lesson-115-release-please-can-close-a-multi-pr-issue-from-a-b
+id: "lesson-115-release-please-can-close-a-multi-pr-issue-from-a-b"
 type: lesson
 status: active
+title: "release-please can close a multi-PR issue from a build-only sub-PR's `Refs` — keep the parent issue out of sub-PR footers"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 115: release-please can close a multi-PR issue from a build-only sub-PR's `Refs` — keep the parent issue out of sub-PR footers
+# release-please can close a multi-PR issue from a build-only sub-PR's `Refs` — keep the parent issue out of sub-PR footers
 
 **Context**: CLI-018 was split into PR-B0 (§4 coverage port, build-only, #522) and PR-B (the deletion, tracked by #509). #522's footer deliberately said `Refs #509`, *not* `Closes`, because the deletion was not done.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-017-plaintext-secrets-must-never-touch-disk-pipe-to-ag
+id: "lesson-017-plaintext-secrets-must-never-touch-disk-pipe-to-ag"
 type: lesson
 status: active
+title: "Plaintext secrets must never touch disk — pipe to age directly"
 created: "2026-03-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 017: Plaintext secrets must never touch disk — pipe to age directly
+# Plaintext secrets must never touch disk — pipe to age directly
 
 **Context**: `secrets_add` and `secrets_rotate` in `load-secrets.sh` wrote the secret value to a plaintext file, encrypted it with age, then deleted the plaintext.
 

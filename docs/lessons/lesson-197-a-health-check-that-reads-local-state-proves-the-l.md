@@ -1,13 +1,14 @@
 ---
-id: lesson-197-a-health-check-that-reads-local-state-proves-the-l
+id: "lesson-197-a-health-check-that-reads-local-state-proves-the-l"
 type: lesson
 status: active
+title: "A health check that reads local state proves the liveness of nothing"
 created: "2026-08-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 197: A health check that reads local state proves the liveness of nothing
+# A health check that reads local state proves the liveness of nothing
 
 **Context**: `dotf doctor` verified the two secret tiers of ADR-028 with opposite rigour. The age floor — the *backup* — was proven by behaviour: derive the recipient, encrypt a sentinel, decrypt it back, compare bytes. Bitwarden — the tier ADR-028 designates the **live SSOT** — was proven by `sys.has("bw")`, a binary on `PATH` (BUG-074, #944).
 

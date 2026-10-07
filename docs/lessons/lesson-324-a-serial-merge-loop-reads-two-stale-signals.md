@@ -1,13 +1,14 @@
 ---
-id: lesson-324
+id: "lesson-324-a-serial-merge-loop-reads-two-stale-signals"
 type: lesson
 status: active
+title: "A serial merge loop reads two stale signals"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, github, merge, triage]
 ---
 
-# 324 — A serial merge loop reads two stale signals: the merge state just after main moves, and a review that arrives during CI
+# A serial merge loop reads two stale signals
 
 ## What happened
 

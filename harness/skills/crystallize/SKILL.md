@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: 69649d81cdefa7e1
+generated_sha: 36e875828f9a7762
 id: crystallize-skill
 type: skill
 status: active
@@ -45,7 +45,7 @@ awk -v s="<Last Crystallized>" 'FNR==1{d=""} /^> Updated: /{d=$3} /^\*\*Decision
 - These become new lesson candidates
 
 ### Step 4 — Vault Update
-- For each gap, write a **project** lesson to the repo's `docs/lessons/lesson-NNN-<slug>.md` and register in `docs/lessons/_index.md` using the standard frontmatter (a genuinely **cross-project** lesson goes to `00_meta/patterns/`):
+- For each gap, write a **project** lesson to the repo's `docs/lessons/lesson-NNN-<slug>.md` with the standard frontmatter, then run `dotf lessons fmt` to regenerate `docs/lessons/_index.md` (a genuinely **cross-project** lesson goes to `00_meta/patterns/`):
 
 ```markdown
 ---

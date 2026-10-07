@@ -1,6 +1,13 @@
-# 265 - A correct measurement answering the wrong question, three times in one session
+---
+id: "lesson-265-a-correct-measurement-answering-the-wrong-question"
+type: lesson
+status: active
+title: "A correct measurement answering the wrong question, three times in one session"
+created: "2026-09-03"
+---
 
-**Date:** 2026-09-03
+# A correct measurement answering the wrong question, three times in one session
+
 **Area:** verification, CI, cross-session coordination
 
 ## What happened

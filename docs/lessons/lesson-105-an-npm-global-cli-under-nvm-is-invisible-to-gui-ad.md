@@ -1,13 +1,14 @@
 ---
-id: lesson-105-an-npm-global-cli-under-nvm-is-invisible-to-gui-ad
+id: "lesson-105-an-npm-global-cli-under-nvm-is-invisible-to-gui-ad"
 type: lesson
 status: active
+title: "An npm-global CLI under nvm is invisible to GUI/ADE processes and to any shell on a different node version — install agent CLIs into ~/.local"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 105: An npm-global CLI under nvm is invisible to GUI/ADE processes and to any shell on a different node version — install agent CLIs into ~/.local
+# An npm-global CLI under nvm is invisible to GUI/ADE processes and to any shell on a different node version — install agent CLIs into ~/.local
 
 **Context**: Using Orca (the parallel-agent ADE), `pi` launched fine from the default terminal but `command not found` from inside Orca — only `claude` would start. `setup-linux.sh` installs `pi` with a bare `npm install -g`.
 

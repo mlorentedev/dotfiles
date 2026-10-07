@@ -31,11 +31,18 @@ created: "2026-10-06"
 
 - [ ] [AC4] `packages.json` entry `mise`, keyed `goos/goarch`, `SHASUMS256.txt`; `MISE_VERSION` in `versions.conf`; installed and probed on the Mac
 
-### T2 — `dotf tools sync` and the converge tools step
+### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
-- [ ] [AC5] Failing tests, then `dotf tools sync`: renders `~/.config/mise/conf.d/dotfiles.toml` from `versions.conf`, runs `mise install` through an injected runner (lesson 335), probes each tool with `mise which` and `--version`; a second run changes nothing
-- [ ] [AC6] The `tools` reconciler in `dotf converge`, after the records step; `--plan` lists the tools to install
-- [ ] Verify `mise lock --platform linux-x64,macos-arm64,windows-x64` end to end before committing `mise.lock`
+- [x] [AC5] Failing tests, then `tools.ParseMiseTools`: pins marked `# mise: cli` on the line before them, name from `NAME_VERSION`; a marker that marks no pin is an error
+- [x] [AC5] `tools.MiseSync`: renders `<mise config dir>/conf.d/dotfiles.toml` (owned end to end, written atomically), runs `mise install` through an injected runner (lesson 335), probes every tool through `mise which` and `--version` at or above the pin; a second run writes and installs nothing; the hand-written `config.toml` is never touched
+- [x] [AC5] `dotf tools sync [--dry-run] [--versions]`; `env.ResolveVersionsPath`, with the checkout-first rule extracted to one helper (`resolveInCheckout`) shared with the catalog and the secret store
+- [x] `versions.conf` marks age, bats, shellcheck, golangci-lint, zoxide and adds pins for jq, direnv, fzf and lazygit; eza stays unmarked (F-056)
+- [x] On the Mac: `dotf tools sync` installed age, direnv, fzf, jq, lazygit and zoxide, each runs at its pin, and a second run reported nothing to do
+
+### T2b — committed `mise.lock` and the converge tools step
+
+- [ ] Commit `mise.lock` (verified 2026-10-06: `mise lock -g --platform linux-x64,macos-arm64,windows-x64` writes `~/.config/mise/mise.lock` with per-platform checksums and attestation provenance for a conf.d config); sync deploys it and installs with `--locked`; CI regenerates it
+- [ ] [AC6] The `tools` reconciler in `dotf converge`, after the records step (after #2025 merges, which owns `Registry` today); `--plan` lists the tools to install
 
 ### W2b — shims on PATH (after #2013 P6/P7)
 

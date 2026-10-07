@@ -1,13 +1,14 @@
 ---
-id: lesson-280
+id: "lesson-280-a-diagnosis-repeated-often-enough-reads-as-evidence"
 type: lesson
 status: active
+title: "A diagnosis repeated often enough becomes indistinguishable from evidence"
 created: "2026-09-06"
 owner: manu
 tags: [lesson, handoff, diagnosis, testing, evidence, session-continuity]
 ---
 
-# 280 — A diagnosis repeated often enough becomes indistinguishable from evidence
+# A diagnosis repeated often enough becomes indistinguishable from evidence
 
 ## What happened
 

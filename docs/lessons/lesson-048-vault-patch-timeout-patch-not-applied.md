@@ -1,13 +1,14 @@
 ---
-id: lesson-048-vault-patch-timeout-patch-not-applied
+id: "lesson-048-vault-patch-timeout-patch-not-applied"
 type: lesson
 status: active
+title: "vault_patch timeout != patch not applied"
 created: "2026-05-20"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 048: vault_patch timeout != patch not applied
+# vault_patch timeout != patch not applied
 
 **Context:** During WIN-001 (PR #71) and the post-merge vault tick, two `mcp__hive__vault_patch` calls to `10_projects/dotfiles/11-tasks.md` returned `vault_patch timed out after 60s. Server may be under load or a lock is contended; retry shortly.` In BOTH cases the patch had actually committed; the file was already in its new state when the retry ran, and the retry then failed with `patch N: find text not found.` (because the original anchor text no longer existed). Pattern observed twice in the same session.</context>
 <parameter name="problem">The naïve retry path on `vault_patch` timeout (call the same patch again with the same find/replace) produces a false `find text not found` failure that masks the fact that the first call succeeded. Wasted ~30s per occurrence verifying after the fact. If the file was not idempotent under the new state, a retry could also corrupt content.

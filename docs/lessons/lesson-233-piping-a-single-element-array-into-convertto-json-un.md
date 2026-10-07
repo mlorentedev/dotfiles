@@ -1,13 +1,14 @@
 ---
-id: lesson-233-piping-a-single-element-array-into-convertto-json-un
+id: "lesson-233-piping-a-single-element-array-into-convertto-json-un"
 type: lesson
 status: active
+title: "Piping a single-element array into ConvertTo-Json unwraps it"
 created: "2026-08-27"
 owner: manu
 tags: [lesson, dotfiles, powershell]
 ---
 
-# Lesson 233: Piping a single-element array into ConvertTo-Json unwraps it
+# Piping a single-element array into ConvertTo-Json unwraps it
 
 **Context**: AI-032/#1247 — syncing `enabledModels` into a deployed `~/.pi/agent/settings.json` needed a way to compare two PowerShell arrays for exact (order-sensitive) equality, mirroring the Linux side's `jq -c '.enabledModels'` canonical-string comparison.
 

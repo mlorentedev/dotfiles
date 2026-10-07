@@ -1,13 +1,14 @@
 ---
-id: lesson-023-cp-fails-when-source-and-destination-resolve-to-th
+id: "lesson-023-cp-fails-when-source-and-destination-resolve-to-th"
 type: lesson
 status: active
+title: "cp fails when source and destination resolve to the same file via symlink"
 created: "2026-03-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 023: cp fails when source and destination resolve to the same file via symlink
+# cp fails when source and destination resolve to the same file via symlink
 
 **Context**: `setup-linux.sh` used `safe_copy` (which wraps `cp`) to deploy `.gitconfig` from `$DOTFILES_DIR/.gitconfig` to `$HOME/.gitconfig`.
 

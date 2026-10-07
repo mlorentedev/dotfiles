@@ -1,13 +1,14 @@
 ---
-id: lesson-329
+id: "lesson-329-a-git-fixture-with-identical-content-is-a-rename"
 type: lesson
 status: active
+title: "A git fixture whose new files repeat the deleted ones' content is a rename, and counts zero lines"
 created: "2026-10-01"
 owner: manu
 tags: [lesson, testing, git, spec-gate, bats]
 ---
 
-# 329 — A git fixture whose new files repeat the deleted ones' content is a rename, and counts zero lines
+# A git fixture whose new files repeat the deleted ones' content is a rename, and counts zero lines
 
 ## What happened
 

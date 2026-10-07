@@ -1,6 +1,13 @@
-# Lesson 267 — A mutation harness must prove the mutation landed
+---
+id: "lesson-267-a-mutation-harness-must-prove-the-mutation-landed"
+type: lesson
+status: active
+title: "A mutation harness must prove the mutation landed"
+created: "2026-09-04"
+---
 
-**Date:** 2026-09-04
+# A mutation harness must prove the mutation landed
+
 **Context:** CI-002 (#1478), PR #1482 — guarding the pi package reconcile skip.
 
 ## What happened

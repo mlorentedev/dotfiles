@@ -1,13 +1,14 @@
 ---
-id: lesson-118-in-bats-a-grep-q-guard-is-exempt-from-errexit-it-w
+id: "lesson-118-in-bats-a-grep-q-guard-is-exempt-from-errexit-it-w"
 type: lesson
 status: active
+title: "In bats, a `! grep -q` guard is exempt from errexit — it won't fail the test when the pattern is found"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 118: In bats, a `! grep -q` guard is exempt from errexit — it won't fail the test when the pattern is found
+# In bats, a `! grep -q` guard is exempt from errexit — it won't fail the test when the pattern is found
 
 **Context**: A guard test asserting a retired token (`diff-check`) no longer appears in the production caller files.
 

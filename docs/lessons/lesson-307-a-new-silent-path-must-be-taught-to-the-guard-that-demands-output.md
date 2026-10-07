@@ -1,13 +1,14 @@
 ---
-id: lesson-307
+id: "lesson-307-a-new-silent-path-must-be-taught-to-the-guard-that-demands-output"
 type: lesson
 status: active
+title: "A new silent path must be taught to the guard that demands output"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, ci, guard, pr-agent, review]
 ---
 
-# 307 — A new silent path must be taught to the guard that demands output
+# A new silent path must be taught to the guard that demands output
 
 ## What happened
 

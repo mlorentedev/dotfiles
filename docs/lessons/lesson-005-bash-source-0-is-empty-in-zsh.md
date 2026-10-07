@@ -1,13 +1,14 @@
 ---
-id: lesson-005-bash-source-0-is-empty-in-zsh
+id: "lesson-005-bash-source-0-is-empty-in-zsh"
 type: lesson
 status: active
+title: "${BASH_SOURCE[0]} is empty in zsh"
 created: "2025-12-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 005: ${BASH_SOURCE[0]} is empty in zsh
+# ${BASH_SOURCE[0]} is empty in zsh
 
 **Context**: Scripts used `${BASH_SOURCE[0]}` to determine their own file path for relative directory resolution
 

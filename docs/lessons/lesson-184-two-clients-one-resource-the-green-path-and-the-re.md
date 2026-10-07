@@ -1,13 +1,14 @@
 ---
-id: lesson-184-two-clients-one-resource-the-green-path-and-the-re
+id: "lesson-184-two-clients-one-resource-the-green-path-and-the-re"
 type: lesson
 status: active
+title: "Two clients, one resource: the green path and the red path shared a credential, so the credential was never the answer"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 184: Two clients, one resource: the green path and the red path shared a credential, so the credential was never the answer
+# Two clients, one resource: the green path and the red path shared a credential, so the credential was never the answer
 
 **Context**: #884. `bitacora-reconcile.yml` had failed every run since it shipped — three for three — with `unknown owner type` on every item in every repo. The obvious readings were a dead token or a rate limit, and both were wrong.
 

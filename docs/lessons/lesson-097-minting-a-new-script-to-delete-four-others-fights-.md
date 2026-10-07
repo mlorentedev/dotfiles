@@ -1,13 +1,14 @@
 ---
-id: lesson-097-minting-a-new-script-to-delete-four-others-fights-
+id: "lesson-097-minting-a-new-script-to-delete-four-others-fights-"
 type: lesson
 status: active
+title: "Minting a new script to delete four others fights a reduce-the-surface goal — remove and ticket-restore, don't extract"
 created: "2026-06-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 097: Minting a new script to delete four others fights a reduce-the-surface goal — remove and ticket-restore, don't extract
+# Minting a new script to delete four others fights a reduce-the-surface goal — remove and ticket-restore, don't extract
 
 **Context**: CLI-014 folds `init-project.sh` + the `init-repo-*.sh` helpers into `dotf init`, executing ADR-021's north star: shrink the per-OS shell-script surface. `init-project.sh` carried a vault-only sub-mode (`--work-sdk <family> <component>` -> writes a `50_work/45-development/…` vault entry, scaffolds no repo). The prior session's plan was to **extract** that mode into a standalone transitional `init-work-sdk.sh` so the capability survived the deletion.
 

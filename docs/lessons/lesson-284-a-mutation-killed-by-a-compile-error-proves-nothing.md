@@ -1,13 +1,14 @@
 ---
-id: lesson-284
+id: "lesson-284-a-mutation-killed-by-a-compile-error-proves-nothing"
 type: lesson
 status: active
+title: "A mutation \"killed\" by a compile error proves nothing"
 created: "2026-09-22"
 owner: manu
 tags: [lesson, testing, mutation, verification, silent-failure, go]
 ---
 
-# 284 — A mutation "killed" by a compile error proves nothing
+# A mutation "killed" by a compile error proves nothing
 
 ## What happened
 

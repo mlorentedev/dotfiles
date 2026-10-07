@@ -1,13 +1,14 @@
 ---
-id: lesson-200-a-dormant-declared-field-must-be-validated-on-the-
+id: "lesson-200-a-dormant-declared-field-must-be-validated-on-the-"
 type: lesson
 status: active
+title: "A dormant declared field must be validated on the same schedule it's written, not the schedule it activates on"
 created: "2026-08-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 200: A dormant declared field must be validated on the same schedule it's written, not the schedule it activates on
+# A dormant declared field must be validated on the same schedule it's written, not the schedule it activates on
 
 **Context**: OPS-028 (#951, PR #957) added `bw.folder` to the secrets registry schema — ADR-028's already-ratified Bitwarden folder taxonomy, which the schema had never implemented. The registry's own convention (ADR-028 §2's addendum) pre-declares a secret's `bw:` block — item, field, and now folder — while `backend:` is still `age`, dormant until `dotf secrets migrate` flips it. The first implementation followed the existing code's own pattern for gating validation: `checkBwSources` (item/field completeness) only runs inside the `switch s.Backend { case "bw": ... }` arm, so the new `folder:` check was added there too, by the same reasoning.
 

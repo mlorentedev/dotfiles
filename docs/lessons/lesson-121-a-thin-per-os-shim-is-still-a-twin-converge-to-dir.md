@@ -1,13 +1,14 @@
 ---
-id: lesson-121-a-thin-per-os-shim-is-still-a-twin-converge-to-dir
+id: "lesson-121-a-thin-per-os-shim-is-still-a-twin-converge-to-dir"
 type: lesson
 status: active
+title: "A thin per-OS shim is still a twin — converge to direct CLI invocation"
 created: "2026-06-23"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 121: A thin per-OS shim is still a twin — converge to direct CLI invocation
+# A thin per-OS shim is still a twin — converge to direct CLI invocation
 
 **Context**: CLI-025 PR1 ported the SessionEnd hook (`session-handoff.{sh,ps1}`) to the Go `dotf mem session-end` noun. The spec's wording said the hook should become a "thin shim that `exec dotf mem …`".
 

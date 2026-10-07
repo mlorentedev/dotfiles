@@ -1,13 +1,14 @@
 ---
-id: lesson-207-a-gate-that-scans-a-directory-will-eventually-scan
+id: "lesson-207-a-gate-that-scans-a-directory-will-eventually-scan"
 type: lesson
 status: active
+title: "A gate that scans a directory will eventually scan its own evidence"
 created: "2026-08-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 207: A gate that scans a directory will eventually scan its own evidence
+# A gate that scans a directory will eventually scan its own evidence
 
 **Context**: HARNESS-072 (#963) had a passing adversarial review and one step left — `dotf spec archive`. The archive refused, listing dozens of unresolved `[AGENT-DRAFT]` markers in a spec whose artifacts a manual `grep` showed were clean.
 
