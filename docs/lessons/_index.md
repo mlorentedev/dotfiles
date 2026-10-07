@@ -379,4 +379,5 @@ tags: [lessons, index, dotfiles]
 | [359 - A gate must read every input the platform acts on](lesson-359-a-gate-must-read-every-input-the-platform-acts-on.md) | 2026-10-07 |
 | [360 - A PR inferred from the checkout is not the PR being pushed](lesson-360-a-pr-inferred-from-the-checkout-is-not-the-pr-being-pushed.md) | 2026-10-07 |
 | [361 - A remote URL is a credential carrier: report its host, never the URL](lesson-361-a-remote-url-is-a-credential-carrier.md) | 2026-10-07 |
+| [362 - An uncomputed merge state is not a pending check](lesson-362-an-uncomputed-merge-state-is-not-a-pending-check.md) | 2026-10-07 |
 <!-- END GENERATED -->
