@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -40,9 +39,10 @@ func TurnCapHint(runner, transcript string) string {
 // withTurnCapHint adds TurnCapHint's line to err for a review launched earlier,
 // typically detached, whose missing verdict is only found when `spec archive`
 // runs. The runner is the one the review-request sidecar says was launched,
-// resolved through the pool. Without a sidecar, a pool entry or a transcript
+// resolved through the pool, and the transcript is read where the launcher
+// writes it (TranscriptPath). Without a sidecar, a pool entry or a transcript
 // there is nothing to read, and err is returned as it was.
-func withTurnCapHint(err error, repoRoot, specDir string) error {
+func withTurnCapHint(err error, repoRoot, specID, specDir string) error {
 	req, found, rerr := ReadReviewRequest(specDir)
 	if rerr != nil || !found || req.Reviewer == "" {
 		return err
@@ -55,7 +55,7 @@ func withTurnCapHint(err error, repoRoot, specDir string) error {
 		if strings.TrimSpace(e.ID) != req.Reviewer {
 			continue
 		}
-		if hint := TurnCapHint(e.Runner, filepath.Join(specDir, TranscriptFile)); hint != "" {
+		if hint := TurnCapHint(e.Runner, TranscriptPath(repoRoot, specID)); hint != "" {
 			return fmt.Errorf("%w\n%s", err, hint)
 		}
 		break

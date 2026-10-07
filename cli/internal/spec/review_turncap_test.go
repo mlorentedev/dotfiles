@@ -129,7 +129,9 @@ func archiveCapFixture(t *testing.T, lastOutput int, withReview bool) (repoRoot,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(specDir, TranscriptFile), transcript, 0o600); err != nil {
+	// Written through the launcher's own helper, so the test and the code
+	// cannot share a private assumption about where the transcript lives.
+	if err := os.WriteFile(TranscriptPath(repoRoot, "X"), transcript, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return repoRoot, specDir

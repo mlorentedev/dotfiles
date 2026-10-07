@@ -332,7 +332,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	if !found {
 		return withTurnCapHint(fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
 			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
-			ReviewFile), repoRoot, specDir)
+			ReviewFile), repoRoot, specID, specDir)
 	}
 	if err != nil {
 		return fmt.Errorf("%w\nfix the artifact, or declare `review: waived` with a reason in proposal.md", err)
@@ -351,7 +351,7 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// that wrote nothing would be accepted before anything looked.
 	if err := checkReviewProvenance(specDir, review); err != nil {
 		if errors.Is(err, errNoNewVerdict) {
-			err = withTurnCapHint(err, repoRoot, specDir)
+			err = withTurnCapHint(err, repoRoot, specID, specDir)
 		}
 		return err
 	}
