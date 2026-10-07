@@ -132,9 +132,15 @@ func ResolveReviewBase(repoRoot, specDir string) string {
 			return "" // the adding commit is the root commit
 		}
 		parent := strings.TrimSpace(string(out))
-		from := renamedFrom(repoRoot, parent, adding, rel)
-		if from == "" {
+		from, renamed := renamedFrom(repoRoot, parent, adding, rel)
+		if !renamed {
 			return parent
+		}
+		if from == "" {
+			// Something was renamed into the folder but its source cannot be
+			// traced. The parent would be a base after the work, which is the
+			// partial diff this function exists to refuse.
+			return ""
 		}
 		rel = from
 	}
@@ -157,14 +163,15 @@ func earliestAdding(repoRoot, rel string) string {
 	return lines[len(lines)-1]
 }
 
-// renamedFrom reports the folder that commit renamed into rel, or "" when the
-// files under rel were genuinely new there. -z keeps paths unquoted whatever
+// renamedFrom reports whether commit renamed anything into rel and, if so, the
+// folder it came from. renamed with an empty from means the source could not be
+// traced, which the caller refuses. -z keeps paths unquoted whatever
 // core.quotePath says.
-func renamedFrom(repoRoot, parent, commit, rel string) string {
+func renamedFrom(repoRoot, parent, commit, rel string) (from string, renamed bool) {
 	out, err := exec.Command("git", "-C", repoRoot,
 		"diff-tree", "-r", "-M", "--name-status", "-z", parent, commit).Output()
 	if err != nil {
-		return ""
+		return "", true
 	}
 	// Records are status NUL path, or for a rename or copy status NUL src NUL dst.
 	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
@@ -174,29 +181,33 @@ func renamedFrom(repoRoot, parent, commit, rel string) string {
 			i += 2
 			continue
 		}
-		if i+2 < len(f) && status[0] == 'R' {
+		if i+2 < len(f) && status[0] == 'R' && strings.HasPrefix(f[i+2], rel+"/") {
+			renamed = true
 			if dir := renamedDir(f[i+1], f[i+2], rel); dir != "" {
-				return dir
+				return dir, true
 			}
 		}
 		i += 3
 	}
-	return ""
+	return "", renamed
 }
 
 // renamedDir is the folder oldPath sat in when its rename to newPath moved it
-// into rel, or "" when newPath is outside rel or the file's place inside the
-// folder changed with it.
+// into rel: oldPath less as many trailing components as newPath has below rel.
+// Counting components rather than matching the suffix keeps a file renamed in
+// the same commit as the move (proposal.md to spec.md) traceable. "" when
+// oldPath is too shallow to have held it.
 func renamedDir(oldPath, newPath, rel string) string {
 	suffix, ok := strings.CutPrefix(newPath, rel+"/")
 	if !ok {
 		return ""
 	}
-	dir, _ := strings.CutSuffix(oldPath, "/"+suffix)
-	if dir == oldPath {
+	parts := strings.Split(oldPath, "/")
+	depth := strings.Count(suffix, "/") + 1
+	if len(parts) <= depth {
 		return ""
 	}
-	return dir
+	return strings.Join(parts[:len(parts)-depth], "/")
 }
 
 // fileDigest returns the SHA-256 of path, or "" when it does not exist.

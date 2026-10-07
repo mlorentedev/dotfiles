@@ -238,3 +238,41 @@ func TestResolveReviewBaseRefusesASpecRenamedOutOfTheRootCommit(t *testing.T) {
 			"base after it excludes the implementation", got)
 	}
 }
+
+// A move that renames a file in the same commit (proposal.md to spec.md) is
+// still traced by the file's depth in the folder rather than its name.
+func TestResolveReviewBaseFollowsAMoveThatAlsoRenamedAFile(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	wantBase := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "specs/OLD-001-x/proposal.md", "specs/NEW-001-x/spec.md")
+	git(t, repoRoot, "commit", "-qm", "move and rename")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != wantBase {
+		t.Errorf("ResolveReviewBase = %q, want %q", got, wantBase)
+	}
+}
+
+// A rename into the folder whose source cannot be placed (here, from the
+// repository root, too shallow to have held it) is refused, never answered
+// with the parent of the move: that base would exclude the implementation.
+func TestResolveReviewBaseRefusesAnUntraceableRename(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	writeAndCommit(t, repoRoot, "draft and implementation", "draft.md", "impl.go")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x", "notes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "draft.md", "specs/NEW-001-x/notes/draft.md")
+	git(t, repoRoot, "commit", "-qm", "file the draft as a spec")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != "" {
+		t.Errorf("ResolveReviewBase = %q, want \"\" for a rename it cannot trace", got)
+	}
+}
