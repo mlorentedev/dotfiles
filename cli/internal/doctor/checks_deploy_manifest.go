@@ -69,6 +69,11 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 			case !pathExists(dst):
 				rep.Warn(fmt.Sprintf("%s: %s not deployed (run: dotf deploy %s)", c.Name, dst, c.Name))
 				drifted++
+			case isSymlink(dst):
+				// Deploy renames a regular file over the link (#2054); its
+				// target's mode is not the question.
+				rep.Warn(fmt.Sprintf("drift: %s — %s is a symlink, not the file %s deploys (run: dotf deploy %s)", c.Name, dst, c.Src, c.Name))
+				drifted++
 			case warnModeDrift(rep, c, dst):
 				// The mode needs no render to read, and deploy fixes it on
 				// this path too.
@@ -131,10 +136,12 @@ func warnModeDrift(rep *Report, c deploy.Config, dst string) bool {
 	return false
 }
 
-// modeDriftLine names the declared mode, not "too open": the predicate also
-// fires for a missing owner bit and, on Windows, for an inherited DACL.
+// modeDriftLine names the mode deploy sets, not "too open": the predicate also
+// fires for a missing owner bit and, on Windows, for an inherited DACL. The
+// declared mode is a reference, not the target: a file tightened below it
+// converges to its narrowed form (deploy.ModeDrift).
 func modeDriftLine(name, dst string, mode os.FileMode) string {
-	return fmt.Sprintf("drift: %s — %s does not carry its declared mode %04o (run: dotf deploy %s)", name, dst, mode.Perm(), name)
+	return fmt.Sprintf("drift: %s — %s does not carry the mode dotf deploy sets (declared %04o) (run: dotf deploy %s)", name, dst, mode.Perm(), name)
 }
 
 // checkPrivateDeployDirs reports a directory that holds a private deployed file

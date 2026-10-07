@@ -346,11 +346,27 @@ func TestCheckDeployManifest_ModeDrift(t *testing.T) {
 		writeFile(t, p, `{"k":"rendered"}`)
 
 		out := runCheckDeployManifest(t, deployManifestRepo(t), home, nil)
-		if got := statusOfLine(out, "does not carry its declared mode 0600 (run: dotf deploy p)"); got != StatusWarn {
+		if got := statusOfLine(out, "(declared 0600) (run: dotf deploy p)"); got != StatusWarn {
 			t.Errorf("want WARN for the rendered mode drift, got %v\n%s", got, out)
 		}
 		if statusOfLine(out, "in sync") == StatusPass {
 			t.Errorf("a mode drift must not read as in sync:\n%s", out)
+		}
+	})
+
+	t.Run("rendered destination that is a symlink → WARN naming the link", func(t *testing.T) {
+		home := inSyncHome(t)
+		p := filepath.Join(home, ".p", "models.json")
+		target := filepath.Join(home, "real-models.json")
+		if err := os.Rename(p, target); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, p); err != nil {
+			t.Skipf("cannot create a symlink here: %v", err)
+		}
+		out := runCheckDeployManifest(t, deployManifestRepo(t), home, nil)
+		if got := statusOfLine(out, "models.json is a symlink"); got != StatusWarn {
+			t.Errorf("want WARN naming the link, got %v\n%s", got, out)
 		}
 	})
 
@@ -364,7 +380,7 @@ func TestCheckDeployManifest_ModeDrift(t *testing.T) {
 			t.Fatal(err)
 		}
 		out := runCheckDeployManifest(t, deployManifestRepo(t), home, nil)
-		if got := statusOfLine(out, "does not carry its declared mode 0644 (run: dotf deploy r)"); got != StatusWarn {
+		if got := statusOfLine(out, "(declared 0644) (run: dotf deploy r)"); got != StatusWarn {
 			t.Errorf("want WARN for the mode drift, got %v\n%s", got, out)
 		}
 	})
