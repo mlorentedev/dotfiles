@@ -80,7 +80,7 @@ func TestDeployCmd_NoArgInstallsEveryDeclaredConfig(t *testing.T) {
 		if _, err := os.Stat(dst); err != nil {
 			t.Errorf("config %q declared in the manifest was not installed at %s: %v", name, dst, err)
 		}
-		if !strings.Contains(out, "deployed  "+name) {
+		if !strings.Contains(out, row("deployed", name)) {
 			t.Errorf("stdout must report config %q as deployed, got:\n%s", name, out)
 		}
 	}
@@ -109,7 +109,7 @@ func TestDeployCmd_SkipsAnEntryForAnotherOS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("dotf deploy %v: %v\n%s", args, err, out)
 		}
-		if !strings.Contains(out, "skipped   elsewhere") || !strings.Contains(out, "not for "+runtime.GOOS) {
+		if !strings.Contains(out, row("skipped", "elsewhere")) || !strings.Contains(out, "not for "+runtime.GOOS) {
 			t.Errorf("dotf deploy %v must report the entry skipped for this OS:\n%s", args, out)
 		}
 		if _, err := os.Stat(filepath.Join(home, ".two")); err == nil {

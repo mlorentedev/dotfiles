@@ -13,13 +13,10 @@ package vault
 //     (tests/golden/vault-health/) stubs that binary on PATH and pins the exact
 //     argv this code sends it — not just stdout — because a port could drift in
 //     HOW it calls obsidian while stdout stayed byte-identical.
-//  2. A SUBPROCESS seam onto two sibling scripts, check-backlog-integrity.sh and
-//     check-backlog-merged.sh (SDD-012 / SDD-012b). They are EXECED, not ported:
-//     porting them is out of #490's three increments, and they survive the
-//     CLI-023 cutover as their own `vault` subcommands. A Go binary has no
-//     $SCRIPT_DIR, so ScriptsDir/BashPath are an explicit location seam
-//     (ADR-025) rather than a guess — and an unresolved seam FAILS the section
-//     rather than silently skipping it, per the spec.
+//  2. The Backlog Integrity section's two checks, check-backlog-integrity.sh
+//     and check-backlog-merged.sh (SDD-012 / SDD-012b), were exec'd through
+//     bash at first. They are ported in backlog.go (#492), so this file runs
+//     no shell at all.
 //
 // The shell is the oracle: every observable byte is pinned by the golden corpus
 // and reproduced faithfully, including its VAULT_DIR/VAULT_PATH/default
@@ -41,11 +38,9 @@ import (
 // resolved by the caller (the shell's own env-var cascade lives in the cmd
 // layer, mirroring how crystallize's path resolution lives there too).
 type HealthOptions struct {
-	VaultDir   string
-	VaultName  string
-	Verbose    bool
-	ScriptsDir string // hosts check-backlog-integrity.sh / check-backlog-merged.sh
-	BashPath   string // interpreter for the two backlog scripts (mem.ResolveBash())
+	VaultDir  string
+	VaultName string
+	Verbose   bool
 }
 
 // deletedLineRe mirrors `grep '^.D '`: git status --short's Y-column (unstaged
@@ -224,24 +219,6 @@ func (h *healthRun) frontmatterCounts(fields []string) map[string]int {
 	return counts
 }
 
-// runScript execs a backlog script through the resolved bash interpreter (the
-// Windows-safe convention session_start.go already uses for vault-health.sh
-// itself) rather than relying on the shebang + executable bit the shell
-// invokes directly — there is no .ps1 twin for either script to fall back to.
-func (h *healthRun) runScript(script, arg string) (string, int) {
-	cmd := exec.Command(h.opts.BashPath, script, arg)
-	out, err := cmd.Output()
-	code := 0
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			code = ee.ExitCode()
-		} else {
-			code = 1
-		}
-	}
-	return string(out), code
-}
-
 // printPrefixed mirrors `sed 's|^|<prefix>|'`: every line of s gets prefix
 // prepended, and empty input produces no output at all (not one empty line).
 func printPrefixed(w io.Writer, s, prefix string) {
@@ -405,17 +382,6 @@ func (h *healthRun) section6Tags() {
 	}
 }
 
-// resolveBacklogScripts locates the two sibling scripts under ScriptsDir. ok is
-// false when the seam cannot be satisfied — an empty ScriptsDir or either
-// script missing — which the caller turns into a loud section-wide FAIL rather
-// than a silent skip, per this file's seam #2.
-func (h *healthRun) resolveBacklogScripts() (integrity, merged string, ok bool) {
-	integrity = filepath.Join(h.opts.ScriptsDir, "check-backlog-integrity.sh")
-	merged = filepath.Join(h.opts.ScriptsDir, "check-backlog-merged.sh")
-	ok = h.opts.ScriptsDir != "" && fileExists(integrity) && fileExists(merged)
-	return integrity, merged, ok
-}
-
 // runIntegrityChecks is the FIRST of section 7's two passes. It returns
 // (code, true) the moment a file drifts — the ORACLE DEFECT (#1314): the shell
 // re-execs check-backlog-integrity.sh a SECOND time, piped straight into `sed`,
@@ -426,14 +392,20 @@ func (h *healthRun) resolveBacklogScripts() (integrity, merged string, ok bool) 
 // later file in this same loop, no merged-check pass, no closing footer.
 // Pinned by the backlog-drift golden, whose expected/stdout simply stops after
 // this file's detail. Not "fixed" here — see #1314.
-func (h *healthRun) runIntegrityChecks(matches []string, script string) (int, bool) {
+func (h *healthRun) runIntegrityChecks(matches []string) (int, bool) {
 	for _, tasks := range matches {
-		out, code := h.runScript(script, tasks)
-		if code != 0 {
+		out, drift, err := BacklogIntegrity(tasks)
+		if err != nil {
+			// The script printed nothing here and exited 2; the reason is
+			// what a reader needs, so the port says it.
+			h.fail("Backlog integrity: cannot read %s/11-tasks.md: %v", filepath.Base(filepath.Dir(tasks)), err)
+			return 2, true
+		}
+		if drift {
 			h.fail("Backlog drift in %s/11-tasks.md (duplicate IDs / status contradictions)",
 				filepath.Base(filepath.Dir(tasks)))
 			printPrefixed(h.w, out, "        ")
-			return code, true
+			return 1, true
 		}
 	}
 	h.pass("Backlog integrity: %d task file(s) clean (one ticket = one entry)", len(matches))
@@ -444,10 +416,14 @@ func (h *healthRun) runIntegrityChecks(matches []string, script string) (int, bo
 // ADVISORY (warn, never fail). It captures each script's output to a variable
 // before printing, so — unlike runIntegrityChecks above — it does NOT share
 // section 7's pipefail landmine: a captured string cannot fail a pipeline.
-func (h *healthRun) runMergedChecks(matches []string, script string) {
+func (h *healthRun) runMergedChecks(matches []string) {
 	for _, tasks := range matches {
-		out, code := h.runScript(script, tasks)
-		if code != 0 {
+		out, stale, err := BacklogMerged(tasks, "")
+		if err != nil {
+			h.warn("Stale-merged ticks: cannot read %s/11-tasks.md: %v", filepath.Base(filepath.Dir(tasks)), err)
+			continue
+		}
+		if stale {
 			h.warn("Stale-merged ticks in %s/11-tasks.md — work shipped, tick still [ ]:",
 				filepath.Base(filepath.Dir(tasks)))
 			printPrefixed(h.w, out, "        ")
@@ -476,17 +452,10 @@ func (h *healthRun) section7Backlog() (int, bool) {
 		return 0, false
 	}
 
-	integrityScript, mergedScript, ok := h.resolveBacklogScripts()
-	if !ok {
-		h.fail("Backlog integrity: cannot locate check-backlog-integrity.sh / check-backlog-merged.sh " +
-			"(scripts dir unresolved) — run from a dotfiles checkout or set DOTFILES_REPO_DIR")
-		return 0, false
-	}
-
-	if code, aborted := h.runIntegrityChecks(matches, integrityScript); aborted {
+	if code, aborted := h.runIntegrityChecks(matches); aborted {
 		return code, true
 	}
-	h.runMergedChecks(matches, mergedScript)
+	h.runMergedChecks(matches)
 	return 0, false
 }
 
