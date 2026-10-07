@@ -186,5 +186,9 @@ func TestVaultHealthWiring(t *testing.T) {
 		if want := "Vault: " + c.wantName + " (" + vaultDir + ")"; !strings.Contains(stdout, want) {
 			t.Errorf("%v: report lacks %q:\n%s", c.args, want, stdout)
 		}
+		// Exit 1 has other causes; this line names the abort the test is about.
+		if want := "Obsidian CLI not found in PATH"; !strings.Contains(stdout, want) {
+			t.Errorf("%v: exit 1 was not the obsidian-absent abort, report lacks %q:\n%s", c.args, want, stdout)
+		}
 	}
 }
