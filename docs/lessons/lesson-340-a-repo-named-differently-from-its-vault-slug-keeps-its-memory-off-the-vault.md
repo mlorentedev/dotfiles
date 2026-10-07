@@ -12,8 +12,9 @@ that repo had been running for a week.
 
 ## The Trap
 `memlink` resolved the vault memory as `10_projects/<repo basename>/memory`. With no project of
-that name, it returned nothing, `dotf doctor` reported SKIP ("no vault memory source"), and Claude
-Code created a real per-project memory directory. Nothing failed: sessions simply never loaded the
+that name, it returned nothing: on a fresh machine `dotf doctor` reports SKIP ("no vault memory
+source"), and Claude Code then creates a real per-project memory directory, which doctor only flags
+as a WARN if someone runs it. Nothing failed: sessions simply never loaded the
 vault handoff, and a feedback memory written there lived only on the local disk, so a workstation
 migration would have dropped it. Once that directory is non-empty, `Ensure` never replaces it, so a
 later fix to resolution alone would not have recovered the link.

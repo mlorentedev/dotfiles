@@ -126,6 +126,17 @@ func TestResolveVaultMemory_RepoURL(t *testing.T) {
 		}
 	})
 
+	t.Run("a trailing YAML comment on repo_url still matches", func(t *testing.T) {
+		vault := t.TempDir()
+		writeFile(t, filepath.Join(vault, "10_projects", "suite", "context.md"),
+			"---\nrepo_url: https://example.com/owner/tool.git  # canonical\n---\n")
+		want := filepath.Join(vault, "10_projects", "suite", "memory")
+		mkdirAll(t, want)
+		if got := resolveVaultMemory("/x/tool", "tool", vault); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
 	t.Run("repo_url outside the frontmatter is ignored", func(t *testing.T) {
 		vault := t.TempDir()
 		writeFile(t, filepath.Join(vault, "10_projects", "suite", "context.md"),
@@ -135,6 +146,24 @@ func TestResolveVaultMemory_RepoURL(t *testing.T) {
 			t.Errorf("got %q, want empty", got)
 		}
 	})
+}
+
+// What doctor reads for a repo named differently from its vault slug: repairable on
+// a fresh machine, the real-dir divergence once an agent has written there.
+func TestStatus_RepoURL(t *testing.T) {
+	vault := t.TempDir()
+	vaultProject(t, vault, "suite", "ssh://git@host:2222/owner/sensortool.git", true)
+
+	fresh := filepath.Join(t.TempDir(), "memory")
+	if got := Status("/x/sensortool", fresh, "", vault); got != StateRepairable {
+		t.Errorf("fresh target: got %v, want StateRepairable", got)
+	}
+
+	real := filepath.Join(t.TempDir(), "memory")
+	writeFile(t, filepath.Join(real, "agent-own.md"), "data")
+	if got := Status("/x/sensortool", real, "", vault); got != StateRealDir {
+		t.Errorf("real dir: got %v, want StateRealDir", got)
+	}
 }
 
 func TestEnsure_LinksByRepoURL(t *testing.T) {

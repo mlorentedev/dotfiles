@@ -144,8 +144,9 @@ func resolveVaultMemory(cwd, project, vault string) string {
 
 // resolveByRepoURL returns 10_projects/<slug>/memory for the single vault project
 // whose context.md frontmatter repo_url ends in repo (".git" optional). Two
-// projects claiming the same repo resolve to nothing: an unlinked memory dir is
-// reported by doctor, while a link into the wrong project would be silent.
+// projects claiming the same repo resolve to nothing rather than to a guess: doctor
+// reports SKIP until an agent writes a real memory dir there, then WARNs on it,
+// whereas a link into the wrong project would never be reported at all.
 func resolveByRepoURL(repo, vault string) string {
 	contexts, _ := filepath.Glob(filepath.Join(vault, "10_projects", "*", "context.md"))
 	match := ""
@@ -180,6 +181,7 @@ func repoURLName(path string) string {
 			return ""
 		}
 		if v, ok := strings.CutPrefix(line, "repo_url:"); ok {
+			v, _, _ = strings.Cut(v, " #") // a trailing YAML comment
 			url := strings.TrimSuffix(strings.Trim(strings.TrimSpace(v), `"'`), "/")
 			return strings.TrimSuffix(url[strings.LastIndexAny(url, "/:")+1:], ".git")
 		}
