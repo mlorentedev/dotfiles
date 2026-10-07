@@ -575,7 +575,7 @@ func checkInstructionDrift(sys *System, rep *Report) {
 		// Trailing newlines are not content either: the LF writer on Windows
 		// ends a file with exactly one, while a source may end with a blank
 		// line, and that alone read as drift on the CI runner (#1308).
-		if strings.TrimRight(harness.StripRegions(string(dc)), "\n") != strings.TrimRight(harness.StripRegions(string(sc)), "\n") {
+		if !harness.DeployedMatchesSource(string(dc), string(sc)) {
 			rep.Fail("stale: " + tgt.homeRel + " has drifted from " + tgt.repoRel + " (run: compile-harness.sh --deploy)")
 			drift++
 		}
@@ -616,7 +616,7 @@ func instructionsRemedy(goos string) string {
 	return "run: dotf converge"
 }
 
-// Harness marker-region delimiters, owned by package harness (StripRegions).
+// Harness marker-region delimiters, owned by package harness (DeployedMatchesSource).
 // TestHarnessMarkerConstants pins them against scripts/compile-harness.sh.
 const (
 	harnessBeginPrefix       = harness.GeneratedBeginPrefix

@@ -52,7 +52,8 @@ created: "2026-10-06"
 
 ### PR 2c — instruction files in Go, then the twins' copies go (F-064)
 
-- [ ] Port `deploy_instructions` to Go (`dotf harness instructions`): a deployed region is deploy-only only when its begin line is absent from the source, so a changed enforced GENERATED region in the source is drift (F-064); `records-harness` plans and probes with it
+- [x] PR 2c-1 (F-064): `harness.DeployedMatchesSource` replaces `StripRegions`. A deployed region is deploy-only only when its BEGIN line is absent from the source, so a refreshed enforced region in the source is drift on a stale deployed copy; `records-harness` (plan and probe) and doctor's instruction-drift check share it. Tests: `TestDeployedMatchesSource` (refreshed source region, text outside regions, lost source region, deploy-only regions, CRLF), `TestCheckInstructionDrift_ARefreshedSourceRegionIsDrift`
+- [ ] PR 2c-2: port `deploy_instructions` to Go (`dotf harness instructions`), writing each source and keeping its deploy-only regions
 - [ ] Gated on the release that ships the subcommand and the `DOTF_VERSION` bump (#1814 class): `compile-harness.sh` delegates `deploy_instructions` to it, and `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for it
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [ ] `records-bind`: the `harness bind` logic with its dry-run
