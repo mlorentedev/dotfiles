@@ -13,11 +13,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC2 (`./name`, `*name` checksum lines) -> T1a / test `TestExpectedChecksum_AcceptsSha256sumNameForms`
 - [x] AC3 (no asset is a skip, as the plan says) -> T1a / tests `TestInstall_NoAssetForThisPlatformIsSkippedNotFailed`, `TestPlanAndInstallAgreeOnAPlatformWithNoAsset`
 - [ ] AC4 -> T1b (after the release carrying T1a is the `DOTF_VERSION` pin)
-- [ ] AC5, AC6 -> T2
+- [x] AC5 (sync renders, installs, probes, is idempotent) -> T2 / tests `TestSync_*`, `TestParseMiseTools_*`, `TestToolsSync_*`; on the Mac, `dotf tools sync` installed six CLIs and a second run reported nothing to do
+- [ ] AC6 -> T2b
 
 ## Test status
 
 - Test suite (T1a, macOS arm64): `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./... -count=1` -> ok; `golangci-lint run` (2.12.2) -> 0 issues; features f1 to f3 -> PASS
+- Test suite (T2, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint -> 0 issues; bats suites that read versions.conf (versions-conf, versions-no-hardcode, ci-age-pin, check-doc-paths, version-gte, install-dotf, setup-linux) -> 140 ok, 4 failing that fail identically on `main` on this Mac (F-054/F-059 baseline)
+- Manual run (T2): `dotf tools sync` -> wrote `conf.d/dotfiles.toml`, installed age, direnv, fzf, jq, lazygit, zoxide, `9 tool(s) at their pin`; second run -> `nothing to do`; each tool's `--version` through `mise which` matches its pin
 - Manual smoke test (T1a): `go run ./cmd/dotf tools list` loads the repo catalog under the new key validation
 - No regressions: yes. `TestInstall_UnsupportedOS` asserted the opposite of AC3 (an error for a missing asset) and is replaced by the AC3 test
 
@@ -26,6 +29,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
 - T1 split into T1a (reader) and T1b (mise entry). An installed `dotf` 0.64 reads a GOOS/GOARCH-keyed entry as "no asset", and before T1a it returned an error for that, so `dotf tools install` would exit 1 on every machine until the pin moves (#1814 class).
+- T2 marks the mise pins with a `# mise: cli` comment on the line BEFORE each pin, not after the value: doctor's `parseVersionsConf`, the 0.64 binary installed on every machine and `setup-windows.ps1` would read a trailing comment as part of the version.
 - `docs/runbooks/tool-installation.md` was rewritten. It listed manual install commands, the debt AUDIT-009 flagged, and now documents the channels and how to add a catalog entry.
 
 ## Promotion candidates

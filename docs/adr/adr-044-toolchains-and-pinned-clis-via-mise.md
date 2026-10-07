@@ -85,3 +85,7 @@ Research for #2013 (epic comment *Toolchain research*) compared five managers ag
 - Epic #2013 (decisions D3, D7; rows T0 to T6, W2, W2b), ledger F-003, F-030, F-041, F-056.
 - ADR-020, ADR-036, ADR-041; lesson 337 (a checksum proves the bytes, not that they run here).
 - mise documentation: `mise.jdx.dev/dev-tools/mise-lock.html`, `/installing-mise.html`, `/dev-tools/backends/aqua.html`, `/lang/java.html`.
+
+## Clarification 2026-10-06 (PLAT-001c T2)
+
+A mise pin is an exact version, not a floor. `dotf tools sync` renders it into `~/.config/mise/conf.d/dotfiles.toml`, and mise activates exactly that version, which is also what the committed lock reproduces. This differs from ADR-036 decision 1, where catalog pins are floors that are never downgraded. An older version reaches a machine only when the pin is lowered in `versions.conf`, which is a reviewed change. mise reads a hand-written `~/.config/mise/config.toml` with precedence over `conf.d` (measured, mise 2026.10.3): a newer version pinned there is kept, and an older one makes the sync's post-condition fail, naming the tool.
