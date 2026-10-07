@@ -666,9 +666,14 @@ FIXTURE
     refute_grep 'cp .*ai/agy/AGY\.md' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'deploy_file .*\.geminiignore' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed "ai\agy\AGY.md" "$PS1_SCRIPT"
-    refute_grep_fixed 'Copy-Item $geminiIgnoreSrc' "$PS1_SCRIPT"
-    # AGY.md stays a pointer to AGENTS.md (SDD-007).
+    refute_grep 'Copy-Item[^#]*geminiignore' "$PS1_SCRIPT"
+    # The mechanism itself: each script runs a BARE `dotf deploy` (no config
+    # name), which is what installs every entry, these two included.
+    grep -qE '^\s*"\$_dotf" deploy\s*(\|\||$)' "$DOTFILES_DIR/setup-linux.sh"
+    grep -qE '^\s*& dotf deploy\s*$' "$PS1_SCRIPT"
+    # The sources exist and say what they must.
     grep -qF 'First, read `AGENTS.md`' "$DOTFILES_DIR/ai/agy/AGY.md"
+    grep -q '^sensitive/' "$DOTFILES_DIR/.geminiignore"
 }
 
 @test "setup-windows.ps1 has no stale 'CORE PRINCIPLE' verify-pattern references" {
