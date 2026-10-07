@@ -25,10 +25,11 @@
 package mem
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -38,14 +39,21 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
+// VaultHealthFunc writes the vault health report for vaultDir to w and returns
+// its exit code: 0 every check passed, 1 one failed, 2 the Obsidian GUI is
+// unreachable. An empty vaultDir or vaultName means the caller's default vault,
+// as `dotf vault health` resolves it. internal/cmd binds it to vault.RunHealth
+// in-process (CLI-023, which retired the bash run of scripts/vault-health.sh);
+// nil skips the section, which is what the hermetic tests pass.
+type VaultHealthFunc func(w io.Writer, vaultDir, vaultName string) (int, error)
+
 // BriefOptions configures the agnostic session-brief core. Now and StaleDays are
-// injected for deterministic staleness; ScriptsDir locates the sibling vault-health.sh
-// (injected in tests, resolved from the env-contract in production).
+// injected for deterministic staleness.
 type BriefOptions struct {
-	Cwd        string
-	ScriptsDir string
-	StaleDays  int
-	Now        time.Time
+	Cwd         string
+	VaultHealth VaultHealthFunc
+	StaleDays   int
+	Now         time.Time
 	// TriageQueue returns the compact list of pull requests awaiting a
 	// disposition, or an error when the question could not be answered. nil
 	// skips the section entirely — which is what the hermetic tests pass, and
@@ -54,7 +62,7 @@ type BriefOptions struct {
 	TriageQueue func() (string, error)
 }
 
-// ansiSeq strips the SGR colour codes vault-health.sh emits, matching the shell's
+// ansiSeq strips SGR colour codes from the health report, matching the shell's
 // `sed 's/\x1b\[[0-9;]*m//g'`.
 var ansiSeq = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
@@ -75,7 +83,7 @@ func Brief(opts BriefOptions) string {
 	}
 
 	brief := vaultDetect(vaultRoot)
-	brief += vaultHealth(vaultRoot, vaultName, opts.ScriptsDir)
+	brief += vaultHealth(vaultRoot, vaultName, opts.VaultHealth)
 	brief += specs(opts.Cwd)
 	brief += lessonsStaleness(opts.Cwd, staleDays, opts.Now)
 	if opts.TriageQueue != nil {
@@ -129,30 +137,19 @@ func vaultDetect(vaultRoot string) string {
 	return fmt.Sprintf("Obsidian vault detected: %s (%s)", filepath.Base(vaultRoot), vaultRoot)
 }
 
-// vaultHealth runs vault-health.sh and formats the GUI-down / pass / fail /
-// not-installed cases with a single leading newline — the shell's sb_vault_health.
-func vaultHealth(vaultRoot, vaultName, scriptsDir string) string {
-	script := filepath.Join(scriptsDir, "vault-health.sh")
-	if !isExecutable(script) {
-		return fmt.Sprintf("\nvault-health.sh not found at %s — run dotfiles setup to install.", script)
+// vaultHealth runs the health report and formats the GUI-down / pass / fail
+// cases with a single leading newline — the shell's sb_vault_health. Empty when
+// no runner is wired.
+func vaultHealth(vaultRoot, vaultName string, run VaultHealthFunc) string {
+	if run == nil {
+		return ""
 	}
-
-	// `bash <script>` (no `-c`): the script path is a trusted env-contract location,
-	// not user input, and is passed as an argv element, so there is no shell-metachar
-	// injection surface. This is the faithful port of the shell's `bash "$vault_health"`.
-	// ResolveBash, not a bare "bash", so Windows does not pick System32's WSL launcher.
-	cmd := exec.Command(ResolveBash(), script)
-	cmd.Env = append(os.Environ(), "VAULT_DIR="+vaultRoot, "VAULT_NAME="+vaultName)
-	out, err := cmd.CombinedOutput()
-	healthExit := 0
+	var out bytes.Buffer
+	healthExit, err := run(&out, vaultRoot, vaultName)
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			healthExit = ee.ExitCode()
-		} else {
-			healthExit = -1 // bash unavailable / spawn failure
-		}
+		return fmt.Sprintf("\nVault health: could not run: %v", err)
 	}
-	clean := ansiSeq.ReplaceAllString(string(out), "")
+	clean := ansiSeq.ReplaceAllString(out.String(), "")
 
 	switch healthExit {
 	case 2:
@@ -161,7 +158,7 @@ func vaultHealth(vaultRoot, vaultName, scriptsDir string) string {
 		if fails := grepLines(clean, func(l string) bool { return strings.Contains(l, "FAIL") }); fails != "" {
 			return fmt.Sprintf("\nObsidian GUI not running — GUI-dependent checks skipped. Integrity issues found:\n%s", fails)
 		}
-		return "\nObsidian GUI not running — vault health skipped. Run 'vault-health.sh' manually when GUI is up."
+		return "\nObsidian GUI not running — vault health skipped. Run 'dotf vault health' manually when GUI is up."
 	case 0:
 		return "\nVault health: ALL CHECKS PASSED"
 	default:
@@ -332,9 +329,8 @@ func isExecutable(path string) bool {
 	return info.Mode()&0o111 != 0
 }
 
-// ResolveBash returns the bash interpreter used to run vault-health.sh (and,
-// via internal/vault's `dotf vault health` port, its two backlog-script
-// exec seams — CLI-021 increment 2). It deliberately avoids Windows'
+// ResolveBash returns the bash interpreter for the two backlog-script exec
+// seams of internal/vault's health report (CLI-021 increment 2). It deliberately avoids Windows'
 // System32\bash.exe — that path is the WSL launcher, which is a broken
 // stub when no distro is installed (it fails with "execvpe(/bin/bash) failed") and, even
 // when WSL works, cannot read a Windows-path script argument (WSL sees /mnt/c/...).

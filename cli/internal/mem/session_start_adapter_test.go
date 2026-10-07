@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,7 +55,7 @@ func TestClaudeContextRecognizesLinkedWorktreeFromRootAndSubdirectory(t *testing
 	mustMkdirAll(t, filepath.Join(vault, "10_projects", "dotfiles"))
 	for _, cwd := range []string{worktree, filepath.Join(worktree, "cli")} {
 		ctx := ClaudeContext(ClaudeContextInput{
-			Cwd: cwd, Vault: vault, ScriptsDir: filepath.Join(t.TempDir(), "absent"),
+			Cwd: cwd, Vault: vault,
 			Home: t.TempDir(), Now: time.Now(),
 			TriageQueue: func() (string, error) { return "#1085", nil },
 		})
@@ -84,7 +85,7 @@ func TestClaudeContextRecognizesSymlinkToCheckoutSubdirectory(t *testing.T) {
 	mustMkdirAll(t, filepath.Join(vault, "10_projects", "dotfiles"))
 
 	ctx := ClaudeContext(ClaudeContextInput{
-		Cwd: link, Vault: vault, ScriptsDir: filepath.Join(t.TempDir(), "absent"),
+		Cwd: link, Vault: vault,
 		Home: t.TempDir(), Now: time.Now(),
 	})
 	if !strings.Contains(ctx, "[hive] Project 'dotfiles'") {
@@ -142,18 +143,18 @@ func TestCheckoutProjectNameHandlesSubmoduleAndBareWorktreePointers(t *testing.T
 
 func TestClaudeContextAssembly(t *testing.T) {
 	now := time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC)
-	scriptsNoHealth := filepath.Join(t.TempDir(), "noscripts") // vault-health.sh absent
+	passed := func(io.Writer, string, string) (int, error) { return 0, nil }
 
 	t.Run("sdd reminder is always first; bare CWD appends only health", func(t *testing.T) {
 		ctx := ClaudeContext(ClaudeContextInput{
-			Cwd: t.TempDir(), Vault: t.TempDir(), ScriptsDir: scriptsNoHealth,
+			Cwd: t.TempDir(), Vault: t.TempDir(), VaultHealth: passed,
 			Home: t.TempDir(), Now: now,
 		})
 		if !strings.HasPrefix(ctx, sddReminder) {
 			t.Errorf("ctx must start with the [sdd] reminder, got: %q", ctx[:min(80, len(ctx))])
 		}
-		if !strings.Contains(ctx, "vault-health.sh not found") {
-			t.Errorf("expected the health 'not found' line, got: %q", ctx)
+		if !strings.Contains(ctx, "Vault health: ALL CHECKS PASSED") {
+			t.Errorf("expected the health line, got: %q", ctx)
 		}
 	})
 
@@ -161,7 +162,7 @@ func TestClaudeContextAssembly(t *testing.T) {
 		vaultCwd := t.TempDir()
 		mustMkdirAll(t, filepath.Join(vaultCwd, ".obsidian"))
 		ctx := ClaudeContext(ClaudeContextInput{
-			Cwd: vaultCwd, Vault: t.TempDir(), ScriptsDir: scriptsNoHealth,
+			Cwd: vaultCwd, Vault: t.TempDir(), VaultHealth: passed,
 			Home: t.TempDir(), Now: now,
 		})
 		if !strings.HasPrefix(ctx, "Obsidian vault detected:") {
@@ -174,7 +175,7 @@ func TestClaudeContextAssembly(t *testing.T) {
 
 	t.Run("doctor-drift is gated off without a contract", func(t *testing.T) {
 		ctx := ClaudeContext(ClaudeContextInput{
-			Cwd: t.TempDir(), Vault: t.TempDir(), ScriptsDir: scriptsNoHealth, Home: t.TempDir(),
+			Cwd: t.TempDir(), Vault: t.TempDir(), VaultHealth: passed, Home: t.TempDir(),
 			ContractPath: filepath.Join(t.TempDir(), "absent.json"),
 			DoctorQuick:  func() string { return "  [WARN] should not appear" },
 			Now:          now,

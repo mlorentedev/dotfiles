@@ -147,7 +147,7 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 		cwd, _ = os.Getwd()
 	}
 	brief := mem.Brief(mem.BriefOptions{
-		Cwd: cwd, ScriptsDir: memScriptsDir(), StaleDays: 14, Now: time.Now(),
+		Cwd: cwd, VaultHealth: memVaultHealth, StaleDays: 14, Now: time.Now(),
 		// The file-based agents get the same probe as the Claude hook. Wiring it
 		// on one path only would rebuild the asymmetry this CLI exists to remove:
 		// opencode, agy and copilot read this brief, and a triage loop that only
@@ -174,7 +174,7 @@ func runClaudeHook(cmd *cobra.Command) error {
 	ctx := mem.ClaudeContext(mem.ClaudeContextInput{
 		Cwd:          cwd,
 		Vault:        vault.ResolveVault(),
-		ScriptsDir:   memScriptsDir(),
+		VaultHealth:  memVaultHealth,
 		Home:         home,
 		ContractPath: filepath.Join(env.DotfilesDir(home), "env-contract.json"),
 		ClaudeJSON:   filepath.Join(home, ".claude", ".claude.json"),
@@ -252,10 +252,22 @@ func memRepoDir() string {
 	return env.RepoDir()
 }
 
-// memScriptsDir locates the scripts/ dir hosting the sibling vault-health.sh —
-// the Go equivalent of session-brief.sh's $(dirname "$0") sibling lookup. ""
-// when unresolved, which makes vaultHealth emit the same "not found" line the
-// shell does.
+// memVaultHealth is the session brief's vault health section: vault.RunHealth
+// in-process, resolved as `dotf vault health` resolves it (healthOptions), with
+// the vault detected from the session's cwd taking precedence. It replaced a
+// bash run of scripts/vault-health.sh (CLI-023), so the banner and the
+// command now report from the same code.
+func memVaultHealth(w io.Writer, vaultDir, vaultName string) (int, error) {
+	opts := healthOptions(vaultName, false)
+	if vaultDir != "" {
+		opts.VaultDir = vaultDir
+	}
+	return vault.RunHealth(w, opts)
+}
+
+// memScriptsDir locates the checkout's scripts/ dir, which hosts the two
+// backlog scripts the health report's last section runs. "" when unresolved;
+// that section then reports the unresolved dir as a FAIL.
 func memScriptsDir() string {
 	repo := memRepoDir()
 	if repo == "" {
