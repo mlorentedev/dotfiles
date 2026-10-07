@@ -178,7 +178,7 @@ func (in *Installer) Install(t Tool) (Result, error) {
 		// heard of. Failing would turn every sync red on a machine that cannot
 		// have the new dotf yet; skipping says so and keeps the other tools
 		// converging. Plan still reports it unsupported, so the two agree.
-		_, _ = fmt.Fprintf(in.Out, "warning: %s: source type %q is not known to this dotf; skipping (upgrade dotf to install it)\n", t.Name, t.Source.Type)
+		_, _ = fmt.Fprintf(in.Out, "warning: %s: %s; skipping (upgrade dotf to install it)\n", t.Name, unknownTypeNote(t))
 		return Skipped, nil
 	}
 }
@@ -201,6 +201,15 @@ const (
 type Plan struct {
 	Name, Installed, Pin string
 	Action               PlanAction
+	// Note says why a skip is not "already installed": the source type this
+	// dotf does not know.
+	Note string
+}
+
+// unknownTypeNote is the words for a source type this dotf cannot read, shared
+// by Install's warning and Plan's note.
+func unknownTypeNote(t Tool) string {
+	return fmt.Sprintf("source type %q is not known to this dotf", t.Source.Type)
 }
 
 // Plan reports what Install would do for t. It runs the same probe and the same
@@ -225,7 +234,10 @@ func (in *Installer) Plan(t Tool) Plan {
 		return in.planSystem(p, t)
 	case "npm", "uv-tool":
 	default:
-		p.Action = PlanUnsupported
+		// What Install does: a skip with a warning. Same words, so a dry run
+		// does not call unsupported what the apply merely skips.
+		p.Action = PlanSkip
+		p.Note = unknownTypeNote(t)
 		return p
 	}
 	action := decideAction(p.Installed, t.Version)

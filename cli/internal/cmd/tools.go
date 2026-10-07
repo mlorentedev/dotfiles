@@ -101,7 +101,11 @@ func planToolsInstall(in *tools.Installer, cat tools.Catalog, name string, out i
 		if pin == "" {
 			pin = "-" // a system package has no pin, and an empty cell would shift the row
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Name, installed, pin, p.Action)
+		action := string(p.Action)
+		if p.Note != "" {
+			action += " (" + p.Note + ")"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Name, installed, pin, action)
 	}
 	return w.Flush()
 }

@@ -73,14 +73,17 @@ func (in *Installer) managerLists(manager, pkg string) bool {
 }
 
 // systemInstallArgv is the command that installs pkg through manager. apt needs
-// root: run directly as root, through sudo otherwise (setup scripts avoid sudo
-// and ask the user to run it once; here the caller asked dotf to install).
+// root: run directly as root, through `sudo -n` otherwise. -n makes sudo fail
+// instead of asking for a password, so a run with no terminal (a scheduled
+// converge, CI) never hangs on a prompt; dotf neither caches credentials nor
+// prompts for one. The setup scripts avoid sudo and ask the user to run it
+// once, which is what installSystem falls back to when sudo needs a password.
 func (in *Installer) systemInstallArgv(manager, pkg string) []string {
 	switch manager {
 	case "apt":
 		argv := []string{"apt-get", "install", "-y", pkg}
 		if !in.IsRoot() {
-			argv = append([]string{"sudo"}, argv...)
+			argv = append([]string{"sudo", "-n"}, argv...)
 		}
 		return argv
 	case "brew":
@@ -133,6 +136,13 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	}
 	argv := in.systemInstallArgv(manager, pkg)
 	if err := in.Run(argv[0], argv[1:]...); err != nil {
+		if in.needsSudoPassword(argv) {
+			// A named outcome, not a failure: nothing is wrong with the entry
+			// or the machine, only the privilege dotf may not ask for. It says
+			// what to run, and the other tools still converge.
+			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, strings.Join(append([]string{"sudo"}, argv[2:]...), " "))
+			return Skipped, nil
+		}
 		return Skipped, fmt.Errorf("%s: %s: %w", t.Name, strings.Join(argv, " "), err)
 	}
 	if in.systemInstalled(t) == "" {
@@ -140,4 +150,20 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s installed via %s (%s)\n", t.Name, manager, pkg)
 	return Installed, nil
+}
+
+// needsSudoPassword reports whether a failed install failed because sudo wanted
+// a password. sudo -n exits 1 for that and for any other failure of the command,
+// so the failure is classified by asking sudo again with a command that cannot
+// fail for another reason: `sudo -n true` fails only when sudo itself refuses.
+func (in *Installer) needsSudoPassword(argv []string) bool {
+	if len(argv) < 2 || argv[0] != "sudo" || argv[1] != "-n" {
+		return false
+	}
+	query := in.Query
+	if query == nil {
+		query = ExecRunner
+	}
+	_, err := query("sudo", "-n", "true")
+	return err != nil
 }

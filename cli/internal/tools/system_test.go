@@ -22,6 +22,7 @@ type world struct {
 	root      bool
 	ran       [][]string
 	failRun   error // returned by Run
+	sudoOK    bool  // `sudo -n true` succeeds, so sudo itself is not what refused
 	noEffect  bool  // Run exits 0 but installs nothing
 	queries   [][]string
 	out       strings.Builder
@@ -50,6 +51,11 @@ func (w *world) installer(goos string) *Installer {
 					return []byte("install ok installed"), nil
 				}
 				return []byte("deinstall ok config-files"), fmt.Errorf("exit 1") // removed, config left
+			case "sudo":
+				if w.sudoOK {
+					return nil, nil
+				}
+				return []byte("sudo: a password is required"), fmt.Errorf("exit 1")
 			case "brew":
 				pkg = args[len(args)-1]
 				if w.installed[pkg] {
@@ -98,7 +104,7 @@ func TestInstallSystem_ArgvPerManager(t *testing.T) {
 		managers   []string
 		want       string
 	}{
-		{"apt through sudo", "linux", false, []string{"apt-get", "sudo"}, "sudo apt-get install -y gh"},
+		{"apt through sudo -n, which never prompts", "linux", false, []string{"apt-get", "sudo"}, "sudo -n apt-get install -y gh"},
 		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"}, "apt-get install -y gh"},
 		{"brew", "darwin", false, []string{"brew"}, "brew install gh"},
 		{"winget names the id, exact match, and both agreements", "windows", false, []string{"winget"},
@@ -273,7 +279,43 @@ func TestInstall_UnknownSourceTypeIsSkippedNotFailed(t *testing.T) {
 	if !strings.Contains(out.String(), "flatpak") || !strings.Contains(out.String(), "skipping") {
 		t.Errorf("the warning must name the type and say it skips, got %q", out.String())
 	}
-	if p := in.Plan(tool); p.Action != PlanUnsupported {
-		t.Errorf("Plan = %q, want %q", p.Action, PlanUnsupported)
+	// The plan says what the apply does: a skip, in the same words.
+	p := in.Plan(tool)
+	if p.Action != PlanSkip || !strings.Contains(p.Note, `source type "flatpak" is not known to this dotf`) {
+		t.Errorf("Plan = %+v, want a skip noting the unknown type", p)
+	}
+	if !strings.Contains(out.String(), p.Note) {
+		t.Errorf("Install's warning %q does not carry the plan's note %q", out.String(), p.Note)
+	}
+}
+
+// sudo -n is the only escalation: it fails instead of prompting. When it fails
+// because a password is needed, that is its own outcome (a skip naming the exact
+// command to run), and the tools after it still converge.
+func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
+	w := newWorld("apt-get", "sudo")
+	w.failRun = fmt.Errorf("exit status 1") // sudo -n refused; w.sudoOK stays false
+	in := w.installer("linux")
+	res, err := in.Install(ghTool())
+	if err != nil || res != Skipped {
+		t.Fatalf("Install = %v, %v; want Skipped, nil", res, err)
+	}
+	if want := "gh: needs sudo; run: sudo apt-get install -y gh"; !strings.Contains(w.out.String(), want) {
+		t.Errorf("output %q lacks %q", w.out.String(), want)
+	}
+	if len(w.ran) != 1 || w.ran[0][1] != "-n" {
+		t.Errorf("ran %v, want one `sudo -n` attempt and no prompt", w.ran)
+	}
+}
+
+// A failure that is not sudo's refusal stays an error, so needs-sudo cannot
+// hide a broken install.
+func TestInstallSystem_AptFailureWithWorkingSudoIsAnError(t *testing.T) {
+	w := newWorld("apt-get", "sudo")
+	w.sudoOK = true
+	w.failRun = fmt.Errorf("exit status 100")
+	_, err := w.installer("linux").Install(ghTool())
+	if err == nil || !strings.Contains(err.Error(), "sudo -n apt-get install -y gh") {
+		t.Errorf("want an error carrying the command, got %v", err)
 	}
 }

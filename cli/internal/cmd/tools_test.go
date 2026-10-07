@@ -237,6 +237,7 @@ func TestPlanToolsInstall_SystemRows(t *testing.T) {
 	cat := tools.Catalog{Tools: []tools.Tool{
 		{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh", Brew: "gh"}},
 		{Name: "tmux", Source: tools.Source{Type: "system", Apt: "tmux"}},
+		{Name: "future", Version: "1.0.0", Source: tools.Source{Type: "flatpak"}},
 	}}
 	in := &tools.Installer{
 		GOOS: "linux", GOARCH: "amd64", Dest: t.TempDir(), Out: io.Discard,
@@ -257,7 +258,8 @@ func TestPlanToolsInstall_SystemRows(t *testing.T) {
 	if err := planToolsInstall(in, cat, "", &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, row := range []string{`(?m)^gh\s+absent\s+-\s+install\s*$`, `(?m)^tmux\s+present\s+-\s+skip\s*$`} {
+	for _, row := range []string{`(?m)^gh\s+absent\s+-\s+install\s*$`, `(?m)^tmux\s+present\s+-\s+skip\s*$`,
+		`(?m)^future\s+absent\s+1\.0\.0\s+skip \(source type "flatpak" is not known to this dotf\)$`} {
 		if !regexp.MustCompile(row).MatchString(out.String()) {
 			t.Errorf("no row matching %s in\n%s", row, out.String())
 		}
@@ -294,5 +296,37 @@ func TestInstallAll_UnknownTypeDoesNotFailTheRun(t *testing.T) {
 	}
 	if len(ran) != 1 || !strings.HasPrefix(ran[0], "npm install -g @bitwarden/cli@2026.5.0") {
 		t.Errorf("the tool after the unknown type did not install: ran %v", ran)
+	}
+}
+
+// A package that needs a sudo password is reported and does not stop, or fail,
+// the tools after it.
+func TestInstallAll_NeedsSudoDoesNotFailTheRun(t *testing.T) {
+	var out strings.Builder
+	var ran [][]string
+	in := &tools.Installer{
+		GOOS: "linux", GOARCH: "amd64", Dest: t.TempDir(), Out: &out,
+		HasCommand: func(string) bool { return true },
+		IsRoot:     func() bool { return false },
+		Query:      func(string, ...string) ([]byte, error) { return nil, fmt.Errorf("a password is required") },
+		Run: func(name string, args ...string) error {
+			ran = append(ran, append([]string{name}, args...))
+			return fmt.Errorf("exit status 1")
+		},
+	}
+	selected := []tools.Tool{
+		{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh"}},
+		{Name: "tmux", Source: tools.Source{Type: "system", Apt: "tmux"}},
+	}
+	if err := installAll(in, selected, io.Discard); err != nil {
+		t.Fatalf("installAll: %v", err)
+	}
+	if len(ran) != 2 || ran[0][1] != "-n" || ran[1][1] != "-n" {
+		t.Errorf("want both tools attempted with sudo -n, ran %v", ran)
+	}
+	for _, want := range []string{"gh: needs sudo; run: sudo apt-get install -y gh", "tmux: needs sudo; run: sudo apt-get install -y tmux"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out.String())
+		}
 	}
 }

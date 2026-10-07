@@ -389,7 +389,7 @@ func TestInstallerPlan(t *testing.T) {
 		{"above the pin is never downgraded", "linux", "3.14.0", release, PlanSkip},
 		{"no build for this platform", "windows", "", release, PlanUnsupported},
 		{"no build for this platform, but installed: the probe still runs", "windows", "3.13.1", release, PlanUnsupported},
-		{"a source type Install skips with a warning", "linux", "", Tool{Name: "x", Version: "1.0.0", Source: Source{Type: "homebrew"}}, PlanUnsupported},
+		{"a source type Install skips with a warning", "linux", "", Tool{Name: "x", Version: "1.0.0", Source: Source{Type: "homebrew"}}, PlanSkip},
 		{"npm below the pin", "linux", "2026.1.0", npm, PlanUpgrade},
 		{"uv-tool below the pin", "linux", "4.1.0", hiveTool(), PlanUpgrade},
 		{"uv-tool at the pin", "darwin", "4.2.2", hiveTool(), PlanSkip},

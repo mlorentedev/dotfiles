@@ -66,7 +66,7 @@ One PR per row of #2013 track T (Wave 1, CLIs only):
 - [ ] AC4: `dotf tools install mise` installs the pinned mise on linux, darwin and windows, checksum-verified and exec-probed.
 - [ ] AC5: `dotf tools sync` renders `conf.d/dotfiles.toml` from `versions.conf`, installs, and fails naming any tool that does not run at or above its pin; a second run changes nothing.
 - [ ] AC6: `dotf converge` runs the tools step after the records step, and `--plan` reports the tools it would install.
-- [ ] AC7: a `system` entry is installed through the OS manager (`sudo apt-get install -y`, `brew install`, `winget install --id <id> -e` with both agreement flags), skipped with a message on an OS whose manager it does not name, and a second run runs no manager command.
+- [ ] AC7: a `system` entry is installed through the OS manager (`sudo -n apt-get install -y`, `brew install`, `winget install --id <id> -e` with both agreement flags), skipped with a message on an OS whose manager it does not name, a sudo password is reported as "needs sudo" with the command to run and does not fail the run, and a second run runs no manager command.
 - [ ] AC8: `Load` rejects a `system` entry that names no manager, names an unknown key, or declares a `version`, naming the entry; `Install` skips a source type it does not know instead of failing.
 
 ## References
