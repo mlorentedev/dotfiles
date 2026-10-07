@@ -519,17 +519,17 @@ func checkDeployedDoctrine(sys *System, cfg *Config, rep *Report) {
 }
 
 // deployedInstructionTargets mirrors harness/manifest.json's agents.presence[]
-// (file/source/requires_command) — the four instruction files
+// (agent/file/source/requires_command) — the four instruction files
 // compile-harness.sh --deploy copies verbatim (HARNESS-058/#828). Kept here
 // rather than parsed from the manifest because the doctor binary must run
 // with no repo/vault present at all; the manifest is only reachable once a
 // repo IS found, at which point this list and the manifest are asserted in
 // sync by TestCheckInstructionDrift_MatchesManifest.
-var deployedInstructionTargets = []struct{ homeRel, repoRel, requiresCommand string }{
-	{".claude/CLAUDE.md", "ai/claude/CLAUDE.md", ""},
-	{".config/opencode/AGENTS.md", "AGENTS.md", ""},
-	{".pi/agent/AGENTS.md", "AGENTS.md", ""},
-	{".copilot/copilot-instructions.md", "ai/copilot/copilot-instructions.md", "copilot"},
+var deployedInstructionTargets = []struct{ agent, homeRel, repoRel, requiresCommand string }{
+	{"claude", ".claude/CLAUDE.md", "ai/claude/CLAUDE.md", ""},
+	{"opencode", ".config/opencode/AGENTS.md", "AGENTS.md", ""},
+	{"pi", ".pi/agent/AGENTS.md", "AGENTS.md", ""},
+	{"copilot", ".copilot/copilot-instructions.md", "ai/copilot/copilot-instructions.md", "copilot"},
 }
 
 // checkInstructionDrift reports (AC2 of HARNESS-058/#828) a deployed
@@ -562,8 +562,18 @@ func checkInstructionDrift(sys *System, rep *Report) {
 		}
 		deployed := filepath.Join(home, filepath.FromSlash(tgt.homeRel))
 		source := filepath.Join(repo, filepath.FromSlash(tgt.repoRel))
-		if !pathExists(deployed) || !pathExists(source) {
-			continue // not deployed here — not drift
+		if !pathExists(source) {
+			continue
+		}
+		if !pathExists(deployed) {
+			// An installed agent without its instructions runs on its harness
+			// defaults (F-060, #2016); an agent that is not installed is not
+			// drift.
+			if sys.has(tgt.agent) {
+				rep.Fail(tgt.agent + " is installed but " + tgt.homeRel + " is missing (run: dotf converge)")
+				drift++
+			}
+			continue
 		}
 		dc, err1 := os.ReadFile(deployed)
 		sc, err2 := os.ReadFile(source)
@@ -574,7 +584,7 @@ func checkInstructionDrift(sys *System, rep *Report) {
 		// Trailing newlines are not content either: the LF writer on Windows
 		// ends a file with exactly one, while a source may end with a blank
 		// line, and that alone read as drift on the CI runner (#1308).
-		if strings.TrimRight(stripHarnessRegions(string(dc)), "\n") != strings.TrimRight(stripHarnessRegions(string(sc)), "\n") {
+		if strings.TrimRight(harness.StripRegions(string(dc)), "\n") != strings.TrimRight(harness.StripRegions(string(sc)), "\n") {
 			rep.Fail("stale: " + tgt.homeRel + " has drifted from " + tgt.repoRel + " (run: compile-harness.sh --deploy)")
 			drift++
 		}
@@ -588,67 +598,14 @@ func checkInstructionDrift(sys *System, rep *Report) {
 	}
 }
 
-// Harness marker-region delimiters. The GENERATED pair mirrors
-// scripts/compile-harness.sh's BEGIN_PREFIX/END_MARKER (the shell still writes
-// that region); the AGENT-PRESENCE pair is the harness package's, which has
-// owned the presence region since HARNESS-092 (#1326) — the shell no longer
-// spells it. TestHarnessMarkerConstants pins both facts.
+// Harness marker-region delimiters, owned by package harness (StripRegions).
+// TestHarnessMarkerConstants pins them against scripts/compile-harness.sh.
 const (
-	harnessBeginPrefix       = "<!-- BEGIN HARNESS GENERATED"
-	harnessEndMarker         = "<!-- END HARNESS GENERATED -->"
+	harnessBeginPrefix       = harness.GeneratedBeginPrefix
+	harnessEndMarker         = harness.GeneratedEndMarker
 	agentPresenceBeginPrefix = harness.PresenceBeginPrefix
 	agentPresenceEndMarker   = harness.PresenceEndMarker
 )
-
-// stripHarnessRegions removes every harness-managed marker region (both the
-// GENERATED and AGENT-PRESENCE kinds) from content, mirroring
-// compile-harness.sh's region_content in reverse (strip instead of extract).
-//
-// Also drops the single blank line immediately preceding a BEGIN marker:
-// both inject_agent_presence and replace_region's append branch write a
-// region as "\n" + BEGIN + body + END + "\n" (compile-harness.sh), so an
-// appended region always leaves that blank separator behind in the deployed
-// file with nothing to match it in the un-appended repo source. Without
-// dropping it, checkInstructionDrift reported drift on every target
-// immediately after a clean --deploy — caught in review before merge.
-//
-// Line endings are normalised first. A deployed copy written by a Windows
-// tool arrives CRLF while the repo source is LF (`.gitattributes` `*.md
-// eol=lf`), and with a bare "\n" split every line kept a trailing "\r": the
-// END marker never matched, so the strip swallowed the rest of the file, and
-// every other line differed anyway — a drift FAIL no redeploy could clear
-// (WIN-008/#1289). EOL is not content; the writer is fixed separately, and
-// this keeps the comparator honest about the next writer that is not.
-func stripHarnessRegions(content string) string {
-	content = strings.ReplaceAll(content, "\r\n", "\n")
-	lines := strings.Split(content, "\n")
-	out := make([]string, 0, len(lines))
-	skip, endMarker := false, ""
-	dropPrecedingBlank := func() {
-		if n := len(out); n > 0 && out[n-1] == "" {
-			out = out[:n-1]
-		}
-	}
-	for _, l := range lines {
-		if skip {
-			if l == endMarker {
-				skip = false
-			}
-			continue
-		}
-		switch {
-		case strings.HasPrefix(l, harnessBeginPrefix):
-			dropPrecedingBlank()
-			skip, endMarker = true, harnessEndMarker
-		case strings.HasPrefix(l, agentPresenceBeginPrefix):
-			dropPrecedingBlank()
-			skip, endMarker = true, agentPresenceEndMarker
-		default:
-			out = append(out, l)
-		}
-	}
-	return strings.Join(out, "\n")
-}
 
 // checkHarnessMirrorOrphans detects harness/{skills,agents} records present in
 // the deploy mirror (cfg.DotfilesDir) with no counterpart in the repo — the gap

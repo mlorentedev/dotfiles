@@ -11,78 +11,6 @@ import (
 	"testing"
 )
 
-func TestStripHarnessRegions(t *testing.T) {
-	cases := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{
-			name: "no markers -> unchanged",
-			in:   "line1\nline2\n",
-			want: "line1\nline2\n",
-		},
-		{
-			name: "strips a GENERATED region",
-			in: "before\n" +
-				"<!-- BEGIN HARNESS GENERATED (sha256:abc) -->\n" +
-				"injected content\n" +
-				"<!-- END HARNESS GENERATED -->\n" +
-				"after\n",
-			want: "before\nafter\n",
-		},
-		{
-			name: "strips an AGENT-PRESENCE region",
-			in: "before\n" +
-				"<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:abc) -->\n" +
-				"persona block\n" +
-				"<!-- END HARNESS AGENT-PRESENCE -->\n" +
-				"after\n",
-			want: "before\nafter\n",
-		},
-		{
-			name: "strips both region kinds, order-independent",
-			in: "head\n" +
-				"<!-- BEGIN HARNESS GENERATED (sha256:x) -->\nA\n<!-- END HARNESS GENERATED -->\n" +
-				"mid\n" +
-				"<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:y) -->\nB\n<!-- END HARNESS AGENT-PRESENCE -->\n" +
-				"tail\n",
-			want: "head\nmid\ntail\n",
-		},
-		{
-			// inject_agent_presence / replace_region's append branch write a
-			// region as "\n" + BEGIN + body + END + "\n" onto untouched
-			// content -- the blank line right before BEGIN must not survive
-			// the strip, or a freshly-appended region reads as drift forever.
-			name: "drops the blank separator line an appended region leaves behind",
-			in:   "shared content\n" + "\n<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:abc) -->\npersona\n<!-- END HARNESS AGENT-PRESENCE -->\n",
-			want: "shared content\n",
-		},
-		{
-			name: "a genuine blank line NOT before a region is preserved",
-			in:   "para one\n\npara two\n",
-			want: "para one\n\npara two\n",
-		},
-		{
-			// A deployed copy written CRLF by a Windows tool (WIN-008/#1289):
-			// the END marker must still close the region — a "\r"-suffixed
-			// marker used to leave skip mode on to EOF — and no "\r" survives
-			// into the comparison.
-			name: "CRLF input: the region closes and line endings normalise",
-			in:   "before\r\n<!-- BEGIN HARNESS GENERATED (sha256:abc) -->\r\ninjected\r\n<!-- END HARNESS GENERATED -->\r\nafter\r\n",
-			want: "before\nafter\n",
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := stripHarnessRegions(tc.in)
-			if got != tc.want {
-				t.Errorf("stripHarnessRegions(%q) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
-	}
-}
-
 // TestCheckInstructionDrift drives AC4/#828: a deployed instruction file that
 // has drifted from its repo source is reported, and the injected
 // AGENT-PRESENCE region alone (added post-copy by --deploy) must not
@@ -162,7 +90,7 @@ func TestCheckInstructionDrift(t *testing.T) {
 			// Faithful to inject_agent_presence's actual append shape
 			// (compile-harness.sh): "\n" + BEGIN + body + END + "\n" tacked
 			// onto the untouched source — including the blank separator line,
-			// which is exactly what stripHarnessRegions must also drop.
+			// which is exactly what harness.StripRegions must also drop.
 			deployed := "shared content\n" +
 				"\n<!-- BEGIN HARNESS AGENT-PRESENCE (sha256:abc) -->\npersona\n<!-- END HARNESS AGENT-PRESENCE -->\n"
 			writeFile(t, filepath.Join(home, tgt.homeRel), deployed)
@@ -366,6 +294,9 @@ func TestCheckInstructionDrift_MatchesManifest(t *testing.T) {
 			t.Errorf("deployedInstructionTargets has %q but manifest agents.presence does not", tgt.homeRel)
 			continue
 		}
+		if e.Agent != tgt.agent {
+			t.Errorf("%s: Go agent=%q, manifest agent=%q — keep deployedInstructionTargets in sync", tgt.homeRel, tgt.agent, e.Agent)
+		}
 		if e.Source != tgt.repoRel {
 			t.Errorf("%s: Go repoRel=%q, manifest source=%q — keep deployedInstructionTargets in sync", tgt.homeRel, tgt.repoRel, e.Source)
 		}
@@ -373,5 +304,28 @@ func TestCheckInstructionDrift_MatchesManifest(t *testing.T) {
 			t.Errorf("%s: Go requiresCommand=%q, manifest requires_command=%q — keep deployedInstructionTargets in sync",
 				tgt.homeRel, tgt.requiresCommand, e.RequiresCommand)
 		}
+	}
+}
+
+// An agent that is installed but has no instruction file runs on its harness
+// defaults, which is how AI attribution reached commits on a fresh machine
+// (F-060, #2016). That is a FAIL; a missing file for an agent that is not
+// installed is not.
+func TestCheckInstructionDrift_InstalledAgentWithoutItsInstructionsFails(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	for _, tgt := range deployedInstructionTargets {
+		writeFile(t, filepath.Join(repo, tgt.repoRel), "source\n")
+	}
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"claude"}, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkInstructionDrift(sys, rep)
+
+	if rep.Failures() != 1 {
+		t.Fatalf("want exactly one FAIL (claude is installed, opencode and pi are not)\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "claude is installed but .claude/CLAUDE.md is missing") {
+		t.Errorf("the FAIL must name the agent and the file\n%s", buf.String())
 	}
 }
