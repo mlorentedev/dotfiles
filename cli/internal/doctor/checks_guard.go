@@ -3,7 +3,6 @@ package doctor
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -131,18 +130,16 @@ func isGuardDispatcher(dir string) bool {
 }
 
 // samePath compares two hooksPath values as paths, not as bytes. git reports
-// core.hooksPath with forward slashes even on Windows, so comparing it to a
-// filepath.Join target is a false negative there; trailing separators and
-// drive-letter case are the same class of noise.
+// core.hooksPath with forward slashes even on Windows, and a trailing separator
+// or another case of the same name is the same class of noise. Paths that
+// exist are compared as files (sameDir), which settles case on whatever the
+// filesystem decides; a path that does not exist yet is compared by spelling.
 func samePath(a, b string) bool {
 	norm := func(p string) string {
 		return filepath.Clean(filepath.FromSlash(strings.TrimRight(p, `/\`)))
 	}
 	na, nb := norm(a), norm(b)
-	if runtime.GOOS == "windows" { //nolint:forbidigo // case folding is a property of the host filesystem these paths live on
-		return strings.EqualFold(na, nb)
-	}
-	return na == nb
+	return na == nb || sameDir(na, nb)
 }
 
 // gitGlobalHooksPath returns the global core.hooksPath, or "" when unset.
