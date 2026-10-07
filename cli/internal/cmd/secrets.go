@@ -910,7 +910,7 @@ func (r *redactWriter) Write(p []byte) (int, error) {
 	// key, the last 63 bytes of every frame -- typically the cursor
 	// positioning -- stayed dark until more output happened to arrive. A TUI
 	// driven that way renders late and misplaced (SEC-002).
-	if hold, _ := r.holdBack(data); hold > 0 {
+	if hold, _ := r.holdBack(data, anyPrefix); hold > 0 {
 		split := len(data) - hold
 		r.tail = make([]byte, hold)
 		copy(r.tail, data[split:])
@@ -930,7 +930,8 @@ func (r *redactWriter) Write(p []byte) (int, error) {
 //
 // Only a proper prefix counts: a suffix that already contains a whole secret
 // was replaced by the ReplaceAll pass above and is no longer present to match.
-func (r *redactWriter) holdBack(data []byte) (int, []byte) {
+// A prefix counts only when it is at least floor(len(secret)) bytes long.
+func (r *redactWriter) holdBack(data []byte, floor func(secretLen int) int) (int, []byte) {
 	maxHold := r.maxSecretLen - 1
 	if maxHold > len(data) {
 		maxHold = len(data)
@@ -940,13 +941,26 @@ func (r *redactWriter) holdBack(data []byte) (int, []byte) {
 	for n := maxHold; n > 0; n-- {
 		suffix := data[len(data)-n:]
 		for _, pair := range r.pairs {
-			if len(suffix) < len(pair[0]) && bytes.HasPrefix(pair[0], suffix) {
+			if len(suffix) < len(pair[0]) && n >= floor(len(pair[0])) && bytes.HasPrefix(pair[0], suffix) {
 				return n, pair[1]
 			}
 		}
 	}
 	return 0, nil
 }
+
+// anyPrefix is Write's floor: while the stream is open, every proper prefix is
+// held, however short, because the next write may complete it.
+func anyPrefix(int) int { return 1 }
+
+// materialPrefix is Flush's floor: the stream has ended, so a held prefix can
+// no longer complete, and only one long enough to be credential material is
+// redacted. That is 6 bytes, the floor below which a value is not treated as a
+// secret at all, or half the secret when that is shorter, so a short secret
+// never prints most of itself. Below it the bytes are a letter or a public
+// format prefix like `sk-`, and redacting them rewrote ordinary output:
+// `results` printed as `result[REDACTED:KEY]` for a key starting with `s`.
+func materialPrefix(secretLen int) int { return min(6, (secretLen+1)/2) }
 
 func (r *redactWriter) Flush() error {
 	r.mu.Lock()
@@ -966,8 +980,9 @@ func (r *redactWriter) Flush() error {
 	// one hole the hold-back leaves, and it leaves it at exactly the moment the
 	// transcript is closed. Replace them with the placeholder of the secret they
 	// begin, which is the honest report: material from that key was here.
-	// Surfaced by the SEC-002 adversarial review.
-	if n, rep := r.holdBack(r.tail); n > 0 {
+	// Surfaced by the SEC-002 adversarial review. A prefix too short to be
+	// material is ordinary output and is written as it is (materialPrefix).
+	if n, rep := r.holdBack(r.tail, materialPrefix); n > 0 {
 		r.tail = append(r.tail[:len(r.tail)-n], rep...)
 	}
 

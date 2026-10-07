@@ -243,6 +243,41 @@ func TestRedactWriter_HoldsBackATrailingSecretPrefix(t *testing.T) {
 	}
 }
 
+// #1857: at end of stream a held prefix can no longer complete, so Flush
+// redacts it only when it is credential material. One letter, or a public
+// format prefix, is ordinary output: `results` used to print as
+// `result[REDACTED:NAN_API_KEY]` for a key starting with `s`.
+func TestRedactWriter_FlushRedactsOnlyAMaterialPrefix(t *testing.T) {
+	// Split so no source line reads as an sk- key to a secret scanner.
+	const long = "sk-" + "mock-nan-test-token-value-0123456789" // 39 bytes: floor 6
+	const short = "zq8w7v"                                      // 6 bytes: floor 3
+	injected := []string{"NAN_API_KEY=" + long, "SHORT_KEY=" + short}
+	cases := []struct{ out, want string }{
+		{"results", "results"},
+		{"status: pass", "status: pass"},
+		{"key: sk-", "key: sk-"},
+		{"key: sk-mo", "key: sk-mo"},
+		{"key: sk-moc", "key: [REDACTED:NAN_API_KEY]"},
+		{"key: " + long[:20], "key: [REDACTED:NAN_API_KEY]"},
+		{"x zq", "x zq"},
+		{"x zq8", "x [REDACTED:SHORT_KEY]"},
+		{"x zq8w7", "x [REDACTED:SHORT_KEY]"},
+	}
+	for _, tc := range cases {
+		var buf bytes.Buffer
+		rw := newRedactWriter(&buf, injected)
+		if _, err := rw.Write([]byte(tc.out)); err != nil {
+			t.Fatalf("Write: %v", err)
+		}
+		if err := rw.Flush(); err != nil {
+			t.Fatalf("Flush: %v", err)
+		}
+		if got := buf.String(); got != tc.want {
+			t.Errorf("child printed %q: got %q, want %q", tc.out, got, tc.want)
+		}
+	}
+}
+
 // SEC-001 review round 1, F1: a secret delivered in writes shorter than itself
 // must never reach the target. The reviewed commit gated its hold-back on
 // len(data) >= maxSecretLen, so 1-3 byte writes went out verbatim. SEC-002's
