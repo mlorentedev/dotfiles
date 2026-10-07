@@ -1541,31 +1541,9 @@ if (Test-Path $gitconfigSource) {
 # ============================================================================
 # 5b. SSH CONFIG
 # ============================================================================
-
-Write-Info "Setting up SSH config..."
-
-$sshDir = "$env:USERPROFILE\.ssh"
-Ensure-Directory $sshDir
-
-$sshConfigSource = "$DotfilesDir\ssh\config"
-if (Test-Path $sshConfigSource) {
-    Copy-Item $sshConfigSource "$sshDir\config" -Force
-    Write-Success "Deployed SSH config"
-} else {
-    Write-Warn "SSH config not found at $sshConfigSource"
-}
-
-$sshPubKeySource = "$DotfilesDir\ssh\id_ed25519.pub"
-if (Test-Path $sshPubKeySource) {
-    if (-not (Test-Path "$sshDir\id_ed25519.pub")) {
-        Copy-Item $sshPubKeySource "$sshDir\id_ed25519.pub"
-        Write-Success "Deployed SSH public key"
-    } else {
-        Write-Info "SSH public key already exists, skipping"
-    }
-} else {
-    Write-Warn "SSH public key not found at $sshPubKeySource"
-}
+# ~/.ssh/config and the public key are `dotf deploy` entries on every OS
+# (ai/deploy.json ssh-config, ssh-pubkey; #2013 P7), deployed by the bare
+# `dotf deploy` above.
 
 # ============================================================================
 # 6. ADD SCRIPTS TO PATH

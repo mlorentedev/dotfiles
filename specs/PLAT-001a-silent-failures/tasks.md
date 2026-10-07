@@ -39,6 +39,16 @@ created: "2026-10-05"
 - [x] P6 (#1843 B2, zsh and tmux rows): `.zshrc`, `.zsh/*` and `tmux.conf` are `ai/deploy.json` entries with `requires: zsh` / `tmux`, and their `deploy_file` lines leave `setup-linux.sh`; the end-of-setup re-enforcement of `.zshrc` calls `dotf deploy zshrc`. `.bashrc`, `.profile`, `.inputrc`, `.gitconfig` and `ssh/config` wait for #1843 B1's OS selector, which needs a manifest version the installed dotf cannot read
 - [x] On the Mac: `dotf deploy` deployed `.zshrc` (keeping the hand-made one as `~/.zshrc.pre-dotf`) and `~/.zsh/*`, skipped tmux (not installed); a second run is `in sync`; a new zsh starts without warnings and resolves age, jq, direnv, zoxide, fzf and go through mise
 
+## P7a — the rc files every OS shares (#2013 P7, no release needed)
+
+- [x] Failing tests first: the `ssh-config` and `ssh-pubkey` entries and their removal from both setup scripts (`tests/setup-linux.bats`, a Windows parity test that replaces the one asserting a log line), `.gitconfig` resolving gh through PATH, and `TestDeploy_ADirectoryCreatedForAPrivateFileIsPrivate`
+- [x] `~/.ssh/config` (0600) and `~/.ssh/id_ed25519.pub` are `ai/deploy.json` entries on every OS. They need no `platforms`, so the version 3 manifest the installed `dotf` reads carries them now; both setup scripts lose their copy blocks, and doctor's `homeDeployMap` drops `ssh/config` for `checkDeployManifest`
+- [x] A directory `dotf deploy` creates for a file that grants nothing to group or others is 0700: `~/.ssh` landed 0755 on the Mac. An existing directory keeps its mode
+- [x] W6 (`.gitconfig`): the github.com and gist credential helpers run `!gh auth git-credential` through PATH. `/usr/bin/gh` is Linux's path; macOS has `/opt/homebrew/bin/gh` and Windows `gh.exe`. On the Mac, `git credential fill` through the repo `.gitconfig` alone returns a password line
+- [x] On the Mac: `dotf deploy ssh-config` and `ssh-pubkey` created `~/.ssh` 0700 with the config 0600 and the key 0644, `ssh -G rpi4` resolves the host, and a second run is in sync
+- [ ] P7b, after B1 is released and pinned: `.bashrc`, `.profile` and `.inputrc` as entries with `platforms: [linux, darwin]`, the manifest at version 4
+- [ ] `.gitconfig` is co-owned: every `git config --global` writes it, which is why doctor exempts it from the content check (measured drifting on a converged box 2026-09-02), so a replace entry would fight those tools on every run. The design for its row: the repo file deploys whole to a file dotfiles owns (`~/.config/dotfiles/gitconfig`), and `~/.gitconfig` keeps one `[include] path` to it, added idempotently, so tools keep writing `~/.gitconfig` and neither side overwrites the other
+
 ## W2, W4, W5, W8–W10
 
 Tracked in #2013 track W. Each PR adds its block here when it starts.

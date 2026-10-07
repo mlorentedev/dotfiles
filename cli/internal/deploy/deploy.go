@@ -466,12 +466,23 @@ func load(c Config, repoRoot, home string, resolve func(string) string) ([]byte,
 	return srcData, dst, nil
 }
 
+// dirMode is the mode for a directory the deploy creates to hold a file of
+// mode: private (0700) when the file grants nothing to group or others, so a
+// 0600 ssh config does not land in a 0755 ~/.ssh. A directory that exists
+// keeps its mode.
+func dirMode(mode os.FileMode) os.FileMode {
+	if mode&0o077 == 0 {
+		return 0o700
+	}
+	return 0o755
+}
+
 // stage writes data to a temp file beside the destination, with the declared
 // mode. Beside it, not /tmp: an atomic rename requires the same filesystem,
 // and a cross-device rename is the failure that turns an install into a
 // half-written config.
 func stage(c Config, dst string, data []byte, mode os.FileMode) (string, error) {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), dirMode(mode)); err != nil {
 		return "", fmt.Errorf("config %q: destination directory: %w", c.Name, err)
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(dst), ".deploy-*")
