@@ -166,3 +166,30 @@ func TestMemHandoffWriteFromAnotherRepositoryTouchesNoThread(t *testing.T) {
 		t.Errorf("MEMORY.md changed:\n--- got ---\n%s\n--- want ---\n%s", after, before)
 	}
 }
+
+// The session brief runs the Go health report in-process (CLI-023). A vault
+// detected from the cwd wins; without one it resolves as `dotf vault health`
+// does. No obsidian on PATH keeps it hermetic: the report stops after its
+// header and connectivity section with exit 1.
+func TestMemVaultHealthRunsTheGoReportForTheDetectedVault(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("VAULT_DIR", filepath.Join(t.TempDir(), "from-env"))
+	t.Setenv("VAULT_NAME", "")
+	cwdVault := t.TempDir()
+	for _, tc := range []struct{ dir, name, wantHeader string }{
+		{cwdVault, "mine", "Vault: mine (" + cwdVault + ")"},
+		{"", "", "Vault: knowledge (" + os.Getenv("VAULT_DIR") + ")"},
+	} {
+		var out bytes.Buffer
+		code, err := memVaultHealth(&out, tc.dir, tc.name)
+		if err != nil || code != 1 {
+			t.Errorf("%q: code %d err %v, want 1 and nil (obsidian absent)", tc.dir, code, err)
+		}
+		if !strings.Contains(out.String(), tc.wantHeader) {
+			t.Errorf("%q: report lacks %q:\n%s", tc.dir, tc.wantHeader, out.String())
+		}
+		if !strings.Contains(out.String(), "Obsidian CLI not found in PATH") {
+			t.Errorf("%q: not the Go report's connectivity section:\n%s", tc.dir, out.String())
+		}
+	}
+}
