@@ -136,6 +136,11 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		}
 		res.HeadSHA, res.Reasons = f.HeadSHA, Decide(f)
 	}
+	// A bare "BEHIND" after three updates reads as if none was tried. Say the
+	// base outran CI, which is the race #2083 describes, not a stale branch.
+	if res.Updated && onlyBehind(res.Reasons) {
+		res.Reasons = []string{fmt.Sprintf("merge state is BEHIND after merging the base in %d times: the base moved again during each CI run (#2083)", maxUpdates)}
+	}
 	if len(res.Reasons) > 0 {
 		return res, nil
 	}

@@ -278,8 +278,9 @@ func TestLand_UpdateBranchGivesUpAfterMaxUpdates(t *testing.T) {
 	o := Options{Run: run, Untriaged: noneUntriaged, UpdateBranch: true, Sleep: func(time.Duration) {}}
 
 	res, err := Land(context.Background(), o, 30)
-	if err != nil || res.Merged || !onlyBehind(res.Reasons) || updates != maxUpdates {
-		t.Errorf("want a BEHIND refusal after %d updates, got %+v, %v, %d updates", maxUpdates, res, err, updates)
+	want := "merge state is BEHIND after merging the base in 3 times"
+	if err != nil || res.Merged || len(res.Reasons) != 1 || !strings.HasPrefix(res.Reasons[0], want) || updates != maxUpdates {
+		t.Errorf("want one reason starting %q after %d updates, got %+v, %v, %d updates", want, maxUpdates, res, err, updates)
 	}
 }
 
