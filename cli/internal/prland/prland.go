@@ -287,6 +287,18 @@ func allGreen(cs []Check) bool {
 
 type ghFunc func(args ...string) ([]byte, error)
 
+// ghNoChecks is the error gh returns when a head has no checks yet
+// (pkg/cmd/pr/checks/checks.go in cli/cli, as of gh 2.102).
+const ghNoChecks = "no checks reported on the"
+
+// ghRemedy names the fix for a gh too old for `pr checks --json`.
+func ghRemedy(err error) string {
+	if strings.Contains(err.Error(), "unknown flag: --json") {
+		return " (this gh predates `gh pr checks --json`; install a newer gh)"
+	}
+	return ""
+}
+
 func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) ([]int, error), number int) (Facts, error) {
 	n := strconv.Itoa(number)
 	f, err := readView(gh, n)
@@ -296,10 +308,16 @@ func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) (
 	// gh exits non-zero while a check fails or is pending, and still prints
 	// the JSON; only an output that does not parse is an error.
 	out, runErr := gh("pr", "checks", n, "--json", "name,bucket")
-	// Before CI has registered any check, gh exits non-zero and prints
-	// nothing: that is "no checks yet" (Decide refuses it, --wait waits for
-	// it), not an unreadable answer.
+	// Before CI has registered any check, gh exits non-zero, prints nothing
+	// and says why on stderr: that is "no checks yet" (Decide refuses it,
+	// --wait waits for it), not an unreadable answer. Any other failure with
+	// nothing on stdout is an error. A gh that predates `pr checks --json`
+	// fails the same way with "unknown flag", and reading that as "no checks"
+	// refused a PR with twenty green checks for the wrong reason (#2056).
 	if len(bytes.TrimSpace(out)) == 0 {
+		if runErr != nil && !strings.Contains(runErr.Error(), ghNoChecks) {
+			return f, fmt.Errorf("gh pr checks: %w%s", runErr, ghRemedy(runErr))
+		}
 		f.Checks = nil
 	} else if err := json.Unmarshal(out, &f.Checks); err != nil {
 		return f, fmt.Errorf("gh pr checks: %v (%w)", runErr, err)
