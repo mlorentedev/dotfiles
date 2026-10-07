@@ -32,6 +32,7 @@ func newToolsCmd() *cobra.Command {
 	cmd.AddCommand(newToolsListCmd())
 	cmd.AddCommand(newToolsInstallCmd())
 	cmd.AddCommand(newToolsVersionCmd())
+	cmd.AddCommand(newToolsSyncCmd())
 	return cmd
 }
 

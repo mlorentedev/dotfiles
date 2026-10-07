@@ -33,6 +33,7 @@ replaces it with the pinned release.
 
 | Command | What it does |
 |---|---|
+| `converge` | Brings this machine to the state the checkout declares; `--plan` shows the changes first |
 | `doctor` | Checks this machine's tools, configs and secrets against the repository |
 | `secrets` | Resolves secrets and injects them into one child process (`dotf secrets run -- <cmd>`) |
 | `spec` | Scaffolds, reviews and archives spec folders for spec-driven development |
@@ -49,8 +50,34 @@ replaces it with the pinned release.
 | `agent`, `harness`, `pi`, `orca`, `mem`, `vault`, `search` | Agent harness and knowledge-vault tooling for this repository |
 | `version` | Prints the version |
 
-Run `dotf <command> --help` for full usage. Two commands get a section below,
+Run `dotf <command> --help` for full usage. Three commands get a section below,
 because their flags and failure modes are not obvious from `--help`.
+
+### `dotf converge` — bring the machine to its declared state
+
+Runs an ordered list of reconcilers, each converging one part of the machine
+from data in the checkout. Records come first: the harness mirror,
+then the agents' instruction files, so no agent runs before its instructions
+exist.
+
+```sh
+dotf converge --plan     # what each reconciler would change; writes nothing
+dotf converge            # apply, then prove each reconciler's post-condition
+```
+
+- **One code path.** Each reconciler has a plan and an apply on the same path,
+  so they cannot disagree.
+- **Mandatory probe.** Every reconciler has a post-condition probe. An apply
+  that fails its probe fails the run and names the reconciler, and the
+  reconcilers after it are reported `not reached`.
+- **Platforms.** A reconciler that does not apply to this OS is reported as
+  `skipped`, naming the OS, never as passed.
+- **Idempotence.** A second run on a converged machine reports `0 changed`.
+- **Report.** Every apply writes a report to
+  `$XDG_STATE_HOME/dotfiles/converge/last.json` (default
+  `~/.local/state/dotfiles/converge/last.json`). It records the result, the
+  error if any, the total changes, and each reconciler's status and detail. A
+  plan writes no report.
 
 ### `dotf review` — cross-model code review
 
