@@ -78,6 +78,7 @@ func run(rootCmd *cobra.Command, stderr io.Writer) int {
 	rootSilencedByAuthor := rootCmd.SilenceErrors
 	rootCmd.SilenceErrors = true
 	rootCmd.SetErr(stderr)
+	markUsageErrors(rootCmd)
 
 	executedCmd, err := rootCmd.ExecuteC()
 	if err != nil {
@@ -87,15 +88,52 @@ func run(rootCmd *cobra.Command, stderr io.Writer) int {
 			_, _ = fmt.Fprintln(stderr, tfe.Error())
 		} else {
 			// If the specific command didn't request silence, print the error.
+			// A usage error is printed regardless: it is raised before the
+			// command's own code runs, so nothing else will ever report it.
 			silenced := executedCmd.SilenceErrors
 			if executedCmd == rootCmd {
 				silenced = rootSilencedByAuthor
 			}
-			if !silenced {
+			var ue usageError
+			if !silenced || goerrors.As(err, &ue) {
 				_, _ = fmt.Fprintf(stderr, "Error: %v\n", err)
 			}
 		}
 		return cmd.ExitCode(err)
 	}
 	return 0
+}
+
+// usageError marks an error Cobra raises before a command's RunE: an unknown
+// flag, or arguments its Args validator refuses (#2090).
+//
+// SilenceErrors means "this command prints its own diagnostics", and it is
+// honoured per command. But a flag or argument error happens before any of the
+// command's code runs, so no diagnostic was ever printed for it, and silencing
+// it left `dotf doctor --no-such-flag` exiting 1 with no output at all.
+type usageError struct{ err error }
+
+func (e usageError) Error() string { return e.err.Error() }
+func (e usageError) Unwrap() error { return e.err }
+
+// markUsageErrors wraps flag parsing and every Args validator in the tree so
+// their errors arrive as usageError. The flag-error func set on the root is
+// inherited by every subcommand that does not set its own.
+func markUsageErrors(root *cobra.Command) {
+	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		if args := c.Args; args != nil {
+			c.Args = func(c *cobra.Command, a []string) error {
+				if err := args(c, a); err != nil {
+					return usageError{err}
+				}
+				return nil
+			}
+		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(root)
 }

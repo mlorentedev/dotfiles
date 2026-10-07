@@ -91,7 +91,12 @@ command exits however it exits; the lock of a process that died is taken over,
 with a note.`,
 		Example: `  dotf pr land 2030 --wait
   dotf pr land 2031 2032 2033 --wait --update-branch`,
-		Args:          cobra.MinimumNArgs(1),
+		// The numbers are validated here rather than in RunE, so a bad one is
+		// reported as a usage error even though the command silences errors.
+		Args: cobra.MatchAll(cobra.MinimumNArgs(1), func(_ *cobra.Command, args []string) error {
+			_, err := parseLandNumbers(args)
+			return err
+		}),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) error {
