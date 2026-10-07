@@ -28,6 +28,8 @@ jobs:
       # CI a diff needs, which one bucket cannot answer.
       pi: ${{ steps.filter.outputs.pi }}
       pi_nan: ${{ steps.filter.outputs.pi_nan }}
+      # #2021: the only diffs on which the PR-Agent upstream contract can drift.
+      pr_agent_contract: ${{ steps.filter.outputs.pr_agent_contract }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
@@ -125,6 +127,10 @@ jobs:
               - 'versions.conf'
               - 'tests/pi-nan-package.bats'
               - '.github/workflows/ci.yml'
+            pr_agent_contract:
+              - '.github/workflows/pr-agent.yml'
+              - 'harness/pr-agent-upstream-contract.json'
+              - 'tests/pr-agent-config.bats'
 
   lint:
     runs-on: ubuntu-latest
@@ -308,6 +314,9 @@ jobs:
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         env:
           DOTF_TEST_GH_TOKEN: ${{ github.token }}
+          # The network leg of pr-agent-config.bats (#2021).
+          DOTF_TEST_NETWORK: >-
+            ${{ (github.event_name == 'push' || needs.changes.outputs.pr_agent_contract == 'true') && '1' || '' }}
         # One process per file, files in parallel (CI-004, #1739): tests in a
         # file share setup_file state, so they stay serial. `--jobs` needs GNU
         # parallel, which the ubuntu runner image ships but nothing here

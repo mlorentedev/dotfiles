@@ -51,7 +51,7 @@
   {
     "id": "TOOL-013-pr-agent-reviewer-f8",
     "behavior": "AC8 — the effective Action pin, not a copied version, selects upstream source identities; changed files or failed API reads fail closed.",
-    "verification": "bats tests/pr-agent-config.bats -f 'pinned upstream review contracts match their approved source identities'",
+    "verification": "bats tests/pr-agent-config.bats -f 'is bound to the action pin' && DOTF_TEST_NETWORK=1 bats tests/pr-agent-config.bats -f 'pinned upstream review contracts match their approved source identities'",
     "state": "pending",
     "evidence": ""
   },

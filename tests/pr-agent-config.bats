@@ -723,8 +723,8 @@ print('PR_AGENT_REF' not in filter_step['env'])
     [ "${lines[3]%$'\r'}" = "True" ]
 }
 
-@test "pr-agent: pinned upstream review contracts match their approved source identities" {
-    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref path expected actual
+@test "pr-agent: the audited upstream contract covers every source and is bound to the action pin" {
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref path audited
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
     for path in action.yaml pr_agent/settings/configuration.toml \
         pr_agent/agent/pr_agent.py pr_agent/algo/comment_identity.py \
@@ -734,6 +734,25 @@ print('PR_AGENT_REF' not in filter_step['env'])
         jq -e --arg path "$path" '.files[$path] | test("^[0-9a-f]{40}$")' \
             "$contract" >/dev/null || { echo "missing audited source: $path" >&2; return 1; }
     done
+    ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
+    [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
+    audited=$(jq -r '.audited_ref' "$contract")
+    [ "$audited" = "$ref" ] || {
+        echo "action pin $ref is not the audited ref $audited: re-audit harness/pr-agent-upstream-contract.json" >&2
+        false
+    }
+}
+
+# The network leg (#2021). A blob SHA at an immutable commit cannot change, and
+# the test above binds the pin to the audited ref, so this comparison can only
+# find something on a diff that moves the pin or edits the contract. CI sets
+# DOTF_TEST_NETWORK=1 on exactly those PRs and on every push to main; the
+# default local run stays hermetic.
+@test "pr-agent: pinned upstream review contracts match their approved source identities" {
+    [ "${DOTF_TEST_NETWORK:-}" = 1 ] \
+        || skip "network leg: set DOTF_TEST_NETWORK=1 to compare the contract with upstream"
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref path expected actual
+    [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
     ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
     [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
     if [ -n "${DOTF_TEST_GH_TOKEN:-}" ]; then
