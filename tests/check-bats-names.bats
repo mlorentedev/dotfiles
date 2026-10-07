@@ -3,6 +3,8 @@
 # the runner silently fails to register (non-ASCII chars, or duplicate names),
 # which yields a "green" test that never ran. Detected by CURATOR-001 (#615).
 
+# bats file_tags=os-sensitive
+
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-bats-names.sh"
     TMP="$(mktemp -d)"
@@ -54,4 +56,18 @@ teardown() { rm -rf "$TMP"; }
 @test "check-bats-names: the repo's own tests/ pass (no silent-skip names remain)" {
     run "$SCRIPT" "$BATS_TEST_DIRNAME"
     [ "$status" -eq 0 ]
+}
+
+# The non-ASCII scan once used `grep -P` with its errors discarded. BSD grep has no
+# -P, so on macOS the scan errored, the error read as "no findings", and the lint
+# passed every name. A grep that cannot run must fail the check, not clear it. An
+# unreadable file makes grep exit 2 on any OS, with no stub needed.
+@test "check-bats-names: a grep that errors fails the check instead of reporting clean" {
+    [ "$(id -u)" -ne 0 ] || skip "root reads a mode-000 file, so grep cannot be made to fail"
+    printf '@test "plain" {\n  true\n}\n' > "$TMP/unreadable.bats"
+    chmod 000 "$TMP/unreadable.bats"
+    run "$SCRIPT" "$TMP/unreadable.bats"
+    chmod 600 "$TMP/unreadable.bats"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"grep failed"* ]]
 }

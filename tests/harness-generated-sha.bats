@@ -14,6 +14,10 @@
 # This test file never starts a line with the marker text (references above are
 # prose / assignments), so `git grep` never lists this file.
 
+# bats file_tags=os-sensitive
+
+load 'lib/os'
+
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     BEGIN_RE='^<!-- BEGIN HARNESS GENERATED \(sha256:'

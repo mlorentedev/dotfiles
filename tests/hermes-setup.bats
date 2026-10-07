@@ -7,6 +7,10 @@
 # REAL git repo (so the installed hooks can be exercised with real git), while
 # setup.sh itself still runs against the stubbed git for clone/pull.
 
+# bats file_tags=os-sensitive
+
+load 'lib/os'
+
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     SETUP="$DOTFILES_DIR/ai/hermes/setup.sh"
@@ -138,7 +142,7 @@ provision() {
     [ "$status" -eq 0 ]
 
     [ "$(grep -c '^GITHUB_TOKEN_KNOWLEDGE=' "$HERMES_HOME/.env")" -eq 1 ]
-    [ "$(stat -c '%a' "$HERMES_HOME/.env")" = "600" ]
+    [ "$(file_mode "$HERMES_HOME/.env")" = "600" ]
     [ "$(grep -c 'vault-pull.sh' "$CRONTAB_STORE")" -eq 1 ]
     [ "$(grep -c 'hermes-managed' "$HERMES_VAULT_PATH/.git/hooks/post-commit")" -eq 1 ]
     [ -x "$HERMES_HOME/vault-pull.sh" ]

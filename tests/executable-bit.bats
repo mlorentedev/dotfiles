@@ -23,6 +23,8 @@
 # the DESTINATION's mode, which is already 644. So the content restores
 # byte-for-byte and the mode does not, which is precisely why nobody notices.
 
+# bats file_tags=os-sensitive
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 }

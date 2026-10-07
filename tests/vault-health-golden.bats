@@ -23,7 +23,10 @@
 # ticket + deliberate recapture rather than a silent "cleanup" folded into
 # an unrelated change.
 
+# bats file_tags=os-sensitive
+
 load 'lib/refute'
+load 'lib/os'
 
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/vault-health"

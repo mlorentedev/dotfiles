@@ -147,6 +147,7 @@ _launch_fake() {
 # the strays the incident left behind. A detector never seen firing is a claim,
 # not a check — and this one's job is to catch what the PATH interceptors
 # structurally cannot: an invocation by absolute path.
+# bats test_tags=os-sensitive
 @test "guard: the stray detector matches a test-shaped GUI process and not a human's" {
     _guard_is_active || skip "setup_suite did not run (single-file invocation); the guard is inactive here"
     command -v pgrep >/dev/null 2>&1 || skip "pgrep not installed"
@@ -187,6 +188,7 @@ _launch_fake() {
 # Under `bats --jobs`, and on a box where several agent sessions run suites at
 # once, another run's fixtures are alive while this one tears down. The detector
 # reports and kills what it matches, so it must match only this run's.
+# bats test_tags=os-sensitive
 @test "guard: the stray detector ignores a test-shaped process from another bats run" {
     _guard_is_active || skip "setup_suite did not run (single-file invocation); the guard is inactive here"
     command -v pgrep >/dev/null 2>&1 || skip "pgrep not installed"

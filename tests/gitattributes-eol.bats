@@ -9,6 +9,8 @@
 # LICENSE) fails loudly here instead of depending on which OS happens to check
 # it out.
 
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
 }

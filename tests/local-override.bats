@@ -5,6 +5,8 @@
 # We do not source the full rc (env-fragile in CI); the structural test proves
 # the real rc carries the exact line, the functional test proves its logic.
 
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     TMP="/tmp/bats_localoverride_$$_${BATS_TEST_NUMBER:-0}"

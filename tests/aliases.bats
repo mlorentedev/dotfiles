@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for .zsh/aliases.zsh
 
+# bats file_tags=os-sensitive
+
 load 'lib/refute'
 
 setup() {

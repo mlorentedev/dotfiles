@@ -18,6 +18,8 @@
 
 load 'lib/dotf-bin'
 
+# bats file_tags=os-sensitive
+
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/crystallize"
     # shellcheck source=golden/crystallize/lib.sh disable=SC1091

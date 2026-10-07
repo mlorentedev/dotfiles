@@ -12,10 +12,13 @@
 # test is the dispatcher's decision and the command it builds — pre-commit's own
 # behaviour is upstream's business.
 
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CHAIN="$REPO/git-hooks/lib/chain-local-hook.sh"
-    WORK="$(mktemp -d)"
+    # Physical path: the hook reports git's, and macOS's mktemp lives behind a symlink.
+    WORK="$(cd "$(mktemp -d)" && pwd -P)"
     STUB="$WORK/stub"
     ARGS_LOG="$WORK/precommit-args"
     STDIN_LOG="$WORK/precommit-stdin"
