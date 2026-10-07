@@ -13,8 +13,8 @@ import (
 // binary: `would deploy copilot-settings`, `would deploy copilot-config`.
 func TestParseManifest_RefusesWhatItCannotFullyRead(t *testing.T) {
 	cases := []struct{ name, manifest, want string }{
-		{"older schema", `{"version":1,"configs":[]}`, "version 1 unsupported"},
-		{"newer schema", `{"version":4,"configs":[]}`, "version 4 unsupported"},
+		{"older schema", `{"version":2,"configs":[]}`, "version 2 unsupported"},
+		{"newer schema", `{"version":5,"configs":[]}`, "version 5 unsupported"},
 		{"unknown entry field", `{"version":3,"configs":[{"name":"x","src":"a","dst":"b","future":true}]}`, `unknown field "future"`},
 		{"unknown top-level field", `{"version":3,"future":1,"configs":[]}`, `unknown field "future"`},
 		{"trailing document", `{"version":3,"configs":[{"name":"x","src":"a","dst":"b"}]}{"future":true}`, "trailing data"},

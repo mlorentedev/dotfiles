@@ -19,6 +19,7 @@ func TestManifestVersion_FreezesTheFieldSet(t *testing.T) {
 	frozen := map[int][]string{
 		2: {"$comment", "configs", "dst", "mode", "name", "render", "requires", "src", "strategy", "version"},
 		3: {"$comment", "configs", "dst", "mode", "name", "paths", "render", "requires", "src", "strategy", "version"},
+		4: {"$comment", "configs", "dst", "mode", "name", "paths", "platforms", "render", "requires", "src", "strategy", "version"},
 	}
 	want, ok := frozen[ManifestVersion]
 	if !ok {
