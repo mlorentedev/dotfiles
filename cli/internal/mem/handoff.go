@@ -482,8 +482,10 @@ func ThreadKey(cwd string) string {
 				name = "detached"
 			}
 			return sanitizeThread(name) + "@" + shortHost()
-		case isDefaultBranch(id.Branch):
-			return id.Branch + "@" + shortHost()
+		case id.isDefaultBranch():
+			// A derived default can carry a `/` (release/1.2), which main and
+			// master never did: sanitize it like every other key.
+			return sanitizeThread(id.Branch) + "@" + shortHost()
 		default:
 			return sanitizeThread(id.Branch)
 		}
