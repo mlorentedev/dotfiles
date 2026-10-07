@@ -215,7 +215,11 @@ jobs:
           $v = ((Get-Content versions.conf | Select-String '^PSSCRIPTANALYZER_VERSION=').Line -split '=', 2)[1]
           if (-not $v) { throw "PSSCRIPTANALYZER_VERSION missing from versions.conf" }
           $v = $v.Trim()
-          if (-not (Get-Module -ListAvailable PSScriptAnalyzer | Where-Object { $_.Version -eq [version]$v })) {
+          $present = Get-Module -ListAvailable PSScriptAnalyzer | Where-Object { $_.Version -eq [version]$v }
+          if ($present) {
+            Write-Output "PSScriptAnalyzer ${v}: present at $($present[0].ModuleBase), not installed"
+          } else {
+            Write-Output "PSScriptAnalyzer ${v}: not on the image, installing from the PowerShell Gallery"
             for ($attempt = 1; $attempt -le 3; $attempt++) {
               try {
                 Install-Module PSScriptAnalyzer -RequiredVersion $v -Force -Scope CurrentUser -ErrorAction Stop
