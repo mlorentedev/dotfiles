@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: 5d3e6d0a63cded64
+generated_sha: bee0aa8eb7382657
 id: spec-skill
 type: skill
 status: active
@@ -106,7 +106,7 @@ When unsure whether a change crosses the threshold, ASK rather than assume (`AGE
 1. **Validate id** matches `^([A-Z]+[0-9]*(-[A-Z]+[0-9]*)*-[0-9]+[a-z]?(-[a-z0-9-]+)?|[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$`. Reject otherwise. The AREA is upper-case segments joined by hyphens, each of which may carry digits (`APP-CONFIG-015`, `ADR028-004`), the ticket number an optional sub-id letter (`SDD-012b`). This string is `idPattern` in `cli/internal/spec/spec.go` **verbatim** — the Go regex is the enforcement point and therefore the canonical form; a drift test asserts the two match, so do not reword it.
 2. **No clobber:** fail if `$REPO_ROOT/specs/<feature-id>/` exists. Warn if `specs/archive/<feature-id>/` exists.
 3. **Work-gate pre-flight (mandatory):**
-   - The gate is an OPEN GitHub issue on the repo (tracked in the bitácora Project). Verify via `gh issue view <number> --json state,title`: the issue must exist and be `OPEN`.
+   - The gate is an OPEN GitHub issue on the repo (tracked in the bitácora Project). Verify over REST, as `dotf spec init --issue` does: `gh api repos/{owner}/{repo}/issues/<number> --jq '.state + "\t" + .title'`. The issue must exist and its state must be `open`. Avoid `gh issue view`: it goes through GraphQL, whose quota parallel sessions exhaust while REST still answers.
    - If `--issue` was not given, ask the user which issue gates this work (suggest candidates via `gh issue list --state open` if helpful).
    - If the issue is missing or closed -> present three options to user:
      - **(a)** Open (or reopen) the gating issue now, add it to the bitácora Project, then proceed with its number.
