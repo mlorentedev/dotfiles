@@ -181,3 +181,151 @@ func contains(haystack, needle string) bool {
 		return false
 	})()
 }
+
+// writeAndCommit writes each path with fixed content and commits them.
+func writeAndCommit(t *testing.T, repoRoot, msg string, paths ...string) {
+	t.Helper()
+	for _, p := range paths {
+		full := filepath.Join(repoRoot, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("# "+p+"\n\nenough text for rename detection to pair the file\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git(t, repoRoot, "add", ".")
+	git(t, repoRoot, "commit", "-qm", msg)
+}
+
+// BUG-108 (#1829): a renamed spec folder looks newly added under its new path,
+// so the base used to be the parent of the RENAME, after the implementation.
+// The base must be the parent of the commit that first added the folder under
+// any of its names.
+func TestResolveReviewBaseFollowsARenamedSpecFolder(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	wantBase := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	git(t, repoRoot, "mv", "specs/OLD-001-x", "specs/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "archive"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "specs/NEW-001-x", "specs/archive/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "archive the spec")
+
+	// Two hops: archive's move, then the rename before it.
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "archive", "NEW-001-x")); got != wantBase {
+		t.Errorf("ResolveReviewBase = %q, want %q (the commit before the spec first appeared)", got, wantBase)
+	}
+}
+
+// The projects-toolkit shape from #1829: the implementation and the spec are in
+// the root commit and the spec is renamed later. There is no commit before the
+// work, so no base resolves, and the caller refuses rather than reviewing a
+// diff that holds only the rename.
+func TestResolveReviewBaseRefusesASpecRenamedOutOfTheRootCommit(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "root: spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	git(t, repoRoot, "mv", "specs/OLD-001-x", "specs/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != "" {
+		t.Errorf("ResolveReviewBase = %q, want \"\": the spec was born in the root commit, so the only "+
+			"base after it excludes the implementation", got)
+	}
+}
+
+// A move that renames a file in the same commit (proposal.md to spec.md) is
+// still traced by the file's depth in the folder rather than its name.
+func TestResolveReviewBaseFollowsAMoveThatAlsoRenamedAFile(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	wantBase := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "specs/OLD-001-x/proposal.md", "specs/NEW-001-x/spec.md")
+	git(t, repoRoot, "commit", "-qm", "move and rename")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != wantBase {
+		t.Errorf("ResolveReviewBase = %q, want %q", got, wantBase)
+	}
+}
+
+// A rename into the folder whose source cannot be placed (here, from directly
+// under specs/, too shallow to have held it) is refused, never answered with
+// the parent of the move: that base would exclude the implementation.
+func TestResolveReviewBaseRefusesAnUntraceableRename(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	writeAndCommit(t, repoRoot, "draft and implementation", "specs/draft.md", "impl.go")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x", "notes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "specs/draft.md", "specs/NEW-001-x/notes/draft.md")
+	git(t, repoRoot, "commit", "-qm", "file the draft as a spec")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != "" {
+		t.Errorf("ResolveReviewBase = %q, want \"\" for a rename it cannot trace", got)
+	}
+}
+
+// A move that also rewrites the spec past git's rename threshold is not paired:
+// diff-tree reports a delete and an add. That unpaired move is refused, not
+// read as a folder born here, whose parent would exclude the implementation.
+func TestResolveReviewBaseRefusesAMoveGitDidNotPair(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	git(t, repoRoot, "rm", "-q", "-r", "specs/OLD-001-x")
+	newSpec := filepath.Join(repoRoot, "specs", "NEW-001-x", "proposal.md")
+	if err := os.MkdirAll(filepath.Dir(newSpec), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newSpec, []byte("rewritten from scratch, nothing in common\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "add", ".")
+	git(t, repoRoot, "commit", "-qm", "move and rewrite")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != "" {
+		t.Errorf("ResolveReviewBase = %q, want \"\" for a move git did not pair", got)
+	}
+}
+
+// A spec created fresh in a commit that also moves an unrelated file into it,
+// or deletes a same-named file elsewhere, was born in that commit. Neither the
+// move nor the delete is the folder moving, so the base is that commit's parent.
+func TestResolveReviewBaseIgnoresFilesMovedInFromOutsideTheSpecsRoot(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	// The deleted ADR's content shares nothing with the new proposal, so git
+	// reports a plain delete rather than pairing the two as a rename.
+	adr := filepath.Join(repoRoot, "docs", "adr", "proposal.md")
+	if err := os.MkdirAll(filepath.Dir(adr), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(adr, []byte("status: superseded\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeAndCommit(t, repoRoot, "base", "README.md", "docs/notes.md")
+	wantBase := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "docs/notes.md", "specs/NEW-001-x/notes.md")
+	git(t, repoRoot, "rm", "-q", "docs/adr/proposal.md")
+	writeAndCommit(t, repoRoot, "new spec", "specs/NEW-001-x/proposal.md")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != wantBase {
+		t.Errorf("ResolveReviewBase = %q, want %q (the spec was created in that commit)", got, wantBase)
+	}
+}

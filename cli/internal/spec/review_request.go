@@ -103,16 +103,54 @@ func HeadSHA(repoRoot string) string {
 // That second case is the whole point: it is the one the old code got wrong by
 // having no answer at all.
 //
+// A folder that was renamed -- by hand, or by `spec archive` moving it under
+// specs/archive/ -- appears ADDED under its new path, so the search follows each
+// rename back to the folder's first name (BUG-108, #1829). Without that, the base
+// was the parent of the rename, after the implementation, and the review diff
+// held the rename and nothing else.
+//
 // Returns "" when there is no such commit (a spec folder not yet committed),
 // which the caller must treat as "cannot review", not as "review everything".
+// It also returns "" when the folder, under any of its names, was added in the
+// repository's root commit: there is no "before" to compare against, and
+// reviewing the entire repository history is not what was asked for.
 func ResolveReviewBase(repoRoot, specDir string) string {
 	rel, err := filepath.Rel(repoRoot, specDir)
 	if err != nil {
 		rel = specDir
 	}
-	// --diff-filter=A finds the commit that ADDED the folder; the last line of
-	// a reverse-chronological log is the earliest such commit. `--` guards a
-	// path that could be read as a revision.
+	rel = filepath.ToSlash(rel)
+	// Bounded so a pathological history cannot loop; a spec renamed more than
+	// a handful of times is refused, not reviewed against a guessed base.
+	for hop := 0; hop < 8; hop++ {
+		adding := earliestAdding(repoRoot, rel)
+		if adding == "" {
+			return ""
+		}
+		out, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
+		if err != nil {
+			return "" // the adding commit is the root commit
+		}
+		parent := strings.TrimSpace(string(out))
+		from, renamed := renamedFrom(repoRoot, parent, adding, rel)
+		if !renamed {
+			return parent
+		}
+		if from == "" {
+			// Something was renamed into the folder but its source cannot be
+			// traced. The parent would be a base after the work, which is the
+			// partial diff this function exists to refuse.
+			return ""
+		}
+		rel = from
+	}
+	return ""
+}
+
+// earliestAdding is the first commit that added a file under rel. --diff-filter=A finds the commits that ADDED it; the last line of a
+// reverse-chronological log is the earliest. `--` guards a path that could be
+// read as a revision.
+func earliestAdding(repoRoot, rel string) string {
 	out, err := exec.Command("git", "-C", repoRoot,
 		"log", "--diff-filter=A", "--format=%H", "--", rel).Output()
 	if err != nil {
@@ -122,18 +160,108 @@ func ResolveReviewBase(repoRoot, specDir string) string {
 	if len(lines) == 0 {
 		return ""
 	}
-	adding := lines[len(lines)-1]
+	return lines[len(lines)-1]
+}
 
-	parent, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
+// renamedFrom reports whether commit renamed anything into rel and, if so, the
+// folder it came from. renamed with an empty from means the source could not be
+// traced, which the caller refuses.
+//
+// A move that also edits a file past git's similarity threshold is not paired:
+// it shows as a delete and an add. A file deleted elsewhere in the same commit
+// whose place in its folder matches a file added under rel is read as that
+// unpaired move, and refused rather than reported as "genuinely new here".
+//
+// Both readings are confined to the specs root, rel's first component: a spec
+// folder lives there under every name it has had. A file moved in from outside
+// it (docs/notes.md into the spec) is content joining the folder, not the
+// folder moving, and a delete outside it is unrelated work in the same commit.
+func renamedFrom(repoRoot, parent, commit, rel string) (from string, renamed bool) {
+	changes, err := treeChanges(repoRoot, parent, commit)
 	if err != nil {
-		// The adding commit is the repository's root commit, so there is no
-		// parent to diff against. Return "" — the caller reads that as "no base
-		// resolved" and refuses the review, which is the right outcome: a spec
-		// added in the root commit has no "before" to compare against, and
-		// reviewing the entire repository history is not what was asked for.
+		return "", true
+	}
+	root, _, _ := strings.Cut(rel, "/")
+	root += "/"
+	var added, deleted []string
+	for _, c := range changes {
+		inRel := strings.HasPrefix(c.dst, rel+"/")
+		fromRoot := strings.HasPrefix(c.src, root) && !strings.HasPrefix(c.src, rel+"/")
+		switch {
+		case c.status == 'R' && inRel && fromRoot:
+			renamed = true
+			if dir := renamedDir(c.src, c.dst, rel); dir != "" {
+				return dir, true
+			}
+		case c.status == 'A' && inRel:
+			added = append(added, strings.TrimPrefix(c.dst, rel+"/"))
+		case c.status == 'D' && fromRoot:
+			deleted = append(deleted, c.src)
+		}
+	}
+	for _, d := range deleted {
+		for _, a := range added {
+			if strings.HasSuffix(d, "/"+a) {
+				return "", true
+			}
+		}
+	}
+	return "", renamed
+}
+
+// treeChange is one record of `git diff-tree --name-status`: src is the path
+// before, dst the path after, the same path for anything but a rename or copy.
+type treeChange struct {
+	status   byte
+	src, dst string
+}
+
+// treeChanges lists what commit changed against parent, with rename detection.
+// -z keeps paths unquoted whatever core.quotePath says.
+func treeChanges(repoRoot, parent, commit string) ([]treeChange, error) {
+	out, err := exec.Command("git", "-C", repoRoot,
+		"diff-tree", "-r", "-M", "--name-status", "-z", parent, commit).Output()
+	if err != nil {
+		return nil, err
+	}
+	// Records are status NUL path, or for a rename or copy status NUL src NUL dst.
+	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	var changes []treeChange
+	for i := 0; i+1 < len(f); {
+		status := f[i]
+		if status == "" {
+			break
+		}
+		if status[0] == 'R' || status[0] == 'C' {
+			if i+2 >= len(f) {
+				break
+			}
+			changes = append(changes, treeChange{status[0], f[i+1], f[i+2]})
+			i += 3
+			continue
+		}
+		changes = append(changes, treeChange{status[0], f[i+1], f[i+1]})
+		i += 2
+	}
+	return changes, nil
+}
+
+// renamedDir is the folder oldPath sat in when its rename to newPath moved it
+// into rel: oldPath less as many trailing components as newPath has below rel.
+// Counting components rather than matching the suffix keeps a file renamed in
+// the same commit as the move (proposal.md to spec.md) traceable. "" when
+// oldPath is too shallow to have held it.
+func renamedDir(oldPath, newPath, rel string) string {
+	suffix, ok := strings.CutPrefix(newPath, rel+"/")
+	if !ok {
 		return ""
 	}
-	return strings.TrimSpace(string(parent))
+	parts := strings.Split(oldPath, "/")
+	depth := strings.Count(suffix, "/") + 1
+	if len(parts) <= depth {
+		return ""
+	}
+	return strings.Join(parts[:len(parts)-depth], "/")
 }
 
 // fileDigest returns the SHA-256 of path, or "" when it does not exist.
