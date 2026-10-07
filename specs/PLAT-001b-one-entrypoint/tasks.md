@@ -52,7 +52,7 @@ created: "2026-10-06"
 
 ### PR 2c — skills and hook bindings
 
-- [ ] `records-skills`: `compile-harness.sh --deploy`, planned with `--check`, behind the shared seam that defaults to "not run" (lesson 335); recorded as a port target
+- [ ] [AC2] `records-skills` (feature f11): `compile-harness.sh --deploy`, planned with `--check`, behind the shared seam that defaults to "not run" (lesson 335); recorded as a port target
 - [ ] `records-bind`: the `harness bind` logic with its dry-run
 
 ### PR 3 — the persisted report (#1843 B7)

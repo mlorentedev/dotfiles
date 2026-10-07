@@ -8,7 +8,7 @@
   },
   {
     "id": "PLAT-001b-one-entrypoint-f2",
-    "behavior": "AC2: the records reconciler deploys the agent instruction files and skills first, and fails if they are absent afterwards",
+    "behavior": "AC2: the records-instructions reconciler deploys every agents.presence instruction file before any later reconciler, and fails if one is absent afterwards",
     "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsInstructions_DeploysInstructionsFirst$' -count=1 -v | grep -q -- '--- PASS: TestRecordsInstructions_DeploysInstructionsFirst'",
     "state": "pending",
     "evidence": ""
@@ -66,6 +66,13 @@
     "id": "PLAT-001b-one-entrypoint-f10",
     "behavior": "AC9: from-zero CI on macos-latest: install, doctor, then a second converge with zero native changes",
     "verification": "gh run list --workflow from-zero.yml --branch main --event push --limit 1 --json conclusion --jq '.[0].conclusion' | grep -qx success",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f11",
+    "behavior": "AC2: the records-skills step deploys the committed skill records (compile-harness.sh --deploy) after the instruction files, planned with --check",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsSkills_DeploysSkillRecordsAfterTheInstructions$' -count=1 -v | grep -q -- '--- PASS: TestRecordsSkills_DeploysSkillRecordsAfterTheInstructions'",
     "state": "pending",
     "evidence": ""
   }
