@@ -369,6 +369,11 @@ the upstream nor contained in the head of a merged pull request for the branch
 (how a squash-merged branch looks once its remote is deleted). When that pull
 request cannot be listed (no gh, offline), it refuses and says so.
 
+Whatever --force says, it also refuses a worktree that contains the current
+directory or, on Linux, the working directory of a process it runs under: the
+removal would strand that shell or agent, and a Claude Code session launched
+from the worktree could not be resumed. Run it from outside the worktree.
+
 The argument is the worktree's path, or the slug given to add: a name that is
 not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 		Args: cobra.MaximumNArgs(1),
@@ -383,9 +388,13 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 				return err
 			}
 
+			// An unreadable cwd leaves the ancestor walk as the only check;
+			// the refusal never depends on it alone.
+			cwd, _ := os.Getwd()
 			opts := worktree.DoneOptions{
 				RepoRoot:     root,
 				WorktreePath: target,
+				Cwd:          cwd,
 				Force:        force,
 			}
 
@@ -399,7 +408,7 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 	}
 
 	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
-	cmd.Flags().StringVar(&worktreePath, "path", "", "path to worktree to remove (defaults to current directory)")
+	cmd.Flags().StringVar(&worktreePath, "path", "", "path to worktree to remove (defaults to the one holding the current directory, which done then refuses)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "force removal even if there are uncommitted changes")
 
 	return cmd

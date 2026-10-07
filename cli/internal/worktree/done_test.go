@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -285,5 +286,75 @@ func TestDonePreservesGitignoredLocalFiles(t *testing.T) {
 
 	if _, statErr := os.Stat(wtDir); !os.IsNotExist(statErr) {
 		t.Errorf("expected worktree directory to be removed after forced teardown")
+	}
+}
+
+// #1653 AC2: done refuses a worktree that holds the caller's working directory,
+// and --force does not lift it. --force is about uncommitted changes, and it is
+// routine; the removal it would allow here strands the caller, and a Claude Code
+// session launched from the worktree cannot be resumed once it is gone.
+func TestDoneRefusesTheWorktreeHoldingTheCallersCwdEvenWithForce(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	sub := filepath.Join(wtDir, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, cwd := range []string{wtDir, sub} {
+		err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: cwd, Force: true})
+		if err == nil || !strings.Contains(err.Error(), "current directory") {
+			t.Fatalf("cwd %s: want a refusal naming the current directory, got %v", cwd, err)
+		}
+		if _, statErr := os.Stat(wtDir); statErr != nil {
+			t.Fatalf("cwd %s: the worktree must survive the refusal: %v", cwd, statErr)
+		}
+	}
+}
+
+// A sibling whose name extends the target's (repo-wt-feat-2 beside repo-wt-feat)
+// is not inside it.
+func TestDoneAllowsACwdInASiblingSharingANamePrefix(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	sibling := wtDir + "-2"
+	if err := os.Mkdir(sibling, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: sibling}); err != nil {
+		t.Fatalf("a sibling cwd must not block done: %v", err)
+	}
+}
+
+// A cwd reached through a symlink is compared by where it resolves.
+func TestDoneRefusesACwdReachedThroughASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(wtDir, link); err != nil {
+		t.Fatal(err)
+	}
+	err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: link, Force: true})
+	if err == nil || !strings.Contains(err.Error(), "current directory") {
+		t.Fatalf("want a refusal for a symlinked cwd, got %v", err)
+	}
+}
+
+// A process the caller runs under (a shell, a Claude Code session) sitting in
+// the worktree blocks done the same way, also under --force. The seam drives
+// the refusing branch on every platform; done_proc_linux_test.go drives the
+// real walk.
+func TestDoneRefusesWhenAnAncestorProcessIsInsideEvenWithForce(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	orig := callerInside
+	t.Cleanup(func() { callerInside = orig })
+	callerInside = func(target string) (ancestor, bool) {
+		return ancestor{PID: 4242, Comm: "claude", Cwd: target}, true
+	}
+	err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Force: true})
+	if err == nil || !strings.Contains(err.Error(), "4242") || !strings.Contains(err.Error(), "claude") {
+		t.Fatalf("want a refusal naming the process, got %v", err)
+	}
+	if _, statErr := os.Stat(wtDir); statErr != nil {
+		t.Fatalf("the worktree must survive the refusal: %v", statErr)
 	}
 }

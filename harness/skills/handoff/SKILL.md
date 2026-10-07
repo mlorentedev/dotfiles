@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: cf2aab8597e30c1d
+generated_sha: d84e6c2b7beddbef
 id: handoff-skill
 type: skill
 status: active
@@ -236,6 +236,7 @@ The board (2b) is not the only place a promise can hide, and it is not the one t
    # For worktrees associated with merged PRs:
    git worktree remove ../<repo>-wt-<slug>
    ```
+   **Never the worktree this session was launched from**, nor one holding the shell's working directory. Removing it strands the session, and the harness cannot resume a conversation whose launch directory is gone (dotfiles #1653; `dotf worktree done` refuses it, `--force` included). List it under **Open threads** for removal after the session ends instead.
 3. **Prune Remote Refs:** Run `git fetch --prune` on all touched repos.
 4. **Delete Merged Local Branches:**
    ```bash
