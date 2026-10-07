@@ -96,6 +96,12 @@ func shortHost() string {
 
 // readGitdirPointer reads a linked worktree's `.git` file and returns the gitdir
 // it names, if it points into a `worktrees/` directory.
+//
+// A relative pointer is relative to the `.git` file's own directory, which is
+// what git writes under `worktree.useRelativePaths`. Read as given, it resolved
+// against the process's working directory instead: from a subdirectory, the
+// project became ".." and HEAD was read from the wrong place, so the thread
+// key named the wrong line of work (MEMORY-016, #1930).
 func readGitdirPointer(path string) (string, bool) {
 	raw, err := os.ReadFile(path) // #nosec G304 -- the .git pointer of the cwd being resolved
 	if err != nil {
@@ -105,7 +111,11 @@ func readGitdirPointer(path string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	target = filepath.Clean(strings.TrimSpace(target))
+	target = strings.TrimSpace(target)
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(path), target)
+	}
+	target = filepath.Clean(target)
 	if filepath.Base(filepath.Dir(target)) != "worktrees" {
 		return "", false
 	}

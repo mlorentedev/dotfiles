@@ -220,7 +220,10 @@ The key is the branch, so the same line of work resumed on another machine
 resolves to the same journal. See handoff-write for the full rule.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			key := mem.ThreadKeyForCwd()
+			key, err := mem.ThreadKeyForCwd()
+			if err != nil {
+				return err
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "thread   %s\n", key)
 			if date != "" && project != "" && agent != "" {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "journal  sessions/%s\n",
