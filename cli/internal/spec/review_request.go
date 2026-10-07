@@ -171,23 +171,31 @@ func earliestAdding(repoRoot, rel string) string {
 // it shows as a delete and an add. A file deleted elsewhere in the same commit
 // whose place in its folder matches a file added under rel is read as that
 // unpaired move, and refused rather than reported as "genuinely new here".
+//
+// Both readings are confined to the specs root, rel's first component: a spec
+// folder lives there under every name it has had. A file moved in from outside
+// it (docs/notes.md into the spec) is content joining the folder, not the
+// folder moving, and a delete outside it is unrelated work in the same commit.
 func renamedFrom(repoRoot, parent, commit, rel string) (from string, renamed bool) {
 	changes, err := treeChanges(repoRoot, parent, commit)
 	if err != nil {
 		return "", true
 	}
+	root, _, _ := strings.Cut(rel, "/")
+	root += "/"
 	var added, deleted []string
 	for _, c := range changes {
 		inRel := strings.HasPrefix(c.dst, rel+"/")
+		fromRoot := strings.HasPrefix(c.src, root) && !strings.HasPrefix(c.src, rel+"/")
 		switch {
-		case c.status == 'R' && inRel:
+		case c.status == 'R' && inRel && fromRoot:
 			renamed = true
 			if dir := renamedDir(c.src, c.dst, rel); dir != "" {
 				return dir, true
 			}
 		case c.status == 'A' && inRel:
 			added = append(added, strings.TrimPrefix(c.dst, rel+"/"))
-		case c.status == 'D' && !strings.HasPrefix(c.src, rel+"/"):
+		case c.status == 'D' && fromRoot:
 			deleted = append(deleted, c.src)
 		}
 	}
