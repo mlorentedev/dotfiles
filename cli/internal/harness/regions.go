@@ -10,27 +10,42 @@ const (
 	GeneratedEndMarker   = "<!-- END HARNESS GENERATED -->"
 )
 
+// CatalogMarker identifies the copilot skill-catalog region among the GENERATED
+// ones: compile-harness.sh writes it into the BEGIN line ("— skill catalog from
+// vault …"). TestCatalogMarkerMatchesCompileHarness pins the two together.
+const CatalogMarker = "skill catalog"
+
+// catalogSlot is the empty BEGIN line a source carries where the catalog is
+// injected at deploy time (ai/copilot/copilot-instructions.md).
+const catalogSlot = GeneratedBeginPrefix + " -->"
+
+// deployOnly reports whether a region with this BEGIN line belongs to the
+// deploy, not to the source: the persona presence roster, the copilot skill
+// catalog, and the empty slot a source reserves for that catalog. Every other
+// region (the enforced-pattern GENERATED region, with its sha and provenance)
+// is part of the source and compared like its text.
+func deployOnly(begin string) bool {
+	switch {
+	case strings.HasPrefix(begin, PresenceBeginPrefix):
+		return true
+	case strings.HasPrefix(begin, GeneratedBeginPrefix):
+		return strings.Contains(begin, CatalogMarker) || strings.TrimSpace(begin) == catalogSlot
+	}
+	return false
+}
+
 // DeployedMatchesSource reports whether a deployed instruction file holds its
-// source: the source verbatim, plus regions written only at deploy time (the
-// AGENT-PRESENCE roster, the copilot skill catalog). A region is deploy-only
-// when its BEGIN line does not appear in the source. A region the source
+// source, ignoring the deploy-only regions on both sides. A region the source
 // carries, such as the enforced-pattern GENERATED region, is compared like any
 // other text, so a refreshed source region reads as drift on a stale deployed
-// copy. Stripping every region on both sides could not see that (F-064, #2013).
+// copy; stripping every region on both sides could not see that (F-064, #2013).
 //
-// Line endings are normalised first (WIN-008/#1289), the blank line an
-// appended region leaves before its BEGIN line is dropped with it, and
-// trailing newlines are not content (#1308).
+// Line endings are normalised first (WIN-008/#1289), the blank line before a
+// stripped region goes with it, and trailing newlines are not content (#1308).
 func DeployedMatchesSource(deployed, source string) bool {
-	source = strings.ReplaceAll(source, "\r\n", "\n")
-	inSource := map[string]bool{}
-	for _, l := range strings.Split(source, "\n") {
-		if strings.HasPrefix(l, GeneratedBeginPrefix) || strings.HasPrefix(l, PresenceBeginPrefix) {
-			inSource[l] = true
-		}
-	}
-	kept := stripRegions(deployed, func(begin string) bool { return !inSource[begin] })
-	return strings.TrimRight(kept, "\n") == strings.TrimRight(source, "\n")
+	d := strings.TrimRight(stripRegions(deployed, deployOnly), "\n")
+	s := strings.TrimRight(stripRegions(source, deployOnly), "\n")
+	return d == s
 }
 
 // stripRegions removes the harness marker regions whose BEGIN line drop

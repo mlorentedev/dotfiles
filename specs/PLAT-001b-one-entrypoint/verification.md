@@ -24,6 +24,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (PR 2b, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues; bats on the touched suites (copilot-config, setup-windows, guard-bats-negation) -> 145/145 ok
 - Manual run (PR 2b): `dotf converge --plan` -> records-mirror 71 to write, records-harness 3 instruction files to deploy; `dotf converge` -> `2 changed`; second run -> `0 changed, 2 ok`; doctor 51 -> 59 passing
 
+- Test suite (PR 2c-1, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Tests: `TestDeployedMatchesSource` (7 cases), `TestCatalogMarkerMatchesCompileHarness`, `TestTheCopilotSourceSlotIsDeployOnly`, `TestCheckInstructionDrift_ARefreshedSourceRegionIsDrift`, `TestRecordsHarness_ARefreshedSourceRegionIsPlannedAndFailsTheProbe`
+- Windows CI (PR 2c-1, first push): doctor reported `.copilot/copilot-instructions.md has drifted`, a false positive. The source reserves an empty `<!-- BEGIN HARNESS GENERATED -->` slot that the deploy fills with the skill catalog, and the first rule ("deploy-only iff the BEGIN line is absent from the source") stripped the catalog from the deployed copy but kept the slot in the source
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -32,6 +35,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The `platforms` matcher moved from the tool catalog into `internal/platform`, so the catalog and the reconcilers cannot drift apart (ADR-045 decision 7).
 - PR 2b drives the instruction files from `harness/manifest.json` `agents.presence[]`, not from new `ai/deploy.json` entries. A new deploy field needs a manifest version the installed `dotf` cannot read, and a `replace` entry would fight `harness presence` over the same file, so AC3 could never pass. Skills and bindings move to a PR 2c.
 - PR 2b runs `compile-harness.sh --deploy` as the records-harness reconciler instead of porting it: the script already deploys the instruction files, the skill catalog and the presence regions in the right order on Linux and macOS, so a port in 2b would have needed a new marker parser and a `dotf` release before the twins could use it (#1814 class). The comparator moved to `harness.StripRegions` is blind to a changed enforced region (F-064), which the 2c port fixes.
+
+- PR 2c-1: deploy-only regions are identified by kind, on both sides: the presence roster, the skill catalog (its BEGIN line names it; pinned against compile-harness.sh) and the empty slot a source reserves for that catalog. Absence from the source was the first rule. It produced a false drift on Windows CI for copilot and would have treated a stale enforced region as deploy-only; the enforced region, with its sha and provenance, is now always compared literally
 
 ## Promotion candidates
 

@@ -1,6 +1,10 @@
 package harness
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+)
 
 const enforcedV1 = "<!-- BEGIN HARNESS GENERATED (sha256:aaa) -->\nrule one\n<!-- END HARNESS GENERATED -->\n"
 const enforcedV2 = "<!-- BEGIN HARNESS GENERATED (sha256:bbb) -->\nrule one\nrule two\n<!-- END HARNESS GENERATED -->\n"
@@ -24,6 +28,9 @@ func TestDeployedMatchesSource(t *testing.T) {
 		{"a refreshed source region is drift", source + presence, "# CLAUDE\n\n" + enforcedV2 + "\ntail\n", false},
 		{"text outside the regions differs", source + presence, "# CLAUDE v2\n\n" + enforcedV1 + "\ntail\n", false},
 		{"the deployed copy lost a source region", "# CLAUDE\n\ntail\n" + presence, source, false},
+		// copilot-instructions.md reserves an empty GENERATED slot the deploy
+		// fills with the skill catalog: measured as a false drift on Windows CI.
+		{"the catalog filled the source's empty slot", "# COPILOT\n" + catalog + "\nmore\n", "# COPILOT\n\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n\nmore\n", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -31,5 +38,33 @@ func TestDeployedMatchesSource(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestCatalogMarkerMatchesCompileHarness(t *testing.T) {
+	raw, err := os.ReadFile("../../../scripts/compile-harness.sh")
+	if err != nil {
+		t.Skipf("compile-harness.sh unreadable: %v", err)
+	}
+	if !strings.Contains(string(raw), "— "+CatalogMarker+" from vault") {
+		t.Errorf("compile-harness.sh no longer writes %q into the catalog BEGIN line; deploy-only detection would miss the catalog", CatalogMarker)
+	}
+}
+
+// The real source: copilot-instructions.md's empty slot must be read as the
+// catalog's place, or every machine with copilot reports false drift.
+func TestTheCopilotSourceSlotIsDeployOnly(t *testing.T) {
+	raw, err := os.ReadFile("../../../ai/copilot/copilot-instructions.md")
+	if err != nil {
+		t.Skipf("copilot-instructions.md unreadable: %v", err)
+	}
+	slot := false
+	for _, l := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(l, GeneratedBeginPrefix) {
+			slot = slot || deployOnly(l)
+		}
+	}
+	if !slot {
+		t.Error("ai/copilot/copilot-instructions.md has no GENERATED slot deployOnly recognises")
 	}
 }
