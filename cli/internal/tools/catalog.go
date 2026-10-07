@@ -55,7 +55,10 @@ type Source struct {
 	// single template) is required because release naming is irregular across OSes
 	// — e.g. sops is "sops-v{version}.linux.{goarch}" but "sops-v{version}.{goarch}.exe"
 	// on Windows (no OS token, arch before .exe). Templates expand {version} and
-	// {goarch}.
+	// {goarch}. A key may also be "GOOS/GOARCH" (e.g. "darwin/arm64"), which wins
+	// over the GOOS key, for releases whose tokens {goarch} cannot spell (mise:
+	// "linux-x64", "macos-arm64"). A platform with no key is not supported: the
+	// installer skips it, and Load rejects a key that names no known platform.
 	Asset map[string]string `json:"asset"`
 	// Checksums is the release's sha256 manifest filename — a SINGLE file covering
 	// every OS asset (so no per-OS map). The name is per-repo: dotf ships
@@ -89,6 +92,18 @@ func Load(path string) (Catalog, error) {
 		// A misspelt platform makes the tool unsupported everywhere, and the
 		// installer reports an unsupported tool as a skip, so nothing else
 		// would ever say so.
+		// A missing asset is a skip, so a release tool with no asset map (or
+		// one misspelt "assets", which the decoder drops) would install
+		// nothing anywhere and say only "no release asset".
+		if t.Source.Type == "github-release" && len(t.Source.Asset) == 0 {
+			return Catalog{}, fmt.Errorf("parse package catalog %q: github-release tool %q declares no asset", path, t.Name)
+		}
+		// Likewise a misspelt key.
+		for key := range t.Source.Asset {
+			if !platform.ValidKey(key) {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has asset key %q (want a GOOS, or GOOS/GOARCH with amd64 or arm64)", path, t.Name, key)
+			}
+		}
 		if p := platform.Unknown(t.Source.Platforms); p != "" {
 			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q lists unknown platform %q (want linux, darwin or windows)", path, t.Name, p)
 		}
@@ -104,8 +119,15 @@ func (t Tool) SupportsOS(goos string) bool {
 
 // AssetName resolves the release-asset filename for the given OS/arch, or "" when
 // the catalog declares no asset for that OS (a tool unavailable on this platform).
+//
+// A "goos/goarch" key names the asset for exactly one platform and wins over the
+// "goos" key, for releases whose arch or OS tokens {goarch} cannot spell (mise:
+// linux-x64, macos-arm64).
 func (t Tool) AssetName(goos, goarch string) string {
-	tmpl, ok := t.Source.Asset[goos]
+	tmpl, ok := t.Source.Asset[goos+"/"+goarch]
+	if !ok {
+		tmpl, ok = t.Source.Asset[goos]
+	}
 	if !ok {
 		return ""
 	}

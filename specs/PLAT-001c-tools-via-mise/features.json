@@ -1,0 +1,44 @@
+[
+  {
+    "id": "PLAT-001c-tools-via-mise-f1",
+    "behavior": "AC1: a goos/goarch asset key wins over goos, and goos still resolves alone",
+    "verification": "cd cli && go test ./internal/tools/ -run '^TestAssetName_PrefersGoosGoarchOverGoos$' -count=1 -v | grep -q -- '--- PASS: TestAssetName_PrefersGoosGoarchOverGoos'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f2",
+    "behavior": "AC2: ./name and *name checksum manifest lines verify name",
+    "verification": "cd cli && go test ./internal/tools/ -run '^TestExpectedChecksum_AcceptsSha256sumNameForms$' -count=1 -v | grep -q -- '--- PASS: TestExpectedChecksum_AcceptsSha256sumNameForms'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f3",
+    "behavior": "AC3: install skips a github-release tool with no asset for this OS/arch, without an error",
+    "verification": "cd cli && go test ./internal/tools/ -run '^TestInstall_NoAssetForThisPlatformIsSkippedNotFailed$' -count=1 -v | grep -q -- '--- PASS: TestInstall_NoAssetForThisPlatformIsSkippedNotFailed'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f4",
+    "behavior": "AC4: the catalog installs the pinned mise, checksum-verified and exec-probed",
+    "verification": "dotf tools install mise && mise --version",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f5",
+    "behavior": "AC5: dotf tools sync renders conf.d/dotfiles.toml, installs, probes, and is idempotent",
+    "verification": "cd cli && go test ./internal/tools/ -run '^TestSync_RendersInstallsProbesAndIsIdempotent$' -count=1 -v | grep -q -- '--- PASS: TestSync_RendersInstallsProbesAndIsIdempotent'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f6",
+    "behavior": "AC6: converge runs the tools step after the records step",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRegistry_ToolsRunAfterRecords$' -count=1 -v | grep -q -- '--- PASS: TestRegistry_ToolsRunAfterRecords'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

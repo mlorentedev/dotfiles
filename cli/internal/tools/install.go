@@ -227,12 +227,17 @@ func (in *Installer) missingManager(t Tool) bool {
 }
 
 // installRelease provisions a github-release tool: download → verify sha256 →
-// place + chmod. A failure at any step leaves Dest untouched (the binary is
-// staged in a temp dir and only moved into place after verification passes).
+// stage and run the binary, which must report a version at or above the pin
+// (lesson 337) → place + chmod. A failure at any step leaves Dest untouched (the
+// binary is staged and only moved into place after both checks pass). A
+// platform with no asset is a skip, as Plan reports it.
 func (in *Installer) installRelease(t Tool) (Result, error) {
 	asset := t.AssetName(in.GOOS, in.GOARCH)
 	if asset == "" {
-		return Skipped, fmt.Errorf("%s: no release asset for %s/%s", t.Name, in.GOOS, in.GOARCH)
+		// Plan reports this as unsupported; Install agrees, so the two cannot
+		// disagree and an entry for one platform never fails the others.
+		_, _ = fmt.Fprintf(in.Out, "%s: no release asset for %s/%s; skipping\n", t.Name, in.GOOS, in.GOARCH)
+		return Skipped, nil
 	}
 	sumsName := t.ChecksumsName(in.GOARCH)
 	if sumsName == "" {
@@ -473,7 +478,9 @@ func expectedChecksum(sumsPath, assetName string) (string, error) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[1] == assetName {
+		// sha256sum writes "*name" in binary mode, and a manifest generated
+		// from the release dir lists "./name" (mise's SHASUMS256.txt).
+		if len(fields) == 2 && strings.TrimPrefix(strings.TrimPrefix(fields[1], "*"), "./") == assetName {
 			return fields[0], nil
 		}
 	}

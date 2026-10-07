@@ -32,3 +32,14 @@ func TestUnknown(t *testing.T) {
 		t.Errorf("a misspelt platform: got %q, want %q", got, "macos")
 	}
 }
+
+func TestValidKey(t *testing.T) {
+	for key, want := range map[string]bool{
+		"linux": true, "darwin/arm64": true, "windows/amd64": true,
+		"macos": false, "linux/x64": false, "darwin/arm64/extra": false, "": false,
+	} {
+		if got := ValidKey(key); got != want {
+			t.Errorf("ValidKey(%q) = %v, want %v", key, got, want)
+		}
+	}
+}

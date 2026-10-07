@@ -4,15 +4,31 @@
 // OS that is not listed is skipped, not failed.
 package platform
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
-// known are the GOOS values a declaration may list.
-var known = []string{"linux", "darwin", "windows"}
+// known are the GOOS values a declaration may list, and knownArch the GOARCH
+// values a per-architecture key may name.
+var (
+	known     = []string{"linux", "darwin", "windows"}
+	knownArch = []string{"amd64", "arm64"}
+)
 
 // Supports reports whether a declaration listing platforms applies on goos:
 // true when the list is empty, otherwise only for a listed GOOS.
 func Supports(platforms []string, goos string) bool {
 	return len(platforms) == 0 || slices.Contains(platforms, goos)
+}
+
+// ValidKey reports whether key names a platform as "goos" or "goos/goarch".
+func ValidKey(key string) bool {
+	goos, goarch, specific := strings.Cut(key, "/")
+	if !slices.Contains(known, goos) {
+		return false
+	}
+	return !specific || slices.Contains(knownArch, goarch)
 }
 
 // Unknown returns the first listed platform that is not a known GOOS, or "".
