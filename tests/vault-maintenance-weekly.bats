@@ -185,7 +185,7 @@ EOF
 # Deliberately NOT a golden-parity suite, unlike increments 1 and 2. The twin's
 # output is a timestamped log wrapping two subcommands whose byte-parity is
 # already proven by knowledge-crystallize-go-parity.bats and
-# vault-health-go-parity.bats; re-proving it through a third fixture scheme
+# cli/internal/vault/health_golden_test.go; re-proving it through a third fixture scheme
 # would measure the same thing a third time. What is left to characterize is
 # the WRAPPER — log location, section framing, exit status — and those are
 # behaviours. The unit-level seams (issue regex, notification threshold, the
