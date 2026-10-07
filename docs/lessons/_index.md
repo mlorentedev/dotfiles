@@ -373,4 +373,5 @@ tags: [lessons, index, dotfiles]
 | [353 - golangci-lint's cache reports another worktree's results](lesson-353-golangci-lint-s-cache-reports-another-worktree-s-results.md) | 2026-10-07 |
 | [354 - A skip reason covers only the question it answers](lesson-354-a-skip-reason-covers-only-the-question-it-answers.md) | 2026-10-07 |
 | [355 - After a squash merge, ask the merged head by containment](lesson-355-after-a-squash-merge-ask-the-merged-head-by-containment.md) | 2026-10-07 |
+| [356 - A required check is only as required as its needs](lesson-356-a-required-check-is-only-as-required-as-its-needs.md) | 2026-10-07 |
 <!-- END GENERATED -->

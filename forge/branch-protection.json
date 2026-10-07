@@ -16,6 +16,10 @@
           "strict": true,
           "checks": [
             {
+              "context": "changes",
+              "app_id": 15368
+            },
+            {
               "context": "cli-gate",
               "app_id": 15368
             },
