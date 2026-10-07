@@ -370,4 +370,6 @@ tags: [lessons, index, dotfiles]
 | [350 - A test that walks every command runs real commands](lesson-350-a-test-that-walks-every-command-runs-real-commands.md) | 2026-10-07 |
 | [351 - A seam OR'd with the host check only fails on that host](lesson-351-a-seam-ored-with-the-host-check-only-fails-on-that-host.md) | 2026-10-07 |
 | [352 - A mid-test [[ ]] assertion is a no-op under bash 3.2](lesson-352-a-mid-test-double-bracket-assertion-is-a-no-op-under-bash-3-2.md) | 2026-10-07 |
+| [353 - golangci-lint's cache reports another worktree's results](lesson-353-golangci-lint-s-cache-reports-another-worktree-s-results.md) | 2026-10-07 |
+| [354 - A skip reason covers only the question it answers](lesson-354-a-skip-reason-covers-only-the-question-it-answers.md) | 2026-10-07 |
 <!-- END GENERATED -->
