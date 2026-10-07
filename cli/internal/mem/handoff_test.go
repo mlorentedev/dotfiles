@@ -509,12 +509,19 @@ func TestWriteThreadKeepsOrdinaryHeadingsAsContent(t *testing.T) {
 			if !strings.Contains(out, body) {
 				t.Errorf("body not written:\n%s", out)
 			}
-			// The foreign thread is byte-identical after the write.
-			const foreign = "### thread: wt-pi-harness (fix/harness-045-reviewer-findings)\n\n" +
-				"**Last task:** #561 binding core, PR #1272 merged.\n" +
-				"**Next action:** AC7 guards before migrating the 35 skills.\n"
-			if !strings.Contains(out, foreign) {
-				t.Errorf("the foreign thread changed:\n%s", out)
+			// Every byte outside the written thread is unchanged: the document up
+			// to its marker, and from the foreign thread's marker to the end.
+			// Containment alone would pass a foreign block emitted twice or moved.
+			own := strings.Index(memoryWithTwoThreads, "### thread: wt-cli-023")
+			foreign := strings.Index(memoryWithTwoThreads, "### thread: wt-pi-harness")
+			if !strings.HasPrefix(out, memoryWithTwoThreads[:own]) {
+				t.Errorf("the document before the written thread changed:\n%s", out)
+			}
+			if !strings.HasSuffix(out, memoryWithTwoThreads[foreign:]) {
+				t.Errorf("the foreign thread or the tail after it changed:\n%s", out)
+			}
+			if n := strings.Count(out, "### thread: wt-pi-harness"); n != 1 {
+				t.Errorf("the foreign thread appears %d times:\n%s", n, out)
 			}
 		})
 	}
