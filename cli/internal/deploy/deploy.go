@@ -161,8 +161,9 @@ func backupOnce(dst string, declared os.FileMode) (string, error) {
 
 // backupLink re-creates the link at backup, so `ls -l` shows where it pointed
 // and restoring it is a rename. Where links cannot be created (Windows without
-// the privilege) it keeps the content the link resolved to instead, and a
-// dangling link there leaves nothing to keep: the file it named is untouched.
+// the privilege) it keeps the content the link resolved to instead, narrowed
+// like any other backup, and a dangling link there leaves nothing to keep: the
+// file it named is untouched.
 func backupLink(dst, backup string, declared os.FileMode) (string, error) {
 	target, err := os.Readlink(dst)
 	if err != nil {
@@ -171,10 +172,11 @@ func backupLink(dst, backup string, declared os.FileMode) (string, error) {
 	if err := symlink(target, backup); err == nil {
 		return backup, nil
 	}
-	if _, err := os.Stat(dst); err != nil {
+	info, err := os.Stat(dst)
+	if err != nil {
 		return "", nil //nolint:nilerr // dangling: no content to keep
 	}
-	return backupContent(dst, backup, declared.Perm())
+	return backupContent(dst, backup, info.Mode().Perm()&declared.Perm())
 }
 
 // symlink is os.Symlink, swappable so the fallback above runs on every host.

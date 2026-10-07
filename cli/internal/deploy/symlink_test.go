@@ -174,3 +174,33 @@ func TestDeploy_ADanglingLinkWhereLinksCannotBeCreatedNeedsNoBackup(t *testing.T
 		t.Errorf("a dangling link has nothing to keep, got backup %q", res.BackedUp)
 	}
 }
+
+// The fallback narrows like a regular backup: a target the operator tightened
+// to 0600 is not copied out at a 0644 the config happens to declare.
+func TestDeploy_TheLinkedContentBackupKeepsATighterTargetMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not meaningful here")
+	}
+	root, home := repoWithSource(t, `{"k":"new"}`), t.TempDir()
+	target := writeTarget(t, `{"k":"old"}`)
+	if err := os.Chmod(target, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	linkedDst(t, home, target)
+	symlink = func(string, string) error { return os.ErrPermission }
+	t.Cleanup(func() { symlink = os.Symlink })
+	c := piConfig()
+	c.Mode = "0644"
+
+	res, err := Deploy(c, root, home, noResolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(res.BackedUp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Errorf("backup must keep the target's tighter 0600, got %o", info.Mode().Perm())
+	}
+}
