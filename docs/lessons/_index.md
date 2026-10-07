@@ -356,3 +356,4 @@ tags: [lessons, index, dotfiles]
 | [336 - A spec's measurement goes stale when another change moves the engine under it](lesson-336-a-spec-measurement-goes-stale-when-another-change-moves-the-engine.md) | 2026-10-03 |  |
 | [337 - A checksum proves the bytes, not that they run here](lesson-337-a-checksum-proves-the-bytes-not-that-they-run-here.md) | 2026-10-05 |  |
 | [338 - The engine you are about to name may already be a row in another epic](lesson-338-the-engine-you-are-about-to-name-may-already-be-a-row-in-another-epic.md) | 2026-10-06 |  |
+| [341 - A merged PR does not mean its branch is merged](lesson-341-a-merged-pr-does-not-mean-its-branch-is-merged.md) | 2026-10-06 |  |
