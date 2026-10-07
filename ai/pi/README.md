@@ -13,6 +13,7 @@ SSOT (see root `AGENTS.md`).
 | `packages.json` | (not deployed — reconciled) | Declared pi packages, each pinned. Setup runs `dotf pi packages apply` on every run: it removes live packages that are not declared and installs declared ones that are missing. See below. |
 | `mcp.json` | `~/.pi/agent/mcp.json` | Model Context Protocol servers (`hive`, `context7`, `sequential-thinking`). Deployed via `dotf deploy` (`ai/deploy.json`, `requires: "pi"`). Pi's native MCP support reads it; no extension package is needed. Note: `context7` routes context over HTTPS to an external API. |
 | `nan-provider.json` | `~/.pi/agent/nan-provider.json` | `pi-nan-provider`'s own state file. Only `mediaMcp: false` is managed (`strategy: merge`); `webSearch` stays the box's own `/nan-mcp` toggle. See *NaN provider package* below. |
+| `nan-package-windows.json` | (not deployed — test data) | The pinned `pi-nan-provider`'s context window per model, committed so the opencode/pi parity check runs offline (#1866). Bumping the pin fails `tests/nan-context-windows.bats` until `source` follows it, and `pi-nan-package` CI until the windows match; that failure prints them. |
 | (canonical `AGENTS.md`) | `~/.pi/agent/AGENTS.md` | Cross-agent SSOT system prompt, deployed verbatim (same as opencode). |
 
 Not managed: `auth.json` (OAuth/secret state) and `skills/` (runtime symlinks).
@@ -133,8 +134,9 @@ the two sets are curated independently. `tests/pi-config.bats` asserts this list
 `settings.json`'s `enabledModels`.
 
 Default: `nan/deepseek-v4-flash`, thinking level `high`. Change in `settings.json`. (Per-model
-context windows come from `pi-nan-provider`'s snapshot; `tests/pi-nan-package.bats` holds
-opencode's to the same numbers.)
+context windows come from `pi-nan-provider`'s snapshot, copied into `nan-package-windows.json`;
+`tests/nan-context-windows.bats` holds opencode's to the same numbers offline, and
+`tests/pi-nan-package.bats` holds the copy to the installed package in CI.)
 
 ## Secret
 
