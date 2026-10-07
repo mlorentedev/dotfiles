@@ -126,3 +126,19 @@ func TestWorktreeDoneRefusesANameThatIsBothAPathAndASlug(t *testing.T) {
 		t.Errorf("the sibling worktree was touched: %v", err)
 	}
 }
+
+// A directory where a slug points that is not a git worktree is named as such,
+// not handed to git status to fail with a bare exit status.
+func TestWorktreeDoneNamesASiblingThatIsNotAWorktree(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	stray := filepath.Join(filepath.Dir(repo), "repo-wt-stray")
+	if err := os.Mkdir(stray, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	_, err := executeWorktree(t, "done", "stray", "--repo", repo)
+	if err == nil || !strings.Contains(err.Error(), stray) || !strings.Contains(err.Error(), "not a git worktree") {
+		t.Fatalf("got %v, want an error naming %s as not a git worktree", err, stray)
+	}
+}

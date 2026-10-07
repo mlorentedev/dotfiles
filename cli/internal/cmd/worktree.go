@@ -311,18 +311,26 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 	case isPath && isSlug && asPath != sibling:
 		return "", fmt.Errorf("%q names two directories, %s (as a path) and %s (as a slug); pass the full path of the one to remove", arg, asPath, sibling)
 	case isPath:
-		if top, err := worktree.ResolveWorktreeRoot(asPath); err == nil {
-			return top, nil
-		}
-		return asPath, nil
+		return worktreeAt(asPath)
 	case isSlug:
-		return sibling, nil
+		return worktreeAt(sibling)
 	case rootErr != nil:
 		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, rootErr)
 	case sibling == "":
 		return "", fmt.Errorf("no worktree at %s", asPath)
 	}
 	return "", fmt.Errorf("no worktree %q: neither %s (as a path) nor %s (as a slug, the path add creates) is a directory", arg, asPath, sibling)
+}
+
+// worktreeAt returns the top of the git worktree holding dir, or an error that
+// names dir when it is not inside one, rather than letting git status fail on
+// it later with a bare exit status.
+func worktreeAt(dir string) (string, error) {
+	top, err := worktree.ResolveWorktreeRoot(dir)
+	if err != nil {
+		return "", fmt.Errorf("%s is a directory but not a git worktree", dir)
+	}
+	return top, nil
 }
 
 func isDirectory(path string) bool {
