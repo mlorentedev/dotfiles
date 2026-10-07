@@ -181,6 +181,12 @@ func TestSetStatus(t *testing.T) {
 			notWant:   "status: archived stays as-is.",
 		},
 		{
+			name:      "CRLF fences (CLI-095): value replaced, line endings kept",
+			in:        "---\r\nstatus: implementing # x\r\n---\r\nbody\r\n",
+			newStatus: "archived",
+			want:      "---\r\nstatus: archived # x\r\n---\r\n",
+		},
+		{
 			name:      "no frontmatter => unchanged",
 			in:        "no frontmatter here\nstatus: draft\n",
 			newStatus: "archived",
@@ -233,6 +239,64 @@ func TestArchiveMovesAndSetsStatus(t *testing.T) {
 	got := mustRead(t, filepath.Join(want, "proposal.md"))
 	if !strings.Contains(got, "status: archived # draft | implementing") {
 		t.Errorf("status not rewritten (comment must survive):\n%s", got)
+	}
+}
+
+// CLI-095 (#1976): a CRLF checkout (Windows, core.autocrlf) carries "---\r"
+// fences. The archive reported `status: archived` and left the frontmatter on
+// its old token. Every lifecycle token, both line endings, end to end.
+func TestArchiveRewritesEveryStatusTokenWithEitherLineEnding(t *testing.T) {
+	for _, eol := range []string{"\n", "\r\n"} {
+		for _, from := range []string{"draft", "implementing", "verifying", "archived"} {
+			root := t.TempDir()
+			proposal := strings.Join([]string{"---", "id: AI-001-x",
+				"status: " + from + " # draft | implementing | verifying | archived", "---", "# AI-001-x", ""}, eol)
+			writeSpec(t, root, "AI-001-x", map[string]string{
+				"proposal.md": proposal,
+				"review.md":   passingReview("AI-001-x"),
+			})
+			target, err := Archive(root, "AI-001-x", ArchiveOptions{Abandoned: from == "archived"})
+			if err != nil {
+				t.Fatalf("eol=%q from=%s: Archive: %v", eol, from, err)
+			}
+			want := "archived"
+			if from == "archived" {
+				want = "abandoned"
+			}
+			got := mustRead(t, filepath.Join(target, "proposal.md"))
+			if !strings.Contains(got, eol+"status: "+want+" # draft | implementing | verifying | archived"+eol) {
+				t.Errorf("eol=%q from=%s: frontmatter not rewritten to %s:\n%q", eol, from, want, got)
+			}
+		}
+	}
+}
+
+// The report must not claim a rewrite that did not happen: a proposal with no
+// status: line in its frontmatter, or no frontmatter at all, gets one.
+func TestArchiveRecordsAStatusWhereTheProposalHadNone(t *testing.T) {
+	for name, proposal := range map[string]string{
+		"no frontmatter":              "# AI-001-x\nstatus: draft\n",
+		"frontmatter, no status":      "---\nid: AI-001-x\n---\n# AI-001-x\n",
+		"CRLF frontmatter, no status": "---\r\nid: AI-001-x\r\n---\r\n# AI-001-x\r\n",
+	} {
+		root := t.TempDir()
+		writeSpec(t, root, "AI-001-x", map[string]string{
+			"proposal.md": proposal,
+			"review.md":   passingReview("AI-001-x"),
+		})
+		target, err := Archive(root, "AI-001-x", ArchiveOptions{})
+		if err != nil {
+			t.Fatalf("%s: Archive: %v", name, err)
+		}
+		got := mustRead(t, filepath.Join(target, "proposal.md"))
+		lines := strings.Split(got, "\n")
+		i := frontmatterStatusLine(lines)
+		if i < 0 || strings.TrimSpace(lines[i]) != "status: archived" {
+			t.Errorf("%s: no frontmatter status: archived:\n%q", name, got)
+		}
+		if strings.Contains(proposal, "\r\n") && strings.Count(got, "\n") != strings.Count(got, "\r\n") {
+			t.Errorf("%s: mixed line endings after the insertion:\n%q", name, got)
+		}
 	}
 }
 
