@@ -173,6 +173,17 @@ STUB
     grep -qF 'SDD_LABELS=[<unset>]' "$GATE_LOG"
 }
 
+@test "spec-gate-prepush: the --jq expression picks the first PR and prints nothing for none" {
+    # The stub gh ignores its arguments, and real gh cannot run the query
+    # offline, so the expression the adapter hands to --jq is read from the
+    # script itself and evaluated here. A typo in it would otherwise make every
+    # push fall through silently with no PR context.
+    expr=$(sed -n "s/.*--jq '\([^']*\)'.*/\1/p" "$SCRIPTS_DIR/spec-gate-prepush.sh")
+    [ "$(printf '%s\n' "$expr" | grep -c .)" -eq 1 ]
+    [ -z "$(printf '[]' | jq -r "$expr")" ]
+    [ "$(printf '[{"body":"first"},{"body":"second"}]' | jq -c "$expr")" = '{"body":"first"}' ]
+}
+
 @test "spec-gate-prepush: a null body and no labels become empty, not the string null" {
     export STUB_PR_JSON='{"labels":[],"body":null,"author":{"login":"dependabot[bot]"}}'
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD

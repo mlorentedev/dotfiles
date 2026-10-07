@@ -50,7 +50,7 @@ teardown() {
 
 @test "real gh accepts every flag and --json field the adapter asks for" {
     cd "$OUTSIDE" || return 1
-    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author
+    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author --jq '.[0] // empty'
     # It must fail (there is no repo here) but NOT because of the field names.
     [ "$status" -ne 0 ]
     [[ "$output" != *"Unknown JSON field"* ]]
@@ -58,7 +58,7 @@ teardown() {
 
 @test "the field check is a detector, not a tautology" {
     cd "$OUTSIDE" || return 1
-    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author,notAFieldName
+    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author,notAFieldName --jq '.[0] // empty'
     [ "$status" -ne 0 ]
     [[ "$output" == *"Unknown JSON field"* ]]
     [[ "$output" == *"notAFieldName"* ]]
