@@ -736,6 +736,45 @@ func TestArchiveTicksTheChecklistItemsItPerformed(t *testing.T) {
 	}
 }
 
+// A verification.md that exists and cannot be read refuses before anything
+// moves. On the full route the promotion preflight already reads it; a
+// fast-track spec carries its promotions in spec.md, so the archive's own read
+// is the only one. Silently skipping it would archive with the checklist
+// contradicting the tree.
+func TestArchiveRefusesAnUnreadableVerificationBeforeMoving(t *testing.T) {
+	root := t.TempDir()
+	dir := writeSpec(t, root, "AI-001-x", map[string]string{
+		"spec.md":         "---\nstatus: verifying\n---\n" + answeredPromotions,
+		"verification.md": "",
+	})
+	// A directory in its place: a read error that is not "does not exist", on
+	// every OS and as any user.
+	v := filepath.Join(dir, "verification.md")
+	if err := os.Remove(v); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(v, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{}); err == nil || !strings.Contains(err.Error(), "verification.md") {
+		t.Fatalf("archived past an unreadable verification.md: err=%v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("the spec moved although the archive refused: %v", err)
+	}
+}
+
+func TestUntickedArchiveChecklistNamesWhatIsLeftForAHuman(t *testing.T) {
+	ticked := tickArchiveChecklist(templateArchiveChecklist(t), false)
+	left := UntickedArchiveChecklist(ticked)
+	if len(left) != 1 || !strings.Contains(left[0], "Bitácora board ticket") {
+		t.Errorf("want only the board item left, got %q", left)
+	}
+	if got := UntickedArchiveChecklist("# x\n- [ ] not in the section\n"); got != nil {
+		t.Errorf("an item outside the section was reported: %q", got)
+	}
+}
+
 func hasItem(content, box, fragment string) bool {
 	for _, line := range strings.Split(content, "\n") {
 		if strings.HasPrefix(line, "- "+box) && strings.Contains(line, fragment) {

@@ -310,6 +310,13 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 	if _, statErr := os.Stat(target); statErr == nil {
 		return "", fmt.Errorf("already in archive: %s", target)
 	}
+	// verification.md is read before anything moves: a missing one is a no-op,
+	// but one that exists and cannot be read would leave the checklist
+	// contradicting the tree, so that refuses here, while nothing has changed.
+	checklist, readErr := os.ReadFile(filepath.Join(specDir, "verification.md"))
+	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
+		return "", fmt.Errorf("reading verification.md: %w", readErr)
+	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return "", err
 	}
@@ -338,11 +345,12 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 		}
 	}
 
-	verification := filepath.Join(target, "verification.md")
-	if data, readErr := os.ReadFile(verification); readErr == nil {
-		if out := tickArchiveChecklist(string(data), opts.Abandoned); out != string(data) {
-			if err := os.WriteFile(verification, []byte(out), 0o644); err != nil {
-				return target, fmt.Errorf("updating verification.md: %w", err)
+	if readErr == nil {
+		if out := tickArchiveChecklist(string(checklist), opts.Abandoned); out != string(checklist) {
+			if err := os.WriteFile(filepath.Join(target, "verification.md"), []byte(out), 0o644); err != nil {
+				// The move already happened, so a retry would refuse as "already in
+				// archive": say what is done and what is left.
+				return target, fmt.Errorf("archived to %s, but ticking verification.md's archive checklist failed: %w; tick it by hand", target, err)
 			}
 		}
 	}
@@ -376,17 +384,7 @@ var uncheckedItemPattern = regexp.MustCompile(`^(\s*[-*+]\s+\[) (\].*)$`)
 // returned byte for byte, CRLF included.
 func tickArchiveChecklist(content string, abandoned bool) string {
 	lines := strings.Split(content, "\n")
-	inSection := false
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "## ") {
-			inSection = strings.EqualFold(trimmed, "## Archive checklist")
-			continue
-		}
-		m := uncheckedItemPattern.FindStringSubmatch(line)
-		if !inSection || m == nil {
-			continue
-		}
+	eachUncheckedArchiveItem(lines, func(i int, m []string) {
 		text := strings.ToLower(m[2])
 		for _, item := range archiveChecklistItems {
 			if item.notAbandoned && abandoned {
@@ -394,11 +392,38 @@ func tickArchiveChecklist(content string, abandoned bool) string {
 			}
 			if strings.Contains(text, item.fragment) {
 				lines[i] = m[1] + "x" + m[2]
-				break
+				return
 			}
 		}
-	}
+	})
 	return strings.Join(lines, "\n")
+}
+
+// UntickedArchiveChecklist returns the text of every item still unticked in
+// content's `## Archive checklist` section: what the archive left for a human
+// (the board ticket, which the command cannot see).
+func UntickedArchiveChecklist(content string) []string {
+	var left []string
+	eachUncheckedArchiveItem(strings.Split(content, "\n"), func(_ int, m []string) {
+		left = append(left, strings.TrimSpace(strings.TrimPrefix(m[2], "]")))
+	})
+	return left
+}
+
+// eachUncheckedArchiveItem calls fn with the index and match of every unticked
+// item inside the `## Archive checklist` section of lines.
+func eachUncheckedArchiveItem(lines []string, fn func(i int, m []string)) {
+	inSection := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") {
+			inSection = strings.EqualFold(trimmed, "## Archive checklist")
+			continue
+		}
+		if m := uncheckedItemPattern.FindStringSubmatch(line); inSection && m != nil {
+			fn(i, m)
+		}
+	}
 }
 
 // checkBypassRequest validates a bypass before anything moves: a Force flag
