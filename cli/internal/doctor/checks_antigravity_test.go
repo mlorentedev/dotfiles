@@ -43,13 +43,23 @@ func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
 	for name, content := range map[string]string{
 		"empty":   "",
 		"invalid": "{not json",
+		"symlink": "{}",
 	} {
 		t.Run(name, func(t *testing.T) {
 			gemini := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(gemini, "config"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(gemini, "config", "mcp_config.json"), []byte(content), 0o600); err != nil {
+			master := filepath.Join(gemini, "config", "mcp_config.json")
+			if name == "symlink" {
+				target := filepath.Join(gemini, "target.json")
+				if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, master); err != nil {
+					t.Skipf("cannot create a symlink here: %v", err)
+				}
+			} else if err := os.WriteFile(master, []byte(content), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			sys := newSys(map[string]string{"GEMINI_HOME": gemini, "AGY_APP_DATA": gemini}, []string{"agy"}, nil)
