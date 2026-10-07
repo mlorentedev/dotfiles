@@ -37,7 +37,7 @@ replaces it with the pinned release.
 | `doctor` | Checks this machine's tools, configs and secrets against the repository |
 | `secrets` | Resolves secrets and injects them into one child process (`dotf secrets run -- <cmd>`) |
 | `spec` | Scaffolds, reviews and archives spec folders for spec-driven development |
-| `pr` | Pull-request review loop helpers, such as the triage queue |
+| `pr` | Pull-request review loop helpers: `triage-queue` lists unanswered reviewer output; `land` merges a PR only when CI, triage and freshness hold on one head |
 | `review` | Cross-model code review of a diff read from stdin |
 | `worktree` | Git worktree lifecycle and safe garbage collection |
 | `hooks` | Installs and dispatches global git hooks |
