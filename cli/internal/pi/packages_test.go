@@ -61,6 +61,10 @@ func TestLoadManifestReadsTheShippedOne(t *testing.T) {
 	}
 }
 
+// fakeToken is joined into a URL at run time, so no committed line carries a
+// user:token@host literal for a secret scanner to flag.
+const fakeToken = "not-a-real-token"
+
 // Both entry forms pi writes: a plain string, and upstream's object form.
 func TestLiveSourcesReadsBothEntryForms(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
@@ -74,6 +78,16 @@ func TestLiveSourcesReadsBothEntryForms(t *testing.T) {
 	}
 	if got, err := LiveSources(filepath.Join(t.TempDir(), "absent.json")); err != nil || len(got) != 0 {
 		t.Fatalf("an absent settings file is an empty live set, got %v %v", got, err)
+	}
+	for _, entry := range []string{`{"extensions": ["x"]}`, `{"source": ""}`, `42`, `null`, `""`, `{"src": "git:https://u:` + fakeToken + `@h/r"}`} {
+		writeJSON(t, path, `{"packages": ["npm:a@1", `+entry+`]}`)
+		_, err := LiveSources(path)
+		if err == nil || !strings.Contains(err.Error(), "packages[1]") {
+			t.Errorf("entry %s: got %v, want an error naming packages[1]: a skipped entry is a package no plan sees", entry, err)
+		}
+		if err != nil && strings.Contains(err.Error(), fakeToken) {
+			t.Errorf("error %q quotes the entry, which can carry a credential", err)
+		}
 	}
 	writeJSON(t, path, `{"packages": [`)
 	if _, err := LiveSources(path); err == nil {
