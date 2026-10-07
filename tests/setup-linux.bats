@@ -415,10 +415,95 @@ setup() {
     [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"
-    refute_grep 'npm install -g "yarn' "$DOTFILES_DIR/setup-linux.sh"
-    refute_grep 'npm install -g \$yarnPkg' "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep '^OBSIDIAN_VERSION=' "$DOTFILES_DIR/versions.conf"
     refute_grep '^YARN_VERSION=' "$DOTFILES_DIR/versions.conf"
+}
+
+# ADR-036: a tool packages.json installs through npm is converged by
+# `dotf tools install`, so neither setup twin may `npm install -g` it as well.
+# This matches the property, not a spelling: OPS-042's guard grepped for the two
+# forms it had deleted, and `npm install -g yarn@1.22.22` passed it (#1864). The
+# scan lives in tests/lib/npm-global-scan.py, which says what it resolves.
+@test "parity: neither setup twin npm-installs a tool packages.json owns (ADR-036, #1864)" {
+    run python3 "$DOTFILES_DIR/tests/lib/npm-global-scan.py" "$DOTFILES_DIR/packages.json" \
+        "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1"
+    [ "$status" -eq 0 ] || { echo "a setup twin installs a catalog-owned npm tool: $output"; false; }
+}
+
+# The scan's own contract, on fixtures rather than on the twins, so it holds
+# when the twins carry no global npm install at all (ADR-036's end state).
+@test "npm-global-scan: every hostile spelling fails and every benign one passes (#1864)" {
+    scan="$DOTFILES_DIR/tests/lib/npm-global-scan.py"
+    fixture="$BATS_TEST_TMPDIR/twin"
+    hostile=(
+        'npm install -g yarn@1.22.22'
+        'npm install -g "yarn@${YARN_VERSION}" || true'
+        'npm i --global @bitwarden/cli@2025.1.0'
+        'npm install -g --ignore-scripts @github/copilot;'
+        $'npm install -g \\\n    yarn@1.22.22'
+        $'& npm install -g `\n    opencode-ai'
+        'npm -g install yarn'
+        'npm --prefix /x install -g yarn'
+        'npm dedupe && npm install -g yarn'
+        'X=$(npm install -g yarn@1.22.22)'
+        'npm.cmd install -g opencode-ai'
+        $'export YARN_ALT=yarn\nnpm install -g "$YARN_ALT"'
+        $'BASE=yarn\nTOOL=$BASE\nnpm install -g "$TOOL"'
+        $'$yarnPkg = "yarn@1.22.22"\n& npm install -g $yarnPkg'
+        $'if ($x) { $alt = "opencode-ai" }\n& npm install -g $alt'
+        'npm install -g "$NEVER_ASSIGNED"'
+        $'TOOL=$1\nnpm install -g "$TOOL"'
+        'npm install -g $(cat pkgs)'
+        'npm install -g `cat pkgs`'
+        '& npm install -g $env:SOME_PKG'
+        $'TOOL=yarn\nnpm install -g "${TOOL:-x}"'
+        $'foo=unrelated\nnpm install -g "$FOO"'
+        'npm install -g yarn${SUFFIX}'
+        'npm install -g "@github/copilot$SUFFIX"'
+        'npm install --location global yarn@1.22.22'
+        $'# installed with: \\\nnpm install -g yarn@1.22.22'
+        'true;npm install -g yarn'
+        'x |npm install -g yarn'
+        '& NPM install -g yarn'
+        '& npm.exe install -g opencode-ai'
+        '& "C:\\Program Files\\nodejs\\npm.cmd" install -g yarn'
+        '/usr/bin/npm install -g yarn'
+        $'TOOL=foo; TOOL=yarn\nnpm install -g "$TOOL"'
+        $'if a; then TOOL=nodejs; else TOOL=yarn; fi\nnpm install -g "$TOOL"'
+    )
+    benign=(
+        'npm install -g yarnish'
+        'npm install yarn'
+        '# was: npm install -g yarn'
+        'npm install -g foo || log_warning "yarn failed"'
+        'echo "nothing installs here"'
+        'npm install -g foo  # yarn would be the other choice'
+        'chmod +x s.sh # used to npm install -g yarn'
+        $'npm install -g foo \\ \n    yarn'
+        $'PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"\nnpm install -g --prefix "$HOME/.local" "$PI_PKG"'
+    )
+    # The hostile fixtures are hostile only while packages.json owns these
+    # through npm. Say so here, so a catalog migration reads as one, not as a
+    # broken scan.
+    for pkg in yarn opencode-ai @bitwarden/cli @github/copilot; do
+        run python3 -c 'import json, sys
+sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") == sys.argv[2]
+                  for t in json.load(open(sys.argv[1]))["tools"]) else 1)' "$DOTFILES_DIR/packages.json" "$pkg"
+        [ "$status" -eq 0 ] || { echo "the fixtures assume packages.json owns $pkg through npm; pick another owned package"; false; }
+    done
+    # A rejection is a verdict naming the line, not just exit 1: a traceback
+    # exits 1 too.
+    for snippet in "${hostile[@]}"; do
+        printf '%s\n' "$snippet" >"$fixture"
+        run python3 "$scan" "$DOTFILES_DIR/packages.json" "$fixture"
+        [ "$status" -eq 1 ] && [[ "$output" =~ twin:[0-9]+:\  ]] && [[ "$output" != *Traceback* ]] ||
+            { echo "not rejected with a verdict: $snippet: $output"; false; }
+    done
+    for snippet in "${benign[@]}"; do
+        printf '%s\n' "$snippet" >"$fixture"
+        run python3 "$scan" "$DOTFILES_DIR/packages.json" "$fixture"
+        [ "$status" -eq 0 ] || { echo "failed, but should pass: $snippet: $output"; false; }
+    done
 }
 
 # MEM-002: the claude-mem install-state assertions that lived in
