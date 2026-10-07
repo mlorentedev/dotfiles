@@ -205,6 +205,10 @@ Pass --force to regenerate the entry files (the memory symlink is left as-is).`,
 			if err != nil {
 				return err
 			}
+			if res.Action == "skipped" {
+				cmd.Printf("[SKIP] Project vault entry: %s\n", res.Reason)
+				return nil
+			}
 
 			cmd.Printf("[OK] Project vault entry: %s\n", res.EntryDir)
 			for _, f := range res.Created {
