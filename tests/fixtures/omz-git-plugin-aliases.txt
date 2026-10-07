@@ -5,8 +5,8 @@
 # the g* namespace collision guard (BUG-045), not a copy of upstream logic.
 #
 # Upstream: https://github.com/ohmyzsh/ohmyzsh, plugins/git/git.plugin.zsh
-# Captured: 2026-08-12
-# Upstream commit (informational): ad586ff
+# Captured: 2026-10-07
+# Upstream commit (informational): 4d4cfc2
 g
 ga
 gaa
@@ -100,7 +100,9 @@ glog
 gloga
 glol
 glola
+glolm
 glols
+glom
 glp
 gluc
 glum
@@ -137,6 +139,8 @@ grbc
 grbd
 grbi
 grbm
+grbmi
+grbmia
 grbo
 grbom
 grbs
@@ -166,6 +170,7 @@ gsb
 gsd
 gsh
 gsi
+gsnut
 gsps
 gsr
 gss
@@ -179,6 +184,7 @@ gstp
 gsts
 gstu
 gsu
+gsuri
 gsw
 gswc
 gswd

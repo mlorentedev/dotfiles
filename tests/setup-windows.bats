@@ -646,8 +646,15 @@ FIXTURE
 # no longer exists in any deployed file. setup-linux.sh was updated; this guard
 # keeps setup-windows.ps1 in lockstep (regression class: BUG-001 + BUG-002).
 
-@test "parity: both scripts verify CLAUDE.md deploy with AGENTS.md pointer marker" {
-    grep -qF "grep -q 'First, read \`AGENTS.md\`' \"\$HOME/.claude/CLAUDE.md\"" "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: CLAUDE.md is verified after deploy on both OSes" {
+    # Linux and macOS: compile-harness.sh --deploy copies it from
+    # agents.presence[], and its post-condition (outside the harness regions it
+    # equals ai/claude/CLAUDE.md) is held by dotf converge's records-harness
+    # probe and doctor's instruction-drift check, not by a grep in the setup.
+    refute_grep 'cp "\$CURRENT_DIR/ai/claude/CLAUDE.md"' "$DOTFILES_DIR/setup-linux.sh"
+    [ "$(jq -r '.agents.presence[] | select(.agent=="claude") | .source' "$DOTFILES_DIR/harness/manifest.json")" = "ai/claude/CLAUDE.md" ]
+    # Windows keeps its copy and pointer check until the Go deploy of the
+    # instruction files ships in a release (PLAT-001b PR 2c).
     grep -qF "Select-String -Path \"\$ClaudeHome\\CLAUDE.md\" -Pattern 'First, read \`AGENTS.md\`'" "$PS1_SCRIPT"
 }
 
@@ -669,7 +676,11 @@ FIXTURE
 }
 
 @test "parity: both setup scripts detect copilot via binary, not gh extension" {
-    grep -qF "command -v copilot" "$DOTFILES_DIR/setup-linux.sh"
+    # Linux and macOS: the copilot instruction file is gated by its
+    # agents.presence[] requires_command, which compile-harness.sh checks with
+    # `command -v` (PLAT-001b); Windows checks the binary in the setup itself.
+    [ "$(jq -r '.agents.presence[] | select(.agent=="copilot") | .requires_command' "$DOTFILES_DIR/harness/manifest.json")" = "copilot" ]
+    grep -qF 'command -v "$requires"' "$DOTFILES_DIR/scripts/compile-harness.sh"
     grep -qF "Get-Command copilot" "$PS1_SCRIPT"
     # Neither should still reference the legacy extension path
     refute_grep_fixed "github/gh-copilot" "$DOTFILES_DIR/setup-linux.sh"
@@ -719,8 +730,13 @@ FIXTURE
     grep -qF 'ai/claude/settings.json' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "SDD-002: setup-linux.sh bulk copy of ai/claude/* skips settings.json" {
-    grep -qF "= \"settings.json\" ] && continue" "$DOTFILES_DIR/setup-linux.sh"
+@test "SDD-002: setup-linux.sh never copies ai/claude/settings.json verbatim" {
+    # The bulk copy of ai/claude/* is gone (PLAT-001b): CLAUDE.md comes from
+    # compile-harness.sh --deploy, and settings.json only from the
+    # claude-settings merge entry of `dotf deploy`.
+    refute_grep 'cp -rf "\$_claude_src"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'cp .*ai/claude/settings\.json' "$DOTFILES_DIR/setup-linux.sh"
+    [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .strategy' "$DOTFILES_DIR/ai/deploy.json")" = "merge" ]
 }
 
 @test "SDD-002: parity -- both scripts log the bootstrap message" {
@@ -1106,4 +1122,16 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     grep -A2 '^\$deployedScripts = @(' "$PS1_SCRIPT" | refute_grep_fixed 'orca-hook-tune.ps1' /dev/stdin
     [ ! -e "$DOTFILES_DIR/scripts/orca-hook-tune.ps1" ]
     [ ! -e "$DOTFILES_DIR/scripts/orca-tune.sh" ]
+}
+
+@test "PLAT-001b: every file under ai/claude has a deployer" {
+    # setup-linux.sh no longer bulk-copies ai/claude/*. Each file there is
+    # deployed by name: CLAUDE.md by compile-harness.sh --deploy (an
+    # agents.presence[] source), settings.json by `dotf deploy` (claude-settings),
+    # and plugins.json is read from the checkout by `dotf deploy`. A new file
+    # needs a deployer before it is added to this list.
+    [ "$(cd "$DOTFILES_DIR/ai/claude" && find . -type f | sort | tr '\n' ' ')" = "./CLAUDE.md ./plugins.json ./settings.json " ]
+    [ "$(jq -r '.agents.presence[] | select(.agent=="claude") | .source' "$DOTFILES_DIR/harness/manifest.json")" = "ai/claude/CLAUDE.md" ]
+    [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .src' "$DOTFILES_DIR/ai/deploy.json")" = "ai/claude/settings.json" ]
+    grep -qF 'PluginsRel = "ai/claude/plugins.json"' "$DOTFILES_DIR/cli/internal/claude/plugins.go"
 }

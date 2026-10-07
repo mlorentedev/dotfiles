@@ -327,6 +327,25 @@ func TestJournalNameIsDerivableAndDistinctPerWorktree(t *testing.T) {
 	}
 }
 
+// HARNESS-174 (#1980): the filename takes only what vault-validate's session
+// rule accepts ([A-Za-z0-9._@-]); a fork's '+' and anything else becomes '-'.
+func TestJournalNameKeepsOnlyCharactersTheVaultAccepts(t *testing.T) {
+	for thread, want := range map[string]string{
+		"main@msi+copilot": "2026-10-01-dotfiles-copilot-main@msi-copilot.md",
+		"wt-a_b.c":         "2026-10-01-dotfiles-copilot-wt-a_b.c.md",
+		"feat/x y:z#1":     "2026-10-01-dotfiles-copilot-feat-x-y-z-1.md",
+	} {
+		if got := JournalName("2026-10-01", "dotfiles", "copilot", thread); got != want {
+			t.Errorf("thread %q: got %q, want %q", thread, got, want)
+		}
+	}
+	// --agent is free text and a project is a directory name: neither is
+	// validated upstream, so the sanitiser covers the whole name.
+	if got, want := JournalName("2026-10-01", "my+proj", "claude code", "main"), "2026-10-01-my-proj-claude-code.md"; got != want {
+		t.Errorf("project and agent: got %q, want %q", got, want)
+	}
+}
+
 // REVIEWER FINDING (#1279): a `###` heading inside a thread's BODY truncated its
 // span, so a replacement rewrote only the part before it and orphaned the rest.
 // Handoff bodies legitimately carry `### Next Actions` and the like, so this is
