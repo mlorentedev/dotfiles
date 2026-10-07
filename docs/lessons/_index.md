@@ -360,4 +360,6 @@ tags: [lessons, index, dotfiles]
 | [339 - A setup script does what the scripts it calls do](lesson-339-a-setup-script-does-what-the-scripts-it-calls-do.md) | 2026-10-06 |
 | [340 - A repo named differently from its vault slug keeps its memory off the vault](lesson-340-a-repo-named-differently-from-its-vault-slug-keeps-its-memory-off-the-vault.md) | 2026-10-06 |
 | [341 - A merged PR does not mean its branch is merged](lesson-341-a-merged-pr-does-not-mean-its-branch-is-merged.md) | 2026-10-06 |
+| [345 - A lint test that installs its linter and passes without it checks nothing](lesson-345-a-lint-test-that-installs-its-linter-and-passes-without-it-checks-nothing.md) | 2026-10-07 |
+| [346 - A CI cache other PRs can read is one main wrote](lesson-346-a-ci-cache-other-prs-can-read-is-one-main-wrote.md) | 2026-10-07 |
 <!-- END GENERATED -->
