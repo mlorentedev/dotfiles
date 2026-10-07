@@ -700,7 +700,7 @@ _upstream_handler='def is_valid_file(filename, bad_extensions=None):
     local pins
     pins=$(grep -o 'The-PR-Agent/pr-agent@[0-9a-f]\{40\}' "$WF" | sort -u)
     [ "$(printf '%s\n' "$pins" | wc -l)" -eq 1 ]
-    ! grep -qE '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
+    refute_grep '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
     grep -qF 'WORKFLOW_SHA: ${{ github.workflow_sha }}' "$WF"
 }
 

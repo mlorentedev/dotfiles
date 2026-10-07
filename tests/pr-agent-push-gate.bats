@@ -4,6 +4,8 @@
 # previous one. The inputs are the PR's comments and commits as the REST API
 # returns them, so the fixtures below are real jq over real JSON, no stubs.
 
+load 'lib/refute'
+
 setup() {
     GATE="$BATS_TEST_DIRNAME/../scripts/pr-agent-push-gate.sh"
     COMMENTS="$BATS_TEST_TMPDIR/comments.json"
@@ -373,6 +375,6 @@ _gate() {
 # The gate's semantics are audited against upstream source identities, not
 # another manually maintained copy of the action version (#1893, #2010).
 @test "the push gate does not duplicate PR-Agent's version" {
-    ! grep -Eq 'v0\.[0-9]+\.[0-9]+' "$GATE"
+    refute_grep 'v0\.[0-9]+\.[0-9]+' "$GATE"
     grep -q 'pr-agent-upstream-contract.json' "$GATE"
 }
