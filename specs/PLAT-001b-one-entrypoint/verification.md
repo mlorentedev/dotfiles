@@ -21,6 +21,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (PR 2a, macOS arm64): `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./... -count=1` -> ok, every package; `golangci-lint run` (pinned 2.12.2) -> 0 issues
 - Manual smoke test (PR 2a): on the real Mac, `go run ./cmd/dotf converge --plan` -> `records-mirror [CHANGE] harness/ + 3 target(s) → ~/.dotfiles (70 to write, 0 unchanged)`; `~/.dotfiles` unchanged afterwards
 - No regressions in existing test suite: yes (the tool catalog's platform tests pass through `internal/platform`)
+- Test suite (PR 3, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./... -count=1` -> ok; golangci-lint 2.12.2 -> 0 issues; feature f3 -> PASS
+- `TestReadmeHasNoInternalReferences` caught an ADR id in the new `converge` README section before push; removed
+- Manual run (PR 3): `dotf converge` on the Mac printed `report: ~/.local/state/dotfiles/converge/last.json`; the file holds `"result": "ok"`, `"changed": 0`, `"goos": "darwin"` and the `records-mirror` entry with its detail
+- Review hardening (PR 3): `env.Home()` falls back to the user database when HOME and USERPROFILE are both empty, so the report path (and every path built on Home) is never relative to the working directory; test `TestHome_FallsBackToTheUserDatabase`
 
 ## Decisions made during implementation
 

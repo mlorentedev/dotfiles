@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 )
@@ -82,12 +83,20 @@ func loadMachine(path string) (*machine, error) {
 
 // Home resolves the user's home directory, preferring HOME (POSIX) then
 // USERPROFILE (Windows) — matching the env-contract's OS-scoped vars and
-// doctor's System.home().
+// doctor's System.home(). With neither set (a minimal service or timer
+// environment) it asks the user database, so a path built on it is never
+// silently relative to the working directory.
 func Home() string {
 	if h := os.Getenv("HOME"); h != "" {
 		return h
 	}
-	return os.Getenv("USERPROFILE")
+	if h := os.Getenv("USERPROFILE"); h != "" {
+		return h
+	}
+	if u, err := user.Current(); err == nil {
+		return u.HomeDir
+	}
+	return ""
 }
 
 // StateDir is where dotf keeps per-machine state it writes itself (the converge

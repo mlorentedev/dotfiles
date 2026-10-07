@@ -463,3 +463,16 @@ func TestResolveCatalogPathFallsBackToDeployed(t *testing.T) {
 		t.Errorf("ResolveCatalogPath() = %q, want deployed copy %q", got, want)
 	}
 }
+
+// A service or timer environment may set neither HOME nor USERPROFILE; a path
+// built on Home must still be absolute, never relative to the working dir.
+func TestHome_FallsBackToTheUserDatabase(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	if h := Home(); !filepath.IsAbs(h) {
+		t.Fatalf("Home() = %q, want an absolute path", h)
+	}
+	if d := StateDir(); !filepath.IsAbs(d) {
+		t.Fatalf("StateDir() = %q, want an absolute path", d)
+	}
+}
