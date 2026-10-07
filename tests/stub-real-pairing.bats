@@ -37,6 +37,10 @@ setup() {
 #                             have caught it. What the suite CAN pin is which call is made, and it
 #                             does; the API's verdict on that call only arrives from a real run.
 #   board-pickup              stubs `gh` — same; a real run self-assigns real issues
+#   dotf-bin-helper           stubs `go` — the case it pins is a toolchain that is present and cannot
+#                             compile the tree, and a real `go` only produces that by breaking the
+#                             tree under test. The real build path is driven for real by every
+#                             suite that calls the helper (compile-harness-real among them).
 #   guard-memory-sink         stubs `git` — the real path is covered end-to-end by the dispatcher's own commit-time behaviour
 #   guard-no-gui              stubs `obsidian` — and here a real run is not merely inconvenient, it is
 #                             the defect. That suite's whole subject is that a test must never launch a
@@ -55,6 +59,9 @@ setup() {
 #   pr-agent-publish-guard    stubs `gh` — its subject is the guard's reaction to GitHub API failures
 #                             (timeouts, 5xx, a 404), which a real API cannot be made to produce on
 #                             demand; the real guard runs on every reviewed PR (#2069)
+#   pr-agent-queue-skip       stubs `gh` — its subject is a PR whose state changed while its run
+#                             was queued, and a failed read; neither can be produced on demand
+#                             against the live API. The real step runs on every reviewed PR (#1923)
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
@@ -69,9 +76,14 @@ setup() {
 #                             .bats file itself — see #892) — same rationale as vault-health: a
 #                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
-EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup guard-memory-sink guard-no-gui
-hermes-setup install-dotf model-canary pr-agent-publish-guard release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
-vault-health-golden vault-maintenance-weekly"
+#   zshrc-guards              stubs `terraform` as an empty executable that is never run. The
+#                             subject is the .zshrc guard: completion is registered only when PATH
+#                             resolves a terraform, and against that path. A real terraform gives
+#                             the same answer, so a sibling would test nothing the stub does not
+#                             (#2055).
+EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
+hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
+vault-health-golden vault-maintenance-weekly zshrc-guards"
 
 exempt() {
     local base

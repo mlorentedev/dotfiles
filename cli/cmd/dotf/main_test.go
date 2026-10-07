@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"testing"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/cmd"
 	"github.com/mlorentedev/dotfiles/cli/internal/errors"
 	"github.com/spf13/cobra"
 )
@@ -192,5 +195,166 @@ func TestResolveVersion(t *testing.T) {
 				t.Errorf("resolveVersion(%q) = %q, want %q", tc.ldflag, got, tc.want)
 			}
 		})
+	}
+}
+
+// `dotf agent run` exits 3 when no pool could serve the dispatch, and composers
+// branch on that number: 3 means "another machine may run it", 1 means "the task
+// failed". The in-process tests in internal/cmd see the code on the returned
+// error; only run() turns it into what main() exits with, so a regression there
+// (every error exiting 1) leaves them green.
+//
+// It stands in for a bats case that ran the compiled binary with an empty PATH.
+// What that case also covered, os.Exit(run(...)) being wired in main(), is the
+// one-liner tests/dotf-agent-run.bats still pins through its refusal case, which
+// reads a non-zero status out of the real binary.
+func TestRunExitsWithTheCodeAnExhaustedChainCarries(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("repo root: %v", err)
+	}
+
+	// An identified machine, and a PATH with no harness binary: the walk finds no
+	// transport for any entry. Without PATH emptied this dispatches for real.
+	cfg := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cfg, "dotfiles"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	machine := `{"machine": {"id": "main-test"}, "pools": {"deny": []}}`
+	if err := os.WriteFile(filepath.Join(cfg, "dotfiles", "machine.json"), []byte(machine), 0o600); err != nil {
+		t.Fatalf("seed machine.json: %v", err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("PATH", t.TempDir())
+
+	rootCmd := cmd.New("dev", "")
+	rootCmd.SetArgs([]string{
+		"agent", "run", "--role", "r", "--task", "t", "--tier", "mid",
+		"--timeout", "1m", "--repo-root", root, "--semaphore-dir", t.TempDir(),
+	})
+	rootCmd.SetOut(&bytes.Buffer{})
+
+	var stderr bytes.Buffer
+	if code := run(rootCmd, &stderr); code != 3 {
+		t.Errorf("exit code = %d, want 3 (chain exhausted); stderr: %s", code, stderr.String())
+	}
+}
+
+// Every command reports a mistyped flag, whether or not it silences its own
+// errors (#2090). Measured before the fix: eight commands, `doctor` and
+// `pr land` among them, exited 1 with nothing on stderr.
+func TestEveryCommandReportsAnUnknownFlag(t *testing.T) {
+	for _, path := range commandPaths(cmd.New("test", "")) {
+		name := strings.Join(path, " ")
+		t.Run(name, func(t *testing.T) {
+			root := cmd.New("test", "")
+			found, _, err := root.Find(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if found.DisableFlagParsing || found.FParseErrWhitelist.UnknownFlags {
+				t.Skipf("dotf %s does not parse flags, so an unknown one would reach its code", name)
+			}
+			root.SetArgs(append(append([]string{}, path...), "--no-such-flag"))
+			var stderr bytes.Buffer
+			root.SetOut(&stderr)
+			code := run(root, &stderr)
+			if code == 0 {
+				t.Errorf("dotf %s --no-such-flag exited 0", name)
+			}
+			if !strings.Contains(stderr.String(), "unknown flag: --no-such-flag") {
+				t.Errorf("dotf %s --no-such-flag did not report the flag; stderr: %q", name, stderr.String())
+			}
+		})
+	}
+}
+
+// A silenced command's Args refusal is reported too, and its own diagnostics
+// are still not printed twice.
+func TestASilencedCommandReportsArgumentsItRefuses(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"pr", "land"}, "requires at least 1 arg(s)"},
+		{[]string{"pr", "land", "abc"}, `"abc" is not a PR number`},
+		{[]string{"pr", "land", "7", "#7"}, "#7 is listed twice"},
+	} {
+		root := cmd.New("test", "")
+		root.SetArgs(tc.args)
+		var stderr bytes.Buffer
+		if code := run(root, &stderr); code == 0 {
+			t.Errorf("dotf %v exited 0", tc.args)
+		}
+		if got := stderr.String(); strings.Count(got, tc.want) != 1 {
+			t.Errorf("dotf %v: want %q reported exactly once, stderr: %q", tc.args, tc.want, got)
+		}
+	}
+}
+
+// An unknown top-level command is refused by Cobra's own root check, before
+// any Args validator, so markUsageErrors never sees it. It is printed only
+// because the root does not silence its errors; this pins that.
+func TestAnUnknownTopLevelCommandIsReported(t *testing.T) {
+	root := cmd.New("test", "")
+	root.SetArgs([]string{"nosuch"})
+	var stderr bytes.Buffer
+	if code := run(root, &stderr); code == 0 {
+		t.Error("dotf nosuch exited 0")
+	}
+	if !strings.Contains(stderr.String(), `unknown command "nosuch"`) {
+		t.Errorf("dotf nosuch did not report the command; stderr: %q", stderr.String())
+	}
+}
+
+// Every command group refuses an unknown subcommand, and still prints its help
+// with no argument (#2091). Measured before the fix: `dotf pr nosuch`,
+// `dotf vault nosuch` and the rest printed help and exited 0.
+//
+// A group that declares its own Args takes positional arguments on purpose
+// (`dotf init [path]` scaffolds a project), so it is never run here. The rest
+// run in a scratch cwd and HOME, so a group whose RunE ever does more than
+// print help cannot write into the checkout.
+func TestEveryCommandGroupRefusesAnUnknownSubcommand(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	groups := 0
+	for _, path := range commandPaths(cmd.New("test", "")) {
+		root := cmd.New("test", "")
+		found, _, err := root.Find(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !found.HasSubCommands() || found.Args != nil {
+			continue
+		}
+		groups++
+		name := strings.Join(path, " ")
+		t.Run(name, func(t *testing.T) {
+			root.SetArgs(append(append([]string{}, path...), "nosuch"))
+			var stderr bytes.Buffer
+			root.SetOut(&stderr)
+			if code := run(root, &stderr); code == 0 {
+				t.Errorf("dotf %s nosuch exited 0", name)
+			}
+			if want := fmt.Sprintf("unknown command %q for %q", "nosuch", "dotf "+name); !strings.Contains(stderr.String(), want) {
+				t.Errorf("dotf %s nosuch: want %q, stderr: %q", name, want, stderr.String())
+			}
+
+			bare := cmd.New("test", "")
+			bare.SetArgs(path)
+			var out bytes.Buffer
+			bare.SetOut(&out)
+			if code := run(bare, &out); code != 0 {
+				t.Errorf("dotf %s with no argument exited %d; want its help and 0", name, code)
+			}
+			if !strings.Contains(out.String(), "Available Commands:") {
+				t.Errorf("dotf %s with no argument did not print its help: %q", name, out.String())
+			}
+		})
+	}
+	if groups == 0 {
+		t.Fatal("found no command groups; the walk is broken")
 	}
 }

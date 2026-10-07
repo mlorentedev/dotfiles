@@ -360,6 +360,16 @@ tags: [lessons, index, dotfiles]
 | [339 - A setup script does what the scripts it calls do](lesson-339-a-setup-script-does-what-the-scripts-it-calls-do.md) | 2026-10-06 |
 | [340 - A repo named differently from its vault slug keeps its memory off the vault](lesson-340-a-repo-named-differently-from-its-vault-slug-keeps-its-memory-off-the-vault.md) | 2026-10-06 |
 | [341 - A merged PR does not mean its branch is merged](lesson-341-a-merged-pr-does-not-mean-its-branch-is-merged.md) | 2026-10-06 |
+| [343 - A build that skips on failure turns a compile error into a green job](lesson-343-a-build-that-skips-on-failure-turns-a-compile-error-into-a-green-job.md) | 2026-10-07 |
+| [344 - Concurrent landers each update every PR after every merge](lesson-344-concurrent-landers-each-update-every-pr-after-every-merge.md) | 2026-10-07 |
 | [345 - A lint test that installs its linter and passes without it checks nothing](lesson-345-a-lint-test-that-installs-its-linter-and-passes-without-it-checks-nothing.md) | 2026-10-07 |
 | [346 - A CI cache other PRs can read is one main wrote](lesson-346-a-ci-cache-other-prs-can-read-is-one-main-wrote.md) | 2026-10-07 |
+| [347 - A change is verified by every test that references the file, not by the file's own suite](lesson-347-a-change-is-verified-by-every-test-that-references-the-file.md) | 2026-10-07 |
+| [348 - Getwd succeeding on darwin does not mean the directory exists](lesson-348-getwd-succeeding-on-darwin-does-not-mean-the-directory-exists.md) | 2026-10-07 |
+| [349 - An exit error wrapped with %w loses the command's reason](lesson-349-an-exit-error-wrapped-with-w-loses-the-commands-reason.md) | 2026-10-07 |
+| [350 - A test that walks every command runs real commands](lesson-350-a-test-that-walks-every-command-runs-real-commands.md) | 2026-10-07 |
+| [351 - A seam OR'd with the host check only fails on that host](lesson-351-a-seam-ored-with-the-host-check-only-fails-on-that-host.md) | 2026-10-07 |
+| [352 - A mid-test [[ ]] assertion is a no-op under bash 3.2](lesson-352-a-mid-test-double-bracket-assertion-is-a-no-op-under-bash-3-2.md) | 2026-10-07 |
+| [353 - golangci-lint's cache reports another worktree's results](lesson-353-golangci-lint-s-cache-reports-another-worktree-s-results.md) | 2026-10-07 |
+| [354 - A skip reason covers only the question it answers](lesson-354-a-skip-reason-covers-only-the-question-it-answers.md) | 2026-10-07 |
 <!-- END GENERATED -->

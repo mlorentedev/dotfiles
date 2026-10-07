@@ -61,6 +61,30 @@ func TestDeploy_InstallsWithDeclaredMode(t *testing.T) {
 	}
 }
 
+// A directory the deploy creates for a private file is private too: ~/.ssh,
+// made for a 0600 config, landed 0755 on a fresh Mac. A directory that already
+// exists keeps its mode.
+func TestDeploy_ADirectoryCreatedForAPrivateFileIsPrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not meaningful here")
+	}
+	root := repoWithSource(t, `{}`)
+	home := t.TempDir()
+
+	if _, err := Deploy(piConfig(), root, home, noResolve, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{".pi", filepath.Join(".pi", "agent")} {
+		info, err := os.Stat(filepath.Join(home, dir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o700 {
+			t.Errorf("%s: want 0700 for a directory created for a 0600 file, got %o", dir, info.Mode().Perm())
+		}
+	}
+}
+
 // Rewriting an identical file churns mtime on every setup run, which makes "did
 // this change?" unanswerable for an operator and for any check watching it.
 func TestDeploy_IsIdempotentAndDoesNotRewrite(t *testing.T) {

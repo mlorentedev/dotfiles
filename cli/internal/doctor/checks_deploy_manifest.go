@@ -19,12 +19,16 @@ import (
 //
 // Two kinds of entry are not compared, and the PASS line says how many: a
 // rendered one (its installed content is only known after `secrets render`,
-// which needs the daemon; doctor stays read-only) and one whose `requires`
+// which needs the daemon; doctor stays read-only, though an absent rendered
+// destination is still a WARN) and one whose `requires`
 // command is absent (deploy skips it too, and a row for a tool the box does
 // not carry is a WARN no remedy can clear — #843). Drift is a WARN, not a
 // FAIL: a tool that co-owns its file (Copilot's `/model` writes `model`) may
 // legitimately have moved a managed key, and the remedy is one command.
-func checkDeployManifest(sys *System, rep *Report) {
+//
+// It also reports a directory the manifest deploys a private file into that
+// is open to group or others (checkPrivateDeployDirs), which --fix tightens.
+func checkDeployManifest(sys *System, rep *Report, fix bool) {
 	rep.Section("Deployed agent configs (ai/deploy.json)")
 
 	repo := resolveRepoDir(sys)
@@ -46,8 +50,26 @@ func checkDeployManifest(sys *System, rep *Report) {
 	home := sys.home()
 	inSync, drifted, notCompared := 0, 0, 0
 	for _, c := range man.Configs {
-		if c.Render || !c.AppliesOn(sys.GOOS) || (c.Requires != "" && !sys.has(c.Requires)) {
+		if !c.AppliesOn(sys.GOOS) || (c.Requires != "" && !sys.has(c.Requires)) {
 			notCompared++
+			continue
+		}
+		if c.Render {
+			// Its content is only comparable after `secrets render`, but its
+			// existence is not: an absent destination is a deploy that never
+			// ran, and a SKIP there let pi on a fresh Mac start with no models
+			// and a doctor that read healthy (#2100).
+			dst, err := deploy.ExpandDst(c.Dst, home, env.ResolvePath)
+			switch {
+			case err != nil:
+				rep.Warn(fmt.Sprintf("%s: %v (run: dotf deploy %s)", c.Name, err, c.Name))
+				drifted++
+			case !pathExists(dst):
+				rep.Warn(fmt.Sprintf("%s: %s not deployed (run: dotf deploy %s)", c.Name, dst, c.Name))
+				drifted++
+			default:
+				notCompared++
+			}
 			continue
 		}
 		p, err := deploy.PlanConfig(c, repo, home, env.ResolvePath)
@@ -65,5 +87,44 @@ func checkDeployManifest(sys *System, rep *Report) {
 	}
 	if drifted == 0 {
 		rep.Pass(fmt.Sprintf("%d deployed config(s) in sync with %s (%d not compared: rendered, or tool absent)", inSync, deploy.ManifestRel, notCompared))
+	}
+	checkPrivateDeployDirs(sys, man, rep, fix)
+}
+
+// checkPrivateDeployDirs reports a directory that holds a private deployed file
+// but grants group or others access: a ~/.ssh left 0755 from before #2051.
+// Deploy creates such a directory 0700 and never changes one that exists,
+// because tightening a directory on every deploy is a decision the operator
+// should see. --fix makes it. Windows has no POSIX mode bits to check.
+func checkPrivateDeployDirs(sys *System, man *deploy.Manifest, rep *Report, fix bool) {
+	if sys.GOOS == "windows" {
+		return
+	}
+	applies := func(c deploy.Config) bool {
+		return c.AppliesOn(sys.GOOS) && (c.Requires == "" || sys.has(c.Requires))
+	}
+	dirs, err := man.PrivateDirs(sys.home(), env.ResolvePath, applies)
+	if err != nil {
+		rep.Warn("private deploy directories: " + err.Error())
+		return
+	}
+	for _, dir := range dirs {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		perm := info.Mode().Perm()
+		if perm&0o077 == 0 {
+			continue
+		}
+		if !fix {
+			rep.Warn(fmt.Sprintf("%s is %04o but holds a private deployed file; want 0700 (run: dotf doctor --fix)", dir, perm))
+			continue
+		}
+		if err := os.Chmod(dir, 0o700); err != nil {
+			rep.Fail(fmt.Sprintf("could not tighten %s to 0700: %v", dir, err))
+			continue
+		}
+		rep.Fix(fmt.Sprintf("tightened %s from %04o to 0700 (it holds a private deployed file)", dir, perm))
 	}
 }

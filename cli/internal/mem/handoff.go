@@ -482,8 +482,10 @@ func ThreadKey(cwd string) string {
 				name = "detached"
 			}
 			return sanitizeThread(name) + "@" + shortHost()
-		case isDefaultBranch(id.Branch):
-			return id.Branch + "@" + shortHost()
+		case id.isDefaultBranch():
+			// A derived default can carry a `/` (release/1.2), which main and
+			// master never did: sanitize it like every other key.
+			return sanitizeThread(id.Branch) + "@" + shortHost()
 		default:
 			return sanitizeThread(id.Branch)
 		}
@@ -503,12 +505,25 @@ func ThreadKey(cwd string) string {
 }
 
 // ThreadKeyForCwd is ThreadKey over the process's working directory.
-func ThreadKeyForCwd() string {
+//
+// An unreadable working directory (deleted under the process, or permissions)
+// is an error, not "main": "main" is the ambient thread, and pooling every
+// failure into it hands an unrelated session somebody else's handoff
+// (MEMORY-016, #1930).
+//
+// Getwd succeeding is not proof the directory exists: on darwin it returns the
+// path the kernel last knew for a working directory that has since been removed
+// (stat(".") still works), where Linux fails with ENOENT. So the path it
+// returned is stat'ed too (#2085).
+func ThreadKeyForCwd() (string, error) {
 	wd, err := os.Getwd()
-	if err != nil {
-		return "main"
+	if err == nil {
+		_, err = os.Stat(wd)
 	}
-	return ThreadKey(wd)
+	if err != nil {
+		return "", fmt.Errorf("resolve the thread from the working directory: %w", err)
+	}
+	return ThreadKey(wd), nil
 }
 
 // HandoffThread is the thread key handoff-write uses for memoryPath (#1606).

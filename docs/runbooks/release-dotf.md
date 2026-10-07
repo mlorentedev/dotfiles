@@ -29,7 +29,19 @@ While a fix waits, tell live peers about the hazard and its workaround. For #172
 
 ## Landing several PRs before a release
 
-Merging ready PRs before the release PR puts them in one release instead of several. Branch protection requires a branch to be up to date with main, so each merge puts every other open PR behind. Land them one at a time:
+Merging ready PRs before the release PR puts them in one release instead of several. Branch protection requires a branch to be up to date with main, so each merge puts every other open PR behind. Land them one at a time.
+
+**Use `dotf pr land` for the whole queue.** It does steps 1 to 5 below for each PR, and it is the only way to do it that scales:
+
+```bash
+dotf pr land 2031 2032 2033 --wait --update-branch
+```
+
+- The PRs land in the order given. A PR is updated only during its own turn.
+- A PR that stops (a failed check, conflicts, reviewer output awaiting triage, an error) is reported and the queue moves on. One summary at the end lists the PRs merged and, for each PR not merged, its reasons. The exit status is 1 when any PR was not merged; re-run the command for the ones left once the cause is fixed.
+- One `pr land` runs per repository at a time. A second one refuses and names the first one's PID, so do not start a second queue beside a running one, and do not land PRs from separate processes: each would update every PR after every merge, which is n squared CI runs and reviews (lesson 344). The lock is released when the command exits however it exits. After a crash the next run takes it over and says so.
+
+The manual steps are the fallback when `dotf pr land` cannot be used:
 
 1. **Wait for the merge state to settle.** Right after main moves, `mergeStateStatus` reads `UNKNOWN` for several seconds. Poll until it reads something else, and note the head sha it prints with it:
 

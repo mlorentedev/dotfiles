@@ -1,8 +1,10 @@
 package mem
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -23,6 +25,9 @@ type Identity struct {
 	// Worktree is git's own name for a linked worktree, or "" in a main
 	// checkout.
 	Worktree string
+	// DefaultBranches are the default branches the clone's remotes recorded
+	// (refs/remotes/<remote>/HEAD), one per remote that recorded one.
+	DefaultBranches []string
 }
 
 // RepoIdentity resolves the repository from a working directory by reading git's
@@ -41,8 +46,9 @@ func RepoIdentity(cwd string) (Identity, bool) {
 		if err == nil {
 			if info.IsDir() {
 				return Identity{
-					Project: filepath.Base(dir),
-					Branch:  headBranch(p),
+					Project:         filepath.Base(dir),
+					Branch:          headBranch(p),
+					DefaultBranches: remoteDefaultBranches(p),
 				}, true
 			}
 			if gitdir, ok := readGitdirPointer(p); ok {
@@ -52,6 +58,8 @@ func RepoIdentity(cwd string) (Identity, bool) {
 					Project:  filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(gitdir)))),
 					Branch:   headBranch(gitdir),
 					Worktree: filepath.Base(gitdir),
+					// Remote refs live in the common dir, two levels above.
+					DefaultBranches: remoteDefaultBranches(filepath.Dir(filepath.Dir(gitdir))),
 				}, true
 			}
 		}
@@ -64,9 +72,49 @@ func RepoIdentity(cwd string) (Identity, bool) {
 }
 
 // isDefaultBranch reports the branches that are ambient rather than a piece of
-// work, and therefore need the machine to tell two of them apart.
-func isDefaultBranch(b string) bool {
-	return b == "main" || b == "master"
+// work, and therefore need the machine to tell two of them apart: main,
+// master, and whatever the remote says its default is. Hardcoding the first two
+// left a repository whose default is `develop` or `trunk` with one key on every
+// machine, so two machines overwrote each other's handoff (MEMORY-013, #1921).
+// main and master stay ambient whatever the clone recorded, and so does the
+// default of every remote, not only origin's (#2089): qualifying one branch too
+// many costs two threads where one would do, while one too few is two machines
+// overwriting one thread.
+func (id Identity) isDefaultBranch() bool {
+	b := id.Branch
+	return b == "main" || b == "master" || slices.Contains(id.DefaultBranches, b)
+}
+
+// remoteDefaultBranches reads the symbolic ref git writes for each remote's
+// default branch, `ref: refs/remotes/<remote>/<branch>`, from a common git dir:
+// on clone for the remote it cloned from, and on `git remote set-head` for any
+// other. Only the loose file exists, because packed-refs holds no symrefs. The
+// walk is recursive because a remote's name may contain a slash (`foo/bar`
+// keeps its HEAD at refs/remotes/foo/bar/HEAD). A HEAD that is not a symref
+// into its own remote names nothing, which also rules out a remote-tracking
+// branch that merely ends in `/HEAD`: that file holds a sha.
+func remoteDefaultBranches(commonDir string) []string {
+	root := filepath.Join(commonDir, "refs", "remotes")
+	var branches []string
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || d.Name() != "HEAD" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(p))
+		if err != nil || rel == "." {
+			return nil
+		}
+		raw, err := os.ReadFile(p) // #nosec G304 -- inside the resolved git dir
+		if err != nil {
+			return nil
+		}
+		remote := filepath.ToSlash(rel)
+		if b, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), "ref: refs/remotes/"+remote+"/"); ok && b != "" {
+			branches = append(branches, b)
+		}
+		return nil
+	})
+	return branches
 }
 
 // sanitizeThread keeps a branch usable as both a markdown heading and a filename
@@ -96,6 +144,17 @@ func shortHost() string {
 
 // readGitdirPointer reads a linked worktree's `.git` file and returns the gitdir
 // it names, if it points into a `worktrees/` directory.
+//
+// A relative pointer is relative to the `.git` file's own directory, which is
+// what git writes under `worktree.useRelativePaths`. Read as given, it resolved
+// against the process's working directory instead: from a subdirectory, the
+// project became ".." and HEAD was read from the wrong place, so the thread
+// key named the wrong line of work (MEMORY-016, #1930).
+//
+// A submodule's `.git` points into `<super>/.git/modules/<name>`, which is not
+// a linked worktree, so it is refused and the walk resolves the superproject:
+// the vault is keyed by project, and a submodule rarely has one of its own
+// (#2089, pinned by TestRepoIdentityResolvesASubmoduleToItsSuperproject).
 func readGitdirPointer(path string) (string, bool) {
 	raw, err := os.ReadFile(path) // #nosec G304 -- the .git pointer of the cwd being resolved
 	if err != nil {
@@ -105,7 +164,11 @@ func readGitdirPointer(path string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	target = filepath.Clean(strings.TrimSpace(target))
+	target = strings.TrimSpace(target)
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(path), target)
+	}
+	target = filepath.Clean(target)
 	if filepath.Base(filepath.Dir(target)) != "worktrees" {
 		return "", false
 	}

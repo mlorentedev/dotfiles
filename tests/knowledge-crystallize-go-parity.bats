@@ -10,10 +10,13 @@
 # satisfying. gc_run_case's `go` mode (lib.sh) never shells out; it only runs the
 # built dotf binary and diffs its output against those static files.
 #
-# Skips (never fails) when the Go toolchain is absent, so a shell-only checkout
-# still runs the rest of the suite. CI installs Go for the `test` job precisely so
-# this does not silently skip there — the failure mode #807 and BUG-055 are both
-# about a check that skips instead of running.
+# Skips when the Go toolchain is absent locally, so a shell-only checkout still
+# runs the rest of the suite; in CI a missing toolchain, and a build that fails
+# anywhere, FAIL. CI builds `dotf` once and exports DOTF_BIN. The failure mode
+# #807 and BUG-055 are both about is a check that skips instead of running
+# (tests/lib/dotf-bin.bash).
+
+load 'lib/dotf-bin'
 
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/crystallize"
@@ -26,16 +29,12 @@ teardown() {
     rm -rf "$ACTUAL"
 }
 
-# Build once per test file run, into a cached location, so 13 cases do not pay 13
-# compilations.
+# One binary per run: DOTF_BIN when CI built it, otherwise one build per file
+# into a cached location, so 13 cases do not pay 13 compilations.
 _build_dotf() {
-    command -v go >/dev/null 2>&1 || skip "go toolchain not installed"
-    GC_DOTF_BIN="${BATS_FILE_TMPDIR:-/tmp}/dotf-parity"
+    dotf_bin_resolve "${BATS_FILE_TMPDIR:-/tmp}/dotf-parity"
+    GC_DOTF_BIN="$DOTF_BIN"
     export GC_DOTF_BIN
-    if [ ! -x "$GC_DOTF_BIN" ]; then
-        ( cd "$BATS_TEST_DIRNAME/../cli" && go build -o "$GC_DOTF_BIN" ./cmd/dotf ) \
-            || skip "go build failed"
-    fi
     export GC_IMPL_MODE=go
 }
 

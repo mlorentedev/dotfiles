@@ -103,6 +103,19 @@ setup() {
     [ "$(jq -r '.mediaMcp' "$DOTFILES_DIR/$(printf '%s' "$entry" | jq -r '.src')")" = "false" ]
 }
 
+# #843 / #2100: models.json is rendered with NAN_API_KEY into a 0600 file,
+# and on a box without pi that file is read by nothing -- the integration
+# image deployed it half-rendered ("NAN_API_KEY could not be resolved").
+# pi-compaction is deliberately NOT gated: it merges into the settings.json
+# setup seeds on every box (#1938), and verify-setup asserts the merge there.
+@test "pi's models.json is deployed only where pi is installed" {
+    command -v jq >/dev/null || skip "jq not available"
+    local entry
+    entry="$(jq -c '.configs[] | select(.dst == "{HOME}/.pi/agent/models.json")' "$DOTFILES_DIR/ai/deploy.json")"
+    [ -n "$entry" ]
+    [ "$(printf '%s' "$entry" | jq -r '.requires')" = "pi" ]
+}
+
 @test "ai/pi/settings.json omits the volatile lastChangelogVersion (seed-if-missing)" {
     refute_grep_fixed 'lastChangelogVersion' "$PI_SETTINGS"
 }

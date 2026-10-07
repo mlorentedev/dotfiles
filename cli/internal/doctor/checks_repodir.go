@@ -3,7 +3,6 @@ package doctor
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -92,26 +91,8 @@ func cleanGitRepositoryEnv(environ []string) []string {
 	return clean
 }
 
+// sameCheckoutRoot reports whether the configured repo dir is the checkout
+// root git reports, through whatever symlink, spelling or case reaches it.
 func sameCheckoutRoot(configured, actual string) bool {
-	a, errA := canonicalPath(configured)
-	b, errB := canonicalPath(actual)
-	if errA != nil || errB != nil {
-		return false
-	}
-	if runtime.GOOS == "windows" {
-		return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
-	}
-	return filepath.Clean(a) == filepath.Clean(b)
-}
-
-func canonicalPath(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	resolved, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(resolved), nil
+	return sameDir(configured, actual)
 }

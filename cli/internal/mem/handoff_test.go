@@ -3,6 +3,7 @@ package mem
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -522,6 +523,120 @@ func TestWriteThreadKeepsOrdinaryHeadingsAsContent(t *testing.T) {
 			}
 			if n := strings.Count(out, "### thread: wt-pi-harness"); n != 1 {
 				t.Errorf("the foreign thread appears %d times:\n%s", n, out)
+			}
+		})
+	}
+}
+
+// MEMORY-016 (#1930): git writes a relative gitdir pointer under
+// worktree.useRelativePaths, relative to the `.git` file. Resolved against the
+// process's working directory instead, the project read as ".." and HEAD came
+// from the wrong place. The process sits in an unrelated directory here, so a
+// cwd-relative read cannot pass by accident.
+func TestThreadKeyResolvesARelativeGitdirAgainstThePointerFile(t *testing.T) {
+	base := t.TempDir()
+	gitdir := filepath.Join(base, "dotfiles", ".git", "worktrees", "rel")
+	if err := os.MkdirAll(gitdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gitdir, "HEAD"), []byte("ref: refs/heads/feat/relative\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(base, "dotfiles-wt-rel")
+	sub := filepath.Join(wt, "cli", "internal")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pointer := "gitdir: " + filepath.Join("..", "dotfiles", ".git", "worktrees", "rel") + "\n"
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte(pointer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	for _, dir := range []string{wt, sub} {
+		if got := ThreadKey(dir); got != "feat-relative" {
+			t.Errorf("ThreadKey(%s) = %q, want the branch the relative pointer names", dir, got)
+		}
+		id, ok := RepoIdentity(dir)
+		if !ok || id.Project != "dotfiles" || id.Worktree != "rel" {
+			t.Errorf("RepoIdentity(%s) = %+v, %v; want project dotfiles, worktree rel", dir, id, ok)
+		}
+	}
+}
+
+// MEMORY-016 (#1930): an unreadable working directory used to resolve to
+// "main", the ambient thread, so an unrelated failure wrote into somebody
+// else's handoff. It is an error now.
+func TestThreadKeyForCwdFailsWhenTheWorkingDirectoryIsGone(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows refuses to remove a process's working directory")
+	}
+	gone := filepath.Join(t.TempDir(), "gone")
+	if err := os.Mkdir(gone, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(gone)
+	if err := os.Remove(gone); err != nil {
+		t.Fatal(err)
+	}
+	key, err := ThreadKeyForCwd()
+	if err == nil {
+		t.Fatalf("got key %q from a working directory that no longer exists; want an error", key)
+	}
+	if key != "" {
+		t.Errorf("an error came with key %q; a caller that ignores the error must not get a usable key", key)
+	}
+}
+
+// setOriginHead records origin's default branch the way `git clone` does, in
+// the common git dir of the repository root returned by the fixtures.
+func setOriginHead(t *testing.T, commonDir, branch string) {
+	t.Helper()
+	setRemoteHead(t, commonDir, "origin", branch)
+}
+
+// MEMORY-013 (#1921): the ambient branch is the remote's default, not only the
+// two names hardcoded before. A repository whose default is `develop` used one
+// key on every machine, and two machines overwrote each other's handoff.
+func TestThreadKeyQualifiesTheRemotesDefaultBranchWithTheHost(t *testing.T) {
+	host := "@" + shortHost()
+	for _, tc := range []struct {
+		name, branch, originHead string
+		linked, qualified        bool
+	}{
+		{"main, no origin HEAD", "main", "", false, true},
+		{"master, origin HEAD develop", "master", "develop", false, true},
+		{"develop as the default, main checkout", "develop", "develop", false, true},
+		{"trunk as the default, linked worktree", "trunk", "trunk", true, true},
+		{"develop when the default is main", "develop", "main", true, false},
+		{"a feature branch", "feat/x", "develop", true, false},
+		{"a slashed default", "release/1.2", "release/1.2", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cwd, common string
+			if tc.linked {
+				cwd = gitFixture(t, "proj", "wt", tc.branch)
+				raw, err := os.ReadFile(filepath.Join(cwd, ".git"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				gitdir := strings.TrimSpace(strings.TrimPrefix(string(raw), "gitdir:"))
+				common = filepath.Dir(filepath.Dir(gitdir))
+			} else {
+				cwd = mainFixture(t, "proj", tc.branch)
+				common = filepath.Join(cwd, ".git")
+			}
+			if tc.originHead != "" {
+				setOriginHead(t, common, tc.originHead)
+			}
+			got := ThreadKey(cwd)
+			if qualified := strings.HasSuffix(got, host); qualified != tc.qualified {
+				t.Errorf("ThreadKey = %q; host-qualified = %v, want %v", got, qualified, tc.qualified)
+			}
+			// The key is a filename component: no derived default may put a
+			// separator in it.
+			if strings.ContainsAny(got, `/\`) {
+				t.Errorf("ThreadKey = %q carries a path separator", got)
 			}
 		})
 	}
