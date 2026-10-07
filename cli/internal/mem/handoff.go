@@ -508,8 +508,16 @@ func ThreadKey(cwd string) string {
 // is an error, not "main": "main" is the ambient thread, and pooling every
 // failure into it hands an unrelated session somebody else's handoff
 // (MEMORY-016, #1930).
+//
+// Getwd succeeding is not proof the directory exists: on darwin it returns the
+// path the kernel last knew for a working directory that has since been removed
+// (stat(".") still works), where Linux fails with ENOENT. So the path it
+// returned is stat'ed too (#2085).
 func ThreadKeyForCwd() (string, error) {
 	wd, err := os.Getwd()
+	if err == nil {
+		_, err = os.Stat(wd)
+	}
 	if err != nil {
 		return "", fmt.Errorf("resolve the thread from the working directory: %w", err)
 	}
