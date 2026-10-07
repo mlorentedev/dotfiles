@@ -195,7 +195,8 @@ is the only record of how.`,
 			baseSHA := resolveReviewBase(repoRoot, specDir)
 			headSHA := headSHAOf(repoRoot)
 			if baseSHA == "" {
-				return fmt.Errorf("cannot resolve a review base for specs/%s: no commit adds that folder.\n"+
+				return fmt.Errorf("cannot resolve a review base for specs/%s: no commit adds that folder, or it\n"+
+					"was first added, under this or an earlier name, in the repository's root commit.\n"+
 					"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
 					"call that a review. Commit the spec first", id)
 			}

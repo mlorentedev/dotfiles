@@ -181,3 +181,60 @@ func contains(haystack, needle string) bool {
 		return false
 	})()
 }
+
+// writeAndCommit writes each path with fixed content and commits them.
+func writeAndCommit(t *testing.T, repoRoot, msg string, paths ...string) {
+	t.Helper()
+	for _, p := range paths {
+		full := filepath.Join(repoRoot, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("# "+p+"\n\nenough text for rename detection to pair the file\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git(t, repoRoot, "add", ".")
+	git(t, repoRoot, "commit", "-qm", msg)
+}
+
+// BUG-108 (#1829): a renamed spec folder looks newly added under its new path,
+// so the base used to be the parent of the RENAME, after the implementation.
+// The base must be the parent of the commit that first added the folder under
+// any of its names.
+func TestResolveReviewBaseFollowsARenamedSpecFolder(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	wantBase := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	git(t, repoRoot, "mv", "specs/OLD-001-x", "specs/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "archive"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "mv", "specs/NEW-001-x", "specs/archive/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "archive the spec")
+
+	// Two hops: archive's move, then the rename before it.
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "archive", "NEW-001-x")); got != wantBase {
+		t.Errorf("ResolveReviewBase = %q, want %q (the commit before the spec first appeared)", got, wantBase)
+	}
+}
+
+// The projects-toolkit shape from #1829: the implementation and the spec are in
+// the root commit and the spec is renamed later. There is no commit before the
+// work, so no base resolves, and the caller refuses rather than reviewing a
+// diff that holds only the rename.
+func TestResolveReviewBaseRefusesASpecRenamedOutOfTheRootCommit(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "root: spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	git(t, repoRoot, "mv", "specs/OLD-001-x", "specs/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != "" {
+		t.Errorf("ResolveReviewBase = %q, want \"\": the spec was born in the root commit, so the only "+
+			"base after it excludes the implementation", got)
+	}
+}

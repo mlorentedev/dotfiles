@@ -103,16 +103,48 @@ func HeadSHA(repoRoot string) string {
 // That second case is the whole point: it is the one the old code got wrong by
 // having no answer at all.
 //
+// A folder that was renamed -- by hand, or by `spec archive` moving it under
+// specs/archive/ -- appears ADDED under its new path, so the search follows each
+// rename back to the folder's first name (BUG-108, #1829). Without that, the base
+// was the parent of the rename, after the implementation, and the review diff
+// held the rename and nothing else.
+//
 // Returns "" when there is no such commit (a spec folder not yet committed),
 // which the caller must treat as "cannot review", not as "review everything".
+// It also returns "" when the folder, under any of its names, was added in the
+// repository's root commit: there is no "before" to compare against, and
+// reviewing the entire repository history is not what was asked for.
 func ResolveReviewBase(repoRoot, specDir string) string {
 	rel, err := filepath.Rel(repoRoot, specDir)
 	if err != nil {
 		rel = specDir
 	}
-	// --diff-filter=A finds the commit that ADDED the folder; the last line of
-	// a reverse-chronological log is the earliest such commit. `--` guards a
-	// path that could be read as a revision.
+	rel = filepath.ToSlash(rel)
+	// Bounded so a pathological history cannot loop; a spec renamed more than
+	// a handful of times is refused, not reviewed against a guessed base.
+	for hop := 0; hop < 8; hop++ {
+		adding := earliestAdding(repoRoot, rel)
+		if adding == "" {
+			return ""
+		}
+		out, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
+		if err != nil {
+			return "" // the adding commit is the root commit
+		}
+		parent := strings.TrimSpace(string(out))
+		from := renamedFrom(repoRoot, parent, adding, rel)
+		if from == "" {
+			return parent
+		}
+		rel = from
+	}
+	return ""
+}
+
+// earliestAdding is the first commit that added a file under rel. --diff-filter=A finds the commits that ADDED it; the last line of a
+// reverse-chronological log is the earliest. `--` guards a path that could be
+// read as a revision.
+func earliestAdding(repoRoot, rel string) string {
 	out, err := exec.Command("git", "-C", repoRoot,
 		"log", "--diff-filter=A", "--format=%H", "--", rel).Output()
 	if err != nil {
@@ -122,18 +154,49 @@ func ResolveReviewBase(repoRoot, specDir string) string {
 	if len(lines) == 0 {
 		return ""
 	}
-	adding := lines[len(lines)-1]
+	return lines[len(lines)-1]
+}
 
-	parent, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
+// renamedFrom reports the folder that commit renamed into rel, or "" when the
+// files under rel were genuinely new there. -z keeps paths unquoted whatever
+// core.quotePath says.
+func renamedFrom(repoRoot, parent, commit, rel string) string {
+	out, err := exec.Command("git", "-C", repoRoot,
+		"diff-tree", "-r", "-M", "--name-status", "-z", parent, commit).Output()
 	if err != nil {
-		// The adding commit is the repository's root commit, so there is no
-		// parent to diff against. Return "" — the caller reads that as "no base
-		// resolved" and refuses the review, which is the right outcome: a spec
-		// added in the root commit has no "before" to compare against, and
-		// reviewing the entire repository history is not what was asked for.
 		return ""
 	}
-	return strings.TrimSpace(string(parent))
+	// Records are status NUL path, or for a rename or copy status NUL src NUL dst.
+	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	for i := 0; i < len(f); {
+		status := f[i]
+		if !strings.HasPrefix(status, "R") && !strings.HasPrefix(status, "C") {
+			i += 2
+			continue
+		}
+		if i+2 < len(f) && status[0] == 'R' {
+			if dir := renamedDir(f[i+1], f[i+2], rel); dir != "" {
+				return dir
+			}
+		}
+		i += 3
+	}
+	return ""
+}
+
+// renamedDir is the folder oldPath sat in when its rename to newPath moved it
+// into rel, or "" when newPath is outside rel or the file's place inside the
+// folder changed with it.
+func renamedDir(oldPath, newPath, rel string) string {
+	suffix, ok := strings.CutPrefix(newPath, rel+"/")
+	if !ok {
+		return ""
+	}
+	dir, _ := strings.CutSuffix(oldPath, "/"+suffix)
+	if dir == oldPath {
+		return ""
+	}
+	return dir
 }
 
 // fileDigest returns the SHA-256 of path, or "" when it does not exist.
