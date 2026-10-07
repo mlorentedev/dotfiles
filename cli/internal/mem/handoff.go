@@ -537,10 +537,11 @@ func MemoryProject(memoryPath string) (string, bool) {
 // it is noise — and the collision being fixed only ever occurred between
 // worktrees.
 func JournalName(date, project, agent, thread string) string {
-	if thread == "" || thread == "main" {
-		return fmt.Sprintf("%s-%s-%s.md", date, project, agent)
+	stem := fmt.Sprintf("%s-%s-%s", date, project, agent)
+	if thread != "" && thread != "main" {
+		stem += "-" + thread
 	}
-	return fmt.Sprintf("%s-%s-%s-%s.md", date, project, agent, journalUnsafe.ReplaceAllString(thread, "-"))
+	return journalUnsafe.ReplaceAllString(stem, "-") + ".md"
 }
 
 // journalUnsafe is what vault-validate's session-name rule rejects. A forked

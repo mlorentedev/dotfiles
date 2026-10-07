@@ -339,6 +339,11 @@ func TestJournalNameKeepsOnlyCharactersTheVaultAccepts(t *testing.T) {
 			t.Errorf("thread %q: got %q, want %q", thread, got, want)
 		}
 	}
+	// --agent is free text and a project is a directory name: neither is
+	// validated upstream, so the sanitiser covers the whole name.
+	if got, want := JournalName("2026-10-01", "my+proj", "claude code", "main"), "2026-10-01-my-proj-claude-code.md"; got != want {
+		t.Errorf("project and agent: got %q, want %q", got, want)
+	}
 }
 
 // REVIEWER FINDING (#1279): a `###` heading inside a thread's BODY truncated its
