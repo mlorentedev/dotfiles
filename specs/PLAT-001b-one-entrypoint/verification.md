@@ -31,6 +31,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (PR 2c-1, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Tests: `TestDeployedMatchesSource` (7 cases), `TestCatalogMarkerMatchesCompileHarness`, `TestTheCopilotSourceSlotIsDeployOnly`, `TestCheckInstructionDrift_ARefreshedSourceRegionIsDrift`, `TestRecordsHarness_ARefreshedSourceRegionIsPlannedAndFailsTheProbe`
 - Windows CI (PR 2c-1, first push): doctor reported `.copilot/copilot-instructions.md has drifted`, a false positive. The source reserves an empty `<!-- BEGIN HARNESS GENERATED -->` slot that the deploy fills with the skill catalog, and the first rule ("deploy-only iff the BEGIN line is absent from the source") stripped the catalog from the deployed copy but kept the slot in the source
 
+- Test suite (PR 2c-2, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. `TestDeployInstructions_TheCatalogFillsTheSourceSlotInPlace` fails when the slot is not filled in place (mutation run: the catalog lands twice)
+- End to end (PR 2c-2): a throwaway HOME with a stub `copilot` and this branch's `dotf` on PATH; `compile-harness.sh --deploy` run twice, both rc=0. The second run delegated (`instructions current` for claude, opencode, pi and copilot), the copilot file holds one catalog region and no empty slot, and `dotf harness instructions --dry-run` then reports every target current
+- Manual run (PR 2c-2): `dotf harness instructions --dry-run` against the Mac's real HOME, whose files `compile-harness.sh` wrote, reports claude, opencode and pi current and skips copilot (not on PATH)
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.

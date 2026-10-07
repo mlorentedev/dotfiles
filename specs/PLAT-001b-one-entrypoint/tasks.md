@@ -56,8 +56,10 @@ created: "2026-10-06"
   - Deploy-only regions are identified by kind and stripped from both sides: the presence roster, the skill catalog (its BEGIN line names it, pinned against `compile-harness.sh`) and the empty slot a source reserves for that catalog
   - Every other region, the enforced one with its sha and provenance included, is compared literally, so a refreshed source region is drift on a stale deployed copy
   - Tests: `TestDeployedMatchesSource` (refreshed source region, text outside regions, lost source region, deploy-only regions, filled catalog slot, CRLF), `TestCatalogMarkerMatchesCompileHarness`, `TestTheCopilotSourceSlotIsDeployOnly`, `TestCheckInstructionDrift_ARefreshedSourceRegionIsDrift`, `TestRecordsHarness_ARefreshedSourceRegionIsPlannedAndFailsTheProbe`
-- [ ] PR 2c-2: port `deploy_instructions` to Go (`dotf harness instructions`), writing each source and keeping its deploy-only regions; the catalog fills the source's slot in place, as `compile-harness.sh` `replace_region` does, so the two writers agree byte for byte
-- [ ] Gated on the release that ships the subcommand and the `DOTF_VERSION` bump (#1814 class): `compile-harness.sh` delegates `deploy_instructions` to it, and `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for it
+- [x] PR 2c-2: `harness.DeployInstructions` and `dotf harness instructions [--dry-run]` write each source verbatim with the deployed file's deploy-only regions, so a refreshed source region replaces the stale one and the presence roster and skill catalog survive
+  - The catalog fills the source's empty slot in place, the position `compile-harness.sh` `replace_region` writes it to, so the two writers agree byte for byte and neither duplicates it; the presence roster is appended, as `dotf harness presence` does
+  - `compile-harness.sh` delegates `deploy_instructions` to it when the installed dotf carries the subcommand (the `dotf_knows_subcommand` probe) and keeps the copy as the fallback, so no release is needed to land it
+- [ ] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [ ] `records-bind`: the `harness bind` logic with its dry-run
 
