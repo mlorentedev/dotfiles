@@ -221,12 +221,25 @@ func ResolveRegistryPath() string {
 // before it calls `dotf tools install`, so a setup run reads the same file
 // either way.
 func ResolveCatalogPath() string {
+	return resolveInCheckout("packages.json", fileExists)
+}
+
+// ResolveVersionsPath locates versions.conf for READS, the same way: the
+// checkout first, else the copy setup deploys under DOTFILES_DIR.
+func ResolveVersionsPath() string {
+	return resolveInCheckout("versions.conf", fileExists)
+}
+
+// resolveInCheckout returns rel inside the dotfiles checkout when the checkout
+// is found and has it, else rel under the deploy dir. One rule for every
+// checkout-first read, so the readers cannot drift apart.
+func resolveInCheckout(rel string, exists func(string) bool) string {
 	if root := RepoDir(); root != "" {
-		if p := filepath.Join(root, "packages.json"); fileExists(p) {
+		if p := filepath.Join(root, filepath.FromSlash(rel)); exists(p) {
 			return p
 		}
 	}
-	return filepath.Join(DotfilesDir(Home()), "packages.json")
+	return filepath.Join(DotfilesDir(Home()), filepath.FromSlash(rel))
 }
 
 // ResolveSensitiveDir locates the age secret store (sensitive/) for READS. Like
@@ -236,12 +249,7 @@ func ResolveCatalogPath() string {
 // registry and the values it maps on the same source avoids the split-brain where a
 // repo-side rotation stays invisible until a redeploy (the #635 class, for secret files).
 func ResolveSensitiveDir() string {
-	if root := RepoDir(); root != "" {
-		if p := filepath.Join(root, "sensitive"); isDir(p) {
-			return p
-		}
-	}
-	return filepath.Join(DotfilesDir(Home()), "sensitive")
+	return resolveInCheckout("sensitive", isDir)
 }
 
 // ResolveHarnessRoot locates the root that CONTAINS harness/ — the directory to
