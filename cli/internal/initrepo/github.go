@@ -30,7 +30,9 @@ func ParseOriginRepo(remoteURL string) (string, error) {
 	}
 
 	if !repoSlugPattern.MatchString(s) {
-		return "", fmt.Errorf("could not derive owner/name from %q (got %q)", remoteURL, s)
+		// The URL is not quoted: a remote often embeds a token, and this error
+		// reaches the init report and the terminal. The host is enough to act on.
+		return "", fmt.Errorf("could not derive owner/name from the origin at %s", originHost(remoteURL))
 	}
 	return s, nil
 }
