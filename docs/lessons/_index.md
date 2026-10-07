@@ -378,4 +378,5 @@ tags: [lessons, index, dotfiles]
 | [358 - A mode convergence must only narrow](lesson-358-a-mode-convergence-must-only-narrow.md) | 2026-10-07 |
 | [359 - A gate must read every input the platform acts on](lesson-359-a-gate-must-read-every-input-the-platform-acts-on.md) | 2026-10-07 |
 | [360 - A PR inferred from the checkout is not the PR being pushed](lesson-360-a-pr-inferred-from-the-checkout-is-not-the-pr-being-pushed.md) | 2026-10-07 |
+| [361 - A remote URL is a credential carrier: report its host, never the URL](lesson-361-a-remote-url-is-a-credential-carrier.md) | 2026-10-07 |
 <!-- END GENERATED -->
