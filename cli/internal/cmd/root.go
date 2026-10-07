@@ -37,6 +37,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newHarnessCmd())
 	root.AddCommand(newAgentCmd())
 	root.AddCommand(newDeployCmd())
+	root.AddCommand(newConvergeCmd())
 	root.AddCommand(newOrcaCmd())
 	root.AddCommand(newPrCmd())
 	root.AddCommand(newForgeCmd())
