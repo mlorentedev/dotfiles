@@ -18,9 +18,11 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -88,6 +90,12 @@ type Config struct {
 	// packages.json's platforms uses (ADR-045): a POSIX rc file is declared for
 	// linux and darwin, because Git Bash on Windows would read it.
 	Platforms []string `json:"platforms"`
+
+	// dirMode is the mode for a directory the deploy creates to hold this
+	// entry's file. ParseManifest derives it from every entry sharing the
+	// directory (assignDirModes); zero means a Config built outside a manifest,
+	// which falls back to its own mode.
+	dirMode os.FileMode
 }
 
 // AppliesOn reports whether the entry is declared for goos.
@@ -211,7 +219,70 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		}
 		seen[c.Name] = true
 	}
+	assignDirModes(m.Configs)
 	return &m, nil
+}
+
+// assignDirModes gives each entry the mode for a directory the deploy creates
+// to hold its file: private (0700) when any entry deploying into that
+// directory is private, 0755 otherwise. It is a fact about the manifest, not
+// about the entry being deployed, so the result no longer depends on which
+// entry creates the directory first: `dotf deploy ssh-pubkey` (0644) alone used
+// to create ~/.ssh 0755 beside a 0600 ssh config (#2053).
+//
+// Entries are grouped by the directory of their dst template, so one directory
+// spelled through two tokens ({HOME}/.claude and {CLAUDE_CONFIG_DIR}) does not
+// group. The manifest holds no such pair with mixed modes.
+func assignDirModes(cs []Config) {
+	private := map[string]bool{}
+	for _, c := range cs {
+		if c.private() {
+			private[path.Dir(c.Dst)] = true
+		}
+	}
+	for i := range cs {
+		cs[i].dirMode = 0o755
+		if private[path.Dir(cs[i].Dst)] {
+			cs[i].dirMode = 0o700
+		}
+	}
+}
+
+// private reports whether the entry's file grants nothing to group or others.
+// ParseManifest has already refused a mode that does not parse.
+func (c Config) private() bool {
+	mode, err := c.FileMode()
+	return err == nil && mode&0o077 == 0
+}
+
+// PrivateDirs lists, expanded and sorted, the directories that hold a private
+// file this manifest deploys: an entry whose own mode is private, that applies
+// here (the caller's filter: platforms, requires), and whose destination file
+// exists. A directory that already existed keeps its mode when the deploy
+// writes into it, so doctor reports one left open (#2053), and the existence
+// test keeps that report true: an entry for another OS, or one never
+// deployed, puts nothing private in its directory.
+func (m *Manifest) PrivateDirs(home string, resolve func(string) string, applies func(Config) bool) ([]string, error) {
+	seen := map[string]bool{}
+	var dirs []string
+	for _, c := range m.Configs {
+		if !c.private() || !applies(c) {
+			continue
+		}
+		dst, err := ExpandDst(c.Dst, home, resolve)
+		if err != nil {
+			return nil, fmt.Errorf("config %q: %w", c.Name, err)
+		}
+		if _, err := os.Stat(dst); err != nil {
+			continue
+		}
+		if dir := filepath.Dir(dst); !seen[dir] {
+			seen[dir] = true
+			dirs = append(dirs, dir)
+		}
+	}
+	sort.Strings(dirs)
+	return dirs, nil
 }
 
 // validatePlatforms refuses a platforms list a released reader could not read
@@ -467,9 +538,10 @@ func load(c Config, repoRoot, home string, resolve func(string) string) ([]byte,
 }
 
 // dirMode is the mode for a directory the deploy creates to hold a file of
-// mode: private (0700) when the file grants nothing to group or others, so a
-// 0600 ssh config does not land in a 0755 ~/.ssh. A directory that exists
-// keeps its mode.
+// mode, for a Config that did not come from a manifest: private (0700) when
+// the file grants nothing to group or others. A manifest entry uses the mode
+// assignDirModes derived from every entry sharing the directory. A directory
+// that exists keeps its mode.
 func dirMode(mode os.FileMode) os.FileMode {
 	if mode&0o077 == 0 {
 		return 0o700
@@ -482,7 +554,11 @@ func dirMode(mode os.FileMode) os.FileMode {
 // and a cross-device rename is the failure that turns an install into a
 // half-written config.
 func stage(c Config, dst string, data []byte, mode os.FileMode) (string, error) {
-	if err := os.MkdirAll(filepath.Dir(dst), dirMode(mode)); err != nil {
+	dm := c.dirMode
+	if dm == 0 {
+		dm = dirMode(mode)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), dm); err != nil {
 		return "", fmt.Errorf("config %q: destination directory: %w", c.Name, err)
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(dst), ".deploy-*")
