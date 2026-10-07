@@ -26,8 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
 // The stub's contract, read from its environment. Set only on the process
@@ -88,16 +86,12 @@ func TestRunHealthGoldenCorpus(t *testing.T) {
 		t.Fatalf("read the golden corpus: %v", err)
 	}
 
-	// Resolved BEFORE PATH is narrowed below. A missing git or bash fails
-	// rather than skips: both exist on every CI leg, and a suite that skips
-	// when its tools vanish reads as green (#807 / BUG-055).
+	// Resolved BEFORE PATH is narrowed below. A missing git fails rather than
+	// skips: it exists on every CI leg, and a suite that skips when its tools
+	// vanish reads as green (#807 / BUG-055).
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatalf("git is required by the worktree cases: %v", err)
-	}
-	bashPath := mem.ResolveBash()
-	if bashPath == "" {
-		t.Fatalf("bash is required by the backlog case (mem.ResolveBash found none)")
 	}
 	stubBin := installObsidianStub(t)
 	emptyBin := t.TempDir()
@@ -116,12 +110,10 @@ func TestRunHealthGoldenCorpus(t *testing.T) {
 				bin = emptyBin
 			}
 			runGoldenCase(t, goldenCase{
-				dir:      caseDir,
-				scripts:  filepath.Join(root, "scripts"),
-				path:     bin + string(os.PathListSeparator) + basePath,
-				stubBin:  bin,
-				gitPath:  gitPath,
-				bashPath: bashPath,
+				dir:     caseDir,
+				path:    bin + string(os.PathListSeparator) + basePath,
+				stubBin: bin,
+				gitPath: gitPath,
 			})
 		})
 	}
@@ -131,7 +123,7 @@ func TestRunHealthGoldenCorpus(t *testing.T) {
 }
 
 type goldenCase struct {
-	dir, scripts, path, stubBin, gitPath, bashPath string
+	dir, path, stubBin, gitPath string
 }
 
 func runGoldenCase(t *testing.T, c goldenCase) {
@@ -155,10 +147,8 @@ func runGoldenCase(t *testing.T, c goldenCase) {
 		VaultDir: vaultDir,
 		// What healthOptions() resolves when neither --vault nor $VAULT_NAME is
 		// set, which is how every case was captured.
-		VaultName:  "knowledge",
-		Verbose:    strings.Contains(readTrimmed(t, filepath.Join(c.dir, "args")), "--verbose"),
-		ScriptsDir: c.scripts,
-		BashPath:   c.bashPath,
+		VaultName: "knowledge",
+		Verbose:   strings.Contains(readTrimmed(t, filepath.Join(c.dir, "args")), "--verbose"),
 	})
 	if err != nil {
 		t.Fatalf("RunHealth: %v", err)
@@ -207,7 +197,7 @@ func installObsidianStub(t *testing.T) string {
 // developer machine has one (~/.local/bin -> the AppImage); left in place, the
 // absent-obsidian case would find it, and any case could reach the real GUI.
 // Prepending the stub is not enough on its own, which is why lib.sh replaces
-// PATH outright. Here the rest is kept, because the backlog scripts need it.
+// PATH outright. Here the rest is kept, because the worktree cases run git from it.
 func pathWithoutObsidian(path string) string {
 	var keep []string
 	for _, dir := range filepath.SplitList(path) {
