@@ -588,17 +588,11 @@ func TestThreadKeyForCwdFailsWhenTheWorkingDirectoryIsGone(t *testing.T) {
 	}
 }
 
-// setOriginHead records the remote's default branch the way `git clone` does,
-// in the common git dir of the repository root returned by the fixtures.
+// setOriginHead records origin's default branch the way `git clone` does, in
+// the common git dir of the repository root returned by the fixtures.
 func setOriginHead(t *testing.T, commonDir, branch string) {
 	t.Helper()
-	dir := filepath.Join(commonDir, "refs", "remotes", "origin")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "HEAD"), []byte("ref: refs/remotes/origin/"+branch+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	setRemoteHead(t, commonDir, "origin", branch)
 }
 
 // MEMORY-013 (#1921): the ambient branch is the remote's default, not only the
