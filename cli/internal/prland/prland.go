@@ -87,6 +87,7 @@ type Options struct {
 
 // Result is what Land did.
 type Result struct {
+	Number     int // the PR this is the result for
 	Merged     bool
 	Updated    bool // the base was merged into the branch first
 	HeadSHA    string
@@ -109,9 +110,9 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	n := strconv.Itoa(number)
 	f, err := settle(ctx, gh, o, number, o.Wait)
 	if err != nil {
-		return Result{}, err
+		return Result{Number: number}, err
 	}
-	res := Result{HeadSHA: f.HeadSHA, Reasons: Decide(f)}
+	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: Decide(f)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
 	for i := 0; o.UpdateBranch && onlyBehind(res.Reasons) && i < maxUpdates; i++ {
