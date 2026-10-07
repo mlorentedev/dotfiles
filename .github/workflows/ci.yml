@@ -92,6 +92,8 @@ jobs:
               - '**/*.psm1'
               - '.PSScriptAnalyzerSettings.psd1'
               - '.github/workflows/ci.yml'
+              # PSSCRIPTANALYZER_VERSION: a bump must lint on its own PR (#2052).
+              - 'versions.conf'
             # What can change what the pi package reconcile DOES. This set is
             # MAINTAINED BY HAND and is not proven closed — an earlier version
             # of this comment claimed "nothing else can", and that claim is
