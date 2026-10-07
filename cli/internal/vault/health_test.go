@@ -49,6 +49,29 @@ func TestHasAnyChar(t *testing.T) {
 	}
 }
 
+// The golden corpus cannot carry a memory/ directory: GUARD-001 refuses an
+// agent-memory path outside the vault. So the directory rule is pinned here.
+func TestOrphanExempt(t *testing.T) {
+	tests := []struct {
+		rel  string
+		want bool
+	}{
+		{"90_archive/old.md", true},
+		{"10_projects/p/sessions/2026-10-07.md", true},
+		{"10_projects/p/memory/feedback.md", true},
+		{"memory/top.md", true},
+		{"00_meta/memory.md", false},   // a file named like the directory
+		{"00_meta/sessions.md", false}, // likewise
+		{"10_projects/memoryless/a.md", false},
+		{"00_meta/note.md", false},
+	}
+	for _, tt := range tests {
+		if got := orphanExempt(tt.rel); got != tt.want {
+			t.Errorf("orphanExempt(%q) = %v, want %v", tt.rel, got, tt.want)
+		}
+	}
+}
+
 func TestCountNonBlank(t *testing.T) {
 	tests := []struct {
 		name string

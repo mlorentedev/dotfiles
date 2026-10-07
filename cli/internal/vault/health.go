@@ -23,8 +23,16 @@ package vault
 // fallback (a plain env-var cascade, NOT the ADR-025 machine.json cascade
 // ResolveVault() uses elsewhere — vault-health.sh predated that cascade, and
 // matching the oracle takes priority over "improving" it here).
+//
+// One deliberate departure, made once the session banner ran this port rather
+// than the script: sections 3 and 4 no longer count what cannot be fixed by
+// design (#1979). Orphans exclude session journals, agent memory and the
+// archive, from the list and the population alike; unresolved links exclude
+// those whose every source is a template placeholder or an archived note. The
+// goldens for those sections are the Go contract from there on.
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
@@ -139,8 +147,9 @@ func countNonBlank(s string) int {
 // stdout with trailing newlines stripped — the same trim bash's `$(...)`
 // command substitution performs, load-bearing because callers reuse this value
 // both for counting AND for the --verbose listing.
-func (h *healthRun) obsidianCmd(sub string) string {
-	cmd := exec.Command("obsidian", "--no-sandbox", sub, "--vault", h.opts.VaultName)
+func (h *healthRun) obsidianCmd(sub ...string) string {
+	args := append(append([]string{"--no-sandbox"}, sub...), "--vault", h.opts.VaultName)
+	cmd := exec.Command("obsidian", args...)
 	out, _ := cmd.Output() // stderr discarded, exit code ignored: `2>/dev/null || true`
 	return strings.TrimRight(string(out), "\n")
 }
@@ -291,24 +300,78 @@ func (h *healthRun) section2Connectivity() (int, bool) {
 	return 0, false
 }
 
+// orphanExempt reports a vault-relative path that has no incoming links by
+// design: a session journal, an agent memory file, or anything archived.
+func orphanExempt(rel string) bool {
+	rel = filepath.ToSlash(rel)
+	if strings.HasPrefix(rel, "90_archive/") {
+		return true
+	}
+	dirs := strings.Split(rel, "/")
+	for _, d := range dirs[:len(dirs)-1] {
+		if d == "sessions" || d == "memory" {
+			return true
+		}
+	}
+	return false
+}
+
+// unresolvedExempt reports a link source whose broken links are expected:
+// template placeholders such as {{client_slug}}, and archived notes that link
+// to IDs which never existed in the vault or moved out of it.
+func unresolvedExempt(source string) bool {
+	source = filepath.ToSlash(source)
+	return strings.HasPrefix(source, "00_meta/templates/") || strings.HasPrefix(source, "90_archive/")
+}
+
+func nonBlankLines(s string) []string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
 func (h *healthRun) section3OrphansDeadEnds() {
 	h.section("3/7", "Orphans & Dead-Ends")
 
-	orphanOut := h.obsidianCmd("orphans")
-	orphanCount := countNonBlank(orphanOut)
+	var orphans []string
+	exemptOrphans := 0
+	for _, l := range nonBlankLines(h.obsidianCmd("orphans")) {
+		if orphanExempt(strings.TrimSpace(l)) {
+			exemptOrphans++
+			continue
+		}
+		orphans = append(orphans, l)
+	}
+	population, exemptFiles := 0, 0
+	for _, f := range h.mdFiles {
+		if rel, err := filepath.Rel(h.opts.VaultDir, f); err == nil && orphanExempt(rel) {
+			exemptFiles++
+			continue
+		}
+		population++
+	}
+	orphanCount := len(orphans)
 	deadOut := h.obsidianCmd("dead-ends")
 	deadCount := countNonBlank(deadOut)
 
-	orphanPct := pct(orphanCount, h.totalFiles)
+	orphanPct := pct(orphanCount, population)
 	deadPct := pct(deadCount, h.totalFiles)
 
 	switch {
 	case orphanPct <= 30:
-		h.pass("Orphans: %d/%d (%d%%)", orphanCount, h.totalFiles, orphanPct)
+		h.pass("Orphans: %d/%d (%d%%)", orphanCount, population, orphanPct)
 	case orphanPct <= 50:
-		h.warn("Orphans: %d/%d (%d%%) — consider adding backlinks", orphanCount, h.totalFiles, orphanPct)
+		h.warn("Orphans: %d/%d (%d%%) — consider adding backlinks", orphanCount, population, orphanPct)
 	default:
-		h.fail("Orphans: %d/%d (%d%%) — too many isolated files", orphanCount, h.totalFiles, orphanPct)
+		h.fail("Orphans: %d/%d (%d%%) — too many isolated files", orphanCount, population, orphanPct)
+	}
+	if exemptFiles > 0 {
+		h.info("Not counted: %d file(s) under sessions/, memory/ and 90_archive/ (%d orphaned), which have no incoming links by design",
+			exemptFiles, exemptOrphans)
 	}
 
 	switch {
@@ -322,15 +385,42 @@ func (h *healthRun) section3OrphansDeadEnds() {
 
 	// The shell lists orphan files only — there is no dead-ends listing.
 	if h.opts.Verbose && orphanCount > 0 {
-		h.printTruncated("Orphan files", orphanOut, orphanCount, 20)
+		h.printTruncated("Orphan files", strings.Join(orphans, "\n"), orphanCount, 20)
 	}
+}
+
+// unresolvedLink is one entry of `obsidian unresolved verbose format=json`.
+// The CLI joins several sources into one string with ", ".
+type unresolvedLink struct {
+	Link    string `json:"link"`
+	Sources string `json:"sources"`
 }
 
 func (h *healthRun) section4Unresolved() {
 	h.section("4/7", "Unresolved Links")
 
-	out := h.obsidianCmd("unresolved")
-	count := countNonBlank(out)
+	out := h.obsidianCmd("unresolved", "verbose", "format=json")
+	var all []unresolvedLink
+	if strings.TrimSpace(out) != "" {
+		if err := json.Unmarshal([]byte(out), &all); err != nil {
+			first, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+			h.fail("Unresolved links: cannot read the obsidian CLI's JSON (%v); it printed: %s", err, first)
+			return
+		}
+	}
+	var live []string
+	for _, l := range all {
+		counted := strings.TrimSpace(l.Sources) == "" // no source named: count it
+		for _, src := range strings.Split(l.Sources, ", ") {
+			if src = strings.TrimSpace(src); src != "" && !unresolvedExempt(src) {
+				counted = true
+			}
+		}
+		if counted {
+			live = append(live, l.Link)
+		}
+	}
+	count := len(live)
 
 	switch {
 	case count == 0:
@@ -340,9 +430,12 @@ func (h *healthRun) section4Unresolved() {
 	default:
 		h.fail("Unresolved links: %d", count)
 	}
+	if exempt := len(all) - count; exempt > 0 {
+		h.info("Not counted: %d unresolved link(s) found only in 00_meta/templates/ or 90_archive/ (placeholders and archived notes)", exempt)
+	}
 
 	if h.opts.Verbose && count > 0 {
-		h.printTruncated("Unresolved links", out, count, 20)
+		h.printTruncated("Unresolved links", strings.Join(live, "\n"), count, 20)
 	}
 }
 
