@@ -21,6 +21,7 @@
 # below is the regression guard (it fails on the old script, passes on the fix).
 
 load 'lib/refute'
+load 'lib/dotf-bin'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -190,19 +191,13 @@ EOF
 # behaviours. The unit-level seams (issue regex, notification threshold, the
 # per-OS log path) are table-tested in cli/internal/vault/maintain_test.go.
 #
-# Skips (never fails) when the Go toolchain is absent, so a shell-only checkout
-# still runs the rest of this file — same reasoning as the two parity suites
-# (#807 / BUG-055).
+# Skips when the Go toolchain is absent locally, so a shell-only checkout still
+# runs the rest of this file; in CI a missing toolchain, and a build that fails
+# anywhere, FAIL — same reasoning as the two parity suites (#807 / BUG-055). CI
+# builds `dotf` once and exports DOTF_BIN (tests/lib/dotf-bin.bash).
 
 _build_dotf_maintain() {
-    command -v go >/dev/null 2>&1 || skip "go toolchain not installed"
-    DOTF_BIN="${BATS_FILE_TMPDIR:-$TMP}/dotf-maintain"
-    if [ ! -x "$DOTF_BIN" ]; then
-        # A missing toolchain skips (above); a toolchain that FAILS to build is
-        # a real defect and must fail, not read as harmless skips.
-        ( cd "$BATS_TEST_DIRNAME/../cli" && go build -o "$DOTF_BIN" ./cmd/dotf ) || return 1
-    fi
-    export DOTF_BIN
+    dotf_bin_resolve "${BATS_FILE_TMPDIR:-$TMP}/dotf-maintain"
     # An empty HOME: no ~/.claude/projects, so crystallize discovers nothing.
     # An empty VAULT_DIR and no `obsidian` on PATH: health degrades exactly as
     # it does on a headless box. No vault, no network, no desktop bus touched.

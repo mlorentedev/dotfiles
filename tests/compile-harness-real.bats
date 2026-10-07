@@ -15,21 +15,19 @@
 # `dotf` is OUR binary, built from this tree, so unlike the `gh`/`hive` suites in
 # the exemption table a real test costs nothing but a build and mutates nothing.
 # The CI `test` job already sets up Go (actions/setup-go, ci.yml), so this runs
-# there rather than skipping.
+# there rather than skipping. CI builds `dotf` once and exports DOTF_BIN; a build
+# that fails is a failure, never a skip (tests/lib/dotf-bin.bash).
 
 load 'lib/refute'
+load 'lib/dotf-bin'
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     SCRIPT="$REPO/scripts/compile-harness.sh"
     # One build per file, reused across tests in it.
     BIN_DIR="${BATS_FILE_TMPDIR:-/tmp/bats_ch_real_$$}/bin"
-    DOTF="$BIN_DIR/dotf"
-    if [ ! -x "$DOTF" ]; then
-        command -v go >/dev/null 2>&1 || skip "go toolchain not available"
-        mkdir -p "$BIN_DIR"
-        ( cd "$REPO/cli" && go build -o "$DOTF" ./cmd/dotf ) || skip "dotf failed to build"
-    fi
+    dotf_bin_resolve "$BIN_DIR/dotf"
+    DOTF="$DOTF_BIN"
 }
 
 @test "real dotf: harness --help lists resolve-tier, which is what the render probes for" {
