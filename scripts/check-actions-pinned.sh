@@ -19,8 +19,10 @@ while IFS= read -r -d '' f; do files+=("$f"); done < <(
 [ "${#files[@]}" -gt 0 ] || { echo "check-actions-pinned: no workflows"; exit 0; }
 
 # A `uses` key: optional indentation, optional "- ", the key, then the reference.
-# The reference is captured up to whitespace, a quote or a comment.
-bad="$(grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]+' "${files[@]}" \
+# The reference is captured up to whitespace, a quote or a comment. -H because
+# grep omits the "file:" prefix when given a single file, and the sed below
+# needs "file:line:" to extract the reference at all (#1855).
+bad="$(grep -HnE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]+' "${files[@]}" \
   | sed -E 's/^([^:]+:[0-9]+:)[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]+["'"'"']?([^"'"'"'[:space:]#]+).*/\1\3/' \
   | grep -vE ':(\./|docker://)' \
   | grep -vE '@[0-9a-fA-F]{40}$' || true)"
