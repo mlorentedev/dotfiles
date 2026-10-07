@@ -239,3 +239,55 @@ func TestRunExitsWithTheCodeAnExhaustedChainCarries(t *testing.T) {
 		t.Errorf("exit code = %d, want 3 (chain exhausted); stderr: %s", code, stderr.String())
 	}
 }
+
+// Every command reports a mistyped flag, whether or not it silences its own
+// errors (#2090). Measured before the fix: eight commands, `doctor` and
+// `pr land` among them, exited 1 with nothing on stderr.
+func TestEveryCommandReportsAnUnknownFlag(t *testing.T) {
+	for _, path := range commandPaths(cmd.New("test", "")) {
+		name := strings.Join(path, " ")
+		t.Run(name, func(t *testing.T) {
+			root := cmd.New("test", "")
+			found, _, err := root.Find(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if found.DisableFlagParsing || found.FParseErrWhitelist.UnknownFlags {
+				t.Skipf("dotf %s does not parse flags, so an unknown one would reach its code", name)
+			}
+			root.SetArgs(append(append([]string{}, path...), "--no-such-flag"))
+			var stderr bytes.Buffer
+			root.SetOut(&stderr)
+			code := run(root, &stderr)
+			if code == 0 {
+				t.Errorf("dotf %s --no-such-flag exited 0", name)
+			}
+			if !strings.Contains(stderr.String(), "unknown flag: --no-such-flag") {
+				t.Errorf("dotf %s --no-such-flag did not report the flag; stderr: %q", name, stderr.String())
+			}
+		})
+	}
+}
+
+// A silenced command's Args refusal is reported too, and its own diagnostics
+// are still not printed twice.
+func TestASilencedCommandReportsArgumentsItRefuses(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"pr", "land"}, "requires at least 1 arg(s)"},
+		{[]string{"pr", "land", "abc"}, `"abc" is not a PR number`},
+		{[]string{"pr", "land", "7", "#7"}, "#7 is listed twice"},
+	} {
+		root := cmd.New("test", "")
+		root.SetArgs(tc.args)
+		var stderr bytes.Buffer
+		if code := run(root, &stderr); code == 0 {
+			t.Errorf("dotf %v exited 0", tc.args)
+		}
+		if got := stderr.String(); strings.Count(got, tc.want) != 1 {
+			t.Errorf("dotf %v: want %q reported exactly once, stderr: %q", tc.args, tc.want, got)
+		}
+	}
+}
