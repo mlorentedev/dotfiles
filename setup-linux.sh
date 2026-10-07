@@ -78,9 +78,11 @@ else
 fi
 
 # Deploy dotfiles via deploy_file (SDD-007 IaC strategy: atomic copy + idempotent).
-# Edit-in-repo workflow: never modify ~/.zshrc directly — edit in repo, re-run setup.
+# ~/.zshrc, ~/.zsh/* and ~/.tmux.conf are `dotf deploy` entries (ai/deploy.json:
+# zshrc, zsh-*, tmux; #1843 B2, PLAT-001 P6), deployed by the bare `dotf deploy`
+# below on every OS that has zsh or tmux, with a one-time .pre-dotf backup of a
+# file the machine already had. Edit in the repo, never in $HOME.
 log_info "Deploying main dotfiles..."
-deploy_file "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
 [ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
 
 # SSH config and public key
@@ -98,15 +100,6 @@ else
     log_warning ".gitconfig not found in dotfiles"
 fi
 
-# Deploy .zsh directory contents
-log_info "Setting up .zsh directory and utils.sh..."
-ensure_directory "$HOME/.zsh"
-deploy_file "$DOTFILES_DIR/.zsh/aliases.zsh" "$HOME/.zsh/aliases.zsh"
-deploy_file "$DOTFILES_DIR/.zsh/functions.zsh" "$HOME/.zsh/functions.zsh"
-# Portable swiss-army functions (IDEAS-002) — shared by bash + zsh.
-deploy_file "$DOTFILES_DIR/.zsh/functions.sh" "$HOME/.zsh/functions.sh"
-deploy_file "$DOTFILES_DIR/.zsh/nvm.zsh" "$HOME/.zsh/nvm.zsh"
-deploy_file "$DOTFILES_DIR/tmux.conf" "$HOME/.tmux.conf"
 # readline config (POLISH-004): case-insensitive completion + smart history.
 deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
@@ -1579,7 +1572,7 @@ if command -v dotf >/dev/null 2>&1; then
 fi
 
 # Re-enforce main dotfiles at the end of setup to overwrite any third-party installer mutations.
-deploy_file "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
+if command -v dotf >/dev/null 2>&1; then dotf deploy zshrc; elif [ -x "$HOME/.local/bin/dotf" ]; then "$HOME/.local/bin/dotf" deploy zshrc; fi
 [ -f "$DOTFILES_DIR/.bashrc" ] && deploy_file "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 [ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
 

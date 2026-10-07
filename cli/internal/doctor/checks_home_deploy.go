@@ -31,17 +31,14 @@ type homeDeployEntry struct {
 
 // homeDeployMap mirrors setup-linux.sh's `deploy_file … "$HOME/…"` call sites.
 // Adding one there without adding it here fails TestHomeDeployMapCoversSetup.
+// Files that moved to ai/deploy.json (.zshrc, ~/.zsh/*, .tmux.conf: #1843 B2)
+// are not listed: checkDeployManifest compares every entry there, so a second
+// copy of the mapping would be a second source of truth.
 var homeDeployMap = []homeDeployEntry{
-	{src: ".zshrc", dst: ".zshrc", exemptReason: "tool installers (opencode, bun, NVM, ggshield) append PATH/init lines post-deploy"},
 	{src: ".bashrc", dst: ".bashrc", exemptReason: "same installer appends; setup only asserts existence here too"},
 	{src: ".profile", dst: ".profile", exemptReason: "same installer appends"},
 	{src: ".gitconfig", dst: ".gitconfig", exemptReason: "every `git config --global` rewrites it; measured drifting on a converged box 2026-09-02"},
 	{src: "ssh/config", dst: ".ssh/config", contentChecked: true},
-	{src: ".zsh/aliases.zsh", dst: ".zsh/aliases.zsh", contentChecked: true},
-	{src: ".zsh/functions.zsh", dst: ".zsh/functions.zsh", contentChecked: true},
-	{src: ".zsh/functions.sh", dst: ".zsh/functions.sh", contentChecked: true},
-	{src: ".zsh/nvm.zsh", dst: ".zsh/nvm.zsh", contentChecked: true},
-	{src: "tmux.conf", dst: ".tmux.conf", contentChecked: true},
 	{src: ".inputrc", dst: ".inputrc", contentChecked: true},
 }
 

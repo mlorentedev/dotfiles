@@ -113,6 +113,39 @@ type Outcome struct {
 	// file — a 0600 whose ACL was still inherited (CLI-055) — and the deploy
 	// applied it without rewriting the content. Changed is true alongside.
 	ModeFixed bool
+	// BackedUp is the path the destination's previous content was kept at, set
+	// on the first deploy that replaces a file the machine already had.
+	BackedUp string
+}
+
+// BackupSuffix names the one-time copy of a destination's previous content.
+const BackupSuffix = ".pre-dotf"
+
+// backupOnce keeps dst's current content at dst+BackupSuffix before the first
+// replacement, so adopting a hand-made file (an rc file, a tool's own config)
+// never loses it. An existing backup is never overwritten: it holds the
+// machine's version, not one dotf wrote. A missing dst needs no backup.
+//
+// The backup takes the narrower of the file's own mode and the config's
+// declared one: a 0644 settings file that held a credential must not leave a
+// 0644 copy of it beside the 0600 file that replaces it.
+func backupOnce(dst string, declared os.FileMode) (string, error) {
+	info, err := os.Lstat(dst)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", nil //nolint:nilerr // nothing to keep: absent, or not a regular file
+	}
+	backup := dst + BackupSuffix
+	if _, err := os.Lstat(backup); err == nil {
+		return "", nil
+	}
+	data, err := os.ReadFile(dst) //nolint:gosec // a manifest-declared destination
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(backup, data, info.Mode().Perm()&declared.Perm()); err != nil {
+		return "", fmt.Errorf("back up %s: %w", dst, err)
+	}
+	return backup, nil
 }
 
 // Plan is what a deploy of a non-rendered config would do, computed without
@@ -350,6 +383,9 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 			return out, err
 		}
 		defer func() { _ = os.Remove(staged) }() // no-op once renamed away
+		if out.BackedUp, err = backupOnce(p.Dst, mode); err != nil {
+			return out, err
+		}
 		return out, commit(c, staged, p.Dst, mode)
 	}
 
@@ -381,6 +417,9 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 	out.Changed = true
 	if dryRun {
 		return out, nil
+	}
+	if out.BackedUp, err = backupOnce(dst, mode); err != nil {
+		return out, err
 	}
 	return out, commit(c, staged, dst, mode)
 }
