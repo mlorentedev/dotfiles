@@ -464,6 +464,10 @@ setup() {
         $'# installed with: \\\nnpm install -g yarn@1.22.22'
         'true;npm install -g yarn'
         'x |npm install -g yarn'
+        '& NPM install -g yarn'
+        '& npm.exe install -g opencode-ai'
+        '& "C:\\Program Files\\nodejs\\npm.cmd" install -g yarn'
+        '/usr/bin/npm install -g yarn'
         $'TOOL=foo; TOOL=yarn\nnpm install -g "$TOOL"'
         $'if a; then TOOL=nodejs; else TOOL=yarn; fi\nnpm install -g "$TOOL"'
     )

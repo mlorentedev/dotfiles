@@ -110,7 +110,9 @@ def package(arg):
     return arg.split("@", 1)[0]
 
 
-NPM_RE = re.compile(r"(?:^|[=(`&;|)])npm(?:\.cmd)?$")
+# Windows resolves commands case-insensitively and with any PATHEXT suffix, so
+# `& NPM ..` and `npm.exe ..` are npm too.
+NPM_RE = re.compile(r"(?:^|[=(`&;|)/\\])npm(?:\.cmd|\.exe)?$", re.IGNORECASE)
 
 
 def npm_commands(line):
@@ -125,7 +127,7 @@ def npm_commands(line):
     # A trailing comment ends the line, `npm` inside it included.
     tokens = tokens[:next((k for k, t in enumerate(tokens) if t.startswith("#")), len(tokens))]
     while i < len(tokens):
-        if not (NPM_RE.search(tokens[i].strip("\"'")) or tokens[i].endswith("/npm")):
+        if not NPM_RE.search(tokens[i].strip("\"'")):
             i += 1
             continue
         cmd, i = [], i + 1
