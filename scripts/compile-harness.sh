@@ -890,6 +890,15 @@ do_deploy() {
 # same as before this change.
 deploy_instructions() {
     local agent file source requires dest rc=0
+    # One implementation (PLAT-001b PR 2c): a dotf that carries
+    # `harness instructions` deploys these files itself, keeping the presence
+    # and catalog regions already in place instead of overwriting them. An
+    # older dotf, or none, falls back to the copy below, so this needs no
+    # release to land.
+    if type -P dotf >/dev/null 2>&1 && dotf_knows_subcommand instructions; then
+        dotf harness instructions --repo-root "$REPO_ROOT"
+        return
+    fi
     while IFS=$'\t' read -r agent file source requires; do
         [[ -n "$source" ]] || continue
         if [[ -n "$requires" ]] && ! command -v "$requires" >/dev/null 2>&1; then
