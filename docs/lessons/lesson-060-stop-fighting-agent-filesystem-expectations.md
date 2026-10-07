@@ -1,13 +1,14 @@
 ---
-id: lesson-060-stop-fighting-agent-filesystem-expectations
+id: "lesson-060-stop-fighting-agent-filesystem-expectations"
 type: lesson
 status: active
+title: "Stop fighting agent filesystem expectations"
 created: "2026-05-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 060: Stop fighting agent filesystem expectations
+# Stop fighting agent filesystem expectations
 
 **Context:** SDD-007 was triggered by BUG-100 — `agy` (Antigravity CLI) v1.0.2 collided with our deploy strategy: agy writes in-place to `~/.gemini/...` paths, but our `setup-linux.sh` had placed symlinks at those paths pointing back to the repo. Symptoms: EEXIST errors (forum #145851), circular link traversal (gemini-cli issue #10960), silent state corruption. The reflex fix would have been "patch each collision case as it surfaces". The root-cause fix was different.
 

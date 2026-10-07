@@ -1,13 +1,14 @@
 ---
-id: lesson-146-a-clean-local-golangci-lint-does-not-certify-ci-v1
+id: "lesson-146-a-clean-local-golangci-lint-does-not-certify-ci-v1"
 type: lesson
 status: active
+title: "A clean local `golangci-lint` does not certify CI — v1 default-excludes errcheck Close/Remove, v2 does not"
 created: "2026-07-10"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 146: A clean local `golangci-lint` does not certify CI — v1 default-excludes errcheck Close/Remove, v2 does not
+# A clean local `golangci-lint` does not certify CI — v1 default-excludes errcheck Close/Remove, v2 does not
 
 **Context**: BUG-029 (#696) added an atomic `machine.json` writer with `defer os.Remove(tmpName)` and a `tmp.Close()` in an error branch. `golangci-lint run` was clean locally (the machine's binary was v1.62.2), so the change was pushed as done.
 

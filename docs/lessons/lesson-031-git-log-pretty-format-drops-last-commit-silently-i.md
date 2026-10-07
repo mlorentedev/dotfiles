@@ -1,13 +1,14 @@
 ---
-id: lesson-031-git-log-pretty-format-drops-last-commit-silently-i
+id: "lesson-031-git-log-pretty-format-drops-last-commit-silently-i"
 type: lesson
 status: active
+title: "git log --pretty=format: drops last commit silently in while-read pipelines"
 created: "2026-05-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 031: git log --pretty=format: drops last commit silently in while-read pipelines
+# git log --pretty=format: drops last commit silently in while-read pipelines
 
 **Context:** Building scripts/changelog-gen.sh to bucket commits by Conventional Commit type. Read `git log --no-merges --pretty=format:'%cs|%h|%s'` via `while IFS='|' read -r date hash subject; do ...; done < <(git log ...)`. All commits except the very oldest one made it into the output. Tests caught it: the assertion that "feat(core): initial commit" appeared under "## Features" failed.</context>
 <parameter name="problem">`git log --pretty=format:'...'` writes the format string between commits but does NOT terminate the LAST commit with a newline (matches the docstring of `format:` in `git log` man page). When piped into a `while read` loop, `read` returns non-zero on the unterminated final line, so the loop exits BEFORE processing it. Result: the oldest commit is silently dropped. Easy to miss — the output looks correct, just one entry shorter.</problem>

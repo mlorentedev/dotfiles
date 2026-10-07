@@ -1,13 +1,14 @@
 ---
-id: lesson-083-frontmatter-must-be-strict-yaml-clean-the-most-len
+id: "lesson-083-frontmatter-must-be-strict-yaml-clean-the-most-len"
 type: lesson
 status: active
+title: "Frontmatter must be strict-YAML clean — the most lenient parser in the fleet is not the contract"
 created: "2026-06-10"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 083: Frontmatter must be strict-YAML clean — the most lenient parser in the fleet is not the contract
+# Frontmatter must be strict-YAML clean — the most lenient parser in the fleet is not the contract
 
 **Context:** pi v0.79.1 flagged two deployed skills (`spec`, `architecture-session`) as **Skill conflicts** at startup: "Nested mappings are not allowed in compact mappings". Both had `description:` values containing `: ` sequences (e.g. "Four subcommands: init (...)") without quoting. Claude Code had consumed those SKILL.md files for weeks without complaint.
 **Problem:** Cross-agent artifacts (skill frontmatter rendered by the harness to claude/opencode/agy/pi) are parsed by N different YAML implementations. Authoring against the *most lenient* consumer (Claude's parser) lets latent violations accumulate; the contract silently becomes "whatever the loosest parser accepts" until a strict consumer joins the fleet (pi) and surfaces them all at once.

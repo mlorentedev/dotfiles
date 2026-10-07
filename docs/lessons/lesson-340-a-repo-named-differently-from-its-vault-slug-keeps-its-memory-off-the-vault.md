@@ -1,6 +1,9 @@
 ---
+id: "lesson-340-a-repo-named-differently-from-its-vault-slug-keeps-its-memory-off-the-vault"
+type: lesson
+status: active
 title: "A repo named differently from its vault slug keeps its memory off the vault"
-date: "2026-10-06"
+created: "2026-10-06"
 ---
 
 # A repo named differently from its vault slug keeps its memory off the vault

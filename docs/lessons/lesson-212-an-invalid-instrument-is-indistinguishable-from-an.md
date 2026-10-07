@@ -1,13 +1,14 @@
 ---
-id: lesson-212-an-invalid-instrument-is-indistinguishable-from-an
+id: "lesson-212-an-invalid-instrument-is-indistinguishable-from-an"
 type: lesson
 status: active
+title: "An invalid instrument is indistinguishable from an absent guard"
 created: "2026-08-19"
 owner: manu
 tags: [lesson, dotfiles, guards, verification]
 ---
 
-# Lesson 212: An invalid instrument is indistinguishable from an absent guard
+# An invalid instrument is indistinguishable from an absent guard
 
 **Context**: two nights (2026-08-17/18) spent closing the review loop — #1033, #1042, #1045, #1047, #1052, #1054, #1065, #1072, #1073. Nine defects that looked unrelated and were one shape.
 

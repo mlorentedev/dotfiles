@@ -1,13 +1,14 @@
 ---
-id: lesson-025-file-deployment-requires-delete-then-copy-not-addi
+id: "lesson-025-file-deployment-requires-delete-then-copy-not-addi"
 type: lesson
 status: active
+title: "File deployment requires delete-then-copy, not additive-only copy"
 created: "2026-03-29"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 025: File deployment requires delete-then-copy, not additive-only copy
+# File deployment requires delete-then-copy, not additive-only copy
 
 **Context**: Skills ecosystem overhaul deleted 9 skill directories from the dotfiles repo. Setup scripts (`setup-linux.sh`, `setup-windows.ps1`) deployed skills by copying source to destination.
 

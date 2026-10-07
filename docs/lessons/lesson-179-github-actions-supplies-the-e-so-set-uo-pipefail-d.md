@@ -1,13 +1,14 @@
 ---
-id: lesson-179-github-actions-supplies-the-e-so-set-uo-pipefail-d
+id: "lesson-179-github-actions-supplies-the-e-so-set-uo-pipefail-d"
 type: lesson
 status: active
+title: "GitHub Actions supplies the `-e`, so `set -uo pipefail` disables nothing"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 179: GitHub Actions supplies the `-e`, so `set -uo pipefail` disables nothing
+# GitHub Actions supplies the `-e`, so `set -uo pipefail` disables nothing
 
 **Context**: `bitacora-reconcile.yml` (OPS-023) is the daily healer for board items the event-driven add drops. Its `run:` block was written with deliberate error handling: capture the rollout output, classify it, soft-pass green on a rate limit because the healer hitting the limit it heals is expected, and file a deduplicated issue on anything else because a backstop failing silently is the exact fault the ticket exists to remove. The first line reads `set -uo pipefail   # deliberately not -e: the classification below is the error handling`.
 

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: ed021a823ecf003f
+generated_sha: 370e4dcb7660c1ee
 id: architecture-session-skill
 type: skill
 status: active
@@ -184,7 +184,7 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 2. **Update the plan** of record. If a `plan-*.md` motivated this session, patch it: append a "Decision recorded" line linking the new ADR, and update the "Next steps" section if the decision changes it.
 3. **Index:** the repo `docs/adr/` self-indexes (GitHub renders the directory) — no separate index file to patch. (Legacy vault-only project: patch the project `_index.md`.)
 4. **Update task tracking** if the decision creates, closes, or reshapes tasks. Open or update GitHub issues via `gh`.
-5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons/`** (and `_index.md`). Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
+5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons/`**; then run `dotf lessons fmt`, which normalises the file and regenerates `_index.md` (never edit the index table by hand). Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
 
 **Blocking rule.** Phase E does not exit until at least the ADR file is written. The user CANNOT defer the write to "later" -- per `pattern-decision-persistence` "Anti-Patterns", `I'll update the vault later` = the decision is lost.
 

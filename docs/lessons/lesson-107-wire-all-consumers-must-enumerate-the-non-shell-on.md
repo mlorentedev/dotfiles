@@ -1,13 +1,14 @@
 ---
-id: lesson-107-wire-all-consumers-must-enumerate-the-non-shell-on
+id: "lesson-107-wire-all-consumers-must-enumerate-the-non-shell-on"
 type: lesson
 status: active
+title: "\"Wire all consumers\" must enumerate the non-shell ones — services and daemons never source a shell profile"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 107: "Wire all consumers" must enumerate the non-shell ones — services and daemons never source a shell profile
+# "Wire all consumers" must enumerate the non-shell ones — services and daemons never source a shell profile
 
 **Context**: After ADR-025 wired the vault-path cascade into shells, hooks and the Go CLI, the Claude Code Hive still pointed at the old path.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-181-pin-a-characterization-oracle-by-content-not-by-co
+id: "lesson-181-pin-a-characterization-oracle-by-content-not-by-co"
 type: lesson
 status: active
+title: "Pin a characterization oracle by content, not by commit — a SHA answers the wrong question"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 181: Pin a characterization oracle by content, not by commit — a SHA answers the wrong question
+# Pin a characterization oracle by content, not by commit — a SHA answers the wrong question
 
 **Context**: The crystallize golden corpus (CLI-021) records which revision of `knowledge-crystallize.{sh,ps1}` produced its expected bytes, and a test fails the suite when the tree drifts off that revision, so a recapture must be a deliberate act rather than a silent regeneration that turns a red golden green. The obvious implementation was `git log -1 --format=%H -- <path>` at capture, compared against the same at test time.
 

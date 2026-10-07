@@ -1,13 +1,14 @@
 ---
-id: lesson-010-grep-c-with-0-matches-outputs-0-and-exits-with-cod
+id: "lesson-010-grep-c-with-0-matches-outputs-0-and-exits-with-cod"
 type: lesson
 status: active
+title: "grep -c with 0 matches outputs \"0\" AND exits with code 1"
 created: "2026-02-28"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 010: grep -c with 0 matches outputs "0" AND exits with code 1
+# grep -c with 0 matches outputs "0" AND exits with code 1
 
 **Context**: Writing `dedup_current_date()` in `knowledge-crystallize.sh`. Used `count=$(grep -c 'pattern' "$file" 2>/dev/null || echo 0)` to count matching lines.
 

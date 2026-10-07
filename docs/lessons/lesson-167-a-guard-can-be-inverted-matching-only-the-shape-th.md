@@ -1,13 +1,14 @@
 ---
-id: lesson-167-a-guard-can-be-inverted-matching-only-the-shape-th
+id: "lesson-167-a-guard-can-be-inverted-matching-only-the-shape-th"
 type: lesson
 status: active
+title: "A guard can be inverted: matching only the shape that is always a false positive, and blind to the shape that is always a true positive"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 167: A guard can be inverted: matching only the shape that is always a false positive, and blind to the shape that is always a true positive
+# A guard can be inverted: matching only the shape that is always a false positive, and blind to the shape that is always a true positive
 
 **Context**: `#769` reported that `dotf spec archive` refused specs that merely *quote* the `[AGENT-DRAFT]` / `[AGENT-SUGGESTION]` markers — inside a code span, or on a completed `- [x]` line. The obvious reading is "the matcher is too broad".
 

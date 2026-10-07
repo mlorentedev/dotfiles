@@ -1,13 +1,14 @@
 ---
-id: lesson-157-whether-the-harness-auto-installs-a-tool-decides-w
+id: "lesson-157-whether-the-harness-auto-installs-a-tool-decides-w"
 type: lesson
 status: active
+title: "Whether the harness auto-installs a tool decides whether its config deploy is conditional"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 157: Whether the harness auto-installs a tool decides whether its config deploy is conditional
+# Whether the harness auto-installs a tool decides whether its config deploy is conditional
 
 **Context**: HARNESS-051 (`#771`) added a Copilot native-skill deploy target to the shared `skills.deploy[]` manifest pipeline (`scripts/compile-harness.sh` + `setup-windows.ps1`'s `Deploy-SkillRecord`), unconditionally — matching how opencode/agy/pi are already deployed to.
 

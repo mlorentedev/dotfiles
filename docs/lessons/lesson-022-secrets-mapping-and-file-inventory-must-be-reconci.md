@@ -1,13 +1,14 @@
 ---
-id: lesson-022-secrets-mapping-and-file-inventory-must-be-reconci
+id: "lesson-022-secrets-mapping-and-file-inventory-must-be-reconci"
 type: lesson
 status: active
+title: "Secrets mapping and file inventory must be reconciled automatically"
 created: "2026-03-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 022: Secrets mapping and file inventory must be reconciled automatically
+# Secrets mapping and file inventory must be reconciled automatically
 
 **Context**: `sensitive/` contained 35 encrypted `.secret.age` files but only 17 had entries in `env-mapping.conf`. 14 were app-specific secrets (mlorentedev) that didn't belong in dotfiles at all.
 

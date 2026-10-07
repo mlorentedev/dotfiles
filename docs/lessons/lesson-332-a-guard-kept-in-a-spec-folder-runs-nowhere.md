@@ -1,13 +1,14 @@
 ---
-id: lesson-332
+id: "lesson-332-a-guard-kept-in-a-spec-folder-runs-nowhere"
 type: lesson
 status: active
+title: "A guard kept in a spec folder runs nowhere"
 created: "2026-10-02"
 owner: manu
 tags: [lesson, guards, specs, ci, harness]
 ---
 
-# 332 — A guard kept in a spec folder runs nowhere
+# A guard kept in a spec folder runs nowhere
 
 ## What happened
 

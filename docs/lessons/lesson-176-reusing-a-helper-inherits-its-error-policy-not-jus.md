@@ -1,13 +1,14 @@
 ---
-id: lesson-176-reusing-a-helper-inherits-its-error-policy-not-jus
+id: "lesson-176-reusing-a-helper-inherits-its-error-policy-not-jus"
 type: lesson
 status: active
+title: "Reusing a helper inherits its error policy, not just its code"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 176: Reusing a helper inherits its error policy, not just its code
+# Reusing a helper inherits its error policy, not just its code
 
 **Context**: Building the advisory adjacency check for `spec-gate` (HARNESS-063) — on a PR that closes an issue, list *other* open issues naming a file in the diff. `check-spec-gate.sh` already had `_strip_markdown_code()`, used by `_closing_issue_numbers` to ignore references inside code blocks. Reaching for it was the obvious move: same script, same job, "find issue references in text".
 

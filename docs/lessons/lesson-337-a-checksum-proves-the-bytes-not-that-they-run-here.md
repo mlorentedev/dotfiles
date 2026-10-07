@@ -1,6 +1,9 @@
 ---
+id: "lesson-337-a-checksum-proves-the-bytes-not-that-they-run-here"
+type: lesson
+status: active
 title: "A checksum proves the bytes, not that they run here"
-date: "2026-10-05"
+created: "2026-10-05"
 ---
 
 # A checksum proves the bytes, not that they run here

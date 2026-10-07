@@ -1,13 +1,14 @@
 ---
-id: lesson-024-psscriptanalyzer-fails-on-non-ascii-chars-outside-
+id: "lesson-024-psscriptanalyzer-fails-on-non-ascii-chars-outside-"
 type: lesson
 status: active
+title: "PSScriptAnalyzer fails on non-ASCII chars outside here-strings"
 created: "2026-03-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 024: PSScriptAnalyzer fails on non-ASCII chars outside here-strings
+# PSScriptAnalyzer fails on non-ASCII chars outside here-strings
 
 **Context**: Added `-WorkSdk` mode to `init-project.ps1` with em dashes (`—`) in `Write-Host` strings and an arrow (`→`) in a `Write-Success` call. Also added an em dash in a comment line.
 

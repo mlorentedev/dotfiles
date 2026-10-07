@@ -1,13 +1,14 @@
 ---
-id: lesson-277
+id: "lesson-277-one-invalid-field-rejects-the-whole-file-and-the-deployed-copy-hides-it"
 type: lesson
 status: active
+title: "One invalid field rejects the whole file, and the deployed copy hides it until a deploy"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, pi, schema, deploy, guard, mutation]
 ---
 
-# 277 — One invalid field rejects the whole file, and the deployed copy hides it until a deploy
+# One invalid field rejects the whole file, and the deployed copy hides it until a deploy
 
 ## What happened
 

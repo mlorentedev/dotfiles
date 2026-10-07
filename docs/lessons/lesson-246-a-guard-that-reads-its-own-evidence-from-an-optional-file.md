@@ -1,6 +1,13 @@
-# Lesson 246 — A guard that reads its own evidence from a file allowed not to exist switches itself off exactly when it is needed
+---
+id: "lesson-246-a-guard-that-reads-its-own-evidence-from-an-optional-file"
+type: lesson
+status: active
+title: "A guard that reads its own evidence from a file allowed not to exist switches itself off exactly when it is needed"
+created: "2026-08-30"
+---
 
-**Date:** 2026-08-30
+# A guard that reads its own evidence from a file allowed not to exist switches itself off exactly when it is needed
+
 **Context:** HARNESS-094 (#1383, PR #1388). `VerifyReviewProduced` was added to make `dotf spec review` fail when a foreground run ends without writing `review.md`. Its first version answered "what did review.md hold before this run?" by reading `review-request.json` — a sidecar whose own writer is documented to fail with a *warning*, never a refusal. Caught in review before it shipped.
 **Category:** guards, degradation, review
 

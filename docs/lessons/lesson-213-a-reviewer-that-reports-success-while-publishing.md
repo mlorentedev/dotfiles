@@ -1,13 +1,14 @@
 ---
-id: lesson-213
+id: "lesson-213-a-reviewer-that-reports-success-while-publishing"
 type: lesson
 status: active
+title: "A reviewer that reports success while publishing nothing, in two shapes"
 created: "2026-08-20"
 owner: manu
 tags: [lesson, ci, review, guards, inference]
 ---
 
-# 213 — A reviewer that reports success while publishing nothing, in two shapes
+# A reviewer that reports success while publishing nothing, in two shapes
 
 **Context**: `pr-agent` is this repo's fallback reviewer, shipped so CodeRabbit's
 account-wide quota stops being the constraint on throughput. On 2026-08-20 six pull

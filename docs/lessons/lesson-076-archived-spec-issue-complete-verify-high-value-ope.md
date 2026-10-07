@@ -1,13 +1,14 @@
 ---
-id: lesson-076-archived-spec-issue-complete-verify-high-value-ope
+id: "lesson-076-archived-spec-issue-complete-verify-high-value-ope"
 type: lesson
 status: active
+title: "Archived-spec ≠ issue-complete; verify \"high-value open\" items against git before implementing"
 created: "2026-06-01"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 076: Archived-spec ≠ issue-complete; verify "high-value open" items against git before implementing
+# Archived-spec ≠ issue-complete; verify "high-value open" items against git before implementing
 
 **Context:** 2026-06-01 backlog-reconciliation session. Picked the top "high-value open" backlog items to implement (BUG-024, SDD-009, #156).
 **Problem:** All three "high-value open" items were already shipped and merged — never ticked in the vault or closed on GitHub (backlog over-reported pending work ~3×). Worse, when reconciling GH issues I closed #193 (HERMES-001) on the archived-spec signal, but the user flagged the agent box still needs bootstrap/config/backups — the issue tracked broader operational scope than its archived spec, so the close was premature.

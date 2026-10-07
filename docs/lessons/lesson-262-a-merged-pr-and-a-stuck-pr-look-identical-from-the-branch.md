@@ -1,7 +1,8 @@
 ---
-id: lesson-262
+id: "lesson-262-a-merged-pr-and-a-stuck-pr-look-identical-from-the-branch"
 type: lesson
 status: active
+title: "A merged PR and a stuck PR are indistinguishable from the branch side"
 created: "2026-09-02"
 owner: manu
 tags: [lesson, git, github, pr, verification]

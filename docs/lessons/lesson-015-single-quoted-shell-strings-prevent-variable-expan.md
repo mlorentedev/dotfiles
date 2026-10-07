@@ -1,13 +1,14 @@
 ---
-id: lesson-015-single-quoted-shell-strings-prevent-variable-expan
+id: "lesson-015-single-quoted-shell-strings-prevent-variable-expan"
 type: lesson
 status: active
+title: "Single-quoted shell strings prevent variable expansion in JSON"
 created: "2026-03-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 015: Single-quoted shell strings prevent variable expansion in JSON
+# Single-quoted shell strings prevent variable expansion in JSON
 
 **Context**: `setup-linux.sh` built a JSON hook entry with `HOOK_ENTRY='{"command":"$HOME/.dotfiles/scripts/..."}'`. The literal `$HOME` was written into `settings.json`.
 

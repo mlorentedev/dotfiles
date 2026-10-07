@@ -1,13 +1,14 @@
 ---
-id: lesson-088-gh-project-item-list-truncates-to-limit-silently-c
+id: "lesson-088-gh-project-item-list-truncates-to-limit-silently-c"
 type: lesson
 status: active
+title: "`gh project item-list` truncates to `--limit` silently — check `totalCount` before asserting absence"
 created: "2026-06-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 088: `gh project item-list` truncates to `--limit` silently — check `totalCount` before asserting absence
+# `gh project item-list` truncates to `--limit` silently — check `totalCount` before asserting absence
 
 **Context**: Verifying whether issues #344/#347/#350 had landed on the bitácora Projects v2 board after an `item-add`. Listed the board's items and grepped for the issue numbers; they were absent from the output, so the working diagnosis became "the add failed, the issues are missing from the board".
 

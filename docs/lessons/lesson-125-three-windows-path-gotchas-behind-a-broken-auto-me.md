@@ -1,13 +1,14 @@
 ---
-id: lesson-125-three-windows-path-gotchas-behind-a-broken-auto-me
+id: "lesson-125-three-windows-path-gotchas-behind-a-broken-auto-me"
 type: lesson
 status: active
+title: "Three Windows path gotchas behind a \"broken\" auto-memory junction (Go 1.26)"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 125: Three Windows path gotchas behind a "broken" auto-memory junction (Go 1.26)
+# Three Windows path gotchas behind a "broken" auto-memory junction (Go 1.26)
 
 **Context**: HARNESS-040 (#551) wired `dotf doctor --fix` to the merged `memlink` primitive to detect+repair the Claude auto-memory↔vault junction. Implementing it on Windows surfaced three non-obvious cross-OS facts the POSIX-first shell code had silently papered over.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-108-number-an-adr-off-the-latest-origin-main-not-your-
+id: "lesson-108-number-an-adr-off-the-latest-origin-main-not-your-"
 type: lesson
 status: active
+title: "Number an ADR off the latest origin/main, not your branch base — a stale base collides with ADRs shipped in parallel"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 108: Number an ADR off the latest origin/main, not your branch base — a stale base collides with ADRs shipped in parallel
+# Number an ADR off the latest origin/main, not your branch base — a stale base collides with ADRs shipped in parallel
 
 **Context**: I wrote ADR-023 for cross-machine path resolution, taking the next number from my branch base (highest was ADR-022). While I worked, `main` advanced: ADR-023 (agnostic session-start) and ADR-024 (PAT-expiry) shipped. On merge, my ADR-023 collided.
 

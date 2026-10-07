@@ -1,13 +1,14 @@
 ---
-id: lesson-290
+id: "lesson-290-a-guard-that-predicts-what-an-interpreter-runs-should-fail-closed"
 type: lesson
 status: active
+title: "A guard that predicts what an interpreter runs should fail closed, not emulate it"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, secrets, security, guard, shell, verification]
 ---
 
-# 290 — A guard that predicts what an interpreter runs should fail closed, not emulate it
+# A guard that predicts what an interpreter runs should fail closed, not emulate it
 
 ## What happened
 

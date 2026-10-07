@@ -1,13 +1,14 @@
 ---
-id: lesson-158-zero-real-invocations-needs-the-transcript-not-the
+id: "lesson-158-zero-real-invocations-needs-the-transcript-not-the"
 type: lesson
 status: active
+title: "\"Zero real invocations\" needs the transcript, not the plugin listing — and a removed plugin can still be pinned by a hard-coded count"
 created: "2026-08-06"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 158: "Zero real invocations" needs the transcript, not the plugin listing — and a removed plugin can still be pinned by a hard-coded count
+# "Zero real invocations" needs the transcript, not the plugin listing — and a removed plugin can still be pinned by a hard-coded count
 
 **Context**: Auditing which of 14 installed Claude Code plugins were actually used, to decide what to remove. The available-skills text shown to the agent lists every installed plugin's commands with a description, regardless of whether they have ever been invoked — that listing was the only signal checked at first.
 

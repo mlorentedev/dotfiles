@@ -1,13 +1,14 @@
 ---
-id: lesson-111-orca-regenerates-its-copilot-hooks-re-apply-the-fi
+id: "lesson-111-orca-regenerates-its-copilot-hooks-re-apply-the-fi"
 type: lesson
 status: active
+title: "Orca regenerates its Copilot hooks — re-apply the fix idempotently and guard the drift (DX-006)"
 created: "2026-06-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 111: Orca regenerates its Copilot hooks — re-apply the fix idempotently and guard the drift (DX-006)
+# Orca regenerates its Copilot hooks — re-apply the fix idempotently and guard the drift (DX-006)
 
 **Context**: On Windows, Copilot CLI tool calls were intermittently denied with "Denied by preToolUse hook ... (hook errored)". The hook is registered in `~/.copilot/hooks/orca.json` and runs `~/.orca/agent-hooks/copilot-hook.ps1`.
 

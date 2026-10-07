@@ -1,13 +1,14 @@
 ---
-id: lesson-312
+id: "lesson-312-refuse-by-construction-what-you-cannot-measure-without-losing-it"
 type: lesson
 status: active
+title: "Refuse by construction what you cannot measure without losing it"
 created: "2026-09-27"
 owner: manu
 tags: [lesson, secrets, bitwarden, passkey, curate, idempotence]
 ---
 
-# 312 — Refuse by construction what you cannot measure without losing it
+# Refuse by construction what you cannot measure without losing it
 
 ## What happened
 

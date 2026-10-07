@@ -1,13 +1,14 @@
 ---
-id: lesson-119-a-strict-cross-os-dotf-doctor-is-not-a-drop-in-ci-
+id: "lesson-119-a-strict-cross-os-dotf-doctor-is-not-a-drop-in-ci-"
 type: lesson
 status: active
+title: "A strict cross-OS `dotf doctor` is not a drop-in CI gate for a lenient platform-specific healthcheck"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 119: A strict cross-OS `dotf doctor` is not a drop-in CI gate for a lenient platform-specific healthcheck
+# A strict cross-OS `dotf doctor` is not a drop-in CI gate for a lenient platform-specific healthcheck
 
 **Context**: CLI-018 retired Windows `healthcheck.ps1`. The `test-windows` CI job's "Run healthcheck.ps1" step was repointed to `dotf doctor` followed by `exit $LASTEXITCODE`.
 

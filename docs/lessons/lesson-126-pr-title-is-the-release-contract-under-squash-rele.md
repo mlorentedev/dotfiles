@@ -1,13 +1,14 @@
 ---
-id: lesson-126-pr-title-is-the-release-contract-under-squash-rele
+id: "lesson-126-pr-title-is-the-release-contract-under-squash-rele"
 type: lesson
 status: active
+title: "PR title is the release contract under squash + release-please"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 126: PR title is the release contract under squash + release-please
+# PR title is the release contract under squash + release-please
 
 **Context**: Shipping ADR-028 secrets work as squash-merged PRs; release-please (release-type: simple) cuts releases from conventional-commit subjects.
 

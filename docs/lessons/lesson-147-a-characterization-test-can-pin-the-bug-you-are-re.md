@@ -1,13 +1,14 @@
 ---
-id: lesson-147-a-characterization-test-can-pin-the-bug-you-are-re
+id: "lesson-147-a-characterization-test-can-pin-the-bug-you-are-re"
 type: lesson
 status: active
+title: "A characterization test can pin the bug you are removing — grep every test extension, not just the source"
 created: "2026-07-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 147: A characterization test can pin the bug you are removing — grep every test extension, not just the source
+# A characterization test can pin the bug you are removing — grep every test extension, not just the source
 
 **Context**: BUG-031 (#689) fixed the Windows Claude project-key encoding by deleting a local `Get-EncodedPath` (which mapped the drive `:` to `''`, the bug) and routing through a shared `dotf`-backed helper. Before pushing I grepped the repo for `Get-EncodedPath` — but only across `*.ps1`. Local Go tests and the Pester guard were green, so the PR looked done.
 

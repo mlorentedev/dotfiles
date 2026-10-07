@@ -1,13 +1,14 @@
 ---
-id: lesson-098-a-migration-that-broadens-a-system-s-scope-leaves-
+id: "lesson-098-a-migration-that-broadens-a-system-s-scope-leaves-"
 type: lesson
 status: active
+title: "A migration that *broadens* a system's scope leaves single-repo assumptions hardcoded in the tools built against the old shape"
 created: "2026-06-16"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 098: A migration that *broadens* a system's scope leaves single-repo assumptions hardcoded in the tools built against the old shape
+# A migration that *broadens* a system's scope leaves single-repo assumptions hardcoded in the tools built against the old shape
 
 **Context**: The bitácora began life as a per-repo idea and became, under ADR-018, one cross-repo GitHub Project spanning many repos (kubelab, knowledge, dotfiles, …). `dotf spec init --issue N` was written when "the bitácora" still effectively meant "the dotfiles repo": it ran the work-gate (`gh issue view N`) against the *current* repo's default, and it hardcoded the scaffolded frontmatter prefix to `issue: "dotfiles#N"`.
 

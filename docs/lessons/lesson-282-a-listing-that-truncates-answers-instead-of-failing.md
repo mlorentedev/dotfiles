@@ -1,13 +1,14 @@
 ---
-id: lesson-282
+id: "lesson-282-a-listing-that-truncates-answers-instead-of-failing"
 type: lesson
 status: active
+title: "A listing that truncates answers instead of failing, so the short read becomes the finding"
 created: "2026-09-08"
 owner: manu
 tags: [lesson, tooling, github, bitacora, verification, silent-failure, gh-cli]
 ---
 
-# 282 — A listing that truncates answers instead of failing, so the short read becomes the finding
+# A listing that truncates answers instead of failing, so the short read becomes the finding
 
 ## What happened
 

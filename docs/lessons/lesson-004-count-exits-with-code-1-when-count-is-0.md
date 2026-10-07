@@ -1,13 +1,14 @@
 ---
-id: lesson-004-count-exits-with-code-1-when-count-is-0
+id: "lesson-004-count-exits-with-code-1-when-count-is-0"
 type: lesson
 status: active
+title: "((count++)) exits with code 1 when count is 0"
 created: "2025-12-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 004: ((count++)) exits with code 1 when count is 0
+# ((count++)) exits with code 1 when count is 0
 
 **Context**: Counter variables used `((count++))` inside scripts with `set -e`
 

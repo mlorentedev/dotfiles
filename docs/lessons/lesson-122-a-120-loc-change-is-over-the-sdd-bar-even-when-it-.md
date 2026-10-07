@@ -1,13 +1,14 @@
 ---
-id: lesson-122-a-120-loc-change-is-over-the-sdd-bar-even-when-it-
+id: "lesson-122-a-120-loc-change-is-over-the-sdd-bar-even-when-it-"
 type: lesson
 status: active
+title: "A ~120-LOC change is over the SDD bar even when it \"obviously\" mirrors an existing check"
 created: "2026-06-23"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 122: A ~120-LOC change is over the SDD bar even when it "obviously" mirrors an existing check
+# A ~120-LOC change is over the SDD bar even when it "obviously" mirrors an existing check
 
 **Context**: OPS-016 added a `checkVaultHooks` diagnostic to `dotf doctor` (#553) — a near-copy of the existing `checkGuardHooks`. Because the GitHub issue read like a complete mini-spec and the change mirrored an established pattern, it was built directly with no `specs/<id>/` folder.
 

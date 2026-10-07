@@ -1,13 +1,14 @@
 ---
-id: lesson-093-deleting-one-os-twin-while-keeping-its-sibling-for
+id: "lesson-093-deleting-one-os-twin-while-keeping-its-sibling-for"
 type: lesson
 status: active
+title: "Deleting one OS twin while keeping its sibling forces asymmetric parity tests — rewrite them to the migration reality, don't fake symmetry"
 created: "2026-06-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 093: Deleting one OS twin while keeping its sibling forces asymmetric parity tests — rewrite them to the migration reality, don't fake symmetry
+# Deleting one OS twin while keeping its sibling forces asymmetric parity tests — rewrite them to the migration reality, don't fake symmetry
 
 **Context**: CLI-012 ported the Linux diagnostics twins (`healthcheck.sh`, `doctor.sh`) to a cross-compiled `dotf doctor` and deleted them, but kept the `.ps1` siblings because `dotf` is not yet installed on Windows (no Windows `install-dotf`).
 

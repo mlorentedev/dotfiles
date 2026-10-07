@@ -1,6 +1,13 @@
-# Lesson 211 — Worktree Config Discovery Must Prefer CWD Walk-Up Over Global Repo Env
+---
+id: "lesson-211-worktree-config-discovery-must-prefer-cwd-walk-up-over-global-repo-env"
+type: lesson
+status: active
+title: "Worktree config discovery must prefer CWD walk-up over global repo env"
+created: "2026-08-18"
+---
 
-> **Date:** 2026-08-18  
+# Worktree config discovery must prefer CWD walk-up over global repo env
+
 > **Area:** CLI / Harness / Worktree Isolation  
 > **Keywords:** worktree, path resolution, config discovery, LoadTriggers, env fallback
 

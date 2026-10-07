@@ -1,6 +1,9 @@
 ---
+id: "lesson-333-createprocess-detached-ignores-no-window"
+type: lesson
+status: active
 title: "CreateProcess DETACHED_PROCESS ignores CREATE_NO_WINDOW"
-date: "2026-10-02"
+created: "2026-10-02"
 ---
 
 # CreateProcess DETACHED_PROCESS ignores CREATE_NO_WINDOW

@@ -1,6 +1,13 @@
-# Lesson 247 — A pointer into a deletable location keeps every check green until the deletion, and then the cleanup gets blamed
+---
+id: "lesson-247-a-pointer-into-a-deletable-location-stays-green-until-the-deletion"
+type: lesson
+status: active
+title: "A pointer into a deletable location keeps every check green until the deletion, and then the cleanup gets blamed"
+created: "2026-08-31"
+---
 
-**Date:** 2026-08-31
+# A pointer into a deletable location keeps every check green until the deletion, and then the cleanup gets blamed
+
 **Context:** A routine worktree cleanup on msi. `dotfiles-wt-gentleai` held `feat/HARNESS-105`, merged as #1404; the worktree was clean, unoccupied, and its branch content verified byte-identical to the squash. Removing it immediately broke `pre-commit` for every session on the box: `Run dotfiles tests` failed 77/78 on `FAIL: DOTFILES_REPO_DIR: directory missing`, and no commit could land.
 **Category:** paths, guards, adr-025, shared-surface
 

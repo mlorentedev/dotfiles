@@ -1,6 +1,13 @@
-# Lesson 235 — reproducing a bug from an environment that already works measures the environment, not the bug
+---
+id: "lesson-235-reproducing-a-bug-from-an-environment-that-alread"
+type: lesson
+status: active
+title: "Reproducing a bug from an environment that already works measures the environment, not the bug"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# Reproducing a bug from an environment that already works measures the environment, not the bug
+
 **Context:** #1283 — `pi` reported "No models available" in fresh terminals.
 **Category:** shell, PATH, diagnosis, false negatives
 

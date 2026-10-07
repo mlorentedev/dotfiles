@@ -1,13 +1,14 @@
 ---
-id: lesson-308
+id: "lesson-308-a-baseline-picked-by-content-is-a-baseline-anyone-can-post"
 type: lesson
 status: active
+title: "A baseline picked by content is a baseline anyone can post"
 created: "2026-09-27"
 owner: manu
 tags: [lesson, ci, guard, pr-agent, security, cwe-345]
 ---
 
-# 308 — A baseline picked by content is a baseline anyone can post
+# A baseline picked by content is a baseline anyone can post
 
 ## What happened
 

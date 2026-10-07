@@ -1,6 +1,13 @@
-# Lesson 244 — A sweep is bounded by what the writer recorded, not by what the store holds; and the store's name rules decide the order
+---
+id: "lesson-244-a-sweep-is-bounded-by-what-the-writer-recorded-not-by-what-the-store-holds"
+type: lesson
+status: active
+title: "A sweep is bounded by what the writer recorded, not by what the store holds; and the store's name rules decide the order"
+created: "2026-08-29"
+---
 
-**Date:** 2026-08-29
+# A sweep is bounded by what the writer recorded, not by what the store holds; and the store's name rules decide the order
+
 **Context:** CLI-065 (#1363) — `dotf env persist` (CLI-058) wrote every contract variable into `HKCU\Environment` and never removed one, so a name retired from `env-contract.json` stayed on every box forever, inherited by exactly the profile-less processes the scope exists for. Same class as WIN-013 (#1310): a deployer that adds and never sweeps.
 **Category:** deploy, idempotence, windows, registry, ownership
 

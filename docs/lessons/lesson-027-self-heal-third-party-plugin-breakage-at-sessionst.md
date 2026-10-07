@@ -1,13 +1,14 @@
 ---
-id: lesson-027-self-heal-third-party-plugin-breakage-at-sessionst
+id: "lesson-027-self-heal-third-party-plugin-breakage-at-sessionst"
 type: lesson
 status: active
+title: "Self-heal third-party plugin breakage at SessionStart"
 created: "2026-05-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 027: Self-heal third-party plugin breakage at SessionStart
+# Self-heal third-party plugin breakage at SessionStart
 
 **Context**: `thedotmack/claude-mem` shipped v12.7.4 and v13.0.0 to the marketplace with two independent bugs that prevent the `mcp-search` MCP server and worker from starting on a fresh install: (1) `.mcp.json` embeds `${_R%/}` shell parameter expansion which Claude Code's MCP loader misreads as a missing env var (upstream #2385), and (2) v13.0.0's `bun.lock` and shipped `node_modules/` omit the `zod` dep declared in `package.json`, so the worker crashes with `Cannot find module 'zod/v3'`.
 

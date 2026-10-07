@@ -1,13 +1,14 @@
 ---
-id: lesson-020-stray-bare-word-causes-silent-set-e-abort
+id: "lesson-020-stray-bare-word-causes-silent-set-e-abort"
 type: lesson
 status: active
+title: "Stray bare word causes silent set -e abort"
 created: "2026-03-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 020: Stray bare word causes silent set -e abort
+# Stray bare word causes silent set -e abort
 
 **Context**: `github-secrets-manager.sh` had an accidental bare word `tmp` on its own line, immediately before a valid `tmp=$(create_temp_file "ssh_key")` assignment.
 

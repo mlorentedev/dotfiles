@@ -1,6 +1,13 @@
-# 255 - Truncation, not hostile input, is what made the collision guard load-bearing — and without it the measurement would have confirmed the opposite
+---
+id: "lesson-255-truncation-not-hostile-input-made-the-digest-load-bearing"
+type: lesson
+status: active
+title: "Truncation, not hostile input, is what made the collision guard load-bearing — and without it the measurement would have confirmed the opposite"
+created: "2026-09-01"
+---
 
-**Date:** 2026-09-01
+# Truncation, not hostile input, is what made the collision guard load-bearing — and without it the measurement would have confirmed the opposite
+
 **Area:** harness, orchestrator gate, path construction
 
 ## What happened

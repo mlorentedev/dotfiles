@@ -1,13 +1,14 @@
 ---
-id: lesson-104-a-warn-that-doesn-t-move-the-exit-code-is-invisibl
+id: "lesson-104-a-warn-that-doesn-t-move-the-exit-code-is-invisibl"
 type: lesson
 status: active
+title: "A WARN that doesn't move the exit code is invisible to CI — give the CI surface its own probe, don't shell out to the tool"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 104: A WARN that doesn't move the exit code is invisible to CI — give the CI surface its own probe, don't shell out to the tool
+# A WARN that doesn't move the exit code is invisible to CI — give the CI surface its own probe, don't shell out to the tool
 
 **Context**: OPS-009 added a PAT-expiry preflight (`dotf doctor`'s "PAT expiry" section) after a classic PAT expired silently and broke release-please's first run with `Bad credentials`. The instinct for the second surface — a scheduled Action that warns *before* CI goes red — was to reuse the binary: run `dotf doctor` in the workflow and act on its exit code.
 

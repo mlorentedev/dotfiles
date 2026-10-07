@@ -1,6 +1,13 @@
-# Lesson 240 — A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off
+---
+id: "lesson-240-a-partial-mirror-the-code-believes-absent-the-check"
+type: lesson
+status: active
+title: "A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# A partial mirror the code believes absent: the check that could have flagged the gap was the one switched off
+
 **Context:** WIN-007 (#1288) — `dotf doctor` FAILs `harness/model-map.json` and `harness/model-pins.json` after every Windows setup, remedy "re-run setup to mirror it".
 **Category:** windows, deploy mirror, doctor, false beliefs
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-202-widening-a-shared-return-type-is-a-change-to-every
+id: "lesson-202-widening-a-shared-return-type-is-a-change-to-every"
 type: lesson
 status: active
+title: "Widening a shared return type is a change to every consumer, and Go's zero values hide the ones you missed"
 created: "2026-08-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 202: Widening a shared return type is a change to every consumer, and Go's zero values hide the ones you missed
+# Widening a shared return type is a change to every consumer, and Go's zero values hide the ones you missed
 
 **Context**: `Registry.Entries()` flattens `secrets/registry.yaml` into the `[]Entry` list that `run`, `show`, `render`, `migrate` and two `dotf doctor` sections all consume. It began life age-only, so every entry had a `File` (the `sensitive/<base>.secret.age` name). #606 added the Bitwarden backend and widened it into a tagged union: each entry now carries `Backend`, the Loader dispatches on it, and only the age variants populate `File`. A test, `TestRegistry_Entries_IncludesBwBackend`, pinned the new behaviour deliberately.
 

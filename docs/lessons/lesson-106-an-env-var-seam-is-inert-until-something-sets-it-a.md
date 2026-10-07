@@ -1,13 +1,14 @@
 ---
-id: lesson-106-an-env-var-seam-is-inert-until-something-sets-it-a
+id: "lesson-106-an-env-var-seam-is-inert-until-something-sets-it-a"
 type: lesson
 status: active
+title: "An env-var seam is inert until something sets it — a hardcoded fallback that matches reality hides the broken seam"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 106: An env-var seam is inert until something sets it — a hardcoded fallback that matches reality hides the broken seam
+# An env-var seam is inert until something sets it — a hardcoded fallback that matches reality hides the broken seam
 
 **Context**: The vault and dotfiles repo were relocated from `~/Projects/` to `~/Projects/Workspace/`. Vault MCP, hive, selfupdate and the session hooks all broke silently.
 

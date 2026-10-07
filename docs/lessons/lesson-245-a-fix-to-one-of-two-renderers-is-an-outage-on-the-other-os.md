@@ -1,6 +1,13 @@
-# Lesson 245 — A fix applied to one of two renderers is an outage on the other OS, and nothing on the fixed side can see it
+---
+id: "lesson-245-a-fix-to-one-of-two-renderers-is-an-outage-on-the-other-os"
+type: lesson
+status: active
+title: "A fix applied to one of two renderers is an outage on the other OS, and nothing on the fixed side can see it"
+created: "2026-08-29"
+---
 
-**Date:** 2026-08-29
+# A fix applied to one of two renderers is an outage on the other OS, and nothing on the fixed side can see it
+
 **Context:** HARNESS-095 — #1080 taught `render_skill` in `scripts/compile-harness.sh` to drop `paths:` from deployed skill frontmatter, because Claude Code reads a top-level `paths:` as a *conditional* skill and holds it dormant until a matching file is touched. Its Windows twin, `Convert-SkillRecord` in `setup-windows.ps1`, never got the same rule. Measured on the Windows box 2026-08-29: 34 of 43 deployed skills invisible at session start, and the nine that survived were the nine whose records carry no `paths:` at all.
 
 ## What happened

@@ -1,13 +1,14 @@
 ---
-id: lesson-193-weaker-locally-ci-catches-it-is-not-safe-when-loca
+id: "lesson-193-weaker-locally-ci-catches-it-is-not-safe-when-loca"
 type: lesson
 status: active
+title: "\"Weaker locally, CI catches it\" is not safe when local and CI share the same script"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 193: "Weaker locally, CI catches it" is not safe when local and CI share the same script
+# "Weaker locally, CI catches it" is not safe when local and CI share the same script
 
 **Context**: BUG-061, fixing a spec-gate false negative where a PR that correctly archived its spec in the same change could not be pushed locally — `check-spec-gate.sh`'s archive-on-merge credit only fires when `SDD_PR_BODY` names a closing keyword, and that variable is empty on every local pre-push run by design. The filed issue offered three fix options; option 2 read "credit an archive move unconditionally in the pre-push tier... weaker, but the #397 protection against a gratuitous archive-move dodging the gate still holds in CI."
 

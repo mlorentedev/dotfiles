@@ -1,13 +1,14 @@
 ---
-id: lesson-102-per-repo-git-hooks-can-t-enforce-a-machine-wide-in
+id: "lesson-102-per-repo-git-hooks-can-t-enforce-a-machine-wide-in"
 type: lesson
 status: active
+title: "Per-repo git hooks can't enforce a machine-wide invariant — core.hooksPath + a chaining dispatcher is the keystone (GUARD-001)"
 created: "2026-06-17"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 102: Per-repo git hooks can't enforce a machine-wide invariant — core.hooksPath + a chaining dispatcher is the keystone (GUARD-001)
+# Per-repo git hooks can't enforce a machine-wide invariant — core.hooksPath + a chaining dispatcher is the keystone (GUARD-001)
 
 **Context**: Building GUARD-001 so agent memory (`MEMORY.md`, `memory/`, session handoffs) can only ever be committed to the vault, never leak into a code repo — the gap that let `MEMORY.md` reach the ts-bridge repo.
 

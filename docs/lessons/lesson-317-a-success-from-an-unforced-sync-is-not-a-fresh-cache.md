@@ -1,13 +1,14 @@
 ---
-id: lesson-317
+id: "lesson-317-a-success-from-an-unforced-sync-is-not-a-fresh-cache"
 type: lesson
 status: active
+title: "A success from an unforced sync is not a fresh cache"
 created: "2026-09-29"
 owner: manu
 tags: [lesson, secrets, bitwarden, bw-serve, caching]
 ---
 
-# 317 — A success from an unforced sync is not a fresh cache
+# A success from an unforced sync is not a fresh cache
 
 ## What happened
 

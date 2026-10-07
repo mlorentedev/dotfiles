@@ -1,13 +1,14 @@
 ---
-id: lesson-171-a-comment-asserting-an-upstream-contract-is-not-ev
+id: "lesson-171-a-comment-asserting-an-upstream-contract-is-not-ev"
 type: lesson
 status: active
+title: "A comment asserting an upstream contract is not evidence of that contract"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 171: A comment asserting an upstream contract is not evidence of that contract
+# A comment asserting an upstream contract is not evidence of that contract
 
 **Context**: `chain-local-hook.sh` chains the machine-wide GUARD dispatcher to repo-local hooks. Where a repo has no local hook for the stage, it falls back to invoking `pre-commit hook-impl` directly, deliberately omitting `--hook-dir`. A comment above that branch explains the choice: *"omitting --hook-dir is its supported dispatcher path (upstream marks that branch 'git 2.54+ hooks')"*.
 

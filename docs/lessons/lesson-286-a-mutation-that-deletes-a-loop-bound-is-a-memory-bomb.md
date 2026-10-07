@@ -1,13 +1,14 @@
 ---
-id: lesson-286
+id: "lesson-286-a-mutation-that-deletes-a-loop-bound-is-a-memory-bomb"
 type: lesson
 status: active
+title: "A mutation that deletes a loop bound is a memory bomb, not a failing test"
 created: "2026-09-23"
 owner: manu
 tags: [lesson, testing, mutation, go, resources, silent-failure]
 ---
 
-# 286 — A mutation that deletes a loop bound is a memory bomb, not a failing test
+# A mutation that deletes a loop bound is a memory bomb, not a failing test
 
 ## What happened
 

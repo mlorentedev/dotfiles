@@ -1,13 +1,14 @@
 ---
-id: lesson-183-a-real-dependency-test-can-rest-on-an-undeclared-e
+id: "lesson-183-a-real-dependency-test-can-rest-on-an-undeclared-e"
 type: lesson
 status: active
+title: "A real-dependency test can rest on an undeclared environment precondition, and then it tests one thing locally and another in CI"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 183: A real-dependency test can rest on an undeclared environment precondition, and then it tests one thing locally and another in CI
+# A real-dependency test can rest on an undeclared environment precondition, and then it tests one thing locally and another in CI
 
 **Context**: BUG-066 added `tests/spec-gate-pr-real.bats`, the real-`gh` sibling that `tests/stub-real-pairing.bats` requires of any suite stubbing a binary. Its core assertion is that `gh` accepts the `--json` field names the adapter asks for — the one contract a stub can never check, since a stub answers whatever it is asked.
 

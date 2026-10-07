@@ -1,13 +1,14 @@
 ---
-id: lesson-330
+id: "lesson-330-an-empty-answer-from-a-syncing-cache-is-not-absence"
 type: lesson
 status: active
+title: "An empty answer from a cache that is syncing is not absence"
 created: "2026-10-01"
 owner: manu
 tags: [lesson, secrets, bitwarden, bw-serve, concurrency]
 ---
 
-# 330 — An empty answer from a cache that is syncing is not absence
+# An empty answer from a cache that is syncing is not absence
 
 ## What happened
 

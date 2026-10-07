@@ -1,13 +1,14 @@
 ---
-id: lesson-159-a-guard-that-is-quiet-when-idle-and-quiet-when-bro
+id: "lesson-159-a-guard-that-is-quiet-when-idle-and-quiet-when-bro"
 type: lesson
 status: active
+title: "A guard that is quiet when idle and quiet when broken is not a guard"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 159: A guard that is quiet when idle and quiet when broken is not a guard
+# A guard that is quiet when idle and quiet when broken is not a guard
 
 **Context**: `windows/hive-upgrade.ps1` runs every 15 minutes to upgrade `hive-vault`. Its step 0 deliberately returns early when there is nothing to do, so a healthy machine is not restarted 96 times a day just to discover it is already current. That early return was one condition covering three cases: no install found, PyPI unreachable, or already up to date. All three exited 0 with no output.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-144-keeping-a-secret-off-curl-s-argv-k-stdin-config-is
+id: "lesson-144-keeping-a-secret-off-curl-s-argv-k-stdin-config-is"
 type: lesson
 status: active
+title: "Keeping a secret off curl's argv: `-K -` (stdin config) is portable; process-substitution and `mktemp` are not"
 created: "2026-07-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 144: Keeping a secret off curl's argv: `-K -` (stdin config) is portable; process-substitution and `mktemp` are not
+# Keeping a secret off curl's argv: `-K -` (stdin config) is portable; process-substitution and `mktemp` are not
 
 **Context**: #687 (audit C26) required moving a bearer token out of `curl -H "Authorization: Bearer $KEY"` — argv is world-readable via `/proc/<pid>/cmdline` for the call's duration — in the `nan-*` benchmark scripts. The issue suggested curl's `-H @file` form. The scripts run on Linux but were being edited and tested from a Windows box, so the mechanism had to survive both.
 

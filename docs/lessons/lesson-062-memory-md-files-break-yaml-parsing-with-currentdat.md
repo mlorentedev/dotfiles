@@ -1,13 +1,14 @@
 ---
-id: lesson-062-memory-md-files-break-yaml-parsing-with-currentdat
+id: "lesson-062-memory-md-files-break-yaml-parsing-with-currentdat"
 type: lesson
 status: active
+title: "MEMORY.md files break YAML parsing with `# currentDate` and `---` separators"
 created: "2026-05-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 062: MEMORY.md files break YAML parsing with `# currentDate` and `---` separators
+# MEMORY.md files break YAML parsing with `# currentDate` and `---` separators
 
 **Context**: 23 `MEMORY.md` files across all projects had invalid frontmatter. `vault_health --checks frontmatter` reported errors on every one.
 

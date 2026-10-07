@@ -1,13 +1,14 @@
 ---
-id: lesson-132-never-read-a-locked-secret-store-as-absent-discrim
+id: "lesson-132-never-read-a-locked-secret-store-as-absent-discrim"
 type: lesson
 status: active
+title: "Never read a locked secret store as \"absent\" — discriminate before create, or you spawn duplicates"
 created: "2026-06-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 132: Never read a locked secret store as "absent" — discriminate before create, or you spawn duplicates
+# Never read a locked secret store as "absent" — discriminate before create, or you spawn duplicates
 
 **Context**: `dotf secrets set`/`migrate` (#612) write a value into a Bitwarden item, creating the item when it does not exist. `BWPut.SetField` deliberately refuses to create; the create path lives in the command (C3, #621).
 

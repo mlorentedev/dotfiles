@@ -1,13 +1,14 @@
 ---
-id: lesson-032-mcp-transport-state-and-daemon-state-can-disagree-
+id: "lesson-032-mcp-transport-state-and-daemon-state-can-disagree-"
 type: lesson
 status: active
+title: "MCP transport state and daemon state can disagree per-conversation"
 created: "2026-05-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 032: MCP transport state and daemon state can disagree per-conversation
+# MCP transport state and daemon state can disagree per-conversation
 
 **Context:** Mid-session on a fresh Windows 11 laptop, after rejecting the very first `mcp__hive__session_briefing` call in the permission prompt. Every subsequent Hive tool call returned `MCP error -32000: Connection closed`, then `No such tool available`. Spent a few minutes assuming the Hive server had crashed.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-327
+id: "lesson-327-a-configured-timeout-is-not-a-bound-until-a-run-shows-it-firing"
 type: lesson
 status: active
+title: "A configured timeout is not a bound until a run shows it firing"
 created: "2026-10-01"
 owner: manu
 tags: [lesson, pr-agent, nan, litellm, timeouts, ci]
 ---
 
-# 327 — A configured timeout is not a bound until a run shows it firing
+# A configured timeout is not a bound until a run shows it firing
 
 ## What happened
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-079-a-late-push-to-a-pr-branch-can-miss-the-squash-ver
+id: "lesson-079-a-late-push-to-a-pr-branch-can-miss-the-squash-ver"
 type: lesson
 status: active
+title: "A late push to a PR branch can miss the squash — verify the commit is on the PR head, and each deliverable is on main post-merge"
 created: "2026-06-03"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 079: A late push to a PR branch can miss the squash — verify the commit is on the PR head, and each deliverable is on main post-merge
+# A late push to a PR branch can miss the squash — verify the commit is on the PR head, and each deliverable is on main post-merge
 
 **Context:** AI-020. Opened PR #216 with the decision commit, then pushed a SECOND commit (the migration runbook, AC6) to the same branch. The user clicked "Update branch" in the GitHub UI and squash-merged.
 **Problem:** The squash captured only what the PR head had at merge time — the decision + AI-023 scaffold — NOT the runbook. The UI "Update branch" + concurrent merge consolidated a head that raced my runbook push, so the runbook silently never reached main. Nothing errored; AC6 was just absent. Caught only by an explicit post-merge `git cat-file -e origin/main:docs/runbooks/...` check, AFTER I'd already torn down the worktree + branch (`-D`).

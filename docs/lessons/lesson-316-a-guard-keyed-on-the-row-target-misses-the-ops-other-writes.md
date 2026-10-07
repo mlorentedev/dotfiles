@@ -1,13 +1,14 @@
 ---
-id: lesson-316
+id: "lesson-316-a-guard-keyed-on-the-row-target-misses-the-ops-other-writes"
 type: lesson
 status: active
+title: "A guard keyed on the row's target misses the op's other writes"
 created: "2026-09-28"
 owner: manu
 tags: [lesson, secrets, authorization, review, mutation-testing]
 ---
 
-# 316 — A guard keyed on the row's target misses the op's other writes
+# A guard keyed on the row's target misses the op's other writes
 
 ## What happened
 

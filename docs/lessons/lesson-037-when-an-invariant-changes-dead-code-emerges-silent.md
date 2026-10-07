@@ -1,13 +1,14 @@
 ---
-id: lesson-037-when-an-invariant-changes-dead-code-emerges-silent
+id: "lesson-037-when-an-invariant-changes-dead-code-emerges-silent"
 type: lesson
 status: active
+title: "When an invariant changes, dead code emerges silently downstream"
 created: "2026-05-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 037: When an invariant changes, dead code emerges silently downstream
+# When an invariant changes, dead code emerges silently downstream
 
 **Context:** SDD-001 (PR #49) added an unconditional `[sdd]` reminder to `$ContextLines` / `CONTEXT_LINES` at the start of both `claude-session-start.{ps1,sh}`. The new invariant: the context buffer is NEVER empty. Two pre-existing branches gated on the OLD invariant (`if (-not $VaultRoot -and -not $ContextLines) { exit 0 }` and the bash equivalent) became unreachable code -- they fired the `exit 0` branch only when both were empty, which can no longer happen. Also: the claude-mem heal block's `$ContextLines = "..."` overwrite (instead of append) would have wiped the new reminder when heal output existed.
 

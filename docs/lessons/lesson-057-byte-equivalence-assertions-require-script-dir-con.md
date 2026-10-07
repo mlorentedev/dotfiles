@@ -1,13 +1,14 @@
 ---
-id: lesson-057-byte-equivalence-assertions-require-script-dir-con
+id: "lesson-057-byte-equivalence-assertions-require-script-dir-con"
 type: lesson
 status: active
+title: "Byte-equivalence assertions require SCRIPT_DIR control, not just literal diff"
 created: "2026-05-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 057: Byte-equivalence assertions require SCRIPT_DIR control, not just literal diff
+# Byte-equivalence assertions require SCRIPT_DIR control, not just literal diff
 
 **Context:** SDD-004 (PR #97). Claimed acceptance criterion: refactor preserves byte-identical output. First attempt at the assertion ran `git show main:scripts/claude-session-start.sh > $(mktemp /tmp/...sh)` then diffed PRE vs POST. False-positive diff appeared (claude-mem heal block missing in PRE, vault-health line different in PRE).</context>
 <parameter name="problem">The `mktemp /tmp/...sh` for PRE put the script in /tmp, which changed its SCRIPT_DIR resolution. The pre-refactor script looked for sibling helpers (`claude-mem-heal.sh`, `vault-health.sh`, `doctor.sh`) in /tmp/, didn't find them, so silently skipped those injectors. POST ran from real `scripts/` directory and found them. The diff was 100% methodology artifact — both versions of the script behaved IDENTICALLY when given identical sibling-script paths. Worse failure mode masked by this: a real refactor regression could be hidden under the same diff noise.</parameter>

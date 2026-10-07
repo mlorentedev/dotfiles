@@ -1,13 +1,14 @@
 ---
-id: lesson-296
+id: "lesson-296-data-compiled-into-the-binary-lags-the-deploy"
 type: lesson
 status: active
+title: "Data compiled into the binary lags the deploy"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, harness, deploy, release, routing]
 ---
 
-# 296 — Data compiled into the binary lags the deploy
+# Data compiled into the binary lags the deploy
 
 ## What happened
 

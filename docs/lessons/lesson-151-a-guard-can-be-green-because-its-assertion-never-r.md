@@ -1,13 +1,14 @@
 ---
-id: lesson-151-a-guard-can-be-green-because-its-assertion-never-r
+id: "lesson-151-a-guard-can-be-green-because-its-assertion-never-r"
 type: lesson
 status: active
+title: "A guard can be green because its assertion never ran"
 created: "2026-08-05"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 151: A guard can be green because its assertion never ran
+# A guard can be green because its assertion never ran
 
 **Context**: The fix above shipped with two source-level assertions, one per platform, each verifying that the pi settings deploy is guarded on the destination being absent and carries neither `Compare-Object` nor `-Force`. Both were green on the first run, and the Linux one was genuinely correct.
 
