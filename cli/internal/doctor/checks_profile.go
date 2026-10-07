@@ -51,8 +51,8 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 	// A missing file for an agent that is not installed is a file nobody reads,
 	// not a failure (#843); an installed agent without it runs on its harness
 	// defaults (#2016).
-	for _, f := range []struct{ rel, name, agent string }{
-		{".gemini/AGY.md", "Antigravity instructions (AGY.md)", "agy"},
+	for _, f := range []struct{ rel, name, agent, deploy string }{
+		{".gemini/AGY.md", "Antigravity instructions (AGY.md)", "agy", "agy-instructions"},
 	} {
 		p := filepath.Join(home, filepath.FromSlash(f.rel))
 		switch {
@@ -61,7 +61,7 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 		case !sys.has(f.agent):
 			rep.Skip(f.name + " not deployed: " + f.agent + " is not installed")
 		default:
-			rep.Fail(f.name + " missing: " + p + " (" + f.agent + " is installed; " + setupRemedy(sys.GOOS) + ")")
+			rep.Fail(f.name + " missing: " + p + " (" + f.agent + " is installed; run: dotf deploy " + f.deploy + ")")
 		}
 	}
 
@@ -282,13 +282,4 @@ func firstLineOr(out string, err error) string {
 		return err.Error()
 	}
 	return "no output"
-}
-
-// setupRemedy names the setup script that deploys AGY.md on goos: it is not an
-// agents.presence[] file, so `dotf converge` does not deploy it yet.
-func setupRemedy(goos string) string {
-	if goos == "windows" {
-		return "re-run setup-windows.ps1"
-	}
-	return "re-run setup-linux.sh"
 }

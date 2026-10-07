@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -66,22 +65,12 @@ func newToolsSyncCmd() *cobra.Command {
 	return c
 }
 
-// syncRunners returns the merged-output runner and the stdout-only one, both
-// run from HOME so a project mise.toml in the caller's directory is not
-// installed as a side effect of a machine-level sync.
+// syncRunners returns the test runner when one is set, else tools.HomeRunners.
 func syncRunners() (run, stdout tools.Runner) {
 	if toolsSyncRunner != nil {
 		return toolsSyncRunner, nil
 	}
-	home := env.Home()
-	command := func(name string, args ...string) *exec.Cmd {
-		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
-		c.Dir = home
-		return c
-	}
-	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
-	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
-	return run, stdout
+	return tools.HomeRunners(env.Home())
 }
 
 func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {

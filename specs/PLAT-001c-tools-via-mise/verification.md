@@ -14,7 +14,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC3 (no asset is a skip, as the plan says) -> T1a / tests `TestInstall_NoAssetForThisPlatformIsSkippedNotFailed`, `TestPlanAndInstallAgreeOnAPlatformWithNoAsset`
 - [ ] AC4 -> T1b (after the release carrying T1a is the `DOTF_VERSION` pin)
 - [x] AC5 (sync renders, installs, probes, is idempotent) -> T2 / tests `TestSync_*`, `TestParseMiseTools_*`, `TestToolsSync_*`; on the Mac, `dotf tools sync` installed six CLIs and a second run reported nothing to do
-- [ ] AC6 -> T2b
+- [x] AC6 -> T2b / tests `TestToolsSync_PlanThenApplyThenNothingToDo`, `TestToolsSync_WithoutMiseIsASkipNamingTheRemedy`, `TestToolsSync_UnwiredRunnersAreASkipNotARealRun`, `TestRun_AReconcilerSkipIsReportedAndNotProbed`; on the Mac `dotf converge` reports `tools [ OK ] 9 pinned CLI(s) at their pin`
 
 ## Test status
 

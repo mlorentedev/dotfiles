@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -195,4 +196,20 @@ func writeFileAtomic(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// HomeRunners returns the runners a machine-level sync uses, both run from
+// home so a project mise.toml in the caller's directory is not installed as a
+// side effect: run merges stdout and stderr (`mise install`, `<tool>
+// --version`), stdout returns stdout alone (`mise which`, whose output is a
+// path a stderr warning must not corrupt).
+func HomeRunners(home string) (run, stdout Runner) {
+	command := func(name string, args ...string) *exec.Cmd {
+		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
+		c.Dir = home
+		return c
+	}
+	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
+	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
+	return run, stdout
 }

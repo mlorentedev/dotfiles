@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // Options carries the side effects a registry needs from its caller, so a test
@@ -13,6 +14,9 @@ type Options struct {
 	// RunHarnessDeploy deploys the instruction files, skills and presence;
 	// CompileHarnessDeploy in production.
 	RunHarnessDeploy func(Env) error
+	// MiseRun and MiseStdout run mise and the tools it installs;
+	// tools.HomeRunners in production. Unset, the tools step is skipped.
+	MiseRun, MiseStdout tools.Runner
 }
 
 // Registry is the ordered list of reconcilers a run drives. The order extends
@@ -22,6 +26,7 @@ func Registry(o Options) []Reconciler {
 	return []Reconciler{
 		recordsMirror{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
+		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},
 	}
 }
 
