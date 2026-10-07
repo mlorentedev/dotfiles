@@ -37,6 +37,10 @@ setup() {
 #                             have caught it. What the suite CAN pin is which call is made, and it
 #                             does; the API's verdict on that call only arrives from a real run.
 #   board-pickup              stubs `gh` — same; a real run self-assigns real issues
+#   dotf-bin-helper           stubs `go` — the case it pins is a toolchain that is present and cannot
+#                             compile the tree, and a real `go` only produces that by breaking the
+#                             tree under test. The real build path is driven for real by every
+#                             suite that calls the helper (compile-harness-real among them).
 #   guard-memory-sink         stubs `git` — the real path is covered end-to-end by the dispatcher's own commit-time behaviour
 #   guard-no-gui              stubs `obsidian` — and here a real run is not merely inconvenient, it is
 #                             the defect. That suite's whole subject is that a test must never launch a
@@ -69,7 +73,7 @@ setup() {
 #                             .bats file itself — see #892) — same rationale as vault-health: a
 #                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
-EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup guard-memory-sink guard-no-gui
+EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
 hermes-setup install-dotf model-canary pr-agent-publish-guard release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
 vault-health-golden vault-maintenance-weekly"
 
