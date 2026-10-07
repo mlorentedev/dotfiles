@@ -32,7 +32,7 @@ Research for #2013 (epic comment *Toolchain research*) compared five managers ag
 | Manager | Native Windows | Lock with per-platform checksums | Verified provenance | Result |
 |---|---|---|---|---|
 | mise | yes | `mise.lock` (URL + checksum per platform), `--locked` | aqua backend: cosign / SLSA / GitHub attestations | **chosen** |
-| Homebrew | no | no (the Brewfile lock was removed by design) | bottles only | casks and system libraries only |
+| Homebrew | no | no (the Brewfile lock was removed by design) | bottles only | rejected as a toolchain channel (it cannot pin) |
 | asdf | no | no | no | rejected |
 | SDKMAN | no | no | no | rejected |
 | Nix | no | yes | yes | rejected (no native Windows) |
@@ -56,7 +56,7 @@ Research for #2013 (epic comment *Toolchain research*) compared five managers ag
    | node-distributed agents and CLIs | npm global, `packages.json` (unchanged) |
    | PyPI-distributed tools | `uv tool`, `packages.json` (unchanged) |
    | mise and `dotf` themselves | `github-release`, `packages.json` / the installers (ADR-041 decision 7) |
-   | tools with no cross-OS channel | OS package manager, class 3 (unchanged; on macOS that is Homebrew, for casks and system libraries only) |
+   | tools with no cross-OS channel | OS package manager, class 3 (unchanged; what Homebrew may install on macOS beyond this ADR is #2013 D4, still proposed) |
 
    uv keeps virtual environments and `uv tool`; mise does not manage Python packages.
 5. **Environment comes from mise, not from hand-written `*_HOME` blocks.** `mise activate` (bash, zsh, pwsh) sets `JAVA_HOME` and PATH in shells. `dotf` writes a static env file for GUI apps and IDEs, which do not run a shell rc. The shims directory is on PATH for non-interactive callers; without it, `dotf tools sync` succeeds and nothing is reachable, which is a new false success (W2b).
