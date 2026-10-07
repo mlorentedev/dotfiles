@@ -482,7 +482,7 @@ func ThreadKey(cwd string) string {
 				name = "detached"
 			}
 			return sanitizeThread(name) + "@" + shortHost()
-		case isDefaultBranch(id.Branch):
+		case id.isDefaultBranch():
 			return id.Branch + "@" + shortHost()
 		default:
 			return sanitizeThread(id.Branch)
