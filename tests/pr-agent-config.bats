@@ -699,6 +699,8 @@ _upstream_handler='def is_valid_file(filename, bad_extensions=None):
 @test "pr-agent: the extension list is read at the same commit the action is pinned to (#1417)" {
     local pins
     pins=$(grep -o 'The-PR-Agent/pr-agent@[0-9a-f]\{40\}' "$WF" | sort -u)
+    # An empty $pins still prints one line, so the count alone passes with no pin.
+    [ -n "$pins" ] || { echo "the action is not pinned to a commit" >&2; false; }
     [ "$(printf '%s\n' "$pins" | wc -l)" -eq 1 ]
     refute_grep '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
     grep -qF 'WORKFLOW_SHA: ${{ github.workflow_sha }}' "$WF"
