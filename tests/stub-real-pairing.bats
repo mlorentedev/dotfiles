@@ -59,6 +59,9 @@ setup() {
 #   pr-agent-publish-guard    stubs `gh` — its subject is the guard's reaction to GitHub API failures
 #                             (timeouts, 5xx, a 404), which a real API cannot be made to produce on
 #                             demand; the real guard runs on every reviewed PR (#2069)
+#   pr-agent-queue-skip       stubs `gh` — its subject is a PR whose state changed while its run
+#                             was queued, and a failed read; neither can be produced on demand
+#                             against the live API. The real step runs on every reviewed PR (#1923)
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
@@ -74,7 +77,7 @@ setup() {
 #                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
 EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
-hermes-setup install-dotf model-canary pr-agent-publish-guard release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
+hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
 vault-health-golden vault-maintenance-weekly"
 
 exempt() {
