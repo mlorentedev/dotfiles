@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
-	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
@@ -100,10 +99,8 @@ func healthOptions(vaultName string, verbose bool) vault.HealthOptions {
 	}
 
 	return vault.HealthOptions{
-		VaultDir:   dir,
-		VaultName:  name,
-		Verbose:    verbose,
-		ScriptsDir: memScriptsDir(),
-		BashPath:   mem.ResolveBash(),
+		VaultDir:  dir,
+		VaultName: name,
+		Verbose:   verbose,
 	}
 }

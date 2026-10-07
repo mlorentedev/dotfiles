@@ -97,7 +97,7 @@ func TestDeployCmd_BareDeployRegistersMissingMCPServers(t *testing.T) {
 	if strings.Join(fake.added, ",") != "hive" {
 		t.Errorf("added %v, want only the missing hive", fake.added)
 	}
-	if !strings.Contains(out, "claude-mcp 1 added, 1 already present") {
+	if !strings.Contains(out, row("installed", "claude-mcp")+"1 added, 1 already present") {
 		t.Errorf("the step must report what it did:\n%s", out)
 	}
 	// Both twins register the servers before installing the plugins.
@@ -115,7 +115,7 @@ func TestDeployCmd_MCPServerWithoutItsPrerequisiteIsSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if strings.Join(fake.added, ",") != "web" || !strings.Contains(out, "skipped   claude-mcp hive (uv not on PATH)") {
+	if strings.Join(fake.added, ",") != "web" || !strings.Contains(out, row("skipped", "claude-mcp")+"hive (uv not on PATH)") {
 		t.Errorf("added %v; the skip must name the server and binary:\n%s", fake.added, out)
 	}
 }
@@ -129,7 +129,7 @@ func TestDeployCmd_AFailedMCPAddFailsTheRunButPluginsStillRun(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "web") {
 		t.Fatalf("a failed add must fail the deploy and name the server: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "failed    claude-mcp web did not register") {
+	if !strings.Contains(out, row("failed", "claude-mcp")+"web did not register") {
 		t.Errorf("the failed server must be named:\n%s", out)
 	}
 	if strings.Join(fake.installed, ",") != "b@m" {
@@ -147,7 +147,7 @@ func TestDeployCmd_StaleHiveRegistrationIsMigrated(t *testing.T) {
 	if strings.Join(fake.removed, ",") != "hive" || strings.Join(fake.added, ",") != "hive" {
 		t.Errorf("removed %v added %v, want hive removed then re-added", fake.removed, fake.added)
 	}
-	if !strings.Contains(out, "migrated  claude-mcp hive") {
+	if !strings.Contains(out, row("migrated", "claude-mcp")+"hive") {
 		t.Errorf("the migration must be reported:\n%s", out)
 	}
 }
@@ -161,7 +161,7 @@ func TestDeployCmd_BareDeployInstallsMissingClaudePlugins(t *testing.T) {
 	if strings.Join(fake.installed, ",") != "b@m" {
 		t.Errorf("installed %v, want only the missing b@m", fake.installed)
 	}
-	if !strings.Contains(out, "claude-plugins 1 added, 1 already present") {
+	if !strings.Contains(out, row("installed", "claude-plugins")+"1 added, 1 already present") {
 		t.Errorf("the step must report what it did:\n%s", out)
 	}
 }
@@ -185,7 +185,7 @@ func TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun(t *testing.T) {
 	if err == nil {
 		t.Fatalf("a failed install must fail the deploy:\n%s", out)
 	}
-	if !strings.Contains(out, "1 added") || !strings.Contains(out, "failed    claude-plugins b@m") {
+	if !strings.Contains(out, "1 added") || !strings.Contains(out, row("failed", "claude-plugins")+"b@m") {
 		t.Errorf("the failed plugin must be named and not counted:\n%s", out)
 	}
 }
@@ -195,8 +195,8 @@ func TestDeployCmd_ClaudePluginsSkippedWithoutClaude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if !strings.Contains(out, "skipped   claude-plugins (claude not installed)") ||
-		!strings.Contains(out, "skipped   claude-mcp (claude not installed)") {
+	if !strings.Contains(out, row("skipped", "claude-plugins")+"(claude not installed)") ||
+		!strings.Contains(out, row("skipped", "claude-mcp")+"(claude not installed)") {
 		t.Errorf("the skip must be reported:\n%s", out)
 	}
 }
@@ -220,10 +220,10 @@ func TestDeployCmd_ClaudePluginsDryRunInstallsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if len(fake.installed) != 0 || !strings.Contains(out, "would add claude-plugins 2 missing") {
+	if len(fake.installed) != 0 || !strings.Contains(out, row("would add", "claude-plugins")+"2 missing") {
 		t.Errorf("dry run installed %v:\n%s", fake.installed, out)
 	}
-	if len(fake.added) != 0 || !strings.Contains(out, "would add claude-mcp 2 missing") {
+	if len(fake.added) != 0 || !strings.Contains(out, row("would add", "claude-mcp")+"2 missing") {
 		t.Errorf("dry run registered %v:\n%s", fake.added, out)
 	}
 }
@@ -247,7 +247,7 @@ func TestDeployCmd_GuardWatchesTheClaudeConfigDir(t *testing.T) {
 	if got, _ := os.ReadFile(claudeJSON); string(got) != string(healthy) {
 		t.Fatalf("%s was not restored after the install truncated it:\n%s", claudeJSON, out)
 	}
-	if !strings.Contains(out, "restored  claude-plugins "+claudeJSON) {
+	if !strings.Contains(out, row("restored", "claude-plugins")+claudeJSON) {
 		t.Errorf("the restore must be reported with the path:\n%s", out)
 	}
 }
