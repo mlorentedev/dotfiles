@@ -20,8 +20,8 @@ import (
 //
 // Unlike increments 1 and 2 this is NOT golden-characterized, deliberately.
 // The twin's output is a timestamped log wrapping two subcommands whose
-// byte-parity is already proven by tests/knowledge-crystallize-go-parity.bats
-// and health_golden_test.go. What is left to characterize is the
+// byte-parity is already proven by health_golden_test.go and
+// cmd/vault_crystallize_golden_test.go. What is left to characterize is the
 // wrapper itself — log path, section framing, the issue-count regex, the
 // notification threshold, the exit code — and those are behaviours, not bytes.
 // They are covered by table tests here plus the behavioural cases in
