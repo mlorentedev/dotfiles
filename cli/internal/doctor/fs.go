@@ -44,6 +44,18 @@ func isExecFile(p string) bool {
 	return fi.Mode().Perm()&0o111 != 0
 }
 
+// sameDir reports whether a and b are one existing file or directory.
+// os.SameFile compares the files themselves (device and inode, or the Windows
+// file ID), so it holds through a symlink and through another case of the same
+// name. Folding case by OS was wrong on macOS, whose default APFS volume is
+// case-insensitive while filepath.EvalSymlinks keeps the spelling it was given
+// (#2094). A path that cannot be stat'ed is never the same as anything.
+func sameDir(a, b string) bool {
+	fa, errA := os.Stat(a)
+	fb, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(fa, fb)
+}
+
 // isSymlink reports whether p is itself a symlink (does not follow it).
 func isSymlink(p string) bool {
 	fi, err := os.Lstat(p)
