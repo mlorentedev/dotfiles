@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for scripts/obs-cli.ps1 (structural + PSScriptAnalyzer)
+# Tests for scripts/obs-cli.ps1 (structural; PSScriptAnalyzer runs in lint-powershell, #2052)
 
 load 'winpath'
 
@@ -43,28 +43,6 @@ setup() {
 
 @test "obs-cli.ps1 exits 2 when GUI not running" {
     grep -q 'exit 2' "$PS1_SCRIPT"
-}
-
-@test "obs-cli.ps1 passes PSScriptAnalyzer (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
-    run pwsh -NonInteractive -Command "
-        \$ErrorActionPreference = 'Stop'
-        try {
-            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            \$results = Invoke-ScriptAnalyzer -Path '$(_winpath "$PS1_SCRIPT")' -Settings '$(_winpath "$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1")' -Severity Error,Warning
-            if (\$results) {
-                \$results | Format-Table -AutoSize
-                exit 1
-            }
-            Write-Host 'PSScriptAnalyzer: OK'
-        } catch {
-            Write-Warning \"PSScriptAnalyzer not available: \$_\"
-            exit 0
-        }
-    "
-    [[ "$status" -eq 0 ]]
 }
 
 @test "obs-cli.ps1 valid PowerShell syntax (if pwsh available)" {
