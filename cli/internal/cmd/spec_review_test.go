@@ -97,11 +97,13 @@ func TestSpecReviewForegroundNamesATurnCap(t *testing.T) {
 	}
 	t.Cleanup(func() { runForeground = prev })
 
-	_, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground")
+	// The reviewer is named, not drawn: the hint is pi's, so the guard must not
+	// depend on what the pool fixture happens to hold.
+	_, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground", "--reviewer", "nan/deepseek-v4-flash")
 	if err == nil {
 		t.Fatal("a review that wrote no review.md must fail")
 	}
-	if !strings.Contains(err.Error(), "cut off after 25 turns") {
+	if !strings.Contains(err.Error(), "after 25 turns") || !strings.Contains(err.Error(), "turn cap") {
 		t.Errorf("the error does not name the turn cap: %v", err)
 	}
 }

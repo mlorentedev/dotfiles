@@ -32,7 +32,7 @@ func TurnCapHint(runner, transcript string) string {
 	if !capped {
 		return ""
 	}
-	return fmt.Sprintf("the reviewer was cut off after %d turns (pi's turn cap: its last message produced no output); re-run the review", turns)
+	return fmt.Sprintf("the reviewer ended after %d turns on a message with no output, which is how pi's turn cap stops a run; re-run the review", turns)
 }
 
 // piTurnCap reads a pi --mode json transcript and reports how many turns ran

@@ -43,7 +43,7 @@ func piTranscript(t *testing.T, turns, lastOutput int) string {
 // message. The hint must name the cap and the turn count.
 func TestTurnCapHintNamesACappedPiRun(t *testing.T) {
 	hint := TurnCapHint("pi", piTranscript(t, 25, 0))
-	for _, want := range []string{"cut off after 25 turns", "re-run the review"} {
+	for _, want := range []string{"after 25 turns", "turn cap", "re-run the review"} {
 		if !strings.Contains(hint, want) {
 			t.Errorf("hint %q does not say %q", hint, want)
 		}
