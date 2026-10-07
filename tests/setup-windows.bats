@@ -1123,3 +1123,15 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     [ ! -e "$DOTFILES_DIR/scripts/orca-hook-tune.ps1" ]
     [ ! -e "$DOTFILES_DIR/scripts/orca-tune.sh" ]
 }
+
+@test "PLAT-001b: every file under ai/claude has a deployer" {
+    # setup-linux.sh no longer bulk-copies ai/claude/*. Each file there is
+    # deployed by name: CLAUDE.md by compile-harness.sh --deploy (an
+    # agents.presence[] source), settings.json by `dotf deploy` (claude-settings),
+    # and plugins.json is read from the checkout by `dotf deploy`. A new file
+    # needs a deployer before it is added to this list.
+    [ "$(cd "$DOTFILES_DIR/ai/claude" && find . -type f | sort | tr '\n' ' ')" = "./CLAUDE.md ./plugins.json ./settings.json " ]
+    [ "$(jq -r '.agents.presence[] | select(.agent=="claude") | .source' "$DOTFILES_DIR/harness/manifest.json")" = "ai/claude/CLAUDE.md" ]
+    [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .src' "$DOTFILES_DIR/ai/deploy.json")" = "ai/claude/settings.json" ]
+    grep -qF 'PluginsRel = "ai/claude/plugins.json"' "$DOTFILES_DIR/cli/internal/claude/plugins.go"
+}

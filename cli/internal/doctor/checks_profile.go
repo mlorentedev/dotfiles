@@ -61,7 +61,7 @@ func checkProfileFiles(sys *System, c *Contract, rep *Report, fix bool) {
 		case !sys.has(f.agent):
 			rep.Skip(f.name + " not deployed: " + f.agent + " is not installed")
 		default:
-			rep.Fail(f.name + " missing: " + p + " (" + f.agent + " is installed)")
+			rep.Fail(f.name + " missing: " + p + " (" + f.agent + " is installed; " + setupRemedy(sys.GOOS) + ")")
 		}
 	}
 
@@ -282,4 +282,13 @@ func firstLineOr(out string, err error) string {
 		return err.Error()
 	}
 	return "no output"
+}
+
+// setupRemedy names the setup script that deploys AGY.md on goos: it is not an
+// agents.presence[] file, so `dotf converge` does not deploy it yet.
+func setupRemedy(goos string) string {
+	if goos == "windows" {
+		return "re-run setup-windows.ps1"
+	}
+	return "re-run setup-linux.sh"
 }
