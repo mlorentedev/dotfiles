@@ -44,3 +44,27 @@ func TestRunOrcaTuneHooksInSyncWhenNothingDrifts(t *testing.T) {
 		t.Fatalf("a tuned pair is in sync: err=%v\n%s", err, out.String())
 	}
 }
+
+// --check names each file's state on its own line: drift where it drifts, ok
+// where it does not, so the operator sees which of the two Orca regenerated.
+func TestRunOrcaTuneHooksCheckNamesEachFilesState(t *testing.T) {
+	cfg, scr := orcaHookPair(t, "$req = [System.Net.HttpWebRequest]::Create($uri)\n")
+	var out bytes.Buffer
+	if err := runOrcaTuneHooks(&out, cfg, scr, 60, true); err == nil {
+		t.Fatal("--check must exit non-zero while a timeout is below the floor")
+	}
+	if !strings.Contains(out.String(), "drift: "+cfg+" has a hook timeoutSec < 60") ||
+		!strings.Contains(out.String(), "ok: copilot-hook.ps1 uses HttpWebRequest") {
+		t.Fatalf("want config drift and script ok:\n%s", out.String())
+	}
+
+	cfg, scr = orcaHookPair(t, "Invoke-WebRequest -Uri $u -Method POST\n")
+	out.Reset()
+	if err := runOrcaTuneHooks(&out, cfg, scr, 30, true); err == nil {
+		t.Fatal("--check must exit non-zero while the script still uses Invoke-WebRequest")
+	}
+	if !strings.Contains(out.String(), "ok: orca.json hook timeouts >= 30") ||
+		!strings.Contains(out.String(), "drift: "+scr+" still uses Invoke-WebRequest") {
+		t.Fatalf("want config ok and script drift:\n%s", out.String())
+	}
+}
