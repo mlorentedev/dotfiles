@@ -27,19 +27,36 @@ created: "2026-10-06"
 - [x] This spec: proposal, tasks, features
 - [ ] Merge = acceptance of ADR-045 (owner)
 
-### PR 2 — `dotf converge --plan` and the records reconciler (#1843 B6, #2016)
+### PR 2a — the engine: `dotf converge [--plan]` and the records-mirror reconciler (#1843 B6)
 
-- [ ] [AC1] Failing test: `--plan` over a fake registry lists each reconciler that applies to the OS with its action, and the temp HOME is byte-identical afterwards
-- [ ] [AC1] Implement `internal/converge`: the `Reconciler` interface (name, platforms, plan, apply, probe), the ordered registry, and `cmd/converge.go` with `--plan`
-- [ ] [AC5] Failing test: a reconciler that does not list `runtime.GOOS` is reported `skipped` naming the OS; implement through the `platforms` vocabulary `packages.json` uses (#2001)
-- [ ] [AC2] Failing test: the records reconciler on a HOME without `~/.claude/CLAUDE.md` plans `mirror`, `instructions` and `bind`
-- [ ] [AC2] Implement the records reconciler over `harness.Mirror`, the instruction-file deploy and `harness bind`; the `compile-harness.sh --deploy` call is its one shell step, recorded as a port target
-- [ ] Refactor: one report type shared with `dotf deploy`'s `Outcome` where the fields match; no second status enum next to doctor's
+> Split from the original PR 2, which did not fit the ~300-line cap: the engine and one reconciler here, the instruction files and the bindings in 2b. Apply mode landed with the engine because plan and apply are one code path; the persisted report stays in PR 3.
 
-### PR 3 — apply mode and the persisted report (#1843 B7)
+- [x] [AC1] Failing test: `PlanMirror` counts what `Mirror` would write and creates nothing, the deploy dir included; implemented on `Mirror`'s own walk with a `dryRun` flag
+- [x] [AC5] Extract `internal/platform` (`Supports`, `Unknown`) from the tool catalog, so the catalog and the reconcilers share one matcher; the catalog's tests still pass
+- [x] [AC1] [AC4] [AC5] Failing tests for the runner: a plan applies and probes nothing; an unlisted OS is `skipped` naming it; a failed probe fails the run naming the reconciler and the reconcilers after it are not reached
+- [x] Implement `internal/converge`: `Reconciler` (name, platforms, `Reconcile(env, dryRun)`, mandatory `Probe`), `Run`, `Report`, and the ordered `Registry`
+- [x] [AC1] [AC3] Failing tests, then the `records-mirror` reconciler: the plan writes nothing, the apply passes its probe, a second plan reports 0 changes
+- [x] [AC1] `cmd/converge.go`: `dotf converge [--plan] [--repo]`; a plan on an empty HOME writes nothing, a second apply reports 0 changed
+- [x] On the Mac: `go run ./cmd/dotf converge --plan` reports `records-mirror` with 70 files to write and leaves `~/.dotfiles` untouched
 
-- [ ] [AC4] Failing test: a reconciler whose probe fails makes `converge` exit non-zero, names it, and stops the reconcilers after it
-- [ ] [AC4] Implement apply: plan, apply, probe, in registry order (ADR-041 decision 4)
+### PR 2b — the agent instruction files, driven by `agents.presence[]` (#2016, #1843 B11)
+
+> Pivot from the first plan: no `ai/deploy.json` entry. A new deploy field needs a manifest version the installed `dotf` cannot read (#1814 class), and a `replace` entry would rewrite the `AGENT-PRESENCE` region `dotf harness presence` owns on every run, so a second converge could never report zero changes (AC3). `harness/manifest.json` `agents.presence[]` already declares each instruction file (`source`, `file`, `requires_command`); it is the registry.
+
+- [ ] [AC2] Failing test, then the `records-instructions` reconciler: for each presence entry, the deployed file outside the `AGENT-PRESENCE` markers must equal `source`; a change writes `source` plus the existing region byte for byte; `requires_command` absent → `skipped`. It reuses the existing marker split, not a second parser
+- [ ] [AC3] Failing test: a HOME holding base plus region plans 0 changes
+- [ ] [AC2] The probe is "outside-marker content equals `source`", which subsumes the shell's `grep 'First, read AGENTS.md'` check
+- [ ] [AC2] `records-presence`: the presence injection in-process, after the instruction files (it skips a file that does not exist yet). It also runs on Linux, where `setup-linux.sh` never ran it
+- [ ] Delete the CLAUDE.md force-copy and the bulk `ai/claude/*` copy from both twins (ADR-020 §5). The opencode, pi and copilot copy blocks follow in their own B11 rows if the cap is reached
+- [ ] [AC2] Doctor FAIL when an agent binary is on PATH without its instruction file (#2016's guard; it covers copilot, whose file is deployed only once copilot exists)
+
+### PR 2c — skills and hook bindings
+
+- [ ] [AC2] `records-skills` (feature f11): `compile-harness.sh --deploy`, planned with `--check`, behind the shared seam that defaults to "not run" (lesson 335); recorded as a port target
+- [ ] `records-bind`: the `harness bind` logic with its dry-run
+
+### PR 3 — the persisted report (#1843 B7)
+
 - [ ] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
 - [ ] [AC3] Implement the report (JSON, one entry per reconciler, the run's exit status)
 - [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file

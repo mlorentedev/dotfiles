@@ -59,6 +59,17 @@ type MirrorResult struct {
 // it was a hardcoded pair, a third target (#1176) needed a copy line nobody
 // wrote.
 func Mirror(repoRoot, deployDir string) (MirrorResult, error) {
+	return mirror(repoRoot, deployDir, false)
+}
+
+// PlanMirror reports what Mirror would do without writing anything, the deploy
+// dir included: Updated counts the files Mirror would write. It runs Mirror's
+// own walk and comparison, so the plan and the apply cannot disagree.
+func PlanMirror(repoRoot, deployDir string) (MirrorResult, error) {
+	return mirror(repoRoot, deployDir, true)
+}
+
+func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 	var res MirrorResult
 	repoRoot, deployDir = filepath.Clean(repoRoot), filepath.Clean(deployDir)
 	if sameDir(repoRoot, deployDir) {
@@ -70,7 +81,7 @@ func Mirror(repoRoot, deployDir string) (MirrorResult, error) {
 		return res, err
 	}
 
-	if err := mirrorTree(repoRoot, deployDir, "harness", &res); err != nil {
+	if err := mirrorTree(repoRoot, deployDir, "harness", dryRun, &res); err != nil {
 		return res, err
 	}
 	for _, rel := range targets {
@@ -79,7 +90,7 @@ func Mirror(repoRoot, deployDir string) (MirrorResult, error) {
 			res.Missing = append(res.Missing, rel)
 			continue
 		}
-		if err := mirrorFile(src, filepath.Join(deployDir, filepath.FromSlash(rel)), &res); err != nil {
+		if err := mirrorFile(src, filepath.Join(deployDir, filepath.FromSlash(rel)), dryRun, &res); err != nil {
 			return res, err
 		}
 		res.Targets = append(res.Targets, rel)
@@ -124,7 +135,7 @@ func manifestTargets(path string) ([]string, error) {
 
 // mirrorTree copies every regular file under <repoRoot>/<sub> to
 // <deployDir>/<sub>, walking in a deterministic order.
-func mirrorTree(repoRoot, deployDir, sub string, res *MirrorResult) error {
+func mirrorTree(repoRoot, deployDir, sub string, dryRun bool, res *MirrorResult) error {
 	root := filepath.Join(repoRoot, sub)
 	if !isDir(root) {
 		return fmt.Errorf("%s: not a directory in the checkout", filepath.ToSlash(sub))
@@ -148,7 +159,7 @@ func mirrorTree(repoRoot, deployDir, sub string, res *MirrorResult) error {
 		if err != nil {
 			return err
 		}
-		if err := mirrorFile(src, filepath.Join(deployDir, rel), res); err != nil {
+		if err := mirrorFile(src, filepath.Join(deployDir, rel), dryRun, res); err != nil {
 			return err
 		}
 	}
@@ -157,8 +168,9 @@ func mirrorTree(repoRoot, deployDir, sub string, res *MirrorResult) error {
 
 // mirrorFile writes src to dst only when bytes or permission bits differ,
 // atomically (temp file in the destination dir, then rename), so a reader never
-// sees a half-written registry and a converged file keeps its mtime.
-func mirrorFile(src, dst string, res *MirrorResult) error {
+// sees a half-written registry and a converged file keeps its mtime. Under
+// dryRun it stops after the comparison and only counts.
+func mirrorFile(src, dst string, dryRun bool, res *MirrorResult) error {
 	info, err := os.Stat(src)
 	if err != nil {
 		return fmt.Errorf("stating %s: %w", src, err)
@@ -173,6 +185,10 @@ func mirrorFile(src, dst string, res *MirrorResult) error {
 			res.Unchanged++
 			return nil
 		}
+	}
+	if dryRun {
+		res.Updated++
+		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err

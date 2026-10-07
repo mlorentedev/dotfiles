@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
 
 // Catalog is the parsed packages.json.
@@ -87,29 +89,17 @@ func Load(path string) (Catalog, error) {
 		// A misspelt platform makes the tool unsupported everywhere, and the
 		// installer reports an unsupported tool as a skip, so nothing else
 		// would ever say so.
-		for _, p := range t.Source.Platforms {
-			if _, ok := knownPlatforms[p]; !ok {
-				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q lists unknown platform %q (want linux, darwin or windows)", path, t.Name, p)
-			}
+		if p := platform.Unknown(t.Source.Platforms); p != "" {
+			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q lists unknown platform %q (want linux, darwin or windows)", path, t.Name, p)
 		}
 	}
 	return c, nil
 }
 
-var knownPlatforms = map[string]struct{}{"linux": {}, "darwin": {}, "windows": {}}
-
 // SupportsOS reports whether the tool installs on goos: true when Platforms is
 // empty, otherwise only for a listed GOOS.
 func (t Tool) SupportsOS(goos string) bool {
-	if len(t.Source.Platforms) == 0 {
-		return true
-	}
-	for _, p := range t.Source.Platforms {
-		if p == goos {
-			return true
-		}
-	}
-	return false
+	return platform.Supports(t.Source.Platforms, goos)
 }
 
 // AssetName resolves the release-asset filename for the given OS/arch, or "" when
