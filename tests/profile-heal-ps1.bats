@@ -124,7 +124,8 @@ setup() {
     # run, so accumulation cannot occur. Asserting the deploy_file usage is
     # in place is the Linux side of this contract.
     grep -qE 'deploy_file\s+"\$DOTFILES_DIR/\.bashrc"\s+"\$HOME/\.bashrc"' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qE 'deploy_file\s+"\$DOTFILES_DIR/\.zshrc"\s+"\$HOME/\.zshrc"' "$DOTFILES_DIR/setup-linux.sh"
+    # .zshrc moved to `dotf deploy`, which writes the same clean copy.
+    jq -e '.configs[] | select(.src == ".zshrc" and .dst == "{HOME}/.zshrc")' "$DOTFILES_DIR/ai/deploy.json" >/dev/null
 }
 
 # CLI-066 (#1364): dotf doctor --fix passes the file it measured, so the script

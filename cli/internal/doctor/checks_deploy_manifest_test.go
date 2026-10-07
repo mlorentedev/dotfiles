@@ -48,6 +48,28 @@ func assertNoDir(t *testing.T, path string) {
 	}
 }
 
+// An entry declared for other OSes is not compared: on Windows a POSIX rc file
+// that is absent is not drift (#1843 B1).
+func TestCheckDeployManifest_AnEntryForAnotherOSIsNotCompared(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	writeFile(t, filepath.Join(repo, "ai", "deploy.json"), `{"version":4,"configs":[
+  {"name":"r","src":"ai/r.json","dst":"{HOME}/.r/config.json"},
+  {"name":"posix","src":"ai/p.json","dst":"{HOME}/.p/rc","platforms":["linux","darwin"]}
+]}`)
+	writeFile(t, filepath.Join(repo, "ai", "r.json"), `{"r":true}`)
+	writeFile(t, filepath.Join(repo, "ai", "p.json"), `x`)
+	writeFile(t, filepath.Join(home, ".r", "config.json"), `{"r":true}`)
+
+	sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
+	sys.GOOS = "windows"
+	var buf bytes.Buffer
+	checkDeployManifest(sys, NewReport(&buf, true))
+	out := buf.String()
+	if strings.Contains(out, "dotf deploy posix") || !strings.Contains(out, "1 not compared") {
+		t.Errorf("the POSIX-only entry must not be compared on windows:\n%s", out)
+	}
+}
+
 // AC4 (AI-039, #1322): the manifest check reports by status — PASS when every
 // compared entry is in sync (and says how many it did not compare), WARN naming
 // the drifted entry and `dotf deploy <name>`, SKIP without a repo — and never

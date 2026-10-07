@@ -1,8 +1,12 @@
 package doctor
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 )
 
 // setupShellCoverage is what setup-linux.sh's check_deployed and
@@ -63,6 +67,22 @@ func TestSetupShellParity(t *testing.T) {
 			contentChecked[e.dst] = true
 		}
 	}
+	// Files that moved to ai/deploy.json (#1843 B2) are byte-compared by
+	// checkDeployManifest, through deploy.PlanConfig, which is as strong as
+	// homeDeployMap's comparison.
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", filepath.FromSlash(deploy.ManifestRel)))
+	if err != nil {
+		t.Fatalf("read %s: %v", deploy.ManifestRel, err)
+	}
+	man, err := deploy.ParseManifest(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range man.Configs {
+		if rel, ok := strings.CutPrefix(c.Dst, "{HOME}/"); ok && !c.Render {
+			contentChecked[rel] = true
+		}
+	}
 
 	for _, item := range setupShellCoverage {
 		t.Run(item.name, func(t *testing.T) {
@@ -72,7 +92,7 @@ func TestSetupShellParity(t *testing.T) {
 			// PASSes exactly the drift the shell call FAILed on.
 			case item.blocking:
 				if !contentChecked[item.name] {
-					t.Fatalf("%s was byte-compared by check_deployed but has no content-checked homeDeployMap entry — deleting the shell call would lose the assertion", item.name)
+					t.Fatalf("%s was byte-compared by check_deployed but has no content-checked homeDeployMap entry or ai/deploy.json entry — deleting the shell call would lose the assertion", item.name)
 				}
 
 			// docker-compose has no PATH entry to find under compose v2; its
