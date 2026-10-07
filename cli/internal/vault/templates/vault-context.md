@@ -3,7 +3,7 @@ id: "{{repo}}"
 type: project
 status: active
 owner: manu
-repo_url: ""
+repo_url: "{{repo_url}}"
 stack: [{{stack}}]
 tags: []
 created: "{{date}}"
