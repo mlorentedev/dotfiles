@@ -24,9 +24,12 @@ type Lesson struct {
 }
 
 var (
-	fileRE       = regexp.MustCompile(`^lesson-(\d+)-.*\.md$`)
-	h1RE         = regexp.MustCompile(`(?m)^# ([^\n]+?)[ \t]*$`) // [ \t], not \s: \s would eat the blank lines after the H1
-	h1PrefixRE   = regexp.MustCompile(`^(?:Lesson\s+)?\d+\s*[:—–-]\s*`)
+	fileRE = regexp.MustCompile(`^lesson-(\d+)-.*\.md$`)
+	h1RE   = regexp.MustCompile(`(?m)^# ([^\n]+?)[ \t]*$`) // [ \t], not \s: \s would eat the blank lines after the H1
+	// Only the numbering forms measured in the repository are a prefix: "Lesson
+	// NNN" with a separator, or a bare NNN followed by a spaced em or en dash.
+	// A hyphen glued to digits ("3-2-1", "12-factor") is part of the title.
+	h1PrefixRE   = regexp.MustCompile(`^(?:Lesson\s+\d+\s*[:—–-]|\d+\s+[—–])\s*`)
 	inlineDateRE = regexp.MustCompile(`(?m)^[ \t]*(?:>[ \t]*)?\*\*Date:\*\*[ \t]*(\d{4}-\d{2}-\d{2})[ \t]*\n`)
 	dateRE       = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
@@ -300,11 +303,21 @@ func lessonDirs(dir string) ([]string, error) {
 
 func planDir(dir string, seen map[int]string) ([]Change, error) {
 	files, err := filepath.Glob(filepath.Join(dir, "lesson-*.md"))
-	if err != nil || len(files) == 0 {
+	if err != nil {
 		return nil, err
 	}
 	indexPath := filepath.Join(dir, "_index.md")
 	index, err := os.ReadFile(indexPath) //nolint:gosec // the repository's own docs
+	if len(files) == 0 {
+		// No lessons here, but a generated table may still list some that
+		// moved into a category: regenerate it empty so stale rows go.
+		if err == nil && bytes.Contains(index, []byte(IndexBegin)) {
+			if want := RenderIndex(index, nil); !bytes.Equal(index, want) {
+				return []Change{{Path: indexPath, Want: want}}, nil
+			}
+		}
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s has lessons but no _index.md", dir)
 	}

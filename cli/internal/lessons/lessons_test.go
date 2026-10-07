@@ -191,3 +191,59 @@ func TestPlan_RequiresTheRootIndexWhenOnlyACategoryHasLessons(t *testing.T) {
 		t.Fatalf("want a missing-root-index error, got %v", err)
 	}
 }
+
+// Only the numbering forms measured in the repository are a prefix: "Lesson
+// NNN" with a separator, or a bare NNN followed by a spaced dash. A title that
+// merely starts with digits keeps them.
+func TestNormalize_StripsOnlyTheMeasuredNumberingPrefixes(t *testing.T) {
+	cases := map[string]string{
+		"# Lesson 026: Config guards\n": "Config guards",
+		"# Lesson 215 — A parser\n":     "A parser",
+		"# Lesson 7 - Hyphen form\n":    "Hyphen form",
+		"# 213 — A reviewer\n":          "A reviewer",
+		"# 213 – En dash\n":             "En dash",
+		"# 3-2-1 backup rule\n":         "3-2-1 backup rule",
+		"# 12-factor apps\n":            "12-factor apps",
+		"# 2026 roadmap\n":              "2026 roadmap",
+		"# 2 shells, one script\n":      "2 shells, one script",
+	}
+	for h1, want := range cases {
+		l, _, err := Normalize("lesson-001-x.md", []byte(h1+"\n**Date:** 2026-01-01\n"), "")
+		if err != nil {
+			t.Fatalf("%q: %v", h1, err)
+		}
+		if l.Title != want {
+			t.Errorf("%q: title %q, want %q", h1, l.Title, want)
+		}
+	}
+}
+
+// A directory whose lessons all moved into categories still has its generated
+// table regenerated, so stale rows cannot outlive the files they listed.
+func TestPlan_RegeneratesAnIndexWhoseDirectoryHasNoLessonsLeft(t *testing.T) {
+	stale := "# Index\n\n" + IndexBegin + "\n| Lesson | Date |\n|---|---|\n| [001 - A](lesson-001-a.md) | 2026-01-01 |\n" + IndexEnd + "\n"
+	dir := writeTree(t, map[string]string{
+		"_index.md":                stale,
+		"category/_index.md":       "# Category\n",
+		"category/lesson-001-a.md": shapes["recent"],
+	})
+	changes, err := Plan(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root []byte
+	for _, c := range changes {
+		if c.Path == filepath.Join(dir, "_index.md") {
+			root = c.Want
+		}
+	}
+	if root == nil || strings.Contains(string(root), "lesson-001-a.md") {
+		t.Fatalf("the stale root table was not emptied:\n%s", root)
+	}
+	if err := Apply(changes); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := Plan(dir); err != nil || len(again) != 0 {
+		t.Errorf("a converged tree still plans %d change(s), err %v", len(again), err)
+	}
+}
