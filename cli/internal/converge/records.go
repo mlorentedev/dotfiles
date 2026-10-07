@@ -7,11 +7,22 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
+// Options carries the side effects a registry needs from its caller, so a test
+// can drive the registry without running the real tools (lesson 335).
+type Options struct {
+	// RunHarnessDeploy deploys the instruction files, skills and presence;
+	// CompileHarnessDeploy in production.
+	RunHarnessDeploy func(Env) error
+}
+
 // Registry is the ordered list of reconcilers a run drives. The order extends
 // ADR-041 decision 4: records come before anything that reads them (ADR-045
 // decision 4). Later reconcilers are appended by the rows that port them.
-func Registry() []Reconciler {
-	return []Reconciler{recordsMirror{}}
+func Registry(o Options) []Reconciler {
+	return []Reconciler{
+		recordsMirror{},
+		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
+	}
 }
 
 // recordsMirror mirrors harness/ and every manifest target from the checkout

@@ -37,11 +37,13 @@ const (
 )
 
 // PresenceTarget is one manifest `agents.presence[]` entry: which harness, which
-// file under $HOME, and (optionally) a command that must exist for the file to
-// be a real surface at all.
+// file under $HOME, the repo file it is deployed from (empty: presence-only, no
+// base file to deploy), and (optionally) a command that must exist for the file
+// to be a real surface at all.
 type PresenceTarget struct {
 	Agent           string `json:"agent"`
 	File            string `json:"file"`
+	Source          string `json:"source"`
 	RequiresCommand string `json:"requires_command"`
 }
 

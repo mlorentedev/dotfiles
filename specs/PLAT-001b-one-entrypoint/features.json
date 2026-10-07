@@ -8,8 +8,8 @@
   },
   {
     "id": "PLAT-001b-one-entrypoint-f2",
-    "behavior": "AC2: the records-instructions reconciler deploys every agents.presence instruction file before any later reconciler, and fails if one is absent afterwards",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsInstructions_DeploysInstructionsFirst$' -count=1 -v | grep -q -- '--- PASS: TestRecordsInstructions_DeploysInstructionsFirst'",
+    "behavior": "AC2: records-harness deploys every applicable agents.presence instruction file before any later reconciler, and its probe fails while one is missing or stale",
+    "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestRecordsHarness_ProbeFailsWhenTheDeployLeftAFileOut|TestRecordsHarness_ApplyDeploysAndASecondPlanIgnoresThePresenceRegion)$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRecordsHarness_ProbeFailsWhenTheDeployLeftAFileOut' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRecordsHarness_ApplyDeploysAndASecondPlanIgnoresThePresenceRegion'",
     "state": "pending",
     "evidence": ""
   },
@@ -71,8 +71,8 @@
   },
   {
     "id": "PLAT-001b-one-entrypoint-f11",
-    "behavior": "AC2: the records-skills step deploys the committed skill records (compile-harness.sh --deploy) after the instruction files, planned with --check",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsSkills_DeploysSkillRecordsAfterTheInstructions$' -count=1 -v | grep -q -- '--- PASS: TestRecordsSkills_DeploysSkillRecordsAfterTheInstructions'",
+    "behavior": "AC2: the records step runs the skill deploy (compile-harness.sh --deploy) on every apply, even when the instruction files are current",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent$' -count=1 -v | grep -q -- '--- PASS: TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent'",
     "state": "pending",
     "evidence": ""
   }
