@@ -39,10 +39,14 @@ created: "2026-10-06"
 - [x] `versions.conf` marks age, bats, shellcheck, golangci-lint, zoxide and adds pins for jq, direnv, fzf and lazygit; eza stays unmarked (F-056)
 - [x] On the Mac: `dotf tools sync` installed age, direnv, fzf, jq, lazygit and zoxide, each runs at its pin, and a second run reported nothing to do
 
-### T2b — committed `mise.lock` and the converge tools step
+### T2b — the converge tools step (this PR)
 
-- [ ] Commit `mise.lock` (verified 2026-10-06: `mise lock -g --platform linux-x64,macos-arm64,windows-x64` writes `~/.config/mise/mise.lock` with per-platform checksums and attestation provenance for a conf.d config); sync deploys it and installs with `--locked`; CI regenerates it
-- [ ] [AC6] The `tools` reconciler in `dotf converge`, after the records step (after #2025 merges, which owns `Registry` today); `--plan` lists the tools to install
+- [x] [AC6] The `tools` reconciler in `dotf converge`, after the records step. Its plan is `MiseSync.Plan`, its apply `MiseSync.Apply`, and its probe re-plans and requires nothing pending. Without mise on PATH it is skipped, naming the remedy, not failed; `Result.Skip` lets any reconciler say so. The mise runners move to `tools.HomeRunners`, shared with `tools sync`
+- [x] On the Mac: `dotf converge` -> records-mirror, records-harness, tools all `[ OK ]`, `9 pinned CLI(s) at their pin`
+
+### Wave 3 — committed `mise.lock`
+
+- [ ] Commit `mise.lock` and install with `--locked`. Measured 2026-10-06: mise keeps one lockfile for the whole global config, and `--locked` fails when any configured tool (the Mac's hand-written `config.toml`) is missing from it, so the lock lands when `conf.d/dotfiles.toml` is the only tools config (comment on #2013). The aqua backend already verifies each asset's checksum and attestation
 
 ### W2b — shims on PATH (after #2013 P6/P7)
 
