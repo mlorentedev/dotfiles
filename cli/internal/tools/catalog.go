@@ -92,8 +92,13 @@ func Load(path string) (Catalog, error) {
 		// A misspelt platform makes the tool unsupported everywhere, and the
 		// installer reports an unsupported tool as a skip, so nothing else
 		// would ever say so.
-		// A missing asset is a skip, so a misspelt key would install nothing
-		// on any platform and say only "no release asset".
+		// A missing asset is a skip, so a release tool with no asset map (or
+		// one misspelt "assets", which the decoder drops) would install
+		// nothing anywhere and say only "no release asset".
+		if t.Source.Type == "github-release" && len(t.Source.Asset) == 0 {
+			return Catalog{}, fmt.Errorf("parse package catalog %q: github-release tool %q declares no asset", path, t.Name)
+		}
+		// Likewise a misspelt key.
 		for key := range t.Source.Asset {
 			if !platform.ValidKey(key) {
 				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has asset key %q (want a GOOS, or GOOS/GOARCH with amd64 or arm64)", path, t.Name, key)

@@ -196,3 +196,19 @@ func TestLoad_RejectsAnUnknownAssetKey(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad_RejectsAReleaseToolWithNoAsset(t *testing.T) {
+	for name, source := range map[string]string{
+		"no asset map":       `{"type":"github-release","repo":"o/r","checksums":"s"}`,
+		"misspelt as assets": `{"type":"github-release","repo":"o/r","assets":{"linux":"a"},"checksums":"s"}`,
+	} {
+		path := filepath.Join(t.TempDir(), "packages.json")
+		body := `{"tools":[{"name":"t","version":"1.0.0","source":` + source + `}]}`
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "declares no asset") {
+			t.Errorf("%s: want a load error, got %v", name, err)
+		}
+	}
+}
