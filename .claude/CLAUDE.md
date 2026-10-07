@@ -31,7 +31,7 @@ All shell scripts MUST work in **both bash and zsh**. Before modifying any `.sh`
 > empty result from a shell sweep, re-run it in the other shell — see `docs/lessons.md`,
 > *"a shell incompatibility that answers wrongly beats one that fails"*.
 >
-> **A script whose failure path reports "found nothing" needs a preflight.** The last row's damage
+> **A script whose failure path reports "found nothing" needs a preflight.** The `path=` row's damage
 > was not the wiped `PATH`, it was that the wipe arrived dressed as a result. Any script that
 > reports absence — no match, no diff, no mutation applied — should assert its tools exist before
 > it starts, so a broken environment exits loudly instead of answering the question wrongly.
