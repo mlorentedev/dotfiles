@@ -93,7 +93,9 @@ func (m Manifest) validate() error {
 // LiveSources reads the packages pi has recorded in its settings file, in both
 // entry forms: a string, and upstream's object form carrying `source`. An
 // absent file is an empty live set; one that exists and does not parse is an
-// error, because removals planned against it would be guesses.
+// error, because removals planned against it would be guesses. So is an entry
+// in neither form: skipping it would hide an installed package from both check
+// and apply, which would report a clean plan while it stays installed.
 func LiveSources(settingsPath string) ([]string, error) {
 	raw, err := os.ReadFile(settingsPath) // #nosec G304 -- pi's own settings file
 	if errors.Is(err, os.ErrNotExist) {
@@ -109,7 +111,7 @@ func LiveSources(settingsPath string) ([]string, error) {
 		return nil, fmt.Errorf("%s: %w", settingsPath, err)
 	}
 	var out []string
-	for _, entry := range s.Packages {
+	for i, entry := range s.Packages {
 		var str string
 		if json.Unmarshal(entry, &str) == nil {
 			out = append(out, str)
@@ -118,9 +120,12 @@ func LiveSources(settingsPath string) ([]string, error) {
 		var obj struct {
 			Source string `json:"source"`
 		}
-		if json.Unmarshal(entry, &obj) == nil && obj.Source != "" {
-			out = append(out, obj.Source)
+		if json.Unmarshal(entry, &obj) != nil || obj.Source == "" {
+			// The entry is not quoted: a git source can carry a token in its URL.
+			return nil, fmt.Errorf("%s: packages[%d] is neither a string nor an object with a source, "+
+				"so no plan can say whether it is declared", settingsPath, i)
 		}
+		out = append(out, obj.Source)
 	}
 	return out, nil
 }
