@@ -514,19 +514,41 @@ jobs:
               "Inspect its logs; no second Action runs on an unclassified failure."
             exit 1
           fi
+          # A GitHub API call that FAILS is an outage, never "no marker declared"
+          # (#2069: a read timeout failed a PR that PR-Agent had reviewed). gh_api
+          # retries a failure, except a 404, which is an answer: the file is absent at
+          # that ref. A call that still fails leaves its stderr in $api_errors, which
+          # the steps below report instead of a misdiagnosis.
+          api_errors=$(mktemp)
+          gh_api() { # gh api arguments; prints the response, or returns 1
+            # Each attempt's output is buffered: gh prints an error body on stdout, and
+            # a failed attempt's body must not prefix the answer of the next one.
+            local attempt out err
+            out=$(mktemp); err=$(mktemp)
+            for attempt in 1 2 3; do
+              if gh api "$@" >"$out" 2>"$err"; then cat "$out"; rm -f "$out" "$err"; return 0; fi
+              if grep -q 'HTTP 404' "$err"; then rm -f "$out" "$err"; return 1; fi
+              if [ "$attempt" -lt 3 ]; then sleep $((attempt * ${GUARD_RETRY_SECONDS:-5})); fi
+            done
+            { printf 'gh api %s: ' "$1"; tr '\n' ' ' < "$err"; echo; } >> "$api_errors"
+            rm -f "$out" "$err"
+            return 1
+          }
           # Every declared marker, as a JSON array: a full review carries "## PR
           # Reviewer Guide", an incremental one "## Incremental PR Reviewer Guide"
-          # (TOOL-023). Prints nothing when none is declared; never aborts the step.
+          # (TOOL-023). Prints nothing when none is declared, or when the read failed.
           read_markers() { # $1 = ref
-            gh api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=$1" \
-              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
+            local content
+            content=$(gh_api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=$1" \
+              --jq '.content') || return 0
+            printf '%s' "$content" | base64 -d 2>/dev/null \
               | jq -c '[.reviewers[] | select(.login == "github-actions") | .review_markers[]?]
                        | select(length > 0)' 2>/dev/null || true
           }
           markers=$(read_markers "${BASE_REF}")
           if [ -z "$markers" ] && [ -z "${HEAD_SHA:-}" ]; then
             # issue_comment events carry no pull_request payload; ask the API for the head.
-            HEAD_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null || true)
+            HEAD_SHA=$(gh_api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha' || true)
           fi
           if [ -z "$markers" ] && [ -n "${HEAD_SHA:-}" ]; then
             # The default branch has no github-actions entry yet: this is the PR that
@@ -541,6 +563,12 @@ jobs:
                 "using PR-Agent's own heading as the marker"
             fi
           fi
+          if [ -z "$markers" ] && [ -s "$api_errors" ]; then
+            echo "::error::the GitHub API failed while reading harness/review-attestation.json," \
+              "so whether a review marker is declared is unknown. Re-run the job once the API answers."
+            sed 's/^/::error::/' "$api_errors"
+            exit 1
+          fi
           if [ -z "$markers" ]; then
             echo "::error::no review marker declared for github-actions in" \
               "harness/review-attestation.json (checked ${BASE_REF} and the PR head)"
@@ -549,7 +577,13 @@ jobs:
           # --paginate emits one JSON array per page; `jq -s` slurps them into one
           # array of arrays so the count spans every page (gh's own --slurp flag is
           # not present on the runner's gh 2.46 and printed usage instead).
-          found=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+          comments=$(gh_api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate) || {
+            echo "::error::the GitHub API failed while listing the PR's comments, so whether" \
+              "a review was published is unknown. Re-run the job once the API answers."
+            sed 's/^/::error::/' "$api_errors"
+            exit 1
+          }
+          found=$(printf '%s' "$comments" \
             | jq -s --arg started "${STARTED}" --argjson markers "${markers}" \
                 '[.[][] | select(.user.login == "github-actions[bot]"
                                  and (.updated_at >= $started)
