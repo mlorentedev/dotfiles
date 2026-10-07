@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"testing"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/cmd"
 	"github.com/mlorentedev/dotfiles/cli/internal/errors"
 	"github.com/spf13/cobra"
 )
@@ -192,5 +195,47 @@ func TestResolveVersion(t *testing.T) {
 				t.Errorf("resolveVersion(%q) = %q, want %q", tc.ldflag, got, tc.want)
 			}
 		})
+	}
+}
+
+// `dotf agent run` exits 3 when no pool could serve the dispatch, and composers
+// branch on that number: 3 means "another machine may run it", 1 means "the task
+// failed". The in-process tests in internal/cmd see the code on the returned
+// error; only run() turns it into what main() exits with, so a regression there
+// (every error exiting 1) leaves them green.
+//
+// It stands in for a bats case that ran the compiled binary with an empty PATH.
+// What that case also covered, os.Exit(run(...)) being wired in main(), is the
+// one-liner tests/dotf-agent-run.bats still pins through its refusal case, which
+// reads a non-zero status out of the real binary.
+func TestRunExitsWithTheCodeAnExhaustedChainCarries(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("repo root: %v", err)
+	}
+
+	// An identified machine, and a PATH with no harness binary: the walk finds no
+	// transport for any entry. Without PATH emptied this dispatches for real.
+	cfg := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cfg, "dotfiles"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	machine := `{"machine": {"id": "main-test"}, "pools": {"deny": []}}`
+	if err := os.WriteFile(filepath.Join(cfg, "dotfiles", "machine.json"), []byte(machine), 0o600); err != nil {
+		t.Fatalf("seed machine.json: %v", err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("PATH", t.TempDir())
+
+	rootCmd := cmd.New("dev", "")
+	rootCmd.SetArgs([]string{
+		"agent", "run", "--role", "r", "--task", "t", "--tier", "mid",
+		"--timeout", "1m", "--repo-root", root, "--semaphore-dir", t.TempDir(),
+	})
+	rootCmd.SetOut(&bytes.Buffer{})
+
+	var stderr bytes.Buffer
+	if code := run(rootCmd, &stderr); code != 3 {
+		t.Errorf("exit code = %d, want 3 (chain exhausted); stderr: %s", code, stderr.String())
 	}
 }

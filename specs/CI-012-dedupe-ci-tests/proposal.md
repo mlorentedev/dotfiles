@@ -21,7 +21,7 @@ Governing rule of #2059: one behaviour, one test, at the cheapest layer that can
 tracks the rows of that issue one PR at a time; the first PR carries the Linux `test` job rows
 (N4, N5, N7). Five bats files compiled their own `dotf` per file run, three of them with
 `|| skip`, so a compile error in `cli/` read as skipped tests and a green job (BUG-055 / #807
-class). Eleven cases in `dotf-agent-run.bats` re-asserted what `cli/internal/cmd` already tests, and
+class). Ten cases in `dotf-agent-run.bats` re-asserted what `cli/internal/cmd` already tests, and
 CI had no per-file bats timing for the #1744 budget guard to read.
 
 ## What

@@ -112,7 +112,9 @@ EOF2
 # --- the fail-open pattern, and the files that must not have it ---
 
 # Prints "file:line" for every `go build` that is followed within three lines by
-# a `skip`: the shape of "build failed, so skip".
+# a `skip`: the shape of "build failed, so skip". It sees only that layout: a
+# build moved into a wrapper, with the `|| skip` at the call site, is out of its
+# reach, which is what _builds_outside_the_helper below is for.
 _fail_open_builds() {
     awk '
         FNR == 1 { last = -99 }
@@ -133,13 +135,57 @@ EOF2
     [ -n "$output" ]
 }
 
-@test "guard: no bats file skips when a build fails" {
+# Prints "file:line" for every line that RUNS `go build`, anywhere under tests/
+# but the helper and this file. A build that lives only in the helper cannot be
+# wrapped by a caller that skips on its failure, whatever the layout: the caller
+# has nothing to wrap. Lines that merely assert about someone else's build (a
+# grep over a Dockerfile or a workflow) and comments are not builds.
+_builds_outside_the_helper() {
+    awk '
+        /^[[:space:]]*#/ { next }
+        /go build/ && !/grep/ { print FILENAME ":" FNR }
+    ' "$@"
+}
+
+@test "guard: no bats file skips right after a go build" {
     # Not this file: its negative control above spells the pattern on purpose.
     local files=() f
     for f in "$REPO"/tests/*.bats; do
         [ "${f##*/}" = "${BATS_TEST_FILENAME##*/}" ] || files+=("$f")
     done
     run _fail_open_builds "${files[@]}"
+    [ -z "$output" ]
+}
+
+@test "guard: the detector flags a build hidden in a wrapper (negative control)" {
+    cat > "$BATS_TEST_TMPDIR/wrapped.bats" <<'EOF2'
+build_dotf() { ( cd cli && go build -o "$BIN" ./cmd/dotf ); }
+
+# ... other setup, four or more lines away ...
+BIN=x
+OTHER=y
+setup() {
+    build_dotf || skip "build failed"
+}
+EOF2
+    run _builds_outside_the_helper "$BATS_TEST_TMPDIR/wrapped.bats"
+    [ -n "$output" ]
+    # and the window detector is blind to exactly that layout, which is why the
+    # two guards exist side by side
+    run _fail_open_builds "$BATS_TEST_TMPDIR/wrapped.bats"
+    [ -z "$output" ]
+}
+
+@test "guard: no test file builds dotf outside the helper, so no wrapper can skip on its failure" {
+    local files=() f
+    for f in "$REPO"/tests/*.bats "$REPO"/tests/lib/*.bash "$REPO"/tests/golden/*/lib.sh; do
+        [ -f "$f" ] || continue
+        case "${f##*/}" in
+            dotf-bin-helper.bats | dotf-bin.bash) continue ;;
+        esac
+        files+=("$f")
+    done
+    run _builds_outside_the_helper "${files[@]}"
     [ -z "$output" ]
 }
 

@@ -2,17 +2,20 @@
 # `dotf agent run` — the one property only a real binary and a real pipe can
 # show (CLI-042 AC1).
 #
-# This file used to hold twelve cases. Eleven restated what the Go tests
-# already assert in-process, and each paid a binary invocation (and four a
-# python interpreter) to do it. They were deleted when each was shown to have a
-# Go twin that fails when the behaviour breaks; the mapping is in the PR that
-# removed them, and the twins are in cli/internal/cmd/agent_test.go,
-# agent_deny_test.go, agent_wiring_test.go and agent_probe_unix_test.go.
+# This file used to hold twelve cases. Ten restated what the Go tests already
+# assert in-process, and each paid a binary invocation (and four a python
+# interpreter) to do it. They were deleted when each was shown to have a Go twin
+# that fails when the behaviour breaks; the mapping is in the PR that removed
+# them, and the twins are in cli/internal/cmd/agent_test.go, agent_deny_test.go,
+# agent_wiring_test.go and agent_probe_unix_test.go, plus
+# cli/cmd/dotf/main_test.go for the exit code (3) an exhausted chain carries out
+# of main().
 #
-# What is left are the two cases the Go tests cannot assert. captureRealStreams
+# Two cases are left, the two the Go tests cannot assert. captureRealStreams
 # swaps os.Stdout for a pipe inside one process; the first runs the compiled
 # binary and pipes it into a separate consumer, which is how every dispatcher
-# reaches it. The second pins that main() sends a refusal to stderr.
+# reaches it. The second pins that main() sends a refusal to stderr, and exits
+# non-zero.
 #
 # The binary is DOTF_BIN when CI built it, otherwise one build per file run.
 # Skips when the Go toolchain is absent locally, fails in CI and on a build
