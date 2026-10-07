@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -90,6 +91,10 @@ func newDeployCmd() *cobra.Command {
 
 			w := cmd.OutOrStdout()
 			for _, target := range targets {
+				if !target.AppliesOn(runtime.GOOS) {
+					_, _ = fmt.Fprintf(w, "skipped   %-10s (not for %s)\n", target.Name, runtime.GOOS)
+					continue
+				}
 				if target.Requires != "" && !deployCommandAvailable(target.Requires) {
 					_, _ = fmt.Fprintf(w, "skipped   %-10s (%s not installed)\n", target.Name, target.Requires)
 					continue
