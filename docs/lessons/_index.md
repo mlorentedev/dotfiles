@@ -362,4 +362,5 @@ tags: [lessons, index, dotfiles]
 | [341 - A merged PR does not mean its branch is merged](lesson-341-a-merged-pr-does-not-mean-its-branch-is-merged.md) | 2026-10-06 |
 | [345 - A lint test that installs its linter and passes without it checks nothing](lesson-345-a-lint-test-that-installs-its-linter-and-passes-without-it-checks-nothing.md) | 2026-10-07 |
 | [346 - A CI cache other PRs can read is one main wrote](lesson-346-a-ci-cache-other-prs-can-read-is-one-main-wrote.md) | 2026-10-07 |
+| [347 - A change is verified by every test that references the file, not by the file's own suite](lesson-347-a-change-is-verified-by-every-test-that-references-the-file.md) | 2026-10-07 |
 <!-- END GENERATED -->
