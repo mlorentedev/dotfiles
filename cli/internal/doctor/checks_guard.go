@@ -139,7 +139,7 @@ func samePath(a, b string) bool {
 		return filepath.Clean(filepath.FromSlash(strings.TrimRight(p, `/\`)))
 	}
 	na, nb := norm(a), norm(b)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" { //nolint:forbidigo // case folding is a property of the host filesystem these paths live on
 		return strings.EqualFold(na, nb)
 	}
 	return na == nb

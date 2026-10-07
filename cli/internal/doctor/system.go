@@ -258,7 +258,7 @@ func realSystem() *System {
 		},
 		HTTPGetBody:     httpGetBody,
 		Now:             time.Now,
-		GOOS:            runtime.GOOS,
+		GOOS:            runtime.GOOS, //nolint:forbidigo // the production wiring of the seam
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
 		BWServeStatus: func() (string, error) {

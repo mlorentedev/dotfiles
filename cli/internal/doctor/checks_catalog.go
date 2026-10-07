@@ -3,7 +3,6 @@ package doctor
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -92,7 +91,7 @@ func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
 // first spelling PATH gives it.
 func (s *System) dirsProviding(name string) []string {
 	candidates := []string{name}
-	if runtime.GOOS == "windows" || s.GOOS == "windows" {
+	if s.GOOS == "windows" {
 		candidates = append(candidates, name+".exe", name+".cmd", name+".ps1")
 	}
 	seen := map[string]bool{}
