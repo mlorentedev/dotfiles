@@ -133,7 +133,8 @@ func runCrystallizeCase(t *testing.T, caseDir string) {
 // dash in the sandbox would make the project undecodable and change which
 // branch the case exercises. t.TempDir() embeds the subtest name, and case
 // names have dashes, hence MkdirTemp. The check stays explicit: TMPDIR is the
-// environment's, and an assumption about it is not isolation.
+// environment's, and an assumption about it is not isolation. The check runs
+// on the resolved path, the one the key is derived from.
 func crystallizeSandbox(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "gc")
@@ -141,6 +142,13 @@ func crystallizeSandbox(t *testing.T) string {
 		t.Fatalf("sandbox: %v", err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	// The command resolves the project path, and the key is derived from the
+	// resolved form. On Windows TEMP is an 8.3 short name (RUNNER~1) that
+	// resolves to the long one; on macOS /var resolves to /private/var. A
+	// sandbox in the unresolved form derives a key the command never looks up.
+	if dir, err = filepath.EvalSymlinks(dir); err != nil {
+		t.Fatalf("resolve the sandbox: %v", err)
+	}
 	home := filepath.Join(dir, "h")
 	mustMkdir(t, home)
 	if strings.Contains(home, "-") {
