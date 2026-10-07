@@ -90,19 +90,19 @@ func deployOrcaHooks(w io.Writer, home string, dryRun bool) error {
 	}
 	switch {
 	case rep.Nothing():
-		_, _ = fmt.Fprintf(w, "skipped   %-10s (Orca not installed)\n", "orca-hooks")
+		deployRow(w, "skipped", "orca-hooks", "(Orca not installed)")
 	case dryRun && rep.Drift():
-		_, _ = fmt.Fprintf(w, "would tune %-9s %s\n", "orca-hooks", config)
+		deployRow(w, "would tune", "orca-hooks", "%s", config)
 	case rep.Changed == 0:
-		_, _ = fmt.Fprintf(w, "in sync   %-10s %s\n", "orca-hooks", config)
+		deployRow(w, "in sync", "orca-hooks", "%s", config)
 	default:
 		for _, bak := range rep.Backups {
-			_, _ = fmt.Fprintf(w, "backup    %-10s %s\n", "orca-hooks", bak)
+			deployRow(w, "backup", "orca-hooks", "%s", bak)
 		}
-		_, _ = fmt.Fprintf(w, "tuned     %-10s %d fix(es) — restart the Copilot CLI session to pick them up\n", "orca-hooks", rep.Changed)
+		deployRow(w, "tuned", "orca-hooks", "%d fix(es) — restart the Copilot CLI session to pick them up", rep.Changed)
 	}
 	if rep.ScriptUnrecognised {
-		_, _ = fmt.Fprintf(w, "unchanged %-10s %s has an unrecognised POST line — review it by hand\n", "orca-hooks", script)
+		deployRow(w, "unchanged", "orca-hooks", "%s has an unrecognised POST line — review it by hand", script)
 	}
 	return nil
 }

@@ -265,17 +265,6 @@ func memVaultHealth(w io.Writer, vaultDir, vaultName string) (int, error) {
 	return vault.RunHealth(w, opts)
 }
 
-// memScriptsDir locates the checkout's scripts/ dir, which hosts the two
-// backlog scripts the health report's last section runs. "" when unresolved;
-// that section then reports the unresolved dir as a FAIL.
-func memScriptsDir() string {
-	repo := memRepoDir()
-	if repo == "" {
-		return ""
-	}
-	return filepath.Join(repo, "scripts")
-}
-
 // memConfigPath resolves session-start-config.json: the SESSION_START_CONFIG
 // override, else <checkout>/session-start-config.json (the shell's
 // $SCRIPT_DIR/../session-start-config.json). "" falls back to historical defaults.

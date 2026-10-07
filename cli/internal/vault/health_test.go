@@ -121,47 +121,63 @@ func TestFrontmatterCountsOneMatchPerFileNotPerLine(t *testing.T) {
 	}
 }
 
-// TestSection7BacklogUnresolvedScriptsDirFailsLoud covers the spec's explicit
-// requirement (tasks.md §3) that an unresolvable ScriptsDir FAILS section 7
-// rather than silently skipping it — a shell script always knows its own
-// $SCRIPT_DIR, so no golden fixture can exercise this Go-only seam.
-func TestSection7BacklogUnresolvedScriptsDirFailsLoud(t *testing.T) {
+// TestSection7BacklogRunsWithoutAShell pins #492's port: section 7 needs no
+// dotfiles checkout and no bash. A vault whose tasks file drifts is reported
+// with the check's own detail, and the run stops there as the shell did
+// (#1314).
+func TestSection7BacklogRunsWithoutAShell(t *testing.T) {
 	vaultDir := t.TempDir()
 	tasksDir := filepath.Join(vaultDir, "10_projects", "demo")
 	if err := os.MkdirAll(tasksDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tasksDir, "11-tasks.md"), []byte("- [ ] **X-1** thing\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(tasksDir, "11-tasks.md"), []byte("- [ ] **X-1** a\n- [x] **X-1** a\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
+	t.Setenv("PATH", t.TempDir())
 
 	var buf bytes.Buffer
-	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir, ScriptsDir: ""}}
+	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
 	code, aborted := h.section7Backlog()
 
-	if aborted {
-		t.Fatalf("section7Backlog() aborted = true, want false (unresolved scripts dir is a FAIL, not the pipefail abort)")
+	if !aborted || code != 1 {
+		t.Fatalf("section7Backlog() = (%d, %v), want (1, true): drift ends the run", code, aborted)
 	}
-	if code != 0 {
-		t.Errorf("section7Backlog() code = %d, want 0 (the run-level abort code, unused on this path)", code)
-	}
-	if h.failed != 1 {
-		t.Errorf("h.failed = %d, want 1", h.failed)
-	}
-	if !strings.Contains(buf.String(), "FAIL: Backlog integrity: cannot locate") {
-		t.Errorf("output = %q, want a FAIL line naming the unresolved scripts dir", buf.String())
+	if !strings.Contains(buf.String(), "FAIL: Backlog drift in demo/11-tasks.md") ||
+		!strings.Contains(buf.String(), "CONTRADICTION: X-1 — 2 entries, marked BOTH open and done") {
+		t.Errorf("output = %q, want the drift FAIL and its detail", buf.String())
 	}
 }
 
-// TestSection7BacklogNoTasksSkipsRegardlessOfScriptsDir proves the fail-loud
-// path above only fires when there is actually something to check — an
-// unresolved ScriptsDir with zero 11-tasks.md files must still be the ordinary
+// TestSection7BacklogNamesAnUnreadableTasksFile: the script exited 2 with
+// nothing on stdout, which read as drift with no detail. The port names the
+// file and the error, and still stops the run with the script's exit 2.
+func TestSection7BacklogNamesAnUnreadableTasksFile(t *testing.T) {
+	vaultDir := t.TempDir()
+	// A directory where the file should be: unreadable as a file on every OS.
+	if err := os.MkdirAll(filepath.Join(vaultDir, "10_projects", "demo", "11-tasks.md"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	var buf bytes.Buffer
+	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
+	code, aborted := h.section7Backlog()
+
+	if !aborted || code != 2 {
+		t.Fatalf("section7Backlog() = (%d, %v), want (2, true)", code, aborted)
+	}
+	if !strings.Contains(buf.String(), "FAIL: Backlog integrity: cannot read demo/11-tasks.md: ") {
+		t.Errorf("output = %q, want the unreadable file named with its error", buf.String())
+	}
+}
+
+// TestSection7BacklogNoTasksSkips: a vault with no 11-tasks.md is the ordinary
 // skip, matching every golden case that has no backlog files at all.
-func TestSection7BacklogNoTasksSkipsRegardlessOfScriptsDir(t *testing.T) {
+func TestSection7BacklogNoTasksSkips(t *testing.T) {
 	vaultDir := t.TempDir()
 
 	var buf bytes.Buffer
-	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir, ScriptsDir: ""}}
+	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
 	code, aborted := h.section7Backlog()
 
 	if aborted || code != 0 {

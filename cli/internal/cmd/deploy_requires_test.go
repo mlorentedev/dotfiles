@@ -32,7 +32,7 @@ func TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if !strings.Contains(out, "skipped   gated") || !strings.Contains(out, "gatedtool not installed") {
+	if !strings.Contains(out, row("skipped", "gated")) || !strings.Contains(out, "gatedtool not installed") {
 		t.Errorf("the skip must be reported by name and reason:\n%s", out)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".gated")); !os.IsNotExist(err) {
@@ -47,7 +47,7 @@ func TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if !strings.Contains(out, "deployed  gated") {
+	if !strings.Contains(out, row("deployed", "gated")) {
 		t.Errorf("with the command present the entry deploys:\n%s", out)
 	}
 }
