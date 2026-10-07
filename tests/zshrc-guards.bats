@@ -22,23 +22,44 @@ setup() {
 }
 
 # load_rc PROBE: source the repo's .zshrc in a scratch HOME, then evaluate PROBE
-# in the same shell. stdout is the probe's; stderr goes to $SANDBOX/stderr.
+# in the same shell. stdout is the probe's. Anything the rc writes to stderr
+# fails the load: zsh reports the probe's status, so an rc that errors midway
+# would otherwise still exit 0 in every test.
 load_rc() {
     env -i HOME="$SANDBOX/home" ZDOTDIR="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" \
         PATH="$SANDBOX/bin:/usr/bin:/bin" TERM=dumb \
-        zsh -f -c '. "$1"; eval "$2"' _ "$REPO/.zshrc" "$1" 2>"$SANDBOX/stderr"
+        zsh -f -c '. "$1"; eval "$2"' _ "$REPO/.zshrc" "$1" 2>"$SANDBOX/stderr" || return
+    if [ -s "$SANDBOX/stderr" ]; then
+        printf 'stderr: %s\n' "$(cat "$SANDBOX/stderr")"
+        return 1
+    fi
 }
 
 @test "loads without errors in a HOME with no oh-my-zsh, no tool homes and no terraform" {
-    run load_rc 'print -r -- "homes=${JAVA_HOME-}${MAVEN_HOME-}${PYTHON_HOME-}${MINIKUBE_HOME-}${GO_HOME-} compdef=$(whence -w compdef) complete=$(whence -w complete)"'
+    run load_rc 'print -r -- "homes=${JAVA_HOME-}${MAVEN_HOME-}${PYTHON_HOME-}${MINIKUBE_HOME-}${GO_HOME-} compdef=$(whence -w compdef) complete=$(whence -w complete)"; print -rl -- $path'
     [ "$status" -eq 0 ]
-    [ ! -s "$SANDBOX/stderr" ] || { cat "$SANDBOX/stderr"; false; }
-    # No *_HOME names a directory that is not there.
+    # No *_HOME names a directory that is not there, and none reaches PATH.
     [[ "$output" == *"homes= "* ]] || false
+    [[ "$output" != *"$SANDBOX/home/Applications/"* ]] || false
     # The compinit fallback ran in place of oh-my-zsh.
     [[ "$output" == *"compdef=compdef: function"* ]] || false
     # bashcompinit is loaded only for terraform.
     [[ "$output" == *"complete=complete: none"* ]] || false
+}
+
+@test "brew shellenv runs exactly when brew is installed" {
+    run load_rc 'print -rl -- $path'
+    [ "$status" -eq 0 ]
+    # Which direction runs depends on the host, since the rc probes brew's two
+    # absolute install paths: the Linux job proves the absent side, a Mac with
+    # Homebrew the present side.
+    for brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [ -x "$brew" ]; then
+            [[ "$output" == *$'\n'"${brew%/brew}"* ]] || false
+            return
+        fi
+    done
+    [[ "$output" != *homebrew* ]] || false
 }
 
 @test "a tool home that exists is exported and put on PATH" {
