@@ -167,8 +167,9 @@ func AtomicWrite(path string, content []byte) error {
 
 // AtomicWriteMode is AtomicWrite with caller-chosen permission bits. Same-dir temp
 // keeps the rename on one filesystem; os.Rename replaces an existing file on both
-// POSIX and Windows (MoveFileEx). The chmod is applied to the temp file before the
-// rename, so the target never appears with looser-than-intended permissions.
+// POSIX and Windows (MoveFileEx). The mode (bits, and on Windows the owner-only
+// DACL) is set on the temp file before the rename, so the target never appears
+// with looser-than-intended permissions.
 func AtomicWriteMode(path string, content []byte, mode os.FileMode) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
@@ -187,7 +188,7 @@ func AtomicWriteMode(path string, content []byte, mode os.FileMode) error {
 	// fsmode, not os.Chmod: on Windows a 0600 credential file gets an owner-only
 	// DACL, which the rename below carries to its final name (CLI-055).
 	if err := fsmode.Apply(tmpName, mode); err != nil {
-		return fmt.Errorf("atomic write: chmod temp for %s: %w", path, err)
+		return fmt.Errorf("atomic write: set mode on temp for %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("atomic write: replace %s: %w", path, err)

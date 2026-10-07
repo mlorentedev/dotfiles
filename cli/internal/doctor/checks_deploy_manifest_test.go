@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsmode"
 )
 
 // Four entries, one per shape the check must tell apart: a merge entry, a
@@ -81,6 +83,11 @@ func TestCheckDeployManifest_ByStatus(t *testing.T) {
 		writeFile(t, filepath.Join(home, ".m", "settings.json"), `{"effortLevel":"max","model":"m","autoUpdate":false}`)
 		writeFile(t, filepath.Join(home, ".r", "config.json"), `{"r":true}`)
 		writeFile(t, filepath.Join(home, ".p", "models.json"), `{"k":"rendered"}`)
+		// As deploy leaves it: a rendered file not on its declared mode is
+		// drift too (#1664).
+		if err := fsmode.Apply(filepath.Join(home, ".p", "models.json"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 
 		out := runCheckDeployManifest(t, repo, home, nil)
 		if got := statusOfLine(out, "in sync"); got != StatusPass {
@@ -310,4 +317,66 @@ func TestCheckDeployManifest_ASymlinkedDestinationIsDriftNamedAsALink(t *testing
 	if got := statusOfLine(out, "is a symlink"); got != StatusWarn {
 		t.Errorf("want a WARN naming the symlink, got %v\n%s", got, out)
 	}
+}
+
+// #1664 (1): a file whose content is in sync but whose mode `dotf deploy` would
+// fix is drift here too, on both paths: doctor used to print "in sync" while
+// `dotf deploy --dry-run` printed `would fix mode`. A file an operator
+// tightened is not, because deploy leaves it alone (#1664 (5)).
+func TestCheckDeployManifest_ModeDrift(t *testing.T) {
+	inSyncHome := func(t *testing.T) string {
+		home := t.TempDir()
+		writeFile(t, filepath.Join(home, ".m", "settings.json"), `{"model":"m","autoUpdate":false}`)
+		writeFile(t, filepath.Join(home, ".r", "config.json"), `{"r":true}`)
+		writeFile(t, filepath.Join(home, ".p", "models.json"), `{"k":"rendered"}`)
+		if err := fsmode.Apply(filepath.Join(home, ".p", "models.json"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return home
+	}
+
+	t.Run("rendered file looser than its declared 0600 → WARN", func(t *testing.T) {
+		home := inSyncHome(t)
+		// On Windows os.Chmod leaves the owner-only DACL Apply set, so
+		// reach the same drift through a fresh file instead.
+		p := filepath.Join(home, ".p", "models.json")
+		if err := os.Remove(p); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, p, `{"k":"rendered"}`)
+
+		out := runCheckDeployManifest(t, deployManifestRepo(t), home, nil)
+		if got := statusOfLine(out, "does not carry its declared mode 0600 (run: dotf deploy p)"); got != StatusWarn {
+			t.Errorf("want WARN for the rendered mode drift, got %v\n%s", got, out)
+		}
+		if statusOfLine(out, "in sync") == StatusPass {
+			t.Errorf("a mode drift must not read as in sync:\n%s", out)
+		}
+	})
+
+	if runtime.GOOS == "windows" {
+		return // the two cases below are about POSIX bits
+	}
+
+	t.Run("replace entry with a bit its 0644 does not grant → WARN", func(t *testing.T) {
+		home := inSyncHome(t)
+		if err := os.Chmod(filepath.Join(home, ".r", "config.json"), 0o666); err != nil {
+			t.Fatal(err)
+		}
+		out := runCheckDeployManifest(t, deployManifestRepo(t), home, nil)
+		if got := statusOfLine(out, "does not carry its declared mode 0644 (run: dotf deploy r)"); got != StatusWarn {
+			t.Errorf("want WARN for the mode drift, got %v\n%s", got, out)
+		}
+	})
+
+	t.Run("replace entry an operator tightened to 0600 → still in sync", func(t *testing.T) {
+		home := inSyncHome(t)
+		if err := os.Chmod(filepath.Join(home, ".r", "config.json"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out := runCheckDeployManifest(t, deployManifestRepo(t), home, nil)
+		if got := statusOfLine(out, "2 deployed config(s) in sync"); got != StatusPass {
+			t.Errorf("a tightened file is not drift, got %v\n%s", got, out)
+		}
+	})
 }

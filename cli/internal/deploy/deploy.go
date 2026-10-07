@@ -207,6 +207,11 @@ type Plan struct {
 	// link's target, and an alias of the right bytes is still not the regular
 	// file a deploy installs (#2054).
 	Symlink bool
+	// ModeDrift: the content is in sync but the file does not carry the mode
+	// the deploy would converge it to (ModeDrift), so `dotf deploy` reports
+	// `would fix mode` and doctor reports drift. It is false whenever Changed
+	// is true: a rewrite installs the converged mode anyway (installMode).
+	ModeDrift bool
 }
 
 var (
@@ -458,6 +463,15 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 		p.Changed = readErr != nil || !bytes.Equal(existing, srcData)
 	}
 	p.Changed = p.Changed || p.Symlink
+	if !p.Changed {
+		mode, err := c.FileMode()
+		if err != nil {
+			return Plan{}, fmt.Errorf("config %q: %w", c.Name, err)
+		}
+		if _, p.ModeDrift, err = ModeDrift(dst, mode); err != nil {
+			return Plan{}, fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
+		}
+	}
 	return p, nil
 }
 
@@ -467,8 +481,9 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 // matches must not be rewritten — rewriting churns mtime on every setup run,
 // which makes "did this change?" unanswerable for the operator and for any
 // check that watches the file. For a non-rendered config the compare comes
-// BEFORE anything touches the destination directory, so an in-sync or dry-run
-// deploy leaves the filesystem exactly as it found it.
+// BEFORE anything touches the destination directory, so a dry run leaves the
+// filesystem exactly as it found it, and an in-sync deploy rewrites nothing: at
+// most it corrects the file's mode in place (ensureMode).
 func Deploy(c Config, repoRoot, home string, resolve func(string) string, render Renderer, dryRun bool) (Outcome, error) {
 	out := Outcome{Name: c.Name, DryRun: dryRun}
 	mode, err := c.FileMode()
@@ -492,15 +507,16 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 		if dryRun {
 			return out, nil
 		}
-		staged, err := stage(c, p.Dst, p.Content, mode)
+		install := installMode(p.Dst, mode)
+		staged, err := stage(c, p.Dst, p.Content, install)
 		if err != nil {
 			return out, err
 		}
 		defer func() { _ = os.Remove(staged) }() // no-op once renamed away
-		if out.BackedUp, err = backupOnce(p.Dst, mode); err != nil {
+		if out.BackedUp, err = backupOnce(p.Dst, install); err != nil {
 			return out, err
 		}
-		return out, commit(c, staged, p.Dst, mode)
+		return out, commit(c, staged, p.Dst, install)
 	}
 
 	// A rendered config is only comparable after `secrets render` ran on a
@@ -532,10 +548,11 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 	if dryRun {
 		return out, nil
 	}
-	if out.BackedUp, err = backupOnce(dst, mode); err != nil {
+	install := installMode(dst, mode)
+	if out.BackedUp, err = backupOnce(dst, install); err != nil {
 		return out, err
 	}
-	return out, commit(c, staged, dst, mode)
+	return out, commit(c, staged, dst, install)
 }
 
 // ensureMode is the in-sync path's last word: the content matches, so the only
@@ -544,21 +561,59 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 // (CLI-055). A dry run reports the fix it would make; a real run makes it and
 // reports it as ModeFixed, never as a content rewrite.
 func ensureMode(c Config, out Outcome, dst string, mode os.FileMode, dryRun bool) (Outcome, error) {
-	needs, err := fsmode.Needs(dst, mode)
+	target, drift, err := ModeDrift(dst, mode)
 	if err != nil {
 		return out, fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
 	}
-	if !needs {
+	if !drift {
 		return out, nil
 	}
 	out.Changed, out.ModeFixed = true, true
 	if dryRun {
 		return out, nil
 	}
-	if err := fsmode.Apply(dst, mode); err != nil {
+	if err := fsmode.Apply(dst, target); err != nil {
 		return out, fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
 	}
 	return out, nil
+}
+
+// ModeDrift reports the mode an in-sync dst converges to, and whether it is
+// not on the file yet. It is the one predicate behind both `dotf deploy`'s
+// mode fix and doctor's drift line, so the two cannot disagree (#1664).
+//
+// The convergence only ever narrows what group and others get. The owner keeps
+// exactly the declared bits, and group and others keep a declared bit only
+// while the file still grants it: an operator who tightened a deployed 0644 to
+// 0600 keeps 0600, and neither tool calls it drift. A bit the declaration does
+// not grant is removed wherever it is. Widening a file someone deliberately
+// narrowed, and reporting it only as `mode fixed`, was the defect.
+func ModeDrift(dst string, declared os.FileMode) (os.FileMode, bool, error) {
+	info, err := os.Stat(dst)
+	if err != nil {
+		return 0, false, err
+	}
+	target := narrowed(info.Mode(), declared)
+	drift, err := fsmode.Needs(dst, target)
+	return target, drift, err
+}
+
+// narrowed is the declared mode less the group and other bits the file no
+// longer grants. See ModeDrift.
+func narrowed(have, declared os.FileMode) os.FileMode {
+	return declared.Perm()&0o700 | have.Perm()&declared.Perm()&0o077
+}
+
+// installMode is the mode a rewrite installs over dst: the same narrowing as
+// the in-sync path, so new content does not undo an operator's tightening
+// either. A destination that is absent, or not a regular file (the link
+// #2054 replaces), has nothing to keep and gets the declared mode.
+func installMode(dst string, declared os.FileMode) os.FileMode {
+	info, err := os.Lstat(dst)
+	if err != nil || !info.Mode().IsRegular() {
+		return declared
+	}
+	return narrowed(info.Mode(), declared)
 }
 
 // load reads the source and resolves the destination.
@@ -633,11 +688,12 @@ func commit(c Config, staged, dst string, mode os.FileMode) error {
 	if err := os.Rename(staged, dst); err != nil {
 		return fmt.Errorf("config %q: install to %s: %w", c.Name, dst, err)
 	}
-	// Rename preserves the staged mode, but an existing destination replaced by
-	// rename keeps the NEW inode's bits — so this is belt-and-braces for the
-	// case that matters: a 0600 config must never end up 0644. On Windows the
-	// rename also carries the staged file's DACL, and fsmode re-applies the
-	// owner-only one for the same reason (CLI-055).
+	// Rename keeps the staged inode's bits, and stage() set them, but a
+	// rendered config's staged copy has been through `secrets render` since,
+	// which writes it anew: the bits on it are the renderer's, not the
+	// manifest's. This is the call that makes the installed mode the declared
+	// one on that path; a 0600 config must never end up 0644. On Windows
+	// fsmode re-applies the owner-only DACL for the same reason (CLI-055).
 	if err := fsmode.Apply(dst, mode); err != nil {
 		return fmt.Errorf("config %q: mode on %s: %w", c.Name, dst, err)
 	}
