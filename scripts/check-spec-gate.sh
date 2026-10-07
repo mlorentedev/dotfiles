@@ -309,15 +309,31 @@ _archived_spec_issue_map() {
     done
 }
 
+# Every text GitHub reads closing keywords from when this PR merges: the PR
+# body, and the branch's commit messages. The repository squashes with
+# squash_merge_commit_message=COMMIT_MESSAGES, so each branch commit body lands
+# in the merge commit and its keywords close issues too. Reading the body alone
+# let a `Closes #N` in one commit close an issue whose spec was still active
+# (#1878). Two dots: commits merged in from the base are not this PR's.
+_closing_text() {
+    printf '%s\n' "$SDD_PR_BODY"
+    if ! git log --format=%B "${BASE_REF}..${HEAD_REF}" 2>/dev/null; then
+        printf '[ERROR] git log "%s..%s" failed: the commit messages cannot be read.\n' "$BASE_REF" "$HEAD_REF" >&2
+        printf '        The gate fails closed: a keyword in an unread commit still closes the issue.\n' >&2
+        exit 2
+    fi
+}
+
 # Spec IDs this PR archived in fulfilment of archive-on-merge: archived at head
 # AND linked, through proposal.md's `issue:` frontmatter, to an issue this PR
 # closes. Anything else archived in the same diff is not here, so #397's
 # protection against a gratuitous archive-move dodging the gate is untouched.
 _mandated_archive_ids() {
-    [[ -z "$SDD_PR_BODY" ]] && return 0
-    local slug numbers map num spec_num spec_id
+    local slug numbers map num spec_num spec_id text
+    # No credit on an unreadable log; _check_archive_on_merge fails closed on it.
+    text=$(_closing_text 2>/dev/null) || return 0
     slug=$(_repo_slug)
-    numbers=$(_closing_issue_numbers "$slug" "$SDD_PR_BODY" | sort -u)
+    numbers=$(_closing_issue_numbers "$slug" "$text" | sort -u)
     [[ -z "$numbers" ]] && return 0
     map=$(_archived_spec_issue_map "$HEAD_REF") || return 0
     [[ -z "$map" ]] && return 0
@@ -333,12 +349,12 @@ _mandated_archive_ids() {
 }
 
 _check_archive_on_merge() {
-    # No PR body (local pre-push runs) means nothing to enforce.
-    [[ -z "$SDD_PR_BODY" ]] && return 0
-
-    local slug numbers
+    # The commit messages are read even with no PR body (a local pre-push run
+    # before the PR exists): a keyword there closes the issue just the same.
+    local slug numbers text
+    text=$(_closing_text) || exit 2
     slug=$(_repo_slug)
-    numbers=$(_closing_issue_numbers "$slug" "$SDD_PR_BODY" | sort -u)
+    numbers=$(_closing_issue_numbers "$slug" "$text" | sort -u)
     [[ -z "$numbers" ]] && return 0
 
     local map base_map head_map
@@ -399,7 +415,8 @@ EOF
         while IFS= read -r v; do [[ -n "$v" ]] && printf '         dotf spec archive %s\n' "${v%% *}"; done <<< "$violations"
         printf '\n'
         printf '       If the work genuinely continues elsewhere, reference the issue\n'
-        printf '       without a closing keyword (e.g. "Refs #N"), or add the\n'
+        printf '       without a closing keyword (e.g. "Refs #N") in the PR body AND in\n'
+        printf '       every commit message (they reach the squash commit), or add the\n'
         printf '       "skip-archive" label AND a non-empty "## Archive skip rationale"\n'
         printf '       section to the PR body.\n'
     } >&2

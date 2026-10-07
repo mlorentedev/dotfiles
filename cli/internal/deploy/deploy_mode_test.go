@@ -123,17 +123,19 @@ func TestPlanConfig_ReportsTheModeDriftDeployWouldFix(t *testing.T) {
 }
 
 // #1664 (5): the in-sync convergence narrows, never widens. An operator who
-// chmod-ed a deployed 0644 file to 0600 keeps 0600, and neither the deploy nor
-// the plan doctor reads calls it drift.
+// tightened a deployed 0644 file to owner-only keeps it, and neither the deploy
+// nor the plan doctor reads calls it drift. It runs on Windows too, where the
+// tightening is the owner-only DACL fsmode writes: Needs never reads the DACL
+// for a mode that grants group or other, so a 0644 entry cannot widen it.
 func TestDeploy_InSyncKeepsAFileAnOperatorTightened(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("POSIX permission bits are not meaningful here")
-	}
 	root := repoWithTrust(t, "ai/rc.json", `{"k":"v"}`)
 	home := t.TempDir()
 	c := Config{Name: "rc", Src: "ai/rc.json", Dst: "{HOME}/.tool/rc.json", Mode: "0644"}
 	dst := filepath.Join(home, ".tool", "rc.json")
-	placeInSync(t, dst, `{"k":"v"}`, 0o600)
+	placeInSync(t, dst, `{"k":"v"}`, 0o644)
+	if err := fsmode.Apply(dst, 0o600); err != nil { // as the operator would, DACL included
+		t.Fatal(err)
+	}
 
 	p, err := PlanConfig(c, root, home, noResolve)
 	if err != nil {
@@ -149,8 +151,8 @@ func TestDeploy_InSyncKeepsAFileAnOperatorTightened(t *testing.T) {
 	if res.Changed || res.ModeFixed {
 		t.Fatalf("a tightened file must be left alone: %+v", res)
 	}
-	if got := permOf(t, dst); got != 0o600 {
-		t.Fatalf("the deploy widened a tightened file to %04o", got)
+	if needs, err := fsmode.Needs(dst, 0o600); err != nil || needs {
+		t.Fatalf("the deploy widened a tightened file: needs=%v err=%v", needs, err)
 	}
 }
 
@@ -217,10 +219,12 @@ func TestDeploy_RenderedInSyncContentStillGetsItsDeclaredMode(t *testing.T) {
 	}
 }
 
-// #1664 (2): each fsmode.Apply in the write path is load-bearing on POSIX, so
-// deleting either one fails a test. stage()'s is what turns os.CreateTemp's
-// 0600 into a declared 0644; commit()'s is what undoes the renderer's own 0600
-// (secrets.Render writes the staged copy anew through AtomicWrite).
+// #1664 (2): the installed mode is the declared one. The rendered case pins
+// commit()'s fsmode.Apply: it alone undoes the renderer's own 0600
+// (secrets.Render writes the staged copy anew through AtomicWrite). The fresh
+// install is end to end only: stage() and commit() each set the mode there, so
+// removing either one alone stays green. stage()'s call is pinned by
+// TestDeploy_TheStagedCopyHasItsDeclaredModeBeforeTheRender.
 func TestDeploy_TheInstalledModeIsTheDeclaredOne(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX permission bits are not meaningful here")
@@ -229,8 +233,8 @@ func TestDeploy_TheInstalledModeIsTheDeclaredOne(t *testing.T) {
 		name   string
 		render Renderer
 	}{
-		{"stage sets it over CreateTemp's 0600", nil},
-		{"commit sets it over the renderer's 0600", func(path string) error { return os.Chmod(path, 0o600) }},
+		{"a fresh install lands with the declared mode", nil},
+		{"a rendered install is not left at the renderer's 0600", func(path string) error { return os.Chmod(path, 0o600) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := repoWithTrust(t, "ai/rc.json", `{"k":"v"}`)
@@ -264,14 +268,18 @@ func TestDeploy_TheStagedCopyHasItsDeclaredModeBeforeTheRender(t *testing.T) {
 	root := repoWithTrust(t, "ai/rc.json", `{"k":"v"}`)
 	home := t.TempDir()
 	c := Config{Name: "rc", Src: "ai/rc.json", Dst: "{HOME}/.tool/rc.json", Mode: octal(declared), Render: true}
-	var needs bool
+	var called, needs bool
 	var needsErr error
 	render := func(staged string) error {
+		called = true
 		needs, needsErr = fsmode.Needs(staged, declared)
 		return nil
 	}
 	if _, err := Deploy(c, root, home, noResolve, render, false); err != nil {
 		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("the renderer never ran, so the staged copy's mode was never observed")
 	}
 	if needsErr != nil || needs {
 		t.Fatalf("the renderer saw a staged copy without its declared %04o: needs=%v err=%v", declared, needs, needsErr)

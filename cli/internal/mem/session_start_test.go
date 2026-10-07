@@ -1,6 +1,8 @@
 package mem
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -127,28 +129,48 @@ func TestVaultBaseline(t *testing.T) {
 // --- vaultHealth -------------------------------------------------------------
 
 func TestVaultHealth(t *testing.T) {
-	t.Run("reports not-installed when vault-health.sh is absent", func(t *testing.T) {
-		got := vaultHealth("", "", filepath.Join(t.TempDir(), "nodir"))
-		if !strings.Contains(got, "vault-health.sh not found") {
-			t.Errorf("got %q", got)
+	report := func(code int, text string) VaultHealthFunc {
+		return func(w io.Writer, _, _ string) (int, error) {
+			_, _ = io.WriteString(w, text)
+			return code, nil
 		}
-	})
+	}
+	for _, tc := range []struct {
+		name string
+		run  VaultHealthFunc
+		want string
+	}{
+		{"no runner wired skips the section", nil, ""},
+		{"all passed", report(0, "  PASS: x\nResults: 1 passed, 0 failed, 0 skipped\n"),
+			"\nVault health: ALL CHECKS PASSED"},
+		{"a failure names the summary and the FAIL lines, colour stripped",
+			report(1, "  PASS: a\n  \x1b[31mFAIL: Orphans: 9/10\x1b[0m\nResults: 1 passed, 1 failed, 0 skipped\n"),
+			"\nVault health: Results: 1 passed, 1 failed, 0 skipped\nIssues found:\n  FAIL: Orphans: 9/10"},
+		{"GUI down with an integrity failure surfaces it",
+			report(2, "  FAIL: 1 file(s) deleted from working tree\n[ERROR] Cannot reach Obsidian GUI.\n"),
+			"\nObsidian GUI not running — GUI-dependent checks skipped. Integrity issues found:\n  FAIL: 1 file(s) deleted from working tree"},
+		{"GUI down and clean points at the command",
+			report(2, "  PASS: Working tree clean\n"),
+			"\nObsidian GUI not running — vault health skipped. Run 'dotf vault health' manually when GUI is up."},
+		{"a runner error is reported, not read as a pass",
+			func(io.Writer, string, string) (int, error) { return 0, errors.New("boom") },
+			"\nVault health: could not run: boom"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := vaultHealth("/v", "v", tc.run); got != tc.want {
+				t.Errorf("vaultHealth() =\n%q\nwant\n%q", got, tc.want)
+			}
+		})
+	}
 
-	t.Run("reports ALL CHECKS PASSED on a clean stub", func(t *testing.T) {
-		// Gate on the interpreter vaultHealth actually uses (ResolveBash), not a bare
-		// LookPath — on Windows that would find the System32 WSL launcher and not skip.
-		if !isExecutable(ResolveBash()) {
-			t.Skip("a real bash is required to run the vault-health.sh stub")
-		}
-		sd := t.TempDir()
-		stub := filepath.Join(sd, "vault-health.sh")
-		mustWrite(t, stub, "#!/bin/sh\nexit 0\n")
-		if err := os.Chmod(stub, 0o755); err != nil {
-			t.Fatalf("chmod: %v", err)
-		}
-		want := "\nVault health: ALL CHECKS PASSED"
-		if got := vaultHealth("/v", "v", sd); got != want {
-			t.Errorf("vaultHealth() = %q, want %q", got, want)
+	t.Run("hands the detected vault to the runner", func(t *testing.T) {
+		var gotDir, gotName string
+		vaultHealth("/v", "v", func(_ io.Writer, dir, name string) (int, error) {
+			gotDir, gotName = dir, name
+			return 0, nil
+		})
+		if gotDir != "/v" || gotName != "v" {
+			t.Errorf("runner got (%q, %q), want (/v, v)", gotDir, gotName)
 		}
 	})
 }
@@ -227,15 +249,15 @@ func TestLessonsStaleness(t *testing.T) {
 func TestBriefDropsLeadingBlankWhenNoHeadline(t *testing.T) {
 	dir := t.TempDir() // no .obsidian, no specs, no lessons
 	b := Brief(BriefOptions{
-		Cwd:        dir,
-		ScriptsDir: filepath.Join(dir, "noscripts"), // health → "not found" (leading \n)
-		StaleDays:  14,
-		Now:        time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC),
+		Cwd:         dir,
+		VaultHealth: func(io.Writer, string, string) (int, error) { return 0, nil }, // leading \n
+		StaleDays:   14,
+		Now:         time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC),
 	})
 	if strings.HasPrefix(b, "\n") {
 		t.Errorf("leading blank line not dropped: %q", b)
 	}
-	if !strings.HasPrefix(b, "vault-health.sh not found") {
+	if !strings.HasPrefix(b, "Vault health: ALL CHECKS PASSED") {
 		t.Errorf("expected brief to start with the health line, got %q", b)
 	}
 }

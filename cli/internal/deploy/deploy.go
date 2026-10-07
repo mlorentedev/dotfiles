@@ -588,6 +588,10 @@ func ensureMode(c Config, out Outcome, dst string, mode os.FileMode, dryRun bool
 // 0600 keeps 0600, and neither tool calls it drift. A bit the declaration does
 // not grant is removed wherever it is. Widening a file someone deliberately
 // narrowed, and reporting it only as `mode fixed`, was the defect.
+//
+// On Windows os.Stat reports only the read-only bit, so the target is the
+// declared mode, and the tightening an operator can make there, an owner-only
+// DACL, is kept by fsmode.Needs: it reads the DACL only for an owner-only mode.
 func ModeDrift(dst string, declared os.FileMode) (os.FileMode, bool, error) {
 	info, err := os.Stat(dst)
 	if err != nil {

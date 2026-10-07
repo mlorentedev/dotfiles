@@ -410,3 +410,79 @@ func readFileT(t *testing.T, p string) string {
 	}
 	return string(b)
 }
+
+// MEMORY-015 (#1929): the agent names the record, from the caller and never
+// from the handoff text. Two agents ending sessions on one thread and day each
+// get their own journal, each archiving its own block; with the name hardcoded
+// the second was a silent no-op and the first was misattributed to claude.
+func TestSessionEndTwoAgentsOnOneThreadAndDayKeepTwoRecords(t *testing.T) {
+	const memory = "# M\n\n## Session Handoff\n\n" +
+		"### thread: feat-a (writer: claude)\n\nclaude's handoff\n\n" +
+		"### thread: feat-a+pi (writer: pi)\n\npi's handoff\n\n" +
+		"## Index\n"
+	vault := t.TempDir()
+	writeMemory(t, vault, memory)
+	wt := gitFixture(t, "proj", "wt", "feat/a")
+	payload, err := json.Marshal(map[string]string{"cwd": wt, "session_id": "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ agent, own, other string }{
+		{"claude", "claude's handoff", "pi's handoff"},
+		{"pi", "pi's handoff", "claude's handoff"},
+	} {
+		written, err := SessionEndAs(payload, vault, tc.agent, fixedNow)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.agent, err)
+		}
+		if written == "" {
+			t.Fatalf("%s: no record; the other agent's journal took its place", tc.agent)
+		}
+		if want := JournalName(fixedNow.Format("2006-01-02"), "proj", tc.agent, "feat-a"); filepath.Base(written) != want {
+			t.Errorf("%s: record %s, want %s", tc.agent, filepath.Base(written), want)
+		}
+		got := readFileT(t, written)
+		for _, want := range []string{tc.own, "agent: " + tc.agent + "\n", "-" + tc.agent + "\"\n", "(" + tc.agent + ")"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s: record lacks %q:\n%s", tc.agent, want, got)
+			}
+		}
+		if strings.Contains(got, tc.other) {
+			t.Errorf("%s: record carries the other agent's block:\n%s", tc.agent, got)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(vault, "10_projects", "proj", "sessions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("want two journals, got %d", len(entries))
+	}
+}
+
+// The default keeps the hook that predates --agent working as it did.
+func TestSessionEndWithoutAnAgentIsClaude(t *testing.T) {
+	vault := t.TempDir()
+	writeMemory(t, vault, "# M\n\n## Session Handoff\n\n### thread: feat-a (writer: claude)\n\nx\n")
+	wt := gitFixture(t, "proj", "wt", "feat/a")
+	payload, _ := json.Marshal(map[string]string{"cwd": wt, "session_id": "s"})
+	written, err := SessionEnd(payload, vault, fixedNow)
+	if err != nil || written == "" {
+		t.Fatalf("SessionEnd = %q, %v", written, err)
+	}
+	if !strings.Contains(filepath.Base(written), "-claude-") {
+		t.Errorf("record %s is not named for claude", filepath.Base(written))
+	}
+}
+
+// The agent becomes a path component, so it is held to the writer rule.
+func TestSessionEndAsRefusesAnAgentThatIsNotOneWord(t *testing.T) {
+	vault := t.TempDir()
+	writeMemory(t, vault, "# M\n\n## Session Handoff\n\nx\n")
+	payload, _ := json.Marshal(map[string]string{"cwd": t.TempDir(), "session_id": "s"})
+	for _, agent := range []string{"", "../x", "Claude", "pi agent"} {
+		if _, err := SessionEndAs(payload, vault, agent, fixedNow); err == nil {
+			t.Errorf("agent %q accepted", agent)
+		}
+	}
+}

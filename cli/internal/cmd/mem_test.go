@@ -39,6 +39,48 @@ func TestMemSessionEnd_WritesRecordAndExitsZero(t *testing.T) {
 	}
 }
 
+// --agent names the record (MEMORY-015, #1929), and a refused one is reported
+// on stderr while the hook still exits 0: a misconfigured hook must say so, not
+// leave every session of that harness without a record in silence.
+func TestMemSessionEnd_AgentFlag(t *testing.T) {
+	vault := t.TempDir()
+	t.Setenv("VAULT_PATH", vault)
+	memDir := filepath.Join(vault, "10_projects", "proj", "memory")
+	if err := os.MkdirAll(memDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(memDir, "MEMORY.md"),
+		[]byte("## Session Handoff\n\nshipped it\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ agent, glob, stderr string }{
+		{"opencode", "*-proj-opencode.md", ""},
+		{"Not One Word", "*-proj-*.md", "one lower-case word"},
+	} {
+		var stderr bytes.Buffer
+		cmd := newMemCmd()
+		cmd.SetArgs([]string{"session-end", "--agent", tc.agent})
+		cmd.SetIn(bytes.NewBufferString(`{"cwd":"/x/proj","session_id":"s1"}`))
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(&stderr)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%s: session-end must exit 0, got %v", tc.agent, err)
+		}
+		matches, _ := filepath.Glob(filepath.Join(vault, "10_projects", "proj", "sessions", tc.glob))
+		if tc.stderr == "" && len(matches) != 1 {
+			t.Errorf("%s: want one record matching %s, got %v", tc.agent, tc.glob, matches)
+		}
+		// A refused agent writes nothing: the opencode record from the case
+		// before is the only one there.
+		if all, _ := filepath.Glob(filepath.Join(vault, "10_projects", "proj", "sessions", "*.md")); tc.stderr != "" && len(all) != 1 {
+			t.Errorf("%s: a refused agent must write no record, got %v", tc.agent, all)
+		}
+		if !strings.Contains(stderr.String(), tc.stderr) {
+			t.Errorf("%s: stderr %q lacks %q", tc.agent, stderr.String(), tc.stderr)
+		}
+	}
+}
+
 // TestMemSessionEnd_MalformedInputExitsZero pins the resilience contract: even
 // garbage on stdin must never crash the session (exit 0, no file).
 func TestMemSessionEnd_MalformedInputExitsZero(t *testing.T) {
@@ -122,5 +164,32 @@ func TestMemHandoffWriteFromAnotherRepositoryTouchesNoThread(t *testing.T) {
 	}
 	if string(after) != before {
 		t.Errorf("MEMORY.md changed:\n--- got ---\n%s\n--- want ---\n%s", after, before)
+	}
+}
+
+// The session brief runs the Go health report in-process (CLI-023). A vault
+// detected from the cwd wins; without one it resolves as `dotf vault health`
+// does. No obsidian on PATH keeps it hermetic: the report stops after its
+// header and connectivity section with exit 1.
+func TestMemVaultHealthRunsTheGoReportForTheDetectedVault(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("VAULT_DIR", filepath.Join(t.TempDir(), "from-env"))
+	t.Setenv("VAULT_NAME", "")
+	cwdVault := t.TempDir()
+	for _, tc := range []struct{ dir, name, wantHeader string }{
+		{cwdVault, "mine", "Vault: mine (" + cwdVault + ")"},
+		{"", "", "Vault: knowledge (" + os.Getenv("VAULT_DIR") + ")"},
+	} {
+		var out bytes.Buffer
+		code, err := memVaultHealth(&out, tc.dir, tc.name)
+		if err != nil || code != 1 {
+			t.Errorf("%q: code %d err %v, want 1 and nil (obsidian absent)", tc.dir, code, err)
+		}
+		if !strings.Contains(out.String(), tc.wantHeader) {
+			t.Errorf("%q: report lacks %q:\n%s", tc.dir, tc.wantHeader, out.String())
+		}
+		if !strings.Contains(out.String(), "Obsidian CLI not found in PATH") {
+			t.Errorf("%q: not the Go report's connectivity section:\n%s", tc.dir, out.String())
+		}
 	}
 }
