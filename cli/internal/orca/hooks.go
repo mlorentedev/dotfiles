@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -82,8 +83,9 @@ func TuneTimeout(content []byte, min int) []byte {
 }
 
 // ScriptUsesInvokeWebRequest reports the slow POST — the second DX-006 signal.
+// The marker is a literal, so it needs no regexp.
 func ScriptUsesInvokeWebRequest(content []byte) bool {
-	return regexp.MustCompile(`Invoke-WebRequest`).Match(content)
+	return bytes.Contains(content, []byte("Invoke-WebRequest"))
 }
 
 // TuneScript swaps the Invoke-WebRequest POST line for the HttpWebRequest
@@ -145,27 +147,46 @@ func (r *HookTuneReport) Nothing() bool { return !r.ConfigExists && !r.ScriptExi
 // to do.
 func TuneHooks(hookConfig, hookScript string, minTimeout int, check bool, now func() time.Time) (*HookTuneReport, error) {
 	rep := &HookTuneReport{}
-	cfg, cfgErr := os.ReadFile(hookConfig) //nolint:gosec // caller-supplied path, the user's own hook file
-	if cfgErr == nil {
-		rep.ConfigExists = true
-		rep.ConfigDrift = TimeoutBelow(cfg, minTimeout)
-	} else if !errors.Is(cfgErr, os.ErrNotExist) {
-		return rep, fmt.Errorf("read %s: %w", hookConfig, cfgErr)
+	cfg, err := readOptional(hookConfig)
+	if err != nil {
+		return rep, err
 	}
-	scr, scrErr := os.ReadFile(hookScript) //nolint:gosec // caller-supplied path, the user's own hook file
-	if scrErr == nil {
-		rep.ScriptExists = true
-		rep.ScriptDrift = ScriptUsesInvokeWebRequest(scr)
-	} else if !errors.Is(scrErr, os.ErrNotExist) {
-		return rep, fmt.Errorf("read %s: %w", hookScript, scrErr)
+	rep.ConfigExists = cfg != nil
+	rep.ConfigDrift = rep.ConfigExists && TimeoutBelow(cfg, minTimeout)
+	scr, err := readOptional(hookScript)
+	if err != nil {
+		return rep, err
 	}
+	rep.ScriptExists = scr != nil
+	rep.ScriptDrift = rep.ScriptExists && ScriptUsesInvokeWebRequest(scr)
 	if check || rep.Nothing() {
 		return rep, nil
 	}
+	return rep, repairHooks(rep, hookConfig, hookScript, cfg, minTimeout, now)
+}
+
+// readOptional reads a hook file Orca may not have generated: absent is nil
+// content and no error, any other failure is an error.
+func readOptional(path string) ([]byte, error) {
+	content, err := os.ReadFile(path) //nolint:gosec // caller-supplied path, the user's own hook file
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	// Present but empty is still present: os.ReadFile returns a non-nil slice
+	// on success, so nil means absent and nothing else.
+	return content, nil
+}
+
+// repairHooks applies the repair rep's measurement called for, recording each
+// backup and clearing each drift it fixed.
+func repairHooks(rep *HookTuneReport, hookConfig, hookScript string, cfg []byte, minTimeout int, now func() time.Time) error {
 	if rep.ConfigDrift {
 		bak, err := writeTuned(hookConfig, cfg, TuneTimeout(cfg, minTimeout), now)
 		if err != nil {
-			return rep, err
+			return err
 		}
 		rep.Backups = append(rep.Backups, bak)
 		rep.Changed++
@@ -174,7 +195,7 @@ func TuneHooks(hookConfig, hookScript string, minTimeout int, check bool, now fu
 	if rep.ScriptDrift {
 		res, err := TuneScriptFile(hookScript, now)
 		if err != nil {
-			return rep, err
+			return err
 		}
 		if res.Unrecognised {
 			rep.ScriptUnrecognised = true
@@ -184,7 +205,7 @@ func TuneHooks(hookConfig, hookScript string, minTimeout int, check bool, now fu
 			rep.ScriptDrift = false
 		}
 	}
-	return rep, nil
+	return nil
 }
 
 // ScriptTuneResult is what TuneScriptFile did to one copilot-hook.ps1.
@@ -224,18 +245,37 @@ func TuneScriptFile(path string, now func() time.Time) (ScriptTuneResult, error)
 
 // writeTuned backs the original up beside itself, then writes the tuned
 // content through a temp file and a rename, so a crash mid-write leaves
-// either the old file or the new one — never a truncated hook.
+// either the old file or the new one — never a truncated hook. The temp name
+// is unique per write: setup and doctor --fix can tune at the same time, and
+// a shared name would let one rename the other's half-written file (#1748).
 func writeTuned(path string, original, tuned []byte, now func() time.Time) (string, error) {
 	bak := path + ".bak." + now().Format("20060102-150405")
 	if err := os.WriteFile(bak, original, 0o644); err != nil { //nolint:gosec // a backup of the user's own hook file
 		return "", fmt.Errorf("back up %s: %w", path, err)
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, tuned, 0o644); err != nil { //nolint:gosec // the user's own hook file
-		return bak, fmt.Errorf("write %s: %w", tmp, err)
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return bak, fmt.Errorf("stage %s: %w", path, err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
+	_, werr := tmp.Write(tuned)
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		return bak, fmt.Errorf("write %s: %w", tmpName, werr)
+	}
+	// CreateTemp makes the file 0600; the hook keeps the mode it already had,
+	// so a restrictive umask or a hand-tightened file stays as it was.
+	info, err := os.Stat(path)
+	if err != nil {
+		return bak, fmt.Errorf("stat %s: %w", path, err)
+	}
+	if err := os.Chmod(tmpName, info.Mode().Perm()); err != nil {
+		return bak, fmt.Errorf("chmod %s: %w", tmpName, err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
 		return bak, fmt.Errorf("replace %s: %w", path, err)
 	}
 	return bak, nil
