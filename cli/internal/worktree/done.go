@@ -103,10 +103,34 @@ func checkUnpushedCommits(absRepo, absWT string, force bool) error {
 	if err != nil {
 		return fmt.Errorf("verifying unpushed commits against %s failed: %w; pass --force to override", baseRef, err)
 	}
-	if count > 0 {
-		return fmt.Errorf("branch has no upstream configured and has %d unpushed commit(s) ahead of %s; push before done, or pass --force", count, baseRef)
+	if count == 0 {
+		return nil
 	}
-	return nil
+	// Ahead of the base is also what a squash-merged branch looks like once
+	// GitHub deleted its remote: ask whether the work landed (#1608).
+	landed, landErr := landedOnMergedPR(absWT)
+	if landed {
+		return nil
+	}
+	reason := ""
+	if landErr != nil {
+		reason = fmt.Sprintf(" (could not check for a merged pull request: %v)", landErr)
+	}
+	return fmt.Errorf("branch has no upstream configured and has %d unpushed commit(s) ahead of %s%s; push before done, or pass --force", count, baseRef, reason)
+}
+
+// landedOnMergedPR asks landedInMergedPR about the worktree's own branch and
+// tip. A detached HEAD names no pull request and answers no.
+func landedOnMergedPR(absWT string) (bool, error) {
+	branch, err := exec.Command("git", "-C", absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	if err != nil {
+		return false, nil //nolint:nilerr // detached: no branch, no pull request
+	}
+	tip, err := exec.Command("git", "-C", absWT, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return false, err
+	}
+	return landedInMergedPR(absWT, strings.TrimSpace(string(branch)), strings.TrimSpace(string(tip)))
 }
 
 func countRevList(dir, revRange string) (int, error) {

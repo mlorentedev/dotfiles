@@ -372,5 +372,6 @@ tags: [lessons, index, dotfiles]
 | [352 - A mid-test [[ ]] assertion is a no-op under bash 3.2](lesson-352-a-mid-test-double-bracket-assertion-is-a-no-op-under-bash-3-2.md) | 2026-10-07 |
 | [353 - golangci-lint's cache reports another worktree's results](lesson-353-golangci-lint-s-cache-reports-another-worktree-s-results.md) | 2026-10-07 |
 | [354 - A skip reason covers only the question it answers](lesson-354-a-skip-reason-covers-only-the-question-it-answers.md) | 2026-10-07 |
+| [355 - After a squash merge, ask the merged head by containment](lesson-355-after-a-squash-merge-ask-the-merged-head-by-containment.md) | 2026-10-07 |
 | [357 - A mode convergence must only narrow](lesson-357-a-mode-convergence-must-only-narrow.md) | 2026-10-07 |
 <!-- END GENERATED -->
