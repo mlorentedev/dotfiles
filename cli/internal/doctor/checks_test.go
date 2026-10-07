@@ -142,9 +142,14 @@ func TestOSGatingSkipsLinuxOnlyChecksOnWindows(t *testing.T) {
 	t.Run("tmux skips", func(t *testing.T) {
 		var b bytes.Buffer
 		rep := capture(&b)
-		checkTmux(winSys(), &Config{}, rep)
-		if rep.Failures() != 0 || !strings.Contains(b.String(), "Linux-only") {
+		checkTmux(winSys(), rep)
+		// tmux runs on Linux and macOS (tmuxInstall names both), so the skip
+		// must not call it Linux-only; it points at WSL instead.
+		if rep.Failures() != 0 || !strings.Contains(b.String(), "WSL") {
 			t.Errorf("tmux must SKIP on Windows\n%s", b.String())
+		}
+		if strings.Contains(b.String(), "Linux-only") {
+			t.Errorf("the tmux skip must not call tmux Linux-only: it runs on macOS too\n%s", b.String())
 		}
 	})
 
@@ -370,37 +375,29 @@ func TestCheckSecrets_FileAuthorityBackend(t *testing.T) {
 	}
 }
 
+// checkTmux owns tmux being installed. ~/.tmux.conf is the `tmux` deploy
+// entry's, which checkDeployManifest compares; a second comparison here would
+// report the same drift twice, from a copy setup no longer writes.
 func TestCheckTmux(t *testing.T) {
 	home := t.TempDir()
-	dotfiles := filepath.Join(home, ".dotfiles")
-	writeFile(t, filepath.Join(dotfiles, "tmux.conf"), "set -g mouse on\n")
-	cfg := &Config{DotfilesDir: dotfiles}
+	// A deployed file that differs from the repo's: not this check's to judge.
+	writeFile(t, filepath.Join(home, ".dotfiles", "tmux.conf"), "set -g mouse on\n")
+	writeFile(t, filepath.Join(home, ".tmux.conf"), "DIFFERENT\n")
 	cmd := map[string]string{"tmux -V": "tmux 3.4"}
 
-	t.Run("deployed matches", func(t *testing.T) {
-		writeFile(t, filepath.Join(home, ".tmux.conf"), "set -g mouse on\n")
+	t.Run("installed passes and leaves the deployed file to the manifest", func(t *testing.T) {
 		var buf bytes.Buffer
 		rep := capture(&buf)
-		checkTmux(newSys(map[string]string{"HOME": home}, []string{"tmux"}, cmd), cfg, rep)
-		if rep.Failures() != 0 {
-			t.Fatalf("matching deploy should pass\n%s", buf.String())
-		}
-	})
-
-	t.Run("drifted", func(t *testing.T) {
-		writeFile(t, filepath.Join(home, ".tmux.conf"), "DIFFERENT\n")
-		var buf bytes.Buffer
-		rep := capture(&buf)
-		checkTmux(newSys(map[string]string{"HOME": home}, []string{"tmux"}, cmd), cfg, rep)
-		if rep.Failures() != 1 || !strings.Contains(buf.String(), "drifted") {
-			t.Fatalf("drift should fail\n%s", buf.String())
+		checkTmux(newSys(map[string]string{"HOME": home}, []string{"tmux"}, cmd), rep)
+		if rep.Failures() != 0 || !strings.Contains(buf.String(), "tmux 3.4") {
+			t.Fatalf("installed tmux should pass on its version alone\n%s", buf.String())
 		}
 	})
 
 	t.Run("not installed", func(t *testing.T) {
 		var buf bytes.Buffer
 		rep := capture(&buf)
-		checkTmux(newSys(map[string]string{"HOME": home}, nil, nil), cfg, rep)
+		checkTmux(newSys(map[string]string{"HOME": home}, nil, nil), rep)
 		if rep.Failures() != 1 {
 			t.Fatalf("missing tmux should fail\n%s", buf.String())
 		}

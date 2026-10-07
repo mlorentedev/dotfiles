@@ -286,16 +286,16 @@ func loadRegistry(cfg *Config) (*secrets.Registry, error) {
 	return secrets.ParseRegistry(raw)
 }
 
-// checkTmux reproduces healthcheck section 9: tmux is installed and ~/.tmux.conf
-// matches the repo source (copy-deploy drift check, ADR-012).
-func checkTmux(sys *System, cfg *Config, rep *Report) {
+// checkTmux reproduces healthcheck section 9: tmux is installed. ~/.tmux.conf is
+// the `tmux` deploy entry's, compared by checkDeployManifest.
+func checkTmux(sys *System, rep *Report) {
 	rep.Section("tmux")
 	if sys.GOOS == "windows" {
-		rep.Skip("tmux (Linux-only by design; use WSL if needed)")
+		rep.Skip("tmux (not available on Windows; use WSL if needed)")
 		return
 	}
 	if !sys.has("tmux") {
-		rep.Fail("tmux not installed (run: sudo apt install -y tmux)")
+		rep.Fail("tmux not installed (run: " + tmuxInstall(sys.GOOS) + ")")
 		return
 	}
 	ver := "unknown" // tmux uses `-V`, not the conventional `--version`
@@ -303,26 +303,15 @@ func checkTmux(sys *System, cfg *Config, rep *Report) {
 		ver = strings.TrimSpace(v)
 	}
 	rep.Pass("tmux installed: " + ver)
+}
 
-	src := filepath.Join(cfg.DotfilesDir, "tmux.conf")
-	dst := filepath.Join(sys.home(), ".tmux.conf")
-	switch {
-	case pathExists(src):
-		switch {
-		case !pathExists(dst):
-			rep.Fail(".tmux.conf missing at " + dst + " (run setup)")
-		case isSymlink(dst):
-			rep.Fail(".tmux.conf is a symlink (expected a regular copy — run setup)")
-		case filesEqual(src, dst):
-			rep.Pass(".tmux.conf deployed (matches repo)")
-		default:
-			rep.Fail(".tmux.conf has drifted from " + src + " (edit in repo + run setup)")
-		}
-	case pathExists(dst):
-		rep.Pass(".tmux.conf exists (source unavailable for drift check)")
-	default:
-		rep.Fail(".tmux.conf missing (run setup)")
+// tmuxInstall is the not-installed remedy. tmux is class 3 (ADR-044): no
+// cross-OS channel ships it, so the remedy is the OS's package manager.
+func tmuxInstall(goos string) string {
+	if goos == "darwin" {
+		return "brew install tmux"
 	}
+	return "sudo apt install -y tmux"
 }
 
 // checkOpenCode reproduces healthcheck section 10: opencode + pi are installed,

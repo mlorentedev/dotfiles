@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
 
 // coreTools is healthcheck.sh section 1's PATH expectation set.
@@ -94,6 +96,30 @@ func checkVersionedPaths(sys *System, rep *Report) {
 	}
 }
 
+// appsLayoutPlatforms are the OSes whose toolchains are laid down as
+// APPS_HOME/<tool>-<version> with *_HOME variables pointing at them.
+var appsLayoutPlatforms = []string{"linux"}
+
+// toolchainSource says how each other OS gets its toolchains: one place for
+// the reason every check of that layout skips with. darwin's are mise's, Mac
+// first, in ADR-044's Wave 3.
+var toolchainSource = map[string]string{
+	"windows": "Windows installs the toolchains with winget",
+	"darwin":  "macOS gets its toolchains through mise",
+}
+
+// appsLayoutSkip is "" where the APPS_HOME layout applies, else why a check of
+// that layout skips. An empty GOOS is a POSIX host, as the System seam says.
+func appsLayoutSkip(goos string) string {
+	if goos == "" || platform.Supports(appsLayoutPlatforms, goos) {
+		return ""
+	}
+	if src, ok := toolchainSource[goos]; ok {
+		return "not the APPS_HOME layout: " + src
+	}
+	return "not the APPS_HOME layout on " + goos
+}
+
 // versionedDir pairs a display name with its versions.conf key and the
 // APPS_HOME subdirectory prefix the installer lays the version down under.
 type versionedDir struct {
@@ -121,11 +147,8 @@ func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 		// deployed copy producing nonsensical drift directions is self-diagnosing.
 		rep.Info("versions.conf: " + cfg.VersionsPath)
 	}
-	if sys.GOOS == "windows" {
-		// Windows installs these via winget, not ~/Applications/<tool>-<version>,
-		// so the versioned-dir check does not apply (parity with healthcheck.ps1
-		// section 3, which skips when APPS_HOME is unset).
-		rep.Skip("versioned tool dirs (Windows uses winget, not APPS_HOME)")
+	if why := appsLayoutSkip(sys.GOOS); why != "" {
+		rep.Skip("versioned tool dirs (" + why + ")")
 	} else {
 		appsHome := sys.env("APPS_HOME", filepath.Join(sys.home(), "Applications"))
 		for _, v := range versionMatches {
@@ -223,17 +246,17 @@ var toolHomeVars = []string{
 }
 
 // checkToolHomeEnvVars reproduces healthcheck section 5: the tool-home vars are
-// set. Unset is a FAIL (the RC files are expected to export them).
+// set. Unset is a FAIL where the APPS_HOME layout applies (the RC files export
+// them there) and a SKIP elsewhere.
 func checkToolHomeEnvVars(sys *System, rep *Report) {
 	rep.Section("Tool-home environment variables")
-	win := sys.GOOS == "windows"
+	why := appsLayoutSkip(sys.GOOS)
 	for _, v := range toolHomeVars {
 		switch {
 		case sys.Getenv(v) != "":
 			rep.Pass(v + " is set")
-		case win:
-			// Linux-deploy vars; optional on Windows (winget-managed toolchains).
-			rep.Skip(v + " (optional on Windows — Linux-deploy var)")
+		case why != "":
+			rep.Skip(v + " unset (" + why + ")")
 		default:
 			rep.Fail(v + " is not set")
 		}

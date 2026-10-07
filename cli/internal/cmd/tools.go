@@ -97,7 +97,15 @@ func planToolsInstall(in *tools.Installer, cat tools.Catalog, name string, out i
 		if installed == "" {
 			installed = "absent"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Name, installed, p.Pin, p.Action)
+		pin := p.Pin
+		if pin == "" {
+			pin = "-" // a system package has no pin, and an empty cell would shift the row
+		}
+		action := string(p.Action)
+		if p.Note != "" {
+			action += " (" + p.Note + ")"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Name, installed, pin, action)
 	}
 	return w.Flush()
 }
@@ -181,6 +189,9 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 		return "npm:" + t.Source.Package
 	case t.Source.Type == "uv-tool":
 		return "uv:" + t.Source.Package
+	case t.Source.Type == "system":
+		manager, pkg := t.Source.SystemPackage(goos)
+		return manager + ":" + pkg
 	}
 	if asset := t.AssetName(goos, goarch); asset != "" {
 		return asset

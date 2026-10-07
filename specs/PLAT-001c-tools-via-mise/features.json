@@ -40,5 +40,19 @@
     "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestToolsSync_PlanThenApplyThenNothingToDo|TestRegistry_ToolsRunAfterRecords)$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestToolsSync_PlanThenApplyThenNothingToDo' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRegistry_ToolsRunAfterRecords'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f7",
+    "behavior": "AC7: a system entry installs through the OS manager, skips on an OS it does not name, and a second run runs no manager command",
+    "verification": "cd cli && out=$(go test ./internal/tools/ -run '^(TestInstallSystem_ArgvPerManager|TestInstallSystem_SecondRunRunsNothing|TestInstallSystem_NoNameForThisOSIsSkipped)$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestInstallSystem_ArgvPerManager' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestInstallSystem_SecondRunRunsNothing' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestInstallSystem_NoNameForThisOSIsSkipped'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f8",
+    "behavior": "AC8: Load rejects a malformed system entry naming it, and Install skips an unknown source type",
+    "verification": "cd cli && out=$(go test ./internal/tools/ -run '^(TestLoad_RejectsMalformedSystemEntries|TestInstall_UnknownSourceTypeIsSkippedNotFailed)$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLoad_RejectsMalformedSystemEntries' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestInstall_UnknownSourceTypeIsSkippedNotFailed'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
