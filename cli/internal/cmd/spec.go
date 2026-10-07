@@ -678,6 +678,11 @@ promoted file, or the reason, first.`,
 				cmd.Printf("     PR: %s\n", prURL)
 			}
 			cmd.Printf("     promotions: every candidate in verification.md is answered\n")
+			if data, err := os.ReadFile(filepath.Join(target, "verification.md")); err == nil {
+				for _, item := range spec.UntickedArchiveChecklist(string(data)) {
+					cmd.Printf("     left for you: %s\n", item)
+				}
+			}
 			return nil
 		},
 	}

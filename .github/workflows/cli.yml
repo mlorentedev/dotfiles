@@ -2,16 +2,16 @@ name: cli
 
 on:
   # No paths filter on pull requests: cli-gate is a required check, and a
-  # required check a filtered workflow never reports stays pending. The
-  # `changes` job skips the Go work instead, and a skipped job still lets
-  # cli-gate report (CI-004, #1739).
+  # required check a filtered workflow never reports stays pending (CI-004,
+  # #1739). The `changes` job narrows lint and the snapshot build only; a
+  # skipped job still lets cli-gate report.
   pull_request:
+  # No paths filter on main either: the Go tests read files outside cli/ (the
+  # golden corpora under tests/golden/, harness/*.json, the shell rc files), and a
+  # push filtered to cli/** never ran the guard written for those files (#1888).
+  # The `changes` job narrows lint and the snapshot build, never the tests.
   push:
     branches: [main]
-    paths:
-      - "cli/**"
-      - "versions.conf"
-      - ".github/workflows/cli.yml"
     tags:
       - "v*"
 
@@ -35,13 +35,15 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      # A push is already path-filtered above, and a tag always builds.
-      go: ${{ github.event_name != 'pull_request' || steps.filter.outputs.go == 'true' }}
+      # Gates lint and the snapshot build only; the tests run on every diff
+      # (#1888). A tag always builds. On a push to main the filter compares the
+      # push against the commit before it.
+      go: ${{ startsWith(github.ref, 'refs/tags/') || steps.filter.outputs.go == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: github.event_name == 'pull_request'
+        if: "!startsWith(github.ref, 'refs/tags/')"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
-        if: github.event_name == 'pull_request'
+        if: "!startsWith(github.ref, 'refs/tags/')"
         id: filter
         with:
           filters: |
@@ -50,10 +52,14 @@ jobs:
               - 'versions.conf'
               - '.github/workflows/cli.yml'
 
+  # Not gated on the path filter. Go tests guard files outside cli/ (#1888): an
+  # allow-list filter treats every unlisted path as safe to skip (lesson 322), and
+  # the guard written for a file never ran on the diff that changed it. setup-go
+  # restores GOCACHE, so `go test` reruns only the packages whose inputs changed,
+  # files read at test time included: on a diff outside cli/ this costs about 30 s
+  # on Linux and 95 s on Windows, in parallel with ci.yml's longer legs.
   test:
     name: test (${{ matrix.os }})
-    needs: changes
-    if: needs.changes.outputs.go == 'true'
     strategy:
       fail-fast: false
       matrix:

@@ -675,3 +675,148 @@ func TestDraftReviewStateListIsCompleteBySource(t *testing.T) {
 		t.Fatal("found no spec-folder path constants — the source walk is broken, so this test proves nothing")
 	}
 }
+
+// templateArchiveChecklist is the `## Archive checklist` section of the
+// verification.md template `dotf spec init` writes, so a change to its wording
+// that the ticker no longer matches fails here rather than in the archive.
+func templateArchiveChecklist(t *testing.T) string {
+	t.Helper()
+	b, err := templatesFS.ReadFile("templates/verification.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, section, ok := strings.Cut(string(b), "## Archive checklist")
+	if !ok {
+		t.Fatal("the verification.md template has no archive checklist")
+	}
+	return "## Archive checklist" + section
+}
+
+// #1990: the archive ticks the checklist items it performed or verified, and
+// leaves the one it cannot see (the board ticket) for the human.
+func TestArchiveTicksTheChecklistItemsItPerformed(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		abandoned bool
+		ticked    []string
+		unticked  []string
+	}{
+		{"archived", false,
+			[]string{"status: archived", "Folder moved", "Promotions above executed"},
+			[]string{"Bitácora board ticket"}},
+		// The status and folder items describe the archive route, which an
+		// abandoned spec did not take.
+		{"abandoned", true,
+			[]string{"Promotions above executed"},
+			[]string{"status: archived", "Folder moved", "Bitácora board ticket"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeSpec(t, root, "AI-001-x", map[string]string{
+				"proposal.md":     "---\nstatus: verifying\n---\n",
+				"review.md":       passingReview("AI-001-x"),
+				"verification.md": answeredPromotions + "\n" + templateArchiveChecklist(t),
+			})
+			target, err := Archive(root, "AI-001-x", ArchiveOptions{Abandoned: tc.abandoned})
+			if err != nil {
+				t.Fatalf("Archive: %v", err)
+			}
+			got := mustRead(t, filepath.Join(target, "verification.md"))
+			for _, item := range tc.ticked {
+				if !hasItem(got, "[x]", item) {
+					t.Errorf("%q not ticked:\n%s", item, got)
+				}
+			}
+			for _, item := range tc.unticked {
+				if !hasItem(got, "[ ]", item) {
+					t.Errorf("%q ticked, but the archive did not do it:\n%s", item, got)
+				}
+			}
+		})
+	}
+}
+
+// A verification.md that exists and cannot be read refuses before anything
+// moves. On the full route the promotion preflight already reads it; a
+// fast-track spec carries its promotions in spec.md, so the archive's own read
+// is the only one. Silently skipping it would archive with the checklist
+// contradicting the tree.
+func TestArchiveRefusesAnUnreadableVerificationBeforeMoving(t *testing.T) {
+	root := t.TempDir()
+	dir := writeSpec(t, root, "AI-001-x", map[string]string{
+		"spec.md":         "---\nstatus: verifying\n---\n" + answeredPromotions,
+		"verification.md": "",
+	})
+	// A directory in its place: a read error that is not "does not exist", on
+	// every OS and as any user.
+	v := filepath.Join(dir, "verification.md")
+	if err := os.Remove(v); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(v, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Archive(root, "AI-001-x", ArchiveOptions{}); err == nil || !strings.Contains(err.Error(), "verification.md") {
+		t.Fatalf("archived past an unreadable verification.md: err=%v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("the spec moved although the archive refused: %v", err)
+	}
+}
+
+func TestUntickedArchiveChecklistNamesWhatIsLeftForAHuman(t *testing.T) {
+	ticked := tickArchiveChecklist(templateArchiveChecklist(t), false)
+	left := UntickedArchiveChecklist(ticked)
+	if len(left) != 1 || !strings.Contains(left[0], "Bitácora board ticket") {
+		t.Errorf("want only the board item left, got %q", left)
+	}
+	if got := UntickedArchiveChecklist("# x\n- [ ] not in the section\n"); got != nil {
+		t.Errorf("an item outside the section was reported: %q", got)
+	}
+}
+
+func hasItem(content, box, fragment string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		if strings.HasPrefix(line, "- "+box) && strings.Contains(line, fragment) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestTickArchiveChecklist(t *testing.T) {
+	for name, tc := range map[string]struct{ in, want string }{
+		// Wordings measured across the archived corpus, not only the template's.
+		"corpus wordings": {
+			"## Archive checklist\n\n" +
+				"- [ ] `proposal.md` frontmatter `status: archived`.\n" +
+				"- [ ] Folder moved to `specs/archive/X/`\n" +
+				"- [ ] Promotions above executed (none)\n" +
+				"- [ ] Vault `11-tasks.md` ticked with PR link.\n",
+			"## Archive checklist\n\n" +
+				"- [x] `proposal.md` frontmatter `status: archived`.\n" +
+				"- [x] Folder moved to `specs/archive/X/`\n" +
+				"- [x] Promotions above executed (none)\n" +
+				"- [ ] Vault `11-tasks.md` ticked with PR link.\n",
+		},
+		"only inside the section": {
+			"## Tasks\n\n- [ ] Folder moved by hand\n\n## Archive checklist\n\n- [ ] Folder moved\n\n## After\n\n- [ ] Folder moved again\n",
+			"## Tasks\n\n- [ ] Folder moved by hand\n\n## Archive checklist\n\n- [x] Folder moved\n\n## After\n\n- [ ] Folder moved again\n",
+		},
+		"CRLF kept": {
+			"## Archive checklist\r\n\r\n- [ ] Folder moved\r\n- [ ] Board ticket\r\n",
+			"## Archive checklist\r\n\r\n- [x] Folder moved\r\n- [ ] Board ticket\r\n",
+		},
+		"already ticked is left alone": {
+			"## Archive checklist\n- [x] Folder moved\n",
+			"## Archive checklist\n- [x] Folder moved\n",
+		},
+		"no section": {"- [ ] Folder moved\n", "- [ ] Folder moved\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := tickArchiveChecklist(tc.in, false); got != tc.want {
+				t.Errorf("got:\n%q\nwant:\n%q", got, tc.want)
+			}
+		})
+	}
+}

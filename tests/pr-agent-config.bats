@@ -557,7 +557,7 @@ if bad:
 }
 
 @test "pr-agent: the guard counts comments across all pages, not per page" {
-    grep -q -- '--paginate \\$' "$WF"
+    grep -q -- '/comments" --paginate)' "$WF"
     grep -q 'jq -s --arg started' "$WF"
 }
 
@@ -612,7 +612,7 @@ print('; '.join(bad)); sys.exit(1 if bad else 0)
 }
 
 @test "pr-agent: the head-ref fallback also works for issue_comment runs" {
-    grep -q 'HEAD_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$WF"
+    grep -q 'HEAD_SHA=$(gh_api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$WF"
 }
 
 @test "pr-agent: the guard reads the registry from the default branch, never from base.ref" {
