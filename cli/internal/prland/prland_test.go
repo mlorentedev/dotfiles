@@ -294,3 +294,23 @@ func TestLand_AFailedRestoreNamesTheDependentLeftRetargeted(t *testing.T) {
 		}
 	}
 }
+
+// Right after a push gh reports no checks at all: it exits non-zero with empty
+// output. That is a refusal ("no checks reported"), not an error, and --wait
+// keeps waiting for the checks to appear.
+func TestLand_NoChecksYetIsARefusalNotAnError(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: "", deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatalf("empty checks output was an error: %v", err)
+	}
+	if res.Merged || !strings.Contains(strings.Join(res.Reasons, ";"), "no checks reported") {
+		t.Errorf("want a refusal naming the missing checks, got %+v", res)
+	}
+	for _, state := range []string{"BLOCKED", "CLEAN"} {
+		if !unsettled(Facts{MergeState: state}) {
+			t.Errorf("no checks yet (state %s) must keep --wait waiting", state)
+		}
+	}
+}

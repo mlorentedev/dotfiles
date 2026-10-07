@@ -47,6 +47,7 @@ Out of scope: landing every PR of the user (`--all-mine`).
 - Measured on #2025: `--wait` returned before a push's checks were registered, so the merge state read BLOCKED with every reported check green; the refusal was correct but premature. `--wait` now pauses and re-reads while a check is pending or the state is BLOCKED/UNKNOWN/UNSTABLE with every check green, up to 6 rounds (`TestLand_WaitReadsAgainUntilTheStateSettles`, `TestLand_WithoutWaitABlockedStateIsARefusal`)
 - `--update-branch`: `TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead` (merges the base, then merges the new head with `--match-head-commit`), `TestLand_UpdateBranchDoesNotTouchAPRThatFailsForAnotherReason`
 - Transactional retarget (pr-agent on #2037): a merge that fails after the dependents were retargeted restores each to the head branch; a restore that fails is named in the error with the merge error (`TestLand_AFailedMergeRestoresTheRetargetedDependents`, `TestLand_AFailedRestoreNamesTheDependentLeftRetargeted`)
+- Measured on #2033/#2037/#2039: right after a push gh reports no checks (non-zero exit, empty output), which `land` read as an error. Empty output is now "no checks reported" (a refusal) and keeps `--wait` waiting (`TestLand_NoChecksYetIsARefusalNotAnError`)
 - Real PR, read-only: `dotf pr land 2033` -> `[NOT MERGED] #2033 at e656207: spec-gate: fail; merge state is UNKNOWN; reviewer output awaits triage`, exit 1, nothing changed
 
 ## Next

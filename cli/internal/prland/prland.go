@@ -5,6 +5,7 @@
 package prland
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -198,6 +199,9 @@ const (
 // push, `gh pr checks --watch` can return before every check is registered,
 // leaving the state BLOCKED with every reported check green.
 func unsettled(f Facts) bool {
+	if len(f.Checks) == 0 {
+		return true // CI has not registered its checks yet
+	}
 	for _, c := range f.Checks {
 		if c.Bucket == "pending" {
 			return true
@@ -230,7 +234,12 @@ func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) (
 	// gh exits non-zero while a check fails or is pending, and still prints
 	// the JSON; only an output that does not parse is an error.
 	out, runErr := gh("pr", "checks", n, "--json", "name,bucket")
-	if err := json.Unmarshal(out, &f.Checks); err != nil {
+	// Before CI has registered any check, gh exits non-zero and prints
+	// nothing: that is "no checks yet" (Decide refuses it, --wait waits for
+	// it), not an unreadable answer.
+	if len(bytes.TrimSpace(out)) == 0 {
+		f.Checks = nil
+	} else if err := json.Unmarshal(out, &f.Checks); err != nil {
 		return f, fmt.Errorf("gh pr checks: %v (%w)", runErr, err)
 	}
 	pending, err := untriaged(ctx)
