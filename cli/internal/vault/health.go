@@ -394,29 +394,22 @@ func (h *healthRun) section6Tags() {
 // this file's detail. Not "fixed" here — see #1314.
 func (h *healthRun) runIntegrityChecks(matches []string) (int, bool) {
 	for _, tasks := range matches {
-		out, code := integrityVerdict(tasks)
-		if code != 0 {
+		out, drift, err := BacklogIntegrity(tasks)
+		if err != nil {
+			// The script printed nothing here and exited 2; the reason is
+			// what a reader needs, so the port says it.
+			h.fail("Backlog integrity: cannot read %s/11-tasks.md: %v", filepath.Base(filepath.Dir(tasks)), err)
+			return 2, true
+		}
+		if drift {
 			h.fail("Backlog drift in %s/11-tasks.md (duplicate IDs / status contradictions)",
 				filepath.Base(filepath.Dir(tasks)))
 			printPrefixed(h.w, out, "        ")
-			return code, true
+			return 1, true
 		}
 	}
 	h.pass("Backlog integrity: %d task file(s) clean (one ticket = one entry)", len(matches))
 	return 0, false
-}
-
-// integrityVerdict is BacklogIntegrity as the script's exit status: 1 for
-// drift, and 2, with nothing on stdout, for a file it cannot read.
-func integrityVerdict(tasks string) (string, int) {
-	out, drift, err := BacklogIntegrity(tasks)
-	switch {
-	case err != nil:
-		return "", 2
-	case drift:
-		return out, 1
-	}
-	return out, 0
 }
 
 // runMergedChecks is section 7's SECOND, independent pass: semantic drift is
@@ -426,7 +419,11 @@ func integrityVerdict(tasks string) (string, int) {
 func (h *healthRun) runMergedChecks(matches []string) {
 	for _, tasks := range matches {
 		out, stale, err := BacklogMerged(tasks, "")
-		if stale || err != nil {
+		if err != nil {
+			h.warn("Stale-merged ticks: cannot read %s/11-tasks.md: %v", filepath.Base(filepath.Dir(tasks)), err)
+			continue
+		}
+		if stale {
 			h.warn("Stale-merged ticks in %s/11-tasks.md — work shipped, tick still [ ]:",
 				filepath.Base(filepath.Dir(tasks)))
 			printPrefixed(h.w, out, "        ")

@@ -149,6 +149,28 @@ func TestSection7BacklogRunsWithoutAShell(t *testing.T) {
 	}
 }
 
+// TestSection7BacklogNamesAnUnreadableTasksFile: the script exited 2 with
+// nothing on stdout, which read as drift with no detail. The port names the
+// file and the error, and still stops the run with the script's exit 2.
+func TestSection7BacklogNamesAnUnreadableTasksFile(t *testing.T) {
+	vaultDir := t.TempDir()
+	// A directory where the file should be: unreadable as a file on every OS.
+	if err := os.MkdirAll(filepath.Join(vaultDir, "10_projects", "demo", "11-tasks.md"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	var buf bytes.Buffer
+	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
+	code, aborted := h.section7Backlog()
+
+	if !aborted || code != 2 {
+		t.Fatalf("section7Backlog() = (%d, %v), want (2, true)", code, aborted)
+	}
+	if !strings.Contains(buf.String(), "FAIL: Backlog integrity: cannot read demo/11-tasks.md: ") {
+		t.Errorf("output = %q, want the unreadable file named with its error", buf.String())
+	}
+}
+
 // TestSection7BacklogNoTasksSkips: a vault with no 11-tasks.md is the ordinary
 // skip, matching every golden case that has no backlog files at all.
 func TestSection7BacklogNoTasksSkips(t *testing.T) {

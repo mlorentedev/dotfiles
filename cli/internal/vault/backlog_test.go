@@ -132,6 +132,7 @@ func TestBacklogChecksMatchTheScripts(t *testing.T) {
 		var stdout bytes.Buffer
 		cmd := exec.Command(bash, args...)
 		cmd.Stdout = &stdout
+		cmd.Env = os.Environ() // carries a HOME set with t.Setenv
 		err := cmd.Run()
 		var ee *exec.ExitError
 		switch {
@@ -182,6 +183,31 @@ func TestBacklogChecksMatchTheScripts(t *testing.T) {
 			if report != wantOut || code(stale) != wantCode {
 				t.Errorf("repo %s: Go (%q, exit %d) != shell (%q, exit %d)", repo, report, code(stale), wantOut, wantCode)
 			}
+		}
+	})
+
+	// The path health takes: no --repo, so both infer $HOME/Projects/<proj>.
+	t.Run("merged/repo from HOME", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		if err := os.MkdirAll(filepath.Join(home, "Projects", "demo", "specs", "archive", "A-1"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		projDir := filepath.Join(t.TempDir(), "10_projects", "demo")
+		if err := os.MkdirAll(projDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		tasks := filepath.Join(projDir, "11-tasks.md")
+		if err := os.WriteFile(tasks, []byte(mergedTasks), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		wantOut, wantCode := run(t, filepath.Join(scripts, "check-backlog-merged.sh"), tasks)
+		report, stale, err := BacklogMerged(tasks, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wantCode != 1 || report != wantOut || code(stale) != wantCode {
+			t.Errorf("Go (%q, exit %d) != shell (%q, exit %d); the shell must find the archive", report, code(stale), wantOut, wantCode)
 		}
 	})
 }
