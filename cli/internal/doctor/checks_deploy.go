@@ -849,9 +849,14 @@ func checkAntigravity(sys *System, rep *Report) {
 		rep.Fail("master mcp_config.json missing at " + master + " (run setup)")
 	case isSymlink(master):
 		// BUG-100 regression
-		rep.Fail("master mcp_config.json is a symlink (recursion risk)")
+		rep.Fail("master mcp_config.json is a symlink (recursion risk) (run setup)")
+	case isEmptyFile(master):
+		// agy writes an empty file on its first run, before setup has written
+		// the master (measured on the Mac bring-up, #2013). Setup overwrites
+		// it, so the remedy is the same as for a missing one.
+		rep.Fail("master mcp_config.json at " + master + " is empty — agy creates it on first run (run setup)")
 	case !isValidJSON(master):
-		rep.Fail("master mcp_config.json at " + master + " is invalid JSON")
+		rep.Fail("master mcp_config.json at " + master + " is invalid JSON (run setup)")
 	default:
 		rep.Pass("master mcp_config.json is a real file with valid JSON")
 	}
