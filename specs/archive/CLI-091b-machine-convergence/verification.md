@@ -41,6 +41,8 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 | Minor: `unsupported` also covers a source type `Install` refuses, and the row does not say which | Ticketed with the Major, #1892. |
 | Speculative: no command-level test for an `unsupported` row or `--dry-run <name>` | Ticketed with the Major, #1892. |
 
+Follow-up, #1892 (#2109): the dry run now runs Install's entry checks and reports a failed one as a `refused` row. A dry run with a `refused` row exits non-zero. This narrows AC1's "exits 0", which was written before any refused row existed. AC1 is contract text and stays as reviewed; every other row, `unsupported` included, still exits 0.
+
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`

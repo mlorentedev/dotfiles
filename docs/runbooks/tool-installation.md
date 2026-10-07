@@ -91,7 +91,7 @@ This channel is only for `dotf`, mise, and tools mise cannot install. Everything
   - A platform with no key is not supported. `dotf` rejects a key that names no known platform, so a typo fails loudly instead of being skipped everywhere.
 - **`checksums`** is the release's sha256 manifest. Its lines may list the asset as `name`, `./name` or `*name`. A tool whose release publishes no manifest cannot use this channel.
 - **`platforms`** (optional) limits a tool to some OSes. It is meant for npm and uv-tool sources; a release tool expresses the same thing through its `asset` keys.
-- Before relying on the entry, check it with `dotf tools list` and `dotf tools install --dry-run` on each OS you declared.
+- Before relying on the entry, check it with `dotf tools list` and `dotf tools install --dry-run` on each OS you declared. The dry run runs the same entry checks as install: a release with no `checksums`, or an npm or uv-tool source with no `package`, shows as `refused (<reason>)`, and the dry run exits non-zero. An `unsupported` row names its cause: no asset for this OS/arch, or an OS the entry's `platforms` leaves out.
 
 ## Adding a system package to the catalog
 
