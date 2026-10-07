@@ -76,9 +76,14 @@ setup() {
 #                             .bats file itself — see #892) — same rationale as vault-health: a
 #                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
+#   zshrc-guards              stubs `terraform` as an empty executable that is never run. The
+#                             subject is the .zshrc guard: completion is registered only when PATH
+#                             resolves a terraform, and against that path. A real terraform gives
+#                             the same answer, so a sibling would test nothing the stub does not
+#                             (#2055).
 EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
 hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
-vault-health-golden vault-maintenance-weekly"
+vault-health-golden vault-maintenance-weekly zshrc-guards"
 
 exempt() {
     local base
