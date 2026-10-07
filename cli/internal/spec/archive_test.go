@@ -279,6 +279,7 @@ func TestArchiveRecordsAStatusWhereTheProposalHadNone(t *testing.T) {
 		"frontmatter, no status":      "---\nid: AI-001-x\n---\n# AI-001-x\n",
 		"CRLF frontmatter, no status": "---\r\nid: AI-001-x\r\n---\r\n# AI-001-x\r\n",
 		"CRLF, no frontmatter":        "# AI-001-x\r\nstatus: draft\r\n",
+		"thematic break in the body":  "# AI-001-x\n\nintro\n\n---\n\nstatus: draft\n",
 	} {
 		root := t.TempDir()
 		writeSpec(t, root, "AI-001-x", map[string]string{
@@ -292,7 +293,7 @@ func TestArchiveRecordsAStatusWhereTheProposalHadNone(t *testing.T) {
 		got := mustRead(t, filepath.Join(target, "proposal.md"))
 		lines := strings.Split(got, "\n")
 		i := frontmatterStatusLine(lines)
-		if i < 0 || strings.TrimSpace(lines[i]) != "status: archived" {
+		if strings.TrimSpace(lines[0]) != "---" || i < 0 || strings.TrimSpace(lines[i]) != "status: archived" {
 			t.Errorf("%s: no frontmatter status: archived:\n%q", name, got)
 		}
 		if strings.Contains(proposal, "\r\n") && strings.Count(got, "\n") != strings.Count(got, "\r\n") {

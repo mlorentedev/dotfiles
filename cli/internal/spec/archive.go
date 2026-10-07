@@ -243,21 +243,16 @@ func setStatus(content, newStatus string) string {
 }
 
 // frontmatterStatusLine returns the index of the first `status:` line inside the
-// first frontmatter block, or -1. Fences are compared trimmed, as in
-// withFrontmatterField: a CRLF checkout's fence is "---\r", and an exact match
-// never saw the block, so the archive reported a rewrite it had not made
-// (CLI-095, #1976).
+// frontmatter block, which opens on the first line, or -1. Fences are compared
+// trimmed, as in withFrontmatterField: a CRLF checkout's fence is "---\r", and
+// an exact match never saw the block, so the archive reported a rewrite it had
+// not made (CLI-095, #1976).
 func frontmatterStatusLine(lines []string) int {
-	fences := 0
-	for i, line := range lines {
-		if strings.TrimSpace(line) == "---" {
-			fences++
-			if fences == 2 {
-				return -1 // end of the first frontmatter block
-			}
-			continue
-		}
-		if fences == 1 && statusLinePattern.MatchString(line) {
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return -1 // a `---` further down is a thematic break, not frontmatter
+	}
+	for i := 1; i < len(lines) && strings.TrimSpace(lines[i]) != "---"; i++ {
+		if statusLinePattern.MatchString(lines[i]) {
 			return i
 		}
 	}
