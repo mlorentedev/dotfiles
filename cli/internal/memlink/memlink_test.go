@@ -72,6 +72,91 @@ func TestResolveVaultMemory(t *testing.T) {
 	})
 }
 
+// --- resolveByRepoURL: repo directory named differently from its vault slug ---
+
+// vaultProject writes 10_projects/<slug>/context.md with the given frontmatter
+// repo_url (none when empty) and, when withMemory, a memory/ dir.
+func vaultProject(t *testing.T, vault, slug, repoURL string, withMemory bool) string {
+	t.Helper()
+	fm := "---\nid: \"" + slug + "\"\n"
+	if repoURL != "" {
+		fm += "repo_url: \"" + repoURL + "\"\n"
+	}
+	writeFile(t, filepath.Join(vault, "10_projects", slug, "context.md"), fm+"---\n\n# "+slug+"\n")
+	mem := filepath.Join(vault, "10_projects", slug, "memory")
+	if withMemory {
+		mkdirAll(t, mem)
+	}
+	return mem
+}
+
+func TestResolveVaultMemory_RepoURL(t *testing.T) {
+	t.Run("repo name differs from the slug: matched by repo_url basename", func(t *testing.T) {
+		vault := t.TempDir()
+		want := vaultProject(t, vault, "suite", "ssh://git@host:2222/owner/sensortool.git", true)
+		vaultProject(t, vault, "other", "https://example.com/owner/other", true)
+		if got := resolveVaultMemory("/home/me/Projects/sensortool", "sensortool", vault); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("convention 1 wins over a repo_url match", func(t *testing.T) {
+		vault := t.TempDir()
+		conv1 := vaultProject(t, vault, "proj", "", true)
+		vaultProject(t, vault, "elsewhere", "https://example.com/owner/proj.git", true)
+		if got := resolveVaultMemory("/x/proj", "proj", vault); got != conv1 {
+			t.Errorf("got %q, want conv1 %q", got, conv1)
+		}
+	})
+
+	t.Run("two projects claim the repo → no link rather than the wrong one", func(t *testing.T) {
+		vault := t.TempDir()
+		vaultProject(t, vault, "a", "https://example.com/owner/dup.git", true)
+		vaultProject(t, vault, "b", "ssh://git@host/owner/dup", true)
+		if got := resolveVaultMemory("/x/dup", "dup", vault); got != "" {
+			t.Errorf("got %q, want empty on an ambiguous repo_url", got)
+		}
+	})
+
+	t.Run("matched project without memory/ → empty", func(t *testing.T) {
+		vault := t.TempDir()
+		vaultProject(t, vault, "suite", "https://example.com/owner/tool.git", false)
+		if got := resolveVaultMemory("/x/tool", "tool", vault); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
+
+	t.Run("repo_url outside the frontmatter is ignored", func(t *testing.T) {
+		vault := t.TempDir()
+		writeFile(t, filepath.Join(vault, "10_projects", "suite", "context.md"),
+			"---\nid: suite\n---\n\nrepo_url: https://example.com/owner/tool.git\n")
+		mkdirAll(t, filepath.Join(vault, "10_projects", "suite", "memory"))
+		if got := resolveVaultMemory("/x/tool", "tool", vault); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
+}
+
+func TestEnsure_LinksByRepoURL(t *testing.T) {
+	vault := t.TempDir()
+	src := vaultProject(t, vault, "suite", "ssh://git@host:2222/owner/sensortool.git", true)
+	cwd := filepath.Join(t.TempDir(), "sensortool")
+	target := filepath.Join(t.TempDir(), "memory")
+
+	msg, err := Ensure(cwd, target, "", vault)
+	if err != nil || msg == "" {
+		t.Fatalf("Ensure: msg=%q err=%v, want a created link", msg, err)
+	}
+	if !isLink(target) {
+		t.Fatalf("target %s is not a link", target)
+	}
+	got, _ := filepath.EvalSymlinks(target)
+	want, _ := filepath.EvalSymlinks(src)
+	if got != want {
+		t.Errorf("link resolves to %q, want %q", got, want)
+	}
+}
+
 // --- ClaudeProjectKey / ClaudeMemoryTarget: cross-OS encoding ----------------
 
 func TestClaudeProjectKey(t *testing.T) {
