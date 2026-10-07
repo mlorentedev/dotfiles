@@ -23,6 +23,9 @@ type Identity struct {
 	// Worktree is git's own name for a linked worktree, or "" in a main
 	// checkout.
 	Worktree string
+	// DefaultBranch is the remote's default branch as the clone recorded it
+	// (refs/remotes/origin/HEAD), or "" when it recorded none.
+	DefaultBranch string
 }
 
 // RepoIdentity resolves the repository from a working directory by reading git's
@@ -41,8 +44,9 @@ func RepoIdentity(cwd string) (Identity, bool) {
 		if err == nil {
 			if info.IsDir() {
 				return Identity{
-					Project: filepath.Base(dir),
-					Branch:  headBranch(p),
+					Project:       filepath.Base(dir),
+					Branch:        headBranch(p),
+					DefaultBranch: originDefaultBranch(p),
 				}, true
 			}
 			if gitdir, ok := readGitdirPointer(p); ok {
@@ -52,6 +56,8 @@ func RepoIdentity(cwd string) (Identity, bool) {
 					Project:  filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(gitdir)))),
 					Branch:   headBranch(gitdir),
 					Worktree: filepath.Base(gitdir),
+					// Remote refs live in the common dir, two levels above.
+					DefaultBranch: originDefaultBranch(filepath.Dir(filepath.Dir(gitdir))),
 				}, true
 			}
 		}
@@ -64,9 +70,29 @@ func RepoIdentity(cwd string) (Identity, bool) {
 }
 
 // isDefaultBranch reports the branches that are ambient rather than a piece of
-// work, and therefore need the machine to tell two of them apart.
-func isDefaultBranch(b string) bool {
-	return b == "main" || b == "master"
+// work, and therefore need the machine to tell two of them apart: main,
+// master, and whatever the remote says its default is. Hardcoding the first two
+// left a repository whose default is `develop` or `trunk` with one key on every
+// machine, so two machines overwrote each other's handoff (MEMORY-013, #1921).
+// main and master stay ambient whatever the clone recorded.
+func (id Identity) isDefaultBranch() bool {
+	b := id.Branch
+	return b == "main" || b == "master" || (id.DefaultBranch != "" && b == id.DefaultBranch)
+}
+
+// originDefaultBranch reads the symbolic ref a clone writes for its remote's
+// default branch, `ref: refs/remotes/origin/<branch>`, from a common git dir.
+// "" when the clone has no origin, or the ref was never written.
+func originDefaultBranch(commonDir string) string {
+	raw, err := os.ReadFile(filepath.Join(commonDir, "refs", "remotes", "origin", "HEAD")) // #nosec G304 -- inside the resolved git dir
+	if err != nil {
+		return ""
+	}
+	ref, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), "ref: refs/remotes/origin/")
+	if !ok {
+		return ""
+	}
+	return ref
 }
 
 // sanitizeThread keeps a branch usable as both a markdown heading and a filename
