@@ -203,6 +203,20 @@
       "requires": "tmux"
     },
     {
+      "name": "ssh-config",
+      "src": "ssh/config",
+      "dst": "{HOME}/.ssh/config",
+      "render": false,
+      "mode": "0600"
+    },
+    {
+      "name": "ssh-pubkey",
+      "src": "ssh/id_ed25519.pub",
+      "dst": "{HOME}/.ssh/id_ed25519.pub",
+      "render": false,
+      "mode": "0644"
+    },
+    {
       "name": "pi-compaction",
       "src": "ai/pi/compaction.json",
       "dst": "{HOME}/.pi/agent/settings.json",
