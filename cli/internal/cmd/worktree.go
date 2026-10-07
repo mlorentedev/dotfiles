@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -265,13 +266,11 @@ clean git status, confirmed merged PR, and minimum age.`,
 	return cmd
 }
 
-func resolveDoneTarget(args []string, worktreePath string) (string, error) {
+// resolveDoneTarget picks the worktree done removes: the argument, then --path,
+// then the current directory.
+func resolveDoneTarget(args []string, worktreePath, repoDir string) (string, error) {
 	if len(args) > 0 {
-		target := args[0]
-		if top, err := worktree.ResolveWorktreeRoot(target); err == nil {
-			return top, nil
-		}
-		return target, nil
+		return resolveDoneArg(args[0], repoDir)
 	}
 	if worktreePath != "" {
 		if top, err := worktree.ResolveWorktreeRoot(worktreePath); err == nil {
@@ -288,6 +287,55 @@ func resolveDoneTarget(args []string, worktreePath string) (string, error) {
 		return "", fmt.Errorf("not in a git repository: %w", err)
 	}
 	return top, nil
+}
+
+// resolveDoneArg reads done's argument as the path add printed or the slug add
+// was given. A bare name is also a slug, naming <repo>-wt-<slug> beside the
+// main repository, the path add creates. A name that is both, a directory in
+// the cwd and a sibling worktree, is refused rather than guessed. When it is
+// neither, the error names both paths it tried.
+func resolveDoneArg(arg, repoDir string) (string, error) {
+	asPath, err := filepath.Abs(arg)
+	if err != nil {
+		return "", err
+	}
+	sibling, rootErr := "", error(nil)
+	if !strings.ContainsAny(arg, `/\`) {
+		var root string
+		if root, rootErr = resolveCommandRepoRoot(repoDir); rootErr == nil {
+			sibling = worktree.ResolveSiblingPath(root, arg)
+		}
+	}
+	isPath, isSlug := isDirectory(asPath), sibling != "" && isDirectory(sibling)
+	switch {
+	case isPath && isSlug && asPath != sibling:
+		return "", fmt.Errorf("%q names two directories, %s (as a path) and %s (as a slug); pass the full path of the one to remove", arg, asPath, sibling)
+	case isPath:
+		return worktreeAt(asPath)
+	case isSlug:
+		return worktreeAt(sibling)
+	case rootErr != nil:
+		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, rootErr)
+	case sibling == "":
+		return "", fmt.Errorf("no worktree at %s", asPath)
+	}
+	return "", fmt.Errorf("no worktree %q: neither %s (as a path) nor %s (as a slug, the path add creates) is a directory", arg, asPath, sibling)
+}
+
+// worktreeAt returns the top of the git worktree holding dir, or an error that
+// names dir when it is not inside one, rather than letting git status fail on
+// it later with a bare exit status.
+func worktreeAt(dir string) (string, error) {
+	top, err := worktree.ResolveWorktreeRoot(dir)
+	if err != nil {
+		return "", fmt.Errorf("%s is a directory but not a git worktree", dir)
+	}
+	return top, nil
+}
+
+func isDirectory(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 func resolveDoneRepoRoot(repoDir, target string) (string, error) {
@@ -313,16 +361,19 @@ func newWorktreeDoneCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "done [path]",
+		Use:   "done [path | slug]",
 		Short: "Tear down a completed worktree cleanly",
 		Long: `done removes a completed worktree and prunes git metadata. Unless --force is
 passed, it refuses on uncommitted changes, and on commits that are neither on
 the upstream nor contained in the head of a merged pull request for the branch
 (how a squash-merged branch looks once its remote is deleted). When that pull
-request cannot be listed (no gh, offline), it refuses and says so.`,
+request cannot be listed (no gh, offline), it refuses and says so.
+
+The argument is the worktree's path, or the slug given to add: a name that is
+not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			target, err := resolveDoneTarget(args, worktreePath)
+			target, err := resolveDoneTarget(args, worktreePath, repoDir)
 			if err != nil {
 				return err
 			}
