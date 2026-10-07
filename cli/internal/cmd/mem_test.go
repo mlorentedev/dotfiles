@@ -70,6 +70,11 @@ func TestMemSessionEnd_AgentFlag(t *testing.T) {
 		if tc.stderr == "" && len(matches) != 1 {
 			t.Errorf("%s: want one record matching %s, got %v", tc.agent, tc.glob, matches)
 		}
+		// A refused agent writes nothing: the opencode record from the case
+		// before is the only one there.
+		if all, _ := filepath.Glob(filepath.Join(vault, "10_projects", "proj", "sessions", "*.md")); tc.stderr != "" && len(all) != 1 {
+			t.Errorf("%s: a refused agent must write no record, got %v", tc.agent, all)
+		}
 		if !strings.Contains(stderr.String(), tc.stderr) {
 			t.Errorf("%s: stderr %q lacks %q", tc.agent, stderr.String(), tc.stderr)
 		}

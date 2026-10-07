@@ -68,7 +68,8 @@ func newMemProjectKeyCmd() *cobra.Command {
 
 // newMemSessionEndCmd wires the SessionEnd hook. Per the resilience contract a
 // session-end hook must NEVER crash a session, so it reads the payload, persists
-// the handoff record best-effort, and ALWAYS exits 0 — every error is swallowed.
+// the handoff record best-effort, and ALWAYS exits 0 — an error is reported on
+// stderr, never returned.
 func newMemSessionEndCmd() *cobra.Command {
 	agent := mem.DefaultSessionEndAgent
 	cmd := &cobra.Command{
@@ -85,7 +86,7 @@ func newMemSessionEndCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload, _ := io.ReadAll(cmd.InOrStdin())
 			// Best-effort by contract: a SessionEnd hook must never crash a
-			// session, so the write result is intentionally discarded — exit 0.
+			// session, so no error becomes the exit status — exit 0.
 			//
 			// Local time, not UTC: `now` is formatted down to a calendar date
 			// that becomes the record's filename and its human-facing heading,
@@ -94,9 +95,10 @@ func newMemSessionEndCmd() *cobra.Command {
 			// next day and collided with the following morning's record.
 			// session-start below is already local; this keeps the pair consistent.
 			//
-			// A refused --agent is the one failure reported: it is the hook's own
-			// configuration, and swallowing it would leave every session of that
-			// harness without a record and nothing saying why.
+			// Every error SessionEndAs returns is printed: a refused --agent (the
+			// hook's own configuration) and a failed write alike. Swallowing
+			// either would leave the session without a record and nothing saying
+			// why. Trivial, missing and malformed input are no-ops, not errors.
 			if _, err := mem.SessionEndAs(payload, vault.ResolveVault(), agent, time.Now()); err != nil {
 				cmd.PrintErrf("dotf mem session-end: %v\n", err)
 			}
