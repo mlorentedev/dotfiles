@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/execerr"
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
 	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -27,7 +28,8 @@ var prLandOptions = func(repo, registry string) prland.Options {
 	return prland.Options{
 		Repo: repo,
 		Run: func(ctx context.Context, args ...string) ([]byte, error) {
-			return exec.CommandContext(ctx, "gh", args...).Output() //nolint:gosec // gh with arguments this command builds
+			out, err := exec.CommandContext(ctx, "gh", args...).Output() //nolint:gosec // gh with arguments this command builds
+			return out, execerr.WithStderr(err)
 		},
 		Untriaged: func(ctx context.Context) ([]int, error) {
 			reg, err := prtriage.LoadRegistry(registry)
