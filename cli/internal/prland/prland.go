@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Facts is what Decide needs, read from GitHub for one head commit.
@@ -74,6 +75,9 @@ type Options struct {
 	Untriaged func(ctx context.Context) ([]int, error) // PR numbers the triage queue lists
 	Repo      string                                   // owner/name; "" is the current repository
 	Wait      bool                                     // wait for the checks before reading them
+	// Sleep pauses between --wait rounds, so checks a push has not registered
+	// yet get time to appear; nil means time.Sleep.
+	Sleep func(time.Duration)
 }
 
 // Result is what Land did.
@@ -97,10 +101,16 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		return o.Run(ctx, args...)
 	}
 	n := strconv.Itoa(number)
-	if o.Wait {
-		_, _ = gh("pr", "checks", n, "--watch", "--interval", "30") // the facts below decide
-	}
 	f, err := readFacts(ctx, gh, o.Untriaged, number)
+	sleep := o.Sleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	for round := 0; o.Wait && err == nil && unsettled(f) && round < maxWaitRounds; round++ {
+		sleep(waitPause)
+		_, _ = gh("pr", "checks", n, "--watch", "--interval", "30") // the facts below decide
+		f, err = readFacts(ctx, gh, o.Untriaged, number)
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -124,6 +134,39 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	}
 	res.Merged = true
 	return res, nil
+}
+
+// maxWaitRounds bounds --wait: each round is a pause and one
+// `gh pr checks --watch`.
+const (
+	maxWaitRounds = 6
+	waitPause     = 30 * time.Second
+)
+
+// unsettled reports facts that more waiting can still change: a check still
+// pending, or a merge state GitHub has not finished computing. Right after a
+// push, `gh pr checks --watch` can return before every check is registered,
+// leaving the state BLOCKED with every reported check green.
+func unsettled(f Facts) bool {
+	for _, c := range f.Checks {
+		if c.Bucket == "pending" {
+			return true
+		}
+	}
+	switch f.MergeState {
+	case "UNKNOWN", "BLOCKED", "UNSTABLE":
+		return len(f.Checks) == 0 || allGreen(f.Checks)
+	}
+	return false
+}
+
+func allGreen(cs []Check) bool {
+	for _, c := range cs {
+		if c.Bucket != "pass" && c.Bucket != "skipping" {
+			return false
+		}
+	}
+	return true
 }
 
 type ghFunc func(args ...string) ([]byte, error)

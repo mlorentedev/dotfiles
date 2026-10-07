@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func readyFacts() Facts {
@@ -139,5 +140,44 @@ func TestLand_AnUnanswerableTriageQueueIsARefusalNotAPass(t *testing.T) {
 
 	if _, err := Land(context.Background(), Options{Run: g.run, Untriaged: broken}, 30); err == nil || len(g.calls) != 0 {
 		t.Errorf("want an error and no mutation when the triage queue cannot be read, got calls %v", g.calls)
+	}
+}
+
+// Right after a push, `gh pr checks --watch` can return while required checks
+// are not registered yet: every reported check is green but the merge state is
+// BLOCKED. --wait reads again instead of refusing on that transient state.
+func TestLand_WaitReadsAgainUntilTheStateSettles(t *testing.T) {
+	blocked := strings.Replace(readyView, `"CLEAN"`, `"BLOCKED"`, 1)
+	views := []string{blocked, readyView, readyView}
+	g := &fakeGH{checks: greenChecks, deps: `[]`}
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		if args[0] == "pr" && args[1] == "view" {
+			v := views[0]
+			if len(views) > 1 {
+				views = views[1:]
+			}
+			return []byte(v), nil
+		}
+		return g.run(ctx, args...)
+	}
+
+	pauses := 0
+	res, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged, Wait: true, Sleep: func(time.Duration) { pauses++ }}, 30)
+	if pauses == 0 {
+		t.Error("--wait read again without pausing for checks to register")
+	}
+	if err != nil || !res.Merged {
+		t.Fatalf("want a merge once the state settles, got %+v, %v", res, err)
+	}
+}
+
+// Without --wait, the transient state is a refusal: nothing waits by default.
+func TestLand_WithoutWaitABlockedStateIsARefusal(t *testing.T) {
+	blocked := strings.Replace(readyView, `"CLEAN"`, `"BLOCKED"`, 1)
+	g := &fakeGH{view: blocked, checks: greenChecks, deps: `[]`}
+
+	res, _ := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if res.Merged || len(g.calls) != 0 {
+		t.Errorf("merged a BLOCKED PR without --wait: %+v", res)
 	}
 }

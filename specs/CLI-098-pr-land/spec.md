@@ -42,6 +42,7 @@ Out of scope: rebasing a BEHIND branch (`--rebase-behind`), and landing every PR
 ## Evidence
 
 - `go test ./internal/prland/ ./internal/cmd/ -count=1` -> ok (Decide: every failed condition named; Land: retarget-then-merge with `--match-head-commit`, refusal without mutation, untriaged refusal, moved head, unanswerable triage queue is an error; cmd: refusal output and exit 1, non-number rejected)
+- Measured on #2025: `--wait` returned before a push's checks were registered, so the merge state read BLOCKED with every reported check green; the refusal was correct but premature. `--wait` now pauses and re-reads while a check is pending or the state is BLOCKED/UNKNOWN/UNSTABLE with every check green, up to 6 rounds (`TestLand_WaitReadsAgainUntilTheStateSettles`, `TestLand_WithoutWaitABlockedStateIsARefusal`)
 - Real PR, read-only: `dotf pr land 2033` -> `[NOT MERGED] #2033 at e656207: spec-gate: fail; merge state is UNKNOWN; reviewer output awaits triage`, exit 1, nothing changed
 
 ## Next
