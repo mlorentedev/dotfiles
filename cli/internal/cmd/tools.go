@@ -47,7 +47,9 @@ func newToolsInstallCmd() *cobra.Command {
 			"upgraded (never downgraded). With no [name] it installs every catalog tool;\n" +
 			"with a name it installs just that one.\n\n" +
 			"--dry-run prints the action install would take for each tool and changes\n" +
-			"nothing.",
+			"nothing. It exits non-zero when install would refuse a tool (a release\n" +
+			"with no checksums file, a package source naming no package), as install\n" +
+			"itself would.",
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,7 +85,8 @@ func loadToolsCatalog() (tools.Catalog, error) {
 	return tools.Load(path)
 }
 
-// planToolsInstall prints one row per selected tool: what install would do.
+// planToolsInstall prints one row per selected tool: what install would do. A
+// tool install would refuse fails the dry run too, after every row is printed.
 func planToolsInstall(in *tools.Installer, cat tools.Catalog, name string, out io.Writer) error {
 	selected, err := selectTools(cat, name)
 	if err != nil {
@@ -91,8 +94,12 @@ func planToolsInstall(in *tools.Installer, cat tools.Catalog, name string, out i
 	}
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "NAME\tINSTALLED\tPIN\tACTION")
+	var refused []string
 	for _, t := range selected {
 		p := in.Plan(t)
+		if p.Action == tools.PlanRefused {
+			refused = append(refused, p.Name)
+		}
 		installed := p.Installed
 		if installed == "" {
 			installed = "absent"
@@ -107,7 +114,13 @@ func planToolsInstall(in *tools.Installer, cat tools.Catalog, name string, out i
 		}
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", p.Name, installed, pin, action)
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	if len(refused) > 0 {
+		return fmt.Errorf("install would refuse: %s", strings.Join(refused, ", "))
+	}
+	return nil
 }
 
 // runToolsInstall selects the requested tools and installs them. Split from the
