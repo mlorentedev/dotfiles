@@ -291,7 +291,7 @@ func loadRegistry(cfg *Config) (*secrets.Registry, error) {
 func checkTmux(sys *System, rep *Report) {
 	rep.Section("tmux")
 	if sys.GOOS == "windows" {
-		rep.Skip("tmux (Linux-only by design; use WSL if needed)")
+		rep.Skip("tmux (not available on Windows; use WSL if needed)")
 		return
 	}
 	if !sys.has("tmux") {

@@ -143,8 +143,13 @@ func TestOSGatingSkipsLinuxOnlyChecksOnWindows(t *testing.T) {
 		var b bytes.Buffer
 		rep := capture(&b)
 		checkTmux(winSys(), rep)
-		if rep.Failures() != 0 || !strings.Contains(b.String(), "Linux-only") {
+		// tmux runs on Linux and macOS (tmuxInstall names both), so the skip
+		// must not call it Linux-only; it points at WSL instead.
+		if rep.Failures() != 0 || !strings.Contains(b.String(), "WSL") {
 			t.Errorf("tmux must SKIP on Windows\n%s", b.String())
+		}
+		if strings.Contains(b.String(), "Linux-only") {
+			t.Errorf("the tmux skip must not call tmux Linux-only: it runs on macOS too\n%s", b.String())
 		}
 	})
 
