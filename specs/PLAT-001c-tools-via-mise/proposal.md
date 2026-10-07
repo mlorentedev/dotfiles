@@ -38,6 +38,11 @@ One PR per row of #2013 track T (Wave 1, CLIs only):
   - Renders the pinned CLIs from `versions.conf` into `~/.config/mise/conf.d/dotfiles.toml`, a file `dotf` owns end to end. The hand-made `~/.config/mise/config.toml` is never touched; the toolchains move in Wave 3.
   - Runs `mise install`, then probes every tool with `mise which <tool>` plus `--version` at or above the pin.
   - A `tools` reconciler in `dotf converge` runs it after the records step.
+- **P5a — `source.type: system`, reader only** (#2013 D8):
+  - A catalog entry names its package per OS manager (`apt`, `brew`, `winget`); `dotf tools install` and `--dry-run` converge it through that manager. A manager with no name skips the entry on that OS, through the same skip as a `platforms` miss.
+  - Presence, not a pin, is the convergence rule, so a second run changes nothing and a system package is never upgraded.
+  - An unknown source type is skipped with a warning instead of failing the run, so a catalog written for a newer `dotf` degrades on an older one.
+  - No `system` entry ships in `packages.json` in this PR: the installed `dotf` errors on an unknown type, so entries wait for the release carrying this reader (P5b).
 - **W2b — the shims on PATH:** `mise activate` in the rc files and the shims directory for non-interactive callers, with a doctor check. This row waits on the rc files moving to deploy entries (#2013 P6, P7).
 
 ## Out of scope
@@ -61,6 +66,8 @@ One PR per row of #2013 track T (Wave 1, CLIs only):
 - [ ] AC4: `dotf tools install mise` installs the pinned mise on linux, darwin and windows, checksum-verified and exec-probed.
 - [ ] AC5: `dotf tools sync` renders `conf.d/dotfiles.toml` from `versions.conf`, installs, and fails naming any tool that does not run at or above its pin; a second run changes nothing.
 - [ ] AC6: `dotf converge` runs the tools step after the records step, and `--plan` reports the tools it would install.
+- [ ] AC7: a `system` entry is installed through the OS manager (`sudo -n apt-get install -y`, `brew install`, `winget install --id <id> -e` with both agreement flags), skipped with a message on an OS whose manager it does not name, a sudo password is reported as "needs sudo" with the command to run and does not fail the run, and a second run runs no manager command.
+- [ ] AC8: `Load` rejects a `system` entry that names no manager, names an unknown key, or declares a `version`, naming the entry; `Install` skips a source type it does not know instead of failing.
 
 ## References
 
