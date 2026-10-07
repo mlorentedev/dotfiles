@@ -98,7 +98,7 @@ func sameCheckoutRoot(configured, actual string) bool {
 	if errA != nil || errB != nil {
 		return false
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" { //nolint:forbidigo // compares paths resolved on this host's filesystem
 		return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 	}
 	return filepath.Clean(a) == filepath.Clean(b)
