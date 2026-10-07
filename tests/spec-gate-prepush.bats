@@ -70,6 +70,9 @@ STUB
     PATH="$FIX/bin:$PATH"
     export PATH
     export STUB_PR_JSON='{"labels":[],"body":null,"author":{"login":"mlorentedev"}}'
+    # The ref pre-commit hands a pre-push hook. Set here so no test depends on
+    # which branch the checkout running the suite happens to be on.
+    export PRE_COMMIT_REMOTE_BRANCH=refs/heads/feat/under-test
 }
 
 teardown() {
@@ -86,12 +89,45 @@ teardown() {
     grep -qF 'Archive skip rationale' "$GATE_LOG"
 }
 
-@test "spec-gate-prepush: resolves the CURRENT branch's PR, no --pr number involved" {
+@test "spec-gate-prepush: resolves the open PR of the PUSHED branch, not one inferred from the checkout" {
+    # A bare `gh pr view` picked a merged PR on a reused branch (#1152) and the
+    # PR of the upstream branch a stacked branch tracked (#1473).
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 0 ]
-    grep -qF -- '--json labels,body,author' "$GH_LOG"
-    run grep -c -- '-p ' "$GH_LOG"
+    grep -qF 'GH_ARGS=[pr list --head feat/under-test --state open --limit 1 --json labels,body,author' "$GH_LOG"
+    run grep -c 'pr view' "$GH_LOG"
     [ "$output" -eq 0 ]
+}
+
+@test "spec-gate-prepush: outside a hook the current branch names the PR" {
+    unset PRE_COMMIT_REMOTE_BRANCH
+    git init -q -b feat/from-checkout "$FIX/repo"
+    cd "$FIX/repo" || return 1
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF -- '--head feat/from-checkout ' "$GH_LOG"
+}
+
+@test "spec-gate-prepush: no branch to name (detached HEAD) falls through without asking gh" {
+    unset PRE_COMMIT_REMOTE_BRANCH
+    git init -q "$FIX/repo"
+    cd "$FIX/repo" || return 1
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+    git checkout -q --detach
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    [ ! -f "$GH_LOG" ]
+    grep -qF 'SDD_LABELS=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: no OPEN PR (an empty answer) falls through with no PR context" {
+    # Real gh answers an empty list with exit 0, so the empty answer, not a
+    # failure, is how a branch with only a merged PR reaches the baseline.
+    export STUB_PR_JSON=''
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_LABELS=[<unset>]' "$GATE_LOG"
+    grep -qF 'SDD_PR_BODY=[<unset>]' "$GATE_LOG"
 }
 
 @test "spec-gate-prepush: forwards every argument to the gate verbatim" {

@@ -7,7 +7,7 @@
 # stub answering any invocation will never surface. That is the BUG-055 shape
 # exactly: 15 green cases over a branch the real tool rejected.
 #
-# `gh pr view --json <fields>` validates field names locally, BEFORE it
+# `gh pr list --json <fields>` validates field names locally, BEFORE it
 # resolves a repository or a branch's PR, so the contract can be pinned with
 # the real binary and no token, no network and no live PR.
 
@@ -48,9 +48,9 @@ teardown() {
     rm -rf "$OUTSIDE"
 }
 
-@test "real gh accepts every --json field the adapter asks for, with no PR number" {
+@test "real gh accepts every flag and --json field the adapter asks for" {
     cd "$OUTSIDE" || return 1
-    run gh pr view --json labels,body,author
+    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author
     # It must fail (there is no repo here) but NOT because of the field names.
     [ "$status" -ne 0 ]
     [[ "$output" != *"Unknown JSON field"* ]]
@@ -58,7 +58,7 @@ teardown() {
 
 @test "the field check is a detector, not a tautology" {
     cd "$OUTSIDE" || return 1
-    run gh pr view --json labels,body,author,notAFieldName
+    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author,notAFieldName
     [ "$status" -ne 0 ]
     [[ "$output" == *"Unknown JSON field"* ]]
     [[ "$output" == *"notAFieldName"* ]]
