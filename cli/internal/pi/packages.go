@@ -113,7 +113,7 @@ func LiveSources(settingsPath string) ([]string, error) {
 	var out []string
 	for i, entry := range s.Packages {
 		var str string
-		if json.Unmarshal(entry, &str) == nil {
+		if json.Unmarshal(entry, &str) == nil && str != "" {
 			out = append(out, str)
 			continue
 		}
