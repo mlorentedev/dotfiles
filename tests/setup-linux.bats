@@ -461,6 +461,7 @@ setup() {
         'npm install -g yarn${SUFFIX}'
         'npm install -g "@github/copilot$SUFFIX"'
         'npm install --location global yarn@1.22.22'
+        $'# installed with: \\\nnpm install -g yarn@1.22.22'
     )
     benign=(
         'npm install -g yarnish'
@@ -469,6 +470,8 @@ setup() {
         'npm install -g foo || log_warning "yarn failed"'
         'echo "nothing installs here"'
         'npm install -g foo  # yarn would be the other choice'
+        'chmod +x s.sh # used to npm install -g yarn'
+        $'npm install -g foo \\ \n    yarn'
         $'PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"\nnpm install -g --prefix "$HOME/.local" "$PI_PKG"'
     )
     # The hostile fixtures are hostile only while packages.json owns these

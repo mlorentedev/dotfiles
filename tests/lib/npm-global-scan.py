@@ -59,14 +59,19 @@ VAR_RE = re.compile(r"^\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))(.*)$")
 
 
 def logical_lines(text):
-    """Yield (first line number, joined line), joining continuations."""
+    """Yield (first line number, joined line), joining continuations.
+
+    As in the shells, a continuation is a backslash or backtick that is the
+    line's last character, and a comment line never continues: a comment ending
+    in a backslash must not swallow the install on the next line.
+    """
     buf, start = [], None
     for n, line in enumerate(text.splitlines(), 1):
-        stripped = line.rstrip()
+        line = line.rstrip("\r")
         if start is None:
             start = n
-        if stripped.endswith("\\") or stripped.endswith("`"):
-            buf.append(stripped[:-1])
+        if line.endswith(("\\", "`")) and not line.lstrip().startswith("#"):
+            buf.append(line[:-1])
             continue
         buf.append(line)
         yield start, " ".join(buf)
@@ -116,6 +121,8 @@ def npm_commands(line):
     ends in `npm` starts one.
     """
     tokens, out, i = line.split(), [], 0
+    # A trailing comment ends the line, `npm` inside it included.
+    tokens = tokens[:next((k for k, t in enumerate(tokens) if t.startswith("#")), len(tokens))]
     while i < len(tokens):
         if not (NPM_RE.search(tokens[i].strip("\"'")) or tokens[i].endswith("/npm")):
             i += 1
@@ -123,7 +130,7 @@ def npm_commands(line):
         cmd, i = [], i + 1
         while i < len(tokens):
             t = tokens[i]
-            if t in OPERATORS or t.startswith("#") or re.match(r"^\d?>", t):
+            if t in OPERATORS or re.match(r"^\d?>", t):
                 break
             i += 1
             ends = t.endswith(";")
