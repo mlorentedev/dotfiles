@@ -66,12 +66,6 @@ setup() {
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
 #   vault-health              stubs `hive` — a real run needs the daemon and a live vault
-#   vault-health-go-parity    stubs `obsidian` (from tests/golden/vault-health/lib.sh, the SAME
-#                             stub vault-health-golden uses, shared by both suites) — same
-#                             rationale: a real run needs the AppImage and a live vault. This
-#                             suite's own subject is Go/shell PARITY against frozen goldens, not
-#                             the stub's fidelity to the real CLI, which vault-health-golden's
-#                             ORACLE hash check already guards.
 #   vault-health-golden       stubs `obsidian` (from tests/golden/vault-health/lib.sh, not the
 #                             .bats file itself — see #892) — same rationale as vault-health: a
 #                             real run needs the AppImage and a live vault
@@ -82,7 +76,7 @@ setup() {
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
 EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
-hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline vault-health vault-health-go-parity
+hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline vault-health
 vault-health-golden vault-maintenance-weekly zshrc-guards"
 
 exempt() {
