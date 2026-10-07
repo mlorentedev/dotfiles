@@ -128,14 +128,20 @@ setup() {
     grep -q '"openrouter":' "$OPENCODE_CFG"
 }
 
-@test "opencode.jsonc openrouter picker is curated to the shared free+NaN set (#300, no big-3)" {
-    # An explicit models map (not an empty {}) restricts the /models picker, and
-    # must match pi's ai/pi/settings.json so the two agents are interchangeable.
-    grep -q '"qwen/qwen3-coder:free":' "$OPENCODE_CFG"
+@test "opencode.jsonc openrouter picker is curated (#300, no big-3)" {
+    # An explicit models map (not an empty {}) restricts the /models picker.
+    grep -q '"nvidia/nemotron-3-ultra-550b-a55b:free":' "$OPENCODE_CFG"
     grep -q '"deepseek/deepseek-v4-pro":' "$OPENCODE_CFG"
     grep -q '"minimax/minimax-m3":' "$OPENCODE_CFG"
     # No OpenAI/Google/Anthropic OpenRouter model entries.
     refute_grep '"(openai|google|anthropic)/[^"]+":[[:space:]]*\{[[:space:]]*"name"' "$OPENCODE_CFG"
+}
+
+@test "opencode.jsonc lists no OpenRouter slug measured gone from the catalog (#1937)" {
+    # Both answered 404 ("unavailable for free") and were absent from
+    # /api/v1/models on 2026-10-07. A picker entry that cannot answer is a
+    # failure one keystroke away; this keeps a revert from bringing them back.
+    refute_grep '"(qwen/qwen3-coder|moonshotai/kimi-k2\.6):free"' "$OPENCODE_CFG"
 }
 
 # The ollama provider is gone and must stay gone: the homelab endpoint no longer
