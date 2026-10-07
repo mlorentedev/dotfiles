@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -190,5 +191,35 @@ func TestVaultHealthWiring(t *testing.T) {
 		if want := "Obsidian CLI not found in PATH"; !strings.Contains(stdout, want) {
 			t.Errorf("%v: exit 1 was not the obsidian-absent abort, report lacks %q:\n%s", c.args, want, stdout)
 		}
+	}
+}
+
+// #2115: a repository the vault tracks under another slug is reported, not
+// scaffolded a second time under its directory name.
+func TestVaultProjectReportsARepositoryTrackedUnderAnotherSlug(t *testing.T) {
+	vaultDir := t.TempDir()
+	t.Setenv("VAULT_PATH", vaultDir)
+	t.Setenv("HOME", t.TempDir())
+	pinClock(t)
+	ctxDir := filepath.Join(vaultDir, "10_projects", "homelab")
+	if err := os.MkdirAll(ctxDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ctxDir, "context.md"), []byte("---\nrepo_url: \"https://github.com/owner/kubelab\"\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(t.TempDir(), "checkout")
+	for _, args := range [][]string{{"init", "-q", repo}, {"-C", repo, "remote", "add", "origin", "git@github.com:owner/kubelab.git"}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	stdout, _, err := execute(t, "vault", "project", repo)
+	if err != nil {
+		t.Fatalf("vault project: %v", err)
+	}
+	if !strings.Contains(stdout, "[SKIP]") || !strings.Contains(stdout, "10_projects/homelab") || strings.Contains(stdout, "[OK]") {
+		t.Errorf("want a [SKIP] naming 10_projects/homelab:\n%s", stdout)
 	}
 }
