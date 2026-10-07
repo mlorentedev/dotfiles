@@ -5,7 +5,16 @@ version: "2"
 linters:
   enable:
     - gocyclo
+    - forbidigo
   settings:
+    forbidigo:
+      # #2061. internal/doctor decides by the target OS through System.GOOS, the
+      # seam that lets a test on one host run every OS branch. A direct
+      # runtime.GOOS read ties the branch to the machine running the test. The
+      # sites that ask about the host filesystem itself say so in a nolint.
+      forbid:
+        - pattern: ^runtime\.GOOS$
+          msg: read System.GOOS, the target-OS seam, so tests can run every branch
     gocyclo:
       # HARNESS-150. The largest function in internal/cmd today is
       # newSpecReviewCmd at 22, so anything that grows past it fails lint. The
@@ -18,6 +27,12 @@ linters:
       - path-except: internal/cmd/
         linters:
           - gocyclo
+      - path-except: internal/doctor/
+        linters:
+          - forbidigo
+      - path: _test\.go
+        linters:
+          - forbidigo
 
 # #1154. v2 moved formatting out of `linters:`, so a config without this block
 # checks no formatting at all: four unformatted files sat on main behind a
