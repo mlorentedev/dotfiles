@@ -60,7 +60,7 @@ func TestDeployCmd_NoOrcaIsNothingToDo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("deploy: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "skipped   orca-hooks") {
+	if !strings.Contains(out, row("skipped", "orca-hooks")) {
 		t.Errorf("no Orca line:\n%s", out)
 	}
 }
