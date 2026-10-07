@@ -103,3 +103,26 @@ func TestWorktreeDoneNamesBothPathsForAnUnknownName(t *testing.T) {
 		t.Errorf("error %q is a bare git exit status", err)
 	}
 }
+
+// A bare name that is both a directory in the cwd and a sibling worktree is
+// refused, naming both, rather than resolved to whichever is checked first.
+func TestWorktreeDoneRefusesANameThatIsBothAPathAndASlug(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	if out, err := executeWorktree(t, "add", "demo", "--repo", repo); err != nil {
+		t.Fatalf("add: %v\n%s", err, out)
+	}
+	cwd := t.TempDir()
+	if err := os.Mkdir(filepath.Join(cwd, "demo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+
+	_, err := executeWorktree(t, "done", "demo", "--repo", repo)
+	wt := filepath.Join(filepath.Dir(repo), "repo-wt-demo")
+	if err == nil || !strings.Contains(err.Error(), wt) || !strings.Contains(err.Error(), filepath.Join(cwd, "demo")) {
+		t.Fatalf("got %v, want a refusal naming both %s and the cwd's demo", err, wt)
+	}
+	if _, err := os.Stat(wt); err != nil {
+		t.Errorf("the sibling worktree was touched: %v", err)
+	}
+}

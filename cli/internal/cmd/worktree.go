@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -289,29 +290,39 @@ func resolveDoneTarget(args []string, worktreePath, repoDir string) (string, err
 }
 
 // resolveDoneArg reads done's argument as the path add printed or the slug add
-// was given. A directory is taken as the path. Anything else is a slug, which
-// names <repo>-wt-<slug> beside the main repository, the path add creates; if
-// that is not a directory either, the error names both paths it tried.
+// was given. A bare name is also a slug, naming <repo>-wt-<slug> beside the
+// main repository, the path add creates. A name that is both, a directory in
+// the cwd and a sibling worktree, is refused rather than guessed. When it is
+// neither, the error names both paths it tried.
 func resolveDoneArg(arg, repoDir string) (string, error) {
-	if isDirectory(arg) {
-		if top, err := worktree.ResolveWorktreeRoot(arg); err == nil {
-			return top, nil
-		}
-		return arg, nil
-	}
 	asPath, err := filepath.Abs(arg)
 	if err != nil {
 		return "", err
 	}
-	root, err := resolveCommandRepoRoot(repoDir)
-	if err != nil {
-		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, err)
+	sibling, rootErr := "", error(nil)
+	if !strings.ContainsAny(arg, `/\`) {
+		var root string
+		if root, rootErr = resolveCommandRepoRoot(repoDir); rootErr == nil {
+			sibling = worktree.ResolveSiblingPath(root, arg)
+		}
 	}
-	sibling := worktree.ResolveSiblingPath(root, arg)
-	if !isDirectory(sibling) {
-		return "", fmt.Errorf("no worktree %q: neither %s (as a path) nor %s (as a slug, the path add creates) is a directory", arg, asPath, sibling)
+	isPath, isSlug := isDirectory(asPath), sibling != "" && isDirectory(sibling)
+	switch {
+	case isPath && isSlug && asPath != sibling:
+		return "", fmt.Errorf("%q names two directories, %s (as a path) and %s (as a slug); pass the full path of the one to remove", arg, asPath, sibling)
+	case isPath:
+		if top, err := worktree.ResolveWorktreeRoot(asPath); err == nil {
+			return top, nil
+		}
+		return asPath, nil
+	case isSlug:
+		return sibling, nil
+	case rootErr != nil:
+		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, rootErr)
+	case sibling == "":
+		return "", fmt.Errorf("no worktree at %s", asPath)
 	}
-	return sibling, nil
+	return "", fmt.Errorf("no worktree %q: neither %s (as a path) nor %s (as a slug, the path add creates) is a directory", arg, asPath, sibling)
 }
 
 func isDirectory(path string) bool {
