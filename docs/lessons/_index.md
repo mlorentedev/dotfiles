@@ -366,4 +366,5 @@ tags: [lessons, index, dotfiles]
 | [346 - A CI cache other PRs can read is one main wrote](lesson-346-a-ci-cache-other-prs-can-read-is-one-main-wrote.md) | 2026-10-07 |
 | [347 - A change is verified by every test that references the file, not by the file's own suite](lesson-347-a-change-is-verified-by-every-test-that-references-the-file.md) | 2026-10-07 |
 | [348 - Getwd succeeding on darwin does not mean the directory exists](lesson-348-getwd-succeeding-on-darwin-does-not-mean-the-directory-exists.md) | 2026-10-07 |
+| [349 - An exit error wrapped with %w loses the command's reason](lesson-349-an-exit-error-wrapped-with-w-loses-the-commands-reason.md) | 2026-10-07 |
 <!-- END GENERATED -->
