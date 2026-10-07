@@ -73,7 +73,7 @@ These are the two secrets that must exist before Bitwarden is reachable. Both be
 
    When the key is missing, `setup-linux.sh` and `setup-windows.ps1` warn and point to this section. To keep the key somewhere else, set `AGE_KEY_PATH`.
 2. **The SSH key.**
-   - `dotf deploy` deploys `ssh/config` (0600, in a 0700 `~/.ssh`) and the public key, on every OS.
+   - `dotf deploy` deploys `ssh/config` (0600) and the public key, on every OS. A `~/.ssh` that deploy creates is 0700; one that already exists keeps its mode, so `chmod 700 ~/.ssh` on a machine that had it at 0755 (tracked in #2053).
    - The private key is the registry's `SSH_KEY` (`age-offline`, blob `sensitive/id_ed25519.secret.age`).
    - Resolving it materializes `~/.ssh/id_ed25519` with mode 0600, on Linux and on Windows:
 
