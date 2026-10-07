@@ -291,3 +291,18 @@ func TestASilencedCommandReportsArgumentsItRefuses(t *testing.T) {
 		}
 	}
 }
+
+// An unknown top-level command is refused by Cobra's own root check, before
+// any Args validator, so markUsageErrors never sees it. It is printed only
+// because the root does not silence its errors; this pins that.
+func TestAnUnknownTopLevelCommandIsReported(t *testing.T) {
+	root := cmd.New("test", "")
+	root.SetArgs([]string{"nosuch"})
+	var stderr bytes.Buffer
+	if code := run(root, &stderr); code == 0 {
+		t.Error("dotf nosuch exited 0")
+	}
+	if !strings.Contains(stderr.String(), `unknown command "nosuch"`) {
+		t.Errorf("dotf nosuch did not report the command; stderr: %q", stderr.String())
+	}
+}
