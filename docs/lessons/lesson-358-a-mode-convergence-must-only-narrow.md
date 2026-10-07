@@ -1,5 +1,5 @@
 ---
-id: "lesson-357-a-mode-convergence-must-only-narrow"
+id: "lesson-358-a-mode-convergence-must-only-narrow"
 type: lesson
 status: active
 title: "A mode convergence must only narrow"
