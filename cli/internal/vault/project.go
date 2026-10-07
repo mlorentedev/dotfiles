@@ -118,8 +118,14 @@ func linkMemory(claudeProjectsDir, repoRoot, target string) string {
 	return link
 }
 
-// originURL is repoRoot's origin remote URL, or "" when it has none.
+// originURL is repoRoot's origin remote URL, or "" when it has none. A
+// directory inside another repository has none of its own: git would answer
+// with the enclosing clone's origin, and the lookup would then report the
+// directory as that repository.
 func originURL(repoRoot string) string {
+	if prefix, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--show-prefix").Output(); err != nil || strings.TrimSpace(string(prefix)) != "" {
+		return ""
+	}
 	out, err := exec.Command("git", "-C", repoRoot, "remote", "get-url", "origin").Output()
 	if err != nil {
 		return ""
@@ -179,17 +185,30 @@ func normalizeRepoURL(u string) string {
 	if u == "" {
 		return ""
 	}
+	var host, path string
 	if i := strings.Index(u, "://"); i >= 0 {
 		u = u[i+3:]
-	} else if at := strings.Index(u, "@"); at >= 0 && strings.Contains(u[at:], ":") {
-		u = strings.Replace(u[at+1:], ":", "/", 1) // scp-like user@host:path
-	}
-	if at := strings.Index(u, "@"); at >= 0 && at < strings.Index(u+"/", "/") {
-		u = u[at+1:] // user info
-	}
-	host, path, _ := strings.Cut(u, "/")
-	if h, _, ok := strings.Cut(host, ":"); ok {
-		host = h // port
+		if at := strings.Index(u, "@"); at >= 0 && at < strings.Index(u+"/", "/") {
+			u = u[at+1:] // user info
+		}
+		host, path, _ = strings.Cut(u, "/")
+		if h, _, ok := strings.Cut(host, ":"); ok {
+			host = h // port
+		}
+	} else {
+		// scp-like [user@]host:path, which git reads whenever a colon comes
+		// before any slash. Anything else is a local path.
+		colon, slash := strings.Index(u, ":"), strings.Index(u, "/")
+		if colon < 0 || (slash >= 0 && slash < colon) {
+			return ""
+		}
+		host, path = u[:colon], u[colon+1:]
+		if at := strings.LastIndex(host, "@"); at >= 0 {
+			host = host[at+1:]
+		}
+		if len(host) == 1 {
+			return "" // a Windows drive letter: C:/src/repo is a local path
+		}
 	}
 	path = strings.TrimSuffix(strings.TrimSuffix(path, "/"), ".git")
 	if host == "" || path == "" {

@@ -20,6 +20,9 @@ func TestNormalizeRepoURL(t *testing.T) {
 		"https://github.com/Owner/Repo":          "github.com/Owner/Repo",
 		"":                                       "",
 		"/srv/git/r.git":                         "",
+		"git.example.lan:homelab/notes.git":      "git.example.lan/homelab/notes",
+		"C:/src/repo":                            "",
+		"./rel/repo:x":                           "",
 	}
 	for in, want := range cases {
 		if got := normalizeRepoURL(in); got != want {
@@ -141,13 +144,30 @@ func TestWriteProjectEntryNeverRecordsOrReportsACredential(t *testing.T) {
 		t.Errorf("context.md should record the origin without its token:\n%s", b)
 	}
 
-	trackProject(t, vault, "renamed", "https://git.example.lan/owner/tool")
+	// A vault of its own, so the one entry matches and the skip is reached:
+	// in the vault above, two entries would make the match ambiguous.
+	tracked := t.TempDir()
+	trackProject(t, tracked, "renamed", "https://git.example.lan/owner/tool")
 	other := repoWithOrigin(t, "checkout", "https://oauth2:"+fakeToken+"@git.example.lan/owner/tool.git")
-	res, err := WriteProjectEntry(ProjectEntryOptions{VaultPath: vault, RepoRoot: other, Date: "2026-10-07"})
+	res, err := WriteProjectEntry(ProjectEntryOptions{VaultPath: tracked, RepoRoot: other, Date: "2026-10-07"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(res.Reason, fakeToken) {
-		t.Errorf("the skip reason printed the credential: %q", res.Reason)
+	if res.Action != "skipped" || !strings.Contains(res.Reason, "10_projects/renamed") || strings.Contains(res.Reason, fakeToken) {
+		t.Errorf("want a skip naming 10_projects/renamed without the credential, got %q: %q", res.Action, res.Reason)
+	}
+}
+
+func TestOriginURLIsEmptyInsideAnotherRepository(t *testing.T) {
+	root := repoWithOrigin(t, "parent", "https://github.com/o/parent")
+	nested := filepath.Join(root, "sub")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := originURL(root); got != "https://github.com/o/parent" {
+		t.Errorf("originURL(root) = %q", got)
+	}
+	if got := originURL(nested); got != "" {
+		t.Errorf("originURL(nested) = %q, want \"\": the directory is not the repository", got)
 	}
 }
