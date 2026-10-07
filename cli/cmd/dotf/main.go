@@ -131,9 +131,33 @@ func markUsageErrors(root *cobra.Command) {
 				return nil
 			}
 		}
+		if c != root && c.HasSubCommands() {
+			if c.Args == nil {
+				c.Args = refuseUnknownSubcommand
+			}
+			if !c.Runnable() {
+				c.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
+			}
+		}
 		for _, sub := range c.Commands() {
 			walk(sub)
 		}
 	}
 	walk(root)
+}
+
+// refuseUnknownSubcommand is the Args of a command group (`dotf pr`, `dotf
+// spec`). Cobra checks for an unknown subcommand only on the root, and a group
+// accepted any argument and printed its help with exit 0, so `dotf pr
+// land-queue` read as a command that ran (#2091). With no argument the group
+// still prints its help.
+func refuseUnknownSubcommand(c *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	msg := fmt.Sprintf("unknown command %q for %q", args[0], c.CommandPath())
+	if s := c.SuggestionsFor(args[0]); len(s) > 0 {
+		msg += "\n\nDid you mean this?\n\t" + strings.Join(s, "\n\t")
+	}
+	return usageError{goerrors.New(msg)}
 }

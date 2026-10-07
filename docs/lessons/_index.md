@@ -367,4 +367,5 @@ tags: [lessons, index, dotfiles]
 | [347 - A change is verified by every test that references the file, not by the file's own suite](lesson-347-a-change-is-verified-by-every-test-that-references-the-file.md) | 2026-10-07 |
 | [348 - Getwd succeeding on darwin does not mean the directory exists](lesson-348-getwd-succeeding-on-darwin-does-not-mean-the-directory-exists.md) | 2026-10-07 |
 | [349 - An exit error wrapped with %w loses the command's reason](lesson-349-an-exit-error-wrapped-with-w-loses-the-commands-reason.md) | 2026-10-07 |
+| [350 - A test that walks every command runs real commands](lesson-350-a-test-that-walks-every-command-runs-real-commands.md) | 2026-10-07 |
 <!-- END GENERATED -->
