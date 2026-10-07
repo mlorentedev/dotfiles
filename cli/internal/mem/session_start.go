@@ -20,8 +20,10 @@
 // from that path: a point-in-time queue frozen into an instruction file would
 // assert stale data as live, which is the failure class this section exists to
 // prevent.
-// The output is contractually byte-equivalent to session-brief.sh, so every emitter
-// mirrors the shell's exact spacing, leading-newline framing, and message text.
+// session-brief.sh is gone; the spacing, leading-newline framing and message text
+// it fixed are kept, and the Go core is now the contract. Messages may change
+// here deliberately, as the vault-health GUI-down hint did when the report moved
+// in process.
 package mem
 
 import (
