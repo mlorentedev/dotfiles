@@ -553,12 +553,49 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: pwsh -NoProfile -File .github/scripts/doctor-gate.ps1
 
-      - name: Run Pester suites
+      # #1605: the Pester that runs the suite is pinned in versions.conf and
+      # cached. It was `Install-Module -MinimumVersion 5.5.0` on every run, so
+      # the Gallery's latest of the day was the test runner, one Gallery blip
+      # failed the job before any test ran, and the install cost ~20 s a run.
+      # Read in pwsh, as AGE_VERSION is: a CRLF checkout would hand bash a `\r`.
+      - name: Resolve the Pester pin
+        id: pester
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
-          Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
-          Import-Module Pester -MinimumVersion 5.5.0
+          $v = ((Get-Content versions.conf | Select-String '^PESTER_VERSION=').Line -split '=', 2)[1]
+          if (-not $v) { throw "PESTER_VERSION missing from versions.conf" }
+          "version=$($v.Trim())" >> $env:GITHUB_OUTPUT
+
+      - name: Restore the pinned Pester
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Documents/PowerShell/Modules/Pester/${{ steps.pester.outputs.version }}
+          key: pester-${{ runner.os }}-${{ steps.pester.outputs.version }}
+
+      - name: Run Pester suites
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        shell: pwsh
+        env:
+          PESTER_VERSION: ${{ steps.pester.outputs.version }}
+        run: |
+          $v = $env:PESTER_VERSION
+          if (-not (Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [version]$v })) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Install-Module Pester -RequiredVersion $v -Force -Scope CurrentUser -SkipPublisherCheck -ErrorAction Stop
+                break
+              } catch {
+                if ($attempt -eq 3) {
+                  Write-Output "::error::Pester $v could not be installed from the PowerShell Gallery after 3 attempts, so no test ran: $_"
+                  exit 1
+                }
+                Start-Sleep -Seconds (10 * $attempt)
+              }
+            }
+          }
+          Import-Module Pester -RequiredVersion $v
           # A later step inherits the runner's original PATH plus GITHUB_PATH only;
           # the winget Links dir and npm's prefix that setup added to the User
           # PATH are invisible here, so every suite gated on an installed tool
