@@ -51,7 +51,7 @@ OPERATORS = {"||", "&&", "|", ";", "&"}
 
 ASSIGN_RE = re.compile(
     r"(?:^|[\s;{(])(?:export\s+|local\s+|readonly\s+|declare\s+(?:-\w+\s+)?)?"
-    r"\$?([A-Za-z_]\w*)\s*=(?!=)\s*(.*)$")
+    r"\$?([A-Za-z_]\w*)\s*=(?!=)\s*([^;]*)")
 LITERAL_RE = re.compile(r"\"([^\"]*)\"|'([^']*)'")
 # `$VAR` or `${VAR}`, plus whatever follows it. Any other `${...}` form is an
 # expansion the scan does not evaluate, so it does not match and fails closed.
@@ -86,15 +86,15 @@ def assignments(lines, key):
     for _, line in lines:
         if line.lstrip().startswith("#"):
             continue
-        m = ASSIGN_RE.search(line)
-        if not m:
-            continue
-        rhs = m.group(2)
-        cands = [a or b for a, b in LITERAL_RE.findall(rhs)]
-        bare = rhs.split()[0] if rhs.split() else ""
-        if bare and bare[0] not in "\"'":
-            cands.append(bare.rstrip(";"))
-        values.setdefault(key(m.group(1)), []).extend(cands)
+        # Every assignment on the line: `if x; then T=a; else T=b; fi` sets T
+        # twice, and both values are candidates.
+        for m in ASSIGN_RE.finditer(line):
+            rhs = m.group(2)
+            cands = [a or b for a, b in LITERAL_RE.findall(rhs)]
+            bare = rhs.split()[0] if rhs.split() else ""
+            if bare and bare[0] not in "\"'":
+                cands.append(bare)
+            values.setdefault(key(m.group(1)), []).extend(cands)
     return values
 
 
@@ -110,15 +110,16 @@ def package(arg):
     return arg.split("@", 1)[0]
 
 
-NPM_RE = re.compile(r"(?:^|[=(`&])npm(?:\.cmd)?$")
+NPM_RE = re.compile(r"(?:^|[=(`&;|)])npm(?:\.cmd)?$")
 
 
 def npm_commands(line):
     """The tokens of every npm command on line, each from `npm` to its end.
 
-    A line can hold several (`npm dedupe && npm install -g x`), and npm can
-    open a command substitution (`X=$(npm install -g x)`), so every token that
-    ends in `npm` starts one.
+    A line can hold several (`npm dedupe && npm install -g x`), npm can open a
+    command substitution (`X=$(npm install -g x)`), and it can be glued to the
+    operator before it (`true;npm ..`), so every token that ends in `npm`
+    after one of those starts one.
     """
     tokens, out, i = line.split(), [], 0
     # A trailing comment ends the line, `npm` inside it included.

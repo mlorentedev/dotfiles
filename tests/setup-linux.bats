@@ -462,6 +462,10 @@ setup() {
         'npm install -g "@github/copilot$SUFFIX"'
         'npm install --location global yarn@1.22.22'
         $'# installed with: \\\nnpm install -g yarn@1.22.22'
+        'true;npm install -g yarn'
+        'x |npm install -g yarn'
+        $'TOOL=foo; TOOL=yarn\nnpm install -g "$TOOL"'
+        $'if a; then TOOL=nodejs; else TOOL=yarn; fi\nnpm install -g "$TOOL"'
     )
     benign=(
         'npm install -g yarnish'
