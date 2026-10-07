@@ -407,12 +407,10 @@ ensure_directory "$GEMINI_HOME/config"
 ensure_directory "$GEMINI_HOME/prompts"
 ensure_directory "$AGY_APP_DATA"
 
-# 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
-#    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
-#    which a verbatim copy could not do. Only the ignore file is copied here.
-if [ -f "$CURRENT_DIR/.geminiignore" ]; then
-    deploy_file "$CURRENT_DIR/.geminiignore" "$GEMINI_HOME/.geminiignore"
-fi
+# 1. agy settings.json, AGY.md and .geminiignore are `dotf deploy` entries
+#    (ai/deploy.json `agy-settings`, `agy-instructions`, `agy-geminiignore`;
+#    #1843 B11): one implementation for every OS, run by the bare `dotf deploy`
+#    this script makes. settings.json renders {HOME} per machine (AI-042/#1334).
 
 # 2. Consolidate MCP servers — master at ~/.gemini/config/mcp_config.json (agy's canonical read path)
 if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
@@ -496,14 +494,6 @@ rm -f "$GEMINI_HOME/config/.migrated" 2>/dev/null
 # this for every agent at once; no per-agent skill loop here.
 ensure_directory "$HOME/.gemini/skills"
 
-# Force copy master files (Neural Hive Protocol)
-rm -f "$GEMINI_HOME/AGY.md"
-cp "$CURRENT_DIR/ai/agy/AGY.md" "$GEMINI_HOME/AGY.md"
-if grep -q 'First, read `AGENTS.md`' "$GEMINI_HOME/AGY.md"; then
-    log_success "AGY.md deployed successfully (verified pointer to AGENTS.md)"
-else
-    echo "❌ Error: AGY.md deployment failed verification"
-fi
 
 # Note: legacy `agy plugin import gemini` removed (SDD-007). Fresh-install model:
 # we don't carry over from legacy gemini-cli on every setup run. If the user

@@ -42,7 +42,7 @@ func TestCheckProfileFiles(t *testing.T) {
 			files:        []string{".claude/CLAUDE.md"},
 			commands:     []string{"agy"},
 			wantFailures: 1,
-			wantSubstr:   "(agy is installed; re-run setup-linux.sh)",
+			wantSubstr:   "(agy is installed; run: dotf deploy agy-instructions)",
 		},
 		{
 			name:         "posix: AGY.md missing, agy not installed → skip, not fail (#843)",
@@ -101,14 +101,5 @@ func TestCheckProfileFiles(t *testing.T) {
 				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
 			}
 		})
-	}
-}
-
-func TestSetupRemedy_NamesTheSetupScriptForTheOS(t *testing.T) {
-	if got := setupRemedy("darwin"); got != "re-run setup-linux.sh" {
-		t.Errorf("darwin: %q", got)
-	}
-	if got := setupRemedy("windows"); got != "re-run setup-windows.ps1" {
-		t.Errorf("windows: %q", got)
 	}
 }
