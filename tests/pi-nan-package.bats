@@ -92,28 +92,14 @@ setup() {
     done < <(jq -r '.pool[] | select(.runner == "pi" and .provider == "nan") | .model' "$REPO/harness/reviewer-pool.json" | tr -d '\r')
 }
 
-# #1772: opencode and pi describe the same endpoint, so a context window they
-# disagree on is wrong in one of them. Since AI-046, pi's side is the package.
-@test "pi-nan-package: opencode.jsonc and the package snapshot declare the same context window for every NaN model both carry" {
-    run python3 - "$REPO/ai/opencode/opencode.jsonc" "$REPO/ai/pi/models.json" "$SNAPSHOT" <<'PY'
-import json, re, sys
-src = "".join(l for l in open(sys.argv[1]) if not l.lstrip().startswith("//"))
-oc = json.loads(re.sub(r",(\s*[}\]])", r"\1", src))["provider"]["nan"]["models"]
-overrides = json.load(open(sys.argv[2]))["providers"]["nan"]["modelOverrides"]
-pkg = {m["id"]: m for m in json.load(open(sys.argv[3]))}
-for model, override in overrides.items():
-    if model in pkg:
-        pkg[model].update(override)
-both = sorted(set(oc) & set(pkg))
-if not both:
-    print("no NaN model is carried by both, so the comparison would be vacuous")
-    sys.exit(1)
-bad = [f"{k}: opencode {oc[k]['limit']['context']} package {pkg[k]['contextWindow']}"
-       for k in both if oc[k]["limit"]["context"] != pkg[k]["contextWindow"]]
-print("\n".join(bad))
-sys.exit(1 if bad else 0)
-PY
-    [ "$status" -eq 0 ] || { echo "context windows disagree: $output"; false; }
+# #1866: opencode is held to pi's windows offline, against the committed copy in
+# ai/pi/nan-package-windows.json (tests/nan-context-windows.bats). This holds the
+# copy to the installed package, so a pin bump that changes a window fails here
+# instead of leaving the offline test comparing against stale numbers.
+@test "pi-nan-package: ai/pi/nan-package-windows.json equals the installed package's windows" {
+    want="$(jq -S 'map({key: .id, value: .contextWindow}) | from_entries' "$SNAPSHOT")"
+    got="$(jq -S '.contextWindow' "$REPO/ai/pi/nan-package-windows.json")"
+    [ "$got" = "$want" ] || { echo "regenerate the committed snapshot's contextWindow as:"; echo "$want"; false; }
 }
 
 @test "pi-nan-package: effective package limits equal NaN's published windows and output caps" {
