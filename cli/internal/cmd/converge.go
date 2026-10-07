@@ -9,6 +9,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 func newConvergeCmd() *cobra.Command {
@@ -39,7 +40,7 @@ func newConvergeCmd() *cobra.Command {
 			}
 			home := env.Home()
 			e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
-			rep, err := converge.Run(converge.Registry(convergeOptions), e, plan)
+			rep, err := converge.Run(converge.Registry(convergeOptions()), e, plan)
 			printConvergeReport(cmd.OutOrStdout(), rep)
 			return err
 		},
@@ -50,7 +51,10 @@ func newConvergeCmd() *cobra.Command {
 }
 
 // convergeOptions wires the registry's side effects; tests replace it.
-var convergeOptions = converge.Options{RunHarnessDeploy: converge.CompileHarnessDeploy}
+var convergeOptions = func() converge.Options {
+	run, stdout := tools.HomeRunners(env.Home())
+	return converge.Options{RunHarnessDeploy: converge.CompileHarnessDeploy, MiseRun: run, MiseStdout: stdout}
+}
 
 var convergeTag = map[converge.Status]string{
 	converge.StatusOK:      "[ OK ]",

@@ -36,8 +36,8 @@
   },
   {
     "id": "PLAT-001c-tools-via-mise-f6",
-    "behavior": "AC6: converge runs the tools step after the records step",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestRegistry_ToolsRunAfterRecords$' -count=1 -v | grep -q -- '--- PASS: TestRegistry_ToolsRunAfterRecords'",
+    "behavior": "AC6: converge runs the tools step after the records step: plan, apply, then nothing to do",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestToolsSync_PlanThenApplyThenNothingToDo$' -count=1 -v | grep -q -- '--- PASS: TestToolsSync_PlanThenApplyThenNothingToDo'",
     "state": "pending",
     "evidence": ""
   }

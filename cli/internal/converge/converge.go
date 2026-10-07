@@ -21,6 +21,10 @@ type Env struct {
 type Result struct {
 	Changes int    // 0 means converged
 	Detail  string // one line for the report
+	// Skip, when set, says why this reconciler does not apply on this machine
+	// right now (a prerequisite it cannot provide itself). The run reports it
+	// as skipped with this reason, never as passed, and does not probe it.
+	Skip string
 }
 
 // Reconciler converges one part of the machine.
@@ -95,6 +99,10 @@ func runOne(r Reconciler, env Env, dryRun bool) (Entry, error) {
 		return e, nil
 	}
 	res, err := r.Reconcile(env, dryRun)
+	if err == nil && res.Skip != "" {
+		e.Status, e.Detail = StatusSkipped, res.Skip
+		return e, nil
+	}
 	e.Changes, e.Detail = res.Changes, res.Detail
 	if err == nil && !dryRun {
 		if perr := r.Probe(env); perr != nil {
