@@ -3,6 +3,7 @@ package orca
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -192,5 +193,44 @@ func TestTuneScript_WritesTheRetiredScriptsBlockByteForByte(t *testing.T) {
 	}
 	if string(got) != want {
 		t.Fatalf("tuned script differs from the retired script's block:\n got %q\nwant %q", got, want)
+	}
+}
+
+// #1748: the staging file is unique to each write. A fixed `<file>.tmp` would be
+// shared by two tuners running at once (setup and doctor --fix), so one could
+// rename the other's half-written content into place. A directory squatting on
+// the old fixed name stands in for that other writer: it makes a write to the
+// fixed path fail, and a unique name never touches it.
+func TestTuneHooks_StagesEachWriteInItsOwnTempFile(t *testing.T) {
+	c, s := hookFixture(t, orcaJSON5s, copilotHookIWR)
+	for _, p := range []string{c, s} {
+		if err := os.Mkdir(p+".tmp", 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rep, err := TuneHooks(c, s, DefaultHookTimeout, false, fixedNow)
+	if err != nil {
+		t.Fatalf("a tuner must not depend on a fixed staging path: %v", err)
+	}
+	if rep.Changed != 2 {
+		t.Fatalf("both files must be repaired: %+v", rep)
+	}
+	entries, err := os.ReadDir(filepath.Dir(c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if len(names) != 6 { // two hooks, two backups, two squatters
+		t.Fatalf("a staging file was left behind: %v", names)
+	}
+	info, err := os.Stat(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
+		t.Fatalf("the tuned file must stay 0644, got %v", info.Mode().Perm())
 	}
 }
