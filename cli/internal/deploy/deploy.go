@@ -108,7 +108,11 @@ const BackupSuffix = ".pre-dotf"
 // replacement, so adopting a hand-made file (an rc file, a tool's own config)
 // never loses it. An existing backup is never overwritten: it holds the
 // machine's version, not one dotf wrote. A missing dst needs no backup.
-func backupOnce(dst string) (string, error) {
+//
+// The backup takes the narrower of the file's own mode and the config's
+// declared one: a 0644 settings file that held a credential must not leave a
+// 0644 copy of it beside the 0600 file that replaces it.
+func backupOnce(dst string, declared os.FileMode) (string, error) {
 	info, err := os.Lstat(dst)
 	if err != nil || !info.Mode().IsRegular() {
 		return "", nil //nolint:nilerr // nothing to keep: absent, or not a regular file
@@ -121,7 +125,7 @@ func backupOnce(dst string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(backup, data, info.Mode().Perm()); err != nil {
+	if err := os.WriteFile(backup, data, info.Mode().Perm()&declared.Perm()); err != nil {
 		return "", fmt.Errorf("back up %s: %w", dst, err)
 	}
 	return backup, nil
@@ -341,7 +345,7 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 			return out, err
 		}
 		defer func() { _ = os.Remove(staged) }() // no-op once renamed away
-		if out.BackedUp, err = backupOnce(p.Dst); err != nil {
+		if out.BackedUp, err = backupOnce(p.Dst, mode); err != nil {
 			return out, err
 		}
 		return out, commit(c, staged, p.Dst, mode)
@@ -376,7 +380,7 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 	if dryRun {
 		return out, nil
 	}
-	if out.BackedUp, err = backupOnce(dst); err != nil {
+	if out.BackedUp, err = backupOnce(dst, mode); err != nil {
 		return out, err
 	}
 	return out, commit(c, staged, dst, mode)

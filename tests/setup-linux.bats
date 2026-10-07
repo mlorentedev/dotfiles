@@ -142,11 +142,16 @@ setup() {
 }
 
 @test "the zsh rc files deploy through dotf deploy, only where zsh is installed (#1843 B2)" {
-    for name in zshrc zsh-aliases zsh-functions zsh-functions-sh zsh-nvm; do
+    for name in zshrc zsh-aliases zsh-functions zsh-nvm; do
         [ "$(jq -r --arg n "$name" '.configs[] | select(.name==$n) | .requires' "$DOTFILES_DIR/ai/deploy.json")" = "zsh" ]
     done
     refute_grep 'deploy_file "\$DOTFILES_DIR/\.zshrc"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'deploy_file "\$DOTFILES_DIR/\.zsh/' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "functions.sh is not gated on zsh: .bashrc sources it too (#1843 B2)" {
+    grep -q '\.zsh/functions\.sh' "$DOTFILES_DIR/.bashrc"
+    [ "$(jq -r '.configs[] | select(.name=="zsh-functions-sh") | .requires // "none"' "$DOTFILES_DIR/ai/deploy.json")" = "none" ]
 }
 
 @test "setup-linux.sh checks for tmux presence" {

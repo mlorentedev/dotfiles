@@ -297,3 +297,43 @@ func TestDeploy_AFreshDestinationNeedsNoBackup(t *testing.T) {
 		t.Error("a backup file was created for a destination that did not exist")
 	}
 }
+
+// The backup keeps the machine's previous content, so it must not outlive the
+// protection the manifest gives the file that replaces it: a 0644 copy of a
+// settings file that may carry a credential, left beside the new 0600 one.
+func TestDeploy_TheBackupNeverHoldsMoreAccessThanTheDeclaredMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	for _, render := range []bool{false, true} {
+		root := repoWithSource(t, "repo\n")
+		home := t.TempDir()
+		c := piConfig() // declares 0600
+		c.Render = render
+		dst, err := ExpandDst(c.Dst, home, noResolve)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dst, []byte("token=old\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(dst, 0o644); err != nil { // umask-proof
+			t.Fatal(err)
+		}
+
+		res, err := Deploy(c, root, home, noResolve, nil, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(res.BackedUp)
+		if err != nil {
+			t.Fatalf("render=%v: no backup: %v", render, err)
+		}
+		if got := info.Mode().Perm(); got&^0o600 != 0 {
+			t.Errorf("render=%v: backup mode %o is wider than the declared 0600", render, got)
+		}
+	}
+}

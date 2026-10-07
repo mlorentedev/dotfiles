@@ -178,8 +178,7 @@
       "src": ".zsh/functions.sh",
       "dst": "{HOME}/.zsh/functions.sh",
       "render": false,
-      "mode": "0644",
-      "requires": "zsh"
+      "mode": "0644"
     },
     {
       "name": "zsh-nvm",
