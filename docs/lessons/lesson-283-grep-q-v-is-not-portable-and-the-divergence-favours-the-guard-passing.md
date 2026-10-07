@@ -1,13 +1,14 @@
 ---
-id: lesson-283
+id: "lesson-283-grep-q-v-is-not-portable-and-the-divergence-favours-the-guard-passing"
 type: lesson
 status: active
+title: "`grep -q -v` is not portable, and the divergence lands on the side that lets a guard pass"
 created: "2026-09-21"
 owner: manu
 tags: [lesson, shell, portability, grep, verification, silent-failure, guards]
 ---
 
-# 283 — `grep -q -v` is not portable, and the divergence lands on the side that lets a guard pass
+# `grep -q -v` is not portable, and the divergence lands on the side that lets a guard pass
 
 ## What happened
 

@@ -1,6 +1,9 @@
 ---
+id: "lesson-341-a-merged-pr-does-not-mean-its-branch-is-merged"
+type: lesson
+status: active
 title: "A merged PR does not mean its branch is merged"
-date: "2026-10-06"
+created: "2026-10-06"
 ---
 
 # A merged PR does not mean its branch is merged

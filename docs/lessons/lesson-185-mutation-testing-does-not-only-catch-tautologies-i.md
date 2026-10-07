@@ -1,13 +1,14 @@
 ---
-id: lesson-185-mutation-testing-does-not-only-catch-tautologies-i
+id: "lesson-185-mutation-testing-does-not-only-catch-tautologies-i"
 type: lesson
 status: active
+title: "Mutation testing does not only catch tautologies — it finds the boundaries your fixtures never land on"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 185: Mutation testing does not only catch tautologies — it finds the boundaries your fixtures never land on
+# Mutation testing does not only catch tautologies — it finds the boundaries your fixtures never land on
 
 **Context**: The vault-health golden corpus (#890) had 16 cases and 19 green tests, including cases named `orphans-warn` and `orphans-fail` for the two sides of a 30% threshold.
 

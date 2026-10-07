@@ -1,6 +1,13 @@
-# Lesson 237 — CREATE_NEW_PROCESS_GROUP is not detachment: a console child dies with its terminal
+---
+id: "lesson-237-create-new-process-group-is-not-detachment-a-console"
+type: lesson
+status: active
+title: "CREATE_NEW_PROCESS_GROUP is not detachment: a console child dies with its terminal"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# CREATE_NEW_PROCESS_GROUP is not detachment: a console child dies with its terminal
+
 **Context:** WIN-012 (#1293) — `pi` and `opencode` "do not work" on the Windows work box; they work on the Linux one.
 **Category:** windows, processes, secrets, daemons
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-155-a-git-revert-cancels-a-commit-s-diff-but-not-its-m
+id: "lesson-155-a-git-revert-cancels-a-commit-s-diff-but-not-its-m"
 type: lesson
 status: active
+title: "A `git revert` cancels a commit's diff but not its message, and GitHub auto-close reads both"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 155: A `git revert` cancels a commit's diff but not its message, and GitHub auto-close reads both
+# A `git revert` cancels a commit's diff but not its message, and GitHub auto-close reads both
 
 **Context**: #768 (the archive-on-merge dogfood sweep) merged into #767's own branch instead of `main` by mistake. Unstacking it meant `git revert`ing #768's squash commit out of #767's branch, then re-landing its content later as a fresh PR (#775) once #767 reached `main`.
 

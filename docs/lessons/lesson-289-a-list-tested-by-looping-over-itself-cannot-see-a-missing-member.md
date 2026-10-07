@@ -1,13 +1,14 @@
 ---
-id: lesson-289
+id: "lesson-289-a-list-tested-by-looping-over-itself-cannot-see-a-missing-member"
 type: lesson
 status: active
+title: "A list tested by looping over itself cannot see a missing member"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, secrets, harness, agnostic, verification, silent-failure]
 ---
 
-# 289 — A list tested by looping over itself cannot see a missing member
+# A list tested by looping over itself cannot see a missing member
 
 ## What happened
 

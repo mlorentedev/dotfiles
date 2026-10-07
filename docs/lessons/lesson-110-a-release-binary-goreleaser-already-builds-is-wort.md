@@ -1,13 +1,14 @@
 ---
-id: lesson-110-a-release-binary-goreleaser-already-builds-is-wort
+id: "lesson-110-a-release-binary-goreleaser-already-builds-is-wort"
 type: lesson
 status: active
+title: "A release binary goreleaser already builds is worthless until each OS's setup script actually downloads it"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 110: A release binary goreleaser already builds is worthless until each OS's setup script actually downloads it
+# A release binary goreleaser already builds is worthless until each OS's setup script actually downloads it
 
 **Context**: WIN-006 wired Windows setup to fetch a prebuilt `dotf` release binary instead of requiring a local Go toolchain.
 

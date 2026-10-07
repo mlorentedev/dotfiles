@@ -1,6 +1,13 @@
-# 257 - A one-time migration with no removal date is indistinguishable from live code, and two of eleven turned out not to be finished
+---
+id: "lesson-257-a-one-time-migration-with-no-removal-date-is"
+type: lesson
+status: active
+title: "A one-time migration with no removal date is indistinguishable from live code, and two of eleven turned out not to be finished"
+created: "2026-09-02"
+---
 
-**Date:** 2026-09-02
+# A one-time migration with no removal date is indistinguishable from live code, and two of eleven turned out not to be finished
+
 **Area:** setup scripts, technical debt
 
 ## What happened

@@ -1,13 +1,14 @@
 ---
-id: lesson-043-numeric-bats-threshold-drift-is-invisible-comment-
+id: "lesson-043-numeric-bats-threshold-drift-is-invisible-comment-"
 type: lesson
 status: active
+title: "Numeric bats threshold drift is invisible — comment the bump inline"
 created: "2026-05-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 043: Numeric bats threshold drift is invisible — comment the bump inline
+# Numeric bats threshold drift is invisible — comment the bump inline
 
 **Context:** AI-019 (model-tier policy) added a Model Tier subsection to ai/claude/CLAUDE.md, pushing the file from 70 to 78 lines. The existing bats assertion `wc -l < CLAUDE.md -le 70` started failing. Two options: compact existing content to fit under 70, or bump the threshold.</context>
 <problem>If you silently bump a numeric threshold in a test (70 → 80 lines, 50 → 100 tests, etc.) without leaving a trace, the next contributor sees the new number and has no way to know whether (a) the threshold is calibrated to real constraints, or (b) it was raised to accommodate scope creep that should have been resisted. Threshold drift is invisible — every bump compounds; six months later, the assertion has become meaningless rubber. The classic "boiled frog" failure mode.</problem>

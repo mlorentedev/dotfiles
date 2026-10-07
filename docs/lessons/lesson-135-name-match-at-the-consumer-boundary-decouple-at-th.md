@@ -1,13 +1,14 @@
 ---
-id: lesson-135-name-match-at-the-consumer-boundary-decouple-at-th
+id: "lesson-135-name-match-at-the-consumer-boundary-decouple-at-th"
 type: lesson
 status: active
+title: "Name-match at the consumer boundary, decouple at the storage boundary"
 created: "2026-06-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 135: Name-match at the consumer boundary, decouple at the storage boundary
+# Name-match at the consumer boundary, decouple at the storage boundary
 
 **Context**: `dotf secrets sync ci` (CLI-024-secrets-sync) uploads registry secrets to a repo's GitHub Actions secrets.
 

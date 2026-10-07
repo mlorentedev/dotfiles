@@ -1,13 +1,14 @@
 ---
-id: lesson-206-bw-status-answers-for-the-cli-s-session-not-for-th
+id: "lesson-206-bw-status-answers-for-the-cli-s-session-not-for-th"
 type: lesson
 status: active
+title: "`bw status` answers for the CLI's session, not for the daemon your code actually uses"
 created: "2026-08-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 206: `bw status` answers for the CLI's session, not for the daemon your code actually uses
+# `bw status` answers for the CLI's session, not for the daemon your code actually uses
 
 **Context**: every `bw`-backed secret was failing at once — `dotf secrets run -- true` died on `dockerhub`, and `dotf secrets verify` showed a wall of FAILED with `bw serve returned no parseable envelope: invalid character 'I'`. Looking for a single cause behind a mass failure, I ran `bw status`, got `{"status":"locked"}`, and reported the blocker as a locked vault needing the user's master password.
 

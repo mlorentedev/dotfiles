@@ -1,6 +1,13 @@
-# 251 - A guard that refuses an anticipated schema change should name its own fix, because the person who reads the refusal is the one who caused it
+---
+id: "lesson-251-a-guard-that-refuses-an-anticipated-schema-change"
+type: lesson
+status: active
+title: "A guard that refuses an anticipated schema change should name its own fix, because the person who reads the refusal is the one who caused it"
+created: "2026-08-31"
+---
 
-**Date:** 2026-08-31
+# A guard that refuses an anticipated schema change should name its own fix, because the person who reads the refusal is the one who caused it
+
 **Area:** harness, guards, spec-driven development
 
 ## What happened

@@ -1,13 +1,14 @@
 ---
-id: lesson-186-the-dangerous-shell-incompatibility-is-the-one-tha
+id: "lesson-186-the-dangerous-shell-incompatibility-is-the-one-tha"
 type: lesson
 status: active
+title: "The dangerous shell incompatibility is the one that answers wrongly instead of failing"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 186: The dangerous shell incompatibility is the one that answers wrongly instead of failing
+# The dangerous shell incompatibility is the one that answers wrongly instead of failing
 
 **Context**: A sweep for git worktrees across every repo under two parent directories, run from an agent's zsh: `for base in /home/manu/Projects /home/manu/Projects/Workspace; do for r in "$base"/*/; do …; done; done`. It printed nothing, and "nothing" was read as "no repository has extra worktrees" — while `kubelab` had one the whole time.
 

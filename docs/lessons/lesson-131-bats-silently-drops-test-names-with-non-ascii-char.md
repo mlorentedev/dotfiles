@@ -1,13 +1,14 @@
 ---
-id: lesson-131-bats-silently-drops-test-names-with-non-ascii-char
+id: "lesson-131-bats-silently-drops-test-names-with-non-ascii-char"
 type: lesson
 status: active
+title: "bats silently drops @test names with non-ASCII chars or duplicates — lint them"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 131: bats silently drops @test names with non-ASCII chars or duplicates — lint them
+# bats silently drops @test names with non-ASCII chars or duplicates — lint them
 
 **Context**: HARNESS-043 (#607) had a `@test` name with an em-dash; bats 1.13.0 reported "executed 36 instead of 37" and exited 0. A prior lesson noted duplicate `@test` names break parsing. The auto-curation analyzer (CURATOR-001, #135) flagged the recurrence; implementing the proposed lint surfaced 6 more non-ASCII `@test` names already in the suite (em-dash, `<=`), 3 of them silently skipped in opencode.bats (44 declared, only 41 run).
 

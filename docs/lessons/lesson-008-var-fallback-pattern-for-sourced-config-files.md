@@ -1,13 +1,14 @@
 ---
-id: lesson-008-var-fallback-pattern-for-sourced-config-files
+id: "lesson-008-var-fallback-pattern-for-sourced-config-files"
 type: lesson
 status: active
+title: "${VAR:-fallback} pattern for sourced config files"
 created: "2026-02-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 008: ${VAR:-fallback} pattern for sourced config files
+# ${VAR:-fallback} pattern for sourced config files
 
 **Context**: Tool versions (Java 21.0.4, Go 1.26.0, etc.) were hardcoded in both `.zshrc` and `.bashrc` — 12 duplicated strings with no single source of truth.
 

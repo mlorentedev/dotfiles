@@ -1,13 +1,14 @@
 ---
-id: lesson-141-a-cli-s-help-long-strings-are-untested-literals-a-
+id: "lesson-141-a-cli-s-help-long-strings-are-untested-literals-a-"
 type: lesson
 status: active
+title: "A CLI's `--help`/`Long` strings are untested literals — a dangling doc ref ships green"
 created: "2026-07-01"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 141: A CLI's `--help`/`Long` strings are untested literals — a dangling doc ref ships green
+# A CLI's `--help`/`Long` strings are untested literals — a dangling doc ref ships green
 
 **Context**: The DR-escrow slice (#661) shipped `dotf secrets backup` whose `Long` help referenced a `guide-secrets-recover.md` that was never created — the recover protocol was (correctly) hardened into `guide-secrets-governance.md` instead, so the referenced file never existed. Every behaviour test was green and the command worked; the dangling reference was caught only because a human read the real `--help` output during review.
 

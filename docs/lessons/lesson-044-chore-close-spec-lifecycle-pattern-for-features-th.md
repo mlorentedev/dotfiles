@@ -1,13 +1,14 @@
 ---
-id: lesson-044-chore-close-spec-lifecycle-pattern-for-features-th
+id: "lesson-044-chore-close-spec-lifecycle-pattern-for-features-th"
 type: lesson
 status: active
+title: "\"chore: close spec lifecycle\" pattern — for features that shipped piecemeal before archive"
 created: "2026-05-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 044: "chore: close spec lifecycle" pattern — for features that shipped piecemeal before archive
+# "chore: close spec lifecycle" pattern — for features that shipped piecemeal before archive
 
 **Context:** TERM-001-ghostty-bootstrap had its proposal scaffolded on 2026-05-17 but the implementation shipped piecemeal across PR #38 (tmux truecolor) + commit b00353e (full ghostty bootstrap) + commit 7424731 (config translation) before the spec lifecycle was formally closed. By 2026-05-19 the feature was 100% live on main with bats green, but the spec folder still sat in specs/ (not archive/) with tasks.md as a skeleton.</context>
 <problem>SDD-001's archive criterion ("move folder to specs/archive/ on merge") is straightforward when a single PR ships the feature. It's awkward when implementation lands across multiple commits over multiple days — there's no single "merge" event to trigger archival, and tasks.md / verification.md don't get filled because the work was done. The risk: spec folders accumulate in active state indefinitely after the feature is shipped, polluting `ls specs/` and breaking the "active spec = WIP" invariant that the spec-gate CI relies on.</problem>

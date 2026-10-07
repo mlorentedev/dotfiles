@@ -1,13 +1,14 @@
 ---
-id: lesson-086-goreleaser-monorepo-tag-prefix-is-pro-only-verify-
+id: "lesson-086-goreleaser-monorepo-tag-prefix-is-pro-only-verify-"
 type: lesson
 status: active
+title: "goreleaser monorepo.tag_prefix is Pro-only — verify paywalled features empirically"
 created: "2026-06-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 086: goreleaser monorepo.tag_prefix is Pro-only — verify paywalled features empirically
+# goreleaser monorepo.tag_prefix is Pro-only — verify paywalled features empirically
 
 **Context**: CLI-001 scaffold (ADR-020): configuring goreleaser for the nested `cli/` Go module with `cli/vX.Y.Z` release tags.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-138-a-successful-operation-is-not-evidence-of-the-prop
+id: "lesson-138-a-successful-operation-is-not-evidence-of-the-prop"
 type: lesson
 status: active
+title: "A successful operation is not evidence of the property you depend on — assert the property, not the success"
 created: "2026-06-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 138: A successful operation is not evidence of the property you depend on — assert the property, not the success
+# A successful operation is not evidence of the property you depend on — assert the property, not the success
 
 **Context**: Four incidents in the secrets/CI surface within two cycles: `sync ci` refreshed a PAT's `updated_at` (#639); `pat-expiry` probed `GET /user` (#647); `setup` `curl`ed a release tarball (#648); `AgeDecrypt` reported a decrypt failure (#644).
 

@@ -1,6 +1,13 @@
-# Lesson 225 — A stacked PR costs a reviewer, and re-conflicts on every squash
+---
+id: "lesson-225-a-stacked-pr-costs-a-reviewer-and-re-conflicts-on-e"
+type: lesson
+status: active
+title: "A stacked PR costs a reviewer, and re-conflicts on every squash"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# A stacked PR costs a reviewer, and re-conflicts on every squash
+
 **Area:** git / CI / review process
 **Severity:** medium — two of three PRs in a chain were read by one reviewer agent instead of two, and nothing said so
 

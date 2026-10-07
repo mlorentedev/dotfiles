@@ -1,13 +1,14 @@
 ---
-id: lesson-117-resolving-windows-profile-from-go-must-include-the
+id: "lesson-117-resolving-windows-profile-from-go-must-include-the"
 type: lesson
 status: active
+title: "Resolving Windows `$PROFILE` from Go must include the OneDrive-redirected Documents root"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 117: Resolving Windows `$PROFILE` from Go must include the OneDrive-redirected Documents root
+# Resolving Windows `$PROFILE` from Go must include the OneDrive-redirected Documents root
 
 **Context**: Porting healthcheck §4 (`$PROFILE` existence) into `dotf doctor`. Go has no `$PROFILE` intrinsic, so the check enumerates candidate paths.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-030-env-vs-disk-drift-after-secret-mutation
+id: "lesson-030-env-vs-disk-drift-after-secret-mutation"
 type: lesson
 status: active
+title: "Env-vs-disk drift after secret mutation"
 created: "2026-05-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 030: Env-vs-disk drift after secret mutation
+# Env-vs-disk drift after secret mutation
 
 **Context:** While diagnosing dotfiles issue #7 (https://github.com/mlorentedev/dotfiles/issues/7) where `secrets_rotate` appeared to silently fail to update the encrypted file. Investigation showed the encrypted .age file WAS being updated correctly on disk (mtime + SHA256 confirmed change after rotate), but every consumer of the secret saw the old value.
 **Problem:** load-secrets.sh exports `$VAR` once at shell startup. `secrets_rotate` updated the on-disk .age file but did NOT re-export `$VAR` in the current shell. Any subsequent read of `$VAR` (gh CLI, curl, scripts, even `secrets_show` without `--raw`) returned the cached old value, indistinguishable from a real failure. This wasted ~30min of debugging adding instrumentation to age_encrypt before realizing the encryption was fine. The issue was env-vs-disk drift between shell state and disk state, with no automatic reconciliation. Compounded by: `_secrets_sync_to_repo` silently no-op'd when `DOTFILES_REPO_DIR` was unset, so the user's primary verification step (git status in the repo) could miss real updates. Also the project lacked a `secrets_remove` function, so deletion was a manual three-step (edit mapping + rm .age + manual sync) that bypassed audit logging.

@@ -1,13 +1,14 @@
 ---
-id: lesson-064-powershell-replace-with-s-s-expands-large-strings-
+id: "lesson-064-powershell-replace-with-s-s-expands-large-strings-"
 type: lesson
 status: active
+title: "PowerShell -replace with [\\s\\S]*? expands large strings instead of replacing"
 created: "2026-05-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 064: PowerShell -replace with [\s\S]*? expands large strings instead of replacing
+# PowerShell -replace with [\s\S]*? expands large strings instead of replacing
 
 **Context**: `setup-windows.ps1` profile-section block used `-replace` regex to update dotfiles section in PowerShell profile.
 

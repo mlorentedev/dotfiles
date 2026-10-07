@@ -1,13 +1,14 @@
 ---
-id: lesson-109-gh-issue-pr-create-use-graphql-when-that-bucket-is
+id: "lesson-109-gh-issue-pr-create-use-graphql-when-that-bucket-is"
 type: lesson
 status: active
+title: "`gh issue/pr create` use GraphQL — when that bucket is rate-limited, `gh api -X POST` (REST) still works"
 created: "2026-06-18"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 109: `gh issue/pr create` use GraphQL — when that bucket is rate-limited, `gh api -X POST` (REST) still works
+# `gh issue/pr create` use GraphQL — when that bucket is rate-limited, `gh api -X POST` (REST) still works
 
 **Context**: Mid-session, `gh repo view --json` and `gh label list` failed with "GraphQL: API rate limit already exceeded", blocking issue/PR creation.
 

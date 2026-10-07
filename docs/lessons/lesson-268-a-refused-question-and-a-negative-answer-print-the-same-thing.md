@@ -1,6 +1,13 @@
-# Lesson 268 — A refused question and a negative answer print the same thing
+---
+id: "lesson-268-a-refused-question-and-a-negative-answer-print-the-same-thing"
+type: lesson
+status: active
+title: "A refused question and a negative answer print the same thing"
+created: "2026-09-04"
+---
 
-**Date:** 2026-09-04
+# A refused question and a negative answer print the same thing
+
 **Context:** Seven instances in one evening, across two sessions, through five different mechanisms
 
 ## What happened

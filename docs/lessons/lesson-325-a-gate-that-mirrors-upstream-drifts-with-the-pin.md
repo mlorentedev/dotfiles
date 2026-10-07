@@ -1,13 +1,14 @@
 ---
-id: lesson-325
+id: "lesson-325-a-gate-that-mirrors-upstream-drifts-with-the-pin"
 type: lesson
 status: active
+title: "A gate that mirrors an upstream tool drifts with the pin, and trusts whatever the tool quotes"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, pr-agent, ci, security]
 ---
 
-# 325 — A gate that mirrors an upstream tool drifts with the pin, and trusts whatever the tool quotes
+# A gate that mirrors an upstream tool drifts with the pin, and trusts whatever the tool quotes
 
 ## What happened
 

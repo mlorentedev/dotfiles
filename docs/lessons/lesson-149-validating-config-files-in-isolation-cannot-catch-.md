@@ -1,13 +1,14 @@
 ---
-id: lesson-149-validating-config-files-in-isolation-cannot-catch-
+id: "lesson-149-validating-config-files-in-isolation-cannot-catch-"
 type: lesson
 status: active
+title: "Validating config files in isolation cannot catch a broken reference between them"
 created: "2026-08-04"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 149: Validating config files in isolation cannot catch a broken reference between them
+# Validating config files in isolation cannot catch a broken reference between them
 
 **Context**: Adding the `deepseek-v4-flash-0731` model to pi touches two files that must agree: `ai/pi/models.json` declares the model `id`, and `ai/pi/settings.json` enables it as `nan/<id>`. `tests/pi-config.bats` already had seven assertions over these files.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-160-a-test-suite-must-test-the-tree-it-ships-in-not-th
+id: "lesson-160-a-test-suite-must-test-the-tree-it-ships-in-not-th"
 type: lesson
 status: active
+title: "A test suite must test the tree it ships in, not the tree it deployed to"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 160: A test suite must test the tree it ships in, not the tree it deployed to
+# A test suite must test the tree it ships in, not the tree it deployed to
 
 **Context**: `scripts/test.sh` runs as the `dotfiles-test` pre-commit hook. It resolved its own location through an ambient `$DOTFILES_DIR` — the same variable the shell exports to point at the **deploy mirror** (`~/.dotfiles`).
 

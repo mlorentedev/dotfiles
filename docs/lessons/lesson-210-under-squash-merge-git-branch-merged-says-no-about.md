@@ -1,13 +1,14 @@
 ---
-id: lesson-210-under-squash-merge-git-branch-merged-says-no-about
+id: "lesson-210-under-squash-merge-git-branch-merged-says-no-about"
 type: lesson
 status: active
+title: "Under squash-merge, `git branch --merged` says no about every branch that landed"
 created: "2026-08-16"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 210: Under squash-merge, `git branch --merged` says no about every branch that landed
+# Under squash-merge, `git branch --merged` says no about every branch that landed
 
 **Context**: end-of-session cleanup, deciding which local branches were safe to delete. The repo's standing rule is to remove a worktree and branch as soon as its PR merges, so the question is answered many times a week.
 

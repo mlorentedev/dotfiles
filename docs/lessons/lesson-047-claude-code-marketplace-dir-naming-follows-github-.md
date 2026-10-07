@@ -1,13 +1,14 @@
 ---
-id: lesson-047-claude-code-marketplace-dir-naming-follows-github-
+id: "lesson-047-claude-code-marketplace-dir-naming-follows-github-"
 type: lesson
 status: active
+title: "Claude Code marketplace dir naming follows GitHub repo, NOT declared name field"
 created: "2026-05-20"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 047: Claude Code marketplace dir naming follows GitHub repo, NOT declared name field
+# Claude Code marketplace dir naming follows GitHub repo, NOT declared name field
 
 **Context:** BUG-012 (PR #70, 2026-05-20). Diagnosing `UserPromptSubmit operation blocked by hook` on Windows. Hook command was claude-mem plugin's `bun-runner.js` discovery script. It searched at `~/.claude/plugins/marketplaces/thedotmack/plugin/scripts/` (the marketplace's declared `name` from `marketplace.json`), but Claude Code had cloned the marketplace under `~/.claude/plugins/marketplaces/thedotmack-claude-mem/` (GitHub repo name `thedotmack/claude-mem` flattened with `-`). When `CLAUDE_PLUGIN_ROOT` is unset/stale (Windows: cache `plugins/cache/thedotmack/claude-mem/` stays empty post-install), the hook falls through to the broken fallback → `exit 1` → blocked.</context>
 <parameter name="problem">A plugin can declare `name: "thedotmack"` in `marketplace.json` but Claude Code names the install dir after the GitHub repo (`<owner>-<repo>` in some cases, just `<repo>` in others — naming logic not fully documented). Plugins that hardcode `marketplaces/<declared-name>/plugin/scripts/...` in fallback paths break silently on machines where the env-var path fails and the fallback is consulted. Symptom on Windows is `printf: write error: Permission denied` (Git Bash + Claude Code hook subprocess sandbox quirk); on Linux it's a cleaner `claude-mem: plugin scripts not found`. The cross-OS root cause is identical.

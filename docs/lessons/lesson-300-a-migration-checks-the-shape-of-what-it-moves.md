@@ -1,13 +1,14 @@
 ---
-id: lesson-300
+id: "lesson-300-a-migration-checks-the-shape-of-what-it-moves"
 type: lesson
 status: active
+title: "A migration checks the shape of what it moves, not only where it sits"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, migration, memory, handoff, data-loss]
 ---
 
-# 300 — A migration checks the shape of what it moves, not only where it sits
+# A migration checks the shape of what it moves, not only where it sits
 
 ## What happened
 

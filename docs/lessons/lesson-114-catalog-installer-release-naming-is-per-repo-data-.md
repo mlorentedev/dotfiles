@@ -1,13 +1,14 @@
 ---
-id: lesson-114-catalog-installer-release-naming-is-per-repo-data-
+id: "lesson-114-catalog-installer-release-naming-is-per-repo-data-"
 type: lesson
 status: active
+title: "Catalog installer: release naming is per-repo data, not a convention (CLI-029)"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 114: Catalog installer: release naming is per-repo data, not a convention (CLI-029)
+# Catalog installer: release naming is per-repo data, not a convention (CLI-029)
 
 **Context**: `dotf tools install` (the declarative `packages.json` catalog's installer) reuses the `install-dotf` download→checksum→place pattern, generalised from one CLI to any github-release tool. First tool: sops.
 

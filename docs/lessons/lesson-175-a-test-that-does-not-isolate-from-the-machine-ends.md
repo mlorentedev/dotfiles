@@ -1,13 +1,14 @@
 ---
-id: lesson-175-a-test-that-does-not-isolate-from-the-machine-ends
+id: "lesson-175-a-test-that-does-not-isolate-from-the-machine-ends"
 type: lesson
 status: active
+title: "A test that does not isolate from the machine ends up measuring the machine"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 175: A test that does not isolate from the machine ends up measuring the machine
+# A test that does not isolate from the machine ends up measuring the machine
 
 **Context**: `tests/board-pickup.bats` failed on a clean `main` with no local changes: "assigns once, no redundant fallback" saw two log entries where it expected one. The obvious reading — and the one first published on the issue — was that the double-assignment bug it guards against was live.
 

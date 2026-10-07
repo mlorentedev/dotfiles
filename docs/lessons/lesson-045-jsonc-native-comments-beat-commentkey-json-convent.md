@@ -1,13 +1,14 @@
 ---
-id: lesson-045-jsonc-native-comments-beat-commentkey-json-convent
+id: "lesson-045-jsonc-native-comments-beat-commentkey-json-convent"
 type: lesson
 status: active
+title: "JSONC native // comments beat _commentKey JSON convention for documentation"
 created: "2026-05-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 045: JSONC native // comments beat _commentKey JSON convention for documentation
+# JSONC native // comments beat _commentKey JSON convention for documentation
 
 **Context:** AI-019 needed to document the model-tier mapping inside ai/opencode/opencode.jsonc. The proposal weighed two conventions: (a) a `_modelTierComment` JSON key with underscore prefix (convention says parsers ignore it); (b) native JSONC `//` line comments. OpenCode reads the file as JSONC (the file already used `//` for the schema URL + 6 other comment blocks).</context>
 <problem>Documenting structured config inside JSON has no native syntax — comments aren't part of the JSON spec. Many projects invent the `_commentKey` convention (`"_comment": "..."`, `"_doc": "..."`). It works in practice because consumers ignore unknown keys, but it has two downsides: (1) it pollutes the parsed JSON namespace, so any tooling that enumerates keys sees noise; (2) underscore-key convention is unofficial — a future JSON schema validator might reject it. JSONC (JSON with Comments) is a different file format where `//` and `/* */` are first-class syntax.</problem>

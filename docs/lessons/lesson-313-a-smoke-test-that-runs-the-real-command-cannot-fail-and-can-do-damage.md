@@ -1,13 +1,14 @@
 ---
-id: lesson-313
+id: "lesson-313-a-smoke-test-that-runs-the-real-command-cannot-fail-and-can-do-damage"
 type: lesson
 status: active
+title: "A smoke test that runs the real command cannot fail, and can do damage"
 created: "2026-09-27"
 owner: manu
 tags: [lesson, testing, pre-commit, sync, secrets, blast-radius]
 ---
 
-# 313 — A smoke test that runs the real command cannot fail, and can do damage
+# A smoke test that runs the real command cannot fail, and can do damage
 
 ## What happened
 

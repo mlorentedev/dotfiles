@@ -1,13 +1,14 @@
 ---
-id: lesson-124-ci-golangci-lint-enforces-staticcheck-qf-quickfixe
+id: "lesson-124-ci-golangci-lint-enforces-staticcheck-qf-quickfixe"
 type: lesson
 status: active
+title: "CI golangci-lint enforces staticcheck QF* quickfixes a stale local version skips — heed the gopls hints"
 created: "2026-06-24"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 124: CI golangci-lint enforces staticcheck QF* quickfixes a stale local version skips — heed the gopls hints
+# CI golangci-lint enforces staticcheck QF* quickfixes a stale local version skips — heed the gopls hints
 
 **Context**: Two PRs in the CLI-025 chain passed locally (`golangci-lint run` exit 0) but failed the CI `lint` job: an `errcheck` on an unchecked `fmt.Fprint`, and `QF1002` ("could use tagged switch") on a `switch { case x == "": … }`.
 

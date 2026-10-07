@@ -1,13 +1,14 @@
 ---
-id: lesson-012-bash-set-e-does-not-exit-on-with-integer-error-whe
+id: "lesson-012-bash-set-e-does-not-exit-on-with-integer-error-whe"
 type: lesson
 status: active
+title: "bash set -e does not exit on [ with integer error when in && chain"
 created: "2026-02-28"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 012: bash set -e does not exit on [ with integer error when in && chain
+# bash set -e does not exit on [ with integer error when in && chain
 
 **Context**: In `knowledge-crystallize.sh`, `[ "$count" -le 1 ] && return 0` was at the top of `dedup_current_date`. When `count="0\n0"` (bug above), `[` exited with code 2 (error).
 

@@ -1,6 +1,13 @@
-# Lesson 266 — Two measurements agreeing is not reproducibility
+---
+id: "lesson-266-two-measurements-agreeing-is-not-reproducibility"
+type: lesson
+status: active
+title: "Two measurements agreeing is not reproducibility"
+created: "2026-09-04"
+---
 
-**Date:** 2026-09-04
+# Two measurements agreeing is not reproducibility
+
 **Context:** CI-001 (#1472), measured on #1475 across two sessions
 
 ## What happened

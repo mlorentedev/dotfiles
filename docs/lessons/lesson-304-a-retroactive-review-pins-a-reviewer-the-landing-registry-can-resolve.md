@@ -1,13 +1,14 @@
 ---
-id: lesson-304
+id: "lesson-304-a-retroactive-review-pins-a-reviewer-the-landing-registry-can-resolve"
 type: lesson
 status: active
+title: "A retroactive review pins a reviewer whose key the landing commit's registry resolves"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, review, sdd, secrets, retroactive]
 ---
 
-# 304 — A retroactive review pins a reviewer whose key the landing commit's registry resolves
+# A retroactive review pins a reviewer whose key the landing commit's registry resolves
 
 ## What happened
 

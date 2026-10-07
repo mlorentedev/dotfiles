@@ -1,13 +1,14 @@
 ---
-id: lesson-214
+id: "lesson-214-a-declared-status-is-not-evidence-probe-the-syst"
 type: lesson
 status: active
+title: "A declared status is not evidence, and a guard that exists is not a guard that covers"
 created: "2026-08-20"
 owner: manu
 tags: [lesson, sdd, specs, verification, guards]
 ---
 
-# 214 — A declared status is not evidence, and a guard that exists is not a guard that covers
+# A declared status is not evidence, and a guard that exists is not a guard that covers
 
 **Context**: `specs/` had drifted to 45 active folders. An audit on 2026-08-19/20
 took it to 20. Two distinct traps showed up, and both are about trusting a

@@ -1,13 +1,14 @@
 ---
-id: lesson-194-looks-like-a-known-bug-class-is-a-hypothesis-not-a
+id: "lesson-194-looks-like-a-known-bug-class-is-a-hypothesis-not-a"
 type: lesson
 status: active
+title: "\"Looks like a known bug class\" is a hypothesis, not a finding — reproduce before you fix"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 194: "Looks like a known bug class" is a hypothesis, not a finding — reproduce before you fix
+# "Looks like a known bug class" is a hypothesis, not a finding — reproduce before you fix
 
 **Context**: HARNESS-070 (deploy convergence, #843/#869/#828). The session's brief carried live evidence: `dotf doctor` flagging 4 deployed skills (`computer-use`, `find-skills`, `orca-cli`, `orchestration`) as symlinks, labeled as a "BUG-100" regression — the historical, closed issue #100 about this repo's own deploy strategy fighting `agy`'s filesystem layout.
 

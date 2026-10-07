@@ -1,6 +1,13 @@
-# Lesson 231 — a hand-wired dev symlink outranks the managed install, and the host fails closed
+---
+id: "lesson-231-a-hand-wired-dev-symlink-outranks-the-managed-instal"
+type: lesson
+status: active
+title: "A hand-wired dev symlink outranks the managed install, and the host fails closed"
+created: "2026-08-26"
+---
 
-**Date:** 2026-08-26
+# A hand-wired dev symlink outranks the managed install, and the host fails closed
+
 **Context:** AI-030 / #1243 — `pi` would not start on this machine.
 **Category:** tooling, extension hosts, declaration-vs-effect
 

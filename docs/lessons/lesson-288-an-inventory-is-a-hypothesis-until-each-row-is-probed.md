@@ -1,13 +1,14 @@
 ---
-id: lesson-288
+id: "lesson-288-an-inventory-is-a-hypothesis-until-each-row-is-probed"
 type: lesson
 status: active
+title: "An inventory is a hypothesis until each row is probed"
 created: "2026-09-23"
 owner: manu
 tags: [lesson, secrets, bitwarden, verification, silent-failure]
 ---
 
-# 288 — An inventory is a hypothesis until each row is probed
+# An inventory is a hypothesis until each row is probed
 
 ## What happened
 

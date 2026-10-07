@@ -1,13 +1,14 @@
 ---
-id: lesson-275
+id: "lesson-275-a-review-that-demands-contract-edits-invalidates-itself"
 type: lesson
 status: active
+title: "A review that demands contract edits invalidates itself"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, sdd, adversarial-review, spec-archive, gates]
 ---
 
-# 275 — A review that demands contract edits invalidates itself
+# A review that demands contract edits invalidates itself
 
 ## What happened
 

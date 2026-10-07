@@ -1,13 +1,14 @@
 ---
-id: lesson-204-a-check-that-cannot-fail-the-way-you-cite-it
+id: "lesson-204-a-check-that-cannot-fail-the-way-you-cite-it"
 type: lesson
 status: active
+title: "A check that cannot fail the way you cite it"
 created: "2026-08-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 204: A check that cannot fail the way you cite it
+# A check that cannot fail the way you cite it
 
 **Context**: HARNESS-072 (#963) adds an `enforced` harness region — text injected verbatim into every agent's instructions across every repo. The spec's own Risks section named the obvious failure: *"a region added to `enforced` but missing from a target's `inject` list silently misses that surface"* — the producer-updated / consumer-forgotten class that BUG-077 had been. It named the mitigation in the same breath: `compile-harness.sh --check` is the test, not a hand count. The acceptance criterion was written on that basis.
 

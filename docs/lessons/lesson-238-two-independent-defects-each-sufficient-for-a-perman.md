@@ -1,6 +1,13 @@
-# Lesson 238 — Two independent defects, each sufficient for a permanent red, hide behind one symptom
+---
+id: "lesson-238-two-independent-defects-each-sufficient-for-a-perman"
+type: lesson
+status: active
+title: "Two independent defects, each sufficient for a permanent red, hide behind one symptom"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# Two independent defects, each sufficient for a permanent red, hide behind one symptom
+
 **Context:** WIN-008 (#1289) — `[FAIL] stale: .copilot/copilot-instructions.md has drifted` on every Windows setup, with a remedy (`compile-harness.sh --deploy`) that does not exist on Windows.
 **Category:** guards, line endings, windows, diagnosis
 

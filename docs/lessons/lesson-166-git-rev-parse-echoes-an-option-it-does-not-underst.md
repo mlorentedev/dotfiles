@@ -1,13 +1,14 @@
 ---
-id: lesson-166-git-rev-parse-echoes-an-option-it-does-not-underst
+id: "lesson-166-git-rev-parse-echoes-an-option-it-does-not-underst"
 type: lesson
 status: active
+title: "`git rev-parse` echoes an option it does not understand back at you, and exits 0"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 166: `git rev-parse` echoes an option it does not understand back at you, and exits 0
+# `git rev-parse` echoes an option it does not understand back at you, and exits 0
 
 **Context**: Fixing hook resolution in a linked worktree (`#776`) by asking git for the shared git dir instead of assuming `$toplevel/.git`.
 

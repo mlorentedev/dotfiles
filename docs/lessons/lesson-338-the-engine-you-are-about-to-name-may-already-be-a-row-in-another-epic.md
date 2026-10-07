@@ -1,6 +1,9 @@
 ---
+id: "lesson-338-the-engine-you-are-about-to-name-may-already-be-a-row-in-another-epic"
+type: lesson
+status: active
 title: "The engine you are about to name may already be a row in another epic"
-date: "2026-10-06"
+created: "2026-10-06"
 ---
 
 # The engine you are about to name may already be a row in another epic

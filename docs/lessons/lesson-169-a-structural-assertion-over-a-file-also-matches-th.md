@@ -1,13 +1,14 @@
 ---
-id: lesson-169-a-structural-assertion-over-a-file-also-matches-th
+id: "lesson-169-a-structural-assertion-over-a-file-also-matches-th"
 type: lesson
 status: active
+title: "A structural assertion over a file also matches the comments that explain it"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 169: A structural assertion over a file also matches the comments that explain it
+# A structural assertion over a file also matches the comments that explain it
 
 **Context**: Pinning the design of two workflows with bats cases — that `add-to-project.yml` classifies rate-limit failures separately, carries no blanket `continue-on-error`, and no longer uses `actions/add-to-project`.
 

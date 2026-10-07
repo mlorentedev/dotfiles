@@ -1,13 +1,14 @@
 ---
-id: lesson-173-a-merged-pr-is-not-a-deployed-change-and-the-deplo
+id: "lesson-173-a-merged-pr-is-not-a-deployed-change-and-the-deplo"
 type: lesson
 status: active
+title: "A merged PR is not a deployed change, and the deploy takes whatever branch the checkout happens to be on"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 173: A merged PR is not a deployed change, and the deploy takes whatever branch the checkout happens to be on
+# A merged PR is not a deployed change, and the deploy takes whatever branch the checkout happens to be on
 
 **Context**: #840 fixed a dispatcher bug that aborted `git commit` in every repo on the machine. It merged, `main` was released as 0.33.1, and the deploy was re-run. Everything reported success.
 

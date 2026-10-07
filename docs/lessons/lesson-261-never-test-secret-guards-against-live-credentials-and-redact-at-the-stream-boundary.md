@@ -1,6 +1,13 @@
-# 261 - Never test secret guards against live credentials, and redact at the stream boundary
+---
+id: "lesson-261-never-test-secret-guards-against-live-credentials-and-redact-at-the-stream-boundary"
+type: lesson
+status: active
+title: "Never test secret guards against live credentials, and redact at the stream boundary"
+created: "2026-09-02"
+---
 
-**Date:** 2026-09-02
+# Never test secret guards against live credentials, and redact at the stream boundary
+
 **Area:** Security, CLI, secrets, multi-agent testing
 
 ## What happened

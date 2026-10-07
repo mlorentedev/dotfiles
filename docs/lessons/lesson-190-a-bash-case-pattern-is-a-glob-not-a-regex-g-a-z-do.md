@@ -1,13 +1,14 @@
 ---
-id: lesson-190-a-bash-case-pattern-is-a-glob-not-a-regex-g-a-z-do
+id: "lesson-190-a-bash-case-pattern-is-a-glob-not-a-regex-g-a-z-do"
 type: lesson
 status: active
+title: "A bash `case` pattern is a glob, not a regex — `g[a-z]*` doesn't mean what it looks like it means"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 190: A bash `case` pattern is a glob, not a regex — `g[a-z]*` doesn't mean what it looks like it means
+# A bash `case` pattern is a glob, not a regex — `g[a-z]*` doesn't mean what it looks like it means
 
 **Context**: BUG-045, widening `tests/shell-alias-collision.bats`'s g-namespace collision guard past its original 1-4-char cap. The replacement was written as `case "$name" in g[a-z]*) ...` with a comment describing it as "matching any all-lowercase `g[a-z]+` token, uncapped" — regex notation, reasoned about with regex semantics, and never run before being described that way.
 

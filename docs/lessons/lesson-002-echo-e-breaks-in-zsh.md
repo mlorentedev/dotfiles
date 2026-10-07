@@ -1,13 +1,14 @@
 ---
-id: lesson-002-echo-e-breaks-in-zsh
+id: "lesson-002-echo-e-breaks-in-zsh"
 type: lesson
 status: active
+title: "echo -e breaks in zsh"
 created: "2025-12-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 002: echo -e breaks in zsh
+# echo -e breaks in zsh
 
 **Context**: Shell scripts used `echo -e "\033[32mDone\033[0m"` for colored output
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-306
+id: "lesson-306-proven-by-a-dispatch-means-joined-to-the-harness-record"
 type: lesson
 status: active
+title: "\"Proven by a dispatch\" is a join to the harness's own record, never a grep of a log anyone can write"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, sdd, verification, harness, gate]
 ---
 
-# 306 — "Proven by a dispatch" is a join to the harness's own record, never a grep of a log anyone can write
+# "Proven by a dispatch" is a join to the harness's own record, never a grep of a log anyone can write
 
 ## What happened
 

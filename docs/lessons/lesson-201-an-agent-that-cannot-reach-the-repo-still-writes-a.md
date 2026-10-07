@@ -1,13 +1,14 @@
 ---
-id: lesson-201-an-agent-that-cannot-reach-the-repo-still-writes-a
+id: "lesson-201-an-agent-that-cannot-reach-the-repo-still-writes-a"
 type: lesson
 status: active
+title: "An agent that cannot reach the repo still writes a confident review"
 created: "2026-08-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 201: An agent that cannot reach the repo still writes a confident review
+# An agent that cannot reach the repo still writes a confident review
 
 **Context**: HARNESS-071 (#955) added a reviewer pool and `dotf spec review`, with `agy/gemini-3.1-pro-high` as the non-Anthropic fallback beside `nan/deepseek-v4-flash`. The spec's acceptance criterion demanded each configured arm produce a *real review*, on the grounds that a fallback never observed working is decoration (#898).
 

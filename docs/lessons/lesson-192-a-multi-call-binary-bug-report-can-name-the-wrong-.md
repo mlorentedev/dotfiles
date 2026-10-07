@@ -1,13 +1,14 @@
 ---
-id: lesson-192-a-multi-call-binary-bug-report-can-name-the-wrong-
+id: "lesson-192-a-multi-call-binary-bug-report-can-name-the-wrong-"
 type: lesson
 status: active
+title: "A \"multi-call binary\" bug report can name the wrong mechanism — verify the dispatch, not just the symptom"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 192: A "multi-call binary" bug report can name the wrong mechanism — verify the dispatch, not just the symptom
+# A "multi-call binary" bug report can name the wrong mechanism — verify the dispatch, not just the symptom
 
 **Context**: BUG-054, fixing `tests/install-dotf.bats`'s busy-binary fixture so the ETXTBSY swap path it claims to exercise is actually reached. The filed issue diagnosed the root cause precisely — `sleep` copied to a file named `dotf` exits immediately instead of sleeping on a multi-call coreutils build — and proposed a fix: `exec -a sleep "$0" 30` to hand the copy the argv[0] the dispatcher expects while the file on disk keeps the name `install_dotf` needs to swap.
 

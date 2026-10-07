@@ -1,13 +1,14 @@
 ---
-id: lesson-314
+id: "lesson-314-remedies-must-preserve-invocation-flags"
 type: lesson
 status: active
+title: "A printed remedy is run verbatim, so it must reproduce the invocation that failed"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, cli-ux, error-messages, verification, secrets]
 ---
 
-# 314 — A printed remedy is run verbatim, so it must reproduce the invocation that failed
+# A printed remedy is run verbatim, so it must reproduce the invocation that failed
 
 ## What happened
 

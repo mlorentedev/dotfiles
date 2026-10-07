@@ -1,13 +1,14 @@
 ---
-id: lesson-091-a-migration-s-acceptance-guard-grep-is-the-complet
+id: "lesson-091-a-migration-s-acceptance-guard-grep-is-the-complet"
 type: lesson
 status: active
+title: "A migration's acceptance guard-grep is the completeness oracle, not the spec's hand-listed targets"
 created: "2026-06-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 091: A migration's acceptance guard-grep is the completeness oracle, not the spec's hand-listed targets
+# A migration's acceptance guard-grep is the completeness oracle, not the spec's hand-listed targets
 
 **Context**: CLI-005 retired the `init-spec`/`archive-spec` shell twins and repointed every reference to `dotf spec`. The proposal enumerated five repoint targets by hand (AGENTS.md, `agents-md.bats`, `check-spec-gate.sh`, the spec `SKILL.md`, the architecture-map).
 

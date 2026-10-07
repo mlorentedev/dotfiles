@@ -1,13 +1,14 @@
 ---
-id: lesson-127-agy-bakes-secrets-into-json-opencode-pi-self-decry
+id: "lesson-127-agy-bakes-secrets-into-json-opencode-pi-self-decry"
 type: lesson
 status: active
+title: "agy bakes secrets into JSON; opencode/pi self-decrypt (they ignore ambient env)"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 127: agy bakes secrets into JSON; opencode/pi self-decrypt (they ignore ambient env)
+# agy bakes secrets into JSON; opencode/pi self-decrypt (they ignore ambient env)
 
 **Context**: Migrating setup off the load-secrets eager-source (which populated $NAN_API_KEY/$OPENROUTER_API_KEY in the setup process env for deploy-time config materialization).
 

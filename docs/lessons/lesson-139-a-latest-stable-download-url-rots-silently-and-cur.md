@@ -1,13 +1,14 @@
 ---
-id: lesson-139-a-latest-stable-download-url-rots-silently-and-cur
+id: "lesson-139-a-latest-stable-download-url-rots-silently-and-cur"
 type: lesson
 status: active
+title: "A \"latest/stable\" download URL rots silently, and `curl` without `-f` turns a 404 into a corrupt artifact"
 created: "2026-06-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 139: A "latest/stable" download URL rots silently, and `curl` without `-f` turns a 404 into a corrupt artifact
+# A "latest/stable" download URL rots silently, and `curl` without `-f` turns a 404 into a corrupt artifact
 
 **Context**: `setup-linux.sh` installed shellcheck from `…/releases/latest/download/shellcheck-stable.linux.x86_64.tar.xz`. A from-scratch container shakeout (running setup in a clean Ubuntu image) found shellcheck **never installs on a fresh machine** — a bug invisible on any box that already had it.
 
