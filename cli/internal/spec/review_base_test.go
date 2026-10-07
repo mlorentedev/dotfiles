@@ -276,3 +276,27 @@ func TestResolveReviewBaseRefusesAnUntraceableRename(t *testing.T) {
 		t.Errorf("ResolveReviewBase = %q, want \"\" for a rename it cannot trace", got)
 	}
 }
+
+// A move that also rewrites the spec past git's rename threshold is not paired:
+// diff-tree reports a delete and an add. That unpaired move is refused, not
+// read as a folder born here, whose parent would exclude the implementation.
+func TestResolveReviewBaseRefusesAMoveGitDidNotPair(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	git(t, repoRoot, "rm", "-q", "-r", "specs/OLD-001-x")
+	newSpec := filepath.Join(repoRoot, "specs", "NEW-001-x", "proposal.md")
+	if err := os.MkdirAll(filepath.Dir(newSpec), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newSpec, []byte("rewritten from scratch, nothing in common\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, repoRoot, "add", ".")
+	git(t, repoRoot, "commit", "-qm", "move and rewrite")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != "" {
+		t.Errorf("ResolveReviewBase = %q, want \"\" for a move git did not pair", got)
+	}
+}

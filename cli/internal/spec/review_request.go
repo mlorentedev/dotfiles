@@ -165,31 +165,77 @@ func earliestAdding(repoRoot, rel string) string {
 
 // renamedFrom reports whether commit renamed anything into rel and, if so, the
 // folder it came from. renamed with an empty from means the source could not be
-// traced, which the caller refuses. -z keeps paths unquoted whatever
-// core.quotePath says.
+// traced, which the caller refuses.
+//
+// A move that also edits a file past git's similarity threshold is not paired:
+// it shows as a delete and an add. A file deleted elsewhere in the same commit
+// whose place in its folder matches a file added under rel is read as that
+// unpaired move, and refused rather than reported as "genuinely new here".
 func renamedFrom(repoRoot, parent, commit, rel string) (from string, renamed bool) {
-	out, err := exec.Command("git", "-C", repoRoot,
-		"diff-tree", "-r", "-M", "--name-status", "-z", parent, commit).Output()
+	changes, err := treeChanges(repoRoot, parent, commit)
 	if err != nil {
 		return "", true
 	}
-	// Records are status NUL path, or for a rename or copy status NUL src NUL dst.
-	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
-	for i := 0; i < len(f); {
-		status := f[i]
-		if !strings.HasPrefix(status, "R") && !strings.HasPrefix(status, "C") {
-			i += 2
-			continue
-		}
-		if i+2 < len(f) && status[0] == 'R' && strings.HasPrefix(f[i+2], rel+"/") {
+	var added, deleted []string
+	for _, c := range changes {
+		inRel := strings.HasPrefix(c.dst, rel+"/")
+		switch {
+		case c.status == 'R' && inRel:
 			renamed = true
-			if dir := renamedDir(f[i+1], f[i+2], rel); dir != "" {
+			if dir := renamedDir(c.src, c.dst, rel); dir != "" {
 				return dir, true
 			}
+		case c.status == 'A' && inRel:
+			added = append(added, strings.TrimPrefix(c.dst, rel+"/"))
+		case c.status == 'D' && !strings.HasPrefix(c.src, rel+"/"):
+			deleted = append(deleted, c.src)
 		}
-		i += 3
+	}
+	for _, d := range deleted {
+		for _, a := range added {
+			if strings.HasSuffix(d, "/"+a) {
+				return "", true
+			}
+		}
 	}
 	return "", renamed
+}
+
+// treeChange is one record of `git diff-tree --name-status`: src is the path
+// before, dst the path after, the same path for anything but a rename or copy.
+type treeChange struct {
+	status   byte
+	src, dst string
+}
+
+// treeChanges lists what commit changed against parent, with rename detection.
+// -z keeps paths unquoted whatever core.quotePath says.
+func treeChanges(repoRoot, parent, commit string) ([]treeChange, error) {
+	out, err := exec.Command("git", "-C", repoRoot,
+		"diff-tree", "-r", "-M", "--name-status", "-z", parent, commit).Output()
+	if err != nil {
+		return nil, err
+	}
+	// Records are status NUL path, or for a rename or copy status NUL src NUL dst.
+	f := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	var changes []treeChange
+	for i := 0; i+1 < len(f); {
+		status := f[i]
+		if status == "" {
+			break
+		}
+		if status[0] == 'R' || status[0] == 'C' {
+			if i+2 >= len(f) {
+				break
+			}
+			changes = append(changes, treeChange{status[0], f[i+1], f[i+2]})
+			i += 3
+			continue
+		}
+		changes = append(changes, treeChange{status[0], f[i+1], f[i+1]})
+		i += 2
+	}
+	return changes, nil
 }
 
 // renamedDir is the folder oldPath sat in when its rename to newPath moved it
