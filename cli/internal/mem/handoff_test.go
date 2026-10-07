@@ -467,3 +467,55 @@ func TestJournalWriterSkipsTheProjectWord(t *testing.T) {
 		}
 	}
 }
+
+// MEMORY-014 (#1928): a body line the parser reads as structure is refused, and
+// the document is left as it was. Reproduced first without the check: the
+// marker line split wt-a in two, and the next write of wt-a replaced only the
+// part above it, stranding the tail under a thread named "smuggled".
+func TestWriteThreadRefusesABodyLineThatIsStructure(t *testing.T) {
+	for name, body := range map[string]string{
+		"thread marker":         "**Last task:** x<br>\n### thread: smuggled\n**Next action:** y<br>",
+		"stamped thread marker": "### thread: main@msi (writer: pi)\ncopied from another block",
+		"marker with CR":        "intro\r\n### thread: smuggled\r\n",
+		"level-2 heading":       "**Last task:** x<br>\n## Findings\nmore",
+		"handoff heading":       "## Session Handoff\nnested",
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, changed, err := WriteThread(memoryWithTwoThreads, "wt-cli-023", body)
+			if err == nil {
+				t.Fatalf("accepted a structural body line; the document became:\n%s", out)
+			}
+			if changed || out != "" {
+				t.Errorf("a refused write still produced a document (changed=%v)", changed)
+			}
+		})
+	}
+}
+
+// The refusal is narrow: ordinary headings and text that only mentions a marker
+// stay content, as they always were.
+func TestWriteThreadKeepsOrdinaryHeadingsAsContent(t *testing.T) {
+	for name, body := range map[string]string{
+		"level-3 heading":     "### Next Actions\n- do it",
+		"marker mid-line":     "see the `### thread: wt-a` block",
+		"indented marker":     "  ### thread: wt-a",
+		"bare level-2 marker": "##",
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, _, err := WriteThread(memoryWithTwoThreads, "wt-cli-023", body)
+			if err != nil {
+				t.Fatalf("refused ordinary content: %v", err)
+			}
+			if !strings.Contains(out, body) {
+				t.Errorf("body not written:\n%s", out)
+			}
+			// The foreign thread is byte-identical after the write.
+			const foreign = "### thread: wt-pi-harness (fix/harness-045-reviewer-findings)\n\n" +
+				"**Last task:** #561 binding core, PR #1272 merged.\n" +
+				"**Next action:** AC7 guards before migrating the 35 skills.\n"
+			if !strings.Contains(out, foreign) {
+				t.Errorf("the foreign thread changed:\n%s", out)
+			}
+		})
+	}
+}
