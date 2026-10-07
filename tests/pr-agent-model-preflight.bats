@@ -9,6 +9,7 @@
 # its argv and stdin so a test can prove where the key travels.
 
 bats_require_minimum_version 1.5.0
+load 'lib/refute'
 
 setup() {
     PREFLIGHT="$BATS_TEST_DIRNAME/../scripts/pr-agent-model-preflight.sh"
@@ -48,7 +49,7 @@ run_preflight() {
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/mimo-v2.6-flash' "$OUT"
     grep -qxF 'fallbacks=["openai/deepseek-v4-flash"]' "$OUT"
-    grep -qxF 'retry_model=openai/deepseek-v4-flash' "$OUT"
+    refute_grep '^retry_model=' "$OUT"
     [[ "$output" != *"::warning::"* ]]
 }
 
@@ -58,7 +59,7 @@ run_preflight() {
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/deepseek-v4-flash' "$OUT"
     grep -qxF 'fallbacks=[]' "$OUT"
-    grep -qxF 'retry_model=' "$OUT"
+    refute_grep '^retry_model=' "$OUT"
     [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"HTTP 401"*"openai/deepseek-v4-flash"* ]]
 }
 

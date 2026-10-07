@@ -16,17 +16,20 @@ owner: manu
 
 ## What it is, exactly
 
-**Two files in this repository, and nothing else.** No GitHub App to install, no
-server to run, no integration in another repo, no account beyond the inference
-key.
+No GitHub App or server to run. The Action's workflow and TOML own the runtime
+configuration; the push gate, model preflight and audited upstream contract
+protect the behavior that depends on PR-Agent internals.
 
 | File | Role |
 |---|---|
 | `.github/workflows/pr-agent.yml` | when it fires, what credential it gets |
 | `.pr_agent.toml` | which model, what it reads, what it must check, what it must never see |
+| `scripts/pr-agent-push-gate.sh` | bounded push-review decision (ADR-040) |
+| `scripts/pr-agent-model-preflight.sh` | select the first declared model that answers |
+| `harness/pr-agent-upstream-contract.json` | approved upstream source identities |
 
 The action itself is `The-PR-Agent/pr-agent`, a public **Docker action** pulled
-per run — pinned to a tag, never a moving ref. The only outbound dependency is
+per run — pinned to a commit SHA, never a moving ref. The inference endpoint is
 NaN's OpenAI-compatible endpoint at `https://api.nan.builders/v1`, reached with a
 single secret, `NAN_API_KEY`, declared in `secrets/registry.yaml` with
 `consumers: ci:mlorentedev/dotfiles` so `dotf secrets sync ci` manages it.
@@ -89,7 +92,7 @@ Six things now stand between that and a silent green:
    fails when none answers. It exists because NaN retired `mimo-v2.5` on
    2026-09-30: it hung for hours (PR-Agent's fallback does not catch a hang, so
    every PR got a green job and no review), then answered 401.
-5. **Streaming (AI-045 AC6, #1858)**: every attempt sets
+5. **Streaming (AI-045 AC6, #1858)**: the Action sets
    `LITELLM__CUSTOM_LLM_PROVIDER`, `LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER`
    and `LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS` in its env, so PR-Agent
    streams its NaN calls. A non-streamed answer is cut at the edge after about
@@ -110,10 +113,29 @@ Six things now stand between that and a silent green:
    A new non-chat service needs its entry in `serviceAPIs`
    (`cli/internal/nanprobe/bindings.go`); until then its row reads "refused".
 
-The multiplier that matters is still the **push**, not the PR: the workflow fires
-on every push to the branch, so a PR with five pushes is five reviews of the full
-diff. The per-PR concurrency group collapses a burst of pushes into one review of
-the settled state.
+The multiplier that matters is still the **push**, not the PR. The push gate
+requires three newer non-merge commits before another review and requests an
+incremental review only with a trusted baseline (ADR-040). The per-PR
+concurrency group collapses a burst of pushes into one run.
+
+## Updating the Action without drifting from its contract
+
+The workflow's `uses: The-PR-Agent/pr-agent@<sha>` is the runtime pin. The
+upstream filter reads that SHA from the executing workflow at
+`github.workflow_sha`; do not maintain a second `PR_AGENT_REF` value.
+`tests/pr-agent-config.bats` checks the pinned Action entrypoint, default
+configuration and review source files against
+`harness/pr-agent-upstream-contract.json`. An update that leaves those files
+unchanged needs no manifest edit. If one changes, inspect the upstream diff
+against the push gate and publication guard before approving the new blob SHA
+in the manifest. A failed API read fails the check; it is not an approval.
+
+`github_action_config.fail_on_tool_errors` is deliberately `true`. The Action
+does not identify whether a failed step was caused by the model or a tool, so
+there is no second Action on `failure` or `cancelled`. Its declared model
+fallback remains inside the single 12-minute attempt. The publication guard
+still fails if `/review` completes without publishing a Guide. Diagnose a red
+Action from its logs; do not re-enable a blind retry that can publish twice.
 
 ## High-Velocity Batch PR & Triage Workflow
 
@@ -122,9 +144,9 @@ To maximize developer velocity without sacrificing review hygiene:
 1. **Sprint Phase (Parallel PR creation)**:
    The developer or agent opens multiple PRs in series for distinct atomic tickets.
    No local pre-push lock blocks PR creation while previous PRs await review.
-2. **Async CI Phase (Parallel review)**:
-   GitHub Actions and PR-Agent review each PR in parallel in the cloud across
-   available NaN slots. Non-slash comments (`## Review triage`, discussions) are
+2. **Async CI Phase (Queued review)**:
+   GitHub Actions queues PR-Agent reviews one at a time for this repository.
+   Non-slash comments (`## Review triage`, discussions) are
    strictly filtered out (`startsWith(comment.body, '/')`), preventing review loops (#1134).
 3. **Triage Sweep Phase (`dotf pr triage-queue`)**:
    Before closing a session or merging, the agent queries `dotf pr triage-queue`.
@@ -155,9 +177,8 @@ To maximize developer velocity without sacrificing review hygiene:
 - **Changing what it checks**: `[pr_reviewer] extra_instructions`. Every review
   opens with a harness-compliance pass over `AGENTS.md` and `.claude/CLAUDE.md`,
   reported per item even when everything passes.
-- **The output is in Spanish** (`response_language = "es-ES"`). The instructions
-  themselves stay in English, as does everything the English-only standing order
-  names — commits, branch names, PR titles and bodies, code comments.
+- **The output is in English** (`response_language = "en-US"`), consistent with
+  the English-only durable-record policy for PR comments and code.
 
 ## What it must never see
 

@@ -8,8 +8,8 @@
   },
   {
     "id": "TOOL-013-pr-agent-reviewer-f2",
-    "behavior": "AC2 — a reasoning-class reviewer with NO cheap fallback. harness/reviewer-pool.json excludes qwen3.6 from the adversarial-review pool by name ('a reviewer that PASSes cheaply is worse than no gate'), and #786's draft proposed exactly that model as a fallback here. Two files holding opposite policies on who may review is the defect this asserts against.",
-    "verification": "bats tests/pr-agent-config.bats -f 'does not fall back' && bats tests/pr-agent-config.bats -f 'the reviewing model is the one measured'",
+    "behavior": "AC2 — the primary and its fallback are reasoning-class reviewers; no cheap or excluded model is permitted.",
+    "verification": "bats tests/pr-agent-config.bats -f 'the fallback is not a model the reviewer pool excludes by name'",
     "state": "pending",
     "evidence": ""
   },
@@ -29,15 +29,15 @@
   },
   {
     "id": "TOOL-013-pr-agent-reviewer-f5",
-    "behavior": "AC5 — the action is pinned to a release tag that exists, at the project's current name. Both were wrong in the first draft, which is why this is a criterion rather than an assumption: qodo-ai/pr-agent now redirects to The-PR-Agent/pr-agent, and @v0.30 does not exist at all.",
-    "verification": "bats tests/pr-agent-config.bats -f 'pins the action to a tag' && gh api repos/The-PR-Agent/pr-agent/contents/action.yaml?ref=$(grep -oE 'pr-agent@v[0-9.]+' .github/workflows/pr-agent.yml | head -1 | cut -d@ -f2) --jq '.name' >/dev/null",
+    "behavior": "AC5 — the action is pinned to an immutable commit of a real release at its current repository name, not an obsolete tag or redirect.",
+    "verification": "bats tests/pr-agent-config.bats -f 'workflow pins the action to an immutable commit'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "TOOL-013-pr-agent-reviewer-f6",
-    "behavior": "AC6 — a provider failure degrades the review AND the absence is visible. The second clause is what distinguishes this from #786's original wording, which as written describes a silent green: GUARD-002 classifies a missing review as `declined` and turns the PR red, so 'degraded' cannot mean 'unnoticed'.",
-    "verification": "test -f scripts/check-review-attestation.sh && scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json 2>&1 | grep -q 'pending' && ! scripts/check-review-attestation.sh --payload tests/fixtures/review-attestation/no-output.json",
+    "behavior": "AC6 — a provider failure cannot silently pass: the Action fails and the publication guard rejects an absent review.",
+    "verification": "bats tests/pr-agent-config.bats -f 'ambiguous failures fail closed'",
     "state": "pending",
     "evidence": ""
   },
@@ -45,6 +45,20 @@
     "id": "TOOL-013-pr-agent-reviewer-f7",
     "behavior": "AC7 — AGENTS.md enters the review prompt, so the repo's standing orders, the English-only rule, the no-auto-merge rule and the shell-compatibility table become review criteria with no additional wiring. #786 calls this the free win and it is the single highest-value line in the config.",
     "verification": "bats tests/pr-agent-config.bats -f 'AGENTS.md enters the review prompt' && test -f AGENTS.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f8",
+    "behavior": "AC8 — the effective Action pin, not a copied version, selects upstream source identities; changed files or failed API reads fail closed.",
+    "verification": "bats tests/pr-agent-config.bats -f 'pinned upstream review contracts match their approved source identities'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-013-pr-agent-reviewer-f9",
+    "behavior": "AC9 — tool errors fail the single Action without a blind retry; the internal model fallback and publication guard remain active.",
+    "verification": "bats tests/pr-agent-config.bats -f 'ambiguous failures fail closed without invoking a second Action'",
     "state": "pending",
     "evidence": ""
   }

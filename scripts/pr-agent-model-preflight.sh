@@ -39,10 +39,6 @@
 # Output, as `key=value` lines to --output (default stdout):
 #   model=<first model that answered>
 #   fallbacks=<JSON array of the other models that answered, in declared order>
-#   retry_model=<the second model that answered, or empty>
-#     A scalar on purpose: GitHub evaluates a step's env before its `if`, so a
-#     workflow that parses `fallbacks` with fromJSON throws whenever this step
-#     was skipped and left it empty (run 36812454370).
 #
 # Exit:
 #   0  a model answered
@@ -165,5 +161,4 @@ fi
 {
     printf 'model=%s\n' "${answered[0]}"
     printf 'fallbacks=%s\n' "$(printf '%s\n' "${answered[@]:1}" | jq -Rsc 'split("\n") | map(select(. != ""))')"
-    printf 'retry_model=%s\n' "${answered[1]:-}"
 } >> "$output"

@@ -87,26 +87,36 @@ would have asked "does this action exist at this tag?" before the answer mattere
 
 - [ ] **AC1** A PR in this repo receives inline review comments generated through NaN.
       Proven by a live PR, not by fixtures.
-- [ ] **AC2** The reviewing model is a reasoning-class one and there is **no cheap
-      fallback**: `fallback_models` is empty. `harness/reviewer-pool.json` excludes
-      `qwen3.6` from the adversarial-review pool by name — *"a reviewer that PASSes
-      cheaply is worse than no gate"* — and two files in this repo must not hold opposite
-      policies on who may review.
+- [ ] **AC2** The reviewing model and any fallback are reasoning-class ones, never
+      cheap fallbacks. `harness/reviewer-pool.json` excludes `qwen3.6` from the
+      adversarial-review pool by name — *"a reviewer that PASSes cheaply is worse
+      than no gate"* — and two files in this repo must not hold opposite policies
+      on who may review.
 - [ ] **AC3** `sensitive/**` never enters the model call. Asserted in config and pinned by
       a test, because the diff leaves this infrastructure only at that call.
 - [ ] **AC4** The workflow holds **exactly one** inference credential, delivered by
       `consumers: ci:<repo>` rather than ambiently. #1025 is the counter-example: the
       spec-review path injects the whole registry to authenticate one model, so one broken
       item mapping takes down authentication for everything.
-- [ ] **AC5** The action is pinned to a release tag that exists, at the project's current
-      name. Both were wrong in the first draft — `qodo-ai/pr-agent` now redirects to
-      `The-PR-Agent/pr-agent`, and `@v0.30` does not exist.
-- [ ] **AC6** A provider failure degrades the review rather than blocking the PR, **and
-      the absence is visible** — GUARD-002 reports `declined` and the PR goes red. The
-      second clause is what distinguishes this from #786's original wording, which as
-      written describes a silent green.
+- [ ] **AC5** The action is pinned to the commit of a real release, at the project's
+      current name. Both were wrong in the first draft — `qodo-ai/pr-agent` now
+      redirects to `The-PR-Agent/pr-agent`, and `@v0.30` does not exist.
+- [ ] **AC6** A provider failure leaves the review unverified and **the absence is
+      visible** — the publish guard and GUARD-002 report failure rather than
+      silently passing an unreviewed PR.
 - [ ] **AC7** `AGENTS.md` enters the review prompt, so the repo's standing orders become
       review criteria with no additional wiring.
+- [ ] **AC8** An action bump passes without changing local version annotations when
+      the upstream Action entrypoint, default configuration, and files implementing
+      review selection and failure semantics are unchanged. Any audited change
+      fails closed until its new
+      behavior is reviewed and the approved source identity is updated. The
+      runtime upstream filter reads the pin from the executing workflow, not a
+      copied SHA.
+- [ ] **AC9** A swallowed tool failure fails the Action, but an ambiguous failure
+      never launches a second Action. The existing publish guard still fails when
+      no review is produced, and the declared model fallback remains available
+      within the first attempt.
 
 ## References
 
@@ -118,3 +128,7 @@ would have asked "does this action exist at this tag?" before the answer mattere
 - `#939` — `DOTFILES_REPO_DIR` outranking the cwd
 - `harness/reviewer-pool.json` — the reviewer policy this config must not contradict
 - `ai/nan/README.md` — NaN endpoint and key material
+- `docs/adr/adr-040-automatic-reviews-bounded-per-push.md` — bounded review
+  contract; future upstream changes must not silently relax its gate
+- `docs/adr/adr-042-shared-ci-is-referenced-not-copied.md` — eventual shared
+  workflow extraction; this repository still owns its trigger and permission gate

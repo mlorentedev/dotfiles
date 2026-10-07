@@ -149,8 +149,8 @@ jobs:
       group: pr-agent-review-${{ github.repository }}
       cancel-in-progress: false
       queue: max
-    # Both PR-Agent attempts (12 + 12) plus setup; see #1913.
-    timeout-minutes: 27
+    # One bounded PR-Agent attempt (12 minutes) plus setup.
+    timeout-minutes: 17
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -213,9 +213,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          PR_AGENT_REF: 1d01f24f455bb879c1d9c557ad7de3d72dcc7975
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
           set -uo pipefail
+          workflow=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/pr-agent.yml?ref=${WORKFLOW_SHA}" \
+            --jq '.content' | base64 -d) || {
+              echo "::error::cannot read the executing PR-Agent workflow"
+              exit 1
+            }
+          PR_AGENT_REF=$(printf '%s\n' "$workflow" \
+            | sed -n 's|^[[:space:]]*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' | sort -u)
+          if [[ ! "$PR_AGENT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::the executing workflow must have one pinned PR-Agent action"
+            exit 1
+          fi
           CFG=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.pr_agent.toml?ref=${DEFAULT_BRANCH}" \
             --jq '.content' 2>/dev/null | base64 -d 2>/dev/null) || CFG=""
           upstream() { # $1 = path in The-PR-Agent/pr-agent at PR_AGENT_REF; empty on failure
@@ -331,9 +342,9 @@ jobs:
         # until its own timeout and publish nothing (run 36805617985), because
         # `ai_timeout` does not fire on a hang (AI-045). 12 minutes covers the
         # slowest review measured on mimo-v2.6-flash (10.5 min, run 36806962325).
-        # continue-on-error lets the retry below decide the job's outcome.
+        # A tool error fails the job; the publication guard still runs on /review.
+        # No second Action runs on an ambiguous failure.
         timeout-minutes: 12
-        continue-on-error: true
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move it decides what runs here, and what runs here holds
         # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
@@ -343,7 +354,7 @@ jobs:
         # sha (an annotated tag returns a tag object: dereference it via git/tags).
         # The tag is not repeated here because Dependabot rewrites only the line
         # below, and a copy in this comment drifted from v0.42.0 to v0.45.0 unseen.
-        uses: The-PR-Agent/pr-agent@1d01f24f455bb879c1d9c557ad7de3d72dcc7975  # v0.46.0
+        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
@@ -440,41 +451,7 @@ jobs:
           # on demand still behaves. What changes is that it no longer runs
           # unasked on every push.
           github_action_config.auto_improve: "false"
-
-      # #1913: the attempt above did not finish, so review once more on the first
-      # fallback the preflight saw answer, with no fallback of its own: two attempts
-      # in all. Only on failure, because that model is the archive gate's primary
-      # and NaN limits concurrency per model (#1149); rotating the chain instead
-      # would spend the gate's bucket on every other PR. The same pinned action and
-      # settings as above, model aside: a test holds the two equal, and Dependabot
-      # bumps both `uses:` lines together.
-      - name: PR-Agent, retried on the first fallback
-        id: pr_agent_retry
-        if: >
-          !cancelled() && contains(fromJSON('["failure", "cancelled"]'), steps.pr_agent.outcome)
-            && steps.models.outputs.retry_model != ''
-        timeout-minutes: 12
-        uses: The-PR-Agent/pr-agent@1d01f24f455bb879c1d9c557ad7de3d72dcc7975  # v0.46.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI__KEY: ${{ secrets.NAN_API_KEY }}
-          OPENAI__API_BASE: https://api.nan.builders/v1
-          CONFIG__MODEL: ${{ steps.models.outputs.retry_model }}
-          CONFIG__FALLBACK_MODELS: '[]'
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
-          LITELLM__CUSTOM_LLM_PROVIDER: openai
-          LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
-          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
-          CONFIG__PUBLISH_OUTPUT_PROGRESS: false
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
-          github_action_config.handle_push_trigger: "true"
-          github_action_config.push_commands: >-
-            ${{ steps.push_gate.outputs.mode == 'incremental' && '["/review -i"]' || '["/review"]' }}
-          github_action_config.push_trigger_ignore_bot_commits: "true"
-          github_action_config.push_trigger_ignore_merge_commits: "true"
-          github_action_config.auto_describe: "false"
-          github_action_config.auto_review: "true"
-          github_action_config.auto_improve: "false"
+          github_action_config.fail_on_tool_errors: "true"
 
       # A review that did not happen must not report success (#1107).
       #
@@ -509,6 +486,7 @@ jobs:
         # the job, naming each model and its status (AI-045).
         if: >
           always() && steps.credential.outcome != 'failure'
+            && steps.reviewable.outcome != 'failure'
             && steps.models.outcome != 'failure'
             && steps.reviewable.outputs.reviewable != 'false'
             && steps.push_gate.outputs.run != 'false'
@@ -527,31 +505,13 @@ jobs:
           BASE_REF: ${{ github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
-          # The LAST attempt decides (#1913): the retry when it ran, else the first.
-          PR_AGENT_OUTCOME: >-
-            ${{ steps.pr_agent_retry.outcome != 'skipped'
-                && steps.pr_agent_retry.outcome || steps.pr_agent.outcome }}
-          REVIEW_MODEL: >-
-            ${{ steps.pr_agent_retry.outcome != 'skipped'
-                && steps.models.outputs.retry_model || steps.models.outputs.model }}
-          FIRST_OUTCOME: ${{ steps.pr_agent.outcome }}
-          FIRST_MODEL: ${{ steps.models.outputs.model }}
+          PR_AGENT_OUTCOME: ${{ steps.pr_agent.outcome }}
+          REVIEW_MODEL: ${{ steps.models.outputs.model }}
         run: |
           set -euo pipefail
-          # A cancelled PR-Agent step was stopped by the job's timeout-minutes while
-          # it waited on the model. That is a hang, not concurrency: measured on run
-          # 36677077122, the model accepted a 42K-token review, never answered, and
-          # `ai_timeout` did not fire (AI-045).
-          if [ "${FIRST_OUTCOME:-}" != "success" ] && [ "${REVIEW_MODEL:-}" != "${FIRST_MODEL:-}" ]; then
-            echo "::warning::the first attempt on ${FIRST_MODEL} ended ${FIRST_OUTCOME}; retried on ${REVIEW_MODEL} (#1913)."
-          fi
-          # A step stopped by its own timeout-minutes is not measured yet to end as
-          # `failure` or as `cancelled` (#1913), so both count: either way it waited
-          # on the model, which accepted the review and never answered.
           if [ "${PR_AGENT_OUTCOME:-}" = "cancelled" ] || [ "${PR_AGENT_OUTCOME:-}" = "failure" ]; then
-            echo "::error::PR-Agent did not finish on ${REVIEW_MODEL:-its model} (${PR_AGENT_OUTCOME}): stopped by its" \
-              "timeout while the model held the review, or failed. Re-run the job; if it repeats, the model" \
-              "cannot review a diff this size in time (AI-045, #1763, #1913)."
+            echo "::error::PR-Agent ended ${PR_AGENT_OUTCOME} on ${REVIEW_MODEL:-its model}." \
+              "Inspect its logs; no second Action runs on an unclassified failure."
             exit 1
           fi
           # Every declared marker, as a JSON array: a full review carries "## PR
