@@ -93,6 +93,13 @@ type Installer struct {
 	// HasCommand reports whether a package manager is on PATH. Nil means
 	// exec.LookPath; tests inject the answer.
 	HasCommand func(name string) bool
+	// Query runs a package manager's read-only presence query for a "system"
+	// entry (dpkg-query, brew list, winget list). Nil means ExecRunner; tests
+	// inject the machine's answer, so no real manager is ever asked.
+	Query Runner
+	// IsRoot reports whether dotf runs with root privileges, which decides if an
+	// apt install needs sudo. Nil means an effective uid of 0.
+	IsRoot func() bool
 }
 
 func (in *Installer) defaults() {
@@ -117,6 +124,9 @@ func (in *Installer) defaults() {
 			return err == nil
 		}
 	}
+	if in.IsRoot == nil {
+		in.IsRoot = func() bool { return os.Geteuid() == 0 }
+	}
 	if in.Run == nil {
 		in.Run = func(name string, args ...string) error {
 			cmd := exec.Command(name, args...)
@@ -132,6 +142,10 @@ func (in *Installer) defaults() {
 // PATH (where npm/scoop/choco place globals and uv links its tools). "" means
 // absent/unparseable.
 func (in *Installer) current(t Tool) string {
+	if t.Source.Type == "system" {
+		// Presence, not a version: the pin seams do not apply (see system.go).
+		return in.systemInstalled(t)
+	}
 	if in.CurrentVersion != nil {
 		return in.CurrentVersion(t.Name)
 	}
@@ -142,7 +156,7 @@ func (in *Installer) current(t Tool) string {
 }
 
 // Install converges the tool to its pinned version, dispatching on source type.
-// Both backends share the reconcile policy (decideAction): a no-op when already
+// The pinned backends share the reconcile policy (decideAction): a no-op when already
 // at or above the pin, never a downgrade.
 func (in *Installer) Install(t Tool) (Result, error) {
 	in.defaults()
@@ -157,8 +171,15 @@ func (in *Installer) Install(t Tool) (Result, error) {
 		return in.installNpm(t)
 	case "uv-tool":
 		return in.installUvTool(t)
+	case "system":
+		return in.installSystem(t)
 	default:
-		return Skipped, fmt.Errorf("%s: unsupported source type %q", t.Name, t.Source.Type)
+		// A catalog written for a newer dotf may carry a type this one has never
+		// heard of. Failing would turn every sync red on a machine that cannot
+		// have the new dotf yet; skipping says so and keeps the other tools
+		// converging. Plan still reports it unsupported, so the two agree.
+		_, _ = fmt.Fprintf(in.Out, "warning: %s: source type %q is not known to this dotf; skipping (upgrade dotf to install it)\n", t.Name, t.Source.Type)
+		return Skipped, nil
 	}
 }
 
@@ -200,6 +221,8 @@ func (in *Installer) Plan(t Tool) Plan {
 			p.Action = PlanUnsupported
 			return p
 		}
+	case "system":
+		return in.planSystem(p, t)
 	case "npm", "uv-tool":
 	default:
 		p.Action = PlanUnsupported

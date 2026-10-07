@@ -1,4 +1,23 @@
 {
+  "$comment": [
+    "The declarative tool catalog `dotf tools` reads (CLI-029). Each entry:",
+    "  name, version (the pin, a floor), profile, source.",
+    "",
+    "source.type picks how the tool arrives:",
+    "  github-release  a checksummed release asset (asset per GOOS or GOOS/GOARCH, checksums)",
+    "  npm             a global npm package (package)",
+    "  uv-tool         a `uv tool install` PyPI package (package)",
+    "  system          a package the OS manager owns, for what no cross-OS channel carries:",
+    "                    apt / brew / winget  the package name per manager (linux / darwin / windows);",
+    "                                         a manager with no name skips the entry on that OS",
+    "                    command              optional: the executable it puts on PATH; found there,",
+    "                                         the entry is satisfied whichever channel installed it",
+    "                  A system entry has no version: it is not pinned, presence is what converges,",
+    "                  and it is never upgraded. A dotf that predates the type skips it with a warning,",
+    "                  so no system entry is added before a release carrying the reader is the pin.",
+    "",
+    "source.platforms (every type) narrows an entry to the listed GOOS values."
+  ],
   "tools": [
     {
       "name": "sops",

@@ -212,3 +212,57 @@ func TestLoad_RejectsAReleaseToolWithNoAsset(t *testing.T) {
 		}
 	}
 }
+
+// A system entry names its package per OS manager. One that names none can never
+// install anywhere, one that names an unknown manager (pacman, dnf) is a typo the
+// decoder would drop in silence, and one that carries a version asks for a pin a
+// system package does not have: each is an error naming the entry.
+func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
+	cases := []struct {
+		name, source, version, want string
+	}{
+		{"no manager at all", `{"type":"system"}`, "", "names no package manager"},
+		{"a platforms list is not a manager", `{"type":"system","platforms":["linux"]}`, "", "names no package manager"},
+		{"an unknown manager key", `{"type":"system","apt":"gh","pacman":"github-cli"}`, "", `"pacman"`},
+		{"a key of another source kind", `{"type":"system","apt":"gh","package":"gh"}`, "", `"package"`},
+		{"a version", `{"type":"system","apt":"gh"}`, `"version":"2.40.0",`, "not pinned"},
+		{"a name that is a flag", `{"type":"system","apt":"-y"}`, "", "apt"},
+		{"a name with a space", `{"type":"system","brew":"gh cli"}`, "", "brew"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"tools":[{"name":"gh",` + tc.version + `"source":` + tc.source + `}]}`
+			_, err := Load(writeCatalog(t, body))
+			if err == nil || !strings.Contains(err.Error(), `"gh"`) || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("want an error naming gh and %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
+func TestLoad_AcceptsASystemEntry(t *testing.T) {
+	body := `{"tools":[{"name":"gh","source":{"type":"system","apt":"gh","brew":"gh","winget":"GitHub.cli","command":"gh","platforms":["linux","darwin","windows"]}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatalf("a well-formed system entry must load: %v", err)
+	}
+	s := c.Tools[0].Source
+	if s.Apt != "gh" || s.Brew != "gh" || s.Winget != "GitHub.cli" || s.Command != "gh" {
+		t.Errorf("source = %+v", s)
+	}
+}
+
+// The skip for an OS the entry names no manager for is the platform skip every
+// other source takes, so Install, Plan and `tools list` need no branch of their own.
+func TestSystemSupportsOnlyTheOSesItNamesAPackageFor(t *testing.T) {
+	gh := Tool{Name: "gh", Source: Source{Type: "system", Apt: "gh", Winget: "GitHub.cli"}}
+	for goos, want := range map[string]bool{"linux": true, "darwin": false, "windows": true} {
+		if got := gh.SupportsOS(goos); got != want {
+			t.Errorf("SupportsOS(%s) = %v, want %v", goos, got, want)
+		}
+	}
+	listed := Tool{Name: "gh", Source: Source{Type: "system", Apt: "gh", Brew: "gh", Platforms: []string{"darwin"}}}
+	if listed.SupportsOS("linux") || !listed.SupportsOS("darwin") {
+		t.Error("a platforms list narrows a system entry further")
+	}
+}

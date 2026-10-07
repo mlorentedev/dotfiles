@@ -20,7 +20,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
 | PyPI tools (hive) | `uv tool` | `packages.json` | `dotf tools install` |
-| Tools with no cross-OS channel (git, gh, uv, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | the setup script for each OS | setup |
+| Tools with no cross-OS channel (git, gh, uv, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | the setup script for each OS today; `packages.json` `source.type: system` entries once a release that reads the type is the pin (#2013 D8) | setup today; then `dotf tools install` |
 
 How a pin is read depends on the channel:
 
@@ -92,6 +92,22 @@ This channel is only for `dotf`, mise, and tools mise cannot install. Everything
 - **`checksums`** is the release's sha256 manifest. Its lines may list the asset as `name`, `./name` or `*name`. A tool whose release publishes no manifest cannot use this channel.
 - **`platforms`** (optional) limits a tool to some OSes. It is meant for npm and uv-tool sources; a release tool expresses the same thing through its `asset` keys.
 - Before relying on the entry, check it with `dotf tools list` and `dotf tools install --dry-run` on each OS you declared.
+
+## Adding a system package to the catalog
+
+`dotf` reads `source.type: "system"`: a package the OS manager owns, named once per manager. **No entry ships yet.** The installed `dotf` fails on a type it does not know, so entries wait for the release that carries this reader to be the `DOTF_VERSION` pin (#2013 P5b).
+
+```json
+{ "name": "gh", "source": { "type": "system", "apt": "gh", "brew": "gh", "winget": "GitHub.cli", "command": "gh" } }
+```
+
+- **Managers.** `apt` (linux), `brew` (darwin), `winget` (windows). A manager with no name skips the entry on that OS, with a `skipping` line, and `dotf tools list` shows it as not in the catalog there. `Load` rejects an entry that names no manager, an unknown key (a typo such as `pacman` would otherwise read as "no name" and skip in silence), a `version`, or a name that is a flag or has a space.
+- **Commands run.** `sudo apt-get install -y <pkg>` (no `sudo` when `dotf` already runs as root), `brew install <name>`, `winget install --id <id> -e --accept-source-agreements --accept-package-agreements`. This is the first place `dotf` itself calls `sudo`: the setup scripts avoid it and ask you to run it once. `sudo` prompts on a terminal and fails without one, so a scheduled run cannot install an apt package.
+- **No pin, so presence converges.** An entry is installed when its `command` is on PATH, or else when the manager lists the package (`dpkg-query` reporting `install ok installed`, `brew list --versions`, `winget list --id <id> -e`). A package that is present is skipped and never upgraded, so a second `dotf tools install` runs no manager command. After an install the manager's record must list the package, or the run fails: a manager exiting 0 is not the package being there.
+- **When to declare `command`.** Where the tool is an executable that another channel may already have provided, which then counts. Leave it out for a library or a GUI app.
+- **A missing manager** (brew before the bootstrap installed it, no `apt-get`) is a skip that names it, and `--dry-run` shows `missing-manager`; the next run installs the package once the manager is there.
+- **An unknown future type** is a skip with a `warning:` line, not a failed run, so a catalog written for a newer `dotf` degrades on an older one. `--dry-run` still shows it as `unsupported`.
+- `dotf tools sync` is unchanged: it renders mise and does not drive the system managers. `dotf tools install` converges them.
 
 **Coupling to the installed `dotf`.** Setup runs the `dotf` pinned in `versions.conf`, not the one in your checkout. An entry that uses a catalog feature the pinned release lacks (for example, GOOS/GOARCH keys before the release that added them) reads as "no asset" on every machine, and before that release it also failed the run. The order is: land the reader first, release it, bump `DOTF_VERSION`, and only then add the entry (#1814).
 
