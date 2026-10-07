@@ -48,9 +48,38 @@ created: "2026-10-06"
 
 - [ ] Commit `mise.lock` and install with `--locked`. Measured 2026-10-06: mise keeps one lockfile for the whole global config, and `--locked` fails when any configured tool (the Mac's hand-written `config.toml`) is missing from it, so the lock lands when `conf.d/dotfiles.toml` is the only tools config (comment on #2013). The aqua backend already verifies each asset's checksum and attestation
 
+### P5a — `source.type: system`, reader only (this PR)
+
+> Tests first, each failing before its implementation. The release constraint: no `system` entry ships in `packages.json` here (#2013 P5b follows the release that carries this reader).
+
+- [x] [AC8] Failing tests, then `Load` validation: a `system` entry with no `apt`/`brew`/`winget`, with an unknown key, or with a `version` is an error naming the entry
+- [x] [AC7] Failing test, then `SupportsOS`: a `system` entry with no name for this OS is skipped by `Install` with a message and reported `unsupported` by `Plan`
+- [x] [AC7] Failing tests, then `Install`: the exact argv per manager (apt as root and through sudo, brew, winget), run through the injected runner; no manager on PATH is a skip naming it
+- [x] [AC7] Failing test, then the second run: a package the manager (or the declared command) reports is skipped and no manager command runs; a manager that exits 0 without installing the package is an error
+- [x] [AC7] Failing test, then `Plan`: install, skip and missing-manager rows, never upgrade; `tools list` shows `apt:`/`brew:`/`winget:` names
+- [x] [AC8] Failing test, then `Install` of an unknown source type: a skip with a warning, exit 0; `Plan` still says `unsupported`
+- [x] Runbook `tool-installation.md` names the type; `packages.json` documents it in a `$comment`, with no entry added
+- [x] Mutation check: invert the presence skip and confirm the second-run test goes red
+- [x] [AC7] Failing tests, then `sudo -n`: `-n` is in the apt argv, and a refusal because a password is needed is a named `needs sudo; run: <exact command>` skip that does not fail the run (`installAll` continues). No `sudo -v` caching, no prompt
+- [x] [AC8] Failing test, then `Plan` of an unknown source type: a skip carrying the same "not known to this dotf" words as `Install`, not `unsupported`
+
+> **Decision (P5a): which command converges system entries.** `dotf tools install` does, and `dotf tools sync` stays mise-only. #2013 D8 says "`dotf tools sync` drives the managers"; P5b uses `dotf tools install`, because `install` is the catalog's converge command (`packages.json` is what `install` reads, and `sync` reads `versions.conf` and renders mise), setup already calls it, and a system package is installed by a manager that may need privilege and may be absent, which `sync`'s all-or-nothing `mise install` and its converge step (a reconciler with a plan and a probe) have no place for yet. Widening `sync` is a separate change once the converge step can plan a sudo-gated install; D8's wording is read as "the tools command", not that verb.
+
 ### W2b — shims on PATH (after #2013 P6/P7)
 
-- [ ] `mise activate` in the rc files, the shims directory for non-interactive callers, and a doctor check
+- [x] `mise activate` in `.zshrc`, `.bashrc` and the PowerShell profile, guarded on mise, before direnv and zoxide (#2013 P6, PR #2043)
+- [ ] The shims directory for non-interactive callers (setup, cron, an agent's shell), which read no rc file
+- [x] The doctor's pin half: the pinned CLIs resolve through `mise which`, T3 below. That answers from the mise config whatever the caller's PATH, so it does NOT show the shims directory reaches PATH
+- [ ] The doctor probe that the shims directory is on PATH for a non-interactive caller; lands with the shims directory above, and until it does a green "at their pin through mise" says nothing about cron or an agent's shell
+
+### T3 — doctor reads a darwin machine as darwin, and checks the mise CLIs (stacked on #2043)
+
+- [x] Failing tests, then one gate for the `~/Applications/<tool>-<version>` toolchain layout: it applies on linux only (`platform.Supports`), and each other OS names how it gets its toolchains instead: winget on windows, mise on darwin (ADR-044 Wave 3)
+  - `checkVersionMatch` (the versioned directories) and `checkToolHomeEnvVars` (the `*_HOME` variables must be set) consult it; on the Mac they reported 11 FAILs for a layout darwin does not use
+  - `checkVersionedPaths` stays on every OS: a `*_HOME` that is set must point at a real toolchain, which is F-041 (a `JAVA_HOME` pointing at nothing breaks macOS's `/usr/bin/java`)
+- [x] tmux is class 3 (ADR-044): the not-installed remedy names the OS's package manager, not `apt` on every POSIX host. `checkTmux` keeps the installed and version half only; `~/.tmux.conf` is the `tmux` deploy entry's, checked by `checkDeployManifest` since #2043
+- [x] W2b doctor check: the CLIs marked `# mise: cli` in `versions.conf` run at their pin through `mise which`, the same plan `dotf tools sync --dry-run` prints, on every OS; a changed rendered config is a WARN naming the sync
+- [x] On the Mac: the doctor run before and after, the FAIL count and what remains (recorded in `verification.md`)
 
 ## Closing
 

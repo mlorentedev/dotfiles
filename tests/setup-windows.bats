@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for setup-windows.ps1 (structural + PSScriptAnalyzer)
+# Tests for setup-windows.ps1 (structural; PSScriptAnalyzer runs in lint-powershell, #2052)
 
 load 'winpath'
 load 'lib/refute'
@@ -896,30 +896,6 @@ FIXTURE
     # by BUG-021 test #1; this parity test asserts both legs of the contract exist).
     awk '/4\. DEPLOY POWERSHELL PROFILE/,/5\. DEPLOY GIT CONFIGURATION/' "$PS1_SCRIPT" \
         | grep -qE '\bcatch\s*\{'
-}
-
-# --- PSScriptAnalyzer ---
-
-@test "setup-windows.ps1 passes PSScriptAnalyzer (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
-    run pwsh -NonInteractive -Command "
-        \$ErrorActionPreference = 'Stop'
-        try {
-            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            \$results = Invoke-ScriptAnalyzer -Path '$(_winpath "$PS1_SCRIPT")' -Settings '$(_winpath "$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1")' -Severity Error,Warning
-            if (\$results) {
-                \$results | Format-Table -AutoSize
-                exit 1
-            }
-            Write-Host 'PSScriptAnalyzer: OK'
-        } catch {
-            Write-Warning \"PSScriptAnalyzer not available: \$_\"
-            exit 0
-        }
-    "
-    [[ "$status" -eq 0 ]]
 }
 
 @test "setup-windows.ps1 valid PowerShell syntax (if pwsh available)" {

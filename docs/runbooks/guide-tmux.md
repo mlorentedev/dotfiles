@@ -7,34 +7,32 @@ created: "2026-05-11"
 
 # tmux Quick Reference
 
-> Linux-only. Config lives in the dotfiles repo at `tmux.conf`, deployed to `~/.tmux.conf` by `setup-linux.sh`. Prefix: default `C-b` (preserves muscle memory across machines).
+> Linux and macOS (on Windows, use WSL). Config lives in the dotfiles repo at `tmux.conf`, deployed to `~/.tmux.conf` by `dotf deploy`. Prefix: default `C-b` (preserves muscle memory across machines).
 
 ## Install
 
-tmux is a system package — `setup-linux.sh` deliberately does not `sudo`, so install it once per machine:
+tmux is a system package with no cross-OS channel, so the setup does not install it; install it once per machine:
 
 ```sh
-sudo apt install -y tmux
-tmux -V   # expect: tmux 3.4 or newer
+sudo apt install -y tmux   # Linux
+brew install tmux          # macOS
+tmux -V                    # expect: tmux 3.4 or newer
 ```
 
-After install, run `./setup-linux.sh` from the dotfiles repo to deploy `~/.tmux.conf` (copy of the repo's `tmux.conf`), then verify with `dotf doctor` (tmux section).
+`dotf doctor` names the command for the OS it runs on (tmux section).
 
 ## How the config gets deployed
 
-Two-tier copy pattern (same as `.zshrc`, `.bashrc`, `.gitconfig`):
+`tmux.conf` is the `tmux` entry of `ai/deploy.json`, which requires `tmux` on PATH: a machine without tmux gets no `~/.tmux.conf`.
 
 ```
 ~/Projects/dotfiles/tmux.conf    (canonical, git tracked — edit here)
-        │ safe_copy in setup-linux.sh
+        │ dotf deploy tmux
         ▼
-~/.dotfiles/tmux.conf            (deploy dir — do not edit)
-        │ ln -sf in setup-linux.sh
-        ▼
-~/.tmux.conf                     (symlink resolves to deploy dir)
+~/.tmux.conf                     (a regular copy — do not edit)
 ```
 
-To update: edit the repo file, commit, re-run `setup-linux.sh`. The symlink stays the same; the deploy-dir target gets refreshed.
+To update: edit the repo file, commit, run `dotf deploy tmux`. The first deploy over a hand-made file keeps it once as `~/.tmux.conf.pre-dotf`. `dotf doctor` reports drift under its deploy-manifest section.
 
 ## Daily commands (shell aliases)
 

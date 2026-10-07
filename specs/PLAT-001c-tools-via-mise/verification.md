@@ -15,6 +15,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC4 -> T1b (after the release carrying T1a is the `DOTF_VERSION` pin)
 - [x] AC5 (sync renders, installs, probes, is idempotent) -> T2 / tests `TestSync_*`, `TestParseMiseTools_*`, `TestToolsSync_*`; on the Mac, `dotf tools sync` installed six CLIs and a second run reported nothing to do
 - [x] AC6 -> T2b / tests `TestToolsSync_PlanThenApplyThenNothingToDo`, `TestToolsSync_WithoutMiseIsASkipNamingTheRemedy`, `TestToolsSync_UnwiredRunnersAreASkipNotARealRun`, `TestRun_AReconcilerSkipIsReportedAndNotProbed`; on the Mac `dotf converge` reports `tools [ OK ] 9 pinned CLI(s) at their pin`
+- [x] AC7 (system entry through the OS manager) -> P5a / tests `TestInstallSystem_*`, `TestPlanSystem_NeverRuns`, `TestPlanToolsInstall_SystemRows`; mutation (skip of a present package disabled) turned `TestInstallSystem_SecondRunRunsNothing` and `TestInstallSystem_PresenceRule` red. No real apt, brew or winget runs in any test; the first real run waits for P5b entries
+- [x] AC8 (malformed system entries rejected, unknown type skipped) -> P5a / tests `TestLoad_RejectsMalformedSystemEntries`, `TestInstall_UnknownSourceTypeIsSkippedNotFailed`, `TestInstallAll_UnknownTypeDoesNotFailTheRun`
 
 ## Test status
 
@@ -22,7 +24,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (T2, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint -> 0 issues; bats suites that read versions.conf (versions-conf, versions-no-hardcode, ci-age-pin, check-doc-paths, version-gte, install-dotf, setup-linux) -> 140 ok, 4 failing that fail identically on `main` on this Mac (F-054/F-059 baseline)
 - Manual run (T2): `dotf tools sync` -> wrote `conf.d/dotfiles.toml`, installed age, direnv, fzf, jq, lazygit, zoxide, `9 tool(s) at their pin`; second run -> `nothing to do`; each tool's `--version` through `mise which` matches its pin
 - Manual smoke test (T1a): `go run ./cmd/dotf tools list` loads the repo catalog under the new key validation
+- Test suite (T3, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Tests: `TestAppsLayout_DarwinSkipsNamingMise`, `TestAppsLayout_LinuxStillRequiresIt`, `TestVersionedPaths_ASetHomeIsCheckedOnDarwinToo`, `TestCheckTmux_TheRemedyNamesThisOSPackageManager`, `TestCheckTmux`, `TestCheckMiseTools_*` (pass on linux, darwin and windows; below pin; stale config; no mise)
+- Mutation runs (T3): adding darwin to the APPS_HOME platforms, an `apt` remedy on darwin, dropping the below-pin FAIL and dropping the stale-config WARN each fail one test
+- Manual run (T3): `dotf doctor` on the Mac, before and after, from the same HOME: FAIL 26 -> 15, WARN 24 -> 24. The 11 FAILs gone are the five `~/Applications/<tool>-<version>` directories and the six `*_HOME` variables, now one SKIP each that names mise; `Pinned CLIs (mise)` passes; the tmux remedy reads `brew install tmux`
+- What T3 leaves FAILing on the Mac, each owned elsewhere: `.bashrc` and `.ssh/config` (#2013 P7, gated on B1), `SCRIPTS_DIR` and the git-hooks dispatcher under a `~/.dotfiles` deploy dir the Mac does not have yet, wget, eza, docker and kubectl (class 3 and Wave 3), the secrets chain (registry, bw, hooks: TOOL-013's review), opencode, tmux, and the gemini `mcp_config.json`
 - No regressions: yes. `TestInstall_UnsupportedOS` asserted the opposite of AC3 (an error for a missing asset) and is replaced by the AC3 test
+- Test suite (P5a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=darwin` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues
 
 ## Decisions made during implementation
 
@@ -31,6 +38,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - T1 split into T1a (reader) and T1b (mise entry). An installed `dotf` 0.64 reads a GOOS/GOARCH-keyed entry as "no asset", and before T1a it returned an error for that, so `dotf tools install` would exit 1 on every machine until the pin moves (#1814 class).
 - T2 marks the mise pins with a `# mise: cli` comment on the line BEFORE each pin, not after the value: doctor's `parseVersionsConf`, the 0.64 binary installed on every machine and `setup-windows.ps1` would read a trailing comment as part of the version.
 - `docs/runbooks/tool-installation.md` was rewritten. It listed manual install commands, the debt AUDIT-009 flagged, and now documents the channels and how to add a catalog entry.
+
+- T3 gates the two checks that assume the APPS_HOME layout (versioned directories, `*_HOME` set) behind one platform list and one reason per other OS, and leaves `checkVersionedPaths` on every OS: a `*_HOME` that is set must point at a real toolchain whatever installed it (F-041). Declaring a platform on each of doctor's ~45 checks was rejected as scope with no failing case behind it.
+- The mise check runs mise through a new `System.CommandStdoutDir` seam from HOME: `mise which` prints its path on stdout and warnings on stderr, and the merged `CommandOutputDir` would make a warning part of the path.
 
 ## Promotion candidates
 

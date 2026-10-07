@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Tests for scripts/windows-defaults.ps1 (WIN-005 -- HKCU engineering defaults,
-# the mathiasbynens .macos analog). Structural + PSScriptAnalyzer here;
+# the mathiasbynens .macos analog). Structural + syntax here (PSScriptAnalyzer runs in lint-powershell, #2052);
 # behavioral (sandboxed registry writes, idempotency) in
 # tests/windows-defaults.Tests.ps1 (Pester, Windows-only).
 
@@ -106,34 +106,7 @@ setup() {
     grep -q 'WithDefaults' "$DOTFILES_DIR/README.md"
 }
 
-# --- PSScriptAnalyzer + syntax (strict variant: catch exits 1, never 0) ---
-
-@test "windows-defaults.ps1 passes PSScriptAnalyzer (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
-    run pwsh -NonInteractive -NoProfile -Command "
-        \$ErrorActionPreference = 'Stop'
-        try {
-            if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
-                Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            }
-            \$results = Invoke-ScriptAnalyzer -Path '$(_winpath "$PS1_SCRIPT")' -Settings '$(_winpath "$DOTFILES_DIR/.PSScriptAnalyzerSettings.psd1")' -Severity Error,Warning
-            if (\$results) {
-                \$results | Format-Table -AutoSize
-                exit 1
-            }
-            Write-Host 'PSScriptAnalyzer: OK'
-        } catch {
-            Write-Host \"PSScriptAnalyzer error: \$_\"
-            exit 1
-        }
-    "
-    [[ "$status" -eq 0 ]] || {
-        echo "$output"
-        return 1
-    }
-}
+# --- syntax (strict variant: catch exits 1, never 0) ---
 
 @test "windows-defaults.ps1 valid PowerShell syntax (if pwsh available)" {
     if ! command -v pwsh >/dev/null 2>&1; then
