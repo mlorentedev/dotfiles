@@ -124,7 +124,7 @@ func Run(opts Options) (int, error) {
 		checkDeployDrift(sys, cfg, rep)
 		checkHomeDeployDrift(sys, cfg, rep)
 		checkDockerCompose(sys, rep)
-		checkDeployManifest(sys, rep)
+		checkDeployManifest(sys, rep, opts.Fix)
 		checkAgentPresence(sys, rep)
 		checkAgentSkillsMigrated(cfg, rep)
 		checkDotfProvenance(sys, cfg, rep)
