@@ -145,3 +145,22 @@ func TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent(t *test
 		t.Errorf("want 0 instruction changes and one deploy run, got %d changes and %d runs", res.Changes, runs)
 	}
 }
+
+// The probe holds only what the plan holds: a presence region in the file of an
+// agent whose requires_command is gone is not this run's to fix.
+func TestRecordsHarness_ProbeIgnoresTargetsThePlanSkipped(t *testing.T) {
+	env := harnessEnv(t)
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"harness/agents/reviewer/AGENT.md": "---\nname: reviewer\nkind: invocable\ntargets: [copilot]\nskills: []\n---\n",
+	})
+	manifest := `{"agents":{"record_dir":"harness/agents","presence":[
+		{"agent":"copilot","file":".copilot/copilot-instructions.md","source":"ai/copilot/ci.md","requires_command":"copilot"}
+	]}}`
+	writeFixture(t, env.RepoRoot, map[string]string{"harness/manifest.json": manifest})
+	// A file left behind by an uninstalled copilot, with no presence region.
+	writeFixture(t, env.Home, map[string]string{".copilot/copilot-instructions.md": "# COPILOT\n"})
+
+	if err := (recordsHarness{has: noCommands}).Probe(env); err != nil {
+		t.Fatalf("probe failed on a target the plan skips: %v", err)
+	}
+}

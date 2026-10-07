@@ -63,7 +63,7 @@ func (r recordsHarness) Probe(env Env) error {
 	if len(stale) > 0 {
 		return fmt.Errorf("instruction files still missing or stale after the deploy: %s", strings.Join(stale, ", "))
 	}
-	return presenceCurrent(env)
+	return presenceCurrent(env, r.has)
 }
 
 // staleInstructions lists the home-relative instruction files that are missing
@@ -112,14 +112,19 @@ func instructionsDetail(stale []string, dryRun bool) string {
 }
 
 // presenceCurrent checks each presence region the records render against the
-// deployed file. A manifest without agent records renders no roster, so there
-// is nothing to check.
-func presenceCurrent(env Env) error {
+// deployed file, for the targets the plan applies to (requires_command on
+// PATH): a file an uninstalled agent left behind is not this run's to fix. A
+// manifest without agent records renders no roster, so there is nothing to
+// check.
+func presenceCurrent(env Env, has func(string) bool) error {
 	recordDir, targets, err := harness.LoadPresence(filepath.Join(env.RepoRoot, filepath.FromSlash(harness.ManifestFile)))
 	if err != nil || recordDir == "" {
 		return err
 	}
 	for _, t := range targets {
+		if t.RequiresCommand != "" && !has(t.RequiresCommand) {
+			continue
+		}
 		block, err := harness.RenderPresence(env.RepoRoot, t.Agent)
 		if err != nil {
 			return err

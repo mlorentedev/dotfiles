@@ -549,31 +549,22 @@ var deployedInstructionTargets = []struct{ agent, homeRel, repoRel, requiresComm
 // remedy can ever clear, the exact #843 signal-rot this session exists to
 // kill.
 func checkInstructionDrift(sys *System, rep *Report) {
+	missing := checkInstalledAgentsHaveInstructions(sys, rep)
 	home := sys.home()
 	repo := resolveRepoDir(sys)
 	if repo == "" {
 		rep.Skip("repo not found — instruction-file drift check skipped")
 		return
 	}
-	checked, drift := 0, 0
+	checked, drift := 0, missing
 	for _, tgt := range deployedInstructionTargets {
 		if tgt.requiresCommand != "" && !sys.has(tgt.requiresCommand) {
 			continue
 		}
 		deployed := filepath.Join(home, filepath.FromSlash(tgt.homeRel))
 		source := filepath.Join(repo, filepath.FromSlash(tgt.repoRel))
-		if !pathExists(source) {
-			continue
-		}
-		if !pathExists(deployed) {
-			// An installed agent without its instructions runs on its harness
-			// defaults (F-060, #2016); an agent that is not installed is not
-			// drift.
-			if sys.has(tgt.agent) {
-				rep.Fail(tgt.agent + " is installed but " + tgt.homeRel + " is missing (run: dotf converge)")
-				drift++
-			}
-			continue
+		if !pathExists(deployed) || !pathExists(source) {
+			continue // a missing file was judged above; this compares contents
 		}
 		dc, err1 := os.ReadFile(deployed)
 		sc, err2 := os.ReadFile(source)
@@ -596,6 +587,33 @@ func checkInstructionDrift(sys *System, rep *Report) {
 	if drift == 0 {
 		rep.Pass(fmt.Sprintf("deployed instruction files match their repo source (%d checked)", checked))
 	}
+}
+
+// checkInstalledAgentsHaveInstructions fails each installed agent whose
+// instruction file is missing: it runs on its harness defaults, which is how AI
+// attribution reached commits on a fresh machine (F-060, #2016). It needs only
+// $HOME and PATH, because doctor runs with no checkout at all. An agent that is
+// not installed is not a failure (#843). Returns the number of failures.
+func checkInstalledAgentsHaveInstructions(sys *System, rep *Report) int {
+	failed := 0
+	for _, tgt := range deployedInstructionTargets {
+		if !sys.has(tgt.agent) || pathExists(filepath.Join(sys.home(), filepath.FromSlash(tgt.homeRel))) {
+			continue
+		}
+		rep.Fail(tgt.agent + " is installed but " + tgt.homeRel + " is missing (" + instructionsRemedy(sys.GOOS) + ")")
+		failed++
+	}
+	return failed
+}
+
+// instructionsRemedy names what deploys the instruction files on goos: the
+// records-harness reconciler covers linux and darwin, and Windows keeps its
+// setup-script copies until the Go deploy of these files ships (PLAT-001b).
+func instructionsRemedy(goos string) string {
+	if goos == "windows" {
+		return "re-run setup-windows.ps1"
+	}
+	return "run: dotf converge"
 }
 
 // Harness marker-region delimiters, owned by package harness (StripRegions).

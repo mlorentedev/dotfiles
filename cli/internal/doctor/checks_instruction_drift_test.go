@@ -329,3 +329,38 @@ func TestCheckInstructionDrift_InstalledAgentWithoutItsInstructionsFails(t *test
 		t.Errorf("the FAIL must name the agent and the file\n%s", buf.String())
 	}
 }
+
+// Doctor must run with no checkout at all, so the missing-file FAIL cannot
+// depend on finding the repo source.
+func TestCheckInstructionDrift_InstalledAgentWithoutItsInstructionsFailsWithNoRepo(t *testing.T) {
+	t.Chdir(t.TempDir())
+	home := t.TempDir()
+	sys := newSys(map[string]string{"HOME": home}, []string{"claude"}, nil)
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkInstructionDrift(sys, rep)
+
+	if rep.Failures() != 1 || !strings.Contains(buf.String(), ".claude/CLAUDE.md is missing") {
+		t.Fatalf("want the missing CLAUDE.md to fail without a checkout\n%s", buf.String())
+	}
+}
+
+// The remedy names what actually deploys the file on each OS: dotf converge on
+// linux and darwin, the setup script on Windows until the Go deploy ships.
+func TestCheckInstructionDrift_TheRemedyFitsTheOS(t *testing.T) {
+	for goos, want := range map[string]string{"darwin": "run: dotf converge", "windows": "re-run setup-windows.ps1"} {
+		t.Run(goos, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			sys := newSys(map[string]string{"HOME": t.TempDir()}, []string{"claude"}, nil)
+			sys.GOOS = goos
+
+			var buf bytes.Buffer
+			checkInstructionDrift(sys, capture(&buf))
+
+			if !strings.Contains(buf.String(), want) {
+				t.Errorf("want %q in the FAIL\n%s", want, buf.String())
+			}
+		})
+	}
+}
