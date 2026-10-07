@@ -62,7 +62,7 @@ The design is ADR-045 (`docs/adr/adr-045-one-entrypoint-converges-every-os.md`);
 - **The legacy reconciler hides drift.** `setup-linux.sh` cannot plan, so `--plan` reports it as `opaque`, never as "no change". *Resolved:* the report states it, and the from-zero CI asserts idempotence only on native reconcilers until the twins are gone.
 - **The rename touches about 118 references, including the sourced `install_dotf` function and doctor's remediation text.** *Resolved:* one PR does the move mechanically, keeps the function name, and adds the old-name guard. `GOOS=windows go vet` and the Pester suite cover the PowerShell side.
 - **The README one-liner changes meaning:** it used to clone and run setup, and now it installs and converges. A machine that used `DOTFILES_SKIP_SETUP=1` uses `dotf converge --plan` instead; the README and the release runbook say so in the same PR.
-- **A from-zero macOS runner costs 10× Linux minutes** (#2013 owner actions). X1 runs on PRs to `main` only and is non-required until green.
+- **A from-zero macOS runner costs 10× Linux minutes** (#2013 owner actions). X1 runs on pull requests to `main` and on push to `main` (the run the verification reads), never on feature-branch pushes, and is non-required until green.
 - **Windows proof needs the Windows box** (owner rule: batch Windows-empirical work). CI `test-windows` and Pester cover the scripts; the real-machine run is #2013 X3.
 - **Open for the ADR review:** #2013 D4 (what Homebrew installs on macOS) and the reach of D2. See ADR-045, *Open questions*.
 
@@ -74,7 +74,7 @@ The design is ADR-045 (`docs/adr/adr-045-one-entrypoint-converges-every-os.md`);
 - [ ] AC4: a reconciler whose post-condition probe fails makes `dotf converge` exit non-zero and names that reconciler; it never reports success.
 - [ ] AC5: a reconciler that does not list the current OS is reported as `skipped` with the OS named, not as passed.
 - [ ] AC6: `install.sh` (bash 3.2 and zsh) and `install.ps1` install `dotf` at the stable pin with checksum and exec probe, then hand off to `dotf converge`; with no network or a bad checksum they fail and place nothing.
-- [ ] AC7: no live file references `install-dotf.sh`, `install-dotf.ps1` or the old clone-and-setup flow, enforced by a test.
+- [ ] AC7: no live file outside the historical records (ADRs and audits, lessons, specs, the changelog) references `install-dotf.sh`, `install-dotf.ps1` or the old clone-and-setup flow, enforced by a test.
 - [ ] AC8: `dotf update` runs `dotf converge`, keeps its exit semantics, and its existing tests pass.
 - [ ] AC9: a from-zero CI job on `macos-latest` runs `install.sh`, then `dotf doctor`, then a second converge with zero native changes.
 
