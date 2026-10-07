@@ -169,8 +169,8 @@
     //
     // The list is a snapshot of a third-party catalog that retires slugs without
     // notice, and nothing probes it: on 2026-10-07 two of the three `:free`
-    // entries (qwen3-coder, kimi-k2.6) had left the catalog and answered 404
-    // (#1937). Re-measure before adding one, keyless:
+    // entries (qwen3-coder, kimi-k2.6) were absent from /api/v1/models, and
+    // qwen3-coder had answered 404 (#1937). Re-measure before adding one, keyless:
     //   curl -s https://openrouter.ai/api/v1/models | jq -r '.data[].id' | grep -Fx '<slug>'
     "openrouter": {
       "models": {
