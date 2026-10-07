@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -88,7 +87,7 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 	home := sys.home()
-	out := envpkg.DefaultOutput(runtime.GOOS, sys.env("DOTFILES_DIR", filepath.Join(home, ".dotfiles")))
+	out := envpkg.DefaultOutput(sys.GOOS, sys.env("DOTFILES_DIR", filepath.Join(home, ".dotfiles")))
 	if !pathExists(out) {
 		rep.Warn(filepath.Base(out) + " not generated — run `dotf env generate`")
 		return
@@ -96,7 +95,7 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 	res, err := envpkg.Generate(envpkg.Options{
 		ContractPath: cfg.ContractPath,
 		MachinePath:  envpkg.MachinePath(home),
-		GOOS:         runtime.GOOS,
+		GOOS:         sys.GOOS,
 		Home:         home,
 		Output:       out,
 		Check:        true,

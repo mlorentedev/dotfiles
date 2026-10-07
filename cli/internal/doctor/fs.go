@@ -38,7 +38,7 @@ func isExecFile(p string) bool {
 	if err != nil || !fi.Mode().IsRegular() {
 		return false
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" { //nolint:forbidigo // whether this host's filesystem has an exec bit
 		return true
 	}
 	return fi.Mode().Perm()&0o111 != 0
