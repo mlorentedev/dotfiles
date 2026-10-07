@@ -42,6 +42,7 @@ sys.exit(1 if bad else 0)'
 @test "cli.yml: cli-gate still waits on the test job" {
     run _yaml '
 needs = wf["jobs"]["cli-gate"]["needs"]
+print("cli-gate needs:", needs)
 sys.exit(0 if "test" in needs else 1)'
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
 }

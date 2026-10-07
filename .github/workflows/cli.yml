@@ -2,9 +2,9 @@ name: cli
 
 on:
   # No paths filter on pull requests: cli-gate is a required check, and a
-  # required check a filtered workflow never reports stays pending. The
-  # `changes` job skips the Go work instead, and a skipped job still lets
-  # cli-gate report (CI-004, #1739).
+  # required check a filtered workflow never reports stays pending (CI-004,
+  # #1739). The `changes` job narrows lint and the snapshot build only; a
+  # skipped job still lets cli-gate report.
   pull_request:
   # No paths filter on main either: the Go tests read files outside cli/ (the
   # golden corpora under tests/golden/, harness/*.json, the shell rc files), and a
