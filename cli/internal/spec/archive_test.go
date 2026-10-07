@@ -278,13 +278,14 @@ func TestArchiveRecordsAStatusWhereTheProposalHadNone(t *testing.T) {
 		"no frontmatter":              "# AI-001-x\nstatus: draft\n",
 		"frontmatter, no status":      "---\nid: AI-001-x\n---\n# AI-001-x\n",
 		"CRLF frontmatter, no status": "---\r\nid: AI-001-x\r\n---\r\n# AI-001-x\r\n",
+		"CRLF, no frontmatter":        "# AI-001-x\r\nstatus: draft\r\n",
 	} {
 		root := t.TempDir()
 		writeSpec(t, root, "AI-001-x", map[string]string{
 			"proposal.md": proposal,
 			"review.md":   passingReview("AI-001-x"),
 		})
-		target, err := Archive(root, "AI-001-x", ArchiveOptions{})
+		target, err := Archive(root, "AI-001-x", ArchiveOptions{Date: "2026-10-07", PRURL: "https://example.test/pr/1"})
 		if err != nil {
 			t.Fatalf("%s: Archive: %v", name, err)
 		}

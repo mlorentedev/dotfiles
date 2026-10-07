@@ -334,7 +334,8 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 			out = withFrontmatterField(out, "review_bypass", bypassRecord(opts, overrode))
 		}
 		if opts.PRURL != "" {
-			out += fmt.Sprintf("\n<!-- archived %s — PR: %s -->\n", opts.Date, opts.PRURL)
+			eol := lineEnding(out)
+			out += fmt.Sprintf("%s<!-- archived %s — PR: %s -->%s", eol, opts.Date, opts.PRURL, eol)
 		}
 		if err := os.WriteFile(proposal, []byte(out), 0o644); err != nil {
 			return target, fmt.Errorf("updating %s: %w", filepath.Base(proposal), err)
@@ -458,5 +459,15 @@ func withFrontmatterLine(content, line string) string {
 			}
 		}
 	}
-	return "---\n" + line + "\n---\n" + content
+	eol := lineEnding(content)
+	return "---" + eol + line + eol + "---" + eol + content
+}
+
+// lineEnding is the line ending content already uses, so text added to a CRLF
+// file is CRLF too.
+func lineEnding(content string) string {
+	if strings.Contains(content, "\r\n") {
+		return "\r\n"
+	}
+	return "\n"
 }
