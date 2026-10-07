@@ -150,4 +150,5 @@ qf "explica..."       # one-shot long-context question via nan/deepseek-v4-flash
 After modifying ANY shell script:
 1. `~/.local/bin/shellcheck <changed-file>`
 2. `~/.local/bin/bats tests/*.bats`
-3. If new lessons were learned, write them to `docs/lessons.md`.
+3. Run every bats file that references each changed file, not just its own suite: `git grep -l <path-or-basename> -- tests` (lesson 347).
+4. If new lessons were learned, write them to `docs/lessons.md`.

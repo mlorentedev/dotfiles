@@ -78,7 +78,7 @@ func TestAgentRun_WritesOneJSONObjectToStdout(t *testing.T) {
 		Tier       string `json:"tier"`
 		Pool       string `json:"pool"`
 		Model      string `json:"model"`
-		Exit       int    `json:"exit"`
+		Exit       *int   `json:"exit"`
 		DurationMS *int64 `json:"duration_ms"`
 		Output     string `json:"output"`
 	}
@@ -108,6 +108,11 @@ func TestAgentRun_WritesOneJSONObjectToStdout(t *testing.T) {
 	// cannot fail.
 	if rec.DurationMS == nil {
 		t.Error("duration_ms is absent from the record")
+	}
+	// Same reasoning for exit: a zero is a legitimate value, so presence is what
+	// the record's consumers (`| jq .exit`) depend on.
+	if rec.Exit == nil {
+		t.Error("exit is absent from the record")
 	}
 	if rec.Output == "" {
 		t.Error("output is empty; the dry run reports nothing about the route it resolved")

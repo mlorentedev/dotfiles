@@ -311,6 +311,17 @@ jobs:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
 
+      # One `dotf` for every bats file that runs the real binary (CI-012, #2059).
+      # Each used to build its own, and three skipped when that build failed, so a
+      # compile error in cli/ read as green. A failure here fails the job, and the
+      # files read DOTF_BIN (tests/lib/dotf-bin.bash).
+      - name: Build dotf once for the bats suite
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        working-directory: cli
+        run: |
+          go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf
+          echo "DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"
+
       - name: Install pre-commit
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
@@ -354,7 +365,21 @@ jobs:
         # Measured locally, 4 jobs: 250 s serial to 89 s, three identical runs.
         run: |
           command -v parallel >/dev/null 2>&1 || { echo "::error::GNU parallel is missing from the runner image; bats --jobs needs it"; exit 1; }
-          bats --jobs "$(nproc)" --no-parallelize-within-files tests/*.bats
+          mkdir -p "$RUNNER_TEMP/bats-report"
+          bats --jobs "$(nproc)" --no-parallelize-within-files \
+            --report-formatter junit --timing --output "$RUNNER_TEMP/bats-report" \
+            tests/*.bats
+
+      # Per-file timing is the baseline a "no file over 30 s" budget (#1744)
+      # needs, and CI had none. `!cancelled()` so a red run still leaves its report.
+      - name: Upload the bats timing report
+        if: ${{ !cancelled() && (github.event_name == 'push' || needs.changes.outputs.code == 'true') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bats-junit
+          path: ${{ runner.temp }}/bats-report/report.xml
+          if-no-files-found: warn
+          retention-days: 14
 
   # AI-046 (#1764): the NaN model ids belong to @gtrabanco/pi-nan-provider, so
   # the checks that name one run against the installed package. Its own job

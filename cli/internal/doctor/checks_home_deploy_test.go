@@ -30,8 +30,8 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 	}{
 		{
 			name:        "checked entries agree → pass",
-			deployFiles: []file{{".inputrc", "set completion-ignore-case on"}, {"ssh/config", "Host *"}},
-			homeFiles:   []file{{".inputrc", "set completion-ignore-case on"}, {".ssh/config", "Host *"}},
+			deployFiles: []file{{".inputrc", "set completion-ignore-case on"}},
+			homeFiles:   []file{{".inputrc", "set completion-ignore-case on"}},
 			wantSubstr:  "matches",
 		},
 		{
@@ -42,13 +42,6 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 			homeFiles:    []file{{".inputrc", "old"}},
 			wantFailures: 1,
 			wantSubstr:   ".inputrc",
-		},
-		{
-			name:         "ssh/config drift → fail, and the two legs use different relative paths",
-			deployFiles:  []file{{"ssh/config", "Host a"}},
-			homeFiles:    []file{{".ssh/config", "Host b"}},
-			wantFailures: 1,
-			wantSubstr:   ".ssh/config",
 		},
 		{
 			// Measured on msi 2026-09-02: the only file of the eleven observed

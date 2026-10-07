@@ -12,8 +12,8 @@ import (
 //
 // The map cannot reuse isManagedDeployPath: that predicate serves the repo →
 // deploy-dir leg, where a file keeps its relative path. On this leg the path
-// changes (ssh/config → .ssh/config, tmux.conf → .tmux.conf), so the mapping has
-// to be explicit — and explicit means it can drift from setup, which is what
+// may change (ssh/config → .ssh/config was one, before it moved to
+// ai/deploy.json), so the mapping has to be explicit — and explicit means it can drift from setup, which is what
 // TestHomeDeployMapCoversSetup exists to prevent.
 type homeDeployEntry struct {
 	// src is relative to cfg.DotfilesDir; dst is relative to $HOME.
@@ -31,14 +31,14 @@ type homeDeployEntry struct {
 
 // homeDeployMap mirrors setup-linux.sh's `deploy_file … "$HOME/…"` call sites.
 // Adding one there without adding it here fails TestHomeDeployMapCoversSetup.
-// Files that moved to ai/deploy.json (.zshrc, ~/.zsh/*, .tmux.conf: #1843 B2)
+// Files that moved to ai/deploy.json (.zshrc, ~/.zsh/*, .tmux.conf: #1843 B2;
+// .ssh/config and the public key: #2013 P7)
 // are not listed: checkDeployManifest compares every entry there, so a second
 // copy of the mapping would be a second source of truth.
 var homeDeployMap = []homeDeployEntry{
 	{src: ".bashrc", dst: ".bashrc", exemptReason: "same installer appends; setup only asserts existence here too"},
 	{src: ".profile", dst: ".profile", exemptReason: "same installer appends"},
 	{src: ".gitconfig", dst: ".gitconfig", exemptReason: "every `git config --global` rewrites it; measured drifting on a converged box 2026-09-02"},
-	{src: "ssh/config", dst: ".ssh/config", contentChecked: true},
 	{src: ".inputrc", dst: ".inputrc", contentChecked: true},
 }
 

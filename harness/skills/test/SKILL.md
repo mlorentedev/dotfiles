@@ -67,6 +67,8 @@ class TestUserService:
 
 Complete test file with imports, fixtures, mocks, and all test cases.
 
+When you change a file, run every test file that references it, not just its own suite: `git grep -l <path-or-basename> -- tests`.
+
 ---
 
 ## Mutation Testing (Anti-Vacuous Test Verification)

@@ -85,12 +85,8 @@ fi
 log_info "Deploying main dotfiles..."
 [ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
 
-# SSH config and public key
-log_info "Setting up SSH config..."
-ensure_directory "$HOME/.ssh"
-deploy_file "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
-chmod 600 "$HOME/.ssh/config"
-cp "$DOTFILES_DIR/ssh/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub" 2>/dev/null || true
+# ~/.ssh/config (0600) and the public key are `dotf deploy` entries on every
+# OS (ai/deploy.json ssh-config, ssh-pubkey; #2013 P7).
 
 # Git configuration
 log_info "Setting up Git configuration..."

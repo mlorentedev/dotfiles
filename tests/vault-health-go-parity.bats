@@ -10,10 +10,13 @@
 # shell edit alone cannot silently pass or fail this file: only the shell suite
 # re-derives from the live script, and its ORACLE hash check catches drift.
 #
-# Skips (never fails) when the Go toolchain is absent, so a shell-only checkout
-# still runs the rest of the suite — same reasoning as the crystallize parity
-# file (#807 / BUG-055: a check that skips instead of running is worse than one
-# that is simply absent).
+# Skips when the Go toolchain is absent locally, so a shell-only checkout still
+# runs the rest of the suite; in CI a missing toolchain, and a build that fails
+# anywhere, FAIL — same reasoning as the crystallize parity file (#807 / BUG-055:
+# a check that skips instead of running is worse than one that is simply absent).
+# CI builds `dotf` once and exports DOTF_BIN (tests/lib/dotf-bin.bash).
+
+load 'lib/dotf-bin'
 
 setup() {
     HERE="$BATS_TEST_DIRNAME/golden/vault-health"
@@ -26,19 +29,14 @@ teardown() {
     rm -rf "$ACTUAL"
 }
 
-# Build once per test file run, into a cached location, so 16 cases do not pay
-# 16 compilations.
+# One binary per run: DOTF_BIN when CI built it, otherwise one build per file
+# into a cached location, so 16 cases do not pay 16 compilations. A toolchain
+# that FAILS to build the CLI is a real defect and fails the suite, not 16
+# harmless skips.
 _build_dotf() {
-    command -v go >/dev/null 2>&1 || skip "go toolchain not installed"
-    GVH_DOTF_BIN="${BATS_FILE_TMPDIR:-/tmp}/dotf-vault-health-parity"
+    dotf_bin_resolve "${BATS_FILE_TMPDIR:-/tmp}/dotf-vault-health-parity"
+    GVH_DOTF_BIN="$DOTF_BIN"
     export GVH_DOTF_BIN
-    if [ ! -x "$GVH_DOTF_BIN" ]; then
-        # A missing toolchain skips (checked above); a toolchain that FAILS to
-        # build the CLI is a real defect and must fail the suite, not read as
-        # 16 harmless skips.
-        ( cd "$BATS_TEST_DIRNAME/../cli" && go build -o "$GVH_DOTF_BIN" ./cmd/dotf ) \
-            || return 1
-    fi
     export GVH_IMPL_MODE=go
 }
 
