@@ -1,11 +1,13 @@
 ---
 id: "DX-007-orca-cli-bootstrap"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: abandoned # draft | implementing | verifying | archived
 created: "2026-06-20"
 issue: "mlorentedev/dotfiles#462"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
+review: waived
+review_waived_reason: "abandoned: Orca is retired in favour of herdr on every OS (owner decision D6 on #2013, 2026-10-05); herdr installs through mise (ADR-044). Never implemented beyond draft."
 ---
 
 # DX-007-orca-cli-bootstrap
