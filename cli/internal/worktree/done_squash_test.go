@@ -115,3 +115,45 @@ func TestIsPRMergedRequiresTheBranchTipInAMergedHead(t *testing.T) {
 		t.Error("a tip past the merged head must not read as merged")
 	}
 }
+
+// The merged head can exist only on origin: GitHub keeps a merged PR's head
+// after the branch is deleted, and this clone never fetched the push that made
+// it. landedInMergedPR fetches it by SHA before asking for containment.
+func TestDoneFetchesAMergedHeadThatOnlyOriginHas(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	commitFile(t, wtDir, "work.txt")
+	origin := filepath.Join(t.TempDir(), "origin.git")
+	gitOut(t, repoDir, "init", "-q", "--bare", origin)
+	gitOut(t, repoDir, "remote", "add", "origin", origin)
+	gitOut(t, repoDir, "push", "-q", "origin", "feat/test")
+
+	// Another clone pushes on top, as a rebase or a merge of main from
+	// elsewhere would; this repo never sees the commit.
+	other := filepath.Join(t.TempDir(), "other")
+	gitOut(t, repoDir, "clone", "-q", "--branch", "feat/test", origin, other)
+	gitOut(t, other, "config", "user.name", "Test User")
+	gitOut(t, other, "config", "user.email", "test@example.com")
+	head := commitFile(t, other, "pushed-elsewhere.txt")
+	gitOut(t, other, "push", "-q", "origin", "HEAD:refs/heads/later")
+	if exec.Command("git", "-C", repoDir, "cat-file", "-e", head+"^{commit}").Run() == nil {
+		t.Fatal("precondition: the merged head must be absent locally")
+	}
+	stubMergedPRHeads(t, []string{head}, nil)
+
+	if err := done(t, repoDir, wtDir, lockPath); err != nil {
+		t.Fatalf("a checkout contained in a head only origin has must be removable: %v", err)
+	}
+}
+
+// A head that cannot be fetched leaves the question unanswered, and the
+// refusal says so instead of reading as plain unpushed work.
+func TestDoneSaysWhenAMergedHeadCannotBeFetched(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	commitFile(t, wtDir, "work.txt")
+	stubMergedPRHeads(t, []string{"0000000000000000000000000000000000000000"}, nil) // no origin at all
+
+	err := done(t, repoDir, wtDir, lockPath)
+	if err == nil || !strings.Contains(err.Error(), "could not check for a merged pull request: fetch merged head 000000000000") {
+		t.Fatalf("want a refusal naming the failed fetch, got %v", err)
+	}
+}

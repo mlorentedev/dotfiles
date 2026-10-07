@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -139,17 +140,43 @@ func landedInMergedPR(repoRoot, branch, tip string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	var unfetched []error
 	for _, head := range heads {
 		if exec.Command("git", "-C", repoRoot, "cat-file", "-e", head+"^{commit}").Run() != nil {
 			// The head may exist only on the remote; GitHub serves a merged
-			// PR's head by its SHA. A failed fetch leaves it unanswerable.
-			_ = exec.Command("git", "-C", repoRoot, "fetch", "--quiet", "--no-tags", "origin", head).Run()
+			// PR's head by its SHA.
+			if err := fetchCommit(repoRoot, head); err != nil {
+				unfetched = append(unfetched, err)
+				continue
+			}
 		}
 		if exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", tip, head).Run() == nil {
 			return true, nil
 		}
 	}
-	return false, nil
+	// A head that could not be fetched is a question nobody answered, not a
+	// "no": reading it as one sent #1608's operator to push a branch GitHub had
+	// already deleted, with no word that the check itself had failed.
+	return false, errors.Join(unfetched...)
+}
+
+// fetchCommit fetches one commit from origin by its SHA. It never prompts for
+// credentials: `list` and `sweep` ask this too, and a listing must fail fast
+// rather than wait on a terminal nobody is watching.
+func fetchCommit(repoRoot, sha string) error {
+	cmd := exec.Command("git", "-C", repoRoot, "fetch", "--quiet", "--no-tags", "origin", sha)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("fetch merged head %s from origin: %w: %s", shortSHA(sha), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
 }
 
 func (r *RealGitRunner) cachePRResult(branch string, merged bool) {
