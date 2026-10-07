@@ -61,6 +61,30 @@ func TestSpecArchiveHappyPath(t *testing.T) {
 	}
 }
 
+// The archive ticks what it did and names what it could not (#1990): the board
+// ticket, which the command cannot see, is reported, not silently left.
+func TestSpecArchiveNamesTheChecklistItemsLeftForAHuman(t *testing.T) {
+	root := makeRepo(t)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n")
+	v := filepath.Join(root, "specs", "AI-001-x", "verification.md")
+	checklist := "\n## Archive checklist\n\n- [ ] Frontmatter `status: archived`\n" +
+		"- [ ] Folder moved to `specs/archive/`\n- [ ] Bitácora board ticket closed\n"
+	if err := os.WriteFile(v, []byte(readFile(t, v)+checklist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err := execute(t, "spec", "archive", "AI-001-x")
+	if err != nil {
+		t.Fatalf("spec archive: %v", err)
+	}
+	if !strings.Contains(stdout, "left for you: Bitácora board ticket closed") {
+		t.Errorf("the board item is not reported:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "left for you: Folder moved") {
+		t.Errorf("an item the archive ticked is reported as left:\n%s", stdout)
+	}
+}
+
 func TestSpecArchiveBlocksOnDrafts(t *testing.T) {
 	root := makeRepo(t)
 	seedSpec(t, root, "AI-001-x", "---\nstatus: draft\n---\n<!-- [AGENT-SUGGESTION] reconsider -->\n")
