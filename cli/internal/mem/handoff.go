@@ -162,6 +162,10 @@ func writeThread(content, threadKey, stamp, body string) (string, bool, error) {
 		return "", false, fmt.Errorf("thread key %q contains whitespace; a thread key is one word, like a branch name", threadKey)
 	}
 
+	if err := checkBodyStructure(body); err != nil {
+		return "", false, err
+	}
+
 	lines := strings.Split(content, "\n")
 	start, end := handoffSection(lines)
 	if start < 0 {
@@ -211,6 +215,29 @@ func writeThread(content, threadKey, stamp, body string) (string, bool, error) {
 		return appendThread(out, legacyKey, strings.Join(legacy, "\n")), true, nil
 	}
 	return strings.Join(out, "\n"), true, nil
+}
+
+// checkBodyStructure refuses a body line the parser reads as structure rather
+// than content (MEMORY-014, #1928). A `### thread: <key>` line becomes another
+// thread's heading on the next read, splitting this thread so a later write
+// replaces only its top and strands the tail under a thread nobody owns. A
+// `## ` line ends the handoff section, and the rest of the body falls outside
+// it. The checks are the parser's own predicates, threadHeadingKey and
+// handoffSection's boundary, so the two cannot disagree about what is
+// structure. An ordinary `### Next Actions` stays content, as it always was.
+//
+// Refused, not escaped: an escape would write something other than what the
+// caller sent, and the caller would never learn its body was rewritten.
+func checkBodyStructure(body string) error {
+	for i, line := range strings.Split(body, "\n") {
+		if _, ok := threadHeadingKey(line); ok {
+			return fmt.Errorf("handoff body line %d is a thread marker (%q): the next read would start another thread there and split this one. Reword it, or drop the %q prefix", i+1, line, ThreadPrefix)
+		}
+		if strings.HasPrefix(line, "## ") {
+			return fmt.Errorf("handoff body line %d is a level-2 heading (%q): it would end the handoff section, leaving the rest of the body outside it. Use ### or bold text instead", i+1, line)
+		}
+	}
+	return nil
 }
 
 // appendThread adds one thread at the end of the handoff section, the same way

@@ -467,3 +467,62 @@ func TestJournalWriterSkipsTheProjectWord(t *testing.T) {
 		}
 	}
 }
+
+// MEMORY-014 (#1928): a body line the parser reads as structure is refused, and
+// the document is left as it was. Reproduced first without the check: the
+// marker line split wt-a in two, and the next write of wt-a replaced only the
+// part above it, stranding the tail under a thread named "smuggled".
+func TestWriteThreadRefusesABodyLineThatIsStructure(t *testing.T) {
+	for name, body := range map[string]string{
+		"thread marker":         "**Last task:** x<br>\n### thread: smuggled\n**Next action:** y<br>",
+		"stamped thread marker": "### thread: main@msi (writer: pi)\ncopied from another block",
+		"marker with CR":        "intro\r\n### thread: smuggled\r\n",
+		"level-2 heading":       "**Last task:** x<br>\n## Findings\nmore",
+		"handoff heading":       "## Session Handoff\nnested",
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, changed, err := WriteThread(memoryWithTwoThreads, "wt-cli-023", body)
+			if err == nil {
+				t.Fatalf("accepted a structural body line; the document became:\n%s", out)
+			}
+			if changed || out != "" {
+				t.Errorf("a refused write still produced a document (changed=%v)", changed)
+			}
+		})
+	}
+}
+
+// The refusal is narrow: ordinary headings and text that only mentions a marker
+// stay content, as they always were.
+func TestWriteThreadKeepsOrdinaryHeadingsAsContent(t *testing.T) {
+	for name, body := range map[string]string{
+		"level-3 heading":     "### Next Actions\n- do it",
+		"marker mid-line":     "see the `### thread: wt-a` block",
+		"indented marker":     "  ### thread: wt-a",
+		"bare level-2 marker": "##",
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, _, err := WriteThread(memoryWithTwoThreads, "wt-cli-023", body)
+			if err != nil {
+				t.Fatalf("refused ordinary content: %v", err)
+			}
+			if !strings.Contains(out, body) {
+				t.Errorf("body not written:\n%s", out)
+			}
+			// Every byte outside the written thread is unchanged: the document up
+			// to its marker, and from the foreign thread's marker to the end.
+			// Containment alone would pass a foreign block emitted twice or moved.
+			own := strings.Index(memoryWithTwoThreads, "### thread: wt-cli-023")
+			foreign := strings.Index(memoryWithTwoThreads, "### thread: wt-pi-harness")
+			if !strings.HasPrefix(out, memoryWithTwoThreads[:own]) {
+				t.Errorf("the document before the written thread changed:\n%s", out)
+			}
+			if !strings.HasSuffix(out, memoryWithTwoThreads[foreign:]) {
+				t.Errorf("the foreign thread or the tail after it changed:\n%s", out)
+			}
+			if n := strings.Count(out, "### thread: wt-pi-harness"); n != 1 {
+				t.Errorf("the foreign thread appears %d times:\n%s", n, out)
+			}
+		})
+	}
+}
