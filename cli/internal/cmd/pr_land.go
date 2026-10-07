@@ -187,7 +187,11 @@ func printLandSummary(w io.Writer, results []prland.Result) error {
 	if len(stopped) > 0 {
 		_, _ = fmt.Fprintln(w, "  not merged:")
 		for _, r := range stopped {
-			_, _ = fmt.Fprintf(w, "    #%d at %.7s:\n", r.Number, r.HeadSHA)
+			at := ""
+			if r.HeadSHA != "" { // a PR that could not be read has no head
+				at = fmt.Sprintf(" at %.7s", r.HeadSHA)
+			}
+			_, _ = fmt.Fprintf(w, "    #%d%s:\n", r.Number, at)
 			for _, reason := range r.Reasons {
 				_, _ = fmt.Fprintf(w, "      - %s\n", reason)
 			}
@@ -202,7 +206,11 @@ func printLandSummary(w io.Writer, results []prland.Result) error {
 func writeLandResult(w io.Writer, res prland.Result) error {
 	number := res.Number
 	if !res.Merged {
-		_, _ = fmt.Fprintf(w, "[NOT MERGED] #%d at %.7s:\n", number, res.HeadSHA)
+		at := ""
+		if res.HeadSHA != "" {
+			at = fmt.Sprintf(" at %.7s", res.HeadSHA)
+		}
+		_, _ = fmt.Fprintf(w, "[NOT MERGED] #%d%s:\n", number, at)
 		for _, r := range res.Reasons {
 			_, _ = fmt.Fprintf(w, "  - %s\n", r)
 		}

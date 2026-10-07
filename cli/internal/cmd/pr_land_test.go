@@ -232,3 +232,14 @@ func TestPrLand_ReleasesTheLockAfterAQueue(t *testing.T) {
 	}
 	release()
 }
+
+func TestPrLand_AnUnreadablePRHasNoHeadToName(t *testing.T) {
+	q := &queueFake{broken: map[string]bool{"12": true}}
+	useQueue(t, q)
+
+	stdout, _, _ := execute(t, "pr", "land", "12", "31", "--repo", "o/r")
+
+	if !strings.Contains(stdout, "[NOT MERGED] #12:\n") || !strings.Contains(stdout, "    #12:\n") || !strings.Contains(stdout, "error: gh pr view: HTTP 502") {
+		t.Errorf("output:\n%s", stdout)
+	}
+}
