@@ -29,6 +29,7 @@ with the PR's state. A local branch can be behind its remote and pass the test w
 
 ```bash
 git fetch --prune origin
+git fetch origin "pull/<N>/head"                # the PR head may be on no branch any more
 ref=origin/<branch>
 head=$(gh pr view <N> --json headRefOid -q .headRefOid)
 git merge-base --is-ancestor "$ref" "$head" && echo "nothing after the PR" \
