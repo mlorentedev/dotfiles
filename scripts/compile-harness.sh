@@ -269,7 +269,14 @@ replace_region() {
     mv "$tmp" "$file"
 }
 
-sha_of() { sha256sum "$1" | cut -c1-16; }
+# macOS has no sha256sum before 26 (and there only in /sbin); shasum is everywhere.
+sha_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -c1-16
+    else
+        shasum -a 256 "$1" | cut -c1-16
+    fi
+}
 
 target_inject() { jq -r --arg f "$1" '.targets[] | select(.file==$f) | .inject[]' "$MANIFEST"; }
 
@@ -782,7 +789,7 @@ EOF
         rm -f "$tmpc"
         cap="$(cap_for "$file")"
         if [[ "$cap" != "0" ]]; then
-            lines="$(wc -l < "$REPO_ROOT/$file")"
+            lines="$(wc -l < "$REPO_ROOT/$file" | tr -d " ")"
             if [[ "$lines" -gt "$cap" ]]; then
                 printf '[ERROR] %s is %s lines after injection (cap %s)\n' "$file" "$lines" "$cap" >&2
                 exit 1
@@ -1340,10 +1347,10 @@ deploy_doctrine() {
         # the normalisation above. A guard that tracks one unit cannot report the
         # other one crossing — so report both and compare against the larger.
         if [[ "$cap" != 0 ]]; then
-            chars="$(wc -m < "$file_abs")"
-            bytes="$(wc -c < "$file_abs")"
-            gen_chars="$(wc -m < "$payload")"
-            gen_bytes="$(wc -c < "$payload")"
+            chars="$(wc -m < "$file_abs" | tr -d " ")"
+            bytes="$(wc -c < "$file_abs" | tr -d " ")"
+            gen_chars="$(wc -m < "$payload" | tr -d " ")"
+            gen_bytes="$(wc -c < "$payload" | tr -d " ")"
             # `if`, not `(( … )) && …`: a false arithmetic test returns non-zero
             # and takes the whole `&&` chain with it, which aborts the script
             # under `set -e`. Prohibited-pattern table, the `((count++))` row.

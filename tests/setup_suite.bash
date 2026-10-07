@@ -130,20 +130,27 @@ teardown_suite() {
 # `bats --jobs`, or with several agent sessions on one box, those are alive
 # while this run tears down, and a bare `bats-run` match killed them (CI-004).
 _gui_guard_test_shaped_processes() {
-    command -v pgrep >/dev/null 2>&1 || return 0
+    command -v ps >/dev/null 2>&1 || return 0
     # An empty prefix would match every --user-data-dir, a human's included.
     [ -n "${BATS_RUN_TMPDIR:-}" ] || return 0
 
-    local bin line
+    # `ps -axo pid=,args=` reads the same on procps and on BSD/macOS. `pgrep -a`
+    # does not: on macOS -a means "include ancestors" and no command line is
+    # printed, so the detector matched nothing there and the guard was inactive.
+    #
+    # The binary is matched by the basename of the command's first two words (a
+    # script fixture shows as `/bin/sh /path/obsidian ...`), never by searching
+    # the whole line for the name: this very shell's argv contains the pattern,
+    # the false positive that made the first reading of this incident report
+    # three strays that were the measurement itself.
+    local bin
     for bin in "${GUI_BINARIES[@]}"; do
-        # pgrep by NAME, then filter on the flag. Matching the flag with
-        # `pgrep -f` would also match this very shell, whose own argv contains
-        # the pattern — the false positive that made the first reading of this
-        # incident report three strays that were the measurement itself.
-        while IFS= read -r line; do
-            case "$line" in
-                *--user-data-dir="$BATS_RUN_TMPDIR"/*) printf '%s\n' "$line" ;;
-            esac
-        done < <(pgrep -a "$bin" 2>/dev/null || true)
+        ps -axo pid=,args= 2>/dev/null | awk -v bin="$bin" -v flag="--user-data-dir=$BATS_RUN_TMPDIR/" '
+            index($0, flag) {
+                for (i = 2; i <= 3 && i <= NF; i++) {
+                    n = split($i, part, "/")
+                    if (tolower(part[n]) == tolower(bin)) { sub(/^ +/, ""); print; next }
+                }
+            }' || true
     done
 }

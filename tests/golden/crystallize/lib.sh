@@ -17,7 +17,10 @@ gc_run_case() {
     local case_dir="$1" out_dir="$2"
 
     local sandbox fake_home
-    sandbox=$(mktemp -d)
+    # Physical path: macOS's $TMPDIR is /var/folders/..., a symlink to /private/var,
+    # and dotf resolves its cwd, so a logical sandbox path would never appear in
+    # its output and the normaliser below would miss it.
+    sandbox=$(cd "$(mktemp -d)" && pwd -P)
     # No dashes anywhere in the path: the script's decode_path() reverses its
     # encoding with `tr '-' '/'`, so a dash in the sandbox path would make the
     # project undecodable and silently change which branch the test exercises.

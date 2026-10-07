@@ -118,7 +118,7 @@ obsidian_cmd vault 2>/dev/null | grep -q . || fail_obsidian_gui
 pass "Obsidian CLI connected to vault '$VAULT_NAME'"
 
 if [ -d "$VAULT_DIR" ]; then
-    TOTAL_FILES=$(find "$VAULT_DIR" -name '*.md' -not -path '*/.obsidian/*' | wc -l)
+    TOTAL_FILES=$(find "$VAULT_DIR" -name '*.md' -not -path '*/.obsidian/*' | wc -l | tr -d " ")
     info "Total markdown files: $TOTAL_FILES"
 else
     fail "Vault directory not found: $VAULT_DIR"

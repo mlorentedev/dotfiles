@@ -45,12 +45,21 @@ fi
 rc=0
 for f in "${files[@]}"; do
     # (a) non-ASCII byte anywhere inside a double-quoted @test name. LC_ALL=C makes
-    #     the class match by byte, so any UTF-8 multibyte char (em-dash, <=) hits.
+    #     [:print:] mean 0x20-0x7e, so any UTF-8 multibyte char (em-dash, <=) is
+    #     outside it. -E, not -P: BSD grep has no -P, and the old `2>/dev/null` made
+    #     that error read as "no findings", so on macOS the check passed everything.
+    #     grep exits 1 for "no match" and 2 for an error; only the first is clean.
+    rc_grep=0
+    hits="$(LC_ALL=C grep -nE '^[[:space:]]*@test[[:space:]]+"[^"]*[^[:print:][:space:]]' "$f")" || rc_grep=$?
+    if [ "$rc_grep" -gt 1 ]; then
+        printf 'check-bats-names: grep failed on %s (exit %s)\n' "$f" "$rc_grep" >&2
+        exit 2
+    fi
     while IFS= read -r ln; do
         [ -n "$ln" ] || continue
         printf '%s:%s: non-ASCII character in @test name (bats silently fails to register it)\n' "$f" "$ln"
         rc=1
-    done < <(LC_ALL=C grep -nP '^[[:space:]]*@test[[:space:]]+"[^"]*[^\x00-\x7F]' "$f" 2>/dev/null | cut -d: -f1)
+    done < <(printf '%s\n' "$hits" | cut -d: -f1)
 
     # (b) duplicate @test names within the file (bats refuses to parse it).
     while IFS= read -r name; do

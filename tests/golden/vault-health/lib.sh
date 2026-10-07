@@ -109,11 +109,11 @@ gvh_run_case() {
             # `|| rc=$?` rather than relying on the caller's flags — the lesson
             # the reconciler cost us (docs/lessons.md, 2026-08-09).
             PATH="$sandbox_path" VAULT_DIR="$vault_dir" \
-                bash "$GVH_ORACLE_SH" "${args[@]}" >"$raw" 2>&1 || rc=$?
+                bash "$GVH_ORACLE_SH" ${args[@]+"${args[@]}"} >"$raw" 2>&1 || rc=$?
             ;;
         go)
             PATH="$sandbox_path" VAULT_DIR="$vault_dir" \
-                "$GVH_DOTF_BIN" vault health "${args[@]}" >"$raw" 2>&1 || rc=$?
+                "$GVH_DOTF_BIN" vault health ${args[@]+"${args[@]}"} >"$raw" 2>&1 || rc=$?
             ;;
         *)
             printf 'gvh_run_case: unknown GVH_IMPL_MODE: %s\n' "$mode" >&2
