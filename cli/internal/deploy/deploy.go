@@ -236,7 +236,7 @@ func ParseManifest(data []byte) (*Manifest, error) {
 func assignDirModes(cs []Config) {
 	private := map[string]bool{}
 	for _, c := range cs {
-		if mode, err := c.FileMode(); err == nil && mode&0o077 == 0 {
+		if c.private() {
 			private[path.Dir(c.Dst)] = true
 		}
 	}
@@ -248,20 +248,33 @@ func assignDirModes(cs []Config) {
 	}
 }
 
-// PrivateDirs lists, expanded and sorted, the directories the manifest
-// deploys a private file into: the ones a deploy creates 0700. A directory
-// that already exists keeps its mode, so doctor reports one left open
-// (#2053).
-func (m *Manifest) PrivateDirs(home string, resolve func(string) string) ([]string, error) {
+// private reports whether the entry's file grants nothing to group or others.
+// ParseManifest has already refused a mode that does not parse.
+func (c Config) private() bool {
+	mode, err := c.FileMode()
+	return err == nil && mode&0o077 == 0
+}
+
+// PrivateDirs lists, expanded and sorted, the directories that hold a private
+// file this manifest deploys: an entry whose own mode is private, that applies
+// here (the caller's filter: platforms, requires), and whose destination file
+// exists. A directory that already existed keeps its mode when the deploy
+// writes into it, so doctor reports one left open (#2053), and the existence
+// test keeps that report true: an entry for another OS, or one never
+// deployed, puts nothing private in its directory.
+func (m *Manifest) PrivateDirs(home string, resolve func(string) string, applies func(Config) bool) ([]string, error) {
 	seen := map[string]bool{}
 	var dirs []string
 	for _, c := range m.Configs {
-		if c.dirMode != 0o700 {
+		if !c.private() || !applies(c) {
 			continue
 		}
 		dst, err := ExpandDst(c.Dst, home, resolve)
 		if err != nil {
 			return nil, fmt.Errorf("config %q: %w", c.Name, err)
+		}
+		if _, err := os.Stat(dst); err != nil {
+			continue
 		}
 		if dir := filepath.Dir(dst); !seen[dir] {
 			seen[dir] = true

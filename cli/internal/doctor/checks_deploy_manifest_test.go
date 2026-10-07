@@ -193,6 +193,9 @@ func TestCheckDeployManifest_ReportsAndFixesAnOpenPrivateDirectory(t *testing.T)
 			t.Fatal(err)
 		}
 	}
+	// Deployed, from before the directory mode was derived: the private file
+	// sits in an open directory.
+	writeFile(t, filepath.Join(ssh, "config"), "c\n")
 	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
 
 	var buf bytes.Buffer
@@ -242,5 +245,32 @@ func TestCheckDeployManifest_SkipsDirectoryModesForAWindowsTarget(t *testing.T) 
 	checkDeployManifest(sys, NewReport(&buf, true), false)
 	if strings.Contains(buf.String(), "holds a private deployed file") {
 		t.Errorf("a Windows target must not be judged by POSIX mode bits\n%s", buf.String())
+	}
+}
+
+// A private entry that does not apply here deployed nothing, so its directory
+// is not reported however open it is (#2098 review).
+func TestCheckDeployManifest_IgnoresAPrivateEntryThatDoesNotApplyHere(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not meaningful here")
+	}
+	repo, home := t.TempDir(), t.TempDir()
+	writeFile(t, filepath.Join(repo, "ai", "deploy.json"), `{"version":4,"configs":[
+  {"name":"other-os","src":"ai/c","dst":"{HOME}/.app/config","mode":"0600","platforms":["windows"]},
+  {"name":"gated","src":"ai/c","dst":"{HOME}/.gated/config","mode":"0600","requires":"absenttool"}
+]}`)
+	writeFile(t, filepath.Join(repo, "ai", "c"), "c\n")
+	for _, f := range []string{".app/config", ".gated/config"} {
+		writeFile(t, filepath.Join(home, filepath.FromSlash(f)), "c\n")
+		if err := os.Chmod(filepath.Dir(filepath.Join(home, filepath.FromSlash(f))), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
+	sys.GOOS = "darwin"
+	var buf bytes.Buffer
+	checkDeployManifest(sys, NewReport(&buf, true), true)
+	if strings.Contains(buf.String(), "private deployed file") || strings.Contains(buf.String(), "tightened") {
+		t.Errorf("an entry that does not apply here must not mark its directory\n%s", buf.String())
 	}
 }

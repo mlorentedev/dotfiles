@@ -65,12 +65,62 @@ func TestManifest_PrivateDirsNamesEveryDirectoryAPrivateEntryShares(t *testing.T
 		t.Fatal(err)
 	}
 	home := t.TempDir()
-	got, err := man.PrivateDirs(home, noResolve)
+	all := func(Config) bool { return true }
+	got, err := man.PrivateDirs(home, noResolve, all)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{filepath.Join(home, ".ssh")}
-	if !slices.Equal(got, want) {
+	if len(got) != 0 {
+		t.Errorf("nothing is deployed yet, so no directory holds a private file: %v", got)
+	}
+
+	for _, f := range []string{".ssh/config", ".ssh/id.pub", ".tool/rc"} {
+		p := filepath.Join(home, filepath.FromSlash(f))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err = man.PrivateDirs(home, noResolve, all)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{filepath.Join(home, ".ssh")}; !slices.Equal(got, want) {
 		t.Errorf("PrivateDirs = %v, want %v", got, want)
+	}
+
+	// An entry that does not apply here (another OS, an absent tool) deploys
+	// nothing, whatever its directory holds.
+	got, err = man.PrivateDirs(home, noResolve, func(c Config) bool { return c.Name != "ssh-config" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("a filtered-out private entry must not mark its directory: %v", got)
+	}
+}
+
+// The shipped manifest's two mixed directories are private for every entry in
+// them, so the public entry alone cannot create either one open.
+func TestParseManifest_ShippedMixedDirectoriesArePrivateForEveryEntry(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", ManifestRel))
+	if err != nil {
+		t.Skipf("manifest not reachable from the test's working directory: %v", err)
+	}
+	m, err := ParseManifest(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ssh-config", "ssh-pubkey", "pi", "pi-mcp", "pi-nan-provider", "pi-compaction"} {
+		c := m.Lookup(name)
+		if c == nil {
+			t.Errorf("the shipped manifest no longer declares %s", name)
+			continue
+		}
+		if c.dirMode != 0o700 {
+			t.Errorf("%s: directory mode %o, want 0700", name, c.dirMode)
+		}
 	}
 }

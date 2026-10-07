@@ -81,7 +81,10 @@ func checkPrivateDeployDirs(sys *System, man *deploy.Manifest, rep *Report, fix 
 	if sys.GOOS == "windows" {
 		return
 	}
-	dirs, err := man.PrivateDirs(sys.home(), env.ResolvePath)
+	applies := func(c deploy.Config) bool {
+		return c.AppliesOn(sys.GOOS) && (c.Requires == "" || sys.has(c.Requires))
+	}
+	dirs, err := man.PrivateDirs(sys.home(), env.ResolvePath, applies)
 	if err != nil {
 		rep.Warn("private deploy directories: " + err.Error())
 		return
@@ -89,7 +92,7 @@ func checkPrivateDeployDirs(sys *System, man *deploy.Manifest, rep *Report, fix 
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
-			continue // not created yet; deploy will create it 0700
+			continue
 		}
 		perm := info.Mode().Perm()
 		if perm&0o077 == 0 {
