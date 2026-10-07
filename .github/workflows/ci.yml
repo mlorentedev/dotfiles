@@ -92,6 +92,8 @@ jobs:
               - '**/*.psm1'
               - '.PSScriptAnalyzerSettings.psd1'
               - '.github/workflows/ci.yml'
+              # PSSCRIPTANALYZER_VERSION: a bump must lint on its own PR (#2052).
+              - 'versions.conf'
             # What can change what the pi package reconcile DOES. This set is
             # MAINTAINED BY HAND and is not proven closed — an earlier version
             # of this comment claimed "nothing else can", and that claim is
@@ -202,16 +204,44 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Install PSScriptAnalyzer
+      # #2052: this job is the ONE owner of PowerShell lint; the bats tests that
+      # re-linted three files (and passed when the module could not load) are
+      # gone. The version is pinned in versions.conf. The runner image ships a
+      # PSScriptAnalyzer, so it is used when it is the pin and installed only
+      # when it is not: `Install-Module -Force` reinstalled it on every run and
+      # one Gallery blip failed the job before any file was analyzed.
+      - name: Install the pinned PSScriptAnalyzer
         if: github.event_name == 'push' || needs.changes.outputs.powershell == 'true'
         shell: pwsh
         run: |
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+          $v = ((Get-Content versions.conf | Select-String '^PSSCRIPTANALYZER_VERSION=').Line -split '=', 2)[1]
+          if (-not $v) { throw "PSSCRIPTANALYZER_VERSION missing from versions.conf" }
+          $v = $v.Trim()
+          $present = Get-Module -ListAvailable PSScriptAnalyzer | Where-Object { $_.Version -eq [version]$v }
+          if ($present) {
+            Write-Output "PSScriptAnalyzer ${v}: present at $($present[0].ModuleBase), not installed"
+          } else {
+            Write-Output "PSScriptAnalyzer ${v}: not on the image, installing from the PowerShell Gallery"
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Install-Module PSScriptAnalyzer -RequiredVersion $v -Force -Scope CurrentUser -ErrorAction Stop
+                break
+              } catch {
+                if ($attempt -eq 3) {
+                  Write-Output "::error::PSScriptAnalyzer $v could not be installed from the PowerShell Gallery after 3 attempts, so no file was analyzed: $_"
+                  exit 1
+                }
+                Start-Sleep -Seconds (10 * $attempt)
+              }
+            }
+          }
+          "PSSCRIPTANALYZER_VERSION=$v" >> $env:GITHUB_ENV
 
       - name: Run PSScriptAnalyzer
         if: github.event_name == 'push' || needs.changes.outputs.powershell == 'true'
         shell: pwsh
         run: |
+          Import-Module PSScriptAnalyzer -RequiredVersion $env:PSSCRIPTANALYZER_VERSION
           $files = Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1 |
             Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
           $failed = $false
