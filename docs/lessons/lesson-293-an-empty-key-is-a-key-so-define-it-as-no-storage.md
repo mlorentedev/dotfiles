@@ -1,13 +1,14 @@
 ---
-id: lesson-293
+id: "lesson-293-an-empty-key-is-a-key-so-define-it-as-no-storage"
 type: lesson
 status: active
+title: "An empty key is still a key: define it as no storage, never as a bucket"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, harness, gate, state, guard]
 ---
 
-# 293 — An empty key is still a key: define it as "no storage", never as a bucket
+# An empty key is still a key: define it as no storage, never as a bucket
 
 ## What happened
 

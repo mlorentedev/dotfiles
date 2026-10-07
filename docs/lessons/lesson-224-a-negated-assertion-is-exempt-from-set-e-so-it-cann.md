@@ -1,6 +1,13 @@
-# Lesson 224 — A negated assertion is exempt from `set -e`, so it cannot fail a test
+---
+id: "lesson-224-a-negated-assertion-is-exempt-from-set-e-so-it-cann"
+type: lesson
+status: active
+title: "A negated assertion is exempt from `set -e`, so it cannot fail a test"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# A negated assertion is exempt from `set -e`, so it cannot fail a test
+
 **Area:** tests / bats / guards
 **Severity:** high — 53 assertions across the suite could not fail, and one was hiding a real violation
 

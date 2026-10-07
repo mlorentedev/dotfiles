@@ -1,13 +1,14 @@
 ---
-id: lesson-074-a-cross-environment-ssot-validator-must-split-cont
+id: "lesson-074-a-cross-environment-ssot-validator-must-split-cont"
 type: lesson
 status: active
+title: "A cross-environment SSOT validator must split \"content drift\" (fail) from \"runtime absent off-box\" (warn)"
 created: "2026-05-31"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 074: A cross-environment SSOT validator must split "content drift" (fail) from "runtime absent off-box" (warn)
+# A cross-environment SSOT validator must split "content drift" (fail) from "runtime absent off-box" (warn)
 
 **Context:** HERMES-001 Track B. `80_agents/hermes-nan/scripts/validate.sh` checks the vault SSOT for the Hermes agent; AC6 is "vault SSOT consistent, validate.sh green". The script also checked box-only runtime facts (post-commit hook, cron entry, `uvx`).
 **Problem:** Those runtime checks only pass on the provisioned Hermes box. As hard failures they made AC6 unprovable anywhere else — the script could never be green from a dev checkout or CI, so "green" had no portable meaning.

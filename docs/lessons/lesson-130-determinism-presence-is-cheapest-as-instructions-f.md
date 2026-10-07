@@ -1,13 +1,14 @@
 ---
-id: lesson-130-determinism-presence-is-cheapest-as-instructions-f
+id: "lesson-130-determinism-presence-is-cheapest-as-instructions-f"
 type: lesson
 status: active
+title: "Determinism \"presence\" is cheapest as instructions-file injection, not a provider hook"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 130: Determinism "presence" is cheapest as instructions-file injection, not a provider hook
+# Determinism "presence" is cheapest as instructions-file injection, not a provider hook
 
 **Context**: ADR-027 cross-harness agent pipeline. The first cut of the curator dogfood (HARNESS-043) emitted a claude-only `SessionStart` hook into ~/.claude/settings.json to force an agent's skills into context.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-136-a-cli-that-reads-its-config-from-the-deployed-copy
+id: "lesson-136-a-cli-that-reads-its-config-from-the-deployed-copy"
 type: lesson
 status: active
+title: "A CLI that reads its config from the *deployed* copy, not the checkout, silently reverts its own writes"
 created: "2026-06-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 136: A CLI that reads its config from the *deployed* copy, not the checkout, silently reverts its own writes
+# A CLI that reads its config from the *deployed* copy, not the checkout, silently reverts its own writes
 
 **Context**: `dotf secrets` resolves `secrets/registry.yaml` (the mapping SSOT) to drive `show`/`run`/`migrate`/`set`. The first cut read and wrote the **deployed** copy at `~/.dotfiles/secrets/registry.yaml` — the same path setup rsyncs from the checkout on every redeploy. The first real C8 migrate (#635) never ran, so the footgun stayed latent until the `sync ci` smoke surfaced it.
 

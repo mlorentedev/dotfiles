@@ -1,13 +1,14 @@
 ---
-id: lesson-273
+id: "lesson-273-the-fix-and-the-detector-can-be-the-same-edit"
 type: lesson
 status: active
+title: "The fix and the detector can be the same edit"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, testing, cross-platform, review, guards]
 ---
 
-# 273 — The fix and the detector can be the same edit
+# The fix and the detector can be the same edit
 
 ## What happened
 

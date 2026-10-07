@@ -1,6 +1,9 @@
 ---
+id: "lesson-339-a-setup-script-does-what-the-scripts-it-calls-do"
+type: lesson
+status: active
 title: "A setup script does what the scripts it calls do"
-date: "2026-10-06"
+created: "2026-10-06"
 ---
 
 # A setup script does what the scripts it calls do

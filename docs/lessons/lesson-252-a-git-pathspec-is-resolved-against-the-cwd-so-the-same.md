@@ -1,6 +1,13 @@
-# 252 - A git pathspec is resolved against the CWD, so the same argument means two different things and one of them is silently empty
+---
+id: "lesson-252-a-git-pathspec-is-resolved-against-the-cwd-so-the-same"
+type: lesson
+status: active
+title: "A git pathspec is resolved against the CWD, so the same argument means two different things and one of them is silently empty"
+created: "2026-09-01"
+---
 
-**Date:** 2026-09-01
+# A git pathspec is resolved against the CWD, so the same argument means two different things and one of them is silently empty
+
 **Area:** git, guards, verification
 
 ## What happened

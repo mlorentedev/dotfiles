@@ -1,6 +1,9 @@
 ---
+id: "lesson-334-windows-prompts-to-open-extensionless-scripts"
+type: lesson
+status: active
 title: "Windows prompts to open extensionless bash scripts"
-date: "2026-10-02"
+created: "2026-10-02"
 ---
 
 # Windows prompts to open extensionless bash scripts

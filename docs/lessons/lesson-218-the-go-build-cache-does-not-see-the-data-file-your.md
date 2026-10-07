@@ -1,6 +1,13 @@
-# Lesson 218 — The Go build cache does not see the data file your test reads
+---
+id: "lesson-218-the-go-build-cache-does-not-see-the-data-file-your"
+type: lesson
+status: active
+title: "The Go build cache does not see the data file your test reads"
+created: "2026-08-21"
+---
 
-**Date:** 2026-08-21
+# The Go build cache does not see the data file your test reads
+
 **Context:** Mutation-testing new guards over `harness/model-map.schema.json` while closing
 HARNESS-075's round-5 review.
 

@@ -1,7 +1,8 @@
 name: Repo hygiene
 
-# Two guards that need no toolchain: lesson numbering/index integrity and
-# SHA-pinned actions. Both scripts run under bash and zsh and print what failed.
+# Repository hygiene: lesson numbering/index integrity, the lessons' canonical
+# form (`dotf lessons fmt --check`, run from the checkout so it never waits for a
+# release), and SHA-pinned actions. Each step prints what failed.
 
 on:
   pull_request:
@@ -21,5 +22,12 @@ jobs:
           persist-credentials: false
       - name: Lessons numbering and index
         run: bash scripts/check-lessons.sh
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: Lessons in their canonical form, index generated from them
+        working-directory: cli
+        run: go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons
       - name: Actions pinned to commit SHAs
         run: bash scripts/check-actions-pinned.sh

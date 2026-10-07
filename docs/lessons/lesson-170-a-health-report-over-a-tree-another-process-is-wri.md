@@ -1,13 +1,14 @@
 ---
-id: lesson-170-a-health-report-over-a-tree-another-process-is-wri
+id: "lesson-170-a-health-report-over-a-tree-another-process-is-wri"
 type: lesson
 status: active
+title: "A health report over a tree another process is writing is a dirty read, and re-running it is how you find out"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 170: A health report over a tree another process is writing is a dirty read, and re-running it is how you find out
+# A health report over a tree another process is writing is a dirty read, and re-running it is how you find out
 
 **Context**: Running `/insights` and then `/vault-doctor` over the knowledge vault. `vault_health` reported frontmatter errors; the plan was to backfill them.
 

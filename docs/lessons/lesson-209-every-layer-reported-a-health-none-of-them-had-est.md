@@ -1,13 +1,14 @@
 ---
-id: lesson-209-every-layer-reported-a-health-none-of-them-had-est
+id: "lesson-209-every-layer-reported-a-health-none-of-them-had-est"
 type: lesson
 status: active
+title: "Every layer reported a health none of them had established"
 created: "2026-08-16"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 209: Every layer reported a health none of them had established
+# Every layer reported a health none of them had established
 
 **Context**: `pi` returned `401 Invalid API key` on every call against the `nan` provider, while the same key sent by hand returned 200. BUG-081b (#987).
 

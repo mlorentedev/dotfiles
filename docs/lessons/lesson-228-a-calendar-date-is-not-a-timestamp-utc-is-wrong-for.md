@@ -1,6 +1,13 @@
-# Lesson 228 — A calendar date is not a timestamp, and UTC is the wrong zone for one
+---
+id: "lesson-228-a-calendar-date-is-not-a-timestamp-utc-is-wrong-for"
+type: lesson
+status: active
+title: "A calendar date is not a timestamp, and UTC is the wrong zone for one"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# A calendar date is not a timestamp, and UTC is the wrong zone for one
+
 **Area:** cli / mem / time handling
 **Severity:** medium — silently misfiles durable records, and can overwrite one
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-318
+id: "lesson-318-a-speed-up-must-name-the-critical-path-it-shortens"
 type: lesson
 status: active
+title: "A speed-up must name the critical path it shortens"
 created: "2026-09-29"
 owner: manu
 tags: [lesson, ci, performance, spec, measurement]
 ---
 
-# 318 — A speed-up must name the critical path it shortens
+# A speed-up must name the critical path it shortens
 
 ## What happened
 

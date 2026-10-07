@@ -1,13 +1,14 @@
 ---
-id: lesson-099-extracting-a-hook-function-into-a-sibling-script-c
+id: "lesson-099-extracting-a-hook-function-into-a-sibling-script-c"
 type: lesson
 status: active
+title: "Extracting a hook function into a sibling script can flip its exit status and silently kill the hook under `set -e`"
 created: "2026-06-16"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 099: Extracting a hook function into a sibling script can flip its exit status and silently kill the hook under `set -e`
+# Extracting a hook function into a sibling script can flip its exit status and silently kill the hook under `set -e`
 
 **Context**: MEMORY-002 extracted the vault→memory symlink resolver out of `claude-session-start.sh`'s `ensure_memory_symlink` into a standalone agnostic `ensure-memory-symlink.sh`. The hook's function was rewritten to delegate: compute Claude's encoded target, call the script, append any message it printed.
 

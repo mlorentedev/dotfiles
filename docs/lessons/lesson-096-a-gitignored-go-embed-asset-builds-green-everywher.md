@@ -1,13 +1,14 @@
 ---
-id: lesson-096-a-gitignored-go-embed-asset-builds-green-everywher
+id: "lesson-096-a-gitignored-go-embed-asset-builds-green-everywher"
 type: lesson
 status: active
+title: "A gitignored `//go:embed` asset builds green everywhere and only fails at runtime in a fresh checkout"
 created: "2026-06-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 096: A gitignored `//go:embed` asset builds green everywhere and only fails at runtime in a fresh checkout
+# A gitignored `//go:embed` asset builds green everywhere and only fails at runtime in a fresh checkout
 
 **Context**: `dotf init` (CLI-014) vendors its scaffold templates under `cli/internal/initrepo/templates/` via `//go:embed`. The CLAUDE.md pointer template was committed as `templates/CLAUDE.md`.
 

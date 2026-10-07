@@ -1,13 +1,14 @@
 ---
-id: lesson-028-tmux-clipboard-needs-an-external-bridge-and-that-b
+id: "lesson-028-tmux-clipboard-needs-an-external-bridge-and-that-b"
 type: lesson
 status: active
+title: "tmux clipboard needs an external bridge — and that bridge is display-server-specific"
 created: "2026-05-11"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 028: tmux clipboard needs an external bridge — and that bridge is display-server-specific
+# tmux clipboard needs an external bridge — and that bridge is display-server-specific
 
 **Context**: After enabling `set -g mouse on` and `mode-keys vi`, selections inside tmux still did not appear in the system clipboard. `Ctrl+V` outside tmux pasted stale content.
 

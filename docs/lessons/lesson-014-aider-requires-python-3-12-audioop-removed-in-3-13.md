@@ -1,13 +1,14 @@
 ---
-id: lesson-014-aider-requires-python-3-12-audioop-removed-in-3-13
+id: "lesson-014-aider-requires-python-3-12-audioop-removed-in-3-13"
 type: lesson
 status: active
+title: "Aider requires Python 3.12 — audioop removed in 3.13"
 created: "2026-03-10"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 014: Aider requires Python 3.12 — audioop removed in 3.13
+# Aider requires Python 3.12 — audioop removed in 3.13
 
 **Context**: Installing aider-chat via `uv tool install` on a system with Python 3.13.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-029-editing-a-dotfile-in-the-repo-does-not-take-effect
+id: "lesson-029-editing-a-dotfile-in-the-repo-does-not-take-effect"
 type: lesson
 status: active
+title: "Editing a dotfile in the repo does not take effect until `setup-linux.sh` runs"
 created: "2026-05-11"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 029: Editing a dotfile in the repo does not take effect until `setup-linux.sh` runs
+# Editing a dotfile in the repo does not take effect until `setup-linux.sh` runs
 
 **Context**: After editing `tmux.conf` in `~/Projects/dotfiles/` to add clipboard bindings (`copy-pipe-and-cancel` piped to `xclip`), tmux still behaved like the old config. Mouse selection produced nothing in the system clipboard.
 

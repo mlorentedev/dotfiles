@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/spec/SKILL.md
-generated_sha: 06a53c98bee5b8eb
+generated_sha: 5d3e6d0a63cded64
 id: spec-skill
 type: skill
 status: active
@@ -319,7 +319,7 @@ Both `--force-*` flags require `--reason`. An override is **recorded**: the arch
 2. **Promotion candidates (interactive; the archive checks the answers):**
    For each of the three promotion types, ASK the user regardless of what `verification.md` already says. Write the promoted file first, then record the answer on its line in `verification.md` as `yes: <path of the promoted file>` or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault (HARNESS-160, ADR-039).
     - **Lesson?** "Any non-obvious lesson worth recording? 2-sentence summary, or `no`."
-      - If non-`no`: compose lesson entry -> save as the **repo's** `docs/lessons/lesson-NNN-<slug>.md` and register in `docs/lessons/_index.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]; fallback: `docs/lessons/`). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
+      - If non-`no`: compose lesson entry -> save as the **repo's** `docs/lessons/lesson-NNN-<slug>.md` and run `dotf lessons fmt` to regenerate `docs/lessons/_index.md` (project lessons live in the repo — see [[pattern-knowledge-placement]]; fallback: `docs/lessons/`). A genuinely cross-project / methodology lesson goes to `00_meta/` (promote to a pattern).
    - **ADR-worthy?** "Any architectural decision that future-you needs to remember? ADR title, or `no`."
      - If non-`no`: ask for ADR number (query existing ADRs in the **repo's** `docs/adr/` first to suggest next sequential) and 1-line decision summary. Create skeleton at the **repo's** `docs/adr/adr-XXX-<slug>.md` (ADRs live in the repo — see [[pattern-knowledge-placement]]; the vault keeps only cross-project decisions in `00_meta/`).
    - **Pattern candidate?** "Does this approach recur in >1 project? Pattern name, or `no`."
@@ -366,7 +366,7 @@ Both `--force-*` flags require `--reason`. An override is **recorded**: the arch
 | `bootstrap` (template) | `00_meta/templates/bootstrap-contract.md`, sister contracts in `specs/archive/` | (filesystem only — repo specs/<id>/bootstrap-contract.md) |
 | `fill` (grounding) | GitHub issue, `roadmap.md`, referenced ADRs, sister specs | nothing |
 | `check` (lint) | `proposal.md`, `tasks.md`, optional `features.json` | nothing |
-| `archive` (promotion) | `verification.md` flags | repo `docs/lessons/lesson-NNN-*.md` + `_index.md`, repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
+| `archive` (promotion) | `verification.md` flags | repo `docs/lessons/lesson-NNN-*.md` (+ `dotf lessons fmt`), repo `docs/adr/adr-XXX.md`, `00_meta/patterns/` (cross-project only) |
 | `archive` (backlog tick) | GitHub issue | GitHub issue closed |
 
 ## References

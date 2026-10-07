@@ -1,13 +1,14 @@
 ---
-id: lesson-061-pkill-f-self-kill-pattern-matches-the-pkill-comman
+id: "lesson-061-pkill-f-self-kill-pattern-matches-the-pkill-comman"
 type: lesson
 status: active
+title: "pkill -f self-kill: pattern matches the pkill command line itself"
 created: "2026-05-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 061: pkill -f self-kill: pattern matches the pkill command line itself
+# pkill -f self-kill: pattern matches the pkill command line itself
 
 **Context:** During a cleanup session uninstalling several AI CLIs (opencode, agy, gemini-cli), I ran `pkill -TERM -f 'opencode|antigravity|/agy\b|gemini-cli'` to terminate any live processes. The shell exited with code 144 (128 + SIGTERM 16) — pkill killed the shell that invoked it.
 

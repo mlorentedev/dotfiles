@@ -1,7 +1,8 @@
 ---
-id: lesson-263
+id: "lesson-263-a-population-that-cannot-prove-it-is-complete"
 type: lesson
 status: active
+title: "A population that cannot prove it is complete answers with a plausible number"
 created: "2026-09-02"
 owner: manu
 tags: [lesson, github, gh-cli, measurement, guards]

@@ -1,13 +1,14 @@
 ---
-id: lesson-310
+id: "lesson-310-a-comment-that-grants-a-safety-exemption-outlives-the-adr-it-cites"
 type: lesson
 status: active
+title: "A comment that grants a safety exemption outlives the ADR it cites"
 created: "2026-09-26"
 owner: manu
 tags: [lesson, secrets, doctor, adr, exemption, dr]
 ---
 
-# 310 — A comment that grants a safety exemption outlives the ADR it cites
+# A comment that grants a safety exemption outlives the ADR it cites
 
 ## What happened
 

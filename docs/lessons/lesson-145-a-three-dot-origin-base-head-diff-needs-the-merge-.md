@@ -1,13 +1,14 @@
 ---
-id: lesson-145-a-three-dot-origin-base-head-diff-needs-the-merge-
+id: "lesson-145-a-three-dot-origin-base-head-diff-needs-the-merge-"
 type: lesson
 status: active
+title: "A three-dot `origin/BASE...HEAD` diff needs the merge-base — `--depth=1` starves it, and a fail-closed gate makes that loud"
 created: "2026-07-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 145: A three-dot `origin/BASE...HEAD` diff needs the merge-base — `--depth=1` starves it, and a fail-closed gate makes that loud
+# A three-dot `origin/BASE...HEAD` diff needs the merge-base — `--depth=1` starves it, and a fail-closed gate makes that loud
 
 **Context**: The C3 fail-closed hardening (#686/#716) made `check-spec-gate.sh` exit 2 whenever `git diff "origin/BASE...HEAD"` cannot resolve its refs, instead of silently passing with `TOTAL_LOC=0`. The next PR to run the gate — #728, whose branch lagged `main` by 6 commits — failed `spec-gate` with `base/head ref could not be resolved. The Discipline Gate fails closed (exit 2).`
 

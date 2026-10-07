@@ -1,6 +1,13 @@
-# Lesson 249 — Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent
+---
+id: "lesson-249-two-scripts-writing-the-same-logical-value-in-two"
+type: lesson
+status: active
+title: "Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent"
+created: "2026-08-31"
+---
 
-**Date:** 2026-08-31
+# Two scripts writing the same logical value in two syntaxes make an equality rule OS-dependent
+
 **Context:** HARNESS-045 AC1 — cutting `setup-linux.sh` and `setup-windows.ps1` over to
 `dotf harness bind`
 

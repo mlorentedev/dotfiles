@@ -1,13 +1,14 @@
 ---
-id: lesson-153-a-guard-installed-machine-wide-can-silently-disabl
+id: "lesson-153-a-guard-installed-machine-wide-can-silently-disabl"
 type: lesson
 status: active
+title: "A guard installed machine-wide can silently disable every other guard"
 created: "2026-08-06"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 153: A guard installed machine-wide can silently disable every other guard
+# A guard installed machine-wide can silently disable every other guard
 
 **Context**: GUARD-001 enforces its memory-sink check everywhere by setting a **global** `core.hooksPath`. Its dispatcher was written knowing that this makes git ignore `.git/hooks/` entirely, so it deliberately chains onward — the comment in `git-hooks/pre-push` says it exists so "per-repo guards (gitleaks) survive". The intent was right and the code did exactly what it said.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-285
+id: "lesson-285-a-404-fixed-by-dropping-the-scope-installs-someone-elses-package"
 type: lesson
 status: active
+title: "A 404 \"fixed\" by dropping the scope installs someone else's package"
 created: "2026-09-23"
 owner: manu
 tags: [lesson, supply-chain, npm, tooling, silent-failure, verification]
 ---
 
-# 285 — A 404 "fixed" by dropping the scope installs someone else's package
+# A 404 "fixed" by dropping the scope installs someone else's package
 
 ## What happened
 

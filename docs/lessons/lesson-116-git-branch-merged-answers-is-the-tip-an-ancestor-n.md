@@ -1,13 +1,14 @@
 ---
-id: lesson-116-git-branch-merged-answers-is-the-tip-an-ancestor-n
+id: "lesson-116-git-branch-merged-answers-is-the-tip-an-ancestor-n"
 type: lesson
 status: active
+title: "`git branch --merged` answers \"is the tip an ancestor?\", not \"is the content backed up\" — verify before deleting"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 116: `git branch --merged` answers "is the tip an ancestor?", not "is the content backed up" — verify before deleting
+# `git branch --merged` answers "is the tip an ancestor?", not "is the content backed up" — verify before deleting
 
 **Context**: Housekeeping a 5-week-old orphan branch (`fix/win-sessionstart-hook-path`). `git branch --merged origin/main` would have green-lit deleting it — its single commit does not conflict with `main`.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-208-the-health-probe-was-the-illness-a-liveness-check-
+id: "lesson-208-the-health-probe-was-the-illness-a-liveness-check-"
 type: lesson
 status: active
+title: "The health probe was the illness: a liveness check that breaks the operation it authorises"
 created: "2026-08-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 208: The health probe was the illness: a liveness check that breaks the operation it authorises
+# The health probe was the illness: a liveness check that breaks the operation it authorises
 
 **Context**: BUG-082 (#988) — `dotf secrets verify` and `run` failed against the `bw serve` daemon with `bw serve returned no parseable envelope: invalid character 'I'`. It had been open for weeks, described as intermittent, and three agent sessions measured it on the same day.
 

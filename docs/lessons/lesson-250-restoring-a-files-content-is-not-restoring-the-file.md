@@ -1,6 +1,13 @@
-# Lesson 250 — Restoring a file's content is not restoring the file, and the mode is the part nobody diffs
+---
+id: "lesson-250-restoring-a-files-content-is-not-restoring-the-file"
+type: lesson
+status: active
+title: "Restoring a file's content is not restoring the file, and the mode is the part nobody diffs"
+created: "2026-09-01"
+---
 
-**Date:** 2026-09-01
+# Restoring a file's content is not restoring the file, and the mode is the part nobody diffs
+
 **Context:** #1411 shipped `setup-linux.sh` at `100644`. `install.sh:52` is `exec ./setup-linux.sh "$@"` — the bootstrap entry point — so a fresh clone failed at its first step with exit 126. Every already-installed machine was unaffected, which is why it reached `main` unnoticed. Found by a peer session reading a merge diff, not by any check.
 **Category:** verification, guards, mutation-testing, ci
 

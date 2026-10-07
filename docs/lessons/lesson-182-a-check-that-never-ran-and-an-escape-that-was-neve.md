@@ -1,13 +1,14 @@
 ---
-id: lesson-182-a-check-that-never-ran-and-an-escape-that-was-neve
+id: "lesson-182-a-check-that-never-ran-and-an-escape-that-was-neve"
 type: lesson
 status: active
+title: "A check that never ran and an escape that was never taken are the same defect: verified in isolation, never exercised in situ"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 182: A check that never ran and an escape that was never taken are the same defect: verified in isolation, never exercised in situ
+# A check that never ran and an escape that was never taken are the same defect: verified in isolation, never exercised in situ
 
 **Context**: BUG-066. The SDD spec-gate's documented escape — a `skip-archive` label plus a non-empty `## Archive skip rationale` section in the PR body — was applied correctly on #877 and never went green; that PR merged with the check red. Separately, HARNESS-063's adjacency report had been fixture-tested and green since the day it shipped.
 

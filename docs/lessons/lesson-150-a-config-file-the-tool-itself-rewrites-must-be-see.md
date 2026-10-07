@@ -1,13 +1,14 @@
 ---
-id: lesson-150-a-config-file-the-tool-itself-rewrites-must-be-see
+id: "lesson-150-a-config-file-the-tool-itself-rewrites-must-be-see"
 type: lesson
 status: active
+title: "A config file the tool itself rewrites must be seeded, not synced"
 created: "2026-08-05"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 150: A config file the tool itself rewrites must be seeded, not synced
+# A config file the tool itself rewrites must be seeded, not synced
 
 **Context**: `setup-{linux,windows}` deploy three pi files side by side. `models.json` and `tui.json` are dotfiles-owned: the deploy copies them whenever source and destination differ, which is correct — the repo is the source of truth and any local edit is drift to be corrected. `ai/pi/settings.json` was given the same shape, and `ai/pi/README.md` plus `tests/pi-config.bats` have described it as seed-if-missing since AI-025.
 

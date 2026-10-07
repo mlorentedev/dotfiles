@@ -1,6 +1,9 @@
 ---
+id: "lesson-335-a-converge-step-is-stubbed-in-the-shared-test-helper"
+type: lesson
+status: active
 title: "A converge step that shells out is stubbed in the shared test helper"
-date: "2026-10-04"
+created: "2026-10-04"
 ---
 
 # A converge step that shells out is stubbed in the shared test helper

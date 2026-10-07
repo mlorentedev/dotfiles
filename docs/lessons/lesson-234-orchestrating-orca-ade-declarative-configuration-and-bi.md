@@ -1,13 +1,14 @@
 ---
-id: lesson-234-orchestrating-orca-ade-declarative-configuration-and-bi
+id: "lesson-234-orchestrating-orca-ade-declarative-configuration-and-bi"
 type: lesson
 status: active
+title: "Orchestrating Orca ADE declarative configuration and bidirectional settings capture"
 created: "2026-08-27"
 owner: manu
 tags: [lesson, dotfiles, orca, cli, deploy]
 ---
 
-# Lesson 234: Orchestrating Orca ADE declarative configuration and bidirectional settings capture
+# Orchestrating Orca ADE declarative configuration and bidirectional settings capture
 
 **Context**: CLI-051/#1273 — Orca ADE (Stably AI) settings were split between shell tuning scripts (`scripts/orca-tune.sh`), untracked user directories (`~/.orca/keybindings.json`), and the primary data store (`~/.config/orca/orca-data.json`).
 

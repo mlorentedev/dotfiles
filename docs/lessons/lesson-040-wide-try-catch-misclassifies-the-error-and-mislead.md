@@ -1,13 +1,14 @@
 ---
-id: lesson-040-wide-try-catch-misclassifies-the-error-and-mislead
+id: "lesson-040-wide-try-catch-misclassifies-the-error-and-mislead"
 type: lesson
 status: active
+title: "Wide try/catch misclassifies the error and misleads the next reader"
 created: "2026-05-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 040: Wide try/catch misclassifies the error and misleads the next reader
+# Wide try/catch misclassifies the error and misleads the next reader
 
 **Context:** SDD-002 (PR #51) wrapped `ConvertFrom-Json -AsHashtable` in `Merge-ClaudeSettings` with `try { ... } catch { Write-Warn "Claude settings template is not valid JSON after placeholder substitution: $_"; return }`. Under Windows PowerShell 5.1 (the default `PowerShell` interpreter on Windows), `-AsHashtable` does not exist — it was added in PowerShell 7.0. The actual exception thrown is `ParameterBindingException` ("A parameter cannot be found that matches parameter name 'AsHashtable'"), NOT a JSON parse error.
 

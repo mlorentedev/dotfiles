@@ -1,13 +1,14 @@
 ---
-id: lesson-056-setup-time-mutations-to-repo-symlinked-files-creat
+id: "lesson-056-setup-time-mutations-to-repo-symlinked-files-creat"
 type: lesson
 status: active
+title: "Setup-time mutations to repo-symlinked files create permanent drift false-positives"
 created: "2026-05-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 056: Setup-time mutations to repo-symlinked files create permanent drift false-positives
+# Setup-time mutations to repo-symlinked files create permanent drift false-positives
 
 **Context:** BUG-024 (PR #93). After REFACTOR-001 audit chain closed earlier today, the next ./setup-linux.sh fresh run reported `[12/12] Repo ↔ Deploy-Dir Drift FAIL`. diff-check.sh (PR #10) showed 3 lines drifting in both .bashrc and .zshrc: opencode PATH, project-init alias, and ~/.dotfiles/scripts on PATH.</context>
 <parameter name="problem">setup-linux.sh appended those 3 lines to ~/.bashrc and ~/.zshrc via `ensure_line_in_file` *after* symlinking them to the repo (L431-433 opencode PATH, L903-905 project-init alias, L922-924 scripts PATH). Because the rc files are symlinks into the deploy-dir, the appends always wrote through to the deploy-dir copies — making those copies diverge from the (clean) repo source on every fresh setup. The drift detector then flagged it on the very next CI run. The repo source rc files also lacked a trailing newline, which caused the first appended line to concatenate onto `fi`.</problem>

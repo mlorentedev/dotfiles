@@ -1,13 +1,14 @@
 ---
-id: lesson-303
+id: "lesson-303-a-check-that-predicts-a-component-uses-its-rule"
 type: lesson
 status: active
+title: "A check that predicts another component uses that component's rule, not a better one"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, doctor, harness, testing, differential]
 ---
 
-# 303 — A check that predicts another component uses that component's rule, not a better one
+# A check that predicts another component uses that component's rule, not a better one
 
 ## What happened
 

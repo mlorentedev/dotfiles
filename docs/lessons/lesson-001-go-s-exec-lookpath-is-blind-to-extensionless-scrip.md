@@ -1,13 +1,14 @@
 ---
-id: lesson-001-go-s-exec-lookpath-is-blind-to-extensionless-scrip
+id: "lesson-001-go-s-exec-lookpath-is-blind-to-extensionless-scrip"
 type: lesson
 status: active
+title: "Go's exec.LookPath is blind to extensionless scripts on Windows"
 created: "2026-08-10"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 001: Go's exec.LookPath is blind to extensionless scripts on Windows
+# Go's exec.LookPath is blind to extensionless scripts on Windows
 
 **Context**: `dotf doctor`'s `has()` (a `command -v` emulation) used `exec.LookPath` to detect optional tools. On a healthy Windows box it reported `bats` as missing though `~/.local/bin/bats` is on PATH and runs fine (BUG-052, #804).
 

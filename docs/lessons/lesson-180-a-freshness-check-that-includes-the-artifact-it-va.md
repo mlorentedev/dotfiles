@@ -1,13 +1,14 @@
 ---
-id: lesson-180-a-freshness-check-that-includes-the-artifact-it-va
+id: "lesson-180-a-freshness-check-that-includes-the-artifact-it-va"
 type: lesson
 status: active
+title: "A freshness check that includes the artifact it validates is stale by construction"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 180: A freshness check that includes the artifact it validates is stale by construction
+# A freshness check that includes the artifact it validates is stale by construction
 
 **Context**: CLI-034 gated `dotf spec archive` on an adversarial-review verdict in `specs/<id>/review.md`. A presence check alone is satisfiable by an empty or outdated file — the same alibi `check-spec-gate.sh` added `SPEC_FLOOR=10` to defeat — so the design added a staleness floor: `review.md` records the `reviewed_sha` it examined, and the archive refuses if the spec changed after it. The first formulation was the obvious one: "did anything in `specs/<id>/` change after `reviewed_sha`?"
 

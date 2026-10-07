@@ -1,13 +1,14 @@
 ---
-id: lesson-075-a-harness-consumer-spec-scoped-on-a-retired-axis-m
+id: "lesson-075-a-harness-consumer-spec-scoped-on-a-retired-axis-m"
 type: lesson
 status: active
+title: "A harness consumer spec scoped on a retired axis must be reconciled, not implemented (WORKMODE-001)"
 created: "2026-06-02"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 075: A harness consumer spec scoped on a retired axis must be reconciled, not implemented (WORKMODE-001)
+# A harness consumer spec scoped on a retired axis must be reconciled, not implemented (WORKMODE-001)
 
 **Context:** Picking up the HARNESS-001 backlog, the next planned consumer was WORKMODE-001 (#159) — "the harness adapts its knowledge-SSOT target to repo type (personal → vault, work → repo + Project)". Before implementing, a vault+repo sweep checked whether the work/personal model had already been decided.
 

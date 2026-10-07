@@ -1,13 +1,14 @@
 ---
-id: lesson-177-a-guard-stops-new-violations-it-does-not-clean-the
+id: "lesson-177-a-guard-stops-new-violations-it-does-not-clean-the"
 type: lesson
 status: active
+title: "A guard stops new violations; it does not clean the stock, and the rule then reads as if it did"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 177: A guard stops new violations; it does not clean the stock, and the rule then reads as if it did
+# A guard stops new violations; it does not clean the stock, and the rule then reads as if it did
 
 **Context**: #857 reported that crystallize corrupts a `MEMORY.md` whose body sits inside a YAML block scalar. The plan of record was to teach the Go port (#490) to edit that shape, deriving the indent rather than assuming it. Before writing any code, two things were measured: what a `yaml.v3` roundtrip actually does to those files, and where the shape came from.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-172-gh-splits-its-subcommands-across-two-rate-limit-po
+id: "lesson-172-gh-splits-its-subcommands-across-two-rate-limit-po"
 type: lesson
 status: active
+title: "`gh` splits its subcommands across two rate-limit pools, so a polling loop can exhaust the one you need"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 172: `gh` splits its subcommands across two rate-limit pools, so a polling loop can exhaust the one you need
+# `gh` splits its subcommands across two rate-limit pools, so a polling loop can exhaust the one you need
 
 **Context**: Waiting on a PR's CI with a background loop calling `gh pr checks` every 20 seconds, while separately reading the issue backlog.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-291
+id: "lesson-291-a-registry-is-read-by-the-released-binary-not-the-code-beside-it"
 type: lesson
 status: active
+title: "A registry is read by the released binary, not by the code beside it"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, secrets, release, compatibility, silent-failure]
 ---
 
-# 291 — A registry is read by the released binary, not by the code beside it
+# A registry is read by the released binary, not by the code beside it
 
 ## What happened
 

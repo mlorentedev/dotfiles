@@ -1,6 +1,13 @@
-# Lesson 215 — A parser written for one runner reads the other runner's review as empty
+---
+id: "lesson-215-a-parser-for-one-runner-reads-the-other-runners-re"
+type: lesson
+status: active
+title: "A parser written for one runner reads the other runner's review as empty"
+created: "2026-08-21"
+---
 
-**Date:** 2026-08-21
+# A parser written for one runner reads the other runner's review as empty
+
 **Context:** Adversarially reviewing the orchestration evidence report before an ADR consumed it.
 
 ## What happened

@@ -1,13 +1,14 @@
 ---
-id: lesson-299
+id: "lesson-299-tell-the-reviewer-its-time-budget"
 type: lesson
 status: active
+title: "Tell the reviewer its time budget; a deadline alone only kills"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, review, sdd, agents, prompts, timeout]
 ---
 
-# 299 — Tell the reviewer its time budget; a deadline alone only kills
+# Tell the reviewer its time budget; a deadline alone only kills
 
 ## What happened
 

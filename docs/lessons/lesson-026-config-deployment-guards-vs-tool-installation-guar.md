@@ -1,13 +1,14 @@
 ---
-id: lesson-026-config-deployment-guards-vs-tool-installation-guar
+id: "lesson-026-config-deployment-guards-vs-tool-installation-guar"
 type: lesson
 status: active
+title: "Config deployment guards vs tool installation guards"
 created: "2026-03-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 026: Config deployment guards vs tool installation guards
+# Config deployment guards vs tool installation guards
 
 **Context**: Made Gemini config deployment conditional on `command -v gemini`. CI integration tests failed because the Docker container doesn't have gemini installed.
 

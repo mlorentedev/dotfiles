@@ -1,13 +1,14 @@
 ---
-id: lesson-112-strangler-fig-deletion-the-parity-gate-must-cover-
+id: "lesson-112-strangler-fig-deletion-the-parity-gate-must-cover-"
 type: lesson
 status: active
+title: "Strangler-fig deletion: the parity gate must cover OS-specific side effects, and a \"different-by-design\" Go path can still be parity (CLI-020)"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 112: Strangler-fig deletion: the parity gate must cover OS-specific side effects, and a "different-by-design" Go path can still be parity (CLI-020)
+# Strangler-fig deletion: the parity gate must cover OS-specific side effects, and a "different-by-design" Go path can still be parity (CLI-020)
 
 **Context**: First real `.ps1` deletion of the ADR-020/021 CLI convergence — repoint Windows `project-init` to `dotf init` and delete the 3 init `.ps1`. The spec gated the deletion on proving `dotf init` is at parity on Windows.
 

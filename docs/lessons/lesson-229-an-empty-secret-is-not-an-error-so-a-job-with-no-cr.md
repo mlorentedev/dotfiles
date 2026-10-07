@@ -1,13 +1,14 @@
 ---
-id: lesson-229-an-empty-secret-is-not-an-error-so-a-job-with-no-cr
+id: "lesson-229-an-empty-secret-is-not-an-error-so-a-job-with-no-cr"
 type: lesson
 status: active
+title: "An empty secret is not an error, so a job with no credential fails as if the work failed"
 created: "2026-08-24"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 229: An empty secret is not an error, so a job with no credential fails as if the work failed
+# An empty secret is not an error, so a job with no credential fails as if the work failed
 
 **Context**: Every Dependabot PR opened since 2026-08-07 carried red checks — `add-to-project`, `review`, and `review-attestation` downstream of them. Measured on #1219 and #1220 (HARNESS-080, #1221). GitHub serves Dependabot-triggered `pull_request` runs from a **separate** secrets store; this repository's was empty, while the Actions store held all three secrets:
 

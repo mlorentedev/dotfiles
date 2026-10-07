@@ -1,6 +1,13 @@
-# Lesson 241 — Re-running a command just to print what it already told you inherits its exit status, silently, under `pipefail`
+---
+id: "lesson-241-re-running-a-command-just-to-print-what-it-already"
+type: lesson
+status: active
+title: "Re-running a command just to print what it already told you inherits its exit status, silently, under `pipefail`"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# Re-running a command just to print what it already told you inherits its exit status, silently, under `pipefail`
+
 **Area:** shell / `set -euo pipefail` / vault-health.sh
 **Severity:** medium — a real run silently drops every backlog file after the first drifted one, the advisory merged-check pass, and the closing report
 

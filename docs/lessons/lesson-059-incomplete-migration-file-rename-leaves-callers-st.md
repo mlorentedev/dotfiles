@@ -1,13 +1,14 @@
 ---
-id: lesson-059-incomplete-migration-file-rename-leaves-callers-st
+id: "lesson-059-incomplete-migration-file-rename-leaves-callers-st"
 type: lesson
 status: active
+title: "Incomplete migration: file rename leaves callers stale"
 created: "2026-05-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 059: Incomplete migration: file rename leaves callers stale
+# Incomplete migration: file rename leaves callers stale
 
 **Context:** SDD-007 renamed GEMINI.md → AGY.md across the dotfiles project. Three separate cleanup PRs (#105, #108, #109) all post-merge found different surfaces still referencing the old name or stale assumptions.
 **Problem:** When migrating an identity file (X.md → Y.md), it's tempting to think the work is "rename the file in repo + deploy from new path". But the FILE rename touches 3 distinct surfaces that all need updating in lockstep:

@@ -1,13 +1,14 @@
 ---
-id: lesson-009-always-edit-the-repo-copy-never-the-deployed-syste
+id: "lesson-009-always-edit-the-repo-copy-never-the-deployed-syste"
 type: lesson
 status: active
+title: "Always edit the repo copy, never the deployed system copy"
 created: "2026-02-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 009: Always edit the repo copy, never the deployed system copy
+# Always edit the repo copy, never the deployed system copy
 
 **Context**: Adding an `obsidian --no-sandbox` alias to `.zshrc` and `.bashrc`
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-129-ci-gotchas-set-content-crlf-on-sh-and-repointing-t
+id: "lesson-129-ci-gotchas-set-content-crlf-on-sh-and-repointing-t"
 type: lesson
 status: active
+title: "CI gotchas: Set-Content CRLF on .sh, and repointing tests creates duplicate names"
 created: "2026-06-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 129: CI gotchas: Set-Content CRLF on .sh, and repointing tests creates duplicate names
+# CI gotchas: Set-Content CRLF on .sh, and repointing tests creates duplicate names
 
 **Context**: PR-C deleted files and edited tests via PowerShell Set-Content and bats edits.
 

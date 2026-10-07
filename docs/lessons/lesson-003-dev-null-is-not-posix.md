@@ -1,13 +1,14 @@
 ---
-id: lesson-003-dev-null-is-not-posix
+id: "lesson-003-dev-null-is-not-posix"
 type: lesson
 status: active
+title: "&>/dev/null is not POSIX"
 created: "2025-12-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 003: &>/dev/null is not POSIX
+# &>/dev/null is not POSIX
 
 **Context**: Scripts used `&>/dev/null` to suppress both stdout and stderr
 

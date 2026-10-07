@@ -1,13 +1,14 @@
 ---
-id: lesson-199-a-default-is-not-a-pin-the-model-that-reviewed-you
+id: "lesson-199-a-default-is-not-a-pin-the-model-that-reviewed-you"
 type: lesson
 status: active
+title: "A default is not a pin: the model that reviewed your code may not be the one you think"
 created: "2026-08-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 199: A default is not a pin: the model that reviewed your code may not be the one you think
+# A default is not a pin: the model that reviewed your code may not be the one you think
 
 **Context**: HARNESS-071 (#955). After making "adversarial reviews never run on an Anthropic model" a standing rule, the first non-Anthropic review was launched as bare `pi -p "<prompt>"`. It ran on `nan/deepseek-v4-flash`, which was the intended model, and `review.md`'s frontmatter recorded it — so the run looked like a successful pin.
 

@@ -1,6 +1,13 @@
-# Lesson 239 — Re-measure a filed bug on the current toolchain before implementing its fix
+---
+id: "lesson-239-re-measure-a-filed-bug-on-the-current-toolchain-before"
+type: lesson
+status: active
+title: "Re-measure a filed bug on the current toolchain before implementing its fix"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# Re-measure a filed bug on the current toolchain before implementing its fix
+
 **Context:** #912 (BUG-069, `core.hooksPath` in `C:/` form breaks hook execution) and #914 (WIN-006, hooks resolve WSL's bash) — both open, both claiming `git commit` fails on Windows.
 **Category:** git, windows, diagnosis, tickets
 

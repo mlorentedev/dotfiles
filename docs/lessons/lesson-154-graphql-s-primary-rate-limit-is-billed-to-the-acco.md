@@ -1,13 +1,14 @@
 ---
-id: lesson-154-graphql-s-primary-rate-limit-is-billed-to-the-acco
+id: "lesson-154-graphql-s-primary-rate-limit-is-billed-to-the-acco"
 type: lesson
 status: active
+title: "GraphQL's primary rate limit is billed to the account, not the token"
 created: "2026-08-06"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 154: GraphQL's primary rate limit is billed to the account, not the token
+# GraphQL's primary rate limit is billed to the account, not the token
 
 **Context**: `dotfiles#530` already documented an agent-side fallback (runbook §8a) for when the bitácora board's GraphQL pool runs dry: fall back to REST for issue data, degrade to waiting for the reset for board fields. `add-to-project.yml` and `bitacora-status.yml` kept failing anyway whenever an interactive Claude Code session ran a few full `gh project item-list` sweeps — three separate incidents across two days.
 

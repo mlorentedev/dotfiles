@@ -1,6 +1,13 @@
-# 259 - A justification outlives its mechanism as easily as a name outlives its contract, and the cleanup that taught us the first lesson left an instance of it
+---
+id: "lesson-259-a-justification-outlives-its-mechanism"
+type: lesson
+status: active
+title: "A justification outlives its mechanism as easily as a name outlives its contract, and the cleanup that taught us the first lesson left an instance of it"
+created: "2026-09-02"
+---
 
-**Date:** 2026-09-02
+# A justification outlives its mechanism as easily as a name outlives its contract, and the cleanup that taught us the first lesson left an instance of it
+
 **Area:** setup scripts, doctor, technical debt
 
 ## What happened

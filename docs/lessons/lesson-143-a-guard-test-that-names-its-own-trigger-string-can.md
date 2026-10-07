@@ -1,13 +1,14 @@
 ---
-id: lesson-143-a-guard-test-that-names-its-own-trigger-string-can
+id: "lesson-143-a-guard-test-that-names-its-own-trigger-string-can"
 type: lesson
 status: active
+title: "A guard test that names its own trigger string can match itself once tracked"
 created: "2026-07-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 143: A guard test that names its own trigger string can match itself once tracked
+# A guard test that names its own trigger string can match itself once tracked
 
 **Context**: GUARD-002 (#669) added `tests/sensitive-hygiene.bats`, asserting `git grep -l "docs/SECRETS.md"` returns no matches, to catch a future resurrection of a dead doc reference.
 

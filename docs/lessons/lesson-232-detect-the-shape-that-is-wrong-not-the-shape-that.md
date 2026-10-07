@@ -1,6 +1,13 @@
-# Lesson 232 — detect the shape that is wrong, not the shape that is merely absent
+---
+id: "lesson-232-detect-the-shape-that-is-wrong-not-the-shape-that"
+type: lesson
+status: active
+title: "Detect the shape that is wrong, not the shape that is merely absent"
+created: "2026-08-26"
+---
 
-**Date:** 2026-08-26
+# Detect the shape that is wrong, not the shape that is merely absent
+
 **Context:** HARNESS-067 / #902 — the model-pin drift guard.
 **Category:** guards, false positives, registries
 

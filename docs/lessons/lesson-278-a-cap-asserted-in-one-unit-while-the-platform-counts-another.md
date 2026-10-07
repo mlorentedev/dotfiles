@@ -1,13 +1,14 @@
 ---
-id: lesson-278
+id: "lesson-278-a-cap-asserted-in-one-unit-while-the-platform-counts-another"
 type: lesson
 status: active
+title: "A cap asserted in one unit while the payload overflowed in another"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, harness, doctrine, measurement, units, guard]
 ---
 
-# 278 — A cap asserted in one unit while the payload overflowed in another
+# A cap asserted in one unit while the payload overflowed in another
 
 ## What happened
 

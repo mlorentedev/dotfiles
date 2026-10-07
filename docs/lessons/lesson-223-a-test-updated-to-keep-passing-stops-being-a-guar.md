@@ -1,6 +1,13 @@
-# Lesson 223 — A test updated to keep passing stops being a guard
+---
+id: "lesson-223-a-test-updated-to-keep-passing-stops-being-a-guar"
+type: lesson
+status: active
+title: "A test updated to keep passing stops being a guard"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# A test updated to keep passing stops being a guard
+
 **Area:** guards / deploy / harness
 **Severity:** medium — a permanent red check whose printed remedy cannot clear it
 

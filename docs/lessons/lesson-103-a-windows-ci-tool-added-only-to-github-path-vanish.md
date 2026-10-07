@@ -1,13 +1,14 @@
 ---
-id: lesson-103-a-windows-ci-tool-added-only-to-github-path-vanish
+id: "lesson-103-a-windows-ci-tool-added-only-to-github-path-vanish"
 type: lesson
 status: active
+title: "A Windows CI tool added only to $GITHUB_PATH vanishes when setup-windows rebuilds PATH from the registry"
 created: "2026-06-17"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 103: A Windows CI tool added only to $GITHUB_PATH vanishes when setup-windows rebuilds PATH from the registry
+# A Windows CI tool added only to $GITHUB_PATH vanishes when setup-windows rebuilds PATH from the registry
 
 **Context**: BUG-025 (#425) replaced `choco install age.portable` in the `test-windows` job with a deterministic download of the pinned `age` release, wired onto PATH via `$GITHUB_PATH`, to kill the chocolatey-shim PATH-propagation flake (sibling of the `eza`/`zoxide` flake BUG-024).
 

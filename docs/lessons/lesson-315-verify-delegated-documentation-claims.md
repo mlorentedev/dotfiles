@@ -1,13 +1,14 @@
 ---
-id: lesson-315
+id: "lesson-315-verify-delegated-documentation-claims"
 type: lesson
 status: active
+title: "A subagent's documentation summary is a claim: check it against what is observable locally before acting on it"
 created: "2026-09-24"
 owner: manu
 tags: [lesson, verification, subagents, claude-code, delegation]
 ---
 
-# 315 — A subagent's documentation summary is a claim: check it against what is observable locally before acting on it
+# A subagent's documentation summary is a claim: check it against what is observable locally before acting on it
 
 ## What happened
 

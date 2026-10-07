@@ -1,13 +1,14 @@
 ---
-id: lesson-133-on-windows-bash-from-path-is-the-system32-wsl-laun
+id: "lesson-133-on-windows-bash-from-path-is-the-system32-wsl-laun"
 type: lesson
 status: active
+title: "On Windows, `bash` from PATH is the System32 WSL launcher, not Git Bash — resolve the real interpreter before shelling out"
 created: "2026-06-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 133: On Windows, `bash` from PATH is the System32 WSL launcher, not Git Bash — resolve the real interpreter before shelling out
+# On Windows, `bash` from PATH is the System32 WSL launcher, not Git Bash — resolve the real interpreter before shelling out
 
 **Context**: `dotf mem session-start` ports `session-brief.sh` (HARNESS-026) and shells out to `vault-health.sh` via Go. The first cut used a bare `exec.Command("bash", script)` (the faithful port of the shell's `bash "$vault_health"`). It worked on Linux/macOS but on Windows the vault-health step failed with `execvpe(/bin/bash) failed: No such file or directory` (#629).
 

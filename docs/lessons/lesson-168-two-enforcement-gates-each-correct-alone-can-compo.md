@@ -1,13 +1,14 @@
 ---
-id: lesson-168-two-enforcement-gates-each-correct-alone-can-compo
+id: "lesson-168-two-enforcement-gates-each-correct-alone-can-compo"
 type: lesson
 status: active
+title: "Two enforcement gates, each correct alone, can compose into a state no change can satisfy"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 168: Two enforcement gates, each correct alone, can compose into a state no change can satisfy
+# Two enforcement gates, each correct alone, can compose into a state no change can satisfy
 
 **Context**: `check-spec-gate.sh` runs a Discipline Gate (a large diff must touch an **active** `specs/<id>/`) and an archive-on-merge check (a PR closing an issue must **archive** that issue's spec). `#397` had hardened the first against archive-moves; `#767` later made archive-moves mandatory.
 

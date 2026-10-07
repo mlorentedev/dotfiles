@@ -1,13 +1,14 @@
 ---
-id: lesson-019-s-is-not-posix-use-space-in-bash-regex
+id: "lesson-019-s-is-not-posix-use-space-in-bash-regex"
 type: lesson
 status: active
+title: "\\s is not POSIX — use `[[:space:]]` in bash regex"
 created: "2026-03-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 019: \s is not POSIX — use `[[:space:]]` in bash regex
+# \s is not POSIX — use `[[:space:]]` in bash regex
 
 **Context**: `utils.sh` used `\s` in `[[ =~ ]]` regex patterns inside `load_env_file()` and `debug_print_env()`.
 

@@ -1,6 +1,13 @@
-# Lesson 230 — A config that parses is not a config the consumer reads
+---
+id: "lesson-230-a-config-that-parses-is-not-a-config-the-consumer-re"
+type: lesson
+status: active
+title: "A config that parses is not a config the consumer reads"
+created: "2026-08-24"
+---
 
-**Date:** 2026-08-24
+# A config that parses is not a config the consumer reads
+
 **Context:** CLI-042 PR E (#1190) — wiring the NaN credential into hive's daemon.
 
 ## What happened

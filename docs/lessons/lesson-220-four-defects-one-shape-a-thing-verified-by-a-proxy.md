@@ -1,6 +1,13 @@
-# Lesson 220 — Four defects, one shape: a thing verified by a proxy that lives somewhere else
+---
+id: "lesson-220-four-defects-one-shape-a-thing-verified-by-a-proxy"
+type: lesson
+status: active
+title: "Four defects, one shape: a thing verified by a proxy that lives somewhere else"
+created: "2026-08-22"
+---
 
-**Date:** 2026-08-22
+# Four defects, one shape: a thing verified by a proxy that lives somewhere else
+
 **Context:** A session that shipped the model-tier and capability renders (#1165, #1172) and then spent most of its length fixing the review machinery around them.
 
 ## What happened

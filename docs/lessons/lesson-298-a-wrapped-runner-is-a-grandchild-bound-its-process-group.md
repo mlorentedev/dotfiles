@@ -1,13 +1,14 @@
 ---
-id: lesson-298
+id: "lesson-298-a-wrapped-runner-is-a-grandchild-bound-its-process-group"
 type: lesson
 status: active
+title: "A wrapped runner is a grandchild: bound its process group"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, go, processes, signals, timeout, review]
 ---
 
-# 298 — A wrapped runner is a grandchild: bound its process group
+# A wrapped runner is a grandchild: bound its process group
 
 ## What happened
 

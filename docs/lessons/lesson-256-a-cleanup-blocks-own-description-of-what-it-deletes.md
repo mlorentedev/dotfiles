@@ -1,6 +1,13 @@
-# 256 - A cleanup block's own description of what it deletes is not evidence that the thing is dead
+---
+id: "lesson-256-a-cleanup-blocks-own-description-of-what-it-deletes"
+type: lesson
+status: active
+title: "A cleanup block's own description of what it deletes is not evidence that the thing is dead"
+created: "2026-09-02"
+---
 
-**Date:** 2026-09-02
+# A cleanup block's own description of what it deletes is not evidence that the thing is dead
+
 **Area:** setup scripts, harness, guards
 
 ## What happened

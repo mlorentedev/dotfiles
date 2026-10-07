@@ -1,6 +1,13 @@
-# Lesson 219 — A stale CLI refuses with the same exit status as a legitimate refusal
+---
+id: "lesson-219-a-stale-cli-refuses-with-the-same-exit-status-as-a"
+type: lesson
+status: active
+title: "A stale CLI refuses with the same exit status as a legitimate refusal"
+created: "2026-08-21"
+---
 
-**Date:** 2026-08-21
+# A stale CLI refuses with the same exit status as a legitimate refusal
+
 **Context:** Wiring `scripts/compile-harness.sh` to `dotf harness resolve-tier`, the first consumer
 of `harness/model-map.json` (HARNESS-076, #1161).
 
