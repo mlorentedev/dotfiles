@@ -14,7 +14,8 @@ import (
 )
 
 // toolsSyncRunner runs mise and the installed tools; nil means the real ones,
-// run from HOME. Tests replace it (lesson 335).
+// run from HOME, with `mise which` read from stdout only. Tests replace it
+// (lesson 335).
 var toolsSyncRunner tools.Runner
 
 func newToolsSyncCmd() *cobra.Command {
@@ -47,7 +48,8 @@ func newToolsSyncCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home(), os.Getenv), Run: syncRunner()}
+			run, stdout := syncRunners()
+			s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home(), os.Getenv), Run: run, Stdout: stdout}
 			if dryRun {
 				return printSyncPlan(cmd.OutOrStdout(), s, pins)
 			}
@@ -64,18 +66,22 @@ func newToolsSyncCmd() *cobra.Command {
 	return c
 }
 
-func syncRunner() tools.Runner {
+// syncRunners returns the merged-output runner and the stdout-only one, both
+// run from HOME so a project mise.toml in the caller's directory is not
+// installed as a side effect of a machine-level sync.
+func syncRunners() (run, stdout tools.Runner) {
 	if toolsSyncRunner != nil {
-		return toolsSyncRunner
+		return toolsSyncRunner, nil
 	}
 	home := env.Home()
-	return func(name string, args ...string) ([]byte, error) {
+	command := func(name string, args ...string) *exec.Cmd {
 		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
-		// From HOME, so a project mise.toml in the caller's directory is not
-		// installed as a side effect of a machine-level sync.
 		c.Dir = home
-		return c.CombinedOutput()
+		return c
 	}
+	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
+	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
+	return run, stdout
 }
 
 func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {

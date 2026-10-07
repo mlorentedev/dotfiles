@@ -46,6 +46,12 @@ func ParseMiseTools(versionsConf []byte) ([]MiseTool, error) {
 		name := strings.ToLower(strings.ReplaceAll(strings.TrimSuffix(key, "_VERSION"), "_", "-"))
 		out = append(out, MiseTool{Name: name, Version: value})
 	}
+	if len(out) == 0 {
+		// A versions.conf with no marker (one deployed before the markers
+		// existed, say) would render an empty config over a converged one and
+		// report success.
+		return nil, fmt.Errorf("versions.conf has no %q pins: nothing to sync", MiseMarker)
+	}
 	sort.Slice(out, func(a, b int) bool { return out[a].Name < out[b].Name })
 	return out, nil
 }
@@ -79,7 +85,10 @@ func MiseConfigDir(home string, getenv func(string) string) string {
 // config: a hand-written config.toml keeps working beside it.
 type MiseSync struct {
 	ConfigDir string
-	Run       Runner // `mise ...` and `<tool> --version`; ExecRunner in production
+	Run       Runner // `mise install` and `<tool> --version`, stdout and stderr merged
+	// Stdout runs `mise which`, whose stdout alone is the path: a warning mise
+	// prints on stderr must not become part of it. Nil means Run.
+	Stdout Runner
 }
 
 // SyncPlan is what a sync would change.
@@ -141,7 +150,11 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 // runsAtPin resolves the tool through mise and runs it: an install is real
 // only when the binary executes and reports at least the pin (lesson 337).
 func (s MiseSync) runsAtPin(t MiseTool) bool {
-	out, err := s.Run("mise", "which", t.Name)
+	which := s.Stdout
+	if which == nil {
+		which = s.Run
+	}
+	out, err := which("mise", "which", t.Name)
 	path := strings.TrimSpace(string(out))
 	if err != nil || path == "" {
 		return false

@@ -165,3 +165,35 @@ func TestMiseConfigDir_FollowsMiseOwnResolution(t *testing.T) {
 		}
 	}
 }
+
+func TestParseMiseTools_RejectsAFileWithNoMarkers(t *testing.T) {
+	if _, err := ParseMiseTools([]byte("GO_VERSION=1.26.0\nAGE_VERSION=1.3.1\n")); err == nil || !strings.Contains(err.Error(), "nothing to sync") {
+		t.Fatalf("want an error for a versions.conf with no markers, got %v", err)
+	}
+}
+
+// mise prints warnings on stderr; only stdout is the path.
+func TestSync_ReadsTheToolPathFromStdoutOnly(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	merged := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" && args[0] == "which" {
+			return []byte("mise WARN  config not trusted\n/bin/age\n"), nil
+		}
+		if name == "/bin/age" {
+			return []byte("v1.3.1"), nil
+		}
+		return nil, nil
+	}
+	stdout := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" && args[0] == "which" {
+			return []byte("/bin/age\n"), nil
+		}
+		return nil, errors.New("unexpected")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: merged, Stdout: stdout}
+
+	p, err := s.Plan(tools)
+	if err != nil || len(p.Missing) != 0 {
+		t.Fatalf("want age at its pin through the stdout runner, got %+v, %v", p, err)
+	}
+}

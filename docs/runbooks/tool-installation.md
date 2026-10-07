@@ -22,7 +22,11 @@ How the tools this repository depends on reach a machine, and how to add one. No
 | PyPI tools (hive) | `uv tool` | `packages.json` | `dotf tools install` |
 | Tools with no cross-OS channel (git, gh, uv, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | the setup script for each OS | setup |
 
-The pin is a floor, not an exact match. An installed version at or above the pin is left alone, and nothing is downgraded (ADR-036 decision 1, ADR-041 decision 6).
+How a pin is read depends on the channel:
+
+- **Catalog pins** (`packages.json`) are floors. An installed version at or above the pin is left alone, and nothing is downgraded (ADR-036 decision 1, ADR-041 decision 6).
+- **mise pins** (`versions.conf` lines marked `# mise: cli`) are exact. They are the version mise activates, and the version a committed lock will reproduce (ADR-044). An older version is only activated when the pin itself is lowered in `versions.conf`, which is a reviewed change.
+- **A hand-written `~/.config/mise/config.toml`** pinning the same tool takes precedence over the synced file. Measured with mise 2026.10.3: a newer version pinned there is kept, and an older one makes `dotf tools sync` fail, naming the tool.
 
 `setup-linux.sh` still installs some CLIs from fixed URLs. Those blocks are #2013 row W2, removed once a `dotf` release carrying `tools sync` is the `DOTF_VERSION` pin.
 
