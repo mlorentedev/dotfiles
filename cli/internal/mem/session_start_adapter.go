@@ -33,15 +33,15 @@ const ClaudeJSONMinBytes = 10240
 // ClaudeContextInput injects every path/clock the adapter touches, so the assembly
 // is hermetically testable; the command wiring resolves them from the env-contract.
 type ClaudeContextInput struct {
-	Cwd          string        // hook stdin .cwd
-	Vault        string        // KNOWLEDGE_VAULT (VAULT_PATH)
-	ScriptsDir   string        // hosts vault-health.sh
-	Home         string        // $HOME — roots ~/.claude/projects/<encoded>/memory
-	ContractPath string        // env-contract.json; doctor-drift is gated on its presence
-	ClaudeJSON   string        // ~/.claude/.claude.json
-	ConfigPath   string        // session-start-config.json (SDD-004 thresholds)
-	Now          time.Time     // injected clock for staleness/temperature
-	DoctorQuick  func() string // returns `dotf doctor --quick` output; nil = skip
+	Cwd          string          // hook stdin .cwd
+	Vault        string          // KNOWLEDGE_VAULT (VAULT_PATH)
+	VaultHealth  VaultHealthFunc // nil skips the vault health section
+	Home         string          // $HOME — roots ~/.claude/projects/<encoded>/memory
+	ContractPath string          // env-contract.json; doctor-drift is gated on its presence
+	ClaudeJSON   string          // ~/.claude/.claude.json
+	ConfigPath   string          // session-start-config.json (SDD-004 thresholds)
+	Now          time.Time       // injected clock for staleness/temperature
+	DoctorQuick  func() string   // returns `dotf doctor --quick` output; nil = skip
 	// TriageQueue returns the pull requests awaiting a disposition, or an error
 	// when the question could not be answered. nil skips the section.
 	TriageQueue func() (string, error)
@@ -78,7 +78,7 @@ func ClaudeContext(in ClaudeContextInput) string {
 		ctx = vaultDetect(vaultRoot) + "\n\n" + ctx // prepend the headline + blank line
 	}
 
-	ctx += vaultHealth(vaultRoot, vaultName, in.ScriptsDir)
+	ctx += vaultHealth(vaultRoot, vaultName, in.VaultHealth)
 	ctx += memorySymlink(in.Cwd, in.Vault, in.Home)
 
 	memoryDir := memlink.ClaudeMemoryTarget(in.Home, in.Cwd)
