@@ -56,3 +56,16 @@ func TestCheckPathFiles_ChecksTheTargetOSsPathFile(t *testing.T) {
 		t.Errorf("GOOS=windows must check paths.ps1, not this host's paths.sh\n%s", buf.String())
 	}
 }
+
+// And the POSIX target checks paths.sh, whichever host runs it.
+func TestCheckPathFiles_ChecksPathsShForAPosixTarget(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "paths.ps1"), "# windows\n")
+	sys := newSys(map[string]string{"DOTFILES_DIR": dir, "HOME": t.TempDir()}, nil, nil)
+	sys.GOOS = "linux"
+	var buf bytes.Buffer
+	checkPathFiles(sys, &Config{ContractPath: filepath.Join(dir, "env-contract.json")}, capture(&buf))
+	if !strings.Contains(buf.String(), "paths.sh not generated") {
+		t.Errorf("GOOS=linux must check paths.sh, not paths.ps1\n%s", buf.String())
+	}
+}
