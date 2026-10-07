@@ -227,8 +227,10 @@ func (in *Installer) missingManager(t Tool) bool {
 }
 
 // installRelease provisions a github-release tool: download → verify sha256 →
-// place + chmod. A failure at any step leaves Dest untouched (the binary is
-// staged in a temp dir and only moved into place after verification passes).
+// stage and run the binary, which must report a version at or above the pin
+// (lesson 337) → place + chmod. A failure at any step leaves Dest untouched (the
+// binary is staged and only moved into place after both checks pass). A
+// platform with no asset is a skip, as Plan reports it.
 func (in *Installer) installRelease(t Tool) (Result, error) {
 	asset := t.AssetName(in.GOOS, in.GOARCH)
 	if asset == "" {

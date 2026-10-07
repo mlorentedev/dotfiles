@@ -165,6 +165,21 @@ func TestInstall_NoAssetForThisPlatformIsSkippedNotFailed(t *testing.T) {
 	}
 }
 
+// Plan and Install read the same tool the same way: no asset for the platform
+// is "unsupported" to the plan and a skip to the install, never an install
+// that then fails or a plan that promises one.
+func TestPlanAndInstallAgreeOnAPlatformWithNoAsset(t *testing.T) {
+	in := newTestInstaller(t, "", fakeRelease(t, "x", []byte("x"), false))
+	in.GOOS = "plan9"
+
+	if p := in.Plan(sopsTool()); p.Action != PlanUnsupported {
+		t.Errorf("plan: want %q, got %q", PlanUnsupported, p.Action)
+	}
+	if res, err := in.Install(sopsTool()); err != nil || res != Skipped {
+		t.Errorf("install: want a skip without an error, got %v, %v", res, err)
+	}
+}
+
 func TestExpectedChecksum_AcceptsSha256sumNameForms(t *testing.T) {
 	sums := filepath.Join(t.TempDir(), "SHASUMS256.txt")
 	content := "aaa  ./mise-v1-linux-x64\nbbb *mise-v1-macos-arm64\nccc  plain-asset\n"

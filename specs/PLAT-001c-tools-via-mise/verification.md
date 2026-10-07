@@ -11,7 +11,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] AC1 (goos/goarch key wins) -> T1a / tests `TestAssetName_PrefersGoosGoarchOverGoos`, `TestValidKey`, `TestLoad_RejectsAnUnknownAssetKey`
 - [x] AC2 (`./name`, `*name` checksum lines) -> T1a / test `TestExpectedChecksum_AcceptsSha256sumNameForms`
-- [x] AC3 (no asset is a skip, as the plan says) -> T1a / test `TestInstall_NoAssetForThisPlatformIsSkippedNotFailed`
+- [x] AC3 (no asset is a skip, as the plan says) -> T1a / tests `TestInstall_NoAssetForThisPlatformIsSkippedNotFailed`, `TestPlanAndInstallAgreeOnAPlatformWithNoAsset`
 - [ ] AC4 -> T1b (after the release carrying T1a is the `DOTF_VERSION` pin)
 - [ ] AC5, AC6 -> T2
 
