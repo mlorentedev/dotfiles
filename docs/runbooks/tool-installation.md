@@ -16,7 +16,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 
 | Tool class | Channel | Declared in | Converged by |
 |---|---|---|---|
-| Pinned single-binary CLIs (age, jq, shellcheck, bats, golangci-lint, direnv, zoxide, fzf, lazygit, herdr) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf` | `dotf tools sync` (spec PLAT-001c, not shipped yet) |
+| Pinned single-binary CLIs (age, jq, shellcheck, bats, golangci-lint, direnv, zoxide, fzf, lazygit, herdr) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync` (CLIs today; toolchains from Wave 3 of #2013) |
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
 | PyPI tools (hive) | `uv tool` | `packages.json` | `dotf tools install` |
@@ -24,7 +24,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 
 The pin is a floor, not an exact match. An installed version at or above the pin is left alone, and nothing is downgraded (ADR-036 decision 1, ADR-041 decision 6).
 
-`setup-linux.sh` still installs some CLIs from fixed URLs. Those blocks are #2013 row W2 and are removed once `dotf tools sync` lands.
+`setup-linux.sh` still installs some CLIs from fixed URLs. Those blocks are #2013 row W2, removed once a `dotf` release carrying `tools sync` is the `DOTF_VERSION` pin.
 
 ## Day to day
 
@@ -34,10 +34,26 @@ dotf tools install --dry-run    # what install would do, tool by tool
 dotf tools install              # converge every catalog tool
 dotf tools install sops         # one tool
 dotf tools version sops         # the version the tool on PATH reports
+dotf tools sync --dry-run       # the mise config and the CLIs sync would install
+dotf tools sync                 # install the pinned CLIs through mise
 dotf doctor                     # pins, drift and leftovers, per tool
 ```
 
 `install` checks each release asset against the release's checksum manifest. It then runs the staged binary before placing it: a binary that does not execute here, or that reports a version below the pin, is refused and nothing is placed (lesson 337). A tool with no asset for this OS/arch is skipped, with a message saying so, and does not fail the run.
+
+## Adding or bumping a CLI that mise installs
+
+Put the pin in `versions.conf` with the marker on the line before it:
+
+```sh
+# mise: cli
+LAZYGIT_VERSION=0.66.0
+```
+
+- **Name.** `NAME_VERSION` becomes mise's `name`, with underscores turned into hyphens (`GOLANGCI_LINT_VERSION` becomes `golangci-lint`). The short name must resolve to an aqua backend; check it with `mise registry | grep '^name '`.
+- **Marker placement.** The marker goes on its own line, never after the value. Every reader of this file (the shell, doctor, `setup-windows.ps1`) skips comment lines, but a trailing comment would be read as part of the version. A marker that is not followed by a `NAME_VERSION=<pin>` line makes `sync` fail.
+- **What sync writes.** `dotf tools sync` renders the marked pins into `~/.config/mise/conf.d/dotfiles.toml`; it honours `MISE_CONFIG_DIR` and `XDG_CONFIG_HOME`. That file is generated, so do not edit it. Sync never touches a hand-written `~/.config/mise/config.toml`; one that pins the same tools is a leftover for the doctor check of #2013 row T3.
+- **Verification.** After `mise install`, every tool must resolve through `mise which` and report a version at or above its pin, or sync fails naming it. Sync does not go through PATH, which only gains the mise shims with #2013 row W2b; until then, run a tool with `mise exec -- <tool>`.
 
 ## Adding a GitHub-release tool to the catalog
 
