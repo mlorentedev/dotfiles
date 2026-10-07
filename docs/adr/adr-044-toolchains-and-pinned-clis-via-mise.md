@@ -1,0 +1,87 @@
+---
+id: "ADR-044-toolchains-and-pinned-clis-via-mise"
+type: adr
+status: accepted
+owner: manu
+date: "2026-10-06"
+supersedes: []
+extends: [adr-036-install-channels, adr-020-tooling-cli-go-convergence, adr-041-update-channels-and-convergence-order]
+issue: mlorentedev/dotfiles#2013
+tags: [architecture, decision, tooling, install, toolchains, mise, macos, cross-os]
+created: "2026-10-06"
+---
+
+# ADR-044: Toolchains and pinned CLIs install through mise; `dotf` orchestrates and verifies
+
+## Context
+
+The first `dotf doctor` run on a factory-fresh macOS arm64 machine (2026-10-05, ledger on #2013) failed on the toolchain model itself, not on a missing package:
+
+- **F-003.** Java, Maven, Python, Go and Minikube are expected as tarballs unpacked into `~/Applications/<tool>-<ver>`, with a `*_HOME` variable per tool. That layout is a Linux convention that `setup-linux.sh` hand-rolls. Nothing installs it on macOS, and `setup-windows.ps1` carries a second, different implementation.
+- **F-041.** On macOS `~/Applications` is a real system folder, and a `JAVA_HOME` that points at a directory that does not exist breaks `/usr/bin/java`, which is a stub that reads `JAVA_HOME`.
+- **F-030.** Five CLIs (age, eza, jq, gh, shellcheck) are downloaded from hard-coded `linux-amd64` URLs. On any other OS or architecture, setup reports SUCCESS and leaves binaries that cannot execute. W1 (#2014) made `dotf tools install` refuse such a binary, but the shell blocks are outside the catalog.
+
+ADR-036 gave each tool class one install channel, and the `github-release` source type in `packages.json` covers static binaries. It has three gaps for this job:
+
+- It has no notion of a toolchain: a JDK or a Python is a tree, not one binary.
+- Every new tool needs a hand-written per-OS/arch asset map.
+- It has no lock file, so two machines with the same pin can still install different bytes when an upstream re-publishes an asset.
+
+Research for #2013 (epic comment *Toolchain research*) compared five managers against three hard requirements: native Windows, pinning with a lock, and verified provenance.
+
+| Manager | Native Windows | Lock with per-platform checksums | Verified provenance | Result |
+|---|---|---|---|---|
+| mise | yes | `mise.lock` (URL + checksum per platform), `--locked` | aqua backend: cosign / SLSA / GitHub attestations | **chosen** |
+| Homebrew | no | no (the Brewfile lock was removed by design) | bottles only | rejected as a toolchain channel (it cannot pin) |
+| asdf | no | no | no | rejected |
+| SDKMAN | no | no | no | rejected |
+| Nix | no | yes | yes | rejected (no native Windows) |
+
+## Decision
+
+1. **mise installs toolchains and pinned CLIs on every OS.**
+   - Toolchains: Java (`temurin-21`; the vendor is always named), Go, Python (mise's python-build-standalone), Maven (aqua), Node.
+   - Pinned CLIs through the aqua backend, which verifies checksums and, where upstream publishes them, attestations: age, zoxide, shellcheck, jq, bats, golangci-lint, sops, direnv, fzf, herdr, lazygit.
+   - eza has no aqua entry and no macOS release asset. It goes through `vfox:jdx/vfox-eza` if that works on all three OSes, otherwise it is a class-3 tool on darwin (ADR-036 decision 1).
+2. **`dotf` orchestrates and verifies; mise does not decide.**
+   - `versions.conf` stays the source of truth for pins. `dotf tools sync` renders the global mise config from it and runs `mise install --locked`.
+   - `mise.lock` is committed. CI regenerates it for linux-x64, macos-arm64 and windows-x64, so the lock never depends on the machine that last ran mise.
+   - mise's exit 0 is not trusted. Every tool is exec-probed after install (`mise which <tool>` plus `--version` at or above the pin), the post-condition W1 introduced for the catalog (lesson 337).
+3. **mise itself is a catalog tool.** It is a checksummed `github-release` entry in `packages.json`, not a brew formula and not mise's own curl installer. mise's documentation advises against package-manager installs that lag its release cadence. mise is date-versioned, so its entry carries a `min_version` floor.
+4. **ADR-036's classes after this ADR:**
+
+   | Tool class | Channel |
+   |---|---|
+   | toolchains and pinned single-binary CLIs | mise, rendered by `dotf tools sync` |
+   | node-distributed agents and CLIs | npm global, `packages.json` (unchanged) |
+   | PyPI-distributed tools | `uv tool`, `packages.json` (unchanged) |
+   | mise and `dotf` themselves | `github-release`, `packages.json` / the installers (ADR-041 decision 7) |
+   | tools with no cross-OS channel | OS package manager, class 3 (unchanged; what Homebrew may install on macOS beyond this ADR is #2013 D4, still proposed) |
+
+   uv keeps virtual environments and `uv tool`; mise does not manage Python packages.
+5. **Environment comes from mise, not from hand-written `*_HOME` blocks.** `mise activate` (bash, zsh, pwsh) sets `JAVA_HOME` and PATH in shells. `dotf` writes a static env file for GUI apps and IDEs, which do not run a shell rc. The shims directory is on PATH for non-interactive callers; without it, `dotf tools sync` succeeds and nothing is reachable, which is a new false success (W2b).
+6. **Rollout is split by risk.**
+   - Wave 1, every OS: the CLIs only. They land in a directory nothing else owns, so there is no legacy layout to collide with.
+   - Toolchains go to the Mac first, as the canary. It has no `~/Applications/<tool>-<ver>` installs, so nothing can break. Linux and Windows move only after the Mac has run `dotf doctor` clean.
+   - Windows Java via mise is undocumented upstream. A spike (T5) gates the Windows half; if it fails, the JDK stays a winget class-3 install on Windows and mise handles everything else.
+   - Legacy `~/Applications/<tool>-<ver>` installs are reported by doctor as leftovers, and removed only after the mise version passes its probe.
+
+## Consequences
+
+- The five hard-coded `linux-amd64` URL blocks and the tarball/`*_HOME` blocks leave both setup scripts (W2, T4). That is code removed from the twins, not ported into them (ADR-020 §5).
+- Doctor stops checking `~/Applications/<tool>-<ver>` and `*_HOME`. It compares `mise ls --json` with the pins and probes each tool (T3).
+- `packages.json` shrinks to npm, uv-tool and the two bootstrap binaries. A pin that moves to mise appears only in `versions.conf`, so ADR-036 decision 2 ("a catalog tool's version appears nowhere else") still holds, with `versions.conf` as the one place.
+- mise is a new runtime dependency on every machine. It is a single static binary with no daemon, installed and verified like any other catalog tool, and removable with its data directory.
+- `DX-007-orca-cli-bootstrap` is abandoned in the same change: Orca is retired in favour of herdr on every OS (#2013 D6), and herdr installs through mise under this ADR.
+
+## Alternatives rejected
+
+- **Extend `github-release` with toolchain support.** It reimplements a version manager inside `dotf` (archive layouts, per-vendor JDK naming, a lock format) for less coverage than mise has today.
+- **Homebrew for toolchains on macOS.** It cannot pin a version, and a macOS-only channel is the per-OS branching this epic removes.
+- **mise's own installer (`curl https://mise.run | sh`).** It is a second unverified shell pipe on a fresh machine; the catalog entry is checksummed and exec-probed by the same code as every other tool.
+
+## References
+
+- Epic #2013 (decisions D3, D7; rows T0 to T6, W2, W2b), ledger F-003, F-030, F-041, F-056.
+- ADR-020, ADR-036, ADR-041; lesson 337 (a checksum proves the bytes, not that they run here).
+- mise documentation: `mise.jdx.dev/dev-tools/mise-lock.html`, `/installing-mise.html`, `/dev-tools/backends/aqua.html`, `/lang/java.html`.

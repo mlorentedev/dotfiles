@@ -84,3 +84,7 @@ deletes their MCP loops.
 ## Amendment 2026-09-30 (ADR-041, #1843)
 
 `dotf` itself gains a second channel for its own binary: `stable`, the pinned release, and `edge`, the newest tested build of `main` (ADR-041). The pin is a floor on both: convergence never downgrades an installed build, and only an explicit `dotf self-update --version` goes down.
+
+## Amendment 2026-10-06 (ADR-044, #2013)
+
+Toolchains (Java, Go, Python, Maven, Node) and the pinned single-binary CLIs (age, zoxide, shellcheck, jq, bats, golangci-lint, sops, direnv, fzf, herdr, lazygit) move to **mise**, rendered from `versions.conf` by `dotf tools sync` and installed with `mise install --locked` against a committed `mise.lock` (ADR-044). The `github-release` source type keeps the two bootstrap binaries, mise and `dotf`. The npm, uv-tool and class-3 rows are unchanged; mise replaces Homebrew as a toolchain channel on macOS, and what Homebrew may still install there is #2013 D4, still proposed. A pin that moves to mise lives only in `versions.conf`, so decision 2 still holds with that file as the single place.
