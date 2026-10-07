@@ -152,3 +152,19 @@ func TestCheckDeployManifest_ByStatus(t *testing.T) {
 		}
 	})
 }
+
+// checkTmux no longer compares ~/.tmux.conf: the `tmux` deploy entry owns it
+// and this check is the only thing that would report its drift. So the guard is
+// on the shipped manifest, end to end: a ~/.tmux.conf that differs from the
+// repo's tmux.conf is a drift WARN naming `dotf deploy tmux`. Without the entry
+// (or if the check were gated behind something that skips it) doctor would
+// silently stop reporting tmux.conf drift on every OS.
+func TestCheckDeployManifest_ReportsTmuxConfDriftFromTheShippedManifest(t *testing.T) {
+	repo, home := repoRootForDoctorTest(t), t.TempDir()
+	writeFile(t, filepath.Join(home, ".tmux.conf"), "DIFFERENT\n")
+
+	out := runCheckDeployManifest(t, repo, home, []string{"tmux"})
+	if got := statusOfLine(out, "drift: tmux "); got != StatusWarn {
+		t.Errorf("a differing ~/.tmux.conf must be a drift WARN from the shipped manifest: got %v\n%s", got, out)
+	}
+}
