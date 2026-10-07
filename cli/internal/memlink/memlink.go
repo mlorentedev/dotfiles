@@ -119,12 +119,17 @@ func ClaudeMemoryTarget(home, cwd string) string {
 	return filepath.Join(home, ".claude", "projects", ClaudeProjectKey(cwd), "memory")
 }
 
-// resolveVaultMemory finds the vault memory source for a project via the three
+// resolveVaultMemory finds the vault memory source for a project via the
 // conventions in precedence order, returning "" when none resolves to a real dir.
 // This is the agent- and OS-agnostic core shared by every caller.
 func resolveVaultMemory(cwd, project, vault string) string {
 	// 1) 10_projects/<project>/memory (personal projects convention).
 	if vm := filepath.Join(vault, "10_projects", project, "memory"); isDir(vm) {
+		return vm
+	}
+	// 1b) the vault project whose context.md repo_url names this repo, for a repo
+	// checked out under a different name than its vault slug (#2022).
+	if vm := resolveByRepoURL(project, vault); vm != "" {
 		return vm
 	}
 	// 2) <cwd>/memory when CWD is inside the vault itself.
@@ -135,6 +140,55 @@ func resolveVaultMemory(cwd, project, vault string) string {
 	}
 	// 3) 50_work/45-development/<family>/<component>/memory (nested work-SDK repos).
 	return resolveWorkSDK(cwd, vault)
+}
+
+// resolveByRepoURL returns 10_projects/<slug>/memory for the single vault project
+// whose context.md frontmatter repo_url ends in repo (".git" optional). Two
+// projects claiming the same repo resolve to nothing rather than to a guess: doctor
+// reports SKIP until an agent writes a real memory dir there, then WARNs on it,
+// whereas a link into the wrong project would never be reported at all.
+func resolveByRepoURL(repo, vault string) string {
+	contexts, _ := filepath.Glob(filepath.Join(vault, "10_projects", "*", "context.md"))
+	match := ""
+	for _, ctx := range contexts {
+		if repoURLName(ctx) != repo {
+			continue
+		}
+		if match != "" {
+			return ""
+		}
+		match = filepath.Join(filepath.Dir(ctx), "memory")
+	}
+	if match != "" && isDir(match) {
+		return match
+	}
+	return ""
+}
+
+// repoURLName reads the repo_url field from a note's leading frontmatter block and
+// returns the repository name it ends in, or "" when the field is absent. A block
+// with no closing delimiter is not frontmatter, so a body line can never match.
+func repoURLName(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if strings.TrimSpace(lines[0]) != "---" {
+		return ""
+	}
+	name := ""
+	for _, line := range lines[1:] {
+		if strings.TrimSpace(line) == "---" {
+			return name
+		}
+		if v, ok := strings.CutPrefix(line, "repo_url:"); ok && name == "" {
+			v, _, _ = strings.Cut(v, " #") // a trailing YAML comment
+			url := strings.TrimSuffix(strings.Trim(strings.TrimSpace(v), `"'`), "/")
+			name = strings.TrimSuffix(url[strings.LastIndexAny(url, "/:")+1:], ".git")
+		}
+	}
+	return ""
 }
 
 // resolveWorkSDK matches CWD path segments against vault family/component dir slugs,
