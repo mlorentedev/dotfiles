@@ -375,5 +375,6 @@ tags: [lessons, index, dotfiles]
 | [355 - After a squash merge, ask the merged head by containment](lesson-355-after-a-squash-merge-ask-the-merged-head-by-containment.md) | 2026-10-07 |
 | [356 - A required check is only as required as its needs](lesson-356-a-required-check-is-only-as-required-as-its-needs.md) | 2026-10-07 |
 | [357 - A pull request closed after a force-push reopens only at its old head](lesson-357-a-pull-request-closed-after-a-force-push-reopens-only-at-its-old-head.md) | 2026-10-07 |
+| [358 - A mode convergence must only narrow](lesson-358-a-mode-convergence-must-only-narrow.md) | 2026-10-07 |
 | [359 - A gate must read every input the platform acts on](lesson-359-a-gate-must-read-every-input-the-platform-acts-on.md) | 2026-10-07 |
 <!-- END GENERATED -->

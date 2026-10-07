@@ -24,7 +24,9 @@ import (
 // command is absent (deploy skips it too, and a row for a tool the box does
 // not carry is a WARN no remedy can clear — #843). Drift is a WARN, not a
 // FAIL: a tool that co-owns its file (Copilot's `/model` writes `model`) may
-// legitimately have moved a managed key, and the remedy is one command.
+// legitimately have moved a managed key, and the remedy is one command. A file
+// whose content is in sync but whose mode deploy would fix is drift too, from
+// deploy.ModeDrift, the predicate deploy runs (#1664).
 //
 // It also reports a directory the manifest deploys a private file into that
 // is open to group or others (checkPrivateDeployDirs), which --fix tightens.
@@ -67,6 +69,15 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 			case !pathExists(dst):
 				rep.Warn(fmt.Sprintf("%s: %s not deployed (run: dotf deploy %s)", c.Name, dst, c.Name))
 				drifted++
+			case isSymlink(dst):
+				// Deploy renames a regular file over the link (#2054); its
+				// target's mode is not the question.
+				rep.Warn(fmt.Sprintf("drift: %s — %s is a symlink, not the file %s deploys (run: dotf deploy %s)", c.Name, dst, c.Src, c.Name))
+				drifted++
+			case warnModeDrift(rep, c, dst):
+				// The mode needs no render to read, and deploy fixes it on
+				// this path too.
+				drifted++
 			default:
 				notCompared++
 			}
@@ -90,12 +101,47 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 			drifted++
 			continue
 		}
+		if p.ModeDrift {
+			mode, _ := c.FileMode() // PlanConfig has already parsed it
+			rep.Warn(modeDriftLine(c.Name, p.Dst, mode))
+			drifted++
+			continue
+		}
 		inSync++
 	}
 	if drifted == 0 {
 		rep.Pass(fmt.Sprintf("%d deployed config(s) in sync with %s (%d not compared: rendered, or tool absent)", inSync, deploy.ManifestRel, notCompared))
 	}
 	checkPrivateDeployDirs(sys, man, rep, fix)
+}
+
+// warnModeDrift reports a rendered destination whose mode deploy would fix,
+// through the same predicate deploy uses (deploy.ModeDrift), and says whether
+// it did.
+func warnModeDrift(rep *Report, c deploy.Config, dst string) bool {
+	mode, err := c.FileMode()
+	if err != nil {
+		rep.Warn(fmt.Sprintf("%s: %v", c.Name, err))
+		return true
+	}
+	_, drift, err := deploy.ModeDrift(dst, mode)
+	switch {
+	case err != nil:
+		rep.Warn(fmt.Sprintf("%s: mode on %s: %v (run: dotf deploy %s)", c.Name, dst, err, c.Name))
+		return true
+	case drift:
+		rep.Warn(modeDriftLine(c.Name, dst, mode))
+		return true
+	}
+	return false
+}
+
+// modeDriftLine names the mode deploy sets, not "too open": the predicate also
+// fires for a missing owner bit and, on Windows, for an inherited DACL. The
+// declared mode is a reference, not the target: a file tightened below it
+// converges to its narrowed form (deploy.ModeDrift).
+func modeDriftLine(name, dst string, mode os.FileMode) string {
+	return fmt.Sprintf("drift: %s — %s does not carry the mode dotf deploy sets (declared %04o) (run: dotf deploy %s)", name, dst, mode.Perm(), name)
 }
 
 // checkPrivateDeployDirs reports a directory that holds a private deployed file
