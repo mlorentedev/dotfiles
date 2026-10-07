@@ -78,6 +78,13 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 			drifted++
 			continue
 		}
+		if p.Symlink {
+			// Its bytes may match: name the link, or the operator diffs two
+			// identical files and stops trusting the line (#2054).
+			rep.Warn(fmt.Sprintf("drift: %s — %s is a symlink, not the file %s deploys (run: dotf deploy %s)", c.Name, p.Dst, c.Src, c.Name))
+			drifted++
+			continue
+		}
 		if p.Changed {
 			rep.Warn(fmt.Sprintf("drift: %s — %s is not what %s deploys (run: dotf deploy %s)", c.Name, p.Dst, c.Src, c.Name))
 			drifted++

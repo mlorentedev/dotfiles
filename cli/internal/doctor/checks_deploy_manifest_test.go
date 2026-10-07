@@ -293,3 +293,21 @@ func TestCheckDeployManifest_IgnoresAPrivateEntryThatDoesNotApplyHere(t *testing
 		t.Errorf("an entry that does not apply here must not mark its directory\n%s", buf.String())
 	}
 }
+
+// #2054: a link at a deployed path is drift even when it resolves to the
+// source's bytes, and the WARN names the link rather than a content difference.
+func TestCheckDeployManifest_ASymlinkedDestinationIsDriftNamedAsALink(t *testing.T) {
+	repo, home := deployManifestRepo(t), t.TempDir()
+	writeFile(t, filepath.Join(home, ".m", "settings.json"), `{"model":"m","autoUpdate":false}`)
+	if err := os.MkdirAll(filepath.Join(home, ".r"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(repo, "ai", "r.json"), filepath.Join(home, ".r", "config.json")); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+
+	out := runCheckDeployManifest(t, repo, home, nil)
+	if got := statusOfLine(out, "is a symlink"); got != StatusWarn {
+		t.Errorf("want a WARN naming the symlink, got %v\n%s", got, out)
+	}
+}
