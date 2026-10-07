@@ -587,3 +587,63 @@ func TestThreadKeyForCwdFailsWhenTheWorkingDirectoryIsGone(t *testing.T) {
 		t.Errorf("an error came with key %q; a caller that ignores the error must not get a usable key", key)
 	}
 }
+
+// setOriginHead records the remote's default branch the way `git clone` does,
+// in the common git dir of the repository root returned by the fixtures.
+func setOriginHead(t *testing.T, commonDir, branch string) {
+	t.Helper()
+	dir := filepath.Join(commonDir, "refs", "remotes", "origin")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "HEAD"), []byte("ref: refs/remotes/origin/"+branch+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// MEMORY-013 (#1921): the ambient branch is the remote's default, not only the
+// two names hardcoded before. A repository whose default is `develop` used one
+// key on every machine, and two machines overwrote each other's handoff.
+func TestThreadKeyQualifiesTheRemotesDefaultBranchWithTheHost(t *testing.T) {
+	host := "@" + shortHost()
+	for _, tc := range []struct {
+		name, branch, originHead string
+		linked, qualified        bool
+	}{
+		{"main, no origin HEAD", "main", "", false, true},
+		{"master, origin HEAD develop", "master", "develop", false, true},
+		{"develop as the default, main checkout", "develop", "develop", false, true},
+		{"trunk as the default, linked worktree", "trunk", "trunk", true, true},
+		{"develop when the default is main", "develop", "main", true, false},
+		{"a feature branch", "feat/x", "develop", true, false},
+		{"a slashed default", "release/1.2", "release/1.2", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cwd, common string
+			if tc.linked {
+				cwd = gitFixture(t, "proj", "wt", tc.branch)
+				raw, err := os.ReadFile(filepath.Join(cwd, ".git"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				gitdir := strings.TrimSpace(strings.TrimPrefix(string(raw), "gitdir:"))
+				common = filepath.Dir(filepath.Dir(gitdir))
+			} else {
+				cwd = mainFixture(t, "proj", tc.branch)
+				common = filepath.Join(cwd, ".git")
+			}
+			if tc.originHead != "" {
+				setOriginHead(t, common, tc.originHead)
+			}
+			got := ThreadKey(cwd)
+			if qualified := strings.HasSuffix(got, host); qualified != tc.qualified {
+				t.Errorf("ThreadKey = %q; host-qualified = %v, want %v", got, qualified, tc.qualified)
+			}
+			// The key is a filename component: no derived default may put a
+			// separator in it.
+			if strings.ContainsAny(got, `/\`) {
+				t.Errorf("ThreadKey = %q carries a path separator", got)
+			}
+		})
+	}
+}
