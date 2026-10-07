@@ -48,6 +48,19 @@ created: "2026-10-06"
 
 - [ ] Commit `mise.lock` and install with `--locked`. Measured 2026-10-06: mise keeps one lockfile for the whole global config, and `--locked` fails when any configured tool (the Mac's hand-written `config.toml`) is missing from it, so the lock lands when `conf.d/dotfiles.toml` is the only tools config (comment on #2013). The aqua backend already verifies each asset's checksum and attestation
 
+### P5a — `source.type: system`, reader only (this PR)
+
+> Tests first, each failing before its implementation. The release constraint: no `system` entry ships in `packages.json` here (#2013 P5b follows the release that carries this reader).
+
+- [x] [AC8] Failing tests, then `Load` validation: a `system` entry with no `apt`/`brew`/`winget`, with an unknown key, or with a `version` is an error naming the entry
+- [x] [AC7] Failing test, then `SupportsOS`: a `system` entry with no name for this OS is skipped by `Install` with a message and reported `unsupported` by `Plan`
+- [x] [AC7] Failing tests, then `Install`: the exact argv per manager (apt as root and through sudo, brew, winget), run through the injected runner; no manager on PATH is a skip naming it
+- [x] [AC7] Failing test, then the second run: a package the manager (or the declared command) reports is skipped and no manager command runs; a manager that exits 0 without installing the package is an error
+- [x] [AC7] Failing test, then `Plan`: install, skip and missing-manager rows, never upgrade; `tools list` shows `apt:`/`brew:`/`winget:` names
+- [x] [AC8] Failing test, then `Install` of an unknown source type: a skip with a warning, exit 0; `Plan` still says `unsupported`
+- [x] Runbook `tool-installation.md` names the type; `packages.json` documents it in a `$comment`, with no entry added
+- [x] Mutation check: invert the presence skip and confirm the second-run test goes red
+
 ### W2b — shims on PATH (after #2013 P6/P7)
 
 - [ ] `mise activate` in the rc files, the shims directory for non-interactive callers, and a doctor check

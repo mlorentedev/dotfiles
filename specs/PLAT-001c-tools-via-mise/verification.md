@@ -15,6 +15,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC4 -> T1b (after the release carrying T1a is the `DOTF_VERSION` pin)
 - [x] AC5 (sync renders, installs, probes, is idempotent) -> T2 / tests `TestSync_*`, `TestParseMiseTools_*`, `TestToolsSync_*`; on the Mac, `dotf tools sync` installed six CLIs and a second run reported nothing to do
 - [x] AC6 -> T2b / tests `TestToolsSync_PlanThenApplyThenNothingToDo`, `TestToolsSync_WithoutMiseIsASkipNamingTheRemedy`, `TestToolsSync_UnwiredRunnersAreASkipNotARealRun`, `TestRun_AReconcilerSkipIsReportedAndNotProbed`; on the Mac `dotf converge` reports `tools [ OK ] 9 pinned CLI(s) at their pin`
+- [x] AC7 (system entry through the OS manager) -> P5a / tests `TestInstallSystem_*`, `TestPlanSystem_NeverRuns`, `TestPlanToolsInstall_SystemRows`; mutation (skip of a present package disabled) turned `TestInstallSystem_SecondRunRunsNothing` and `TestInstallSystem_PresenceRule` red. No real apt, brew or winget runs in any test; the first real run waits for P5b entries
+- [x] AC8 (malformed system entries rejected, unknown type skipped) -> P5a / tests `TestLoad_RejectsMalformedSystemEntries`, `TestInstall_UnknownSourceTypeIsSkippedNotFailed`, `TestInstallAll_UnknownTypeDoesNotFailTheRun`
 
 ## Test status
 
@@ -23,6 +25,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Manual run (T2): `dotf tools sync` -> wrote `conf.d/dotfiles.toml`, installed age, direnv, fzf, jq, lazygit, zoxide, `9 tool(s) at their pin`; second run -> `nothing to do`; each tool's `--version` through `mise which` matches its pin
 - Manual smoke test (T1a): `go run ./cmd/dotf tools list` loads the repo catalog under the new key validation
 - No regressions: yes. `TestInstall_UnsupportedOS` asserted the opposite of AC3 (an error for a missing asset) and is replaced by the AC3 test
+- Test suite (P5a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=darwin` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues
 
 ## Decisions made during implementation
 
