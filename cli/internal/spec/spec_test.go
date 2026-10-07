@@ -214,6 +214,37 @@ func TestGateClosedIssueFails(t *testing.T) {
 	}
 }
 
+// #1452: the gate asks REST, whose quota GraphQL's exhaustion does not touch,
+// and reads REST's lower-case state as open.
+func TestGateAsksRESTForTheIssueInItsHome(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("gh stub uses a POSIX shell script")
+	}
+	for _, tc := range []struct{ repo, path string }{
+		{"owner/name", "repos/owner/name/issues/42"},
+		{"", "repos/{owner}/{repo}/issues/42"},
+	} {
+		dir := t.TempDir()
+		argsFile := filepath.Join(dir, "args")
+		script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + shellQuote(argsFile) + "\nprintf 'open\\tMy open issue'\n"
+		if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", dir)
+		title, err := Gate(42, tc.repo)
+		if err != nil || title != "My open issue" {
+			t.Fatalf("repo %q: Gate = (%q, %v), want the title: REST reports state in lower case", tc.repo, title, err)
+		}
+		got, err := os.ReadFile(argsFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if args := strings.Split(strings.TrimSpace(string(got)), "\n"); len(args) < 2 || args[0] != "api" || args[1] != tc.path {
+			t.Errorf("repo %q: gh called with %q, want api %s", tc.repo, args, tc.path)
+		}
+	}
+}
+
 func TestGateMissingIssueFails(t *testing.T) {
 	stubGh(t, "", "gh: could not resolve issue", true)
 	if _, err := Gate(99999, ""); err == nil {
