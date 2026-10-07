@@ -394,6 +394,12 @@ func TestInstallerPlan(t *testing.T) {
 		{"uv-tool below the pin", "linux", "4.1.0", hiveTool(), PlanUpgrade},
 		{"uv-tool at the pin", "darwin", "4.2.2", hiveTool(), PlanSkip},
 		{"a platform the tool does not list", "windows", "", hiveTool(), PlanUnsupported},
+		// #1892: what Install refuses, the plan refuses, never install/upgrade/skip.
+		{"a release with no checksums file", "linux", "", noSums(release), PlanRefused},
+		{"a release with no checksums file, already at the pin", "linux", "3.13.1", noSums(release), PlanRefused},
+		{"a release with no checksums file and no build here is only unsupported", "windows", "", noSums(release), PlanUnsupported},
+		{"an npm source with no package", "linux", "", noPackage(npm), PlanRefused},
+		{"a uv-tool source with no package", "linux", "", noPackage(hiveTool()), PlanRefused},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -418,6 +424,58 @@ func TestInstallerPlan(t *testing.T) {
 				t.Errorf("Plan(%s) = %+v, want installed %q pin %q", tc.tool.Name, got, tc.installed, tc.tool.Version)
 			}
 		})
+	}
+}
+
+func noSums(t Tool) Tool {
+	t.Source.Checksums = ""
+	return t
+}
+
+func noPackage(t Tool) Tool {
+	t.Source.Package = ""
+	return t
+}
+
+// Plan and Install run one refusal check (#1892): every entry Plan refuses,
+// Install fails on with the same reason, before it fetches or runs anything.
+func TestPlanAndInstallRefuseTheSameEntries(t *testing.T) {
+	release := Tool{Name: "sops", Version: "3.13.1", Source: Source{
+		Type: "github-release", Repo: "getsops/sops",
+		Asset: map[string]string{"linux": "sops-v{version}.linux.{goarch}"},
+	}}
+	for _, tool := range []Tool{release, {Name: "bw", Version: "2026.9.0", Source: Source{Type: "npm"}}, noPackage(hiveTool())} {
+		t.Run(tool.Name, func(t *testing.T) {
+			in := &Installer{
+				GOOS: "linux", GOARCH: "amd64", Dest: t.TempDir(), Out: io.Discard,
+				CurrentVersion: func(string) string { return "" },
+				HasCommand:     func(string) bool { return true },
+				Fetch:          func(string, string) error { t.Fatal("a refused entry must not download"); return nil },
+				Run:            func(string, ...string) error { t.Fatal("a refused entry must not run a package manager"); return nil },
+			}
+			p := in.Plan(tool)
+			_, err := in.Install(tool)
+			if p.Action != PlanRefused || err == nil {
+				t.Fatalf("Plan = %+v, Install err = %v: want both to refuse", p, err)
+			}
+			if p.Note == "" || !strings.HasSuffix(err.Error(), p.Note) {
+				t.Errorf("Plan's note %q must be Install's reason %q", p.Note, err)
+			}
+		})
+	}
+}
+
+// An unsupported row says which of its two causes it is.
+func TestPlanSaysWhyAToolIsUnsupported(t *testing.T) {
+	release := Tool{Name: "sops", Version: "3.13.1", Source: Source{
+		Type: "github-release", Asset: map[string]string{"linux": "sops"}, Checksums: "sums",
+	}}
+	in := &Installer{GOOS: "windows", GOARCH: "arm64", Dest: t.TempDir(), CurrentVersion: func(string) string { return "" }}
+	if got := in.Plan(release).Note; got != "no release asset for windows/arm64" {
+		t.Errorf("no-asset note = %q", got)
+	}
+	if got := in.Plan(hiveTool()).Note; got != "not installed on windows by this catalog" {
+		t.Errorf("unlisted-platform note = %q", got)
 	}
 }
 

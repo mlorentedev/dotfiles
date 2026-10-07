@@ -164,6 +164,9 @@ func (in *Installer) Install(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s is not installed on %s by this catalog; skipping\n", t.Name, in.GOOS)
 		return Skipped, nil
 	}
+	if reason := in.refusal(t); reason != "" {
+		return Skipped, fmt.Errorf("%s: %s", t.Name, reason)
+	}
 	switch t.Source.Type {
 	case "github-release":
 		return in.installRelease(t)
@@ -190,7 +193,9 @@ const (
 	PlanInstall     PlanAction = "install"
 	PlanUpgrade     PlanAction = "upgrade"
 	PlanSkip        PlanAction = "skip"
-	PlanUnsupported PlanAction = "unsupported" // no release asset for this OS/arch
+	PlanUnsupported PlanAction = "unsupported" // not for this OS, or no release asset for it
+	// PlanRefused: the entry is one Install refuses with an error (#1892).
+	PlanRefused PlanAction = "refused"
 	// PlanMissingManager: the tool needs installing but its package manager is
 	// not on PATH yet (uv, before setup has installed it). Install skips it.
 	PlanMissingManager PlanAction = "missing-manager"
@@ -201,8 +206,8 @@ const (
 type Plan struct {
 	Name, Installed, Pin string
 	Action               PlanAction
-	// Note says why a skip is not "already installed": the source type this
-	// dotf does not know.
+	// Note says why: a skip that is not "already installed" (a source type this
+	// dotf does not know), an unsupported row's platform, a refusal's reason.
 	Note string
 }
 
@@ -210,6 +215,24 @@ type Plan struct {
 // by Install's warning and Plan's note.
 func unknownTypeNote(t Tool) string {
 	return fmt.Sprintf("source type %q is not known to this dotf", t.Source.Type)
+}
+
+// refusal is the entry check Install fails on, run by Plan too, so a dry run
+// cannot promise what the apply refuses (#1892). "" for an entry Install acts
+// on or skips. A release with no asset for this platform is a skip, not a
+// refusal, so it is not asked about its checksums.
+func (in *Installer) refusal(t Tool) string {
+	switch t.Source.Type {
+	case "github-release":
+		if t.AssetName(in.GOOS, in.GOARCH) != "" && t.ChecksumsName(in.GOARCH) == "" {
+			return "no checksums file declared — refusing to install unverified"
+		}
+	case "npm", "uv-tool":
+		if t.Source.Package == "" {
+			return t.Source.Type + " source declares no package"
+		}
+	}
+	return ""
 }
 
 // Plan reports what Install would do for t. It runs the same probe and the same
@@ -222,12 +245,18 @@ func (in *Installer) Plan(t Tool) Plan {
 	// unsupported, after the probe, so an installed tool never reads as absent.
 	if !t.SupportsOS(in.GOOS) {
 		p.Action = PlanUnsupported
+		p.Note = "not installed on " + in.GOOS + " by this catalog"
+		return p
+	}
+	if reason := in.refusal(t); reason != "" {
+		p.Action, p.Note = PlanRefused, reason
 		return p
 	}
 	switch t.Source.Type {
 	case "github-release":
 		if t.AssetName(in.GOOS, in.GOARCH) == "" {
 			p.Action = PlanUnsupported
+			p.Note = "no release asset for " + in.GOOS + "/" + in.GOARCH
 			return p
 		}
 	case "system":
@@ -274,10 +303,7 @@ func (in *Installer) installRelease(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s: no release asset for %s/%s; skipping\n", t.Name, in.GOOS, in.GOARCH)
 		return Skipped, nil
 	}
-	sumsName := t.ChecksumsName(in.GOARCH)
-	if sumsName == "" {
-		return Skipped, fmt.Errorf("%s: no checksums file declared — refusing to install unverified", t.Name)
-	}
+	sumsName := t.ChecksumsName(in.GOARCH) // non-empty: Install's refusal check
 
 	switch decideAction(in.current(t), t.Version) {
 	case actionSkip:
@@ -299,10 +325,7 @@ func (in *Installer) installRelease(t Tool) (Result, error) {
 // first-party CLI pinned by version, vs. the rewrite a checksum-manifested
 // github-release would need for bw's archive+cli-v-tag releases).
 func (in *Installer) installNpm(t Tool) (Result, error) {
-	pkg := t.Source.Package
-	if pkg == "" {
-		return Skipped, fmt.Errorf("%s: npm source declares no package", t.Name)
-	}
+	pkg := t.Source.Package // non-empty: Install's refusal check
 	action := decideAction(in.current(t), t.Version)
 	if action == actionSkip {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
@@ -330,10 +353,7 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 // the shared one, so a version the user upgraded to on purpose is never rolled
 // back: hive's upgrades are opt-in (hive ADR-020), and the pin is a floor.
 func (in *Installer) installUvTool(t Tool) (Result, error) {
-	pkg := t.Source.Package
-	if pkg == "" {
-		return Skipped, fmt.Errorf("%s: uv-tool source declares no package", t.Name)
-	}
+	pkg := t.Source.Package // non-empty: Install's refusal check
 	action := decideAction(in.current(t), t.Version)
 	if action == actionSkip {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
