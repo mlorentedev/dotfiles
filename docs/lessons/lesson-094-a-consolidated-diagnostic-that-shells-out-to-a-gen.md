@@ -1,13 +1,14 @@
 ---
-id: lesson-094-a-consolidated-diagnostic-that-shells-out-to-a-gen
+id: "lesson-094-a-consolidated-diagnostic-that-shells-out-to-a-gen"
 type: lesson
 status: active
+title: "A consolidated diagnostic that shells out to a generator is on-demand-cheap but per-event-expensive"
 created: "2026-06-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 094: A consolidated diagnostic that shells out to a generator is on-demand-cheap but per-event-expensive
+# A consolidated diagnostic that shells out to a generator is on-demand-cheap but per-event-expensive
 
 **Context**: `dotf doctor` (CLI-012) consolidates the 12-section healthcheck. One section gates on `compile-harness.sh --check`, which re-renders every skill record offline. The retired `claude-session-start.sh` used to run a light, env-contract-only `doctor.sh` on every Claude session start.
 

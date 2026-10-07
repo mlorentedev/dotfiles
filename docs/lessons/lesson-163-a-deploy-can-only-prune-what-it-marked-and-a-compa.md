@@ -1,13 +1,14 @@
 ---
-id: lesson-163-a-deploy-can-only-prune-what-it-marked-and-a-compa
+id: "lesson-163-a-deploy-can-only-prune-what-it-marked-and-a-compa"
 type: lesson
 status: active
+title: "A deploy can only prune what it marked, and a compatibility fence set by agent identity points the wrong way"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 163: A deploy can only prune what it marked, and a compatibility fence set by agent identity points the wrong way
+# A deploy can only prune what it marked, and a compatibility fence set by agent identity points the wrong way
 
 **Context**: Auditing the 36-skill cross-agent library for consistency. `targets[]` in a skill's frontmatter is documented as the *compatibility truth*: absent means every agent, present means only the listed ones. Seven skills declared it; the deploy honours it and prunes an output once its skill drops that agent.
 

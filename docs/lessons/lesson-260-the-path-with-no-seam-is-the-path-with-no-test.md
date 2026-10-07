@@ -1,6 +1,13 @@
-# 260 - The path with no seam is the path with no test, and it is the one that fails in production
+---
+id: "lesson-260-the-path-with-no-seam-is-the-path-with-no-test"
+type: lesson
+status: active
+title: "The path with no seam is the path with no test, and it is the one that fails in production"
+created: "2026-09-02"
+---
 
-**Date:** 2026-09-02
+# The path with no seam is the path with no test, and it is the one that fails in production
+
 **Area:** CLI, testing, PR triage
 
 ## What happened

@@ -1,13 +1,14 @@
 ---
-id: lesson-162-gh-run-rerun-replays-the-original-event-payload-no
+id: "lesson-162-gh-run-rerun-replays-the-original-event-payload-no"
 type: lesson
 status: active
+title: "`gh run rerun` replays the original *event payload*, not just the original workflow file"
 created: "2026-08-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 162: `gh run rerun` replays the original *event payload*, not just the original workflow file
+# `gh run rerun` replays the original *event payload*, not just the original workflow file
 
 **Context**: A PR failed a label-gated check. The label was added, and the natural next step was to re-run the failed job rather than push a no-op commit.
 

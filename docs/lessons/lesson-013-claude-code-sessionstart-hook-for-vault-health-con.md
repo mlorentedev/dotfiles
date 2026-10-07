@@ -1,13 +1,14 @@
 ---
-id: lesson-013-claude-code-sessionstart-hook-for-vault-health-con
+id: "lesson-013-claude-code-sessionstart-hook-for-vault-health-con"
 type: lesson
 status: active
+title: "Claude Code SessionStart hook for vault health context"
 created: "2026-02-27"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 013: Claude Code SessionStart hook for vault health context
+# Claude Code SessionStart hook for vault health context
 
 **Context**: `vault-health.sh` was created to report Obsidian vault health (orphans, unresolved links, frontmatter coverage) but required manual invocation.
 

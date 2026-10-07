@@ -1,13 +1,14 @@
 ---
-id: lesson-101-a-byte-identical-parity-contract-is-the-tripwire-t
+id: "lesson-101-a-byte-identical-parity-contract-is-the-tripwire-t"
 type: lesson
 status: active
+title: "A byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename"
 created: "2026-06-17"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 101: A byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename
+# A byte-identical parity contract is the tripwire that exposes a template divergence masquerading as a rename
 
 **Context**: CLI-015 PR2 (#395/#403) extracted `dotf init`'s inlined vault-entry renderer into `cli/internal/vault` as `WriteProjectEntry`, moving three `vault-*` templates with it. The inherited plan (from the prior session's handoff) was "Full SSOT + drift": vendor the templates into the vault SSOT and drift-test them, mirroring PR1's work-SDK precedent.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-320
+id: "lesson-320-a-retired-model-hangs-before-it-refuses"
 type: lesson
 status: active
+title: "A retired model hangs before it refuses, and only a refusal reaches the fallback"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, nan, pr-agent, ci, models, reviewer]
 ---
 
-# 320 — A retired model hangs before it refuses, and only a refusal reaches the fallback
+# A retired model hangs before it refuses, and only a refusal reaches the fallback
 
 ## What happened
 

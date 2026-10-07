@@ -1,13 +1,14 @@
 ---
-id: lesson-323
+id: "lesson-323-a-quoted-path-doubles-every-windows-backslash"
 type: lesson
 status: active
+title: "A path quoted with %q doubles every Windows backslash"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, go, windows, testing]
 ---
 
-# 323 — A path quoted with %q doubles every Windows backslash, so a test that looks for the raw path passes only on Linux
+# A path quoted with %q doubles every Windows backslash
 
 ## What happened
 

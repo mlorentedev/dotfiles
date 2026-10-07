@@ -1,6 +1,13 @@
-# Lesson 227 — A test suite inherits the developer's installed applications, and PATH is the door
+---
+id: "lesson-227-a-test-suite-inherits-the-developers-installed-apps"
+type: lesson
+status: active
+title: "A test suite inherits the developer's installed applications, and PATH is the door"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# A test suite inherits the developer's installed applications, and PATH is the door
+
 **Area:** tests / isolation / guards
 **Severity:** medium — noisy and destructive-adjacent rather than silently wrong, but it drove a real desktop and touched live data
 

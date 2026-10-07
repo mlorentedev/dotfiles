@@ -1,13 +1,14 @@
 ---
-id: lesson-053-heal-scripts-versioned-against-the-upstream-bug-cl
+id: "lesson-053-heal-scripts-versioned-against-the-upstream-bug-cl"
 type: lesson
 status: active
+title: "Heal scripts versioned against the upstream bug class they paper over"
 created: "2026-05-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 053: Heal scripts versioned against the upstream bug class they paper over
+# Heal scripts versioned against the upstream bug class they paper over
 
 **Context:** BUG-016 (PR #83, today). `claude-mem-heal.{sh,ps1}::Repair-McpJson` was authored against v12.7.4's broken `${_R%/}` literal in `.mcp.json` (PR #57, 2026-05-19). v13.0.0+ shipped a different broken pattern: cascading-printf via `sh -c` triggering the EPIPE race. The heal silently no-oped against v13.3.0 installs because the v12.7.4 signature was absent. User hit the upstream MCP failure repeatedly while the heal kept exiting clean — `[claude-mem-heal] .mcp.json already healthy: ...` was a false claim.
 **Problem:** Heal scripts are bug-class-specific by design (they paper over a SPECIFIC broken upstream pattern). When the upstream changes its bug pattern (intentionally or accidentally — v12 → v13 shipped different brokenness), the heal's detection regex no longer matches, and the heal becomes a no-op. The script reports "healthy" while the install is broken. Worst: silent failure.

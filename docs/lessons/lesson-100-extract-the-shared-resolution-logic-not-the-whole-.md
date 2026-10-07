@@ -1,13 +1,14 @@
 ---
-id: lesson-100-extract-the-shared-resolution-logic-not-the-whole-
+id: "lesson-100-extract-the-shared-resolution-logic-not-the-whole-"
 type: lesson
 status: active
+title: "Extract the shared resolution logic, not the whole caller — keep agent-specific detail in the hook"
 created: "2026-06-16"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 100: Extract the shared resolution logic, not the whole caller — keep agent-specific detail in the hook
+# Extract the shared resolution logic, not the whole caller — keep agent-specific detail in the hook
 
 **Context**: MEMORY-002 pulled the vault→memory symlink target resolution out of `claude-session-start.sh` into a standalone `ensure-memory-symlink.sh`, so other agents (or `dotf init`) could reuse the linking mechanics without reimplementing it.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-058-batch-scaffold-n-specs-in-one-pr-from-a-research-w
+id: "lesson-058-batch-scaffold-n-specs-in-one-pr-from-a-research-w"
 type: lesson
 status: active
+title: "Batch-scaffold N specs in one PR from a research worktree, defer implementation"
 created: "2026-05-25"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 058: Batch-scaffold N specs in one PR from a research worktree, defer implementation
+# Batch-scaffold N specs in one PR from a research worktree, defer implementation
 
 **Context:** Did a research worktree comparing 3 reference dotfiles repos (fmontes / holman / mathiasbynens) against this repo. Research surfaced 6 actionable ideas with clear ROI tiering. Two paths forward: (a) open 6 separate PRs, one per spec, paid out over weeks; (b) batch-scaffold all 6 in one PR, defer implementation to per-spec branches.
 

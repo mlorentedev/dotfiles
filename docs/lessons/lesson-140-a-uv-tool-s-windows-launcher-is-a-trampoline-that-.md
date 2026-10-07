@@ -1,13 +1,14 @@
 ---
-id: lesson-140-a-uv-tool-s-windows-launcher-is-a-trampoline-that-
+id: "lesson-140-a-uv-tool-s-windows-launcher-is-a-trampoline-that-"
 type: lesson
 status: active
+title: "A uv tool's Windows launcher is a trampoline that orphans silently — and a running daemon blocks its own repair"
 created: "2026-06-29"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 140: A uv tool's Windows launcher is a trampoline that orphans silently — and a running daemon blocks its own repair
+# A uv tool's Windows launcher is a trampoline that orphans silently — and a running daemon blocks its own repair
 
 **Context**: A session opened with the start-of-session `[hive]` banner printed, but `ToolSearch` for `vault_query`/`vault_search` returned nothing — the Hive MCP server's tools never registered. The config in `~/.claude.json` looked correct (`hive.exe`, right `HIVE_VAULT_PATH`), so it was not a config problem.
 

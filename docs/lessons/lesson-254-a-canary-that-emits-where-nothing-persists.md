@@ -1,6 +1,13 @@
-# 254 - A canary that emits where nothing persists accumulates no evidence, and its silence reads as success
+---
+id: "lesson-254-a-canary-that-emits-where-nothing-persists"
+type: lesson
+status: active
+title: "A canary that emits where nothing persists accumulates no evidence, and its silence reads as success"
+created: "2026-09-01"
+---
 
-**Date:** 2026-09-01
+# A canary that emits where nothing persists accumulates no evidence, and its silence reads as success
+
 **Area:** harness, orchestrator gate, verification
 
 ## What happened

@@ -1,7 +1,9 @@
 package env
 
 import (
+	"errors"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -461,5 +463,46 @@ func TestResolveCatalogPathFallsBackToDeployed(t *testing.T) {
 
 	if got := ResolveCatalogPath(); got != want {
 		t.Errorf("ResolveCatalogPath() = %q, want deployed copy %q", got, want)
+	}
+}
+
+// A service or timer environment may set neither HOME nor USERPROFILE; a path
+// built on Home must still be absolute, never relative to the working dir.
+func TestHome_FallsBackToTheUserDatabase(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	if h := Home(); !filepath.IsAbs(h) {
+		t.Fatalf("Home() = %q, want an absolute path", h)
+	}
+	if d, err := StateDir(); err != nil || !filepath.IsAbs(d) {
+		t.Fatalf("StateDir() = %q, %v; want an absolute path", d, err)
+	}
+}
+
+// When nothing resolves an absolute home, StateDir refuses instead of handing
+// back a path relative to the working directory.
+func TestStateDir_RefusesWhenNoAbsoluteHomeResolves(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	t.Setenv("XDG_STATE_HOME", "")
+	saved := currentUser
+	currentUser = func() (*user.User, error) { return nil, errors.New("no passwd entry") }
+	t.Cleanup(func() { currentUser = saved })
+
+	d, err := StateDir()
+	if err == nil || d != "" {
+		t.Fatalf("StateDir() = %q, %v; want an error and no path", d, err)
+	}
+	if !strings.Contains(err.Error(), "HOME") || !strings.Contains(err.Error(), "user database") {
+		t.Errorf("the error should name what was tried: %v", err)
+	}
+}
+
+// A relative XDG_STATE_HOME is not a state dir either.
+func TestStateDir_IgnoresARelativeXDGStateHome(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "relative/state")
+	d, err := StateDir()
+	if err != nil || !filepath.IsAbs(d) {
+		t.Fatalf("StateDir() = %q, %v; want an absolute path from the home", d, err)
 	}
 }

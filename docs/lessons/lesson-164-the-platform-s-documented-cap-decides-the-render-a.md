@@ -1,13 +1,14 @@
 ---
-id: lesson-164-the-platform-s-documented-cap-decides-the-render-a
+id: "lesson-164-the-platform-s-documented-cap-decides-the-render-a"
 type: lesson
 status: active
+title: "The platform's documented cap decides the render, and a shared file is injected into, never written"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 164: The platform's documented cap decides the render, and a shared file is injected into, never written
+# The platform's documented cap decides the render, and a shared file is injected into, never written
 
 **Context**: Closing the last two holes in cross-agent doctrine coverage. Four harnesses already carried the enforced rules and the presence block; Antigravity and codex carried nothing. The obvious fix was to deploy the same `AGENTS.md` everyone else gets.
 

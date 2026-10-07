@@ -1,6 +1,13 @@
-# Lesson 222 — A coupling's scope is measured, not inferred from where you saw it fail
+---
+id: "lesson-222-a-couplings-scope-is-measured-not-inferred-from-whe"
+type: lesson
+status: active
+title: "A coupling's scope is measured, not inferred from where you saw it fail"
+created: "2026-08-23"
+---
 
-**Date:** 2026-08-23
+# A coupling's scope is measured, not inferred from where you saw it fail
+
 **Area:** guards / CI / cross-repo contracts
 **Severity:** medium — fixes that look complete because the place you were looking went green
 

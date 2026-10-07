@@ -1,6 +1,13 @@
-# Lesson 243 — A guard that reads a cache reports the cache's age as the credential's health
+---
+id: "lesson-243-a-guard-that-reads-a-cache-reports-the-cache-not-the-credential"
+type: lesson
+status: active
+title: "A guard that reads a cache reports the cache's age as the credential's health"
+created: "2026-08-28"
+---
 
-**Date:** 2026-08-28
+# A guard that reads a cache reports the cache's age as the credential's health
+
 **Context:** CLI-056 (#1316) — on the Windows work box `dotf doctor` reported the bitácora PAT as "token invalid or expired (HTTP 401) — rotate it" and `dotf secrets verify` reported the `dockerhub` item as "not found". Both credentials were in daily use by the owner.
 **Category:** secrets, bw serve, doctor, diagnosis
 

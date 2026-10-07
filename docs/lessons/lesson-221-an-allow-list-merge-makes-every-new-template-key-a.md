@@ -1,6 +1,13 @@
-# Lesson 221 — An allow-list merge makes every new template key a silent no-op
+---
+id: "lesson-221-an-allow-list-merge-makes-every-new-template-key-a"
+type: lesson
+status: active
+title: "An allow-list merge makes every new template key a silent no-op"
+created: "2026-08-22"
+---
 
-**Date:** 2026-08-22
+# An allow-list merge makes every new template key a silent no-op
+
 **Area:** setup / settings deployment
 **Severity:** medium — config that reads as deployed but never was
 

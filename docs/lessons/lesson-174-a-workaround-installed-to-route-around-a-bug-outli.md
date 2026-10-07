@@ -1,13 +1,14 @@
 ---
-id: lesson-174-a-workaround-installed-to-route-around-a-bug-outli
+id: "lesson-174-a-workaround-installed-to-route-around-a-bug-outli"
 type: lesson
 status: active
+title: "A workaround installed to route around a bug outlives the bug silently, because nothing re-examines it"
 created: "2026-08-08"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 174: A workaround installed to route around a bug outlives the bug silently, because nothing re-examines it
+# A workaround installed to route around a bug outlives the bug silently, because nothing re-examines it
 
 **Context**: `dotf doctor` reported the GUARD-001 memory-sink guard healthy. It was not running in the dotfiles repo at all — the repo carried a local `core.hooksPath` override pointing at its own `.git/hooks`, and local scope beats the global dispatcher.
 

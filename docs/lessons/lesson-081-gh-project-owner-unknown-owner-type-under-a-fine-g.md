@@ -1,13 +1,14 @@
 ---
-id: lesson-081-gh-project-owner-unknown-owner-type-under-a-fine-g
+id: "lesson-081-gh-project-owner-unknown-owner-type-under-a-fine-g"
 type: lesson
 status: active
+title: "`gh project --owner` → \"unknown owner type\" under a fine-grained PAT; a green CI is not a green workflow"
 created: "2026-06-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 081: `gh project --owner` → "unknown owner type" under a fine-grained PAT; a green CI is not a green workflow
+# `gh project --owner` → "unknown owner type" under a fine-grained PAT; a green CI is not a green workflow
 
 **Context:** HARNESS-010's `bitacora-status.yml` used `gh project item-add/item-edit --owner mlorentedev` to move an assigned issue to In Progress. `actionlint`, `test`, and `spec-gate` were all green, and the same commands worked when run with my local `gh` auth.
 **Problem:** On the first real assignment the workflow failed at runtime with `unknown owner type`. The `gh project` CLI resolves the owner (user vs org) via an API call the fine-grained `BITACORA_PAT` cannot satisfy — so it works with a local token but not with the workflow's secret. No CI job exercises the workflow with the real secret, so CI was green while the workflow was broken.

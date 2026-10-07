@@ -1,13 +1,14 @@
 ---
-id: lesson-203-a-check-whose-precondition-the-architecture-forbid
+id: "lesson-203-a-check-whose-precondition-the-architecture-forbid"
 type: lesson
 status: active
+title: "A check whose precondition the architecture forbids reports SKIP forever, and SKIP reads as nothing-to-check"
 created: "2026-08-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 203: A check whose precondition the architecture forbids reports SKIP forever, and SKIP reads as nothing-to-check
+# A check whose precondition the architecture forbids reports SKIP forever, and SKIP reads as nothing-to-check
 
 **Context**: `dotf doctor`'s PAT-expiry section probes each GitHub PAT for liveness and days-to-expiry. It was written when secrets were loaded into the login shell by `load-secrets.sh`, so it read its token with `sys.Getenv(...)` and SKIPped when the var was unset — "fresh shell, no alarm", which was true at the time. ADR-028 then retired the loader: secrets are injected into one child process on demand and **never** exported into the ambient environment. Nobody revisited the check.
 

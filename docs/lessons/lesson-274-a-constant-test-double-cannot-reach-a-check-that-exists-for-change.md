@@ -1,13 +1,14 @@
 ---
-id: lesson-274
+id: "lesson-274-a-constant-test-double-cannot-reach-a-check-that-exists-for-change"
 type: lesson
 status: active
+title: "A constant test double cannot reach a check that exists for change"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, testing, toctou, test-doubles, review]
 ---
 
-# 274 — A constant test double cannot reach a check that exists for change
+# A constant test double cannot reach a check that exists for change
 
 ## What happened
 

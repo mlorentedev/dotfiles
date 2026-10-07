@@ -1,13 +1,14 @@
 ---
-id: lesson-039-defensive-monitors-are-not-fixes-trigger-fix-and-m
+id: "lesson-039-defensive-monitors-are-not-fixes-trigger-fix-and-m"
 type: lesson
 status: active
+title: "Defensive monitors are not fixes — trigger fix and monitor are siblings, not substitutes"
 created: "2026-05-19"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 039: Defensive monitors are not fixes — trigger fix and monitor are siblings, not substitutes
+# Defensive monitors are not fixes — trigger fix and monitor are siblings, not substitutes
 
 **Context:** dotfiles#33 was the "original" fix for the upstream `anthropics/claude-code#59870` truncation bug — every `claude plugin install` call rewrites `~/.claude/.claude.json` and silently drops subscription metadata (organizationType, organizationRateLimitTier, projects map, onboarding flags), shrinking the file from ~75 KB to ~1.5 KB and forcing re-authentication. The "fix" was an idempotence guard: don't call install if the plugin already appears in `claude plugin list` output. Six months later SDD-021 (2026-05-18) added a session-start canary (`Test-ClaudeJsonSize` in `claude-session-start.{sh,ps1}`) that flags the symptom if it ever recurs, with a 10 KB threshold. Today (2026-05-19) I noticed the canary firing on every session: file at 3444 bytes, re-login prompt in every project.
 

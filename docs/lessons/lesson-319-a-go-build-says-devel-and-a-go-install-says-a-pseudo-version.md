@@ -1,13 +1,14 @@
 ---
-id: lesson-319
+id: "lesson-319-a-go-build-says-devel-and-a-go-install-says-a-pseudo-version"
 type: lesson
 status: active
+title: "A go build says (devel); a go install says a pseudo-version"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, go, release, versioning, cli]
 ---
 
-# 319 — A `go build` says `(devel)`; a `go install` says a pseudo-version
+# A go build says (devel); a go install says a pseudo-version
 
 ## What happened
 

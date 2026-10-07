@@ -1,13 +1,14 @@
 ---
-id: lesson-295
+id: "lesson-295-a-check-written-without-the-guard-lessons-rediscovered-three-of-them"
 type: lesson
 status: active
+title: "A check written without reading the guard lessons rediscovered three of them"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, verification, guard, fail-closed, retrieval, sdd]
 ---
 
-# 295 — A check written without reading the guard lessons rediscovered three of them
+# A check written without reading the guard lessons rediscovered three of them
 
 ## What happened
 

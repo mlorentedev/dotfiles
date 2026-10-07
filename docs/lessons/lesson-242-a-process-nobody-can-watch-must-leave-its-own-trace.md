@@ -1,6 +1,13 @@
-# Lesson 242 — A process nobody can watch must leave its own trace, and the redirect has to survive the parent
+---
+id: "lesson-242-a-process-nobody-can-watch-must-leave-its-own-trace"
+type: lesson
+status: active
+title: "A process nobody can watch must leave its own trace, and the redirect has to survive the parent"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# A process nobody can watch must leave its own trace, and the redirect has to survive the parent
+
 **Context:** CLI-057 (#1315) — the `bw serve` daemon `dotf secrets unlock` starts died twice within minutes on the Windows work box and left nothing behind: no log, no pid, no listener.
 **Category:** secrets, bw serve, os/exec, observability, windows
 

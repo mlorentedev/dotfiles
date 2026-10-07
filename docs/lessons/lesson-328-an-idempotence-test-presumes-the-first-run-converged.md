@@ -1,13 +1,14 @@
 ---
-id: lesson-328
+id: "lesson-328-an-idempotence-test-presumes-the-first-run-converged"
 type: lesson
 status: active
+title: "An idempotence test presumes the first run converged"
 created: "2026-10-01"
 owner: manu
 tags: [lesson, setup, idempotence, integration, ci, agy]
 ---
 
-# 328 — An idempotence test presumes the first run converged
+# An idempotence test presumes the first run converged
 
 ## What happened
 

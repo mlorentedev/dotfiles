@@ -1,13 +1,14 @@
 ---
-id: lesson-302
+id: "lesson-302-grep-q-in-a-pipe-under-pipefail-fails-at-random"
 type: lesson
 status: active
+title: "`producer | grep -q` under `pipefail` fails at random"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, bash, pipefail, sigpipe, flaky, guard]
 ---
 
-# 302 — `producer | grep -q` under `pipefail` fails at random
+# `producer | grep -q` under `pipefail` fails at random
 
 ## What happened
 

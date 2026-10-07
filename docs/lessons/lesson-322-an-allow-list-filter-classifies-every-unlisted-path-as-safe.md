@@ -1,13 +1,14 @@
 ---
-id: lesson-322
+id: "lesson-322-an-allow-list-filter-classifies-every-unlisted-path-as-safe"
 type: lesson
 status: active
+title: "An allow-list path filter classifies every unlisted path as safe to skip"
 created: "2026-09-30"
 owner: manu
 tags: [lesson, ci, paths-filter, guards]
 ---
 
-# 322 — An allow-list path filter classifies every unlisted path as safe to skip
+# An allow-list path filter classifies every unlisted path as safe to skip
 
 ## What happened
 

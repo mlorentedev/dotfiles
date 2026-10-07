@@ -1,13 +1,14 @@
 ---
-id: lesson-018-uninitialized-variable-under-set-u-in-conditional-
+id: "lesson-018-uninitialized-variable-under-set-u-in-conditional-"
 type: lesson
 status: active
+title: "Uninitialized variable under set -u in conditional-only assignment"
 created: "2026-03-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 018: Uninitialized variable under set -u in conditional-only assignment
+# Uninitialized variable under set -u in conditional-only assignment
 
 **Context**: `claude-session-start.sh` used `VAULT_NAME` which was only assigned inside a vault-detection `if` block.
 

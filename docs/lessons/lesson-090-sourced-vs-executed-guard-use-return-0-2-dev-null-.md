@@ -1,13 +1,14 @@
 ---
-id: lesson-090-sourced-vs-executed-guard-use-return-0-2-dev-null-
+id: "lesson-090-sourced-vs-executed-guard-use-return-0-2-dev-null-"
 type: lesson
 status: active
+title: "Sourced-vs-executed guard: use `(return 0 2>/dev/null)`, not a `BASH_SOURCE`-vs-`$0` compare"
 created: "2026-06-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 090: Sourced-vs-executed guard: use `(return 0 2>/dev/null)`, not a `BASH_SOURCE`-vs-`$0` compare
+# Sourced-vs-executed guard: use `(return 0 2>/dev/null)`, not a `BASH_SOURCE`-vs-`$0` compare
 
 **Context**: CLI-009 `scripts/install-dotf.sh` (named `install-dot.sh` until the CLI-010 rename) is both *sourced* (by `setup-linux.sh` and by its bats test) and *executed* directly (standalone `./install-dotf.sh` upgrade). It needs a guard so `install_dotf "$@"` runs only on direct execution, not on source.
 

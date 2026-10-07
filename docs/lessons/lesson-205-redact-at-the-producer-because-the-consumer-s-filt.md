@@ -1,13 +1,14 @@
 ---
-id: lesson-205-redact-at-the-producer-because-the-consumer-s-filt
+id: "lesson-205-redact-at-the-producer-because-the-consumer-s-filt"
 type: lesson
 status: active
+title: "Redact at the producer, because the consumer's filter is a guess about a format you have not seen"
 created: "2026-08-15"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 205: Redact at the producer, because the consumer's filter is a guess about a format you have not seen
+# Redact at the producer, because the consumer's filter is a guess about a format you have not seen
 
 **Context**: diagnosing BUG-082 (`bw serve` returning a non-JSON envelope under batch reads) required seeing what the daemon actually replies with, because the client discards the body it fails to parse and reports only the offending character. Earlier probes in the same session had been careful — printing value *lengths*, HTTP status codes, and sha256 fingerprints, never the values themselves — and each of those answered its question without exposing anything.
 

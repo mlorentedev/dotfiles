@@ -1,13 +1,14 @@
 ---
-id: lesson-021-shellcheck-treats-shellcheck-comments-as-directive
+id: "lesson-021-shellcheck-treats-shellcheck-comments-as-directive"
 type: lesson
 status: active
+title: "ShellCheck treats \"# shellcheck\" comments as directives"
 created: "2026-03-16"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 021: ShellCheck treats "# shellcheck" comments as directives
+# ShellCheck treats "# shellcheck" comments as directives
 
 **Context**: `setup-linux.sh` had a comment `# shellcheck (shell script linter)` describing the tool being installed.
 

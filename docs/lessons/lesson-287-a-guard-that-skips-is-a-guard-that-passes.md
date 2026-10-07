@@ -1,13 +1,14 @@
 ---
-id: lesson-287
+id: "lesson-287-a-guard-that-skips-is-a-guard-that-passes"
 type: lesson
 status: active
+title: "A guard that skips is a guard that passes"
 created: "2026-09-23"
 owner: manu
 tags: [lesson, testing, go, silent-failure, sdd, vacuity]
 ---
 
-# 287 — A guard that skips is a guard that passes
+# A guard that skips is a guard that passes
 
 ## What happened
 

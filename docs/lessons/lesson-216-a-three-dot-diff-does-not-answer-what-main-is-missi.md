@@ -1,6 +1,13 @@
-# Lesson 216 — A three-dot diff does not answer "what is main missing"
+---
+id: "lesson-216-a-three-dot-diff-does-not-answer-what-main-is-missi"
+type: lesson
+status: active
+title: "A three-dot diff does not answer \"what is main missing\""
+created: "2026-08-21"
+---
 
-**Date:** 2026-08-21
+# A three-dot diff does not answer "what is main missing"
+
 **Context:** Auditing a leftover worktree during session orientation.
 
 ## What happened

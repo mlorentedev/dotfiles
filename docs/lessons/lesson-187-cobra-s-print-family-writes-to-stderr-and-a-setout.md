@@ -1,13 +1,14 @@
 ---
-id: lesson-187-cobra-s-print-family-writes-to-stderr-and-a-setout
+id: "lesson-187-cobra-s-print-family-writes-to-stderr-and-a-setout"
 type: lesson
 status: active
+title: "Cobra's `Print` family writes to stderr, and a `SetOut` test cannot tell you otherwise"
 created: "2026-08-10"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 187: Cobra's `Print` family writes to stderr, and a `SetOut` test cannot tell you otherwise
+# Cobra's `Print` family writes to stderr, and a `SetOut` test cannot tell you otherwise
 
 **Context**: #915. `dotf env path VAULT_PATH` is the ADR-025 seam — `AGENTS.md` tells every agent to resolve `$VAULT_PATH` through it, and `setup-linux.sh` provisions the hive daemon from it. Captured in a `$(...)`, it returned an empty string. It had done so since the subcommand shipped.
 

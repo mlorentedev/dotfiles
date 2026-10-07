@@ -1,13 +1,14 @@
 ---
-id: lesson-113-windows-winget-jq-emits-crlf-breaks-jq-read
+id: "lesson-113-windows-winget-jq-emits-crlf-breaks-jq-read"
 type: lesson
 status: active
+title: "Windows winget jq emits CRLF — breaks `< <(jq)` + read"
 created: "2026-06-20"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 113: Windows winget jq emits CRLF — breaks `< <(jq)` + read
+# Windows winget jq emits CRLF — breaks `< <(jq)` + read
 
 **Context**: `compile-harness.sh --refresh` (the harness deploy engine) aborted on Windows with `section "6-attribution-policy" not found`, even though the slug matched a real heading. The deployed agent skills had silently drifted from the vault SSOT for ~16 skills.
 

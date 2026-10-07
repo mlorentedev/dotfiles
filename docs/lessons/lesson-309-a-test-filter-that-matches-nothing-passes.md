@@ -1,13 +1,14 @@
 ---
-id: lesson-309
+id: "lesson-309-a-test-filter-that-matches-nothing-passes"
 type: lesson
 status: active
+title: "A test filter that matches nothing passes"
 created: "2026-09-27"
 owner: manu
 tags: [lesson, testing, bats, spec, vacuous-check]
 ---
 
-# 309 — A test filter that matches nothing passes
+# A test filter that matches nothing passes
 
 ## What happened
 

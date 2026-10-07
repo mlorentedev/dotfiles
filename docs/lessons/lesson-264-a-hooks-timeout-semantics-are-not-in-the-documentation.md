@@ -1,7 +1,8 @@
 ---
-id: lesson-264
+id: "lesson-264-a-hooks-timeout-semantics-are-not-in-the-documentation"
 type: lesson
 status: active
+title: "When the documentation does not name a field, read the executable — twice it decided a design"
 created: "2026-09-03"
 owner: manu
 tags: [lesson, harness, hooks, verification, claude-code]

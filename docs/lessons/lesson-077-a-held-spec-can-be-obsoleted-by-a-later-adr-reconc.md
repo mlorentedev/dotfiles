@@ -1,13 +1,14 @@
 ---
-id: lesson-077-a-held-spec-can-be-obsoleted-by-a-later-adr-reconc
+id: "lesson-077-a-held-spec-can-be-obsoleted-by-a-later-adr-reconc"
 type: lesson
 status: active
+title: "A held spec can be obsoleted by a later ADR — reconcile+close, don't implement-as-written"
 created: "2026-06-01"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 077: A held spec can be obsoleted by a later ADR — reconcile+close, don't implement-as-written
+# A held spec can be obsoleted by a later ADR — reconcile+close, don't implement-as-written
 
 **Context:** Picked up IDEAS-007 (#103, filed 2026-05-27) to implement a 4-layer cross-provider agent harness (.agent/<id>/INSTRUCT.md design). Ran verify-before-act against git/specs before coding.
 **Problem:** The spec's architecture had already shipped by other means AFTER it was written: ADR-009 (AGENTS.md SSOT) + ADR-010 (parity) + the ai/<provider>/ overlay structure realised Layers 1-2; the L3 registry + runtime discovery mechanism had zero consumer. Implementing the spec literally would have manufactured debt — a binary-name->provider detector nothing calls, plus a churning rename of a deployed convention wired into setup-linux.sh (~6 sites) + healthcheck.

@@ -1,13 +1,14 @@
 ---
-id: lesson-142-bash-on-path-via-scoop-is-not-gnu-bash-it-silently
+id: "lesson-142-bash-on-path-via-scoop-is-not-gnu-bash-it-silently"
 type: lesson
 status: active
+title: "`bash` on PATH via scoop is not GNU Bash — it silently mis-executes bashisms"
 created: "2026-07-07"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 142: `bash` on PATH via scoop is not GNU Bash — it silently mis-executes bashisms
+# `bash` on PATH via scoop is not GNU Bash — it silently mis-executes bashisms
 
 **Context**: Adding two new skills required running `scripts/compile-harness.sh --refresh` from a Windows machine to render them into the committed `harness/skills/` record. `bash` resolved on PATH to `C:\Users\mlorente\scoop\shims\bash.exe`.
 

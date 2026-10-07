@@ -1,13 +1,14 @@
 ---
-id: lesson-297
+id: "lesson-297-a-temp-file-rename-narrows-the-mode-of-the-file-it-replaces"
 type: lesson
 status: active
+title: "A temp-file rename narrows the mode of the file it replaces"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, go, filesystem, permissions, atomic-write]
 ---
 
-# 297 — A temp-file rename narrows the mode of the file it replaces
+# A temp-file rename narrows the mode of the file it replaces
 
 ## What happened
 

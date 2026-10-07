@@ -1,13 +1,14 @@
 ---
-id: lesson-195-resolverepodir-s-cwd-fallback-silently-defeats-unr
+id: "lesson-195-resolverepodir-s-cwd-fallback-silently-defeats-unr"
 type: lesson
 status: active
+title: "`resolveRepoDir`'s cwd fallback silently defeats \"unresolvable repo\" test cases"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 195: `resolveRepoDir`'s cwd fallback silently defeats "unresolvable repo" test cases
+# `resolveRepoDir`'s cwd fallback silently defeats "unresolvable repo" test cases
 
 **Context**: HARNESS-070, writing Go unit tests for two new doctor checks (`checkHarnessMirrorOrphans`, `checkInstructionDrift`) that both call `resolveRepoDir(sys)` to find the repo checkout. Both checks' contracts include "repo not found → SKIP, not FAIL," so each got a test setting `DOTFILES_REPO_DIR` to a non-existent path to exercise that branch.
 

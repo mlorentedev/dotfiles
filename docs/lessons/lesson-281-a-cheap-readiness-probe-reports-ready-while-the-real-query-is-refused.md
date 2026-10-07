@@ -1,13 +1,14 @@
 ---
-id: lesson-281
+id: "lesson-281-a-cheap-readiness-probe-reports-ready-while-the-real-query-is-refused"
 type: lesson
 status: active
+title: "A readiness probe cheaper than the work it gates reports ready while the work is still refused"
 created: "2026-09-07"
 owner: manu
 tags: [lesson, github-api, rate-limits, gh-cli, retry, background-jobs, fail-closed]
 ---
 
-# 281 — A readiness probe cheaper than the work it gates reports ready while the work is still refused
+# A readiness probe cheaper than the work it gates reports ready while the work is still refused
 
 ## What happened
 

@@ -59,8 +59,8 @@ created: "2026-10-06"
 
 ### PR 3 — the persisted report (#1843 B7)
 
-- [ ] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
-- [ ] [AC3] Implement the report (JSON, one entry per reconciler, the run's exit status)
+- [x] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
+- [x] [AC3] Implement the report (JSON, one entry per reconciler, the run's result and error), written atomically under `env.StateDir()`, which the skill gate's ledger now shares; a plan writes none. `cli/README.md` documents `converge`, which shipped in PR 2a without a section
 - [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file
 
 ### PR 4 — one entrypoint: `install.sh` and `install.ps1` at the root

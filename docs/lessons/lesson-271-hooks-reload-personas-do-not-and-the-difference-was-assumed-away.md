@@ -1,11 +1,13 @@
 ---
-id: 271
+id: "lesson-271-hooks-reload-personas-do-not-and-the-difference-was-assumed-away"
+type: lesson
+status: active
 title: "Hooks are re-read and personas are not, and one measurement was generalised into both"
-date: "2026-09-02"
+created: "2026-09-02"
 tags: [lesson, harness, orchestrator, measurement]
 ---
 
-# 271 — Hooks are re-read, personas are not, and one measurement was generalised into both
+# Hooks are re-read and personas are not, and one measurement was generalised into both
 
 ## What happened
 

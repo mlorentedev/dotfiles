@@ -11,7 +11,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] AC1 (plan lists and writes nothing) -> commit `b70aa63` / tests `TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing`, `TestRun_PlanReportsEveryReconcilerAndAppliesNothing`, `TestPlanMirror_CountsWhatMirrorWouldWriteAndWritesNothing`
 - [x] AC2 (instruction files first) -> PR 2b / tests `TestRecordsHarness_*` (converge), `TestCheckInstructionDrift_InstalledAgentWithoutItsInstructionsFails` (doctor); on the Mac, `dotf converge` deployed `~/.claude/CLAUDE.md`, the opencode and pi instruction files and 33 skills, and a second run reported `0 changed`
-- [ ] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63` (`TestConverge_AppliesThenASecondRunChangesNothing`, `TestRecordsMirror_PlanWritesNothingApplyConvergesAndRerunIsANoOp`); the persisted report is PR 3
+- [x] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63`; the report in PR 3 / tests `TestConverge_SecondRunIsANoOpAndPersistsTheReport`, `TestWriteReport_RecordsTheRunAndItsOutcome`
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
 - [ ] AC6–AC9 -> PRs 4 to 6
@@ -23,6 +23,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - No regressions in existing test suite: yes (the tool catalog's platform tests pass through `internal/platform`)
 - Test suite (PR 2b, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues; bats on the touched suites (copilot-config, setup-windows, guard-bats-negation) -> 145/145 ok
 - Manual run (PR 2b): `dotf converge --plan` -> records-mirror 71 to write, records-harness 3 instruction files to deploy; `dotf converge` -> `2 changed`; second run -> `0 changed, 2 ok`; doctor 51 -> 59 passing
+- Test suite (PR 3, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./... -count=1` -> ok; golangci-lint 2.12.2 -> 0 issues; feature f3 -> PASS
+- `TestReadmeHasNoInternalReferences` caught an ADR id in the new `converge` README section before push; removed
+- Manual run (PR 3): `dotf converge` on the Mac printed `report: ~/.local/state/dotfiles/converge/last.json`; the file holds `"result": "ok"`, `"changed": 0`, `"goos": "darwin"` and the `records-mirror` entry with its detail
+- Review hardening (PR 3): `env.Home()` falls back to the user database when HOME and USERPROFILE are both empty (`TestHome_FallsBackToTheUserDatabase`), and `env.StateDir()` returns an error instead of a path relative to the working directory when no absolute home resolves, or when XDG_STATE_HOME is relative (`TestStateDir_RefusesWhenNoAbsoluteHomeResolves`, `TestStateDir_IgnoresARelativeXDGStateHome`). The converge apply fails loudly on it; the skill gate fails open with the reason on stderr
 
 ## Decisions made during implementation
 

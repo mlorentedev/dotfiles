@@ -1,13 +1,14 @@
 ---
-id: lesson-305
+id: "lesson-305-systemd-run-expands-dollar-braces-in-its-own-arguments"
 type: lesson
 status: active
+title: "systemd-run expands ${VAR} in its own arguments before the shell sees them"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, systemd, shell, measurement]
 ---
 
-# 305 — `systemd-run` expands `${VAR}` in its own arguments before the shell sees them
+# systemd-run expands ${VAR} in its own arguments before the shell sees them
 
 ## What happened
 

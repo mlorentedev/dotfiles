@@ -1,6 +1,13 @@
-# Lesson 258 — An argument passed through two independent quoting conventions is only as safe as the weaker one
+---
+id: "lesson-258-an-argument-passed-through-two-independent-quoting-layers"
+type: lesson
+status: active
+title: "An argument passed through two independent quoting conventions is only as safe as the weaker one"
+created: "2026-09-02"
+---
 
-**Date:** 2026-09-02
+# An argument passed through two independent quoting conventions is only as safe as the weaker one
+
 **Context:** HARNESS-050 (#575) — `memlink.createLink`'s Windows junction creation
 failing on a path containing a bare comma
 

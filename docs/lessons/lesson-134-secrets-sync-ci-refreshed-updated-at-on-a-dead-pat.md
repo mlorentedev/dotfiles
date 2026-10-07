@@ -1,13 +1,14 @@
 ---
-id: lesson-134-secrets-sync-ci-refreshed-updated-at-on-a-dead-pat
+id: "lesson-134-secrets-sync-ci-refreshed-updated-at-on-a-dead-pat"
 type: lesson
 status: active
+title: "`secrets sync ci` refreshed `updated_at` on a dead PAT — a successful write is not a live credential"
 created: "2026-06-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 134: `secrets sync ci` refreshed `updated_at` on a dead PAT — a successful write is not a live credential
+# `secrets sync ci` refreshed `updated_at` on a dead PAT — a successful write is not a live credential
 
 **Context**: After rotating-by-redeploy, `dotf secrets sync ci` uploaded `BITACORA_PAT` to the repo's Actions secrets and reported success. The board automation (`add-to-project`/`bitacora-status`) then failed every run with HTTP 401 — the uploaded token was expired at source. `sync` had verified the *write* (`gh secret set` succeeded, `updated_at` refreshed) but never that the *value still authenticates*.
 

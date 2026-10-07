@@ -1,13 +1,14 @@
 ---
-id: lesson-326
+id: "lesson-326-a-step-env-is-evaluated-before-its-if"
 type: lesson
 status: active
+title: "A step env is evaluated before its if, so parsing a skipped step output throws"
 created: "2026-10-01"
 owner: manu
 tags: [lesson, github-actions, ci, pr-agent]
 ---
 
-# 326 — A step's `env` is evaluated before its `if`, so parsing a skipped step's output throws
+# A step env is evaluated before its if, so parsing a skipped step output throws
 
 ## What happened
 

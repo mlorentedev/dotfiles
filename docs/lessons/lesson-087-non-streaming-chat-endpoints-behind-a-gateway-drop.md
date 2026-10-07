@@ -1,13 +1,14 @@
 ---
-id: lesson-087-non-streaming-chat-endpoints-behind-a-gateway-drop
+id: "lesson-087-non-streaming-chat-endpoints-behind-a-gateway-drop"
 type: lesson
 status: active
+title: "Non-streaming chat endpoints behind a gateway drop long generations — a client timeout cannot fix a server-side cut"
 created: "2026-06-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 087: Non-streaming chat endpoints behind a gateway drop long generations — a client timeout cannot fix a server-side cut
+# Non-streaming chat endpoints behind a gateway drop long generations — a client timeout cannot fix a server-side cut
 
 **Context**: CLI-003 `dot review` QA: live review of a real 12KB staged diff through the NaN gateway (`deepseek-v4-flash`, non-streaming chat completions).
 

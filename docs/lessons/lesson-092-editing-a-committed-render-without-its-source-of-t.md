@@ -1,13 +1,14 @@
 ---
-id: lesson-092-editing-a-committed-render-without-its-source-of-t
+id: "lesson-092-editing-a-committed-render-without-its-source-of-t"
 type: lesson
 status: active
+title: "Editing a committed render without its source-of-truth is a half-migration that `--refresh` reverts"
 created: "2026-06-13"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 092: Editing a committed render without its source-of-truth is a half-migration that `--refresh` reverts
+# Editing a committed render without its source-of-truth is a half-migration that `--refresh` reverts
 
 **Context**: CLI-005 repointed `harness/skills/spec/SKILL.md` and `harness/skills/adversarial-review/SKILL.md` to `dotf spec`. Those files are committed *renders*: `compile-harness.sh` (SDD-008) treats the vault `00_meta/skills/<name>/SKILL.md` as the edit-SSOT and regenerates `harness/skills/` from it via `--refresh`.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-279
+id: "lesson-279-a-helper-written-to-mirror-a-parser-is-the-defect"
 type: lesson
 status: active
+title: "A helper written to \"mirror\" an existing parser is the defect; the transcription bug is only how you find out"
 created: "2026-09-05"
 owner: manu
 tags: [lesson, go, parsing, duplication, unicode, build]
 ---
 
-# 279 — A helper written to "mirror" an existing parser is the defect; the transcription bug is only how you find out
+# A helper written to "mirror" an existing parser is the defect; the transcription bug is only how you find out
 
 ## What happened
 

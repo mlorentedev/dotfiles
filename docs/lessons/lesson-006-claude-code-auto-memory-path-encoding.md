@@ -1,13 +1,14 @@
 ---
-id: lesson-006-claude-code-auto-memory-path-encoding
+id: "lesson-006-claude-code-auto-memory-path-encoding"
 type: lesson
 status: active
+title: "Claude Code auto-memory path encoding"
 created: "2026-02-26"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 006: Claude Code auto-memory path encoding
+# Claude Code auto-memory path encoding
 
 **Context**: Needed to symlink auto-memory directories from dotfiles repo to `~/.claude/projects/*/memory/`
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-178-the-sandbox-is-not-the-territory-a-dry-run-that-ca
+id: "lesson-178-the-sandbox-is-not-the-territory-a-dry-run-that-ca"
 type: lesson
 status: active
+title: "The sandbox is not the territory: a dry run that can reach production, and a fixture that cannot know what production contains"
 created: "2026-08-09"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 178: The sandbox is not the territory: a dry run that can reach production, and a fixture that cannot know what production contains
+# The sandbox is not the territory: a dry run that can reach production, and a fixture that cannot know what production contains
 
 **Context**: Migrating 17 auto-memory `MEMORY.md` files (#864). Two safety steps were built before touching live data: a dry run into a sandbox copy of `~/.claude/projects`, and a fixture suite covering every shape the corpus was known to hold.
 

@@ -1,13 +1,14 @@
 ---
-id: lesson-188-the-reviewer-that-cannot-be-you-four-rounds-four-d
+id: "lesson-188-the-reviewer-that-cannot-be-you-four-rounds-four-d"
 type: lesson
 status: active
+title: "The reviewer that cannot be you: four rounds, four defects, three of them in the fix for the last one"
 created: "2026-08-11"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 188: The reviewer that cannot be you: four rounds, four defects, three of them in the fix for the last one
+# The reviewer that cannot be you: four rounds, four defects, three of them in the fix for the last one
 
 **Context**: DOCS-013 (#916, PRs #922/#924) added a guard that fails CI when an instruction file names a repo path that no longer resolves. It was written after `.claude/CLAUDE.md` was tracked into the repo carrying seven dead file references, two of which sessions had already acted on. The change was reviewed by CodeRabbit and by the implementing session's own tests, then by three independent adversarial-review rounds run as fresh subagents.
 

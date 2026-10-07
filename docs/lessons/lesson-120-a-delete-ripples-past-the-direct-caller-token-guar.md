@@ -1,13 +1,14 @@
 ---
-id: lesson-120-a-delete-ripples-past-the-direct-caller-token-guar
+id: "lesson-120-a-delete-ripples-past-the-direct-caller-token-guar"
 type: lesson
 status: active
+title: "A delete ripples past the direct caller — token guard-greps miss transitive refs, and \"orphaned\" fixtures can have hidden consumers"
 created: "2026-06-21"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 120: A delete ripples past the direct caller — token guard-greps miss transitive refs, and "orphaned" fixtures can have hidden consumers
+# A delete ripples past the direct caller — token guard-greps miss transitive refs, and "orphaned" fixtures can have hidden consumers
 
 **Context**: Deleting `healthcheck.ps1`/`doctor.ps1` + `tests/healthcheck-ps1.bats` (CLI-018 PR-B). A guard test greps the production files for the `(healthcheck|doctor)\.ps1` token.
 

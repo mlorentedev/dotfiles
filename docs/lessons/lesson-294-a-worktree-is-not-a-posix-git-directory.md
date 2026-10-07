@@ -1,13 +1,14 @@
 ---
-id: lesson-294
+id: "lesson-294-a-worktree-is-not-a-posix-git-directory"
 type: lesson
 status: active
+title: "A Windows worktree is not automatically readable by POSIX Git"
 created: "2026-09-25"
 owner: manu
 tags: [lesson, git, windows, worktree, hooks]
 ---
 
-# 294 — A Windows worktree is not automatically readable by POSIX Git
+# A Windows worktree is not automatically readable by POSIX Git
 
 ## What happened
 

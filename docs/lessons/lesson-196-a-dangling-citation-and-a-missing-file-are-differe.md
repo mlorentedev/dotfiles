@@ -1,13 +1,14 @@
 ---
-id: lesson-196-a-dangling-citation-and-a-missing-file-are-differe
+id: "lesson-196-a-dangling-citation-and-a-missing-file-are-differe"
 type: lesson
 status: active
+title: "A dangling citation and a missing file are different bugs — check for the first before assuming the second"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 196: A dangling citation and a missing file are different bugs — check for the first before assuming the second
+# A dangling citation and a missing file are different bugs — check for the first before assuming the second
 
 **Context**: the docs truth-pass batch (#677/#681/#682/#683/#684), plus the standalone #738 ("fresh-machine bug issues cite an audit doc absent from the repo"). Nine-plus GitHub issues cited findings from `docs/audits/docs-audit-2026-07-07.md`, `docs/audits/codebase-audit-2026-07-06.md`, and `docs/audits/process-audit-2026-07-07.md`. None of those three paths existed in the working tree, and #738's own investigation (`git log --all -- 'docs/audits/*'`) had already shown none was ever committed — its proposed fix was either commit the audit (if it existed locally) or edit the citations to point wherever the findings actually live.
 

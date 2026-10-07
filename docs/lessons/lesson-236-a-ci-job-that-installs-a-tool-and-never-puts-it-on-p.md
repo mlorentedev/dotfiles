@@ -1,6 +1,13 @@
-# Lesson 236 — A CI job that installs a tool and never puts it on PATH certifies nothing it was built to check
+---
+id: "lesson-236-a-ci-job-that-installs-a-tool-and-never-puts-it-on-p"
+type: lesson
+status: active
+title: "A CI job that installs a tool and never puts it on PATH certifies nothing it was built to check"
+created: "2026-08-27"
+---
 
-**Date:** 2026-08-27
+# A CI job that installs a tool and never puts it on PATH certifies nothing it was built to check
+
 **Context:** TEST-003 (#1298) — `test-windows` green on every PR while a real Windows box failed four `dotf doctor` checks after the same setup.
 **Category:** ci, windows, guards, false negatives
 

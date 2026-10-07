@@ -1,13 +1,14 @@
 ---
-id: lesson-095-a-non-runnable-cobra-parent-with-no-subcommands-is
+id: "lesson-095-a-non-runnable-cobra-parent-with-no-subcommands-is"
 type: lesson
 status: active
+title: "A non-runnable cobra parent with no subcommands is demoted to \"Additional help topics\""
 created: "2026-06-14"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 095: A non-runnable cobra parent with no subcommands is demoted to "Additional help topics"
+# A non-runnable cobra parent with no subcommands is demoted to "Additional help topics"
 
 **Context**: Building `dotf init` (CLI-014) incrementally — Step 1 wired the `init` parent into `root.go` before its `agents`/`github` subcommands or an orchestrator `RunE` existed.
 

@@ -1,6 +1,13 @@
-# Lesson 269 — A generated file fixed without its source is a countdown, and the drift guard says OK either way
+---
+id: "lesson-269-a-generated-file-fixed-without-its-source-is-a-countdown"
+type: lesson
+status: active
+title: "A generated file fixed without its source is a countdown, and the drift guard says OK either way"
+created: "2026-09-05"
+---
 
-**Date:** 2026-09-05
+# A generated file fixed without its source is a countdown, and the drift guard says OK either way
+
 **Context:** Two reversions in two days (`new-ticket`, `crystallize`), found by two different sessions, neither found by the guard whose job it is
 
 ## What happened

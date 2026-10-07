@@ -1,13 +1,14 @@
 ---
-id: lesson-189-an-apostrophe-in-a-comment-inside-an-open-awk-bloc
+id: "lesson-189-an-apostrophe-in-a-comment-inside-an-open-awk-bloc"
 type: lesson
 status: active
+title: "An apostrophe in a comment inside an open `awk '...'` block reopens bash's own parser"
 created: "2026-08-12"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 189: An apostrophe in a comment inside an open `awk '...'` block reopens bash's own parser
+# An apostrophe in a comment inside an open `awk '...'` block reopens bash's own parser
 
 **Context**: HARNESS-069 (#917), extending `scripts/compile-harness.sh`'s `render_skill()` with a rationale comment explaining why a new awk rule strips pre-existing `generated_*` fields before re-injecting fresh ones. The comment read, in part, "...describing `$HOME's` relationship to the record...". `bash -n` on the whole script failed with `syntax error near unexpected token '_from'`, pointing at a completely different line — an unrelated regex three lines below the comment.
 

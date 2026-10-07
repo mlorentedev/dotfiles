@@ -1,6 +1,13 @@
-# Lesson 217 — `go test -run` passes when the test name matches nothing
+---
+id: "lesson-217-go-test-run-passes-when-the-test-name-matches-not"
+type: lesson
+status: active
+title: "`go test -run` passes when the test name matches nothing"
+created: "2026-08-21"
+---
 
-**Date:** 2026-08-21
+# `go test -run` passes when the test name matches nothing
+
 **Context:** Writing the `features.json` verification contract for HARNESS-075.
 
 ## What happened

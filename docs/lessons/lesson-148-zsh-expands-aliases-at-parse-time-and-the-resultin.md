@@ -1,13 +1,14 @@
 ---
-id: lesson-148-zsh-expands-aliases-at-parse-time-and-the-resultin
+id: "lesson-148-zsh-expands-aliases-at-parse-time-and-the-resultin"
 type: lesson
 status: active
+title: "zsh expands aliases at parse time, and the resulting parse error still exits 0"
 created: "2026-08-04"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 148: zsh expands aliases at parse time, and the resulting parse error still exits 0
+# zsh expands aliases at parse time, and the resulting parse error still exits 0
 
 **Context**: `.zsh/functions.sh` held the Gemini saved-prompt helper. It had already been renamed once — `gp` → `gpr` — after colliding with oh-my-zsh's `alias gp='git push'`. The rename picked `gpr`, which oh-my-zsh's git plugin also owns (`alias gpr='git pull --rebase'`, `git.plugin.zsh:269`). `.zshrc` loads oh-my-zsh at line 13 and sources `functions.sh` at line 135, so the alias was always live first.
 

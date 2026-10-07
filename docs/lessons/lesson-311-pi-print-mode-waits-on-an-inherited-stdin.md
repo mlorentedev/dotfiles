@@ -1,13 +1,14 @@
 ---
-id: lesson-311
+id: "lesson-311-pi-print-mode-waits-on-an-inherited-stdin"
 type: lesson
 status: active
+title: "pi's print mode waits on an inherited stdin"
 created: "2026-09-27"
 owner: manu
 tags: [lesson, pi, stdin, background, measurement]
 ---
 
-# 311 — pi's print mode waits on an inherited stdin
+# pi's print mode waits on an inherited stdin
 
 ## What happened
 

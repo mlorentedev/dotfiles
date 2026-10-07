@@ -1,13 +1,14 @@
 ---
-id: lesson-123-a-go-vs-shell-byte-equivalence-gate-is-posix-only-
+id: "lesson-123-a-go-vs-shell-byte-equivalence-gate-is-posix-only-"
 type: lesson
 status: active
+title: "A Go-vs-shell byte-equivalence gate is POSIX-only, and it retires at cutover"
 created: "2026-06-24"
 owner: manu
 tags: [lesson, dotfiles]
 ---
 
-# Lesson 123: A Go-vs-shell byte-equivalence gate is POSIX-only, and it retires at cutover
+# A Go-vs-shell byte-equivalence gate is POSIX-only, and it retires at cutover
 
 **Context**: CLI-025 ported the session-start hooks (`session-brief.sh`, `claude-session-start.sh`) to `dotf mem session-start`. Each port shipped a "golden" test that diffs the Go output against the live shell script across representative CWDs.
 
