@@ -46,7 +46,7 @@ func checkDeployManifest(sys *System, rep *Report) {
 	home := sys.home()
 	inSync, drifted, notCompared := 0, 0, 0
 	for _, c := range man.Configs {
-		if c.Render || (c.Requires != "" && !sys.has(c.Requires)) {
+		if c.Render || !c.AppliesOn(sys.GOOS) || (c.Requires != "" && !sys.has(c.Requires)) {
 			notCompared++
 			continue
 		}

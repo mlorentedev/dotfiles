@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -81,6 +82,38 @@ func TestDeployCmd_NoArgInstallsEveryDeclaredConfig(t *testing.T) {
 		}
 		if !strings.Contains(out, "deployed  "+name) {
 			t.Errorf("stdout must report config %q as deployed, got:\n%s", name, out)
+		}
+	}
+}
+
+// An entry declared for other OSes is skipped and said so, whether the run
+// names it or not: Git Bash on Windows would read a POSIX rc file (#1843 B1).
+func TestDeployCmd_SkipsAnEntryForAnotherOS(t *testing.T) {
+	other := "windows"
+	if runtime.GOOS == "windows" {
+		other = "linux"
+	}
+	repo, home := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "deploy.json"), `{
+  "version": 4,
+  "configs": [
+    {"name": "one", "src": "ai/one.json", "dst": "{HOME}/.one/config.json"},
+    {"name": "elsewhere", "src": "ai/two.json", "dst": "{HOME}/.two/config.json", "platforms": ["`+other+`"]}
+  ]
+}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "one.json"), `{"one":true}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "two.json"), `{"two":true}`)
+
+	for _, args := range [][]string{nil, {"elsewhere"}} {
+		out, err := runDeploy(t, repo, home, args)
+		if err != nil {
+			t.Fatalf("dotf deploy %v: %v\n%s", args, err, out)
+		}
+		if !strings.Contains(out, "skipped   elsewhere") || !strings.Contains(out, "not for "+runtime.GOOS) {
+			t.Errorf("dotf deploy %v must report the entry skipped for this OS:\n%s", args, out)
+		}
+		if _, err := os.Stat(filepath.Join(home, ".two")); err == nil {
+			t.Errorf("dotf deploy %v installed an entry declared for %s", args, other)
 		}
 	}
 }

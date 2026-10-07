@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/fsmode"
+	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
 
 // ManifestRel is the declarative table of what gets deployed where, relative to
@@ -33,13 +34,19 @@ import (
 // not a function.
 const ManifestRel = "ai/deploy.json"
 
-// ManifestVersion is the schema this binary reads. It is bumped whenever a new
-// field changes what an entry MEANS (2: `strategy` and `requires`, AI-039; 3:
-// `paths`, AI-042), so a
-// binary that predates the field refuses the manifest instead of deploying
-// every entry the old way. The check is the version, not the field, because
-// a field an old decoder ignores is invisible to it by construction.
-const ManifestVersion = 3
+// ManifestVersion is the newest schema this binary reads. It is bumped whenever
+// a new field changes what an entry MEANS (2: `strategy` and `requires`,
+// AI-039; 3: `paths`, AI-042; 4: `platforms`, #1843 B1), so a binary that
+// predates the field refuses the manifest instead of deploying every entry the
+// old way. The check is the version, not the field, because a field an old
+// decoder ignores is invisible to it by construction.
+const ManifestVersion = 4
+
+// MinManifestVersion is the oldest schema this binary reads. A reader that adds
+// a field reads the version before it too, which by construction carries none
+// of it, so the reader ships in a release before the manifest moves: the dotf
+// every machine has installed keeps reading the manifest in between (#1814).
+const MinManifestVersion = 3
 
 // Strategies. Replace installs the source as the whole destination; merge
 // writes the source's top-level keys into the destination's JSON object and
@@ -76,6 +83,16 @@ type Config struct {
 	// (AI-042, #1334). Declared per entry because which form a tool accepts is a
 	// measured fact about the tool, not a property of the OS.
 	Paths string `json:"paths"`
+	// Platforms lists the GOOS values the entry applies on; absent means every
+	// OS, and an OS that is not listed is skipped, not failed. The vocabulary
+	// packages.json's platforms uses (ADR-045): a POSIX rc file is declared for
+	// linux and darwin, because Git Bash on Windows would read it.
+	Platforms []string `json:"platforms"`
+}
+
+// AppliesOn reports whether the entry is declared for goos.
+func (c Config) AppliesOn(goos string) bool {
+	return platform.Supports(c.Platforms, goos)
 }
 
 // Manifest is the parsed ai/deploy.json.
@@ -125,8 +142,8 @@ func ParseManifest(data []byte) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if m.Version != ManifestVersion {
-		return nil, fmt.Errorf("deploy manifest version %d unsupported (this dotf reads %d; update dotf, or the checkout, so they agree)", m.Version, ManifestVersion)
+	if m.Version < MinManifestVersion || m.Version > ManifestVersion {
+		return nil, fmt.Errorf("deploy manifest version %d unsupported (this dotf reads %d to %d; update dotf, or the checkout, so they agree)", m.Version, MinManifestVersion, ManifestVersion)
 	}
 	seen := map[string]bool{}
 	for i := range m.Configs {
@@ -144,6 +161,9 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		if _, err := c.FileMode(); err != nil {
 			return nil, fmt.Errorf("config %q: %w", c.Name, err)
 		}
+		if err := validatePlatforms(c, m.Version); err != nil {
+			return nil, err
+		}
 		if c.Paths != "" && c.Paths != PathsNative && c.Paths != PathsSlash {
 			return nil, fmt.Errorf("config %q: unknown paths form %q (want %s or %s)", c.Name, c.Paths, PathsNative, PathsSlash)
 		}
@@ -159,6 +179,24 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		seen[c.Name] = true
 	}
 	return &m, nil
+}
+
+// validatePlatforms refuses a platforms list a released reader could not read
+// (one in a version 3 manifest), one that names no OS, and one naming an OS
+// that is not a GOOS: a typo such as "macos" would skip the entry everywhere.
+func validatePlatforms(c *Config, version int) error {
+	switch {
+	case c.Platforms == nil:
+		return nil
+	case version < 4:
+		return fmt.Errorf("config %q: platforms needs manifest version 4", c.Name)
+	case len(c.Platforms) == 0:
+		return fmt.Errorf("config %q: empty platforms (omit the field for every OS)", c.Name)
+	}
+	if p := platform.Unknown(c.Platforms); p != "" {
+		return fmt.Errorf("config %q: unknown platform %q", c.Name, p)
+	}
+	return nil
 }
 
 // decodeManifest reads exactly one JSON document, strictly.
