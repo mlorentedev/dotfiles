@@ -463,6 +463,51 @@ jobs:
           if ($userPath -notlike "*$bin*") { [Environment]::SetEnvironmentVariable('PATH', "$userPath;$bin", 'User') }
           & "$bin\dotf.exe" version
 
+      # CI-010 (#2047): the pinned pi CLI is restored on a pull request instead
+      # of reinstalled from npm, which was ~130 s of every PR's run (p50 508 s,
+      # 2026-10-07). The install is a function of three inputs and the key names
+      # all three: the runner image (node and npm come from it), PI_VERSION and
+      # setup-windows.ps1. A PR that changes any of them misses, so the fresh
+      # install path runs on exactly the PRs that can break it.
+      #
+      # On a hit setup takes its existing branch: `pi --version` is checked
+      # against the pin. Exact key, no restore-keys, so a stale install never
+      # stands in. Only main writes the cache (the save is the job's last step),
+      # because a cache saved on a PR ref is invisible to every other PR, and so
+      # the cache is always a fresh install from a fully green run. On main the
+      # restore is lookup-only: it never downloads, only tells the save whether
+      # the key already exists.
+      #
+      # Only what the install writes is cached: the package (npm nests its deps
+      # inside it) and its three shims. Not the prefix, which also holds the
+      # image's own globals and the CLIs `dotf tools install` puts there.
+      - name: Resolve the pi CLI cache key
+        id: picli
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        shell: pwsh
+        run: |
+          $v = ((Get-Content versions.conf | Select-String '^PI_VERSION=').Line -split '=', 2)[1]
+          if (-not $v) { throw "PI_VERSION missing from versions.conf" }
+          $prefix = "$(& npm prefix -g)".Trim()
+          if (-not $prefix) { throw "npm prefix -g printed nothing" }
+          if (-not $env:ImageVersion) { throw "ImageVersion is not set: the cache key cannot name the runner image" }
+          "version=$($v.Trim())" >> $env:GITHUB_OUTPUT
+          "prefix=$prefix" >> $env:GITHUB_OUTPUT
+          "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Restore the pinned pi CLI (pull requests; a lookup on main)
+        id: picli-cache
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          lookup-only: ${{ github.event_name == 'push' }}
+          path: |
+            ${{ steps.picli.outputs.prefix }}\node_modules\@earendil-works\pi-coding-agent
+            ${{ steps.picli.outputs.prefix }}\pi
+            ${{ steps.picli.outputs.prefix }}\pi.cmd
+            ${{ steps.picli.outputs.prefix }}\pi.ps1
+          key: pi-cli-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
+
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
       # the binary built above survives setup. No DOTFILES_DIR override: the
       # deploy dir is the real-box default (~/.dotfiles), so the gate below
@@ -583,6 +628,20 @@ jobs:
             tests/profile-heal-ps1.bats \
             tests/setup-windows.bats \
             tests/obs-cli-ps1.bats
+
+      # CI-010: the other half of the restore above. Last, so only a run whose
+      # every step passed writes the cache. The first clause is every step's
+      # guard (HARNESS-041); the rest narrows it to a miss on main.
+      - name: Save the pi CLI that main installed
+        if: (github.event_name == 'push' || needs.changes.outputs.code == 'true') && github.event_name == 'push' && steps.picli-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.picli.outputs.prefix }}\node_modules\@earendil-works\pi-coding-agent
+            ${{ steps.picli.outputs.prefix }}\pi
+            ${{ steps.picli.outputs.prefix }}\pi.cmd
+            ${{ steps.picli.outputs.prefix }}\pi.ps1
+          key: pi-cli-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
 
   integration:
     runs-on: ubuntu-latest
