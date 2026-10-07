@@ -203,7 +203,9 @@ dbg() { nan-debug.sh "$@"; }
 # Portable swiss-army functions (IDEAS-002) — shared with zsh (.zsh/functions.sh)
 [ -f ~/.zsh/functions.sh ] && . ~/.zsh/functions.sh
 
-# Enable direnv and zoxide
+# mise first: the pinned CLIs it installs (direnv, zoxide, ...) reach PATH
+# through it (ADR-044, #2013 W2b). Then direnv and zoxide.
+command -v mise >/dev/null && eval "$(mise activate bash)"
 command -v direnv >/dev/null && eval "$(direnv hook bash)"
 command -v zoxide >/dev/null && eval "$(zoxide init bash)"
 

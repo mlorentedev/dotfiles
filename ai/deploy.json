@@ -35,6 +35,12 @@
     "            about the tool: Copilot wrote backslash trustedFolders into its own",
     "            config on Windows; agy has read C:/... trustedWorkspaces there daily.",
     "            Declare the observed form, never guess (AI-042, #1334).",
+    "  platforms the GOOS values (linux, darwin, windows) the entry applies on;",
+    "            absent means every OS, and an OS not listed is skipped, not",
+    "            failed - the meaning packages.json gives it. Needs version 4: the",
+    "            dotf that reads 4 also reads 3, so this file moves to 4 with its",
+    "            first OS-only entry, once the release carrying that reader is the",
+    "            DOTF_VERSION pin (#1843 B1).",
     "",
     "version 3 (AI-042): paths changes what an entry's CONTENT means. Version 2",
     "(AI-039): strategy and requires change what an entry MEANS, so a",
@@ -148,6 +154,53 @@
       "dst": "{HOME}/.gemini/.geminiignore",
       "render": false,
       "mode": "0644"
+    },
+    {
+      "name": "zshrc",
+      "src": ".zshrc",
+      "dst": "{HOME}/.zshrc",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-aliases",
+      "src": ".zsh/aliases.zsh",
+      "dst": "{HOME}/.zsh/aliases.zsh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-functions",
+      "src": ".zsh/functions.zsh",
+      "dst": "{HOME}/.zsh/functions.zsh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "zsh-functions-sh",
+      "src": ".zsh/functions.sh",
+      "dst": "{HOME}/.zsh/functions.sh",
+      "render": false,
+      "mode": "0644"
+    },
+    {
+      "name": "zsh-nvm",
+      "src": ".zsh/nvm.zsh",
+      "dst": "{HOME}/.zsh/nvm.zsh",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh"
+    },
+    {
+      "name": "tmux",
+      "src": "tmux.conf",
+      "dst": "{HOME}/.tmux.conf",
+      "render": false,
+      "mode": "0644",
+      "requires": "tmux"
     },
     {
       "name": "pi-compaction",

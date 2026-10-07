@@ -30,25 +30,25 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 	}{
 		{
 			name:        "checked entries agree → pass",
-			deployFiles: []file{{".zsh/functions.sh", "f()"}, {".zsh/aliases.zsh", "a=1"}},
-			homeFiles:   []file{{".zsh/functions.sh", "f()"}, {".zsh/aliases.zsh", "a=1"}},
+			deployFiles: []file{{".inputrc", "set completion-ignore-case on"}, {"ssh/config", "Host *"}},
+			homeFiles:   []file{{".inputrc", "set completion-ignore-case on"}, {".ssh/config", "Host *"}},
 			wantSubstr:  "matches",
 		},
 		{
 			// The file that lives in NO doctor list today: checkSymlinks covers
 			// aliases.zsh and functions.zsh only.
-			name:         "functions.sh drift → fail naming both paths",
-			deployFiles:  []file{{".zsh/functions.sh", "new"}},
-			homeFiles:    []file{{".zsh/functions.sh", "old"}},
+			name:         ".inputrc drift → fail naming both paths",
+			deployFiles:  []file{{".inputrc", "new"}},
+			homeFiles:    []file{{".inputrc", "old"}},
 			wantFailures: 1,
-			wantSubstr:   ".zsh/functions.sh",
+			wantSubstr:   ".inputrc",
 		},
 		{
-			name:         "tmux.conf drift → fail, and the two legs use different relative paths",
-			deployFiles:  []file{{"tmux.conf", "set -g mouse on"}},
-			homeFiles:    []file{{".tmux.conf", "set -g mouse off"}},
+			name:         "ssh/config drift → fail, and the two legs use different relative paths",
+			deployFiles:  []file{{"ssh/config", "Host a"}},
+			homeFiles:    []file{{".ssh/config", "Host b"}},
 			wantFailures: 1,
-			wantSubstr:   ".tmux.conf",
+			wantSubstr:   ".ssh/config",
 		},
 		{
 			// Measured on msi 2026-09-02: the only file of the eleven observed
@@ -61,8 +61,8 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 		{
 			// Installers (opencode, bun, NVM, ggshield) append PATH/init lines.
 			name:        "rc files drift → exempt, pass",
-			deployFiles: []file{{".zshrc", "base"}, {".bashrc", "base"}, {".profile", "base"}},
-			homeFiles:   []file{{".zshrc", "base\nexport PATH=x"}, {".bashrc", "base\n. bun"}, {".profile", "base\nnvm"}},
+			deployFiles: []file{{".bashrc", "base"}, {".profile", "base"}},
+			homeFiles:   []file{{".bashrc", "base\n. bun"}, {".profile", "base\nnvm"}},
 			wantSubstr:  "exists",
 		},
 		{
@@ -70,8 +70,8 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 			// pre-ADR-012 leftover. cmp follows it and checkSymlinks PASSes it,
 			// so this FAIL exists nowhere else in doctor.
 			name:         "symlink at $HOME → fail even when content resolves equal",
-			deployFiles:  []file{{".zsh/functions.sh", "f()"}},
-			symlinks:     map[string]string{".zsh/functions.sh": ".zsh/functions.sh"},
+			deployFiles:  []file{{".inputrc", "f()"}},
+			symlinks:     map[string]string{".inputrc": ".inputrc"},
 			wantFailures: 1,
 			wantSubstr:   "symlink",
 		},
@@ -85,8 +85,8 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 			// setup guards .profile/.gitconfig/.bashrc on the SOURCE existing,
 			// so "not provisioned" is a skip, never a failure (R4).
 			name:        "source absent from deploy dir → skip, not fail",
-			deployFiles: []file{{".zsh/functions.sh", "f()"}},
-			homeFiles:   []file{{".zsh/functions.sh", "f()"}},
+			deployFiles: []file{{".inputrc", "f()"}},
+			homeFiles:   []file{{".inputrc", "f()"}},
 			wantSubstr:  "not provisioned",
 		},
 	}
@@ -202,8 +202,8 @@ func TestRun_HomeDeployDriftIsWiredIn(t *testing.T) {
 	env := map[string]string{"HOME": home, "DOTFILES_DIR": dotfiles}
 
 	// One content-checked entry, deployed and then drifted in $HOME.
-	writeFile(t, filepath.Join(dotfiles, ".zsh", "functions.sh"), "from the repo")
-	writeFile(t, filepath.Join(home, ".zsh", "functions.sh"), "edited in place")
+	writeFile(t, filepath.Join(dotfiles, ".inputrc"), "from the repo")
+	writeFile(t, filepath.Join(home, ".inputrc"), "edited in place")
 
 	var buf bytes.Buffer
 	code, err := Run(Options{Out: &buf, System: newSys(env, nil, nil), StartDir: home, Verbose: true})
@@ -215,7 +215,7 @@ func TestRun_HomeDeployDriftIsWiredIn(t *testing.T) {
 	if !strings.Contains(out, "Deploy-dir↔$HOME drift") {
 		t.Fatalf("the drift section did not run at all — is it still called from doctor.Run?\n%s", out)
 	}
-	if !strings.Contains(out, ".zsh/functions.sh has drifted") {
+	if !strings.Contains(out, ".inputrc has drifted") {
 		t.Errorf("want the drifted file reported by name\n%s", out)
 	}
 	if code == 0 {
