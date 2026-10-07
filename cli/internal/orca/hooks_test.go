@@ -203,6 +203,10 @@ func TestTuneScript_WritesTheRetiredScriptsBlockByteForByte(t *testing.T) {
 // fixed path fail, and a unique name never touches it.
 func TestTuneHooks_StagesEachWriteInItsOwnTempFile(t *testing.T) {
 	c, s := hookFixture(t, orcaJSON5s, copilotHookIWR)
+	before, err := os.Stat(c)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, p := range []string{c, s} {
 		if err := os.Mkdir(p+".tmp", 0o755); err != nil {
 			t.Fatal(err)
@@ -230,8 +234,10 @@ func TestTuneHooks_StagesEachWriteInItsOwnTempFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
-		t.Fatalf("the tuned file must keep its 0644, got %v", info.Mode().Perm())
+	// The fixture's mode is whatever the umask left, so compare with it rather
+	// than with a literal.
+	if info.Mode().Perm() != before.Mode().Perm() {
+		t.Fatalf("the tuned file must keep its %v, got %v", before.Mode().Perm(), info.Mode().Perm())
 	}
 }
 
