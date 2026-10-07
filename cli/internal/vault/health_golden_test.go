@@ -274,11 +274,17 @@ var ansiRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 // normalizeGolden is lib.sh's _gvh_normalize: strip ANSI colour and replace the
 // sandbox vault path with <VAULT>. The slash form is replaced too, for the
-// paths a Windows run prints with forward slashes.
+// paths a Windows run prints with forward slashes. On Windows the report joins
+// paths with native separators and the goldens are POSIX; no golden carries a
+// backslash, so mapping every one back is lossless.
 func normalizeGolden(s, vaultDir string) string {
 	s = ansiRe.ReplaceAllString(s, "")
 	s = strings.ReplaceAll(s, vaultDir, "<VAULT>")
-	return strings.ReplaceAll(s, filepath.ToSlash(vaultDir), "<VAULT>")
+	s = strings.ReplaceAll(s, filepath.ToSlash(vaultDir), "<VAULT>")
+	if runtime.GOOS == "windows" {
+		s = strings.ReplaceAll(s, `\`, "/")
+	}
+	return s
 }
 
 func assertArtefact(t *testing.T, name, want, got string) {
