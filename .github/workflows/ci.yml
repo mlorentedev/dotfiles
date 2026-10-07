@@ -363,12 +363,9 @@ jobs:
         # parallel, which the ubuntu runner image ships but nothing here
         # installs, so its absence fails loudly instead of as a bats error.
         # Measured locally, 4 jobs: 250 s serial to 89 s, three identical runs.
-        run: |
-          command -v parallel >/dev/null 2>&1 || { echo "::error::GNU parallel is missing from the runner image; bats --jobs needs it"; exit 1; }
-          mkdir -p "$RUNNER_TEMP/bats-report"
-          bats --jobs "$(nproc)" --no-parallelize-within-files \
-            --report-formatter junit --timing --output "$RUNNER_TEMP/bats-report" \
-            tests/*.bats
+        # The flags, the parallel preflight and the CPU count live in
+        # scripts/run-bats.sh, shared with the macOS job, where nproc does not exist.
+        run: ./scripts/run-bats.sh --report-dir "$RUNNER_TEMP/bats-report"
 
       # Per-file timing is the baseline a "no file over 30 s" budget (#1744)
       # needs, and CI had none. `!cancelled()` so a red run still leaves its report.
@@ -415,6 +412,136 @@ jobs:
       - name: Check the NaN ids against the package
         run: |
           PI_BIN="$RUNNER_TEMP/pi/bin/pi" PI_NAN_PACKAGE_REQUIRED=1 bats tests/pi-nan-package.bats
+
+  # PLAT-001d (W10, #2013, #1843 E10): the macOS leg. Linux CI cannot see a BSD
+  # sed, a bash 3.2 or a missing sha256sum, and every one of them broke a Mac
+  # silently while this suite stayed green (docs/lessons, specs/PLAT-001d).
+  #
+  # NOT REQUIRED yet. It is not in forge/branch-protection.json, on purpose: it
+  # becomes required once it has been green on main for a run of pushes (W10's
+  # own acceptance criterion). Making it required means moving the job-level
+  # `if:` below onto the steps, as `test` does, or a skipped job leaves the
+  # required check pending forever; tests/workflow-job-names.bats flags it.
+  #
+  # Three layers, one suite (never a per-OS copy of a test):
+  #   1. OS behaviour that can be injected (doctor's System.GOOS, deploy's goos)
+  #      is tested on the one Linux runner, in `test` and cli.yml.
+  #   2. THIS job runs what only a real macOS answers, as tagged in the suite
+  #      (`# bats file_tags=os-sensitive`): on a pull request just that tier,
+  #      on a push to main the whole suite as well, since a required-later job
+  #      that has never run the full suite cannot be trusted with it.
+  #   3. From-zero install end to end is X1 (#2013), gated on the root
+  #      installers; nothing here pretends to be it.
+  #
+  # The shells are asserted, not assumed: bats runs under /bin/bash 3.2 (a
+  # Homebrew bash ahead of it on PATH would make this a second bash 5 run), and
+  # zsh must exist because the tagged tests start it themselves.
+  test-macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve pins from versions.conf
+        id: pins
+        run: |
+          . ./versions.conf
+          for v in PYTHON_VERSION AGE_VERSION BATS_VERSION; do
+            eval "val=\${$v:-}"
+            [ -n "$val" ] || { echo "::error::$v missing from versions.conf"; exit 1; }
+            echo "$v=$val" >> "$GITHUB_OUTPUT"
+          done
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      # The suite reads workflow YAML and a pinned toml with Python (3.11+ for
+      # tomllib, PyYAML for the rest). macOS ships 3.9 without either.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ steps.pins.outputs.PYTHON_VERSION }}
+
+      - name: Install the suite's Python dependencies
+        run: python3 -m pip install --quiet pyyaml pre-commit
+
+      # Pinned release, as the Linux job does, but for the runner's own arch.
+      - name: Install age (pinned release, darwin)
+        env:
+          AGE_VERSION: ${{ steps.pins.outputs.AGE_VERSION }}
+        run: |
+          case "$(uname -m)" in
+            arm64) arch=arm64 ;;
+            x86_64) arch=amd64 ;;
+            *) echo "::error::unsupported runner arch $(uname -m)"; exit 1 ;;
+          esac
+          url="https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-darwin-${arch}.tar.gz"
+          curl -fsSL "$url" | tar xz
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 age/age age/age-keygen "$HOME/.local/bin/"
+          rm -rf age
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          got="$("$HOME/.local/bin/age" --version | sed 's/^v//')"
+          [ "$got" = "${AGE_VERSION#v}" ] || { echo "age is $got, expected ${AGE_VERSION#v}" >&2; exit 1; }
+
+      - name: Install bats-core (pinned)
+        env:
+          BATS_VERSION: ${{ steps.pins.outputs.BATS_VERSION }}
+        run: |
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          tar -xzf bats.tar.gz
+          "bats-core-${BATS_VERSION}/install.sh" "$HOME/.local"
+          rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
+          "$HOME/.local/bin/bats" --version
+
+      # `bats --jobs` needs GNU parallel, which the macOS image may not ship.
+      # scripts/run-bats.sh fails with the same ::error as the Linux job when it
+      # is still absent, so a failed install cannot read as a green leg. The
+      # install is a workflow step for now; the declaration moves into the
+      # package catalog as a system package under #2013 row P5b, which will
+      # also feed this step.
+      - name: Install GNU parallel
+        run: |
+          command -v parallel >/dev/null 2>&1 || brew install parallel
+          parallel --version | head -n 1
+
+      - name: Setup mock environment
+        run: |
+          mkdir -p ~/.dotfiles/sensitive ~/.dotfiles/scripts ~/.config/age
+          age-keygen -o ~/.config/age/key.txt 2>/dev/null
+          cp versions.conf ~/.dotfiles/
+          cp -r scripts/* ~/.dotfiles/scripts/
+          cp -r sensitive/* ~/.dotfiles/sensitive/ 2>/dev/null || true
+
+      - name: Show the shells under test
+        run: |
+          command -v zsh >/dev/null 2>&1 || { echo "::error::zsh is missing; the tagged tests start it"; exit 1; }
+          zsh --version
+          /bin/bash --version | head -n 1
+
+      - name: Go build, vet (native and GOOS=darwin) and test
+        working-directory: cli
+        run: |
+          go build ./...
+          go vet ./...
+          GOOS=darwin go vet ./...
+          go test ./...
+
+      # `/bin` first so bats' `#!/usr/bin/env bash` finds 3.2; run-bats.sh fails
+      # the step when it does not, and when no test carries the tag.
+      - name: bats, os-sensitive tier (bash 3.2)
+        env:
+          DOTF_TEST_GH_TOKEN: ${{ github.token }}
+        run: PATH="/bin:$PATH" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive
+
+      - name: bats, full suite (bash 3.2, main only)
+        if: github.event_name == 'push'
+        env:
+          DOTF_TEST_GH_TOKEN: ${{ github.token }}
+        run: PATH="/bin:$PATH" ./scripts/run-bats.sh --expect-bash 3
 
   test-windows:
     runs-on: windows-latest
