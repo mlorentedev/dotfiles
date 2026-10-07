@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
 
 // Semaphore bounds how many dispatches `dotf` runs against one pool at once.
@@ -32,7 +34,7 @@ func NewSemaphore(dir string) *Semaphore { return &Semaphore{dir: dir} }
 // once: the timeout path releases early and the normal path releases again on
 // the way out.
 type Slot struct {
-	f      *os.File
+	unlock func()
 	closed bool
 }
 
@@ -44,7 +46,7 @@ func (s *Slot) Release() {
 		return
 	}
 	s.closed = true
-	releaseSlot(s.f)
+	s.unlock()
 }
 
 // errPoolBusy marks the one refusal that is an availability fact rather than a
@@ -77,15 +79,18 @@ func (s *Semaphore) Acquire(pool string, capacity int) (*Slot, error) {
 
 	for i := 0; i < capacity; i++ {
 		path := filepath.Join(dir, fmt.Sprintf("slot-%d.lock", i))
-		f, taken, err := tryTakeSlot(path)
+		// A held slot is an expected answer. Any other failure (a filesystem
+		// that cannot lock, an unopenable path) is a refusal, never a free slot.
+		unlock, err := filelock.TryLock(path)
+		if errors.Is(err, filelock.ErrLocked) {
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("semaphore slot %d for pool %q is unusable: %w\n"+
 				"this is a refusal, not a free slot: treating a lock that could not be attempted as "+
 				"available would grant the slot precisely when the accounting is broken", i, pool, err)
 		}
-		if taken {
-			return &Slot{f: f}, nil
-		}
+		return &Slot{unlock: unlock}, nil
 	}
 	return nil, fmt.Errorf("pool %q: %w (capacity %d, all held by other dotf dispatches)",
 		pool, errPoolBusy, capacity)
