@@ -105,3 +105,15 @@ func (*skipper) Reconcile(Env, bool) (Result, error) {
 	return Result{Skip: "mise is not on PATH"}, nil
 }
 func (s *skipper) Probe(Env) error { s.probed = true; return nil }
+
+// The order is the contract: records first, so an agent that starts once a tool
+// lands already has its instructions (ADR-045 decision 4).
+func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
+	var names []string
+	for _, r := range Registry(Options{}) {
+		names = append(names, r.Name())
+	}
+	if got := strings.Join(names, ","); got != "records-mirror,records-harness,tools" {
+		t.Errorf("registry order: %s", got)
+	}
+}
