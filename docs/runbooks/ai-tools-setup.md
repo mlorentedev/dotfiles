@@ -36,11 +36,24 @@ Guide for setting up and using Claude Code and Gemini CLI with the dotfiles repo
 #### Linux / macOS
 
 ```bash
-git clone https://github.com/mlorentedev/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
-./setup-linux.sh
+# Fresh machine: clones to ~/Projects/dotfiles (DOTFILES_DIR), then runs setup,
+# which installs dotf, runs `dotf tools install` and `dotf deploy`, and ends
+# with `dotf doctor`.
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
 source ~/.zshrc
 ```
+
+Already cloned instead: the same, with a fast-forward pull first. Run one block,
+not both.
+
+```bash
+cd ~/Projects/dotfiles && ./install.sh
+source ~/.zshrc
+```
+
+Never clone into `~/.dotfiles`: that is the deploy target setup writes into, and
+setup refuses to run from it (#695). The README's *Install* section has the
+overrides (`DOTFILES_DIR`, `DOTFILES_REPO`).
 
 #### Windows (PowerShell)
 
@@ -262,7 +275,7 @@ The `claude-mem` plugin provides persistent memory across sessions.
 dotfiles-sync
 
 # Machine B - pull updates
-cd ~/.dotfiles && git pull && ./setup-linux.sh
+cd ~/Projects/dotfiles && ./install.sh   # fast-forward pull, then setup
 ```
 
 ## Environment Variables
