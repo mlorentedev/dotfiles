@@ -24,16 +24,19 @@ fail() {
     || fail "run from the repository root (versions.conf, scripts/ and sensitive/ expected in $(pwd))"
 command -v age-keygen >/dev/null 2>&1 || fail "age-keygen is not on PATH; install age before this step"
 
-mkdir -p "$HOME/.dotfiles/sensitive" "$HOME/.dotfiles/scripts" "$HOME/.config/age"
+mkdir -p "$HOME/.dotfiles/sensitive" "$HOME/.dotfiles/scripts" "$HOME/.config/age" \
+    || fail "could not create the mock directories under $HOME"
 
 # age-keygen refuses to overwrite an existing key; a rerun keeps the first one.
 key="$HOME/.config/age/key.txt"
-[ -s "$key" ] || age-keygen -o "$key"
+[ -s "$key" ] || age-keygen -o "$key" || fail "age-keygen could not write $key"
 [ -s "$key" ] || fail "age-keygen left no key at $key"
 
-cp versions.conf "$HOME/.dotfiles/"
-cp -r scripts/. "$HOME/.dotfiles/scripts/"
-cp -r sensitive/. "$HOME/.dotfiles/sensitive/"
+# Every failure goes through fail(), so the step always carries an annotation;
+# `set -e` alone would stop the script with plain stderr and no ::error:: line.
+cp versions.conf "$HOME/.dotfiles/" || fail "could not copy versions.conf"
+cp -r scripts/. "$HOME/.dotfiles/scripts/" || fail "could not copy scripts/"
+cp -r sensitive/. "$HOME/.dotfiles/sensitive/" || fail "could not copy sensitive/"
 
 for dir in scripts sensitive; do
     # -quit, not `| grep -q .`: under pipefail grep's early exit would SIGPIPE

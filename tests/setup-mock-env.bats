@@ -71,8 +71,19 @@ run_script() {
 @test "setup-mock-env: a failing age-keygen fails the step with its stderr visible" {
     stub_keygen 'echo "keygen exploded" >&2; exit 3'
     run_script
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
     [[ "$output" == *"keygen exploded"* ]]
+    [[ "$output" == *"::error::setup-mock-env: age-keygen could not write"* ]]
+}
+
+@test "setup-mock-env: a failing copy fails the step with an annotation" {
+    stub_keygen 'printf "AGE-SECRET-KEY-1STUB\n" > "$2"'
+    # A copy that cannot land: the scripts/ destination is a file, not a dir.
+    mkdir -p "$HOME/.dotfiles"
+    printf 'not a dir\n' > "$HOME/.dotfiles/scripts"
+    run_script
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"::error::setup-mock-env:"* ]]
 }
 
 @test "setup-mock-env: an empty sensitive/ fails the step instead of copying nothing" {
@@ -121,4 +132,11 @@ run_script() {
     [ "$(printf '%s\n' "$output" | grep -c -E '^[[:space:]]+run: \./scripts/setup-mock-env\.sh$')" = "2" ]
     # The inline form, not every age-keygen: test-windows makes its own key.
     refute_grep_fixed 'age-keygen -o ~/.config/age/key.txt' "$REPO/.github/workflows/ci.yml"
+}
+
+@test "ci: no step discards a command's error with 2>/dev/null || true (#2152)" {
+    # The form that turned a broken mock into skipped tests. Measured absent from
+    # ci.yml once the mock step moved to the script; this keeps it absent. A step
+    # that genuinely tolerates a failure says so with an explicit test instead.
+    refute_grep '2>/dev/null[[:space:]]*\|\|[[:space:]]*true' "$REPO/.github/workflows/ci.yml"
 }

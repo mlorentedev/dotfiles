@@ -62,7 +62,8 @@ Declined on #2147 because the Linux job shares the defect; it is fixed for both 
 - `scripts/setup-mock-env.sh` is now the only definition. Both `Setup mock environment` steps run it, and nothing else.
 - It refuses to run outside the repository root or without `age-keygen` on PATH, then asserts a non-empty key and non-empty `scripts/` and `sensitive/` copies, failing with `::error::`.
 - The two `ln -sf ~/.dotfiles/.{zshrc,bashrc}` lines are gone: the mock never holds those files, so the links always dangled.
-- Evidence: `tests/setup-mock-env.bats`, 9 ok with the fix and 9 not ok with the script and workflow change removed. Every bats file that references `ci.yml`: 308 ok.
+- Every failure inside the script, including a failing `mkdir` or `cp` that `set -e` alone would have stopped with plain stderr, goes through `fail()`, so the step always carries its annotation (PR-Agent on #2160). `ci.yml` may no longer contain `2>/dev/null || true` anywhere.
+- Evidence: `tests/setup-mock-env.bats`, 11 ok with the fix and 11 not ok with the script and workflow change removed. `tests/setup-mock-env-real.bats` runs the real age-keygen in CI, as BUG-055 pairing requires. On the `test-macos` runner the step printed `mock environment ready`, so BSD `find -quit` works there. Every bats file that references `ci.yml`: 308 ok.
 
 ## Decisions made during implementation
 
