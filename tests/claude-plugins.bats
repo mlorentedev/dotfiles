@@ -22,7 +22,7 @@ linux_plugins() {
 # The ids quoted inside the `$plugins = @(` array. The file is CRLF.
 windows_plugins() {
     tr -d '\r' < "$DOTFILES_DIR/setup-windows.ps1" |
-        sed -n '/^\s*\$plugins = @($/,/^\s*)$/p' |
+        sed -n '/^[[:space:]]*\$plugins = @($/,/^[[:space:]]*)$/p' |
         grep -oE '"[^"]+@[^"]+"' | tr -d '"' | sort
 }
 

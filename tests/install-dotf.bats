@@ -5,6 +5,9 @@
 # there is no network here. A fake `dotf` binary that echoes its version stands
 # in for the real release artifact.
 
+
+load 'lib/os'
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     TMP="$(mktemp -d "/tmp/bats_installdotf_XXXXXX")"
@@ -212,6 +215,12 @@ teardown() {
     # own executable text image open for the swap to contend with.
     cp "$(command -v bash)" "$DEST/dotf"
     chmod 0755 "$DEST/dotf"
+    # An Apple-silicon kernel kills (SIGKILL, "Killed: 9") a copied Apple-signed
+    # binary at exec: its signature is bound to the original path. Re-sign the
+    # copy ad hoc so it runs; without it the fixture dies and proves nothing.
+    if [ "$(uname -s)" = Darwin ]; then
+        codesign --force --sign - "$DEST/dotf" >/dev/null 2>&1
+    fi
     "$DEST/dotf" -c 's=$SECONDS; while (( SECONDS - s < 30 )); do :; done' &
     BUSY_PID=$!
 

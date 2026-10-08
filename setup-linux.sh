@@ -783,12 +783,13 @@ if [ -f "$PI_SETTINGS_DST" ] && [ -f "$PI_SETTINGS_SRC" ]; then
             # Same directory as the destination, not $TMPDIR: a cross-filesystem
             # mv degrades to copy+delete (not atomic) and mktemp's 0600 mode
             # would silently tighten the destination's permissions on the first
-            # sync. chmod --reference copies the live file's mode before the
-            # swap, so a rename within one filesystem is both atomic and
-            # permission-preserving.
+            # sync. Copying the live file's mode before the swap keeps a rename
+            # within one filesystem both atomic and permission-preserving. The
+            # mode is read with GNU stat or, failing that, BSD stat: chmod
+            # --reference is GNU-only and silently failed here on macOS.
             PI_SETTINGS_TMP=$(mktemp "$(dirname "$PI_SETTINGS_DST")/.settings.json.XXXXXX")
             if jq --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels = $m' "$PI_SETTINGS_DST" > "$PI_SETTINGS_TMP" 2>/dev/null \
-                && chmod --reference="$PI_SETTINGS_DST" "$PI_SETTINGS_TMP" 2>/dev/null; then
+                && chmod "$(stat -c '%a' "$PI_SETTINGS_DST" 2>/dev/null || stat -f '%Lp' "$PI_SETTINGS_DST")" "$PI_SETTINGS_TMP" 2>/dev/null; then
                 mv "$PI_SETTINGS_TMP" "$PI_SETTINGS_DST"
                 log_success "Synced pi enabledModels (theme/defaultModel/lastChangelogVersion preserved)"
             else
@@ -921,8 +922,8 @@ restore_claude_json_if_truncated() {
     local claude_json="$HOME/.claude/.claude.json"
     if [ -f "$claude_json" ]; then
         local snapshot_size new_size half
-        snapshot_size=$(stat -c %s "$backup" 2>/dev/null || echo 0)
-        new_size=$(stat -c %s "$claude_json" 2>/dev/null || echo 0)
+        snapshot_size=$(stat -c %s "$backup" 2>/dev/null || stat -f %z "$backup" 2>/dev/null || echo 0)
+        new_size=$(stat -c %s "$claude_json" 2>/dev/null || stat -f %z "$claude_json" 2>/dev/null || echo 0)
         half=$((snapshot_size / 2))
         if [ "$snapshot_size" -ge 10240 ] && [ "$new_size" -lt "$half" ]; then
             cp -f "$backup" "$claude_json"

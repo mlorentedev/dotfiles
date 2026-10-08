@@ -1,0 +1,44 @@
+[
+  {
+    "id": "PLAT-001d-macos-ci-leg-f1",
+    "behavior": "AC1: the doctor GOOS seam runs the darwin and windows dialects on any host",
+    "verification": "cd cli && go test ./internal/doctor/ -run 'TestContractOS|TestCheckContractPath_Dialects|TestCheckContractEnvVars_WindowsDialect' -count=1 -v | grep -q -- '--- PASS: TestContractOS'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001d-macos-ci-leg-f2",
+    "behavior": "AC2: the os-sensitive tier selects tests and passes under bash 3.2",
+    "verification": "PATH=\"/bin:$PATH\" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001d-macos-ci-leg-f3",
+    "behavior": "AC3: a near-miss tag, an unknown tag and a tag no test carries each fail",
+    "verification": "bats tests/guard-bats-tags.bats tests/run-bats-real.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001d-macos-ci-leg-f4",
+    "behavior": "AC4: the full bats suite is green on macOS",
+    "verification": "./scripts/run-bats.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001d-macos-ci-leg-f5",
+    "behavior": "AC5: ci.yml declares test-macos, not required, on the code path filter",
+    "verification": "python3 -c \"import yaml;j=yaml.safe_load(open('.github/workflows/ci.yml'))['jobs']['test-macos'];assert j['runs-on']=='macos-latest' and 'needs.changes.outputs.code' in j['if']\" && ! grep -q test-macos forge/branch-protection.json",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001d-macos-ci-leg-f6",
+    "behavior": "AC6: one script owns the CPU count and the parallel preflight; ci.yml runs no nproc",
+    "verification": "bats tests/run-bats.bats tests/run-bats-real.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

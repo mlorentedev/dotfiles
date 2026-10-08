@@ -16,6 +16,10 @@ toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$toplevel" ] || exit 0
 
 VAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
+# `git rev-parse --show-toplevel` answers with the physical path, so a vault
+# configured through a symlink (macOS's /var -> /private/var, a linked
+# ~/Projects) would never compare equal and its own MEMORY.md would be blocked.
+VAULT="$(cd "$VAULT" 2>/dev/null && pwd -P || printf '%s' "$VAULT")"
 
 # Vault detection: the sentinel .obsidian/ at the repo root (cross-machine) or
 # the repo root being the configured vault path. The vault is the allowed sink.

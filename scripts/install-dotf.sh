@@ -137,6 +137,19 @@ _dotf_current_version() {
     printf '%s\n' "$_dotf_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|dev' | head -n1 || :
 }
 
+# _dotf_sha256 <file>: print the file's sha256. macOS ships no sha256sum before
+# 26 (and there it lives in /sbin, off the PATH an installer stream runs with);
+# `shasum` is in /usr/bin on every release. This script runs from a raw stream
+# with no utils.sh, so the helper is local. An unusable tool prints nothing and
+# the caller's comparison fails, which is the safe direction.
+_dotf_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
 # _dotf_fetch <url> <sums_url> <artifact> <workdir>: download the artifact and
 # checksums into workdir, verify sha256, extract `dotf`. A mismatch or missing
 # entry aborts (return 1) and leaves nothing extracted.
@@ -152,7 +165,7 @@ _dotf_fetch() {
     if [ -z "$_dotf_expected" ]; then
         log_error "install_dotf: $artifact not listed in checksums.txt"; return 1
     fi
-    _dotf_actual="$(sha256sum "$work/$artifact" | awk '{print $1}')"
+    _dotf_actual="$(_dotf_sha256 "$work/$artifact")"
     if [ "$_dotf_expected" != "$_dotf_actual" ]; then
         log_error "install_dotf: checksum mismatch for $artifact (want $_dotf_expected, got $_dotf_actual)"
         return 1

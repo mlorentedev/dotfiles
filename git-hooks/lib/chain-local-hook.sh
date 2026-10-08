@@ -60,6 +60,9 @@ toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 # the same reasoning BUG-036 already applies to pre-commit's OWN config.
 # Store path per pre-commit's own Store.get_default_directory().
 precommit_store="${PRE_COMMIT_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/pre-commit}"
+# $toplevel is the physical path, so a store reached through a symlink (macOS's
+# /var -> /private/var, a linked ~/.cache) would never match as written.
+precommit_store="$(cd "$precommit_store" 2>/dev/null && pwd -P || printf '%s' "$precommit_store")"
 case "$toplevel" in
     "$precommit_store"/*) exit 0 ;;
 esac
