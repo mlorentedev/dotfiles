@@ -63,14 +63,19 @@ utils() {
     [[ "$output" == *"Removed $HOME/.local/bin/eza"* ]] || false
 }
 
-@test "remove_unrunnable_tool: leaves a working tool, a failing tool, a symlink and an absent name alone" {
+@test "remove_unrunnable_tool: leaves a working tool, a failing tool, a non-executable file, a symlink and an absent name alone" {
+    # A native file that lost its execute bit also makes bash exit 126 (EACCES);
+    # that says nothing about its platform, so it stays.
+    printf '\000\000\000\000not a program\n' > "$HOME/.local/bin/sops"
+    chmod 644 "$HOME/.local/bin/sops"
     printf '#!/bin/sh\nexit 0\n' > "$HOME/.local/bin/jq"
     printf '#!/bin/sh\nexit 1\n' > "$HOME/.local/bin/gh"
     printf '\000\000\000\000not a program\n' > "$TMP/elsewhere"
     chmod +x "$HOME/.local/bin/jq" "$HOME/.local/bin/gh" "$TMP/elsewhere"
     ln -s "$TMP/elsewhere" "$HOME/.local/bin/pi"
-    utils remove_unrunnable_tool jq gh pi age
+    utils remove_unrunnable_tool jq gh pi age sops
     [ "$status" -eq 0 ]
+    [ -f "$HOME/.local/bin/sops" ]
     [ -f "$HOME/.local/bin/jq" ]
     [ -f "$HOME/.local/bin/gh" ]
     [ -L "$HOME/.local/bin/pi" ]
@@ -94,6 +99,10 @@ utils() {
 
 @test "setup-linux.sh: age is reported installed only after the placed binary runs" {
     grep -qF '&& "$HOME/.local/bin/age" --version >/dev/null 2>&1; then' "$REPO/setup-linux.sh"
+    # A failed post-condition removes the copies, or the next run's command -v
+    # fast path would log "age already installed" for a binary that cannot run.
+    awk '/age installation failed/ { print prev } { prev = $0 }' "$REPO/setup-linux.sh" \
+        | grep -qF 'rm -f "$HOME/.local/bin/age" "$HOME/.local/bin/age-keygen"'
 }
 
 @test "aliases.zsh: ls stays the system ls when eza is absent, and is eza when present" {

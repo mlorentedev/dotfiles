@@ -72,14 +72,16 @@ host_is_linux_amd64() {
 
 # remove_unrunnable_tool: delete ~/.local/bin/<name> when the OS refuses to run it.
 # Exit 126 is "found but cannot execute" (another OS's or arch's build); such a
-# file only shadows the working copies later on PATH. A tool that runs, or that
-# fails for any other reason, is left alone, and so is a symlink.
+# file only shadows the working copies later on PATH. bash also exits 126 for a
+# file without the execute bit, which says nothing about its platform, so only an
+# executable file is probed. A tool that runs, one that fails for any other
+# reason, a non-executable file and a symlink are left alone.
 # Usage: remove_unrunnable_tool age age-keygen eza
 remove_unrunnable_tool() {
     local name file rc
     for name in "$@"; do
         file="$HOME/.local/bin/$name"
-        if [ ! -f "$file" ] || [ -L "$file" ]; then
+        if [ ! -f "$file" ] || [ -L "$file" ] || [ ! -x "$file" ]; then
             continue
         fi
         rc=0

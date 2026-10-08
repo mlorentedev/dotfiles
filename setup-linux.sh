@@ -219,6 +219,9 @@ if host_is_linux_amd64; then
             log_success "age installed (v${AGE_VER})"
         else
             rm -rf "$_age_tmp"
+            # A placed copy that does not run would turn this failure into
+            # "age already installed" on the next run (command -v finds it).
+            rm -f "$HOME/.local/bin/age" "$HOME/.local/bin/age-keygen"
             log_warning "age installation failed"
         fi
     else
