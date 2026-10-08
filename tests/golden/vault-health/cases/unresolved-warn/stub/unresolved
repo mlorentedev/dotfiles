@@ -1,5 +1,27 @@
-link1
-link2
-link3
-link4
-link5
+[
+  {
+    "link": "link1",
+    "count": "1",
+    "sources": "00_meta/note.md"
+  },
+  {
+    "link": "link2",
+    "count": "1",
+    "sources": "00_meta/note.md"
+  },
+  {
+    "link": "link3",
+    "count": "1",
+    "sources": "00_meta/note.md"
+  },
+  {
+    "link": "link4",
+    "count": "1",
+    "sources": "00_meta/note.md"
+  },
+  {
+    "link": "link5",
+    "count": "1",
+    "sources": "00_meta/note.md"
+  }
+]
