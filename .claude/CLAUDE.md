@@ -74,6 +74,12 @@ the drift under *Go lint toolchain*; install the pin with:
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(. ./versions.conf; echo "$GOLANGCI_LINT_VERSION")
 ```
 
+**A finding whose path leaves your worktree is the cache, not your code.**
+golangci-lint's cache is shared by every worktree on the machine, so a run can
+report `../../dotfiles-wt-<other>/…` — a file of another worktree, or of one
+already removed (lesson 365). Run `golangci-lint cache clean` and lint again
+before you fix or dismiss anything.
+
 ```bash
 # --- Post-setup verification (both layers) ---
 dotf doctor
