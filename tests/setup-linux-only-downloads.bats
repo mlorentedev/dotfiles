@@ -51,9 +51,11 @@ utils() {
 }
 
 @test "remove_unrunnable_tool: removes a binary the OS cannot execute (exit 126)" {
-    # A missing interpreter is the portable stand-in for an ELF on macOS: the
-    # kernel finds the file and refuses to run it, and the shell reports 126.
-    printf '#!/nonexistent/interpreter\n' > "$HOME/.local/bin/eza"
+    # A file of no known executable format is the portable stand-in for an ELF
+    # on macOS: the kernel refuses it (ENOEXEC), bash sees binary content and
+    # reports 126 on both OSes. A missing #! interpreter is not: Linux bash
+    # reports that as 127.
+    printf '\000\000\000\000not a program\n' > "$HOME/.local/bin/eza"
     chmod +x "$HOME/.local/bin/eza"
     utils remove_unrunnable_tool eza
     [ "$status" -eq 0 ]
@@ -64,7 +66,7 @@ utils() {
 @test "remove_unrunnable_tool: leaves a working tool, a failing tool, a symlink and an absent name alone" {
     printf '#!/bin/sh\nexit 0\n' > "$HOME/.local/bin/jq"
     printf '#!/bin/sh\nexit 1\n' > "$HOME/.local/bin/gh"
-    printf '#!/nonexistent/interpreter\n' > "$TMP/elsewhere"
+    printf '\000\000\000\000not a program\n' > "$TMP/elsewhere"
     chmod +x "$HOME/.local/bin/jq" "$HOME/.local/bin/gh" "$TMP/elsewhere"
     ln -s "$TMP/elsewhere" "$HOME/.local/bin/pi"
     utils remove_unrunnable_tool jq gh pi age
