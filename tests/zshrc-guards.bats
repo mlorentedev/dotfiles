@@ -12,14 +12,27 @@
 # shellcheck disable=SC2016  # the probes are zsh code, expanded by the zsh under test
 
 setup() {
-    command -v zsh >/dev/null 2>&1 || skip "zsh not available"
+    ZSH_BIN=$(command -v zsh) || skip "zsh not available"
     REPO="$BATS_TEST_DIRNAME/.."
     SANDBOX="$BATS_TEST_TMPDIR/sandbox"
     mkdir -p "$SANDBOX/home" "$SANDBOX/dotfiles" "$SANDBOX/bin"
     # versions.conf names the tool-home directories; paths.sh is left absent so
     # the rc takes its bootstrap fallback, as on a machine that has not run setup.
     cp "$REPO/versions.conf" "$SANDBOX/dotfiles/"
+    # The rc's PATH holds the test's own stubs and links to RC_TOOLS, never a
+    # host directory: with /usr/bin on it, a host terraform (or direnv, mise,
+    # zoxide, dotf) switches on a block the test assumes is off (#2149). A tool
+    # the rc needs and RC_TOOLS lacks fails loudly, as stderr fails the load.
+    mkdir -p "$SANDBOX/sysbin"
+    for tool in $RC_TOOLS; do
+        target=$(command -v "$tool") || continue
+        ln -s "$target" "$SANDBOX/sysbin/$tool"
+    done
 }
+
+# The external commands the rc runs whatever the host has: compinit's dump is
+# renamed into place with mv.
+RC_TOOLS="mv"
 
 # load_rc PROBE: source the repo's .zshrc in a scratch HOME, then evaluate PROBE
 # in the same shell. stdout is the probe's. Anything the rc writes to stderr
@@ -27,8 +40,8 @@ setup() {
 # would otherwise still exit 0 in every test.
 load_rc() {
     env -i HOME="$SANDBOX/home" ZDOTDIR="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" \
-        PATH="$SANDBOX/bin:/usr/bin:/bin" TERM=dumb \
-        zsh -f -c '. "$1"; eval "$2"' _ "$REPO/.zshrc" "$1" 2>"$SANDBOX/stderr" || return
+        PATH="$SANDBOX/bin:$SANDBOX/sysbin" TERM=dumb \
+        "$ZSH_BIN" -f -c '. "$1"; eval "$2"' _ "$REPO/.zshrc" "$1" 2>"$SANDBOX/stderr" || return
     if [ -s "$SANDBOX/stderr" ]; then
         printf 'stderr: %s\n' "$(cat "$SANDBOX/stderr")"
         return 1
@@ -45,6 +58,17 @@ load_rc() {
     [[ "$output" == *"compdef=compdef: function"* ]] || false
     # bashcompinit is loaded only for terraform.
     [[ "$output" == *"complete=complete: none"* ]] || false
+}
+
+@test "the sandbox resolves none of the optional tools the rc probes for" {
+    # Every `command -v X` in the rc is a block a test assumes is off unless it
+    # stubs X. Read them from the rc, so a new probe is covered without an edit
+    # here, and fail on the first that resolves to anything on the host (#2149).
+    probes=$(grep -oE 'command -v [A-Za-z0-9_-]+' "$REPO/.zshrc" | awk '{print $3}' | sort -u | tr '\n' ' ')
+    [ -n "$probes" ] || false
+    run load_rc 'for t in '"$probes"'; do whence -p $t >/dev/null && print -r -- "leak: $t -> $(whence -p $t)"; done; true'
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "brew shellenv runs exactly when brew is installed" {
