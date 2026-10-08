@@ -786,7 +786,8 @@ unset_var() {
 
 # Emits the canonical "Cannot reach Obsidian GUI" error + start hint, then
 # exits 2. Caller owns the probe shape; this owns the user-facing message
-# so it stays in one place across obs-cli.sh and vault-health.sh.
+# so it stays in one place (obs-cli.sh; vault-health.sh, its other caller,
+# retired under #492).
 # Input: none
 # Output: error log + info hint to stderr/stdout, then exit 2
 # Usage: <your_probe> || fail_obsidian_gui

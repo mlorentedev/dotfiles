@@ -2,11 +2,11 @@
 
 # vault.sh: Thin dispatcher for vault tooling (REFACTOR-005).
 #
-# The three vault scripts (vault-health.sh, vault-maintenance-weekly.sh,
-# check-md-escapes.sh) do genuinely independent things and share almost no
-# code, so they stay separate on disk. This dispatcher only adds a single
-# discoverable entry point: `vault <subcommand>`. Each backing script remains
-# runnable standalone — the dispatcher just `exec`s into it.
+# The vault tools do genuinely independent things and share almost no code,
+# so they stay separate. This dispatcher only adds a single discoverable entry
+# point: `vault <subcommand>`. `health` is `dotf vault health` (the shell
+# report it used to exec was retired under #492); every other subcommand
+# `exec`s a backing script that remains runnable standalone.
 
 set -euo pipefail
 
@@ -42,11 +42,11 @@ Subcommands:
   help, -h, --help
       Show this message.
 
-Each subcommand is also runnable standalone (vault-health.sh,
+Each subcommand is also runnable standalone (`dotf vault health`,
 vault-maintenance-weekly.sh, check-md-escapes.sh, check-backlog-integrity.sh,
 check-backlog-merged.sh) —
 this dispatcher provides a single discoverable entry point without changing the
-underlying scripts.
+underlying tools.
 EOF
 }
 
@@ -60,7 +60,7 @@ shift
 
 case "$sub" in
     health)
-        exec "$SCRIPT_DIR/vault-health.sh" "$@"
+        exec dotf vault health "$@"
         ;;
     maintenance|weekly)
         exec "$SCRIPT_DIR/vault-maintenance-weekly.sh" "$@"

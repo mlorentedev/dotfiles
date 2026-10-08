@@ -1,11 +1,17 @@
-# Oracle for the vault-health golden corpus (CLI-021 increment 2).
+# Oracle for the vault-health golden corpus — HISTORICAL, read-only.
 #
-# sha256 of each file the goldens were captured from. A test fails the
-# suite when the working tree drifts from these, so a recapture is always
-# a deliberate, reviewable act.
+# scripts/vault-health.sh was deleted under CLI-023 (#492): `dotf vault health`
+# is the sole implementation now, and the corpus is Go-owned —
+# cli/internal/vault/health_golden_test.go replays cases/ against it. There is
+# no re-capture path: capture.sh and lib.sh were deleted with the script, and
+# tests/vault-health-golden.bats, which asserted these hashes, went with them.
+# Kept as the provenance record of which shell bytes produced the goldens under
+# tests/golden/vault-health/cases/ — do not delete or "fix" the hashes below.
+# The first describes a script that no longer exists; the two check-backlog
+# scripts still exist (scripts/vault.sh exposes them) but are no longer pinned
+# here, so their current bytes may differ.
 #
-# Captured at git revision 147e4ed (informational only - never assert on it,
-# CI checks out shallow and rebases change it for free).
+# Captured at git revision 147e4ed (informational only).
 
 578e90f784d5a526b9d39aedd208f396df632bfec77652a91021d257b0f4078e  scripts/vault-health.sh
 5bdb882ab09463774c94c52d31374263939104f83e04a4981ff13f2067c8b4c7  scripts/check-backlog-integrity.sh

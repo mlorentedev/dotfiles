@@ -16,8 +16,8 @@ import (
 var errVaultHealthFailed = errors.New("vault health: one or more checks failed")
 
 // newVaultHealthCmd builds `dotf vault health`, the Go port of
-// scripts/vault-health.sh (CLI-021 / #490, increment 2). Built BESIDE the shell
-// twin: nothing repoints at this yet (that cutover is CLI-023 / #492).
+// scripts/vault-health.sh (CLI-021 / #490, increment 2). Built beside the shell
+// twin; CLI-023 (#492) repointed every caller here and deleted the script.
 //
 // The vault directory resolves $VAULT_DIR first — the shell's own internal
 // handoff variable, and what every golden case in tests/golden/vault-health/
