@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for scripts/install-precommit.sh
 
+# bats file_tags=os-sensitive
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"

@@ -6,6 +6,8 @@
 # there could see it. This guard is static, so it runs on every OS: it fails on a
 # bash-4-only construct in any POSIX shell file that bash executes.
 
+# bats file_tags=os-sensitive
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
 }

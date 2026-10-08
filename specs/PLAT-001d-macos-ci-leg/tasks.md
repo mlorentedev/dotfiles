@@ -25,13 +25,13 @@ created: "2026-10-07"
 
 ### Tiering and runner (AC2, AC3, AC6)
 
-- [ ] [AC3] Failing test, then `tests/guard-bats-tags.bats`: exact tag spelling, known tags only, `test_tags` above an `@test`, non-empty tier
-- [ ] [AC2] Tag the OS-sensitive tests (`# bats file_tags=os-sensitive` / `test_tags`), each file justified in `verification.md`
-- [ ] [AC6] Failing tests, then `scripts/run-bats.sh` (`getconf` CPU count, GNU parallel preflight, `--expect-bash`, empty tag selection fails); `tests/run-bats.bats` for the broken environments, `tests/run-bats-real.bats` for the real tools
+- [x] [AC3] Failing test, then `tests/guard-bats-tags.bats`: exact tag spelling, known tags only, `test_tags` above an `@test`, non-empty tier
+- [x] [AC2] Tag the OS-sensitive tests (`# bats file_tags=os-sensitive` / `test_tags`), each file justified in `verification.md`
+- [x] [AC6] Failing tests, then `scripts/run-bats.sh` (`getconf` CPU count, GNU parallel preflight, `--expect-bash`, empty tag selection fails); `tests/run-bats.bats` for the broken environments, `tests/run-bats-real.bats` for the real tools
 
 ### Workflow (AC5)
 
-- [ ] [AC6] `ci.yml`: `test` calls `run-bats.sh`
+- [x] [AC6] `ci.yml`: `test` calls `run-bats.sh`
 - [ ] [AC5] `ci.yml`: new non-required `test-macos` on the `code` filter
 - [ ] [AC5] Assert bash 3.2 and zsh in the job rather than assume them
 - [ ] [AC5] First green run of `test-macos` on this PR (run 37590992834); the main-only full-suite step runs after merge

@@ -363,12 +363,9 @@ jobs:
         # parallel, which the ubuntu runner image ships but nothing here
         # installs, so its absence fails loudly instead of as a bats error.
         # Measured locally, 4 jobs: 250 s serial to 89 s, three identical runs.
-        run: |
-          command -v parallel >/dev/null 2>&1 || { echo "::error::GNU parallel is missing from the runner image; bats --jobs needs it"; exit 1; }
-          mkdir -p "$RUNNER_TEMP/bats-report"
-          bats --jobs "$(nproc)" --no-parallelize-within-files \
-            --report-formatter junit --timing --output "$RUNNER_TEMP/bats-report" \
-            tests/*.bats
+        # The flags, the parallel preflight and the CPU count live in
+        # scripts/run-bats.sh, which a macOS run uses too, where nproc does not exist.
+        run: ./scripts/run-bats.sh --report-dir "$RUNNER_TEMP/bats-report"
 
       # Per-file timing is the baseline a "no file over 30 s" budget (#1744)
       # needs, and CI had none. `!cancelled()` so a red run still leaves its report.

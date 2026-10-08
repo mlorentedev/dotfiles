@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for scripts/shell-profile.sh — shell startup profiling
 
+# bats file_tags=os-sensitive
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     REPO_ROOT="$BATS_TEST_DIRNAME/.."

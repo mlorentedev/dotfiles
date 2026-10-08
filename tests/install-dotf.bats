@@ -5,6 +5,7 @@
 # there is no network here. A fake `dotf` binary that echoes its version stands
 # in for the real release artifact.
 
+# bats file_tags=os-sensitive
 
 load 'lib/os'
 

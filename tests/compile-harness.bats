@@ -1481,6 +1481,7 @@ set_agy_cap() {
         "$REPO/harness/manifest.json" > "$tmp" && mv "$tmp" "$REPO/harness/manifest.json"
 }
 
+# bats test_tags=os-sensitive
 @test "doctrine: the over-cap warning for the generated doctrine names characters and bytes" {
     seed_doctrine_fixture
     set_agy_cap 10
@@ -1489,6 +1490,7 @@ set_agy_cap() {
     [[ "$output" =~ GENERATED\ doctrine\ alone\ is\ [0-9]+\ characters\ /\ [0-9]+\ bytes,\ over\ the\ 10\ cap ]]
 }
 
+# bats test_tags=os-sensitive
 @test "doctrine: the over-cap warning for a user's file names characters and bytes, and they differ" {
     seed_doctrine_fixture
     run_refresh; [ "$status" -eq 0 ]

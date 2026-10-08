@@ -17,6 +17,8 @@
 # These tests therefore assert REACH -- that a definition placed after the
 # failure point still resolves -- rather than exit status.
 
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     # Files sourced into an interactive shell; their function names are at risk.

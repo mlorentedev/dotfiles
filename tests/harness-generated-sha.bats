@@ -14,6 +14,7 @@
 # This test file never starts a line with the marker text (references above are
 # prose / assignments), so `git grep` never lists this file.
 
+# bats file_tags=os-sensitive
 
 load 'lib/os'
 

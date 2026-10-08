@@ -35,6 +35,7 @@ windows_plugins() {
     [ "$(linux_plugins)" = "$(ssot_plugins)" ]
 }
 
+# bats test_tags=os-sensitive
 @test "setup-windows.ps1 installs exactly the plugins in plugins.json" {
     [ -n "$(windows_plugins)" ]
     [ "$(windows_plugins)" = "$(ssot_plugins)" ]

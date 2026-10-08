@@ -7,6 +7,7 @@
 # REAL git repo (so the installed hooks can be exercised with real git), while
 # setup.sh itself still runs against the stubbed git for clone/pull.
 
+# bats file_tags=os-sensitive
 
 load 'lib/os'
 
