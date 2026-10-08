@@ -44,6 +44,19 @@ link_basics() {
     [ "$status" -eq 2 ]
 }
 
+@test "run-bats: an option given an empty value is a usage error, never an unfiltered run" {
+    # `--filter-tags "$UNSET"` would otherwise read as no filter at all and run the
+    # whole suite in place of the tier (#2146 review).
+    local opt
+    for opt in --filter-tags --expect-bash --report-dir; do
+        # --print-jobs exits before any test runs, so a regression fails fast
+        # instead of starting the suite.
+        run "$RUN" "$opt" "" --print-jobs
+        [ "$status" -eq 2 ] || { printf '%s exited %s: %s\n' "$opt" "$status" "$output" >&2; false; }
+        [[ "$output" == *"$opt needs a non-empty value"* ]]
+    done
+}
+
 @test "ci.yml counts CPUs through run-bats.sh, not nproc, which macOS does not have" {
     refute_grep '(\$\(|`)[[:space:]]*nproc' "$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
 }

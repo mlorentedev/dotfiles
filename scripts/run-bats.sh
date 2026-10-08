@@ -59,10 +59,10 @@ print_jobs=0
 report_dir=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --filter-tags) [ "$#" -ge 2 ] || die "--filter-tags needs a value" 2; tags="$2"; shift 2 ;;
-        --report-dir) [ "$#" -ge 2 ] || die "--report-dir needs a value" 2; report_dir="$2"; shift 2 ;;
+        --filter-tags) [ "$#" -ge 2 ] && [ -n "$2" ] || die "--filter-tags needs a non-empty value" 2; tags="$2"; shift 2 ;;
+        --report-dir) [ "$#" -ge 2 ] && [ -n "$2" ] || die "--report-dir needs a non-empty value" 2; report_dir="$2"; shift 2 ;;
         --print-jobs) print_jobs=1; shift ;;
-        --expect-bash) [ "$#" -ge 2 ] || die "--expect-bash needs a value" 2; expect_bash="$2"; shift 2 ;;
+        --expect-bash) [ "$#" -ge 2 ] && [ -n "$2" ] || die "--expect-bash needs a non-empty value" 2; expect_bash="$2"; shift 2 ;;
         --) shift; break ;;
         -*) die "unknown option: $1" 2 ;;
         *) break ;;
