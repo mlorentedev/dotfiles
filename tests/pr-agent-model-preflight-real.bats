@@ -10,6 +10,8 @@
 #
 # No network: the server listens on 127.0.0.1 on a port the kernel picks.
 
+# bats file_tags=os-sensitive
+
 bats_require_minimum_version 1.5.0
 
 setup() {
@@ -24,7 +26,7 @@ setup() {
     # alive answers 200, dead answers 401, hang holds the connection open, stall
     # sends a 200 status line and never the body.
     cat > "$BATS_TEST_TMPDIR/server.py" <<'PY'
-import http.server, json, sys, time
+import http.server, json, socketserver, sys, time
 auth_log, port_file = sys.argv[1], sys.argv[2]
 class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
@@ -49,7 +51,15 @@ class H(http.server.BaseHTTPRequestHandler):
         self.wfile.write(b"{}")
     def log_message(self, *a):
         pass
-s = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+class S(http.server.ThreadingHTTPServer):
+    # HTTPServer.server_bind resolves socket.getfqdn(host) only to fill
+    # server_name. On a macOS runner that reverse lookup outlived the 5 s
+    # start-up wait below, so every test failed in setup (run 37722585322).
+    # Nothing here reads server_name.
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+s = S(("127.0.0.1", 0), H)
 with open(port_file, "w") as f:
     f.write(str(s.server_address[1]))
 s.serve_forever()
