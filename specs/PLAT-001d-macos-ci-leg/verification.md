@@ -22,7 +22,7 @@ created: "2026-10-07"
 |---|---|---|---|
 | (b) missing tool | 27 | no PyYAML for the Python that reads workflow YAML (pr-agent-config 13, agent-runtime-deployment, check-review-attestation, dependabot-ci, release-pr-body-refs, review-attestation-workflow, secrets-only-scope, model-canary) | environment; CI uses `actions/setup-python` plus `pip install pyyaml` |
 | (b) missing tool | 13 | macOS Python is 3.9, no `tomllib` (pr-agent-config) | environment; Python 3.12 from `versions.conf` in CI |
-| (a) script | 15 | BSD `wc` pads counts: `vault-health.sh` (13 golden tests), `compile-harness.sh` (2) | `\| tr -d ' '`; goldens recaptured, byte-identical, only the ORACLE hash moved |
+| (a) script | 15 | BSD `wc` pads counts: `vault-health.sh` (13 golden tests), `compile-harness.sh` (2) | `\| tr -d ' '`; goldens recaptured, byte-identical, only the ORACLE hash moved. The `vault-health.sh` half was dropped on rebase: #2150 retired the script and its golden suite, and the corpus is now replayed by a Go test |
 | (a) script | 3 | `check-bats-names.sh` used `grep -P` and discarded stderr, so it passed every file | `grep -E` with `[:print:]`; grep exit 2 now fails; test with an unreadable file |
 | (a) script | 3 | no `sha256sum` (absent before macOS 26, `/sbin` after): `install-dotf.sh` | `_dotf_sha256` falls back to `shasum -a 256`; `sha_of` in `compile-harness.sh` likewise |
 | (a) script | 1 | `chmod --reference` is GNU-only: pi `enabledModels` sync in `setup-linux.sh` | mode read with GNU or BSD `stat`; two `stat -c %s` fall back to `stat -f %z` |
@@ -39,7 +39,7 @@ Totals: (a) 26, (b) 58 (40 missing tool, 18 test), (c) 4. No failure was left un
 
 ### The tagged tier (272 tests: 22 whole files, 6 single tests in 4 more)
 
-Whole files, tagged because their subject is a BSD/GNU or shell difference: `bash32-portable`, `utils`, `aliases`, `shell-functions`, `shell-wrapper-dedup`, `shell-alias-collision`, `shell-profile`, `local-override`, `version-gte` (shell functions in bash and zsh); `install-dotf`, `install-precommit`, `executable-bit`, `gitattributes-eol`, `age-scripts` (installers, modes, line endings, the age binary); `check-bats-names`, `guard-memory-sink`, `precommit-fallback`, `hermes-setup`, `harness-generated-sha`, `vault-health-golden` (each one a defect found in the triage; `knowledge-crystallize-go-parity` was one too, until #2070 replaced it with a Go test); `run-bats`, `run-bats-real` (the runner itself). Single tests: two over-cap doctrine warnings (`compile-harness`), two stray-detector tests (`guard-no-gui`), the Windows plugin list (`claude-plugins`), the pi settings sync (`pi-config`). Not tagged: tests that only read repo text (workflow and docs lints), which answer the same on every OS.
+Whole files, tagged because their subject is a BSD/GNU or shell difference: `bash32-portable`, `utils`, `aliases`, `shell-functions`, `shell-wrapper-dedup`, `shell-alias-collision`, `shell-profile`, `local-override`, `version-gte` (shell functions in bash and zsh); `install-dotf`, `install-precommit`, `executable-bit`, `gitattributes-eol`, `age-scripts` (installers, modes, line endings, the age binary); `check-bats-names`, `guard-memory-sink`, `precommit-fallback`, `hermes-setup`, `harness-generated-sha` (each one a defect found in the triage; `knowledge-crystallize-go-parity` and `vault-health-golden` were too, until #2070 and #2150 replaced them with Go tests); `run-bats`, `run-bats-real` (the runner itself). Single tests: two over-cap doctrine warnings (`compile-harness`), two stray-detector tests (`guard-no-gui`), the Windows plugin list (`claude-plugins`), the pi settings sync (`pi-config`). Not tagged: tests that only read repo text (workflow and docs lints), which answer the same on every OS.
 
 ## Test status
 
@@ -47,7 +47,7 @@ Whole files, tagged because their subject is a BSD/GNU or shell difference: `bas
 - bats tier: `./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` (no `/sbin` on PATH) -> 272 ok
 - Go: `go build ./... && go vet ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./... && go test ./...` -> ok; `golangci-lint run` (2.12.2) -> 0 issues
 - `shellcheck` on every changed `.sh` at warning severity: clean. `actionlint`: not installed here; the workflow is parsed by PyYAML and by the repo's workflow bats guards
-- Manual: the vault-health goldens recaptured on bash 3.2 differ from Linux's by nothing but the ORACLE hash
+- Manual: the vault-health goldens recaptured on bash 3.2 differed from Linux's by nothing but the ORACLE hash (moot since #2150 made the ORACLE a historical record)
 
 ## Decisions made during implementation
 
