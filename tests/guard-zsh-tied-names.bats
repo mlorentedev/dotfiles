@@ -23,16 +23,24 @@ TIED='path|status|cdpath|manpath|fignore'
 # tied_bindings FILE NAMES: print FILE's non-comment lines that bind one of
 # NAMES (an ERE alternation). Four shapes: an assignment (`n=`, `n+=`,
 # `n[i]=`), a `read` target, a `for` variable, and a bare declaration
-# (`local n`). A grep error (exit 2: unreadable file, bad pattern) returns 2,
+# (`local n`). A read or grep error (unreadable file, bad pattern) returns 2,
 # so a tool failure is never read as "no bindings".
+#
+# `&` is not a separator: `cmd & path=x` already has whitespace before the
+# name, and `?a=1&path=x` is a URL query, not a binding.
 tied_bindings() {
-    local file="$1" names="$2" sep='(^|[[:space:];(&|])' end='([[:space:];]|$)' hits rc=0
-    hits="$(grep -nE \
+    local file="$1" names="$2" sep='(^|[[:space:];(|])' end='([[:space:];]|$)' code hits rc=0
+    # Strip trailing comments first, line by line so grep's numbers still
+    # match the file. Only a comment with no quote in it: a ` #` inside a
+    # quoted string would otherwise cut off real code, and a missed binding is
+    # silent, while a comment left in can only cost a loud false positive.
+    code="$(sed -E "s/[[:space:]]#[^'\"]*\$//" -- "$file")" || return 2
+    hits="$(printf '%s\n' "$code" | grep -nE \
         -e "${sep}(${names})(\\[[^]]*\\])?\\+?=" \
         -e "${sep}read([[:space:]]+[^[:space:]&;|]+)*[[:space:]]+(${names})${end}" \
         -e "${sep}for[[:space:]]+(${names})[[:space:]]+in${end}" \
         -e "${sep}(local|declare|typeset|readonly|export)([[:space:]]+[^[:space:]&;|]+)*[[:space:]]+(${names})${end}" \
-        -- "$file")" || rc=$?
+        )" || rc=$?
     [ "$rc" -le 1 ] || return 2
     [ -n "$hits" ] || return 0
     printf '%s\n' "$hits" | grep -vE '^[0-9]+:[[:space:]]*#' || true
@@ -75,8 +83,8 @@ tied_bindings() {
 
 @test "guard: the detector actually detects, on a fixture with a known answer" {
     # A guard that silently matches nothing reports a clean tree forever. Six
-    # bindings must count; six look-alikes must not, including a comment, a
-    # flag, a URL query, an expansion and a longer name.
+    # bindings must count; eight look-alikes must not, including a comment, a
+    # trailing comment, a flag, two URL queries, an expansion and a longer name.
     local probe n
     probe="$BATS_TEST_TMPDIR/probe.sh"
     {
@@ -84,11 +92,15 @@ tied_bindings() {
         printf 'while IFS=$%s read -r added removed path; do :; done\n' "'\\t'"
         printf 'for status in a b; do :; done\n'
         printf '    local num path base\n'
-        printf 'x=1; cdpath+=foo\n'
-        printf 'manpath[1]=x\n'
+        # A ` #` inside quotes is not a comment: the binding after it counts.
+        printf 'printf %s; cdpath+=foo\n' "'a #b'"
+        # A trailing comment is stripped without eating the binding before it.
+        printf 'manpath[1]=x  # keep it\n'
         printf '# local path=x\n'
         printf 'gh api --path=x\n'
         printf 'curl "https://h/x?path=1"\n'
+        printf 'gh api "repos/o/r/commits?sha=main&path=$f"\n'
+        printf 'x=1  # then read the path\n'
         printf 'echo "$path ${status}"\n'
         printf 'local file_path="$1" paths=x\n'
         printf 'read -r xpath\n'
