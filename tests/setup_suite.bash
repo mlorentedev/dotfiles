@@ -8,8 +8,9 @@
 # opens windows against actual data.
 #
 # The fix is not "remember to stub it". `tests/golden/vault-health/lib.sh`
-# already does this correctly for itself — it replaces PATH and then asserts no
-# leak — and the rest of the suite had no such protection, which is precisely
+# (retired with vault-health.sh under #492) did this correctly for itself — it
+# replaced PATH and then asserted no leak — and the rest of the suite had no
+# such protection, which is precisely
 # the shape that recurs. This makes the protection the default for every test,
 # so a new test file inherits it without its author knowing it exists.
 #
@@ -72,8 +73,8 @@ Stub it in your own test, which wins because it is earlier on PATH:
     chmod +x "\$BATS_TEST_TMPDIR/$name"
     PATH="\$BATS_TEST_TMPDIR:\$PATH"
 
-Or replace PATH outright, as tests/golden/vault-health/lib.sh does, when the
-test must also cover the case where the tool is absent.
+Or replace PATH outright, rather than prepending to it, when the test must
+also cover the case where the tool is absent.
 
 Guard: tests/setup_suite.bash
 MSG

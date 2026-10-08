@@ -4,11 +4,14 @@ package vault
 // (CI-009 / #1745). The corpus was captured from scripts/vault-health.sh and
 // was only ever replayed against a built `dotf` by the bats suite
 // tests/vault-health-go-parity.bats, which this file replaces: RunHealth had no
-// Go test at all. tests/vault-health-golden.bats still replays the corpus
-// against the shell twin, and its ORACLE hash keeps the goldens honest.
+// Go test at all. The shell twin and its bats replay were retired under
+// CLI-023 (#492), so this test is now the corpus's only consumer and the
+// corpus is Go-owned: its ORACLE is a historical provenance record, with no
+// re-capture path.
 //
-// The oracle is three artefacts per case, exactly the ones tests/golden/
-// vault-health/lib.sh compares: the exit code, the normalised report, and
+// The oracle is three artefacts per case, exactly the ones the retired shell
+// replay (tests/golden/vault-health/lib.sh) compared: the exit code, the
+// normalised report, and
 // every `obsidian` invocation in order. The last one is the reason this does
 // not inject a fake runner: four sections shell out to `obsidian`, and a fake
 // in-process runner would test a seam the binary never uses. Instead the test

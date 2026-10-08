@@ -1,9 +1,9 @@
 package vault
 
 // health.go — the Go port of scripts/vault-health.sh (CLI-021 / #490, increment
-// 2). Built BESIDE the shell twin, exactly like crystallize.go was in increment
-// 1: nothing here is wired up as a caller yet (that is CLI-023 / #492). The
-// shell stays canonical until that cutover.
+// 2). Built beside the shell twin, exactly like crystallize.go was in increment
+// 1. CLI-023 (#492) cut every caller over and deleted the script, so this is the
+// only implementation.
 //
 // Two seams increment 1 did not have, both called out in the spec
 // (specs/CLI-021-dotf-vault-build-knowledge/tasks.md §3):
@@ -18,10 +18,10 @@ package vault
 //     bash at first. They are ported in backlog.go (#492), so this file runs
 //     no shell at all.
 //
-// The shell is the oracle: every observable byte is pinned by the golden corpus
+// The shell was the oracle: every observable byte is pinned by the golden corpus
 // and reproduced faithfully, including its VAULT_DIR/VAULT_PATH/default
 // fallback (a plain env-var cascade, NOT the ADR-025 machine.json cascade
-// ResolveVault() uses elsewhere — vault-health.sh predates that cascade, and
+// ResolveVault() uses elsewhere — vault-health.sh predated that cascade, and
 // matching the oracle takes priority over "improving" it here).
 
 import (

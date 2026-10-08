@@ -1,10 +1,11 @@
 #!/usr/bin/env bats
 # Tests for REFACTOR-005 vault.sh thin dispatcher.
 
+load 'lib/refute'
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export VAULT_SCRIPT="$DOTFILES_DIR/scripts/vault.sh"
-    export HEALTH_SCRIPT="$DOTFILES_DIR/scripts/vault-health.sh"
     export MAINT_SCRIPT="$DOTFILES_DIR/scripts/vault-maintenance-weekly.sh"
     export ESCAPES_SCRIPT="$DOTFILES_DIR/scripts/check-md-escapes.sh"
 }
@@ -42,9 +43,11 @@ setup() {
 # --- Dispatch correctness (asserted via grep on the source, not by execing
 # the backing scripts which require Obsidian / cron / fixture vaults) ---
 
-@test "vault.sh dispatches 'health' to vault-health.sh" {
+# vault-health.sh was retired under #492; `health` is the Go report now.
+@test "vault.sh dispatches 'health' to dotf vault health, passing its flags through" {
     grep -qE '^\s*health\)' "$VAULT_SCRIPT"
-    grep -qE 'exec "\$SCRIPT_DIR/vault-health.sh"' "$VAULT_SCRIPT"
+    grep -qE 'exec dotf vault health "\$@"' "$VAULT_SCRIPT"
+    refute_grep_fixed 'vault-health.sh' "$VAULT_SCRIPT"
 }
 
 @test "vault.sh dispatches 'maintenance' (and alias 'weekly') to vault-maintenance-weekly.sh" {
@@ -85,10 +88,6 @@ setup() {
 
 # --- Backing scripts still exist and still executable (dispatcher is additive,
 # not a replacement — REFACTOR-005 scope choice). ---
-
-@test "backing script: vault-health.sh still exists and executable" {
-    [ -f "$HEALTH_SCRIPT" ] && [ -x "$HEALTH_SCRIPT" ]
-}
 
 @test "backing script: vault-maintenance-weekly.sh still exists and executable" {
     [ -f "$MAINT_SCRIPT" ] && [ -x "$MAINT_SCRIPT" ]

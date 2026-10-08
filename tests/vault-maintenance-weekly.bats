@@ -2,8 +2,9 @@
 # Tests for scripts/vault-maintenance-weekly.sh (TEST-001 / #128)
 #
 # This script is mostly side-effectful: it runs `dotf vault crystallize --all`
-# (CLI-050 / #1269 — was the sibling script knowledge-crystallize.sh) plus the
-# sibling vault-health.sh, writes a log under $HOME/.local/share, and fires a
+# (CLI-050 / #1269 — was the sibling script knowledge-crystallize.sh) plus
+# `dotf vault health` (#492 — was the sibling script vault-health.sh), writes a
+# log under $HOME/.local/share, and fires a
 # best-effort desktop notification. The real
 # maintenance run needs the Obsidian vault + every project, so we cannot unit
 # test it directly. Instead we:
@@ -54,13 +55,10 @@ teardown() {
     grep -q 'set -euo pipefail' "$MAINT_SCRIPT"
 }
 
-@test "vault-maintenance-weekly.sh derives SCRIPT_DIR with the zsh-safe BASH_SOURCE fallback" {
-    grep -qF '${BASH_SOURCE[0]:-$0}' "$MAINT_SCRIPT"
-}
-
 @test "vault-maintenance-weekly.sh invokes both maintenance steps best-effort (|| true)" {
     grep -qE 'dotf vault crystallize --all .*\|\| true' "$MAINT_SCRIPT"
-    grep -qE 'vault-health.sh" .*\|\| true' "$MAINT_SCRIPT"
+    grep -qE 'dotf vault health .*\|\| true' "$MAINT_SCRIPT"
+    refute_grep '^[^#]*vault-health\.sh' "$MAINT_SCRIPT"
 }
 
 @test "vault-maintenance-weekly.sh hardens PATH with ~/.local/bin before calling bare dotf" {
@@ -91,11 +89,9 @@ _prep_sandbox() {
 #!/usr/bin/env bash
 if [ "\$1" = "vault" ] && [ "\$2" = "crystallize" ]; then
     printf '%s\n' "$crystallize_body"
+elif [ "\$1" = "vault" ] && [ "\$2" = "health" ]; then
+    printf 'dotf vault health stub: ok\n'
 fi
-EOF
-    cat > "$TMP/vault-health.sh" <<'EOF'
-#!/usr/bin/env bash
-printf 'vault-health stub: ok\n'
 EOF
     cat > "$TMP/notify-send" <<'EOF'
 #!/usr/bin/env bash
@@ -126,7 +122,7 @@ EOF
     [ "$status" -eq 0 ]
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
     grep -qF 'dotf vault crystallize --all' "$log"
-    grep -qF 'vault-health' "$log"
+    grep -qF 'dotf vault health stub: ok' "$log"
     grep -qF '=== Done:' "$log"
 }
 
@@ -141,7 +137,7 @@ EOF
     [[ "$output" != *"invalid option"* ]]
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
     grep -qF 'dotf vault crystallize --all' "$log"
-    grep -qF 'vault-health' "$log"
+    grep -qF 'dotf vault health stub: ok' "$log"
     grep -qF '=== Done:' "$log"
 }
 
@@ -161,6 +157,7 @@ EOF
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
     refute_grep_fixed 'command not found' "$log"
     grep -qF 'all clean' "$log"
+    grep -qF 'dotf vault health stub: ok' "$log"
 }
 
 @test "vault-maintenance-weekly.sh tolerates a sibling that prints issue keywords (still exit 0, zsh run)" {
@@ -205,8 +202,8 @@ _build_dotf_maintain() {
     export FAKE_VAULT="$TMP/govault"
     mkdir -p "$FAKE_HOME" "$FAKE_VAULT"
     # A no-op notify-send FIRST on PATH, so the notification branch can never
-    # reach the real desktop bus — the leak tests/golden/vault-health guards
-    # against by replacing PATH rather than extending it.
+    # reach the real desktop bus — the leak cli/internal/vault/health_golden_test.go
+    # guards against by replacing PATH rather than extending it.
     cat > "$TMP/notify-send" <<'EOF'
 #!/usr/bin/env bash
 exit 0

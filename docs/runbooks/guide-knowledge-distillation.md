@@ -94,7 +94,7 @@ The `--all` flag auto-discovers every project Claude Code has ever touched on th
 
 ### `scripts/vault-maintenance-weekly.sh` / `.ps1`
 
-**What:** Automated weekly maintenance. Runs `dotf vault crystallize --all` + `vault-health.sh`, sends desktop notification with results.
+**What:** Automated weekly maintenance. Runs `dotf vault crystallize --all` + `dotf vault health`, sends desktop notification with results.
 **When:** Cron/Task Scheduler fires every Sunday 10:07 AM. Can also be run manually.
 **Log:** `~/.local/share/vault-maintenance/latest.log` (Linux) / `%LOCALAPPDATA%\vault-maintenance\latest.log` (Windows).
 **Deployed by:** `setup-linux.sh` (crontab) / `setup-windows.ps1` (Register-ScheduledTask).

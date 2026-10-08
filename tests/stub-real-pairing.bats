@@ -65,10 +65,6 @@ setup() {
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
-#   vault-health              stubs `hive` — a real run needs the daemon and a live vault
-#   vault-health-golden       stubs `obsidian` (from tests/golden/vault-health/lib.sh, not the
-#                             .bats file itself — see #892) — same rationale as vault-health: a
-#                             real run needs the AppImage and a live vault
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
 #   zshrc-guards              stubs `terraform` as an empty executable that is never run. The
 #                             subject is the .zshrc guard: completion is registered only when PATH
@@ -76,8 +72,8 @@ setup() {
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
 EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
-hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline vault-health
-vault-health-golden vault-maintenance-weekly zshrc-guards"
+hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline
+vault-maintenance-weekly zshrc-guards"
 
 exempt() {
     local base
@@ -206,16 +202,27 @@ stubs_a_binary() {
     [ -f "$TESTS/precommit-fallback-real.bats" ]
 }
 
-@test "the source-following is enforceable: vault-health-golden stubs obsidian only via its sourced lib.sh" {
-    # Guards the #892 fix itself. The .bats file greps clean on its own -- the
-    # stubbing lives entirely in tests/golden/vault-health/lib.sh -- so this
-    # pins that stubs_a_binary only catches it by following the `. "$HERE/..."`
-    # line. Without this pin, the source-following could silently regress (e.g.
-    # a refactor changes the variable name) and both tests above would pass
-    # vacuously again, exactly the failure #892 reported.
-    run _stubs_a_binary_in_file "$TESTS/vault-health-golden.bats"
+@test "the source-following is enforceable: a suite that stubs only via its sourced lib is caught" {
+    # Guards the #892 fix itself: a suite whose stubbing lives entirely in a
+    # library it sources greps clean on its own, so stubs_a_binary only catches
+    # it by following the `. "$HERE/lib.sh"` line. Without this pin the
+    # source-following could silently regress (e.g. a refactor changes the
+    # variable name) and both tests above would pass vacuously again, exactly
+    # the failure #892 reported. The suite that used to carry this shape,
+    # vault-health-golden, retired with vault-health.sh (#492), so the shape is
+    # built here, under a scratch tests/ root.
+    TESTS="$BATS_TEST_TMPDIR/tests"
+    mkdir -p "$TESTS/golden/x"
+    printf '%s\n' '#!/usr/bin/env bats' \
+        'HERE="$BATS_TEST_DIRNAME/golden/x"' \
+        '. "$HERE/lib.sh"' >"$TESTS/x-golden.bats"
+    # Spelled through printf so this file does not itself match the detector.
+    printf 'chmod %s "%sSTUB_DIR/obsidian"\nexport PATH="%sSTUB_DIR:%sPATH"\n' \
+        '+x' '$' '$' '$' >"$TESTS/golden/x/lib.sh"
+
+    run _stubs_a_binary_in_file "$TESTS/x-golden.bats"
     [ "$status" -ne 0 ]
 
-    run stubs_a_binary "$TESTS/vault-health-golden.bats"
+    run stubs_a_binary "$TESTS/x-golden.bats"
     [ "$status" -eq 0 ]
 }

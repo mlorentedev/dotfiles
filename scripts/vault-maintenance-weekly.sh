@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vault-maintenance-weekly.sh: Automated weekly vault maintenance
 #
-# Runs dotf vault crystallize --all + vault health checks.
+# Runs dotf vault crystallize --all + dotf vault health.
 # Logs results and sends desktop notification (best-effort).
 #
 # Deployed to crontab by setup-linux.sh: Sundays 10:00 AM
@@ -10,12 +10,11 @@
 set -euo pipefail
 
 # cron runs with a minimal PATH that does not include ~/.local/bin (install-dotf.sh's
-# install target), unlike an interactive shell. The old knowledge-crystallize.sh call
-# used an absolute path and never needed this; `dotf` is invoked by bare name below, so
-# without this the crystallize step silently no-ops under `|| true` every Sunday.
+# install target), unlike an interactive shell. The old knowledge-crystallize.sh and
+# vault-health.sh calls used absolute paths and never needed this; `dotf` is invoked by
+# bare name below, so without this both steps silently no-op under `|| true` every Sunday.
 export PATH="$HOME/.local/bin:$PATH"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 LOG_DIR="$HOME/.local/share/vault-maintenance"
 LOG_FILE="$LOG_DIR/latest.log"
 
@@ -29,7 +28,7 @@ mkdir -p "$LOG_DIR"
     printf '\n'
 
     printf '%s\n' '--- vault-health ---'
-    "$SCRIPT_DIR/vault-health.sh" 2>&1 || true
+    dotf vault health 2>&1 || true
     printf '\n'
 
     printf '=== Done: %s ===\n' "$(date)"

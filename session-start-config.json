@@ -15,7 +15,7 @@
     "hive_project": { "enabled": true, "comment": "Detect vault project match for CWD (10_projects + 50_work/45-development)" },
     "specs_summary": { "enabled": true, "comment": "Count active vs archived specs and flag [AGENT-DRAFT]/[AGENT-SUGGESTION] tags" },
     "vault_root_detection": { "enabled": true, "comment": "Walk up from CWD to find Obsidian vault (.obsidian/)" },
-    "vault_health": { "enabled": true, "comment": "Run vault-health.sh and surface FAIL lines / integrity issues" },
+    "vault_health": { "enabled": true, "comment": "Run the vault health report in-process (dotf vault health) and surface FAIL lines / integrity issues" },
     "auto_memory_symlink": { "enabled": true, "comment": "Create ~/.claude/projects/<encoded>/memory symlink to vault project memory" },
     "knowledge_health": { "enabled": true, "comment": "MEMORY.md size + crystallize staleness (thresholds: memory_md_max_lines, crystallize_max_days)" },
     "vault_baseline": { "enabled": true, "comment": "Canonical artifact integrity check (SKILL.md, patterns/_index.md, AGENTS.md...)" },

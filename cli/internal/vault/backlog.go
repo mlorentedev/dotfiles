@@ -6,10 +6,11 @@ package vault
 // through bash, so `dotf vault health` needed bash and a dotfiles checkout.
 //
 // Each function returns what its script prints on stdout, byte for byte, and
-// the verdict its exit status carried. The scripts stay beside this port until
-// vault-health.sh retires: it still execs them, and the golden corpus is
-// replayed against both. backlog_test.go runs the two implementations on the
-// same fixtures and compares them while the shell exists.
+// the verdict its exit status carried. vault-health.sh, which exec'd them,
+// retired under #492; the scripts stay because scripts/vault.sh still exposes
+// them (check-tasks, check-merged). backlog_test.go runs the two
+// implementations on the same fixtures and compares them while the shell
+// exists.
 
 import (
 	"fmt"

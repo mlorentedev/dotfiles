@@ -6,7 +6,7 @@
 # sequence `\n` (backslash followed by 'n') into markdown content when the
 # replacement string was meant to include a real newline. The corruption is
 # invisible in rendered markdown but breaks line-based parsers (dotf spec
-# frontmatter gate, vault-health.sh frontmatter scans, obs-cli graph queries).
+# frontmatter gate, `dotf vault health` frontmatter scans, obs-cli graph queries).
 #
 # This script scans for the canonical signature: a literal `\n` followed by a
 # recognised line-start glyph (`-`, `#`, `>`, `*`). Single-pass grep, no
