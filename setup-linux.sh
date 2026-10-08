@@ -201,64 +201,74 @@ else
     log_info "xclip installed: $(xclip -version 2>&1 | head -n1)"
 fi
 
-# age (file encryption — required by secrets system; pins AGE_VERSION from versions.conf)
-if ! command -v age >/dev/null 2>&1; then
-    log_info "Installing age..."
-    AGE_VER="${AGE_VERSION:-1.3.1}"
-    _age_tmp="$(mktemp -d)"
-    if curl -Lo "$_age_tmp/age.tar.gz" "https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz" 2>/dev/null \
-        && tar xzf "$_age_tmp/age.tar.gz" -C "$_age_tmp" \
-        && cp "$_age_tmp/age/age" "$_age_tmp/age/age-keygen" "$HOME/.local/bin/"; then
-        rm -rf "$_age_tmp"
-        log_success "age installed (v${AGE_VER})"
+# These blocks fetch linux-amd64 release assets (#2013 F-030). Elsewhere they
+# would place a binary the OS cannot execute ahead of a working copy on PATH,
+# so they run on linux-amd64 only, and any such leftover is removed. Interim:
+# #2013 W2 moves these tools to mise and deletes the blocks.
+if host_is_linux_amd64; then
+    # age (file encryption — required by secrets system; pins AGE_VERSION from versions.conf)
+    if ! command -v age >/dev/null 2>&1; then
+        log_info "Installing age..."
+        AGE_VER="${AGE_VERSION:-1.3.1}"
+        _age_tmp="$(mktemp -d)"
+        if curl -Lo "$_age_tmp/age.tar.gz" "https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz" 2>/dev/null \
+            && tar xzf "$_age_tmp/age.tar.gz" -C "$_age_tmp" \
+            && cp "$_age_tmp/age/age" "$_age_tmp/age/age-keygen" "$HOME/.local/bin/" \
+            && "$HOME/.local/bin/age" --version >/dev/null 2>&1; then
+            rm -rf "$_age_tmp"
+            log_success "age installed (v${AGE_VER})"
+        else
+            rm -rf "$_age_tmp"
+            log_warning "age installation failed"
+        fi
     else
-        rm -rf "$_age_tmp"
-        log_warning "age installation failed"
+        log_info "age already installed"
+    fi
+
+    # eza (modern ls replacement)
+    if ! command -v eza >/dev/null 2>&1; then
+        log_info "Installing eza..."
+        curl -Lo /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" 2>/dev/null \
+            && tar xzf /tmp/eza.tar.gz -C "$HOME/.local/bin/" \
+            && chmod +x "$HOME/.local/bin/eza" \
+            && rm -f /tmp/eza.tar.gz \
+            && log_success "eza installed" \
+            || log_warning "eza installation failed"
+    else
+        log_info "eza already installed"
+    fi
+
+    # jq (JSON processor — required by Claude hook registration)
+    if ! command -v jq >/dev/null 2>&1; then
+        log_info "Installing jq..."
+        curl -Lo "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" 2>/dev/null \
+            && chmod +x "$HOME/.local/bin/jq" \
+            && log_success "jq installed" \
+            || log_warning "jq installation failed"
+    else
+        log_info "jq already installed"
+    fi
+
+    # gh (GitHub CLI — required by Copilot setup)
+    if ! command -v gh >/dev/null 2>&1; then
+        log_info "Installing GitHub CLI..."
+        GH_VERSION=$(curl -sI "https://github.com/cli/cli/releases/latest" 2>/dev/null | grep -i '^location:' | sed 's|.*/v||;s/[[:space:]]*$//')
+        if [ -n "$GH_VERSION" ]; then
+            curl -Lo /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" 2>/dev/null \
+                && tar xzf /tmp/gh.tar.gz -C /tmp \
+                && cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" "$HOME/.local/bin/" \
+                && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" \
+                && log_success "GitHub CLI installed" \
+                || log_warning "GitHub CLI installation failed"
+        else
+            log_warning "Could not determine gh version, skipping"
+        fi
+    else
+        log_info "gh already installed"
     fi
 else
-    log_info "age already installed"
-fi
-
-# eza (modern ls replacement)
-if ! command -v eza >/dev/null 2>&1; then
-    log_info "Installing eza..."
-    curl -Lo /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" 2>/dev/null \
-        && tar xzf /tmp/eza.tar.gz -C "$HOME/.local/bin/" \
-        && chmod +x "$HOME/.local/bin/eza" \
-        && rm -f /tmp/eza.tar.gz \
-        && log_success "eza installed" \
-        || log_warning "eza installation failed"
-else
-    log_info "eza already installed"
-fi
-
-# jq (JSON processor — required by Claude hook registration)
-if ! command -v jq >/dev/null 2>&1; then
-    log_info "Installing jq..."
-    curl -Lo "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" 2>/dev/null \
-        && chmod +x "$HOME/.local/bin/jq" \
-        && log_success "jq installed" \
-        || log_warning "jq installation failed"
-else
-    log_info "jq already installed"
-fi
-
-# gh (GitHub CLI — required by Copilot setup)
-if ! command -v gh >/dev/null 2>&1; then
-    log_info "Installing GitHub CLI..."
-    GH_VERSION=$(curl -sI "https://github.com/cli/cli/releases/latest" 2>/dev/null | grep -i '^location:' | sed 's|.*/v||;s/[[:space:]]*$//')
-    if [ -n "$GH_VERSION" ]; then
-        curl -Lo /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" 2>/dev/null \
-            && tar xzf /tmp/gh.tar.gz -C /tmp \
-            && cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" "$HOME/.local/bin/" \
-            && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" \
-            && log_success "GitHub CLI installed" \
-            || log_warning "GitHub CLI installation failed"
-    else
-        log_warning "Could not determine gh version, skipping"
-    fi
-else
-    log_info "gh already installed"
+    log_warning "Skipping the linux-amd64 downloads of age, eza, jq and gh on $(uname -s)/$(uname -m): they come from dotf tools install (mise) or the OS package manager (#2013 W2)"
+    remove_unrunnable_tool age age-keygen eza jq gh
 fi
 
 # dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
@@ -333,21 +343,27 @@ else
     log_info "direnv already installed"
 fi
 
-# ShellCheck (shell script linter)
-if ! command -v shellcheck >/dev/null 2>&1; then
-    log_info "Installing shellcheck..."
-    # Versioned asset (the `-stable` alias 404s post-v0.10) + `-f` so an HTTP error
-    # fails the curl loudly instead of saving the 404 body as a bogus "tarball" that
-    # only blows up later at xz. The tarball's internal dir is shellcheck-v<ver>/.
-    _sc_ver="v${SHELLCHECK_VERSION:-0.11.0}"
-    curl -fsSLo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/download/${_sc_ver}/shellcheck-${_sc_ver}.linux.x86_64.tar.xz" \
-        && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
-        && cp "/tmp/shellcheck-${_sc_ver}/shellcheck" "$HOME/.local/bin/" \
-        && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${_sc_ver}" \
-        && log_success "shellcheck installed" \
-        || log_warning "shellcheck installation failed"
+# Same linux-amd64 gate as the age/eza/jq/gh blocks above (#2013 F-030).
+if host_is_linux_amd64; then
+    # ShellCheck (shell script linter)
+    if ! command -v shellcheck >/dev/null 2>&1; then
+        log_info "Installing shellcheck..."
+        # Versioned asset (the `-stable` alias 404s post-v0.10) + `-f` so an HTTP error
+        # fails the curl loudly instead of saving the 404 body as a bogus "tarball" that
+        # only blows up later at xz. The tarball's internal dir is shellcheck-v<ver>/.
+        _sc_ver="v${SHELLCHECK_VERSION:-0.11.0}"
+        curl -fsSLo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/download/${_sc_ver}/shellcheck-${_sc_ver}.linux.x86_64.tar.xz" \
+            && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
+            && cp "/tmp/shellcheck-${_sc_ver}/shellcheck" "$HOME/.local/bin/" \
+            && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${_sc_ver}" \
+            && log_success "shellcheck installed" \
+            || log_warning "shellcheck installation failed"
+    else
+        log_info "shellcheck already installed"
+    fi
 else
-    log_info "shellcheck already installed"
+    log_warning "Skipping the linux-amd64 download of shellcheck on $(uname -s)/$(uname -m): it comes from dotf tools install (mise) (#2013 W2)"
+    remove_unrunnable_tool shellcheck
 fi
 
 # bats (Bash Automated Testing System)
