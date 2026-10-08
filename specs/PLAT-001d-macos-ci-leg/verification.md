@@ -7,12 +7,12 @@ created: "2026-10-07"
 
 ## Evidence
 
-> Delivered in three PRs (see `tasks.md`). The evidence below was measured on the combined change, rebased onto `main` at e65182a7 after #2070 replaced `tests/knowledge-crystallize-go-parity.bats` with a Go test. That file left the tier, which went from 285 tests to 272. The ticks below record that measurement: AC4 is made true by #2145, AC2, AC3 and AC6 by #2146, AC5 by #2147, so on #2145's tree alone the commands for AC2, AC3, AC5 and AC6 (and `features.json` f2 to f6) name files that do not exist yet. Every `features.json` entry stays `pending` until `dotf spec archive` runs them on `main` after the third PR.
+> Delivered in three PRs (see `tasks.md`). The evidence below was measured on the combined change, rebased onto `main` at e65182a7 after #2070 replaced `tests/knowledge-crystallize-go-parity.bats` with a Go test. That file left the tier, which went from 285 tests to 272. Re-measured after #2150 retired `tests/vault-health-golden.bats` (19 tagged tests) and #2146 added one runner test: the tier is 254, the full suite 1804; the figures below are that re-measurement, on the head of #2147 over `main` at 3d1f07d1. The ticks below record that measurement: AC4 is made true by #2145, AC2, AC3 and AC6 by #2146, AC5 by #2147, so on #2145's tree alone the commands for AC2, AC3, AC5 and AC6 (and `features.json` f2 to f6) name files that do not exist yet. Every `features.json` entry stays `pending` until `dotf spec archive` runs them on `main` after the third PR.
 
 - [x] AC1 (Go injection seams) -> `cd cli && go test ./internal/doctor/ -run 'TestContractOS|TestCheckContractPath_Dialects|TestCheckContractEnvVars_WindowsDialect'`: doctor reads `System.GOOS` for the darwin and windows dialects, so layer 1 needs no new work. Gap noted, not fixed: `checks_catalog.go:95` and `checks_repodir.go:101` read `runtime.GOOS` directly.
-- [x] AC2 (tier tagged, non-empty, passes under bash 3.2 with no `sha256sum`) -> `PATH="/bin:...(no /sbin)" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` -> `bash 3.2.57 at /bin/bash`, `272 test(s) tagged os-sensitive`, 272 ok, 0 not ok
+- [x] AC2 (tier tagged, non-empty, passes under bash 3.2 with no `sha256sum`) -> `PATH="/bin:...(no /sbin)" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` -> `bash 3.2.57 at /bin/bash`, `254 test(s) tagged os-sensitive`, 254 ok, 0 not ok
 - [x] AC3 (tag mistakes fail) -> `tests/guard-bats-tags.bats` (mutation: `file_tag=` in `tests/utils.bats` turns test 2 red), `tests/run-bats-real.bats` ("a tag no test carries fails the run")
-- [x] AC4 (classified and resolved) -> table below; `bats --jobs 8 --no-parallelize-within-files tests/*.bats` -> 1825 tests, 0 failed, 99 skipped (each with a reason), with the pinned Python 3.12 on `PATH`. Under the system Python 3.9, the 13 `pr-agent-config` tests that `import tomllib` (3.11+) fail; that is class (b), environment only, tracked in #2062
+- [x] AC4 (classified and resolved) -> table below; `bats --jobs 8 --no-parallelize-within-files tests/*.bats` -> 1804 tests, 0 failed, 99 skipped (each with a reason), with the pinned Python 3.12 on `PATH`. Under the system Python 3.9, the 13 `pr-agent-config` tests that `import tomllib` (3.11+) fail; that is class (b), environment only, tracked in #2062
 - [x] AC5 (workflow) -> job declared and checked by `tests/workflow-job-names.bats`, `tests/workflow-timeouts.bats`, `tests/ci-path-filtering.bats`; first hosted run on PR #2063 (run 37590992834, job `test-macos`): pass in 4m19s, every step success (age, bats, GNU parallel install, shells, Go build/vet/`GOOS=darwin` vet/test, tier under bash 3.2); the full-suite step is `push`-only and ran skipped, so its first hosted run is the merge to main
 - [x] AC6 (one script) -> `tests/run-bats.bats`, `tests/run-bats-real.bats`; mutation: putting `$(nproc)` back into `ci.yml` turns the `refute_grep` test red
 
@@ -37,14 +37,14 @@ created: "2026-10-07"
 
 Totals: (a) 26, (b) 58 (40 missing tool, 18 test), (c) 4. No failure was left unexplained.
 
-### The tagged tier (272 tests: 22 whole files, 6 single tests in 4 more)
+### The tagged tier (254 tests: 21 whole files, 6 single tests in 4 more)
 
 Whole files, tagged because their subject is a BSD/GNU or shell difference: `bash32-portable`, `utils`, `aliases`, `shell-functions`, `shell-wrapper-dedup`, `shell-alias-collision`, `shell-profile`, `local-override`, `version-gte` (shell functions in bash and zsh); `install-dotf`, `install-precommit`, `executable-bit`, `gitattributes-eol`, `age-scripts` (installers, modes, line endings, the age binary); `check-bats-names`, `guard-memory-sink`, `precommit-fallback`, `hermes-setup`, `harness-generated-sha` (each one a defect found in the triage; `knowledge-crystallize-go-parity` and `vault-health-golden` were too, until #2070 and #2150 replaced them with Go tests); `run-bats`, `run-bats-real` (the runner itself). Single tests: two over-cap doctrine warnings (`compile-harness`), two stray-detector tests (`guard-no-gui`), the Windows plugin list (`claude-plugins`), the pi settings sync (`pi-config`). Not tagged: tests that only read repo text (workflow and docs lints), which answer the same on every OS.
 
 ## Test status
 
-- bats, full, macOS arm64, bash 3.2: `bats --jobs 8 --no-parallelize-within-files tests/*.bats` -> 1825 tests, 0 failed (pinned Python 3.12 on `PATH`; see AC4)
-- bats tier: `./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` (no `/sbin` on PATH) -> 272 ok
+- bats, full, macOS arm64, bash 3.2: `bats --jobs 8 --no-parallelize-within-files tests/*.bats` -> 1804 tests, 0 failed (pinned Python 3.12 on `PATH`; see AC4)
+- bats tier: `./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` (no `/sbin` on PATH) -> 254 ok
 - Go: `go build ./... && go vet ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./... && go test ./...` -> ok; `golangci-lint run` (2.12.2) -> 0 issues
 - `shellcheck` on every changed `.sh` at warning severity: clean. `actionlint`: not installed here; the workflow is parsed by PyYAML and by the repo's workflow bats guards
 - Manual: the vault-health goldens recaptured on bash 3.2 differed from Linux's by nothing but the ORACLE hash (moot since #2150 made the ORACLE a historical record)
