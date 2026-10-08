@@ -34,8 +34,10 @@ type Config struct {
 // Outcome classifies a run for the caller to log. Every Outcome except the
 // setup-failure path is returned with a nil error.
 type Outcome struct {
-	Status  string // stable tag: not-a-repo|dirty|offline|no-upstream|current|diverged|ff-failed|updated|setup-failed
-	Message string // human-readable line
+	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|diverged|ff-failed|updated|setup-failed
+	Message  string // human-readable line
+	Upstream string // the upstream branch, once resolved (e.g. origin/main)
+	Detail   string // multi-line evidence for the status (the dirtying paths), printed after Message
 }
 
 // Run executes the self-update against cfg.Repo using the injected Deps. It
@@ -43,58 +45,100 @@ type Outcome struct {
 // fast-forward; every other branch is a benign skip (nil error) so a scheduled
 // run does not report spurious failures.
 func Run(cfg Config, d Deps) (Outcome, error) {
-	if _, err := d.Git("rev-parse", "--git-dir"); err != nil {
-		return skip("not-a-repo", "not a git repo: "+cfg.Repo+" — nothing to self-update")
-	}
-	// Never touch a dirty worktree (the primary failure mode). An unreadable
-	// status is treated as "cannot confirm clean" → skip (fail-safe).
-	out, err := d.Git("status", "--porcelain")
-	if err != nil {
-		return skip("dirty", "cannot read git status in "+cfg.Repo+" — skipping (fail-safe: cannot confirm the worktree is clean)")
-	}
-	// Name the dirtying paths in the message. A scheduled self-update that skips
-	// on a dirty worktree is otherwise a silent no-op forever (dotfiles#694): the
-	// timer stays green while the deploy never runs. Surfacing the exact paths
-	// makes that state diagnosable from the run log alone.
-	if dirt := strings.TrimSpace(out); dirt != "" {
-		return skip("dirty", "dirty worktree in "+cfg.Repo+" — skipping (commit or stash first). Dirtying paths:\n"+dirt)
-	}
-	// A fetch failure is transient (network) → skip and retry next slot.
-	if _, err := d.Git("fetch", "--quiet"); err != nil {
-		return skip("offline", "git fetch failed (network?) — skipping self-update this run")
-	}
-	upstream, err := d.Git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-	if err != nil {
-		return skip("no-upstream", "no upstream configured for the current branch — skipping")
-	}
-	local, err := d.Git("rev-parse", "HEAD")
-	if err != nil {
-		return skip("no-upstream", "cannot resolve HEAD — skipping")
-	}
-	remote, err := d.Git("rev-parse", "@{u}")
-	if err != nil {
-		return skip("no-upstream", "cannot resolve "+upstream+" — skipping")
-	}
-	base, err := d.Git("merge-base", "HEAD", "@{u}")
-	if err != nil {
-		return skip("no-upstream", "cannot compute merge-base — skipping")
-	}
-	if local == remote {
-		return skip("current", "already current ("+upstream+") — no deploy needed")
-	}
-	// Diverged / non-fast-forward: never merge, rebase, or reset unattended.
-	if base != local {
-		return skip("diverged", "local branch has diverged from "+upstream+" (non fast-forward) — skipping")
-	}
-	if _, err := d.Git("merge", "--ff-only", "@{u}"); err != nil {
-		return skip("ff-failed", "fast-forward failed unexpectedly — skipping (worktree left untouched)")
+	out := Sync(cfg.Repo, d.Git)
+	switch out.Status {
+	case StatusFastForwarded:
+	case StatusCurrent:
+		return skip(out.Status, out.Message+" — no deploy needed")
+	case StatusAhead:
+		// Local commits are not on the upstream, so they are not a deploy: the
+		// self-update only ever runs what the upstream holds.
+		return skip("diverged", "local branch has diverged from "+out.Upstream+" (non fast-forward) — skipping")
+	case "not-a-repo":
+		return skip(out.Status, out.Message+" — nothing to self-update")
+	case "dirty":
+		if out.Detail == "" {
+			return skip(out.Status, out.Message+" — skipping")
+		}
+		return skip(out.Status, out.Message+" — skipping (commit or stash first). Dirtying paths:\n"+out.Detail)
+	default:
+		return skip(out.Status, out.Message+" — skipping self-update")
 	}
 	// Clean fast-forward landed → re-run the idempotent setup. THE only error path.
 	if err := d.RunSetup(); err != nil {
 		return Outcome{Status: "setup-failed", Message: "setup failed — see output above"},
 			fmt.Errorf("setup: %w", err)
 	}
-	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + upstream + ")"}, nil
+	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + out.Upstream + ")"}, nil
+}
+
+// Sync statuses that leave the checkout level with, or ahead of, its upstream.
+// Every other status Sync returns names why it left the checkout untouched.
+const (
+	StatusCurrent       = "current"
+	StatusAhead         = "ahead"
+	StatusFastForwarded = "fast-forwarded"
+)
+
+// Sync brings the checkout git operates on level with its upstream, by a
+// fast-forward and only by one, and reports where that left it. It never
+// merges, rebases or resets, and it touches nothing unless the worktree is
+// clean and the upstream strictly contains HEAD. `dotf update` (this repo) and
+// `dotf harness refresh` (the vault, #2162) share it, so the two cannot
+// disagree on what "safe to move" means.
+//
+// Statuses: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|
+// ff-failed|fast-forwarded. A git command that fails is read as the condition
+// it would have ruled out (an unreadable status is "dirty"), never as clean.
+func Sync(repo string, git func(args ...string) (string, error)) Outcome {
+	if _, err := git("rev-parse", "--git-dir"); err != nil {
+		return Outcome{Status: "not-a-repo", Message: "not a git repo: " + repo}
+	}
+	// Never touch a dirty worktree (the primary failure mode). An unreadable
+	// status is treated as "cannot confirm clean" (fail-safe).
+	out, err := git("status", "--porcelain")
+	if err != nil {
+		return Outcome{Status: "dirty", Message: "cannot read git status in " + repo + " (fail-safe: cannot confirm the worktree is clean)"}
+	}
+	// Name the dirtying paths in the message. A scheduled self-update that skips
+	// on a dirty worktree is otherwise a silent no-op forever (dotfiles#694): the
+	// timer stays green while the deploy never runs. Surfacing the exact paths
+	// makes that state diagnosable from the run log alone.
+	if dirt := strings.TrimSpace(out); dirt != "" {
+		return Outcome{Status: "dirty", Message: "dirty worktree in " + repo, Detail: dirt}
+	}
+	// A fetch failure is transient (network): the caller retries next run.
+	if _, err := git("fetch", "--quiet"); err != nil {
+		return Outcome{Status: "offline", Message: "git fetch failed in " + repo + " (network?)"}
+	}
+	upstream, err := git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	if err != nil {
+		return Outcome{Status: "no-upstream", Message: "no upstream configured for the current branch of " + repo}
+	}
+	local, err := git("rev-parse", "HEAD")
+	if err != nil {
+		return Outcome{Status: "no-upstream", Message: "cannot resolve HEAD in " + repo, Upstream: upstream}
+	}
+	remote, err := git("rev-parse", "@{u}")
+	if err != nil {
+		return Outcome{Status: "no-upstream", Message: "cannot resolve " + upstream, Upstream: upstream}
+	}
+	base, err := git("merge-base", "HEAD", "@{u}")
+	if err != nil {
+		return Outcome{Status: "no-upstream", Message: "cannot compute the merge-base with " + upstream, Upstream: upstream}
+	}
+	switch {
+	case local == remote:
+		return Outcome{Status: StatusCurrent, Message: "already current (" + upstream + ")", Upstream: upstream}
+	case base == remote:
+		return Outcome{Status: StatusAhead, Message: "ahead of " + upstream + " (local commits not pushed yet)", Upstream: upstream}
+	case base != local:
+		return Outcome{Status: "diverged", Message: "local branch has diverged from " + upstream + " (non fast-forward)", Upstream: upstream}
+	}
+	if _, err := git("merge", "--ff-only", "@{u}"); err != nil {
+		return Outcome{Status: "ff-failed", Message: "fast-forward to " + upstream + " failed unexpectedly (worktree left untouched)", Upstream: upstream}
+	}
+	return Outcome{Status: StatusFastForwarded, Message: "fast-forwarded to " + upstream, Upstream: upstream}
 }
 
 // skip is a tiny helper so every benign branch reads as one line and always

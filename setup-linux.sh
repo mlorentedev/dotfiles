@@ -509,32 +509,27 @@ ensure_directory "$HOME/.gemini/skills"
 log_success "Antigravity CLI configuration complete"
 
 # Harness deploy engine (ENGINE-001 / HARNESS-001): re-render the generated
-# "Overrides of Harness Defaults" blocks in AGENTS.md + ai/claude/CLAUDE.md from
-# the vault SSOT before deploying agent configs. Committed blocks are the fallback
-# when the vault is absent (fresh machine), so this only re-renders when possible.
-if [ -d "${VAULT_PATH:-$HOME/Projects/knowledge}/00_meta/patterns" ]; then
-    if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --refresh ) >/dev/null 2>&1; then
-        log_success "Harness override blocks refreshed from vault SSOT"
-        # OPS-003: --refresh regenerates the committed harness records (and the
-        # generated blocks in AGENTS.md / ai/claude/CLAUDE.md) from the vault SSOT
-        # -- generate-and-commit (ADR-013). When the vault is ahead, that leaves
-        # UNCOMMITTED changes in the working tree. Announce them LOUDLY so they read
-        # as an actionable commit, not a parallel session's WIP (the silent drift
-        # misled a session, #295). Only meaningful inside the git repo -- the
-        # ~/.dotfiles deploy mirror is not a repo (ADR-005).
-        if git -C "$CURRENT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-            harness_drift="$(git -C "$CURRENT_DIR" status --porcelain -- harness/ AGENTS.md ai/claude/CLAUDE.md 2>/dev/null)"
-            if [ -n "$harness_drift" ]; then
-                log_warning "Harness records changed by --refresh from the vault -- commit them:"
-                printf '%s\n' "$harness_drift" | sed 's/^/      /'
-                log_warning "  git add harness/ AGENTS.md ai/claude/CLAUDE.md && git commit -m 'chore(harness): refresh records from vault'"
-            fi
-        fi
-    else
-        log_warning "compile-harness --refresh failed; deploying committed blocks"
-    fi
+# "Overrides of Harness Defaults" blocks in AGENTS.md + ai/claude/CLAUDE.md and
+# the committed harness records from the vault SSOT before deploying agent
+# configs. `dotf harness refresh` fast-forwards the vault first and refuses one
+# it cannot confirm current: the refresh reads whatever the local clone holds,
+# so a clone that is behind reverted merged records (#2162). It names any
+# change the refresh leaves in the checkout, with the commit that records it
+# (OPS-003, #295). Without a vault the committed records stand (fresh machine).
+# Resolve dotf by path, not only by name: install_dotf placed it in ~/.local/bin,
+# which the rc files put on PATH but THIS process may not have -- the integration
+# container installs dotf and then cannot see it in the same run (#1202 was the
+# identical trap with jq, and this block inherited it the moment it moved to dotf).
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then
+    _dotf="dotf"
+elif [ -x "$HOME/.local/bin/dotf" ]; then
+    _dotf="$HOME/.local/bin/dotf"
+fi
+if [ -n "$_dotf" ]; then
+    "$_dotf" harness refresh --repo "$CURRENT_DIR" || log_warning "dotf harness refresh failed (above); deploying the committed harness records"
 else
-    log_info "Vault absent; deploying committed harness override blocks"
+    log_warning "dotf not found (PATH or ~/.local/bin) -- harness records not refreshed from the vault; deploying the committed ones"
 fi
 
 # Mirror the harness inputs into the deploy dir so `compile-harness.sh --check`
@@ -550,16 +545,6 @@ fi
 # A declared target the checkout lacks is named and exits non-zero after
 # mirroring the rest: setup does not abort (it is long and idempotent), but the
 # warning is loud and verify-setup.bats fails on the resulting gap.
-# Resolve dotf by path, not only by name: install_dotf placed it in ~/.local/bin,
-# which the rc files put on PATH but THIS process may not have -- the integration
-# container installs dotf and then cannot see it in the same run (#1202 was the
-# identical trap with jq, and this block inherited it the moment it moved to dotf).
-_dotf=""
-if command -v dotf >/dev/null 2>&1; then
-    _dotf="dotf"
-elif [ -x "$HOME/.local/bin/dotf" ]; then
-    _dotf="$HOME/.local/bin/dotf"
-fi
 if [ -n "$_dotf" ]; then
     "$_dotf" harness mirror --repo "$CURRENT_DIR" || log_warning "dotf harness mirror reported a gap (above) -- 'dotf doctor' will report harness drift"
 else
