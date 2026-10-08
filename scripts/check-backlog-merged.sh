@@ -22,7 +22,7 @@
 # reliable, zero-false-positive half.
 #
 # ADVISORY by contract: a finding is a "verify + tick" candidate, not proof.
-# vault-health.sh treats a non-zero exit as a WARN, not a failure.
+# `dotf vault health` (its Go port) treats a finding as a WARN, not a failure.
 #
 # Usage:
 #   check-backlog-merged.sh <tasks-file> [--repo <repo-dir>]

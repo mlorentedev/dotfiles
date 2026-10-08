@@ -120,7 +120,7 @@ func TestBacklogMergedInfersTheRepoFromHome(t *testing.T) {
 
 // TestBacklogChecksMatchTheScripts runs each script and its port on the same
 // input and compares stdout and exit status. It holds only while the scripts
-// exist (vault-health.sh still execs them); delete it with them.
+// exist (scripts/vault.sh still exposes them); delete it with them.
 func TestBacklogChecksMatchTheScripts(t *testing.T) {
 	bash := mem.ResolveBash()
 	if bash == "" {

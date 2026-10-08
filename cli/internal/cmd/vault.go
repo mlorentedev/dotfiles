@@ -63,13 +63,13 @@ Subcommands:
 // the sole implementation.
 //
 // All three of #490's increments are now built — crystallize (this file),
-// health (vault_health.go) and maintain (vault_maintain.go). Only crystallize
-// is CUT OVER; the other two are built beside twins that are still the
-// canonical invocation (scripts/vault-health.sh and
-// scripts/vault-maintenance-weekly.{sh,ps1}, the latter still wired to cron at
-// setup-linux.sh:1605 and to Task Scheduler at setup-windows.ps1:2185). That
-// cutover, plus the rest of the cluster (obs-cli, the spec-gate scripts), is
-// CLI-023 (#492), blocked on CLI-022.
+// health (vault_health.go) and maintain (vault_maintain.go). Crystallize and
+// health are CUT OVER (health under CLI-023 / #492, which deleted
+// scripts/vault-health.sh). Maintain is built beside
+// scripts/vault-maintenance-weekly.{sh,ps1}, still the canonical invocation and
+// still wired to cron by setup-linux.sh and to Task Scheduler by
+// setup-windows.ps1. That cutover, plus the rest of the cluster (obs-cli, the
+// spec-gate scripts), is the remainder of CLI-023 (#492).
 //
 // This comment previously said health and maintain were "still unbuilt" while
 // health was registered forty lines below it. Lessons 256/257: probe the
