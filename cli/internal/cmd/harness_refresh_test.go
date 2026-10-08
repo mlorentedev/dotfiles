@@ -205,3 +205,25 @@ func TestHarnessRefresh_ADirtyVaultIsNotRefreshedFromAndTheWarningNamesItsPaths(
 		t.Errorf("record = %q: the refresh ran against a dirty vault", got)
 	}
 }
+
+func TestHarnessRefresh_UncommittedWorkInTheRecordsIsNeitherOverwrittenNorAnnounced(t *testing.T) {
+	f := newRefreshFixture(t)
+	if err := os.WriteFile(filepath.Join(f.repo, "harness", "record.md"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, err := f.run(t)
+
+	if err != nil {
+		t.Fatalf("a skip is not an error: %v", err)
+	}
+	if got := f.record(t); got != "wip\n" {
+		t.Errorf("record = %q: the refresh overwrote uncommitted work", got)
+	}
+	if strings.Contains(stderr, "chore(harness): refresh records from vault") {
+		t.Errorf("uncommitted work was announced as the vault's change:\n%s", stderr)
+	}
+	if !strings.Contains(stderr, "      M harness/record.md\n") {
+		t.Errorf("the warning does not name the uncommitted path:\n%s", stderr)
+	}
+}

@@ -82,8 +82,12 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   `harness-refresh-announce.bats` forbids a direct `compile-harness --refresh` call again
 - [x] Windows: `setup-windows.ps1` has no refresh (ENGINE-001), so it has no call site to change.
   The command is OS-agnostic, and a Windows refresh would call it
+- [x] Review triage: uncommitted work in the refreshed paths stops the refresh. It would have been
+  overwritten, and then announced as the vault's change with a commit line that folds it in.
+  The ordering guard anchors on the mirror invocation, not on the comment that names it
 - [ ] The installed release lacks the command until the next `DOTF_VERSION` pin. Until then setup
-  warns that the refresh failed and deploys the committed records, the safe side of #2162
+  warns that the refresh failed and deploys the committed records, the safe side of #2162.
+  #1814 owns this class (setup calling what the pinned `dotf` does not have)
 
 ## Closing
 

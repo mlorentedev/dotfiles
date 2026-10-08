@@ -700,7 +700,9 @@ $block"
 
 @test "setup-linux.sh harness mirror runs AFTER the harness refresh (ordering guard)" {
     refresh_line=$(grep -n 'harness refresh --repo' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    mirror_line=$(grep -n 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    # Both anchors are invocations: a comment names `dotf harness mirror` above
+    # the call, and matching it would pin the order of the prose instead.
+    mirror_line=$(grep -n 'harness mirror --repo' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     [ -n "$refresh_line" ] && [ -n "$mirror_line" ]
     [ "$mirror_line" -gt "$refresh_line" ]
 }

@@ -74,12 +74,20 @@ func runHarnessRefresh(stdout, stderr io.Writer, repo, vault string) error {
 		_, _ = fmt.Fprintf(stdout, "harness refresh: vault %s\n", sync.Message)
 	default:
 		_, _ = fmt.Fprintf(stderr, "WARNING: harness refresh skipped, the vault is not confirmed current: %s\n", sync.Message)
-		for _, line := range strings.Split(sync.Detail, "\n") {
-			if line != "" {
-				_, _ = fmt.Fprintf(stderr, "      %s\n", line)
-			}
-		}
+		printIndented(stderr, sync.Detail)
 		_, _ = fmt.Fprintln(stderr, "  The committed harness records stand: refreshing from a stale vault would revert merged records.")
+		return nil
+	}
+
+	// The refresh overwrites the records, and its drift report reads the same
+	// paths. Uncommitted work there would be clobbered and then announced as the
+	// vault's change, inviting a commit that folds it in, so it stops here.
+	if wip, err := refreshPathsDirt(repo); err != nil {
+		return err
+	} else if wip != "" {
+		_, _ = fmt.Fprintln(stderr, "WARNING: harness refresh skipped, the checkout has uncommitted changes the refresh would overwrite:")
+		printIndented(stderr, wip)
+		_, _ = fmt.Fprintln(stderr, "  The committed harness records stand: commit or stash these, then re-run.")
 		return nil
 	}
 
@@ -93,30 +101,45 @@ func runHarnessRefresh(stdout, stderr io.Writer, repo, vault string) error {
 		return fmt.Errorf("compile-harness.sh --refresh failed: %w; the committed harness records stand", err)
 	}
 	_, _ = fmt.Fprintln(stdout, "harness refresh: override blocks and records re-rendered from the vault")
-	return reportRefreshDrift(stdout, stderr, repo)
+	return reportRefreshDrift(stderr, repo)
+}
+
+// refreshPathsDirt returns `git status --porcelain` over the paths the refresh
+// writes, or "" when the checkout is not a repo: the deploy mirror is not one
+// (ADR-005), and there is no work in it to protect or commit.
+func refreshPathsDirt(repo string) (string, error) {
+	git := gitRunner(repo)
+	if _, err := git("rev-parse", "--git-dir"); err != nil {
+		return "", nil
+	}
+	dirt, err := git(append([]string{"status", "--porcelain", "--"}, refreshPaths...)...)
+	if err != nil {
+		return "", fmt.Errorf("cannot read git status of the harness records in %s: %w", repo, err)
+	}
+	return dirt, nil
 }
 
 // reportRefreshDrift lists what the refresh changed in the checkout. Those
 // changes are the vault's newer state and belong in a commit, so they are
 // announced loudly rather than left to read as a parallel session's work
-// (#295). The deploy mirror is not a repo (ADR-005), so there it says nothing.
-func reportRefreshDrift(stdout, stderr io.Writer, repo string) error {
-	git := gitRunner(repo)
-	if _, err := git("rev-parse", "--git-dir"); err != nil {
-		return nil
-	}
-	drift, err := git(append([]string{"status", "--porcelain", "--"}, refreshPaths...)...)
-	if err != nil {
-		return fmt.Errorf("cannot read the refresh's changes in %s: %w", repo, err)
-	}
-	if drift == "" {
-		return nil
+// (#295). The paths were clean before the refresh ran, so all of it is the
+// refresh's.
+func reportRefreshDrift(stderr io.Writer, repo string) error {
+	drift, err := refreshPathsDirt(repo)
+	if err != nil || drift == "" {
+		return err
 	}
 	_, _ = fmt.Fprintln(stderr, "WARNING: Harness records changed by --refresh from the vault -- commit them:")
-	for _, line := range strings.Split(drift, "\n") {
-		_, _ = fmt.Fprintf(stderr, "      %s\n", line)
-	}
+	printIndented(stderr, drift)
 	_, _ = fmt.Fprintf(stderr, "  git add %s && git commit -m 'chore(harness): refresh records from vault'\n",
 		strings.Join(refreshPaths, " "))
 	return nil
+}
+
+func printIndented(w io.Writer, lines string) {
+	for _, line := range strings.Split(lines, "\n") {
+		if line != "" {
+			_, _ = fmt.Fprintf(w, "      %s\n", line)
+		}
+	}
 }
