@@ -22,7 +22,7 @@ Every CI job runs on Linux or Windows, so nothing could say that the suite is wr
 Three layers, one common suite. There are never per-OS copies of a test.
 
 1. **OS behaviour is tested by injection where it can be.** Go: doctor's `System.GOOS` seam and deploy's `goos` parameter run the darwin and windows branches on the one Linux runner. Nothing to build here; one gap found (see Risks).
-2. **A real macOS runs the OS-sensitive tier.** Tests whose answer depends on the OS (BSD sed, stat, wc, symlinked tmp paths, hooks, shell startup, installers) carry the bats tag `os-sensitive`. A non-required `test-macos` job in `ci.yml` runs `bats --filter-tags os-sensitive` under `/bin/bash` 3.2, plus `go build`, `go vet`, `GOOS=darwin go vet` and `go test ./...`, only when the existing path filter says code changed. On a push to main it also runs the full suite. The Linux job keeps the full suite. The same tag is usable by `test-windows` later.
+2. **A real macOS runs the OS-sensitive tier.** Tests whose answer depends on the OS (BSD sed, stat, wc, symlinked tmp paths, hooks, shell startup, installers) carry the bats tag `os-sensitive`. A non-required `test-macos` job in `ci.yml` runs `bats --filter-tags os-sensitive` under `/bin/bash` 3.2, plus `go build`, `go vet` (native, so it is the darwin vet) and `go test ./...`, only when the existing path filter says code changed. On a push to main it also runs the full suite. The Linux job keeps the full suite. The same tag is usable by `test-windows` later.
 3. **End to end from zero is X1**, not this change; it is gated on the root installers.
 
 Every bats failure on this Mac is classified (script bug, non-hermetic test, Linux-only) and resolved, so the leg starts green. The classification is in `verification.md`.
@@ -48,7 +48,7 @@ Every bats failure on this Mac is classified (script bug, non-hermetic test, Lin
 - [ ] AC2: the OS-sensitive tier is tagged, non-empty, justified, and passes on this Mac under bash 3.2 with `/sbin` off PATH.
 - [ ] AC3: a near-miss tag comment, an unknown tag and an empty selection each fail loudly.
 - [ ] AC4: every bats failure on macOS is classified and resolved, and the full suite is green on this Mac.
-- [ ] AC5: `ci.yml` has a non-required `test-macos` job on the existing path filter, running the tier under asserted bash 3.2 and zsh, Go build/vet/`GOOS=darwin` vet/test, and the full suite on main.
+- [ ] AC5: `ci.yml` has a non-required `test-macos` job on the existing path filter, running the tier under asserted bash 3.2 and zsh, Go build, native (darwin) vet and test, and the full suite on main.
 - [ ] AC6: CPU count and the GNU parallel preflight come from one script, and `ci.yml` does not call `nproc`.
 
 ## References
