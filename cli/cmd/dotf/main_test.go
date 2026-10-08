@@ -339,10 +339,12 @@ func sandboxContractPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	names := []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"}
+	declaresVault := false
 	for _, v := range contract.EnvVars {
 		names = append(names, v.Name)
+		declaresVault = declaresVault || v.Name == "VAULT_PATH"
 	}
-	if len(names) < 5 || !strings.Contains(strings.Join(names, " "), "VAULT_PATH") {
+	if !declaresVault {
 		t.Fatalf("env-contract.json declared no VAULT_PATH; parsed %v", names)
 	}
 	for _, name := range names {
