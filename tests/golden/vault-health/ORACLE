@@ -11,6 +11,10 @@
 # scripts still exist (scripts/vault.sh exposes them) but are no longer pinned
 # here, so their current bytes may differ.
 #
+# Cases changed after the retirement are Go behaviour changes, reviewed in the
+# PR that made them, not re-captures: the first is the expected-noise exclusion
+# for templates, archive, sessions and memory (#1979).
+#
 # Captured at git revision 147e4ed (informational only).
 
 578e90f784d5a526b9d39aedd208f396df632bfec77652a91021d257b0f4078e  scripts/vault-health.sh
