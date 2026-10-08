@@ -1013,9 +1013,9 @@ deploy_skills() {
 # residue instead: warn when an unmarked entry SHADOWS a record name. Third-party
 # skills that own their name — no record, no shadow — stay silent.
 warn_unmanaged_output() {
-    local recdir="$1" name="$2" path="$3"
+    local recdir="$1" name="$2" out_path="$3"
     [[ -f "$recdir/$name/SKILL.md" ]] || return 0
-    printf '[deploy] WARN unmanaged copy of a managed skill (no provenance marker, not prunable) -> %s\n' "$path" >&2
+    printf '[deploy] WARN unmanaged copy of a managed skill (no provenance marker, not prunable) -> %s\n' "$out_path" >&2
 }
 
 deploy_prune() {
