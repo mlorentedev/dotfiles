@@ -65,6 +65,26 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   non-zero exit would only break `dotf deploy bashrc` typed on Windows without telling anyone more
 - [ ] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc`, `.gitconfig` and `ssh/config` to entries with `platforms: [linux, darwin]` and the manifest to version 4
 
+## #2162 — the harness refresh reads a vault clone of unknown age
+
+- [x] Failing test first: `TestHarnessRefresh_ABehindVaultIsFastForwardedBeforeTheRefreshReadsIt`.
+  The fixture is the measured shape: an upstream at v2, a clone one commit behind at v1, and a
+  record that already holds v2. Without the sync the record comes back as v1
+- [x] `update.Sync` holds the fast-forward logic `dotf update` had inline, and returns `ahead` as
+  its own status. `update.Run` still reports an ahead checkout as a `diverged` skip, because a
+  self-update deploys only what the upstream holds
+- [x] `dotf harness refresh`: behind is fast-forwarded, level or ahead is refreshed from, and
+  diverged, dirty, offline or no upstream keeps the committed records with a warning that names
+  the reason. `VAULT_PATH` is pinned on the script, so it reads the clone the check vouched for
+- [x] The drift report moves into the command with the same text, and a failed
+  `compile-harness.sh` run relays its own output instead of `>/dev/null 2>&1`
+- [x] `setup-linux.sh` calls it, and resolves `dotf` once for the refresh and the mirror.
+  `harness-refresh-announce.bats` forbids a direct `compile-harness --refresh` call again
+- [x] Windows: `setup-windows.ps1` has no refresh (ENGINE-001), so it has no call site to change.
+  The command is OS-agnostic, and a Windows refresh would call it
+- [ ] The installed release lacks the command until the next `DOTF_VERSION` pin. Until then setup
+  warns that the refresh failed and deploys the committed records, the safe side of #2162
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
