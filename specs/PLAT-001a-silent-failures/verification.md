@@ -40,6 +40,7 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
 - [x] `age installed` is logged only after the placed `age --version` runs.
 - [x] `.zsh/aliases.zsh` aliases `ls`/`ll`/`lla` to eza only when eza is on PATH. Otherwise `ll` and `lla` fall back to `ls -l` and `ls -la`.
 - [x] `tests/setup-linux-only-downloads.bats`: 6 ok on the branch, 6 not ok on `main`. Every bats file referencing `setup-linux`, `utils.sh` or `aliases.zsh`: 950/950 on darwin. While writing it, a mid-test `[[ ]]` passed against the unfixed file under bash 3.2, which is #2164 (54 such assertions in the `os-sensitive` tier).
+- [x] CI review round: a `#!/nonexistent` interpreter is not a portable stand-in for an unrunnable binary. macOS bash reports 126 and Linux bash reports 127. A file of no executable format (NUL bytes) fails exec with ENOEXEC on both kernels, and bash reports it as 126 on both. `setup-linux-only-downloads-real.bats` pairs the suite with the host's real `uname` and a copy of its `ls`. macOS kills a copied system binary on launch (137) and Linux runs it; neither is 126, so it stays.
 - W2 still owns the real fix. When it deletes the blocks, it deletes `host_is_linux_amd64`, the gate and this guard test with them.
 
 ## Test status

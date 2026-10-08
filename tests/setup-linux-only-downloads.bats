@@ -60,7 +60,7 @@ utils() {
     utils remove_unrunnable_tool eza
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.local/bin/eza" ]
-    [[ "$output" == *"Removed $HOME/.local/bin/eza"* ]]
+    [[ "$output" == *"Removed $HOME/.local/bin/eza"* ]] || false
 }
 
 @test "remove_unrunnable_tool: leaves a working tool, a failing tool, a symlink and an absent name alone" {
@@ -105,5 +105,5 @@ utils() {
     printf '#!/bin/sh\nexit 0\n' > "$TMP/bin/eza"
     chmod +x "$TMP/bin/eza"
     run env PATH="$TMP/bin:/usr/bin:/bin" zsh -f -c '. "$1"; alias ls' _ "$REPO/.zsh/aliases.zsh"
-    [[ "$output" == *"eza --group-directories-first"* ]]
+    [[ "$output" == *"eza --group-directories-first"* ]] || false
 }
