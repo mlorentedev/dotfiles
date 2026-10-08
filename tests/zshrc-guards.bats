@@ -22,7 +22,8 @@ setup() {
     # The rc's PATH holds the test's own stubs and links to RC_TOOLS, never a
     # host directory: with /usr/bin on it, a host terraform (or direnv, mise,
     # zoxide, dotf) switches on a block the test assumes is off (#2149). A tool
-    # the rc needs and RC_TOOLS lacks fails loudly, as stderr fails the load.
+    # the rc needs and RC_TOOLS lacks fails the load through its "command not
+    # found" on stderr, unless the rc silences that call's stderr.
     mkdir -p "$SANDBOX/sysbin"
     for tool in $RC_TOOLS; do
         target=$(command -v "$tool") || continue
@@ -64,8 +65,12 @@ load_rc() {
     # Every `command -v X` in the rc is a block a test assumes is off unless it
     # stubs X. Read them from the rc, so a new probe is covered without an edit
     # here, and fail on the first that resolves to anything on the host (#2149).
-    probes=$(grep -oE 'command -v [A-Za-z0-9_-]+' "$REPO/.zshrc" | awk '{print $3}' | sort -u | tr '\n' ' ')
+    # A probe whose name is a variable cannot be read statically, so it fails
+    # here rather than drop out of the sweep.
+    local rc_probes='command -v[[:space:]]+["'"'"']?[$A-Za-z0-9_.-]+'
+    probes=$(grep -oE "$rc_probes" "$REPO/.zshrc" | sed -E 's/^command -v[[:space:]]+["'"'"']?//' | sort -u | tr '\n' ' ')
     [ -n "$probes" ] || false
+    [[ "$probes" != *'$'* ]] || { printf 'a probe names its tool through a variable: %s\n' "$probes"; false; }
     run load_rc 'for t in '"$probes"'; do whence -p $t >/dev/null && print -r -- "leak: $t -> $(whence -p $t)"; done; true'
     [ "$status" -eq 0 ]
     [ -z "$output" ]
