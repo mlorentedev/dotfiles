@@ -82,6 +82,34 @@ function Sync-SessionPath {
     $env:PATH = @($merged) -join ';'
 }
 
+# Installs one winget package and reports what actually happened (#2157). A
+# native command reports failure through its exit code, never an exception, so
+# setup's old loop -- winget's output discarded, a catch that could not fire --
+# printed "installed" after a failed install, and doctor found the tool missing
+# later with nothing in the log to say why (2 of 12 test-windows runs on
+# 2026-10-08). Success is judged by the command resolving after a PATH refresh,
+# not by what winget says; one retry covers the transient failures measured on
+# the runner. Returns the outcome; the caller words it.
+function Install-WingetTool {
+    param(
+        [Parameter(Mandatory)][string]$Cmd,
+        [Parameter(Mandatory)][string]$Id,
+        [ValidateRange(1, 5)][int]$Attempts = 2
+    )
+    $output = @()
+    $exitCode = $null
+    for ($i = 1; $i -le $Attempts; $i++) {
+        $output = @(& winget install $Id --accept-package-agreements --accept-source-agreements 2>&1)
+        $exitCode = $LASTEXITCODE
+        Sync-SessionPath
+        if (Get-Command $Cmd -ErrorAction SilentlyContinue) {
+            return [pscustomobject]@{ Installed = $true; Attempts = $i; ExitCode = $exitCode; Detail = '' }
+        }
+    }
+    $detail = @($output | ForEach-Object { "$_".Trim() } | Where-Object { $_ } | Select-Object -Last 3) -join ' | '
+    [pscustomobject]@{ Installed = $false; Attempts = $Attempts; ExitCode = $exitCode; Detail = $detail }
+}
+
 function Deploy-File {
     param(
         [Parameter(Mandatory)][string]$Source,
