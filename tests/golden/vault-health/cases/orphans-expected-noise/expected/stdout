@@ -1,0 +1,37 @@
+========================================
+   VAULT HEALTH REPORT
+========================================
+Vault: knowledge (<VAULT>)
+
+[1/7] Working Tree Integrity
+  SKIP: Working tree integrity - vault is not a git repo
+
+[2/7] Vault Connectivity
+  PASS: Obsidian CLI connected to vault 'knowledge'
+  INFO: Total markdown files: 9
+
+[3/7] Orphans & Dead-Ends
+  PASS: Orphans: 1/4 (25%)
+  INFO: Not counted: 5 file(s) under sessions/, memory/ and 90_archive/ (5 orphaned), which have no incoming links by design
+  PASS: Dead-ends: 1/9 (11%)
+
+[4/7] Unresolved Links
+  PASS: No unresolved links
+
+[5/7] Frontmatter Coverage
+  PASS: id: 9/9 (100%)
+  PASS: type: 9/9 (100%)
+  PASS: status: 9/9 (100%)
+  PASS: tags: 9/9 (100%)
+  PASS: created: 9/9 (100%)
+  PASS: owner: 9/9 (100%)
+
+[6/7] Tag Hygiene
+  INFO: Total unique tags: 2
+
+[7/7] Backlog Integrity
+  SKIP: Backlog integrity - no 10_projects/*/11-tasks.md found
+
+========================================
+Results: 10 passed, 0 failed, 2 skipped
+========================================
