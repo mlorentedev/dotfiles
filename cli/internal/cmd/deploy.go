@@ -106,6 +106,7 @@ func newDeployCmd() *cobra.Command {
 			}
 
 			w := cmd.OutOrStdout()
+			deployed := map[string]bool{}
 			for _, target := range targets {
 				if !target.AppliesOn(runtime.GOOS) {
 					deployRow(w, "skipped", target.Name, "(not for %s)", runtime.GOOS)
@@ -119,6 +120,7 @@ func newDeployCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
+				deployed[target.Name] = true
 				switch {
 				case !res.Changed:
 					deployRow(w, "in sync", res.Name, "%s", res.Dst)
@@ -136,6 +138,9 @@ func newDeployCmd() *cobra.Command {
 				if res.BackedUp != "" {
 					deployRow(w, "", "", "kept the previous file at %s", res.BackedUp)
 				}
+			}
+			if err := tightenPrivateDirs(w, man, deployed, dryRun); err != nil {
+				return err
 			}
 			// A bare deploy converges everything the setups own, including the
 			// Orca hooks Orca rewrites on every install (CLI-093, #1953) and the
@@ -155,6 +160,34 @@ func newDeployCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change without writing anything")
 	return c
+}
+
+// tightenPrivateDirs narrows each directory that holds a private file this run
+// deployed, with the rule doctor --fix uses (deploy.TightenDir). A directory
+// that already existed kept the mode it was created with, so a 0600 written
+// into a 0755 ~/.pi/agent left it open until someone ran doctor --fix (#2161).
+// Only the entries this run deployed count, so `dotf deploy pi` never narrows
+// ~/.ssh as a side effect.
+func tightenPrivateDirs(w io.Writer, man *deploy.Manifest, deployed map[string]bool, dryRun bool) error {
+	dirs, err := man.PrivateDirsOf(env.Home(), env.ResolvePath, deployed)
+	if err != nil {
+		return err
+	}
+	for _, dir := range dirs {
+		from, to, changed, err := deploy.TightenDir(dir, runtime.GOOS, dryRun)
+		if err != nil {
+			return fmt.Errorf("tightening %s, which holds a private deployed file: %w", dir, err)
+		}
+		if !changed {
+			continue
+		}
+		verb := "tightened"
+		if dryRun {
+			verb = "would tighten"
+		}
+		deployRow(w, verb, "", "%s from %04o to %04o", dir, from, to)
+	}
+	return nil
 }
 
 func names(m *deploy.Manifest) string {

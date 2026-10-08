@@ -90,16 +90,16 @@ if ! DELETED="$(deleted_paths)"; then
 fi
 
 offenders=""
-while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    case "$path" in
+while IFS= read -r file_path; do
+    [ -n "$file_path" ] || continue
+    case "$file_path" in
         scripts/*.sh|scripts/*.ps1) ;;
         *) continue ;;
     esac
 
     # A twin pair is only retired when BOTH halves are gone. Deleting just the
     # .ps1 (a Windows-only cleanup) must not demand the bats file's head.
-    stem="$(basename "$path")"; stem="${stem%.sh}"; stem="${stem%.ps1}"
+    stem="$(basename "$file_path")"; stem="${stem%.sh}"; stem="${stem%.ps1}"
     if [ -f "scripts/$stem.sh" ] || [ -f "scripts/$stem.ps1" ]; then
         continue
     fi
@@ -111,7 +111,7 @@ while IFS= read -r path; do
 "
         fi
     done <<EOF
-$(test_twins_for "$path")
+$(test_twins_for "$file_path")
 EOF
 done <<EOF
 $DELETED

@@ -76,6 +76,15 @@ Describe 'powershell/profile.ps1 command-name collisions' {
         $cleared.Count | Should -BeGreaterThan 0
     }
 
+    It "'<Name>' is defined whether or not eza is installed" -ForEach @(
+        @{ Name = 'll' }
+        @{ Name = 'lla' }
+    ) {
+        # The eza branch used to be the only definition, so a machine without
+        # eza had no ll at all. The zsh profile falls back to ls (#2166).
+        (Get-Resolution -Name $Name).ResolvesAs | Should -BeExactly 'Function'
+    }
+
     Context 'the four collisions reported in BUG-034' {
         It "'<Name>' resolves to the profile function, not the built-in alias" -ForEach @(
             @{ Name = 'gp';  Expect = 'git pull' }
