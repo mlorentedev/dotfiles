@@ -522,12 +522,13 @@ jobs:
           zsh --version
           /bin/bash --version | head -n 1
 
-      - name: Go build, vet (native and GOOS=darwin) and test
+      # Native vet IS the darwin vet on this runner; a GOOS=darwin line would
+      # repeat it (#2147 review).
+      - name: Go build, vet and test
         working-directory: cli
         run: |
           go build ./...
           go vet ./...
-          GOOS=darwin go vet ./...
           go test ./...
 
       # One `dotf` for every bats file that runs the real binary, as in `test`
@@ -550,6 +551,8 @@ jobs:
         if: github.event_name == 'push'
         env:
           DOTF_TEST_GH_TOKEN: ${{ github.token }}
+          # As `test` sets it on a push: the network leg of pr-agent-config.bats (#2021).
+          DOTF_TEST_NETWORK: '1'
         run: PATH="/bin:$PATH" ./scripts/run-bats.sh --expect-bash 3
 
   test-windows:
