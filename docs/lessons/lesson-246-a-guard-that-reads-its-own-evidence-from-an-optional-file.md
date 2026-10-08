@@ -73,3 +73,12 @@ path fires. Worth noting for the shape: this class survives unit tests by
 construction, because the fixture that sets up the guard's happy path is the same
 fixture that hides the degraded one. Ask what the *other* branch of every
 warning-level failure does to the checks that come after it.
+
+## Update (#1908): the sidecar is no longer optional
+
+The premise above, that `review-request.json` may legitimately be absent, no
+longer holds. `spec archive` now refuses a `review.md` with no sidecar beside
+it, so the launcher refuses to start a review when it cannot write one: a run
+launched without it spends a review that can never archive. The warning path
+this lesson analysed is gone. The lesson's question still applies to any other
+warning-level failure: ask what its other branch does to the checks after it.

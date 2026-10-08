@@ -429,17 +429,34 @@ func changedContracts(specDir string, recorded map[string]string) []string {
 // wrote, which is the only part of the evidence the reviewed party did not
 // author.
 //
-// Absent sidecar → no finding. Reviews predating this guard, and hand-written
-// ones, remain governed by the verdict, staleness and pool checks; refusing them
-// would invalidate every review already on disk to close a hole none of them
-// demonstrably has.
+// Absent sidecar → refusal (#1908). It used to be no finding, so that reviews
+// predating the guard stayed archivable, and that left a hole: a repository
+// that ignores the sidecar loses it on every fresh clone and CI checkout, and
+// the archive then skipped the reviewer and SHA cross-checks without saying
+// so. Every active spec carries one now, and the launcher writes it on every
+// run. A review produced outside the launcher has two exits: relaunch it, or
+// waive the review in proposal.md. Only the archive gate reaches this, so the
+// launcher is never refused for lacking the file it is about to write.
 func checkReviewProvenance(specDir string, review Review) error {
 	req, found, err := ReadReviewRequest(specDir)
 	if err != nil {
 		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review", err)
 	}
 	if !found {
-		return nil
+		path := filepath.Join(specDir, ReviewRequestFile)
+		return fmt.Errorf("no %s beside %s: the archive cannot verify which reviewer was launched or against which commit\n"+
+			"the launcher writes it on every `dotf spec review`. It goes missing when the repository ignores it (check `git check-ignore -v %s`), or when the review was not launched by dotf\n"+
+			"un-ignore `specs/**/%s`, then `git add -f` the existing request, or re-run `dotf spec review %s` and commit what it writes",
+			ReviewRequestFile, ReviewFile, path, ReviewRequestFile, filepath.Base(specDir))
+	}
+	// Present but empty is the same skip as absent: every cross-check below
+	// is conditional on the field it compares, so a `{}` would pass them all.
+	// The launcher has always written both fields, so a request without them
+	// was not written by it.
+	if req.ReviewedSHA == "" || req.Reviewer == "" {
+		return fmt.Errorf("%s records no reviewed_sha or no reviewer, so it proves nothing about the run that wrote %s\n"+
+			"the launcher always writes both; re-run `dotf spec review %s` and commit what it writes",
+			ReviewRequestFile, ReviewFile, filepath.Base(specDir))
 	}
 
 	// The digest is the no-verdict case, and it is checked first because it

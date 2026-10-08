@@ -131,17 +131,75 @@ func TestProvenanceCatchesADifferentPoolMember(t *testing.T) {
 	}
 }
 
-// TestProvenanceIsSilentWithoutASidecar keeps the guard from invalidating every
-// review already on disk. Reviews predating it, and hand-written ones, stay
-// governed by the verdict, staleness and pool checks.
-func TestProvenanceIsSilentWithoutASidecar(t *testing.T) {
+// TestProvenanceRefusesAMissingSidecar is #1908: a repository that ignores the
+// sidecar loses it on every fresh clone, and a missing sidecar used to skip the
+// reviewer and SHA cross-checks silently. It must refuse, and name the remedy.
+func TestProvenanceRefusesAMissingSidecar(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
-	if err := checkReviewProvenance(dir, Review{
+	err := checkReviewProvenance(dir, Review{
 		Verdict:     "PASS",
 		ReviewedSHA: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Reviewer:    "nan/deepseek-v4-flash",
-	}); err != nil {
-		t.Fatalf("no sidecar means the guard is not asserted, not that the review is bad: %v", err)
+	})
+	if err == nil {
+		t.Fatal("a review with no launcher sidecar must not archive: nothing can vouch for its reviewer or SHA")
+	}
+	for _, want := range []string{ReviewRequestFile, "git check-ignore", "dotf spec review " + filepath.Base(dir)} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal does not name %q: %v", want, err)
+		}
+	}
+}
+
+// An empty sidecar is the same skip as a missing one: every cross-check is
+// conditional on the field it compares, so `{}` would pass them all (#1908).
+func TestProvenanceRefusesAnIncompleteSidecar(t *testing.T) {
+	review := Review{
+		Verdict:     "PASS",
+		ReviewedSHA: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Reviewer:    "nan/deepseek-v4-flash",
+	}
+	for name, body := range map[string]string{
+		"empty":       "{}\n",
+		"no reviewer": `{"reviewed_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+		"no sha":      `{"reviewer": "nan/deepseek-v4-flash"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := seedProvenanceSpec(t, provenanceReviewDoc)
+			if err := os.WriteFile(filepath.Join(dir, ReviewRequestFile), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			err := checkReviewProvenance(dir, review)
+			if err == nil {
+				t.Fatal("a sidecar that names no reviewer or no commit must not vouch for the review")
+			}
+			if !strings.Contains(err.Error(), "dotf spec review "+filepath.Base(dir)) {
+				t.Errorf("refusal does not name the remedy: %v", err)
+			}
+		})
+	}
+}
+
+// TestRequestIgnored runs real git: the launcher refuses an ignored request,
+// because it would be lost on every other checkout (#1908).
+func TestRequestIgnored(t *testing.T) {
+	root := t.TempDir()
+	gitRun(t, root, "init", "-q", "-b", "main")
+	specDir := filepath.Join(root, "specs", "AI-001-x")
+	if err := os.MkdirAll(specDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if RequestIgnored(root, specDir) {
+		t.Fatal("no ignore rule, yet the request reads as ignored")
+	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("specs/**/"+ReviewRequestFile+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !RequestIgnored(root, specDir) {
+		t.Error("the ignore rule matches the request, yet it reads as not ignored")
+	}
+	if RequestIgnored(t.TempDir(), specDir) {
+		t.Error("outside a repository the answer must be false: the archive gate refuses later")
 	}
 }
 

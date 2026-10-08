@@ -87,6 +87,19 @@ func HeadSHA(repoRoot string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// RequestIgnored reports whether git ignores the review request in specDir.
+// An ignored request is written, read by a local archive, and lost on every
+// other checkout, so the review it records cannot archive anywhere else
+// (#1908). A tracked request is not ignored, whatever the rules say: a
+// `git add -f` already makes it travel. Any answer but "ignored" (not a
+// repository, git missing) is false:
+// the archive gate still refuses a request that did not travel, so failing
+// open here only moves the refusal later.
+func RequestIgnored(repoRoot, specDir string) bool {
+	path := filepath.Join(specDir, ReviewRequestFile)
+	return exec.Command("git", "-C", repoRoot, "check-ignore", "-q", "--", path).Run() == nil
+}
+
 // ResolveReviewBase returns the commit the spec's work starts from: the PARENT
 // of the commit that first added specDir.
 //
