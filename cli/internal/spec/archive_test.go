@@ -18,7 +18,10 @@ const answeredPromotions = "## Promotion candidates\n\n" +
 	"- [x] New pattern candidate for `00_meta/patterns/`? no: a fixture\n"
 
 // writeSpec materializes specs/<id>/ under root with the given files. A spec
-// given no verification.md gets answeredPromotions.
+// given no verification.md gets answeredPromotions. A spec given a review.md
+// and no review-request.json gets an empty sidecar, the launcher's record with
+// nothing to cross-check: the archive refuses a review without one (#1908), and
+// a fixture about something else should not trip on that.
 func writeSpec(t *testing.T, root, id string, files map[string]string) string {
 	t.Helper()
 	dir := filepath.Join(root, "specs", id)
@@ -27,6 +30,11 @@ func writeSpec(t *testing.T, root, id string, files map[string]string) string {
 	}
 	if _, ok := files["verification.md"]; !ok {
 		files["verification.md"] = answeredPromotions
+	}
+	if _, review := files[ReviewFile]; review {
+		if _, ok := files[ReviewRequestFile]; !ok {
+			files[ReviewRequestFile] = "{}\n"
+		}
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {

@@ -131,17 +131,23 @@ func TestProvenanceCatchesADifferentPoolMember(t *testing.T) {
 	}
 }
 
-// TestProvenanceIsSilentWithoutASidecar keeps the guard from invalidating every
-// review already on disk. Reviews predating it, and hand-written ones, stay
-// governed by the verdict, staleness and pool checks.
-func TestProvenanceIsSilentWithoutASidecar(t *testing.T) {
+// TestProvenanceRefusesAMissingSidecar is #1908: a repository that ignores the
+// sidecar loses it on every fresh clone, and a missing sidecar used to skip the
+// reviewer and SHA cross-checks silently. It must refuse, and name the remedy.
+func TestProvenanceRefusesAMissingSidecar(t *testing.T) {
 	dir := seedProvenanceSpec(t, provenanceReviewDoc)
-	if err := checkReviewProvenance(dir, Review{
+	err := checkReviewProvenance(dir, Review{
 		Verdict:     "PASS",
 		ReviewedSHA: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Reviewer:    "nan/deepseek-v4-flash",
-	}); err != nil {
-		t.Fatalf("no sidecar means the guard is not asserted, not that the review is bad: %v", err)
+	})
+	if err == nil {
+		t.Fatal("a review with no launcher sidecar must not archive: nothing can vouch for its reviewer or SHA")
+	}
+	for _, want := range []string{ReviewRequestFile, "git check-ignore", "dotf spec review " + filepath.Base(dir)} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal does not name %q: %v", want, err)
+		}
 	}
 }
 

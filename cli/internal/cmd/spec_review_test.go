@@ -196,6 +196,37 @@ func TestSpecReviewFailsWhenTheLaunchDiedImmediately(t *testing.T) {
 	}
 }
 
+// #1908: the archive refuses a review with no launcher sidecar, so a launch that
+// cannot write one would spend a review that can never archive. It refuses
+// before starting anything. The sidecar path is made a directory, a write
+// failure that behaves the same on every OS.
+func TestSpecReviewRefusesWhenTheRequestCannotBeRecorded(t *testing.T) {
+	root := makeRepo(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, true)
+	launched := false
+	runCommand = func(string, []string) error { launched = true; return nil }
+	req := filepath.Join(root, "specs", "AI-001-x", "review-request.json")
+	if err := os.Remove(req); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(req, "blocker"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x")
+	if err == nil {
+		t.Fatalf("a launch that cannot record its request must refuse:\n%s", stdout+stderr)
+	}
+	if launched {
+		t.Error("the reviewer was started although its review could never archive")
+	}
+	if !strings.Contains(err.Error(), "review-request.json") {
+		t.Errorf("refusal does not name the sidecar: %v", err)
+	}
+}
+
 // The error has to carry what the reviewer said, not just that it died. The
 // death reason arrives on stderr, which the `| tee` pipeline never captured —
 // that is why the original failure left no clue anywhere.

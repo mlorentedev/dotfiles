@@ -23,6 +23,11 @@ func seedSpec(t *testing.T, root, id, proposal string) {
 	if err := os.WriteFile(filepath.Join(dir, "review.md"), []byte(review), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The launcher's sidecar, with nothing to cross-check: the archive refuses a
+	// review without one (#1908).
+	if err := os.WriteFile(filepath.Join(dir, "review-request.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	// Answered promotions, so these cases pass the promotion pre-flight
 	// (HARNESS-160); internal/spec's promotion_test.go covers its refusals.
 	promotions := "## Promotion candidates\n\n" +
