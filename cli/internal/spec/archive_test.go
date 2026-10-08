@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -19,9 +20,25 @@ const answeredPromotions = "## Promotion candidates\n\n" +
 
 // writeSpec materializes specs/<id>/ under root with the given files. A spec
 // given no verification.md gets answeredPromotions. A spec given a review.md
-// and no review-request.json gets an empty sidecar, the launcher's record with
-// nothing to cross-check: the archive refuses a review without one (#1908), and
-// a fixture about something else should not trip on that.
+// and no review-request.json gets one matching it (fixtureRequest): the archive
+// refuses a review without one (#1908), and a fixture about something else
+// should not trip on that.
+// fixtureRequest is the sidecar the launcher would have written for review: the
+// same reviewer and reviewed_sha, no digests. A review that does not parse gets
+// placeholders; the gate refuses it before it reads the request.
+func fixtureRequest(review string) string {
+	sha, reviewer := strings.Repeat("0", 40), "fixture/reviewer"
+	if r, err := ParseReview(review); err == nil {
+		if r.ReviewedSHA != "" {
+			sha = r.ReviewedSHA
+		}
+		if r.Reviewer != "" {
+			reviewer = r.Reviewer
+		}
+	}
+	return fmt.Sprintf("{\"reviewed_sha\": %q, \"reviewer\": %q}\n", sha, reviewer)
+}
+
 func writeSpec(t *testing.T, root, id string, files map[string]string) string {
 	t.Helper()
 	dir := filepath.Join(root, "specs", id)
@@ -33,7 +50,7 @@ func writeSpec(t *testing.T, root, id string, files map[string]string) string {
 	}
 	if _, review := files[ReviewFile]; review {
 		if _, ok := files[ReviewRequestFile]; !ok {
-			files[ReviewRequestFile] = "{}\n"
+			files[ReviewRequestFile] = fixtureRequest(files[ReviewFile])
 		}
 	}
 	for name, content := range files {

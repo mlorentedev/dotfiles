@@ -74,6 +74,9 @@ var reviewerDraw = rand.IntN
 var resolveReviewBase = spec.ResolveReviewBase
 var headSHAOf = spec.HeadSHA
 
+// requestIgnored is a seam over spec.RequestIgnored, for the same reason.
+var requestIgnored = spec.RequestIgnored
+
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
 //
@@ -260,7 +263,13 @@ is the only record of how.`,
 			// A failure to write it refuses the launch. It used to be a warning,
 			// but `spec archive` refuses a review with no sidecar (#1908), so a run
 			// launched without one spends a review that can never archive.
-			// Refusing here costs nothing yet.
+			// Refusing here costs nothing yet. So does an ignored request: it is
+			// written, and lost on every checkout but this one.
+			if requestIgnored(repoRoot, specDir) {
+				return fmt.Errorf("git ignores specs/%s/%s, so the review would not archive from any other checkout\n"+
+					"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
+					id, spec.ReviewRequestFile, spec.ReviewRequestFile)
+			}
 			if err := spec.WriteReviewRequest(specDir, headSHA, chosen.ID, baseSHA); err != nil {
 				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
 					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",

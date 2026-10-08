@@ -449,6 +449,15 @@ func checkReviewProvenance(specDir string, review Review) error {
 			"un-ignore `specs/**/%s`, then `git add -f` the existing request, or re-run `dotf spec review %s` and commit what it writes",
 			ReviewRequestFile, ReviewFile, path, ReviewRequestFile, filepath.Base(specDir))
 	}
+	// Present but empty is the same skip as absent: every cross-check below
+	// is conditional on the field it compares, so a `{}` would pass them all.
+	// The launcher has always written both fields, so a request without them
+	// was not written by it.
+	if req.ReviewedSHA == "" || req.Reviewer == "" {
+		return fmt.Errorf("%s records no reviewed_sha or no reviewer, so it proves nothing about the run that wrote %s\n"+
+			"the launcher always writes both; re-run `dotf spec review %s` and commit what it writes",
+			ReviewRequestFile, ReviewFile, filepath.Base(specDir))
+	}
 
 	// The digest is the no-verdict case, and it is checked first because it
 	// explains the sha mismatch that would otherwise be reported instead: a

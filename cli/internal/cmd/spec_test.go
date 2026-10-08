@@ -24,10 +24,11 @@ func makeRepo(t *testing.T) string {
 	// resolvers answer "" here and `spec review` would refuse every launch
 	// (HARNESS-112). Drive the seams instead; the resolvers are tested against
 	// real git histories in internal/spec.
-	prevBase, prevHead := resolveReviewBase, headSHAOf
+	prevBase, prevHead, prevIgnored := resolveReviewBase, headSHAOf, requestIgnored
 	resolveReviewBase = func(string, string) string { return "basebasebase" }
 	headSHAOf = func(string) string { return "headheadhead" }
-	t.Cleanup(func() { resolveReviewBase, headSHAOf = prevBase, prevHead })
+	requestIgnored = func(string, string) bool { return false }
+	t.Cleanup(func() { resolveReviewBase, headSHAOf, requestIgnored = prevBase, prevHead, prevIgnored })
 
 	return root
 }
