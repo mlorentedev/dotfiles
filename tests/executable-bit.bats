@@ -62,19 +62,19 @@ _invoked_scripts() {
 }
 
 @test "every script invoked as ./x.sh is executable in git's index" {
-    local path mode missing="" seen=0
+    local file_path mode missing="" seen=0
     # Self-defending: an empty derivation would make this pass vacuously, and
     # relying on a SEPARATE test to notice that is exactly the coupling a
     # reviewer flagged. Assert the premise here too.
-    while IFS= read -r path; do
-        [ -n "$path" ] || continue
+    while IFS= read -r file_path; do
+        [ -n "$file_path" ] || continue
         seen=$((seen + 1))
-        mode="$(git -C "$DOTFILES_DIR" ls-files -s -- "$path" | awk '{print $1}')"
+        mode="$(git -C "$DOTFILES_DIR" ls-files -s -- "$file_path" | awk '{print $1}')"
         # The INDEX, not the filesystem: the index is what a fresh clone
         # materialises from, and it is what a commit records. A working tree can
         # be executable while the thing that ships is not.
         if [ "$mode" != "100755" ]; then
-            missing="$missing $path($mode)"
+            missing="$missing $file_path($mode)"
         fi
     done < <(_invoked_scripts)
 
