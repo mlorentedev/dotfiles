@@ -40,8 +40,13 @@ Guide for setting up and using Claude Code and Gemini CLI with the dotfiles repo
 # which installs dotf, runs `dotf tools install` and `dotf deploy`, and ends
 # with `dotf doctor`.
 curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
+source ~/.zshrc
+```
 
-# Already cloned: the same, plus a fast-forward pull first.
+Already cloned instead: the same, with a fast-forward pull first. Run one block,
+not both.
+
+```bash
 cd ~/Projects/dotfiles && ./install.sh
 source ~/.zshrc
 ```
