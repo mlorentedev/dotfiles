@@ -17,6 +17,7 @@
 # workflow text alone would pass for a substitution that matches nothing.
 
 load 'lib/refute'
+load 'lib/os'
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -110,6 +111,7 @@ if ours[0] < rp[0]:
 }
 
 @test "release-please: the template's ', closes [#N](url)' becomes ', refs [#N](url)'" {
+    require_gnu_sed
     set_body 10 '* **forge:** declare branch protection ([da16c65](https://github.com/o/r/commit/da16c65)), closes [#1451](https://github.com/o/r/issues/1451)'
     run run_step
     [ "$status" -eq 0 ]
@@ -118,6 +120,7 @@ if ours[0] < rp[0]:
 }
 
 @test "release-please: several references after one keyword, and a cross-repo one" {
+    require_gnu_sed
     set_body 10 '* a, closes [#1](u) [#2](u)
 * b, closes [owner/other#3](u)'
     run run_step
@@ -130,6 +133,7 @@ if ours[0] < rp[0]:
 # GitHub honours. Every closing keyword counts, in any case, with or without a
 # colon, bare or as a URL.
 @test "release-please: every GitHub closing keyword is neutralised, not only the template's" {
+    require_gnu_sed
     set_body 10 '* fix: Fixes #4
 * fix: resolved: #5
 * fix: the release closed #6
@@ -145,6 +149,7 @@ if ours[0] < rp[0]:
 }
 
 @test "release-please: a word that merely contains a keyword is left alone" {
+    require_gnu_sed
     set_body 10 '* feat: prefixes #8 and unresolved #9, closes [#10](u)'
     run run_step
     [ "$status" -eq 0 ]
@@ -152,6 +157,7 @@ if ours[0] < rp[0]:
 }
 
 @test "release-please: a body with nothing to rewrite is not written back" {
+    require_gnu_sed
     set_body 10 '* feat: something ([abc](u))'
     run run_step
     [ "$status" -eq 0 ]
@@ -160,6 +166,7 @@ if ours[0] < rp[0]:
 }
 
 @test "release-please: an already neutralised body is not written again" {
+    require_gnu_sed
     set_body 10 '* a, refs [#1](u)'
     run run_step
     [ "$status" -eq 0 ]
@@ -167,6 +174,7 @@ if ours[0] < rp[0]:
 }
 
 @test "release-please: a pull request without the release label is never touched" {
+    require_gnu_sed
     set_body 10 '* a, closes [#1](u)'
     run run_step
     [ "$status" -eq 0 ]
