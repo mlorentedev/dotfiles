@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -313,9 +314,44 @@ func TestAnUnknownTopLevelCommandIsReported(t *testing.T) {
 //
 // A group that declares its own Args takes positional arguments on purpose
 // (`dotf init [path]` scaffolds a project), so it is never run here. The rest
-// run in a scratch cwd and HOME, so a group whose RunE ever does more than
-// print help cannot write into the checkout.
+// run in a scratch cwd and HOME, and with every path the env contract declares
+// pointed at scratch, so a group whose RunE ever does more than print help
+// cannot write into the checkout or into the real vault.
+// sandboxContractPaths points every variable env-contract.json declares, and the
+// XDG roots, at its own scratch directory. A scratch HOME alone does not do
+// this: env.ResolvePath returns a set variable before it consults HOME, so a
+// developer shell's VAULT_PATH reached the real vault. That is how this walk's
+// first version left two scaffolded projects there on 2026-10-07 (lesson 350).
+// The names come from the contract, so a path variable added later is covered
+// without anyone remembering this test.
+func sandboxContractPaths(t *testing.T) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "env-contract.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contract struct {
+		EnvVars []struct {
+			Name string `json:"name"`
+		} `json:"env_vars"`
+	}
+	if err := json.Unmarshal(raw, &contract); err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"}
+	for _, v := range contract.EnvVars {
+		names = append(names, v.Name)
+	}
+	if len(names) < 5 || !strings.Contains(strings.Join(names, " "), "VAULT_PATH") {
+		t.Fatalf("env-contract.json declared no VAULT_PATH; parsed %v", names)
+	}
+	for _, name := range names {
+		t.Setenv(name, t.TempDir())
+	}
+}
+
 func TestEveryCommandGroupRefusesAnUnknownSubcommand(t *testing.T) {
+	sandboxContractPaths(t)
 	t.Chdir(t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USERPROFILE", t.TempDir())
