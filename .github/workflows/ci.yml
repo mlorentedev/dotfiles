@@ -614,7 +614,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\age" | Out-Null
-          age-keygen -o "$env:USERPROFILE\.config\age\key.txt"
+          # A native command's failure does not stop a pwsh step, so a broken
+          # age-keygen used to leave no key and the suite skipped on it (#2152,
+          # the Windows half). Assert what the step promises.
+          $key = "$env:USERPROFILE\.config\age\key.txt"
+          age-keygen -o $key
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error::age-keygen exited $LASTEXITCODE"; exit 1 }
+          if (-not ((Test-Path $key) -and (Get-Item $key).Length -gt 0)) { Write-Output "::error::age-keygen left no key at $key"; exit 1 }
           # No per-secret blob is planted: NAN_API_KEY is bw-backed, and doctor
           # FAILs any blob the registry does not claim (CLI-036).
           $vault = "$env:USERPROFILE\Projects\knowledge"

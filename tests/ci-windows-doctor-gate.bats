@@ -58,3 +58,15 @@ test_windows_job() {
     grep -B12 'Invoke-Pester -Path tests -CI' "$CI_YML" | grep -qF "DOTFILES_CI_EXPECT_COPILOT = '1'"
     grep -qF 'DOTFILES_CI_EXPECT_COPILOT' "$BATS_TEST_DIRNAME/copilot-native-skills.Tests.ps1"
 }
+
+# #2152, the Windows half: a native command's failure does not stop a pwsh step,
+# so `age-keygen -o` with nothing after it left no key and a green step. The
+# sandbox step must check the exit code and the key file before going on.
+@test "test-windows: the sandbox step fails on a failed age-keygen or an empty key (#2152)" {
+    job="$(test_windows_job)"
+    step="$(printf '%s\n' "$job" | awk '/- name: Sandbox secrets \+ minimal vault/{f=1} f && /^      - /&& !/Sandbox secrets/{exit} f')"
+    [ -n "$step" ]
+    printf '%s\n' "$step" | grep -qF 'age-keygen -o $key'
+    printf '%s\n' "$step" | grep -qF 'if ($LASTEXITCODE -ne 0) { Write-Output "::error::age-keygen exited'
+    printf '%s\n' "$step" | grep -qF '(Get-Item $key).Length -gt 0'
+}
