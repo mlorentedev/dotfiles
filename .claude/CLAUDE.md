@@ -61,6 +61,11 @@ golangci-lint run
 GOOS=windows go vet ./...
 ```
 
+**Run unreleased `dotf` with `go run ./cmd/dotf …` from the worktree** (or a
+binary built into `$TMPDIR`). Never `go build` over `~/.local/bin/dotf`: that is
+the pinned release every setup and hook on the machine calls, and a dev build
+there drifts from `DOTF_VERSION` silently (#1469).
+
 **Use the pinned linter, not whatever is installed.** CI resolves
 `GOLANGCI_LINT_VERSION` from `versions.conf`; a local binary on a different
 major reports "0 issues" on code CI rejects (BUG-071). `dotf doctor` reports
