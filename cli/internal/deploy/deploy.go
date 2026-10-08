@@ -306,11 +306,22 @@ func (c Config) private() bool {
 // PrivateDirs lists, expanded and sorted, the directories that hold a private
 // file this manifest deploys: an entry whose own mode is private, that applies
 // here (the caller's filter: platforms, requires), and whose destination file
-// exists. `dotf deploy` tightens each one with TightenDir, and doctor reports
-// one left open after it (#2053, #2161). The existence test keeps both true:
-// an entry for another OS, or one never deployed, puts nothing private in its
-// directory.
+// exists. Doctor reports one left open after a deploy (#2053, #2161). The
+// existence test keeps that report true: an entry for another OS, or one never
+// deployed, puts nothing private in its directory.
 func (m *Manifest) PrivateDirs(home string, resolve func(string) string, applies func(Config) bool) ([]string, error) {
+	return m.privateDirs(home, resolve, applies, true)
+}
+
+// PrivateDirsOf lists the directories the named entries put a private file in,
+// whether or not the file is there yet. `dotf deploy` tightens these: it is
+// about to write every one of those files, so a dry run on a fresh machine
+// must predict the same tightening the real run makes (#2161).
+func (m *Manifest) PrivateDirsOf(home string, resolve func(string) string, names map[string]bool) ([]string, error) {
+	return m.privateDirs(home, resolve, func(c Config) bool { return names[c.Name] }, false)
+}
+
+func (m *Manifest) privateDirs(home string, resolve func(string) string, applies func(Config) bool, mustExist bool) ([]string, error) {
 	seen := map[string]bool{}
 	var dirs []string
 	for _, c := range m.Configs {
@@ -321,7 +332,7 @@ func (m *Manifest) PrivateDirs(home string, resolve func(string) string, applies
 		if err != nil {
 			return nil, fmt.Errorf("config %q: %w", c.Name, err)
 		}
-		if _, err := os.Stat(dst); err != nil {
+		if _, err := os.Stat(dst); mustExist && err != nil {
 			continue
 		}
 		if dir := filepath.Dir(dst); !seen[dir] {

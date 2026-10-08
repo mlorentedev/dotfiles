@@ -169,7 +169,7 @@ func newDeployCmd() *cobra.Command {
 // Only the entries this run deployed count, so `dotf deploy pi` never narrows
 // ~/.ssh as a side effect.
 func tightenPrivateDirs(w io.Writer, man *deploy.Manifest, deployed map[string]bool, dryRun bool) error {
-	dirs, err := man.PrivateDirs(env.Home(), env.ResolvePath, func(c deploy.Config) bool { return deployed[c.Name] })
+	dirs, err := man.PrivateDirsOf(env.Home(), env.ResolvePath, deployed)
 	if err != nil {
 		return err
 	}

@@ -266,3 +266,33 @@ func TestDeployCmd_TightensAnExistingDirectoryThatHoldsAPrivateFile(t *testing.T
 		t.Errorf("a second deploy must have nothing left to do:\n%s", out)
 	}
 }
+
+// The bootstrap state of #2161 before any deploy: the directory exists at 0755
+// and the private file is not there yet. A dry run must predict the tightening
+// the real run makes, not only report it once the file exists.
+func TestDeployCmd_ADryRunPredictsTheTighteningBeforeTheFileExists(t *testing.T) {
+	repo, home, dir := privateDirRepo(t)
+	if err := os.Remove(filepath.Join(dir, "config.json")); err != nil {
+		t.Fatal(err)
+	}
+	out := deployOK(t, repo, home, "--dry-run")
+	if !strings.Contains(out, "would tighten ") || !strings.Contains(out, dir+" from 0755 to 0700") || permOf(t, dir) != 0o755 {
+		t.Errorf("a first dry run must predict the tightening and leave %04o:\n%s", permOf(t, dir), out)
+	}
+}
+
+// Never widened: a directory an operator made 0700 keeps it when the deploy
+// writes only a public file into it.
+func TestDeployCmd_AnOwnerOnlyDirectoryWithAPublicFileStaysOwnerOnly(t *testing.T) {
+	repo, home, _ := privateDirRepo(t)
+	pub := filepath.Join(home, ".pub")
+	if err := os.Chmod(pub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if out := deployOK(t, repo, home, "pub"); strings.Contains(out, "tighten") {
+		t.Errorf("a public entry must not report a tightening:\n%s", out)
+	}
+	if got := permOf(t, pub); got != 0o700 {
+		t.Errorf("%s is %04o after deploying a public file, want 0700 kept", pub, got)
+	}
+}

@@ -148,9 +148,14 @@ func modeDriftLine(name, dst string, mode os.FileMode) string {
 // but grants group or others access. `dotf deploy` narrows such a directory
 // itself (#2161), so what this finds is drift that arose after the last deploy,
 // or a directory no deploy has run on since. --fix converges it with the same
-// rule, deploy.TightenDir, which is also a no-op on Windows: there is no POSIX
-// mode to clear there.
+// rule, deploy.TightenDir. Windows has no POSIX mode to clear, and TightenDir
+// is a no-op there; returning early also keeps an unresolvable destination,
+// which the drift loop above already reports per entry, from being reported a
+// second time on a platform with nothing to check.
 func checkPrivateDeployDirs(sys *System, man *deploy.Manifest, rep *Report, fix bool) {
+	if sys.GOOS == "windows" {
+		return
+	}
 	applies := func(c deploy.Config) bool {
 		return c.AppliesOn(sys.GOOS) && (c.Requires == "" || sys.has(c.Requires))
 	}

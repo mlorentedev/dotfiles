@@ -64,6 +64,9 @@ created: "2026-10-05"
     `TestDeployCmd_TightensAnExistingDirectoryThatHoldsAPrivateFile` /
     `..._ReportsButDoesNotTightenOnADryRunOrAnotherEntry`. The second deploy prints nothing to tighten
     and both entries are `in sync`. Both cmd tests fail without the deploy change.
+  - Review round (PR-Agent on #2171): deploy reads `PrivateDirsOf` (the entries it deploys, file present
+    or not), so a dry run on a fresh machine predicts the tightening the real run makes; doctor keeps
+    `PrivateDirs` (file present). A 0700 directory that receives only a public file stays 0700.
 
 ## Promotion candidates
 
