@@ -12,10 +12,16 @@ alias gprj="cd $HOME/Projects"                    # Go to Projects directory
 alias gcs="cd $HOME/Projects/cheat-sheets"        # Go to cheat-sheets
 alias gbp="cd $HOME/Projects/boilerplates"        # Go to boilerplates
 
-# Enhanced file listing (requires eza)
-alias ls="eza --group-directories-first"          # Basic listing with eza
-alias ll="eza --group-directories-first -l"       # Long format listing
-alias lla="eza --group-directories-first -la"     # Long format with hidden files
+# Enhanced file listing with eza, only when eza is installed: an unconditional
+# alias turns a missing eza into a broken `ls` (#2013 F-030, macOS bring-up).
+if command -v eza >/dev/null 2>&1; then
+    alias ls="eza --group-directories-first"          # Basic listing with eza
+    alias ll="eza --group-directories-first -l"       # Long format listing
+    alias lla="eza --group-directories-first -la"     # Long format with hidden files
+else
+    alias ll="ls -l"
+    alias lla="ls -la"
+fi
 
 # Git shortcuts
 alias gs="git status"
