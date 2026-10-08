@@ -261,17 +261,17 @@ _active_spec_issue_map() {
     local paths
     paths=$(git ls-tree -r --name-only "$ref" -- specs/ 2>/dev/null) || return 1
 
-    printf '%s\n' "$paths" | while IFS= read -r path; do
-        case "$path" in
+    printf '%s\n' "$paths" | while IFS= read -r file_path; do
+        case "$file_path" in
             specs/archive/*) continue ;;
             specs/*/proposal.md) ;;
             *) continue ;;
         esac
-        local id="${path#specs/}"
+        local id="${file_path#specs/}"
         id="${id%/proposal.md}"
         case "$id" in */*) continue ;; esac   # only specs/<id>/proposal.md
         local num
-        num=$(git show "$ref:$path" 2>/dev/null | _frontmatter_issue_number) || continue
+        num=$(git show "$ref:$file_path" 2>/dev/null | _frontmatter_issue_number) || continue
         # An `if`, not `[[ ... ]] && printf`: the latter is the loop body's last
         # command, so a spec WITHOUT an issue: field would make the whole while
         # loop exit 1 and the caller fail closed on perfectly valid data.
@@ -291,16 +291,16 @@ _archived_spec_issue_map() {
     local paths
     paths=$(git ls-tree -r --name-only "$ref" -- specs/archive/ 2>/dev/null) || return 1
 
-    printf '%s\n' "$paths" | while IFS= read -r path; do
-        case "$path" in
+    printf '%s\n' "$paths" | while IFS= read -r file_path; do
+        case "$file_path" in
             specs/archive/*/proposal.md) ;;
             *) continue ;;
         esac
-        local id="${path#specs/archive/}"
+        local id="${file_path#specs/archive/}"
         id="${id%/proposal.md}"
         case "$id" in */*) continue ;; esac   # only specs/archive/<id>/proposal.md
         local num
-        num=$(git show "$ref:$path" 2>/dev/null | _frontmatter_issue_number) || continue
+        num=$(git show "$ref:$file_path" 2>/dev/null | _frontmatter_issue_number) || continue
         # Same `if` reasoning as _active_spec_issue_map: a trailing failed test
         # would make the whole while loop exit 1 on valid data.
         if [[ -n "$num" ]]; then
@@ -451,12 +451,12 @@ ADJACENCY_GENERIC_BASENAMES="README.md AGENTS.md CLAUDE.md CHANGELOG.md Makefile
 # the defect class this check exists for, lives in production code by definition,
 # and precision is what makes the report legible enough to act on.
 _adjacency_candidate_files() {
-    local path
-    while IFS= read -r path; do
-        if [[ -z "$path" ]]; then continue; fi
-        if _excluded "$path"; then continue; fi
-        if _is_active_spec_path "$path"; then continue; fi
-        printf '%s\n' "$path"
+    local file_path
+    while IFS= read -r file_path; do
+        if [[ -z "$file_path" ]]; then continue; fi
+        if _excluded "$file_path"; then continue; fi
+        if _is_active_spec_path "$file_path"; then continue; fi
+        printf '%s\n' "$file_path"
     done <<< "$1"
     return 0
 }
@@ -473,17 +473,17 @@ _adjacency_candidate_files() {
 # code; tests/spec-gate-adjacency.bats pins that so a future refactor goes red.
 _adjacent_open_issues() {
     local feed="$1" files="$2" closed="$3"
-    local num haystack path base
+    local num haystack file_path base
     while IFS=$'\t' read -r num haystack; do
         if [[ -z "$num" || -z "${haystack:-}" ]]; then continue; fi
         if printf '%s\n' "$closed" | grep -qxF "$num"; then continue; fi
-        while IFS= read -r path; do
-            if [[ -z "$path" ]]; then continue; fi
-            if [[ "$haystack" == *"$path"* ]]; then
-                printf '%s\t%s\t%s\n' "$num" "$path" "$haystack"
+        while IFS= read -r file_path; do
+            if [[ -z "$file_path" ]]; then continue; fi
+            if [[ "$haystack" == *"$file_path"* ]]; then
+                printf '%s\t%s\t%s\n' "$num" "$file_path" "$haystack"
                 break
             fi
-            base="${path##*/}"
+            base="${file_path##*/}"
             case " $ADJACENCY_GENERIC_BASENAMES " in *" $base "*) continue ;; esac
             if [[ "$haystack" == *"$base"* ]]; then
                 printf '%s\t%s\t%s\n' "$num" "$base" "$haystack"
@@ -500,7 +500,7 @@ _adjacent_open_issues() {
 _report_adjacent_issues() {
     if [[ -z "$ADJACENCY_ISSUES" || ! -r "$ADJACENCY_ISSUES" ]]; then return 0; fi
 
-    local files closed rows num path haystack
+    local files closed rows num file_path haystack
     files=$(git diff --name-only "${BASE_REF}...${HEAD_REF}" 2>/dev/null) || return 0
     files=$(_adjacency_candidate_files "$files")
     if [[ -z "$files" ]]; then return 0; fi
@@ -509,9 +509,9 @@ _report_adjacent_issues() {
     if [[ -z "$rows" ]]; then return 0; fi
 
     printf '[INFO] Adjacent open issues (advisory — this does not gate the PR):\n'
-    while IFS=$'\t' read -r num path haystack; do
+    while IFS=$'\t' read -r num file_path haystack; do
         if [[ -z "$num" ]]; then continue; fi
-        printf '         #%-6s names %s\n' "$num" "$path"
+        printf '         #%-6s names %s\n' "$num" "$file_path"
         printf '                 %.88s\n' "$haystack"
     done <<< "$rows"
     printf '       One of these may describe the same defect on an input shape this\n'
@@ -526,11 +526,11 @@ _report_adjacent_issues() {
         {
             printf '\n### Adjacent open issues (advisory)\n\n'
             printf '| Issue | Names | Title |\n|---|---|---|\n'
-            while IFS=$'\t' read -r num path haystack; do
+            while IFS=$'\t' read -r num file_path haystack; do
                 if [[ -z "$num" ]]; then continue; fi
                 # shellcheck disable=SC2016  # backticks are markdown code spans
                 # for the step-summary table, not command substitution.
-                printf '| #%s | `%s` | %.88s |\n' "$num" "$path" "$haystack"
+                printf '| #%s | `%s` | %.88s |\n' "$num" "$file_path" "$haystack"
             done <<< "$rows"
         } >> "$GITHUB_STEP_SUMMARY"
     fi
@@ -538,9 +538,9 @@ _report_adjacent_issues() {
 }
 
 _excluded() {
-    local path="$1"
-    local base="${path##*/}"
-    case "$path" in
+    local file_path="$1"
+    local base="${file_path##*/}"
+    case "$file_path" in
         docs/*.md) return 0 ;;   # doc-only (ADRs, lessons, runbooks): prose, not production
         tests/*|specs/archive/*) return 0 ;;
         # No broad *generated* glob (#686/C25): it excluded any path merely
@@ -666,27 +666,27 @@ if ! DIFF_OUTPUT=$(git diff --numstat "${BASE_REF}...${HEAD_REF}" 2>/dev/null); 
     exit 2
 fi
 
-while IFS=$'\t' read -r added removed path; do
-    [[ -z "${path:-}" ]] && continue
+while IFS=$'\t' read -r added removed file_path; do
+    [[ -z "${file_path:-}" ]] && continue
     # Resolve git's rename-compression to the destination path (#397).
-    case "$path" in *' => '*) path=$(_normalize_rename_path "$path") ;; esac
+    case "$file_path" in *' => '*) file_path=$(_normalize_rename_path "$file_path") ;; esac
     [[ "$added" == "-" ]] && added=0
     [[ "$removed" == "-" ]] && removed=0
 
-    if _is_active_spec_path "$path"; then
+    if _is_active_spec_path "$file_path"; then
         SPEC_LOC=$((SPEC_LOC + added + removed))
-    elif _is_mandated_archive_path "$path"; then
+    elif _is_mandated_archive_path "$file_path"; then
         SPEC_TOUCHED=1
     fi
 
-    if _excluded "$path"; then
-        EXCLUDED+=("$path:$((added + removed))")
+    if _excluded "$file_path"; then
+        EXCLUDED+=("$file_path:$((added + removed))")
         continue
     fi
 
     file_loc=$((added + removed))
     TOTAL_LOC=$((TOTAL_LOC + file_loc))
-    INCLUDED+=("$path:$file_loc")
+    INCLUDED+=("$file_path:$file_loc")
 done <<< "$DIFF_OUTPUT"
 
 # A spec touch only counts if it is substantive (#686/C25). A trivial edit to an

@@ -82,18 +82,18 @@ LINKED="$(gh api graphql -f query="query { user(login: \"$OWNER\") { projectV2(n
 PR_FILES=()   # workflows that hit branch protection on the current repo (reset per repo)
 
 deploy_workflow() {  # $1 = repo, $2 = workflow filename
-    local repo="$1" wf="$2" path=".github/workflows/$2" src remote sha
+    local repo="$1" wf="$2" wf_path=".github/workflows/$2" src remote sha
     src="$REPO_ROOT/.github/workflows/$wf"
     [ -f "$src" ] || { err "$repo: canonical $wf missing in this checkout"; return; }
-    remote="$(gh api "repos/$OWNER/$repo/contents/$path" -q '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    remote="$(gh api "repos/$OWNER/$repo/contents/$wf_path" -q '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
     if [ "$remote" = "$(cat "$src")" ]; then
         ok "$repo: $wf current"
         return
     fi
-    sha="$(gh api "repos/$OWNER/$repo/contents/$path" -q '.sha' 2>/dev/null || true)"
+    sha="$(gh api "repos/$OWNER/$repo/contents/$wf_path" -q '.sha' 2>/dev/null || true)"
     chg "$repo: deploy $wf$( [ -n "$sha" ] && echo ' (update)')"
     if [ "$CHECK" = 0 ]; then
-        local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$path"
+        local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$wf_path"
             -f message="ci: deploy bitácora workflow $wf (OPS-002)"
             -f content="$(base64 -w0 < "$src")")
         [ -n "$sha" ] && put_args+=(-f sha="$sha")
@@ -106,7 +106,7 @@ deploy_workflow() {  # $1 = repo, $2 = workflow filename
 }
 
 deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR for review (never auto-merge)
-    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf path src sha
+    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf wf_path src sha
     base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
     base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
     # Create the branch at base HEAD; if it already exists, FORCE-reset it to base.
@@ -121,10 +121,10 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
             || { err "$repo: cannot reset $branch to $base HEAD"; return; }
     fi
     for wf in "${PR_FILES[@]}"; do
-        path=".github/workflows/$wf"
+        wf_path=".github/workflows/$wf"
         src="$REPO_ROOT/.github/workflows/$wf"
-        sha="$(gh api "repos/$OWNER/$repo/contents/$path?ref=$branch" -q '.sha' 2>/dev/null || true)"
-        local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$path"
+        sha="$(gh api "repos/$OWNER/$repo/contents/$wf_path?ref=$branch" -q '.sha' 2>/dev/null || true)"
+        local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$wf_path"
             -f message="ci: deploy bitácora workflow $wf (OPS-002)"
             -f content="$(base64 -w0 < "$src")" -f branch="$branch")
         [ -n "$sha" ] && put_args+=(-f sha="$sha")
