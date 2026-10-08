@@ -64,7 +64,7 @@ setup() {
         recomputed="$(awk 'NR==1 || NR>4' "$f" | sha256sum | cut -c1-16)"
         checked=$((checked + 1))
         if [ "$declared" != "$recomputed" ]; then
-            echo "DRIFT: $f declared=$declared body=$recomputed — edit the vault source and run scripts/compile-harness.sh --refresh" >&2
+            echo "DRIFT: $f declared=$declared body=$recomputed — edit the vault source, pull the vault (git -C \"\$VAULT_PATH\" pull --ff-only: a stale clone reverts records, #2162), then run scripts/compile-harness.sh --refresh" >&2
             failed=1
         fi
     done < <(git grep -lE '^generated_sha: [0-9a-f]{16}$' -- 'harness/**/*.md')
