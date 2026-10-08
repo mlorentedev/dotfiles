@@ -7,7 +7,7 @@ created: "2026-10-07"
 
 ## Evidence
 
-> Delivered in three PRs (see `tasks.md`). The evidence below was measured on the combined change, rebased onto `main` at e65182a7 after #2070 replaced `tests/knowledge-crystallize-go-parity.bats` with a Go test. That file left the tier, which went from 285 tests to 272.
+> Delivered in three PRs (see `tasks.md`). The evidence below was measured on the combined change, rebased onto `main` at e65182a7 after #2070 replaced `tests/knowledge-crystallize-go-parity.bats` with a Go test. That file left the tier, which went from 285 tests to 272. The ticks below record that measurement: AC4 is made true by #2145, AC2, AC3 and AC6 by #2146, AC5 by #2147, so on #2145's tree alone the commands for AC2, AC3, AC5 and AC6 (and `features.json` f2 to f6) name files that do not exist yet. Every `features.json` entry stays `pending` until `dotf spec archive` runs them on `main` after the third PR.
 
 - [x] AC1 (Go injection seams) -> `cd cli && go test ./internal/doctor/ -run 'TestContractOS|TestCheckContractPath_Dialects|TestCheckContractEnvVars_WindowsDialect'`: doctor reads `System.GOOS` for the darwin and windows dialects, so layer 1 needs no new work. Gap noted, not fixed: `checks_catalog.go:95` and `checks_repodir.go:101` read `runtime.GOOS` directly.
 - [x] AC2 (tier tagged, non-empty, passes under bash 3.2 with no `sha256sum`) -> `PATH="/bin:...(no /sbin)" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` -> `bash 3.2.57 at /bin/bash`, `272 test(s) tagged os-sensitive`, 272 ok, 0 not ok
