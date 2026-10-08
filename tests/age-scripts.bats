@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for age-encrypt-decrypt.sh and age-standalone.sh
 
+# bats file_tags=os-sensitive
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"

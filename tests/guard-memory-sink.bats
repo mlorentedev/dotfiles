@@ -5,6 +5,8 @@
 # dispatcher via a *local* core.hooksPath on fixture repos — never the global
 # config — so they are CI-safe and non-invasive.
 
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     HOOKS="$REPO/git-hooks"

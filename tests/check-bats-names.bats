@@ -3,6 +3,7 @@
 # the runner silently fails to register (non-ASCII chars, or duplicate names),
 # which yields a "green" test that never ran. Detected by CURATOR-001 (#615).
 
+# bats file_tags=os-sensitive
 
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-bats-names.sh"

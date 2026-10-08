@@ -5,6 +5,8 @@
 # pin the semver semantics so a future edit can't silently reintroduce the
 # exact-match (== / !=) behavior that downgraded newer tools.
 
+# bats file_tags=os-sensitive
+
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     source "$DOTFILES_DIR/scripts/utils.sh"

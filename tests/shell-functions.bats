@@ -3,6 +3,8 @@
 # Functions are POSIX-portable, so each behavioural test is exercised under bash;
 # cross-shell sourcing is asserted under both bash and zsh.
 
+# bats file_tags=os-sensitive
+
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     FN_FILE="$DOTFILES_DIR/.zsh/functions.sh"

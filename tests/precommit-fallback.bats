@@ -12,6 +12,7 @@
 # test is the dispatcher's decision and the command it builds — pre-commit's own
 # behaviour is upstream's business.
 
+# bats file_tags=os-sensitive
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."

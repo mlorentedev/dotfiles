@@ -323,6 +323,7 @@ assert_absent() {
 # a container (pure jq over temp files, no $HOME involved), unlike the seed
 # block's second-run behavior that lesson-150 documents as uncoverable here.
 
+# bats test_tags=os-sensitive
 @test "setup-linux.sh pi enabledModels sync updates the model list and preserves theme/defaultModel/lastChangelogVersion" {
     command -v jq >/dev/null || skip "jq not available"
     PI_SETTINGS_SRC="$BATS_TEST_TMPDIR/src.json"

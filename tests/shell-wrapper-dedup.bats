@@ -4,6 +4,8 @@
 # (_qq_call) and the oc/ocfull wrappers live once in .zsh/functions.sh;
 # each rc keeps only its thin shell-specific qq/qf/dbg wrapper.
 
+# bats file_tags=os-sensitive
+
 load 'lib/refute'
 
 setup() {
