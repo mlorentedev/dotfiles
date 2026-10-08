@@ -67,6 +67,7 @@ test_windows_job() {
     step="$(printf '%s\n' "$job" | awk '/- name: Sandbox secrets \+ minimal vault/{f=1} f && /^      - /&& !/Sandbox secrets/{exit} f')"
     [ -n "$step" ]
     printf '%s\n' "$step" | grep -qF 'age-keygen -o $key'
-    printf '%s\n' "$step" | grep -qF 'if ($LASTEXITCODE -ne 0) { Write-Output "::error::age-keygen exited'
-    printf '%s\n' "$step" | grep -qF '(Get-Item $key).Length -gt 0'
+    # Each check must end the step: a Write-Output alone leaves pwsh exiting 0.
+    printf '%s\n' "$step" | grep -qF 'if ($LASTEXITCODE -ne 0) { Write-Output "::error::age-keygen exited $LASTEXITCODE"; exit 1 }'
+    printf '%s\n' "$step" | grep -qF 'if (-not ((Test-Path $key) -and (Get-Item $key).Length -gt 0)) { Write-Output "::error::age-keygen left no key at $key"; exit 1 }'
 }
