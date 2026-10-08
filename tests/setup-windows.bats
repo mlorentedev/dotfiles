@@ -141,6 +141,15 @@ setup() {
 # binary `copilot`) is agentic (closer to Claude Code). Setup detects the new one
 # via 'Get-Command copilot' and stops referencing the old extension entirely.
 
+@test "setup-windows.ps1 installs winget tools through Install-WingetTool, never by discarding winget's result (#2157)" {
+    # The inline call threw winget's output away and printed "installed" after a
+    # failed install; Install-WingetTool reads the exit code and checks the command
+    # resolves (tests/winget-tool.Tests.ps1 drives it).
+    refute_grep 'winget install .*\| *Out-Null' "$PS1_SCRIPT"
+    grep -qF 'Install-WingetTool -Cmd $tool.Cmd -Id $tool.Id' "$PS1_SCRIPT"
+    grep -qF 'function Install-WingetTool' "$DOTFILES_DIR/scripts/utils.ps1"
+}
+
 @test "setup-windows.ps1 detects copilot via Get-Command, not gh extension list" {
     grep -qF "Get-Command copilot" "$PS1_SCRIPT"
     refute_grep_fixed "gh extension list" "$PS1_SCRIPT"
