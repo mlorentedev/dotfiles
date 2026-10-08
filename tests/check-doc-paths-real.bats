@@ -10,6 +10,6 @@ setup() {
 @test "check-doc-paths: real Git auto-discovers tracked instruction files [#1021]" {
     run "$GUARD"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "check-doc-paths: OK AGENTS.md" ]]
-    [[ "$output" =~ "check-doc-paths: OK ai/claude/CLAUDE.md" ]]
+    [[ "$output" =~ "check-doc-paths: OK AGENTS.md" ]] || false
+    [[ "$output" =~ "check-doc-paths: OK ai/claude/CLAUDE.md" ]] || false
 }

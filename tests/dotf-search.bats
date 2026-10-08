@@ -37,16 +37,16 @@ EOF
     cd "$CLI"
     run go run ./cmd/dotf search --dir "$TMP" "falsifiable"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-sample"* ]]
-    [[ "$output" == *"PATTERN"* ]]
+    [[ "$output" == *"pattern-sample"* ]] || false
+    [[ "$output" == *"PATTERN"* ]] || false
 }
 
 @test "search: filters by type" {
     cd "$CLI"
     run go run ./cmd/dotf search --dir "$TMP" --type skill "test"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"test-skill"* ]]
-    [[ "$output" != *"pattern-sample"* ]]
+    [[ "$output" == *"test-skill"* ]] || false
+    [[ "$output" != *"pattern-sample"* ]] || false
 }
 
 @test "search: --json flag outputs valid JSON results" {

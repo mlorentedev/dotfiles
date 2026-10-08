@@ -151,6 +151,6 @@ _declared_eol_files() {
     local f
     for f in pre-commit pre-push commit-msg post-checkout prepare-commit-msg; do
         run git -C "$REPO" check-attr eol -- "git-hooks/$f"
-        [[ "$output" == *": eol: lf" ]]
+        [[ "$output" == *": eol: lf" ]] || false
     done
 }

@@ -94,7 +94,7 @@ teardown() {
     FAKE_CURRENT="$VERSION"
     run install_dotf "$VERSION" "$DEST" "$BASE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"already installed"* ]]
+    [[ "$output" == *"already installed"* ]] || false
     [ ! -e "$DEST/dotf" ]
 }
 
@@ -110,7 +110,7 @@ teardown() {
     FAKE_CURRENT="dev"
     run install_dotf "$VERSION" "$DEST" "$BASE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"source build"* ]]
+    [[ "$output" == *"source build"* ]] || false
     # The point of the branch: the release must NOT replace a source build.
     [ ! -e "$DEST/dotf" ]
 }
@@ -278,8 +278,8 @@ teardown() {
     # must get PAST the "no version given" check and name the pinned versions.conf value.
     pinned="$(grep -m1 '^DOTF_VERSION=' "$SCRIPTS_DIR/../versions.conf" | cut -d= -f2)"
     run env -u DOTF_VERSION DOTF_RELEASE_BASE="file://$TMP/nope" "$SCRIPTS_DIR/install-dotf.sh"
-    [[ "$output" != *"no version given"* ]]
-    [[ "$output" == *"$pinned"* ]]
+    [[ "$output" != *"no version given"* ]] || false
+    [[ "$output" == *"$pinned"* ]] || false
 }
 
 @test "a raw installer stream installs an explicit release outside a checkout" {
@@ -295,7 +295,7 @@ teardown() {
         DOTF_VERSION='$VERSION' DOTF_RELEASE_BASE='$BASE' \
         bash < '$SCRIPTS_DIR/install-dotf.sh'"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"command_exists"* ]]
+    [[ "$output" != *"command_exists"* ]] || false
     [ -x "$pipe_home/.local/bin/dotf" ]
 
     run "$pipe_home/.local/bin/dotf"
@@ -315,7 +315,7 @@ teardown() {
 
     run _dotf_latest_version
     [ "$status" -ne 0 ]
-    [[ "$output" == *"semver"* ]]
+    [[ "$output" == *"semver"* ]] || false
 }
 
 @test "a raw installer stream resolves its release without a checkout pin" {

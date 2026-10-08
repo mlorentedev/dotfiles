@@ -38,7 +38,7 @@ jobs:
 YML
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"g.yml:gate does not need 'b'"* ]]
+    [[ "$output" == *"g.yml:gate does not need 'b'"* ]] || false
 }
 
 @test "gate rule: only a positive tag-ref if: is exempt, a negated one is not" {
@@ -51,8 +51,8 @@ jobs:
 YML
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"does not need 'notag'"* ]]
-    [[ "$output" != *"'release'"* ]]
+    [[ "$output" == *"does not need 'notag'"* ]] || false
+    [[ "$output" != *"'release'"* ]] || false
 }
 
 @test "required rule: a required job with a skipping if: is flagged, one under always() is not" {
@@ -65,8 +65,8 @@ jobs:
 YML
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"required check 'x' comes from g.yml:x, whose job-level if:"* ]]
-    [[ "$output" != *"required check 'gate'"* ]]
+    [[ "$output" == *"required check 'x' comes from g.yml:x, whose job-level if:"* ]] || false
+    [[ "$output" != *"required check 'gate'"* ]] || false
 }
 
 # #1877: `lint` and `test` needed `changes`, which was not required. A failed
@@ -85,7 +85,7 @@ YML
     [[ "$output" == *"required check 'x' comes from g.yml:x, which needs 'a', and 'a' is not required"* ]] || false
     [[ "$output" == *"required check 'b' comes from g.yml:b, which needs 'a'"* ]] || false
     [[ "$output" != *"which needs 'b'"* ]] || false
-    [[ "$output" != *"required check 'gate'"* ]]
+    [[ "$output" != *"required check 'gate'"* ]] || false
 }
 
 @test "needs rule: requiring the upstream job clears it" {

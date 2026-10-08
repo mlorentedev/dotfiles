@@ -42,12 +42,12 @@ teardown() {
 @test "backup-secrets-to-usb.sh with no args prints usage and exits 1" {
     run bash "$BACKUP_SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Usage:"* ]]
+    [[ "$output" == *"Usage:"* ]] || false
 }
 
 @test "backup-secrets-to-usb.sh usage documents the key.txt prerequisite" {
     run bash "$BACKUP_SCRIPT"
-    [[ "$output" == *"key.txt must already exist in USB root"* ]]
+    [[ "$output" == *"key.txt must already exist in USB root"* ]] || false
 }
 
 # --- Failure-mode guards: the three validations, in order (4) ---
@@ -57,7 +57,7 @@ teardown() {
 @test "backup-secrets-to-usb.sh exits with error when USB path does not exist" {
     run bash "$BACKUP_SCRIPT" "$TMP/no-such-usb"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"USB path not found"* ]]
+    [[ "$output" == *"USB path not found"* ]] || false
 }
 
 @test "backup-secrets-to-usb.sh exits with error when key.txt is missing on the USB" {
@@ -66,7 +66,7 @@ teardown() {
     mkdir -p "$usb"
     run bash "$BACKUP_SCRIPT" "$usb"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"key.txt not found in USB"* ]]
+    [[ "$output" == *"key.txt not found in USB"* ]] || false
 }
 
 @test "backup-secrets-to-usb.sh does not write anything to the USB when key.txt is missing" {
@@ -87,7 +87,7 @@ teardown() {
     mkdir -p "$usb"
     run zsh "$BACKUP_SCRIPT" "$usb"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"key.txt not found in USB"* ]]
+    [[ "$output" == *"key.txt not found in USB"* ]] || false
 }
 
 # --- DR escrow coverage (#1000, ADR-033) ---

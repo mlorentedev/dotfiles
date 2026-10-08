@@ -53,15 +53,15 @@ teardown() {
     run gh pr list --head some-branch --state open --limit 1 --json labels,body,author --jq '.[0] // empty'
     # It must fail (there is no repo here) but NOT because of the field names.
     [ "$status" -ne 0 ]
-    [[ "$output" != *"Unknown JSON field"* ]]
+    [[ "$output" != *"Unknown JSON field"* ]] || false
 }
 
 @test "the field check is a detector, not a tautology" {
     cd "$OUTSIDE" || return 1
     run gh pr list --head some-branch --state open --limit 1 --json labels,body,author,notAFieldName --jq '.[0] // empty'
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Unknown JSON field"* ]]
-    [[ "$output" == *"notAFieldName"* ]]
+    [[ "$output" == *"Unknown JSON field"* ]] || false
+    [[ "$output" == *"notAFieldName"* ]] || false
 }
 
 @test "a real gh failure falls through to the gate instead of failing closed" {
@@ -76,5 +76,5 @@ teardown() {
     # "Not in a git repo") -- proof the adapter reached it and ran the gate
     # rather than swallowing the gh failure into some exit code of its own.
     [ "$status" -eq 2 ]
-    [[ "$output" == *"Not in a git repo"* ]]
+    [[ "$output" == *"Not in a git repo"* ]] || false
 }

@@ -83,8 +83,8 @@ teardown() {
     export STUB_GH_RC=1
     run "$ADAPTER" --pr 877 --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 2 ]
-    [[ "$output" == *"could not read live metadata"* ]]
-    [[ "$output" == *"Refusing to fall back to the event payload"* ]]
+    [[ "$output" == *"could not read live metadata"* ]] || false
+    [[ "$output" == *"Refusing to fall back to the event payload"* ]] || false
     [ ! -f "$GATE_LOG" ]
 }
 
@@ -106,20 +106,20 @@ teardown() {
 @test "spec-gate-pr: exits 2 without --pr" {
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 2 ]
-    [[ "$output" == *"--pr is required"* ]]
+    [[ "$output" == *"--pr is required"* ]] || false
     [ ! -f "$GATE_LOG" ]
 }
 
 @test "spec-gate-pr: exits 2 when there is nothing to forward" {
     run "$ADAPTER" --pr 877
     [ "$status" -eq 2 ]
-    [[ "$output" == *"nothing to forward"* ]]
+    [[ "$output" == *"nothing to forward"* ]] || false
 }
 
 @test "spec-gate-pr: --help exits 0 and documents the forwarding" {
     run "$ADAPTER" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"forwarded"* ]]
+    [[ "$output" == *"forwarded"* ]] || false
 }
 
 @test "spec-gate-pr: --gate runs the named checker beside it instead of check-spec-gate.sh" {
@@ -139,7 +139,7 @@ STUB
 @test "spec-gate-pr: a --gate value with a path separator exits 2 and runs nothing" {
     run "$ADAPTER" --pr 877 --gate ../bin/check-spec-gate.sh --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 2 ]
-    [[ "$output" == *"--gate"* ]]
+    [[ "$output" == *"--gate"* ]] || false
     [ ! -f "$GATE_LOG" ]
 }
 
@@ -173,7 +173,7 @@ _knowledge_repo() {
     export STUB_PR_JSON='{"labels":[],"body":"## Knowledge\r\n- Lesson: docs/lessons/lesson-002-new.md\r\n- ADR: none: no decision\r\n- Runbook: none: no procedure","author":{"login":"mlorentedev"}}'
     run "$ADAPTER" --pr 1 --gate check-knowledge-gate.sh --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK] knowledge-gate"* ]]
+    [[ "$output" == *"[OK] knowledge-gate"* ]] || false
 }
 
 @test "spec-gate-pr: a live body without the section fails the real checker" {
@@ -181,7 +181,7 @@ _knowledge_repo() {
     export STUB_PR_JSON='{"labels":[],"body":null,"author":{"login":"mlorentedev"}}'
     run "$ADAPTER" --pr 1 --gate check-knowledge-gate.sh --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"## Knowledge"* ]]
+    [[ "$output" == *"## Knowledge"* ]] || false
 }
 
 @test "spec-gate workflow: no PR metadata is sourced from the event payload" {

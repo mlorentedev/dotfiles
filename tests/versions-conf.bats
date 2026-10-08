@@ -9,7 +9,7 @@ setup() {
 }
 
 @test "versions.conf exists" {
-    [[ -f "$VERSIONS_CONF" ]]
+    [[ -f "$VERSIONS_CONF" ]] || false
 }
 
 @test "versions.conf valid bash syntax" {
@@ -31,37 +31,37 @@ setup() {
 
 @test "versions.conf sets JAVA_VERSION" {
     . "$VERSIONS_CONF"
-    [[ -n "$JAVA_VERSION" ]]
+    [[ -n "$JAVA_VERSION" ]] || false
 }
 
 @test "versions.conf sets MAVEN_VERSION" {
     . "$VERSIONS_CONF"
-    [[ -n "$MAVEN_VERSION" ]]
+    [[ -n "$MAVEN_VERSION" ]] || false
 }
 
 @test "versions.conf sets PYTHON_VERSION" {
     . "$VERSIONS_CONF"
-    [[ -n "$PYTHON_VERSION" ]]
+    [[ -n "$PYTHON_VERSION" ]] || false
 }
 
 @test "versions.conf sets GO_VERSION" {
     . "$VERSIONS_CONF"
-    [[ -n "$GO_VERSION" ]]
+    [[ -n "$GO_VERSION" ]] || false
 }
 
 @test "versions.conf sets BATS_VERSION" {
     . "$VERSIONS_CONF"
-    [[ -n "$BATS_VERSION" ]]
+    [[ -n "$BATS_VERSION" ]] || false
 }
 
 @test "versions.conf does not pin opencode (packages.json is the catalog pin SSOT, ADR-036)" {
     . "$VERSIONS_CONF"
-    [[ -z "${OPENCODE_VERSION:-}" ]]
+    [[ -z "${OPENCODE_VERSION:-}" ]] || false
 }
 
 @test "versions.conf sets PI_VERSION" {
     . "$VERSIONS_CONF"
-    [[ -n "$PI_VERSION" ]]
+    [[ -n "$PI_VERSION" ]] || false
 }
 
 @test "versions.conf sets GIT_VERSION (git-for-windows floor read by dotf doctor, #912)" {
@@ -69,7 +69,7 @@ setup() {
     # non-empty check while doctor's WARN names 2.55.0 (CodeRabbit on #1350).
     unset GIT_VERSION
     . "$VERSIONS_CONF"
-    [[ "$GIT_VERSION" == "2.55.0" ]]
+    [[ "$GIT_VERSION" == "2.55.0" ]] || false
 }
 
 @test "versions.conf all values match semver pattern" {
@@ -77,19 +77,19 @@ setup() {
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "$line" ]] && continue
         value="${line#*=}"
-        [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+        [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || false
     done < "$VERSIONS_CONF"
 }
 
 @test "versions.conf sourceable under zsh" {
     run zsh -c ". '$VERSIONS_CONF'; echo \$JAVA_VERSION"
-    [[ $status -eq 0 ]]
-    [[ -n "$output" ]]
+    [[ $status -eq 0 ]] || false
+    [[ -n "$output" ]] || false
 }
 
 @test "versions.conf sets GOLANGCI_LINT_VERSION [#919]" {
     . "$VERSIONS_CONF"
-    [[ -n "$GOLANGCI_LINT_VERSION" ]]
+    [[ -n "$GOLANGCI_LINT_VERSION" ]] || false
 }
 
 @test "cli.yml pins golangci-lint from versions.conf, never the action default [#919]" {

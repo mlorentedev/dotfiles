@@ -26,22 +26,22 @@ teardown() { rm -rf "$TMP"; }
     printf '@test "bad \xe2\x80\x94 em-dash" {\n  true\n}\n' > "$TMP/bad.bats"
     run "$SCRIPT" "$TMP/bad.bats"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"bad.bats:1"* ]]
-    [[ "$output" == *"non-ASCII"* ]]
+    [[ "$output" == *"bad.bats:1"* ]] || false
+    [[ "$output" == *"non-ASCII"* ]] || false
 }
 
 @test "check-bats-names: flags the <= glyph too (not just em-dash)" {
     printf '@test "pointer is \xe2\x89\xa4 100 lines" {\n  true\n}\n' > "$TMP/le.bats"
     run "$SCRIPT" "$TMP/le.bats"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"non-ASCII"* ]]
+    [[ "$output" == *"non-ASCII"* ]] || false
 }
 
 @test "check-bats-names: flags duplicate @test names within a file" {
     printf '@test "dup name" {\n  true\n}\n@test "dup name" {\n  false\n}\n' > "$TMP/dup.bats"
     run "$SCRIPT" "$TMP/dup.bats"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"duplicate"* ]]
+    [[ "$output" == *"duplicate"* ]] || false
 }
 
 @test "check-bats-names: scans a directory recursively for *.bats" {
@@ -50,7 +50,7 @@ teardown() { rm -rf "$TMP"; }
     printf '@test "bad \xe2\x80\x94 dash" {\n  true\n}\n' > "$TMP/sub/bad.bats"
     run "$SCRIPT" "$TMP"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"bad.bats"* ]]
+    [[ "$output" == *"bad.bats"* ]] || false
 }
 
 @test "check-bats-names: the repo's own tests/ pass (no silent-skip names remain)" {
@@ -69,5 +69,5 @@ teardown() { rm -rf "$TMP"; }
     run "$SCRIPT" "$TMP/unreadable.bats"
     chmod 600 "$TMP/unreadable.bats"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"grep failed"* ]]
+    [[ "$output" == *"grep failed"* ]] || false
 }

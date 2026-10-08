@@ -36,7 +36,7 @@ setup() {
     # Regression guard: --directory must not return.
     run jq -r '.mcpServers["hive-vault"].args | join(" ")' "$DOTFILES_DIR/ai/agy/mcp_servers.json"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"--directory"* ]]
+    [[ "$output" != *"--directory"* ]] || false
 }
 
 @test "ai/agy/mcp_servers.json VAULT_PATH is the placeholder, not a hardcoded user path" {
@@ -73,7 +73,7 @@ setup() {
 @test "ai/agy/AGY.md H1 is '# AGY.md' (regression: GEMINI.md->AGY.md rename completeness)" {
     # SDD-007 renamed the file; the H1 and body content lagged. This test
     # locks in that the body actually reflects the file's new identity.
-    [[ "$(head -n1 "$DOTFILES_DIR/ai/agy/AGY.md")" == "# AGY.md" ]]
+    [[ "$(head -n1 "$DOTFILES_DIR/ai/agy/AGY.md")" == "# AGY.md" ]] || false
     # No stray "Gemini-specific" / "GEMINI.md" body references in the
     # canonical SSOT (archived specs and the cleanup logic in setup-*.{sh,ps1}
     # are excluded by file scope).
@@ -86,7 +86,7 @@ setup() {
 }
 
 @test "AGY_APP_DATA uses absolute path" {
-    [[ "$AGY_APP_DATA" == /* ]]
+    [[ "$AGY_APP_DATA" == /* ]] || false
 }
 
 @test "agy settings.json deployed to AGY_APP_DATA" {

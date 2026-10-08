@@ -92,8 +92,8 @@ add_linked_worktree() {
     # `hook-impl` rather than `run --hook-stage`: only hook-impl parses the
     # pre-push ref list on stdin into --from-ref/--to-ref, so only it scans the
     # commits actually being pushed.
-    [[ "$(cat "$ARGS_LOG")" == *"hook-impl"* ]]
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-push"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"hook-impl"* ]] || false
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-push"* ]] || false
 }
 
 @test "AC2: a failing pre-commit blocks the operation (exit status propagates)" {
@@ -131,7 +131,7 @@ add_linked_worktree() {
 
     run bash -c "printf '\n' | '$CHAIN' pre-push origin git@example.com:o/r.git"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *"origin git@example.com:o/r.git"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"origin git@example.com:o/r.git"* ]] || false
 }
 
 @test "AC4: an executable repo-local hook still wins and pre-commit is not also run" {
@@ -184,7 +184,7 @@ add_linked_worktree() {
 
     run bash -c "'$CHAIN' pre-commit < /dev/null"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-commit"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-commit"* ]] || false
 }
 
 @test "AC6: commit-msg forwards the message file argument" {
@@ -194,8 +194,8 @@ add_linked_worktree() {
 
     run bash -c "'$CHAIN' commit-msg .git/COMMIT_EDITMSG < /dev/null"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-type commit-msg"* ]]
-    [[ "$(cat "$ARGS_LOG")" == *".git/COMMIT_EDITMSG"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type commit-msg"* ]] || false
+    [[ "$(cat "$ARGS_LOG")" == *".git/COMMIT_EDITMSG"* ]] || false
 }
 
 @test "AC1: the config is passed explicitly, not left to the caller's cwd" {
@@ -205,7 +205,7 @@ add_linked_worktree() {
 
     run bash -c "'$CHAIN' pre-commit < /dev/null"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *".pre-commit-config.yaml"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *".pre-commit-config.yaml"* ]] || false
 }
 
 @test "outside a git repo the dispatcher stays a no-op" {
@@ -331,7 +331,7 @@ add_linked_worktree() {
 
     run bash -c "'$CHAIN' pre-commit < /dev/null"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-commit"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-commit"* ]] || false
 }
 
 # BUG-055. The fallback omitted --hook-dir. pre-commit's hook_impl passes that
@@ -353,7 +353,7 @@ add_linked_worktree() {
     # The value, not merely the flag: a present-but-wrong path would satisfy a
     # bare substring check while still resolving .legacy hooks nowhere. This is
     # what pre-commit's own generated hook computes (dirname "$0").
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]] || false
 }
 
 @test "BUG-055: --hook-dir resolves through the COMMON git dir from a linked worktree" {
@@ -367,7 +367,7 @@ add_linked_worktree() {
 
     run bash -c "'$CHAIN' pre-commit < /dev/null"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-dir $FIXTURE/.git/hooks"* ]] || false
 }
 
 # BUG-090: pre-commit builds a hook repo's environment by cloning it into its own
@@ -422,5 +422,5 @@ YAML
 
     run bash -c "PRE_COMMIT_HOME='$WORK/pre-commit-store' '$CHAIN' post-checkout 0000000000000000000000000000000000000000 abc 1 < /dev/null"
     [ "$status" -eq 0 ]
-    [[ "$(cat "$ARGS_LOG")" == *"--hook-type post-checkout"* ]]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type post-checkout"* ]] || false
 }

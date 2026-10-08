@@ -8,7 +8,7 @@ setup() {
 }
 
 @test "docs/architecture.md exists" {
-    [[ -f "$ARCH_MD" ]]
+    [[ -f "$ARCH_MD" ]] || false
 }
 
 @test "README links docs/architecture.md" {

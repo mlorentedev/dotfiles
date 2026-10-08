@@ -56,7 +56,7 @@ _step() { # $1 = event name
         : > "$CALLS"; : > "$OUT"
         STUB_PULL=$state _step pull_request
         [ "$status" -eq 0 ] || { echo "$state: $output"; false; }
-        [[ "$output" == *"became $state while this review waited in the queue"* ]]
+        [[ "$output" == *"became $state while this review waited in the queue"* ]] || false
         grep -qx 'reviewable=false' "$OUT"
         [ "$(wc -l < "$CALLS")" -eq 1 ] || { echo "$state: went past the gate:"; cat "$CALLS"; false; }
     done

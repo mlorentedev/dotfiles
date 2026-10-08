@@ -54,8 +54,8 @@ _write_849_feed() {
         run "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
-    [[ "$output" == *"849"* ]]
-    [[ "$output" == *"knowledge-crystallize"* ]]
+    [[ "$output" == *"849"* ]] || false
+    [[ "$output" == *"knowledge-crystallize"* ]] || false
 }
 
 @test "adjacency: matches a path that appears only inside an inline code span" {
@@ -69,7 +69,7 @@ _write_849_feed() {
     SDD_PR_BODY="Closes #850" \
         run "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
-    [[ "$output" == *"777"* ]]
+    [[ "$output" == *"777"* ]] || false
 }
 
 @test "adjacency: an issue naming no changed file is not reported" {
@@ -78,7 +78,7 @@ _write_849_feed() {
     SDD_PR_BODY="Closes #850" \
         run "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
-    [[ "$output" != *"900"* ]]
+    [[ "$output" != *"900"* ]] || false
 }
 
 @test "adjacency: the issues this PR closes are excluded from its own report" {
@@ -87,7 +87,7 @@ _write_849_feed() {
     SDD_PR_BODY="Closes #850" \
         run "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
-    [[ "$output" != *"#850"* ]]
+    [[ "$output" != *"#850"* ]] || false
 }
 
 @test "adjacency: spec-template and doc filenames do not drag in the backlog" {
@@ -108,9 +108,9 @@ _write_849_feed() {
     SDD_PR_BODY="Closes #850" \
         run "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
-    [[ "$output" != *"111"* ]]
-    [[ "$output" != *"222"* ]]
-    [[ "$output" == *"333"* ]]
+    [[ "$output" != *"111"* ]] || false
+    [[ "$output" != *"222"* ]] || false
+    [[ "$output" == *"333"* ]] || false
 }
 
 @test "adjacency: the report is advisory and cannot change the exit status" {
@@ -134,7 +134,7 @@ _write_849_feed() {
         run "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues /nonexistent/feed.tsv
     [ "$status" -ne 2 ]
-    [[ "$output" != *"Adjacent open issues"* ]]
+    [[ "$output" != *"Adjacent open issues"* ]] || false
 }
 
 @test "adjacency: with no flag the output is byte-identical to the previous version" {
@@ -172,5 +172,5 @@ _write_849_feed() {
 @test "adjacency: --help documents the flag" {
     run "$SCRIPTS_DIR/check-spec-gate.sh" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"--adjacency-issues"* ]]
+    [[ "$output" == *"--adjacency-issues"* ]] || false
 }

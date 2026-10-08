@@ -21,46 +21,46 @@ stub_shell_exiting() {
 
 @test "shell-profile.sh --help shows usage" {
     run "$SCRIPTS_DIR/shell-profile.sh" --help
-    [[ $status -eq 0 ]]
-    [[ "$output" == *"Usage"* ]]
-    [[ "$output" == *"--detail"* ]]
-    [[ "$output" == *"--runs"* ]]
+    [[ $status -eq 0 ]] || false
+    [[ "$output" == *"Usage"* ]] || false
+    [[ "$output" == *"--detail"* ]] || false
+    [[ "$output" == *"--runs"* ]] || false
 }
 
 @test "shell-profile.sh rejects unknown args" {
     run "$SCRIPTS_DIR/shell-profile.sh" --bogus
-    [[ $status -eq 2 ]]
-    [[ "$output" == *"Unknown"* ]]
+    [[ $status -eq 2 ]] || false
+    [[ "$output" == *"Unknown"* ]] || false
 }
 
 @test "shell-profile.sh rejects unsupported shell" {
     run "$SCRIPTS_DIR/shell-profile.sh" --shell fish
-    [[ $status -eq 2 ]]
-    [[ "$output" == *"--shell must be zsh or bash"* ]]
+    [[ $status -eq 2 ]] || false
+    [[ "$output" == *"--shell must be zsh or bash"* ]] || false
 }
 
 @test "shell-profile.sh rejects shell not in PATH" {
     run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --runs 1
     # bash is in PATH so this should succeed; smoke check the path
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
 }
 
 @test "shell-profile.sh time-only mode reports min/median/mean/max" {
     run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --runs 3
-    [[ $status -eq 0 ]]
-    [[ "$output" == *"min:"* ]]
-    [[ "$output" == *"median:"* ]]
-    [[ "$output" == *"mean:"* ]]
-    [[ "$output" == *"max:"* ]]
+    [[ $status -eq 0 ]] || false
+    [[ "$output" == *"min:"* ]] || false
+    [[ "$output" == *"median:"* ]] || false
+    [[ "$output" == *"mean:"* ]] || false
+    [[ "$output" == *"max:"* ]] || false
 }
 
 @test "shell-profile.sh time-only mode runs the requested number of iterations" {
     run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --runs 4
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     # Count "run:" lines (each iteration prints one)
     local run_count
     run_count=$(printf '%s' "$output" | grep -c "^  run:" || true)
-    [[ "$run_count" -eq 4 ]]
+    [[ "$run_count" -eq 4 ]] || false
 }
 
 @test "time-only mode still reports stats when the shell exits non-zero" {
@@ -72,11 +72,11 @@ stub_shell_exiting() {
     stub_shell_exiting 1
 
     run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --runs 2
-    [[ $status -eq 0 ]]
-    [[ "$output" == *"min:"* ]]
-    [[ "$output" == *"median:"* ]]
-    [[ "$output" == *"mean:"* ]]
-    [[ "$output" == *"max:"* ]]
+    [[ $status -eq 0 ]] || false
+    [[ "$output" == *"min:"* ]] || false
+    [[ "$output" == *"median:"* ]] || false
+    [[ "$output" == *"mean:"* ]] || false
+    [[ "$output" == *"max:"* ]] || false
 }
 
 @test "detail mode survives a shell that exits non-zero" {
@@ -85,8 +85,8 @@ stub_shell_exiting() {
     stub_shell_exiting 1
 
     run "$SCRIPTS_DIR/shell-profile.sh" --shell bash --detail
-    [[ $status -eq 0 ]]
-    [[ "$output" == *"Detail profile"* ]]
+    [[ $status -eq 0 ]] || false
+    [[ "$output" == *"Detail profile"* ]] || false
 }
 
 @test ".bashrc has DOTFILES_PROFILE opt-in hook" {
@@ -110,5 +110,5 @@ stub_shell_exiting() {
     # Source bashrc without DOTFILES_PROFILE; should not enable xtrace.
     run bash -c 'unset DOTFILES_PROFILE; source "$1"; [[ "$-" != *x* ]] && echo "no_xtrace"' \
         -- "$REPO_ROOT/.bashrc"
-    [[ "$output" == *"no_xtrace"* ]]
+    [[ "$output" == *"no_xtrace"* ]] || false
 }

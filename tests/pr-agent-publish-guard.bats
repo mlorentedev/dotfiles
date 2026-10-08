@@ -84,10 +84,10 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE=fail:504 STUB_HEAD=fail:504
     _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"the GitHub API failed while determining whether a review marker is declared"* ]]
-    [[ "$output" == *"review-attestation.json?ref=main"* ]]
-    [[ "$output" == *"HTTP 504"* ]]
-    [[ "$output" != *"no review marker declared"* ]]
+    [[ "$output" == *"the GitHub API failed while determining whether a review marker is declared"* ]] || false
+    [[ "$output" == *"review-attestation.json?ref=main"* ]] || false
+    [[ "$output" == *"HTTP 504"* ]] || false
+    [[ "$output" != *"no review marker declared"* ]] || false
     [ "$(calls_to BASE)" -eq 3 ]
 }
 
@@ -95,7 +95,7 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE=flaky:502 STUB_BASE_OK="$REGISTRY" STUB_COMMENTS="$REVIEW"
     _guard
     [ "$status" -eq 0 ]
-    [[ "$output" == *'review published (markers: ["PR Reviewer Guide"])'* ]]
+    [[ "$output" == *'review published (markers: ["PR Reviewer Guide"])'* ]] || false
     [ "$(calls_to BASE)" -eq 2 ]
 }
 
@@ -103,15 +103,15 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE="$NO_ENTRY" STUB_HEAD="$NO_ENTRY"
     _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"no review marker declared for github-actions"* ]]
-    [[ "$output" != *"GitHub API failed"* ]]
+    [[ "$output" == *"no review marker declared for github-actions"* ]] || false
+    [[ "$output" != *"GitHub API failed"* ]] || false
 }
 
 @test "a 404 is an answer, not an outage: no retry, and the head-ref fallback still applies" {
     export STUB_BASE=fail:404 STUB_HEAD="$REGISTRY" STUB_COMMENTS="$REVIEW"
     _guard
     [ "$status" -eq 0 ]
-    [[ "$output" == *"reviewer registry entry found only on the PR head"* ]]
+    [[ "$output" == *"reviewer registry entry found only on the PR head"* ]] || false
     [ "$(calls_to BASE)" -eq 1 ]
 }
 
@@ -119,9 +119,9 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE="$NO_ENTRY" STUB_PULL=fail:503
     HEAD_SHA="" _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"the GitHub API failed while determining whether a review marker is declared"* ]]
-    [[ "$output" == *"pulls/7"* ]]
-    [[ "$output" != *"no review marker declared"* ]]
+    [[ "$output" == *"the GitHub API failed while determining whether a review marker is declared"* ]] || false
+    [[ "$output" == *"pulls/7"* ]] || false
+    [[ "$output" != *"no review marker declared"* ]] || false
     [ "$(calls_to PULL)" -eq 3 ]
 }
 
@@ -129,22 +129,22 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     export STUB_BASE="$REGISTRY" STUB_COMMENTS=fail:500
     _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"the GitHub API failed while listing the PR's comments"* ]]
-    [[ "$output" != *"published no review"* ]]
+    [[ "$output" == *"the GitHub API failed while listing the PR's comments"* ]] || false
+    [[ "$output" != *"published no review"* ]] || false
 }
 
 @test "a comment listing that answers 404 is reported as such: no retry, no empty outage report" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS=fail:404
     _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"listing the PR's comments answered 404"* ]]
+    [[ "$output" == *"listing the PR's comments answered 404"* ]] || false
     [ "$(calls_to COMMENTS)" -eq 1 ]
-    [[ "$output" != *"GitHub API failed"* ]]
+    [[ "$output" != *"GitHub API failed"* ]] || false
 }
 
 @test "with every call answering and no review comment, the published-no-review diagnosis stands" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
     _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"PR-Agent reported success but published no review"* ]]
+    [[ "$output" == *"PR-Agent reported success but published no review"* ]] || false
 }

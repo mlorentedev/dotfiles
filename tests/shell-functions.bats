@@ -63,7 +63,7 @@ teardown() {
 @test "mkd with no argument prints usage and fails" {
     run bash -c ". '$FN_FILE'; mkd"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Usage: mkd"* ]]
+    [[ "$output" == *"Usage: mkd"* ]] || false
 }
 
 # --- gz ---
@@ -72,8 +72,8 @@ teardown() {
     printf 'the quick brown fox jumps over the lazy dog\n' > "$WORK/sample.txt"
     run bash -c ". '$FN_FILE'; gz '$WORK/sample.txt'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"original:"* ]]
-    [[ "$output" == *"gzipped:"* ]]
+    [[ "$output" == *"original:"* ]] || false
+    [[ "$output" == *"gzipped:"* ]] || false
     # Both lines carry a numeric byte count.
     echo "$output" | grep -qE 'original: [0-9]+ bytes'
     echo "$output" | grep -qE 'gzipped:  [0-9]+ bytes'
@@ -82,7 +82,7 @@ teardown() {
 @test "gz on a missing file fails with usage" {
     run bash -c ". '$FN_FILE'; gz '$WORK/does-not-exist'"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Usage: gz"* ]]
+    [[ "$output" == *"Usage: gz"* ]] || false
 }
 
 # --- dataurl ---
@@ -91,8 +91,8 @@ teardown() {
     printf 'IDEAS-002 payload' > "$WORK/payload.txt"
     run bash -c ". '$FN_FILE'; dataurl '$WORK/payload.txt'"
     [ "$status" -eq 0 ]
-    [[ "$output" == data:* ]]
-    [[ "$output" == *";base64,"* ]]
+    [[ "$output" == data:* ]] || false
+    [[ "$output" == *";base64,"* ]] || false
     # Strip everything up to and including 'base64,' then decode.
     decoded="$(printf '%s' "$output" | sed 's/^data:[^,]*base64,//' | base64 -d)"
     [ "$decoded" = "IDEAS-002 payload" ]
@@ -101,7 +101,7 @@ teardown() {
 @test "dataurl on a missing file fails with usage" {
     run bash -c ". '$FN_FILE'; dataurl '$WORK/nope'"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Usage: dataurl"* ]]
+    [[ "$output" == *"Usage: dataurl"* ]] || false
 }
 
 # --- targz ---
@@ -116,14 +116,14 @@ teardown() {
     # The defining property across zopfli/pigz/gzip: a gzip-compatible stream.
     run bash -c "gzip -dc '$WORK/src.tar.gz' | tar -t"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"a.txt"* ]]
-    [[ "$output" == *"b.txt"* ]]
+    [[ "$output" == *"a.txt"* ]] || false
+    [[ "$output" == *"b.txt"* ]] || false
 }
 
 @test "targz on a missing path fails with usage" {
     run bash -c ". '$FN_FILE'; targz '$WORK/missing'"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Usage: targz"* ]]
+    [[ "$output" == *"Usage: targz"* ]] || false
 }
 
 # --- server / getcertnames: smoke only (network / python / interactive) ---
@@ -137,7 +137,7 @@ teardown() {
 @test "getcertnames prints usage with no host (smoke)" {
     run bash -c ". '$FN_FILE'; getcertnames"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Usage: getcertnames"* ]]
+    [[ "$output" == *"Usage: getcertnames"* ]] || false
 }
 
 # --- Wiring: both rc files source the portable functions file (AC3) ---

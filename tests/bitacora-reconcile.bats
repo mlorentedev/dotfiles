@@ -61,27 +61,27 @@ refute_issue_filed() {
 @test "success: notice and exit 0" {
     STUB_RC=0 run "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"::notice::bitácora reconciled"* ]]
+    [[ "$output" == *"::notice::bitácora reconciled"* ]] || false
     refute_issue_filed
 }
 
 @test "rate limit: warning, exit 0, and no issue filed" {
     STUB_RC=1 STUB_OUT="gh: API rate limit exceeded for user" run "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"::warning::reconciler hit the primary GraphQL pool"* ]]
+    [[ "$output" == *"::warning::reconciler hit the primary GraphQL pool"* ]] || false
     refute_issue_filed
 }
 
 @test "rate limit: the 'already exceeded' wording is matched too" {
     STUB_RC=1 STUB_OUT="API rate limit already exceeded" run "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"::warning::"* ]]
+    [[ "$output" == *"::warning::"* ]] || false
 }
 
 @test "other failure with no existing issue: files one and exits 1" {
     STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="" run "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::bitácora reconciliation failed"* ]]
+    [[ "$output" == *"::error::bitácora reconciliation failed"* ]] || false
     grep -q "issue create" "$GH_LOG"
 }
 
@@ -102,21 +102,21 @@ refute_issue_filed() {
 @test "the regression: under bash -e, a failing rollout still reaches the classifier" {
     STUB_RC=1 STUB_OUT="something else broke" run bash -e "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::bitácora reconciliation failed"* ]]
+    [[ "$output" == *"::error::bitácora reconciliation failed"* ]] || false
     grep -q "issue create" "$GH_LOG"
 }
 
 @test "the regression: under bash -e, the rate limit still soft-passes green" {
     STUB_RC=1 STUB_OUT="API rate limit exceeded" run bash -e "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"::warning::"* ]]
+    [[ "$output" == *"::warning::"* ]] || false
 }
 
 @test "the regression: rollout output is printed before the verdict, so the log keeps the evidence" {
     STUB_RC=1 STUB_OUT="DIAGNOSTIC MARKER" run bash -e "$SCRIPT"
-    [[ "$output" == *"DIAGNOSTIC MARKER"* ]]
+    [[ "$output" == *"DIAGNOSTIC MARKER"* ]] || false
     # Evidence first, verdict second — the ordering that was lost.
-    [[ "${output%%::error::*}" == *"DIAGNOSTIC MARKER"* ]]
+    [[ "${output%%::error::*}" == *"DIAGNOSTIC MARKER"* ]] || false
 }
 
 # --- input validation -----------------------------------------------------
@@ -124,13 +124,13 @@ refute_issue_filed() {
 @test "a repo name outside the allowed charset is refused" {
     TARGET_REPOS='good; rm -rf /' run bash -e "$SCRIPT"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"refusing repo name"* ]]
+    [[ "$output" == *"refusing repo name"* ]] || false
 }
 
 @test "an empty TARGET_REPOS reconciles every repo without tripping set -u" {
     STUB_RC=0 TARGET_REPOS="" run bash -e "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"::notice::"* ]]
+    [[ "$output" == *"::notice::"* ]] || false
 }
 
 @test "several valid repo names are passed through as separate arguments" {
@@ -142,7 +142,7 @@ STUB
     chmod +x "$BITACORA_ROLLOUT"
     TARGET_REPOS="dotfiles kubelab" run bash -e "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"args:--backfill-only dotfiles kubelab"* ]]
+    [[ "$output" == *"args:--backfill-only dotfiles kubelab"* ]] || false
 }
 
 # --- the reporting path must survive -e too (CodeRabbit on PR #870) ----------
@@ -169,13 +169,13 @@ STUB
     _gh_failing_on "issue list"
     STUB_RC=1 STUB_OUT="something else broke" run bash -e "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::bitácora reconciliation failed"* ]]
+    [[ "$output" == *"::error::bitácora reconciliation failed"* ]] || false
 }
 
 @test "a failed lookup refuses to file, so the stable-title issue is never duplicated" {
     _gh_failing_on "issue list"
     STUB_RC=1 STUB_OUT="something else broke" run bash -e "$SCRIPT"
-    [[ "$output" == *"not filing, to avoid a duplicate"* ]]
+    [[ "$output" == *"not filing, to avoid a duplicate"* ]] || false
     refute_issue_filed
 }
 
@@ -183,16 +183,16 @@ STUB
     _gh_failing_on "issue create"
     STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="" run bash -e "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"could not open a bitacora-reconcile issue"* ]]
-    [[ "$output" != *"::warning::opened a bitacora-reconcile issue"* ]]
+    [[ "$output" == *"could not open a bitacora-reconcile issue"* ]] || false
+    [[ "$output" != *"::warning::opened a bitacora-reconcile issue"* ]] || false
 }
 
 @test "a failed issue comment reports the failure instead of claiming success" {
     _gh_failing_on "issue comment"
     STUB_RC=1 STUB_OUT="something else broke" STUB_EXISTING="42" run bash -e "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"could not comment on issue #42"* ]]
-    [[ "$output" != *"::notice::updated existing issue"* ]]
+    [[ "$output" == *"could not comment on issue #42"* ]] || false
+    [[ "$output" != *"::notice::updated existing issue"* ]] || false
 }
 
 # --- TARGET_REPOS must not glob (CodeRabbit on PR #870) ---------------------
@@ -202,5 +202,5 @@ STUB
     cd "$FIX/cwd" || return 1
     TARGET_REPOS='*' run bash -e "$SCRIPT"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"refusing repo name"* ]]
+    [[ "$output" == *"refusing repo name"* ]] || false
 }
