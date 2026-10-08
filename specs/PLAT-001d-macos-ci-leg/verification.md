@@ -57,6 +57,18 @@ The tier runs under `/bin/bash` 3.2 on purpose, and before bash 4.1 a failing `[
 - `shellcheck` on every changed `.sh` at warning severity: clean. `actionlint`: not installed here; the workflow is parsed by PyYAML and by the repo's workflow bats guards
 - Manual: the vault-health goldens recaptured on bash 3.2 differed from Linux's by nothing but the ORACLE hash (moot since #2150 made the ORACLE a historical record)
 
+### Follow-up: the mock-environment step hid its own failures (#2152)
+
+PR-Agent flagged on #2147 that the new job's "Setup mock environment" step was copied from the Linux `test` job together with its silencers: age-keygen's stderr went to `/dev/null` and the fixture copy ended in `2>/dev/null || true`. The suite skips on a missing key or fixture, so a broken setup would have shown up as skipped tests on a green leg, which is the failure this spec exists to prevent on macOS.
+
+Declined on #2147 because the Linux job shares the defect; it is fixed for both jobs in the follow-up PR:
+
+- `scripts/setup-mock-env.sh` is now the only definition. Both `Setup mock environment` steps run it, and nothing else.
+- It refuses to run outside the repository root or without `age-keygen` on PATH, then asserts a non-empty key and non-empty `scripts/` and `sensitive/` copies, failing with `::error::`.
+- The two `ln -sf ~/.dotfiles/.{zshrc,bashrc}` lines are gone: the mock never holds those files, so the links always dangled.
+- Every failure inside the script, including a failing `mkdir` or `cp` that `set -e` alone would have stopped with plain stderr, goes through `fail()`, so the step always carries its annotation (PR-Agent on #2160). `ci.yml` may no longer contain `2>/dev/null || true` anywhere.
+- Evidence: `tests/setup-mock-env.bats`, 11 ok with the fix and 11 not ok with the script and workflow change removed. `tests/setup-mock-env-real.bats` runs the real age-keygen in CI, as BUG-055 pairing requires. On the `test-macos` runner the step printed `mock environment ready`, so BSD `find -quit` works there. Every bats file that references `ci.yml`: 308 ok.
+
 ## Decisions made during implementation
 
 - The tier is the OS-sensitive subset, justified per file above, not "everything": a whole-suite macOS leg would mostly re-test repo text that does not vary by OS. The full suite still runs on macOS on a push to main, so the tier cannot hide a regression for long.
