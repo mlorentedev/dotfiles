@@ -724,15 +724,15 @@ print('PR_AGENT_REF' not in filter_step['env'])
 }
 
 @test "pr-agent: the audited upstream contract covers every source and is bound to the action pin" {
-    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref path audited
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref file_path audited
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
-    for path in action.yaml pr_agent/settings/configuration.toml \
+    for file_path in action.yaml pr_agent/settings/configuration.toml \
         pr_agent/agent/pr_agent.py pr_agent/algo/comment_identity.py \
         pr_agent/algo/file_filter.py pr_agent/algo/review_finding_state.py \
         pr_agent/git_providers/github_provider.py pr_agent/servers/github_action_runner.py \
         pr_agent/tools/pr_reviewer.py; do
-        jq -e --arg path "$path" '.files[$path] | test("^[0-9a-f]{40}$")' \
-            "$contract" >/dev/null || { echo "missing audited source: $path" >&2; return 1; }
+        jq -e --arg path "$file_path" '.files[$path] | test("^[0-9a-f]{40}$")' \
+            "$contract" >/dev/null || { echo "missing audited source: $file_path" >&2; return 1; }
     done
     ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
     [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
@@ -751,19 +751,19 @@ print('PR_AGENT_REF' not in filter_step['env'])
 @test "pr-agent: pinned upstream review contracts match their approved source identities" {
     [ "${DOTF_TEST_NETWORK:-}" = 1 ] \
         || skip "network leg: set DOTF_TEST_NETWORK=1 to compare the contract with upstream"
-    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref path expected actual
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref file_path expected actual
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
     ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
     [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
     if [ -n "${DOTF_TEST_GH_TOKEN:-}" ]; then
         export GH_TOKEN="$DOTF_TEST_GH_TOKEN"
     fi
-    while IFS=$'\t' read -r path expected; do
+    while IFS=$'\t' read -r file_path expected; do
         expected=${expected%$'\r'}
-        actual=$(gh api "repos/The-PR-Agent/pr-agent/contents/$path?ref=$ref" --jq '.sha') \
-            || { echo "cannot verify $path at $ref" >&2; return 1; }
+        actual=$(gh api "repos/The-PR-Agent/pr-agent/contents/$file_path?ref=$ref" --jq '.sha') \
+            || { echo "cannot verify $file_path at $ref" >&2; return 1; }
         [ "$actual" = "$expected" ] \
-            || { echo "$path changed since the approved upstream contract" >&2; return 1; }
+            || { echo "$file_path changed since the approved upstream contract" >&2; return 1; }
     done < <(jq -r '.files | to_entries[] | [.key, .value] | @tsv' "$contract")
 }
 
