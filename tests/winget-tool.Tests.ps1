@@ -48,6 +48,15 @@ $r = Install-WingetTool -Cmd 'dotfiles-test-tool-2157' -Id 'Example.Tool'
         $r.Installed | Should -BeFalse
     }
 
+    It 'reports an already-installed package as installed when its command resolves' {
+        # #2157 asks for winget's already-installed exit code to count as
+        # success. Resolution decides, so it does with no code-specific branch:
+        # 0x8A150061 (APPINSTALLER_CLI_ERROR_PACKAGE_ALREADY_INSTALLED) here.
+        $r = & $script:Run 'function global:dotfiles-test-tool-2157 { } ; $global:LASTEXITCODE = -1978335135; "Found an existing package already installed."'
+        $r.Installed | Should -BeTrue
+        $r.Calls | Should -Be 1
+    }
+
     It 'succeeds on the retry when the first attempt failed transiently' {
         $body = 'if ($script:calls -ge 2) { function global:dotfiles-test-tool-2157 { } ; $global:LASTEXITCODE = 0 } else { $global:LASTEXITCODE = 1 }'
         $r = & $script:Run $body
