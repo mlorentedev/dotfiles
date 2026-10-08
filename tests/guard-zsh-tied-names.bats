@@ -16,6 +16,7 @@
 # - specs/archive/. Its scripts are frozen records.
 # - `status` in *.bats. bats owns it: `run` sets it, and bats runs only under
 #   bash.
+# - this file, whose fixture spells out every binding shape.
 
 TIED='path|status|cdpath|manpath|fignore'
 
@@ -38,6 +39,7 @@ tied_bindings() {
     while IFS= read -r f; do
         case "$f" in
             specs/archive/*) continue ;;
+            tests/guard-zsh-tied-names.bats) continue ;;  # its fixture is every shape
             *.bats) names='path|cdpath|manpath|fignore' ;;
             *) names="$TIED" ;;
         esac
