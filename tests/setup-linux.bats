@@ -594,10 +594,11 @@ sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") ==
     grep -qF '"$_dotf" harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# From the harness refresh to the mirror: the two share one dotf resolution.
 extract_linux_harness_mirror_block() {
     local script="${1:-$DOTFILES_DIR/setup-linux.sh}"
     awk '
-        /^# Mirror the harness inputs into the deploy dir/ { capture = 1 }
+        /^# Harness deploy engine \(ENGINE-001/ { capture = 1 }
         capture { print }
         capture && /^unset _dotf$/ { ended = 1; exit }
         END { if (!capture || !ended) exit 1 }
@@ -630,6 +631,27 @@ DOTFILES_DIR="/deploy"
 $block"
     [ "$status" -eq 0 ]
     [[ "$output" == *"CALL <harness> <mirror> <--repo> </checkout with spaces>"* ]] || false
+    [[ "$output" == *"CALL <harness> <refresh> <--repo> </checkout with spaces>"* ]] || false
+}
+
+@test "setup-linux.sh warns on a failed harness refresh and still mirrors (#2162)" {
+    local block command_script
+    block="$(extract_linux_harness_mirror_block)"
+    [ -n "$block" ]
+    command_script='
+log_warning() { printf "WARN:%s\n" "$*"; }
+dotf() {
+    printf "CALL <%s>\n" "$2"
+    [ "$2" != refresh ]
+}
+CURRENT_DIR="/checkout"
+DOTFILES_DIR="/deploy"
+'
+    run bash -c "$command_script
+$block"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN:dotf harness refresh failed (above); deploying the committed harness records"* ]] || false
+    [[ "$output" == *"CALL <mirror>"* ]] || false
 }
 
 @test "setup-linux.sh warns when dotf cannot mirror the harness (WIN-014)" {
@@ -676,9 +698,11 @@ $block"
     grep -qF '"$_dotf_hooks" hooks install' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh harness mirror runs AFTER compile-harness --refresh (ordering guard)" {
-    refresh_line=$(grep -n 'compile-harness.sh" --refresh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    mirror_line=$(grep -n 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+@test "setup-linux.sh harness mirror runs AFTER the harness refresh (ordering guard)" {
+    refresh_line=$(grep -n 'harness refresh --repo' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    # Both anchors are invocations: a comment names `dotf harness mirror` above
+    # the call, and matching it would pin the order of the prose instead.
+    mirror_line=$(grep -n 'harness mirror --repo' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     [ -n "$refresh_line" ] && [ -n "$mirror_line" ]
     [ "$mirror_line" -gt "$refresh_line" ]
 }
