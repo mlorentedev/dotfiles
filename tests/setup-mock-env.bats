@@ -57,7 +57,7 @@ run_script() {
 @test "setup-mock-env: a missing age-keygen fails the step, never a silent skip" {
     run_script
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::setup-mock-env: age-keygen is not on PATH"* ]]
+    [[ "$output" == *"::error::setup-mock-env: age-keygen is not on PATH"* ]] || false
     [ ! -e "$HOME/.config/age/key.txt" ]
 }
 
@@ -65,15 +65,15 @@ run_script() {
     stub_keygen 'exit 0'
     run_script
     [ "$status" -eq 1 ]
-    [[ "$output" == *"left no key at $HOME/.config/age/key.txt"* ]]
+    [[ "$output" == *"left no key at $HOME/.config/age/key.txt"* ]] || false
 }
 
 @test "setup-mock-env: a failing age-keygen fails the step with its stderr visible" {
     stub_keygen 'echo "keygen exploded" >&2; exit 3'
     run_script
     [ "$status" -eq 1 ]
-    [[ "$output" == *"keygen exploded"* ]]
-    [[ "$output" == *"::error::setup-mock-env: age-keygen could not write"* ]]
+    [[ "$output" == *"keygen exploded"* ]] || false
+    [[ "$output" == *"::error::setup-mock-env: age-keygen could not write"* ]] || false
 }
 
 @test "setup-mock-env: a failing copy fails the step with an annotation" {
@@ -83,7 +83,7 @@ run_script() {
     printf 'not a dir\n' > "$HOME/.dotfiles/scripts"
     run_script
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::setup-mock-env:"* ]]
+    [[ "$output" == *"::error::setup-mock-env:"* ]] || false
 }
 
 @test "setup-mock-env: an empty sensitive/ fails the step instead of copying nothing" {
@@ -92,7 +92,7 @@ run_script() {
     mkdir "$TMP/root/sensitive"
     run_script
     [ "$status" -eq 1 ]
-    [[ "$output" == *"/.dotfiles/sensitive is empty after the copy"* ]]
+    [[ "$output" == *"/.dotfiles/sensitive is empty after the copy"* ]] || false
 }
 
 @test "setup-mock-env: outside the repository root it refuses before touching HOME" {
@@ -100,7 +100,7 @@ run_script() {
     rm "$TMP/root/versions.conf"
     run_script
     [ "$status" -eq 1 ]
-    [[ "$output" == *"run from the repository root"* ]]
+    [[ "$output" == *"run from the repository root"* ]] || false
     [ ! -e "$HOME/.dotfiles" ]
 }
 

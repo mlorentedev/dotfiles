@@ -67,7 +67,7 @@ teardown() {
     mkdir -p "$target"
     run bash -c "DOTFILES_DIR='$target' DOTFILES_SKIP_SETUP=1 bash '$INSTALL_SH'"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"not a git repository"* ]]
+    [[ "$output" == *"not a git repository"* ]] || false
 }
 
 @test "IDEAS-005: install.sh fails if git is missing" {
@@ -77,7 +77,7 @@ teardown() {
     ln -s "$(command -v bash)" "$stub/bash"
     run env PATH="$stub" DOTFILES_SKIP_SETUP=1 bash "$INSTALL_SH"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"git"* ]]
+    [[ "$output" == *"git"* ]] || false
 }
 
 @test "IDEAS-005: install.sh skips setup when DOTFILES_SKIP_SETUP=1" {
@@ -92,5 +92,5 @@ teardown() {
     target="$TEST_TMPDIR/skip-setup"
     run bash -c "DOTFILES_DIR='$target' DOTFILES_REPO='$remote' DOTFILES_SKIP_SETUP=1 bash '$INSTALL_SH'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"DOTFILES_SKIP_SETUP=1"* ]]
+    [[ "$output" == *"DOTFILES_SKIP_SETUP=1"* ]] || false
 }

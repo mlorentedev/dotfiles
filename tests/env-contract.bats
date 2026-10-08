@@ -87,8 +87,8 @@ setup() {
     for name in AGE_KEY_PATH SOPS_AGE_KEY_FILE; do
         linux=$(jq -r ".env_vars[] | select(.name == \"$name\") | .default.linux" "$CONTRACT")
         windows=$(jq -r ".env_vars[] | select(.name == \"$name\") | .default.windows" "$CONTRACT")
-        [[ "$linux" == *"/.config/age/key.txt" ]]
-        [[ "$windows" == *'\.config\age\key.txt' ]]
+        [[ "$linux" == *"/.config/age/key.txt" ]] || false
+        [[ "$windows" == *'\.config\age\key.txt' ]] || false
     done
 }
 
@@ -167,10 +167,10 @@ setup() {
     # Extract that window, then grep within it.
     local window
     window=$(awk '/Pre-export the REFACTOR-002 path vars/,/command -v dotf/' "$setup")
-    [[ "$window" == *"export SCRIPTS_DIR="* ]]
-    [[ "$window" == *"export AGY_HOME="* ]]
-    [[ "$window" == *"export COPILOT_HOME="* ]]
-    [[ "$window" == *"export OPENCODE_HOME="* ]]
+    [[ "$window" == *"export SCRIPTS_DIR="* ]] || false
+    [[ "$window" == *"export AGY_HOME="* ]] || false
+    [[ "$window" == *"export COPILOT_HOME="* ]] || false
+    [[ "$window" == *"export OPENCODE_HOME="* ]] || false
 }
 
 @test "setup-windows.ps1 pre-exports the 4 path vars before post-setup doctor check" {
@@ -180,10 +180,10 @@ setup() {
     # Cross-OS parity: same fix shape, PowerShell syntax.
     local window
     window=$(awk '/Pre-export the REFACTOR-002 path vars/,/\$doctorScript = /' "$setup")
-    [[ "$window" == *"\$env:SCRIPTS_DIR"* ]]
-    [[ "$window" == *"\$env:AGY_HOME"* ]]
-    [[ "$window" == *"\$env:COPILOT_HOME"* ]]
-    [[ "$window" == *"\$env:OPENCODE_HOME"* ]]
+    [[ "$window" == *"\$env:SCRIPTS_DIR"* ]] || false
+    [[ "$window" == *"\$env:AGY_HOME"* ]] || false
+    [[ "$window" == *"\$env:COPILOT_HOME"* ]] || false
+    [[ "$window" == *"\$env:OPENCODE_HOME"* ]] || false
 }
 
 @test "no rc file exports COPILOT_MODEL (retired: invalid id, fallback-only, absent on Windows) [AI-036]" {

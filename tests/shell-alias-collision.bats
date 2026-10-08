@@ -63,8 +63,8 @@ fake_home() {
     rm -rf "$tmph"
     [ "$status" -eq 0 ]
     # A parse error is reported on stderr while still exiting 0 -- catch it.
-    [[ "$output" != *"parse error"* ]]
-    [[ "$output" != *"defining function based on alias"* ]]
+    [[ "$output" != *"parse error"* ]] || false
+    [[ "$output" != *"defining function based on alias"* ]] || false
 }
 
 @test "functions.sh parses to completion in bash with the historic git aliases live" {

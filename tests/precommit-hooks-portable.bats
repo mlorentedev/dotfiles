@@ -26,8 +26,8 @@ script_hook_entries() {
 
 @test "the config declares script hooks, so the guard below checks something" {
     run script_hook_entries
-    [[ $status -eq 0 ]]
-    [[ -n "$output" ]]
+    [[ $status -eq 0 ]] || false
+    [[ -n "$output" ]] || false
 }
 
 @test "every script hook resolves its interpreter via env so pre-commit can run it on Windows" {

@@ -66,7 +66,7 @@ _gate() {
 @test "--help exits 0 and names the threshold" {
     run "$GATE" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"--threshold"* ]]
+    [[ "$output" == *"--threshold"* ]] || false
 }
 
 @test "a missing argument is a usage error" {
@@ -80,8 +80,8 @@ _gate() {
     commit 2026-09-25T12:00:00Z
     _gate
     [ "$status" -eq 0 ]
-    [[ "$output" == *"run=false"* ]]
-    [[ "$output" == *"2 new commit"* ]]
+    [[ "$output" == *"run=false"* ]] || false
+    [[ "$output" == *"2 new commit"* ]] || false
 }
 
 @test "at the threshold: three new commits run it" {
@@ -91,7 +91,7 @@ _gate() {
     commit 2026-09-25T13:00:00Z
     _gate
     [ "$status" -eq 0 ]
-    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"run=true"* ]] || false
 }
 
 @test "commits older than the review do not count" {
@@ -100,8 +100,8 @@ _gate() {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z "$FULL"
     commit 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=false"* ]]
-    [[ "$output" == *"1 new commit"* ]]
+    [[ "$output" == *"run=false"* ]] || false
+    [[ "$output" == *"1 new commit"* ]] || false
 }
 
 @test "merge commits do not count: updating the branch from main is not new work" {
@@ -111,7 +111,7 @@ _gate() {
     commit 2026-09-25T13:00:00Z 2
     commit 2026-09-25T14:00:00Z 2
     _gate
-    [[ "$output" == *"run=false"* ]]
+    [[ "$output" == *"run=false"* ]] || false
 }
 
 @test "the latest review is the baseline: an incremental review resets the count" {
@@ -122,15 +122,15 @@ _gate() {
     comment "github-actions[bot]" 2026-09-25T14:00:00Z "$INCREMENTAL"
     commit 2026-09-25T15:00:00Z
     _gate
-    [[ "$output" == *"run=false"* ]]
-    [[ "$output" == *"1 new commit"* ]]
+    [[ "$output" == *"run=false"* ]] || false
+    [[ "$output" == *"1 new commit"* ]] || false
 }
 
 @test "a review is recognised by its heading alone, as PR-Agent's legacy prefix" {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z "## PR Reviewer Guide"$'\n\nno identity line'
     commit 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=false"* ]]
+    [[ "$output" == *"run=false"* ]] || false
 }
 
 @test "prose that mentions the Guide is not a review, nor is an identity past line 5" {
@@ -141,27 +141,27 @@ _gate() {
     comment "mlorentedev" 2026-09-25T14:00:00Z "The ## PR Reviewer Guide above is triaged."
     comment "mlorentedev" 2026-09-25T14:30:00Z $'a\nb\nc\nd\ne\n<!-- pr-agent:review:full -->'
     _gate
-    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"run=true"* ]] || false
     # Pins the direction: run=true here comes from the 3 real commits meeting
     # the threshold (mode=incremental), never from the forged-override path
     # (mode=full) misfiring on prose that only mentions the Guide.
-    [[ "$output" == *"mode=incremental"* ]]
+    [[ "$output" == *"mode=incremental"* ]] || false
 }
 
 @test "an identity line with CRLF endings still marks a review" {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z $'## Something else\r\n\r\n<!-- pr-agent:review:full -->\r\n'
     commit 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=false"* ]]
+    [[ "$output" == *"run=false"* ]] || false
 }
 
 @test "with no previous review it runs, and PR-Agent reviews in full" {
     comment "mlorentedev" 2026-09-25T10:00:00Z "a note"
     commit 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"no previous review"* ]]
-    [[ "$output" == *"mode=full"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"no previous review"* ]] || false
+    [[ "$output" == *"mode=full"* ]] || false
 }
 
 # CWE-345: the baseline used to be picked by content alone, so ANY account
@@ -172,9 +172,9 @@ _gate() {
     comment "randomuser" 2026-09-25T10:00:00Z "$FULL"
     commit 2026-09-25T09:00:00Z
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"no previous review"* ]]
-    [[ "$output" == *"mode=full"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"no previous review"* ]] || false
+    [[ "$output" == *"mode=full"* ]] || false
 }
 
 # PR-Agent's own get_previous_review (github_provider.py) walks its comments
@@ -188,8 +188,8 @@ _gate() {
     commit 2026-09-25T11:00:00Z
     comment "randomuser" 2026-09-25T12:00:00Z "$FULL"
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"mode=full"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"mode=full"* ]] || false
 }
 
 # A rebase preserves author dates, so date-based counting undercounts across
@@ -204,8 +204,8 @@ _gate() {
     commit 2026-09-25T09:15:00Z                                   # c2: new, but dated before the review
     commit 2026-09-25T09:30:00Z                                   # c3: new, but dated before the review
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"mode=incremental"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"mode=incremental"* ]] || false
 }
 
 @test "a head_sha still respects the threshold: 2 new commits after it do not run" {
@@ -214,8 +214,8 @@ _gate() {
     commit 2026-09-25T09:00:00Z                                   # c1
     commit 2026-09-25T09:15:00Z                                   # c2
     _gate
-    [[ "$output" == *"run=false"* ]]
-    [[ "$output" == *"2 new commit"* ]]
+    [[ "$output" == *"run=false"* ]] || false
+    [[ "$output" == *"2 new commit"* ]] || false
 }
 
 # When the reviewed sha is gone entirely (a rebase or force-push rewrites
@@ -225,9 +225,9 @@ _gate() {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z "$(full_review_with_sha deadbeef)"
     commit 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"mode=full"* ]]
-    [[ "$output" == *"rebase"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"mode=full"* ]] || false
+    [[ "$output" == *"rebase"* ]] || false
 }
 
 # Only the bot's own block counts: PR-Agent appends it as the LAST thing in a
@@ -242,9 +242,9 @@ _gate() {
     commit 2026-09-25T12:00:00Z                                   # c2
     commit 2026-09-25T13:00:00Z                                   # c3: the forged head_sha
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"mode=incremental"* ]]
-    [[ "$output" == *"since the review of"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"mode=incremental"* ]] || false
+    [[ "$output" == *"since the review of"* ]] || false
 }
 
 @test "a state block followed by more text is quoted text, not the baseline" {
@@ -255,8 +255,8 @@ _gate() {
     commit 2026-09-25T12:00:00Z                                   # c2
     commit 2026-09-25T13:00:00Z                                   # c3: the forged head_sha
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"since the review of"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"since the review of"* ]] || false
 }
 
 # The tail anchor is what rejects this one. The test above passes without it,
@@ -271,8 +271,8 @@ _gate() {
     commit 2026-09-25T12:00:00Z                                   # c2
     commit 2026-09-25T13:00:00Z                                   # c3: the forged head_sha
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"since the review of"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"since the review of"* ]] || false
 }
 
 # Incremental reviews carry no state block at all (PR-Agent v0.45.0,
@@ -287,9 +287,9 @@ _gate() {
     commit 2026-09-25T12:00:00Z
     commit 2026-09-25T13:00:00Z
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"mode=incremental"* ]]
-    [[ "$output" == *"since the review of 2026-09-25T10:00:00Z"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"mode=incremental"* ]] || false
+    [[ "$output" == *"since the review of 2026-09-25T10:00:00Z"* ]] || false
 }
 
 @test "a head_sha review with unreadable commits still fails open" {
@@ -297,7 +297,7 @@ _gate() {
     echo 'not json' > "$COMMITS"
     run "$GATE" --comments "$COMMENTS" --commits "$COMMITS"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"run=true"* ]] || false
 }
 
 @test "a push by a bot is skipped, as PR-Agent skips it" {
@@ -306,32 +306,32 @@ _gate() {
     commit 2026-09-25T12:00:00Z
     commit 2026-09-25T13:00:00Z
     _gate --sender-type Bot
-    [[ "$output" == *"run=false"* ]]
-    [[ "$output" == *"bot"* ]]
+    [[ "$output" == *"run=false"* ]] || false
+    [[ "$output" == *"bot"* ]] || false
 }
 
 @test "unreadable input reviews: a skip must be justified, never assumed" {
     run "$GATE" --comments "$BATS_TEST_TMPDIR/absent.json" --commits "$COMMITS"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"run=true"* ]] || false
     echo 'not json' > "$COMMITS"
     run "$GATE" --comments "$COMMENTS" --commits "$COMMITS"
-    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"run=true"* ]] || false
 }
 
 @test "--threshold changes the bound" {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z "$FULL"
     commit 2026-09-25T11:00:00Z
     _gate --threshold 1
-    [[ "$output" == *"run=true"* ]]
+    [[ "$output" == *"run=true"* ]] || false
 }
 
 @test "the output is two key=value lines, ready for GITHUB_OUTPUT" {
     comment "github-actions[bot]" 2026-09-25T10:00:00Z "$FULL"
     _gate
     [ "${#lines[@]}" -eq 2 ]
-    [[ "${lines[0]}" =~ ^run=(true|false)$ ]]
-    [[ "${lines[1]}" == reason=* ]]
+    [[ "${lines[0]}" =~ ^run=(true|false)$ ]] || false
+    [[ "${lines[1]}" == reason=* ]] || false
 }
 
 # #1893: with no head_sha to anchor on, the gate counts by date. A rebase keeps
@@ -345,8 +345,8 @@ _gate() {
     commit_rebased 2026-09-25T08:30:00Z 2026-09-25T11:00:00Z
     commit_rebased 2026-09-25T09:00:00Z 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"3 new commit"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"3 new commit"* ]] || false
 }
 
 # The audited upstream also stores a review identity as a link reference, for providers
@@ -359,8 +359,8 @@ _gate() {
         $'[pr-agent:review:full]: https://github.com/The-PR-Agent/pr-agent\n\nlooks fine'
     commit 2026-09-25T12:00:00Z
     _gate
-    [[ "$output" == *"run=true"* ]]
-    [[ "$output" == *"mode=full"* ]]
+    [[ "$output" == *"run=true"* ]] || false
+    [[ "$output" == *"mode=full"* ]] || false
 }
 
 @test "the bot's own review in the link-reference form is a baseline" {
@@ -368,8 +368,8 @@ _gate() {
         $'[pr-agent:review:incremental]: https://github.com/The-PR-Agent/pr-agent\n\nmore'
     commit 2026-09-25T11:00:00Z
     _gate
-    [[ "$output" == *"run=false"* ]]
-    [[ "$output" == *"1 new commit"* ]]
+    [[ "$output" == *"run=false"* ]] || false
+    [[ "$output" == *"1 new commit"* ]] || false
 }
 
 # The gate's semantics are audited against upstream source identities, not

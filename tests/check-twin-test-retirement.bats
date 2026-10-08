@@ -25,8 +25,8 @@ deleted() {
 
     run "$GUARD" --deleted-from "$WORK/deleted.txt"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"tests/obs-cli.bats"* ]]
-    [[ "$output" == *"ADR-020"* ]]
+    [[ "$output" == *"tests/obs-cli.bats"* ]] || false
+    [[ "$output" == *"ADR-020"* ]] || false
 }
 
 @test "a retired pair whose Pester twin survives is reported" {
@@ -35,7 +35,7 @@ deleted() {
 
     run "$GUARD" --deleted-from "$WORK/deleted.txt"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"tests/obs-cli.Tests.ps1"* ]]
+    [[ "$output" == *"tests/obs-cli.Tests.ps1"* ]] || false
 }
 
 @test "the -ps1 Pester spelling is covered too" {
@@ -47,7 +47,7 @@ deleted() {
 
     run "$GUARD" --deleted-from "$WORK/deleted.txt"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"tests/install-dotf-ps1.Tests.ps1"* ]]
+    [[ "$output" == *"tests/install-dotf-ps1.Tests.ps1"* ]] || false
 }
 
 @test "a retirement that took its tests along passes" {
@@ -56,7 +56,7 @@ deleted() {
 
     run "$GUARD" --deleted-from "$WORK/deleted.txt"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK]"* ]]
+    [[ "$output" == *"[OK]"* ]] || false
 }
 
 @test "deleting only the .ps1 half does not demand the bats file" {

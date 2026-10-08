@@ -30,7 +30,7 @@ setup() {
 
     run "$FIX/scripts/check-lessons.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"OK (400 lessons)"* ]]
+    [[ "$output" == *"OK (400 lessons)"* ]] || false
 }
 
 @test "check-lessons: a lesson missing from the index is still reported" {
@@ -39,5 +39,5 @@ setup() {
 
     run "$FIX/scripts/check-lessons.sh"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"not in docs/lessons/_index.md: lesson-001-orphan.md"* ]]
+    [[ "$output" == *"not in docs/lessons/_index.md: lesson-001-orphan.md"* ]] || false
 }

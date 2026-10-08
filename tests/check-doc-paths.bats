@@ -88,14 +88,14 @@ governed_files() {
     printf 'See `scripts/definitely-not-here.sh` for details.\n' > "$SCRATCH/doc.md"
     run "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"definitely-not-here.sh"* ]]
+    [[ "$output" == *"definitely-not-here.sh"* ]] || false
 }
 
 @test "check-doc-paths: catches a glob that matches nothing [#916]" {
     printf 'Skills live in `ai/skills/*/SKILL.md` today.\n' > "$SCRATCH/doc.md"
     run "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"matches nothing"* ]]
+    [[ "$output" == *"matches nothing"* ]] || false
 }
 
 @test "check-doc-paths: accepts a path that exists [#916]" {
@@ -204,7 +204,7 @@ governed_files() {
 
     run "$GUARD"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"$PROBE_REL"* ]]
+    [[ "$output" != *"$PROBE_REL"* ]] || false
 }
 
 @test "check-doc-paths: Windows worktree falls back to git.exe for tracked files [#1718]" {
@@ -228,7 +228,7 @@ EOF
 
     run bash -c "cd '$worktree' && env PATH='$fake_bin:$PATH' ./scripts/check-doc-paths.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"check-doc-paths: OK AGENTS.md"* ]]
+    [[ "$output" == *"check-doc-paths: OK AGENTS.md"* ]] || false
 }
 
 @test "check-doc-paths: nested Git ignores an incomplete hook config override [#1718]" {
@@ -257,7 +257,7 @@ EOF
         GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath \
         ./scripts/check-doc-paths.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"check-doc-paths: OK AGENTS.md"* ]]
+    [[ "$output" == *"check-doc-paths: OK AGENTS.md"* ]] || false
 }
 
 @test "check-doc-paths: rejects a token that escapes the repo root [#916]" {
@@ -267,7 +267,7 @@ EOF
     printf 'Escaping: `scripts/../../dotfiles/README.md` is outside.\n' > "$SCRATCH/doc.md"
     run "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"escapes the repo root"* ]]
+    [[ "$output" == *"escapes the repo root"* ]] || false
 }
 
 @test "check-doc-paths: a .. token that is not repo-rooted stays ignored [#916]" {
@@ -332,7 +332,7 @@ EOF
 
     run env VAULT_PATH="$fake_vault" "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "referenced vault path does not exist" ]]
+    [[ "$output" =~ "referenced vault path does not exist" ]] || false
 }
 
 @test "check-doc-paths: accepts an existing \$VAULT_PATH path when vault is present [#1043]" {

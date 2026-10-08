@@ -27,7 +27,7 @@ link_basics() {
     link_basics
     run env PATH="$BIN" "$BIN/bash" "$RUN" --print-jobs
     [ "$status" -eq 1 ]
-    [[ "$output" == "::error::run-bats: GNU parallel is missing"* ]]
+    [[ "$output" == "::error::run-bats: GNU parallel is missing"* ]] || false
 }
 
 @test "run-bats: a parallel that is not GNU parallel (moreutils) is refused by name" {
@@ -36,7 +36,7 @@ link_basics() {
     chmod +x "$BIN/parallel"
     run env PATH="$BIN" "$BIN/bash" "$RUN" --print-jobs
     [ "$status" -eq 1 ]
-    [[ "$output" == *"is not GNU parallel"* ]]
+    [[ "$output" == *"is not GNU parallel"* ]] || false
 }
 
 @test "run-bats: an unknown option is a usage error" {
@@ -53,7 +53,7 @@ link_basics() {
         # instead of starting the suite.
         run "$RUN" "$opt" "" --print-jobs
         [ "$status" -eq 2 ] || { printf '%s exited %s: %s\n' "$opt" "$status" "$output" >&2; false; }
-        [[ "$output" == *"$opt needs a non-empty value"* ]]
+        [[ "$output" == *"$opt needs a non-empty value"* ]] || false
     done
 }
 

@@ -109,7 +109,7 @@ EOF
     _prep_sandbox "all clean"
     run env HOME="$FAKE_HOME" PATH="$TMP:$PATH" zsh "$TMP/vault-maintenance-weekly.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Log written to"* ]]
+    [[ "$output" == *"Log written to"* ]] || false
     [ -f "$FAKE_HOME/.local/share/vault-maintenance/latest.log" ]
 }
 
@@ -134,7 +134,7 @@ EOF
     _prep_sandbox "all clean"
     run env HOME="$FAKE_HOME" PATH="$TMP:$PATH" bash "$TMP/vault-maintenance-weekly.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"invalid option"* ]]
+    [[ "$output" != *"invalid option"* ]] || false
     log="$FAKE_HOME/.local/share/vault-maintenance/latest.log"
     grep -qF 'dotf vault crystallize --all' "$log"
     grep -qF 'dotf vault health stub: ok' "$log"
@@ -170,7 +170,7 @@ EOF
     _prep_sandbox "WARNING: 3 stale memory files need action"
     run env HOME="$FAKE_HOME" PATH="$TMP:$PATH" zsh "$TMP/vault-maintenance-weekly.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Log written to"* ]]
+    [[ "$output" == *"Log written to"* ]] || false
 }
 
 # --- The Go path: `dotf vault maintain` (CLI-021 increment 3, #490) ---
@@ -218,7 +218,7 @@ _go_log() { printf '%s/.local/share/vault-maintenance/latest.log' "$FAKE_HOME"; 
     run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
         "$DOTF_BIN" vault maintain
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Log written to"* ]]
+    [[ "$output" == *"Log written to"* ]] || false
     # Same path the .sh has always written, because a human looks for the log by
     # path and the cutover must not move it.
     [ -f "$(_go_log)" ]
@@ -250,7 +250,7 @@ _go_log() { printf '%s/.local/share/vault-maintenance/latest.log' "$FAKE_HOME"; 
     run env HOME="$FAKE_HOME" VAULT_DIR="$FAKE_VAULT" PATH="$TMP:/usr/bin:/bin" \
         "$DOTF_BIN" vault maintain
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Vault health:"* ]]
+    [[ "$output" == *"Vault health:"* ]] || false
     # No `|| true` here: an assertion that cannot fail is not an assertion. The
     # log genuinely carries issue lines under an empty HOME (crystallize warns
     # twice that it found no MEMORY.md), so this passes on its own merits.

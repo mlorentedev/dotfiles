@@ -19,16 +19,16 @@ teardown() {
 
 @test ".zshrc sources ~/.zshrc.local (guarded) as the last non-blank line" {
     last="$(grep -vE '^[[:space:]]*$' "$REPO/.zshrc" | tail -1)"
-    [[ "$last" == *'.zshrc.local'* ]]
-    [[ "$last" == *'-r '* ]]
-    [[ "$last" == *'-f '* ]]
+    [[ "$last" == *'.zshrc.local'* ]] || false
+    [[ "$last" == *'-r '* ]] || false
+    [[ "$last" == *'-f '* ]] || false
 }
 
 @test ".bashrc sources ~/.bashrc.local (guarded) as the last non-blank line" {
     last="$(grep -vE '^[[:space:]]*$' "$REPO/.bashrc" | tail -1)"
-    [[ "$last" == *'.bashrc.local'* ]]
-    [[ "$last" == *'-r '* ]]
-    [[ "$last" == *'-f '* ]]
+    [[ "$last" == *'.bashrc.local'* ]] || false
+    [[ "$last" == *'-r '* ]] || false
+    [[ "$last" == *'-f '* ]] || false
 }
 
 @test "guard sources the local file when present (zsh + bash)" {

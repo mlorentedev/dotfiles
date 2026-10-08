@@ -26,8 +26,8 @@ setup() {
     run env HOME="$tmp" bash -c "cd '$tmp/.dotfiles' && bash ./setup-linux.sh"
     rm -rf "$tmp"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"in-place"* ]]
-    [[ "$output" == *"dotfiles-repo"* ]]
+    [[ "$output" == *"in-place"* ]] || false
+    [[ "$output" == *"dotfiles-repo"* ]] || false
 }
 
 # --- Developer tools section ---
@@ -166,7 +166,7 @@ setup() {
     # /usr/bin/gh fails every https push there.
     run git config -f "$DOTFILES_DIR/.gitconfig" --get-all 'credential.https://github.com.helper'
     [ "$status" -eq 0 ]
-    [[ "$output" == *'!gh auth git-credential'* ]]
+    [[ "$output" == *'!gh auth git-credential'* ]] || false
     refute_grep '/usr/bin/gh' "$DOTFILES_DIR/.gitconfig"
 }
 
@@ -629,7 +629,7 @@ DOTFILES_DIR="/deploy"
     run bash -c "$command_script
 $block"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"CALL <harness> <mirror> <--repo> </checkout with spaces>"* ]]
+    [[ "$output" == *"CALL <harness> <mirror> <--repo> </checkout with spaces>"* ]] || false
 }
 
 @test "setup-linux.sh warns when dotf cannot mirror the harness (WIN-014)" {
@@ -646,7 +646,7 @@ DOTFILES_DIR="/deploy"
     run bash -c "$command_script
 $block"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"WARN:dotf not found (PATH or ~/.local/bin) -- harness not mirrored to /deploy"* ]]
+    [[ "$output" == *"WARN:dotf not found (PATH or ~/.local/bin) -- harness not mirrored to /deploy"* ]] || false
 }
 
 # CLI-054 (#1301): bare `dotf deploy` installs every config ai/deploy.json

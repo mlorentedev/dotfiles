@@ -66,8 +66,8 @@ _add_lesson() {
 @test "--help shows usage and exits 0" {
     _both --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage"* ]]
-    [[ "$output" == *"## Knowledge"* ]]
+    [[ "$output" == *"Usage"* ]] || false
+    [[ "$output" == *"## Knowledge"* ]] || false
 }
 
 @test "exits 2 when --base-ref is missing" {
@@ -79,13 +79,13 @@ _add_lesson() {
 @test "exits 2 on an unknown argument" {
     _both --bogus
     [ "$status" -eq 2 ]
-    [[ "$output" == *"Unknown"* ]]
+    [[ "$output" == *"Unknown"* ]] || false
 }
 
 @test "exits 2 when the PR body is unset: no PR context is a wiring error, not a pass" {
     _gate
     [ "$status" -eq 2 ]
-    [[ "$output" == *"no PR context"* ]]
+    [[ "$output" == *"no PR context"* ]] || false
 }
 
 @test "exits 2 when the range cannot be diffed" {
@@ -99,8 +99,8 @@ _add_lesson() {
     _body_with_lesson "docs/lessons/lesson-002-new.md"
     _gate
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK]"* ]]
-    [[ "$output" == *"docs/lessons/lesson-002-new.md"* ]]
+    [[ "$output" == *"[OK]"* ]] || false
+    [[ "$output" == *"docs/lessons/lesson-002-new.md"* ]] || false
 }
 
 @test "passes three paths, one per kind" {
@@ -157,7 +157,7 @@ _add_lesson() {
 No knowledge section here."
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"## Knowledge"* ]]
+    [[ "$output" == *"## Knowledge"* ]] || false
 }
 
 @test "fails when the body is set but empty" {
@@ -173,44 +173,44 @@ No knowledge section here."
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Runbook"* ]]
+    [[ "$output" == *"Runbook"* ]] || false
 }
 
 @test "fails on a bare none: the reason is the point" {
     _body_with_lesson "none"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Lesson"* ]]
-    [[ "$output" == *"reason"* ]]
+    [[ "$output" == *"Lesson"* ]] || false
+    [[ "$output" == *"reason"* ]] || false
 }
 
 @test "fails on none: with an empty reason" {
     _body_with_lesson "none:   "
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"reason"* ]]
+    [[ "$output" == *"reason"* ]] || false
 }
 
 @test "fails on the template's placeholder reason copied verbatim" {
     _body_with_lesson "none: <reason>"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"placeholder"* ]]
+    [[ "$output" == *"placeholder"* ]] || false
 }
 
 @test "fails when a line is neither a path nor a reasoned none" {
     _body_with_lesson "yes, see the PR"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Lesson"* ]]
+    [[ "$output" == *"Lesson"* ]] || false
 }
 
 @test "fails on a lesson path this PR does not change" {
     _body_with_lesson "docs/lessons/lesson-001-old.md"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"lesson-001-old.md"* ]]
-    [[ "$output" == *"not changed by this PR"* ]]
+    [[ "$output" == *"lesson-001-old.md"* ]] || false
+    [[ "$output" == *"not changed by this PR"* ]] || false
 }
 
 @test "fails on a lesson this PR deletes: a deletion is not capture" {
@@ -227,7 +227,7 @@ No knowledge section here."
     _body_with_lesson "README.md"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"docs/lessons/"* ]]
+    [[ "$output" == *"docs/lessons/"* ]] || false
 }
 
 @test "fails on _index.md: an index row is not a lesson" {
@@ -236,7 +236,7 @@ No knowledge section here."
     _body_with_lesson "docs/lessons/_index.md"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"_index.md"* ]]
+    [[ "$output" == *"_index.md"* ]] || false
 }
 
 @test "fails when one of several paths does not count, naming that one" {
@@ -244,7 +244,7 @@ No knowledge section here."
     _body_with_lesson "docs/lessons/lesson-002-new.md, docs/lessons/lesson-009-ghost.md"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"lesson-009-ghost.md"* ]]
+    [[ "$output" == *"lesson-009-ghost.md"* ]] || false
 }
 
 @test "fails on a duplicated line: two answers are no answer" {
@@ -256,7 +256,7 @@ No knowledge section here."
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Lesson"* ]]
+    [[ "$output" == *"Lesson"* ]] || false
 }
 
 @test "a section quoted in a fenced code block does not count" {
@@ -273,7 +273,7 @@ The shape the gate wants:
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"## Knowledge"* ]]
+    [[ "$output" == *"## Knowledge"* ]] || false
 }
 
 @test "a fence left open says so, instead of only reporting a missing section" {
@@ -289,8 +289,8 @@ make test
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"line 3"* ]]
-    [[ "$output" == *"never closed"* ]]
+    [[ "$output" == *"line 3"* ]] || false
+    [[ "$output" == *"never closed"* ]] || false
 }
 
 @test "lines inside an HTML comment do not count: GitHub does not render them" {
@@ -312,7 +312,7 @@ Example:
 - Runbook: none: no procedure"
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Lesson: the line is missing"* ]]
+    [[ "$output" == *"Lesson: the line is missing"* ]] || false
 }
 
 @test "the section ends at the next heading" {
@@ -325,22 +325,22 @@ Example:
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Runbook"* ]]
+    [[ "$output" == *"Runbook"* ]] || false
 }
 
 @test "--explain prints the expected shape on failure" {
     export SDD_PR_BODY="no section"
     _gate --explain
     [ "$status" -eq 1 ]
-    [[ "$output" == *"none: <reason>"* ]]
+    [[ "$output" == *"none: <reason>"* ]] || false
 }
 
 @test "dependencies: a dependency bot's PR with the label is skipped" {
     export SDD_PR_BODY="Bumps a dependency." SDD_LABELS="dependencies" SDD_PR_AUTHOR="dependabot[bot]"
     _gate
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[OK]"* ]]
-    [[ "$output" == *"dependabot[bot]"* ]]
+    [[ "$output" == *"[OK]"* ]] || false
+    [[ "$output" == *"dependabot[bot]"* ]] || false
 }
 
 @test "dependencies: a human's PR with the label is judged" {

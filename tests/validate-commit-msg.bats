@@ -35,7 +35,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_$$"
     echo "feat: add new feature" > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
@@ -43,8 +43,8 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_$$"
     echo "Invalid commit message" > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 1 ]]
-    [[ "$output" == *"ERROR"* ]]
+    [[ $status -eq 1 ]] || false
+    [[ "$output" == *"ERROR"* ]] || false
     rm -f "$msg_file"
 }
 
@@ -53,7 +53,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_zsh_$$"
     echo "fix: resolve bug" > "$msg_file"
     run zsh "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
@@ -62,7 +62,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_zsh_$$"
     echo "Bad message" > "$msg_file"
     run zsh "$HOOK" "$msg_file"
-    [[ $status -eq 1 ]]
+    [[ $status -eq 1 ]] || false
     rm -f "$msg_file"
 }
 
@@ -72,7 +72,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_scope_$$"
     echo 'feat(tmux): add a ~/.tmux.conf.local override seam' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
@@ -101,10 +101,10 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_bang_$$"
     echo 'feat(api)!: drop the v1 endpoint' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     echo 'feat!: drop the v1 endpoint' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
@@ -112,7 +112,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_sep_$$"
     echo 'chore(ai/hermes): re-pin the runtime' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
@@ -120,7 +120,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_nospace_$$"
     echo 'feat:no space' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 1 ]]
+    [[ $status -eq 1 ]] || false
     rm -f "$msg_file"
 }
 
@@ -128,7 +128,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_empty_$$"
     echo 'feat: ' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 1 ]]
+    [[ $status -eq 1 ]] || false
     rm -f "$msg_file"
 }
 
@@ -136,7 +136,7 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_body_$$"
     printf '%s\n\n%s\n' 'THIS SUBJECT IS WRONG' 'feat: this body line conforms' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 1 ]]
+    [[ $status -eq 1 ]] || false
     rm -f "$msg_file"
 }
 
@@ -144,10 +144,10 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_merge_$$"
     echo 'Merge branch main into feat/x' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     echo 'Revert "feat(tmux): add a seam"' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
@@ -155,21 +155,21 @@ require_zsh() {
     local msg_file="/tmp/bats_commit_msg_fixup_$$"
     echo 'fixup! feat(tmux): add a seam' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     echo 'squash! feat(tmux): add a seam' > "$msg_file"
     run bash "$HOOK" "$msg_file"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
     rm -f "$msg_file"
 }
 
 @test "fails loudly when no message-file argument is passed" {
     run bash "$HOOK"
-    [[ $status -eq 1 ]]
-    [[ "$output" == *"no commit message file"* ]]
+    [[ $status -eq 1 ]] || false
+    [[ "$output" == *"no commit message file"* ]] || false
 }
 
 @test "the shebang resolves via env so the hook can run on Windows" {
     run head -n 1 "$HOOK"
-    [[ $status -eq 0 ]]
-    [[ "$output" == '#!/usr/bin/env sh' ]]
+    [[ $status -eq 0 ]] || false
+    [[ "$output" == '#!/usr/bin/env sh' ]] || false
 }

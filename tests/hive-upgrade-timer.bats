@@ -187,21 +187,21 @@ setup() {
 @test "hive-upgrade.ps1 is loud and non-zero when no install is found" {
     run grep -A3 -F 'no hive-vault install found' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"exit 1"* ]]
+    [[ "$output" == *"exit 1"* ]] || false
 }
 
 @test "hive-upgrade.ps1 stays silent when the install is already current" {
     # The deliberate 15-min no-op: no output, exit 0, daemon untouched.
     run grep -A2 -F '[version]$installed -ge [version]$latest' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"exit 0"* ]]
-    [[ "$output" != *"Write-Output"* ]]
+    [[ "$output" == *"exit 0"* ]] || false
+    [[ "$output" != *"Write-Output"* ]] || false
 }
 
 @test "hive-upgrade.ps1 reports an unreachable PyPI without failing the tick" {
     run grep -A3 -F 'could not resolve the latest' "$DOTFILES_DIR/windows/hive-upgrade.ps1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"exit 0"* ]]
+    [[ "$output" == *"exit 0"* ]] || false
 }
 
 @test "hive-upgrade.ps1 does not collapse no-install into the already-current guard" {

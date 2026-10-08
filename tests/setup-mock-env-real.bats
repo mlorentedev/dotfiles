@@ -30,7 +30,7 @@ teardown() {
     # The identity yields a recipient, so it is a key age can use, not just text.
     run age-keygen -y "$key"
     [ "$status" -eq 0 ]
-    [[ "$output" == age1* ]]
+    [[ "$output" == age1* ]] || false
     [ -f "$HOME/.dotfiles/versions.conf" ]
     [ -f "$HOME/.dotfiles/scripts/utils.sh" ]
     [ -f "$HOME/.dotfiles/sensitive/README.md" ]

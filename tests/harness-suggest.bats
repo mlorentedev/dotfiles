@@ -12,16 +12,16 @@ setup() {
     cd "$CLI"
     run go run ./cmd/dotf harness suggest --prompt "memory leak in python script"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-python-cli"* ]]
-    [[ "$output" == *"async-python-patterns"* ]]
+    [[ "$output" == *"pattern-python-cli"* ]] || false
+    [[ "$output" == *"async-python-patterns"* ]] || false
 }
 
 @test "harness suggest: matches path arguments" {
     cd "$CLI"
     run go run ./cmd/dotf harness suggest Dockerfile
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-container-workflow"* ]]
-    [[ "$output" == *"docker"* ]]
+    [[ "$output" == *"pattern-container-workflow"* ]] || false
+    [[ "$output" == *"docker"* ]] || false
 }
 
 @test "harness suggest: --json outputs valid JSON object with patterns and skills" {
@@ -43,16 +43,16 @@ assert 'docker' in data['skills']
     cd "$CLI"
     run go run ./cmd/dotf harness suggest --prompt "create terraform module for EKS cluster"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-git-workflow"* ]]
-    [[ "$output" == *"terraform"* ]]
+    [[ "$output" == *"pattern-git-workflow"* ]] || false
+    [[ "$output" == *"terraform"* ]] || false
 }
 
 @test "harness suggest: resolves helm trigger on Chart.yaml path" {
     cd "$CLI"
     run go run ./cmd/dotf harness suggest Chart.yaml
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pattern-container-workflow"* ]]
-    [[ "$output" == *"helm"* ]]
+    [[ "$output" == *"pattern-container-workflow"* ]] || false
+    [[ "$output" == *"helm"* ]] || false
 }
 
 @test "harness suggest: resolves transitive skill dependencies" {
@@ -61,8 +61,8 @@ assert 'docker' in data['skills']
     [ "$status" -eq 0 ]
     # The ADR trigger names architecture-session; spec is its dependency and
     # adversarial-review is spec's, so the last is reached two levels down.
-    [[ "$output" == *"architecture-session"* ]]
-    [[ "$output" == *"- spec"* ]]
-    [[ "$output" == *"adversarial-review"* ]]
+    [[ "$output" == *"architecture-session"* ]] || false
+    [[ "$output" == *"- spec"* ]] || false
+    [[ "$output" == *"adversarial-review"* ]] || false
 }
 

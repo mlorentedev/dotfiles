@@ -23,7 +23,7 @@ setup() {
 # --- File presence + doc block ---
 
 @test "profile-heal.ps1 exists" {
-    [[ -f "$PS1_SCRIPT" ]]
+    [[ -f "$PS1_SCRIPT" ]] || false
 }
 
 @test "profile-heal.ps1 has .SYNOPSIS block" {
@@ -99,7 +99,7 @@ setup() {
         }
         Write-Host 'Syntax OK'
     "
-    [[ "$status" -eq 0 ]]
+    [[ "$status" -eq 0 ]] || false
 }
 
 # --- Setup deploy + doctor integration (cross-script contract) ---

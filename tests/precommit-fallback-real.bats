@@ -78,8 +78,8 @@ dispatched_commit() {
     git -C "$FIXTURE" add -A
 
     run dispatched_commit
-    [[ "$output" != *"TypeError"* ]]
-    [[ "$output" != *"An unexpected error has occurred"* ]]
+    [[ "$output" != *"TypeError"* ]] || false
+    [[ "$output" != *"An unexpected error has occurred"* ]] || false
 }
 
 @test "BUG-055: a failing hook still blocks the commit (the fix does not disarm the gate)" {
