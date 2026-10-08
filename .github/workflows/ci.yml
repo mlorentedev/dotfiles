@@ -340,16 +340,9 @@ jobs:
 
       - name: Setup mock environment
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        run: |
-          mkdir -p ~/.dotfiles/sensitive ~/.dotfiles/scripts ~/.config/age
-          age-keygen -o ~/.config/age/key.txt 2>/dev/null
-
-          cp versions.conf ~/.dotfiles/
-          cp -r scripts/* ~/.dotfiles/scripts/
-          cp -r sensitive/* ~/.dotfiles/sensitive/ 2>/dev/null || true
-
-          ln -sf ~/.dotfiles/.zshrc ~/.zshrc 2>/dev/null || true
-          ln -sf ~/.dotfiles/.bashrc ~/.bashrc 2>/dev/null || true
+        # One definition for both jobs; it fails the step on a missing key or an
+        # empty fixture copy instead of letting the suite skip on it (#2152).
+        run: ./scripts/setup-mock-env.sh
 
       - name: Run bats test suite
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -509,12 +502,7 @@ jobs:
           parallel --version | head -n 1
 
       - name: Setup mock environment
-        run: |
-          mkdir -p ~/.dotfiles/sensitive ~/.dotfiles/scripts ~/.config/age
-          age-keygen -o ~/.config/age/key.txt 2>/dev/null
-          cp versions.conf ~/.dotfiles/
-          cp -r scripts/* ~/.dotfiles/scripts/
-          cp -r sensitive/* ~/.dotfiles/sensitive/ 2>/dev/null || true
+        run: ./scripts/setup-mock-env.sh
 
       - name: Show the shells under test
         run: |

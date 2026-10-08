@@ -383,12 +383,15 @@ if ($wingetCmd) {
     foreach ($tool in $tools) {
         if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
             Write-Info "Installing $($tool.Name)..."
-            try {
-                $wingetArgs = @($tool.Id, '--accept-package-agreements', '--accept-source-agreements')
-                & winget install @wingetArgs 2>$null | Out-Null
+            # Install-WingetTool (utils.ps1) reads winget's exit code and checks
+            # the command resolves; the old inline call printed "installed"
+            # whatever winget did (#2157).
+            $result = Install-WingetTool -Cmd $tool.Cmd -Id $tool.Id
+            if ($result.Installed) {
                 Write-Success "$($tool.Name) installed"
-            } catch {
-                Write-Warn "Failed to install $($tool.Name): $_"
+            } else {
+                Write-Warn ("$($tool.Name) is not on PATH after $($result.Attempts) winget attempt(s)" +
+                    " (exit code $($result.ExitCode)): $($result.Detail)")
             }
         } else {
             Write-Info "$($tool.Name) already installed"
