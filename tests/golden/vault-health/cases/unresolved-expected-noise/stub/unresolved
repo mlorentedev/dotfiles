@@ -2,5 +2,6 @@
   {"link": "{{client_slug}}", "count": "1", "sources": "00_meta/templates/client-product.md"},
   {"link": "HIVE-211", "count": "2", "sources": "90_archive/hive/11-tasks.md, 90_archive/hive/roadmap.md"},
   {"link": "live-broken-link", "count": "1", "sources": "00_meta/a.md"},
-  {"link": "moved-note", "count": "2", "sources": "90_archive/old.md, 00_meta/b.md"}
+  {"link": "moved-note", "count": "2", "sources": "90_archive/old.md, 00_meta/b.md"},
+  {"link": "comma-joined", "count": "2", "sources": "00_meta/templates/x.md,00_meta/c.md"}
 ]

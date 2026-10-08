@@ -15,7 +15,7 @@ Vault: knowledge (<VAULT>)
   PASS: Dead-ends: 1/5 (20%)
 
 [4/7] Unresolved Links
-  WARN: Unresolved links: 2
+  WARN: Unresolved links: 3
   INFO: Not counted: 2 unresolved link(s) found only in 00_meta/templates/ or 90_archive/ (placeholders and archived notes)
 
 [5/7] Frontmatter Coverage

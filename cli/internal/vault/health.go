@@ -390,7 +390,11 @@ func (h *healthRun) section3OrphansDeadEnds() {
 }
 
 // unresolvedLink is one entry of `obsidian unresolved verbose format=json`.
-// The CLI joins several sources into one string with ", ".
+// The CLI joins several sources into one string with ", ". It is split on the
+// bare comma and trimmed, so a joiner without the space still separates the
+// sources. A comma inside a file name only produces fragments without an
+// exempt prefix, which count: the split can over-count, never exempt a live
+// link.
 type unresolvedLink struct {
 	Link    string `json:"link"`
 	Sources string `json:"sources"`
@@ -411,7 +415,7 @@ func (h *healthRun) section4Unresolved() {
 	var live []string
 	for _, l := range all {
 		counted := strings.TrimSpace(l.Sources) == "" // no source named: count it
-		for _, src := range strings.Split(l.Sources, ", ") {
+		for _, src := range strings.Split(l.Sources, ",") {
 			if src = strings.TrimSpace(src); src != "" && !unresolvedExempt(src) {
 				counted = true
 			}
