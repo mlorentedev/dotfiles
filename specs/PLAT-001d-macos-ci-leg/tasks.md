@@ -32,14 +32,14 @@ created: "2026-10-07"
 ### Workflow (AC5)
 
 - [x] [AC6] `ci.yml`: `test` calls `run-bats.sh`
-- [ ] [AC5] `ci.yml`: new non-required `test-macos` on the `code` filter
-- [ ] [AC5] Assert bash 3.2 and zsh in the job rather than assume them
-- [ ] [AC5] First green run of `test-macos` on this PR (run 37590992834); the main-only full-suite step runs after merge
+- [x] [AC5] `ci.yml`: new non-required `test-macos` on the `code` filter
+- [x] [AC5] Assert bash 3.2 and zsh in the job rather than assume them
+- [ ] [AC5] First green run of `test-macos` on the PR that adds the job (first measured on #2063, run 37590992834); the main-only full-suite step runs after merge
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
 - [x] Type checks pass
 - [x] Lint passes
 - [x] No unrelated changes in the diff (no scope creep)
