@@ -69,7 +69,7 @@ EOF2
     _fake_go_ok
     CASE_DOTF_BIN="$BATS_TEST_TMPDIR/nope" _resolve
     [ "$status" -eq 1 ]
-    [[ "$output" == *"DOTF_BIN is set to $BATS_TEST_TMPDIR/nope"* ]]
+    [[ "$output" == *"DOTF_BIN is set to $BATS_TEST_TMPDIR/nope"* ]] || false
     [ ! -e "$CALLS" ]
 }
 
@@ -81,22 +81,22 @@ EOF2
 @test "dotf-bin: no toolchain on a developer machine skips" {
     _resolve
     [ "$status" -eq 77 ]
-    [[ "$output" == *"SKIPPED: go toolchain not installed"* ]]
+    [[ "$output" == *"SKIPPED: go toolchain not installed"* ]] || false
 }
 
 @test "dotf-bin: no toolchain in CI fails rather than skipping" {
     CASE_CI=true _resolve
     [ "$status" -eq 1 ]
-    [[ "$output" != *SKIPPED* ]]
-    [[ "$output" == *"missing in CI"* ]]
+    [[ "$output" != *SKIPPED* ]] || false
+    [[ "$output" == *"missing in CI"* ]] || false
 }
 
 @test "dotf-bin: a build that fails fails, locally as well as in CI" {
     _fake_go_fail
     _resolve
     [ "$status" -eq 1 ]
-    [[ "$output" != *SKIPPED* ]]
-    [[ "$output" == *"go build ./cmd/dotf failed"* ]]
+    [[ "$output" != *SKIPPED* ]] || false
+    [[ "$output" == *"go build ./cmd/dotf failed"* ]] || false
 }
 
 @test "dotf-bin: with no DOTF_BIN it builds once into the fallback and reuses it" {

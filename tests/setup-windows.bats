@@ -10,7 +10,7 @@ setup() {
 }
 
 @test "setup-windows.ps1 exists" {
-    [[ -f "$PS1_SCRIPT" ]]
+    [[ -f "$PS1_SCRIPT" ]] || false
 }
 
 # --- Structural checks ---
@@ -918,7 +918,7 @@ FIXTURE
         }
         Write-Host 'Syntax OK'
     "
-    [[ "$status" -eq 0 ]]
+    [[ "$status" -eq 0 ]] || false
 }
 
 # --- DX-004: opencode tui.json deploy (Linux parity) ---
@@ -964,7 +964,7 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     fi
     run_windows_harness_mirror_block yes 'C:\checkout with spaces'
     [ "$status" -eq 0 ]
-    [[ "$output" == *'CALL <harness> <mirror> <--repo> <C:\checkout with spaces>'* ]]
+    [[ "$output" == *'CALL <harness> <mirror> <--repo> <C:\checkout with spaces>'* ]] || false
 }
 
 @test "setup-windows.ps1 warns when dotf cannot mirror the harness (WIN-014)" {
@@ -973,7 +973,7 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     fi
     run_windows_harness_mirror_block no 'C:\checkout'
     [ "$status" -eq 0 ]
-    [[ "$output" == *'WARN:dotf not found; harness inputs were not mirrored'* ]]
+    [[ "$output" == *'WARN:dotf not found; harness inputs were not mirrored'* ]] || false
 }
 
 @test "parity: both setups mirror the harness through the same dotf command (WIN-007)" {

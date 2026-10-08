@@ -10,7 +10,7 @@ setup() {
 }
 
 @test "profile.ps1 exists" {
-    [[ -f "$PROFILE_SCRIPT" ]]
+    [[ -f "$PROFILE_SCRIPT" ]] || false
 }
 
 # --- AI tool aliases ---

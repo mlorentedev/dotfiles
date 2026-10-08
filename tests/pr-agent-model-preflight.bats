@@ -50,7 +50,7 @@ run_preflight() {
     grep -qxF 'model=openai/mimo-v2.6-flash' "$OUT"
     grep -qxF 'fallbacks=["openai/deepseek-v4-flash"]' "$OUT"
     refute_grep '^retry_model=' "$OUT"
-    [[ "$output" != *"::warning::"* ]]
+    [[ "$output" != *"::warning::"* ]] || false
 }
 
 @test "preflight: a retired primary (401) hands the review to the fallback, and says so" {
@@ -60,7 +60,7 @@ run_preflight() {
     grep -qxF 'model=openai/deepseek-v4-flash' "$OUT"
     grep -qxF 'fallbacks=[]' "$OUT"
     refute_grep '^retry_model=' "$OUT"
-    [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"HTTP 401"*"openai/deepseek-v4-flash"* ]]
+    [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"HTTP 401"*"openai/deepseek-v4-flash"* ]] || false
 }
 
 @test "preflight: a primary that hangs is skipped like one that refuses" {
@@ -68,7 +68,7 @@ run_preflight() {
     run_preflight
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/deepseek-v4-flash' "$OUT"
-    [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"no answer within"* ]]
+    [[ "$output" == *"::warning::"*"openai/mimo-v2.6-flash"*"no answer within"* ]] || false
 }
 
 @test "preflight: the warning names the fix by status class, not one remedy for all" {
@@ -78,24 +78,24 @@ run_preflight() {
     export STUB_CODES="mimo-v2.6-flash=429 deepseek-v4-flash=200"
     run_preflight
     [ "$status" -eq 0 ]
-    [[ "$output" == *"openai/mimo-v2.6-flash answered HTTP 429"*"quota or concurrency"* ]]
-    [[ "$output" != *"Fix the chain"* ]]
+    [[ "$output" == *"openai/mimo-v2.6-flash answered HTTP 429"*"quota or concurrency"* ]] || false
+    [[ "$output" != *"Fix the chain"* ]] || false
 
     export STUB_CODES="mimo-v2.6-flash=401 deepseek-v4-flash=200"
     run_preflight
-    [[ "$output" == *"HTTP 401"*"Fix the chain"* ]]
+    [[ "$output" == *"HTTP 401"*"Fix the chain"* ]] || false
 
     export STUB_CODES="mimo-v2.6-flash=503 deepseek-v4-flash=200"
     run_preflight
-    [[ "$output" == *"HTTP 503"*"NaN did not serve it"* ]]
-    [[ "$output" != *"Fix the chain"* ]]
+    [[ "$output" == *"HTTP 503"*"NaN did not serve it"* ]] || false
+    [[ "$output" != *"Fix the chain"* ]] || false
 }
 
 @test "preflight: when no declared model answers, the job fails before PR-Agent runs" {
     export STUB_CODES="mimo-v2.6-flash=401 deepseek-v4-flash=429"
     run_preflight
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::"* ]]
+    [[ "$output" == *"::error::"* ]] || false
     run ! grep -q '^model=' "$OUT"
 }
 
@@ -121,7 +121,7 @@ run_preflight() {
     [ "$status" -eq 0 ]
     run ! grep -q "$NAN_API_KEY" "$STUB_ARGV_LOG"
     grep -q "Bearer $NAN_API_KEY" "$STUB_STDIN_LOG"
-    [[ "$output" != *"$NAN_API_KEY"* ]]
+    [[ "$output" != *"$NAN_API_KEY"* ]] || false
 }
 
 @test "preflight: the job summary names the model that reviews and every one that did not answer" {

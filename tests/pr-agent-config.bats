@@ -599,7 +599,7 @@ print('; '.join(bad)); sys.exit(1 if bad else 0)
     # No declared model answered: the preflight already failed the job with the
     # cause, and the guard's NaN-concurrency diagnosis would be a wrong second one.
     run _step_if "s.get('name') == 'Fail if no review was published'"
-    [[ "$output" == *"steps.models.outcome != 'failure'"* ]]
+    [[ "$output" == *"steps.models.outcome != 'failure'"* ]] || false
 }
 
 @test "pr-agent: the publication guard is skipped after a credential failure" {
@@ -790,7 +790,7 @@ print(s.get('if', ''))
 @test "pr-agent: a push runs the push gate first, and only a push does" {
     run _step_if "s.get('id') == 'push_gate'"
     [ "$status" -eq 0 ] || { echo "no step with id push_gate" >&2; false; }
-    [[ "$output" == *"github.event.action == 'synchronize'"* ]]
+    [[ "$output" == *"github.event.action == 'synchronize'"* ]] || false
     grep -q 'scripts/pr-agent-push-gate.sh' "$WF"
     # The job has no full checkout; the gate script and the model preflight
     # (AI-045, which runs on every event) are the only files checked out.
@@ -817,8 +817,8 @@ print(co['with']['sparse-checkout'].split())
 @test "pr-agent: the registry declares the incremental Guide heading as a review marker" {
     run jq -r '.reviewers[] | select(.login == "github-actions") | .review_markers[]' \
         "$REPO/harness/review-attestation.json"
-    [[ "$output" == *"## PR Reviewer Guide"* ]]
-    [[ "$output" == *"## Incremental PR Reviewer Guide"* ]]
+    [[ "$output" == *"## PR Reviewer Guide"* ]] || false
+    [[ "$output" == *"## Incremental PR Reviewer Guide"* ]] || false
 }
 
 @test "pr-agent: the guard accepts every marker the registry declares, not only the first" {

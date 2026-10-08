@@ -20,17 +20,17 @@ setup() {
 
 @test "age-encrypt-decrypt.sh shows usage with no args" {
     run bash "$SCRIPTS_DIR/age-encrypt-decrypt.sh" 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "age-encrypt-decrypt.sh shows usage with invalid arg" {
     run bash "$SCRIPTS_DIR/age-encrypt-decrypt.sh" invalid 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "age-encrypt-decrypt.sh shows usage under zsh" {
     run zsh "$SCRIPTS_DIR/age-encrypt-decrypt.sh" 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 # --- age-standalone.sh ---
@@ -45,17 +45,17 @@ setup() {
 
 @test "age-standalone.sh shows usage with no args" {
     run bash "$SCRIPTS_DIR/age-standalone.sh" 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "age-standalone.sh shows usage with invalid arg" {
     run bash "$SCRIPTS_DIR/age-standalone.sh" invalid 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "age-standalone.sh shows usage under zsh" {
     run zsh "$SCRIPTS_DIR/age-standalone.sh" 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 # --- backup-secrets-to-usb.sh ---
@@ -70,10 +70,10 @@ setup() {
 
 @test "backup-secrets-to-usb.sh shows usage with no args" {
     run bash "$SCRIPTS_DIR/backup-secrets-to-usb.sh" 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "backup-secrets-to-usb.sh shows usage under zsh" {
     run zsh "$SCRIPTS_DIR/backup-secrets-to-usb.sh" 2>&1
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }

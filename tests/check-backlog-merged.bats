@@ -26,8 +26,8 @@ teardown() {
     printf -- '- [ ] **SDD-009-opencode-deploy-time-secrets** still open here\n' > "$TASKS"
     run "$GUARD" "$TASKS" --repo "$REPO"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"STALE-OPEN: SDD-009-opencode-deploy-time-secrets"* ]]
-    [[ "$output" == *"archived spec exists"* ]]
+    [[ "$output" == *"STALE-OPEN: SDD-009-opencode-deploy-time-secrets"* ]] || false
+    [[ "$output" == *"archived spec exists"* ]] || false
 }
 
 @test "clean when the same id is already ticked [x]" {
@@ -53,7 +53,7 @@ teardown() {
     printf -- '- [ ] **WIN-002a-vault-health-sh-inverted-check** sub-id\n' > "$TASKS"
     run "$GUARD" "$TASKS" --repo "$REPO"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"WIN-002a-vault-health-sh-inverted-check"* ]]
+    [[ "$output" == *"WIN-002a-vault-health-sh-inverted-check"* ]] || false
 }
 
 @test "open statuses [~] and [-] are also checked" {
@@ -70,17 +70,17 @@ teardown() {
     } > "$TASKS"
     run "$GUARD" "$TASKS" --repo "$REPO"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"SDD-009-opencode-deploy-time-secrets"* ]]
-    [[ "$output" == *"WIN-002a-vault-health-sh-inverted-check"* ]]
+    [[ "$output" == *"SDD-009-opencode-deploy-time-secrets"* ]] || false
+    [[ "$output" == *"WIN-002a-vault-health-sh-inverted-check"* ]] || false
     # AI-020 has no archived spec -> not flagged
-    [[ "$output" != *"AI-020"* ]]
+    [[ "$output" != *"AI-020"* ]] || false
 }
 
 @test "no repo / no specs/archive -> advisory skip, exit 0" {
     printf -- '- [ ] **SDD-009-opencode-deploy-time-secrets** open\n' > "$TASKS"
     run "$GUARD" "$TASKS" --repo "$TMP/nonexistent-repo"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"SKIP"* ]]
+    [[ "$output" == *"SKIP"* ]] || false
 }
 
 @test "missing tasks file -> exit 2" {
@@ -91,7 +91,7 @@ teardown() {
 @test "no argument -> usage, exit 2" {
     run "$GUARD"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"Usage:"* ]]
+    [[ "$output" == *"Usage:"* ]] || false
 }
 
 @test "repo inference: <vault>/10_projects/<proj>/11-tasks.md -> \$HOME/Projects/<proj>" {
@@ -103,5 +103,5 @@ teardown() {
     printf -- '- [ ] **SDD-009-opencode-deploy-time-secrets** open\n' > "$VAULTTASKS"
     run env HOME="$FAKE_HOME" "$GUARD" "$VAULTTASKS"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"STALE-OPEN: SDD-009-opencode-deploy-time-secrets"* ]]
+    [[ "$output" == *"STALE-OPEN: SDD-009-opencode-deploy-time-secrets"* ]] || false
 }

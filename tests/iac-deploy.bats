@@ -37,7 +37,7 @@ teardown() {
     # Aligned with the Windows always-overwrite strategy: every run guarantees
     # convergence and logs the deploy — there is no silent "already in sync"
     # skip path that could mask drift. Idempotency is of *outcome*, not output.
-    [[ "$output" == *"Deployed"* ]]
+    [[ "$output" == *"Deployed"* ]] || false
     [ -f "$DST" ]
     [ ! -L "$DST" ]
     cmp -s "$SRC" "$DST"
@@ -48,14 +48,14 @@ teardown() {
     echo "modified-content-v2" > "$SRC"
     run deploy_file "$SRC" "$DST"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Deployed"* ]]
+    [[ "$output" == *"Deployed"* ]] || false
     cmp -s "$SRC" "$DST"
 }
 
 @test "deploy_file: missing source returns error" {
     run deploy_file "$TEST_TMPDIR/does-not-exist" "$DST"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"source missing"* ]]
+    [[ "$output" == *"source missing"* ]] || false
     [ ! -f "$DST" ]
 }
 

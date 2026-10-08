@@ -11,7 +11,7 @@ setup() {
 }
 
 @test "template file exists" {
-    [[ -f "$SETTINGS_TEMPLATE" ]]
+    [[ -f "$SETTINGS_TEMPLATE" ]] || false
 }
 
 @test "template is valid JSON (jq parses without error)" {
@@ -26,11 +26,11 @@ setup() {
     # `template wins` for model, so every setup run resets whatever /model
     # last saved. With a bare "opus" here, a 1M default chosen interactively
     # survives exactly until the next deploy -- silently.
-    [[ "$(jq -r '.model' "$SETTINGS_TEMPLATE")" == "opus[1m]" ]]
+    [[ "$(jq -r '.model' "$SETTINGS_TEMPLATE")" == "opus[1m]" ]] || false
 }
 
 @test "template has effortLevel = xhigh" {
-    [[ "$(jq -r '.effortLevel' "$SETTINGS_TEMPLATE")" == "xhigh" ]]
+    [[ "$(jq -r '.effortLevel' "$SETTINGS_TEMPLATE")" == "xhigh" ]] || false
 }
 
 @test "every dotfiles-owned top-level key is named in both merge policies" {
@@ -218,7 +218,7 @@ setup() {
     # dictation", and with it unset /voice dictates in English. The UI stays in
     # English either way. Git and GitHub artifacts stay English because
     # AGENTS.md says so, not because of this key.
-    [[ "$(jq -r '.language' "$SETTINGS_TEMPLATE")" == "spanish" ]]
+    [[ "$(jq -r '.language' "$SETTINGS_TEMPLATE")" == "spanish" ]] || false
 }
 
 @test "the merge expression survives a template that omits an optional key" {
@@ -255,7 +255,7 @@ setup() {
 }
 
 @test "template has outputStyle and both merge policies propagate it" {
-    [[ "$(jq -r '.outputStyle' "$SETTINGS_TEMPLATE")" != "null" ]]
+    [[ "$(jq -r '.outputStyle' "$SETTINGS_TEMPLATE")" != "null" ]] || false
     grep -q 'outputStyle' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'outputStyle' "$DOTFILES_DIR/setup-windows.ps1"
 }
@@ -331,7 +331,7 @@ setup() {
 # --- permissions.allow: MCP entries required, Bash/WebSearch/WebFetch/Skill allowed ---
 
 @test "template permissions.allow has at least 3 entries" {
-    [[ "$(jq '.permissions.allow | length' "$SETTINGS_TEMPLATE")" -ge 3 ]]
+    [[ "$(jq '.permissions.allow | length' "$SETTINGS_TEMPLATE")" -ge 3 ]] || false
 }
 
 @test "template permissions.allow has all 3 expected MCP entries" {
@@ -344,7 +344,7 @@ setup() {
     # Negative assertion: no entry starts with "Read(" -- those are absolute paths
     # tied to a specific machine and stay user-owned via the merge policy.
     run jq -e '.permissions.allow | map(startswith("Read(")) | any' "$SETTINGS_TEMPLATE"
-    [[ "$status" -ne 0 ]]
+    [[ "$status" -ne 0 ]] || false
 }
 
 @test "template permissions.allow entries only use allowed prefixes" {
@@ -361,13 +361,13 @@ setup() {
 
 @test "template does NOT define permissions.additionalDirectories (user-owned)" {
     run jq -e '.permissions.additionalDirectories' "$SETTINGS_TEMPLATE"
-    [[ "$status" -ne 0 ]]
+    [[ "$status" -ne 0 ]] || false
 }
 
 # --- enabledPlugins: 5 universal plugins, all true (was 13 pre-usage-audit) ---
 
 @test "template enabledPlugins has exactly 5 universal plugins" {
-    [[ "$(jq '.enabledPlugins | length' "$SETTINGS_TEMPLATE")" == "5" ]]
+    [[ "$(jq '.enabledPlugins | length' "$SETTINGS_TEMPLATE")" == "5" ]] || false
 }
 
 @test "template enabledPlugins values all set to true" {

@@ -75,6 +75,6 @@ tag_comments() {
 @test "the os-sensitive tier selects tests, and bats agrees with the comments" {
     run bats --count --filter-tags os-sensitive "$TESTS"/*.bats
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^[0-9]+$ ]]
+    [[ "$output" =~ ^[0-9]+$ ]] || false
     [ "$output" -ge 100 ]
 }

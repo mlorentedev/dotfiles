@@ -29,26 +29,26 @@ _commit() {
 @test "check-spec-gate.sh --help shows usage and exits 0" {
     run "$SCRIPTS_DIR/check-spec-gate.sh" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage"* ]]
-    [[ "$output" == *"--base-ref"* ]]
+    [[ "$output" == *"Usage"* ]] || false
+    [[ "$output" == *"--base-ref"* ]] || false
 }
 
 @test "exits 2 when --base-ref missing" {
     run "$SCRIPTS_DIR/check-spec-gate.sh" --head-ref HEAD
     [ "$status" -eq 2 ]
-    [[ "$output" == *"required"* ]]
+    [[ "$output" == *"required"* ]] || false
 }
 
 @test "exits 2 when --head-ref missing" {
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main
     [ "$status" -eq 2 ]
-    [[ "$output" == *"required"* ]]
+    [[ "$output" == *"required"* ]] || false
 }
 
 @test "exits 2 on unknown argument" {
     run "$SCRIPTS_DIR/check-spec-gate.sh" --bogus
     [ "$status" -eq 2 ]
-    [[ "$output" == *"Unknown"* ]]
+    [[ "$output" == *"Unknown"* ]] || false
 }
 
 @test "exits 0 when diff is below threshold (no spec needed)" {
@@ -56,7 +56,7 @@ _commit() {
     _commit "small change"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
-    [[ "$output" == *"below threshold"* ]] || [[ "$output" == *"OK"* ]]
+    [[ "$output" == *"below threshold"* ]] || [[ "$output" == *"OK"* ]] || false
 }
 
 @test "exits 0 when diff >= threshold AND a substantive spec folder is touched" {
@@ -66,7 +66,7 @@ _commit() {
     _commit "big change with spec"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
-    [[ "$output" == *"spec folder touched"* ]] || [[ "$output" == *"OK"* ]]
+    [[ "$output" == *"spec folder touched"* ]] || [[ "$output" == *"OK"* ]] || false
 }
 
 @test "a trivial (sub-floor) active-spec touch does NOT satisfy the gate (#686/C25)" {
@@ -76,7 +76,7 @@ _commit() {
     _commit "large PR with a trivial stale-spec alibi"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "exits 1 when diff >= threshold AND no specs folder" {
@@ -84,8 +84,8 @@ _commit() {
     _commit "big change without spec"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
-    [[ "$output" == *"AGENTS.md"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
+    [[ "$output" == *"AGENTS.md"* ]] || false
 }
 
 @test "exits 0 with skip-sdd label AND non-empty rationale" {
@@ -95,7 +95,7 @@ _commit() {
         SDD_PR_BODY=$'## Summary\nfoo\n\n## SDD skip rationale\nmechanical rename, no logic change.\n' \
         "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
-    [[ "$output" == *"skip-sdd"* ]]
+    [[ "$output" == *"skip-sdd"* ]] || false
 }
 
 @test "exits 1 when skip-sdd label present but rationale empty" {
@@ -105,7 +105,7 @@ _commit() {
         SDD_PR_BODY=$'## Summary\nfoo\n\n## SDD skip rationale\n\n' \
         "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"rationale"* ]]
+    [[ "$output" == *"rationale"* ]] || false
 }
 
 @test "exits 0 when dependencies label present AND author is a bot (#686/C25)" {
@@ -114,7 +114,7 @@ _commit() {
     run env SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="dependabot[bot]" \
         "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
-    [[ "$output" == *"bot-authored"* ]]
+    [[ "$output" == *"bot-authored"* ]] || false
 }
 
 @test "dependencies label from a NON-bot author does not bypass the gate (#686/C25)" {
@@ -123,7 +123,7 @@ _commit() {
     run env SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="some-human" \
         "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "fails closed (exit 2) when the base ref does not resolve (#686/C3)" {
@@ -131,7 +131,7 @@ _commit() {
     _commit "change against a bogus base"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref origin/does-not-exist --head-ref feature
     [ "$status" -eq 2 ]
-    [[ "$output" == *"could not be resolved"* ]] || [[ "$output" == *"fails closed"* ]]
+    [[ "$output" == *"could not be resolved"* ]] || [[ "$output" == *"fails closed"* ]] || false
 }
 
 @test "a hand-written *generated* path is counted, not excluded (#686/C25)" {
@@ -140,7 +140,7 @@ _commit() {
     _commit "large generated-named file, no spec"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "excludes tests/ from LOC count" {
@@ -183,7 +183,7 @@ _commit() {
     _commit "script under docs counts as production"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "excludes lockfiles from LOC count" {
@@ -220,7 +220,7 @@ _commit() {
     _commit "delete the script"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "--explain prints LOC breakdown" {
@@ -228,8 +228,8 @@ _commit() {
     _commit "small"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Threshold"* ]]
-    [[ "$output" == *"Production LOC"* ]]
+    [[ "$output" == *"Threshold"* ]] || false
+    [[ "$output" == *"Production LOC"* ]] || false
 }
 
 @test "--threshold flag overrides default" {
@@ -237,7 +237,7 @@ _commit() {
     _commit "small"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --threshold 5
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "specs/archive/ is not counted as a valid spec folder for the gate" {
@@ -247,7 +247,7 @@ _commit() {
     _commit "archive does not satisfy gate"
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 # Regression for #397: git compresses a spec-archive rename into
@@ -271,7 +271,7 @@ _commit() {
 
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 # The compressed rename must normalize so a PURE archive move still passes — but
@@ -291,6 +291,6 @@ _commit() {
 
     run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Spec folder touched: no"* ]]
-    [[ "$output" == *"Production LOC (added+removed): 0"* ]]
+    [[ "$output" == *"Spec folder touched: no"* ]] || false
+    [[ "$output" == *"Production LOC (added+removed): 0"* ]] || false
 }

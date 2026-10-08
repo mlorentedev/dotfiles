@@ -20,21 +20,21 @@ setup() {
 @test "dotfiles-sync.sh fails on a missing installation directory" {
     run bash -c 'DOTFILES_DIR="$HOME/absent" DOTFILES_REPO_DIR="$HOME" "$1/dotfiles-sync.sh"' -- "$SCRIPTS_DIR"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"not found"* ]]
+    [[ "$output" == *"not found"* ]] || false
 }
 
 @test "dotfiles-sync.sh refuses the same directory for both sides" {
     mkdir -p "$HOME/same"
     run bash -c 'DOTFILES_DIR="$HOME/same" DOTFILES_REPO_DIR="$HOME/same" "$1/dotfiles-sync.sh" 2>&1' -- "$SCRIPTS_DIR"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"same directory"* ]]
+    [[ "$output" == *"same directory"* ]] || false
 }
 
 @test "dotfiles-sync.sh rejects the retired --secrets-only flag under bash and zsh" {
     for sh in bash zsh; do
         run "$sh" -c 'DOTFILES_DIR="$HOME/l" DOTFILES_REPO_DIR="$HOME/r" "$1/dotfiles-sync.sh" --secrets-only 2>&1' -- "$SCRIPTS_DIR"
         [ "$status" -eq 2 ]
-        [[ "$output" == *"#1795"* ]]
+        [[ "$output" == *"#1795"* ]] || false
     done
 }
 

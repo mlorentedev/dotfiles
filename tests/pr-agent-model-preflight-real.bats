@@ -88,7 +88,7 @@ teardown() {
     run "$PREFLIGHT" --model openai/dead --fallbacks '["openai/alive"]' --output "$OUT"
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/alive' "$OUT"
-    [[ "$output" == *"openai/dead answered HTTP 401"* ]]
+    [[ "$output" == *"openai/dead answered HTTP 401"* ]] || false
     # Every probe carried the key, so `-K -` parsed the config line.
     [ "$(grep -c "Bearer $NAN_API_KEY\$" "$AUTH_LOG")" -eq 2 ]
 }
@@ -97,12 +97,12 @@ teardown() {
     run "$PREFLIGHT" --model openai/hang --fallbacks '["openai/alive"]' --output "$OUT"
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/alive' "$OUT"
-    [[ "$output" == *"openai/hang gave no answer within 2s"* ]]
+    [[ "$output" == *"openai/hang gave no answer within 2s"* ]] || false
 }
 
 @test "preflight-real: a 200 status line whose body never arrives is no answer" {
     run "$PREFLIGHT" --model openai/stall --fallbacks '["openai/alive"]' --output "$OUT"
     [ "$status" -eq 0 ]
     grep -qxF 'model=openai/alive' "$OUT"
-    [[ "$output" == *"openai/stall gave no answer within 2s"* ]]
+    [[ "$output" == *"openai/stall gave no answer within 2s"* ]] || false
 }

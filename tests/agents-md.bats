@@ -9,7 +9,7 @@ setup() {
 }
 
 @test "AGENTS.md exists" {
-    [[ -f "$AGENTS_MD" ]]
+    [[ -f "$AGENTS_MD" ]] || false
 }
 
 @test "AGENTS.md states the memory single-sink rule (GUARD-001, AC6)" {

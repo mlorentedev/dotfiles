@@ -119,8 +119,8 @@ count_calls() {
     [ "$status" -ne 0 ]
     # The bug: '0 open item(s) ensured' with a leading tick, identical to the
     # healthy no-op. The summary must name the failures.
-    [[ "$output" != *"✅ demo: backfill"* ]]
-    [[ "$output" == *"0 ensured, 2 failed"* ]]
+    [[ "$output" != *"✅ demo: backfill"* ]] || false
+    [[ "$output" == *"0 ensured, 2 failed"* ]] || false
 }
 
 @test "a partial failure is still reported as a failure" {
@@ -150,7 +150,7 @@ STUB
     chmod +x "$FIX/bin/gh"
     run "$SCRIPT" --backfill-only demo
     [ "$status" -ne 0 ]
-    [[ "$output" == *"1 ensured, 1 failed"* ]]
+    [[ "$output" == *"1 ensured, 1 failed"* ]] || false
 }
 
 @test "a repo with nothing to add stays green - the healthy no-op" {
@@ -158,7 +158,7 @@ STUB
     export STUB_PRS=''
     run "$SCRIPT" --backfill-only demo
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✅ demo: backfill — 0 open item(s) ensured on board"* ]]
+    [[ "$output" == *"✅ demo: backfill — 0 open item(s) ensured on board"* ]] || false
 }
 
 # ── loud abort ────────────────────────────────────────────────────────────────
@@ -167,11 +167,11 @@ STUB
     default_issues
     STUB_NO_PROJECT=1 run "$SCRIPT" --backfill-only demo
     [ "$status" -ne 0 ]
-    [[ "$output" == *"cannot resolve project #1"* ]]
+    [[ "$output" == *"cannot resolve project #1"* ]] || false
     # The point of aborting: 27 repos of identical per-item errors would bury
     # the one line that explains them.
     [ "$(count_calls 'addProjectV2ItemById')" -eq 0 ]
-    [[ "$output" != *"item-add failed"* ]]
+    [[ "$output" != *"item-add failed"* ]] || false
 }
 
 @test "without BITACORA_PAT a provisioning run fails before uploading anything, naming dotf secrets run" {
@@ -179,7 +179,7 @@ STUB
     # decrypting a blob that no longer exists, or to anything else.
     run env -u BITACORA_PAT bash "$SCRIPT" --check some-repo
     [ "$status" -eq 1 ]
-    [[ "$output" == *"dotf secrets run --only BITACORA_PAT"* ]]
+    [[ "$output" == *"dotf secrets run --only BITACORA_PAT"* ]] || false
     [ ! -e "$GH_LOG" ] || refute_grep 'secret set' "$GH_LOG"
 }
 
@@ -194,15 +194,15 @@ STUB
     default_issues
     BITACORA_PAT=stub run "$SCRIPT" --check demo
     [ "$status" -eq 0 ]
-    [[ "$output" != *"unbound variable"* ]]
+    [[ "$output" != *"unbound variable"* ]] || false
     [ "$(count_calls 'projectV2(number: 1) { id }')" -eq 1 ]
-    [[ "$output" == *"✅ demo: backfill — 2 open item(s) ensured on board"* ]]
+    [[ "$output" == *"✅ demo: backfill — 2 open item(s) ensured on board"* ]] || false
 }
 
 @test "a provisioning run with an unresolvable project id aborts before touching any repo" {
     default_issues
     BITACORA_PAT=stub STUB_NO_PROJECT=1 run "$SCRIPT" --check demo
     [ "$status" -ne 0 ]
-    [[ "$output" == *"cannot resolve project #1"* ]]
-    [[ "$output" != *"── demo ──"* ]]
+    [[ "$output" == *"cannot resolve project #1"* ]] || false
+    [[ "$output" != *"── demo ──"* ]] || false
 }

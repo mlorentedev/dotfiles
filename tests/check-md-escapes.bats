@@ -19,13 +19,13 @@ teardown() {
 @test "exits 2 with usage when no args given" {
     run "$SCRIPTS_DIR/check-md-escapes.sh"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "exits 2 when path does not exist" {
     run "$SCRIPTS_DIR/check-md-escapes.sh" "$SCRATCH/nonexistent.md"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"not found"* ]]
+    [[ "$output" == *"not found"* ]] || false
 }
 
 @test "detects '\\\\n-' corruption (backslash-n-hyphen, bullet merge)" {
@@ -34,8 +34,8 @@ teardown() {
     printf 'foo\\n- merged bullet\n' > "$fixture"
     run "$SCRIPTS_DIR/check-md-escapes.sh" "$fixture"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"CORRUPTED"* ]]
-    [[ "$output" == *"corrupt.md"* ]]
+    [[ "$output" == *"CORRUPTED"* ]] || false
+    [[ "$output" == *"corrupt.md"* ]] || false
 }
 
 @test "detects '\\\\n#' corruption (header merge)" {
@@ -59,8 +59,8 @@ teardown() {
     printf 'bad\\n- merged\n' > "$SCRATCH/vault/sub/corrupt.md"
     run "$SCRIPTS_DIR/check-md-escapes.sh" "$SCRATCH/vault"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"corrupt.md"* ]]
-    [[ "$output" != *"clean.md"* ]]
+    [[ "$output" == *"corrupt.md"* ]] || false
+    [[ "$output" != *"clean.md"* ]] || false
 }
 
 @test "ignores .obsidian/ and node_modules/ directories" {
@@ -87,8 +87,8 @@ teardown() {
     printf 'merged bullets\\n- lost\n' > "$SCRATCH/repo/specs/A-001-x/proposal.md"
     run "$SCRIPTS_DIR/check-md-escapes.sh" "$SCRATCH/repo"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"specs/A-001-x/proposal.md"* ]]
-    [[ "$output" != *"review.md"* ]]
+    [[ "$output" == *"specs/A-001-x/proposal.md"* ]] || false
+    [[ "$output" != *"review.md"* ]] || false
 }
 
 # Self-test: the dotfiles repo's own markdown files MUST stay clean.

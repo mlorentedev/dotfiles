@@ -202,7 +202,7 @@ STUB
 @test "spec-gate-prepush: --help exits 0 and documents the fall-through" {
     run "$ADAPTER" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Falls through"* ]]
+    [[ "$output" == *"Falls through"* ]] || false
 }
 
 @test "the pre-commit config wires sdd-spec-gate through this adapter, not the gate directly" {
@@ -212,6 +212,6 @@ STUB
     # config logic unreachable by tests goes red-and-silent).
     run grep -A8 'id: sdd-spec-gate' "$BATS_TEST_DIRNAME/../.pre-commit-config.yaml"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"entry: ./scripts/spec-gate-prepush.sh"* ]]
-    [[ "$output" != *"entry: ./scripts/check-spec-gate.sh"* ]]
+    [[ "$output" == *"entry: ./scripts/spec-gate-prepush.sh"* ]] || false
+    [[ "$output" != *"entry: ./scripts/check-spec-gate.sh"* ]] || false
 }
