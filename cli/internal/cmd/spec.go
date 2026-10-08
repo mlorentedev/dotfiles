@@ -74,6 +74,9 @@ var reviewerDraw = rand.IntN
 var resolveReviewBase = spec.ResolveReviewBase
 var headSHAOf = spec.HeadSHA
 
+// requestIgnored is a seam over spec.RequestIgnored, for the same reason.
+var requestIgnored = spec.RequestIgnored
+
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
 //
@@ -257,13 +260,20 @@ is the only record of how.`,
 			// round's verdict then sits on disk looking exactly like a fresh one.
 			// `spec archive` compares the digest and refuses.
 			//
-			// A failure to write it is a WARNING, not a refusal: losing the guard
-			// is worse than losing the review, but refusing to launch because a
-			// sidecar could not be written would make the guard a liability the
-			// first time a spec dir is read-only.
+			// A failure to write it refuses the launch. It used to be a warning,
+			// but `spec archive` refuses a review with no sidecar (#1908), so a run
+			// launched without one spends a review that can never archive.
+			// Refusing here costs nothing yet. So does an ignored request: it is
+			// written, and lost on every checkout but this one.
+			if requestIgnored(repoRoot, specDir) {
+				return fmt.Errorf("git ignores specs/%s/%s, so the review would not archive from any other checkout\n"+
+					"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
+					id, spec.ReviewRequestFile, spec.ReviewRequestFile)
+			}
 			if err := spec.WriteReviewRequest(specDir, headSHA, chosen.ID, baseSHA); err != nil {
-				cmd.PrintErrf("[WARN] could not record the review request: %v\n", err)
-				cmd.PrintErrf("       the archive gate cannot then tell a fresh verdict from the previous one\n")
+				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
+					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
+					err, spec.ReviewRequestFile)
 			}
 
 			if useTmux {
