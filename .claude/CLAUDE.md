@@ -61,6 +61,11 @@ golangci-lint run
 GOOS=windows go vet ./...
 ```
 
+**Run unreleased `dotf` with `go run ./cmd/dotf …` from the worktree** (or a
+binary built into `$TMPDIR`). Never `go build` over `~/.local/bin/dotf`: that is
+the pinned release every setup and hook on the machine calls, and a dev build
+there drifts from `DOTF_VERSION` silently (#1469).
+
 **Use the pinned linter, not whatever is installed.** CI resolves
 `GOLANGCI_LINT_VERSION` from `versions.conf`; a local binary on a different
 major reports "0 issues" on code CI rejects (BUG-071). `dotf doctor` reports
@@ -73,6 +78,12 @@ the drift under *Go lint toolchain*; install the pin with:
 # `@v`. Same class as the prohibited-pattern table above.
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(. ./versions.conf; echo "$GOLANGCI_LINT_VERSION")
 ```
+
+**A `./...` finding whose path leaves your worktree is suspect: clean the cache.**
+golangci-lint's cache is shared by every worktree on the machine, so a run can
+report `../../dotfiles-wt-<other>/…` — a file of another worktree, or of one
+already removed (lesson 353). Run `golangci-lint cache clean` and lint again
+before you fix or dismiss anything; a finding that survives the clean run is real.
 
 ```bash
 # --- Post-setup verification (both layers) ---
