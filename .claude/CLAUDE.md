@@ -77,7 +77,7 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(. ./version
 **A `./...` finding whose path leaves your worktree is suspect: clean the cache.**
 golangci-lint's cache is shared by every worktree on the machine, so a run can
 report `../../dotfiles-wt-<other>/…` — a file of another worktree, or of one
-already removed (lesson 365). Run `golangci-lint cache clean` and lint again
+already removed (lesson 353). Run `golangci-lint cache clean` and lint again
 before you fix or dismiss anything; a finding that survives the clean run is real.
 
 ```bash
