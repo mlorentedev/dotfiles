@@ -31,3 +31,17 @@ A guard that executes what a walk finds must do two things:
 
 Assert flag-parse failures, which stop before `RunE`, when you can. They never reach the
 command's code; #2092's unknown-flag guard is safe for that reason.
+
+## Addendum: a scratch HOME does not sandbox a variable that is already set
+
+The same first run also wrote outside the checkout: `10_projects/dotf/` and
+`10_projects/nosuch/` appeared in the real vault and stayed there until the #2121 backfill.
+`env.ResolvePath` returns a set variable before it ever looks at HOME, so the developer
+shell's `VAULT_PATH` sent the scaffold to the real vault. That happened even inside the
+scratch HOME. The untracked-files check could not see it, because the vault is another
+repository.
+
+The walk now points every variable `env-contract.json` declares, plus the XDG roots, at
+scratch. The test reads those names from the contract, so a path variable added later is
+covered too. A sandbox defined as "a scratch HOME" covers only the defaults derived from
+HOME, not the overrides a real shell carries.
