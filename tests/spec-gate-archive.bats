@@ -82,9 +82,9 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-001-demo"* ]]
+    [[ "$output" == *"FOO-001-demo"* ]] || false
     # The message has to be actionable, not just a refusal.
-    [[ "$output" == *"dotf spec archive"* ]]
+    [[ "$output" == *"dotf spec archive"* ]] || false
 }
 
 @test "AC2: the same PR passes once the spec folder is archived" {
@@ -138,7 +138,7 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-002-demo"* ]]
+    [[ "$output" == *"FOO-002-demo"* ]] || false
 }
 
 @test "AC4: a bare unquoted numeric frontmatter value is matched" {
@@ -149,7 +149,7 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-003-demo"* ]]
+    [[ "$output" == *"FOO-003-demo"* ]] || false
 }
 
 @test "AC4: a full GitHub issue URL in the closing reference is matched" {
@@ -160,7 +160,7 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-004-demo"* ]]
+    [[ "$output" == *"FOO-004-demo"* ]] || false
 }
 
 @test "AC4: closing keywords are matched case-insensitively" {
@@ -229,7 +229,7 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Archive skip rationale"* ]]
+    [[ "$output" == *"Archive skip rationale"* ]] || false
 }
 
 @test "AC8: an empty PR body is a clean pass" {
@@ -288,7 +288,7 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-008-samepr"* ]]
+    [[ "$output" == *"FOO-008-samepr"* ]] || false
 }
 
 @test "AC1: multiple closing references are all checked" {
@@ -301,8 +301,8 @@ run_gate() { run "$GATE" --base-ref main --head-ref feature; }
     # The first is archived, the second is not -> still a violation.
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-007-b"* ]]
-    [[ "$output" != *"FOO-007-a"* ]]
+    [[ "$output" == *"FOO-007-b"* ]] || false
+    [[ "$output" != *"FOO-007-a"* ]] || false
 }
 
 # BUG-050: the two halves of the gate were mutually unsatisfiable for a PR that
@@ -328,7 +328,7 @@ big_change() {
 
     run_gate
     [ "$status" -eq 0 ]
-    [[ "$output" == *"spec folder touched"* ]]
+    [[ "$output" == *"spec folder touched"* ]] || false
 }
 
 @test "BUG-050: an archive move alone is far under SPEC_FLOOR, so it cannot count by LOC" {
@@ -343,9 +343,9 @@ big_change() {
 
     run "$GATE" --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Active-spec LOC (added+removed): 0"* ]]
-    [[ "$output" == *"Specs archived for archive-on-merge"* ]]
-    [[ "$output" == *"FOO-001-demo"* ]]
+    [[ "$output" == *"Active-spec LOC (added+removed): 0"* ]] || false
+    [[ "$output" == *"Specs archived for archive-on-merge"* ]] || false
+    [[ "$output" == *"FOO-001-demo"* ]] || false
 }
 
 @test "BUG-050: a gratuitous archive-move earns no spec touch (#397 intact)" {
@@ -360,7 +360,7 @@ big_change() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 @test "BUG-050: a spec created and archived in the same PR counts" {
@@ -388,7 +388,7 @@ big_change() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Discipline Gate"* ]]
+    [[ "$output" == *"Discipline Gate"* ]] || false
 }
 
 # BUG-042: the closing-keyword scan read the raw PR body with no awareness of
@@ -427,7 +427,7 @@ big_change() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-001-demo"* ]]
+    [[ "$output" == *"FOO-001-demo"* ]] || false
 }
 
 @test "BUG-042: a fence closes only on a matching delimiter, so later prose is still scanned" {
@@ -438,7 +438,7 @@ big_change() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-001-demo"* ]]
+    [[ "$output" == *"FOO-001-demo"* ]] || false
 }
 
 @test "BUG-042: the colon form is a closing declaration too" {
@@ -452,7 +452,7 @@ big_change() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-001-demo"* ]]
+    [[ "$output" == *"FOO-001-demo"* ]] || false
 }
 
 # #1878: the squash merge commit carries every branch commit message
@@ -473,8 +473,8 @@ commit_closing() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-001-demo (#123)"* ]]
-    [[ "$output" == *"every commit message"* ]]
+    [[ "$output" == *"FOO-001-demo (#123)"* ]] || false
+    [[ "$output" == *"every commit message"* ]] || false
 }
 
 @test "#1878: a commit keyword is enforced with no PR body (a pre-push before the PR exists)" {
@@ -484,7 +484,7 @@ commit_closing() {
 
     run_gate
     [ "$status" -eq 1 ]
-    [[ "$output" == *"FOO-001-demo"* ]]
+    [[ "$output" == *"FOO-001-demo"* ]] || false
 }
 
 @test "#1878: a commit keyword credits the archive like a body keyword" {
@@ -497,7 +497,7 @@ commit_closing() {
 
     run_gate
     [ "$status" -eq 0 ]
-    [[ "$output" == *"spec folder touched"* ]]
+    [[ "$output" == *"spec folder touched"* ]] || false
 }
 
 @test "#1878: a closing keyword in a commit that came from the base is not this PR's" {

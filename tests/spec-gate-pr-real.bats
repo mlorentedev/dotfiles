@@ -52,15 +52,15 @@ teardown() {
     run gh pr view --json labels,body,author
     # It must fail (there is no repo here) but NOT because of the field names.
     [ "$status" -ne 0 ]
-    [[ "$output" != *"Unknown JSON field"* ]]
+    [[ "$output" != *"Unknown JSON field"* ]] || false
 }
 
 @test "the field check is a detector, not a tautology" {
     cd "$OUTSIDE" || return 1
     run gh pr view --json labels,body,author,notAFieldName
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Unknown JSON field"* ]]
-    [[ "$output" == *"notAFieldName"* ]]
+    [[ "$output" == *"Unknown JSON field"* ]] || false
+    [[ "$output" == *"notAFieldName"* ]] || false
 }
 
 @test "a real gh failure makes the adapter fail closed" {
@@ -70,6 +70,6 @@ teardown() {
     # so reaching it at all would be visible as a different error.
     run "$SCRIPTS_DIR/spec-gate-pr.sh" --pr 1 --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 2 ]
-    [[ "$output" == *"could not read live metadata"* ]]
-    [[ "$output" == *"Refusing to fall back to the event payload"* ]]
+    [[ "$output" == *"could not read live metadata"* ]] || false
+    [[ "$output" == *"Refusing to fall back to the event payload"* ]] || false
 }

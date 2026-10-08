@@ -11,7 +11,7 @@ setup() {
 }
 
 @test "aliases.zsh exists" {
-    [[ -f "$ALIASES_FILE" ]]
+    [[ -f "$ALIASES_FILE" ]] || false
 }
 
 @test "aliases.zsh valid bash syntax" {
@@ -124,7 +124,7 @@ setup() {
 @test "aliases.zsh gprj does not point to Apps" {
     run grep 'alias gprj=' "$ALIASES_FILE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *Apps* ]]
+    [[ "$output" != *Apps* ]] || false
 }
 
 # --- Git shortcuts ---

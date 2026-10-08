@@ -15,7 +15,7 @@ setup() {
 }
 
 @test "obs-cli.sh is executable" {
-    [[ -x "$SCRIPTS_DIR/obs-cli.sh" ]]
+    [[ -x "$SCRIPTS_DIR/obs-cli.sh" ]] || false
 }
 
 @test "obs-cli.sh sources utils.sh" {

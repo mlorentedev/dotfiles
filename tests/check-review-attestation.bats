@@ -41,20 +41,20 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
     # not refused the change; no review has happened yet.
     run "$SCRIPT" --payload "$F/pr-1009.raw.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pending"* ]]
-    [[ "$output" == *"coderabbitai"* ]]
-    [[ "$output" == *"could not review"* ]]
+    [[ "$output" == *"pending"* ]] || false
+    [[ "$output" == *"coderabbitai"* ]] || false
+    [[ "$output" == *"could not review"* ]] || false
     # and it is NOT reported as silence: the author must not go hunting for a
     # reviewer that already answered
-    [[ "$output" != *"no reviewer output on this PR yet"* ]]
+    [[ "$output" != *"no reviewer output on this PR yet"* ]] || false
 }
 
 @test "AC1: the other two real captures behave the same way" {
     for pr in 1007 1013; do
         run "$SCRIPT" --payload "$F/pr-${pr}.raw.json"
         [ "$status" -eq 1 ]
-        [[ "$output" == *"pending"* ]]
-        [[ "$output" == *"could not review"* ]]
+        [[ "$output" == *"pending"* ]] || false
+        [[ "$output" == *"could not review"* ]] || false
     done
 }
 
@@ -76,7 +76,7 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
         "$BATS_TEST_DIRNAME/../harness/review-attestation.json" > "$cfg"
     run "$SCRIPT" --payload "$F/pr-1009.raw.json" --config "$cfg"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"declined"* ]]
+    [[ "$output" == *"declined"* ]] || false
 }
 
 @test "an advisory reviewer's REVIEW still attests" {
@@ -92,17 +92,17 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
     }' > "$payload"
     run "$SCRIPT" --payload "$payload"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "AC3: a PR with no reviewer output is pending, not declined" {
     run "$SCRIPT" --payload "$F/no-output.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pending"* ]]
+    [[ "$output" == *"pending"* ]] || false
     # The fourth constraint: refusing is not enough, the refusal must say WHICH
     # refusal it is. Collapsing these two would repeat #988's second defect,
     # where the error path discarded the HTTP status and showed the wrong cause.
-    [[ "$output" != *"declined"* ]]
+    [[ "$output" != *"declined"* ]] || false
 }
 
 # --- AC2: a real review attests, whoever performed it ---
@@ -110,13 +110,13 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 @test "AC2: a bot review attests" {
     run "$SCRIPT" --payload "$F/bot-reviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "AC2: a human review attests" {
     run "$SCRIPT" --payload "$F/human-reviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "AC2: the author reviewing their own PR does NOT attest" {
@@ -125,7 +125,7 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
     # must not be the implementer.
     run "$SCRIPT" --payload "$F/self-review.json"
     [ "$status" -eq 1 ]
-    [[ "$output" != *"attested"* ]]
+    [[ "$output" != *"attested"* ]] || false
 }
 
 # --- AC4: the escape needs BOTH halves ---
@@ -133,7 +133,7 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 @test "AC4: label plus a non-empty rationale is disclosed" {
     run "$SCRIPT" --payload "$F/disclosed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"disclosed"* ]]
+    [[ "$output" == *"disclosed"* ]] || false
 }
 
 @test "AC4: the label alone is not a disclosure" {
@@ -171,8 +171,8 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 EOF
     run "$SCRIPT" --config "$TMP/config.json" --payload "$F/second-reviewer.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"declined"* ]]
-    [[ "$output" == *"pr-agent"* ]]
+    [[ "$output" == *"declined"* ]] || false
+    [[ "$output" == *"pr-agent"* ]] || false
 }
 
 @test "AC5: the script names no reviewer of its own" {
@@ -226,7 +226,7 @@ EOF
 
 @test "AC6: every failure path says it could not determine, rather than implying fine" {
     run "$SCRIPT" --payload "$F/malformed.json"
-    [[ "$output" == *"NOT treated as reviewed"* ]]
+    [[ "$output" == *"NOT treated as reviewed"* ]] || false
 }
 
 # --- usage ---
@@ -239,7 +239,7 @@ EOF
 @test "--help exits 0 and prints usage" {
     run "$SCRIPT" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "--quiet suppresses the report but keeps the exit code" {
@@ -319,7 +319,7 @@ sys.exit(0 if expected.issubset(types) else 1)
     # crosses from a Windows-flavoured producer.
     run "$SCRIPT" --payload "$F/disclosed-crlf.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"disclosed"* ]]
+    [[ "$output" == *"disclosed"* ]] || false
 }
 
 @test "AC4: trailing whitespace on the heading still satisfies the escape" {
@@ -383,7 +383,7 @@ sys.exit(0 if expected.issubset(types) else 1)
 
     run env PATH="$TMP/bin" "$SCRIPT" --pr 1
     [ "$status" -eq 2 ]
-    [[ "$output" == *"gh is not installed"* ]]
+    [[ "$output" == *"gh is not installed"* ]] || false
 }
 
 @test "AC3: the declined message names both the reviewer and the marker" {
@@ -400,18 +400,18 @@ sys.exit(0 if expected.issubset(types) else 1)
         "$BATS_TEST_DIRNAME/../harness/review-attestation.json" > "$cfg"
     run "$SCRIPT" --payload "$F/coderabbit-rate-limited.json" --config "$cfg"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"declined"* ]]
-    [[ "$output" == *"coderabbitai"* ]]
-    [[ "$output" == *"rate limited by coderabbit.ai"* ]]
+    [[ "$output" == *"declined"* ]] || false
+    [[ "$output" == *"coderabbitai"* ]] || false
+    [[ "$output" == *"rate limited by coderabbit.ai"* ]] || false
 }
 
 @test "AC3: the advisory message names the reviewer, without claiming it refused" {
     # The advisory path owes the same preserve-why, in its own words.
     run "$SCRIPT" --payload "$F/coderabbit-rate-limited.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"coderabbitai"* ]]
-    [[ "$output" == *"advisory"* ]]
-    [[ "$output" != *"declined"* ]]
+    [[ "$output" == *"coderabbitai"* ]] || false
+    [[ "$output" == *"advisory"* ]] || false
+    [[ "$output" != *"declined"* ]] || false
 }
 
 # The "meta: no bare negated assertion survives in this suite" case that used to
@@ -455,8 +455,8 @@ sys.exit(0 if expected.issubset(types) else 1)
 @test "AC: a declared reviewer's comment-shaped review attests" {
     run "$SCRIPT" --payload "$F/pr-agent-reviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
-    [[ "$output" == *"github-actions"* ]]
+    [[ "$output" == *"attested"* ]] || false
+    [[ "$output" == *"github-actions"* ]] || false
 }
 
 @test "AC: the [bot] login suffix does not change the verdict" {
@@ -466,7 +466,7 @@ sys.exit(0 if expected.issubset(types) else 1)
     # payload — half of #1033. Both spellings must attest identically.
     run "$SCRIPT" --payload "$F/pr-agent-reviewed-bot-suffix.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "AC: suggestions are not a review" {
@@ -475,7 +475,7 @@ sys.exit(0 if expected.issubset(types) else 1)
     # reviewer ran" rather than "the reviewer reviewed".
     run "$SCRIPT" --payload "$F/pr-agent-suggestions-only.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pending"* ]]
+    [[ "$output" == *"pending"* ]] || false
 }
 
 @test "#1122: a clean CodeRabbit review comment attests without reviews[]" {
@@ -500,8 +500,8 @@ sys.exit(0 if expected.issubset(types) else 1)
 EOF
     run "$SCRIPT" --payload "$tmp_payload"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
-    [[ "$output" == *"coderabbitai"* ]]
+    [[ "$output" == *"attested"* ]] || false
+    [[ "$output" == *"coderabbitai"* ]] || false
 }
 
 @test "AC: an undeclared bot cannot attest by posting the same marker" {
@@ -510,7 +510,7 @@ EOF
     # pair (login, marker) must both be declared in the registry.
     run "$SCRIPT" --payload "$F/undeclared-bot-guide.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pending"* ]]
+    [[ "$output" == *"pending"* ]] || false
 }
 
 @test "AC: a reviewer cannot attest its own PR by commenting on it" {
@@ -519,7 +519,7 @@ EOF
     # comment path must exclude it identically or it becomes the way around.
     run "$SCRIPT" --payload "$F/pr-agent-self-authored.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pending"* ]]
+    [[ "$output" == *"pending"* ]] || false
 }
 
 @test "AC: a real review outranks another reviewer's declined notice" {
@@ -528,8 +528,8 @@ EOF
     # #1042. The gate asks whether a review happened, so the one that did wins.
     run "$SCRIPT" --payload "$F/pr-agent-reviewed-coderabbit-declined.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
-    [[ "$output" == *"github-actions"* ]]
+    [[ "$output" == *"attested"* ]] || false
+    [[ "$output" == *"github-actions"* ]] || false
 }
 
 @test "AC: the registry must declare review_markers for every reviewer" {
@@ -540,7 +540,7 @@ EOF
                   "escape":{"label":"l","section":"## s"}}' > "$TMP/bad.json"
     run "$SCRIPT" --config "$TMP/bad.json" --payload "$F/pr-agent-reviewed.json"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"wrong shape"* ]]
+    [[ "$output" == *"wrong shape"* ]] || false
 }
 
 # --- exempt: changes carrying nothing a review could act on --------------------
@@ -553,8 +553,8 @@ EOF
 @test "exempt: a release-shaped diff with no review passes" {
     run "$SCRIPT" --payload "$F/release-unreviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"exempt"* ]]
-    [[ "$output" == *"release-please"* ]]
+    [[ "$output" == *"exempt"* ]] || false
+    [[ "$output" == *"release-please"* ]] || false
 }
 
 @test "exempt: one extra file ends the exemption" {
@@ -563,14 +563,14 @@ EOF
     # and this is what makes the exemption unavailable to game.
     run "$SCRIPT" --payload "$F/release-plus-one-file.json"
     [ "$status" -eq 1 ]
-    [[ "$output" != *"exempt"* ]]
+    [[ "$output" != *"exempt"* ]] || false
 }
 
 @test "exempt: a strict subset of the signature is NOT exempt" {
     # Exact set equality: changing only CHANGELOG.md requires review.
     run "$SCRIPT" --payload "$F/release-strict-subset.json"
     [ "$status" -eq 1 ]
-    [[ "$output" != *"exempt"* ]]
+    [[ "$output" != *"exempt"* ]] || false
 }
 
 @test "exempt: an empty file list does not exempt everything" {
@@ -580,7 +580,7 @@ EOF
     # exists to prevent, reached through a set-theory identity rather than a bug.
     run "$SCRIPT" --payload "$F/no-files-at-all.json"
     [ "$status" -eq 1 ]
-    [[ "$output" != *"exempt"* ]]
+    [[ "$output" != *"exempt"* ]] || false
 }
 
 @test "exempt: a real review outranks the exemption in the report" {
@@ -589,7 +589,7 @@ EOF
     # one a later reader wants.
     run "$SCRIPT" --payload "$F/release-reviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "exempt: the signature is declared in the registry, not in the script" {
@@ -609,8 +609,8 @@ EOF
 @test "#1033: an undeclared automation login cannot attest through reviews[]" {
     run "$SCRIPT" --payload "$F/undeclared-bot-review.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"stale-labeler-bot"* ]]
-    [[ "$output" != *"attested"* ]]
+    [[ "$output" == *"stale-labeler-bot"* ]] || false
+    [[ "$output" != *"attested"* ]] || false
 }
 
 @test "#1033: the refusal says reviews exist, instead of claiming none do" {
@@ -618,20 +618,20 @@ EOF
     # review "no reviewer output on this PR yet" is a false statement, and the one
     # a reader would act on by asking for a review it already has.
     run "$SCRIPT" --payload "$F/undeclared-bot-review.json"
-    [[ "$output" == *"reviews exist"* ]]
-    [[ "$output" != *"no reviewer output"* ]]
+    [[ "$output" == *"reviews exist"* ]] || false
+    [[ "$output" != *"no reviewer output"* ]] || false
 }
 
 @test "#1033: a declared reviewer still attests through reviews[]" {
     run "$SCRIPT" --payload "$F/bot-reviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "#1033: a member's review attests without being declared anywhere" {
     run "$SCRIPT" --payload "$F/human-reviewed.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attested"* ]]
+    [[ "$output" == *"attested"* ]] || false
 }
 
 @test "#1033: CONTRIBUTOR is not a member association" {
@@ -640,7 +640,7 @@ EOF
     # closed at.
     run "$SCRIPT" --payload "$F/contributor-review.json"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"drive-by-bot"* ]]
+    [[ "$output" == *"drive-by-bot"* ]] || false
 }
 
 @test "#1033: a review with no authorAssociation does not attest an undeclared login" {

@@ -362,7 +362,7 @@ path_without_copilot() {
     run bash scripts/compile-harness.sh --check
     cp "$backup" "$victim"; rm -f "$backup"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"owner"* ]]
+    [[ "$output" == *"owner"* ]] || false
 }
 
 @test "HERMES-018: a vendored skill carries provenance and an attribution row" {

@@ -64,7 +64,7 @@ setup() {
 
 @test "setup-linux.sh opencode block has no new silenced errors (2>/dev/null || true)" {
     # Count silenced errors in opencode block specifically (between OPENCODE marker and next blank-line section)
-    [[ $(awk '/^# OpenCode/,/^# GitHub Copilot/' "$SETUP_SCRIPT" | grep -c '2>/dev/null || true') -eq 0 ]]
+    [[ $(awk '/^# OpenCode/,/^# GitHub Copilot/' "$SETUP_SCRIPT" | grep -c '2>/dev/null || true') -eq 0 ]] || false
 }
 
 # --- Regression: aider sunset ---
@@ -85,7 +85,7 @@ setup() {
 }
 
 @test "ai/aider/ directory removed from repo" {
-    [[ ! -d "$DOTFILES_DIR/ai/aider" ]]
+    [[ ! -d "$DOTFILES_DIR/ai/aider" ]] || false
 }
 
 @test ".zsh/aliases.zsh no longer has aider tier aliases" {
@@ -112,7 +112,7 @@ setup() {
 # --- opencode.jsonc structure ---
 
 @test "ai/opencode/opencode.jsonc exists" {
-    [[ -f "$OPENCODE_CFG" ]]
+    [[ -f "$OPENCODE_CFG" ]] || false
 }
 
 @test "opencode.jsonc declares \$schema" {
@@ -271,7 +271,7 @@ PY
 # --- AGENTS.md (SSOT cross-agent per ADR-009) ---
 
 @test "AGENTS.md exists at repo root" {
-    [[ -f "$AGENTS_MD" ]]
+    [[ -f "$AGENTS_MD" ]] || false
 }
 
 @test "setup-linux.sh deploys AGENTS.md to ~/.config/opencode/ (opencode global SSOT)" {
@@ -307,12 +307,12 @@ PY
     # no-phase-refs) sourced from the vault, which needs the extra headroom.
     # Future per-agent extensions should justify each bump in the spec.
     grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/claude/CLAUDE.md"
-    [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 100 ]]
+    [[ $(wc -l < "$DOTFILES_DIR/ai/claude/CLAUDE.md") -le 100 ]] || false
 }
 
 @test "ai/agy/AGY.md is a pointer to AGENTS.md (<= 50 lines)" {
     grep -q "First, read \`AGENTS.md\`" "$DOTFILES_DIR/ai/agy/AGY.md"
-    [[ $(wc -l < "$DOTFILES_DIR/ai/agy/AGY.md") -le 50 ]]
+    [[ $(wc -l < "$DOTFILES_DIR/ai/agy/AGY.md") -le 50 ]] || false
 }
 
 @test "ai/copilot/copilot-instructions.md is a pointer (no template-placeholder bug)" {

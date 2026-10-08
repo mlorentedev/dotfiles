@@ -17,7 +17,7 @@ setup() {
 # --- File presence + doc block ---
 
 @test "windows-defaults.ps1 exists" {
-    [[ -f "$PS1_SCRIPT" ]]
+    [[ -f "$PS1_SCRIPT" ]] || false
 }
 
 @test "windows-defaults.ps1 has .SYNOPSIS block" {
@@ -123,5 +123,5 @@ setup() {
         }
         Write-Host 'Syntax OK'
     "
-    [[ "$status" -eq 0 ]]
+    [[ "$status" -eq 0 ]] || false
 }

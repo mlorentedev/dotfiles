@@ -144,7 +144,7 @@ STUB
 @test "--help exits 0 and prints usage" {
     run "$SCRIPT" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage"* ]]
+    [[ "$output" == *"Usage"* ]] || false
 }
 
 @test "unknown argument exits 2" {
@@ -172,7 +172,7 @@ STUB
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no harness drift"* ]]
+    [[ "$output" == *"no harness drift"* ]] || false
 }
 
 @test "AC1: --check fails after a deployed block is hand-edited" {
@@ -180,7 +180,7 @@ STUB
     sed -i.bak 's/rule line one/TAMPERED/' "$REPO/TARGET.md" && rm -f "$REPO/TARGET.md.bak"
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"DRIFT"* ]]
+    [[ "$output" == *"DRIFT"* ]] || false
 }
 
 # --- HARNESS-072: coverage, not just consistency -------------------------------
@@ -212,14 +212,14 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"GAP"* ]]
-    [[ "$output" == *"TARGET2.md"* ]]
+    [[ "$output" == *"GAP"* ]] || false
+    [[ "$output" == *"TARGET2.md"* ]] || false
     # The point of the guard: the region diff is PERFECTLY HAPPY with TARGET2.md,
     # because it renders what it expects from that target's own (empty) inject
     # list. Consistency says OK; only coverage sees the surface was skipped.
-    [[ "$output" == *"[check] OK -> TARGET2.md"* ]]
+    [[ "$output" == *"[check] OK -> TARGET2.md"* ]] || false
     # And an orphan check would miss it too — the id is in use on TARGET.md.
-    [[ "$output" == *"[check] OK -> TARGET.md"* ]]
+    [[ "$output" == *"[check] OK -> TARGET.md"* ]] || false
 }
 
 @test "HARNESS-072: a declared opt_out with a reason satisfies coverage" {
@@ -229,8 +229,8 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"excluded from TARGET2.md"* ]]
-    [[ "$output" == *"hand-written prose"* ]]
+    [[ "$output" == *"excluded from TARGET2.md"* ]] || false
+    [[ "$output" == *"hand-written prose"* ]] || false
 }
 
 @test "HARNESS-072: an opt_out with an empty reason is still a gap" {
@@ -240,7 +240,7 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"GAP"* ]]
+    [[ "$output" == *"GAP"* ]] || false
 }
 
 # A manifest carrying a `doctrine` section, so check_coverage's surface list
@@ -267,12 +267,12 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"GAP"* ]]
-    [[ "$output" == *"doctrine"* ]]
+    [[ "$output" == *"GAP"* ]] || false
+    [[ "$output" == *"doctrine"* ]] || false
     # Same shape as the targets[] case: the region diff is happy, because
     # TARGET.md does inject `demo` and renders consistently. Only coverage can
     # see that the doctrine payloads were skipped.
-    [[ "$output" == *"[check] OK -> TARGET.md"* ]]
+    [[ "$output" == *"[check] OK -> TARGET.md"* ]] || false
 }
 
 @test "HARNESS-072: a region present in doctrine.inject satisfies coverage" {
@@ -280,7 +280,7 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    [[ "$output" != *"GAP"* ]]
+    [[ "$output" != *"GAP"* ]] || false
 }
 
 @test "HARNESS-072: an opt_out naming the doctrine surface satisfies coverage" {
@@ -289,8 +289,8 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"excluded from doctrine"* ]]
-    [[ "$output" == *"cannot carry the full prose"* ]]
+    [[ "$output" == *"excluded from doctrine"* ]] || false
+    [[ "$output" == *"cannot carry the full prose"* ]] || false
 }
 
 @test "AC3: --check works offline (no vault) from the committed record" {
@@ -310,7 +310,7 @@ EOF
     printf 'intro\n<!-- BEGIN HARNESS GENERATED -->\nno end here\n' > "$REPO/TARGET.md"
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"marker"* ]]
+    [[ "$output" == *"marker"* ]] || false
 }
 
 # AC6 (offline harness drift gate) + AC1 (deployed skills are symlink-free)
@@ -345,7 +345,7 @@ EOF
     { printf 'line %d\n' $(seq 1 99); printf '<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n'; } > "$REPO/ai/claude/CLAUDE.md"
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"cap"* ]]
+    [[ "$output" == *"cap"* ]] || false
 }
 
 # --- SDD-008: kind: render (skills), option A (records + render-at-deploy) ---
@@ -592,9 +592,9 @@ EOF
         > "$FAKEHOME/.gemini/skills/vendor-skill/SKILL.md"
 
     run_deploy; [ "$status" -eq 0 ]
-    [[ "$output" == *"WARN unmanaged copy"* ]]
-    [[ "$output" == *"demo-skill"* ]]
-    [[ "$output" != *"vendor-skill"* ]]
+    [[ "$output" == *"WARN unmanaged copy"* ]] || false
+    [[ "$output" == *"demo-skill"* ]] || false
+    [[ "$output" != *"vendor-skill"* ]] || false
     [ -f "$FAKEHOME/.gemini/skills/vendor-skill/SKILL.md" ]
     # reported, never deleted — the marker is the only proof of ownership
     [ -f "$FAKEHOME/.gemini/skills/demo-skill/SKILL.md" ]
@@ -611,7 +611,7 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run_deploy; [ "$status" -eq 0 ]
     [ ! -d "$FAKEHOME/.gemini/skills/demo-skill" ]
-    [[ "$output" == *"pruned stale"* ]]
+    [[ "$output" == *"pruned stale"* ]] || false
 }
 
 @test "AC3: --check validates records render, offline (no vault)" {
@@ -619,7 +619,7 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run env VAULT_PATH="$TMP/nonexistent" "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no harness drift"* ]]
+    [[ "$output" == *"no harness drift"* ]] || false
 }
 
 @test "AC3: --check fails when a committed record has invalid frontmatter" {
@@ -628,7 +628,7 @@ EOF
     printf -- '---\ndescription: no name on purpose.\n---\n\n# x\n' > "$REPO/harness/skills/demo-skill/SKILL.md"
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"name"* ]]
+    [[ "$output" == *"name"* ]] || false
 }
 
 @test "schema: a skill missing required 'name' fails --refresh with file context (AC5)" {
@@ -642,8 +642,8 @@ description: Missing name on purpose.
 EOF
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"name"* ]]
-    [[ "$output" == *"SKILL.md"* ]]
+    [[ "$output" == *"name"* ]] || false
+    [[ "$output" == *"SKILL.md"* ]] || false
 }
 
 @test "schema: unterminated frontmatter fails --refresh (AC5)" {
@@ -651,7 +651,7 @@ EOF
     printf -- '---\nname: x\ndescription: y\n' > "$VAULT/00_meta/skills/demo-skill/SKILL.md"
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"frontmatter"* ]]
+    [[ "$output" == *"frontmatter"* ]] || false
 }
 
 # --- ENGINE-002: follow-up hardening from the ENGINE-001 adversarial review ---
@@ -693,8 +693,8 @@ EOF
 EOF
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"section"* ]]
-    [[ "$output" == *"not found"* ]]
+    [[ "$output" == *"section"* ]] || false
+    [[ "$output" == *"not found"* ]] || false
     # no broken record left behind
     [ ! -f "$REPO/harness/enforced/demo.md" ]
 }
@@ -711,7 +711,7 @@ EOF
     sed -i.bak 's/rule line one/TAMPERED/' "$REPO/TARGET.md" && rm -f "$REPO/TARGET.md.bak"
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"DRIFT"* ]]
+    [[ "$output" == *"DRIFT"* ]] || false
 }
 
 # --- ADR-027 / HARNESS-043: agents (curator dogfood slice) ---
@@ -822,7 +822,7 @@ seed_doctrine_fixture() {
     mkdir -p "$FAKEHOME/.gemini"
     head -c 12500 /dev/zero | tr '\0' 'x' > "$FAKEHOME/.gemini/GEMINI.md"
     run_deploy; [ "$status" -eq 0 ]
-    [[ "$output" == *"over the 12000"* ]]
+    [[ "$output" == *"over the 12000"* ]] || false
 }
 
 @test "HARNESS-054: a shadow file that wins at read time warns" {
@@ -831,8 +831,8 @@ seed_doctrine_fixture() {
     mkdir -p "$FAKEHOME/.codex"
     printf 'override wins\n' > "$FAKEHOME/.codex/AGENTS.override.md"
     run_deploy; [ "$status" -eq 0 ]
-    [[ "$output" == *"shadows"* ]]
-    [[ "$output" == *"never read"* ]]
+    [[ "$output" == *"shadows"* ]] || false
+    [[ "$output" == *"never read"* ]] || false
 }
 
 @test "HARNESS-054: every declared agent surface carries a generated region" {
@@ -928,9 +928,9 @@ DIAG
     run_deploy
     [ "$status" -ne 0 ]
     # the CAUSE survives, not only the generic wrapper
-    [[ "$output" == *ghost* ]]
+    [[ "$output" == *ghost* ]] || false
     # and the wrapper must not assert a cause it cannot know
-    [[ "$output" != *"does not resolve for harness"* ]]
+    [[ "$output" != *"does not resolve for harness"* ]] || false
 }
 
 @test "agents: the rendered file keeps umask permissions, not a temp file's 0600" {
@@ -993,8 +993,8 @@ DIAG
     STUB_TIER_MODEL="" run_deploy
     [ "$status" -ne 0 ]
     # the operator must learn WHICH tier and WHICH harness could not be resolved
-    [[ "$output" == *top* ]]
-    [[ "$output" == *claude* ]]
+    [[ "$output" == *top* ]] || false
+    [[ "$output" == *claude* ]] || false
     # and the render must not leave a truncated definition behind: a file naming
     # no model is the exact degrade the resolution was added to prevent
     [ ! -f "$FAKEHOME/.claude/agents/curator.md" ]
@@ -1026,7 +1026,7 @@ DIAG
     # must not take the whole harness deploy down with it. C15 governs a map that
     # cannot be READ; an absent binary is a bootstrap state.
     [ "$status" -eq 0 ]
-    [[ "$output" == *dotf* ]]
+    [[ "$output" == *dotf* ]] || false
     F="$FAKEHOME/.claude/agents/curator.md"
     [ -f "$F" ]
     grep -q '^name: curator' "$F"
@@ -1057,7 +1057,7 @@ STALE
     chmod +x "$STUB_BIN/dotf"
     run_deploy
     [ "$status" -eq 0 ]
-    [[ "$output" == *"predates"* ]]
+    [[ "$output" == *"predates"* ]] || false
     F="$FAKEHOME/.claude/agents/curator.md"
     [ -f "$F" ]
     # the help screen must not have become the model id
@@ -1126,7 +1126,7 @@ EOF
     F="$FAKEHOME/.claude/agents/curator.md"
     STUB_CAP_LINE="" run_deploy
     [ "$status" -ne 0 ]
-    [[ "$output" == *capabilit* ]]
+    [[ "$output" == *capabilit* ]] || false
     # the previous definition survives, same guarantee as the tier path
     [ -s "$F" ]
     grep -q '^tools: Read, Glob, Bash' "$F"
@@ -1150,7 +1150,7 @@ HALF
     chmod +x "$STUB_BIN/dotf"
     run_deploy
     [ "$status" -eq 0 ]
-    [[ "$output" == *"predates the resolve-capabilities"* ]]
+    [[ "$output" == *"predates the resolve-capabilities"* ]] || false
     F="$FAKEHOME/.claude/agents/curator.md"
     grep -q '^model: opus' "$F"
     refute_grep '^tools:' "$F"
@@ -1163,9 +1163,9 @@ HALF
     # "dotf is too old" sent the operator to rebuild a binary that was fine.
     STUB_TIER_MODEL="opus 4" run_deploy
     [ "$status" -ne 0 ]
-    [[ "$output" == *"model-map.json"* ]]
-    [[ "$output" == *"opus 4"* ]]
-    [[ "$output" != *"predates the resolve-tier"* ]]
+    [[ "$output" == *"model-map.json"* ]] || false
+    [[ "$output" == *"opus 4"* ]] || false
+    [[ "$output" != *"predates the resolve-tier"* ]] || false
 }
 
 @test "DESIGN-1169: a bad record does not block the agents behind it" {
@@ -1201,7 +1201,7 @@ ONEBAD
     grep -q '^model: opus' "$FAKEHOME/.claude/agents/curator.md"
     # the failing one wrote nothing, not even a truncated file
     [ ! -f "$FAKEHOME/.claude/agents/scribe.md" ]
-    [[ "$output" == *scribe* ]]
+    [[ "$output" == *scribe* ]] || false
 }
 
 @test "DESIGN-1169: every failing record is named in one run, not just the first" {
@@ -1213,12 +1213,12 @@ ONEBAD
     STUB_TIER_MODEL="" run_deploy
     [ "$status" -ne 0 ]
     # BOTH records appear, so one deploy tells the operator the whole story
-    [[ "$output" == *curator* ]]
-    [[ "$output" == *scribe* ]]
+    [[ "$output" == *curator* ]] || false
+    [[ "$output" == *scribe* ]] || false
     # ...and when NONE survived, the summary says so. Claiming "others deployed"
     # here would be false, and the operator decides whether to roll back on
     # exactly this sentence.
-    [[ "$output" == *"NO agent deployed"* ]]
+    [[ "$output" == *"NO agent deployed"* ]] || false
 }
 
 @test "agents: a block-style capabilities list fails loudly instead of granting everything" {
@@ -1236,8 +1236,8 @@ PY
     run_refresh; [ "$status" -eq 0 ]
     run_deploy
     [ "$status" -ne 0 ]
-    [[ "$output" == *"block style"* ]]
-    [[ "$output" == *GRANT* || "$output" == *"would GRANT"* ]]
+    [[ "$output" == *"block style"* ]] || false
+    [[ "$output" == *GRANT* || "$output" == *"would GRANT"* ]] || false
     [ ! -f "$FAKEHOME/.claude/agents/curator.md" ]
 }
 
@@ -1255,7 +1255,7 @@ PY
     run_refresh; [ "$status" -eq 0 ]
     export STUB_NO_PRESENCE=1
     run_deploy; [ "$status" -eq 0 ]
-    [[ "$output" == *"presence NOT deployed"* ]]
+    [[ "$output" == *"presence NOT deployed"* ]] || false
     refute_grep_fixed 'MUST consume' "$FAKEHOME/.claude/CLAUDE.md"
     # the real rendering of the mapping form -- ids only, no severity -- is
     # pinned in cli/internal/harness/presence_test.go
@@ -1279,7 +1279,7 @@ HALF2
     [ "$status" -eq 0 ]
     # the direction is the whole risk: a missing model line is neutral, a missing
     # allow-list line is permissive, and the operator must be told which this is
-    [[ "$output" == *GRANTS* ]]
+    [[ "$output" == *GRANTS* ]] || false
 }
 
 @test "agents: the capability list parses identically under bash and zsh" {
@@ -1333,8 +1333,8 @@ HALF2
     # the engine's bootstrap contract (see "an absent dotf warns ..." above):
     # an absent or old resolver degrades loudly, it does not take the deploy down
     [ "$status" -eq 0 ]
-    [[ "$output" == *"dotf harness presence"* ]]
-    [[ "$output" == *"presence NOT deployed"* ]]
+    [[ "$output" == *"dotf harness presence"* ]] || false
+    [[ "$output" == *"presence NOT deployed"* ]] || false
     refute_grep_fixed 'AGENT-PRESENCE' "$FAKEHOME/.claude/CLAUDE.md"
     # the agent definitions still deployed
     [ -f "$FAKEHOME/.claude/agents/curator.md" ]
@@ -1345,7 +1345,7 @@ HALF2
     run_refresh; [ "$status" -eq 0 ]
     run env VAULT_PATH="$TMP/nonexistent" "$SCRIPT" --check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no harness drift"* ]]
+    [[ "$output" == *"no harness drift"* ]] || false
 }
 
 @test "agents: --check fails when a record is missing a required key (kind)" {
@@ -1354,7 +1354,7 @@ HALF2
     printf -- '---\nname: curator\ndescription: no kind on purpose.\n---\n\n# x\n' > "$REPO/harness/agents/curator/AGENT.md"
     run "$SCRIPT" --check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"kind"* ]]
+    [[ "$output" == *"kind"* ]] || false
 }
 
 @test "agents: per-agent targets[] excludes a non-targeted harness from deploy" {
@@ -1437,7 +1437,7 @@ EOF
     run_refresh; [ "$status" -eq 0 ]
     run_deploy
     [ "$status" -ne 0 ]
-    [[ "$output" == *"full-only:begin has no matching full-only:end"* ]]
+    [[ "$output" == *"full-only:begin has no matching full-only:end"* ]] || false
 }
 
 
@@ -1487,7 +1487,7 @@ set_agy_cap() {
     set_agy_cap 10
     run_refresh; [ "$status" -eq 0 ]
     run_deploy;  [ "$status" -eq 0 ]
-    [[ "$output" =~ GENERATED\ doctrine\ alone\ is\ [0-9]+\ characters\ /\ [0-9]+\ bytes,\ over\ the\ 10\ cap ]]
+    [[ "$output" =~ GENERATED\ doctrine\ alone\ is\ [0-9]+\ characters\ /\ [0-9]+\ bytes,\ over\ the\ 10\ cap ]] || false
 }
 
 # bats test_tags=os-sensitive
@@ -1504,7 +1504,7 @@ set_agy_cap() {
     printf '\n' >> "$f"
     set_agy_cap $((gen + 100))
     run_deploy;  [ "$status" -eq 0 ]
-    [[ "$output" =~ is\ ([0-9]+)\ characters\ /\ ([0-9]+)\ bytes,\ over\ the ]]
+    [[ "$output" =~ is\ ([0-9]+)\ characters\ /\ ([0-9]+)\ bytes,\ over\ the ]] || false
     [ "${BASH_REMATCH[1]}" -lt "${BASH_REMATCH[2]}" ]
 }
 
@@ -1518,8 +1518,8 @@ set_agy_cap() {
     printf -- '- tick \xe2\x9c\x93 done\n' > "$REPO/harness/enforced/demo.md"
     run_refresh; [ "$status" -eq 0 ]
     run_deploy;  [ "$status" -eq 0 ]
-    [[ "$output" == *"non-ASCII survives the fold"* ]]
-    [[ "$output" == *"e29c93"* ]]
+    [[ "$output" == *"non-ASCII survives the fold"* ]] || false
+    [[ "$output" == *"e29c93"* ]] || false
     grep -q 'tick' "$FAKEHOME/.gemini/GEMINI.md"
 }
 
@@ -1604,14 +1604,14 @@ seed_triggers() {
 @test "triggers: --refresh passes when every trigger names a pattern the vault has" {
     seed_triggers test-pattern
     run_refresh; [ "$status" -eq 0 ]
-    [[ "$output" == *"every pattern named in harness/triggers.json exists in the vault"* ]]
+    [[ "$output" == *"every pattern named in harness/triggers.json exists in the vault"* ]] || false
 }
 
 @test "triggers: --refresh fails naming the trigger and pattern, and writes nothing" {
     seed_triggers pattern-does-not-exist
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *'trigger "demo-trigger" names pattern "pattern-does-not-exist"'* ]]
+    [[ "$output" == *'trigger "demo-trigger" names pattern "pattern-does-not-exist"'* ]] || false
     [ ! -f "$REPO/harness/enforced/demo.md" ]
 }
 
@@ -1623,7 +1623,7 @@ seed_triggers() {
     printf '{ this is not json' > "$REPO/harness/triggers.json"
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"harness/triggers.json"*"cannot be read"* ]]
+    [[ "$output" == *"harness/triggers.json"*"cannot be read"* ]] || false
     printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/refresh.out"
     refute_grep_fixed 'every pattern named in harness/triggers.json exists' "$BATS_TEST_TMPDIR/refresh.out"
     [ ! -f "$REPO/harness/enforced/demo.md" ]
@@ -1633,7 +1633,7 @@ seed_triggers() {
     printf '{"version":1,"triggers":[]}\n' > "$REPO/harness/triggers.json"
     run_refresh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"names no pattern"* ]]
+    [[ "$output" == *"names no pattern"* ]] || false
     printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/refresh.out"
     refute_grep_fixed 'every pattern named in harness/triggers.json exists' "$BATS_TEST_TMPDIR/refresh.out"
 }

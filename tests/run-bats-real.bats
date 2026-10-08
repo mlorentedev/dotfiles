@@ -30,32 +30,32 @@ nested() {
 @test "run-bats: the parallelism is the CPU count getconf reports, as a positive integer" {
     run "$RUN" --print-jobs
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^[1-9][0-9]*$ ]]
+    [[ "$output" =~ ^[1-9][0-9]*$ ]] || false
     [ "$output" = "$(getconf _NPROCESSORS_ONLN)" ]
 }
 
 @test "run-bats: runs a fixture suite in parallel and passes it" {
     run nested "$FX/a.bats" "$FX/b.bats"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ok"*"a one"* ]]
-    [[ "$output" == *"ok"*"b one"* ]]
+    [[ "$output" == *"ok"*"a one"* ]] || false
+    [[ "$output" == *"ok"*"b one"* ]] || false
 }
 
 @test "run-bats: --filter-tags runs only the tagged tests" {
     run nested --filter-tags fixture-tag "$FX/a.bats" "$FX/b.bats"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"a one"* ]]
-    [[ "$output" != *"b one"* ]]
+    [[ "$output" == *"a one"* ]] || false
+    [[ "$output" != *"b one"* ]] || false
 }
 
 @test "run-bats: a tag no test carries fails the run instead of passing it empty" {
     run nested --filter-tags no-such-tag "$FX/a.bats" "$FX/b.bats"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"no test carries the tag"* ]]
+    [[ "$output" == *"no test carries the tag"* ]] || false
 }
 
 @test "run-bats: --expect-bash fails when the bash on PATH is another major version" {
     run nested --expect-bash 2 "$FX/b.bats"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"expected major version 2"* ]]
+    [[ "$output" == *"expected major version 2"* ]] || false
 }

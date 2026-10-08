@@ -18,12 +18,12 @@ setup() {
 
 @test "find-polluter.sh shows usage with wrong args" {
     run bash "$SCRIPT" 2>&1
-    [[ "$output" == *"Usage"* ]]
-    [[ $status -eq 1 ]]
+    [[ "$output" == *"Usage"* ]] || false
+    [[ $status -eq 1 ]] || false
 }
 
 @test "find-polluter.sh shows usage under zsh" {
     run zsh "$SCRIPT" 2>&1
-    [[ "$output" == *"Usage"* ]]
-    [[ $status -eq 1 ]]
+    [[ "$output" == *"Usage"* ]] || false
+    [[ $status -eq 1 ]] || false
 }

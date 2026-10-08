@@ -453,7 +453,7 @@ setup() {
     command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
     local ver
     ver="$(dotf version 2>/dev/null)"
-    [[ "$ver" == dotf\ version\ * ]]
+    [[ "$ver" == dotf\ version\ * ]] || false
 }
 
 # =============================================================================

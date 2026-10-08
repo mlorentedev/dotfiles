@@ -76,13 +76,13 @@ teardown() {
 @test "canary: a clean run whose issue cannot be closed says so instead of exiting bare" {
     STUB_RC=0 STUB_EXISTING=42 STUB_FAIL="issue close" run bash -e "$SCRIPT" "$CANARY" .
     [ "$status" -eq 2 ]
-    [[ "$output" == *"::error::every bound model answered, but #42 could not be closed"* ]]
+    [[ "$output" == *"::error::every bound model answered, but #42 could not be closed"* ]] || false
 }
 
 @test "canary: a failing run whose issue cannot be written says so instead of exiting bare" {
     STUB_RC=1 STUB_EXISTING=42 STUB_FAIL="api -X" run bash -e "$SCRIPT" "$CANARY" .
     [ "$status" -eq 2 ]
-    [[ "$output" == *"::error::a bound model is not answering, but #42 could not be updated"* ]]
+    [[ "$output" == *"::error::a bound model is not answering, but #42 could not be updated"* ]] || false
 }
 
 @test "canary: a clean run with no open issue touches nothing" {

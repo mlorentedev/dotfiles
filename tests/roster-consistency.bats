@@ -62,7 +62,7 @@ run_guard() {
     definition curator '[crystallize, handoff, vault-doctor]'
     run_guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"curator: skills diverge"* ]]
+    [[ "$output" == *"curator: skills diverge"* ]] || false
 }
 
 @test "roster: a skill listed twice is drift, not a match" {
@@ -70,7 +70,7 @@ run_guard() {
     definition curator '[crystallize, handoff, insights, handoff]'
     run_guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"curator: skills diverge"* ]]
+    [[ "$output" == *"curator: skills diverge"* ]] || false
 }
 
 @test "roster: a role bundling fewer than three skills fails" {
@@ -78,5 +78,5 @@ run_guard() {
     definition architect '[read-all-adrs, architecture-session]'
     run_guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"architect: bundles 2 skill(s)"* ]]
+    [[ "$output" == *"architect: bundles 2 skill(s)"* ]] || false
 }

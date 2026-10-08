@@ -72,5 +72,5 @@ PY
     fi
     [ "$status" -eq 0 ]
     # pi exits 0 even on a rejected file, so assert on the message, not status.
-    [[ "$output" != *"Invalid models.json schema"* ]]
+    [[ "$output" != *"Invalid models.json schema"* ]] || false
 }

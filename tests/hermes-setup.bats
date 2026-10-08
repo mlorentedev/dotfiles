@@ -89,7 +89,7 @@ provision() {
     export GITHUB_TOKEN_KNOWLEDGE=dummy   # isolate the uv check
     PATH="$STUB:/usr/bin:/bin" run bash "$SETUP"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"uv"* ]]
+    [[ "$output" == *"uv"* ]] || false
 }
 
 @test "fail fast: non-zero exit + message when GITHUB_TOKEN_KNOWLEDGE is missing" {
@@ -98,7 +98,7 @@ provision() {
     unset GITHUB_TOKEN_KNOWLEDGE
     PATH="$STUB:/usr/bin:/bin" run bash "$SETUP"   # HERMES_HOME has no .env
     [ "$status" -ne 0 ]
-    [[ "$output" == *"GITHUB_TOKEN_KNOWLEDGE"* ]]
+    [[ "$output" == *"GITHUB_TOKEN_KNOWLEDGE"* ]] || false
 }
 
 @test "preflight: aborts when the token cannot reach the vault remote" {
@@ -109,7 +109,7 @@ provision() {
     mkdir -p "$HERMES_VAULT_PATH/.git/hooks"
     PATH="$STUB:/usr/bin:/bin" run bash "$SETUP"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"cannot reach vault remote"* ]]
+    [[ "$output" == *"cannot reach vault remote"* ]] || false
 }
 
 @test "guard: setup.sh touches none of the local-deploy surface (comments excluded)" {
@@ -156,7 +156,7 @@ provision() {
     git -C "$HERMES_VAULT_PATH" add 00_meta/foo.md
     run git -C "$HERMES_VAULT_PATH" commit -m "out of zone"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"80_agents"* || "$output" == *"outside"* ]]
+    [[ "$output" == *"80_agents"* || "$output" == *"outside"* ]] || false
 }
 
 @test "guardrail: pre-commit allows a commit inside the write-zone" {
@@ -175,7 +175,7 @@ provision() {
     git -C "$HERMES_VAULT_PATH" add 80_agents/hermes-nan/leak.md
     run git -C "$HERMES_VAULT_PATH" commit -m "leak"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"token-like"* ]]
+    [[ "$output" == *"token-like"* ]] || false
 }
 
 @test "guardrail: pre-push hook installed and rejects non-fast-forward" {

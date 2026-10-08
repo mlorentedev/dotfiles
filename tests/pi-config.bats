@@ -13,7 +13,7 @@ setup() {
 }
 
 @test "ai/pi/models.json exists" {
-    [[ -f "$PI_MODELS" ]]
+    [[ -f "$PI_MODELS" ]] || false
 }
 
 @test "ai/pi/models.json has no literal API key" {

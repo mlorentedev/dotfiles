@@ -34,21 +34,21 @@ header() {
 @test "resolves the repo root even when DOTFILES_DIR points elsewhere" {
     run env DOTFILES_DIR="$DECOY" bash -c "$(declare -f header); REPO_ROOT='$REPO_ROOT'; header"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"$REPO_ROOT"* ]]
+    [[ "$output" == *"$REPO_ROOT"* ]] || false
 }
 
 @test "never reports the deploy mirror as the tree under test" {
     run env DOTFILES_DIR="$DECOY" bash -c "$(declare -f header); REPO_ROOT='$REPO_ROOT'; header"
-    [[ "$output" != *"$DECOY"* ]]
+    [[ "$output" != *"$DECOY"* ]] || false
 }
 
 @test "resolves the repo root when DOTFILES_DIR is unset" {
     run env -u DOTFILES_DIR bash -c "$(declare -f header); REPO_ROOT='$REPO_ROOT'; header"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"$REPO_ROOT"* ]]
+    [[ "$output" == *"$REPO_ROOT"* ]] || false
 }
 
 @test "does not announce a custom DOTFILES_DIR as the test root" {
     run env DOTFILES_DIR="$DECOY" bash -c "bash '$REPO_ROOT/scripts/test.sh' 2>&1 | head -8"
-    [[ "$output" != *"Using custom DOTFILES_DIR"* ]]
+    [[ "$output" != *"Using custom DOTFILES_DIR"* ]] || false
 }

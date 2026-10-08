@@ -65,25 +65,25 @@ setup() {
 @test "vault.sh with no args prints usage and exits 2" {
     run "$VAULT_SCRIPT"
     [ "$status" -eq 2 ]
-    [[ "$output" =~ "Usage: vault" ]]
+    [[ "$output" =~ "Usage: vault" ]] || false
 }
 
 @test "vault.sh help prints usage and exits 0" {
     run "$VAULT_SCRIPT" help
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "Usage: vault" ]]
+    [[ "$output" =~ "Usage: vault" ]] || false
 }
 
 @test "vault.sh --help also prints usage" {
     run "$VAULT_SCRIPT" --help
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "Usage: vault" ]]
+    [[ "$output" =~ "Usage: vault" ]] || false
 }
 
 @test "vault.sh with unknown subcommand exits 2 with error" {
     run "$VAULT_SCRIPT" totally-not-a-real-subcommand
     [ "$status" -eq 2 ]
-    [[ "$output" =~ "unknown subcommand" ]]
+    [[ "$output" =~ "unknown subcommand" ]] || false
 }
 
 # --- Backing scripts still exist and still executable (dispatcher is additive,

@@ -28,7 +28,7 @@ teardown() { rm -rf "$VAULT" "$WORK"; }
     git -C "$NONVAULT" add MEMORY.md
     run git -C "$NONVAULT" commit -m "try"
     [ "$status" -ne 0 ]
-    [[ "$output" == *vault* ]]
+    [[ "$output" == *vault* ]] || false
 }
 
 @test "AC1: rejects a memory/ path committed to a non-vault repo" {

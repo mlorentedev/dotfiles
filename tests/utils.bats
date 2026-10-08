@@ -13,36 +13,36 @@ setup() {
 
 @test "log_info outputs INFO tag" {
     run log_info "test message"
-    [[ "$output" == *"[INFO]"* ]]
-    [[ "$output" == *"test message"* ]]
+    [[ "$output" == *"[INFO]"* ]] || false
+    [[ "$output" == *"test message"* ]] || false
 }
 
 @test "log_success outputs SUCCESS tag" {
     run log_success "done"
-    [[ "$output" == *"[SUCCESS]"* ]]
-    [[ "$output" == *"done"* ]]
+    [[ "$output" == *"[SUCCESS]"* ]] || false
+    [[ "$output" == *"done"* ]] || false
 }
 
 @test "log_warning outputs WARNING tag" {
     run log_warning "caution"
-    [[ "$output" == *"[WARNING]"* ]]
-    [[ "$output" == *"caution"* ]]
+    [[ "$output" == *"[WARNING]"* ]] || false
+    [[ "$output" == *"caution"* ]] || false
 }
 
 @test "log_error outputs ERROR tag" {
     run log_error "bad"
-    [[ "$output" == *"[ERROR]"* ]]
-    [[ "$output" == *"bad"* ]]
+    [[ "$output" == *"[ERROR]"* ]] || false
+    [[ "$output" == *"bad"* ]] || false
 }
 
 @test "exit_error exits with code 1 by default" {
     run bash -c 'source "$1/utils.sh"; exit_error "fail"' -- "$SCRIPTS_DIR"
-    [[ $status -eq 1 ]]
+    [[ $status -eq 1 ]] || false
 }
 
 @test "exit_error exits with custom code" {
     run bash -c 'source "$1/utils.sh"; exit_error "fail" 42' -- "$SCRIPTS_DIR"
-    [[ $status -eq 42 ]]
+    [[ $status -eq 42 ]] || false
 }
 
 # --- Silent check functions ---
@@ -115,28 +115,28 @@ setup() {
 
 @test "trim removes leading/trailing spaces" {
     result=$(trim "  hello  ")
-    [[ "$result" == "hello" ]]
+    [[ "$result" == "hello" ]] || false
 }
 
 @test "trim preserves inner spaces" {
     result=$(trim "  hello world  ")
-    [[ "$result" == "hello world" ]]
+    [[ "$result" == "hello world" ]] || false
 }
 
 @test "mask_value full mask" {
     result=$(mask_value "secret")
-    [[ "$result" == "******" ]]
+    [[ "$result" == "******" ]] || false
 }
 
 @test "mask_value partial mask" {
     result=$(mask_value "secret123" 3)
-    [[ "$result" == "sec******" ]]
+    [[ "$result" == "sec******" ]] || false
 }
 
 @test "base64 roundtrip" {
     encoded=$(base64_encode "test string 123")
     decoded=$(base64_decode "$encoded")
-    [[ "$decoded" == "test string 123" ]]
+    [[ "$decoded" == "test string 123" ]] || false
 }
 
 # --- Config parsing ---
@@ -151,39 +151,39 @@ EOF
     PARSED_KEYS=()
     test_handler() { PARSED_KEYS+=("$1"); }
     count=$(parse_mapping_file "$conf" test_handler)
-    [[ "$count" == "2" ]]
+    [[ "$count" == "2" ]] || false
     rm -f "$conf"
 }
 
 @test "parse_mapping_file returns 1 for missing file" {
     run parse_mapping_file "/nonexistent_xyz" echo
-    [[ $status -eq 1 ]]
+    [[ $status -eq 1 ]] || false
 }
 
 # --- Counter functions ---
 
 @test "init_counter starts at 0" {
     init_counter "test_ctr"
-    [[ "$(get_counter test_ctr)" == "0" ]]
+    [[ "$(get_counter test_ctr)" == "0" ]] || false
 }
 
 @test "increment_counter increments" {
     init_counter "test_ctr"
     increment_counter "test_ctr"
-    [[ "$(get_counter test_ctr)" == "1" ]]
+    [[ "$(get_counter test_ctr)" == "1" ]] || false
     increment_counter "test_ctr"
     increment_counter "test_ctr"
-    [[ "$(get_counter test_ctr)" == "3" ]]
+    [[ "$(get_counter test_ctr)" == "3" ]] || false
 }
 
 # --- File operations ---
 
 @test "create_temp_file creates file with correct prefix" {
     tmp=$(create_temp_file "bats_test")
-    [[ -f "$tmp" ]]
-    [[ "$tmp" == /tmp/bats_test* ]]
+    [[ -f "$tmp" ]] || false
+    [[ "$tmp" == /tmp/bats_test* ]] || false
     perms=$(stat -c "%a" "$tmp" 2>/dev/null || stat -f "%Lp" "$tmp" 2>/dev/null)
-    [[ "$perms" == "600" ]]
+    [[ "$perms" == "600" ]] || false
     rm -f "$tmp"
 }
 
@@ -202,7 +202,7 @@ EOF
     # Second call returns 1 (line already exists) - that's correct behavior
     ensure_line_in_file "$f" "new line" || true
     count=$(grep -c "new line" "$f")
-    [[ "$count" == "1" ]]
+    [[ "$count" == "1" ]] || false
     rm -f "$f"
 }
 
@@ -210,51 +210,51 @@ EOF
 
 @test "export_var sets variable" {
     export_var "BATS_TEST_VAR" "val123"
-    [[ "$BATS_TEST_VAR" == "val123" ]]
+    [[ "$BATS_TEST_VAR" == "val123" ]] || false
 }
 
 @test "unset_var removes variable" {
     export BATS_TEST_VAR2="val"
     unset_var "BATS_TEST_VAR2"
-    [[ -z "$BATS_TEST_VAR2" ]]
+    [[ -z "$BATS_TEST_VAR2" ]] || false
 }
 
 # --- Zsh compatibility ---
 
 @test "utils.sh sources under zsh without error" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'"
-    [[ $status -eq 0 ]]
+    [[ $status -eq 0 ]] || false
 }
 
 @test "log functions work under zsh" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; log_info 'zsh test'"
-    [[ "$output" == *"[INFO]"* ]]
-    [[ "$output" == *"zsh test"* ]]
+    [[ "$output" == *"[INFO]"* ]] || false
+    [[ "$output" == *"zsh test"* ]] || false
 }
 
 @test "command_exists works under zsh" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; command_exists zsh && echo yes || echo no"
-    [[ "$output" == *"yes"* ]]
+    [[ "$output" == *"yes"* ]] || false
 }
 
 @test "var_is_set works under zsh" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; MY_VAR=hello; var_is_set MY_VAR && echo yes || echo no"
-    [[ "$output" == *"yes"* ]]
+    [[ "$output" == *"yes"* ]] || false
 }
 
 @test "counter functions work under zsh" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; init_counter cnt; increment_counter cnt; echo \$(get_counter cnt)"
-    [[ "$output" == *"1"* ]]
+    [[ "$output" == *"1"* ]] || false
 }
 
 @test "trim works under zsh" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; echo \$(trim '  hello  ')"
-    [[ "$output" == *"hello"* ]]
+    [[ "$output" == *"hello"* ]] || false
 }
 
 @test "mask_value works under zsh" {
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; echo \$(mask_value secret)"
-    [[ "$output" == *"******"* ]]
+    [[ "$output" == *"******"* ]] || false
 }
 
 @test "parse_mapping_file works under zsh" {
@@ -264,6 +264,6 @@ KEY1=val1
 KEY2=val2
 EOF
     run zsh -c ". '$SCRIPTS_DIR/utils.sh'; count=\$(parse_mapping_file '$conf' echo); echo \$count"
-    [[ "$output" == *"2"* ]]
+    [[ "$output" == *"2"* ]] || false
     rm -f "$conf"
 }

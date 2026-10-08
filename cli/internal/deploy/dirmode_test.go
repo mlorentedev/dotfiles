@@ -124,3 +124,78 @@ func TestParseManifest_ShippedMixedDirectoriesArePrivateForEveryEntry(t *testing
 		}
 	}
 }
+
+// TightenDir is the one rule deploy and doctor --fix apply to a directory that
+// holds a private deployed file (#2161): drop group and other access, never add
+// a bit, and leave a directory that grants nothing alone.
+func TestTightenDir_RemovesGroupAndOtherAccessOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX directory modes; Windows is asserted by TestTightenDir_IsANoOpOnWindows")
+	}
+	for _, tc := range []struct {
+		have, want os.FileMode
+		changed    bool
+	}{
+		{0o755, 0o700, true},
+		{0o750, 0o700, true},
+		{0o711, 0o700, true},
+		{0o555, 0o500, true}, // owner bits are kept as they are: no write is added
+		{0o700, 0o700, false},
+		{0o500, 0o500, false},
+	} {
+		for _, dryRun := range []bool{true, false} {
+			dir := filepath.Join(t.TempDir(), "d")
+			if err := os.Mkdir(dir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(dir, tc.have); err != nil {
+				t.Fatal(err)
+			}
+			from, to, changed, err := TightenDir(dir, runtime.GOOS, dryRun)
+			if err != nil {
+				t.Fatalf("%04o dry=%v: %v", tc.have, dryRun, err)
+			}
+			if changed != tc.changed || from != tc.have || to != tc.want {
+				t.Errorf("%04o dry=%v: got from=%04o to=%04o changed=%v, want to=%04o changed=%v",
+					tc.have, dryRun, from, to, changed, tc.want, tc.changed)
+			}
+			info, err := os.Stat(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantOnDisk := tc.want
+			if dryRun {
+				wantOnDisk = tc.have
+			}
+			if got := info.Mode().Perm(); got != wantOnDisk {
+				t.Errorf("%04o dry=%v: directory is %04o on disk, want %04o", tc.have, dryRun, got, wantOnDisk)
+			}
+			_ = os.Chmod(dir, 0o700) // let t.TempDir clean up a 0500
+		}
+	}
+}
+
+func TestTightenDir_AnAbsentDirectoryIsNotAChange(t *testing.T) {
+	_, _, changed, err := TightenDir(filepath.Join(t.TempDir(), "absent"), runtime.GOOS, false)
+	if err != nil || changed {
+		t.Errorf("absent directory: changed=%v err=%v, want neither", changed, err)
+	}
+}
+
+// Windows reports 0777 for every directory and has no group or other bits to
+// clear; a tightening there would print on every deploy and change nothing.
+func TestTightenDir_IsANoOpOnWindows(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, _, changed, err := TightenDir(dir, "windows", false)
+	if err != nil || changed {
+		t.Errorf("windows: changed=%v err=%v, want neither", changed, err)
+	}
+	if runtime.GOOS != "windows" {
+		if info, _ := os.Stat(dir); info.Mode().Perm() != 0o755 {
+			t.Errorf("windows must leave the directory alone, it is %04o", info.Mode().Perm())
+		}
+	}
+}

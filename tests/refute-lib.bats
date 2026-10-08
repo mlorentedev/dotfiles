@@ -33,27 +33,27 @@ teardown() { rm -rf "$TMP"; }
 @test "refute_grep: names the file and prints the offending line" {
     run refute_grep '^beta' "$FIXTURE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"expected NOT to find"* ]]
-    [[ "$output" == *"subject.txt"* ]]
-    [[ "$output" == *"2:beta = 2"* ]]
+    [[ "$output" == *"expected NOT to find"* ]] || false
+    [[ "$output" == *"subject.txt"* ]] || false
+    [[ "$output" == *"2:beta = 2"* ]] || false
 }
 
 @test "refute_grep: a pattern beginning with a dash is a pattern, not options" {
     run refute_grep '\-\-vault knowledge \-\-vault knowledge' "$FIXTURE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"but it is there"* ]]
+    [[ "$output" == *"but it is there"* ]] || false
 }
 
 @test "refute_grep_fixed: a literal dash-leading string is a pattern too" {
     run refute_grep_fixed '--vault knowledge --vault knowledge' "$FIXTURE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"but it is there"* ]]
+    [[ "$output" == *"but it is there"* ]] || false
 }
 
 @test "refute_grep_fixed: parentheses are literal, not a group" {
     run refute_grep_fixed '(parenthesised)' "$FIXTURE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"but it is there"* ]]
+    [[ "$output" == *"but it is there"* ]] || false
 }
 
 @test "refute_grep: a grep error is a failure, not an absence" {
@@ -61,7 +61,7 @@ teardown() { rm -rf "$TMP"; }
     # exits 2, and `! grep` reads that as "not found".
     run refute_grep 'anything' "$TMP/does-not-exist.txt"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"an error is not an absence"* ]]
+    [[ "$output" == *"an error is not an absence"* ]] || false
 }
 
 @test "refute_grep: an invalid extended regex is a failure, not an absence" {
@@ -69,11 +69,11 @@ teardown() { rm -rf "$TMP"; }
     # unterminated group in ERE.  grep exits 2, and the assertion must not pass.
     run refute_grep 'a (parenthesised' "$FIXTURE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"an error is not an absence"* ]]
+    [[ "$output" == *"an error is not an absence"* ]] || false
 }
 
 @test "refute_grep: a wrong argument count fails instead of half-asserting" {
     run refute_grep '^alpha$'
     [ "$status" -eq 1 ]
-    [[ "$output" == *"expected <pattern> <file>"* ]]
+    [[ "$output" == *"expected <pattern> <file>"* ]] || false
 }
