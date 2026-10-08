@@ -145,14 +145,12 @@ func modeDriftLine(name, dst string, mode os.FileMode) string {
 }
 
 // checkPrivateDeployDirs reports a directory that holds a private deployed file
-// but grants group or others access: a ~/.ssh left 0755 from before #2051.
-// Deploy creates such a directory 0700 and never changes one that exists,
-// because tightening a directory on every deploy is a decision the operator
-// should see. --fix makes it. Windows has no POSIX mode bits to check.
+// but grants group or others access. `dotf deploy` narrows such a directory
+// itself (#2161), so what this finds is drift that arose after the last deploy,
+// or a directory no deploy has run on since. --fix converges it with the same
+// rule, deploy.TightenDir, which is also a no-op on Windows: there is no POSIX
+// mode to clear there.
 func checkPrivateDeployDirs(sys *System, man *deploy.Manifest, rep *Report, fix bool) {
-	if sys.GOOS == "windows" {
-		return
-	}
 	applies := func(c deploy.Config) bool {
 		return c.AppliesOn(sys.GOOS) && (c.Requires == "" || sys.has(c.Requires))
 	}
@@ -162,22 +160,17 @@ func checkPrivateDeployDirs(sys *System, man *deploy.Manifest, rep *Report, fix 
 		return
 	}
 	for _, dir := range dirs {
-		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
-			continue
+		from, to, changed, err := deploy.TightenDir(dir, sys.GOOS, !fix)
+		switch {
+		case err != nil && fix:
+			rep.Fail(fmt.Sprintf("could not tighten %s to %04o: %v", dir, to, err))
+		case err != nil:
+			rep.Warn(fmt.Sprintf("private deploy directory %s: %v", dir, err))
+		case !changed:
+		case !fix:
+			rep.Warn(fmt.Sprintf("%s is %04o but holds a private deployed file; want %04o (run: dotf deploy, or dotf doctor --fix)", dir, from, to))
+		default:
+			rep.Fix(fmt.Sprintf("tightened %s from %04o to %04o (it holds a private deployed file)", dir, from, to))
 		}
-		perm := info.Mode().Perm()
-		if perm&0o077 == 0 {
-			continue
-		}
-		if !fix {
-			rep.Warn(fmt.Sprintf("%s is %04o but holds a private deployed file; want 0700 (run: dotf doctor --fix)", dir, perm))
-			continue
-		}
-		if err := os.Chmod(dir, 0o700); err != nil {
-			rep.Fail(fmt.Sprintf("could not tighten %s to 0700: %v", dir, err))
-			continue
-		}
-		rep.Fix(fmt.Sprintf("tightened %s from %04o to 0700 (it holds a private deployed file)", dir, perm))
 	}
 }

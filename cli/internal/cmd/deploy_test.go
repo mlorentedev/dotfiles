@@ -183,3 +183,86 @@ func TestDeployCmd_AModeOnlyFixIsReportedAsOne(t *testing.T) {
 		}
 	}
 }
+
+// A directory that existed before the deploy keeps the mode it was created
+// with, so a private file written into a 0755 ~/.pi/agent left it 0755 until
+// `dotf doctor --fix` ran (#2161). privateDirRepo declares a 0600 entry and a
+// 0644 one, each in a directory that already exists at 0755, and deploys the
+// private one; then reopens its directory, the state the tests start from.
+func privateDirRepo(t *testing.T) (repo, home, dir string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX directory modes; deploy.TightenDir is a no-op on Windows")
+	}
+	repo, home = t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "deploy.json"), `{
+  "version": 3,
+  "configs": [
+    {"name": "sec", "src": "ai/sec.json", "dst": "{HOME}/.sec/config.json", "render": false, "mode": "0600"},
+    {"name": "pub", "src": "ai/pub.json", "dst": "{HOME}/.pub/config.json", "render": false, "mode": "0644"}
+  ]
+}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "sec.json"), `{"sec":true}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "pub.json"), `{"pub":true}`)
+	dir = filepath.Join(home, ".sec")
+	for _, d := range []string{dir, filepath.Join(home, ".pub")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deployOK(t, repo, home, "sec")
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return repo, home, dir
+}
+
+func deployOK(t *testing.T, repo, home string, args ...string) string {
+	t.Helper()
+	out, err := runDeploy(t, repo, home, args)
+	if err != nil {
+		t.Fatalf("dotf deploy %v: %v\n%s", args, err, out)
+	}
+	return out
+}
+
+func permOf(t *testing.T, p string) os.FileMode {
+	t.Helper()
+	info, err := os.Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info.Mode().Perm()
+}
+
+// A dry run reports the tightening and changes nothing; a named deploy of
+// another entry never narrows a directory as a side effect.
+func TestDeployCmd_ReportsButDoesNotTightenOnADryRunOrAnotherEntry(t *testing.T) {
+	repo, home, dir := privateDirRepo(t)
+	if out := deployOK(t, repo, home, "pub"); strings.Contains(out, "tighten") || permOf(t, dir) != 0o755 {
+		t.Errorf("a named deploy of pub must not touch .sec (%04o):\n%s", permOf(t, dir), out)
+	}
+	out := deployOK(t, repo, home, "--dry-run")
+	if !strings.Contains(out, "would tighten ") || !strings.Contains(out, dir+" from 0755 to 0700") || permOf(t, dir) != 0o755 {
+		t.Errorf("a dry run must report the tightening and leave %04o:\n%s", permOf(t, dir), out)
+	}
+}
+
+// The deploy narrows the directory, says so, leaves a public-only directory
+// alone, and a second deploy has nothing left to do.
+func TestDeployCmd_TightensAnExistingDirectoryThatHoldsAPrivateFile(t *testing.T) {
+	repo, home, dir := privateDirRepo(t)
+	out := deployOK(t, repo, home)
+	if !strings.Contains(out, "tightened ") || !strings.Contains(out, dir+" from 0755 to 0700") {
+		t.Errorf("the deploy must report the tightening:\n%s", out)
+	}
+	if got := permOf(t, dir); got != 0o700 {
+		t.Errorf("%s is %04o after deploy, want 0700", dir, got)
+	}
+	if got := permOf(t, filepath.Join(home, ".pub")); got != 0o755 {
+		t.Errorf("a directory holding only a public file must keep 0755, it is %04o", got)
+	}
+	if out := deployOK(t, repo, home); strings.Contains(out, "tighten") || strings.Count(out, "in sync ") != 2 {
+		t.Errorf("a second deploy must have nothing left to do:\n%s", out)
+	}
+}

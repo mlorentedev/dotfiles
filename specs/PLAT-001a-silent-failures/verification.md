@@ -45,6 +45,25 @@ created: "2026-10-05"
 - The probe runs the **staged** copy (in the temp dir, under its command name) rather than the placed one. A failing binary therefore never shadows a working copy on PATH, even briefly.
 - The staged copy lives in a hidden dir **inside Dest** (`.dotf-stage-*`), not the system temp dir. pr-agent review on #2014 pointed out that a `noexec` `/tmp` would refuse a binary that runs fine from Dest and blame the OS/arch. Staging on Dest's own mount fails exactly when the placed binary would, and the dir is removed on both success and refusal; the tests assert an empty or single-entry Dest.
 - A version below the pin after install is an error on all three channels. For npm/uv it means another copy earlier on PATH answers, so the next command would not get the pin either.
+- **Deploy narrows an existing private directory (#2161, decided by the owner 2026-10-08).** The
+  Mac's first setup run wrote `models.json` (0600) into a `~/.pi/agent` that already existed at 0755.
+  Setup's own doctor then warned, so a successful setup did not reach the state it declares. #2051 had
+  decided that deploy never changes an existing directory, because tightening is "a decision the
+  operator should see", and left it to `doctor --fix`. The owner reversed that: a setup that ends in a
+  warning it could have fixed is not idempotent.
+  - `deploy.TightenDir` is the single rule. It clears group and other bits, keeps the owner's bits
+    exactly (so it never widens), and leaves an absent or already-private directory alone. It is a no-op
+    on Windows, where Stat reports 0777 for every directory, which would otherwise read as a tightening
+    on every run.
+  - `dotf deploy` applies it to `PrivateDirs`, restricted to the entries the run deployed, so `dotf
+    deploy pi` does not narrow `~/.ssh`. It prints `tightened <dir> from 0755 to 0700`, or `would
+    tighten` on a dry run, and a failed chmod fails the deploy.
+  - `dotf doctor` calls the same function. Without `--fix` it warns about drift that arose after the
+    last deploy; with `--fix` it applies it. The two cannot disagree about what "private enough" means.
+  - Tests: `TestTightenDir_*` (the mode table under dry and real runs, absent, Windows) and
+    `TestDeployCmd_TightensAnExistingDirectoryThatHoldsAPrivateFile` /
+    `..._ReportsButDoesNotTightenOnADryRunOrAnotherEntry`. The second deploy prints nothing to tighten
+    and both entries are `in sync`. Both cmd tests fail without the deploy change.
 
 ## Promotion candidates
 

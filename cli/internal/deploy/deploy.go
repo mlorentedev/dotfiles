@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/big"
 	"os"
 	"path"
@@ -305,10 +306,10 @@ func (c Config) private() bool {
 // PrivateDirs lists, expanded and sorted, the directories that hold a private
 // file this manifest deploys: an entry whose own mode is private, that applies
 // here (the caller's filter: platforms, requires), and whose destination file
-// exists. A directory that already existed keeps its mode when the deploy
-// writes into it, so doctor reports one left open (#2053), and the existence
-// test keeps that report true: an entry for another OS, or one never
-// deployed, puts nothing private in its directory.
+// exists. `dotf deploy` tightens each one with TightenDir, and doctor reports
+// one left open after it (#2053, #2161). The existence test keeps both true:
+// an entry for another OS, or one never deployed, puts nothing private in its
+// directory.
 func (m *Manifest) PrivateDirs(home string, resolve func(string) string, applies func(Config) bool) ([]string, error) {
 	seen := map[string]bool{}
 	var dirs []string
@@ -330,6 +331,41 @@ func (m *Manifest) PrivateDirs(home string, resolve func(string) string, applies
 	}
 	sort.Strings(dirs)
 	return dirs, nil
+}
+
+// TightenDir removes group and other access from dir, a directory that holds
+// a private deployed file, and reports the mode it had and the one it now has.
+// It is the one rule `dotf deploy` and `dotf doctor --fix` both apply, so the
+// two cannot disagree on what "private enough" means (#2161). It only clears
+// bits: the owner's bits stay exactly as they are, so a directory is never
+// widened. A directory that grants nothing to group or others, and one that is
+// absent, are not a change. A dry run reports the change without making it.
+//
+// Windows has no POSIX directory mode to clear. Stat reports 0777 for every
+// directory there, so without the goos check this would report a tightening on
+// every run and change nothing.
+func TightenDir(dir, goos string, dryRun bool) (from, to os.FileMode, changed bool, err error) {
+	if goos == "windows" {
+		return 0, 0, false, nil
+	}
+	info, err := os.Stat(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, err
+	}
+	from = info.Mode().Perm()
+	to = from &^ 0o077
+	if to == from {
+		return from, to, false, nil
+	}
+	if !dryRun {
+		if err := os.Chmod(dir, to); err != nil {
+			return from, to, false, err
+		}
+	}
+	return from, to, true, nil
 }
 
 // validatePlatforms refuses a platforms list a released reader could not read
@@ -643,7 +679,7 @@ func load(c Config, repoRoot, home string, resolve func(string) string) ([]byte,
 // mode, for a Config that did not come from a manifest: private (0700) when
 // the file grants nothing to group or others. A manifest entry uses the mode
 // assignDirModes derived from every entry sharing the directory. A directory
-// that exists keeps its mode.
+// that exists is not created again; TightenDir narrows it afterwards.
 func dirMode(mode os.FileMode) os.FileMode {
 	if mode&0o077 == 0 {
 		return 0o700
