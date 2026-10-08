@@ -26,10 +26,11 @@ TIED='path|status|cdpath|manpath|fignore'
 # (`local n`). A read or grep error (unreadable file, bad pattern) returns 2,
 # so a tool failure is never read as "no bindings".
 #
-# `&` is not a separator: `cmd & path=x` already has whitespace before the
-# name, and `?a=1&path=x` is a URL query, not a binding.
+# `&` stays a separator: `sleep 1 &path=x` really assigns `path`. The cost is
+# that a URL query in a quoted string (`"...?sha=main&path=$f"`) is reported
+# too. That fails loud, and `gh api -X GET ... -f path="$f"` avoids it.
 tied_bindings() {
-    local file="$1" names="$2" sep='(^|[[:space:];(|])' end='([[:space:];]|$)' code hits rc=0
+    local file="$1" names="$2" sep='(^|[[:space:];(&|])' end='([[:space:];]|$)' code hits rc=0
     # Strip trailing comments first, line by line so grep's numbers still
     # match the file. Only a comment with no quote in it: a ` #` inside a
     # quoted string would otherwise cut off real code, and a missed binding is
@@ -82,9 +83,9 @@ tied_bindings() {
 }
 
 @test "guard: the detector actually detects, on a fixture with a known answer" {
-    # A guard that silently matches nothing reports a clean tree forever. Six
-    # bindings must count; eight look-alikes must not, including a comment, a
-    # trailing comment, a flag, two URL queries, an expansion and a longer name.
+    # A guard that silently matches nothing reports a clean tree forever. Seven
+    # bindings must count; seven look-alikes must not, including a comment, a
+    # trailing comment, a flag, a URL query, an expansion and a longer name.
     local probe n
     probe="$BATS_TEST_TMPDIR/probe.sh"
     {
@@ -99,7 +100,8 @@ tied_bindings() {
         printf '# local path=x\n'
         printf 'gh api --path=x\n'
         printf 'curl "https://h/x?path=1"\n'
-        printf 'gh api "repos/o/r/commits?sha=main&path=$f"\n'
+        # No space after `&` is still a background, then an assignment.
+        printf 'sleep 1 &path=x\n'
         printf 'x=1  # then read the path\n'
         printf 'echo "$path ${status}"\n'
         printf 'local file_path="$1" paths=x\n'
@@ -107,9 +109,9 @@ tied_bindings() {
     } > "$probe"
 
     n="$(tied_bindings "$probe" "$TIED" | wc -l | tr -d ' ')"
-    if [ "$n" -ne 6 ]; then
+    if [ "$n" -ne 7 ]; then
         tied_bindings "$probe" "$TIED" >&2
-        printf 'expected 6 bindings, matched %s\n' "$n" >&2
+        printf 'expected 7 bindings, matched %s\n' "$n" >&2
         return 1
     fi
 
