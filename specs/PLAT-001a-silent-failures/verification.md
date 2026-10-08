@@ -32,6 +32,17 @@ created: "2026-10-05"
   - `nan-quality-bench.sh`: the 4 prompts are identical to `main` and come out in the same order, under bash 3.2 and zsh.
   - `pin-actions.sh`: with a stub `gh` under bash 3.2, a repeated key makes no second API call and an unresolvable ref stays empty.
 
+### Interim: setup's hard-coded linux-amd64 downloads (ahead of W2)
+
+The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the first bullet of the proposal's problem list on a real machine. Setup logged `age installed (v1.3.1)` and `eza installed`, and left four ELF x86-64 files in `~/.local/bin`: `age`, `age-keygen`, `eza` and `shellcheck`. mise's age and shellcheck come earlier on an interactive PATH, so those two still worked. eza has no mise entry, and the unconditional `alias ls="eza ..."` made `ls` exit 126 in every new shell. W2 deletes the blocks once the tools come from mise on every OS, and a second setup run would have placed them again. So this interim fix lands first:
+
+- [x] `setup-linux.sh` runs the age/eza/jq/gh and shellcheck blocks only when `host_is_linux_amd64` (`scripts/utils.sh`). Elsewhere it warns once and calls `remove_unrunnable_tool`, which deletes a `~/.local/bin` file only when running it exits 126 ("found but cannot execute"). Symlinks, tools that run and tools that fail for other reasons stay.
+- [x] `age installed` is logged only after the placed `age --version` runs.
+- [x] `.zsh/aliases.zsh` aliases `ls`/`ll`/`lla` to eza only when eza is on PATH. Otherwise `ll` and `lla` fall back to `ls -l` and `ls -la`.
+- [x] `tests/setup-linux-only-downloads.bats`: 6 ok on the branch, 6 not ok on `main`. Every bats file referencing `setup-linux`, `utils.sh` or `aliases.zsh`: 950/950 on darwin. While writing it, a mid-test `[[ ]]` passed against the unfixed file under bash 3.2, which is #2164 (54 such assertions in the `os-sensitive` tier).
+- [x] CI review round: a `#!/nonexistent` interpreter is not a portable stand-in for an unrunnable binary. macOS bash reports 126 and Linux bash reports 127. A file of no executable format (NUL bytes) fails exec with ENOEXEC on both kernels, and bash reports it as 126 on both. `setup-linux-only-downloads-real.bats` pairs the suite with the host's real `uname` and a copy of its `ls`. macOS kills a copied system binary on launch (137) and Linux runs it; neither is 126, so it stays.
+- W2 still owns the real fix. When it deletes the blocks, it deletes `host_is_linux_amd64`, the gate and this guard test with them.
+
 ## Test status
 
 - `cd cli && go build ./... && go vet ./... && go test ./...`: all packages ok (darwin/arm64).

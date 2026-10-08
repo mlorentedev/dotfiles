@@ -190,7 +190,6 @@ function hc {
     }
 }
 
-# Enhanced listing (requires eza)
 # ============================================================================
 # TOOL ACTIVATION
 # ============================================================================
@@ -204,9 +203,15 @@ if (Get-Command zoxide -ErrorAction SilentlyContinue) {
     . ([ScriptBlock]::Create((& zoxide init powershell | Out-String)))
 }
 
+# Enhanced listing with eza when it is installed. Without it ll and lla still
+# exist and fall back to Get-ChildItem (lla adds -Force for hidden files), as
+# .zsh/aliases.zsh falls back to ls -l and ls -la.
 if (Get-Command eza -ErrorAction SilentlyContinue) {
     function ll { eza -la --icons @args }
     function lla { eza -la --icons --git @args }
+} else {
+    function ll { Get-ChildItem @args }
+    function lla { Get-ChildItem -Force @args }
 }
 
 # ============================================================================

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/test/SKILL.md
-generated_sha: 47192803c8d525d8
+generated_sha: cca1cc979a226f38
 id: test-skill
 type: skill
 status: active

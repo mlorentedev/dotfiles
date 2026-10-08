@@ -33,8 +33,8 @@ PY
 # BASE / HEAD (the registry at each ref), PULL, COMMENTS. A value is either
 # "fail:<code>" (always fails), "flaky:<code>" (fails on the first call only)
 # or the response itself. Every call is logged to $CALLS.
-path="$2"
-case "$path" in
+api_path="$2"
+case "$api_path" in
     *contents/harness/review-attestation.json?ref=main) key=BASE ;;
     *contents/harness/review-attestation.json?ref=*) key=HEAD ;;
     */pulls/*) key=PULL ;;

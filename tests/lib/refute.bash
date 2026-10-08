@@ -51,10 +51,10 @@ _refute_grep_impl() {
         return 1
     fi
 
-    local status=0
-    grep "-q${dialect}" -- "$pattern" "$file" >/dev/null 2>&1 || status=$?
+    local rc=0
+    grep "-q${dialect}" -- "$pattern" "$file" >/dev/null 2>&1 || rc=$?
 
-    case "$status" in
+    case "$rc" in
         0)
             printf 'expected NOT to find /%s/ in %s, but it is there:\n' \
                 "$pattern" "$file" >&2
@@ -66,7 +66,7 @@ _refute_grep_impl() {
             ;;
         *)
             printf 'refute_grep: grep exited %s on %s for /%s/ — an error is not an absence\n' \
-                "$status" "$file" "$pattern" >&2
+                "$rc" "$file" "$pattern" >&2
             return 1
             ;;
     esac
