@@ -84,22 +84,22 @@ func TestCheckVersionedPaths(t *testing.T) {
 	writeFile(t, filepath.Join(goHomeNoBin, "README"), "x") // dir exists, no bin/go
 
 	env := map[string]string{
-		"HOME":        home,
-		"JAVA_HOME":   javaHome,
-		"GO_HOME":     goHomeNoBin,
-		"PYTHON_HOME": filepath.Join(home, "does-not-exist"),
-		// MAVEN_HOME, MINIKUBE_HOME unset → SKIP
+		"HOME":       home,
+		"JAVA_HOME":  javaHome,
+		"GO_HOME":    goHomeNoBin,
+		"MAVEN_HOME": filepath.Join(home, "does-not-exist"),
+		// MINIKUBE_HOME unset → SKIP
 	}
 	var buf bytes.Buffer
 	rep := capture(&buf)
 	checkVersionedPaths(newSys(env, nil, nil), rep)
 
-	// java ok; go dir-but-no-binary fail; python missing fail = 2 failures.
+	// java ok; go dir-but-no-binary fail; maven missing fail = 2 failures.
 	if rep.Failures() != 2 {
 		t.Fatalf("failures = %d, want 2\n%s", rep.Failures(), buf.String())
 	}
-	if !strings.Contains(buf.String(), "MAVEN_HOME (variable not set)") {
-		t.Error("unset MAVEN_HOME should SKIP")
+	if !strings.Contains(buf.String(), "MINIKUBE_HOME (variable not set)") {
+		t.Error("unset MINIKUBE_HOME should SKIP")
 	}
 }
 

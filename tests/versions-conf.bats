@@ -107,3 +107,20 @@ setup() {
     # bug while looking green. The resolve step must exit non-zero instead.
     grep -q 'GOLANGCI_LINT_VERSION missing from versions.conf' "$wf"
 }
+
+# The released dotf reads this file too: setup and doctor run DOTF_VERSION's
+# binary, not this tree's. Up to v0.65.0 its parser rejects every "# mise:"
+# comment except "# mise: cli", so "# mise: python-package" would turn every
+# machine's `dotf tools sync` and doctor into a parse error until a release
+# carrying ParseMisePins is the pinned one (#2062). Marking PYTHON_VERSION
+# early is no safer: that binary would install mise's python without its
+# packages, and its shim would shadow the system python the suite imports yaml
+# from. Relax this in the PR that marks both, once DOTF_VERSION carries the
+# parser.
+@test "versions.conf marks python for mise only once DOTF_VERSION parses the python-package marker" {
+    run grep -nE '^[[:space:]]*#[[:space:]]*mise[[:space:]]*:' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || false
+    refute_grep '^# mise: python-package' "$VERSIONS_CONF"
+    run grep -A1 -x '# mise: cli' "$VERSIONS_CONF"
+    [[ "$output" != *PYTHON_VERSION=* ]] || false
+}

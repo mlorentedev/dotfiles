@@ -391,4 +391,5 @@ tags: [lessons, index, dotfiles]
 | [370 - A reasoning model at its default effort can think away the whole answer](lesson-370-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
 | [371 - A paid model is bounded by every layer that supplies a default](lesson-371-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default.md) | 2026-10-08 |
 | [372 - A dry run proves the launch, not the request](lesson-372-a-dry-run-proves-the-launch-not-the-request.md) | 2026-10-09 |
+| [373 - A record the released binary reads waits for the release](lesson-373-a-record-the-released-binary-reads-waits-for-the-release.md) | 2026-10-09 |
 <!-- END GENERATED -->

@@ -54,5 +54,12 @@
     "verification": "cd cli && out=$(go test ./internal/tools/ -run '^(TestLoad_RejectsMalformedSystemEntries|TestInstall_UnknownSourceTypeIsSkippedNotFailed)$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLoad_RejectsMalformedSystemEntries' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestInstall_UnknownSourceTypeIsSkippedNotFailed'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001c-tools-via-mise-f9",
+    "behavior": "AC9: the sync installs the marked python packages into mise's Python, and doctor fails on a shell Python below 3.11 or missing a package",
+    "verification": "cd cli && out=$(go test ./internal/tools/ ./internal/doctor/ -run '^(TestSync_WritesThePackagesFileBeforeMiseInstallsPython|TestSync_PipInstallsIntoAPythonAlreadyAtItsPin|TestCheckPython_BelowTheFloorFailsNamingTheSync|TestCheckPython_APackageMissingOrBelowItsPinFails)$' -count=1 -v) && for t in TestSync_WritesThePackagesFileBeforeMiseInstallsPython TestSync_PipInstallsIntoAPythonAlreadyAtItsPin TestCheckPython_BelowTheFloorFailsNamingTheSync TestCheckPython_APackageMissingOrBelowItsPinFails; do printf '%s' \"$out\" | grep -q -- \"--- PASS: $t\" || exit 1; done",
+    "state": "pending",
+    "evidence": ""
   }
 ]

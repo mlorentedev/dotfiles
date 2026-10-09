@@ -150,6 +150,19 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] Review triage: an entry from `mise bin-paths --bin-names` that is a path rather than a file name (a separator, `.` or `..`) is reported and left alone, so `--fix` can never rename over a file outside `~/.local/bin` (`TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched`, mutation-checked). The doc comment on `checkMiseTools` now says the fix links, not removes
 - [x] Review triage: the pin-guard test was vacuous. Its fixture had no shim, so with the guard removed `--fix` still left the copy, for a different reason. The fixture now writes the shim and asserts the copy is still a regular file; deleting the guard's `return` turns it red (measured 2026-10-09)
 
+### Python, the Wave 3 canary (#2062) — PR1, the reader and the check
+
+> The release constraint: `versions.conf` is unchanged here. The released `dotf` (v0.65.0) rejects any `# mise:` comment but `# mise: cli`, so the pins are marked in PR2, once `DOTF_VERSION` carries this parser.
+
+- [x] [AC9] Failing tests, then `ParseMisePins`: both markers, sorted; a package with no `PYTHON_VERSION` under `# mise: cli` is an error; a near-miss names both markers
+- [x] [AC9] Failing tests, then the sync: the packages file is written before `mise install` and named by `python.default_packages_file` under `[settings]`; a Python already at its pin gets the packages through pip, once; a failed pip and a pip that installs nothing are errors naming the package; a package below its pin is missing
+- [x] [AC9] Failing tests, then doctor's Python section: the shell's `python3` (`python` on Windows) below 3.11, or absent, fails; a package missing or below its pin fails; the remedy is the sync, the PATH when mise already has a Python that clears the floor, or "install one" when nothing pins it
+- [x] `checkMiseTools` reports packages missing from mise's Python, and `--fix` runs the sync: one owner for mise's config and installs
+- [x] The dead `~/Applications/python-<ver>` layout leaves doctor (`versionedHomes`, `versionMatches`, `toolHomeVars`) and the rc files: nothing installs it
+- [x] Guard: `tests/versions-conf.bats` refuses the python-package marker and a marked `PYTHON_VERSION` until PR2 relaxes it; both mutations fail it
+- [x] On the Mac, through a scratch `versions.conf` (`--versions`): `python@3.12.6` is refused for lacking GitHub attestations, `3.13.16` installs with PyYAML 6.0.3, a second run does nothing, and `mise install python@3.13.16` alone also leaves `import yaml` working
+- [ ] PR2, after the release: mark `PYTHON_VERSION=3.13.16` and `PYYAML_VERSION=6.0.3`, relax the guard to the `DOTF_VERSION` condition, read the pins in CI's macOS job, and remove the user-site PyYAML the Mac's system 3.9 carries
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
