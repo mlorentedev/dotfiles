@@ -89,21 +89,21 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   warns that the refresh failed and deploys the committed records, the safe side of #2162.
   #1814 owns this class (setup calling what the pinned `dotf` does not have)
 
-## `dotf vault health` on macOS — a connection check that passes on an error
+## `dotf vault health` — every obsidian call was an error read as a result
 
-- [x] Measured on the Mac (obsidian 1.14.4): the CLI is a separate binary
-  (`obsidian-cli`) that reads `--no-sandbox` as a command, and it exits 0 with its
-  error on stdout ("Vault not found.", `Error: Command "--no-sandbox" not found.`).
-  Section 2 checked only for output, so it reported "connected" and section 4
-  failed on JSON it could not parse
-- [x] Failing golden cases first: `darwin-argv` (the argv without `--no-sandbox`) and
-  `vault-not-found` (exit 2, the CLI's own words). Each fails against the old
-  code (mutation-checked); every other case pins linux through the new `goos` seam
-- [x] `--no-sandbox` is sent everywhere but darwin; the connection passes only when
-  the answer names the vault. Linux and Windows argv are unchanged (unmeasured
-  here, so not changed)
-- [x] The `obsidian` alias in `.zshrc` and `.bashrc` is set on Linux only
-- [x] On the Mac, against the live vault: 11 passed, 0 failed (10 and 1 before)
+- [x] Measured on obsidian 1.14.4 against the documentation (https://obsidian.md/help/cli): the
+  CLI exits 0 and prints its errors on stdout. `--vault <name>` is not a parameter (the CLI
+  answered for the active vault, or "Vault not found."), `--no-sandbox` is read as a command,
+  and `dead-ends` is not a command (`deadends` is), so its error line counted as one dead end
+- [x] Failing tests first: the `vault-not-found` golden case (exit 2, the CLI's own words),
+  `TestNamesVault` and `TestObsidianArgs`. The stubs answer in the real CLI's format. Each of
+  the three fixes is mutation-checked: reverting it fails the suite
+- [x] One argv on every OS, `vault=<name> <sub...>`, and `deadends`. The connection passes
+  only on the vault's `name<TAB><vault>` record
+- [x] The `obsidian` alias in `.zshrc` and `.bashrc` keeps `--no-sandbox` (an AppImage GUI
+  launch flag) everywhere but darwin
+- [x] On the Mac, against the live vault: connected, and dead-ends now read 1918/2163 (88%),
+  a FAIL kept on purpose (owner, 2026-10-08): the number is real, and it was `1` before
 
 ## Closing
 

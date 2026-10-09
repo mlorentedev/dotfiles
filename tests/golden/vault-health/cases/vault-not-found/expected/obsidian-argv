@@ -1,1 +1,1 @@
---no-sandbox vault --vault knowledge
+vault=knowledge vault

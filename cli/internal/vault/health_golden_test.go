@@ -61,7 +61,7 @@ func runObsidianStub(args []string) int {
 
 	for _, a := range args {
 		switch a {
-		case "vault", "orphans", "dead-ends", "unresolved", "tags":
+		case "vault", "orphans", "deadends", "unresolved", "tags":
 			if b, err := os.ReadFile(filepath.Join(os.Getenv(stubEnvCase), "stub", a)); err == nil {
 				_, _ = os.Stdout.Write(b)
 			}
@@ -152,9 +152,6 @@ func runGoldenCase(t *testing.T, c goldenCase) {
 		// set, which is how every case was captured.
 		VaultName: "knowledge",
 		Verbose:   strings.Contains(readTrimmed(t, filepath.Join(c.dir, "args")), "--verbose"),
-		// The argv depends on the OS, so each case pins one: linux, where every
-		// case was captured, unless the case names another in its goos file.
-		GOOS: goldenGOOS(t, c.dir),
 	})
 	if err != nil {
 		t.Fatalf("RunHealth: %v", err)
@@ -339,17 +336,6 @@ func copyTree(t *testing.T, src, dst string) {
 }
 
 // readTrimmed reads an optional one-line fixture file; absent is "".
-// goldenGOOS is the platform a case's argv was captured for: its goos file, or
-// linux when it has none. Never runtime.GOOS — the same corpus must pass on
-// every CI leg.
-func goldenGOOS(t *testing.T, caseDir string) string {
-	t.Helper()
-	if goos := readTrimmed(t, filepath.Join(caseDir, "goos")); goos != "" {
-		return goos
-	}
-	return "linux"
-}
-
 func readTrimmed(t *testing.T, p string) string {
 	t.Helper()
 	f, err := os.Open(p)

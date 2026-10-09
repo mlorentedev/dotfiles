@@ -57,7 +57,8 @@ func TestNamesVault(t *testing.T) {
 		want      bool
 	}{
 		{"real CLI answer (1.14, macOS)", "name\tknowledge\npath\t/Users/x/Projects/knowledge\nfiles\t2631", true},
-		{"bare name", "knowledge", true},
+		{"bare name is not the record", "knowledge", false},
+		{"an error that mentions the vault", "Error: Vault knowledge not found.", false},
 		{"vault not found", "Vault not found.", false},
 		{"flag read as a command", `Error: Command "--no-sandbox" not found. It may require a plugin to be enabled.`, false},
 		{"another vault", "name\tknowledge-old", false},
@@ -70,18 +71,12 @@ func TestNamesVault(t *testing.T) {
 	}
 }
 
-// --no-sandbox is a Linux AppImage flag; the macOS CLI fails every call that
-// carries it (measured on obsidian 1.14.4).
-func TestObsidianArgsPerOS(t *testing.T) {
-	for goos, want := range map[string]string{
-		"linux":   "--no-sandbox vault --vault knowledge",
-		"windows": "--no-sandbox vault --vault knowledge",
-		"darwin":  "vault --vault knowledge",
-	} {
-		h := &healthRun{opts: HealthOptions{VaultName: "knowledge", GOOS: goos}}
-		if got := strings.Join(h.obsidianArgs("vault"), " "); got != want {
-			t.Errorf("%s: argv %q, want %q", goos, got, want)
-		}
+// One argv on every OS, vault first: `--vault <name>` was silently ignored and
+// `--no-sandbox` read as a command (measured on obsidian 1.14.4).
+func TestObsidianArgs(t *testing.T) {
+	h := &healthRun{opts: HealthOptions{VaultName: "knowledge"}}
+	if got, want := strings.Join(h.obsidianArgs("unresolved", "format=json"), " "), "vault=knowledge unresolved format=json"; got != want {
+		t.Errorf("argv %q, want %q", got, want)
 	}
 }
 

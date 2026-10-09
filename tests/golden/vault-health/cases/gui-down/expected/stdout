@@ -8,4 +8,4 @@ Vault: knowledge (<VAULT>)
 
 [2/7] Vault Connectivity
 [ERROR] Cannot reach Obsidian GUI. Is Obsidian running?
-[INFO] Start Obsidian or run: obsidian --no-sandbox &
+[INFO] Start Obsidian, then re-run.
