@@ -58,6 +58,20 @@ func TestRenderMiseConfig_IsSortedPinnedAndNamesItsSource(t *testing.T) {
 	}
 }
 
+// mise itself is pinned in packages.json and installed by `dotf tools install`.
+// Its own update notice tells the user to run `mise self-update`, which would
+// move it past that pin, so the rendered config turns the notice off.
+func TestRenderMiseConfig_TurnsOffMiseOwnUpdateNotice(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}))
+	if !strings.Contains(out, "\n[settings]\ndisable_update_warning = true\n") {
+		t.Errorf("want disable_update_warning = true under [settings]:\n%s", out)
+	}
+	// The pins stay in [tools]: a table header ends the one before it.
+	if strings.Index(out, "age = ") > strings.Index(out, "[settings]") {
+		t.Errorf("the pins must come before [settings]:\n%s", out)
+	}
+}
+
 // fakeMise answers `mise which <tool>` for the tools in installed, and
 // `<path> --version` with the version installed records; `mise install` marks
 // every pending tool installed at its pin.

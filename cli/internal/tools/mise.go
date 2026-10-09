@@ -76,6 +76,9 @@ func RenderMiseConfig(tools []MiseTool) []byte {
 	for _, t := range tools {
 		fmt.Fprintf(&b, "%s = %q\n", t.Name, t.Version)
 	}
+	// mise is pinned in packages.json; its update notice says `mise self-update`,
+	// which would move it past that pin.
+	b.WriteString("\n[settings]\ndisable_update_warning = true\n")
 	return b.Bytes()
 }
 
