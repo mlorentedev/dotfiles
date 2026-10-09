@@ -139,7 +139,7 @@ func TestCheckMiseTools_FixReplacesACopyWithALinkToMiseShim(t *testing.T) {
 	if got, err := os.Readlink(filepath.Join(bin, "jq")); err != nil || got != shim {
 		t.Errorf("~/.local/bin/jq must now link to mise's shim %q, got %q (%v)", shim, got, err)
 	}
-	if got, _ := os.Readlink(filepath.Join(bin, "age")); got != "/m/age" {
+	if got, _ := os.Readlink(filepath.Join(bin, "age")); got != filepath.FromSlash("/m/age") {
 		t.Errorf("a symlink that was already there must be left alone, got %q", got)
 	}
 	if fi, err := os.Lstat(filepath.Join(bin, "dotf")); err != nil || !fi.Mode().IsRegular() {
