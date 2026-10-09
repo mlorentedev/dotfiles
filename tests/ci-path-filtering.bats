@@ -81,7 +81,7 @@ filters = next(s["with"]["filters"] for s in steps if s.get("id") == "filter")
 code = set(yaml.safe_load(filters)["code"])
 
 docs_only = {
-    "docs/":    "prose; check-doc-paths and check-lessons run in pre-commit, docs-drift on the push to main",
+    "docs/":    "prose; check-doc-paths and lessons-fmt run in pre-commit, docs-drift on the push to main",
     "specs/":   "spec records; archive PRs are the common case, and the spec-id guard runs on the push to main",
     "README.md": "prose",
     "CHANGELOG.md": "written by release-please",

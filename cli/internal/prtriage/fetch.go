@@ -32,6 +32,7 @@ const (
 	// part of the data.
 	prLimit      = 100
 	commentLimit = 100
+	filesLimit   = 100
 
 	// commentFanout bounds the per-pull-request calls. The session-start probe
 	// runs on every session start under a five-second budget (see the caller in
@@ -134,7 +135,61 @@ func fetchWith(ctx context.Context, run ghRunner, repo string, reg Registry) ([]
 	if err != nil {
 		return nil, err
 	}
-	return Queue(prs, reg), nil
+	pending := Queue(prs, reg)
+	if len(reg.Exempt.Signatures) == 0 {
+		return pending, nil
+	}
+	return withoutExempt(ctx, run, base, pending, reg)
+}
+
+// withoutExempt drops a pending PR whose diff is an exempt signature. The file
+// list is read only for a PR the queue would report, which is rarely more than
+// a few, so the session-start path pays no call for a quiet PR.
+//
+// A file list that cannot be read keeps its PR listed and costs nothing else.
+// The queue is already computed at this point; an exemption may only make it
+// quieter, so failing to establish one leaves it as loud as it was, and never
+// turns into an error that would discard every other entry (the session-start
+// probe runs under a deadline, and a slow call here must not empty its answer).
+func withoutExempt(ctx context.Context, run ghRunner, base string, pending []Status, reg Registry) ([]Status, error) {
+	kept := pending[:0]
+	for _, st := range pending {
+		files, err := fetchFiles(ctx, run, base, st.PR.Number)
+		if err != nil {
+			kept = append(kept, st)
+			continue
+		}
+		pr := st.PR
+		pr.Files = files
+		if ev := Evaluate(pr, reg); ev.Pending {
+			kept = append(kept, st)
+		}
+	}
+	return kept, nil
+}
+
+// fetchFiles reads one pull request's changed paths. A full page cannot be
+// compared with a signature, so it returns nil, which is never exempt: the
+// PR stays in the queue rather than leaving it on partial data.
+func fetchFiles(ctx context.Context, run ghRunner, base string, number int) ([]string, error) {
+	out, err := run(ctx, "api", fmt.Sprintf("%s/pulls/%d/files?per_page=%d", base, number, filesLimit))
+	if err != nil {
+		return nil, fmt.Errorf("gh api files for #%d: %w", number, err)
+	}
+	var wire []struct {
+		Filename string `json:"filename"`
+	}
+	if err := json.Unmarshal(out, &wire); err != nil {
+		return nil, fmt.Errorf("parse files for #%d: %w", number, err)
+	}
+	if len(wire) >= filesLimit {
+		return nil, nil
+	}
+	files := make([]string, 0, len(wire))
+	for _, w := range wire {
+		files = append(files, w.Filename)
+	}
+	return files, nil
 }
 
 // withComments resolves every pull request's conversation, overlapping the calls

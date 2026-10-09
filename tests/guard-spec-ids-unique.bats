@@ -7,7 +7,7 @@
 # reality (issue #1533) shared a number: two sessions took the next free
 # HARNESS-NNN from the same tree, neither saw the other's unpushed folder, and
 # main accepted both because nothing asserted across them. The same shape as the
-# lesson-number collisions in guard-lesson-numbers-unique.bats, one directory up.
+# lesson-number collisions that `dotf lessons fmt --check` refuses, one directory up.
 # Measured on main at 0c18d26 before this guard existed: three such pairs
 # reachable from an active or bare-ID folder (HARNESS-027, HARNESS-041,
 # HARNESS-111), all renumbered by the change that added this file, and six more

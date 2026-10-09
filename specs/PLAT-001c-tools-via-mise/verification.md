@@ -29,6 +29,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Manual run (T3): `dotf doctor` on the Mac, before and after, from the same HOME: FAIL 26 -> 15, WARN 24 -> 24. The 11 FAILs gone are the five `~/Applications/<tool>-<version>` directories and the six `*_HOME` variables, now one SKIP each that names mise; `Pinned CLIs (mise)` passes; the tmux remedy reads `brew install tmux`
 - What T3 leaves FAILing on the Mac, each owned elsewhere: `.bashrc` and `.ssh/config` (#2013 P7, gated on B1), `SCRIPTS_DIR` and the git-hooks dispatcher under a `~/.dotfiles` deploy dir the Mac does not have yet, wget, eza, docker and kubectl (class 3 and Wave 3), the secrets chain (registry, bw, hooks: TOOL-013's review), opencode, tmux, and the gemini `mcp_config.json`
 - No regressions: yes. `TestInstall_UnsupportedOS` asserted the opposite of AC3 (an error for a missing asset) and is replaced by the AC3 test
+- Test suite (H4a, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues. Tests: `TestDeploy_TOMLMergeKeepsWhatTheToolWrote`, `TestDeploy_TOMLMergeIsInSyncAfterTheToolReformatsIt`, `TestDeploy_TOMLMergeCreatesAnAbsentDestination`, `TestDeploy_TOMLMergeRefusesADestinationItCannotRead`, `TestParseManifest_RefusesPathsOnATOMLSource`; the JSON merge tests are unchanged and pass
+- Mutation run (H4a): reading a `.toml` destination as JSON fails all five TOML tests
+- W2c on macOS arm64: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` ok; golangci-lint 0 issues. `go run ./cmd/dotf doctor` from the worktree warns about 5 files: `~/.local/bin/{bats,direnv,uv,uvx,zoxide}`. `mise bin-paths --bin-names uv@0.12.18 age@1.3.1` lists `uvx` and `age-keygen` as well (mise 2026.10.3)
 - Test suite (P5a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=darwin` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues
 
 ## Decisions made during implementation
@@ -40,6 +43,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - `docs/runbooks/tool-installation.md` was rewritten. It listed manual install commands, the debt AUDIT-009 flagged, and now documents the channels and how to add a catalog entry.
 
 - T3 gates the two checks that assume the APPS_HOME layout (versioned directories, `*_HOME` set) behind one platform list and one reason per other OS, and leaves `checkVersionedPaths` on every OS: a `*_HOME` that is set must point at a real toolchain whatever installed it (F-041). Declaring a platform on each of doctor's ~45 checks was rejected as scope with no failing case behind it.
+- H4a picks the merge format from the destination's extension rather than a new manifest field: the strategy keeps one meaning (the repo owns the keys it names), and a field would need a manifest version bump that every machine's installed `dotf` refuses until the pin moves. A `dotf` that predates H4a refuses a TOML merge entry with "source is not a JSON object", loudly, so the herdr entry waits for the pin instead of a version bump.
+- H4a re-encodes the merged TOML, so comments in herdr's file do not survive a merge that changes a value. A format-preserving TOML editor in Go would keep them, at the cost of a less common dependency; herdr's own writes do not depend on comments, and an in-sync merge writes nothing.
 - The mise check runs mise through a new `System.CommandStdoutDir` seam from HOME: `mise which` prints its path on stdout and warnings on stderr, and the merged `CommandOutputDir` would make a warning part of the path.
 
 ## Promotion candidates
