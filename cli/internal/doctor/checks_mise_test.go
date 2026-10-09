@@ -119,9 +119,14 @@ func TestCheckMiseTools_ACopyInLocalBinThatShadowsMiseWarnsNamingIt(t *testing.T
 	}
 }
 
-func TestCheckMiseTools_FixRemovesTheShadowingCopiesOnly(t *testing.T) {
+// --fix replaces a copy with a link to mise's shim rather than deleting it: a
+// consumer whose PATH lists ~/.local/bin explicitly (a systemd unit, a plist)
+// keeps resolving the tool, now at its pin, instead of finding nothing.
+func TestCheckMiseTools_FixReplacesACopyWithALinkToMiseShim(t *testing.T) {
 	s, cfg, home := shadowFixture(t, "jq", "dotf")
 	bin := filepath.Join(home, ".local", "bin")
+	shim := filepath.Join(home, ".local", "share", "mise", "shims", "jq")
+	writeFile(t, shim, "#!/bin/sh\n")
 	if err := os.Symlink("/m/age", filepath.Join(bin, "age")); err != nil {
 		t.Fatal(err)
 	}
@@ -129,22 +134,38 @@ func TestCheckMiseTools_FixRemovesTheShadowingCopiesOnly(t *testing.T) {
 	rep := capture(&b)
 	checkMiseTools(s, cfg, rep, true)
 	if rep.Failures() != 0 || rep.Warnings() != 0 {
-		t.Errorf("a repaired leftover is not a warning\n%s", b.String())
+		t.Errorf("a repaired copy is not a warning\n%s", b.String())
 	}
-	if _, err := os.Lstat(filepath.Join(bin, "jq")); !os.IsNotExist(err) {
-		t.Errorf("the shadowing jq was not removed: %v", err)
+	if got, err := os.Readlink(filepath.Join(bin, "jq")); err != nil || got != shim {
+		t.Errorf("~/.local/bin/jq must now link to mise's shim %q, got %q (%v)", shim, got, err)
 	}
-	for _, keep := range []string{"dotf", "age"} {
-		if _, err := os.Lstat(filepath.Join(bin, keep)); err != nil {
-			t.Errorf("%s must survive the fix (not mise's, or a deliberate symlink): %v", keep, err)
-		}
+	if got, _ := os.Readlink(filepath.Join(bin, "age")); got != "/m/age" {
+		t.Errorf("a symlink that was already there must be left alone, got %q", got)
 	}
-	// Idempotent: a second run has nothing to repair.
+	if fi, err := os.Lstat(filepath.Join(bin, "dotf")); err != nil || !fi.Mode().IsRegular() {
+		t.Errorf("a file mise does not provide must be left alone: %v", err)
+	}
+	// Idempotent: the link is a symlink, so a second run has nothing to repair.
 	b.Reset()
 	rep = capture(&b)
 	checkMiseTools(s, cfg, rep, true)
-	if rep.Warnings() != 0 || strings.Contains(b.String(), "removed") {
+	if rep.Warnings() != 0 || strings.Contains(b.String(), "replaced") {
 		t.Errorf("second run must be clean\n%s", b.String())
+	}
+}
+
+// A link to a shim that does not exist would break the consumer the copy still
+// serves, so the copy stays and the WARN names the reshim.
+func TestCheckMiseTools_FixKeepsTheCopyWhenMiseHasNoShimForIt(t *testing.T) {
+	s, cfg, home := shadowFixture(t, "jq")
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, true)
+	if fi, err := os.Lstat(filepath.Join(home, ".local", "bin", "jq")); err != nil || !fi.Mode().IsRegular() {
+		t.Errorf("the copy must stay when there is no shim to link to: %v", err)
+	}
+	if rep.Warnings() != 1 || !strings.Contains(b.String(), "mise reshim") {
+		t.Errorf("want one WARN naming mise reshim\n%s", b.String())
 	}
 }
 

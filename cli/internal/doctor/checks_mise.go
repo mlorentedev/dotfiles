@@ -68,13 +68,16 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 // checkShadowingCopies finds the executables mise provides for the pins that
 // also sit in ~/.local/bin as regular files: the copies setup's own installers
 // placed before mise owned these CLIs (#2013 W2). An activated shell puts mise
-// first, but a GUI app, launchd or cron finds ~/.local/bin and runs a copy no
-// pin governs. mise names the executables (`bin-paths --bin-names`), so a
-// companion such as uvx or age-keygen counts, not only the pin's own name.
+// first, but any PATH that lists ~/.local/bin without mise's shims ahead of it
+// (a systemd unit, a launchd plist, a cron line) runs a copy no pin governs.
+// mise names the executables (`bin-paths --bin-names`), so a companion such as
+// uvx or age-keygen counts, not only the pin's own name.
 //
-// It runs only after every pin is proven to run through mise, which is what
-// makes removing a copy safe. A symlink is left alone: someone made it on
-// purpose.
+// The fix replaces each copy with a link to mise's shim rather than deleting
+// it: a consumer that relied on ~/.local/bin keeps finding the tool, now at its
+// pin. It runs only after every pin is proven to run through mise, and only
+// links to a shim that exists. A symlink is never touched: it is deliberate, or
+// a link this fix made.
 func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *Report, fix bool) {
 	args := []string{"bin-paths", "--bin-names"}
 	for _, p := range pins {
@@ -89,13 +92,12 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 	seen := map[string]bool{}
 	var copies []string
 	for _, name := range strings.Fields(out) {
-		p := filepath.Join(localBin, name)
-		if seen[p] {
+		if seen[name] {
 			continue
 		}
-		seen[p] = true
-		if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
-			copies = append(copies, p)
+		seen[name] = true
+		if fi, err := os.Lstat(filepath.Join(localBin, name)); err == nil && fi.Mode().IsRegular() {
+			copies = append(copies, name)
 		}
 	}
 	if len(copies) == 0 {
@@ -103,15 +105,42 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 	}
 	sort.Strings(copies)
 	if !fix {
-		rep.Warn(fmt.Sprintf("%d file(s) in %s shadow mise's pinned CLIs for a process without mise activated (a GUI app, launchd, cron): %s (run: dotf doctor --fix)",
-			len(copies), localBin, strings.Join(copies, ", ")))
+		paths := make([]string, len(copies))
+		for i, name := range copies {
+			paths[i] = filepath.Join(localBin, name)
+		}
+		rep.Warn(fmt.Sprintf("%d file(s) shadow mise's pinned CLIs for any PATH that lists %s without mise's shims ahead of it: %s (run: dotf doctor --fix, which links each to mise's shim)",
+			len(copies), localBin, strings.Join(paths, ", ")))
 		return
 	}
-	for _, p := range copies {
-		if err := os.Remove(p); err != nil {
-			rep.Warn("cannot remove " + p + ": " + err.Error())
+	shims := tools.MiseShimsDir(home, sys.Getenv)
+	for _, name := range copies {
+		dst := filepath.Join(localBin, name)
+		shim := filepath.Join(shims, name)
+		if _, err := os.Stat(shim); err != nil {
+			rep.Warn(fmt.Sprintf("%s shadows mise's pin, and mise has no shim for it at %s to link to (run: mise reshim, then dotf doctor --fix)", dst, shim))
 			continue
 		}
-		rep.Fix("removed " + p + ", a copy that shadowed mise's pinned CLI")
+		if err := replaceWithLink(dst, shim); err != nil {
+			rep.Warn("cannot link " + dst + " to mise's shim: " + err.Error())
+			continue
+		}
+		rep.Fix("replaced " + dst + " with a link to mise's shim " + shim)
 	}
+}
+
+// replaceWithLink makes dst a symlink to target in one rename, so dst is the
+// old file or the link and never missing. A failed symlink leaves dst as it
+// was (Windows without the privilege to create one, for instance).
+func replaceWithLink(dst, target string) error {
+	tmp := dst + ".dotf-link"
+	_ = os.Remove(tmp) // a leftover from an interrupted run
+	if err := os.Symlink(target, tmp); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }

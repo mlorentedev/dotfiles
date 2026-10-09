@@ -124,10 +124,11 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 
 The installers W2 deletes left copies on every machine they ran on. Measured on the Mac (2026-10-08): `bats`, `direnv`, `zoxide`, `uv` and `uvx` sit in `~/.local/bin` beside mise's pinned ones.
 
-- [x] Failing tests first: a regular file named like an executable mise provides warns and names it (a companion such as `age-keygen` counts); `--fix` removes it, keeps a symlink and a file mise does not provide, and a second run is clean; nothing is touched while a pin does not run through mise; a failing `mise bin-paths` warns naming the command
+- [x] Failing tests first: a regular file named like an executable mise provides warns and names it (a companion such as `age-keygen` counts); `--fix` replaces it with a link to mise's shim, keeps a symlink and a file mise does not provide, keeps the copy when no shim exists, and a second run is clean; nothing is touched while a pin does not run through mise; a failing `mise bin-paths` warns naming the command
 - [x] `checkMiseTools` asks mise what each pin provides (`mise bin-paths --bin-names name@version`), not the pin's name, because uv brings uvx and age brings age-keygen
-- [x] The check runs only after every pin is proven at its pin through mise: that is what makes removing a copy safe. It is a WARN, never a FAIL. Owner decision: `dotf doctor --fix` removes the copies
-- [x] Mutation-checked: dropping the symlink exemption, or running the check before the pins are verified, turns tests red
+- [x] The check runs only after every pin is proven at its pin through mise: that is what makes replacing a copy safe. It is a WARN, never a FAIL. Owner decision: `dotf doctor --fix` removes the copies
+- [x] Review triage: `--fix` replaces each copy with a link to mise's shim instead of deleting it (`MiseShimsDir`, one rename, only to a shim that exists). A deleted copy would leave a consumer whose PATH lists `~/.local/bin` explicitly with nothing, which is worse than the old version; the link keeps it resolvable, now at the pin. The copy's content is still gone, as the owner decided
+- [x] Mutation-checked: dropping the symlink exemption, running the check before the pins are verified, or linking without checking the shim exists turns tests red
 - [x] Runbook: `docs/runbooks/tool-installation.md` says where the copies come from and how `--fix` treats them
 
 ## Closing
