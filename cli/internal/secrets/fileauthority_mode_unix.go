@@ -21,11 +21,9 @@ import (
 // The Windows half returns nil and says the same thing from the other file, so
 // the asymmetry is declared in both places rather than inferred from one.
 func checkKeyMode(fi os.FileInfo, path string, want fs.FileMode) error {
-	if want == 0 {
-		want = 0o600
-	}
-	if got := fi.Mode().Perm(); got != want.Perm() {
-		return fmt.Errorf("%s has mode %04o, expected %04o", path, got, want.Perm())
+	want = declaredKeyMode(want)
+	if got := fi.Mode().Perm(); got != want {
+		return fmt.Errorf("%s has mode %04o, expected %04o", path, got, want)
 	}
 	return nil
 }
