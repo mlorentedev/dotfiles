@@ -64,6 +64,11 @@ type ReviewerEntry struct {
 	Role     string `json:"role"`
 	SecretID string `json:"secret_id,omitempty"`
 	Auth     string `json:"auth,omitempty"`
+	// Vendor is who trains the model ("xiaomi", "anthropic", ...): the unit a
+	// second signature must differ in. Signs is the signature the member may
+	// give: first (the default), second or fallback. See review_slot.go.
+	Vendor string `json:"vendor,omitempty"`
+	Signs  string `json:"signs,omitempty"`
 }
 
 // ReviewerCommand builds the argv that runs one pooled reviewer non-interactively.
@@ -199,7 +204,12 @@ func agyReviewerCommand(model, prompt string, timeout time.Duration, repoRoot, g
 
 // TranscriptPath is where the launched reviewer's event stream lands for a spec.
 func TranscriptPath(repoRoot, specID string) string {
-	return filepath.Join(repoRoot, "specs", specID, TranscriptFile)
+	return TranscriptPathIn(repoRoot, specID, FirstSigner)
+}
+
+// TranscriptPathIn is TranscriptPath for one signer's slot.
+func TranscriptPathIn(repoRoot, specID string, slot ReviewSlot) string {
+	return filepath.Join(repoRoot, "specs", specID, slot.Transcript)
 }
 
 // StderrPath is where the launched reviewer's stderr lands, beside the
@@ -283,6 +293,13 @@ func ResolveReviewer(entries []ReviewerEntry, want string) (ReviewerEntry, error
 // executed; one cited a string that exists nowhere in the code, having read a
 // mutation payload out of the spec folder as if it were the implementation.
 func ReviewPrompt(specID, repoRoot, reviewerID, runner, skillPath, baseSHA string) string {
+	return ReviewPromptIn(FirstSigner, specID, repoRoot, reviewerID, runner, skillPath, baseSHA)
+}
+
+// ReviewPromptIn is ReviewPrompt for one signer's slot. The second signer is
+// told where its verdict goes and that the first verdict is not its input: two
+// signatures are worth more than one only while neither has read the other.
+func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPath, baseSHA string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
 	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
@@ -303,7 +320,12 @@ func ReviewPrompt(specID, repoRoot, reviewerID, runner, skillPath, baseSHA strin
 	b.WriteString("Mechanical constraints:\n")
 	fmt.Fprintf(&b, "- Write your verdict to `specs/%s/%s`, overwriting what is there. The YAML\n"+
 		"  frontmatter is part of the deliverable; `dotf spec archive` parses it and refuses a\n"+
-		"  malformed one.\n", specID, ReviewFile)
+		"  malformed one.\n", specID, slot.Review)
+	if slot.Name == SecondSigner.Name {
+		fmt.Fprintf(&b, "- You are the SECOND signer, of a different vendor than the first. Do NOT read\n"+
+			"  `specs/%s/%s` or its transcript: your verdict must be independent of it, and the\n"+
+			"  archive counts the two only because neither saw the other.\n", specID, ReviewFile)
+	}
 	fmt.Fprintf(&b, "- Set `reviewer:` to exactly `%s`. That string is matched against this repo's\n"+
 		"  reviewer pool, so any other spelling is refused even when the model is correct.\n", reviewerID)
 	b.WriteString("- Set `reviewed_sha` to the output of `git rev-parse HEAD`.\n")

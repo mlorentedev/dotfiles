@@ -116,3 +116,5 @@ CLAUDE.md
 # been pushed at all (#998).
 specs/**/review-transcript.jsonl
 specs/**/review-transcript.jsonl.stderr
+specs/**/review-second-transcript.jsonl
+specs/**/review-second-transcript.jsonl.stderr

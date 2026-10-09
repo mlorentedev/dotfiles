@@ -155,6 +155,11 @@ func normalizeVerdict(raw string) Verdict {
 }
 
 func ParseReview(content string) (Review, error) {
+	return parseReviewAs(content, ReviewFile)
+}
+
+// parseReviewAs is ParseReview with the file name its errors report.
+func parseReviewAs(content, name string) (Review, error) {
 	f := frontmatterFields(content)
 	r := Review{
 		Spec:        f["spec"],
@@ -164,13 +169,13 @@ func ParseReview(content string) (Review, error) {
 		Date:        f["date"],
 	}
 	if r.Verdict == "" {
-		return r, fmt.Errorf("%s has no `verdict:` field in its frontmatter", ReviewFile)
+		return r, fmt.Errorf("%s has no `verdict:` field in its frontmatter", name)
 	}
 	if r.Verdict != VerdictPass && r.Verdict != VerdictPassWithGaps && r.Verdict != VerdictFail {
-		return r, fmt.Errorf("%s has an unrecognized verdict %q (want PASS, PASS-WITH-GAPS or FAIL)", ReviewFile, r.Verdict)
+		return r, fmt.Errorf("%s has an unrecognized verdict %q (want PASS, PASS-WITH-GAPS or FAIL)", name, r.Verdict)
 	}
 	if r.ReviewedSHA == "" {
-		return r, fmt.Errorf("%s has no `reviewed_sha:` field — the review cannot be checked for staleness", ReviewFile)
+		return r, fmt.Errorf("%s has no `reviewed_sha:` field — the review cannot be checked for staleness", name)
 	}
 	return r, nil
 }
@@ -178,14 +183,19 @@ func ParseReview(content string) (Review, error) {
 // FindReview loads specDir/review.md. found is false when the file is absent,
 // which the caller reports differently from a malformed one.
 func FindReview(specDir string) (review Review, found bool, err error) {
-	data, readErr := os.ReadFile(filepath.Join(specDir, ReviewFile))
+	return FindReviewIn(specDir, FirstSigner)
+}
+
+// FindReviewIn loads the verdict of one signer's slot.
+func FindReviewIn(specDir string, slot ReviewSlot) (review Review, found bool, err error) {
+	data, readErr := os.ReadFile(filepath.Join(specDir, slot.Review))
 	if os.IsNotExist(readErr) {
 		return Review{}, false, nil
 	}
 	if readErr != nil {
 		return Review{}, false, readErr
 	}
-	parsed, parseErr := ParseReview(string(data))
+	parsed, parseErr := parseReviewAs(string(data), slot.Review)
 	return parsed, true, parseErr
 }
 
@@ -328,37 +338,65 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 		return nil
 	}
 
-	review, found, err := FindReview(specDir)
+	first, err := checkSignature(repoRoot, specID, specDir, FirstSigner, checker)
+	if err != nil {
+		return err
+	}
+
+	// The second signature (AI-045, #1923) is required by `risk: high`, and
+	// checked whenever it is present: a FAIL from a second signer someone chose
+	// to run is still a FAIL.
+	var second *Review
+	if _, statErr := os.Stat(filepath.Join(specDir, SecondSigner.Review)); statErr == nil || RiskHigh(specDir) {
+		r, sErr := checkSignature(repoRoot, specID, specDir, SecondSigner, checker)
+		if sErr != nil {
+			return sErr
+		}
+		second = &r
+	}
+	return checkSigners(repoRoot, specDir, first, second)
+}
+
+// checkSignature runs every per-signature check on one slot, in the order
+// below, and returns the verdict it validated.
+func checkSignature(repoRoot, specID, specDir string, slot ReviewSlot, checker StalenessChecker) (Review, error) {
+	review, found, err := FindReviewIn(specDir, slot)
 	if !found {
-		return withTurnCapHint(fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
+		if slot.Name == SecondSigner.Name {
+			return Review{}, fmt.Errorf("proposal.md declares `risk: high`, which needs a second signature from another vendor, and there is no %s\n"+
+				"run `dotf spec review %s --second` once the first review has passed\n"+
+				"to proceed without one, lower the declared risk in proposal.md, or declare `review: waived` with a `review_waived_reason:`",
+				slot.Review, specID)
+		}
+		return Review{}, withTurnCapHint(fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
 			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
-			ReviewFile), repoRoot, specID, specDir)
+			slot.Review), repoRoot, specID, specDir, slot)
 	}
 	if err != nil {
-		return fmt.Errorf("%w\nfix the artifact, or declare `review: waived` with a reason in proposal.md", err)
+		return Review{}, fmt.Errorf("%w\nfix the artifact, or declare `review: waived` with a reason in proposal.md", err)
 	}
 	// A review.md copied from a sibling spec would otherwise satisfy the gate
 	// while describing a different change — the copy-paste analogue of the
 	// one-line alibi SPEC_FLOOR exists to defeat in check-spec-gate.sh.
 	if review.Spec != "" && review.Spec != specID {
-		return fmt.Errorf("%s declares spec %q but lives in %q — the review describes a different change\n"+
+		return Review{}, fmt.Errorf("%s declares spec %q but lives in %q — the review describes a different change\n"+
 			"re-run /adversarial-review for this spec",
-			ReviewFile, review.Spec, specID)
+			slot.Review, review.Spec, specID)
 	}
 	// Provenance before verdict, deliberately. Both later checks read the file's
 	// CLAIMS; this one asks whether the file is the answer to the question this
 	// repository asked. Put it after, and a stale PASS left behind by a reviewer
 	// that wrote nothing would be accepted before anything looked.
-	if err := checkReviewProvenance(specDir, review); err != nil {
+	if err := checkReviewProvenanceIn(specDir, slot, review); err != nil {
 		if errors.Is(err, errNoNewVerdict) {
-			err = withTurnCapHint(err, repoRoot, specID, specDir)
+			err = withTurnCapHint(err, repoRoot, specID, specDir, slot)
 		}
-		return err
+		return Review{}, err
 	}
 	if review.Verdict.Blocks() {
-		return fmt.Errorf("%s records verdict %s — address the findings and re-review before archiving\n"+
+		return Review{}, fmt.Errorf("%s records verdict %s — address the findings and re-review before archiving\n"+
 			"a FAIL is resolved by its findings: apply them in a follow-up, then re-review",
-			ReviewFile, review.Verdict)
+			slot.Review, review.Verdict)
 	}
 
 	// The first exit named is the one that keeps the review, and it is named
@@ -371,20 +409,20 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 	// BUG-093 (#1516), where four of them targeted the contract set. Restoring
 	// the contract and recording the dispositions is the correct answer there,
 	// and it was not previously on offer.
-	if stale, known, reason := reviewStale(repoRoot, specID, specDir, review, checker); known && stale {
-		return fmt.Errorf("%s is stale: %s\n"+
+	if stale, known, reason := reviewStale(repoRoot, specID, specDir, slot, review, checker); known && stale {
+		return Review{}, fmt.Errorf("%s is stale: %s\n"+
 			"keeps the review:\n"+
 			"  restore the contract files to the content the review was launched against, and record what changed as dispositions in verification.md (excluded from this check)\n"+
 			"discards it — only if the review is genuinely no longer the right one:\n"+
 			"  re-run /adversarial-review against the current head\n"+
 			"  declare `review: waived` with a reason in proposal.md",
-			ReviewFile, reason)
+			slot.Review, reason)
 	}
 
 	// Last, because it is the only check that asks WHO reviewed rather than
 	// what they concluded — a valid, fresh, passing review signed by the wrong
 	// model is still a self-review, and the earlier checks cannot see that.
-	return checkReviewerPool(repoRoot, review.Reviewer)
+	return review, checkReviewerPool(repoRoot, slot.Review, review.Reviewer)
 }
 
 // reviewStale decides whether the review still describes the contract: by
@@ -396,8 +434,8 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 // workflow, and whether its object still exists locally is a fact about
 // garbage collection, not about the review (#1566, #970). Comparing against
 // disk also keeps the uncommitted-edit bypass closed.
-func reviewStale(repoRoot, specID, specDir string, review Review, checker StalenessChecker) (stale, known bool, reason string) {
-	if req, found, err := ReadReviewRequest(specDir); err == nil && found && len(req.ContractDigests) > 0 {
+func reviewStale(repoRoot, specID, specDir string, slot ReviewSlot, review Review, checker StalenessChecker) (stale, known bool, reason string) {
+	if req, found, err := ReadReviewRequestIn(specDir, slot); err == nil && found && len(req.ContractDigests) > 0 {
 		if moved := changedContracts(specDir, req.ContractDigests); len(moved) > 0 {
 			return true, true, fmt.Sprintf("%s changed since the review was launched (its content digest differs)",
 				strings.Join(moved, ", "))
@@ -438,16 +476,21 @@ func changedContracts(specDir string, recorded map[string]string) []string {
 // waive the review in proposal.md. Only the archive gate reaches this, so the
 // launcher is never refused for lacking the file it is about to write.
 func checkReviewProvenance(specDir string, review Review) error {
-	req, found, err := ReadReviewRequest(specDir)
+	return checkReviewProvenanceIn(specDir, FirstSigner, review)
+}
+
+// checkReviewProvenanceIn is checkReviewProvenance for one signer's slot.
+func checkReviewProvenanceIn(specDir string, slot ReviewSlot, review Review) error {
+	req, found, err := ReadReviewRequestIn(specDir, slot)
 	if err != nil {
 		return fmt.Errorf("%w\nrepair or delete it and re-run /adversarial-review", err)
 	}
 	if !found {
-		path := filepath.Join(specDir, ReviewRequestFile)
+		path := filepath.Join(specDir, slot.Request)
 		return fmt.Errorf("no %s beside %s: the archive cannot verify which reviewer was launched or against which commit\n"+
 			"the launcher writes it on every `dotf spec review`. It goes missing when the repository ignores it (check `git check-ignore -v %s`), or when the review was not launched by dotf\n"+
-			"un-ignore `specs/**/%s`, then `git add -f` the existing request, or re-run `dotf spec review %s` and commit what it writes",
-			ReviewRequestFile, ReviewFile, path, ReviewRequestFile, filepath.Base(specDir))
+			"un-ignore `specs/**/%s`, then `git add -f` the existing request, or re-run `dotf spec review %s%s` and commit what it writes",
+			slot.Request, slot.Review, path, slot.Request, filepath.Base(specDir), slot.Flag())
 	}
 	// Present but empty is the same skip as absent: every cross-check below
 	// is conditional on the field it compares, so a `{}` would pass them all.
@@ -455,26 +498,26 @@ func checkReviewProvenance(specDir string, review Review) error {
 	// was not written by it.
 	if req.ReviewedSHA == "" || req.Reviewer == "" {
 		return fmt.Errorf("%s records no reviewed_sha or no reviewer, so it proves nothing about the run that wrote %s\n"+
-			"the launcher always writes both; re-run `dotf spec review %s` and commit what it writes",
-			ReviewRequestFile, ReviewFile, filepath.Base(specDir))
+			"the launcher always writes both; re-run `dotf spec review %s%s` and commit what it writes",
+			slot.Request, slot.Review, filepath.Base(specDir), slot.Flag())
 	}
 
 	// The digest is the no-verdict case, and it is checked first because it
 	// explains the sha mismatch that would otherwise be reported instead: a
 	// reviewer that wrote nothing leaves the PREVIOUS round's sha in place, and
 	// "the shas differ" would send the reader hunting for a rebase.
-	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == fileDigest(filepath.Join(specDir, ReviewFile)) {
+	if req.ReviewDigestBefore != "" && req.ReviewDigestBefore == fileDigest(filepath.Join(specDir, slot.Review)) {
 		return fmt.Errorf("%s has not changed since the review was launched — %w\n"+
 			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
 			"re-run /adversarial-review (a run ended by a turn limit or a rate limit leaves exactly this state)",
-			ReviewFile, errNoNewVerdict)
+			slot.Review, errNoNewVerdict)
 	}
 
 	if req.ReviewedSHA != "" && review.ReviewedSHA != "" && req.ReviewedSHA != review.ReviewedSHA {
 		return fmt.Errorf("%s claims reviewed_sha %s but the review was launched against %s\n"+
 			"the launcher records the head it pointed the reviewer at; the frontmatter is the reviewer's own claim about it\n"+
 			"re-run /adversarial-review against the current head",
-			ReviewFile, short(review.ReviewedSHA), short(req.ReviewedSHA))
+			slot.Review, short(review.ReviewedSHA), short(req.ReviewedSHA))
 	}
 
 	// Reviewer identity, last of the three: checkReviewerPool already refuses a
@@ -484,7 +527,7 @@ func checkReviewProvenance(specDir string, review Review) error {
 	if req.Reviewer != "" && review.Reviewer != "" && req.Reviewer != review.Reviewer {
 		return fmt.Errorf("%s is signed by %q but %q was launched — the verdict is not from the run that was requested\n"+
 			"re-run /adversarial-review",
-			ReviewFile, review.Reviewer, req.Reviewer)
+			slot.Review, review.Reviewer, req.Reviewer)
 	}
 	return nil
 }

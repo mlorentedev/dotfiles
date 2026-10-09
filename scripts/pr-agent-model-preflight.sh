@@ -19,7 +19,8 @@
 #
 # It never CHOOSES a model. The chain is declared in the workflow and in
 # .pr_agent.toml (a test holds the two equal), and this only skips dead entries
-# in that order. Anything outside the chain is never considered, whatever NaN
+# in that order. The draw among the members that answered is
+# scripts/pr-agent-route.sh's (AI-045 AC9). Anything outside the chain is never considered, whatever NaN
 # serves: `GET /v1/models` lists what the cluster runs, not what the key may
 # call (https://nan.builders/docs/choose-a-model), so only a real call counts.
 #
@@ -42,7 +43,7 @@
 #
 # Exit:
 #   0  a model answered
-#   1  no declared model answered
+#   1  no declared model answered (the review pool continues without NaN)
 #   2  usage or setup error
 
 set -uo pipefail
@@ -142,13 +143,16 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         if [ "${#answered[@]}" -gt 0 ]; then
             printf '\nReviewing with %s.\n' "\`${answered[0]}\`"
         else
-            printf '\nNo declared model answered, so PR-Agent did not run.\n'
+            printf '\nNo declared model answered, so NaN is out of the review pool for this run.\n'
         fi
     } >> "$GITHUB_STEP_SUMMARY"
 fi
 
 if [ "${#answered[@]}" -eq 0 ]; then
-    printf '::error::No model in PR-Agent'\''s declared chain answered, so no review can run.'
+    # A warning, not an error: NaN is out of the review pool for this run, and
+    # the pool's Anthropic member may still review (scripts/pr-agent-route.sh).
+    # The final guard fails the job if nothing was published.
+    printf '::warning::No model in PR-Agent'\''s declared NaN chain answered, so NaN is out of the review pool for this run.'
     printf ' The warnings above give each model'\''s status and what to do about it.\n'
     exit 1
 fi

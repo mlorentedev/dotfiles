@@ -75,7 +75,7 @@ var resolveReviewBase = spec.ResolveReviewBase
 var headSHAOf = spec.HeadSHA
 
 // requestIgnored is a seam over spec.RequestIgnored, for the same reason.
-var requestIgnored = spec.RequestIgnored
+var requestIgnored = spec.RequestIgnoredIn
 
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
@@ -122,10 +122,12 @@ var runForeground = func(dir string, argv []string, transcript string) error {
 
 func newSpecReviewCmd() *cobra.Command {
 	var (
-		reviewer   string
-		foreground bool
-		dryRun     bool
-		timeout    time.Duration
+		reviewer       string
+		foreground     bool
+		dryRun         bool
+		second         bool
+		fallbackReason string
+		timeout        time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -150,8 +152,15 @@ so the run can be watched while it happens; attach with the command printed on
 launch. Without tmux (Windows, or a machine that lacks it) the run goes to the
 foreground and says so. A machine-readable transcript is written beside the
 review, because the verdict records what a reviewer concluded and the transcript
-is the only record of how.`,
-		Example:      "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.1-pro-high",
+is the only record of how.
+
+A spec whose proposal.md declares ` + "`risk: high`" + ` also needs a second signature, from
+a pool member of another vendor that declares ` + "`signs: second`" + `: --second launches it,
+after the first review, into review-second.md. A member that declares
+` + "`signs: fallback`" + ` signs first only when the first signers failed, and
+--fallback-reason names how they failed.`,
+		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.1-pro-high\n" +
+			"  dotf spec review FEAT-012-reviewer-pool --second\n  dotf spec review FEAT-012-reviewer-pool --fallback-reason rate-limit",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -177,14 +186,7 @@ is the only record of how.`,
 			if err != nil {
 				return err
 			}
-			var chosen spec.ReviewerEntry
-			how := "requested"
-			if strings.TrimSpace(reviewer) == "" {
-				chosen, err = spec.DrawReviewer(entries, reviewerDraw)
-				how = "random draw"
-			} else {
-				chosen, err = spec.ResolveReviewer(entries, reviewer)
-			}
+			slot, chosen, how, err := chooseForLaunch(specDir, entries, reviewer, fallbackReason, second)
 			if err != nil {
 				return err
 			}
@@ -213,13 +215,13 @@ is the only record of how.`,
 					"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
 			}
 
-			argv, err := reviewerArgv(chosen, id, repoRoot, skill, baseSHA, timeout)
+			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, baseSHA, timeout)
 			if err != nil {
 				return err
 			}
 
-			transcript := spec.TranscriptPath(repoRoot, id)
-			session := spec.TmuxSession(id)
+			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
+			session := slot.Session(id)
 			useTmux := !foreground
 			if useTmux {
 				if _, lookErr := lookPath("tmux"); lookErr != nil {
@@ -265,15 +267,15 @@ is the only record of how.`,
 			// launched without one spends a review that can never archive.
 			// Refusing here costs nothing yet. So does an ignored request: it is
 			// written, and lost on every checkout but this one.
-			if requestIgnored(repoRoot, specDir) {
+			if requestIgnored(repoRoot, specDir, slot) {
 				return fmt.Errorf("git ignores specs/%s/%s, so the review would not archive from any other checkout\n"+
 					"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
-					id, spec.ReviewRequestFile, spec.ReviewRequestFile)
+					id, slot.Request, slot.Request)
 			}
-			if err := spec.WriteReviewRequest(specDir, headSHA, chosen.ID, baseSHA); err != nil {
+			if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, chosen.ID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
 				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
 					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
-					err, spec.ReviewRequestFile)
+					err, slot.Request)
 			}
 
 			if useTmux {
@@ -281,11 +283,11 @@ is the only record of how.`,
 				if err := runCommand(repoRoot, launch); err != nil {
 					return fmt.Errorf("starting the tmux session: %w", err)
 				}
-				if err := confirmLaunched(session, transcript, id, chosen, entries); err != nil {
+				if err := confirmLaunched(slot, session, transcript, id, chosen, entries); err != nil {
 					return err
 				}
 				cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
-				cmd.Printf("When it finishes, %s carries the verdict and archive reads it.\n", spec.ReviewFile)
+				cmd.Printf("When it finishes, %s carries the verdict and archive reads it.\n", slot.Review)
 				return nil
 			}
 
@@ -295,23 +297,55 @@ is the only record of how.`,
 			// reported here, with the transcript still in hand, instead of being left
 			// for whoever next tries to archive.
 			runErr := runForeground(repoRoot, launch, transcript)
-			return foregroundOutcome(specDir, transcript, chosen.Runner, runErr)
+			return foregroundOutcome(slot, specDir, transcript, chosen.Runner, runErr)
 		},
 	}
 
 	cmd.Flags().StringVar(&reviewer, "reviewer", "", "pool member to run (default: one drawn at random from the pool)")
 	cmd.Flags().BoolVar(&foreground, "foreground", false, "run in this terminal instead of a detached tmux session")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command that would run, and exit")
+	cmd.Flags().BoolVar(&second, "second", false, "launch the second signature, from a `signs: second` member of another vendor than the first signer, into "+spec.SecondSigner.Review)
+	cmd.Flags().StringVar(&fallbackReason, "fallback-reason", "",
+		"launch a `signs: fallback` member as the first signer, naming how the first signers failed: "+strings.Join(spec.FallbackReasons, ", "))
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
 	return cmd
 }
 
+// chooseForLaunch resolves which signature this launch gives and which pool
+// member gives it, and says how the member was picked for the launch line.
+func chooseForLaunch(specDir string, entries []spec.ReviewerEntry, reviewer, fallbackReason string, second bool) (spec.ReviewSlot, spec.ReviewerEntry, string, error) {
+	choice := spec.ReviewerChoice{Slot: spec.FirstSigner, Want: reviewer, FallbackReason: fallbackReason}
+	if second {
+		choice.Slot = spec.SecondSigner
+		vendor, err := spec.FirstSignerVendor(specDir, entries)
+		if err != nil {
+			return choice.Slot, spec.ReviewerEntry{}, "", err
+		}
+		choice.FirstVendor = vendor
+	}
+	chosen, err := spec.ChooseReviewer(entries, choice, reviewerDraw)
+	if err != nil {
+		return choice.Slot, spec.ReviewerEntry{}, "", err
+	}
+	how := "requested"
+	if strings.TrimSpace(reviewer) == "" {
+		how = "random draw"
+	}
+	if r := strings.TrimSpace(fallbackReason); r != "" {
+		how += ", fallback: " + r
+	}
+	if second {
+		how += ", second signer"
+	}
+	return choice.Slot, chosen, how, nil
+}
+
 // foregroundOutcome is how a foreground review ended: a missing or stale verdict
 // is the error, with the turn cap named when the runner's transcript shows one
 // (GUARD-005b), and the runner's own exit status is carried alongside it.
-func foregroundOutcome(specDir, transcript, runner string, runErr error) error {
-	err := spec.VerifyReviewProduced(specDir, transcript)
+func foregroundOutcome(slot spec.ReviewSlot, specDir, transcript, runner string, runErr error) error {
+	err := spec.VerifyReviewProducedIn(specDir, slot, transcript)
 	if err == nil {
 		return runErr
 	}
@@ -350,11 +384,11 @@ growing length.`,
 // reviewerArgv is the pooled runner's command with its prompt, the time budget
 // included, under the deadline every runner gets in both modes (HARNESS-152).
 // Only agy used to be bounded, through its own --print-timeout.
-func reviewerArgv(chosen spec.ReviewerEntry, id, repoRoot, skill, baseSHA string, timeout time.Duration) ([]string, error) {
+func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill, baseSHA string, timeout time.Duration) ([]string, error) {
 	if timeout <= 0 {
 		timeout = spec.DefaultReviewerTimeout
 	}
-	prompt := spec.ReviewPrompt(id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA) +
+	prompt := spec.ReviewPromptIn(slot, id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA) +
 		"\n" + spec.TimeBudget(time.Now(), timeout)
 	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
 	if err != nil {
@@ -439,7 +473,7 @@ var transcriptSink = func(transcript string) []string {
 // fail; it does NOT promise the run will finish. A death at minute three is
 // inherently unwatched in detached mode, and `spec archive` refusing without a
 // review.md stays the backstop for that.
-func confirmLaunched(session, transcript, specID string, current spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
+func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, current spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
 	const (
 		window = 3 * time.Second        // ~6x the slowest observed startup failure
 		step   = 250 * time.Millisecond // cheap enough to poll, coarse enough not to spin
@@ -451,14 +485,14 @@ func confirmLaunched(session, transcript, specID string, current spec.ReviewerEn
 		}
 		var nextAdvice string
 		for _, e := range entries {
-			if e.ID != current.ID {
-				nextAdvice = fmt.Sprintf("\nOr try another pool member (e.g. if saturated):\n    dotf spec review %s --reviewer %s", specID, e.ID)
+			if e.ID != current.ID && e.SignatureRole() == current.SignatureRole() {
+				nextAdvice = fmt.Sprintf("\nOr try another pool member (e.g. if saturated):\n    dotf spec review %s --reviewer %s%s", specID, e.ID, slot.Flag())
 				break
 			}
 		}
 		return fmt.Errorf("the review died on startup — tmux session %q is already gone.\n%s\n"+
 			"Nothing was reviewed and %s was not written; re-run with --foreground to watch it fail live.%s",
-			session, reviewerLastWords(transcript), spec.ReviewFile, nextAdvice)
+			session, reviewerLastWords(transcript), slot.Review, nextAdvice)
 	}
 	return nil
 }

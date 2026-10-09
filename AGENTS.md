@@ -175,10 +175,12 @@ session **cannot be the reviewer**.
 
 Who reviews is not an open question in this repo. `harness/reviewer-pool.json`
 is the allow-list of models permitted to sign a `review.md`, and `dotf spec
-archive` refuses one signed outside it — so an adversarial review **never runs
-on an Anthropic model here**, and running it on one is wasted work rather than
-merely discouraged. Launch it with `dotf spec review <feature-id>`, which
-resolves the model from the pool, pins provider and model explicitly rather
+archive` refuses one signed outside it — so an Anthropic model **never signs a
+review alone here** (#1923, amendment B). The first signature is always another
+vendor's; an Anthropic member signs only second (`--second`, required when
+`proposal.md` declares `risk: high`) or as the recorded fallback when the first
+signers failed (`--fallback-reason`), and the archive gate checks both. Launch
+it with `dotf spec review <feature-id>`, which resolves the model from the pool, pins provider and model explicitly rather
 than inheriting a runner's default, and runs detached in `review-<feature-id>`
 so the run can be watched. Full activation rule (checks, phrasing, when NOT to
 propose) is the SSOT in the `/adversarial-review` skill.

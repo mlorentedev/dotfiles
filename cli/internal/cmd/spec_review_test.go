@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // seedPool writes a repo whose pool holds one pi-backed reviewer.
@@ -236,7 +238,7 @@ func TestSpecReviewRefusesWhenGitIgnoresTheRequest(t *testing.T) {
 	stubLaunch(t, true)
 	launched := false
 	runCommand = func(string, []string) error { launched = true; return nil }
-	requestIgnored = func(string, string) bool { return true }
+	requestIgnored = func(string, string, spec.ReviewSlot) bool { return true }
 	req := filepath.Join(root, "specs", "AI-001-x", "review-request.json")
 	before, err := os.ReadFile(req)
 	if err != nil {
@@ -343,5 +345,86 @@ func TestSpecReviewRedirectsStderrBesideTheTranscript(t *testing.T) {
 	}
 	if strings.Contains(out, "2>&1") {
 		t.Errorf("stderr must not be folded into the transcript pipe:\n%s", out)
+	}
+}
+
+// seedSignerPool writes a pool with one first signer and one Anthropic member
+// for each non-first role (AI-045, #1923).
+func seedSignerPool(t *testing.T, root string) {
+	t.Helper()
+	dir := filepath.Join(root, "harness")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pool := `{"pool":[
+ {"id":"nan/deepseek-v4-flash","runner":"pi","provider":"nan","model":"deepseek-v4-flash","vendor":"deepseek"},
+ {"id":"anthropic-review/claude-haiku-5-5","runner":"pi","provider":"anthropic-review","model":"claude-haiku-5-5","vendor":"anthropic","signs":"fallback"},
+ {"id":"anthropic-review/claude-sonnet-5-5","runner":"pi","provider":"anthropic-review","model":"claude-sonnet-5-5","vendor":"anthropic","signs":"second"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "reviewer-pool.json"), []byte(pool), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// --second is given after a first signer's launch, never in place of it.
+func TestSpecReviewSecondNeedsAFirstLaunch(t *testing.T) {
+	root := makeRepo(t)
+	seedSignerPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\nrisk: high\n---\n# AI-001-x\n")
+	// seedSpec may lay down a fixture request; this test is the state without one.
+	_ = os.Remove(filepath.Join(root, "specs", "AI-001-x", spec.ReviewRequestFile))
+
+	_, _, err := execute(t, "spec", "review", "AI-001-x", "--second", "--dry-run")
+	if err == nil || !strings.Contains(err.Error(), "run `dotf spec review AI-001-x` first") {
+		t.Fatalf("want a refusal naming the first launch, got: %v", err)
+	}
+}
+
+// After a first launch, --second draws the cross-vendor second signer and
+// writes into the second slot's own files, under its own session.
+func TestSpecReviewSecondLaunchesTheSecondSigner(t *testing.T) {
+	root := makeRepo(t)
+	seedSignerPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\nrisk: high\n---\n# AI-001-x\n")
+	specDir := filepath.Join(root, "specs", "AI-001-x")
+	if err := spec.WriteReviewRequest(specDir, "headheadhead", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
+		t.Fatal(err)
+	}
+	// The session name is printed only on the detached path, so tmux "exists"
+	// here whatever the machine has (a CI runner has none).
+	prev := lookPath
+	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
+	t.Cleanup(func() { lookPath = prev })
+
+	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--second", "--dry-run")
+	if err != nil {
+		t.Fatalf("spec review --second --dry-run: %v\n%s", err, stdout+stderr)
+	}
+	out := stdout + stderr
+	for _, want := range []string{"anthropic-review/claude-sonnet-5-5", "second signer", spec.SecondSigner.Transcript, "review-AI-001-x-second", spec.SecondSigner.Review} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output must name %q:\n%s", want, out)
+		}
+	}
+}
+
+// The fallback launches only with a classified reason, and the reason is
+// recorded in the request the archive later reads.
+func TestSpecReviewFallbackRecordsItsReason(t *testing.T) {
+	root := makeRepo(t)
+	seedSignerPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+
+	if _, _, err := execute(t, "spec", "review", "AI-001-x", "--reviewer", "anthropic-review/claude-haiku-5-5", "--dry-run"); err == nil ||
+		!strings.Contains(err.Error(), "--fallback-reason") {
+		t.Fatalf("a fallback without a reason must be refused, got: %v", err)
+	}
+
+	prev := runForeground
+	runForeground = func(string, []string, string) error { return nil }
+	t.Cleanup(func() { runForeground = prev })
+	_, _, _ = execute(t, "spec", "review", "AI-001-x", "--fallback-reason", "rate-limit", "--foreground")
+	req, found, err := spec.ReadReviewRequest(filepath.Join(root, "specs", "AI-001-x"))
+	if err != nil || !found || req.Reviewer != "anthropic-review/claude-haiku-5-5" || req.FallbackReason != "rate-limit" {
+		t.Fatalf("want the fallback and its reason recorded, got %+v found=%v err=%v", req, found, err)
 	}
 }

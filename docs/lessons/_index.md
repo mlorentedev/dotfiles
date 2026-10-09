@@ -387,4 +387,7 @@ tags: [lessons, index, dotfiles]
 | [366 - A config the tool also writes is co-owned, whatever its format](lesson-366-a-config-the-tool-also-writes-is-co-owned-whatever-its-format.md) | 2026-10-08 |
 | [367 - A gate that needs a binary is only as present as the binary](lesson-367-a-gate-that-needs-a-binary-is-only-as-present-as-the-binary.md) | 2026-10-08 |
 | [368 - Two checks of one property must share one predicate](lesson-368-two-checks-of-one-property-must-share-one-predicate.md) | 2026-10-08 |
+| [369 - read shifts fields left when the first one is empty](lesson-369-read-shifts-fields-left-when-the-first-one-is-empty.md) | 2026-10-08 |
+| [370 - A reasoning model at its default effort can think away the whole answer](lesson-370-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
+| [371 - A paid model is bounded by every layer that supplies a default](lesson-371-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default.md) | 2026-10-08 |
 <!-- END GENERATED -->

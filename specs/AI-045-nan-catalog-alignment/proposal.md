@@ -59,7 +59,33 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
 - The preflight spends one minimal request per model per run, about 20 to 800 completion tokens depending on the reasoning. That is negligible against the quotas, but it is not zero.
 - An early-failover preflight means the review can run on a fallback without anyone choosing it. The job summary names the model that reviewed, and PR-Agent records the same in its own run.
 - AC9 reverses a recorded decision: `harness/model-map.json`'s `$comment` lists the openrouter pool as retired. The OpenRouter key authenticates, but its credit is spent (5.03 used of 5.00, measured 2026-10-01). AC9 therefore stays blocked on the owner: fund that provider or name another, then deliver the key with `dotf secrets sync ci`. Until then the step is gated on the credential and never runs.
-- AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 27 minutes per PR ahead in the queue.
+- **Amended 2026-10-08 (#1923, option 1).** The owner named the provider: Anthropic, paid from Max-plan API credits with no card, no
+  auto-reload and a $100 spend limit, and asked that it unload NaN rather than only back it up. So
+  `anthropic/claude-haiku-5-5` (on a purpose-named key, `PR_AGENT_ANTHROPIC_API_KEY`) joins the two NaN models in a review
+  pool drawn with equal weight among the members that answered, as `dotf spec review` draws. Three deviations from the
+  text above. It is a pool, not a third attempt: the drawn provider reviews first and the other is the second attempt,
+  with PR-Agent's own NaN chain inside the NaN one. The second attempt is keyed on a measured absence of a published
+  review, not on the first attempt's outcome, because `fail_on_tool_errors` cannot tell a model failure from a tool
+  failure and a review published late must not be duplicated. And Haiku is admitted without the planted-defect bar NaN
+  candidates pass; that bar is owed on its first live run (#1923). The pool is a first-pass gate on every PR, distinct
+  from the spec archive gate: `harness/reviewer-pool.json`'s rule against Anthropic reviewers stands unchanged.
+  Later the same day, after the live runs, the owner widened it: `glm5.3-flash` joins the NaN chain, so four members
+  draw at a quarter each, and Haiku gets parity with NaN's prompt cap (200K, accepting the over-100K price on large
+  diffs) and adaptive thinking at `high` effort, within a worst case under $0.25 a review that a test holds. glm
+  reviews only at `reasoning_effort: low` (lesson 370).
+- **Amended 2026-10-09 (#1923, amendment B), budget $60-65 a month.** The owner wanted Haiku and Sonnet in real use
+  rather than as members a uniform draw seldom reaches, inside a stated budget. Three changes. PR-Agent's draw is
+  weighted, and the weights live in `harness/reviewer-pool.json` (`pr_agent` blocks: mimo 27, glm 19, deepseek 19,
+  Haiku 35), so a share is a declared number rather than one over the member count. Sonnet joins as a risk route: a PR
+  at or past 1,500 changed lines, or labelled `deep-review`, reviews first on Sonnet, and falls back to the draw when
+  Sonnet does not answer. The threshold was 900 at first; the owner raised it after the first live Sonnet review cost
+  $0.37, not $0.13. The allowlist of Anthropic models CI may spend on moves from the workflow into
+  `scripts/pr-agent-route.sh`, which fails the draw on any other. And the spec archive gate's rule against Anthropic
+  reviewers is replaced by "an Anthropic model never signs alone": the first signature stays another vendor's, Sonnet
+  adds a second signature on `risk: high` specs, and Haiku signs as a recorded fallback when the first signers failed
+  for a classified reason. The local review reads the same Bitwarden item as PR-Agent under its own name
+  (`REVIEW_ANTHROPIC_API_KEY`), so one Console spend limit covers both. The budget arithmetic is in verification.md.
+- AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 31 minutes per PR ahead in the queue.
 
 ## Acceptance criteria
 
