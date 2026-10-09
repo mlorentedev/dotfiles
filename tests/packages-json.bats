@@ -19,6 +19,13 @@ setup() {
     [ "$total" -eq "$unique" ]
 }
 
+# A "system" entry is the OS package manager's, so it carries no version and
+# names at least one manager's package; cli/internal/tools/catalog.go
+# (validateSystem) is the authority, this is the cheap shell-side mirror.
 @test "every packages.json tool declares name, version, profile and a typed source" {
-    jq -e 'all(.tools[]; (.name | type == "string") and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.profile | type == "string") and (.source.type | IN("npm", "github-release", "uv-tool")))' "$CATALOG" >/dev/null
+    jq -e 'all(.tools[]; (.name | type == "string") and (.profile | type == "string") and
+        (if .source.type == "system"
+         then (has("version") | not) and ([.source.apt, .source.brew, .source.winget] | any(type == "string"))
+         else (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.source.type | IN("npm", "github-release", "uv-tool"))
+         end))' "$CATALOG" >/dev/null
 }

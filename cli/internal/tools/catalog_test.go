@@ -287,3 +287,28 @@ func TestTheRepoCatalogUsesOnlyKnownSourceTypes(t *testing.T) {
 		}
 	}
 }
+
+// macOS ships /bin/bash 3.2, and `env bash` there needs brew's bash 5 (#2202).
+// The entry must not declare `command: bash`: a command found on PATH satisfies
+// a system entry, and /bin/bash is always found, so the install would never
+// run. Presence is brew's own record instead. Only brew names it: Linux ships a
+// current bash, and Windows has none to replace.
+func TestTheRepoCatalogDeclaresBrewBashWithoutACommand(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "bash" {
+			continue
+		}
+		if tool.Source.Type != "system" || tool.Source.Brew != "bash" || tool.Source.Apt != "" || tool.Source.Winget != "" {
+			t.Errorf("bash source = %+v, want system, brew only", tool.Source)
+		}
+		if tool.Source.Command != "" {
+			t.Errorf("bash declares command %q, which /bin/bash 3.2 would satisfy", tool.Source.Command)
+		}
+		return
+	}
+	t.Fatal("packages.json declares no bash entry")
+}

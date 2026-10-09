@@ -14,7 +14,7 @@
     "                                         the entry is satisfied whichever channel installed it",
     "                  A system entry has no version: it is not pinned, presence is what converges,",
     "                  and it is never upgraded. A dotf that predates the type skips it with a warning,",
-    "                  so no system entry is added before a release carrying the reader is the pin.",
+    "                  so no system entry was added before a release carrying the reader was the pin (0.65.0).",
     "",
     "source.platforms (every type) narrows an entry to the listed GOOS values."
   ],
@@ -106,6 +106,96 @@
       "source": {
         "type": "uv-tool",
         "package": "poetry"
+      }
+    },
+    {
+      "name": "gh",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "gh",
+        "brew": "gh",
+        "winget": "GitHub.cli",
+        "command": "gh"
+      }
+    },
+    {
+      "name": "bash",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "bash"
+      }
+    },
+    {
+      "name": "git-lfs",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "git-lfs",
+        "brew": "git-lfs",
+        "command": "git-lfs"
+      }
+    },
+    {
+      "name": "tmux",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "tmux",
+        "brew": "tmux",
+        "command": "tmux"
+      }
+    },
+    {
+      "name": "xclip",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "xclip",
+        "command": "xclip"
+      }
+    },
+    {
+      "name": "parallel",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "parallel",
+        "brew": "parallel",
+        "command": "parallel"
+      }
+    },
+    {
+      "name": "wget",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "wget",
+        "brew": "wget",
+        "command": "wget"
+      }
+    },
+    {
+      "name": "eza",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "eza",
+        "brew": "eza",
+        "winget": "eza-community.eza",
+        "command": "eza"
+      }
+    },
+    {
+      "name": "zoxide",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "zoxide",
+        "brew": "zoxide",
+        "winget": "ajeetdsouza.zoxide",
+        "command": "zoxide"
       }
     }
   ]

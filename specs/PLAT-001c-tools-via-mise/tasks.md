@@ -98,6 +98,16 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 
 > **Decision (P5a): which command converges system entries.** `dotf tools install` does, and `dotf tools sync` stays mise-only. #2013 D8 says "`dotf tools sync` drives the managers"; P5b uses `dotf tools install`, because `install` is the catalog's converge command (`packages.json` is what `install` reads, and `sync` reads `versions.conf` and renders mise), setup already calls it, and a system package is installed by a manager that may need privilege and may be absent, which `sync`'s all-or-nothing `mise install` and its converge step (a reconciler with a plan and a probe) have no place for yet. Widening `sync` is a separate change once the converge step can plan a sudo-gated install; D8's wording is read as "the tools command", not that verb.
 
+### P5b (first half) — class-3 CLIs as `system` entries (0.65.0, carrying P5a, is the pin)
+
+- [x] `packages.json` declares gh, git-lfs (#2201), tmux, xclip (apt only), parallel, wget, eza and zoxide, each with the manager names it has and the command it puts on PATH, so a copy from another channel (setup's linux-amd64 download of gh and eza, Git for Windows' git-lfs) satisfies the entry
+- [x] `setup-linux.sh` loses its tmux and xclip presence checks and hand-written `sudo apt install` hints; `tests/setup-linux.bats` asserts the catalog carries both and setup no longer prints the hint
+- [x] On the Mac, the dry-run plans install for tmux, wget and eza and skip for the rest, xclip `unsupported`. Each entry was then installed through brew, and a second plan reports skip for all three
+- [ ] The winget rows that move here (gh, eza, zoxide) leave `setup-windows.ps1`'s loop in the Windows-empirical batch: `dotf tools install` there is not followed by a PATH refresh, which only a run on the Windows box can prove harmless. The catalog declares the same ids, so both channels agree until then
+- [x] `bash`, brew only and with no `command` (/bin/bash 3.2 would satisfy one), for `env bash` on the Mac (#2202). The PATH half was already true: `.zshrc` evals `brew shellenv`, which puts `/opt/homebrew/bin` (or `/usr/local/bin` on Intel) ahead of `/bin`, and `dotf env` declares path variables, not PATH. The 3.2 guard is unchanged: CI's macOS leg runs bats with `/bin` first and `--expect-bash 3`; the guard's comment now says so
+- [ ] Second half: `git lfs install` as a converge reconciler beside `git-config` once #2208 lands (#2201); the darwin casks from the owner's list in the vault runbook `runbook-macos-workstation-setup`
+- [ ] Out of P5b: docker and kubectl wait on the owner's runtime choice (Docker Desktop, OrbStack or Colima), and doctor keeps reporting them
+
 ### W2b — shims on PATH (after #2013 P6/P7)
 
 - [x] `mise activate` in `.zshrc`, `.bashrc` and the PowerShell profile, guarded on mise, before direnv and zoxide (#2013 P6, PR #2043)
