@@ -130,6 +130,7 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] Review triage: `--fix` replaces each copy with a link to mise's shim instead of deleting it (`MiseShimsDir`, one rename, only to a shim that exists). A deleted copy would leave a consumer whose PATH lists `~/.local/bin` explicitly with nothing, which is worse than the old version; the link keeps it resolvable, now at the pin. The copy's content is still gone, as the owner decided
 - [x] Mutation-checked: dropping the symlink exemption, running the check before the pins are verified, or linking without checking the shim exists turns tests red
 - [x] Runbook: `docs/runbooks/tool-installation.md` says where the copies come from and how `--fix` treats them
+- [x] Review triage: an entry from `mise bin-paths --bin-names` that is a path rather than a file name (a separator, `.` or `..`) is reported and left alone, so `--fix` can never rename over a file outside `~/.local/bin` (`TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched`, mutation-checked). The doc comment on `checkMiseTools` now says the fix links, not removes
 
 ## Closing
 

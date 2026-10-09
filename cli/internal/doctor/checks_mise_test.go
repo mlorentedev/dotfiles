@@ -198,3 +198,30 @@ func TestCheckMiseTools_BinPathsFailingWarnsNamingTheCommand(t *testing.T) {
 		t.Errorf("want one WARN naming mise bin-paths\n%s", b.String())
 	}
 }
+
+// mise names executables; an entry that is a path instead would, joined onto
+// ~/.local/bin, reach a file outside it. It is reported and never touched.
+func TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched(t *testing.T) {
+	s, cfg, home := shadowFixture(t)
+	outside := filepath.Join(home, "notes")
+	writeFile(t, outside, "mine\n")
+	// Where the same path lands under the shims dir, so only the name check
+	// stands between the fix and the rename.
+	writeFile(t, filepath.Join(home, ".local", "share", "mise", "shims", "..", "..", "notes"), "#!/bin/sh\n")
+	prev := s.CommandStdoutDir
+	s.CommandStdoutDir = func(dir, name string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "bin-paths" {
+			return "../../notes\n..\n", nil
+		}
+		return prev(dir, name, args...)
+	}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, true)
+	if fi, err := os.Lstat(outside); err != nil || !fi.Mode().IsRegular() {
+		t.Errorf("a file outside ~/.local/bin was touched: %v\n%s", err, b.String())
+	}
+	if rep.Warnings() != 1 || !strings.Contains(b.String(), "not file names") || strings.Contains(b.String(), "replaced") {
+		t.Errorf("want one WARN naming the odd entries and no repair\n%s", b.String())
+	}
+}

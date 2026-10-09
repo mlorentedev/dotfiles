@@ -16,7 +16,7 @@ import (
 // doctor reads, checkout first, and runs mise from HOME as the sync does, so a
 // project mise.toml in the working directory cannot answer for the machine.
 // Once every pin runs, it reports the copies in ~/.local/bin that shadow mise's,
-// and with fix removes them.
+// and with fix replaces each with a link to mise's shim.
 func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Pinned CLIs (mise)")
 	if cfg.VersionsPath == "" {
@@ -90,15 +90,24 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 	}
 	localBin := filepath.Join(home, ".local", "bin")
 	seen := map[string]bool{}
-	var copies []string
+	var copies, odd []string
 	for _, name := range strings.Fields(out) {
 		if seen[name] {
 			continue
 		}
 		seen[name] = true
+		// A path, not a name: joined onto ~/.local/bin it would reach a file
+		// outside it, which the fix must never rename over.
+		if name != filepath.Base(name) || name == "." || name == ".." {
+			odd = append(odd, name)
+			continue
+		}
 		if fi, err := os.Lstat(filepath.Join(localBin, name)); err == nil && fi.Mode().IsRegular() {
 			copies = append(copies, name)
 		}
+	}
+	if len(odd) > 0 {
+		rep.Warn("mise bin-paths --bin-names printed entries that are not file names, left alone: " + strings.Join(odd, ", "))
 	}
 	if len(copies) == 0 {
 		return
