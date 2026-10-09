@@ -254,3 +254,22 @@ func TestParseManifest_RefusesAMergeWhoseSourceAndDestinationFormatsDiffer(t *te
 		t.Errorf("replace must not be refused: %v", err)
 	}
 }
+
+// Lists union, so an entry the tool appended inside a managed key survives a
+// deploy. The union is written against `[]any`, which is how JSON decodes an
+// array; go-toml/v2 decodes into `[]any` as well, and this pins it, because a
+// decoder that produced a typed slice would make the repo's list replace the
+// tool's without an error.
+func TestDeploy_TOMLMergeUnionsAListTheToolAppendedTo(t *testing.T) {
+	root := repoWithHerdrConfig(t, "[keys]\nprefix = \"ctrl+s\"\nextra = [\"a\", \"b\"]\n")
+	home := t.TempDir()
+	dst := writeHerdrDst(t, home, "[keys]\nprefix = \"ctrl+s\"\nextra = [\"a\", \"b\", \"tool\"]\n")
+	if _, err := Deploy(herdrConfig(), root, home, noResolve, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := readTOML(t, dst)["keys"].(map[string]any)
+	got, _ := keys["extra"].([]any)
+	if len(got) != 3 || got[2] != "tool" {
+		t.Errorf("the element the tool appended was lost: keys.extra = %#v", keys["extra"])
+	}
+}
