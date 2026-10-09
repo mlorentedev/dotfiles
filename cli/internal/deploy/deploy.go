@@ -266,6 +266,9 @@ func ParseManifest(data []byte) (*Manifest, error) {
 			if c.Render {
 				return nil, fmt.Errorf("config %q: strategy merge cannot render (unsupported)", c.Name)
 			}
+			if isTOML(c.Src) != isTOML(c.Dst) {
+				return nil, fmt.Errorf("config %q: merge reads %s in the format of %s, and their formats differ", c.Name, c.Src, c.Dst)
+			}
 		default:
 			return nil, fmt.Errorf("config %q: unknown strategy %q (want %s or %s)", c.Name, c.Strategy, StrategyReplace, StrategyMerge)
 		}

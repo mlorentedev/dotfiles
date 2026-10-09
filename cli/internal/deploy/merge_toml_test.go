@@ -219,3 +219,19 @@ func TestDeploy_MergeRefusesASourceThatManagesNoKey(t *testing.T) {
 		}
 	})
 }
+
+// A merge reads its source in the destination's format, so a source of the
+// other format fails on every machine at deploy time with a misleading
+// "source is not a TOML table". The manifest is refused instead.
+func TestParseManifest_RefusesAMergeWhoseSourceAndDestinationFormatsDiffer(t *testing.T) {
+	for _, pair := range [][2]string{{"a.json", "{HOME}/b.toml"}, {"a.toml", "{HOME}/b.json"}} {
+		_, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"` + pair[0] + `","dst":"` + pair[1] + `","strategy":"merge"}]}`))
+		if err == nil || !strings.Contains(err.Error(), `config "x": merge`) {
+			t.Errorf("%s -> %s: want a format mismatch error naming the config, got %v", pair[0], pair[1], err)
+		}
+	}
+	// replace copies bytes and never parses, so it may cross formats.
+	if _, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"a.json","dst":"{HOME}/b.toml"}]}`)); err != nil {
+		t.Errorf("replace must not be refused: %v", err)
+	}
+}
