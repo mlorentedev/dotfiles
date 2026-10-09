@@ -161,7 +161,7 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] The dead `~/Applications/python-<ver>` layout leaves doctor (`versionedHomes`, `versionMatches`, `toolHomeVars`) and the rc files: nothing installs it
 - [x] Guard: `tests/versions-conf.bats` refuses the python-package marker and a marked `PYTHON_VERSION` until PR2 relaxes it; both mutations fail it
 - [x] On the Mac, through a scratch `versions.conf` (`--versions`): `python@3.12.6` is refused for lacking GitHub attestations, `3.13.16` installs with PyYAML 6.0.3, a second run does nothing, and `mise install python@3.13.16` alone also leaves `import yaml` working
-- [ ] PR2, after the release: mark `PYTHON_VERSION=3.13.16` and `PYYAML_VERSION=6.0.3`, relax the guard to the `DOTF_VERSION` condition, read the pins in CI's macOS job, and remove the user-site PyYAML the Mac's system 3.9 carries
+- [ ] PR2, after the release: mark `PYTHON_VERSION=3.13.16` and `PYYAML_VERSION=6.0.3`, relax the guard to the `DOTF_VERSION` condition, read the pins in CI's macOS job (check first that `actions/setup-python`'s manifest has 3.13.16: it lags upstream, so the job may need a floor instead of the exact pin), and remove the user-site PyYAML the Mac's system 3.9 carries
 
 ## Closing
 
