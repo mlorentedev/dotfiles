@@ -56,7 +56,12 @@ created: "2026-09-29"
 - [x] [AC8] Real sibling, local: against NaN on 2026-10-01, nine models, 26 s; it found `mimo-v2.5` (401) still
       offered by the deployed `~/.pi/agent/settings.json` `enabledModels`
 - [x] [AC8] Real sibling, CI: a `workflow_dispatch` run of `model-canary.yml` after merge; run id recorded on #1860 (run 36887489906, green, 6/6 answered)
-- [ ] [AC9] #1923: third attempt outside NaN, gated on its credential (blocked: provider funding and `dotf secrets sync ci`)
+- [x] [AC9] #1923: an attempt outside NaN (`anthropic/claude-haiku-5-5`), gated on its credential AND on a measured
+      absence of a published review (`scripts/pr-agent-publish-guard.sh --probe`); `unknown` never runs it. Tests pin the
+      gating, the outcome chain, the model, the input/output caps and the single credential per step
+- [ ] [AC9] Owner: `dotf secrets sync ci --repo mlorentedev/dotfiles` once the key is in Bitwarden
+- [ ] [AC9] Live run: the first real NaN saturation after merge that runs the fallback; record its run id on #1923
+      (a saturation cannot be forced from CI without spending the shared NaN pool)
 - [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block
 - [x] [AC10] Live run of the PR that adds the queue shows GitHub accepts it: run 36835280780 started its `review` job and published a review (an unknown key fails the workflow before any job starts)
 - [x] [AC10] On `main`, two reviews that overlap in time both complete and neither is cancelled; record the run ids on #1923. A cancelled review run there means the job-level queue is ignored: revert the block (runs 36881054024, 36881389377, 36881441749 queued together, ran in turn, none cancelled; #1923 comment 5934615584)

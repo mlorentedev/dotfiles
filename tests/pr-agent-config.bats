@@ -12,6 +12,9 @@ setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CFG="$REPO/.pr_agent.toml"
     WF="$REPO/.github/workflows/pr-agent.yml"
+    # The publication guard's logic, shared by the final guard and the probe that
+    # gates the fallback outside NaN (AI-045 AC9).
+    GUARD="$REPO/scripts/pr-agent-publish-guard.sh"
 }
 
 @test "pr-agent: the config and workflow both exist" {
@@ -161,22 +164,54 @@ sys.exit(0 if 'AGENTS.md' in files else 1)
     refute_grep 'secrets.OPENAI_API_KEY' "$WF"
 }
 
-@test "pr-agent: the workflow takes exactly one secret" {
+@test "pr-agent: the workflow takes only its declared secrets, one inference credential per attempt" {
     # #1025: the spec-review path injects the WHOLE registry to authenticate one
     # model, so one broken item mapping takes down authentication for
-    # everything. This path must not inherit that shape — the failure surface
-    # stays one key wide.
+    # everything. This path must not inherit that shape: each secret arrives by
+    # name, and each PR-Agent step holds exactly one inference credential, so
+    # the NaN attempt never sees the Anthropic key, nor the fallback NaN's.
     #
     # Counted as distinct NAMES, not as references: the model preflight (AI-045)
     # hands the same NAN_API_KEY to its own step, which is a second use of one
     # credential, not a second credential.
     local names
     names=$(grep -oE '\$\{\{ *secrets\.[A-Z_]+ *\}\}' "$WF" | grep -oE 'secrets\.[A-Z_]+' | sort -u | tr '\n' ' ')
-    [ "$names" = "secrets.GITHUB_TOKEN secrets.NAN_API_KEY " ] || {
-        printf 'expected exactly GITHUB_TOKEN and NAN_API_KEY, found: %s\n' "$names" >&2
+    [ "$names" = "secrets.GITHUB_TOKEN secrets.NAN_API_KEY secrets.PR_AGENT_ANTHROPIC_API_KEY " ] || {
+        printf 'expected exactly GITHUB_TOKEN, NAN_API_KEY and PR_AGENT_ANTHROPIC_API_KEY, found: %s\n' "$names" >&2
         grep -nE '\$\{\{ *secrets\.[A-Z_]+ *\}\}' "$WF" >&2
         return 1
     }
+    run python3 -c "
+import re, sys, yaml
+steps = yaml.safe_load(open(sys.argv[1]))['jobs']['review']['steps']
+for s in steps:
+    if 'pr-agent' not in s.get('uses', ''):
+        continue
+    held = sorted(set(re.findall(r'secrets\.([A-Z_]+)', str(s.get('env', {})))) - {'GITHUB_TOKEN'})
+    print(s['id'], ' '.join(held))
+" "$WF"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]%$'\r'}" = "pr_agent NAN_API_KEY" ]
+    [ "${lines[1]%$'\r'}" = "pr_agent_fallback PR_AGENT_ANTHROPIC_API_KEY" ]
+    [ "${#lines[@]}" -eq 2 ]
+}
+
+@test "pr-agent: PR_AGENT_ANTHROPIC_API_KEY is declared for this repo's CI only" {
+    # Without the consumer, `dotf secrets sync ci` never delivers the key and the
+    # fallback is skipped with a warning. Only this repository: the other
+    # workflows adopt the fallback in their own pull requests, and a credential
+    # synced where nothing reads it only widens the surface. Purpose-named, never
+    # ANTHROPIC_API_KEY, which Claude Code and the SDKs read on their own.
+    run python3 -c "
+import yaml
+d = yaml.safe_load(open('$REPO/secrets/registry.yaml'))
+s = [s for s in d['secrets'] if s['id'] == 'PR_AGENT_ANTHROPIC_API_KEY'][0]
+print(s['consumers'], s['expose'], s['plane'])
+print(any(s.get('expose', {}).get('env') == 'ANTHROPIC_API_KEY' for s in d['secrets']))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "['ci:mlorentedev/dotfiles'] {'env': 'PR_AGENT_ANTHROPIC_API_KEY'} app" ]
+    [ "${lines[1]}" = "False" ]
 }
 
 @test "pr-agent: NAN_API_KEY is declared as a CI consumer of this repo" {
@@ -519,7 +554,7 @@ if bad:
 # guard. Restating it in the workflow would rebuild the two-file agreement
 # nobody checks that the registry exists to prevent.
 @test "pr-agent: the no-review guard reads its marker from the registry, not a literal" {
-    run grep -c 'contents/harness/review-attestation.json' "$REPO/.github/workflows/pr-agent.yml"
+    run grep -c 'contents/harness/review-attestation.json' "$GUARD"
     [ "$status" -eq 0 ] && [ "$output" -ge 1 ] \
         || { echo "the guard no longer reads the marker from the registry" >&2; false; }
 
@@ -537,13 +572,13 @@ if bad:
 
 @test "pr-agent: the guard only counts comments authored by github-actions[bot]" {
     # On a public repository anyone can paste the marker text into a comment.
-    grep -q 'select(.user.login == "github-actions\[bot\]"' "$WF"
+    grep -q 'select(.user.login == "github-actions\[bot\]"' "$GUARD"
 }
 
 @test "pr-agent: the guard binds the marker to this run's start stamp" {
     grep -q 'id: start' "$WF"
     grep -q 'STARTED: \${{ steps.start.outputs.started }}' "$WF"
-    grep -q '(.updated_at >= $started)' "$WF"
+    grep -q '(.updated_at >= $started)' "$GUARD"
 }
 
 @test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
@@ -552,13 +587,13 @@ if bad:
 }
 
 @test "pr-agent: the guard reads the marker from the PR head when the base has no registry yet" {
-    grep -q 'read_markers "${BASE_REF}"' "$WF"
-    grep -q 'read_markers "${HEAD_SHA}"' "$WF"
+    grep -q 'read_markers "${BASE_REF}"' "$GUARD"
+    grep -q 'read_markers "${HEAD_SHA}"' "$GUARD"
 }
 
 @test "pr-agent: the guard counts comments across all pages, not per page" {
-    grep -q -- '/comments" --paginate)' "$WF"
-    grep -q 'jq -s --arg started' "$WF"
+    grep -q -- '/comments" --paginate)' "$GUARD"
+    grep -q 'jq -s --arg started' "$GUARD"
 }
 
 @test "pr-agent: the model travels in the workflow env so bootstrap PRs do not fall back to upstream defaults" {
@@ -588,18 +623,27 @@ print('; '.join(bad)); sys.exit(1 if bad else 0)
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
 
-@test "pr-agent: the preflight runs wherever PR-Agent runs, and a failed one skips the guard" {
+@test "pr-agent: the preflight runs wherever PR-Agent runs, and a failed one hands over to the fallback" {
     run _step_if "s.get('id') == 'models'"
     [ "$status" -eq 0 ] || { echo "no step with id models (AI-045)" >&2; false; }
     local models_if="$output"
-    run _step_if "'pr-agent' in s.get('uses', '')"
-    [ "$models_if" = "$output" ] \
+    run _step_if "s.get('id') == 'pr_agent'"
+    # The NaN attempt runs where the preflight runs, and only on a model it picked.
+    [[ "$(printf '%s' "$output" | tr -s ' \n' ' ')" == "$(printf '%s' "$models_if" | tr -s ' \n' ' ')"* ]] \
         || { printf 'preflight if: %s\nPR-Agent if: %s\n' "$models_if" "$output" >&2; false; }
+    [[ "$output" == *"steps.models.outcome == 'success'"* ]] || false
     grep -q 'scripts/pr-agent-model-preflight.sh' "$WF"
-    # No declared model answered: the preflight already failed the job with the
-    # cause, and the guard's NaN-concurrency diagnosis would be a wrong second one.
+    # No declared model answered: NaN is down as a whole, the case AC9 exists
+    # for. The failure must not end the job before the fallback, and the final
+    # guard must still run to report it.
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+print(next(s for s in steps if s.get('id') == 'models').get('continue-on-error', False))
+"
+    [ "$output" = "True" ]
     run _step_if "s.get('name') == 'Fail if no review was published'"
-    [[ "$output" == *"steps.models.outcome != 'failure'"* ]] || false
+    [[ "$output" != *"steps.models.outcome"* ]] || false
 }
 
 @test "pr-agent: the publication guard is skipped after a credential failure" {
@@ -612,7 +656,7 @@ print('; '.join(bad)); sys.exit(1 if bad else 0)
 }
 
 @test "pr-agent: the head-ref fallback also works for issue_comment runs" {
-    grep -q 'HEAD_SHA=$(gh_api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$WF"
+    grep -q 'HEAD_SHA=$(gh_api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$GUARD"
 }
 
 @test "pr-agent: the guard reads the registry from the default branch, never from base.ref" {
@@ -622,8 +666,8 @@ print('; '.join(bad)); sys.exit(1 if bad else 0)
 }
 
 @test "pr-agent: the head-ref fallback never takes the marker text from the PR" {
-    grep -q "markers='\\[\"PR Reviewer Guide\"\\]'" "$WF"
-    run grep -c 'markers=$(read_markers "${HEAD_SHA}")' "$WF"
+    grep -q "markers='\\[\"PR Reviewer Guide\"\\]'" "$GUARD"
+    run grep -c 'markers=$(read_markers "${HEAD_SHA}")' "$GUARD"
     [ "$output" = "0" ]
 }
 
@@ -792,8 +836,9 @@ print(s.get('if', ''))
     [ "$status" -eq 0 ] || { echo "no step with id push_gate" >&2; false; }
     [[ "$output" == *"github.event.action == 'synchronize'"* ]] || false
     grep -q 'scripts/pr-agent-push-gate.sh' "$WF"
-    # The job has no full checkout; the gate script and the model preflight
-    # (AI-045, which runs on every event) are the only files checked out.
+    # The job has no full checkout; the gate script, the model preflight
+    # (AI-045, which runs on every event) and the publication guard (AC9) are
+    # the only files checked out.
     run _step_if "'checkout' in s.get('uses', '') and 'pr-agent-push-gate' in str(s.get('with', {}))"
     [ "$status" -eq 0 ] || { echo "no sparse checkout of the gate script" >&2; false; }
     run python3 -c "
@@ -802,7 +847,7 @@ steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 co = next(s for s in steps if 'checkout' in s.get('uses', ''))
 print(co['with']['sparse-checkout'].split())
 "
-    [ "$output" = "['scripts/pr-agent-push-gate.sh', 'scripts/pr-agent-model-preflight.sh']" ]
+    [ "$output" = "['scripts/pr-agent-push-gate.sh', 'scripts/pr-agent-model-preflight.sh', 'scripts/pr-agent-publish-guard.sh']" ]
 }
 
 @test "pr-agent: below the push gate's threshold, neither PR-Agent nor the guard runs" {
@@ -822,28 +867,30 @@ print(co['with']['sparse-checkout'].split())
 }
 
 @test "pr-agent: the guard accepts every marker the registry declares, not only the first" {
-    run grep -c 'review_markers\[0\]' "$WF"
+    run grep -c 'review_markers\[0\]' "$GUARD"
     [ "$output" = "0" ]
-    grep -q -- '--argjson markers' "$WF"
-    grep -q 'any($markers\[\]' "$WF"
+    grep -q -- '--argjson markers' "$GUARD"
+    grep -q 'any($markers\[\]' "$GUARD"
 }
 
 # AI-045: timeouts must not be mislabeled as concurrency (#1107); failures
 # can also be tool errors. Report the actual outcome and selected model.
-@test "pr-agent: a cancelled or failed Action reports its outcome and model" {
+@test "pr-agent: a cancelled or failed Action reports its outcome and model, for the last attempt that ran" {
     run python3 -c "
 import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
-pa = next(s for s in steps if 'pr-agent' in s.get('uses', ''))
 guard = next(s for s in steps if s.get('name') == 'Fail if no review was published')
-print(pa.get('id', ''))
-print(' '.join(guard['env'].get('PR_AGENT_OUTCOME', '').split()))
-print(' '.join(guard['env'].get('REVIEW_MODEL', '').split()))
+for k in ('PR_AGENT_OUTCOME', 'REVIEW_MODEL', 'FALLBACK_OUTCOME', 'FALLBACK_NOTE', 'FALLBACK_MODEL'):
+    print(' '.join(str(guard['env'].get(k, '')).split()))
+print(guard['run'].strip())
 "
-    [ "${lines[0]}" = "pr_agent" ]
-    [ "${lines[1]}" = "\${{ steps.pr_agent.outcome }}" ]
-    [ "${lines[2]}" = "\${{ steps.models.outputs.model }}" ]
-    grep -q 'if \[ "${PR_AGENT_OUTCOME:-}" = "cancelled" \] || \[ "${PR_AGENT_OUTCOME:-}" = "failure" \]' "$WF"
+    [ "${lines[0]}" = "\${{ steps.pr_agent.outcome }}" ]
+    [ "${lines[1]}" = "\${{ steps.models.outputs.model }}" ]
+    [ "${lines[2]}" = "\${{ steps.pr_agent_fallback.outcome }}" ]
+    [ "${lines[3]}" = "\${{ steps.fallback.outputs.note }}" ]
+    [ "${lines[5]}" = "./scripts/pr-agent-publish-guard.sh" ]
+    grep -q 'if \[ "${FALLBACK_OUTCOME:-skipped}" != "skipped" \]' "$GUARD"
+    grep -q '    cancelled|failure)' "$GUARD"
 }
 
 # AI-045: the guard blamed every silent run on concurrency (#1107). Run
@@ -852,50 +899,68 @@ print(' '.join(guard['env'].get('REVIEW_MODEL', '').split()))
 # The message must name both measured causes, so a reader does not chase the
 # wrong one.
 @test "pr-agent: the no-review guard names both measured causes, not concurrency alone" {
-    grep -q '#1107' "$WF"
-    grep -q 'non-streamed answer.*#1858\|#1858.*non-streamed' "$WF" \
-        || grep -A2 'non-streamed answer' "$WF" | grep -q '#1858'
+    grep -q '#1107' "$GUARD"
+    grep -q 'non-streamed answer.*#1858\|#1858.*non-streamed' "$GUARD" \
+        || grep -A2 'non-streamed answer' "$GUARD" | grep -q '#1858'
 }
 
 # A failed Action is not a classified model failure: a second run could publish
 # the same review twice. The guard must turn the swallowed step outcome red.
-@test "pr-agent: a failed attempt is reported rather than retried" {
+@test "pr-agent: two bounded attempts, and the second needs a measured absence of the first" {
     run python3 -c "
 import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 pa = [s for s in steps if 'pr-agent' in s.get('uses', '')]
 print(len(pa))
-print(pa[0].get('id'), pa[0].get('timeout-minutes'), pa[0].get('continue-on-error', False))
-guard = next(s for s in steps if s.get('name') == 'Fail if no review was published')
-print('failure' in guard['run'] and 'PR_AGENT_OUTCOME' in guard['run'])
+for s in pa:
+    print(s.get('id'), s.get('timeout-minutes'), s.get('continue-on-error', False))
+print(' '.join(pa[1]['if'].split()))
+ids = [s.get('id') for s in steps]
+print(ids.index('pr_agent') < ids.index('fallback') < ids.index('pr_agent_fallback'))
 "
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "1" ]
-    [ "${lines[1]}" = "pr_agent 12 False" ]
-    [ "${lines[2]}" = "True" ]
+    [ "${lines[0]}" = "2" ]
+    [ "${lines[1]}" = "pr_agent 12 True" ]
+    [ "${lines[2]}" = "pr_agent_fallback 8 True" ]
+    [ "${lines[3]}" = "!cancelled() && steps.fallback.outputs.run == 'true'" ]
+    [ "${lines[4]}" = "True" ]
 }
 
+# The fallback runs on one answer only: the probe measured that nothing was
+# published. An Action that failed may still have published, and an API that
+# failed answers nothing; neither may run a second Action (#1923, AI-045 AC9).
 @test "pr-agent: ambiguous failures fail closed without invoking a second Action" {
-    run python3 -c "
+    local step="$BATS_TEST_TMPDIR/decide.sh" bin="$BATS_TEST_TMPDIR/bin" out
+    python3 - "$WF" > "$step" <<'PY'
 import sys, yaml
-job = yaml.safe_load(open(sys.argv[1]))['jobs']['review']
-pa = [s for s in job['steps'] if 'pr-agent' in s.get('uses', '')]
-print(len(pa))
-if pa:
-    print(pa[0]['env'].get('github_action_config.fail_on_tool_errors'))
-    print(pa[0]['env'].get('CONFIG__FALLBACK_MODELS'))
-    print(pa[0].get('continue-on-error', False))
-guard = next(s for s in job['steps'] if s.get('name') == 'Fail if no review was published')
-print('steps.pr_agent.outcome' in guard['env']['PR_AGENT_OUTCOME'])
-print(\"steps.reviewable.outcome != 'failure'\" in guard['if'])
-" "$WF"
-    [ "$status" -eq 0 ]
-    [ "${lines[0]%$'\r'}" = "1" ]
-    [ "${lines[1]%$'\r'}" = "true" ]
-    [ "${lines[2]%$'\r'}" = '${{ steps.models.outputs.fallbacks }}' ]
-    [ "${lines[3]%$'\r'}" = "False" ]
-    [ "${lines[4]%$'\r'}" = "True" ]
-    [ "${lines[5]%$'\r'}" = "True" ]
+steps = yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]["steps"]
+print(next(s for s in steps if s.get("id") == "fallback")["run"])
+PY
+    mkdir -p "$bin/scripts"
+    # A stub probe answering whatever PROBE says, run from the step's own text.
+    printf '#!/usr/bin/env bash\necho "published=${PROBE}" >> "$3"\n' > "$bin/scripts/pr-agent-publish-guard.sh"
+    chmod +x "$bin/scripts/pr-agent-publish-guard.sh"
+    for case in "true true" "unknown true" " true" "false false" "false true"; do
+        set -- $case
+        out="$BATS_TEST_TMPDIR/out.$1.$2"
+        : > "$out"
+        (cd "$bin" && PROBE="$1" HAS_FALLBACK_KEY="$2" GITHUB_OUTPUT="$out" GITHUB_REPOSITORY=o/r \
+            bash -eo pipefail "$step") >/dev/null
+        case "$1/$2" in
+            false/true) grep -qx 'run=true' "$out" ;;
+            false/false) grep -qx 'run=false' "$out" && grep -q '^note=.*PR_AGENT_ANTHROPIC_API_KEY is not set' "$out" ;;
+            *) grep -qx 'run=false' "$out" && ! grep -q '^note=' "$out" ;;
+        esac || { printf 'probe=%s key=%s gave:\n' "$1" "$2" >&2; cat "$out" >&2; return 1; }
+    done
+    # PR-Agent's own tool errors still fail the attempt rather than pass silently.
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
+    print(s['env'].get('github_action_config.fail_on_tool_errors'))
+"
+    [ "${lines[0]}" = "true" ]
+    [ "${lines[1]}" = "true" ]
 }
 
 # Run 36812454370: a merge commit from "update branch" is a push the gate does
@@ -921,12 +986,15 @@ print(\"steps.reviewable.outcome != 'failure'\" in guard['if'])
 # `api_base` contains one of the substrings. The substring is checked against
 # the base URL the step really sends, so moving NaN's endpoint fails here
 # instead of silently turning streaming off.
-@test "pr-agent: the single attempt streams its NaN calls" {
+@test "pr-agent: the NaN attempt streams its calls, and the fallback carries no NaN transport" {
     run python3 -c "
 import json, yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
     e = s['env']
+    if 'OPENAI__API_BASE' not in e:
+        print(s['id'], 'no-nan', [k for k in e if k.startswith(('OPENAI__', 'LITELLM__'))])
+        continue
     subs = json.loads(e.get('LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS', '[]'))
     print(s['id'],
           e.get('LITELLM__CUSTOM_LLM_PROVIDER') == 'openai',
@@ -935,19 +1003,71 @@ for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
 "
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "pr_agent True True True" ]
-    [ "${#lines[@]}" -eq 1 ]
+    # A forced `openai` provider would send the Anthropic model through NaN's transport.
+    [ "${lines[1]}" = "pr_agent_fallback no-nan []" ]
+    [ "${#lines[@]}" -eq 2 ]
 }
 
 # A job timeout shorter than its Action step would hide the Action's own bound.
-@test "pr-agent: the job outlives the bounded Action" {
+@test "pr-agent: the job outlives both bounded Actions" {
     run python3 -c "
 import yaml
 job = yaml.safe_load(open('$WF'))['jobs']['review']
 pa = [s for s in job['steps'] if 'pr-agent' in s.get('uses', '')]
-print(len(pa) == 1 and job['timeout-minutes'] >= pa[0]['timeout-minutes'] + 3)
+print(len(pa) == 2 and job['timeout-minutes'] >= sum(s['timeout-minutes'] for s in pa) + 3)
 "
     [ "$status" -eq 0 ]
     [ "$output" = "True" ]
+}
+
+# AI-045 AC9 (#1923): what the key outside NaN may spend. The Claude Console
+# cannot restrict a key to a model, so the allowlist is the workflow, and this
+# test is what makes it a rule rather than a line anyone can edit.
+@test "pr-agent: the fallback runs one pinned model with bounded input and output" {
+    run python3 -c "
+import json, yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+fb = next(s for s in steps if s.get('id') == 'pr_agent_fallback')
+e = fb['env']
+guard = next(s for s in steps if s.get('name') == 'Fail if no review was published')
+model = e['CONFIG__MODEL']
+print(model)
+print(json.loads(e['CONFIG__FALLBACK_MODELS']))
+print(guard['env']['FALLBACK_MODEL'] == model)
+print(model in json.loads(e['CONFIG__NO_TEMPERATURE_MODELS']))
+# Haiku 5.5's price steps up fivefold above 100,000 prompt tokens, and Claude's
+# tokenizer counts about 30% more than PR-Agent's: the cap must leave that margin.
+print(int(e['CONFIG__MAX_MODEL_TOKENS']) * 1.3 < 100000, e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
+# LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short.
+print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'])
+# Effort travels as nothing, which on Haiku 5.5 is medium; no thinking switch either.
+print(sorted(k for k in e if 'EFFORT' in k.upper() or 'THINKING' in k.upper()))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "anthropic/claude-haiku-5-5" ]
+    [ "${lines[1]}" = "[]" ]
+    [ "${lines[2]}" = "True" ]
+    [ "${lines[3]}" = "True" ]
+    [ "${lines[4]}" = "True True" ]
+    [ "${lines[5]}" = "16000" ]
+    [ "${lines[6]}" = "[]" ]
+}
+
+# The fallback reviews what the NaN attempt would have: same action, same pin,
+# same event handling. A setting changed on one step only fails here.
+@test "pr-agent: both attempts share the action pin and every review setting" {
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+a, b = [s for s in steps if 'pr-agent' in s.get('uses', '')]
+pick = lambda s: {k: v for k, v in s['env'].items()
+                  if k.startswith('github_action_config.') or k == 'CONFIG__PUBLISH_OUTPUT_PROGRESS'}
+print(a['uses'] == b['uses'])
+print(pick(a) == pick(b), len(pick(a)))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "True" ]
+    [ "${lines[1]}" = "True 10" ]
 }
 
 # AI-045 AC10 (#1923, option 3): this repository runs one review at a time. NaN

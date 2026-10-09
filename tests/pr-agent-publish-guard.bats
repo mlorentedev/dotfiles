@@ -1,27 +1,22 @@
 #!/usr/bin/env bats
-# Behaviour of the pr-agent publication guard ("Fail if no review was published"
-# in .github/workflows/pr-agent.yml) when the GitHub API fails (#2069).
+# Behaviour of the pr-agent publication guard (scripts/pr-agent-publish-guard.sh,
+# run by "Fail if no review was published" in .github/workflows/pr-agent.yml)
+# when the GitHub API fails (#2069), and of its --probe mode, which gates the
+# fallback outside NaN (AI-045 AC9, #1923).
 #
 # A read timeout on the registry used to become an empty marker list, and the
 # guard then failed a reviewed PR with "no review marker declared": the wrong
 # diagnosis, measured downstream on leaving-denver run 37155990064. These run the
-# step's REAL script, extracted from the workflow, against a stub gh whose every
-# answer is set per test. pr-agent-config.bats pins the step's text; this file
-# pins what it does.
+# REAL script against a stub gh whose every answer is set per test.
+# pr-agent-config.bats pins how the workflow calls it; this file pins what it does.
 #
 # Each test sets its stub's answers with `export`, which bats scopes to that
 # test's own subshell by design.
 # shellcheck disable=SC2030,SC2031
 
 setup() {
-    WF="$BATS_TEST_DIRNAME/../.github/workflows/pr-agent.yml"
-    GUARD="$BATS_TEST_TMPDIR/guard.sh"
-    python3 - "$WF" > "$GUARD" <<'PY'
-import sys, yaml
-steps = yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]["steps"]
-print(next(s for s in steps if s.get("name") == "Fail if no review was published")["run"])
-PY
-    [ -s "$GUARD" ] || { echo "the guard step is gone from $WF" >&2; return 1; }
+    GUARD="$BATS_TEST_DIRNAME/../scripts/pr-agent-publish-guard.sh"
+    [ -x "$GUARD" ] || { echo "the guard script is gone or not executable: $GUARD" >&2; return 1; }
 
     STUB="$BATS_TEST_TMPDIR/bin"
     CALLS="$BATS_TEST_TMPDIR/calls"
@@ -70,12 +65,22 @@ SH
     export CALLS REGISTRY NO_ENTRY REVIEW
 }
 
-# Runs the guard as the workflow does: bash, errexit and pipefail, the step's env.
+# Runs the guard as the workflow does, with the final guard's env. Arguments
+# reach the script, so `_guard --probe --output F` runs the probe.
 _guard() {
     run env PATH="$STUB:$PATH" CALLS="$CALLS" GUARD_RETRY_SECONDS=0 \
         GITHUB_REPOSITORY=o/r PR_NUMBER=7 BASE_REF=main STARTED=2026-10-07T09:00:00Z \
-        HEAD_SHA="${HEAD_SHA-abc123}" PR_AGENT_OUTCOME=success REVIEW_MODEL=m \
-        bash -eo pipefail "$GUARD"
+        HEAD_SHA="${HEAD_SHA-abc123}" PR_AGENT_OUTCOME="${PR_AGENT_OUTCOME-success}" REVIEW_MODEL=m \
+        FALLBACK_OUTCOME="${FALLBACK_OUTCOME-skipped}" FALLBACK_MODEL=fb \
+        FALLBACK_NOTE="${FALLBACK_NOTE-}" \
+        "$GUARD" "$@"
+}
+
+# The probe's answer, from the file it appends to.
+_probe() {
+    PROBE_OUT="$BATS_TEST_TMPDIR/probe.out"
+    : > "$PROBE_OUT"
+    _guard --probe --output "$PROBE_OUT"
 }
 
 calls_to() { grep -c "^$1\$" "$CALLS" || true; }
@@ -147,4 +152,82 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     _guard
     [ "$status" -eq 1 ]
     [[ "$output" == *"PR-Agent reported success but published no review"* ]] || false
+}
+
+@test "the published review names the attempt that produced it" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
+    FALLBACK_OUTCOME=success _guard
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"on fb"* ]] || false
+}
+
+# --- probe: the gate in front of the fallback outside NaN (AI-045 AC9) -------
+
+@test "probe: a review published by this run answers true" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
+    _probe
+    [ "$status" -eq 0 ]
+    [ "$(cat "$PROBE_OUT")" = "published=true" ]
+}
+
+@test "probe: no review answers false, the only answer that runs the fallback" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
+    _probe
+    [ "$status" -eq 0 ]
+    [ "$(cat "$PROBE_OUT")" = "published=false" ]
+}
+
+@test "probe: a review older than this run's start is not this run's review" {
+    local old='[{"user":{"login":"github-actions[bot]"},"updated_at":"2026-10-07T08:00:00Z","body":"## PR Reviewer Guide"}]'
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS="$old"
+    _probe
+    [ "$(cat "$PROBE_OUT")" = "published=false" ]
+}
+
+@test "probe: an API that keeps failing answers unknown, never false" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS=fail:502
+    _probe
+    [ "$status" -eq 0 ]
+    [ "$(cat "$PROBE_OUT")" = "published=unknown" ]
+    [[ "$output" == *"HTTP 502"* ]] || false
+}
+
+@test "probe: no declared marker answers unknown, never false" {
+    export STUB_BASE="$NO_ENTRY" STUB_HEAD="$NO_ENTRY"
+    _probe
+    [ "$(cat "$PROBE_OUT")" = "published=unknown" ]
+}
+
+@test "probe: a comment listing that is not JSON answers unknown, never false" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS='<html>bad gateway</html>'
+    _probe
+    [ "$(cat "$PROBE_OUT")" = "published=unknown" ]
+}
+
+# --- final guard: the last attempt that ran is the one judged -----------------
+
+@test "a failed fallback is reported with its own model, not the NaN one" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
+    PR_AGENT_OUTCOME=failure FALLBACK_OUTCOME=failure _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"PR-Agent ended failure on fb"* ]] || false
+}
+
+@test "a NaN failure with no fallback repeats why the fallback did not run" {
+    PR_AGENT_OUTCOME=failure FALLBACK_NOTE="PR_AGENT_ANTHROPIC_API_KEY is not set" _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"PR-Agent ended failure on m"* ]] || false
+    [[ "$output" == *"PR_AGENT_ANTHROPIC_API_KEY is not set"* ]] || false
+}
+
+@test "no attempt at all (NaN down, no fallback) fails and says so" {
+    PR_AGENT_OUTCOME=skipped _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no review attempt ran"* ]] || false
+}
+
+@test "a fallback that reviewed after a NaN failure passes" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
+    PR_AGENT_OUTCOME=failure FALLBACK_OUTCOME=success _guard
+    [ "$status" -eq 0 ]
 }

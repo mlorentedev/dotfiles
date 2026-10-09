@@ -59,6 +59,13 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
 - The preflight spends one minimal request per model per run, about 20 to 800 completion tokens depending on the reasoning. That is negligible against the quotas, but it is not zero.
 - An early-failover preflight means the review can run on a fallback without anyone choosing it. The job summary names the model that reviewed, and PR-Agent records the same in its own run.
 - AC9 reverses a recorded decision: `harness/model-map.json`'s `$comment` lists the openrouter pool as retired. The OpenRouter key authenticates, but its credit is spent (5.03 used of 5.00, measured 2026-10-01). AC9 therefore stays blocked on the owner: fund that provider or name another, then deliver the key with `dotf secrets sync ci`. Until then the step is gated on the credential and never runs.
+- **Amended 2026-10-08 (#1923, option 1).** The owner named the provider: Anthropic, paid from Max-plan API credits with no card, no
+  auto-reload and a $100 spend limit. The attempt runs `anthropic/claude-haiku-5-5` on a purpose-named key
+  (`PR_AGENT_ANTHROPIC_API_KEY`). Two deviations from the text above. It is a second attempt, not a third: PR-Agent's own
+  NaN fallback chain stays inside the first. And it is keyed on a measured absence of a published review, not on the first
+  attempt's outcome, because `fail_on_tool_errors` cannot tell a model failure from a tool failure and a review published
+  late must not be duplicated. Haiku is admitted without the planted-defect bar NaN candidates pass; that bar is owed on
+  its first live run (#1923).
 - AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 27 minutes per PR ahead in the queue.
 
 ## Acceptance criteria

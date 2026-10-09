@@ -26,13 +26,16 @@ protect the behavior that depends on PR-Agent internals.
 | `.pr_agent.toml` | which model, what it reads, what it must check, what it must never see |
 | `scripts/pr-agent-push-gate.sh` | bounded push-review decision (ADR-040) |
 | `scripts/pr-agent-model-preflight.sh` | select the first declared model that answers |
+| `scripts/pr-agent-publish-guard.sh` | did this run publish a review: the probe before the fallback, and the final guard |
 | `harness/pr-agent-upstream-contract.json` | approved upstream source identities |
 
 The action itself is `The-PR-Agent/pr-agent`, a public **Docker action** pulled
-per run — pinned to a commit SHA, never a moving ref. The inference endpoint is
-NaN's OpenAI-compatible endpoint at `https://api.nan.builders/v1`, reached with a
-single secret, `NAN_API_KEY`, declared in `secrets/registry.yaml` with
-`consumers: ci:mlorentedev/dotfiles` so `dotf secrets sync ci` manages it.
+per run — pinned to a commit SHA, never a moving ref. The primary inference
+endpoint is NaN's OpenAI-compatible endpoint at `https://api.nan.builders/v1`,
+reached with `NAN_API_KEY`. The fallback outside NaN (below) reaches Anthropic's
+API with `PR_AGENT_ANTHROPIC_API_KEY`. Each attempt receives only its own key.
+Both are declared in `secrets/registry.yaml` with
+`consumers: ci:mlorentedev/dotfiles`, so `dotf secrets sync ci` manages them.
 
 It is deliberately not a replacement yet: it runs **alongside** CodeRabbit for a
 bounded window, because #786 requires recording which tool found what before
@@ -67,7 +70,7 @@ busy session exhausts it — six PRs in one session received no review at all
 (#1096, #1100, #1101, #1103, #1104, #1105), every one of them reporting a green
 `review` job.
 
-Six things now stand between that and a silent green:
+Seven things now stand between that and a silent green:
 
 1. `auto_improve = false` halves what this workflow asks for (#1107).
 2. **One review at a time across the repository, none dropped (AI-045 AC10, #1923)**:
@@ -112,6 +115,44 @@ Six things now stand between that and a silent green:
    2026-10-01), which a chat-only probe would report as a retirement every day.
    A new non-chat service needs its entry in `serviceAPIs`
    (`cli/internal/nanprobe/bindings.go`); until then its row reads "refused".
+7. **A fallback outside NaN (AI-045 AC9, #1923)**: when the NaN attempt ends
+   and the probe (`scripts/pr-agent-publish-guard.sh --probe`) measures that no
+   review was published, or no NaN model answered the preflight, a second
+   bounded PR-Agent step runs on `anthropic/claude-haiku-5-5`. See the next
+   section for cost and limits.
+
+### The fallback outside NaN: what it may spend
+
+The key is funded from the owner's plan credits, with no card and no
+auto-reload, under a $100 spend limit in the Console. The Console has no
+per-key model allowlist, so the **workflow is the allowlist**, and
+`tests/pr-agent-config.bats` pins each of these settings:
+
+| Setting | Value | Why |
+|---|---|---|
+| `CONFIG__MODEL` | `anthropic/claude-haiku-5-5` | the cheapest current model; $0.10 / $0.50 per MTok up to 100K prompt tokens |
+| `CONFIG__FALLBACK_MODELS` | `[]` | no chain: a failure ends the attempt, it never escalates to a pricier model |
+| `CONFIG__MAX_MODEL_TOKENS`, `CONFIG__CUSTOM_MODEL_MAX_TOKENS` | `70000` | PR-Agent clips the diff to this. With the new tokenizer counting about 30% more, 70K × 1.3 stays under the 100K price step |
+| `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` | `16000` | LiteLLM's output cap for a Claude model it does not know. Its default, 4096, is shared with thinking and truncated reviews |
+| effort | not sent (`medium`, the model's default) | PR-Agent sends no effort to Claude models; nothing here raises it |
+| temperature | not sent (`CONFIG__NO_TEMPERATURE_MODELS`) | Haiku 5.5 answers 400 to a non-default temperature, and PR-Agent's default is 0.2 |
+| step `timeout-minutes` | `8` | a bounded second attempt; the job's 25 minutes cover both |
+
+A worst-case review is about 70K input plus 16K output tokens, roughly
+$0.015. The spend limit is the backstop, not the budget.
+
+**Owner setup, once per key rotation:**
+
+```bash
+dotf secrets unlock                                   # Bitwarden session
+dotf secrets sync ci --repo mlorentedev/dotfiles      # pushes both CI secrets
+```
+
+Until the secret exists, the decision step prints a `::warning::` naming this
+command, and the final guard repeats it when no review was published. Check the
+organization's tier and Haiku 5.5 limits on the Console's *Rate limits* page.
+The default workspace takes no workspace-level spend or rate limit; a dedicated
+workspace is the place for a tighter one.
 
 The multiplier that matters is still the **push**, not the PR. The push gate
 requires three newer non-merge commits before another review and requests an
@@ -132,10 +173,19 @@ in the manifest. A failed API read fails the check; it is not an approval.
 
 `github_action_config.fail_on_tool_errors` is deliberately `true`. The Action
 does not identify whether a failed step was caused by the model or a tool, so
-there is no second Action on `failure` or `cancelled`. Its declared model
-fallback remains inside the single 12-minute attempt. The publication guard
-still fails if `/review` completes without publishing a Guide. Diagnose a red
-Action from its logs; do not re-enable a blind retry that can publish twice.
+the second Action (the fallback outside NaN) is never keyed on the first one's
+`failure` or `cancelled`. It runs only when the publication probe **measures**
+that no review was published. An unreadable answer (`unknown`) keeps it off, so
+it can never publish a second Guide. The publication guard still fails if
+`/review` completes without publishing a Guide. Diagnose a red Action from its
+logs; do not re-enable a blind retry that can publish twice.
+
+The fallback step pins the same `uses:` SHA and repeats the NaN step's review
+settings. `tests/pr-agent-config.bats` asserts both, so a pin bump moves the two
+steps together. When the pin moves, also re-check
+`pr_agent/algo/ai_handlers/litellm_ai_handler.py` in the contract: the Anthropic
+key path (`ANTHROPIC.KEY`), `no_temperature_models`, and the exclusion of Claude
+models from the generic `reasoning_effort` path all live there.
 
 ## High-Velocity Batch PR & Triage Workflow
 
