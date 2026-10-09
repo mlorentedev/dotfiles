@@ -2,6 +2,7 @@ package tools
 
 import (
 	"errors"
+	"os/exec"
 	"testing"
 )
 
@@ -31,6 +32,29 @@ func TestProbeVersion(t *testing.T) {
 			got := ProbeVersion("x", func(string, ...string) ([]byte, error) { return []byte(tc.out), tc.err })
 			if got != tc.want {
 				t.Errorf("ProbeVersion(%q, err=%v) = %q, want %q", tc.out, tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+// A warning on stderr must not be read as the version. Measured on the Mac:
+// uv's poetry runs on the system Python 3.9, whose urllib3 warns about
+// "OpenSSL 1.1.1+" before poetry prints `Poetry (version 2.2.1)`, and the
+// merged stream made `dotf tools install` plan an upgrade from 1.1.1 on every
+// run. stdout comes first; stderr still counts for a tool that prints its
+// version only there.
+func TestExecRunner_ReadsStdoutBeforeStderr(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not on PATH")
+	}
+	for name, tc := range map[string]struct{ script, want string }{
+		"a warning on stderr first": {"echo 'urllib3 v2 only supports OpenSSL 1.1.1+' >&2; echo 'Poetry (version 2.2.1)'", "2.2.1"},
+		"a version on stderr only":  {"echo 'tool 3.4.5' >&2", "3.4.5"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			run := func(string, ...string) ([]byte, error) { return ExecRunner("sh", "-c", tc.script) }
+			if got := ProbeVersion("x", run); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
 	}
