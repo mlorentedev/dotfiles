@@ -98,6 +98,15 @@
         "package": "hive-vault",
         "platforms": ["linux", "darwin"]
       }
+    },
+    {
+      "name": "poetry",
+      "version": "2.5.1",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "poetry"
+      }
     }
   ]
 }

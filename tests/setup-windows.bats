@@ -603,21 +603,23 @@ FIXTURE
     grep -q 'astral.sh/uv/install.ps1' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 installs poetry via uv" {
-    grep -q 'Installing poetry' "$PS1_SCRIPT"
-    grep -q 'uv tool install poetry' "$PS1_SCRIPT"
+@test "setup-windows.ps1 has no poetry block: poetry is a packages.json uv-tool entry" {
+    refute_grep_fixed 'uv tool install poetry' "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
 # --- Cross-platform parity: developer tools ---
 
-@test "parity: both scripts install uv" {
-    grep -q 'Installing uv' "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: both scripts provide uv (Linux through mise, Windows through its installer)" {
+    grep -q '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh"
+    grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
     grep -q 'Installing uv' "$PS1_SCRIPT"
 }
 
-@test "parity: both scripts install poetry via uv" {
-    grep -q 'uv tool install poetry' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'uv tool install poetry' "$PS1_SCRIPT"
+@test "parity: neither script installs poetry itself; the catalog does on every OS" {
+    refute_grep_fixed 'uv tool install poetry' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'uv tool install poetry' "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name == "poetry" and (.source.platforms == null))' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
 @test "parity: both scripts install age" {
@@ -1077,7 +1079,8 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 }
 
 @test "parity: both setups install uv before registering the Claude MCP servers (OPS-044)" {
-    uv_line=$(grep -n 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    # Linux: uv is a mise pin, installed by `dotf tools sync` (#2013 W2).
+    uv_line=$(grep -n '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
 }

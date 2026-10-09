@@ -28,14 +28,17 @@ setup() {
 
 @test "hive-upgrade.service is a oneshot running uv tool upgrade hive-vault" {
     grep -qF 'Type=oneshot' "$DOTFILES_DIR/systemd/hive-upgrade.service"
-    grep -qF 'ExecStart=%h/.local/bin/uv tool upgrade hive-vault' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    grep -qF 'ExecStart=/usr/bin/env uv tool upgrade hive-vault' "$DOTFILES_DIR/systemd/hive-upgrade.service"
 }
 
-# The ExecStart must be an ABSOLUTE path: a --user oneshot gets a minimal PATH
-# that may omit ~/.local/bin, so a bare `uv` would fail every slot.
-@test "hive-upgrade.service ExecStart is absolute, not a bare uv on PATH" {
+# A --user oneshot gets a minimal PATH with neither mise's shims nor
+# ~/.local/bin, so a bare `uv` would fail every slot. The unit declares its own
+# PATH: mise's shims (where uv lives since #2013 W2) ahead of ~/.local/bin (uv's
+# own installer, on boxes set up before that), and resolves uv through env.
+@test "hive-upgrade.service resolves uv through a declared PATH, mise shims first" {
     refute_grep '^ExecStart=uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
-    grep -qE '^ExecStart=%h/' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    grep -qF 'Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    grep -qE '^ExecStart=/usr/bin/env uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
 }
 
 # --- setup-linux.sh wiring ---

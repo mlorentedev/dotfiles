@@ -284,13 +284,19 @@ else
     log_warning "scripts/install-dotf.sh not found; skipping dotf install"
 fi
 
-# Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
-# tools (currently sops) into ~/.local/bin via dotf — the same deterministic pattern
-# as install_dotf, driven by data instead of a per-OS install block. Best-effort:
-# an offline box or a single failed download must never abort setup (parity with the
-# `install_dotf || log_warning` line above). Needs dotf on PATH (installed just
-# above; ~/.local/bin was exported into PATH earlier in this script).
+# Catalog tools (CLI-029, packages.json) and the mise-pinned CLIs (ADR-044,
+# versions.conf). Three steps, each needing the one before it: `dotf tools
+# install` places mise and the release binaries, `dotf tools sync` has mise
+# install the pinned CLIs (uv among them), and the second `dotf tools install`
+# reaches the uv-tool entries, which skip while uv is absent. On a converged box
+# every step reports nothing to do. mise's shims go on PATH ahead of ~/.local/bin
+# so a pinned CLI wins over an older copy an installer left there; interactive
+# shells get the same order from `mise activate`. Best-effort, like
+# `install_dotf` above: an offline box must never abort setup.
 if command -v dotf >/dev/null 2>&1; then
+    dotf tools install || log_warning "dotf tools install failed (continuing; re-run 'dotf tools install')"
+    export PATH="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims:$PATH"
+    dotf tools sync || log_warning "dotf tools sync failed (continuing; re-run 'dotf tools sync')"
     dotf tools install || log_warning "dotf tools install failed (continuing; re-run 'dotf tools install')"
 fi
 
@@ -563,37 +569,8 @@ ensure_directory "$HOME/.claude/skills"
 # plan and a post-condition probe (PLAT-001b). settings.json is merged by
 # `dotf deploy` (claude-settings), and its hooks come from `dotf harness bind`.
 
-# Python tooling (uv + poetry) — used by hive MCP server (uvx hive-vault) and general Python workflows
-# Install uv (Python package manager — provides uvx)
-if ! command -v uv >/dev/null 2>&1; then
-    log_info "Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null || true
-    export PATH="$HOME/.local/bin:$PATH"
-    if command -v uv >/dev/null 2>&1; then
-        log_success "uv installed"
-    else
-        log_warning "uv installation failed"
-    fi
-else
-    log_info "uv already installed"
-fi
-
-# Install poetry via uv
-if ! command -v poetry >/dev/null 2>&1; then
-    if command -v uv >/dev/null 2>&1; then
-        log_info "Installing poetry via uv..."
-        uv tool install poetry 2>/dev/null || true
-        if command -v poetry >/dev/null 2>&1; then
-            log_success "Poetry installed"
-        else
-            log_warning "Poetry installation failed"
-        fi
-    else
-        log_warning "uv not available, skipping poetry installation"
-    fi
-else
-    log_info "poetry already installed"
-fi
+# uv and poetry: uv is a mise-pinned CLI and poetry a packages.json uv-tool
+# entry, both converged by the tools steps above (#2013 W2).
 
 # Claude Code (primary AI coding agent — see ADR-009)
 log_info "Setting up Claude Code CLI..."

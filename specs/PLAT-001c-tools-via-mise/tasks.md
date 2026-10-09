@@ -34,6 +34,16 @@ created: "2026-10-06"
 - Linux and darwin only for now (`platforms`). On the Windows runner the catalog installed mise, `setup-windows.ps1` runs no `dotf tools sync`, and doctor turned its "mise not on PATH" WARN into a FAIL for the nine pins that winget provides there. The six asset names are verified against the release's `SHASUMS256.txt`, so the Windows keys stay
 - [ ] [AC4] Windows, at the Windows box (batched with the other Windows-empirical work): drop `platforms`, add `dotf tools sync` to `setup-windows.ps1` next to `dotf tools install`, and retire the winget installs mise then owns. Measure first that `mise install` works there for bats, shellcheck and direnv
 
+### W2 (first half) — uv through mise; setup runs the sync (stacked on T1b)
+
+- [x] `UV_VERSION=0.12.18` under `# mise: cli` (aqua:astral-sh/uv, the short name resolves there; so does herdr's, which answers H1's open question). It also provides `uvx` for the uvx MCP servers
+- [x] `setup-linux.sh`: `dotf tools install` (mise and release binaries), mise's shims onto PATH ahead of `~/.local/bin`, `dotf tools sync`, `dotf tools install` again (the uv-tool entries). Order asserted in `tests/setup-linux.bats`. The unpinned `curl … astral.sh/uv/install.sh | sh` block and the poetry block are deleted (31 lines)
+- [x] poetry 2.5.1 is a `packages.json` uv-tool entry on every OS; `setup-windows.ps1` loses its poetry block (26 lines). Windows keeps its uv installer until the Windows session measures `mise install uv` there
+- [x] `systemd/hive-upgrade.service` hard-coded `%h/.local/bin/uv`, where uv's own installer put it and mise does not. It declares a PATH (mise shims, then `~/.local/bin`) and runs `/usr/bin/env uv`
+- [x] From zero on the Mac (empty HOME, isolated mise/XDG/uv dirs): `tools install mise` → shims on PATH → `tools sync` installed uv 0.12.18 → `tools install pre-commit` installed and ran 4.6.2 through that uv
+- [ ] Second half: delete the five linux-amd64 curl blocks once doctor reports leftover `~/.local/bin` copies that shadow mise's (Go, needs a release)
+- [ ] `disable_update_warning` in the rendered mise config: a catalog-pinned mise prints "run mise self-update" on every call, and self-update steps outside the pin
+
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
 - [x] [AC5] Failing tests, then `tools.ParseMiseTools`: pins marked `# mise: cli` on the line before them, name from `NAME_VERSION`; a marker that marks no pin is an error

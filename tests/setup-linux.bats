@@ -40,14 +40,33 @@ setup() {
     grep -q 'export PATH.*\.local/bin' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh installs uv if missing" {
-    grep -q 'command -v uv' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh"
+# uv is a mise-pinned CLI and poetry a packages.json uv-tool entry (#2013 W2):
+# no unpinned installer and no per-script poetry block survive.
+@test "setup-linux.sh gets uv from mise, not from uv's curl installer" {
+    grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
+    refute_grep_fixed 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh installs poetry via uv" {
-    grep -q 'command -v poetry' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'uv tool install poetry' "$DOTFILES_DIR/setup-linux.sh"
+@test "poetry is a packages.json uv-tool entry, and setup-linux.sh has no poetry block" {
+    jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool" and (.source.platforms == null))' "$DOTFILES_DIR/packages.json" >/dev/null
+    refute_grep_fixed 'uv tool install poetry' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# install places mise, sync installs the pinned CLIs (uv), and the second
+# install reaches the uv-tool entries; mise's shims must be on PATH, ahead of
+# ~/.local/bin, before sync, or a copy an installer left there shadows the pin.
+@test "setup-linux.sh runs tools install, shims onto PATH, tools sync, tools install, in that order" {
+    install1=$(grep -n '^    dotf tools install ' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    shims=$(grep -n 'export PATH=.*mise}/shims:\$PATH' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    sync=$(grep -n '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
+    install2=$(grep -n '^    dotf tools install ' "$DOTFILES_DIR/setup-linux.sh" | sed -n 2p | cut -d: -f1)
+    [ -n "$install1" ]
+    [ -n "$shims" ]
+    [ -n "$sync" ]
+    [ -n "$install2" ]
+    [ "$install1" -lt "$shims" ]
+    [ "$shims" -lt "$sync" ]
+    [ "$sync" -lt "$install2" ]
 }
 
 @test "setup-linux.sh installs age if missing" {
@@ -110,8 +129,6 @@ setup() {
 }
 
 @test "setup-linux.sh skips tools already installed" {
-    grep -q 'uv already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'poetry already installed' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'age already installed' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'eza already installed' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'jq already installed' "$DOTFILES_DIR/setup-linux.sh"

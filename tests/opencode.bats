@@ -79,9 +79,9 @@ setup() {
     refute_grep_fixed "DEPLOY AIDER CONFIGURATION" "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup-linux.sh keeps uv install (used by hive MCP server)" {
-    grep -q "Installing uv" "$SETUP_SCRIPT"
-    grep -q "https://astral.sh/uv/install.sh" "$SETUP_SCRIPT"
+@test "setup-linux.sh still provides uv (used by hive MCP server), now through mise" {
+    grep -q '^    dotf tools sync ' "$SETUP_SCRIPT"
+    grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
 }
 
 @test "ai/aider/ directory removed from repo" {
