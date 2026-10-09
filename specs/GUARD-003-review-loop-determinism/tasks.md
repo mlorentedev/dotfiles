@@ -68,6 +68,14 @@ What genuinely blocks:
       `internal/prtriage` with the `gh` call at the boundary, so the core is
       tested without a network. It lists; it never applies.
 - [x] T9. [AC7] Verify against the live repository rather than fixtures alone.
+- [x] T10. (#1196) The queue honours the registry's `exempt.signatures`, as the
+      gate does: set equality both ways, and the file list is read only for a PR
+      the queue would report, so a quiet PR costs no call. Release-please
+      regenerates its PR on every merge to main, and CodeRabbit re-edits its
+      "Reviews paused" notice each time. Before this, every edit re-listed the
+      release PR, and the owner was asked for one triage comment per merge (five
+      on #2168 in one night). Live, 2026-10-09: the released `dotf` lists #2168
+      and this build clears it.
 
 ## Closing
 
