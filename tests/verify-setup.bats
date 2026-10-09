@@ -359,6 +359,41 @@ setup() {
     [ ! -e "$HOME/.local/bin/shellcheck" ]
 }
 
+@test "every CLI versions.conf marks for mise is installed through mise at its pin (#2013 T2)" {
+    # The Windows CI leg gates on doctor's "Pinned CLIs (mise)" check; Linux has
+    # no doctor gate, so this is that check's Linux half. It reads the marks the
+    # way dotf does: "# mise: cli" on its own line, the pin on the next one, and
+    # NAME_VERSION as mise's name with underscores as hyphens.
+    local mise pins pin missing=""
+    mise="$(command -v mise || printf '%s' "$HOME/.local/bin/mise")"
+    pins="$(awk '
+        m && /^[A-Z0-9_]+_VERSION=/ {
+            n = $0; sub(/_VERSION=.*/, "", n); n = tolower(n); gsub(/_/, "-", n)
+            v = $0; sub(/^[^=]*=/, "", v)
+            print n "@" v
+        }
+        { m = ($0 == "# mise: cli") }' "$DOTFILES_DIR/versions.conf")"
+    [ -n "$pins" ]
+    # The awk above is a second reading of versions.conf; dotf's own reading
+    # (tools.ParseMiseTools) is what the sync rendered. They must agree, or this
+    # test checks a different pin set than the one dotf installs.
+    local rendered from_dotf
+    rendered="${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}/conf.d/dotfiles.toml"
+    from_dotf="$(awk '/^\[/ { t = ($0 == "[tools]"); next }
+        t && / = "/ { v = $3; gsub(/"/, "", v); print $1 "@" v }' "$rendered" | sort)"
+    [ "$(printf '%s\n' "$pins" | sort)" = "$from_dotf" ] || {
+        echo "versions.conf read here: $(printf '%s\n' "$pins" | sort | tr '\n' ' ')"
+        echo "rendered by dotf ($rendered): $(printf '%s' "$from_dotf" | tr '\n' ' ')"
+        false
+    }
+    while IFS= read -r pin; do
+        # From $HOME, so the checkout's own mise.toml cannot answer for the machine.
+        bash -c 'cd "$HOME" && "$1" where "$2"' _ "$mise" "$pin" >/dev/null 2>&1 ||
+            missing="$missing $pin"
+    done <<< "$pins"
+    [ -z "$missing" ] || { echo "not installed through mise at the pin:$missing"; false; }
+}
+
 # =============================================================================
 # Section 11: tmux
 # =============================================================================

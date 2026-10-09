@@ -39,10 +39,17 @@ created: "2026-10-06"
 - [x] `UV_VERSION=0.12.18` under `# mise: cli` (aqua:astral-sh/uv, the short name resolves there; so does herdr's, which answers H1's open question). It also provides `uvx` for the uvx MCP servers
 - [x] `setup-linux.sh`: `dotf tools install` (mise and release binaries), mise's shims onto PATH ahead of `~/.local/bin`, `dotf tools sync`, `dotf tools install` again (the uv-tool entries). Order asserted in `tests/setup-linux.bats`. The unpinned `curl … astral.sh/uv/install.sh | sh` block and the poetry block are deleted (31 lines)
 - [x] poetry 2.5.1 is a `packages.json` uv-tool entry on every OS; `setup-windows.ps1` loses its poetry block (26 lines). Windows keeps its uv installer until the Windows session measures `mise install uv` there
-- [x] `systemd/hive-upgrade.service` hard-coded `%h/.local/bin/uv`, where uv's own installer put it and mise does not. It declares a PATH (mise shims, then `~/.local/bin`) and runs `/usr/bin/env uv`
+- [x] `systemd/hive-upgrade.service` hard-coded `%h/.local/bin/uv`, where uv's own installer put it and mise does not. It runs `/usr/bin/env mise exec -- uv`, with a PATH that finds mise and no shims dir (a moved mise data dir would leave a hard-coded one stale)
 - [x] From zero on the Mac (empty HOME, isolated mise/XDG/uv dirs): `tools install mise` → shims on PATH → `tools sync` installed uv 0.12.18 → `tools install pre-commit` installed and ran 4.6.2 through that uv
 - [ ] Second half: delete the five linux-amd64 curl blocks once doctor reports leftover `~/.local/bin` copies that shadow mise's (Go, needs a release)
 - [ ] `disable_update_warning` in the rendered mise config: a catalog-pinned mise prints "run mise self-update" on every call, and self-update steps outside the pin
+
+### H1 — herdr through mise (#2013 track H)
+
+- [x] `HERDR_VERSION=0.9.3` under `# mise: cli` (`aqua:herdrdev/herdr`). That entry checks the release digest only; upstream's GitHub attestations for the linux and macOS assets are left to H3 (`gh release verify-asset`), and ADR-044 now says aqua verifies what its registry entry declares
+- [x] Guard: `tests/verify-setup.bats` asserts that every marked pin is installed through mise at its version (`mise where name@pin`). Doctor's equivalent check gates only the Windows leg, so Linux had none. On the Mac the same loop reported uv and herdr missing before `dotf tools sync`, and nothing after
+- [x] On the Mac: `dotf tools sync` installed herdr and uv, `herdr --version` is 0.9.3, a second run reported nothing to do
+- [ ] Windows: H2 (does `mise install herdr` keep `conpty/` next to `herdr.exe`), at the Windows box
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
