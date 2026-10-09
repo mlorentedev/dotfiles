@@ -11,6 +11,12 @@ setup() {
     export HOME="/home/testuser"
     export DOTFILES_DIR="$HOME/.dotfiles"
     export REPO_DIR="$HOME/dotfiles-repo"
+    # The PATH a user's shell has after setup: the rc files put ~/.local/bin on
+    # it (dotf, eza, gh), and `mise activate` puts the mise-pinned CLIs ahead
+    # of it, some of which setup installs only there (jq among them, #2013 W2).
+    # The entrypoint's PATH has neither, so without this the dotf tests below
+    # skipped on every run and verified nothing (#696, #915).
+    export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 }
 
 # =============================================================================
@@ -464,17 +470,13 @@ setup() {
 # (self-deploy is a silent no-op) and `dotf mem` says "run setup" though setup
 # ran — on every fresh machine. These guard exactly that class.
 
-# These two activate only once an available `dotf` binary carries `env set`.
-# The integration container installs the *released* dotf (scripts/install-dotf.sh
-# downloads the pinned release, it is not built from the PR source), and dotf is
-# not on the bats-time PATH, so a brand-new subcommand cannot be exercised here
-# until it ships in a release. They skip cleanly until then — the seed logic is
-# fully guarded by the Go unit tests (env set) + the `dotf doctor` repo-dir check.
-# Harness gap tracked separately (integration should test the PR's built binary).
+# The image builds dotf from this checkout into ~/.local/bin (tests/Dockerfile.integration),
+# so these run against the PR's own binary. A missing dotf is a failure, not a skip:
+# these skipped on every run while the bats PATH lacked ~/.local/bin, and so
+# verified nothing.
 
 @test "setup seeds machine.json with DOTFILES_REPO_DIR = the checkout [#696]" {
-    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
-    dotf env set --help >/dev/null 2>&1 || skip "installed dotf predates 'env set'; seed not exercised"
+    command -v dotf >/dev/null 2>&1
     machine="$HOME/.config/dotfiles/machine.json"
     [ -f "$machine" ]
     run grep -F "$REPO_DIR" "$machine"
@@ -486,8 +488,7 @@ setup() {
 }
 
 @test "dotf env path DOTFILES_REPO_DIR resolves to the real checkout [#696]" {
-    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
-    dotf env set --help >/dev/null 2>&1 || skip "installed dotf predates 'env set'; seed not exercised"
+    command -v dotf >/dev/null 2>&1
     # Captured through a plain $(...) with stderr discarded — the exact idiom
     # setup-linux.sh uses. `run` is avoided on purpose: it merges stdout and
     # stderr into $output, so it passed all the way through BUG-070 (#915)
@@ -499,7 +500,7 @@ setup() {
 }
 
 @test "dotf version reaches stdout so install-dotf can grep the semver [#915]" {
-    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
+    command -v dotf >/dev/null 2>&1
     local ver
     ver="$(dotf version 2>/dev/null)"
     [[ "$ver" == dotf\ version\ * ]] || false

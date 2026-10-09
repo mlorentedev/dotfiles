@@ -284,7 +284,7 @@ func Plan(dir string) ([]Change, error) {
 	if _, err := os.Stat(filepath.Join(dir, "_index.md")); len(seen) > 0 && err != nil {
 		return nil, fmt.Errorf("%s has lessons but no root _index.md", dir)
 	}
-	dangling, err := danglingLinks(seen)
+	dangling, err := danglingLinks(dir, dirs, seen)
 	if err != nil {
 		return nil, err
 	}
@@ -299,13 +299,22 @@ func Plan(dir string) ([]Change, error) {
 // alias or heading separator.
 var wikilink = regexp.MustCompile(`\[\[(lesson-[^\]|#]+)`)
 
-// danglingLinks names every wikilink, in any lesson of the tree, that resolves
-// to no lesson file. Two forms are in use and both resolve: [[lesson-212]] names
-// a lesson by number, [[lesson-268-full-slug]] names the file (#1514).
-func danglingLinks(lessons map[int]string) ([]string, error) {
+// danglingLinks names every wikilink, in any lesson or index of the tree, that
+// resolves to no lesson file. An index counts because its prose above the
+// generated table is hand-written. Two forms are in use and both resolve:
+// [[lesson-212]] names a lesson by number, [[lesson-268-full-slug]] names the
+// file (#1514). Each is reported with its path relative to root.
+func danglingLinks(root string, dirs []string, lessons map[int]string) ([]string, error) {
 	stems := make([]string, 0, len(lessons))
+	files := make([]string, 0, len(lessons)+len(dirs))
 	for _, p := range lessons {
 		stems = append(stems, strings.TrimSuffix(filepath.Base(p), ".md"))
+		files = append(files, p)
+	}
+	for _, d := range dirs {
+		if idx := filepath.Join(d, "_index.md"); fileExists(idx) {
+			files = append(files, idx)
+		}
 	}
 	resolves := func(target string) bool {
 		for _, s := range stems {
@@ -316,19 +325,28 @@ func danglingLinks(lessons map[int]string) ([]string, error) {
 		return false
 	}
 	var out []string
-	for _, p := range lessons {
+	for _, p := range files {
 		raw, err := os.ReadFile(p) //nolint:gosec // the repository's own docs
+		if err != nil {
+			return nil, err
+		}
+		rel, err := filepath.Rel(root, p)
 		if err != nil {
 			return nil, err
 		}
 		for _, m := range wikilink.FindAllSubmatch(raw, -1) {
 			if target := strings.TrimSpace(string(m[1])); !resolves(target) {
-				out = append(out, fmt.Sprintf("%s links [[%s]]", filepath.Base(p), target))
+				out = append(out, fmt.Sprintf("%s links [[%s]]", rel, target))
 			}
 		}
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 func lessonDirs(dir string) ([]string, error) {
