@@ -70,7 +70,8 @@ AC9, 2026-10-08:
   draw picked mimo, which published; Anthropic skipped). glm5.3-flash, streamed from NaN on review prompts with 16K
   output tokens: default effort 289 s and `medium` 338 s, both `finish_reason: length` with no content (the
   60,000-reasoning-character ceiling); `low` 285 s on 37,251 prompt tokens (45,651 reasoning characters, a review) and
-  215 s on 96,707 (33,541, a review). Pending: Haiku's first run with thinking, glm5.3-flash's first
+  215 s on 96,707 (33,541, a review). Run 37885509177: the draw picked Haiku, which logged adaptive thinking at `high` and published, with all
+  three NaN members answering the probe. Pending: glm5.3-flash's first
   drawn review, and a real second attempt.
 
 ## Decisions made during implementation

@@ -74,8 +74,9 @@ created: "2026-09-29"
       under $0.25
 - [x] [AC9] glm5.3-flash measured on review-sized prompts before admission: no review at its default effort or `medium`,
       a review at `low` on 37K and 97K tokens (lesson 369); the NaN attempt sends `low`, pinned by a test
-- [ ] [AC9] Live run, Haiku with thinking: the step log carries PR-Agent's `Using adaptive thinking for model
-      anthropic/claude-haiku-5-5 with output_config effort 'high'` and a review is published; run id on #1923
+- [x] [AC9] Live run, Haiku with thinking: drawn with no override, the step log carries PR-Agent's `Using adaptive
+      thinking for model anthropic/claude-haiku-5-5 with output_config effort 'high'` and a review is published
+      (run 37885509177)
 - [ ] [AC9] Live run, glm5.3-flash: its first drawn review publishes inside the 12-minute bound; run id on #1923
 - [ ] [AC9] Live run, second attempt: the first real failure of a first attempt after merge that runs the other
       provider; run id on #1923 (a failure cannot be forced from CI without spending the shared NaN pool)
