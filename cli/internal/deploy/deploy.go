@@ -29,6 +29,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/fsmode"
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // ManifestRel is the declarative table of what gets deployed where, relative to
@@ -255,6 +256,9 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		}
 		if c.Paths != "" && c.Paths != PathsNative && c.Paths != PathsSlash {
 			return nil, fmt.Errorf("config %q: unknown paths form %q (want %s or %s)", c.Name, c.Paths, PathsNative, PathsSlash)
+		}
+		if c.Paths != "" && isTOML(c.Dst) {
+			return nil, fmt.Errorf("config %q: paths rewrites JSON string values, and %s is TOML", c.Name, c.Dst)
 		}
 		switch c.strategy() {
 		case StrategyReplace:
@@ -751,39 +755,96 @@ func commit(c Config, staged, dst string, mode os.FileMode) error {
 	return nil
 }
 
-// mergeInto returns the destination's JSON object with the source's top-level
-// keys written into it, and whether any of them differed. Equality is semantic
-// (parsed values), never textual: Copilot rewrites its config.json with a
-// `// User settings belong in settings.json` header, and a byte-compare would
-// call that drift on every setup run. The header is dropped on read only — the
-// merged file is plain JSON, and the tool that wants a header puts it back.
-//
-// A missing destination merges into an empty object; a destination that is not
-// a JSON object is an error, because "merge" has no meaning for it and silently
-// replacing it is the data loss this strategy exists to prevent.
-func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
-	managed, err := decodeJSONObject(srcData)
-	if err != nil {
-		return nil, false, fmt.Errorf("source is not a JSON object: %w", err)
+// mergeFormat is how a merge reads and writes one file format. The merge itself
+// (deepMerge) is the same for every format: a document is a map of keys, and
+// the repo owns the keys its source names.
+type mergeFormat struct {
+	what         string // "a JSON object", in "source is not a JSON object"
+	decodeSource func([]byte) (map[string]any, error)
+	decodeDest   func([]byte) (map[string]any, error)
+	encode       func(map[string]any) ([]byte, error)
+}
+
+// jsonMerge drops `//` header lines from the destination on read only:
+// Copilot rewrites its config.json with a `// User settings belong in
+// settings.json` header. The merged file is plain JSON, and the tool that wants
+// a header puts it back.
+var jsonMerge = mergeFormat{
+	what:         "a JSON object",
+	decodeSource: decodeJSONMap,
+	decodeDest:   func(raw []byte) (map[string]any, error) { return decodeJSONMap(stripLineComments(raw)) },
+	encode:       func(m map[string]any) ([]byte, error) { return encodeJSON(m) },
+}
+
+// tomlMerge is for a TOML config the tool also writes: herdr saves onboarding
+// and its Settings screen into config.toml (#2013 H4). The merged file is
+// re-encoded, so comments in the destination do not survive a merge that
+// changes a value; an in-sync merge writes nothing and keeps them.
+var tomlMerge = mergeFormat{
+	what:         "a TOML table",
+	decodeSource: decodeTOMLTable,
+	decodeDest:   decodeTOMLTable,
+	encode:       encodeTOML,
+}
+
+// mergeFormatFor chooses by the destination's extension: .toml is TOML, and
+// anything else is JSON, the only format merge read before #2013 H4.
+func mergeFormatFor(dst string) mergeFormat {
+	if isTOML(dst) {
+		return tomlMerge
 	}
-	if managed == nil {
-		return nil, false, errors.New("source is not a JSON object: null")
+	return jsonMerge
+}
+
+func isTOML(p string) bool { return strings.EqualFold(path.Ext(filepath.ToSlash(p)), ".toml") }
+
+// decodeJSONMap is decodeJSONObject for a merge: a JSON `null` unmarshals into
+// a nil map without error, and assigning into it would panic, so it is refused
+// like any other non-object.
+func decodeJSONMap(raw []byte) (map[string]any, error) {
+	m, err := decodeJSONObject(raw)
+	if err == nil && m == nil {
+		return nil, errors.New("null")
+	}
+	return m, err
+}
+
+// decodeTOMLTable reads a TOML document. An empty one is an empty table.
+func decodeTOMLTable(raw []byte) (map[string]any, error) {
+	m := map[string]any{}
+	if err := toml.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func encodeTOML(m map[string]any) ([]byte, error) { return toml.Marshal(m) }
+
+// mergeInto returns the destination's document with the source's top-level
+// keys written into it, and whether any of them differed. Equality is semantic
+// (parsed values), never textual: a tool that rewrites its config in its own
+// layout (a header, key order, inline tables) must not read as drift on every
+// setup run.
+//
+// A missing destination merges into an empty document; a destination that does
+// not parse as one is an error, because "merge" has no meaning for it and
+// silently replacing it is the data loss this strategy exists to prevent.
+func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
+	f := mergeFormatFor(dst)
+	managed, err := f.decodeSource(srcData)
+	if err != nil {
+		return nil, false, fmt.Errorf("source is not %s: %w", f.what, err)
 	}
 	existing := map[string]any{}
 	if raw, err := os.ReadFile(dst); err == nil { //nolint:gosec // manifest-declared destination
-		if existing, err = decodeJSONObject(stripLineComments(raw)); err != nil {
-			return nil, false, fmt.Errorf("destination is not a JSON object: %w", err)
-		}
-		// A JSON `null` unmarshals into a nil map without error; assigning
-		// into it would panic. Reject it like any other non-object.
-		if existing == nil {
-			return nil, false, errors.New("destination is not a JSON object: null")
+		if existing, err = f.decodeDest(raw); err != nil {
+			return nil, false, fmt.Errorf("destination is not %s: %w", f.what, err)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, false, err
 	}
 	merged, changed := deepMerge(existing, managed)
-	content, err := encodeJSON(merged)
+	content, err := f.encode(merged)
 	if err != nil {
 		return nil, false, err
 	}

@@ -51,6 +51,15 @@ created: "2026-10-06"
 - [x] On the Mac: `dotf tools sync` installed herdr and uv, `herdr --version` is 0.9.3, a second run reported nothing to do
 - [ ] Windows: H2 (does `mise install herdr` keep `conpty/` next to `herdr.exe`), at the Windows box
 
+### H4a — `dotf deploy` merges TOML (#2013 H4, owner decision 2026-10-08)
+
+herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the Settings screen saves into it), so a `replace` entry would overwrite the owner's in-app choices on every deploy and show drift until then: the `.gitconfig` class (lesson 366). The owner chose a TOML merge over `replace` and seed-if-missing.
+
+- [x] Failing tests first (`merge_toml_test.go`): a merge keeps the keys the tool wrote and writes the managed ones; a reformatted destination (comments, key order, inline tables) is in sync and is not rewritten; an absent destination is created and a second run is in sync; an unreadable destination fails naming the config and is untouched; `paths` on a TOML entry is refused at parse time
+- [x] `mergeFormat`: the destination's extension picks the codec (`.toml` is TOML, anything else JSON as before), and `deepMerge` is shared. Dependency `github.com/pelletier/go-toml/v2` v2.2.4. Mutation-checked: with `.toml` read as JSON, all five tests fail
+- [x] `ai/deploy.json` documents the TOML merge. No manifest version bump: a `dotf` that predates this refuses a TOML merge entry loudly ("source is not a JSON object") rather than replacing the file
+- [ ] H4 (the `herdr` entry) lands after the release carrying this is the `DOTF_VERSION` pin, so no machine runs a `dotf` that refuses it (#1814 class)
+
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
 - [x] [AC5] Failing tests, then `tools.ParseMiseTools`: pins marked `# mise: cli` on the line before them, name from `NAME_VERSION`; a marker that marks no pin is an error
