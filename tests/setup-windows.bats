@@ -608,6 +608,17 @@ FIXTURE
     jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
+# A uv-tool entry installs only when uv is on PATH, so on a from-zero Windows box
+# poetry converges only if uv's installer runs before the catalog does.
+@test "setup-windows.ps1 installs uv before dotf tools install, so the uv-tool entries converge" {
+    local uv_line catalog_line
+    uv_line="$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
+    catalog_line="$(grep -nE '^[[:space:]]+dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
+    [ -n "$uv_line" ]
+    [ -n "$catalog_line" ]
+    [ "$uv_line" -lt "$catalog_line" ]
+}
+
 # --- Cross-platform parity: developer tools ---
 
 @test "parity: both scripts provide uv (Linux through mise, Windows through its installer)" {
