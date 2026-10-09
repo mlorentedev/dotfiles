@@ -48,9 +48,11 @@ func (r gitConfig) Reconcile(env Env, dryRun bool) (Result, error) {
 	return res, gitconfig.Apply(m, st)
 }
 
-// Probe holds the post-condition: the include is in place, and every helper is
-// gh's absolute form unless gh itself is what is missing, which converge
-// cannot provide and the detail already names.
+// Probe holds the post-condition: the include is in place and names a file
+// that exists, and every helper is gh's absolute form unless gh itself is what
+// is missing, which converge cannot provide and the detail already names. An
+// include of an undeployed file fails: git ignores it without a word, so a run
+// that passed there would leave git reading none of the dotfiles' settings.
 func (r gitConfig) Probe(env Env) error {
 	st, err := gitconfig.Inspect(r.machine(env))
 	if err != nil {
@@ -58,6 +60,9 @@ func (r gitConfig) Probe(env Env) error {
 	}
 	if st.IncludeMissing {
 		return fmt.Errorf("~/.gitconfig still does not include %s", gitconfig.IncludePath)
+	}
+	if st.TargetMissing {
+		return fmt.Errorf("%s is not deployed, so git reads none of the dotfiles' settings (run: dotf deploy)", gitconfig.IncludePath)
 	}
 	if len(st.BadHelpers) > 0 && st.Blocked == "" {
 		return fmt.Errorf("after gh auth setup-git, the credential helper is still not gh's absolute path: %s", strings.Join(st.BadHelpers, "; "))

@@ -117,6 +117,28 @@ func TestGitConfig_ABlockedHelperIsNamedNotFailed(t *testing.T) {
 	}
 }
 
+// The include converges but names a file `dotf deploy` never wrote: git
+// ignores it silently, so the post-condition fails and names the remedy.
+func TestGitConfig_AnIncludeOfAnUndeployedFileFailsTheProbe(t *testing.T) {
+	home := t.TempDir()
+	gh := filepath.Join(home, "gh")
+	if err := os.WriteFile(gh, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, run := gitFake(gh)
+	r := gitConfig{run: run, has: func(string) bool { return true }}
+	env := Env{Home: home}
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg["include.path"]) != 1 {
+		t.Fatalf("the include must still be added: %v", cfg["include.path"])
+	}
+	if err := r.Probe(env); err == nil || !strings.Contains(err.Error(), "dotf deploy") {
+		t.Errorf("want the probe to fail naming dotf deploy, got %v", err)
+	}
+}
+
 // Nothing repairable: the include is there, gh is absent and the deployed
 // file is missing. The run changes nothing, so its detail must not say
 // "applied", and it names both remedies.
