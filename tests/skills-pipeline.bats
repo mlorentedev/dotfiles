@@ -49,6 +49,32 @@ setup_file() {
         "$DEPLOY_COUNT" "$real" > "$COUNTING_SCRIPT"
     chmod +x "$COUNTING_SCRIPT"
 
+    # `dotf harness instructions` is the only writer of the instruction files,
+    # and a deploy without it fails. What it writes is pinned in cli/internal/
+    # harness and tests/compile-harness.bats; this file is about skills. The
+    # shim answers that one command and hands everything else to a real dotf
+    # when one is on PATH, so a dev box runs as before and the unit job, which
+    # has no dotf, still deploys.
+    local shim="$BATS_FILE_TMPDIR/dotf-shim"
+    mkdir -p "$shim"
+    cat > "$shim/dotf" <<'SHIM'
+#!/usr/bin/env bash
+self="$(cd "$(dirname "$0")" && pwd)"
+rest="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$self" | paste -sd: -)"
+real="$(PATH="$rest" command -v dotf || true)"
+case "$1 $2" in
+    "harness instructions") exit 0 ;;
+    "harness --help")
+        [ -z "$real" ] || "$real" harness --help
+        printf '  instructions  Deploy the agent instruction files\n'
+        exit 0 ;;
+esac
+[ -n "$real" ] && exec "$real" "$@"
+exit 127
+SHIM
+    chmod +x "$shim/dotf"
+    export PATH="$shim:$PATH"
+
     deploy_shared clean "$PATH"
     # The copilot skill target has a manifest-declared requires_command (BUG-771:
     # native skills must not create ~/.copilot on a box that never installed

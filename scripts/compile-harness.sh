@@ -871,63 +871,47 @@ do_deploy() {
     # copilot catalog and deploy_agents injects the AGENT-PRESENCE region into
     # these SAME files below. A full-file copy after either would wipe out what
     # they just wrote.
+    #
+    # A failure here does not stop the surfaces below, which do not depend on
+    # these files existing: losing every skill and agent over one surface helps
+    # nobody. It still fails this script, at the end, with exit 2. A caller
+    # has to act on that: setup-linux.sh downgrades it to a warning today, and
+    # making setup fail loudly is #2013 W4.
+    local instructions_rc=0
     if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then
-        deploy_instructions || exit 2
-    fi
-    if ! has_skills && ! has_agents; then
-        printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
-        return 0
+        deploy_instructions || instructions_rc=$?
     fi
     if has_skills; then deploy_skills; fi
     if has_agents; then deploy_agents; fi
     if has_doctrine && has_agents; then
         deploy_doctrine "$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
     fi
+    if [ "$instructions_rc" -ne 0 ]; then
+        printf '[deploy] FAILED: the agent instruction files were not deployed (see above)\n' >&2
+        exit 2
+    fi
+    if ! has_skills && ! has_agents; then
+        printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
+        return 0
+    fi
     printf '[deploy] OK\n'
 }
 
-# Copy each agents.presence[] entry's full instruction-file SSOT (already
+# Deploy each agents.presence[] entry's full instruction-file SSOT (already
 # injected with the enforced-pattern region by --refresh) to its per-agent
-# $HOME path (HARNESS-058/#828). Until now this copy only happened in
-# setup-linux.sh, so a standalone `--deploy` run (no full setup) left
-# claude/opencode/pi/copilot stale after a merge while agy/codex (the compact
-# doctrine payload) stayed current — the same command now converges all six
-# surfaces. De-symlinks first (BUG-100 safety, same as deploy_skills/deploy_agents).
-# Entries with no `source` (none today) are skipped -- presence-only injection,
-# same as before this change.
+# $HOME path (HARNESS-058/#828), so a standalone `--deploy` run converges all
+# six surfaces, not only a full setup.
 deploy_instructions() {
-    local agent file source requires dest rc=0
-    # One implementation (PLAT-001b PR 2c): a dotf that carries
-    # `harness instructions` deploys these files itself, keeping the presence
-    # and catalog regions already in place instead of overwriting them. An
-    # older dotf, or none, falls back to the copy below, so this needs no
-    # release to land.
-    if type -P dotf >/dev/null 2>&1 && dotf_knows_subcommand instructions; then
-        dotf harness instructions --repo-root "$REPO_ROOT"
-        return
+    # One implementation (PLAT-001b PR 2c): `dotf harness instructions` deploys
+    # these files, keeping the presence and catalog regions already in place.
+    # The shell copy that stood in for an older dotf is gone: the pinned dotf
+    # carries the command, and a second writer is how the two drift.
+    if ! type -P dotf >/dev/null 2>&1 || ! dotf_knows_subcommand instructions; then
+        printf '[ERROR] instructions need `dotf harness instructions`; dotf is absent or predates it\n' >&2
+        printf '        no agent instruction file was deployed -- install the pinned dotf and re-run --deploy\n' >&2
+        return 1
     fi
-    while IFS=$'\t' read -r agent file source requires; do
-        [[ -n "$source" ]] || continue
-        if [[ -n "$requires" ]] && ! command -v "$requires" >/dev/null 2>&1; then
-            printf '[deploy] instructions target %s skipped: %s not on PATH\n' "$agent" "$requires"
-            continue
-        fi
-        if [[ ! -f "$REPO_ROOT/$source" ]]; then
-            printf '[ERROR] instruction source missing: %s\n' "$REPO_ROOT/$source" >&2
-            rc=1
-            continue
-        fi
-        dest="$HOME/$file"
-        [[ -L "$dest" ]] && rm -f "$dest"
-        mkdir -p "$(dirname "$dest")"
-        cp -f "$REPO_ROOT/$source" "$dest"
-        printf '[deploy] instructions -> %s\n' "$dest"
-    done < <(jq -r '.agents.presence[] | "\(.agent)\t\(.file)\t\(.source // "")\t\(.requires_command // "")"' "$MANIFEST")
-    # A missing source is a manifest/repo defect, not a transient skip -- an
-    # [ERROR] line followed by [deploy] OK was the same silently-contradicting
-    # shape deploy_agent_presence had (fixed earlier this PR); propagate it so
-    # `do_deploy` stops instead of claiming success.
-    return "$rc"
+    dotf harness instructions --repo-root "$REPO_ROOT"
 }
 
 # Render committed skill records to their per-agent $HOME paths (offline),
