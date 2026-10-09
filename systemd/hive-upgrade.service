@@ -4,11 +4,12 @@ Documentation=https://github.com/mlorentedev/hive/issues/176
 
 [Service]
 Type=oneshot
-# uv comes from mise (setup's `dotf tools sync`, #2013 W2), reached through its
-# shims dir; a box set up before that has it in ~/.local/bin from uv's own
-# installer. A --user oneshot gets a minimal PATH that has neither, so the unit
-# declares both, shims first as `mise activate` orders them, and resolves uv
-# through env. %h resolves to the user home.
+# uv comes from mise (setup's `dotf tools sync`, #2013 W2). `mise exec` finds
+# it in mise's data dir, which MISE_DATA_DIR or XDG_DATA_HOME can move, so the
+# unit names no shims path of its own. A uv that mise does not pin (a box set
+# up before W2 has it in ~/.local/bin from uv's own installer) is found on the
+# PATH below. A --user oneshot's own PATH has neither mise nor ~/.local/bin.
+# %h resolves to the user home.
 # uv tool upgrade exits 0 when already current, so the oneshot is not marked failed.
-Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/env uv tool upgrade hive-vault
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env mise exec -- uv tool upgrade hive-vault

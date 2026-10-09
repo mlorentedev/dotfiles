@@ -28,17 +28,19 @@ setup() {
 
 @test "hive-upgrade.service is a oneshot running uv tool upgrade hive-vault" {
     grep -qF 'Type=oneshot' "$DOTFILES_DIR/systemd/hive-upgrade.service"
-    grep -qF 'ExecStart=/usr/bin/env uv tool upgrade hive-vault' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    grep -qF 'ExecStart=/usr/bin/env mise exec -- uv tool upgrade hive-vault' "$DOTFILES_DIR/systemd/hive-upgrade.service"
 }
 
-# A --user oneshot gets a minimal PATH with neither mise's shims nor
-# ~/.local/bin, so a bare `uv` would fail every slot. The unit declares its own
-# PATH: mise's shims (where uv lives since #2013 W2) ahead of ~/.local/bin (uv's
-# own installer, on boxes set up before that), and resolves uv through env.
-@test "hive-upgrade.service resolves uv through a declared PATH, mise shims first" {
+# A --user oneshot gets a minimal PATH with neither mise nor ~/.local/bin, so a
+# bare `uv` would fail every slot. mise resolves uv in its own data dir, which
+# MISE_DATA_DIR or XDG_DATA_HOME can move: a shims path written into the unit
+# would point at nothing on such a box (#2186 review). ~/.local/bin holds the
+# catalog's mise, and uv's own installer copy on boxes set up before W2.
+@test "hive-upgrade.service resolves uv through mise, not a hard-coded shims path" {
     refute_grep '^ExecStart=uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
-    grep -qF 'Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:' "$DOTFILES_DIR/systemd/hive-upgrade.service"
-    grep -qE '^ExecStart=/usr/bin/env uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    refute_grep 'mise/shims' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    grep -qF 'Environment=PATH=%h/.local/bin:' "$DOTFILES_DIR/systemd/hive-upgrade.service"
+    grep -qE '^ExecStart=/usr/bin/env mise exec -- uv ' "$DOTFILES_DIR/systemd/hive-upgrade.service"
 }
 
 # --- setup-linux.sh wiring ---
