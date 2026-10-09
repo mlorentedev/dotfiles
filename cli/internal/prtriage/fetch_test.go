@@ -426,3 +426,27 @@ func TestFetchKeepsAPRWhoseFileListFillsAPage(t *testing.T) {
 		t.Fatalf("a full page of files must keep the PR pending: %+v, %v", got, err)
 	}
 }
+
+// A files call that fails, a deadline on the session-start path among the
+// causes, keeps that PR listed and does not discard the rest of the queue.
+func TestFetchKeepsAPRWhoseFilesCannotBeRead(t *testing.T) {
+	r := testRegistry()
+	r.Exempt.Signatures = []Signature{{Name: "release-please", Files: []string{"CHANGELOG.md"}}}
+	review := `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-09T05:00:00Z"}]`
+	fake := &fakeGH{
+		responses: map[string]string{
+			"pulls?state":         `[{"number":20,"title":"release"},{"number":21,"title":"feature"}]`,
+			"/issues/20/comments": review,
+			"/issues/21/comments": review,
+			"pulls/21/files":      `[{"filename":"cli/main.go"}]`,
+		},
+		errs: map[string]error{"pulls/20/files": context.DeadlineExceeded},
+	}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", r)
+	if err != nil {
+		t.Fatalf("an unreadable file list must not fail the queue: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("both PRs stay listed, got %+v", got)
+	}
+}

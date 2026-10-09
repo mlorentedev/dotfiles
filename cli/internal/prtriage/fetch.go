@@ -145,12 +145,19 @@ func fetchWith(ctx context.Context, run ghRunner, repo string, reg Registry) ([]
 // withoutExempt drops a pending PR whose diff is an exempt signature. The file
 // list is read only for a PR the queue would report, which is rarely more than
 // a few, so the session-start path pays no call for a quiet PR.
+//
+// A file list that cannot be read keeps its PR listed and costs nothing else.
+// The queue is already computed at this point; an exemption may only make it
+// quieter, so failing to establish one leaves it as loud as it was, and never
+// turns into an error that would discard every other entry (the session-start
+// probe runs under a deadline, and a slow call here must not empty its answer).
 func withoutExempt(ctx context.Context, run ghRunner, base string, pending []Status, reg Registry) ([]Status, error) {
 	kept := pending[:0]
 	for _, st := range pending {
 		files, err := fetchFiles(ctx, run, base, st.PR.Number)
 		if err != nil {
-			return nil, err
+			kept = append(kept, st)
+			continue
 		}
 		pr := st.PR
 		pr.Files = files
