@@ -49,6 +49,43 @@ func TestHasAnyChar(t *testing.T) {
 	}
 }
 
+// The obsidian CLI exits 0 and prints its own errors on stdout, so these are
+// the answers a connectivity check that only looks for output would pass.
+func TestNamesVault(t *testing.T) {
+	tests := []struct {
+		name, out string
+		want      bool
+	}{
+		{"real CLI answer (1.14, macOS)", "name\tknowledge\npath\t/Users/x/Projects/knowledge\nfiles\t2631", true},
+		{"bare name is not the record", "knowledge", false},
+		{"an error that mentions the vault", "Error: Vault knowledge not found.", false},
+		{"vault not found", "Vault not found.", false},
+		{"flag read as a command", `Error: Command "--no-sandbox" not found. It may require a plugin to be enabled.`, false},
+		{"another vault", "name\tknowledge-old", false},
+		{"empty", "", false},
+	}
+	for _, tt := range tests {
+		if got := namesVault(tt.out, "knowledge"); got != tt.want {
+			t.Errorf("%s: namesVault(%q) = %v, want %v", tt.name, tt.out, got, tt.want)
+		}
+	}
+}
+
+// Vault first on every OS; --no-sandbox only off darwin, where the separate
+// CLI reads it as a command (measured on obsidian 1.14.4).
+func TestObsidianArgsPerOS(t *testing.T) {
+	for goos, want := range map[string]string{
+		"linux":   "--no-sandbox vault=knowledge unresolved format=json",
+		"windows": "--no-sandbox vault=knowledge unresolved format=json",
+		"darwin":  "vault=knowledge unresolved format=json",
+	} {
+		h := &healthRun{opts: HealthOptions{VaultName: "knowledge", GOOS: goos}}
+		if got := strings.Join(h.obsidianArgs("unresolved", "format=json"), " "); got != want {
+			t.Errorf("%s: argv %q, want %q", goos, got, want)
+		}
+	}
+}
+
 // The golden corpus cannot carry a memory/ directory: GUARD-001 refuses an
 // agent-memory path outside the vault. So the directory rule is pinned here.
 func TestOrphanExempt(t *testing.T) {

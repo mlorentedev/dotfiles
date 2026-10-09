@@ -383,4 +383,5 @@ tags: [lessons, index, dotfiles]
 | [362 - An uncomputed merge state is not a pending check](lesson-362-an-uncomputed-merge-state-is-not-a-pending-check.md) | 2026-10-07 |
 | [363 - An assertion sound on one bash is vacuous on another](lesson-363-an-assertion-sound-on-one-bash-is-vacuous-on-another.md) | 2026-10-07 |
 | [364 - A regenerate-from-SSOT step must know which way its clone is off](lesson-364-a-regenerate-from-ssot-step-must-know-which-way-its-clone-is-off.md) | 2026-10-08 |
+| [365 - A CLI that exits 0 on its own errors is answered by content, not by output](lesson-365-a-cli-that-exits-0-on-its-own-errors-is-answered-by-content.md) | 2026-10-08 |
 <!-- END GENERATED -->

@@ -47,9 +47,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// runObsidianStub is lib.sh's stub, byte for byte: append the argv to the log,
-// take the first argument naming a subcommand (so `--vault knowledge` never
-// matches), print stub/<sub> when the case has one, and exit 0.
+// runObsidianStub was lib.sh's stub: append the argv to the log, take the first
+// argument naming a subcommand (so `--vault knowledge` never matches), print
+// stub/<sub> when the case has one, and exit with stub/<sub>.exit when the case
+// has one (a CLI that dies), 0 otherwise.
 func runObsidianStub(args []string) int {
 	logf, err := os.OpenFile(os.Getenv(stubEnvLog), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -61,9 +62,14 @@ func runObsidianStub(args []string) int {
 
 	for _, a := range args {
 		switch a {
-		case "vault", "orphans", "dead-ends", "unresolved", "tags":
+		case "vault", "orphans", "deadends", "unresolved", "tags":
 			if b, err := os.ReadFile(filepath.Join(os.Getenv(stubEnvCase), "stub", a)); err == nil {
 				_, _ = os.Stdout.Write(b)
+			}
+			if b, err := os.ReadFile(filepath.Join(os.Getenv(stubEnvCase), "stub", a+".exit")); err == nil {
+				if code, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil {
+					return code
+				}
 			}
 			return 0
 		}
@@ -152,6 +158,10 @@ func runGoldenCase(t *testing.T, c goldenCase) {
 		// set, which is how every case was captured.
 		VaultName: "knowledge",
 		Verbose:   strings.Contains(readTrimmed(t, filepath.Join(c.dir, "args")), "--verbose"),
+		// The argv depends on the OS, so each case pins one: darwin, where the
+		// corpus's argv was measured, unless the case names another in its goos
+		// file.
+		GOOS: goldenGOOS(t, c.dir),
 	})
 	if err != nil {
 		t.Fatalf("RunHealth: %v", err)
@@ -333,6 +343,17 @@ func copyTree(t *testing.T, src, dst string) {
 	if err != nil {
 		t.Fatalf("copy fixture %s: %v", src, err)
 	}
+}
+
+// goldenGOOS is the platform a case's argv was captured for: its goos file, or
+// darwin when it has none. Never runtime.GOOS — the same corpus must pass on
+// every CI leg.
+func goldenGOOS(t *testing.T, caseDir string) string {
+	t.Helper()
+	if goos := readTrimmed(t, filepath.Join(caseDir, "goos")); goos != "" {
+		return goos
+	}
+	return "darwin"
 }
 
 // readTrimmed reads an optional one-line fixture file; absent is "".

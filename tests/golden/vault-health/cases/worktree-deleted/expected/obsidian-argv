@@ -1,5 +1,5 @@
---no-sandbox vault --vault knowledge
---no-sandbox orphans --vault knowledge
---no-sandbox dead-ends --vault knowledge
---no-sandbox unresolved verbose format=json --vault knowledge
---no-sandbox tags --vault knowledge
+vault=knowledge vault
+vault=knowledge orphans
+vault=knowledge deadends
+vault=knowledge unresolved verbose format=json
+vault=knowledge tags

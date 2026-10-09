@@ -33,11 +33,13 @@ package vault
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -49,6 +51,9 @@ type HealthOptions struct {
 	VaultDir  string
 	VaultName string
 	Verbose   bool
+	// GOOS decides the argv sent to obsidian; empty means runtime.GOOS. A seam
+	// so the golden corpus pins one platform's argv on every CI leg.
+	GOOS string
 }
 
 // deletedLineRe mirrors `grep '^.D '`: git status --short's Y-column (unstaged
@@ -143,15 +148,71 @@ func countNonBlank(s string) int {
 	return n
 }
 
-// obsidianCmd runs `obsidian --no-sandbox <sub> --vault <name>` and returns its
-// stdout with trailing newlines stripped — the same trim bash's `$(...)`
-// command substitution performs, load-bearing because callers reuse this value
-// both for counting AND for the --verbose listing.
+// namesVault reports whether the obsidian CLI's `vault` answer is the vault's
+// own record: a `name<TAB><vault>` line, as the real CLI prints it. The CLI
+// exits 0 and prints to stdout on its own errors too ("Vault not found.",
+// `Error: Command "--no-sandbox" not found.`), so neither output nor a mention
+// of the name is a connection.
+func namesVault(out, name string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if key, value, ok := strings.Cut(line, "\t"); ok && key == "name" && strings.TrimSpace(value) == name {
+			return true
+		}
+	}
+	return false
+}
+
+// obsidianArgs builds `[--no-sandbox] vault=<name> <sub...>`. `vault=<name>`
+// first is the CLI's documented form (https://obsidian.md/help/cli);
+// `--vault <name>` is not a parameter, and the CLI ignored it and answered for
+// whichever vault was active, or "Vault not found." when none was.
+// `--no-sandbox` is for the Linux AppImage's Electron sandbox, which every
+// non-darwin call carried before; the macOS binary is a separate CLI
+// (obsidian-cli) that reads it as a command and fails every call (measured on
+// obsidian 1.14.4).
+func (h *healthRun) obsidianArgs(sub ...string) []string {
+	goos := h.opts.GOOS
+	if goos == "" {
+		goos = runtime.GOOS //nolint:forbidigo // the seam's production default
+	}
+	var args []string
+	if goos != "darwin" {
+		args = append(args, "--no-sandbox")
+	}
+	return append(append(args, "vault="+h.opts.VaultName), sub...)
+}
+
+// obsidianCmd runs `obsidian <obsidianArgs>` and returns its stdout with
+// trailing newlines stripped — the same trim bash's `$(...)` command
+// substitution performs, load-bearing because callers reuse this value both
+// for counting AND for the --verbose listing.
 func (h *healthRun) obsidianCmd(sub ...string) string {
-	args := append(append([]string{"--no-sandbox"}, sub...), "--vault", h.opts.VaultName)
-	cmd := exec.Command("obsidian", args...)
-	out, _ := cmd.Output() // stderr discarded, exit code ignored: `2>/dev/null || true`
-	return strings.TrimRight(string(out), "\n")
+	out, _ := h.obsidianRun(sub...) // exit code ignored: `2>/dev/null || true`
+	return out
+}
+
+// obsidianRun is obsidianCmd plus how the CLI exited; stderr is discarded.
+func (h *healthRun) obsidianRun(sub ...string) (string, error) {
+	out, err := exec.Command("obsidian", h.obsidianArgs(sub...)...).Output()
+	return strings.TrimRight(string(out), "\n"), err
+}
+
+// obsidianList runs a listing subcommand and returns its answer, or why it is
+// not one. A CLI that exits non-zero has no answer, even an empty one: an empty
+// list would count as zero findings and pass. The CLI also reports a failure on
+// stdout and exits 0 (measured: `Error: Command "x" not found. It may require a
+// plugin to be enabled.`), so an answer that starts with "Error:" is refused
+// rather than counted as one listed file.
+func (h *healthRun) obsidianList(sub ...string) (string, error) {
+	out, err := h.obsidianRun(sub...)
+	if err != nil {
+		return "", err
+	}
+	first, _, _ := strings.Cut(strings.TrimLeft(out, " \t\r\n"), "\n")
+	if strings.HasPrefix(first, "Error:") {
+		return "", errors.New(strings.TrimSpace(first))
+	}
+	return out, nil
 }
 
 // printTruncated mirrors `echo "$VAR" | head -N` plus the "... and M more"
@@ -282,9 +343,16 @@ func (h *healthRun) section2Connectivity() (int, bool) {
 		return 1, true
 	}
 
-	if !hasAnyChar(h.obsidianCmd("vault")) {
+	answer := h.obsidianCmd("vault")
+	if !hasAnyChar(answer) {
 		h.errorLine("Cannot reach Obsidian GUI. Is Obsidian running?")
-		h.infoLine("Start Obsidian or run: obsidian --no-sandbox &")
+		h.infoLine("Start Obsidian, then re-run.")
+		return 2, true
+	}
+	if !namesVault(answer, h.opts.VaultName) {
+		first, _, _ := strings.Cut(strings.TrimSpace(answer), "\n")
+		h.errorLine("Obsidian CLI answered, but not for vault '" + h.opts.VaultName + "': " + first)
+		h.infoLine("Is the vault registered and open in Obsidian under that name?")
 		return 2, true
 	}
 	h.pass("Obsidian CLI connected to vault '%s'", h.opts.VaultName)
@@ -337,9 +405,10 @@ func nonBlankLines(s string) []string {
 func (h *healthRun) section3OrphansDeadEnds() {
 	h.section("3/7", "Orphans & Dead-Ends")
 
+	orphansOut, orphansErr := h.obsidianList("orphans")
 	var orphans []string
 	exemptOrphans := 0
-	for _, l := range nonBlankLines(h.obsidianCmd("orphans")) {
+	for _, l := range nonBlankLines(orphansOut) {
 		if orphanExempt(strings.TrimSpace(l)) {
 			exemptOrphans++
 			continue
@@ -355,13 +424,15 @@ func (h *healthRun) section3OrphansDeadEnds() {
 		population++
 	}
 	orphanCount := len(orphans)
-	deadOut := h.obsidianCmd("dead-ends")
+	deadOut, deadErr := h.obsidianList("deadends")
 	deadCount := countNonBlank(deadOut)
 
 	orphanPct := pct(orphanCount, population)
 	deadPct := pct(deadCount, h.totalFiles)
 
 	switch {
+	case orphansErr != nil:
+		h.fail("Orphans: the obsidian CLI answered with an error: %s", orphansErr)
 	case orphanPct <= 30:
 		h.pass("Orphans: %d/%d (%d%%)", orphanCount, population, orphanPct)
 	case orphanPct <= 50:
@@ -369,12 +440,14 @@ func (h *healthRun) section3OrphansDeadEnds() {
 	default:
 		h.fail("Orphans: %d/%d (%d%%) — too many isolated files", orphanCount, population, orphanPct)
 	}
-	if exemptFiles > 0 {
+	if exemptFiles > 0 && orphansErr == nil {
 		h.info("Not counted: %d file(s) under sessions/, memory/ and 90_archive/ (%d orphaned), which have no incoming links by design",
 			exemptFiles, exemptOrphans)
 	}
 
 	switch {
+	case deadErr != nil:
+		h.fail("Dead-ends: the obsidian CLI answered with an error: %s", deadErr)
 	case deadPct <= 30:
 		h.pass("Dead-ends: %d/%d (%d%%)", deadCount, h.totalFiles, deadPct)
 	case deadPct <= 50:
@@ -403,7 +476,11 @@ type unresolvedLink struct {
 func (h *healthRun) section4Unresolved() {
 	h.section("4/7", "Unresolved Links")
 
-	out := h.obsidianCmd("unresolved", "verbose", "format=json")
+	out, err := h.obsidianList("unresolved", "verbose", "format=json")
+	if err != nil {
+		h.fail("Unresolved links: the obsidian CLI answered with an error: %s", err)
+		return
+	}
 	var all []unresolvedLink
 	if strings.TrimSpace(out) != "" {
 		if err := json.Unmarshal([]byte(out), &all); err != nil {
@@ -470,7 +547,11 @@ func (h *healthRun) section5Frontmatter() {
 func (h *healthRun) section6Tags() {
 	h.section("6/7", "Tag Hygiene")
 
-	out := h.obsidianCmd("tags")
+	out, err := h.obsidianList("tags")
+	if err != nil {
+		h.fail("Tags: the obsidian CLI answered with an error: %s", err)
+		return
+	}
 	count := countNonBlank(out)
 	h.info("Total unique tags: %d", count)
 
