@@ -346,6 +346,7 @@ obstacles, but they fail loudly.
 | No review at all, `PR-Agent: skipped` | a comment landed inside the ~20s Docker build window and cancelled the run | #1040 |
 | `OPENAI_KEY not set` in the log | benign — the runner prints it while Dynaconf loads `OPENAI__KEY` separately. If the review publishes, the credential is fine | — |
 | Comment-triggered runs missing from `gh run list --branch <pr>` | `issue_comment` runs attach to the **default branch**, not the PR | — |
+| A `/review` comment on a PR that changes this workflow runs the old steps | an `issue_comment` run executes the **default branch's** workflow file, so it cannot test the PR's version. Toggle the PR to draft and back (`gh pr ready <N> --undo`, then `gh pr ready <N>`): `ready_for_review` runs the PR's own workflow, and the push gate does not hold it back | #2188 |
 
 The first two are one bug with a variable outcome, which is the dangerous shape:
 an always-broken reviewer gets noticed, a coin-flip one gets trusted. Both come

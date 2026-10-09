@@ -88,7 +88,8 @@ created: "2026-09-29"
 - [x] [AC9] Amendment B, archive gate: `signs` and `vendor` in the pool, `review-second.md` required on `risk: high`,
       `--second` and `--fallback-reason` on `dotf spec review`, and pool loading refusing an Anthropic first signer
       (commit 77c89fd5)
-- [ ] [AC9] Live run, Sonnet risk route: a PR with the `deep-review` label reviews first on Sonnet; run id on #1923
+- [x] [AC9] Live run, Sonnet risk route: #2188 itself (3,682 changed lines) at `ready_for_review` reviewed first on
+      Sonnet with adaptive thinking, published, and the review's run details name the model (run 37907390670)
 - [ ] [AC9] Live run, second attempt: the first real failure of a first attempt after merge that runs the other
       provider; run id on #1923 (a failure cannot be forced from CI without spending the shared NaN pool)
 - [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block

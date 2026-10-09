@@ -101,7 +101,14 @@ reviews an hour of spec work, against $60-65 of Anthropic credit:
 | Haiku, fallback first signature | rare | | ~$2 |
 | Total | | | ~$48-52 |
 
-The margin covers the Sonnet share running above 8% while #2215 and #2216 measure it. Sonnet is the only `signs:
+The margin covers the Sonnet share running above 8% while #2215 and #2216 measure it.
+
+**Measured against the estimate, 2026-10-09.** The first live Sonnet review (run 37907390670, #2188 itself, 3,682 changed
+lines) read 176,372 prompt tokens and wrote 1,642: about $0.37, against the $0.13 assumed above. A PR on the risk
+route is large by definition, so its prompt is near the 200K cap, and $0.13 is a mid-size PR's figure. At $0.37 the
+Sonnet PR-Agent line becomes about $74, and the total about $96, over the $60-65 budget. The owner decides the
+correction: raise `min_changed_lines` (fewer PRs on the route), cap Sonnet's prompt below NaN's (a smaller diff, and a
+divergence from the parity rule), or lower Sonnet's share another way. #2215 and #2216 hold the measurement. Sonnet is the only `signs:
 second` member, so a high-risk spec's second signature depends on the Anthropic key: deliberate, and named in the
 pool's `$comment`.
 
