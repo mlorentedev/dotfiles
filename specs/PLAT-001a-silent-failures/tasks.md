@@ -143,6 +143,7 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   pre-commit in uv's tool bin dir when PATH lacks it (GUI launchers)
 - [x] `pre-commit` 4.6.2 is a `uv-tool` entry in `packages.json` on every OS. Installed on the Mac
   with `dotf tools install pre-commit`; the second run skips
+- [x] Review triage: the dispatcher also finds `pre-commit.exe` in uv's tool bin dir, the name uv installs on Windows and the name doctor's `preCommitPath` checks there. Before, doctor could report a gate that the hook then failed closed on (test `pre-commit.exe in uv's tool bin dir is found, as on Windows`, red before the fix)
 - [x] `scripts/install-precommit.sh` deleted. `pre-commit install` refuses under `core.hooksPath`
   (measured), so the script could not work on a provisioned machine, and nothing called it. Its
   config assertions moved to `tests/precommit-config.bats`

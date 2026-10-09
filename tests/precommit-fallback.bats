@@ -211,6 +211,21 @@ add_linked_worktree() {
     [ -f "$ARGS_LOG" ]
 }
 
+@test "pre-commit.exe in uv's tool bin dir is found, as on Windows" {
+    # uv installs pre-commit.exe there on Windows, and doctor looks for that
+    # name (preCommitPath); the dispatcher must find the same file, or doctor
+    # reports a gate the hook then fails closed on.
+    add_precommit_config
+    mkdir -p "$WORK/.local/bin"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > %s\n' "$ARGS_LOG" > "$WORK/.local/bin/pre-commit.exe"
+    chmod +x "$WORK/.local/bin/pre-commit.exe"
+    cd "$FIXTURE"
+
+    run bash -c "unset UV_TOOL_BIN_DIR XDG_BIN_HOME; HOME='$WORK' PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-push < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-push"* ]] || false
+}
+
 @test "AC6: the fallback is stage-generic, not pre-push-only" {
     stub_precommit 0
     add_precommit_config

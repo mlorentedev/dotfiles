@@ -113,7 +113,10 @@ pre_commit_config="$toplevel/.pre-commit-config.yaml"
 pre_commit="$(command -v pre-commit 2>/dev/null)"
 if [ -z "$pre_commit" ]; then
     uv_bin="${UV_TOOL_BIN_DIR:-${XDG_BIN_HOME:-$HOME/.local/bin}}"
-    [ -x "$uv_bin/pre-commit" ] && pre_commit="$uv_bin/pre-commit"
+    # pre-commit.exe on Windows, the name doctor looks for there too.
+    for candidate in "$uv_bin/pre-commit" "$uv_bin/pre-commit.exe"; do
+        if [ -x "$candidate" ]; then pre_commit="$candidate"; break; fi
+    done
 fi
 if [ -n "$pre_commit" ]; then
     exec "$pre_commit" hook-impl \
