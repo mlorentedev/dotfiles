@@ -199,8 +199,8 @@ setup() {
 # The hand-written install hint is what the catalog replaced. A second copy in
 # setup would drift from the catalog's declaration the first time one changes.
 @test "setup-linux.sh no longer hand-checks tmux or xclip" {
-    refute_grep 'sudo apt install -y tmux' "$DOTFILES_DIR/setup-linux.sh"
-    refute_grep 'sudo apt install -y xclip' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'command -v (tmux|xclip)' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep '(apt|apt-get|brew) install[^#]*(tmux|xclip)' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- Session hook registration (issue #20 prevention) ---
