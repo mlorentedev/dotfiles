@@ -384,8 +384,8 @@ tags: [lessons, index, dotfiles]
 | [363 - An assertion sound on one bash is vacuous on another](lesson-363-an-assertion-sound-on-one-bash-is-vacuous-on-another.md) | 2026-10-07 |
 | [364 - A regenerate-from-SSOT step must know which way its clone is off](lesson-364-a-regenerate-from-ssot-step-must-know-which-way-its-clone-is-off.md) | 2026-10-08 |
 | [365 - A CLI that exits 0 on its own errors is answered by content, not by output](lesson-365-a-cli-that-exits-0-on-its-own-errors-is-answered-by-content.md) | 2026-10-08 |
-| [367 - A paid model is bounded by every layer that supplies a default](lesson-367-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default.md) | 2026-10-08 |
 | [366 - A config the tool also writes is co-owned, whatever its format](lesson-366-a-config-the-tool-also-writes-is-co-owned-whatever-its-format.md) | 2026-10-08 |
+| [367 - A paid model is bounded by every layer that supplies a default](lesson-367-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default.md) | 2026-10-08 |
 | [368 - Two checks of one property must share one predicate](lesson-368-two-checks-of-one-property-must-share-one-predicate.md) | 2026-10-08 |
 | [369 - read shifts fields left when the first one is empty](lesson-369-read-shifts-fields-left-when-the-first-one-is-empty.md) | 2026-10-08 |
 | [370 - A reasoning model at its default effort can think away the whole answer](lesson-370-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
