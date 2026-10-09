@@ -16,7 +16,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 
 | Tool class | Channel | Declared in | Converged by |
 |---|---|---|---|
-| Pinned single-binary CLIs (age, bats, direnv, fzf, golangci-lint, jq, lazygit, shellcheck, zoxide) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: the CLIs listed today, herdr with track H of #2013, the toolchains from Wave 3 |
+| Pinned single-binary CLIs (age, bats, direnv, fzf, golangci-lint, herdr, jq, lazygit, shellcheck, uv, zoxide) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: the CLIs listed today on Linux and macOS (Windows after its session, #2013 H2), the toolchains from Wave 3 |
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
 | PyPI tools (hive) | `uv tool` | `packages.json` | `dotf tools install` |
