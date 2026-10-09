@@ -197,6 +197,15 @@
         "winget": "ajeetdsouza.zoxide",
         "command": "zoxide"
       }
+    },
+    {
+      "name": "pre-commit",
+      "version": "4.6.2",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "pre-commit"
+      }
     }
   ]
 }

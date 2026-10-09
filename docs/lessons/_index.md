@@ -385,5 +385,6 @@ tags: [lessons, index, dotfiles]
 | [364 - A regenerate-from-SSOT step must know which way its clone is off](lesson-364-a-regenerate-from-ssot-step-must-know-which-way-its-clone-is-off.md) | 2026-10-08 |
 | [365 - A CLI that exits 0 on its own errors is answered by content, not by output](lesson-365-a-cli-that-exits-0-on-its-own-errors-is-answered-by-content.md) | 2026-10-08 |
 | [366 - A config the tool also writes is co-owned, whatever its format](lesson-366-a-config-the-tool-also-writes-is-co-owned-whatever-its-format.md) | 2026-10-08 |
+| [367 - A gate that needs a binary is only as present as the binary](lesson-367-a-gate-that-needs-a-binary-is-only-as-present-as-the-binary.md) | 2026-10-08 |
 | [368 - Two checks of one property must share one predicate](lesson-368-two-checks-of-one-property-must-share-one-predicate.md) | 2026-10-08 |
 <!-- END GENERATED -->

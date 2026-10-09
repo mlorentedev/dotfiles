@@ -100,7 +100,6 @@ fi
 deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
-chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 
 # Copy sensitive directory (encrypted *.secret.age files; the mapping lives in secrets/registry.yaml)

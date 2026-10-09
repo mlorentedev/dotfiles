@@ -148,10 +148,6 @@ setup() {
     [ -x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh" ]
 }
 
-@test "install-precommit.sh is executable" {
-    [ -x "$DOTFILES_DIR/scripts/install-precommit.sh" ]
-}
-
 @test "dotfiles-sync.sh is executable" {
     [ -x "$DOTFILES_DIR/scripts/dotfiles-sync.sh" ]
 }
