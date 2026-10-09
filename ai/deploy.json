@@ -205,6 +205,14 @@
       "requires": "tmux"
     },
     {
+      "name": "gitconfig",
+      "src": "git/dotfiles.gitconfig",
+      "dst": "{HOME}/.config/git/dotfiles.gitconfig",
+      "render": false,
+      "mode": "0644",
+      "requires": "git"
+    },
+    {
       "name": "ssh-config",
       "src": "ssh/config",
       "dst": "{HOME}/.ssh/config",

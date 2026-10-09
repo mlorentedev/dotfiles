@@ -14,4 +14,5 @@ Operational guides and procedures for managing the dotfiles environment.
 | [guide-tmux.md](guide-tmux.md) | Tmux terminal multiplexer workflows, keybindings & clipboard bridge | Active |
 | [guide-self-deploy-timer.md](guide-self-deploy-timer.md) | Self-deploy background timer and autodeploy configuration | Active |
 | [release-dotf.md](release-dotf.md) | Releasing and installing `dotf`: mirror, deploy, install, verify by effect | Active |
+| [guide-git-config.md](guide-git-config.md) | Git config ownership (`~/.gitconfig` vs the deployed include) and the GitHub credential helper that works without a shell | Active |
 | [tool-installation.md](tool-installation.md) | How tools reach a machine: one channel per class, the dotf catalog, and adding a tool | Active |

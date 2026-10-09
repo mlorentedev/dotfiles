@@ -148,6 +148,42 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   (measured), so the script could not work on a provisioned machine, and nothing called it. Its
   config assertions moved to `tests/precommit-config.bats`
 
+## #2207 — git's credential helper needed the shell's PATH
+
+The third defect of one class on the Mac: a tool a non-interactive process runs, resolved through the
+interactive shell's PATH (the setup binaries, the vault's pre-commit gate #2184, and now gh as git's
+credential helper). obsidian-git asked for a GitHub password; `env -i ... git ls-remote` exited 128 with
+`gh: command not found`.
+
+Phase 1 (this PR, no setup change, so the pinned `dotf` keeps working):
+
+- [x] `cli/internal/gitconfig`: `Inspect` and `Apply`, one predicate for converge and doctor (lesson 368).
+  `~/.gitconfig` includes `~/.config/git/dotfiles.gitconfig`; GitHub's helper is gh's absolute form
+  (`IsAbsoluteGHHelper`: `!<abs path to an existing gh> auth git-credential`, quoted Windows paths
+  included). `gh auth setup-git` writes it with its own path on every OS; the include goes in through
+  `git config --global --add`
+- [x] Failing tests first: the bare helper and the missing include are both reported; apply converges and
+  a second run writes nothing; gh absent or logged out blocks only the helper and names the remedy; one
+  run against the real git binary under `GIT_CONFIG_GLOBAL`
+- [x] `git-config` converge reconciler (every OS), probed by re-inspecting; `dotf converge --only <names>`
+  runs a subset in registry order and refuses an unknown name
+- [x] Doctor `Git config (global)`: FAIL for what `--fix` can repair, WARN for what needs `gh auth login`;
+  `--fix` runs the same `Apply`
+- [x] `git/dotfiles.gitconfig` and the `gitconfig` deploy entry. Not `~/.config/git/config`: git reads that
+  path itself and writes into it when `~/.gitconfig` is absent, so a deploy over it would erase git's
+  writes
+- [x] On the Mac: `dotf deploy gitconfig`, then `converge --only git-config` -> 1 changed, then 0 changed;
+  doctor `Git config (global)` all ok; `env -i ... git ls-remote` exit 0
+- [x] Runbook `docs/runbooks/guide-git-config.md`
+
+Phase 2 (after the release carrying phase 1 is the `DOTF_VERSION` pin, #1814 class):
+
+- [ ] Delete the `.gitconfig` `deploy_file` block in `setup-linux.sh` and its `setup-windows.ps1` twin;
+  each calls `dotf converge --only git-config` once. Setup stops overwriting `~/.gitconfig`, which today
+  erases gh's helper, the include and `core.hooksPath` on every Linux/macOS run
+- [ ] Delete the repo `.gitconfig`, its `safe_copy` and its doctor home-deploy exemption; update
+  `tests/setup-linux.bats` (the bare-helper assertion)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
