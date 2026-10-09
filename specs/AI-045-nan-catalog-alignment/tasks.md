@@ -77,7 +77,8 @@ created: "2026-09-29"
 - [x] [AC9] Live run, Haiku with thinking: drawn with no override, the step log carries PR-Agent's `Using adaptive
       thinking for model anthropic/claude-haiku-5-5 with output_config effort 'high'` and a review is published
       (run 37885509177)
-- [ ] [AC9] Live run, glm5.3-flash: its first drawn review publishes inside the 12-minute bound; run id on #1923
+- [x] [AC9] Live run, glm5.3-flash: drawn with no override, `reasoning_effort` low in the log, a complete review published
+      in 74 s (run 37886959259)
 - [ ] [AC9] Live run, second attempt: the first real failure of a first attempt after merge that runs the other
       provider; run id on #1923 (a failure cannot be forced from CI without spending the shared NaN pool)
 - [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block
