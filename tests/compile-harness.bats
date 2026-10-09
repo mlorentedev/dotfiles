@@ -80,6 +80,7 @@ fi
 # records the call. What it writes is pinned in cli/internal/harness.
 if [ "$1 $2" = "harness instructions" ]; then
     printf '%s\n' "$*" >> "${STUB_BIN_DIR:-$(dirname "$0")}/instructions.argv"
+    [ "${STUB_INSTRUCTIONS_FAIL:-0}" = "1" ] && { echo "instructions: simulated failure" >&2; exit 1; }
     exit 0
 fi
 # Simulates the real subcommand's CONTRACT: both frontmatter forms in, one flow
@@ -1062,6 +1063,17 @@ seed_instructions_source() {
     [ "$status" -eq 0 ]
     grep -qxF "harness instructions --repo-root $REPO" "$STUB_BIN/instructions.argv"
     [[ "$output" == *"[deploy] OK"* ]] || false
+}
+
+@test "instructions: a failing dotf harness instructions fails the deploy after the other surfaces" {
+    seed_agents_fixture
+    seed_instructions_source
+    run_refresh; [ "$status" -eq 0 ]
+    STUB_INSTRUCTIONS_FAIL=1 run_deploy
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"instructions: simulated failure"* ]] || false
+    [[ "$output" != *"[deploy] OK"* ]] || false
+    [ -f "$FAKEHOME/.claude/agents/curator.md" ]
 }
 
 @test "instructions: without the command, nothing is copied and the deploy fails after the other surfaces" {
