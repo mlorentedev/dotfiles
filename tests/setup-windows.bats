@@ -39,8 +39,11 @@ setup() {
     grep -q 'Setting up PowerShell profile' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys Git configuration" {
-    grep -q 'Setting up Git configuration' "$PS1_SCRIPT"
+@test "setup-windows.ps1 converges git config after dotf deploy, never copies ~/.gitconfig (#2207)" {
+    refute_grep 'gitconfigSource|Copy-Item[^#]*\.gitconfig' "$PS1_SCRIPT"
+    deploy=$(grep -nE '^    & dotf deploy[[:space:]]*$' "$PS1_SCRIPT" | cut -d: -f1)
+    converge=$(grep -n '^    & dotf converge --only git-config' "$PS1_SCRIPT" | cut -d: -f1)
+    [ -n "$deploy" ] && [ -n "$converge" ] && [ "$converge" -gt "$deploy" ]
 }
 
 @test "setup-windows.ps1 deploys versions.conf" {

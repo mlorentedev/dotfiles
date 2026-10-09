@@ -65,7 +65,6 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     if [ -f "$CURRENT_DIR/.bashrc" ]; then
         safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
     fi    
-    safe_copy "$CURRENT_DIR/.gitconfig" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/tmux.conf" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.inputrc" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.editorconfig" "$DOTFILES_DIR/" 2>/dev/null || true
@@ -88,13 +87,9 @@ log_info "Deploying main dotfiles..."
 # ~/.ssh/config (0600) and the public key are `dotf deploy` entries on every
 # OS (ai/deploy.json ssh-config, ssh-pubkey; #2013 P7).
 
-# Git configuration
-log_info "Setting up Git configuration..."
-if [ -f "$DOTFILES_DIR/.gitconfig" ]; then
-    deploy_file "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
-else
-    log_warning ".gitconfig not found in dotfiles"
-fi
+# ~/.gitconfig is co-owned by git, gh and the user, so nothing deploys over it
+# (#2207): `dotf deploy` below writes ~/.config/git/dotfiles.gitconfig and
+# `dotf converge --only git-config` after it adds the include and gh's helper.
 
 # readline config (POLISH-004): case-insensitive completion + smart history.
 deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
@@ -631,6 +626,8 @@ _dotf=""
 if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
 if [ -n "$_dotf" ]; then
     "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
+    # After deploy, which writes the file the include names (#2207).
+    "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
 else
     log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy')"
 fi

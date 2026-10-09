@@ -5,6 +5,8 @@ package converge
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
@@ -68,6 +70,33 @@ type Report struct {
 	DryRun  bool
 	GOOS    string
 	Entries []Entry
+}
+
+// Select keeps the named reconcilers, in registry order. An unknown name is an
+// error that lists the known ones, so a typo cannot select nothing and pass.
+func Select(reconcilers []Reconciler, names []string) ([]Reconciler, error) {
+	want := map[string]bool{}
+	for _, n := range names {
+		want[n] = true
+	}
+	var out []Reconciler
+	known := make([]string, 0, len(reconcilers))
+	for _, r := range reconcilers {
+		known = append(known, r.Name())
+		if want[r.Name()] {
+			out = append(out, r)
+			delete(want, r.Name())
+		}
+	}
+	if len(want) > 0 {
+		unknown := make([]string, 0, len(want))
+		for n := range want {
+			unknown = append(unknown, n)
+		}
+		sort.Strings(unknown)
+		return nil, fmt.Errorf("unknown reconciler(s) %s (known: %s)", strings.Join(unknown, ", "), strings.Join(known, ", "))
+	}
+	return out, nil
 }
 
 // Run drives the reconcilers in order. A reconciler that does not list

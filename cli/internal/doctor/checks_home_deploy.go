@@ -38,7 +38,6 @@ type homeDeployEntry struct {
 var homeDeployMap = []homeDeployEntry{
 	{src: ".bashrc", dst: ".bashrc", exemptReason: "same installer appends; setup only asserts existence here too"},
 	{src: ".profile", dst: ".profile", exemptReason: "same installer appends"},
-	{src: ".gitconfig", dst: ".gitconfig", exemptReason: "every `git config --global` rewrites it; measured drifting on a converged box 2026-09-02"},
 	{src: ".inputrc", dst: ".inputrc", contentChecked: true},
 }
 
@@ -88,7 +87,7 @@ func reportHomeDeployEntry(e homeDeployEntry, deploy, home string, rep *Report) 
 
 	switch {
 	// setup guards its conditional deploys on the SOURCE existing
-	// (`[ -f "$DOTFILES_DIR/.gitconfig" ]`), so an absent source means "not
+	// (`[ -f "$DOTFILES_DIR/.profile" ]`), so an absent source means "not
 	// provisioned on this box", never "deploy failed".
 	case !pathExists(src):
 		rep.Skip(e.dst + " not provisioned (" + e.src + " absent from deploy-dir)")

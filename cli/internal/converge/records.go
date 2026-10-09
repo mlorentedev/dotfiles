@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
@@ -17,6 +18,9 @@ type Options struct {
 	// MiseRun and MiseStdout run mise and the tools it installs;
 	// tools.HomeRunners in production. Unset, the tools step is skipped.
 	MiseRun, MiseStdout tools.Runner
+	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
+	// production. Unset, the git-config step is skipped.
+	GitRun gitconfig.Runner
 }
 
 // Registry is the ordered list of reconcilers a run drives. The order extends
@@ -27,6 +31,7 @@ func Registry(o Options) []Reconciler {
 		recordsMirror{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},
+		gitConfig{run: o.GitRun, has: onPath},
 	}
 }
 

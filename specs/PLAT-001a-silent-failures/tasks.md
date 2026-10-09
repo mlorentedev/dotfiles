@@ -47,7 +47,7 @@ created: "2026-10-05"
 - [x] W6 (`.gitconfig`): the github.com and gist credential helpers run `!gh auth git-credential` through PATH. `/usr/bin/gh` is Linux's path; macOS has `/opt/homebrew/bin/gh` and Windows `gh.exe`. On the Mac, `git credential fill` through the repo `.gitconfig` alone returns a password line
 - [x] On the Mac: `dotf deploy ssh-config` and `ssh-pubkey` created `~/.ssh` 0700 with the config 0600 and the key 0644, `ssh -G rpi4` resolves the host, and a second run is in sync
 - [ ] P7b, after B1 is released and pinned: `.bashrc`, `.profile` and `.inputrc` as entries with `platforms: [linux, darwin]`, the manifest at version 4
-- [ ] `.gitconfig` is co-owned: every `git config --global` writes it, which is why doctor exempts it from the content check (measured drifting on a converged box 2026-09-02), so a replace entry would fight those tools on every run. The design for its row: the repo file deploys whole to a file dotfiles owns (`~/.config/dotfiles/gitconfig`), and `~/.gitconfig` keeps one `[include] path` to it, added idempotently, so tools keep writing `~/.gitconfig` and neither side overwrites the other
+- [x] `.gitconfig` is co-owned: every `git config --global` writes it, which is why doctor exempts it from the content check (measured drifting on a converged box 2026-09-02), so a replace entry would fight those tools on every run. The design for its row: the repo file deploys whole to a file dotfiles owns (`~/.config/dotfiles/gitconfig`), and `~/.gitconfig` keeps one `[include] path` to it, added idempotently, so tools keep writing `~/.gitconfig` and neither side overwrites the other Done by #2207 (#2208) with the include target at `~/.config/git/dotfiles.gitconfig`, deployed by the `gitconfig` entry and included through `dotf converge --only git-config`
 
 ## W2, W4, W5, W8–W10
 
@@ -63,7 +63,7 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] Review triage: `dotf deploy <name>` for an entry of another OS prints a `skipped` line and exits 0, not 1.
   A skip is not a failure (#1843 contract), and no script deploys a single entry by name, so a
   non-zero exit would only break `dotf deploy bashrc` typed on Windows without telling anyone more
-- [ ] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc`, `.gitconfig` and `ssh/config` to entries with `platforms: [linux, darwin]` and the manifest to version 4
+- [ ] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc` and `ssh/config` (`.gitconfig` left this list with #2207) to entries with `platforms: [linux, darwin]` and the manifest to version 4
 
 ## #2162 — the harness refresh reads a vault clone of unknown age
 
@@ -147,6 +147,59 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] `scripts/install-precommit.sh` deleted. `pre-commit install` refuses under `core.hooksPath`
   (measured), so the script could not work on a provisioned machine, and nothing called it. Its
   config assertions moved to `tests/precommit-config.bats`
+
+## #2207 — git's credential helper needed the shell's PATH
+
+The third defect of one class on the Mac: a tool a non-interactive process runs, resolved through the
+interactive shell's PATH (the setup binaries, the vault's pre-commit gate #2184, and now gh as git's
+credential helper). obsidian-git asked for a GitHub password; `env -i ... git ls-remote` exited 128 with
+`gh: command not found`.
+
+Phase 1 (this PR, no setup change, so the pinned `dotf` keeps working):
+
+- [x] `cli/internal/gitconfig`: `Inspect` and `Apply`, one predicate for converge and doctor (lesson 368).
+  `~/.gitconfig` includes `~/.config/git/dotfiles.gitconfig`; GitHub's helper is gh's absolute form
+  (`IsAbsoluteGHHelper`: `!<abs path to an existing gh> auth git-credential`, quoted Windows paths
+  included). `gh auth setup-git` writes it with its own path on every OS; the include goes in through
+  `git config --global --add`
+- [x] Failing tests first: the bare helper and the missing include are both reported; apply converges and
+  a second run writes nothing; gh absent or logged out blocks only the helper and names the remedy; one
+  run against the real git binary under `GIT_CONFIG_GLOBAL`
+- [x] `git-config` converge reconciler (every OS), probed by re-inspecting; `dotf converge --only <names>`
+  runs a subset in registry order and refuses an unknown name
+- [x] Doctor `Git config (global)`: FAIL for what `--fix` can repair, WARN for what needs `gh auth login`;
+  `--fix` runs the same `Apply`
+- [x] `git/dotfiles.gitconfig` and the `gitconfig` deploy entry. Not `~/.config/git/config`: git reads that
+  path itself and writes into it when `~/.gitconfig` is absent, so a deploy over it would erase git's
+  writes
+- [x] On the Mac: `dotf deploy gitconfig`, then `converge --only git-config` -> 1 changed, then 0 changed;
+  doctor `Git config (global)` all ok; `env -i ... git ls-remote` exit 0
+- [x] Runbook `docs/runbooks/guide-git-config.md`
+
+Phase 2, moved into this PR. The doctor check made `test-windows` red: CI builds `dotf` from the PR, so
+the gate reported the include missing on a box whose setup never added it. That is a real-box state, not
+a runner one, so the known-failures list was not its home; the fix is setup converging it:
+
+- [x] Deleted the `.gitconfig` `deploy_file` block in `setup-linux.sh` and its `setup-windows.ps1` twin
+  (setup net -18 lines). Each calls `dotf converge --only git-config` once, right after `dotf deploy`
+  writes the file the include names. Setup stops overwriting `~/.gitconfig`
+- [x] Deleted the repo `.gitconfig`, its `safe_copy`, its `.gitattributes` line, its doctor home-deploy
+  exemption and its `isManagedDeployPath` entry; the CI `code` filter lists `git/**` instead
+- [x] Tests: setup-linux and setup-windows assert the converge call follows `dotf deploy` and nothing
+  copies `~/.gitconfig` (both mutation-checked: removing the call turns them red); `verify-setup.bats`
+  asserts the include and that it is effective (`git config --global --includes user.name` equals the
+  deployed value; `--global` alone ignores includes). Run end to end in a throwaway HOME with this
+  branch's build: deploy, converge 1 changed, `user.name` read through the include, second run 0 changed
+- [x] The window: the pinned 0.65.0 rejects `--only` (`unknown flag`, exit 1) and deploys the new
+  `gitconfig` entry (`in sync`, exit 0). Until a release moves `DOTF_VERSION`, setup on a fresh box warns
+  and leaves `~/.gitconfig` absent; an existing box keeps its file. The warning names the condition.
+  Recorded on #1814
+- [x] Runner-only remainder: the setup step has no `GH_TOKEN` (CI-004 AC8) and the gate step has, so the
+  helper reads as repairable only in the gate. Listed in `doctor-gate-known-failures.txt` against #2212,
+  which holds the owner's choice
+- [x] Review triage (`fa5f55aa`): `Inspect` reports `TargetMissing` when the deployed file is absent
+  (doctor FAIL naming `dotf deploy`, not repairable by `Apply`); the converge detail says "applied" only
+  for what a run changed and names what it left. Both mutation-checked
 
 ## Closing
 

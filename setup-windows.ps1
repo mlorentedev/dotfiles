@@ -1196,6 +1196,11 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
     }
+    # After deploy, which writes the file the include names (#2207).
+    & dotf converge --only git-config
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
+    }
 } else {
     Write-Warn "dotf not on PATH -- skipping agent config deploy (run install-dotf.ps1, then 'dotf deploy')"
 }
@@ -1490,30 +1495,10 @@ if (Test-Path $profileSource) {
 # 5. DEPLOY GIT CONFIGURATION
 # ============================================================================
 
-Write-Info "Setting up Git configuration..."
-
-$gitconfigSource = "$DotfilesDir\.gitconfig"
-$gitconfigTarget = "$env:USERPROFILE\.gitconfig"
-
-if (Test-Path $gitconfigSource) {
-    # Check if target already exists
-    if (Test-Path $gitconfigTarget) {
-        $srcHash = (Get-FileHash -LiteralPath $gitconfigSource -Algorithm SHA256).Hash
-        $dstHash = (Get-FileHash -LiteralPath $gitconfigTarget -Algorithm SHA256).Hash
-        if ($srcHash -eq $dstHash) {
-            Write-Info ".gitconfig already exists and matches repo (no action needed)"
-        } else {
-            Write-Warn ".gitconfig already exists at $gitconfigTarget (differs from repo version)"
-            Write-Info "Skipping to avoid overwriting existing configuration"
-            Write-Info "To merge manually: Copy-Item '$gitconfigSource' '$gitconfigTarget' -Force"
-        }
-    } else {
-        Copy-Item $gitconfigSource $gitconfigTarget -Force
-        Write-Success "Deployed .gitconfig"
-    }
-} else {
-    Write-Warn ".gitconfig not found at $gitconfigSource"
-}
+# ~/.gitconfig is co-owned by git, gh and the user, so nothing deploys over it
+# (#2207): `dotf deploy` (section above) writes ~/.config/git/dotfiles.gitconfig
+# and `dotf converge --only git-config` right after it adds the include and
+# gh's credential helper. docs/runbooks/guide-git-config.md.
 
 # tmux: intentionally skipped on Windows (Linux-only -- see tmux.conf in repo root)
 

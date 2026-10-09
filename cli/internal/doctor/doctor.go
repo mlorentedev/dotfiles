@@ -97,6 +97,7 @@ func Run(opts Options) (int, error) {
 		checkMiseTools(sys, cfg, rep, opts.Fix)
 		checkVault(sys, rep)
 		checkVaultHooks(sys, rep, opts.Fix)
+		checkGitConfig(sys, rep, opts.Fix)
 		checkAutoMemoryLink(sys, start, rep, opts.Fix)
 		checkMemoryShape(sys, rep, opts.Fix)
 		checkPathFiles(sys, cfg, rep)

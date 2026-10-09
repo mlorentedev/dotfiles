@@ -11,6 +11,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -18,6 +19,7 @@ func newConvergeCmd() *cobra.Command {
 	var (
 		plan bool
 		repo string
+		only []string
 	)
 	cmd := &cobra.Command{
 		Use:   "converge",
@@ -29,8 +31,10 @@ func newConvergeCmd() *cobra.Command {
 			"Without it, each reconciler applies and then proves its post-condition; the\n" +
 			"first failure stops the run and names the reconciler. A reconciler that does\n" +
 			"not apply to this OS is reported as skipped, never as passed.\n\n" +
-			"Re-running on a converged machine reports 0 changed.",
-		Example:      "  dotf converge --plan\n  dotf converge",
+			"Re-running on a converged machine reports 0 changed.\n\n" +
+			"--only runs the named reconcilers, in registry order, and leaves the\n" +
+			"persisted report of the last full run alone.",
+		Example:      "  dotf converge --plan\n  dotf converge\n  dotf converge --only git-config",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -42,9 +46,16 @@ func newConvergeCmd() *cobra.Command {
 			}
 			home := env.Home()
 			e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
-			rep, err := converge.Run(converge.Registry(convergeOptions()), e, plan)
+			reg := converge.Registry(convergeOptions())
+			if len(only) > 0 {
+				var serr error
+				if reg, serr = converge.Select(reg, only); serr != nil {
+					return serr
+				}
+			}
+			rep, err := converge.Run(reg, e, plan)
 			printConvergeReport(cmd.OutOrStdout(), rep)
-			if plan {
+			if plan || len(only) > 0 {
 				return err
 			}
 			state, serr := env.StateDir()
@@ -61,13 +72,14 @@ func newConvergeCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&plan, "plan", false, "report what would change and write nothing")
 	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout to converge from")
+	cmd.Flags().StringSliceVar(&only, "only", nil, "run only these reconcilers (comma-separated names)")
 	return cmd
 }
 
 // convergeOptions wires the registry's side effects; tests replace it.
 var convergeOptions = func() converge.Options {
 	run, stdout := tools.HomeRunners(env.Home())
-	return converge.Options{RunHarnessDeploy: converge.CompileHarnessDeploy, MiseRun: run, MiseStdout: stdout}
+	return converge.Options{RunHarnessDeploy: converge.CompileHarnessDeploy, MiseRun: run, MiseStdout: stdout, GitRun: gitconfig.ExecRunner}
 }
 
 var convergeTag = map[converge.Status]string{
