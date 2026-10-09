@@ -187,12 +187,20 @@ setup() {
     refute_grep '/usr/bin/gh' "$DOTFILES_DIR/.gitconfig"
 }
 
-@test "setup-linux.sh checks for tmux presence" {
-    grep -qE 'command -v tmux' "$DOTFILES_DIR/setup-linux.sh"
+# tmux and xclip are packages.json `system` entries (#2013 P5b): `dotf tools
+# install` installs them through apt or brew, or prints the sudo command once.
+@test "packages.json declares tmux and xclip as system entries" {
+    run jq -r '.tools[] | select(.source.type == "system") | "\(.name)=\(.source.apt // "")"' "$DOTFILES_DIR/packages.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tmux=tmux"* ]] || false
+    [[ "$output" == *"xclip=xclip"* ]] || false
 }
 
-@test "setup-linux.sh tells user how to install tmux when missing" {
-    grep -qE 'sudo apt install -y tmux' "$DOTFILES_DIR/setup-linux.sh"
+# The hand-written install hint is what the catalog replaced. A second copy in
+# setup would drift from the catalog's declaration the first time one changes.
+@test "setup-linux.sh no longer hand-checks tmux or xclip" {
+    refute_grep 'sudo apt install -y tmux' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep 'sudo apt install -y xclip' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- Session hook registration (issue #20 prevention) ---

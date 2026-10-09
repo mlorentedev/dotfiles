@@ -187,19 +187,9 @@ log_info "Installing developer tools..."
 ensure_directory "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
 
-# tmux (system package — this script avoids sudo, so user installs it once)
-if ! command -v tmux >/dev/null 2>&1; then
-    log_warning "tmux not installed. Run: sudo apt install -y tmux"
-else
-    log_info "tmux installed: $(tmux -V)"
-fi
-
-# xclip (X11 clipboard bridge — required for tmux mouse-copy to system clipboard)
-if ! command -v xclip >/dev/null 2>&1; then
-    log_warning "xclip not installed. Run: sudo apt install -y xclip  (needed for tmux clipboard integration on X11)"
-else
-    log_info "xclip installed: $(xclip -version 2>&1 | head -n1)"
-fi
+# tmux, xclip, gh, git-lfs, parallel, wget, eza and zoxide are `system` entries
+# in packages.json (#2013 P5b): `dotf tools install` below installs them through
+# the OS manager, or says which `sudo` command to run once.
 
 # These blocks fetch linux-amd64 release assets (#2013 F-030). Elsewhere they
 # would place a binary the OS cannot execute ahead of a working copy on PATH,
