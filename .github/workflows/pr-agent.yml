@@ -150,10 +150,12 @@ jobs:
       cancel-in-progress: false
       queue: max
     # At most two bounded PR-Agent attempts, one per provider (12 minutes on NaN,
-    # 8 on Anthropic), plus the probes before them and setup. The second runs only
-    # when the first published nothing (AI-045 AC9), so a day without trouble
-    # holds the one-at-a-time lane no longer than before.
-    timeout-minutes: 27
+    # 8 on Anthropic), plus the probes before them, setup, and the two publication
+    # measurements and the final guard after them (each up to three API calls with
+    # retry sleeps). The second attempt runs only when the first published nothing
+    # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
+    # longer than before.
+    timeout-minutes: 30
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -700,4 +702,7 @@ jobs:
             ${{ steps.pr_agent.outcome }} ${{ steps.route.outputs.nan_model }}
             ${{ steps.pr_agent_anthropic_second.outcome }} anthropic/claude-haiku-5-5
           ROUTE_NOTE: ${{ steps.route.outputs.note }}
+          # A failed draw writes no outputs, so every attempt reads skipped; this
+          # tells that apart from a pool where no member answered.
+          ROUTE_OUTCOME: ${{ steps.route.outcome }}
         run: ./scripts/pr-agent-publish-guard.sh

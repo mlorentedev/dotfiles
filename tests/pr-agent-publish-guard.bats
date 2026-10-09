@@ -71,7 +71,7 @@ _guard() {
     run env PATH="$STUB:$PATH" CALLS="$CALLS" GUARD_RETRY_SECONDS=0 \
         GITHUB_REPOSITORY=o/r PR_NUMBER=7 BASE_REF=main STARTED=2026-10-07T09:00:00Z \
         HEAD_SHA="${HEAD_SHA-abc123}" ATTEMPTS="${ATTEMPTS-$(attempts skipped success skipped)}" \
-        ROUTE_NOTE="${ROUTE_NOTE-}" \
+        ROUTE_NOTE="${ROUTE_NOTE-}" ROUTE_OUTCOME="${ROUTE_OUTCOME-success}" \
         "$GUARD" "$@"
 }
 
@@ -241,6 +241,17 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     ATTEMPTS=$(attempts skipped skipped skipped) _guard
     [ "$status" -eq 1 ]
     [[ "$output" == *"no review attempt ran"* ]] || false
+    [[ "$output" == *"no member of the review pool answered"* ]] || false
+}
+
+# A draw that exits non-zero (an unknown PR_AGENT_PROVIDER) writes no outputs,
+# so every attempt reads skipped too; blaming the pool would send the reader to
+# probe warnings that were never printed (#2188 review).
+@test "no attempt because the draw failed names the draw, not the pool" {
+    ATTEMPTS=$(attempts skipped skipped skipped) ROUTE_OUTCOME=failure _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"the draw itself failed"* ]] || false
+    [[ "$output" != *"no member of the review pool answered"* ]] || false
 }
 
 @test "an ATTEMPTS list with nothing evaluated is no attempt, not a success" {

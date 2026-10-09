@@ -45,20 +45,23 @@ out() { sed -n "s/^$1=//p" "$OUT"; }
     PR_AGENT_DRAW=0 route
     [ "$status" -eq 0 ]
     [ "$(out reviewer)" = "openai/mimo-v2.6-flash" ]
-    [ "$(out first)" = "nan" ] && [ "$(out second)" = "anthropic" ]
+    [ "$(out first)" = "nan" ]
+    [ "$(out second)" = "anthropic" ]
     [ "$(out nan_model)" = "openai/mimo-v2.6-flash" ]
     [ "$(out nan_fallbacks)" = '["openai/deepseek-v4-flash"]' ]
 
     : > "$OUT"; PR_AGENT_DRAW=1 route
     [ "$(out reviewer)" = "openai/deepseek-v4-flash" ]
-    [ "$(out first)" = "nan" ] && [ "$(out second)" = "anthropic" ]
+    [ "$(out first)" = "nan" ]
+    [ "$(out second)" = "anthropic" ]
     # The drawn NaN model goes first; the other stays behind it.
     [ "$(out nan_model)" = "openai/deepseek-v4-flash" ]
     [ "$(out nan_fallbacks)" = '["openai/mimo-v2.6-flash"]' ]
 
     : > "$OUT"; PR_AGENT_DRAW=2 route
     [ "$(out reviewer)" = "anthropic/claude-haiku-5-5" ]
-    [ "$(out first)" = "anthropic" ] && [ "$(out second)" = "nan" ]
+    [ "$(out first)" = "anthropic" ]
+    [ "$(out second)" = "nan" ]
     # NaN is the second attempt, in declared order.
     [ "$(out nan_model)" = "openai/mimo-v2.6-flash" ]
     [ "$(out nan_fallbacks)" = '["openai/deepseek-v4-flash"]' ]
@@ -138,7 +141,8 @@ out() { sed -n "s/^$1=//p" "$OUT"; }
     export GITHUB_STEP_SUMMARY="$BATS_TEST_TMPDIR/summary"
     NAN_OUTCOME=failure NAN_MODEL="" STUB_CODE=529 route
     [ "$status" -eq 0 ]
-    [ "$(out first)" = "none" ] && [ "$(out second)" = "none" ]
+    [ "$(out first)" = "none" ]
+    [ "$(out second)" = "none" ]
     grep -q 'No member answered' "$GITHUB_STEP_SUMMARY"
 }
 
@@ -154,13 +158,15 @@ out() { sed -n "s/^$1=//p" "$OUT"; }
 
 @test "route: PR_AGENT_PROVIDER=anthropic puts Anthropic first, NaN second" {
     PR_AGENT_PROVIDER=anthropic PR_AGENT_DRAW=0 route
-    [ "$(out first)" = "anthropic" ] && [ "$(out second)" = "nan" ]
+    [ "$(out first)" = "anthropic" ]
+    [ "$(out second)" = "nan" ]
 }
 
 @test "route: PR_AGENT_PROVIDER=nan-only never probes or schedules Anthropic" {
     PR_AGENT_PROVIDER=nan-only PR_AGENT_DRAW=0 route
     [ "$status" -eq 0 ]
-    [ "$(out first)" = "nan" ] && [ "$(out second)" = "none" ]
+    [ "$(out first)" = "nan" ]
+    [ "$(out second)" = "none" ]
     [ ! -s "$STUB_ARGV_LOG" ]
     # Even with NaN down, the switch holds: no review rather than spending.
     : > "$OUT"; NAN_OUTCOME=failure NAN_MODEL="" PR_AGENT_PROVIDER=nan-only route

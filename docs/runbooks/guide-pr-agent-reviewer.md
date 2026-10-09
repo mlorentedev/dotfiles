@@ -183,7 +183,7 @@ per-key model allowlist, so the **workflow is the allowlist**, and
 | `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` | `16000` | LiteLLM's output cap for a Claude model it does not know. Its default, 4096, is shared with thinking and truncated reviews |
 | effort | not sent (`medium`, the model's default) | PR-Agent sends no effort to Claude models; nothing here raises it |
 | temperature | not sent (`CONFIG__NO_TEMPERATURE_MODELS`) | Haiku 5.5 answers 400 to a non-default temperature, and PR-Agent's default is 0.2 |
-| step `timeout-minutes` | `8` | at most two attempts run; the job's 27 minutes cover the worst pair plus the probes |
+| step `timeout-minutes` | `8` | at most two attempts run; the job's 30 minutes cover the worst pair, the probes and the publication measurements |
 
 A worst-case review is about 70K input plus 16K output tokens, roughly $0.015,
 and the draw's probe a few dozen tokens per run. With a third of the reviews

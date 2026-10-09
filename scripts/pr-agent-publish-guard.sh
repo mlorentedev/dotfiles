@@ -168,8 +168,13 @@ case "$outcome" in
         exit 1
         ;;
     "")
-        echo "::error::no review attempt ran: no member of the review pool answered its probe" \
-            "(the preflight's and the draw's warnings name each one)."
+        if [ "${ROUTE_OUTCOME:-}" = "failure" ]; then
+            echo "::error::no review attempt ran: the draw itself failed, so no member was" \
+                "chosen. Its step names why (an unknown PR_AGENT_PROVIDER fails it on purpose)."
+        else
+            echo "::error::no review attempt ran: no member of the review pool answered its probe" \
+                "(the preflight's and the draw's warnings name each one)."
+        fi
         note
         exit 1
         ;;

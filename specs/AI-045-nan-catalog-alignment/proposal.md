@@ -69,7 +69,7 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
   failure and a review published late must not be duplicated. And Haiku is admitted without the planted-defect bar NaN
   candidates pass; that bar is owed on its first live run (#1923). The pool is a first-pass gate on every PR, distinct
   from the spec archive gate: `harness/reviewer-pool.json`'s rule against Anthropic reviewers stands unchanged.
-- AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 27 minutes per PR ahead in the queue.
+- AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 30 minutes per PR ahead in the queue.
 
 ## Acceptance criteria
 

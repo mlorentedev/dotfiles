@@ -915,11 +915,14 @@ print([re.sub(r'.*steps\.(\w+)\.outcome.*', r'\1', l[0] + l[1]) for l in listed]
 models = [s['env']['CONFIG__MODEL'] for s in pa]
 print([' '.join(l[3:]) for l in listed] == models)
 print(guard['env']['ROUTE_NOTE'], guard['run'].strip())
+print(guard['env']['ROUTE_OUTCOME'])
 "
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "True" ]
     [ "${lines[1]}" = "True" ]
     [ "${lines[2]}" = '${{ steps.route.outputs.note }} ./scripts/pr-agent-publish-guard.sh' ]
+    # A failed draw must reach the guard, or it reads as a pool with no answer.
+    [ "${lines[3]}" = '${{ steps.route.outcome }}' ]
     grep -q '    cancelled|failure)' "$GUARD"
 }
 
@@ -1037,7 +1040,10 @@ for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
 @test "pr-agent: the job outlives both bounded Actions and the probes before them" {
     # At most two attempts run, one per provider. The worst pair, plus the
     # preflight's probes (PREFLIGHT_TIMEOUT, 90 s per NaN model), the draw's
-    # (30 s), and three minutes of setup, must fit inside the job.
+    # (30 s), three minutes of setup (31 s measured, run 37879933613), and a
+    # minute for each step after the attempts that calls the GitHub API (two
+    # publication measurements and the final guard: up to three calls each, with
+    # 5 s and 10 s retry sleeps), must fit inside the job.
     run python3 -c "
 import json, math, yaml
 job = yaml.safe_load(open('$WF'))['jobs']['review']
@@ -1045,7 +1051,9 @@ by = {s.get('id'): s for s in job['steps']}
 pair = by['pr_agent']['timeout-minutes'] + max(by[i]['timeout-minutes'] for i in ('pr_agent_anthropic_first', 'pr_agent_anthropic_second'))
 chain = 1 + len(json.loads(by['models']['env']['DECLARED_FALLBACK_MODELS']))
 probes = math.ceil((90 * chain + 30) / 60)
-print(job['timeout-minutes'] >= pair + probes + 3, job['timeout-minutes'], pair, probes)
+after = len([s for s in job['steps'] if s.get('id') in ('published_after_anthropic', 'published_after_nan')
+             or s.get('name') == 'Fail if no review was published'])
+print(after == 3 and job['timeout-minutes'] >= pair + probes + 3 + after, job['timeout-minutes'], pair, probes, after)
 "
     [ "$status" -eq 0 ]
     [[ "$output" == "True "* ]] || { echo "$output" >&2; false; }
