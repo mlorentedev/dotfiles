@@ -31,6 +31,8 @@ created: "2026-10-06"
 
 - [x] [AC4] `packages.json` entry `mise` 2026.9.13, keyed `goos/goarch` (linux, darwin and windows on amd64 and arm64; the raw binaries, so no archive extraction and no dependency on #649), `SHASUMS256.txt`. With an empty HOME on the Mac it downloaded, verified, probed `2026.9.13 macos-arm64`, and a second run skipped; on the real HOME the hand-installed 2026.10.3 is above the floor and is skipped
 - Deviation: no `MISE_VERSION` in `versions.conf`. The catalog entry carries the pin, as every `packages.json` tool does, and a second copy would have no reader
+- Linux and darwin only for now (`platforms`). On the Windows runner the catalog installed mise, `setup-windows.ps1` runs no `dotf tools sync`, and doctor turned its "mise not on PATH" WARN into a FAIL for the nine pins that winget provides there. The six asset names are verified against the release's `SHASUMS256.txt`, so the Windows keys stay
+- [ ] [AC4] Windows, at the Windows box (batched with the other Windows-empirical work): drop `platforms`, add `dotf tools sync` to `setup-windows.ps1` next to `dotf tools install`, and retire the winget installs mise then owns. Measure first that `mise install` works there for bats, shellcheck and direnv
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
