@@ -179,3 +179,31 @@ implication, that it should be trusted.
 
 Revisit if a PR is ever observed merging with the two signals disagreeing at
 merge time. That is the failure that would matter, and it has not been seen.
+
+## T10: the queue honours the exempt signature (#1196), 2026-10-09
+
+Unit tests in `cli/internal/prtriage`:
+
+- `TestEvaluate_AnExemptDiffSignatureIsNotPending`: exactly the signature, one file more, one file fewer, a file list never read, and a duplicate path.
+- `TestFetchDropsAPendingPRWhoseDiffIsAnExemptSignature`: also asserts that a quiet PR costs no files call.
+- `TestFetchKeepsAPRWhoseFileListFillsAPage`: a full page of files keeps the PR pending.
+- `TestTheRealRegistryDeclaresTheReleaseSignature`.
+
+Mutations, each run once and then reverted:
+
+| Mutation | Result |
+|---|---|
+| Disable the exemption in `Evaluate` | 4 failures |
+| Drop the length equality, so only a subset is checked | `one_file_fewer` fails |
+
+Live against `mlorentedev/dotfiles`, with release PR #2168 open and its CodeRabbit notice re-edited after the last triage:
+
+```
+$ dotf pr triage-queue                      # released 0.65.0
+  #2168  chore(main): release 0.66.0
+         coderabbitai reviewed again after the last triage
+exit 1
+$ $TMPDIR/dotf-exempt pr triage-queue       # this branch
+[OK] no reviewer output is awaiting a disposition
+exit 0
+```

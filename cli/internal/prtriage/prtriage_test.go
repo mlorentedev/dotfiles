@@ -3,6 +3,7 @@ package prtriage
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -194,3 +195,45 @@ func TestTheRealRegistryServesBothConsumers(t *testing.T) {
 // helper, and it covers the SECOND axis REST introduced. Comments now paginate
 // too, and a truncated comment list yields a wrong verdict rather than a
 // visibly missing pull request.
+
+// A release PR restates commits each reviewed when it merged, and the registry
+// declares its diff signature exempt; the attestation gate already honours it.
+// The queue did not, so every regeneration of the release branch made
+// CodeRabbit re-edit its "Reviews paused" notice and put the PR back in the
+// queue, once per merge to main (#1196). The match is the gate's: set
+// equality, both directions, and an unread file list is never exempt.
+func TestEvaluate_AnExemptDiffSignatureIsNotPending(t *testing.T) {
+	r := reg()
+	r.Exempt.Signatures = []Signature{{Name: "release-please", Files: []string{"CHANGELOG.md", "versions.conf", ".release-please-manifest.json"}}}
+	notice := Comment{Author: "github-actions[bot]", Body: "## PR Reviewer Guide", CreatedAt: at(0), UpdatedAt: at(30)}
+	for name, tc := range map[string]struct {
+		files   []string
+		pending bool
+	}{
+		"exactly the signature":   {[]string{".release-please-manifest.json", "CHANGELOG.md", "versions.conf"}, false},
+		"one file more":           {[]string{".release-please-manifest.json", "CHANGELOG.md", "versions.conf", "cli/main.go"}, true},
+		"one file fewer":          {[]string{"CHANGELOG.md", "versions.conf"}, true},
+		"files never read":        {nil, true},
+		"a duplicate is the same": {[]string{"CHANGELOG.md", "CHANGELOG.md", "versions.conf", ".release-please-manifest.json"}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			st := Evaluate(PR{Number: 1, Files: tc.files, Comments: []Comment{notice}}, r)
+			if st.Pending != tc.pending {
+				t.Fatalf("pending = %v, want %v (%s)", st.Pending, tc.pending, st.Reason)
+			}
+			if !tc.pending && !strings.Contains(st.Reason, `exempt: the "release-please" diff signature`) {
+				t.Errorf("an exemption must say which signature it matched: %q", st.Reason)
+			}
+		})
+	}
+}
+
+func TestTheRealRegistryDeclaresTheReleaseSignature(t *testing.T) {
+	r, err := LoadRegistry(filepath.Join("..", "..", "..", "harness", "review-attestation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Exempt.Signatures) == 0 || len(r.Exempt.Signatures[0].Files) == 0 {
+		t.Fatalf("the queue reads exempt.signatures from the registry, and found none: %+v", r.Exempt)
+	}
+}
