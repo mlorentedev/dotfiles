@@ -6,11 +6,12 @@
 # One definition of "published", two callers in .github/workflows/pr-agent.yml:
 #
 #   --probe --output FILE
-#       Between the NaN attempt and the fallback outside NaN. Appends
-#       `published=true`, `published=false` or `published=unknown` to FILE and
-#       exits 0. Only a measured `false` lets the fallback run: a second review
-#       cannot duplicate a first one that does not exist. `unknown` (the API
-#       failed, or no marker is declared) never runs it.
+#       Between the first attempt and the second (one per provider of the
+#       review pool, scripts/pr-agent-route.sh). Appends `published=true`,
+#       `published=false` or `published=unknown` to FILE and exits 0. Only a
+#       measured `false` lets the second attempt run: a second review cannot
+#       duplicate a first one that does not exist. `unknown` (the API failed,
+#       or no marker is declared) never runs it.
 #
 #   (no arguments)
 #       The final guard. Exits 0 only when a review was published, and names
@@ -27,10 +28,10 @@
 # declares, read at the DEFAULT branch, since a PR could redefine its own.
 #
 # Env: GH_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, BASE_REF, STARTED, HEAD_SHA
-# (empty on issue_comment runs). The final guard also reads PR_AGENT_OUTCOME
-# and REVIEW_MODEL (the NaN attempt), FALLBACK_OUTCOME and FALLBACK_MODEL (the
-# attempt outside NaN, `skipped` when it did not run) and FALLBACK_NOTE (why it
-# did not run). GUARD_RETRY_SECONDS shortens the retry backoff in tests.
+# (empty on issue_comment runs). The final guard also reads ATTEMPTS, one
+# `<outcome> <model>` line per attempt in execution order (`skipped` or empty
+# for one that did not run), and ROUTE_NOTE (why a pool member was out of the
+# draw). GUARD_RETRY_SECONDS shortens the retry backoff in tests.
 
 set -euo pipefail
 
@@ -139,36 +140,36 @@ if [ "$mode" = probe ]; then
     elif [ "$rc" -eq 0 ]; then
         echo "published=false" >> "$output"
     else
-        echo "::warning::whether the NaN attempt published a review is unknown (probe status ${rc});" \
-            "the fallback outside NaN runs only on a measured absence."
+        echo "::warning::whether the first attempt published a review is unknown (probe status ${rc});" \
+            "the second attempt runs only on a measured absence."
         if [ -s "$api_errors" ]; then sed 's/^/::warning::/' "$api_errors"; fi
         echo "published=unknown" >> "$output"
     fi
     exit 0
 fi
 
-# The final guard judges the LAST attempt that ran: the fallback when it ran,
-# the NaN attempt otherwise.
-if [ "${FALLBACK_OUTCOME:-skipped}" != "skipped" ]; then
-    outcome="${FALLBACK_OUTCOME}"
-    model="${FALLBACK_MODEL:-}"
-else
-    outcome="${PR_AGENT_OUTCOME:-}"
-    model="${REVIEW_MODEL:-}"
-fi
+# The final guard judges the LAST attempt that ran. Only a known outcome counts:
+# an attempt GitHub never evaluated leaves its outcome empty, and `read` would
+# then take the model's name for the outcome.
+outcome="" model=""
+while read -r line_outcome line_model; do
+    case "$line_outcome" in
+        success|failure|cancelled) outcome="$line_outcome"; model="$line_model" ;;
+    esac
+done <<<"${ATTEMPTS:-}"
 note() {
-    if [ -n "${FALLBACK_NOTE:-}" ]; then echo "::error::${FALLBACK_NOTE}"; fi
+    if [ -n "${ROUTE_NOTE:-}" ]; then echo "::error::${ROUTE_NOTE}"; fi
 }
 case "$outcome" in
     cancelled|failure)
         echo "::error::PR-Agent ended ${outcome} on ${model:-its model}." \
-            "Inspect its logs; the fallback runs only when no review is measured as published."
+            "Inspect its logs; a second attempt runs only when no review is measured as published."
         note
         exit 1
         ;;
-    skipped|"")
-        echo "::error::no review attempt ran: no declared NaN model answered the preflight" \
-            "(its warnings name each one)."
+    "")
+        echo "::error::no review attempt ran: no member of the review pool answered its probe" \
+            "(the preflight's and the draw's warnings name each one)."
         note
         exit 1
         ;;

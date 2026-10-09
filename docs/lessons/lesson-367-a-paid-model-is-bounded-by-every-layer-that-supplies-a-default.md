@@ -9,9 +9,10 @@ created: "2026-10-08"
 # A paid model is bounded by every layer that supplies a default
 
 ## Context
-AI-045 AC9 (#1923) adds a PR-Agent attempt outside NaN, on Claude Haiku 5.5, paid from plan
-credits under a spend limit. The Console offers no per-key model allowlist, so the workflow
-step is the only place where the model, the prompt size and the answer size are decided.
+AI-045 AC9 (#1923) adds Claude Haiku 5.5 to the PR-Agent review pool, beside two NaN models,
+paid from plan credits under a spend limit. The Console offers no per-key model allowlist, so
+the workflow step is the only place where the model, the prompt size and the answer size are
+decided.
 
 ## The Trap
 Setting `CONFIG__MODEL` looks like the whole configuration. Three other layers each supply a

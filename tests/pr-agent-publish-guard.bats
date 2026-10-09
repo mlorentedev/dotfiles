@@ -2,7 +2,7 @@
 # Behaviour of the pr-agent publication guard (scripts/pr-agent-publish-guard.sh,
 # run by "Fail if no review was published" in .github/workflows/pr-agent.yml)
 # when the GitHub API fails (#2069), and of its --probe mode, which gates the
-# fallback outside NaN (AI-045 AC9, #1923).
+# second attempt of the review pool (AI-045 AC9, #1923).
 #
 # A read timeout on the registry used to become an empty marker list, and the
 # guard then failed a reviewed PR with "no review marker declared": the wrong
@@ -70,11 +70,14 @@ SH
 _guard() {
     run env PATH="$STUB:$PATH" CALLS="$CALLS" GUARD_RETRY_SECONDS=0 \
         GITHUB_REPOSITORY=o/r PR_NUMBER=7 BASE_REF=main STARTED=2026-10-07T09:00:00Z \
-        HEAD_SHA="${HEAD_SHA-abc123}" PR_AGENT_OUTCOME="${PR_AGENT_OUTCOME-success}" REVIEW_MODEL=m \
-        FALLBACK_OUTCOME="${FALLBACK_OUTCOME-skipped}" FALLBACK_MODEL=fb \
-        FALLBACK_NOTE="${FALLBACK_NOTE-}" \
+        HEAD_SHA="${HEAD_SHA-abc123}" ATTEMPTS="${ATTEMPTS-$(attempts skipped success skipped)}" \
+        ROUTE_NOTE="${ROUTE_NOTE-}" \
         "$GUARD" "$@"
 }
+
+# The workflow's ATTEMPTS, in execution order: Anthropic first (model `hk`), NaN
+# (model `m`), Anthropic second. Each argument is that attempt's outcome.
+attempts() { printf '%s hk\n%s m\n%s hk\n' "$1" "$2" "$3"; }
 
 # The probe's answer, from the file it appends to.
 _probe() {
@@ -156,12 +159,12 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
 
 @test "the published review names the attempt that produced it" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
-    FALLBACK_OUTCOME=success _guard
+    ATTEMPTS=$(attempts skipped failure success) _guard
     [ "$status" -eq 0 ]
-    [[ "$output" == *"on fb"* ]] || false
+    [[ "$output" == *"on hk"* ]] || false
 }
 
-# --- probe: the gate in front of the fallback outside NaN (AI-045 AC9) -------
+# --- probe: the gate in front of the second attempt (AI-045 AC9) -------------
 
 @test "probe: a review published by this run answers true" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
@@ -170,7 +173,7 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     [ "$(cat "$PROBE_OUT")" = "published=true" ]
 }
 
-@test "probe: no review answers false, the only answer that runs the fallback" {
+@test "probe: no review answers false, the only answer that runs a second attempt" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
     _probe
     [ "$status" -eq 0 ]
@@ -206,28 +209,48 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
 
 # --- final guard: the last attempt that ran is the one judged -----------------
 
-@test "a failed fallback is reported with its own model, not the NaN one" {
+@test "a failed second attempt is reported with its own model, not the first one's" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
-    PR_AGENT_OUTCOME=failure FALLBACK_OUTCOME=failure _guard
+    ATTEMPTS=$(attempts skipped failure failure) _guard
     [ "$status" -eq 1 ]
-    [[ "$output" == *"PR-Agent ended failure on fb"* ]] || false
+    [[ "$output" == *"PR-Agent ended failure on hk"* ]] || false
 }
 
-@test "a NaN failure with no fallback repeats why the fallback did not run" {
-    PR_AGENT_OUTCOME=failure FALLBACK_NOTE="PR_AGENT_ANTHROPIC_API_KEY is not set" _guard
+@test "Anthropic drawn first, then NaN: the NaN attempt is the one judged" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
+    ATTEMPTS=$(attempts failure cancelled skipped) _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"PR-Agent ended cancelled on m"* ]] || false
+}
+
+@test "Anthropic drawn first and alone: its outcome is the one judged" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
+    ATTEMPTS=$(attempts success skipped skipped) _guard
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"on hk"* ]] || false
+}
+
+@test "a failure with no second attempt repeats why a member was out of the draw" {
+    ATTEMPTS=$(attempts skipped failure skipped) ROUTE_NOTE="PR_AGENT_ANTHROPIC_API_KEY is not set" _guard
     [ "$status" -eq 1 ]
     [[ "$output" == *"PR-Agent ended failure on m"* ]] || false
     [[ "$output" == *"PR_AGENT_ANTHROPIC_API_KEY is not set"* ]] || false
 }
 
-@test "no attempt at all (NaN down, no fallback) fails and says so" {
-    PR_AGENT_OUTCOME=skipped _guard
+@test "no attempt at all (no pool member answered) fails and says so" {
+    ATTEMPTS=$(attempts skipped skipped skipped) _guard
     [ "$status" -eq 1 ]
     [[ "$output" == *"no review attempt ran"* ]] || false
 }
 
-@test "a fallback that reviewed after a NaN failure passes" {
+@test "an ATTEMPTS list with nothing evaluated is no attempt, not a success" {
+    ATTEMPTS="$(printf ' hk\n m\n hk\n')" _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no review attempt ran"* ]] || false
+}
+
+@test "a second attempt that reviewed after a first failure passes" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS="$REVIEW"
-    PR_AGENT_OUTCOME=failure FALLBACK_OUTCOME=success _guard
+    ATTEMPTS=$(attempts skipped failure success) _guard
     [ "$status" -eq 0 ]
 }
