@@ -1,0 +1,5 @@
+vault --vault knowledge
+orphans --vault knowledge
+dead-ends --vault knowledge
+unresolved verbose format=json --vault knowledge
+tags --vault knowledge

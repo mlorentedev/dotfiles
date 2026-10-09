@@ -89,6 +89,22 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   warns that the refresh failed and deploys the committed records, the safe side of #2162.
   #1814 owns this class (setup calling what the pinned `dotf` does not have)
 
+## `dotf vault health` on macOS — a connection check that passes on an error
+
+- [x] Measured on the Mac (obsidian 1.14.4): the CLI is a separate binary
+  (`obsidian-cli`) that reads `--no-sandbox` as a command, and it exits 0 with its
+  error on stdout ("Vault not found.", `Error: Command "--no-sandbox" not found.`).
+  Section 2 checked only for output, so it reported "connected" and section 4
+  failed on JSON it could not parse
+- [x] Failing golden cases first: `darwin-argv` (the argv without `--no-sandbox`) and
+  `vault-not-found` (exit 2, the CLI's own words). Each fails against the old
+  code (mutation-checked); every other case pins linux through the new `goos` seam
+- [x] `--no-sandbox` is sent everywhere but darwin; the connection passes only when
+  the answer names the vault. Linux and Windows argv are unchanged (unmeasured
+  here, so not changed)
+- [x] The `obsidian` alias in `.zshrc` and `.bashrc` is set on Linux only
+- [x] On the Mac, against the live vault: 11 passed, 0 failed (10 and 1 before)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

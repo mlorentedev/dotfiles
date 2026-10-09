@@ -49,6 +49,42 @@ func TestHasAnyChar(t *testing.T) {
 	}
 }
 
+// The obsidian CLI exits 0 and prints its own errors on stdout, so these are
+// the answers a connectivity check that only looks for output would pass.
+func TestNamesVault(t *testing.T) {
+	tests := []struct {
+		name, out string
+		want      bool
+	}{
+		{"real CLI answer (1.14, macOS)", "name\tknowledge\npath\t/Users/x/Projects/knowledge\nfiles\t2631", true},
+		{"bare name", "knowledge", true},
+		{"vault not found", "Vault not found.", false},
+		{"flag read as a command", `Error: Command "--no-sandbox" not found. It may require a plugin to be enabled.`, false},
+		{"another vault", "name\tknowledge-old", false},
+		{"empty", "", false},
+	}
+	for _, tt := range tests {
+		if got := namesVault(tt.out, "knowledge"); got != tt.want {
+			t.Errorf("%s: namesVault(%q) = %v, want %v", tt.name, tt.out, got, tt.want)
+		}
+	}
+}
+
+// --no-sandbox is a Linux AppImage flag; the macOS CLI fails every call that
+// carries it (measured on obsidian 1.14.4).
+func TestObsidianArgsPerOS(t *testing.T) {
+	for goos, want := range map[string]string{
+		"linux":   "--no-sandbox vault --vault knowledge",
+		"windows": "--no-sandbox vault --vault knowledge",
+		"darwin":  "vault --vault knowledge",
+	} {
+		h := &healthRun{opts: HealthOptions{VaultName: "knowledge", GOOS: goos}}
+		if got := strings.Join(h.obsidianArgs("vault"), " "); got != want {
+			t.Errorf("%s: argv %q, want %q", goos, got, want)
+		}
+	}
+}
+
 // The golden corpus cannot carry a memory/ directory: GUARD-001 refuses an
 // agent-memory path outside the vault. So the directory rule is pinned here.
 func TestOrphanExempt(t *testing.T) {

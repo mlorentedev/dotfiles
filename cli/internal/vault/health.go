@@ -38,6 +38,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -49,6 +50,9 @@ type HealthOptions struct {
 	VaultDir  string
 	VaultName string
 	Verbose   bool
+	// GOOS decides the argv sent to obsidian; empty means runtime.GOOS. A seam
+	// so the golden corpus pins one platform's argv on every CI leg.
+	GOOS string
 }
 
 // deletedLineRe mirrors `grep '^.D '`: git status --short's Y-column (unstaged
@@ -143,13 +147,43 @@ func countNonBlank(s string) int {
 	return n
 }
 
-// obsidianCmd runs `obsidian --no-sandbox <sub> --vault <name>` and returns its
-// stdout with trailing newlines stripped — the same trim bash's `$(...)`
-// command substitution performs, load-bearing because callers reuse this value
-// both for counting AND for the --verbose listing.
+// namesVault reports whether the obsidian CLI's `vault` answer names the vault:
+// a field equal to the name on some line (`name<TAB>knowledge` from the real
+// CLI). The CLI exits 0 and prints to stdout on its own errors too ("Vault not
+// found.", `Error: Command "--no-sandbox" not found.`), so mere output is not a
+// connection.
+func namesVault(out, name string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		for _, field := range strings.Fields(line) {
+			if field == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// obsidianArgs builds `[--no-sandbox] <sub> --vault <name>`. `--no-sandbox` is
+// for the Linux AppImage's Electron sandbox; the macOS binary is a separate CLI
+// (obsidian-cli) that reads it as a subcommand and fails every call.
+func (h *healthRun) obsidianArgs(sub ...string) []string {
+	goos := h.opts.GOOS
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	var args []string
+	if goos != "darwin" {
+		args = append(args, "--no-sandbox")
+	}
+	return append(append(args, sub...), "--vault", h.opts.VaultName)
+}
+
+// obsidianCmd runs `obsidian <obsidianArgs>` and returns its stdout with
+// trailing newlines stripped — the same trim bash's `$(...)` command
+// substitution performs, load-bearing because callers reuse this value both
+// for counting AND for the --verbose listing.
 func (h *healthRun) obsidianCmd(sub ...string) string {
-	args := append(append([]string{"--no-sandbox"}, sub...), "--vault", h.opts.VaultName)
-	cmd := exec.Command("obsidian", args...)
+	cmd := exec.Command("obsidian", h.obsidianArgs(sub...)...)
 	out, _ := cmd.Output() // stderr discarded, exit code ignored: `2>/dev/null || true`
 	return strings.TrimRight(string(out), "\n")
 }
@@ -282,9 +316,16 @@ func (h *healthRun) section2Connectivity() (int, bool) {
 		return 1, true
 	}
 
-	if !hasAnyChar(h.obsidianCmd("vault")) {
+	answer := h.obsidianCmd("vault")
+	if !hasAnyChar(answer) {
 		h.errorLine("Cannot reach Obsidian GUI. Is Obsidian running?")
 		h.infoLine("Start Obsidian or run: obsidian --no-sandbox &")
+		return 2, true
+	}
+	if !namesVault(answer, h.opts.VaultName) {
+		first, _, _ := strings.Cut(strings.TrimSpace(answer), "\n")
+		h.errorLine("Obsidian CLI answered, but not for vault '" + h.opts.VaultName + "': " + first)
+		h.infoLine("Is the vault registered and open in Obsidian under that name?")
 		return 2, true
 	}
 	h.pass("Obsidian CLI connected to vault '%s'", h.opts.VaultName)

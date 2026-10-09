@@ -172,7 +172,9 @@ alias c='claude'
 # and profile.ps1 -- bash had neither (AI-036/#1296).
 alias cop='copilot'
 cops() { copilot -p "$*" --allow-all-tools -s; }
-alias obsidian='obsidian --no-sandbox'
+# --no-sandbox is for the Linux AppImage's Electron sandbox; the macOS CLI
+# reads it as a command and fails every call (obsidian 1.14.4).
+case "$OSTYPE" in linux*) alias obsidian='obsidian --no-sandbox' ;; esac
 
 # Gemini saved-prompt helper `agyp` lives in .zsh/functions.sh (shared bash/zsh,
 # sourced below). Named out of the `g*` namespace, which oh-my-zsh's git plugin
