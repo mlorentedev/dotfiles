@@ -35,6 +35,25 @@
       }
     },
     {
+      "name": "mise",
+      "version": "2026.9.13",
+      "profile": "full",
+      "source": {
+        "type": "github-release",
+        "repo": "jdx/mise",
+        "asset": {
+          "linux/amd64": "mise-v{version}-linux-x64",
+          "linux/arm64": "mise-v{version}-linux-arm64",
+          "darwin/amd64": "mise-v{version}-macos-x64",
+          "darwin/arm64": "mise-v{version}-macos-arm64",
+          "windows/amd64": "mise-v{version}-windows-x64.exe",
+          "windows/arm64": "mise-v{version}-windows-arm64.exe"
+        },
+        "checksums": "SHASUMS256.txt",
+        "platforms": ["linux", "darwin"]
+      }
+    },
+    {
       "name": "opencode",
       "version": "1.16.2",
       "profile": "full",
