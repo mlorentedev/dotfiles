@@ -32,7 +32,7 @@
 Every chat model reads images. Source: https://nan.builders/docs/models (checked 2026-09-30).
 
 `GET /v1/models` lists what the cluster runs, not what this key can call. In
-particular, `glm5.3` requires the premium membership tier, and so does
+particular, `glm5.3` requires the premium membership tier. So does
 `minimax-h3`: listed on 2026-10-08, it answers this key HTTP 401 ("This API key
 does not have access to the requested model").
 
