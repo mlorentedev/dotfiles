@@ -28,14 +28,17 @@ TIED='path|status|cdpath|manpath|fignore'
 #
 # `&` stays a separator: `sleep 1 &path=x` really assigns `path`. The cost is
 # that a URL query in a quoted string (`"...?sha=main&path=$f"`) is reported
-# too. That fails loud, and `gh api -X GET ... -f path="$f"` avoids it.
+# too. That fails loud, and quoting the whole field, `gh api -X GET ... -f
+# "path=$f"`, avoids it: the `"` before `path` is not a separator.
 tied_bindings() {
     local file="$1" names="$2" sep='(^|[[:space:];(&|])' end='([[:space:];]|$)' code hits rc=0
     # Strip trailing comments first, line by line so grep's numbers still
     # match the file. Only a comment with no quote in it: a ` #` inside a
     # quoted string would otherwise cut off real code, and a missed binding is
     # silent, while a comment left in can only cost a loud false positive.
-    code="$(sed -E "s/[[:space:]]#[^'\"]*\$//" -- "$file")" || return 2
+    # The file goes in on stdin: BSD sed reads a `--` after the script as a
+    # file named `--` and fails, so the dash-safe form is a redirect.
+    code="$(sed -E "s/[[:space:]]#[^'\"]*\$//" < "$file")" || return 2
     hits="$(printf '%s\n' "$code" | grep -nE \
         -e "${sep}(${names})(\\[[^]]*\\])?\\+?=" \
         -e "${sep}read([[:space:]]+[^[:space:]&;|]+)*[[:space:]]+(${names})${end}" \
@@ -82,10 +85,14 @@ tied_bindings() {
     fi
 }
 
+# bats test_tags=os-sensitive
 @test "guard: the detector actually detects, on a fixture with a known answer" {
     # A guard that silently matches nothing reports a clean tree forever. Seven
-    # bindings must count; seven look-alikes must not, including a comment, a
-    # trailing comment, a flag, a URL query, an expansion and a longer name.
+    # bindings must count; eight look-alikes must not, including a comment, a
+    # trailing comment, a flag, a URL query, a quoted field, an expansion and a
+    # longer name. Tagged os-sensitive because the detector shells out to sed,
+    # and BSD sed differs: a `--` after the script failed every file on macOS
+    # while Linux passed.
     local probe n
     probe="$BATS_TEST_TMPDIR/probe.sh"
     {
@@ -100,6 +107,8 @@ tied_bindings() {
         printf '# local path=x\n'
         printf 'gh api --path=x\n'
         printf 'curl "https://h/x?path=1"\n'
+        # The remedy the header comment names for a URL query.
+        printf 'gh api -X GET repos/x -f "path=$f"\n'
         # No space after `&` is still a background, then an assignment.
         printf 'sleep 1 &path=x\n'
         printf 'x=1  # then read the path\n'
