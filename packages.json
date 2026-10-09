@@ -188,17 +188,6 @@
       }
     },
     {
-      "name": "zoxide",
-      "profile": "full",
-      "source": {
-        "type": "system",
-        "apt": "zoxide",
-        "brew": "zoxide",
-        "winget": "ajeetdsouza.zoxide",
-        "command": "zoxide"
-      }
-    },
-    {
       "name": "pre-commit",
       "version": "4.6.2",
       "profile": "full",

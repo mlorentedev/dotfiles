@@ -186,37 +186,18 @@ log_info "Installing developer tools..."
 ensure_directory "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
 
-# tmux, xclip, gh, git-lfs, parallel, wget, eza and zoxide are `system` entries
+# tmux, xclip, gh, git-lfs, parallel, wget and eza are `system` entries
 # in packages.json (#2013 P5b): `dotf tools install` below installs them through
 # the OS manager, or says which `sudo` command to run once.
 
-# These blocks fetch linux-amd64 release assets (#2013 F-030). Elsewhere they
-# would place a binary the OS cannot execute ahead of a working copy on PATH,
-# so they run on linux-amd64 only, and any such leftover is removed. Interim:
-# #2013 W2 moves these tools to mise and deletes the blocks.
+# age, jq, zoxide, direnv, shellcheck and bats are pinned in versions.conf and
+# installed by `dotf tools sync` below (mise, ADR-044); setup has no installer
+# of its own for them (#2013 W2). eza and gh are not in mise yet: these blocks
+# fetch linux-amd64 release assets (F-030). Elsewhere they would place a binary
+# the OS cannot execute ahead of a working copy on PATH, so they run on
+# linux-amd64 only, and any such leftover is removed, along with those of the
+# tools the deleted blocks used to place.
 if host_is_linux_amd64; then
-    # age (file encryption — required by secrets system; pins AGE_VERSION from versions.conf)
-    if ! command -v age >/dev/null 2>&1; then
-        log_info "Installing age..."
-        AGE_VER="${AGE_VERSION:-1.3.1}"
-        _age_tmp="$(mktemp -d)"
-        if curl -Lo "$_age_tmp/age.tar.gz" "https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz" 2>/dev/null \
-            && tar xzf "$_age_tmp/age.tar.gz" -C "$_age_tmp" \
-            && cp "$_age_tmp/age/age" "$_age_tmp/age/age-keygen" "$HOME/.local/bin/" \
-            && "$HOME/.local/bin/age" --version >/dev/null 2>&1; then
-            rm -rf "$_age_tmp"
-            log_success "age installed (v${AGE_VER})"
-        else
-            rm -rf "$_age_tmp"
-            # A placed copy that does not run would turn this failure into
-            # "age already installed" on the next run (command -v finds it).
-            rm -f "$HOME/.local/bin/age" "$HOME/.local/bin/age-keygen"
-            log_warning "age installation failed"
-        fi
-    else
-        log_info "age already installed"
-    fi
-
     # eza (modern ls replacement)
     if ! command -v eza >/dev/null 2>&1; then
         log_info "Installing eza..."
@@ -228,17 +209,6 @@ if host_is_linux_amd64; then
             || log_warning "eza installation failed"
     else
         log_info "eza already installed"
-    fi
-
-    # jq (JSON processor — required by Claude hook registration)
-    if ! command -v jq >/dev/null 2>&1; then
-        log_info "Installing jq..."
-        curl -Lo "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" 2>/dev/null \
-            && chmod +x "$HOME/.local/bin/jq" \
-            && log_success "jq installed" \
-            || log_warning "jq installation failed"
-    else
-        log_info "jq already installed"
     fi
 
     # gh (GitHub CLI — required by Copilot setup)
@@ -259,8 +229,8 @@ if host_is_linux_amd64; then
         log_info "gh already installed"
     fi
 else
-    log_warning "Skipping the linux-amd64 downloads of age, eza, jq and gh on $(uname -s)/$(uname -m): they come from dotf tools install (mise) or the OS package manager (#2013 W2)"
-    remove_unrunnable_tool age age-keygen eza jq gh
+    log_warning "Skipping the linux-amd64 downloads of eza and gh on $(uname -s)/$(uname -m): install them with the OS package manager (#2013 W2)"
+    remove_unrunnable_tool age age-keygen eza jq gh shellcheck
 fi
 
 # dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
@@ -320,61 +290,6 @@ else
     log_warning "dotf not found; skipping memory-sink guard install (run 'dotf hooks install' after setup)"
 fi
 unset _dotf_hooks
-
-# zoxide (smarter cd)
-if ! command -v zoxide >/dev/null 2>&1; then
-    log_info "Installing zoxide..."
-    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh 2>/dev/null \
-        && log_success "zoxide installed" \
-        || log_warning "zoxide installation failed"
-else
-    log_info "zoxide already installed"
-fi
-
-# direnv (per-directory environment variables)
-if ! command -v direnv >/dev/null 2>&1; then
-    log_info "Installing direnv..."
-    curl -sfL https://direnv.net/install.sh | bin_path="$HOME/.local/bin" bash 2>/dev/null \
-        && log_success "direnv installed" \
-        || log_warning "direnv installation failed"
-else
-    log_info "direnv already installed"
-fi
-
-# Same linux-amd64 gate as the age/eza/jq/gh blocks above (#2013 F-030).
-if host_is_linux_amd64; then
-    # ShellCheck (shell script linter)
-    if ! command -v shellcheck >/dev/null 2>&1; then
-        log_info "Installing shellcheck..."
-        # Versioned asset (the `-stable` alias 404s post-v0.10) + `-f` so an HTTP error
-        # fails the curl loudly instead of saving the 404 body as a bogus "tarball" that
-        # only blows up later at xz. The tarball's internal dir is shellcheck-v<ver>/.
-        _sc_ver="v${SHELLCHECK_VERSION:-0.11.0}"
-        curl -fsSLo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/download/${_sc_ver}/shellcheck-${_sc_ver}.linux.x86_64.tar.xz" \
-            && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
-            && cp "/tmp/shellcheck-${_sc_ver}/shellcheck" "$HOME/.local/bin/" \
-            && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${_sc_ver}" \
-            && log_success "shellcheck installed" \
-            || log_warning "shellcheck installation failed"
-    else
-        log_info "shellcheck already installed"
-    fi
-else
-    log_warning "Skipping the linux-amd64 download of shellcheck on $(uname -s)/$(uname -m): it comes from dotf tools install (mise) (#2013 W2)"
-    remove_unrunnable_tool shellcheck
-fi
-
-# bats (Bash Automated Testing System)
-if ! command -v bats >/dev/null 2>&1; then
-    log_info "Installing bats..."
-    git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core 2>/dev/null \
-        && /tmp/bats-core/install.sh "$HOME/.local" 2>/dev/null \
-        && rm -rf /tmp/bats-core \
-        && log_success "bats installed" \
-        || log_warning "bats installation failed"
-else
-    log_info "bats already installed"
-fi
 
 # Antigravity CLI (agy) install — idempotent per pattern-setup-script-idempotence.
 # Official install URL: https://antigravity.google/cli/install.sh
