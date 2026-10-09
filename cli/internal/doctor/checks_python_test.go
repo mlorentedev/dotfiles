@@ -108,3 +108,17 @@ func TestCheckPython_APackageMissingOrBelowItsPinFails(t *testing.T) {
 		}
 	}
 }
+
+// The sync installs packages into mise's Python only: when that one has them,
+// the shell is running another Python, and the remedy says so, not the sync.
+func TestCheckPython_APackageOnlyMisePythonHasNamesThePath(t *testing.T) {
+	s, cfg := pythonFixture(t, "darwin", pythonVersions, []string{"python3", "mise"}, map[string]string{
+		"python3 --version":  "Python 3.12.6",
+		"mise which python3": "/m/python3\n",
+		"/m/python3 -c " + tools.PyDistVersion + " pyyaml": "6.0.3\n",
+	})
+	rep, out := runCheckPython(s, cfg)
+	if rep.Failures() != 1 || !strings.Contains(out, "mise's python at /m/python3 has them") || strings.Contains(out, "run: dotf tools sync") {
+		t.Errorf("want one FAIL naming mise's python and the PATH, not the sync\n%s", out)
+	}
+}

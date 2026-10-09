@@ -118,9 +118,14 @@ setup() {
 # from. Relax this in the PR that marks both, once DOTF_VERSION carries the
 # parser.
 @test "versions.conf marks python for mise only once DOTF_VERSION parses the python-package marker" {
-    run grep -nE '^[[:space:]]*#[[:space:]]*mise[[:space:]]*:' "$VERSIONS_CONF"
-    [[ "$status" -eq 0 ]] || false
-    refute_grep '^# mise: python-package' "$VERSIONS_CONF"
-    run grep -A1 -x '# mise: cli' "$VERSIONS_CONF"
-    [[ "$output" != *PYTHON_VERSION=* ]] || false
+    # The released parser trims each line and matches markers case-blind, so
+    # an indented or differently cased marker counts the same.
+    run awk '
+        marked { marked = 0; if ($0 ~ /^[[:space:]]*PYTHON_VERSION[[:space:]]*=/) { print NR ": PYTHON_VERSION is marked"; bad = 1 } }
+        tolower($0) ~ /^[[:space:]]*#[[:space:]]*mise[[:space:]]*:/ {
+            t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t)
+            if (t != "# mise: cli") { print NR ": " t; bad = 1 } else { marked = 1 }
+        }
+        END { exit bad }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
 }

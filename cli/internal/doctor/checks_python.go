@@ -60,16 +60,8 @@ func checkPython(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 	rep.Pass(fmt.Sprintf("%s %s", py, v))
-	var missing []string
-	for _, p := range pins.PythonPackages {
-		out, err := sys.CommandOutput(py, "-c", tools.PyDistVersion, p.Name)
-		got := pythonVersionRE.FindString(out)
-		if err != nil || got == "" || !atLeast(got, p.Version) {
-			missing = append(missing, p.Name)
-		}
-	}
-	if len(missing) > 0 {
-		rep.Fail(fmt.Sprintf("%s cannot import at their pin: %s (run: dotf tools sync)", py, strings.Join(missing, ", ")))
+	if missing := packagesMissing(sys, py, pins.PythonPackages); len(missing) > 0 {
+		rep.Fail(fmt.Sprintf("%s cannot import at their pin: %s (%s)", py, strings.Join(missing, ", "), packagesRemedy(sys, pins.PythonPackages)))
 		return
 	}
 	if len(pins.PythonPackages) > 0 {
@@ -100,6 +92,36 @@ func pythonRemedy(sys *System, pins tools.MisePins) string {
 	out, _ := sys.CommandOutput(path, "--version")
 	if mv := pythonVersionRE.FindString(out); mv != "" && atLeast(mv, pythonFloor) {
 		return fmt.Sprintf("mise's python is %s at %s, but this shell does not resolve it: activate mise in the shell, or put its shims ahead of the system python on PATH", mv, path)
+	}
+	return "run: dotf tools sync"
+}
+
+// packagesMissing names the packages python does not carry at or above their
+// pin.
+func packagesMissing(sys *System, python string, pkgs []tools.MiseTool) []string {
+	var missing []string
+	for _, p := range pkgs {
+		out, err := sys.CommandOutput(python, "-c", tools.PyDistVersion, p.Name)
+		got := pythonVersionRE.FindString(out)
+		if err != nil || got == "" || !atLeast(got, p.Version) {
+			missing = append(missing, p.Name)
+		}
+	}
+	return missing
+}
+
+// packagesRemedy says what clears a package the shell's Python lacks. The sync
+// installs the packages into mise's Python only, so when that one already
+// carries them, the shell is running another Python and a sync changes
+// nothing.
+func packagesRemedy(sys *System, pkgs []tools.MiseTool) string {
+	if !sys.has("mise") {
+		return "install mise, then run: dotf tools sync"
+	}
+	path, err := sys.CommandStdoutDir(sys.home(), "mise", "which", pythonCommand(sys))
+	path = strings.TrimSpace(path)
+	if err == nil && path != "" && len(packagesMissing(sys, path, pkgs)) == 0 {
+		return fmt.Sprintf("mise's python at %s has them, but this shell runs another python: activate mise in the shell, or put its shims ahead of it on PATH", path)
 	}
 	return "run: dotf tools sync"
 }
