@@ -389,6 +389,11 @@ func TestSpecReviewSecondLaunchesTheSecondSigner(t *testing.T) {
 	if err := spec.WriteReviewRequest(specDir, "headheadhead", "nan/deepseek-v4-flash", "basebasebase"); err != nil {
 		t.Fatal(err)
 	}
+	// The session name is printed only on the detached path, so tmux "exists"
+	// here whatever the machine has (a CI runner has none).
+	prev := lookPath
+	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
+	t.Cleanup(func() { lookPath = prev })
 
 	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--second", "--dry-run")
 	if err != nil {
