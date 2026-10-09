@@ -58,6 +58,7 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 - [x] Failing tests first (`merge_toml_test.go`): a merge keeps the keys the tool wrote and writes the managed ones; a reformatted destination (comments, key order, inline tables) is in sync and is not rewritten; an absent destination is created and a second run is in sync; an unreadable destination fails naming the config and is untouched; `paths` on a TOML entry is refused at parse time
 - [x] `mergeFormat`: the destination's extension picks the codec (`.toml` is TOML, anything else JSON as before), and `deepMerge` is shared. Dependency `github.com/pelletier/go-toml/v2` v2.2.4. Mutation-checked: with `.toml` read as JSON, all five tests fail
 - [x] `ai/deploy.json` documents the TOML merge. No manifest version bump: a `dotf` that predates this refuses a TOML merge entry loudly ("source is not a JSON object") rather than replacing the file
+- [x] Review triage: a merge source that names no key is refused for every format (`source manages no key`). An empty or comment-only TOML file parsed as an empty table, so the deploy wrote nothing and reported success, or failed on a confusing `stat` when the destination was absent; JSON `{}` had the same hole (`TestDeploy_MergeRefusesASourceThatManagesNoKey`)
 - [ ] H4 (the `herdr` entry) lands after the release carrying this is the `DOTF_VERSION` pin, so no machine runs a `dotf` that refuses it (#1814 class)
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
