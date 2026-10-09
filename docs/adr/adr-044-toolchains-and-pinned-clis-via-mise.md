@@ -41,8 +41,7 @@ Research for #2013 (epic comment *Toolchain research*) compared five managers ag
 
 1. **mise installs toolchains and pinned CLIs on every OS.**
    - Toolchains: Java (`temurin-21`; the vendor is always named), Go, Python (mise's python-build-standalone), Maven (aqua), Node.
-   - Pinned CLIs through the aqua backend, which verifies checksums and, where upstream publishes them, attestations: age, zoxide, shellcheck, jq, bats, golangci-lint, sops, direnv, fzf, herdr, lazygit.
-     What aqua verifies is what its registry entry declares, not what upstream publishes: herdr publishes GitHub attestations for its linux and macOS assets, but `aqua:herdrdev/herdr` checks the release digest only (measured on 0.9.3, mise 2026.9.13). Verifying those attestations is #2013 H3's job (`gh release verify-asset`).
+   - Pinned CLIs through the aqua backend, which verifies what each tool's aqua registry entry declares (a checksum or release digest always; an attestation only where the entry declares one, whatever upstream publishes): age, zoxide, shellcheck, jq, bats, golangci-lint, sops, direnv, fzf, herdr, lazygit. herdr publishes GitHub attestations for its linux and macOS assets, but `aqua:herdrdev/herdr` checks the release digest only (measured on 0.9.3, mise 2026.9.13); verifying those attestations is #2013 H3's job (`gh release verify-asset`).
    - eza has no aqua entry and no macOS release asset. It goes through `vfox:jdx/vfox-eza` if that works on all three OSes, otherwise it is a class-3 tool on darwin (ADR-036 decision 1).
 2. **`dotf` orchestrates and verifies; mise does not decide.**
    - `versions.conf` stays the source of truth for pins. `dotf tools sync` renders the global mise config from it and runs `mise install --locked`.
