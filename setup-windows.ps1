@@ -493,8 +493,8 @@ Ensure-Directory "$ClaudeHome\skills"
 # the installer (its old place, section 4) a clean box's first run skipped
 # both with "prerequisite 'uv' not found" and only the second run
 # converged -- measured on the CI runner the day Claude Code first installed
-# there (OPS-044, #1361). Linux has always installed uv first. poetry stays
-# in section 4; it only needs uv to exist, which it now does.
+# there (OPS-044, #1361). Linux gets uv from mise (`dotf tools sync`), and
+# poetry is a packages.json uv-tool entry that `dotf tools install` converges.
 # Install uv (Python package manager -- provides uvx)
 $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
 if (-not $uvCmd) {
@@ -1039,32 +1039,8 @@ if (Test-Path $VaultRoot) {
 # into committed records, and rendered to a regular copy by Deploy-SkillRecord
 # near the end of this script (SDD-008, option A).
 
-# ============================================================================
-# 2b. PYTHON TOOLING (uv + poetry)
-# ============================================================================
-# uv is required by the hive MCP server (uvx hive-vault). poetry is general
-# Python tooling. Aider was removed in chore/aider-sunset-full (2026-05-16);
-# OpenCode integration on Windows is a separate follow-up (admin-conditional,
-# not automated here).
-
-# Install poetry via uv
-$poetryCmd = Get-Command poetry -ErrorAction SilentlyContinue
-if (-not $poetryCmd) {
-    $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-    if ($uvCmd) {
-        Write-Info "Installing poetry via uv..."
-        try {
-            & uv tool install poetry 2>$null
-            Write-Success "Poetry installed"
-        } catch {
-            Write-Warn "Failed to install poetry: $_"
-        }
-    } else {
-        Write-Warn "uv not available, skipping poetry installation"
-    }
-} else {
-    Write-Info "poetry already installed"
-}
+# poetry is a packages.json uv-tool entry, converged by `dotf tools install`
+# above; uv is installed earlier in this script (OPS-044).
 
 # Bun was installed here until OPS-040, for "some Claude Code plugin workers for
 # bun:sqlite" -- the conversation-memory plugin worker MEM-002 retired on

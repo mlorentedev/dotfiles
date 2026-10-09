@@ -345,12 +345,18 @@ setup() {
     true
 }
 
-@test "shellcheck installed to ~/.local/bin (xz-utils present, .tar.xz extracts)" {
-    # setup-linux.sh installs shellcheck from a .tar.xz via `tar xJf`, which needs
-    # the xz binary. The container previously lacked xz-utils, so this step failed
-    # silently ("tar (child): xz: Cannot exec") and the build stayed green — the
-    # install path was never verified. With xz-utils in the image it must land.
-    [ -x "$HOME/.local/bin/shellcheck" ]
+@test "shellcheck comes from mise at its pin, with no copy in ~/.local/bin to shadow it (#2013 W2)" {
+    # Setup puts mise's shims on PATH and runs `dotf tools sync` before the
+    # linux-amd64 download, which then finds shellcheck and skips. mise does the
+    # download and the extraction; the old .tar.xz path (and its xz-utils
+    # dependency) is no longer how shellcheck arrives.
+    local mise
+    mise="$(command -v mise || printf '%s' "$HOME/.local/bin/mise")"
+    # From $HOME, so the checkout's own mise.toml cannot answer for the machine.
+    run bash -c 'cd "$HOME" && "$1" which shellcheck' _ "$mise"
+    [ "$status" -eq 0 ]
+    [[ "$output" == */mise/installs/shellcheck/* ]] || false
+    [ ! -e "$HOME/.local/bin/shellcheck" ]
 }
 
 # =============================================================================
