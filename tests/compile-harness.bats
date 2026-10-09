@@ -73,6 +73,13 @@ if [ "$1 $2" = "harness --help" ]; then
     printf 'Available Commands:\n  resolve-tier          Resolve a neutral model tier\n  resolve-capabilities  Resolve neutral capabilities\n  resolve-skills        Print the forced-skill ids a record declares\n  triggers              x\n'
     # HARNESS-092: listed unless a test simulates a dotf that predates the verb.
     [ "${STUB_NO_PRESENCE:-0}" = "1" ] || printf '  presence              Inject the forced-skills roster into the harness files\n'
+    [ "${STUB_NO_INSTRUCTIONS:-0}" = "1" ] || printf '  instructions          Deploy the agent instruction files\n'
+    exit 0
+fi
+# `harness instructions` is the only writer of the instruction files; the stub
+# records the call. What it writes is pinned in cli/internal/harness.
+if [ "$1 $2" = "harness instructions" ]; then
+    printf '%s\n' "$*" >> "${STUB_BIN_DIR:-$(dirname "$0")}/instructions.argv"
     exit 0
 fi
 # Simulates the real subcommand's CONTRACT: both frontmatter forms in, one flow
@@ -1013,7 +1020,7 @@ DIAG
     grep -q '^model: opus' "$F"
 }
 
-@test "agents: an absent dotf warns and renders without a model line, it does not fail the deploy" {
+@test "agents: an absent dotf still renders agents without a model line, and the deploy fails for the instructions" {
     seed_agents_fixture
     run_refresh; [ "$status" -eq 0 ]
     # Genuinely absent, which means the developer's own ~/.local/bin must be off
@@ -1022,11 +1029,12 @@ DIAG
     # test. System dirs only, which is also what CI has.
     rm -f "$STUB_BIN/dotf"
     DEPLOY_PATH="$STUB_BIN:/usr/local/bin:/usr/bin:/bin" run_deploy
-    # NOT fatal: setup-linux.sh installs dotf best-effort, so a missing resolver
-    # must not take the whole harness deploy down with it. C15 governs a map that
-    # cannot be READ; an absent binary is a bootstrap state.
-    [ "$status" -eq 0 ]
-    [[ "$output" == *dotf* ]] || false
+    # The agents still land: setup-linux.sh installs dotf best-effort, so a
+    # missing resolver must not take the whole harness deploy down with it. C15
+    # governs a map that cannot be READ; an absent binary is a bootstrap state.
+    # The run still fails, because the instruction files have no other writer.
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"instructions need"* ]] || false
     F="$FAKEHOME/.claude/agents/curator.md"
     [ -f "$F" ]
     grep -q '^name: curator' "$F"
@@ -1034,21 +1042,40 @@ DIAG
     refute_grep '^model:' "$F"
 }
 
-@test "instructions: only dotf writes them; without the command the deploy warns and copies nothing" {
-    seed_agents_fixture
-    # A presence entry with a source: the shape the real manifest uses, and the
-    # one a second, shell-side writer used to copy when dotf lacked the command.
+# The instruction files have one writer, `dotf harness instructions`. A shell
+# copy used to stand in for a dotf without the command, writing the source
+# verbatim and dropping the regions dotf keeps.
+seed_instructions_source() {
     local tmp
     tmp="$(mktemp)"
     jq '.agents.presence[0].source = "ai/claude/CLAUDE.md"' "$REPO/harness/manifest.json" > "$tmp" \
         && mv "$tmp" "$REPO/harness/manifest.json"
     mkdir -p "$REPO/ai/claude"
     printf 'SOURCE-ONLY-MARKER\n' > "$REPO/ai/claude/CLAUDE.md"
+}
+
+@test "instructions: --deploy hands them to dotf harness instructions with the checkout" {
+    seed_agents_fixture
+    seed_instructions_source
     run_refresh; [ "$status" -eq 0 ]
     run_deploy
     [ "$status" -eq 0 ]
+    grep -qxF "harness instructions --repo-root $REPO" "$STUB_BIN/instructions.argv"
+    [[ "$output" == *"[deploy] OK"* ]] || false
+}
+
+@test "instructions: without the command, nothing is copied and the deploy fails after the other surfaces" {
+    seed_agents_fixture
+    seed_instructions_source
+    run_refresh; [ "$status" -eq 0 ]
+    STUB_NO_INSTRUCTIONS=1 run_deploy
+    [ "$status" -eq 2 ]
     [[ "$output" == *"instructions need \`dotf harness instructions\`"* ]] || false
+    [[ "$output" != *"[deploy] OK"* ]] || false
     [ ! -e "$FAKEHOME/.claude/CLAUDE.md" ]
+    [ ! -e "$STUB_BIN/instructions.argv" ]
+    # the surfaces that do not depend on it still landed
+    [ -f "$FAKEHOME/.claude/agents/curator.md" ]
 }
 
 @test "agents: a dotf too old to know resolve-tier warns rather than embedding its help output" {
@@ -1065,9 +1092,11 @@ DIAG
 # rejects the unknown flag with exit 1, the SAME status a genuine routing refusal
 # returns. Only the capability probe separates them.
 if [ "$1 $2" = "harness --help" ]; then
-    printf 'Available Commands:\n  suggest   x\n  triggers  x\n'
+    printf 'Available Commands:\n  instructions  x\n  suggest   x\n  triggers  x\n'
     exit 0
 fi
+# Knows the instruction deploy, so the run is about resolve-tier alone.
+[ "$1 $2" = "harness instructions" ] && exit 0
 printf 'Error: unknown flag: --harness\n' >&2
 exit 1
 STALE
@@ -1158,9 +1187,10 @@ EOF
     cat > "$STUB_BIN/dotf" <<'HALF'
 #!/usr/bin/env bash
 if [ "$1 $2" = "harness --help" ]; then
-    printf 'Available Commands:\n  resolve-tier  Resolve a neutral model tier\n'
+    printf 'Available Commands:\n  instructions  x\n  resolve-tier  Resolve a neutral model tier\n'
     exit 0
 fi
+[ "$1 $2" = "harness instructions" ] && exit 0
 [ "$1 $2" = "harness resolve-tier" ] || { printf 'Error: unknown flag\n' >&2; exit 1; }
 printf 'opus\n'
 HALF
@@ -1285,9 +1315,10 @@ PY
     cat > "$STUB_BIN/dotf" <<'HALF2'
 #!/usr/bin/env bash
 if [ "$1 $2" = "harness --help" ]; then
-    printf 'Available Commands:\n  resolve-tier  x\n'
+    printf 'Available Commands:\n  instructions  x\n  resolve-tier  x\n'
     exit 0
 fi
+[ "$1 $2" = "harness instructions" ] && exit 0
 [ "$1 $2" = "harness resolve-tier" ] || { printf 'Error: unknown flag\n' >&2; exit 1; }
 printf 'opus\n'
 HALF2

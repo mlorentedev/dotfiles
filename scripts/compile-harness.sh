@@ -871,17 +871,26 @@ do_deploy() {
     # copilot catalog and deploy_agents injects the AGENT-PRESENCE region into
     # these SAME files below. A full-file copy after either would wipe out what
     # they just wrote.
+    #
+    # A failure here does not stop the surfaces below, which do not depend on
+    # these files existing: losing every skill and agent over one surface helps
+    # nobody. It still fails the run, at the end, so no caller reads success.
+    local instructions_rc=0
     if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then
-        deploy_instructions || exit 2
-    fi
-    if ! has_skills && ! has_agents; then
-        printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
-        return 0
+        deploy_instructions || instructions_rc=$?
     fi
     if has_skills; then deploy_skills; fi
     if has_agents; then deploy_agents; fi
     if has_doctrine && has_agents; then
         deploy_doctrine "$REPO_ROOT/$(jq -r '.agents.record_dir' "$MANIFEST")"
+    fi
+    if [ "$instructions_rc" -ne 0 ]; then
+        printf '[deploy] FAILED: the agent instruction files were not deployed (see above)\n' >&2
+        exit 2
+    fi
+    if ! has_skills && ! has_agents; then
+        printf '[deploy] no skills/agents block in manifest; nothing to deploy\n'
+        return 0
     fi
     printf '[deploy] OK\n'
 }
@@ -896,9 +905,9 @@ deploy_instructions() {
     # The shell copy that stood in for an older dotf is gone: the pinned dotf
     # carries the command, and a second writer is how the two drift.
     if ! type -P dotf >/dev/null 2>&1 || ! dotf_knows_subcommand instructions; then
-        printf '[WARN] instructions need `dotf harness instructions`; dotf is absent or predates it\n' >&2
-        printf '       no agent instruction file was deployed -- install the pinned dotf and re-run --deploy\n' >&2
-        return 0
+        printf '[ERROR] instructions need `dotf harness instructions`; dotf is absent or predates it\n' >&2
+        printf '        no agent instruction file was deployed -- install the pinned dotf and re-run --deploy\n' >&2
+        return 1
     fi
     dotf harness instructions --repo-root "$REPO_ROOT"
 }
