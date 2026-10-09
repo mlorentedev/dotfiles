@@ -229,8 +229,10 @@ func getAll(run Runner, key string) ([]string, error) {
 		}
 		return nil, fmt.Errorf("git config --global --get-all %s: %w", key, err)
 	}
+	// Drop only the final newline: a last value that is empty (a reset) prints
+	// as a blank last line, and trimming every trailing newline would lose it.
 	var vals []string
-	for _, line := range strings.Split(strings.TrimRight(string(out), "\r\n"), "\n") {
+	for _, line := range strings.Split(strings.TrimSuffix(string(out), "\n"), "\n") {
 		vals = append(vals, strings.TrimRight(line, "\r"))
 	}
 	return vals, nil

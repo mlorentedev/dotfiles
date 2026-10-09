@@ -173,6 +173,24 @@ func TestInspect_AGitErrorOtherThanAbsentIsReturned(t *testing.T) {
 	}
 }
 
+// An empty value appended last resets git's list to nothing. git prints it as
+// a blank last line, which a trim of every trailing newline would swallow,
+// leaving the stale helper before it to read as converged.
+func TestInspect_AResetAppendedLastLeavesNoHelper(t *testing.T) {
+	f := bareMachine()
+	for _, h := range CredentialHosts {
+		f.cfg["credential."+h+".helper"] = []string{"", "!" + f.ghPath + " auth git-credential", ""}
+	}
+	f.cfg["include.path"] = []string{IncludePath}
+	st, err := Inspect(machine(f, true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.BadHelpers) != 2 || !strings.Contains(st.BadHelpers[0], "no helper") {
+		t.Fatalf("a trailing reset leaves no helper: %+v", st)
+	}
+}
+
 // The fake speaks git's dialect only if git does: one run against the real
 // binary, confined to a temporary global config (GIT_CONFIG_GLOBAL) so the
 // developer's ~/.gitconfig is never touched.
@@ -182,7 +200,7 @@ func TestAgainstRealGit(t *testing.T) {
 	}
 	home := t.TempDir()
 	global := filepath.Join(home, "gitconfig")
-	if err := os.WriteFile(global, []byte("[credential \"https://github.com\"]\n\thelper =\n\thelper = !gh auth git-credential\n"), 0o600); err != nil {
+	if err := os.WriteFile(global, []byte("[credential \"https://github.com\"]\n\thelper =\n\thelper = !gh auth git-credential\n[credential \"https://gist.github.com\"]\n\thelper = !/abs/gh auth git-credential\n\thelper =\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", global)
@@ -202,7 +220,7 @@ func TestAgainstRealGit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !st.IncludeMissing || len(st.BadHelpers) != 2 || !strings.Contains(st.BadHelpers[0], "!gh auth git-credential") || !strings.Contains(st.BadHelpers[1], "no helper") {
+	if !st.IncludeMissing || len(st.BadHelpers) != 2 || !strings.Contains(st.BadHelpers[0], "!gh auth git-credential") || !strings.HasSuffix(st.BadHelpers[1], "no helper") {
 		t.Fatalf("real git read differently: %+v", st)
 	}
 	st.BadHelpers = nil // only the include is exercised against real git

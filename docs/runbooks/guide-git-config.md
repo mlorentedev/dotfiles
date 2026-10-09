@@ -16,12 +16,14 @@ created: "2026-10-08"
 | `git/dotfiles.gitconfig` (repo) → `~/.config/git/dotfiles.gitconfig` | the dotfiles | `dotf deploy` (`gitconfig` entry), replaced whole |
 | `~/.gitconfig` | git, gh and you | `git config --global`, `gh auth setup-git`, `dotf hooks install` (`core.hooksPath`), and the `include.path` line `dotf converge` adds |
 
-`~/.gitconfig` is co-owned, so nothing deploys over it (lesson 366). The dotfiles' settings reach git through one line in it:
+`~/.gitconfig` is co-owned, so nothing should deploy over it (lesson 366). The dotfiles' settings reach git through one line in it:
 
 ```ini
 [include]
 	path = ~/.config/git/dotfiles.gitconfig
 ```
+
+> **Until #2207 phase 2 lands, `setup-linux.sh` still replaces `~/.gitconfig`** with the repo's `.gitconfig` on every run, which restores the bare helper and drops the include. That swap waits for the release carrying `dotf converge --only git-config` to become the `DOTF_VERSION` pin, so setup can call it. Until then a setup run is followed by `dotf doctor` reporting a FAIL in `Git config (global)`, and `dotf doctor --fix` repairs it. `setup-windows.ps1` already refuses to overwrite a `~/.gitconfig` that differs.
 
 The deployed file is deliberately not `~/.config/git/config`. Git reads that path by itself, and on a machine with no `~/.gitconfig`, `git config --global` writes into it; the next deploy would then erase what git wrote.
 
