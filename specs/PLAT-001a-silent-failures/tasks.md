@@ -101,6 +101,11 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] `vault=<name> <sub...>` and `deadends`, with `--no-sandbox` in front everywhere but darwin
   (the `linux-argv` golden case). The connection passes only on the vault's `name<TAB><vault>`
   record
+- [x] Review triage: the orphan, dead-end, unresolved and tag sections refuse an answer that is
+  not a list, and FAIL instead of counting it. An `Error:` first line was one listed file, and a
+  CLI that exited non-zero with no output was an empty list, so a PASS at 0%. Golden cases
+  `obsidian-error-answers` and `obsidian-exits-nonzero` (the stub honours `stub/<sub>.exit`),
+  both mutation-checked
 - [ ] Linux: `dotf vault health` against the live vault on msi, to measure the
   `--no-sandbox vault=<name>` form. Only darwin was measured
 - [x] The `obsidian` alias in `.zshrc` and `.bashrc` keeps `--no-sandbox` (an AppImage GUI
