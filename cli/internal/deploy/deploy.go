@@ -257,8 +257,10 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		if c.Paths != "" && c.Paths != PathsNative && c.Paths != PathsSlash {
 			return nil, fmt.Errorf("config %q: unknown paths form %q (want %s or %s)", c.Name, c.Paths, PathsNative, PathsSlash)
 		}
-		if c.Paths != "" && isTOML(c.Dst) {
-			return nil, fmt.Errorf("config %q: paths rewrites JSON string values, and %s is TOML", c.Name, c.Dst)
+		// paths rewrites the source before it is installed or merged, so the
+		// source's format is the one that must be JSON.
+		if c.Paths != "" && isTOML(c.Src) {
+			return nil, fmt.Errorf("config %q: paths rewrites JSON string values, and %s is TOML", c.Name, c.Src)
 		}
 		switch c.strategy() {
 		case StrategyReplace:

@@ -183,12 +183,20 @@ func TestDeploy_TOMLMergeRefusesADestinationItCannotRead(t *testing.T) {
 	}
 }
 
-// `paths` rewrites the string values of a JSON document; on a TOML file it
-// would fail at deploy time, on every machine. The manifest is refused instead.
-func TestParseManifest_RefusesPathsOnATOMLConfig(t *testing.T) {
-	_, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"a.toml","dst":"{HOME}/b.toml","paths":"native"}]}`))
-	if err == nil || !strings.Contains(err.Error(), `config "x": paths`) {
-		t.Errorf("want a paths error naming the config, got %v", err)
+// `paths` rewrites the string values of the source, parsed as JSON, before it
+// is installed; on a TOML source it would fail at deploy time, on every
+// machine. The manifest is refused instead. What decides is the source's
+// format: a replace installs the source's bytes whatever the destination's
+// extension says.
+func TestParseManifest_RefusesPathsOnATOMLSource(t *testing.T) {
+	for _, pair := range [][2]string{{"a.toml", "{HOME}/b.toml"}, {"a.toml", "{HOME}/b.json"}} {
+		_, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"` + pair[0] + `","dst":"` + pair[1] + `","paths":"native"}]}`))
+		if err == nil || !strings.Contains(err.Error(), `config "x": paths`) {
+			t.Errorf("%s -> %s: want a paths error naming the config, got %v", pair[0], pair[1], err)
+		}
+	}
+	if _, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"a.json","dst":"{HOME}/b.toml","paths":"native"}]}`)); err != nil {
+		t.Errorf("paths on a JSON source must not be refused: %v", err)
 	}
 }
 
