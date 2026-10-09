@@ -1039,7 +1039,7 @@ func resolveRepoDir(sys *System) string {
 // and this port inherits that coupling (CLI-019 follow-up: a grep-guard test).
 func isManagedDeployPath(rel string) bool {
 	switch rel {
-	case "versions.conf", ".zshrc", ".bashrc", ".profile", ".gitconfig", "tmux.conf":
+	case "versions.conf", ".zshrc", ".bashrc", ".profile", "tmux.conf":
 		return true
 	}
 	for _, prefix := range []string{".zsh/", "ssh/", "scripts/", "sensitive/"} {

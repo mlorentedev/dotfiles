@@ -117,7 +117,7 @@ func TestCheckDeployDrift(t *testing.T) {
 // TestIsManagedDeployPath pins the allowlist that MUST mirror setup's copy block.
 func TestIsManagedDeployPath(t *testing.T) {
 	managed := []string{
-		"versions.conf", ".zshrc", ".bashrc", ".profile", ".gitconfig", "tmux.conf",
+		"versions.conf", ".zshrc", ".bashrc", ".profile", "tmux.conf",
 		".zsh/aliases.zsh", "ssh/config", "scripts/utils.sh", "sensitive/chatgpt.api-key.secret.age",
 	}
 	unmanaged := []string{"README.md", "go.mod", "cli/main.go", "docs/lessons.md", ".github/workflows/ci.yml"}

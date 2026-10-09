@@ -175,13 +175,18 @@ setup() {
     refute_grep 'id_ed25519\.pub" "\$HOME/\.ssh' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test ".gitconfig resolves gh through PATH, not a Linux path (#2013 W6)" {
-    # gh is /opt/homebrew/bin/gh on macOS and gh.exe on Windows: an absolute
-    # /usr/bin/gh fails every https push there.
-    run git config -f "$DOTFILES_DIR/.gitconfig" --get-all 'credential.https://github.com.helper'
-    [ "$status" -eq 0 ]
-    [[ "$output" == *'!gh auth git-credential'* ]] || false
-    refute_grep '/usr/bin/gh' "$DOTFILES_DIR/.gitconfig"
+@test "~/.gitconfig is converged after dotf deploy, never deployed over (#2207)" {
+    # Co-owned by git, gh and the user: a deploy over it erased their writes
+    # and restored a helper that needs the shell's PATH (lesson 366).
+    [ ! -e "$DOTFILES_DIR/.gitconfig" ]
+    refute_grep '\.gitconfig" "\$HOME/\.gitconfig"' "$DOTFILES_DIR/setup-linux.sh"
+    # gh writes the credential helper, with its absolute path; the repo's
+    # settings carry none.
+    run git config -f "$DOTFILES_DIR/git/dotfiles.gitconfig" --get-regexp '^credential\.'
+    [ "$status" -eq 1 ]
+    deploy=$(grep -n '"\$_dotf" deploy ||' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)
+    converge=$(grep -n '"\$_dotf" converge --only git-config ||' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)
+    [ -n "$deploy" ] && [ -n "$converge" ] && [ "$converge" -gt "$deploy" ]
 }
 
 # tmux and xclip are packages.json `system` entries (#2013 P5b): `dotf tools
