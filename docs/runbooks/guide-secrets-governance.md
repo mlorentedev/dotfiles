@@ -267,9 +267,14 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
    sudo apt install age veracrypt            # a fresh machine has neither
    sudo mkdir -p /media/secrets              # veracrypt does not create the mount point
    veracrypt /dev/sdX /media/secrets         # prompts for the volume password
-   install -m 600 -D /media/secrets/key.txt ~/.config/age/key.txt
+   mkdir -p ~/.config/age && install -m 600 /media/secrets/key.txt ~/.config/age/key.txt
    veracrypt -d /media/secrets               # unmount when done
    ```
+
+   The copy must land at mode 0600. `install -m 600` sets it on Linux and macOS alike;
+   GNU's `-D` does not exist in BSD `install`, and a plain `cp` keeps the copy's mode,
+   0644 under the default umask. `dotf doctor` FAILs on a root that does not carry its
+   declared mode, and `dotf doctor --fix` sets it (#2203).
 
    **Verify the key before trusting the rest of the chain.** A restored key that is
    the wrong one decrypts nothing, and finds out four steps later; one restored from

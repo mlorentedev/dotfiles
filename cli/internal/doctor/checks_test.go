@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -334,6 +335,10 @@ func TestCheckSecrets_FileAuthorityBackend(t *testing.T) {
 	home := t.TempDir()
 	keyPath := filepath.Join(home, ".config", "age", "key.txt")
 	writeFile(t, keyPath, "AGE-SECRET-KEY-1...")
+	// A healthy root carries its declared mode; the mode check has its own tests.
+	if err := os.Chmod(keyPath, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, filepath.Join(dotfiles, "secrets", "registry.yaml"),
 		"version: 1\nsecrets:\n"+
 			"  - id: age-root\n"+

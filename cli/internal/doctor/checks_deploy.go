@@ -159,7 +159,7 @@ func checkSecrets(sys *System, cfg *Config, rep *Report, fix bool) {
 				continue
 			}
 			if pathExists(e.Dest) {
-				rep.Pass(fmt.Sprintf("%s -> %s (file-authority on disk)", display, e.Dest))
+				checkFileAuthorityMode(rep, e, display, fix)
 			} else {
 				rep.Fail(fmt.Sprintf("%s -> %s (file-authority missing on disk)", display, e.Dest))
 			}
@@ -181,6 +181,28 @@ func checkSecrets(sys *System, cfg *Config, rep *Report, fix bool) {
 		}
 	}
 	pruneOrReportOrphans(sys, cfg, rep, orphans, fix)
+}
+
+// checkFileAuthorityMode holds a root that is on disk to its declared mode, as
+// `dotf secrets verify` does: a key restored with a plain copy keeps the copy's
+// mode, 0644 under the default umask, and every account on the machine can then
+// read the key that decrypts every age secret (#2203). With fix it sets the
+// declared mode; the key's content is never read.
+func checkFileAuthorityMode(rep *Report, e secrets.Entry, display string, fix bool) {
+	err := secrets.CheckFileAuthorityMode(e)
+	if err == nil {
+		rep.Pass(fmt.Sprintf("%s -> %s (file-authority on disk)", display, e.Dest))
+		return
+	}
+	if !fix {
+		rep.Fail(fmt.Sprintf("%s -> %s (run: dotf doctor --fix)", display, err))
+		return
+	}
+	if rerr := secrets.RepairFileAuthorityMode(e); rerr != nil {
+		rep.Fail(fmt.Sprintf("%s -> %s, and setting the declared mode failed: %v", display, err, rerr))
+		return
+	}
+	rep.Fix(fmt.Sprintf("%s -> %s: set to the declared mode", display, err))
 }
 
 // secretBlobCandidates lists the top-level files in the secrets dir that hold

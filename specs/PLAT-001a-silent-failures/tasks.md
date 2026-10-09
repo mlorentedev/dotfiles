@@ -113,6 +113,19 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] On the Mac, against the live vault: connected, and dead-ends now read 1918/2163 (88%),
   a FAIL kept on purpose (owner, 2026-10-08): the number is real, and it was `1` before
 
+## #2203 — doctor passed a world-readable age root
+
+- [x] Measured on the Mac (2026-10-08): `~/.config/age/key.txt` restored at 0644. `dotf secrets
+  verify` FAILED it (`has mode 0644, expected 0600`); doctor's file-authority branch asked only
+  whether the file existed and reported `file-authority on disk`
+- [x] Failing tests first (`checks_secrets_mode_test.go`, unix only): a 0644 root is one FAIL naming
+  the mode, the declared mode and `dotf doctor --fix`, and the mode is not touched without `--fix`;
+  `--fix` sets 0600 and a second run is clean
+- [x] `secrets.CheckFileAuthorityMode` and `RepairFileAuthorityMode` share `checkKeyMode` with
+  `verify`, so doctor and verify cannot disagree again; on Windows both are no-ops (no POSIX bits)
+- [x] Runbook: the DR restore step was GNU-only (`install -D`); it is now `mkdir -p` plus
+  `install -m 600`, which macOS has too, and says doctor catches a wrong mode
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
