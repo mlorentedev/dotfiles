@@ -1263,8 +1263,10 @@ if ((Test-Path -LiteralPath $piSettingsDst -PathType Leaf) -and (Test-Path -Lite
 # CLI. It replaced a loop here that only ever installed. The Go command keeps
 # the captured output, the elapsed time, the DOTFILES_SKIP_PI_PACKAGES skip
 # (CI-002, #1478), and a warning rather than a failure without pi or npm.
-if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    dotf pi packages apply --repo $DotfilesDir
+$dotfBin = Get-Command dotf -ErrorAction SilentlyContinue
+$dotfPath = if ($dotfBin) { $dotfBin.Source } elseif (Test-Path "$env:USERPROFILE\.local\bin\dotf.exe") { "$env:USERPROFILE\.local\bin\dotf.exe" } else { $null }
+if ($dotfPath) {
+    & $dotfPath pi packages apply --repo $DotfilesDir
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "pi package reconcile reported a failure (above); run 'dotf pi packages check'"
     }
