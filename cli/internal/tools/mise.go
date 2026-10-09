@@ -94,6 +94,19 @@ func MiseConfigDir(home string, getenv func(string) string) string {
 	return filepath.Join(home, ".config", "mise")
 }
 
+// MiseShimsDir is where mise keeps its shims: MISE_DATA_DIR/shims, else
+// $XDG_DATA_HOME/mise/shims, else ~/.local/share/mise/shims. A shim runs the
+// tool at the version mise's config selects, with or without `mise activate`.
+func MiseShimsDir(home string, getenv func(string) string) string {
+	if d := getenv("MISE_DATA_DIR"); d != "" {
+		return filepath.Join(d, "shims")
+	}
+	if x := getenv("XDG_DATA_HOME"); x != "" {
+		return filepath.Join(x, "mise", "shims")
+	}
+	return filepath.Join(home, ".local", "share", "mise", "shims")
+}
+
 // MiseSync converges the pinned CLIs through mise. It owns one file,
 // <ConfigDir>/conf.d/dotfiles.toml, and never touches the rest of the mise
 // config: a hand-written config.toml keeps working beside it.

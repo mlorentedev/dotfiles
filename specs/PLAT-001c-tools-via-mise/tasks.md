@@ -120,6 +120,19 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 - [x] Why: mise is pinned in `packages.json` and installed by `dotf tools install`. Its notice, `mise version 2026.10.4 available / To update, run mise self-update`, printed on stderr in a `mise bin-paths` call on the Mac (2026-10-08), points the user past that pin
 - [x] Measured: mise 2026.10.3 reads the setting from a `conf.d` file (`MISE_CONFIG_DIR=<tmp> mise settings get disable_update_warning` gives `true`; the live config gives `false`)
 
+### W2c — doctor reports the copies in `~/.local/bin` that shadow mise's
+
+The installers W2 deletes left copies on every machine they ran on. Measured on the Mac (2026-10-08): `bats`, `direnv`, `zoxide`, `uv` and `uvx` sit in `~/.local/bin` beside mise's pinned ones.
+
+- [x] Failing tests first: a regular file named like an executable mise provides warns and names it (a companion such as `age-keygen` counts); `--fix` replaces it with a link to mise's shim, keeps a symlink and a file mise does not provide, keeps the copy when no shim exists, and a second run is clean; nothing is touched while a pin does not run through mise; a failing `mise bin-paths` warns naming the command
+- [x] `checkMiseTools` asks mise what each pin provides (`mise bin-paths --bin-names name@version`), not the pin's name, because uv brings uvx and age brings age-keygen
+- [x] The check runs only after every pin is proven at its pin through mise: that is what makes replacing a copy safe. It is a WARN, never a FAIL. Owner decision: `dotf doctor --fix` removes the copies
+- [x] Review triage: `--fix` replaces each copy with a link to mise's shim instead of deleting it (`MiseShimsDir`, one rename, only to a shim that exists). A deleted copy would leave a consumer whose PATH lists `~/.local/bin` explicitly with nothing, which is worse than the old version; the link keeps it resolvable, now at the pin. The copy's content is still gone, as the owner decided
+- [x] Mutation-checked: dropping the symlink exemption, running the check before the pins are verified, or linking without checking the shim exists turns tests red
+- [x] Runbook: `docs/runbooks/tool-installation.md` says where the copies come from and how `--fix` treats them
+- [x] Review triage: an entry from `mise bin-paths --bin-names` that is a path rather than a file name (a separator, `.` or `..`) is reported and left alone, so `--fix` can never rename over a file outside `~/.local/bin` (`TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched`, mutation-checked). The doc comment on `checkMiseTools` now says the fix links, not removes
+- [x] Review triage: the pin-guard test was vacuous. Its fixture had no shim, so with the guard removed `--fix` still left the copy, for a different reason. The fixture now writes the shim and asserts the copy is still a regular file; deleting the guard's `return` turns it red (measured 2026-10-09)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
