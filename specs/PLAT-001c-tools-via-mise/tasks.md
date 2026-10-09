@@ -29,7 +29,8 @@ created: "2026-10-06"
 
 ### T1b — mise in the catalog (after the release carrying T1a is the `DOTF_VERSION` pin)
 
-- [ ] [AC4] `packages.json` entry `mise`, keyed `goos/goarch`, `SHASUMS256.txt`; `MISE_VERSION` in `versions.conf`; installed and probed on the Mac
+- [x] [AC4] `packages.json` entry `mise` 2026.9.13, keyed `goos/goarch` (linux, darwin and windows on amd64 and arm64; the raw binaries, so no archive extraction and no dependency on #649), `SHASUMS256.txt`. With an empty HOME on the Mac it downloaded, verified, probed `2026.9.13 macos-arm64`, and a second run skipped; on the real HOME the hand-installed 2026.10.3 is above the floor and is skipped
+- Deviation: no `MISE_VERSION` in `versions.conf`. The catalog entry carries the pin, as every `packages.json` tool does, and a second copy would have no reader
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
