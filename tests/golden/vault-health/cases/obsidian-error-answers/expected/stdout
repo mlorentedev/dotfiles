@@ -1,0 +1,36 @@
+========================================
+   VAULT HEALTH REPORT
+========================================
+Vault: knowledge (<VAULT>)
+
+[1/7] Working Tree Integrity
+  SKIP: Working tree integrity - vault is not a git repo
+
+[2/7] Vault Connectivity
+  PASS: Obsidian CLI connected to vault 'knowledge'
+  INFO: Total markdown files: 5
+
+[3/7] Orphans & Dead-Ends
+  FAIL: Orphans: the obsidian CLI answered with an error: Error: Command "orphans" not found. It may require a plugin to be enabled.
+  FAIL: Dead-ends: the obsidian CLI answered with an error: Error: Command "deadends" not found. It may require a plugin to be enabled.
+
+[4/7] Unresolved Links
+  PASS: No unresolved links
+
+[5/7] Frontmatter Coverage
+  PASS: id: 5/5 (100%)
+  PASS: type: 5/5 (100%)
+  PASS: status: 5/5 (100%)
+  PASS: tags: 5/5 (100%)
+  PASS: created: 5/5 (100%)
+  PASS: owner: 5/5 (100%)
+
+[6/7] Tag Hygiene
+  FAIL: Tags: the obsidian CLI answered with an error: Error: Command "tags" not found. It may require a plugin to be enabled.
+
+[7/7] Backlog Integrity
+  SKIP: Backlog integrity - no 10_projects/*/11-tasks.md found
+
+========================================
+Results: 8 passed, 3 failed, 2 skipped
+========================================

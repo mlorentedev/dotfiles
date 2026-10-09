@@ -33,6 +33,7 @@ package vault
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -189,6 +190,20 @@ func (h *healthRun) obsidianCmd(sub ...string) string {
 	cmd := exec.Command("obsidian", h.obsidianArgs(sub...)...)
 	out, _ := cmd.Output() // stderr discarded, exit code ignored: `2>/dev/null || true`
 	return strings.TrimRight(string(out), "\n")
+}
+
+// obsidianList runs a listing subcommand and returns its answer, or the
+// error the CLI printed instead. The CLI reports a failure on stdout and exits
+// 0 (measured: `Error: Command "x" not found. It may require a plugin to be
+// enabled.`), so an answer that starts with "Error:" is refused rather than
+// counted as one listed file.
+func (h *healthRun) obsidianList(sub ...string) (string, error) {
+	out := h.obsidianCmd(sub...)
+	first, _, _ := strings.Cut(strings.TrimLeft(out, " \t\r\n"), "\n")
+	if strings.HasPrefix(first, "Error:") {
+		return "", errors.New(strings.TrimSpace(first))
+	}
+	return out, nil
 }
 
 // printTruncated mirrors `echo "$VAR" | head -N` plus the "... and M more"
@@ -381,9 +396,10 @@ func nonBlankLines(s string) []string {
 func (h *healthRun) section3OrphansDeadEnds() {
 	h.section("3/7", "Orphans & Dead-Ends")
 
+	orphansOut, orphansErr := h.obsidianList("orphans")
 	var orphans []string
 	exemptOrphans := 0
-	for _, l := range nonBlankLines(h.obsidianCmd("orphans")) {
+	for _, l := range nonBlankLines(orphansOut) {
 		if orphanExempt(strings.TrimSpace(l)) {
 			exemptOrphans++
 			continue
@@ -399,13 +415,15 @@ func (h *healthRun) section3OrphansDeadEnds() {
 		population++
 	}
 	orphanCount := len(orphans)
-	deadOut := h.obsidianCmd("deadends")
+	deadOut, deadErr := h.obsidianList("deadends")
 	deadCount := countNonBlank(deadOut)
 
 	orphanPct := pct(orphanCount, population)
 	deadPct := pct(deadCount, h.totalFiles)
 
 	switch {
+	case orphansErr != nil:
+		h.fail("Orphans: the obsidian CLI answered with an error: %s", orphansErr)
 	case orphanPct <= 30:
 		h.pass("Orphans: %d/%d (%d%%)", orphanCount, population, orphanPct)
 	case orphanPct <= 50:
@@ -413,12 +431,14 @@ func (h *healthRun) section3OrphansDeadEnds() {
 	default:
 		h.fail("Orphans: %d/%d (%d%%) — too many isolated files", orphanCount, population, orphanPct)
 	}
-	if exemptFiles > 0 {
+	if exemptFiles > 0 && orphansErr == nil {
 		h.info("Not counted: %d file(s) under sessions/, memory/ and 90_archive/ (%d orphaned), which have no incoming links by design",
 			exemptFiles, exemptOrphans)
 	}
 
 	switch {
+	case deadErr != nil:
+		h.fail("Dead-ends: the obsidian CLI answered with an error: %s", deadErr)
 	case deadPct <= 30:
 		h.pass("Dead-ends: %d/%d (%d%%)", deadCount, h.totalFiles, deadPct)
 	case deadPct <= 50:
@@ -514,7 +534,11 @@ func (h *healthRun) section5Frontmatter() {
 func (h *healthRun) section6Tags() {
 	h.section("6/7", "Tag Hygiene")
 
-	out := h.obsidianCmd("tags")
+	out, err := h.obsidianList("tags")
+	if err != nil {
+		h.fail("Tags: the obsidian CLI answered with an error: %s", err)
+		return
+	}
 	count := countNonBlank(out)
 	h.info("Total unique tags: %d", count)
 
