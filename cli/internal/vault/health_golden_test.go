@@ -47,9 +47,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// runObsidianStub is lib.sh's stub, byte for byte: append the argv to the log,
-// take the first argument naming a subcommand (so `--vault knowledge` never
-// matches), print stub/<sub> when the case has one, and exit 0.
+// runObsidianStub was lib.sh's stub: append the argv to the log, take the first
+// argument naming a subcommand (so `--vault knowledge` never matches), print
+// stub/<sub> when the case has one, and exit with stub/<sub>.exit when the case
+// has one (a CLI that dies), 0 otherwise.
 func runObsidianStub(args []string) int {
 	logf, err := os.OpenFile(os.Getenv(stubEnvLog), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -64,6 +65,11 @@ func runObsidianStub(args []string) int {
 		case "vault", "orphans", "deadends", "unresolved", "tags":
 			if b, err := os.ReadFile(filepath.Join(os.Getenv(stubEnvCase), "stub", a)); err == nil {
 				_, _ = os.Stdout.Write(b)
+			}
+			if b, err := os.ReadFile(filepath.Join(os.Getenv(stubEnvCase), "stub", a+".exit")); err == nil {
+				if code, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil {
+					return code
+				}
 			}
 			return 0
 		}

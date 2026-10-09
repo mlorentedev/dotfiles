@@ -187,18 +187,27 @@ func (h *healthRun) obsidianArgs(sub ...string) []string {
 // substitution performs, load-bearing because callers reuse this value both
 // for counting AND for the --verbose listing.
 func (h *healthRun) obsidianCmd(sub ...string) string {
-	cmd := exec.Command("obsidian", h.obsidianArgs(sub...)...)
-	out, _ := cmd.Output() // stderr discarded, exit code ignored: `2>/dev/null || true`
-	return strings.TrimRight(string(out), "\n")
+	out, _ := h.obsidianRun(sub...) // exit code ignored: `2>/dev/null || true`
+	return out
 }
 
-// obsidianList runs a listing subcommand and returns its answer, or the
-// error the CLI printed instead. The CLI reports a failure on stdout and exits
-// 0 (measured: `Error: Command "x" not found. It may require a plugin to be
-// enabled.`), so an answer that starts with "Error:" is refused rather than
-// counted as one listed file.
+// obsidianRun is obsidianCmd plus how the CLI exited; stderr is discarded.
+func (h *healthRun) obsidianRun(sub ...string) (string, error) {
+	out, err := exec.Command("obsidian", h.obsidianArgs(sub...)...).Output()
+	return strings.TrimRight(string(out), "\n"), err
+}
+
+// obsidianList runs a listing subcommand and returns its answer, or why it is
+// not one. A CLI that exits non-zero has no answer, even an empty one: an empty
+// list would count as zero findings and pass. The CLI also reports a failure on
+// stdout and exits 0 (measured: `Error: Command "x" not found. It may require a
+// plugin to be enabled.`), so an answer that starts with "Error:" is refused
+// rather than counted as one listed file.
 func (h *healthRun) obsidianList(sub ...string) (string, error) {
-	out := h.obsidianCmd(sub...)
+	out, err := h.obsidianRun(sub...)
+	if err != nil {
+		return "", err
+	}
 	first, _, _ := strings.Cut(strings.TrimLeft(out, " \t\r\n"), "\n")
 	if strings.HasPrefix(first, "Error:") {
 		return "", errors.New(strings.TrimSpace(first))
@@ -467,7 +476,11 @@ type unresolvedLink struct {
 func (h *healthRun) section4Unresolved() {
 	h.section("4/7", "Unresolved Links")
 
-	out := h.obsidianCmd("unresolved", "verbose", "format=json")
+	out, err := h.obsidianList("unresolved", "verbose", "format=json")
+	if err != nil {
+		h.fail("Unresolved links: the obsidian CLI answered with an error: %s", err)
+		return
+	}
 	var all []unresolvedLink
 	if strings.TrimSpace(out) != "" {
 		if err := json.Unmarshal([]byte(out), &all); err != nil {
