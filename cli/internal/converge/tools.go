@@ -35,7 +35,7 @@ func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
 		plan = s.Apply
 	}
 	p, err := plan(pins)
-	res := Result{Changes: len(p.Missing), Detail: syncDetail(p, len(pins), dryRun)}
+	res := Result{Changes: len(p.Missing) + len(p.MissingPackages), Detail: syncDetail(p, len(pins), dryRun)}
 	if p.ConfigChanged {
 		res.Changes++
 	}
@@ -53,8 +53,8 @@ func (r toolsSync) Probe(env Env) error {
 	if err != nil {
 		return err
 	}
-	if p.ConfigChanged || len(p.Missing) > 0 {
-		return fmt.Errorf("after the sync, config current=%v, not at their pin: %s", !p.ConfigChanged, strings.Join(p.Missing, ", "))
+	if p.ConfigChanged || len(p.Missing) > 0 || len(p.MissingPackages) > 0 {
+		return fmt.Errorf("after the sync, config current=%v, not at their pin: %s", !p.ConfigChanged, strings.Join(append(p.Missing, p.MissingPackages...), ", "))
 	}
 	return nil
 }
@@ -75,7 +75,7 @@ func (r toolsSync) sync(env Env) (tools.MiseSync, []tools.MiseTool, error) {
 	if err != nil {
 		return tools.MiseSync{}, nil, err
 	}
-	pins, err := tools.ParseMiseTools(raw)
+	all, err := tools.ParseMisePins(raw)
 	if err != nil {
 		return tools.MiseSync{}, nil, err
 	}
@@ -83,12 +83,12 @@ func (r toolsSync) sync(env Env) (tools.MiseSync, []tools.MiseTool, error) {
 	if getenv == nil {
 		getenv = os.Getenv
 	}
-	s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home, getenv), Run: r.run, Stdout: r.stdout}
-	return s, pins, nil
+	s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home, getenv), Run: r.run, Stdout: r.stdout, PythonPackages: all.PythonPackages}
+	return s, all.Tools, nil
 }
 
 func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
-	if !p.ConfigChanged && len(p.Missing) == 0 {
+	if !p.ConfigChanged && len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
 		return fmt.Sprintf("%d pinned CLI(s) at their pin", total)
 	}
 	verb := "installed"
@@ -101,6 +101,9 @@ func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
 	}
 	if len(p.Missing) > 0 {
 		parts = append(parts, verb+": "+strings.Join(p.Missing, ", "))
+	}
+	if len(p.MissingPackages) > 0 {
+		parts = append(parts, "python packages "+verb+": "+strings.Join(p.MissingPackages, ", "))
 	}
 	return strings.Join(parts, "; ")
 }

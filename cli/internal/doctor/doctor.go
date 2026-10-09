@@ -95,6 +95,7 @@ func Run(opts Options) (int, error) {
 		checkToolHomeEnvVars(sys, rep)
 		checkOptionalTools(sys, cfg, contract, rep)
 		checkMiseTools(sys, cfg, rep, opts.Fix)
+		checkPython(sys, cfg, rep)
 		checkVault(sys, rep)
 		checkVaultHooks(sys, rep, opts.Fix)
 		checkGitConfig(sys, rep, opts.Fix)

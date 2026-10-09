@@ -15,8 +15,9 @@ import (
 // on every OS (ADR-044, PLAT-001c W2b). It reads the versions.conf the rest of
 // doctor reads, checkout first, and runs mise from HOME as the sync does, so a
 // project mise.toml in the working directory cannot answer for the machine.
-// Once every pin runs, it reports the copies in ~/.local/bin that shadow mise's,
-// and with fix replaces each with a link to mise's shim.
+// With fix it runs the sync when anything is pending. Once every pin runs, it
+// reports the copies in ~/.local/bin that shadow mise's, and with fix replaces
+// each with a link to mise's shim.
 func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Pinned CLIs (mise)")
 	if cfg.VersionsPath == "" {
@@ -28,17 +29,56 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		rep.Fail("versions.conf unreadable: " + err.Error())
 		return
 	}
-	pins, err := tools.ParseMiseTools(raw)
+	all, err := tools.ParseMisePins(raw)
 	if err != nil {
 		rep.Fail(err.Error())
 		return
 	}
+	pins := all.Tools
 	if !sys.has("mise") {
 		rep.Warn(fmt.Sprintf("mise not on PATH: the %d CLI(s) pinned in versions.conf are not managed (install mise, then run: dotf tools sync)", len(pins)))
 		return
 	}
 	home := sys.home()
-	s := tools.MiseSync{
+	s := miseSync(sys, all.PythonPackages)
+	p, err := s.Plan(pins)
+	if err != nil {
+		rep.Fail("mise plan: " + err.Error())
+		return
+	}
+	if fix && (p.ConfigChanged || len(p.Missing) > 0 || len(p.MissingPackages) > 0) {
+		// The fix is the sync itself, the one owner of mise's config and
+		// installs; checkPython only re-probes what it leaves behind.
+		if _, err := s.Apply(pins); err != nil {
+			rep.Fail("dotf tools sync: " + err.Error())
+			return
+		}
+		rep.Fix("ran the mise sync (dotf tools sync)")
+		if p, err = s.Plan(pins); err != nil {
+			rep.Fail("mise plan: " + err.Error())
+			return
+		}
+	}
+	if p.ConfigChanged {
+		rep.Warn(s.ConfigPath() + " is not what versions.conf renders (run: dotf tools sync)")
+	}
+	if len(p.Missing) > 0 {
+		rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + " (run: dotf tools sync)")
+		return
+	}
+	if len(p.MissingPackages) > 0 {
+		rep.Fail("python packages missing from mise's python at their pin: " + strings.Join(p.MissingPackages, ", ") + " (run: dotf tools sync)")
+		return
+	}
+	rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
+	checkShadowingCopies(sys, home, pins, rep, fix)
+}
+
+// miseSync is the sync `dotf tools sync` runs, with mise run from HOME so a
+// project mise.toml in the working directory cannot answer for the machine.
+func miseSync(sys *System, pythonPackages []tools.MiseTool) tools.MiseSync {
+	home := sys.home()
+	return tools.MiseSync{
 		ConfigDir: tools.MiseConfigDir(home, sys.Getenv),
 		Run: func(name string, args ...string) ([]byte, error) {
 			out, err := sys.CommandOutputDir(home, name, args...)
@@ -48,21 +88,8 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 			out, err := sys.CommandStdoutDir(home, name, args...)
 			return []byte(out), err
 		},
+		PythonPackages: pythonPackages,
 	}
-	p, err := s.Plan(pins)
-	if err != nil {
-		rep.Fail("mise plan: " + err.Error())
-		return
-	}
-	if p.ConfigChanged {
-		rep.Warn(s.ConfigPath() + " is not what versions.conf renders (run: dotf tools sync)")
-	}
-	if len(p.Missing) > 0 {
-		rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + " (run: dotf tools sync)")
-		return
-	}
-	rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
-	checkShadowingCopies(sys, home, pins, rep, fix)
 }
 
 // checkShadowingCopies finds the executables mise provides for the pins that

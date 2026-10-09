@@ -55,7 +55,6 @@ type toolHome struct {
 var versionedHomes = []toolHome{
 	{"JAVA_HOME", "java"},
 	{"MAVEN_HOME", "mvn"},
-	{"PYTHON_HOME", "python3"},
 	{"GO_HOME", "go"},
 }
 
@@ -131,7 +130,6 @@ type versionedDir struct {
 var versionMatches = []versionedDir{
 	{"Java", "JAVA_VERSION", "jdk-"},
 	{"Maven", "MAVEN_VERSION", "apache-maven-"},
-	{"Python", "PYTHON_VERSION", "python-"},
 	{"Minikube", "MINIKUBE_VERSION", "minikube-"},
 	{"Go", "GO_VERSION", "go-"},
 }
@@ -242,7 +240,7 @@ func checkGitWindowsFloor(sys *System, cfg *Config, rep *Report) {
 // is intentionally omitted: it is owned by the env-contract section (which also
 // validates its path), so listing it here would double-report.
 var toolHomeVars = []string{
-	"APPS_HOME", "JAVA_HOME", "MAVEN_HOME", "PYTHON_HOME", "GO_HOME", "MINIKUBE_HOME",
+	"APPS_HOME", "JAVA_HOME", "MAVEN_HOME", "GO_HOME", "MINIKUBE_HOME",
 }
 
 // checkToolHomeEnvVars reproduces healthcheck section 5: the tool-home vars are

@@ -25,7 +25,7 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		if err != nil {
 			t.Fatal(err)
 		}
-		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins)))
+		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, "")))
 	}
 	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
 		"mise which jq":    "/m/jq\n",
@@ -34,6 +34,7 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		"/m/age --version": "v" + ageVersion,
 		// What mise provides for the pins: a pin can bring a companion.
 		"mise bin-paths --bin-names age@1.2.1 jq@1.7.1": "age\nage-keygen\njq\n",
+		"mise install": "",
 	})
 	s.GOOS = goos
 	return s, &Config{VersionsPath: versions}
@@ -225,5 +226,37 @@ func TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched(t *testing.T) {
 	}
 	if rep.Warnings() != 1 || !strings.Contains(b.String(), "not file names") || strings.Contains(b.String(), "replaced") {
 		t.Errorf("want one WARN naming the odd entries and no repair\n%s", b.String())
+	}
+}
+
+// Under fix the drift is cleared by the sync itself: the config is written and
+// mise install runs, and the section ends clean.
+func TestCheckMiseTools_FixRunsTheSync(t *testing.T) {
+	s, cfg := miseFixture(t, "darwin", "1.2.1", false)
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, true)
+	if rep.Failures() != 0 || rep.Warnings() != 0 || !strings.Contains(b.String(), "ran the mise sync") {
+		t.Errorf("want the sync run and a clean section\n%s", b.String())
+	}
+	if _, err := os.Stat(filepath.Join(s.home(), ".config", "mise", "conf.d", "dotfiles.toml")); err != nil {
+		t.Errorf("the fix wrote no config: %v", err)
+	}
+}
+
+func TestCheckMiseTools_APythonPackageMissingFailsNamingTheSync(t *testing.T) {
+	home := t.TempDir()
+	versions := filepath.Join(home, "versions.conf")
+	body := "# mise: cli\nPYTHON_VERSION=3.12.6\n# mise: python-package\nPYYAML_VERSION=6.0.3\n"
+	writeFile(t, versions, body)
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+		"mise which python":   "/m/python\n",
+		"/m/python --version": "Python 3.12.6",
+	})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, &Config{VersionsPath: versions}, rep, false)
+	if rep.Failures() != 1 || !strings.Contains(b.String(), "python packages missing from mise's python at their pin: pyyaml") {
+		t.Errorf("want one FAIL naming pyyaml\n%s", b.String())
 	}
 }

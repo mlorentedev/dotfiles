@@ -126,7 +126,6 @@ export NINJA_HOME="$HOME/.console-ninja"
 # Tool Homes (constructed from versions.conf)
 export JAVA_HOME="$APPS_HOME/jdk-${JAVA_VERSION}"
 export MAVEN_HOME="$APPS_HOME/apache-maven-${MAVEN_VERSION}"
-export PYTHON_HOME="$APPS_HOME/python-${PYTHON_VERSION}"
 export MINIKUBE_HOME="$APPS_HOME/minikube-${MINIKUBE_VERSION}"
 export GO_HOME="$APPS_HOME/go-${GO_VERSION}"
 
@@ -139,7 +138,6 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 # Prepend Tool Paths (priority over system)
 export PATH="$JAVA_HOME/bin:$PATH"
 export PATH="$MAVEN_HOME/bin:$PATH"
-export PATH="$PYTHON_HOME/bin:$PATH"
 export PATH="$MINIKUBE_HOME:$PATH"
 export PATH="$GO_HOME/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"
