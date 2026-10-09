@@ -88,7 +88,7 @@ echo "Shell: ${ZSH_VERSION:+zsh $ZSH_VERSION}${BASH_VERSION:+bash $BASH_VERSION}
 
 # ==================================================
 section "1/15" "Script Syntax Validation"
-for script in utils.sh age-encrypt-decrypt.sh install-precommit.sh dotfiles-sync.sh; do
+for script in utils.sh age-encrypt-decrypt.sh dotfiles-sync.sh; do
     if [[ -f "$SCRIPTS_DIR/$script" ]]; then
         if bash -n "$SCRIPTS_DIR/$script" 2>/dev/null; then
             pass "$script syntax OK"
@@ -466,7 +466,7 @@ for link in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.zsh/aliases.zsh" "$HOME/.zsh/
 done
 
 subsection "Script permissions"
-for script in utils.sh age-encrypt-decrypt.sh install-precommit.sh dotfiles-sync.sh; do
+for script in utils.sh age-encrypt-decrypt.sh dotfiles-sync.sh; do
     if [[ -x "$SCRIPTS_DIR/$script" ]]; then
         pass "$script: executable"
     elif [[ -f "$SCRIPTS_DIR/$script" ]]; then

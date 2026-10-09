@@ -56,6 +56,15 @@ func checkVaultHooks(sys *System, rep *Report, fix bool) {
 	// `pre-commit install` refuses outright, so that file is one the design
 	// guarantees absent — and this check reported the gate INACTIVE while gitleaks
 	// was verifiably running through the GUARD dispatcher's fallback.
+	//
+	// Every route reaches gitleaks only through the pre-commit binary, so a
+	// missing binary is an inactive gate whatever the hooks look like. Checked
+	// first and in check mode too: a Mac with the dispatcher deployed and no
+	// pre-commit installed reported "gate active" while no commit was scanned.
+	if !sys.has("pre-commit") {
+		rep.Fail("vault secret gate INACTIVE — pre-commit not on PATH; install it with `dotf tools install pre-commit`, then re-run `dotf doctor --fix`")
+		return
+	}
 	preCommitOK := stageReachesPreCommit(sys, vault, "pre-commit")
 	prePushOK := stageReachesPreCommit(sys, vault, "pre-push")
 	if preCommitOK && prePushOK {
@@ -69,12 +78,6 @@ func checkVaultHooks(sys *System, rep *Report, fix bool) {
 		return
 	}
 
-	// --fix on a present vault: the gate matters, so a missing tool is loud, not
-	// a skip (#549 acceptance).
-	if !sys.has("pre-commit") {
-		rep.Fail("pre-commit not on PATH — install it (e.g. `pipx install pre-commit`), then re-run `dotf doctor --fix`")
-		return
-	}
 	// `pre-commit install` resolves the git repo from its working directory, so it
 	// must run with cwd = vault (hence CommandOutputDir, not CommandOutput).
 	out, err := sys.CommandOutputDir(vault, "pre-commit", "install",

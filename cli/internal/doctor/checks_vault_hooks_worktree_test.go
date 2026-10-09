@@ -96,7 +96,9 @@ func commonHooksDir(t *testing.T, repo string) string {
 
 // realVaultSystem wires the real git/exec seams (realSystem) but overrides
 // VAULT_PATH to point at the fixture, without touching the process's actual
-// environment or other seams.
+// environment or other seams. pre-commit resolves whether or not this machine
+// has it: these tests are about where the hooks live, and the missing-binary
+// FAIL has its own test.
 func realVaultSystem(vault string) *System {
 	sys := realSystem()
 	sys.Getenv = func(k string) string {
@@ -104,6 +106,13 @@ func realVaultSystem(vault string) *System {
 			return vault
 		}
 		return os.Getenv(k)
+	}
+	realLookPath := sys.LookPath
+	sys.LookPath = func(n string) (string, error) {
+		if n == "pre-commit" {
+			return "/usr/bin/pre-commit", nil
+		}
+		return realLookPath(n)
 	}
 	return sys
 }

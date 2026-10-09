@@ -1,44 +1,13 @@
 #!/usr/bin/env bats
-# Tests for scripts/install-precommit.sh
+# The repo's own .pre-commit-config.yaml. No installer: the global dispatcher
+# (git-hooks/) hands every stage to `pre-commit hook-impl`, and `dotf tools
+# install pre-commit` puts the binary on the machine.
 
 # bats file_tags=os-sensitive
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-}
-
-@test "install-precommit.sh valid bash syntax" {
-    bash -n "$SCRIPTS_DIR/install-precommit.sh"
-}
-
-@test "install-precommit.sh valid zsh syntax" {
-    zsh -n "$SCRIPTS_DIR/install-precommit.sh"
-}
-
-@test "install-precommit.sh sources utils.sh" {
-    # Just verify it can parse and source without crashing
-    # (actual execution needs git repo context)
-    run bash -c 'source "$1/utils.sh" && echo "sourced"' -- "$SCRIPTS_DIR"
-    [[ "$output" == *"sourced"* ]] || false
-}
-
-@test "install-precommit.sh --help shows usage including --with-sdd-gate" {
-    run "$SCRIPTS_DIR/install-precommit.sh" --help
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"--with-sdd-gate"* ]] || false
-}
-
-@test "install-precommit.sh rejects unknown flag" {
-    run "$SCRIPTS_DIR/install-precommit.sh" --bogus
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"Unknown"* ]] || false
-}
-
-@test "install-precommit.sh includes pre-push hook-type when --with-sdd-gate set" {
-    # Static check: the conditional path includes the pre-push hook arg
-    grep -q 'WITH_SDD_GATE' "$SCRIPTS_DIR/install-precommit.sh"
-    grep -q '"pre-push"' "$SCRIPTS_DIR/install-precommit.sh"
 }
 
 @test ".pre-commit-config.yaml declares sdd-spec-gate pre-push hook" {

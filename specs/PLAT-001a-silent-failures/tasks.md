@@ -128,6 +128,22 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] Runbook: the DR restore step was GNU-only (`install -D`); it is now `mkdir -p` plus
   `install -m 600`, which macOS has too, and says doctor catches a wrong mode
 
+## #2183 — the vault secret gate was off while doctor said it was active
+
+- [x] Failing test first: `TestVaultHooks_GateViaDispatcherWithoutPreCommit_Fails`. The fixture
+  is the measured shape: dispatcher wired, config present, no pre-commit on PATH. Before the fix
+  it reported "gitleaks gate active"
+- [x] `checkVaultHooks` FAILs in check mode when pre-commit is absent, before probing the stages.
+  The real-git worktree tests pin pre-commit as present, so they stay about hook layout
+- [x] The dispatcher fails closed on pre-commit, pre-push and commit-msg when a repo declares a
+  config and pre-commit is missing. It stays a no-op on stages that cannot block, and it finds
+  pre-commit in uv's tool bin dir when PATH lacks it (GUI launchers)
+- [x] `pre-commit` 4.6.2 is a `uv-tool` entry in `packages.json` on every OS. Installed on the Mac
+  with `dotf tools install pre-commit`; the second run skips
+- [x] `scripts/install-precommit.sh` deleted. `pre-commit install` refuses under `core.hooksPath`
+  (measured), so the script could not work on a provisioned machine, and nothing called it. Its
+  config assertions moved to `tests/precommit-config.bats`
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
