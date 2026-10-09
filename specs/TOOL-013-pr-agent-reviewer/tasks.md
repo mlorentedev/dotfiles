@@ -28,21 +28,23 @@ created: "2026-08-16"
 - [x] [AC4] Declare `NAN_API_KEY` as a CI consumer of this repo, so
       `dotf secrets sync ci` delivers exactly that key and no other
 - [x] 11 bats cases asserting the DECISIONS rather than the syntax
-- [ ] [AC1] **Empirical acceptance: open a PR carrying a known defect and confirm
+- [x] [AC1] **Empirical acceptance: open a PR carrying a known defect and confirm
       the reviewer finds it.** Cannot run before merge — the workflow is not on
       the default branch yet. This is the real test and no fixture substitutes
-      for it
+      for it. Met by defects nobody planted, which is the stronger form: see
+      `verification.md`, "Evidence for the archive" (#2039, #2211)
 
 ## Blocked, and not by anything in this change
 
-- [ ] Deliver the key: `dotf secrets sync ci`. **Blocked by #983** — the command
+- [x] Deliver the key: `dotf secrets sync ci`. **Blocked by #983** (closed; AI-045 `tasks.md` records the
+      sync delivering CI keys on 2026-10-08, and every NaN review since authenticates with it) — the command
       refuses the whole batch when any entry fails its liveness check, and
       `BITACORA_PAT` is a dead token (HTTP 401). Until that is resolved, or the
       operator passes `--skip-verify`, `NAN_API_KEY` cannot reach GitHub Actions
       secrets and the workflow authenticates with an empty string. Worth noting
       as a shape, not just an instance: one dead credential blocks delivery of
       every other, which is #1004's batch-abort defect in a second command
-- [ ] Verify the registry change end to end. **Blocked by #939** — `dotf`
+- [x] Verify the registry change end to end. **Blocked by #939** (closed) — `dotf`
       resolves `DOTFILES_REPO_DIR` ahead of the cwd, so `secrets sync ci` reads
       the registry in the main checkout, not this worktree
 
@@ -53,8 +55,8 @@ created: "2026-08-16"
 - [x] Every acceptance criterion has a matching entry in `features.json`
 - [x] Config and workflow parse (`tomllib`, `yaml.safe_load`)
 - [x] Tests pass (`bats tests/pr-agent-config.bats` — 11/11)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
 
 ## Follow-on, after the first production runs (#1044)

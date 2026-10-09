@@ -40,11 +40,39 @@ created: "2026-08-16"
   of copying the Action version into the gate. The workflow at
   `github.workflow_sha` supplies the effective runtime pin.
 
+## Evidence for the archive (2026-10-09)
+
+Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0 there.
+
+- AC1: the reviewer finds real defects on live PRs, through NaN. On #2039 (DOCS-020) a PR-Agent round
+  found two, both applied: a numbering-prefix rule that stripped `3-` from `3-2-1 backup rule`, and an
+  index left stale when its directory emptied (DOCS-020 `verification.md`). On #2211, run 37887978561
+  reviewed with `openai/mimo-v2.6-flash` and raised three findings; one was applied in `17553abc`
+  ([triage](https://github.com/mlorentedev/dotfiles/pull/2211#issuecomment-6074931691)). The
+  findings arrive as one review comment that links each file and line, not as inline diff comments:
+  #1107 turned `auto_improve` off, the only pass that posts inline, to halve NaN demand per PR; the
+  decision and its measurement are in `pr-agent.yml`. `/improve` still posts inline on demand.
+- AC2: `.pr_agent.toml` names `mimo-v2.6-flash` with `deepseek-v4-flash` as fallback; `qwen3.6` is
+  `model_weak`, which the review never uses.
+- AC3: `ignore.glob` keeps `sensitive/**` out of the call (f3).
+- AC4: holds on `main`: the workflow reads one inference secret, `NAN_API_KEY`, and its step fails
+  naming the remedy when that secret is absent (`pr-agent.yml`, `HAS_NAN_API_KEY`). AI-045 (#2188,
+  held for the owner's billing review) adds a second credential on purpose and records the reversal.
+- AC5, AC8: the #2010 evidence above stands; the pin is v0.47.0.
+- AC6: live, both halves. Run 37736957032 (#2174, NaN timed out): the step "Fail if no review was
+  published" failed the job. Run 37888015495 (#2211, before the review published):
+  `review-attestation` reported `[FAIL] pending` on the PR head.
+- AC7: `repo_context_files = ["AGENTS.md", ".claude/CLAUDE.md"]` (f7).
+- AC9: holds on `main`: one Action, `fail_on_tool_errors`, the fallback inside its attempt. AI-045
+  (#2188) adds an attempt on a second provider by recorded decision.
+- Blocked tasks: #983 and #939 are both closed.
+- No earlier `review.md` exists for this spec, in git history or in the Linux worktrees.
+
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons.md`? no: the operational update procedure is in `docs/runbooks/guide-pr-agent-reviewer.md`.
-- [ ] ADR-worthy decision for the repo's `docs/adr/`? no: the review-bounding decision remains ADR-040.
-- [ ] New pattern candidate for `00_meta/patterns/`? no: this is a repository-specific dependency contract.
+- [x] Lesson for the repo's `docs/lessons.md`? no: the operational update procedure is in `docs/runbooks/guide-pr-agent-reviewer.md`.
+- [x] ADR-worthy decision for the repo's `docs/adr/`? no: the review-bounding decision remains ADR-040.
+- [x] New pattern candidate for `00_meta/patterns/`? no: this is a repository-specific dependency contract.
 
 ## Archive checklist
 
