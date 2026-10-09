@@ -91,18 +91,10 @@ utils() {
         g == 1 && /^(else|fi)$/ { g = 0 }
         /^[[:space:]]*#/ || /log_(warning|info)/ { next }
         /linux-amd64|x86_64-unknown-linux|linux\.x86_64|linux_amd64/ && g != 1 { print NR": "$0 }
-        END { if (gates < 2) print "only " gates + 0 " gate(s) found" }
+        END { if (gates < 1) print "no gate found" }
     ' "$REPO/setup-linux.sh"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
-}
-
-@test "setup-linux.sh: age is reported installed only after the placed binary runs" {
-    grep -qF '&& "$HOME/.local/bin/age" --version >/dev/null 2>&1; then' "$REPO/setup-linux.sh"
-    # A failed post-condition removes the copies, or the next run's command -v
-    # fast path would log "age already installed" for a binary that cannot run.
-    awk '/age installation failed/ { print prev } { prev = $0 }' "$REPO/setup-linux.sh" \
-        | grep -qF 'rm -f "$HOME/.local/bin/age" "$HOME/.local/bin/age-keygen"'
 }
 
 @test "aliases.zsh: ls stays the system ls when eza is absent, and is eza when present" {

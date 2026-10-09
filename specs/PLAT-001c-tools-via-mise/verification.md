@@ -32,7 +32,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (H4a, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues. Tests: `TestDeploy_TOMLMergeKeepsWhatTheToolWrote`, `TestDeploy_TOMLMergeIsInSyncAfterTheToolReformatsIt`, `TestDeploy_TOMLMergeCreatesAnAbsentDestination`, `TestDeploy_TOMLMergeRefusesADestinationItCannotRead`, `TestParseManifest_RefusesPathsOnATOMLSource`; the JSON merge tests are unchanged and pass
 - Mutation run (H4a): reading a `.toml` destination as JSON fails all five TOML tests
 - W2c on macOS arm64: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` ok; golangci-lint 0 issues. `go run ./cmd/dotf doctor` from the worktree warns about 5 files: `~/.local/bin/{bats,direnv,uv,uvx,zoxide}`. `mise bin-paths --bin-names uv@0.12.18 age@1.3.1` lists `uvx` and `age-keygen` as well (mise 2026.10.3)
+- Test suite (W2 second half, macOS arm64): every bats file that references `setup-linux.sh` (37 files, 751 tests) -> ok after updating the two `setup-windows.bats` parity tests to read the mise mark; `tests/verify-setup.bats` skips outside the container, so the integration job is its evidence; shellcheck on `setup-linux.sh` -> no warnings or errors; `bash -n` and `zsh -n` -> ok
 - Test suite (P5a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=darwin` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues
+
+- Test suite (P5b first half, macOS arm64): `go test ./internal/tools/ ./internal/doctor/` -> ok (the catalog loads with the nine system entries); `bats tests/setup-linux.bats` -> all ok, with tests 28-29 replaced (they pinned the hand-written tmux hint the catalog replaced)
+- Manual run (P5b, the Mac, unreleased build from the worktree): `dotf tools install --dry-run` -> gh, git-lfs, parallel and zoxide `present/skip`, tmux, wget and eza `absent/install`, xclip `unsupported (not installed on darwin by this catalog)`. Then `dotf tools install tmux`, `wget`, `eza` -> `installed via brew` each, exit 0; a second dry-run -> all three `present/skip`
+- Manual run (#2202, the Mac): `dotf tools install bash` -> `installed via brew (bash)`, second plan `present/skip`; in a login zsh `command -v bash` -> `/opt/homebrew/bin/bash` and `env bash` -> 5.3.20, while `/bin/bash` stays 3.2.57; `tests/bash32-portable.bats` passes under both, the 3.2 run through `PATH="/bin:$PATH" ./scripts/run-bats.sh --expect-bash 3`
 
 ## Decisions made during implementation
 

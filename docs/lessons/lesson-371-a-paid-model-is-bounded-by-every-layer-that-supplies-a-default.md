@@ -1,5 +1,5 @@
 ---
-id: "lesson-367-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default"
+id: "lesson-371-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default"
 type: lesson
 status: active
 title: "A paid model is bounded by every layer that supplies a default"

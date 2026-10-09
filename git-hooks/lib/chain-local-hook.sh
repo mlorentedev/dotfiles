@@ -32,9 +32,16 @@
 #
 # Both paths are `exec` on purpose — that is what makes stdin reach the child and
 # its exit status become the hook's, and the exit status is the whole feature.
-# A clean no-op (exit 0) when neither a local hook nor pre-commit is available:
-# this dispatcher is wired machine-wide, so failing closed would break `git
-# commit` in every unrelated repo on the box.
+# A repo with no local hook and no .pre-commit-config.yaml is a clean no-op:
+# this dispatcher is wired machine-wide, and most repos on a box declare no gate.
+# A repo that DOES declare one fails closed on the stages that can block
+# (pre-commit, pre-push, commit-msg) when pre-commit is missing. A no-op there
+# was a silent bypass: on a Mac without pre-commit, every vault commit and push
+# skipped gitleaks while `dotf doctor` reported the gate active (2026-10-08).
+#
+# pre-commit is looked up on PATH, then in uv's tool bin dir, where `dotf tools`
+# installs it. GUI launchers do not read the shell rc: obsidian-git commits the
+# vault under launchd's PATH, which has no ~/.local/bin.
 
 set -u
 
@@ -99,12 +106,33 @@ local_hook="$common_dir/hooks/$hook_type"
 [ -x "$local_hook" ] && exec "$local_hook" "$@"
 
 pre_commit_config="$toplevel/.pre-commit-config.yaml"
-if [ -f "$pre_commit_config" ] && command -v pre-commit >/dev/null 2>&1; then
-    exec pre-commit hook-impl \
+[ -f "$pre_commit_config" ] || exit 0
+
+# uv's documented order for its tool executables: UV_TOOL_BIN_DIR, then
+# XDG_BIN_HOME, then ~/.local/bin.
+pre_commit="$(command -v pre-commit 2>/dev/null)"
+if [ -z "$pre_commit" ]; then
+    uv_bin="${UV_TOOL_BIN_DIR:-${XDG_BIN_HOME:-$HOME/.local/bin}}"
+    # pre-commit.exe on Windows, the name doctor looks for there too.
+    for candidate in "$uv_bin/pre-commit" "$uv_bin/pre-commit.exe"; do
+        if [ -x "$candidate" ]; then pre_commit="$candidate"; break; fi
+    done
+fi
+if [ -n "$pre_commit" ]; then
+    exec "$pre_commit" hook-impl \
         --config "$pre_commit_config" \
         --hook-type "$hook_type" \
         --hook-dir "$common_dir/hooks" \
         -- "$@"
 fi
 
+case "$hook_type" in
+    pre-commit|pre-push|commit-msg)
+        printf '%s\n' \
+            "$hook_type: $toplevel declares .pre-commit-config.yaml, but pre-commit is not installed, so its gates (gitleaks among them) cannot run." \
+            "Install it with: dotf tools install pre-commit" \
+            "To skip the gates once, deliberately: --no-verify" >&2
+        exit 1
+        ;;
+esac
 exit 0
