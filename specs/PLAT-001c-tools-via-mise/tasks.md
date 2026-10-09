@@ -120,6 +120,16 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 - [x] Why: mise is pinned in `packages.json` and installed by `dotf tools install`. Its notice, `mise version 2026.10.4 available / To update, run mise self-update`, printed on stderr in a `mise bin-paths` call on the Mac (2026-10-08), points the user past that pin
 - [x] Measured: mise 2026.10.3 reads the setting from a `conf.d` file (`MISE_CONFIG_DIR=<tmp> mise settings get disable_update_warning` gives `true`; the live config gives `false`)
 
+### W2c — doctor reports the copies in `~/.local/bin` that shadow mise's
+
+The installers W2 deletes left copies on every machine they ran on. Measured on the Mac (2026-10-08): `bats`, `direnv`, `zoxide`, `uv` and `uvx` sit in `~/.local/bin` beside mise's pinned ones.
+
+- [x] Failing tests first: a regular file named like an executable mise provides warns and names it (a companion such as `age-keygen` counts); `--fix` removes it, keeps a symlink and a file mise does not provide, and a second run is clean; nothing is touched while a pin does not run through mise; a failing `mise bin-paths` warns naming the command
+- [x] `checkMiseTools` asks mise what each pin provides (`mise bin-paths --bin-names name@version`), not the pin's name, because uv brings uvx and age brings age-keygen
+- [x] The check runs only after every pin is proven at its pin through mise: that is what makes removing a copy safe. It is a WARN, never a FAIL. Owner decision: `dotf doctor --fix` removes the copies
+- [x] Mutation-checked: dropping the symlink exemption, or running the check before the pins are verified, turns tests red
+- [x] Runbook: `docs/runbooks/tool-installation.md` says where the copies come from and how `--fix` treats them
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
