@@ -86,11 +86,13 @@ setup() {
 # live run. An older Claude model that needs budget thinking must say so here.
 @test "every reasoning model on the Anthropic Messages API declares adaptive thinking" {
     command -v jq >/dev/null || skip "jq not available"
-    bad="$(jq -r '.providers | to_entries[] | .value as $p | ($p.models // [])[]
-        | select((.api // $p.api) == "anthropic-messages" and .reasoning == true)
-        | select(.compat.forceAdaptiveThinking != true) | .id' "$PI_MODELS")"
+    # One filter feeds both checks, so the non-empty guard counts exactly the set
+    # the flag is asserted on: a renamed `reasoning` or `api` empties it and fails.
+    local set='[.providers[] | . as $p | (.models // [])[]
+        | select((.api // $p.api) == "anthropic-messages" and .reasoning == true)]'
+    [ "$(jq "$set | length" "$PI_MODELS")" -gt 0 ] || { echo "no Anthropic reasoning model found: the filter matches nothing"; return 1; }
+    bad="$(jq -r "$set | .[] | select(.compat.forceAdaptiveThinking != true) | .id" "$PI_MODELS")"
     [ -z "$bad" ] || { echo "Anthropic reasoning models without compat.forceAdaptiveThinking: $bad"; return 1; }
-    [ "$(jq '[.providers[] | (.models // [])[] | select(.api == "anthropic-messages")] | length' "$PI_MODELS")" -gt 0 ]
 }
 
 @test "ai/pi/models.json is valid JSON" {
