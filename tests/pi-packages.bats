@@ -131,7 +131,8 @@ linux_pi_fallback_present() {
          pi && /_dotf="\$HOME\/\.local\/bin\/dotf"/ { next }
          { print }' "$SETUP_SH" > "$mutant"
     grep -qF '[ -x "$HOME/.local/bin/dotf" ]' "$mutant"
-    ! linux_pi_fallback_present "$mutant"
+    run linux_pi_fallback_present "$mutant"
+    [ "$status" -ne 0 ]
 }
 
 @test "pi packages: neither twin carries the reconcile loop any more" {
