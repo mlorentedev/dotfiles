@@ -31,6 +31,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - No regressions: yes. `TestInstall_UnsupportedOS` asserted the opposite of AC3 (an error for a missing asset) and is replaced by the AC3 test
 - Test suite (H4a, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues. Tests: `TestDeploy_TOMLMergeKeepsWhatTheToolWrote`, `TestDeploy_TOMLMergeIsInSyncAfterTheToolReformatsIt`, `TestDeploy_TOMLMergeCreatesAnAbsentDestination`, `TestDeploy_TOMLMergeRefusesADestinationItCannotRead`, `TestParseManifest_RefusesPathsOnATOMLSource`; the JSON merge tests are unchanged and pass
 - Mutation run (H4a): reading a `.toml` destination as JSON fails all five TOML tests
+- W2c on macOS arm64: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` ok; golangci-lint 0 issues. `go run ./cmd/dotf doctor` from the worktree warns about 5 files: `~/.local/bin/{bats,direnv,uv,uvx,zoxide}`. `mise bin-paths --bin-names uv@0.12.18 age@1.3.1` lists `uvx` and `age-keygen` as well (mise 2026.10.3)
 - Test suite (P5a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=darwin` vet, `go test ./...` -> ok; golangci-lint (2.12.2, the pin) -> 0 issues
 
 ## Decisions made during implementation

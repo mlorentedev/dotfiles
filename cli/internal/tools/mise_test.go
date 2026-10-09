@@ -180,6 +180,23 @@ func TestMiseConfigDir_FollowsMiseOwnResolution(t *testing.T) {
 	}
 }
 
+func TestMiseShimsDir_FollowsMiseOwnResolution(t *testing.T) {
+	home := filepath.FromSlash("/home/u")
+	cases := []struct {
+		env  map[string]string
+		want string
+	}{
+		{map[string]string{"MISE_DATA_DIR": "/d/mise", "XDG_DATA_HOME": "/xdg"}, filepath.Join("/d/mise", "shims")},
+		{map[string]string{"XDG_DATA_HOME": "/xdg"}, filepath.Join("/xdg", "mise", "shims")},
+		{map[string]string{}, filepath.Join(home, ".local", "share", "mise", "shims")},
+	}
+	for _, tc := range cases {
+		if got := MiseShimsDir(home, func(k string) string { return tc.env[k] }); got != tc.want {
+			t.Errorf("%v: got %q, want %q", tc.env, got, tc.want)
+		}
+	}
+}
+
 func TestParseMiseTools_RejectsAFileWithNoMarkers(t *testing.T) {
 	if _, err := ParseMiseTools([]byte("GO_VERSION=1.26.0\nAGE_VERSION=1.3.1\n")); err == nil || !strings.Contains(err.Error(), "nothing to sync") {
 		t.Fatalf("want an error for a versions.conf with no markers, got %v", err)

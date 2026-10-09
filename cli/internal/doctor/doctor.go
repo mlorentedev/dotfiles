@@ -94,7 +94,7 @@ func Run(opts Options) (int, error) {
 		checkProfileFiles(sys, contract, rep, opts.Fix)
 		checkToolHomeEnvVars(sys, rep)
 		checkOptionalTools(sys, cfg, contract, rep)
-		checkMiseTools(sys, cfg, rep)
+		checkMiseTools(sys, cfg, rep, opts.Fix)
 		checkVault(sys, rep)
 		checkVaultHooks(sys, rep, opts.Fix)
 		checkAutoMemoryLink(sys, start, rep, opts.Fix)
