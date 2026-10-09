@@ -69,7 +69,10 @@ func checkSecretsTooling(sys *System, cfg *Config, rep *Report) {
 		rep.Warn("age identity key missing at " + keyPath + " — restore from offline backup (recover runbook)")
 		return
 	}
-	rep.Pass("age identity key present (" + keyPath + ")")
+	// Presence only: the declared mode is held by [Secrets integrity], through
+	// the same predicate `dotf secrets verify` uses (#2203). Saying more here
+	// would be a second, weaker verdict on the same file (lesson 368).
+	rep.Pass("age identity key present (" + keyPath + "; its mode is checked under Secrets integrity)")
 
 	// Round-trip guard: proving the key decrypts needs both `age` (encrypt/decrypt)
 	// and `age-keygen` (derive the recipient). age absent already FAILed above; if

@@ -123,6 +123,8 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   `--fix` sets 0600 and a second run is clean
 - [x] `secrets.CheckFileAuthorityMode` and `RepairFileAuthorityMode` share `checkKeyMode` with
   `verify`, so doctor and verify cannot disagree again; on Windows both are no-ops (no POSIX bits)
+- [x] Review triage: the `[Secrets tooling]` line said `age identity key present` as a PASS next to
+  the new FAIL. It now says it checks presence only and points to `[Secrets integrity]` for the mode
 - [x] Runbook: the DR restore step was GNU-only (`install -D`); it is now `mkdir -p` plus
   `install -m 600`, which macOS has too, and says doctor catches a wrong mode
 
