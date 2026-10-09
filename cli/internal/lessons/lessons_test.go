@@ -175,6 +175,31 @@ func TestPlan_RefusesANumberUsedTwice(t *testing.T) {
 	}
 }
 
+// A renumbering moves a file and leaves its inbound wikilinks behind (#1514:
+// renumbering lesson-256 to 271 left lesson-264's link pointing at nothing).
+// Both forms in use resolve: a number names a lesson, a full stem names a file,
+// across categories.
+func TestPlan_RefusesAWikilinkThatNamesNoLesson(t *testing.T) {
+	linking := "---\ntitle: \"Links\"\ndate: \"2026-10-05\"\n---\n\n# Links\n\n" +
+		"See [[lesson-002]], [[lesson-003-c]] and [[lesson-009-gone]].\n"
+	dir := writeTree(t, map[string]string{
+		"_index.md":                "# Index\n",
+		"lesson-001-a.md":          linking,
+		"lesson-002-b.md":          shapes["recent"],
+		"category/_index.md":       "# Category\n",
+		"category/lesson-003-c.md": shapes["recent"],
+	})
+	_, err := Plan(dir)
+	if err == nil || !strings.Contains(err.Error(), "lesson-001-a.md links [[lesson-009-gone]]") {
+		t.Fatalf("want the dangling wikilink named with its file, got %v", err)
+	}
+	for _, ok := range []string{"[[lesson-002]]", "[[lesson-003-c]]"} {
+		if strings.Contains(err.Error(), ok) {
+			t.Errorf("%s resolves and was reported: %v", ok, err)
+		}
+	}
+}
+
 func TestPlan_RefusesLessonsWithoutAnIndex(t *testing.T) {
 	dir := writeTree(t, map[string]string{"lesson-001-a.md": shapes["recent"]})
 	if _, err := Plan(dir); err == nil {

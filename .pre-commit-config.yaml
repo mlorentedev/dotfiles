@@ -59,10 +59,15 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-      - id: check-lessons
-        name: Check docs/lessons numbering and index
-        entry: scripts/check-lessons.sh
-        language: script
+      # DOCS-020: the lessons' one format, numbers used once, wikilinks that
+      # resolve, and an index generated from the files. Same command as CI's
+      # repo-hygiene job, which runs it from the checkout; here it is the
+      # installed dotf (DOTF_VERSION in versions.conf). A host without dotf
+      # fails this hook rather than skipping it.
+      - id: lessons-fmt
+        name: Check docs/lessons format and generated index
+        entry: dotf lessons fmt --check --dir docs/lessons
+        language: system
         pass_filenames: false
         files: ^docs/lessons/
         stages: [pre-commit]
