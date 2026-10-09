@@ -591,6 +591,7 @@ jobs:
           # The only inference credential this step holds; NaN's is not here.
           ANTHROPIC__KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
           CONFIG__MODEL: anthropic/claude-haiku-5-5
+          CONFIG__MODEL_WEAK: anthropic/claude-haiku-5-5
           CONFIG__FALLBACK_MODELS: "[]"
           CONFIG__MAX_MODEL_TOKENS: "70000"
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "70000"

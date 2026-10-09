@@ -1042,6 +1042,12 @@ print(int(e['CONFIG__MAX_MODEL_TOKENS']) * 1.3 < 100000, e['CONFIG__MAX_MODEL_TO
 print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'])
 # Effort travels as nothing, which on Haiku 5.5 is medium; no thinking switch either.
 print(sorted(k for k in e if 'EFFORT' in k.upper() or 'THINKING' in k.upper()))
+# Every model id .pr_agent.toml pins (model, model_weak, any later one) is a NaN
+# id. Each needs its own override here, or a call to it leaves Haiku for NaN.
+import tomllib
+cfg = tomllib.load(open('$REPO/.pr_agent.toml', 'rb'))['config']
+pinned = sorted(k for k, v in cfg.items() if k.startswith('model') and isinstance(v, str) and '/' in v)
+print(pinned, all(e.get('CONFIG__' + k.upper()) == model for k in pinned))
 "
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "anthropic/claude-haiku-5-5" ]
@@ -1051,6 +1057,7 @@ print(sorted(k for k in e if 'EFFORT' in k.upper() or 'THINKING' in k.upper()))
     [ "${lines[4]}" = "True True" ]
     [ "${lines[5]}" = "16000" ]
     [ "${lines[6]}" = "[]" ]
+    [ "${lines[7]}" = "['model', 'model_weak'] True" ]
 }
 
 # The fallback reviews what the NaN attempt would have: same action, same pin,
