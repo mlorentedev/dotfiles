@@ -76,8 +76,8 @@ const (
 // exists to rule out.
 var FallbackReasons = []string{"rate-limit", "quota", "provider-error", "timeout", "content-filter", "empty-answer"}
 
-// signs is the entry's declared signature role; an absent one means first.
-func (e ReviewerEntry) signs() string {
+// SignatureRole is the entry's declared signature role; an absent one means first.
+func (e ReviewerEntry) SignatureRole() string {
 	if s := strings.TrimSpace(e.Signs); s != "" {
 		return s
 	}
@@ -120,7 +120,7 @@ func (e ReviewerEntry) vendor() string {
 // validateSigns is the pool-load check of each entry's `signs`: a known value,
 // and never `first` for an Anthropic model.
 func validateSigns(e ReviewerEntry) error {
-	switch e.signs() {
+	switch e.SignatureRole() {
 	case SignsFirst:
 		if e.IsAnthropic() {
 			return fmt.Errorf("pool entry %q is an Anthropic model that would sign first, and an Anthropic model never signs a review alone\n"+
@@ -196,7 +196,7 @@ func ChooseReviewer(entries []ReviewerEntry, c ReviewerChoice, draw func(n int) 
 // fallback reason the draw is among the fallbacks only: the reason says the
 // first signers already failed.
 func ineligible(e ReviewerEntry, slot ReviewSlot, reason, firstVendor string) string {
-	signs := e.signs()
+	signs := e.SignatureRole()
 	if slot.Name == SecondSigner.Name {
 		if signs != SignsSecond {
 			return fmt.Sprintf("it signs %s, and only a `signs: second` member gives the second signature", signs)
@@ -277,7 +277,7 @@ func checkSigners(repoRoot, specDir string, first Review, second *Review) error 
 	if !ok {
 		return nil
 	}
-	switch firstEntry.signs() {
+	switch firstEntry.SignatureRole() {
 	case SignsSecond:
 		return fmt.Errorf("%s is signed by %q, which only gives a second signature: a first signer of another vendor must review first\n"+
 			"run `dotf spec review %s` and let it draw a first signer",
@@ -297,7 +297,7 @@ func checkSigners(repoRoot, specDir string, first Review, second *Review) error 
 	if !ok {
 		return nil
 	}
-	if secondEntry.signs() != SignsSecond {
+	if secondEntry.SignatureRole() != SignsSecond {
 		return fmt.Errorf("%s is signed by %q, which does not declare `signs: second`", SecondSigner.Review, second.Reviewer)
 	}
 	if secondEntry.vendor() == firstEntry.vendor() {

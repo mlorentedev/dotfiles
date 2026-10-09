@@ -867,7 +867,7 @@ steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 co = next(s for s in steps if 'checkout' in s.get('uses', ''))
 print(co['with']['sparse-checkout'].split())
 "
-    [ "$output" = "['scripts/pr-agent-push-gate.sh', 'scripts/pr-agent-model-preflight.sh', 'scripts/pr-agent-route.sh', 'scripts/pr-agent-publish-guard.sh']" ]
+    [ "$output" = "['harness/reviewer-pool.json', 'scripts/pr-agent-push-gate.sh', 'scripts/pr-agent-model-preflight.sh', 'scripts/pr-agent-route.sh', 'scripts/pr-agent-publish-guard.sh']" ]
 }
 
 @test "pr-agent: below the push gate's threshold, neither PR-Agent nor the guard runs" {
@@ -1087,59 +1087,98 @@ print(after == 3 and job['timeout-minutes'] >= pair + probes + 3 + after, job['t
 }
 
 # AI-045 AC9 (#1923): what the key outside NaN may spend. The Claude Console
-# cannot restrict a key to a model, so the allowlist is the workflow, and this
-# test is what makes it a rule rather than a line anyone can edit.
-@test "pr-agent: the Anthropic attempts run one pinned model with bounded input and output" {
+# cannot restrict a key to a model, so the allowlist is ALLOWED_ANTHROPIC in
+# scripts/pr-agent-route.sh, and this test is what makes it a rule rather than a
+# line anyone can edit: every allowed model needs a price row below, and its
+# worst review under the caps must stay under that row's ceiling.
+@test "pr-agent: the Anthropic attempts run the routed model, allowlisted, with bounded input and output" {
     run python3 -c "
-import json, yaml
+import json, re, yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 by = {s.get('id'): s for s in steps}
 a1, a2 = by['pr_agent_anthropic_first'], by['pr_agent_anthropic_second']
 e = a1['env']
-model = e['CONFIG__MODEL']
-print(model)
+routed = '\${{ steps.route.outputs.anthropic_model }}'
+# The model and its effort are the route's outputs, never a literal.
+print(e['CONFIG__MODEL'] == e['CONFIG__MODEL_WEAK'] == routed,
+      e['CONFIG__REASONING_EFFORT'] == '\${{ steps.route.outputs.anthropic_effort }}')
 # Both copies are one attempt: identical in every key and the action pin.
 print(a1['env'] == a2['env'] and a1['uses'] == a2['uses'] and a1['timeout-minutes'] == a2['timeout-minutes'])
-# The pool's member, the one the draw probes, is the model these steps run.
-print(by['route']['env']['ANTHROPIC_MODEL'] == model)
+# The allowlist, read from the script that enforces it.
+m = re.search(r'^ALLOWED_ANTHROPIC=\"([^\"]*)\"$', open('$REPO/scripts/pr-agent-route.sh').read(), re.M)
+allowed = m.group(1).split()
+print(allowed)
+# Every Anthropic model the pool gives PR-Agent is allowed, with a known effort.
+pool = json.load(open('$REPO/harness/reviewer-pool.json'))['pool']
+ant = [p['pr_agent'] for p in pool if p.get('pr_agent', {}).get('model', '').startswith('anthropic/')]
+print(all(a['model'] in allowed and a.get('reasoning_effort', 'medium') in ('low', 'medium', 'high') for a in ant))
 print(json.loads(e['CONFIG__FALLBACK_MODELS']))
-print(model in json.loads(e['CONFIG__NO_TEMPERATURE_MODELS']))
+# Temperature is never sent and adaptive thinking reaches every allowed model:
+# PR-Agent's built-in pattern matches neither id.
+nt = json.loads(e['CONFIG__NO_TEMPERATURE_MODELS'])
+print(all(a in nt and a.split('/', 1)[1] in nt for a in allowed),
+      sorted(json.loads(e['CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE'])) == sorted(allowed),
+      e['CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING'])
 # The prompt cap equals the NaN attempt's, so every pool member reviews the same
 # diff (the owner chose parity over Haiku's 100,000-token price step, 2026-10-08).
 nan = by['pr_agent']['env']
 print(e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'] == nan['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
 # LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short.
 print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'])
-# The worst review the caps allow, at the prices above 100,000 prompt tokens
-# ($0.50 in, $2.50 out per million) with Claude's tokenizer ~30% larger, stays
-# under $0.25. Raising either cap past that fails here, on purpose.
-worst = int(e['CONFIG__MAX_MODEL_TOKENS']) * 1.3 * 0.50e-6 + int(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']) * 2.50e-6
-print(worst < 0.25)
-# Adaptive thinking at high effort. PR-Agent's built-in pattern does not match
-# Haiku, so the override must name exactly this model or nothing is sent.
-print(e['CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING'], json.loads(e['CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE']) == [model], e['CONFIG__REASONING_EFFORT'])
+# The worst review the caps allow, per allowed model, at its highest prices per
+# million tokens (in, out) with Claude's tokenizer ~30% larger, stays under the
+# ceiling. Haiku 5.5: its rates above 100,000 prompt tokens. Sonnet 5.5: no
+# price step. A model without a row, or a cap raised past a ceiling, fails here.
+prices = {'anthropic/claude-haiku-5-5': (0.50, 2.50, 0.25),
+          'anthropic/claude-sonnet-5-5': (2.00, 10.00, 1.00)}
+def worst(model):
+    i, o, _ = prices[model]
+    return int(e['CONFIG__MAX_MODEL_TOKENS']) * 1.3 * i * 1e-6 + int(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']) * o * 1e-6
+print(all(a in prices and worst(a) < prices[a][2] for a in allowed))
 # The call is not streamed, so ai_timeout bounds the whole answer; it must end
 # inside the step, or the step's kill would hide PR-Agent's own timeout.
 print(int(e['CONFIG__AI_TIMEOUT']) < a1['timeout-minutes'] * 60)
 # Every model id .pr_agent.toml pins (model, model_weak, any later one) is a NaN
-# id. Each needs its own override here, or a call to it leaves Haiku for NaN.
+# id. Each needs its own override here, or a call to it leaves Anthropic for NaN.
 import tomllib
 cfg = tomllib.load(open('$REPO/.pr_agent.toml', 'rb'))['config']
 pinned = sorted(k for k, v in cfg.items() if k.startswith('model') and isinstance(v, str) and '/' in v)
-print(pinned, all(e.get('CONFIG__' + k.upper()) == model for k in pinned))
+print(pinned, all(e.get('CONFIG__' + k.upper()) == routed for k in pinned))
+# The guard names the model each Anthropic attempt ran, from the same output.
+guard = next(s for s in steps if s.get('run', '').strip() == './scripts/pr-agent-publish-guard.sh')
+lines = guard['env']['ATTEMPTS'].strip().splitlines()
+print(lines[0].endswith(routed) and lines[2].endswith(routed))
 "
-    [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "anthropic/claude-haiku-5-5" ]
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    [ "${lines[0]}" = "True True" ]
     [ "${lines[1]}" = "True" ]
-    [ "${lines[2]}" = "True" ]
-    [ "${lines[3]}" = "[]" ]
-    [ "${lines[4]}" = "True" ]
-    [ "${lines[5]}" = "True" ]
-    [ "${lines[6]}" = "32000" ]
-    [ "${lines[7]}" = "True" ]
-    [ "${lines[8]}" = "true True high" ]
+    [ "${lines[2]}" = "['anthropic/claude-haiku-5-5', 'anthropic/claude-sonnet-5-5']" ]
+    [ "${lines[3]}" = "True" ]
+    [ "${lines[4]}" = "[]" ]
+    [ "${lines[5]}" = "True True true" ]
+    [ "${lines[6]}" = "True" ]
+    [ "${lines[7]}" = "32000" ]
+    [ "${lines[8]}" = "True" ]
     [ "${lines[9]}" = "True" ]
     [ "${lines[10]}" = "['model', 'model_weak'] True" ]
+    [ "${lines[11]}" = "True" ]
+}
+
+# The pool and the preflight name one NaN chain: a member the pool weighs but the
+# preflight never probes would never be in the draw, and a model the preflight
+# probes with no pool entry would never be drawn first.
+@test "pr-agent: the pool's NaN members for PR-Agent are exactly the chain the preflight probes" {
+    run python3 -c "
+import json, yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+e = next(s for s in steps if s.get('id') == 'models')['env']
+declared = [e['DECLARED_MODEL']] + json.loads(e['DECLARED_FALLBACK_MODELS'])
+pool = json.load(open('$REPO/harness/reviewer-pool.json'))['pool']
+nan = [p['pr_agent']['model'] for p in pool if p.get('pr_agent', {}).get('model', '').startswith('openai/')]
+print(sorted(nan) == sorted(declared), sorted(nan))
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    [[ "$output" == "True "* ]] || { echo "$output" >&2; false; }
 }
 
 # The fallback reviews what the NaN attempt would have: same action, same pin,
@@ -1150,13 +1189,14 @@ import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 pa = [s for s in steps if 'pr-agent' in s.get('uses', '')]
 pick = lambda s: {k: v for k, v in s['env'].items()
-                  if k.startswith('github_action_config.') or k == 'CONFIG__PUBLISH_OUTPUT_PROGRESS'}
+                  if k.startswith('github_action_config.')
+                  or k in ('CONFIG__PUBLISH_OUTPUT_PROGRESS', 'CONFIG__OUTPUT_RUN_DETAILS')}
 print(len(pa), len({s['uses'] for s in pa}))
 print(all(pick(s) == pick(pa[0]) for s in pa), len(pick(pa[0])))
 "
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "3 1" ]
-    [ "${lines[1]}" = "True 10" ]
+    [ "${lines[1]}" = "True 11" ]
 }
 
 # AI-045 AC10 (#1923, option 3): this repository runs one review at a time. NaN

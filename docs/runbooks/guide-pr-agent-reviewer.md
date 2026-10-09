@@ -85,10 +85,13 @@ Seven things now stand between that and a silent green:
    overlapping runs on `main` both complete is the open measurement in AI-045
    `tasks.md`, and a cancelled review run there means the key is ignored: revert
    the block.
-3. `fallback_models = ["openai/deepseek-v4-flash"]` behind the primary
-   `openai/mimo-v2.6-flash` — a second NaN model with its own bucket of five,
-   which is what makes it an automatic fallback under LiteLLM when the primary
-   is saturated.
+3. `fallback_models = ["openai/deepseek-v4-flash", "openai/glm5.3-flash"]`
+   behind the primary `openai/mimo-v2.6-flash`: NaN models with their own
+   buckets of five, which is what makes them an automatic fallback under
+   LiteLLM when the primary is saturated. The draw puts whichever NaN model it
+   picked first and keeps the others behind it, and a model that times out
+   moves on to the next instead of being retried
+   (`CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"`).
 4. **A model preflight (AI-045)**: before PR-Agent starts,
    `scripts/pr-agent-model-preflight.sh` sends one minimal call to each model of
    the declared chain. Only the ones that answer enter the review pool's draw;
@@ -120,19 +123,39 @@ Seven things now stand between that and a silent green:
 
 ### The review pool
 
-Four members, drawn with equal weight among those that answered their probe,
-the way `dotf spec review` draws from `harness/reviewer-pool.json`:
+Members that answered their probe are drawn by the `weight` in their
+`pr_agent` block of `harness/reviewer-pool.json` (#1923, amendment B, 2026-10-09),
+so each member's share is a declared number:
 
-| Member | Provider | Declared in |
-|---|---|---|
-| `openai/mimo-v2.6-flash` | NaN | `.pr_agent.toml` `model`, the `models` step's `DECLARED_MODEL` |
-| `openai/deepseek-v4-flash` | NaN | `.pr_agent.toml` `fallback_models`, `DECLARED_FALLBACK_MODELS` |
-| `openai/glm5.3-flash` | NaN | `.pr_agent.toml` `fallback_models`, `DECLARED_FALLBACK_MODELS` (joined 2026-10-08; reviews only at `reasoning_effort: low`, see below) |
-| `anthropic/claude-haiku-5-5` | Anthropic | the `route` step's `ANTHROPIC_MODEL` and both Anthropic steps |
+| Member | Provider | Weight | Declared in |
+|---|---|---|---|
+| `openai/mimo-v2.6-flash` | NaN | 27 | the pool; `.pr_agent.toml` `model`; the `models` step's `DECLARED_MODEL` |
+| `openai/deepseek-v4-flash` | NaN | 19 | the pool; `.pr_agent.toml` `fallback_models`; `DECLARED_FALLBACK_MODELS` |
+| `openai/glm5.3-flash` | NaN | 19 | the same (joined 2026-10-08; reviews only at `reasoning_effort: low`, see below) |
+| `anthropic/claude-haiku-5-5` | Anthropic | 35 | the pool, effort `high` |
+| `anthropic/claude-sonnet-5-5` | Anthropic | risk route | the pool, effort `medium`; never drawn |
 
-`scripts/pr-agent-route.sh` draws the member that reviews first and writes it to
-the job summary. A member that refused, hung or was over quota is not in the
-draw, so a saturated NaN model hands its share to the others for that run.
+Tests hold the pool's NaN models equal to the preflight's chain, and the draw's
+share of every member equal to its weight. `scripts/pr-agent-route.sh` draws the
+member that reviews first and writes it to the job summary. A member that
+refused, hung or was over quota is not in the draw, and its weight is shared out
+among the rest for that run.
+
+**The risk route.** A PR whose additions plus deletions reach
+`pr_agent_risk.min_changed_lines` (900), or that carries the `deep-review`
+label, reviews first on Sonnet, with NaN as the second attempt. The route step
+reads the size and labels with `gh api`, because an `issue_comment` event
+carries neither. When Sonnet does not answer its probe, the PR goes to the draw
+and the job summary says why. Add the label to a small PR whose risk is not in
+its size (secrets, auth, CI permissions); create it once per repository:
+
+```bash
+gh label create deep-review --repo mlorentedev/dotfiles --color 5319e7 \
+  --description "Route the PR-Agent review to Sonnet"
+```
+
+Every attempt sets `CONFIG__OUTPUT_RUN_DETAILS`, so the published review ends
+with the model that wrote it, its tokens and its time.
 
 One attempt talks to one provider, because PR-Agent's fallback chain shares one
 transport and NaN's would misroute an Anthropic model. So:
@@ -157,8 +180,8 @@ the copies identical.
 
 | Value | Effect |
 |---|---|
-| unset or `draw` | equal weight over every member that answered |
-| `nan` | NaN first, Anthropic second |
+| unset or `draw` | by weight over every member that answered, risky PRs to Sonnet first |
+| `nan` | NaN first, Anthropic second, no risk route |
 | `anthropic` | Anthropic first, NaN second |
 | `nan-only` | NaN only. The Anthropic model is not even probed: **this stops all spending on the key** |
 
@@ -170,35 +193,40 @@ gh variable set PR_AGENT_PROVIDER --repo mlorentedev/dotfiles --body nan-only   
 gh variable delete PR_AGENT_PROVIDER --repo mlorentedev/dotfiles               # back to the draw
 ```
 
-**Independence.** `harness/reviewer-pool.json` forbids Anthropic models for the
-spec archive gate, whose value is that the reviewer is not the implementer.
-This pool is a different gate: a first-pass review on every PR. It admits Haiku
-by the owner's decision of 2026-10-08 (#1923). The reviewer-pool rule is
-unchanged.
+**Independence.** For the spec archive gate, whose value is that the reviewer is
+not the implementer, `harness/reviewer-pool.json` lets an Anthropic model sign
+only beside another vendor's first signature, or as a recorded fallback
+(amendment B, 2026-10-09). This pool is a different gate, a first-pass review on
+every PR, and admits Haiku and Sonnet as reviewers in their own right by the
+owner's decisions of 2026-10-08 and 2026-10-09 (#1923).
 
 ### What the Anthropic member may spend
 
 The key is funded from the owner's plan credits, with no card and no
-auto-reload, under a $100 spend limit in the Console. The Console has no
-per-key model allowlist, so the **workflow is the allowlist**, and
-`tests/pr-agent-config.bats` pins each of these settings:
+auto-reload, under a spend limit in the Console; the monthly budget is $60-65,
+shared with the local adversarial review, which reads the same Bitwarden item as
+`REVIEW_ANTHROPIC_API_KEY`. The Console has no per-key model allowlist, so
+`ALLOWED_ANTHROPIC` in `scripts/pr-agent-route.sh` is the allowlist (Haiku and
+Sonnet): a pool naming any other model fails the draw. `tests/pr-agent-config.bats`
+pins it and each of these settings:
 
 | Setting | Value | Why |
 |---|---|---|
-| `CONFIG__MODEL`, `CONFIG__MODEL_WEAK` | `anthropic/claude-haiku-5-5` | the cheapest current model; $0.10 / $0.50 per MTok up to 100K prompt tokens. Every model id the toml pins gets an override, or a call to it would leave Haiku for NaN |
+| `CONFIG__MODEL`, `CONFIG__MODEL_WEAK` | the route's `anthropic_model` | Haiku ($0.10 / $0.50 per MTok up to 100K prompt tokens) when drawn, Sonnet ($2 / $10, no price step) on the risk route. Every model id the toml pins gets an override, or a call to it would leave Anthropic for NaN |
 | `CONFIG__FALLBACK_MODELS` | `[]` | no chain: a failure ends the attempt, it never escalates to a pricier model |
 | `CONFIG__MAX_MODEL_TOKENS`, `CONFIG__CUSTOM_MODEL_MAX_TOKENS` | `200000` | the NaN attempt's cap, so every member reviews the same diff (owner's choice, 2026-10-08). With Claude's tokenizer counting about 30% more, a diff past ~75K of PR-Agent's tokens crosses the 100K price step and that request pays $0.50 / $2.50 |
 | `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` | `32000` | LiteLLM's output cap for a Claude model it does not know. Its default, 4096, is shared with thinking and truncated reviews |
-| `CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING`, `CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE`, `CONFIG__REASONING_EFFORT` | `true`, `["anthropic/claude-haiku-5-5"]`, `high` | adaptive thinking at high effort (the API default is `medium`). PR-Agent's built-in pattern does not match Haiku, so the override names it; measured with LiteLLM 1.103.0, `thinking` and `output_config` reach the API unchanged |
+| `CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING`, `CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE`, `CONFIG__REASONING_EFFORT` | `true`, both allowed models, the route's `anthropic_effort` | adaptive thinking at the member's effort from the pool (Haiku `high`, Sonnet `medium`). PR-Agent's built-in pattern matches neither id, so the override names both; measured with LiteLLM 1.103.0, `thinking` and `output_config` reach the API unchanged |
 | `CONFIG__AI_TIMEOUT` | `360` | the call is not streamed, so this bounds the whole answer, thinking included; it ends inside the step's 8 minutes |
-| temperature | not sent (`CONFIG__NO_TEMPERATURE_MODELS`) | Haiku 5.5 answers 400 to a non-default temperature, and PR-Agent's default is 0.2 |
+| temperature | not sent (`CONFIG__NO_TEMPERATURE_MODELS`, both models) | Haiku 5.5 answers 400 to a non-default temperature, and PR-Agent's default is 0.2 |
 | step `timeout-minutes` | `8` | at most two attempts run; the job's 31 minutes cover the worst pair, the probes and the publication measurements |
 
-A worst-case review is about 260K input plus 32K output tokens at the higher
-prices, roughly $0.21; a test fails if the caps allow more than $0.25. A review
-under the price step costs about $0.02, and the draw's probe a few dozen tokens
-per run. With a quarter of about 190 monthly reviews drawn to Haiku, a month
-costs $1 to $3, $10 at the very worst. The spend limit is the backstop, not the
+A worst-case review is about 260K input plus 32K output tokens: roughly $0.21 on
+Haiku at its higher prices, and $0.84 on Sonnet. A test holds a price row and a
+ceiling for every allowed model ($0.25 and $1.00), so allowlisting a model
+without pricing it fails. The budget arithmetic, about $48-52 a month of the
+$60-65, is in `specs/AI-045-nan-catalog-alignment/verification.md`; #2215 and
+#2216 measure it against real volume. The spend limit is the backstop, not the
 budget.
 
 **Owner setup, once per key rotation:**
@@ -210,8 +238,8 @@ dotf secrets sync ci --repo mlorentedev/dotfiles      # pushes both CI secrets
 
 Until the secret exists, Haiku is out of the draw and the `route` step prints a
 `::warning::` naming this command; the final guard repeats it when no review was
-published. Check the organization's tier and Haiku 5.5 limits on the Console's
-*Rate limits* page. The default workspace takes no workspace-level spend or rate
+published. Check the organization's tier and the Haiku 5.5 and Sonnet 5.5
+limits on the Console's *Rate limits* page. The default workspace takes no workspace-level spend or rate
 limit; a dedicated workspace is the place for a tighter one.
 
 **Testing each route live** after the sync and the merge (a `/review` comment

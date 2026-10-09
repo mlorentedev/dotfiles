@@ -485,7 +485,7 @@ func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, c
 		}
 		var nextAdvice string
 		for _, e := range entries {
-			if e.ID != current.ID && e.Signs == current.Signs {
+			if e.ID != current.ID && e.SignatureRole() == current.SignatureRole() {
 				nextAdvice = fmt.Sprintf("\nOr try another pool member (e.g. if saturated):\n    dotf spec review %s --reviewer %s%s", specID, e.ID, slot.Flag())
 				break
 			}

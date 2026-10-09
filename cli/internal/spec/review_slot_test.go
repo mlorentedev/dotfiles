@@ -215,3 +215,24 @@ func TestSecondSlotPromptAndSession(t *testing.T) {
 		t.Error("the two slots must run under different tmux sessions")
 	}
 }
+
+// The shipped pool under amendment B: it loads (so no Anthropic member signs
+// first), every member names its vendor, and a `risk: high` spec has a second
+// signer of another vendor than every first signer.
+func TestShippedPoolCanSignAHighRiskSpec(t *testing.T) {
+	entries, err := LoadReviewerPoolEntries(shippedRepoRoot(t))
+	if err != nil {
+		t.Fatalf("the shipped pool must load under amendment B: %v", err)
+	}
+	for _, e := range entries {
+		if strings.TrimSpace(e.Vendor) == "" {
+			t.Errorf("pool entry %q declares no vendor; the second-signature check compares vendors", e.ID)
+		}
+		if e.SignatureRole() != SignsFirst {
+			continue
+		}
+		if _, err := ChooseReviewer(entries, ReviewerChoice{Slot: SecondSigner, FirstVendor: e.vendor()}, func(int) int { return 0 }); err != nil {
+			t.Errorf("after first signer %q, no second signer is eligible: %v", e.ID, err)
+		}
+	}
+}

@@ -305,13 +305,15 @@ jobs:
       # The job has no full checkout: only the scripts that decide whether
       # PR-Agent runs (TOOL-023's push gate), on which model (AI-045's
       # preflight and the pool draw), and whether it published (the guard,
-      # which also gates the second attempt). They are fetched from the PR's merge ref, the same
+      # which also gates the second attempt), plus the pool whose weights the
+      # draw reads. They are fetched from the PR's merge ref, the same
       # trust as this workflow file, and forks never reach this job.
       - name: Check out the reviewer's scripts
         if: steps.reviewable.outputs.reviewable != 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: |
+            harness/reviewer-pool.json
             scripts/pr-agent-push-gate.sh
             scripts/pr-agent-model-preflight.sh
             scripts/pr-agent-route.sh
@@ -375,15 +377,21 @@ jobs:
           echo "exit=${rc}" >> "$GITHUB_OUTPUT"
           exit "$rc"
       # AI-045 AC9 (#1923): the CI review pool. Every member that answered its
-      # probe (the NaN models above, and the Anthropic model probed here) is
-      # drawn with equal weight, the way `dotf spec review` draws its reviewer,
-      # so a third of the reviews leave NaN's shared quota, and a member that is
-      # saturated or dead is simply not in the draw. One attempt talks to one
-      # provider: the other provider is the second attempt, which runs only on a
-      # measured absence of a published review. `vars.PR_AGENT_PROVIDER`
-      # overrides the draw (draw, nan, anthropic, nan-only); `nan-only` stops
-      # all spending on the Anthropic key without a PR. The script's header has
-      # the rules; the job summary names the member drawn.
+      # probe (the NaN models above, and Haiku, probed here) is drawn by the
+      # `weight` harness/reviewer-pool.json gives it, so each member's share of
+      # the reviews is a declared number, and a member that is saturated or dead
+      # is simply not in the draw. A PR at or past `pr_agent_risk` (its changed
+      # lines, or the label) reviews first on Sonnet instead, when Sonnet
+      # answers. One attempt talks to one provider: the other provider is the
+      # second attempt, which runs only on a measured absence of a published
+      # review. `vars.PR_AGENT_PROVIDER` overrides the draw (draw, nan,
+      # anthropic, nan-only); `nan-only` stops all spending on the Anthropic key
+      # without a PR. The script's header has the rules, including the
+      # allowlist of Anthropic models; the job summary names the member drawn.
+      #
+      # The size and labels are read here rather than from the event, because
+      # an `issue_comment` event carries neither. A failed read leaves them
+      # empty: the route then says so, and the label alone can still route.
       - name: Draw the reviewer from the pool
         id: route
         if: >
@@ -396,23 +404,34 @@ jobs:
           NAN_MODEL: ${{ steps.models.outputs.model }}
           NAN_FALLBACKS: ${{ steps.models.outputs.fallbacks }}
           NAN_PREFLIGHT_EXIT: ${{ steps.models.outputs.exit }}
-          ANTHROPIC_MODEL: anthropic/claude-haiku-5-5
           # For the probe only; it travels to curl on stdin, never on argv.
           PR_AGENT_ANTHROPIC_API_KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
           PR_AGENT_PROVIDER: ${{ vars.PR_AGENT_PROVIDER }}
-        run: ./scripts/pr-agent-route.sh --output "$GITHUB_OUTPUT"
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          if pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"); then
+            PR_CHANGED_LINES=$(jq -r '.additions + .deletions' <<<"$pr")
+            PR_LABELS=$(jq -c '[.labels[].name]' <<<"$pr")
+          else
+            PR_CHANGED_LINES="" PR_LABELS="[]"
+          fi
+          export PR_CHANGED_LINES PR_LABELS
+          ./scripts/pr-agent-route.sh --output "$GITHUB_OUTPUT"
       # The Anthropic attempt. It appears twice, first and second, because steps
       # cannot be reordered at run time; a test holds the two identical.
       # Everything that shapes its cost is stated here and pinned by tests,
       # because the key it holds pays per token:
       #
-      # - The MODEL is one literal, `anthropic/claude-haiku-5-5`, for `model`
-      #   and `model_weak`, with no fallback chain. The API key cannot be
-      #   restricted to a model in the Claude Console (workspaces carry spend
-      #   and rate limits, not an allowlist), so the allowlist is these lines and
-      #   the test that pins them. Haiku 5.5 costs $0.10 / $0.50 per million
-      #   input / output tokens for prompts up to 100,000 tokens, and five times
-      #   that above it.
+      # - The MODEL is the one the draw chose, for `model` and `model_weak`,
+      #   with no fallback chain: Haiku when drawn, Sonnet on the risk route.
+      #   The API key cannot be restricted to a model in the Claude Console
+      #   (workspaces carry spend and rate limits, not an allowlist), so the
+      #   allowlist is ALLOWED_ANTHROPIC in scripts/pr-agent-route.sh, which
+      #   fails the draw on any other model, and the test that pins it. Haiku
+      #   5.5 costs $0.10 / $0.50 per million input / output tokens for prompts
+      #   up to 100,000 tokens, and five times that above it; Sonnet 5.5 costs
+      #   $2 / $10 with no price step.
       # - The PROMPT is capped at 200,000 tokens (`max_model_tokens`; the
       #   `custom_` twin is needed because PR-Agent's registry does not know the
       #   model), the same as the NaN attempt, so every pool member reviews the
@@ -424,15 +443,17 @@ jobs:
       #   model it does not know (DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS), and the
       #   model's thinking counts toward the cap, so a review could be cut short
       #   and published as nothing. Worst case, a 260,000-token prompt with a
-      #   full answer, is about $0.21 a review.
-      # - EFFORT is `high`, with adaptive thinking (Haiku 5.5's API default is
-      #   `medium`). PR-Agent sends `thinking` and `output_config` only for a
-      #   model it recognises as adaptive, and its built-in pattern does not
-      #   match Haiku, hence the override list. Measured with LiteLLM 1.103.0,
+      #   full answer, is about $0.21 a review on Haiku and $0.84 on Sonnet.
+      # - EFFORT is the member's `reasoning_effort` in the pool (Haiku `high`,
+      #   Sonnet `medium`), with adaptive thinking. PR-Agent sends `thinking`
+      #   and `output_config` only for a model it recognises as adaptive, and
+      #   its built-in pattern does not match these ids, hence the override
+      #   list, which names every allowed model. Measured with LiteLLM 1.103.0,
       #   the version PR-Agent v0.47.0 pins: both reach the API unchanged and the
       #   answer carries a thinking block.
       # - TEMPERATURE is never sent: Haiku 5.5 answers 400 to any non-default
-      #   value, and PR-Agent sends 0.2 unless the model is listed here.
+      #   value, and PR-Agent sends 0.2 unless the model is listed here. Both
+      #   allowed models are listed, so neither depends on accepting it.
       # - The call is not streamed. PR-Agent forces streaming only for an
       #   OpenAI-compatible base URL, and none is set for Anthropic. `ai_timeout`
       #   therefore bounds the whole answer, thinking included, so it is raised
@@ -451,19 +472,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The only inference credential this step holds; NaN's is not here.
           ANTHROPIC__KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
-          CONFIG__MODEL: anthropic/claude-haiku-5-5
-          CONFIG__MODEL_WEAK: anthropic/claude-haiku-5-5
+          CONFIG__MODEL: ${{ steps.route.outputs.anthropic_model }}
+          CONFIG__MODEL_WEAK: ${{ steps.route.outputs.anthropic_model }}
           CONFIG__FALLBACK_MODELS: "[]"
           CONFIG__MAX_MODEL_TOKENS: "200000"
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
-          CONFIG__NO_TEMPERATURE_MODELS: '["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]'
+          CONFIG__NO_TEMPERATURE_MODELS: >-
+            ["anthropic/claude-haiku-5-5", "claude-haiku-5-5",
+            "anthropic/claude-sonnet-5-5", "claude-sonnet-5-5"]
           CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING: "true"
-          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5"]'
-          CONFIG__REASONING_EFFORT: high
+          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"]'
+          CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
           CONFIG__AI_TIMEOUT: "360"
           DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          CONFIG__OUTPUT_RUN_DETAILS: "true"
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
           github_action_config.handle_push_trigger: "true"
           github_action_config.push_commands: >-
@@ -569,6 +593,10 @@ jobs:
           # not act on (ai/nan/README.md). mimo-v2.6-flash receives none.
           CONFIG__REASONING_EFFORT: low
           CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS: '["glm5.3-flash"]'
+          # A timed-out call moves to the next model of the chain instead of
+          # retrying the one that just timed out: a NaN model that times out once
+          # is usually saturated, and a retry spends the step's 12 minutes on it.
+          CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
           # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
           # the entries whose `consumers` list this repo, so the reviewer holds
           # one credential rather than an ambient set — the failure surface stays
@@ -576,6 +604,10 @@ jobs:
           # where whole-registry injection means one broken item mapping can take
           # down authentication for everything.
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          # The review names the model that wrote it (model, tokens, time, AI
+          # calls), so a reader of the comment knows which pool member reviewed
+          # without opening the run. Every attempt sets it.
+          CONFIG__OUTPUT_RUN_DETAILS: "true"
           # Stated rather than defaulted, so the event lists are visible rather
           # than implied — leaving that implicit is what let the workflow's own
           # trigger list drift away unnoticed (#1053).
@@ -662,19 +694,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The only inference credential this step holds; NaN's is not here.
           ANTHROPIC__KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
-          CONFIG__MODEL: anthropic/claude-haiku-5-5
-          CONFIG__MODEL_WEAK: anthropic/claude-haiku-5-5
+          CONFIG__MODEL: ${{ steps.route.outputs.anthropic_model }}
+          CONFIG__MODEL_WEAK: ${{ steps.route.outputs.anthropic_model }}
           CONFIG__FALLBACK_MODELS: "[]"
           CONFIG__MAX_MODEL_TOKENS: "200000"
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
-          CONFIG__NO_TEMPERATURE_MODELS: '["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]'
+          CONFIG__NO_TEMPERATURE_MODELS: >-
+            ["anthropic/claude-haiku-5-5", "claude-haiku-5-5",
+            "anthropic/claude-sonnet-5-5", "claude-sonnet-5-5"]
           CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING: "true"
-          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5"]'
-          CONFIG__REASONING_EFFORT: high
+          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"]'
+          CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
           CONFIG__AI_TIMEOUT: "360"
           DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          CONFIG__OUTPUT_RUN_DETAILS: "true"
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
           github_action_config.handle_push_trigger: "true"
           github_action_config.push_commands: >-
@@ -727,9 +762,9 @@ jobs:
           # Every attempt in execution order, as `<outcome> <model>`; the guard
           # judges the last one that ran.
           ATTEMPTS: |
-            ${{ steps.pr_agent_anthropic_first.outcome }} anthropic/claude-haiku-5-5
+            ${{ steps.pr_agent_anthropic_first.outcome }} ${{ steps.route.outputs.anthropic_model }}
             ${{ steps.pr_agent.outcome }} ${{ steps.route.outputs.nan_model }}
-            ${{ steps.pr_agent_anthropic_second.outcome }} anthropic/claude-haiku-5-5
+            ${{ steps.pr_agent_anthropic_second.outcome }} ${{ steps.route.outputs.anthropic_model }}
           ROUTE_NOTE: ${{ steps.route.outputs.note }}
           # A failed draw writes no outputs, so every attempt reads skipped; this
           # tells that apart from a pool where no member answered.

@@ -74,6 +74,37 @@ AC9, 2026-10-08:
   three NaN members answering the probe. Run 37886959259: the draw picked glm5.3-flash,
   which received `low` and published a complete review in 74 s. Pending: a real second attempt.
 
+AC9 amendment B, 2026-10-09:
+
+- `tests/pr-agent-route.bats` (32, stub curl) drives every point of a fixture pool's total weight and asserts each member
+  is drawn exactly its weight, the same over the shipped pool, a non-answering member's points shared out, a weightless
+  NaN member kept in the chain but never drawn first, the risk route at the threshold and one below it, by the exact
+  label only, Sonnet probed only for a risky PR, its failure falling back to the draw with a note, an unread size, the
+  overrides never taking the risk route, and the allowlist refusing another model before any probe.
+  `tests/pr-agent-route-real.bats` (4) runs the real curl with the allowlisted id; the local server answers by a mode
+  file, so no test-only model id has to pass the allowlist. `tests/pr-agent-config.bats` (70) pins the routed model and
+  effort, the allowlist read from the script, a price row per allowed model with its worst review under a ceiling (Haiku
+  $0.21 under $0.25, Sonnet $0.84 under $1.00), the pool's NaN models equal to the preflight's chain, and run details
+  among the settings all three attempts share. The Go gate: `cli/internal/spec/review_slot_test.go` and
+  `cli/internal/cmd/spec_review_test.go`. Mutations, each turned red: a third model allowlisted, a pool NaN model
+  drifting from the chain, an off-by-one in the cumulative draw, the risk comparison made strict, Sonnet given a weight;
+  six more on the Go gate (commit 77c89fd5).
+
+Budget, at about 2,500 PR reviews a month (60% of a 30-35 hour week, 10-15 PRs in parallel) plus 4-5 adversarial
+reviews an hour of spec work, against $60-65 of Anthropic credit:
+
+| Spend | Volume | Unit | Month |
+|---|---|---|---|
+| Sonnet, PR-Agent risk route | ~8% of PRs, ~200 | ~$0.13 | ~$26 |
+| Haiku, PR-Agent draw (35% of the weight) | ~875 | ~$0.008 | ~$7 |
+| Sonnet, second signature on `risk: high` specs | ~8 | ~$1.60 | ~$13 |
+| Haiku, fallback first signature | rare | | ~$2 |
+| Total | | | ~$48-52 |
+
+The margin covers the Sonnet share running above 8% while #2215 and #2216 measure it. Sonnet is the only `signs:
+second` member, so a high-risk spec's second signature depends on the Anthropic key: deliberate, and named in the
+pool's `$comment`.
+
 ## Decisions made during implementation
 
 - The chain is declared twice (workflow and toml) and a test holds them equal, rather than the preflight reading the toml. PR-Agent reads the toml from the default branch, so a PR changing the model would otherwise probe the old one.

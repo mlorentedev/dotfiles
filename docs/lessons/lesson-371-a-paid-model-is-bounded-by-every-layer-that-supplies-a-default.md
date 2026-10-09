@@ -30,10 +30,13 @@ value of their own, and none of them fails loudly:
 
 ## The Solution
 Read the pinned versions' source for every default that reaches the request, and set each one
-explicitly: `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "16000"`, the model listed in
-`CONFIG__NO_TEMPERATURE_MODELS`, `CONFIG__MAX_MODEL_TOKENS` sized so the prompt stays under the
-100K-token price step, and an empty `CONFIG__FALLBACK_MODELS` so a failure never escalates to a
-pricier model. `tests/pr-agent-config.bats` pins each value, and
+explicitly: `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` (16000 when this was written, 32000 since the
+owner gave Haiku adaptive thinking), the model listed in `CONFIG__NO_TEMPERATURE_MODELS`,
+`CONFIG__MAX_MODEL_TOKENS` (first sized under the 100K-token price step, then raised to the NaN
+attempt's 200000 by the owner's choice of parity, which accepts the higher price on large diffs),
+and an empty `CONFIG__FALLBACK_MODELS` so a failure never escalates to a pricier model. Whatever
+the values, the rule is the same: each is a stated number, and a test bounds the worst review it
+allows. `tests/pr-agent-config.bats` pins each value, and
 `harness/pr-agent-upstream-contract.json` pins PR-Agent's LiteLLM handler (`litellm_ai_handler.py`), so an Action bump
 that changes these paths fails the contract check instead of the bill.
 

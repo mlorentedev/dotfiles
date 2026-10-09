@@ -73,6 +73,17 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
   draw at a quarter each, and Haiku gets parity with NaN's prompt cap (200K, accepting the over-100K price on large
   diffs) and adaptive thinking at `high` effort, within a worst case under $0.25 a review that a test holds. glm
   reviews only at `reasoning_effort: low` (lesson 370).
+- **Amended 2026-10-09 (#1923, amendment B), budget $60-65 a month.** The owner wanted Haiku and Sonnet in real use
+  rather than as members a uniform draw seldom reaches, inside a stated budget. Three changes. PR-Agent's draw is
+  weighted, and the weights live in `harness/reviewer-pool.json` (`pr_agent` blocks: mimo 27, glm 19, deepseek 19,
+  Haiku 35), so a share is a declared number rather than one over the member count. Sonnet joins as a risk route: a PR
+  at or past 900 changed lines, or labelled `deep-review`, reviews first on Sonnet, and falls back to the draw when
+  Sonnet does not answer. The allowlist of Anthropic models CI may spend on moves from the workflow into
+  `scripts/pr-agent-route.sh`, which fails the draw on any other. And the spec archive gate's rule against Anthropic
+  reviewers is replaced by "an Anthropic model never signs alone": the first signature stays another vendor's, Sonnet
+  adds a second signature on `risk: high` specs, and Haiku signs as a recorded fallback when the first signers failed
+  for a classified reason. The local review reads the same Bitwarden item as PR-Agent under its own name
+  (`REVIEW_ANTHROPIC_API_KEY`), so one Console spend limit covers both. The budget arithmetic is in verification.md.
 - AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 31 minutes per PR ahead in the queue.
 
 ## Acceptance criteria
