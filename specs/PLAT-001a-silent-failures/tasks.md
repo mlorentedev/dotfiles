@@ -176,13 +176,30 @@ Phase 1 (this PR, no setup change, so the pinned `dotf` keeps working):
   doctor `Git config (global)` all ok; `env -i ... git ls-remote` exit 0
 - [x] Runbook `docs/runbooks/guide-git-config.md`
 
-Phase 2 (after the release carrying phase 1 is the `DOTF_VERSION` pin, #1814 class):
+Phase 2, moved into this PR. The doctor check made `test-windows` red: CI builds `dotf` from the PR, so
+the gate reported the include missing on a box whose setup never added it. That is a real-box state, not
+a runner one, so the known-failures list was not its home; the fix is setup converging it:
 
-- [ ] Delete the `.gitconfig` `deploy_file` block in `setup-linux.sh` and its `setup-windows.ps1` twin;
-  each calls `dotf converge --only git-config` once. Setup stops overwriting `~/.gitconfig`, which today
-  erases gh's helper, the include and `core.hooksPath` on every Linux/macOS run
-- [ ] Delete the repo `.gitconfig`, its `safe_copy` and its doctor home-deploy exemption; update
-  `tests/setup-linux.bats` (the bare-helper assertion)
+- [x] Deleted the `.gitconfig` `deploy_file` block in `setup-linux.sh` and its `setup-windows.ps1` twin
+  (setup net -18 lines). Each calls `dotf converge --only git-config` once, right after `dotf deploy`
+  writes the file the include names. Setup stops overwriting `~/.gitconfig`
+- [x] Deleted the repo `.gitconfig`, its `safe_copy`, its `.gitattributes` line, its doctor home-deploy
+  exemption and its `isManagedDeployPath` entry; the CI `code` filter lists `git/**` instead
+- [x] Tests: setup-linux and setup-windows assert the converge call follows `dotf deploy` and nothing
+  copies `~/.gitconfig` (both mutation-checked: removing the call turns them red); `verify-setup.bats`
+  asserts the include and that it is effective (`git config --global --includes user.name` equals the
+  deployed value; `--global` alone ignores includes). Run end to end in a throwaway HOME with this
+  branch's build: deploy, converge 1 changed, `user.name` read through the include, second run 0 changed
+- [x] The window: the pinned 0.65.0 rejects `--only` (`unknown flag`, exit 1) and deploys the new
+  `gitconfig` entry (`in sync`, exit 0). Until a release moves `DOTF_VERSION`, setup on a fresh box warns
+  and leaves `~/.gitconfig` absent; an existing box keeps its file. The warning names the condition.
+  Recorded on #1814
+- [x] Runner-only remainder: the setup step has no `GH_TOKEN` (CI-004 AC8) and the gate step has, so the
+  helper reads as repairable only in the gate. Listed in `doctor-gate-known-failures.txt` against #2212,
+  which holds the owner's choice
+- [x] Review triage (`fa5f55aa`): `Inspect` reports `TargetMissing` when the deployed file is absent
+  (doctor FAIL naming `dotf deploy`, not repairable by `Apply`); the converge detail says "applied" only
+  for what a run changed and names what it left. Both mutation-checked
 
 ## Closing
 

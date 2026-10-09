@@ -23,7 +23,7 @@ created: "2026-10-08"
 	path = ~/.config/git/dotfiles.gitconfig
 ```
 
-> **Until #2207 phase 2 lands, `setup-linux.sh` still replaces `~/.gitconfig`** with the repo's `.gitconfig` on every run, which restores the bare helper and drops the include. That swap waits for the release carrying `dotf converge --only git-config` to become the `DOTF_VERSION` pin, so setup can call it. Until then a setup run is followed by `dotf doctor` reporting a FAIL in `Git config (global)`, and `dotf doctor --fix` repairs it. `setup-windows.ps1` already refuses to overwrite a `~/.gitconfig` that differs.
+Both setup scripts run `dotf deploy` and then `dotf converge --only git-config`; neither copies a file over `~/.gitconfig`. A `dotf` older than the `--only` flag (0.65.0 and before) rejects the call, and setup warns: re-run setup once a release moves `DOTF_VERSION`, or run the two steps below by hand with a newer `dotf`.
 
 The deployed file is deliberately not `~/.config/git/config`. Git reads that path by itself, and on a machine with no `~/.gitconfig`, `git config --global` writes into it; the next deploy would then erase what git wrote.
 
@@ -40,6 +40,12 @@ env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin GIT_TERMINAL_PROMPT=0 \
 
 Exit 0 means the helper works without your shell.
 
+To check the include is effective, ask what a commit sees. `git config --global` alone ignores includes:
+
+```bash
+git config --global --includes user.name
+```
+
 ## New machine
 
 1. `gh auth login`. Grant what the board tooling needs as well; #2204 tracks requesting every scope in this one step.
@@ -49,6 +55,6 @@ Exit 0 means the helper works without your shell.
 ## Checks and repair
 
 - `dotf doctor`, section `Git config (global)`:
-  - **FAIL**: the include is missing, or the helper is not gh's absolute form while gh could fix it.
+  - **FAIL**: the include is missing, the file it names is not deployed (run `dotf deploy`), or the helper is not gh's absolute form while gh could fix it.
   - **WARN**: the helper is wrong and gh is not on PATH or not logged in. The message names the login.
 - `dotf doctor --fix` runs the same repair as converge. Both use the predicate in `cli/internal/gitconfig` (lesson 368).

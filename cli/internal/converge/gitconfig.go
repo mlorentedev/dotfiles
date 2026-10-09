@@ -65,24 +65,36 @@ func (r gitConfig) Probe(env Env) error {
 	return nil
 }
 
+// gitDetail names what a run changes apart from what it leaves, so a run that
+// changed nothing never reads as "applied".
 func gitDetail(st gitconfig.State, dryRun bool) string {
 	if st.Converged() {
 		return "include and GitHub credential helper in place"
 	}
-	var parts []string
+	var fix, left []string
 	if st.IncludeMissing {
-		parts = append(parts, "include "+gitconfig.IncludePath)
+		fix = append(fix, "include "+gitconfig.IncludePath)
 	}
 	if len(st.BadHelpers) > 0 {
 		if st.Blocked != "" {
-			parts = append(parts, "credential helper left as it is: "+st.Blocked)
+			left = append(left, "credential helper: "+st.Blocked)
 		} else {
-			parts = append(parts, "credential helper through gh auth setup-git")
+			fix = append(fix, "credential helper through gh auth setup-git")
 		}
 	}
-	verb := "applied: "
-	if dryRun {
-		verb = "to apply: "
+	if st.TargetMissing {
+		left = append(left, gitconfig.IncludePath+" is not deployed (run: dotf deploy)")
 	}
-	return verb + strings.Join(parts, "; ")
+	var parts []string
+	if len(fix) > 0 {
+		verb := "applied: "
+		if dryRun {
+			verb = "to apply: "
+		}
+		parts = append(parts, verb+strings.Join(fix, "; "))
+	}
+	if len(left) > 0 {
+		parts = append(parts, "left as it is: "+strings.Join(left, "; "))
+	}
+	return strings.Join(parts, "; ")
 }

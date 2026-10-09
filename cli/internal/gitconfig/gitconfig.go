@@ -62,6 +62,9 @@ type Machine struct {
 type State struct {
 	// IncludeMissing: ~/.gitconfig does not include the deployed file.
 	IncludeMissing bool
+	// TargetMissing: the deployed file itself is absent, so an include reads
+	// nothing. `dotf deploy` writes it; Apply does not.
+	TargetMissing bool
 	// BadHelpers names each host whose helper is not gh's absolute form, with
 	// the helper git would run.
 	BadHelpers []string
@@ -70,9 +73,12 @@ type State struct {
 	Blocked string
 }
 
-// Converged reports whether Apply has nothing left to do. A blocked helper is
-// not converged either: it still needs gh, and the caller names the remedy.
-func (s State) Converged() bool { return !s.IncludeMissing && len(s.BadHelpers) == 0 }
+// Converged reports whether git reads the dotfiles' settings and runs gh's
+// absolute helper. A blocked helper or an undeployed file is not converged
+// either: Apply cannot fix them, and the caller names the remedy.
+func (s State) Converged() bool {
+	return !s.IncludeMissing && !s.TargetMissing && len(s.BadHelpers) == 0
+}
 
 // Repairable is what Apply would change on this machine now.
 func (s State) Repairable() int {
@@ -94,6 +100,7 @@ func Inspect(m Machine) (State, error) {
 		return st, err
 	}
 	st.IncludeMissing = !hasInclude(includes, m.Home)
+	st.TargetMissing = !m.Exists(IncludeFile(m.Home))
 
 	for _, host := range CredentialHosts {
 		helpers, err := getAll(m.Run, "credential."+host+".helper")

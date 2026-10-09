@@ -59,6 +59,9 @@ func reportGitConfig(st gitconfig.State, rep *Report) {
 	if st.IncludeMissing {
 		rep.Fail("~/.gitconfig does not include " + gitconfig.IncludePath + ", where `dotf deploy` puts the dotfiles' git settings (run: dotf doctor --fix)")
 	}
+	if st.TargetMissing {
+		rep.Fail(gitconfig.IncludePath + " is missing, so git reads none of the dotfiles' settings (run: dotf deploy)")
+	}
 	switch {
 	case len(st.BadHelpers) == 0:
 	case st.Blocked != "":

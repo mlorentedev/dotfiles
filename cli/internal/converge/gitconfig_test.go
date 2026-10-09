@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 )
 
 type gitExit int
@@ -42,8 +44,22 @@ func gitFake(ghPath string) (map[string][]string, *int, func(string, ...string) 
 	return cfg, &setups, run
 }
 
-func TestGitConfig_PlanChangesNothingAndApplyConverges(t *testing.T) {
+// deployedHome is a home where `dotf deploy` has written the include target.
+func deployedHome(t *testing.T) string {
+	t.Helper()
 	home := t.TempDir()
+	dst := gitconfig.IncludeFile(home)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return home
+}
+
+func TestGitConfig_PlanChangesNothingAndApplyConverges(t *testing.T) {
+	home := deployedHome(t)
 	gh := filepath.Join(home, "gh")
 	if err := os.WriteFile(gh, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -88,7 +104,7 @@ func TestGitConfig_SkippedWithoutGit(t *testing.T) {
 func TestGitConfig_ABlockedHelperIsNamedNotFailed(t *testing.T) {
 	cfg, setups, run := gitFake("/nowhere/gh")
 	r := gitConfig{run: run, has: func(n string) bool { return n == "git" }}
-	env := Env{Home: t.TempDir()}
+	env := Env{Home: deployedHome(t)}
 	res, err := r.Reconcile(env, false)
 	if err != nil || res.Changes != 1 || !strings.Contains(res.Detail, "gh is not on PATH") {
 		t.Fatalf("got %+v %v", res, err)
@@ -98,6 +114,22 @@ func TestGitConfig_ABlockedHelperIsNamedNotFailed(t *testing.T) {
 	}
 	if err := r.Probe(env); err != nil {
 		t.Errorf("a helper only gh can fix must not fail the probe: %v", err)
+	}
+}
+
+// Nothing repairable: the include is there, gh is absent and the deployed
+// file is missing. The run changes nothing, so its detail must not say
+// "applied", and it names both remedies.
+func TestGitConfig_ARunThatChangesNothingDoesNotSayApplied(t *testing.T) {
+	cfg, _, run := gitFake("/nowhere/gh")
+	cfg["include.path"] = []string{gitconfig.IncludePath}
+	r := gitConfig{run: run, has: func(n string) bool { return n == "git" }}
+	res, err := r.Reconcile(Env{Home: t.TempDir()}, false)
+	if err != nil || res.Changes != 0 {
+		t.Fatalf("got %+v %v", res, err)
+	}
+	if strings.Contains(res.Detail, "applied") || !strings.Contains(res.Detail, "gh is not on PATH") || !strings.Contains(res.Detail, "dotf deploy") {
+		t.Errorf("detail must name what is left, not claim an action: %q", res.Detail)
 	}
 }
 

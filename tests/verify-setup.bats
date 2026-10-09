@@ -231,11 +231,23 @@ setup() {
     grep -q 'alias ' "$HOME/.bash/bash_aliases"
 }
 
-@test ".gitconfig deployed to home" {
-    [ -f "$HOME/.gitconfig" ]
+@test "~/.gitconfig includes the deployed dotfiles.gitconfig (#2207)" {
+    [ -f "$HOME/.config/git/dotfiles.gitconfig" ]
+    run git config --global --get-all include.path
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'~/.config/git/dotfiles.gitconfig'* ]] || false
 }
 
-@test ".gitconfig is a regular file (post-SDD-007 copy-only deploy)" {
+@test "the include is effective: git reads the dotfiles' user.name (#2207)" {
+    # The pointer alone proves nothing; this proves git expands ~/ in
+    # include.path and reads the deployed file. `--global` alone ignores
+    # includes, so `--includes` asks what a commit would see.
+    want=$(git config -f "$HOME/.config/git/dotfiles.gitconfig" user.name)
+    [ -n "$want" ]
+    [ "$(git config --global --includes user.name)" = "$want" ]
+}
+
+@test "~/.gitconfig is a regular file" {
     [ -f "$HOME/.gitconfig" ]
     [ ! -L "$HOME/.gitconfig" ]
 }

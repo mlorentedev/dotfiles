@@ -23,6 +23,7 @@ func gitSys(t *testing.T, loggedIn bool) (*System, map[string][]string) {
 	home := t.TempDir()
 	gh := filepath.Join(home, "bin", "gh")
 	writeFile(t, gh, "")
+	writeFile(t, gitconfig.IncludeFile(home), "")
 	cfg := map[string][]string{
 		"credential.https://github.com.helper":      {"", "!gh auth git-credential"},
 		"credential.https://gist.github.com.helper": {"", "!gh auth git-credential"},
@@ -100,6 +101,19 @@ func TestCheckGitConfig_AHelperOnlyALoginCanFixWarns(t *testing.T) {
 	}
 	if len(cfg["include.path"]) != 1 {
 		t.Error("the include does not need gh and must be repaired")
+	}
+}
+
+func TestCheckGitConfig_AnUndeployedIncludeTargetFailsNamingDeploy(t *testing.T) {
+	s, _ := gitSys(t, true)
+	if err := os.Remove(gitconfig.IncludeFile(s.home())); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkGitConfig(s, rep, true)
+	if rep.Failures() != 1 || !strings.Contains(b.String(), "run: dotf deploy") || strings.Contains(b.String(), "runs gh by absolute path") {
+		t.Errorf("want one FAIL naming dotf deploy and no PASS\n%s", b.String())
 	}
 }
 

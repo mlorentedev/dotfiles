@@ -57,7 +57,7 @@ func machine(f *fakeGit, ghOnPath bool) Machine {
 		Home:   "/home/u",
 		Run:    f.run,
 		OnPath: func(string) bool { return ghOnPath },
-		Exists: func(p string) bool { return p == f.ghPath },
+		Exists: func(p string) bool { return p == f.ghPath || p == IncludeFile("/home/u") },
 	}
 }
 
@@ -130,6 +130,25 @@ func TestInspect_AHelperGHCannotRepairIsBlockedNotApplied(t *testing.T) {
 				t.Errorf("setup-git ran %d time(s), include %v", f.setupRan, f.cfg["include.path"])
 			}
 		})
+	}
+}
+
+// The include is only a pointer: with the deployed file absent, git reads
+// none of the dotfiles' settings, so the state is not converged. Apply cannot
+// write that file (`dotf deploy` does), so it is not repairable either.
+func TestInspect_AnIncludeWhoseFileIsNotDeployedIsNotConverged(t *testing.T) {
+	f := bareMachine()
+	m := machine(f, true)
+	m.Exists = func(p string) bool { return p == f.ghPath }
+	f.cfg["include.path"] = []string{IncludePath}
+	f.cfg["credential.https://github.com.helper"] = []string{"", "!" + f.ghPath + " auth git-credential"}
+	f.cfg["credential.https://gist.github.com.helper"] = []string{"", "!" + f.ghPath + " auth git-credential"}
+	st, err := Inspect(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.TargetMissing || st.Converged() || st.Repairable() != 0 {
+		t.Fatalf("want the missing target reported, not converged, nothing repairable: %+v", st)
 	}
 }
 
