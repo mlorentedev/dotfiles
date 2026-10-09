@@ -114,7 +114,10 @@ setup() {
         { m = ($0 == "# mise: cli") }' "$DOTFILES_DIR/versions.conf")"
     [ -n "$names" ]
     while IFS= read -r name; do
-        grep -qF "log_info \"Installing $name..." "$DOTFILES_DIR/setup-linux.sh" && found="$found $name"
+        # Three shapes an installer takes, any one is enough: its log line, the
+        # path it places the binary at, and the release asset it downloads.
+        grep -qE "log_info \"Installing $name\.\.\.|\.local/bin/$name([^A-Za-z0-9_-]|\$)|/$name/releases/download/" \
+            "$DOTFILES_DIR/setup-linux.sh" && found="$found $name"
     done <<< "$names"
     [ -z "$found" ] || { echo "setup-linux.sh installs mise-owned CLIs itself:$found"; false; }
 }
