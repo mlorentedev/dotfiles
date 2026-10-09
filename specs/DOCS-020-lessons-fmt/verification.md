@@ -19,6 +19,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
+- PR 2 (#2211): the hook runs the installed `dotf` (0.65.0), which has `lessons fmt` but not the wikilink check; CI builds from the checkout and enforces it until the next release reaches the pin. `dotf lessons fmt --check` passed through the hook on this host (`pre-commit run lessons-fmt --all-files`). Review triage: [#2211](https://github.com/mlorentedev/dotfiles/pull/2211#issuecomment-6074931691), one finding applied, two declined with reasons
+
 - Migration on the repository (macOS arm64): `dotf lessons fmt --check` reported all 339 lessons and the index as `not formatted:`; `dotf lessons fmt` -> `formatted 340 file(s)`; a second `--check` -> `[OK]`; `bash scripts/check-lessons.sh` -> `OK (339 lessons)`
 - Samples read in the diff: lesson 215 (no frontmatter, inline date), 026 (vault shape), 213 (H1 `213 — …`, with the curated title seeded from the index), 337 (title/date shape), and the head and tail of the index
 - Measured before migrating: 0 lessons without a date once inline `**Date:**` is counted; 2 dates a day off the index (233, 234; the file wins); 77 titles differing from the index (the curated index title is seeded)
@@ -36,9 +38,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? no: the one surprise, that a deleted guard asserted more than its successor (the wikilink check), is recorded in AC7 and `tasks.md`, where the next reader of this spec looks
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: retiring a shell twin for a `dotf` command is ADR-020's strangler-fig, not a new decision
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the lesson format and index are this repository's
 
 ## Archive checklist
 
