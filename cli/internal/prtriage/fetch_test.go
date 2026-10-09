@@ -377,3 +377,52 @@ func TestFetchTargetsTheCurrentRepoByDefault(t *testing.T) {
 		t.Errorf("request %q should use gh's {owner}/{repo} placeholders when no repo is given", seen[0])
 	}
 }
+
+// The file list is read only for a PR the queue would report, so a quiet PR
+// costs no extra call on the session-start path, and a release PR whose diff is
+// exactly the exempt signature leaves the queue (#1196).
+func TestFetchDropsAPendingPRWhoseDiffIsAnExemptSignature(t *testing.T) {
+	r := testRegistry()
+	r.Exempt.Signatures = []Signature{{Name: "release-please", Files: []string{"CHANGELOG.md", "versions.conf"}}}
+	review := `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-09T05:00:00Z"}]`
+	fake := &fakeGH{responses: map[string]string{
+		"pulls?state":         `[{"number":20,"title":"release"},{"number":21,"title":"feature"},{"number":22,"title":"quiet"}]`,
+		"/issues/20/comments": review,
+		"/issues/21/comments": review,
+		"/issues/22/comments": `[]`,
+		"pulls/20/files":      `[{"filename":"versions.conf"},{"filename":"CHANGELOG.md"}]`,
+		"pulls/21/files":      `[{"filename":"CHANGELOG.md"},{"filename":"cli/main.go"}]`,
+	}}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].PR.Number != 21 {
+		t.Fatalf("want only #21 pending, got %+v", got)
+	}
+	for _, req := range fake.seen() {
+		if strings.Contains(req, "pulls/22/files") {
+			t.Error("a PR with nothing pending must not cost a files call")
+		}
+	}
+}
+
+// A file list that fills a page cannot be compared, and is never exempt: the
+// error toward a louder queue, the direction this package always takes.
+func TestFetchKeepsAPRWhoseFileListFillsAPage(t *testing.T) {
+	r := testRegistry()
+	r.Exempt.Signatures = []Signature{{Name: "release-please", Files: []string{"CHANGELOG.md"}}}
+	files := make([]string, filesLimit)
+	for i := range files {
+		files[i] = `{"filename":"CHANGELOG.md"}`
+	}
+	fake := &fakeGH{responses: map[string]string{
+		"pulls?state":         `[{"number":20,"title":"release"}]`,
+		"/issues/20/comments": `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-09T05:00:00Z"}]`,
+		"pulls/20/files":      "[" + strings.Join(files, ",") + "]",
+	}}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", r)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("a full page of files must keep the PR pending: %+v, %v", got, err)
+	}
+}

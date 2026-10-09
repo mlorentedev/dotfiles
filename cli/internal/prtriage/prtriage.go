@@ -29,6 +29,20 @@ type Registry struct {
 	Triage    struct {
 		Marker string `json:"marker"`
 	} `json:"triage"`
+	Exempt struct {
+		Signatures []Signature `json:"signatures"`
+	} `json:"exempt"`
+}
+
+// Signature is a diff that carries nothing a review could act on, declared in
+// the registry and honoured by both consumers: the attestation gate reports it
+// exempt, and the queue does not list it (#1196). A release PR is the case:
+// release-please regenerates it on every merge to main, CodeRabbit re-edits its
+// "Reviews paused" notice each time, and the queue read every edit as new
+// review output.
+type Signature struct {
+	Name  string   `json:"name"`
+	Files []string `json:"files"`
 }
 
 // Reviewer is one declared reviewer. ReviewMarkers are the headings a reviewer
@@ -73,6 +87,9 @@ type PR struct {
 	Title    string    `json:"title"`
 	URL      string    `json:"url"`
 	Comments []Comment `json:"comments"`
+	// Files is the diff's file list, or nil when it was not read. Only a PR
+	// the queue would otherwise report has it read (see fetchWith).
+	Files []string `json:"files,omitempty"`
 }
 
 // Status is the verdict for one pull request.
@@ -180,6 +197,9 @@ func hasLinePrefix(body, marker string) bool {
 // which is the case that matters, because pushing a fix makes the reviewer
 // re-review and the earlier disposition no longer covers what it said.
 func Evaluate(pr PR, reg Registry) Status {
+	if name, ok := exemptAs(pr.Files, reg); ok {
+		return Status{PR: pr, Reason: fmt.Sprintf("exempt: the %q diff signature, nothing here is reviewable", name)}
+	}
 	out, by, ok := reviewOutput(pr, reg)
 	if !ok {
 		return Status{PR: pr, Reason: "no reviewer output yet"}
@@ -194,6 +214,42 @@ func Evaluate(pr PR, reg Registry) Status {
 			Reason: fmt.Sprintf("%s reviewed again after the last triage", by)}
 	}
 	return Status{PR: pr, Reviewer: by, At: out.Spoken(), Reason: "triaged"}
+}
+
+// exemptAs returns the signature whose files are exactly the diff's: set
+// equality in both directions, the attestation gate's rule, so touching one
+// file more or one fewer ends the exemption. A diff whose files were not read
+// is never exempt.
+func exemptAs(files []string, reg Registry) (string, bool) {
+	if len(files) == 0 {
+		return "", false
+	}
+	changed := setOf(files)
+	for _, sig := range reg.Exempt.Signatures {
+		want := setOf(sig.Files)
+		if len(want) == 0 || len(want) != len(changed) {
+			continue
+		}
+		same := true
+		for f := range changed {
+			if !want[f] {
+				same = false
+				break
+			}
+		}
+		if same {
+			return sig.Name, true
+		}
+	}
+	return "", false
+}
+
+func setOf(xs []string) map[string]bool {
+	m := make(map[string]bool, len(xs))
+	for _, x := range xs {
+		m[x] = true
+	}
+	return m
 }
 
 // Queue evaluates every pull request and returns those awaiting a disposition.
