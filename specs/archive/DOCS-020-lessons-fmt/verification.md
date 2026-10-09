@@ -62,5 +62,5 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/DOCS-020-lessons-fmt/` -> `specs/archive/DOCS-020-lessons-fmt/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018) — pending merge: #2214 carries `Closes #2038`, so the issue closes, and the board item moves to Done, when it lands
 - [x] Promotions above executed (if any)
