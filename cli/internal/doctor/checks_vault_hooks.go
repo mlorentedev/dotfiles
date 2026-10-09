@@ -61,8 +61,9 @@ func checkVaultHooks(sys *System, rep *Report, fix bool) {
 	// missing binary is an inactive gate whatever the hooks look like. Checked
 	// first and in check mode too: a Mac with the dispatcher deployed and no
 	// pre-commit installed reported "gate active" while no commit was scanned.
-	if !sys.has("pre-commit") {
-		rep.Fail("vault secret gate INACTIVE — pre-commit not on PATH; install it with `dotf tools install pre-commit`, then re-run `dotf doctor --fix`")
+	preCommit := preCommitPath(sys)
+	if preCommit == "" {
+		rep.Fail("vault secret gate INACTIVE — pre-commit not on PATH; install it with `dotf tools install pre-commit`")
 		return
 	}
 	preCommitOK := stageReachesPreCommit(sys, vault, "pre-commit")
@@ -80,13 +81,35 @@ func checkVaultHooks(sys *System, rep *Report, fix bool) {
 
 	// `pre-commit install` resolves the git repo from its working directory, so it
 	// must run with cwd = vault (hence CommandOutputDir, not CommandOutput).
-	out, err := sys.CommandOutputDir(vault, "pre-commit", "install",
+	out, err := sys.CommandOutputDir(vault, preCommit, "install",
 		"--hook-type", "pre-commit", "--hook-type", "pre-push")
 	if err != nil {
 		rep.Fail(fmt.Sprintf("`pre-commit install` failed in %s: %v (%s)", vault, err, firstLine(out)))
 		return
 	}
 	rep.Fix("installed vault pre-commit + pre-push hooks in " + vault)
+}
+
+// preCommitPath resolves pre-commit the way the dispatcher does
+// (git-hooks/lib/chain-local-hook.sh): PATH first, then uv's tool bin dir in
+// uv's documented order (UV_TOOL_BIN_DIR, XDG_BIN_HOME, ~/.local/bin), where
+// `dotf tools install` puts it. A GUI launcher's PATH has no ~/.local/bin, and
+// the dispatcher still runs the gate there, so doctor must not FAIL it. The
+// bare name when PATH has it, the absolute path from uv's dir otherwise, ""
+// when neither has it.
+func preCommitPath(sys *System) string {
+	if sys.has("pre-commit") {
+		return "pre-commit"
+	}
+	dir := sys.env("UV_TOOL_BIN_DIR", sys.env("XDG_BIN_HOME", filepath.Join(sys.home(), ".local", "bin")))
+	p := filepath.Join(dir, "pre-commit")
+	if sys.GOOS == "windows" {
+		p += ".exe"
+	}
+	if isExecFile(p) {
+		return p
+	}
+	return ""
 }
 
 // missingHooks renders the human list of absent stages for the FAIL message.

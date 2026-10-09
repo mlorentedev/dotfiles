@@ -135,6 +135,9 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   it reported "gitleaks gate active"
 - [x] `checkVaultHooks` FAILs in check mode when pre-commit is absent, before probing the stages.
   The real-git worktree tests pin pre-commit as present, so they stay about hook layout
+- [x] Doctor resolves pre-commit the way the dispatcher does: PATH, then uv's tool bin dir
+  (`TestVaultHooks_PreCommitInUvBinDirOnly_Passes`). Otherwise the two disagree, and doctor
+  FAILs a gate that runs (found by the migration-debt audit)
 - [x] The dispatcher fails closed on pre-commit, pre-push and commit-msg when a repo declares a
   config and pre-commit is missing. It stays a no-op on stages that cannot block, and it finds
   pre-commit in uv's tool bin dir when PATH lacks it (GUI launchers)
