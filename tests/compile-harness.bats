@@ -1034,6 +1034,23 @@ DIAG
     refute_grep '^model:' "$F"
 }
 
+@test "instructions: only dotf writes them; without the command the deploy warns and copies nothing" {
+    seed_agents_fixture
+    # A presence entry with a source: the shape the real manifest uses, and the
+    # one a second, shell-side writer used to copy when dotf lacked the command.
+    local tmp
+    tmp="$(mktemp)"
+    jq '.agents.presence[0].source = "ai/claude/CLAUDE.md"' "$REPO/harness/manifest.json" > "$tmp" \
+        && mv "$tmp" "$REPO/harness/manifest.json"
+    mkdir -p "$REPO/ai/claude"
+    printf 'SOURCE-ONLY-MARKER\n' > "$REPO/ai/claude/CLAUDE.md"
+    run_refresh; [ "$status" -eq 0 ]
+    run_deploy
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"instructions need \`dotf harness instructions\`"* ]] || false
+    [ ! -e "$FAKEHOME/.claude/CLAUDE.md" ]
+}
+
 @test "agents: a dotf too old to know resolve-tier warns rather than embedding its help output" {
     seed_agents_fixture
     run_refresh; [ "$status" -eq 0 ]
