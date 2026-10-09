@@ -100,8 +100,10 @@ _guard_is_active() {
 }
 
 @test "guard: setup_suite.bash passes shellcheck" {
-    command -v "$HOME/.local/bin/shellcheck" >/dev/null 2>&1 || skip "shellcheck not installed"
-    run "$HOME/.local/bin/shellcheck" -s bash "$REPO_ROOT/tests/setup_suite.bash"
+    # From PATH: mise installs shellcheck (#2013 W2), and a fixed
+    # ~/.local/bin path skipped this test on every machine set up since.
+    command -v shellcheck >/dev/null 2>&1 || skip "shellcheck not installed"
+    run shellcheck -s bash "$REPO_ROOT/tests/setup_suite.bash"
     [ "$status" -eq 0 ]
 }
 

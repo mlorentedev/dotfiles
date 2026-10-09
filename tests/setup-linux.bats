@@ -69,20 +69,9 @@ setup() {
     [ "$sync" -lt "$install2" ]
 }
 
-@test "setup-linux.sh installs age if missing" {
-    grep -q 'command -v age' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'FiloSottile/age' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'AGE_VERSION' "$DOTFILES_DIR/setup-linux.sh"
-}
-
 @test "setup-linux.sh installs eza if missing" {
     grep -q 'command -v eza' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'eza.*linux.*tar.gz' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh installs jq if missing" {
-    grep -q 'command -v jq' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'jq-linux-amd64' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
@@ -108,35 +97,26 @@ setup() {
     grep -q 'cli/cli/releases' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh installs zoxide if missing" {
-    grep -q 'command -v zoxide' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'zoxide.*install.sh' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh installs direnv if missing" {
-    grep -q 'command -v direnv' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'direnv.net/install.sh' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh installs shellcheck if missing" {
-    grep -q 'command -v shellcheck' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'ShellCheck/releases' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh installs bats if missing" {
-    grep -q 'command -v bats' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'bats-core/bats-core' "$DOTFILES_DIR/setup-linux.sh"
-}
-
 @test "setup-linux.sh skips tools already installed" {
-    grep -q 'age already installed' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'eza already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'jq already installed' "$DOTFILES_DIR/setup-linux.sh"
     grep -q 'gh already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'zoxide already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'direnv already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'shellcheck already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'bats already installed' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+@test "setup-linux.sh has no installer of its own for a CLI versions.conf marks for mise (#2013 W2)" {
+    # mise installs these through `dotf tools sync` (ADR-044). An installer that
+    # ran before the sync put a second, unpinned copy in ~/.local/bin on every
+    # fresh box (age and jq did); one that ran after it was dead code.
+    local names name found=""
+    names="$(awk '
+        m && /^[A-Z0-9_]+_VERSION=/ {
+            n = $0; sub(/_VERSION=.*/, "", n); n = tolower(n); gsub(/_/, "-", n); print n
+        }
+        { m = ($0 == "# mise: cli") }' "$DOTFILES_DIR/versions.conf")"
+    [ -n "$names" ]
+    while IFS= read -r name; do
+        grep -qF "log_info \"Installing $name..." "$DOTFILES_DIR/setup-linux.sh" && found="$found $name"
+    done <<< "$names"
+    [ -z "$found" ] || { echo "setup-linux.sh installs mise-owned CLIs itself:$found"; false; }
 }
 
 # --- tmux integration ---

@@ -41,7 +41,11 @@ created: "2026-10-06"
 - [x] poetry 2.5.1 is a `packages.json` uv-tool entry on every OS; `setup-windows.ps1` loses its poetry block (26 lines). Windows keeps its uv installer until the Windows session measures `mise install uv` there
 - [x] `systemd/hive-upgrade.service` hard-coded `%h/.local/bin/uv`, where uv's own installer put it and mise does not. It runs `/usr/bin/env mise exec -- uv`, with a PATH that finds mise and no shims dir (a moved mise data dir would leave a hard-coded one stale)
 - [x] From zero on the Mac (empty HOME, isolated mise/XDG/uv dirs): `tools install mise` → shims on PATH → `tools sync` installed uv 0.12.18 → `tools install pre-commit` installed and ran 4.6.2 through that uv
-- [ ] Second half: delete the five linux-amd64 curl blocks once doctor reports leftover `~/.local/bin` copies that shadow mise's (Go, needs a release)
+- [x] Second half: `setup-linux.sh` has no installer of its own for a marked pin. Deleted: age and jq (linux-amd64 curl, which ran BEFORE `dotf tools sync` and so put a second, unpinned copy in `~/.local/bin` on every fresh box), and zoxide, direnv, shellcheck and bats (after the sync, so dead). eza and gh stay behind the host gate: neither is in mise. On a non-amd64 host the leftover cleanup still removes an unrunnable age, jq or shellcheck a past run placed
+- [x] Guard: `tests/setup-linux.bats` fails when setup logs "Installing <name>" for any name `versions.conf` marks for mise (mutation-checked with a reintroduced direnv line). It replaces the per-tool "installs X if missing" assertions, which asserted the opposite
+- [x] The integration suite's PATH carries mise's shims, as a shell with `mise activate` does: jq now exists only there, and two `verify-setup.bats` tests resolve it from PATH or `~/.local/bin`
+- [x] The documented `~/.local/bin/shellcheck` and `~/.local/bin/bats` paths are gone from CLAUDE.md, `specs/CI-002` verification commands and `guard-no-gui.bats`, whose shellcheck test skipped on every machine set up through mise; ADR-004 carries an update note. CI installs its own bats and is unchanged
+- [ ] doctor reports a leftover `~/.local/bin` copy of a marked pin (placed by the deleted blocks on existing machines; shadowed by mise in a shell, but what a GUI-launched or cron process finds first). Go, needs a release
 - [ ] `disable_update_warning` in the rendered mise config: a catalog-pinned mise prints "run mise self-update" on every call, and self-update steps outside the pin
 
 ### H1 — herdr through mise (#2013 track H)

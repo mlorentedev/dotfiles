@@ -11,6 +11,11 @@ setup() {
     export HOME="/home/testuser"
     export DOTFILES_DIR="$HOME/.dotfiles"
     export REPO_DIR="$HOME/dotfiles-repo"
+    # The PATH a user's shell has after setup: `mise activate` in the rc files
+    # puts the mise-pinned CLIs on it, and setup installs some of them only
+    # there (jq among them, #2013 W2). The entrypoint's PATH has neither them
+    # nor ~/.local/bin.
+    export PATH="$HOME/.local/share/mise/shims:$PATH"
 }
 
 # =============================================================================

@@ -633,8 +633,10 @@ FIXTURE
     jq -e '.tools[] | select(.name == "poetry" and (.source.platforms == null))' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
-@test "parity: both scripts install age" {
-    grep -q 'command -v age' "$DOTFILES_DIR/setup-linux.sh"
+# Linux gets age and zoxide from mise (`dotf tools sync` reads the "# mise: cli"
+# mark in versions.conf, #2013 W2); Windows from winget until its own session.
+@test "parity: both OSes install age (Linux through mise)" {
+    grep -B1 '^AGE_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'FiloSottile.age' "$PS1_SCRIPT"
 }
 
@@ -653,8 +655,8 @@ FIXTURE
     grep -q 'GitHub.cli' "$PS1_SCRIPT"
 }
 
-@test "parity: both scripts install zoxide" {
-    grep -q 'command -v zoxide' "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: both OSes install zoxide (Linux through mise)" {
+    grep -B1 '^ZOXIDE_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'ajeetdsouza.zoxide' "$PS1_SCRIPT"
 }
 
