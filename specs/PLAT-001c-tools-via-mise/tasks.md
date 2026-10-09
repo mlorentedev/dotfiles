@@ -131,6 +131,7 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] Mutation-checked: dropping the symlink exemption, running the check before the pins are verified, or linking without checking the shim exists turns tests red
 - [x] Runbook: `docs/runbooks/tool-installation.md` says where the copies come from and how `--fix` treats them
 - [x] Review triage: an entry from `mise bin-paths --bin-names` that is a path rather than a file name (a separator, `.` or `..`) is reported and left alone, so `--fix` can never rename over a file outside `~/.local/bin` (`TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched`, mutation-checked). The doc comment on `checkMiseTools` now says the fix links, not removes
+- [x] Review triage: the pin-guard test was vacuous. Its fixture had no shim, so with the guard removed `--fix` still left the copy, for a different reason. The fixture now writes the shim and asserts the copy is still a regular file; deleting the guard's `return` turns it red (measured 2026-10-09)
 
 ## Closing
 
