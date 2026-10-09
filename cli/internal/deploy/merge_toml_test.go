@@ -191,3 +191,31 @@ func TestParseManifest_RefusesPathsOnATOMLConfig(t *testing.T) {
 		t.Errorf("want a paths error naming the config, got %v", err)
 	}
 }
+
+// A merge source that names no key deploys nothing and reports success, so an
+// emptied or truncated config would read as in sync forever. JSON refused an
+// empty file only by accident (it does not parse); `{}` and an empty or
+// comment-only TOML file parse fine, so the refusal is the merge's, not the
+// decoder's.
+func TestDeploy_MergeRefusesASourceThatManagesNoKey(t *testing.T) {
+	for name, src := range map[string]string{"empty TOML": "", "comment-only TOML": "# nothing yet\n"} {
+		t.Run(name, func(t *testing.T) {
+			root := repoWithHerdrConfig(t, src)
+			_, err := Deploy(herdrConfig(), root, t.TempDir(), noResolve, nil, false)
+			if err == nil || !strings.Contains(err.Error(), "manages no key") {
+				t.Errorf("want a refusal naming the empty source, got %v", err)
+			}
+		})
+	}
+	t.Run("empty JSON object", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "s.json"), []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		c := Config{Name: "x", Src: "s.json", Dst: "{HOME}/d.json", Mode: "0644", Strategy: StrategyMerge}
+		_, err := Deploy(c, root, t.TempDir(), noResolve, nil, false)
+		if err == nil || !strings.Contains(err.Error(), "manages no key") {
+			t.Errorf("want a refusal naming the empty source, got %v", err)
+		}
+	})
+}

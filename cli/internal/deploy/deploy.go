@@ -809,7 +809,8 @@ func decodeJSONMap(raw []byte) (map[string]any, error) {
 	return m, err
 }
 
-// decodeTOMLTable reads a TOML document. An empty one is an empty table.
+// decodeTOMLTable reads a TOML document. An empty one is an empty table, which
+// mergeInto refuses as a source.
 func decodeTOMLTable(raw []byte) (map[string]any, error) {
 	m := map[string]any{}
 	if err := toml.Unmarshal(raw, &m); err != nil {
@@ -834,6 +835,12 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	managed, err := f.decodeSource(srcData)
 	if err != nil {
 		return nil, false, fmt.Errorf("source is not %s: %w", f.what, err)
+	}
+	if len(managed) == 0 {
+		// The repo owns the keys its source names, so a source that names none
+		// owns nothing: every run would succeed and change nothing, and an
+		// emptied config would read as in sync forever.
+		return nil, false, errors.New("source manages no key: a merge source must name at least one")
 	}
 	existing := map[string]any{}
 	if raw, err := os.ReadFile(dst); err == nil { //nolint:gosec // manifest-declared destination
