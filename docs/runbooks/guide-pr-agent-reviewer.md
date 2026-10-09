@@ -143,7 +143,7 @@ transport and NaN's would misroute an Anthropic model. So:
 
 **glm5.3-flash needs `reasoning_effort: low`.** At its default it reasons until
 NaN closes the stream at 60,000 reasoning characters and publishes nothing
-(lesson 369). The NaN step sets `CONFIG__REASONING_EFFORT: low` and lists glm in
+(lesson 370). The NaN step sets `CONFIG__REASONING_EFFORT: low` and lists glm in
 `CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS`, because PR-Agent sends an effort to
 a model LiteLLM does not know only when it is listed. The setting covers the
 whole NaN attempt; deepseek accepts it and ignores it, mimo never receives it.

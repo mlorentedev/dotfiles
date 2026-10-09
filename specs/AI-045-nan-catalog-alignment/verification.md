@@ -62,7 +62,7 @@ AC9, 2026-10-08:
   the NaN attempt's `low` effort listed for glm5.3-flash only, the preflight's exit code reaching the draw, and the
   action pin and ten review settings shared by all three attempts. `tests/pr-agent-publish-guard.bats` (23) runs the
   guard: the probe's answers and the final guard judging the last attempt in `ATTEMPTS`; its empty-outcome case found a
-  real defect (lesson 368). Mutations, each turned red: an unanswered member admitted, the key check dropped, `nan-only`
+  real defect (lesson 369). Mutations, each turned red: an unanswered member admitted, the key check dropped, `nan-only`
   probing, an unknown override accepted, the drawn NaN model not first, a constant draw, the non-numeric count check
   dropped, `CONFIG__MODEL_WEAK` dropped, the setup-error stop disabled, the Anthropic branch of the no-review message
   removed, the output cap doubled, glm's effort list dropped or its level raised, the job timeout back to 30. One mutant survived and was equivalent (a redundant `nan-only` clause, removed).

@@ -73,7 +73,7 @@ created: "2026-09-29"
       v0.47.0's pin) measured forwarding `thinking` and `output_config` unchanged; the budget test bounds the worst review
       under $0.25
 - [x] [AC9] glm5.3-flash measured on review-sized prompts before admission: no review at its default effort or `medium`,
-      a review at `low` on 37K and 97K tokens (lesson 369); the NaN attempt sends `low`, pinned by a test
+      a review at `low` on 37K and 97K tokens (lesson 370); the NaN attempt sends `low`, pinned by a test
 - [x] [AC9] Live run, Haiku with thinking: drawn with no override, the step log carries PR-Agent's `Using adaptive
       thinking for model anthropic/claude-haiku-5-5 with output_config effort 'high'` and a review is published
       (run 37885509177)

@@ -1,5 +1,5 @@
 ---
-id: "lesson-369-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer"
+id: "lesson-370-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer"
 type: lesson
 status: active
 title: "A reasoning model at its default effort can think away the whole answer"

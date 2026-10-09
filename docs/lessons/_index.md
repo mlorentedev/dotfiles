@@ -385,13 +385,7 @@ tags: [lessons, index, dotfiles]
 | [364 - A regenerate-from-SSOT step must know which way its clone is off](lesson-364-a-regenerate-from-ssot-step-must-know-which-way-its-clone-is-off.md) | 2026-10-08 |
 | [365 - A CLI that exits 0 on its own errors is answered by content, not by output](lesson-365-a-cli-that-exits-0-on-its-own-errors-is-answered-by-content.md) | 2026-10-08 |
 | [367 - A paid model is bounded by every layer that supplies a default](lesson-367-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default.md) | 2026-10-08 |
-<<<<<<< HEAD
 | [368 - Two checks of one property must share one predicate](lesson-368-two-checks-of-one-property-must-share-one-predicate.md) | 2026-10-08 |
-=======
-| [368 - read shifts fields left when the first one is empty](lesson-368-read-shifts-fields-left-when-the-first-one-is-empty.md) | 2026-10-08 |
-<<<<<<< HEAD
->>>>>>> c38ece0e (feat(ci): draw PR-Agent's first reviewer from a NaN + Claude Haiku pool)
-=======
-| [369 - A reasoning model at its default effort can think away the whole answer](lesson-369-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
->>>>>>> 47a1747c (feat(ci): add glm5.3-flash to the review pool and give Haiku NaN's budget)
+| [369 - read shifts fields left when the first one is empty](lesson-369-read-shifts-fields-left-when-the-first-one-is-empty.md) | 2026-10-08 |
+| [370 - A reasoning model at its default effort can think away the whole answer](lesson-370-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
 <!-- END GENERATED -->

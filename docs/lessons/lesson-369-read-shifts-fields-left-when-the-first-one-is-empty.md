@@ -1,5 +1,5 @@
 ---
-id: "lesson-368-read-shifts-fields-left-when-the-first-one-is-empty"
+id: "lesson-369-read-shifts-fields-left-when-the-first-one-is-empty"
 type: lesson
 status: active
 title: "read shifts fields left when the first one is empty"

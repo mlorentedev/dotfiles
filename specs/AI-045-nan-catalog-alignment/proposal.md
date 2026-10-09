@@ -72,7 +72,7 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
   Later the same day, after the live runs, the owner widened it: `glm5.3-flash` joins the NaN chain, so four members
   draw at a quarter each, and Haiku gets parity with NaN's prompt cap (200K, accepting the over-100K price on large
   diffs) and adaptive thinking at `high` effort, within a worst case under $0.25 a review that a test holds. glm
-  reviews only at `reasoning_effort: low` (lesson 369).
+  reviews only at `reasoning_effort: low` (lesson 370).
 - AC10's `queue: max` is documented for workflow-level groups only, and actionlint 1.7.12 does not know the key. Its PR's own run is the measurement: a workflow GitHub refuses fails visibly before any review. Serialised reviews also mean a busy day waits, up to the job's 31 minutes per PR ahead in the queue.
 
 ## Acceptance criteria
