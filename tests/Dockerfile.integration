@@ -15,11 +15,11 @@ ARG AGE_VERSION=1.3.1
 # `go` directive; ci.yml passes the real value as a build-arg).
 ARG GO_VERSION=1.26.0
 
-# Minimal dependencies that setup-linux.sh actually needs. xz-utils is required
-# for the shellcheck install (a .tar.xz extracted with `tar xJf`); without it the
-# step failed silently with "tar (child): xz: Cannot exec" and the integration test
-# never actually exercised shellcheck install. A standard Ubuntu desktop ships it,
-# so its absence here made the container UNrepresentative of a real machine.
+# Minimal dependencies that setup-linux.sh actually needs. xz-utils extracts
+# .tar.xz archives: without it a `tar xJf` failed silently with "tar (child): xz:
+# Cannot exec". shellcheck, its first user, now comes from mise (#2013 W2). A
+# standard Ubuntu desktop ships xz-utils, so the container keeps it to stay
+# representative of a real machine.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     zsh \
