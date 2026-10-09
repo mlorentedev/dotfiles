@@ -835,17 +835,30 @@ func encodeTOML(m map[string]any) ([]byte, error) { return toml.Marshal(m) }
 // A missing destination merges into an empty document; a destination that does
 // not parse as one is an error, because "merge" has no meaning for it and
 // silently replacing it is the data loss this strategy exists to prevent.
+// managesAValue reports whether m holds a value anywhere below it: anything
+// that is not a table counts, an empty list included.
+func managesAValue(m map[string]any) bool {
+	for _, v := range m {
+		sub, ok := v.(map[string]any)
+		if !ok || managesAValue(sub) {
+			return true
+		}
+	}
+	return false
+}
+
 func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	f := mergeFormatFor(dst)
 	managed, err := f.decodeSource(srcData)
 	if err != nil {
 		return nil, false, fmt.Errorf("source is not %s: %w", f.what, err)
 	}
-	if len(managed) == 0 {
-		// The repo owns the keys its source names, so a source that names none
-		// owns nothing: every run would succeed and change nothing, and an
-		// emptied config would read as in sync forever.
-		return nil, false, errors.New("source manages no key: a merge source must name at least one")
+	if !managesAValue(managed) {
+		// The repo owns the values its source names, so a source that names
+		// none owns nothing: every run would succeed and change nothing, and an
+		// emptied config would read as in sync forever. A table with no values
+		// (a TOML header left alone, `{"keys": {}}`) names none either.
+		return nil, false, errors.New("source manages no key: a merge source must name at least one value")
 	}
 	existing := map[string]any{}
 	if raw, err := os.ReadFile(dst); err == nil { //nolint:gosec // manifest-declared destination

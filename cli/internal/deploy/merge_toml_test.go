@@ -206,7 +206,7 @@ func TestParseManifest_RefusesPathsOnATOMLSource(t *testing.T) {
 // comment-only TOML file parse fine, so the refusal is the merge's, not the
 // decoder's.
 func TestDeploy_MergeRefusesASourceThatManagesNoKey(t *testing.T) {
-	for name, src := range map[string]string{"empty TOML": "", "comment-only TOML": "# nothing yet\n"} {
+	for name, src := range map[string]string{"empty TOML": "", "comment-only TOML": "# nothing yet\n", "header-only TOML": "[keys]\n[update]\n"} {
 		t.Run(name, func(t *testing.T) {
 			root := repoWithHerdrConfig(t, src)
 			_, err := Deploy(herdrConfig(), root, t.TempDir(), noResolve, nil, false)
@@ -215,17 +215,28 @@ func TestDeploy_MergeRefusesASourceThatManagesNoKey(t *testing.T) {
 			}
 		})
 	}
-	t.Run("empty JSON object", func(t *testing.T) {
-		root := t.TempDir()
-		if err := os.WriteFile(filepath.Join(root, "s.json"), []byte("{}\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		c := Config{Name: "x", Src: "s.json", Dst: "{HOME}/d.json", Mode: "0644", Strategy: StrategyMerge}
-		_, err := Deploy(c, root, t.TempDir(), noResolve, nil, false)
-		if err == nil || !strings.Contains(err.Error(), "manages no key") {
-			t.Errorf("want a refusal naming the empty source, got %v", err)
-		}
-	})
+	for name, body := range map[string]string{"empty JSON object": "{}\n", "JSON of empty objects": `{"a": {}, "b": {"c": {}}}`} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "s.json"), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			c := Config{Name: "x", Src: "s.json", Dst: "{HOME}/d.json", Mode: "0644", Strategy: StrategyMerge}
+			_, err := Deploy(c, root, t.TempDir(), noResolve, nil, false)
+			if err == nil || !strings.Contains(err.Error(), "manages no key") {
+				t.Errorf("want a refusal naming the empty source, got %v", err)
+			}
+		})
+	}
+	// An empty list is a value: the source sets it.
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "s.json"), []byte(`{"a": {"list": []}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := Config{Name: "x", Src: "s.json", Dst: "{HOME}/d.json", Mode: "0644", Strategy: StrategyMerge}
+	if _, err := Deploy(c, root, t.TempDir(), noResolve, nil, false); err != nil {
+		t.Errorf("an empty list is a managed value: %v", err)
+	}
 }
 
 // A merge reads its source in the destination's format, so a source of the
