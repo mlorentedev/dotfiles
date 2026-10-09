@@ -120,6 +120,14 @@
       }
     },
     {
+      "name": "bash",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "bash"
+      }
+    },
+    {
       "name": "git-lfs",
       "profile": "full",
       "source": {

@@ -104,7 +104,8 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 - [x] `setup-linux.sh` loses its tmux and xclip presence checks and hand-written `sudo apt install` hints; `tests/setup-linux.bats` asserts the catalog carries both and setup no longer prints the hint
 - [x] On the Mac, the dry-run plans install for tmux, wget and eza and skip for the rest, xclip `unsupported`. Each entry was then installed through brew, and a second plan reports skip for all three
 - [ ] The winget rows that move here (gh, eza, zoxide) leave `setup-windows.ps1`'s loop in the Windows-empirical batch: `dotf tools install` there is not followed by a PATH refresh, which only a run on the Windows box can prove harmless. The catalog declares the same ids, so both channels agree until then
-- [ ] Second half: `bash` (brew only) with `/opt/homebrew/bin` ahead of `/bin` on the PATH `dotf env` declares (#2202); `git lfs install` as a converge reconciler beside `git-config` once #2208 lands (#2201); the darwin casks from the owner's list in the vault runbook `runbook-macos-workstation-setup`
+- [x] `bash`, brew only and with no `command` (/bin/bash 3.2 would satisfy one), for `env bash` on the Mac (#2202). The PATH half was already true: `.zshrc` evals `brew shellenv`, which puts `/opt/homebrew/bin` (or `/usr/local/bin` on Intel) ahead of `/bin`, and `dotf env` declares path variables, not PATH. The 3.2 guard is unchanged: CI's macOS leg runs bats with `/bin` first and `--expect-bash 3`; the guard's comment now says so
+- [ ] Second half: `git lfs install` as a converge reconciler beside `git-config` once #2208 lands (#2201); the darwin casks from the owner's list in the vault runbook `runbook-macos-workstation-setup`
 - [ ] Out of P5b: docker and kubectl wait on the owner's runtime choice (Docker Desktop, OrbStack or Colima), and doctor keeps reporting them
 
 ### W2b — shims on PATH (after #2013 P6/P7)

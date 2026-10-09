@@ -36,6 +36,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - Test suite (P5b first half, macOS arm64): `go test ./internal/tools/ ./internal/doctor/` -> ok (the catalog loads with the eight system entries); `bats tests/setup-linux.bats` -> all ok, with tests 28-29 replaced (they pinned the hand-written tmux hint the catalog replaced)
 - Manual run (P5b, the Mac, unreleased build from the worktree): `dotf tools install --dry-run` -> gh, git-lfs, parallel and zoxide `present/skip`, tmux, wget and eza `absent/install`, xclip `unsupported (not installed on darwin by this catalog)`. Then `dotf tools install tmux`, `wget`, `eza` -> `installed via brew` each, exit 0; a second dry-run -> all three `present/skip`
+- Manual run (#2202, the Mac): `dotf tools install bash` -> `installed via brew (bash)`, second plan `present/skip`; in a login zsh `command -v bash` -> `/opt/homebrew/bin/bash` and `env bash` -> 5.3.20, while `/bin/bash` stays 3.2.57; `tests/bash32-portable.bats` passes under both, the 3.2 run through `PATH="/bin:$PATH" ./scripts/run-bats.sh --expect-bash 3`
 
 ## Decisions made during implementation
 
