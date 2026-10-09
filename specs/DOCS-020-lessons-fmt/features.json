@@ -40,5 +40,19 @@
     "verification": "grep -qF 'lessons fmt --check' .github/workflows/repo-hygiene.yml",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f7",
+    "behavior": "AC7: a wikilink that names no lesson is an error",
+    "verification": "cd cli && go test ./internal/lessons/ -run '^TestPlan_RefusesAWikilinkThatNamesNoLesson$' -count=1 -v | grep -q -- '--- PASS: TestPlan_RefusesAWikilinkThatNamesNoLesson'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "DOCS-020-lessons-fmt-f8",
+    "behavior": "AC7: pre-commit runs fmt --check and the shell check is gone",
+    "verification": "grep -qF 'entry: dotf lessons fmt --check' .pre-commit-config.yaml && test ! -e scripts/check-lessons.sh",
+    "state": "pending",
+    "evidence": ""
   }
 ]

@@ -64,6 +64,7 @@ The owner asked for the formats to be homogenised and the check ported to Go (20
 - [ ] AC4: `dotf lessons fmt --check` exits 1 naming every unformatted file, and exits 0 on the formatted repository.
 - [ ] AC5: the `dotf init` index template is exactly what `fmt` renders for no lessons.
 - [ ] AC6: CI runs `fmt --check` on every PR.
+- [ ] AC7 (PR 2): pre-commit runs `dotf lessons fmt --check`, and `check-lessons.sh` and its two bats files are deleted. Every assertion they made is in Go first, including the one only `guard-lesson-numbers-unique.bats` made: a lesson wikilink that names no lesson is an error.
 
 ## References
 

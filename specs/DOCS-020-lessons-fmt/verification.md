@@ -15,6 +15,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC4 -> `TestLessonsFmt_CheckFailsThenFmtConvergesThenCheckPasses`; on the repository, `fmt --check` passes after the migration
 - [x] AC5 -> `TestLessonsIndexTemplateIsWhatFmtRenders`
 - [x] AC6 -> `.github/workflows/repo-hygiene.yml`
+- [x] AC7 -> `TestPlan_RefusesAWikilinkThatNamesNoLesson`; `.pre-commit-config.yaml` hook `lessons-fmt`; the three files deleted. On the real tree, an appended `[[lesson-999-nope]]` made `fmt --check` exit 1 naming the file and link, and the 13 existing wikilinks all resolve
 
 ## Test status
 

@@ -32,8 +32,11 @@ created: "2026-10-06"
 
 ### PR 2 — after the release that carries `dotf lessons` is the `DOTF_VERSION` pin
 
-- [ ] Pre-commit runs `dotf lessons fmt --check` instead of `check-lessons.sh`
-- [ ] Delete `scripts/check-lessons.sh`, `tests/check-lessons.bats` and `tests/guard-lesson-numbers-unique.bats` (their cases live in the Go tests)
+- [x] [AC7] Failing test, then `Plan` refuses a wikilink that names no lesson. The task below assumed every case of the
+      deleted bats already lived in Go; the wikilink assertion of `guard-lesson-numbers-unique.bats` did not
+- [x] [AC7] Pre-commit runs `dotf lessons fmt --check` instead of `check-lessons.sh` (DOTF_VERSION 0.65.0 carries `lessons`)
+- [x] [AC7] Delete `scripts/check-lessons.sh`, `tests/check-lessons.bats` and `tests/guard-lesson-numbers-unique.bats`, and
+      the hygiene workflow's shell step
 
 ## Closing
 
