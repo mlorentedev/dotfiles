@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // makeRepo creates a temp directory that looks like a repo root (has .git) and
@@ -27,7 +29,7 @@ func makeRepo(t *testing.T) string {
 	prevBase, prevHead, prevIgnored := resolveReviewBase, headSHAOf, requestIgnored
 	resolveReviewBase = func(string, string) string { return "basebasebase" }
 	headSHAOf = func(string) string { return "headheadhead" }
-	requestIgnored = func(string, string) bool { return false }
+	requestIgnored = func(string, string, spec.ReviewSlot) bool { return false }
 	t.Cleanup(func() { resolveReviewBase, headSHAOf, requestIgnored = prevBase, prevHead, prevIgnored })
 
 	return root
