@@ -150,12 +150,12 @@
         "route": "risk",
         "reasoning_effort": "medium"
       },
-      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B) as the quality tier, placed where it pays: the SECOND signature of a `risk: high` spec (about 8 a month, about $1.60 each agentic), and in PR-Agent the first review of a PR past `pr_agent_risk` (about 8% of PRs at 900 changed lines, about $0.13 each). Never drawn at random in either flow: at 15x Haiku's PR-Agent price a uniform share would spend the month's budget in a week. No calibration yet; #2215 and #2216 measure it."
+      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B) as the quality tier, placed where it pays: the SECOND signature of a `risk: high` spec (about 8 a month, about $1.60 each agentic), and in PR-Agent the first review of a PR past `pr_agent_risk` (about 3% of PRs at 1500 changed lines, about $0.37 each, measured). Never drawn at random in either flow: at 15x Haiku's PR-Agent price a uniform share would spend the month's budget in a week. No calibration yet; #2215 and #2216 measure it."
     }
   ],
   "pr_agent_risk": {
-    "min_changed_lines": 900,
+    "min_changed_lines": 1500,
     "label": "deep-review",
-    "$comment": "A PR reviews first on the `route: risk` member when its additions plus deletions reach min_changed_lines, or it carries the label. Measured 2026-10-09 over 30 days: 6.6% of PRs pass 1000 changed lines; a path-based predicate matched 14-35% and was rejected as too costly. Recalibrate at #2215 / #2216."
+    "$comment": "A PR reviews first on the `route: risk` member when its additions plus deletions reach min_changed_lines, or it carries the label. Set to 1500 by owner decision 2026-10-09: the first live Sonnet review cost $0.37, not $0.13, because a PR this large fills the prompt cap, and over the last 395 merged PRs 9.1% reach 900 lines, 4.8% reach 1200 and 3.0% reach 1500. At 1500 the route costs about $28 of the $60-65 month. A path-based predicate matched 14-35% and was rejected as too costly. Recalibrate at #2215 / #2216."
   }
 }

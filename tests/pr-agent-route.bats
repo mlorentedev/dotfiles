@@ -156,6 +156,27 @@ every_point() {
     [ "$output" = "$want " ] || { printf 'drawn:   %s\nweights: %s\n' "$output" "$want" >&2; false; }
 }
 
+# The shipped risk line is the budget lever (ADR-046): 1,500 changed lines put
+# about 3% of PRs on Sonnet. Moving it moves the month's spend, so the number is
+# pinned here and the route is driven against the shipped pool on both sides.
+@test "route: the shipped pool routes to Sonnet at 1,500 changed lines and not below" {
+    local pool="$BATS_TEST_DIRNAME/../harness/reviewer-pool.json"
+    export POOL_FILE="$pool"
+    NAN_MODEL=$(jq -r '[.pool[] | .pr_agent.model // empty | select(startswith("openai/"))] | first' "$pool")
+    NAN_FALLBACKS=$(jq -c '[.pool[] | .pr_agent.model // empty | select(startswith("openai/"))] | .[1:]' "$pool")
+    export NAN_MODEL NAN_FALLBACKS
+    [ "$(jq '.pr_agent_risk.min_changed_lines' "$pool")" = "1500" ]
+
+    PR_CHANGED_LINES=1500 PR_AGENT_DRAW=0 route
+    [ "$status" -eq 0 ]
+    [ "$(out route)" = "risk" ]
+    [ "$(out reviewer)" = "anthropic/claude-sonnet-5-5" ]
+
+    : > "$OUT"; PR_CHANGED_LINES=1499 PR_AGENT_DRAW=0 route
+    [ "$status" -eq 0 ]
+    [ "$(out route)" = "draw" ]
+}
+
 # --- the risk route --------------------------------------------------------------
 
 @test "route: a PR at the line threshold reviews first on the risk member, NaN second" {

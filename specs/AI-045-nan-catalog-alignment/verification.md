@@ -95,20 +95,22 @@ reviews an hour of spec work, against $60-65 of Anthropic credit:
 
 | Spend | Volume | Unit | Month |
 |---|---|---|---|
-| Sonnet, PR-Agent risk route | ~8% of PRs, ~200 | ~$0.13 | ~$26 |
+| Sonnet, PR-Agent risk route (1,500 lines) | ~3% of PRs, ~75 | ~$0.37 measured | ~$28 |
 | Haiku, PR-Agent draw (35% of the weight) | ~875 | ~$0.008 | ~$7 |
 | Sonnet, second signature on `risk: high` specs | ~8 | ~$1.60 | ~$13 |
 | Haiku, fallback first signature | rare | | ~$2 |
-| Total | | | ~$48-52 |
+| Total | | | ~$50 |
 
-The margin covers the Sonnet share running above 8% while #2215 and #2216 measure it.
+The margin covers the Sonnet share running above 3% while #2215 and #2216 measure it.
 
 **Measured against the estimate, 2026-10-09.** The first live Sonnet review (run 37907390670, #2188 itself, 3,682 changed
 lines) read 176,372 prompt tokens and wrote 1,642: about $0.37, against the $0.13 assumed above. A PR on the risk
 route is large by definition, so its prompt is near the 200K cap, and $0.13 is a mid-size PR's figure. At $0.37 the
-Sonnet PR-Agent line becomes about $74, and the total about $96, over the $60-65 budget. The owner decides the
-correction: raise `min_changed_lines` (fewer PRs on the route), cap Sonnet's prompt below NaN's (a smaller diff, and a
-divergence from the parity rule), or lower Sonnet's share another way. #2215 and #2216 hold the measurement. Sonnet is the only `signs:
+Sonnet PR-Agent line becomes about $74, and the total about $96, over the $60-65 budget. The owner chose the
+correction the same day: `min_changed_lines` goes from 900 to 1,500. Over the last 395 merged PRs, 9.1% reach 900
+lines, 4.8% reach 1,200 and 3.0% reach 1,500. At 1,500 the line is about $28 and the total about $50. The table above
+already uses the measured unit and the new share. Capping Sonnet's prompt was rejected: it truncates the large diffs
+the route exists for. #2215 and #2216 hold the measurement. Sonnet is the only `signs:
 second` member, so a high-risk spec's second signature depends on the Anthropic key: deliberate, and named in the
 pool's `$comment`.
 

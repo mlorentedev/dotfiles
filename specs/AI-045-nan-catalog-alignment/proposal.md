@@ -77,8 +77,9 @@ NaN retired `mimo-v2.5` on 2026-09-30. It answered at 05:44Z and returned `401` 
   rather than as members a uniform draw seldom reaches, inside a stated budget. Three changes. PR-Agent's draw is
   weighted, and the weights live in `harness/reviewer-pool.json` (`pr_agent` blocks: mimo 27, glm 19, deepseek 19,
   Haiku 35), so a share is a declared number rather than one over the member count. Sonnet joins as a risk route: a PR
-  at or past 900 changed lines, or labelled `deep-review`, reviews first on Sonnet, and falls back to the draw when
-  Sonnet does not answer. The allowlist of Anthropic models CI may spend on moves from the workflow into
+  at or past 1,500 changed lines, or labelled `deep-review`, reviews first on Sonnet, and falls back to the draw when
+  Sonnet does not answer. The threshold was 900 at first; the owner raised it after the first live Sonnet review cost
+  $0.37, not $0.13. The allowlist of Anthropic models CI may spend on moves from the workflow into
   `scripts/pr-agent-route.sh`, which fails the draw on any other. And the spec archive gate's rule against Anthropic
   reviewers is replaced by "an Anthropic model never signs alone": the first signature stays another vendor's, Sonnet
   adds a second signature on `risk: high` specs, and Haiku signs as a recorded fallback when the first signers failed

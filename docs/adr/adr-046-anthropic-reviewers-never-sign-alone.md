@@ -41,7 +41,7 @@ reviews a month (10-15 PRs in parallel) and 4-5 adversarial reviews per hour of 
 3. **PR-Agent draws by declared weight.** Each member's `pr_agent` block in the pool gives its model, its weight and
    its reasoning effort. A member that does not answer its probe gives up its weight to the rest for that run.
    Weights at adoption: mimo 27, glm 19, deepseek 19, Haiku 35.
-4. **A risky PR reviews first on Sonnet.** A PR is risky when it has at least 900 changed lines or carries the
+4. **A risky PR reviews first on Sonnet.** A PR is risky when it has at least 1,500 changed lines or carries the
    `deep-review` label. Sonnet is never drawn. When it does not answer, the PR goes to the draw with a note.
 5. **The allowlist of Anthropic models CI may spend on lives in `scripts/pr-agent-route.sh`, not in the pool.** A
    pool edit naming another model fails the draw. A test requires a price row and a worst-review ceiling for every
@@ -52,11 +52,14 @@ reviews a month (10-15 PRs in parallel) and 4-5 adversarial reviews per hour of 
 
 ## Consequences
 
-- The quality tier reaches the reviews that justify it: about 8% of PRs and about 8 specs a month. Independence is
-  still guaranteed by the first signature. The budget arithmetic (about $48-52 of $60-65) is in
-  `specs/AI-045-nan-catalog-alignment/verification.md`. #2215 and #2216 measure it against real volume. The first
-  live Sonnet review already ran over the estimate: a PR on the risk route is large, so its prompt sits near the
-  200K cap ($0.37 a review, not $0.13). The threshold or Sonnet's prompt cap is the lever, and the owner decides it.
+- The quality tier reaches the reviews that justify it: about 3% of PRs and about 8 specs a month. Independence is
+  still guaranteed by the first signature. The budget arithmetic (about $50 of $60-65) is in
+  `specs/AI-045-nan-catalog-alignment/verification.md`. #2215 and #2216 measure it against real volume.
+- **The threshold is the budget lever, not Sonnet's prompt cap.** The first live Sonnet review cost $0.37, not the
+  estimated $0.13: a PR on the risk route is large, so its prompt sits near the 200K cap. The threshold was planned
+  at 900 lines, which 9.1% of the last 395 merged PRs reach, for about $106 a month. The owner set it to 1,500 lines,
+  which 3.0% reach, for about $50. Capping Sonnet's prompt instead would truncate exactly the large diffs the route
+  exists for. A smaller PR whose risk is not in its size takes the `deep-review` label.
 - **A deliberate single point of failure.** A high-risk spec's second signature depends on the Anthropic key. When
   that key is down, the owner waits, or waives or lowers the risk in `proposal.md` with a stated reason.
 - A share in either flow is a number in one file. Changing it is a reviewed diff, and a test checks that every

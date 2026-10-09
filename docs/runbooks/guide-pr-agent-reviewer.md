@@ -142,7 +142,7 @@ refused, hung or was over quota is not in the draw, and its weight is shared out
 among the rest for that run.
 
 **The risk route.** A PR whose additions plus deletions reach
-`pr_agent_risk.min_changed_lines` (900), or that carries the `deep-review`
+`pr_agent_risk.min_changed_lines` (1,500), or that carries the `deep-review`
 label, reviews first on Sonnet, with NaN as the second attempt. The route step
 reads the size and labels with `gh api`, because an `issue_comment` event
 carries neither. When Sonnet does not answer its probe, the PR goes to the draw
@@ -224,7 +224,7 @@ pins it and each of these settings:
 A worst-case review is about 260K input plus 32K output tokens: roughly $0.21 on
 Haiku at its higher prices, and $0.84 on Sonnet. A test holds a price row and a
 ceiling for every allowed model ($0.25 and $1.00), so allowlisting a model
-without pricing it fails. The budget arithmetic, about $48-52 a month of the
+without pricing it fails. The budget arithmetic, about $50 a month of the
 $60-65, is in `specs/AI-045-nan-catalog-alignment/verification.md`; #2215 and
 #2216 measure it against real volume. The spend limit is the backstop, not the
 budget.

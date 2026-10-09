@@ -79,7 +79,7 @@ created: "2026-09-29"
       (run 37885509177)
 - [x] [AC9] Live run, glm5.3-flash: drawn with no override, `reasoning_effort` low in the log, a complete review published
       in 74 s (run 37886959259)
-- [x] [AC9] Amendment B (2026-10-09): the weighted draw from the pool's `pr_agent` blocks, the Sonnet risk route (900
+- [x] [AC9] Amendment B (2026-10-09): the weighted draw from the pool's `pr_agent` blocks, the Sonnet risk route (1,500
       changed lines or the `deep-review` label, read with `gh api` because `issue_comment` carries neither), the
       allowlist in `scripts/pr-agent-route.sh`, the routed model and effort in both Anthropic steps, run details on every
       attempt, `retry_same_model_on_timeout = false` on NaN. Tests pin the exact share of every point of the shipped
