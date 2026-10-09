@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.66.0](https://github.com/mlorentedev/dotfiles/compare/v0.65.0...v0.66.0) (2026-10-09)
+
+
+### Features
+
+* **ci:** draw PR-Agent's reviewer from a NaN + Claude Haiku pool ([#2188](https://github.com/mlorentedev/dotfiles/issues/2188)) ([5dbb724](https://github.com/mlorentedev/dotfiles/commit/5dbb724a19337779a2e57df80c4d07e538d2899f))
+* **deploy:** merge a TOML config the tool also writes ([#2192](https://github.com/mlorentedev/dotfiles/issues/2192)) ([e0be824](https://github.com/mlorentedev/dotfiles/commit/e0be824231b9504f94a3a71396dd4b2880adc301))
+* **doctor:** report and fix the ~/.local/bin copies that shadow mise's pinned CLIs ([#2196](https://github.com/mlorentedev/dotfiles/issues/2196)) ([90549a9](https://github.com/mlorentedev/dotfiles/commit/90549a9e6250c6e4df81512a35a9f32cdf8cb367))
+* **git:** converge git's global config without owning ~/.gitconfig ([#2208](https://github.com/mlorentedev/dotfiles/issues/2208)) ([0ecddb3](https://github.com/mlorentedev/dotfiles/commit/0ecddb362e78b57879602c11c08607dca731481e))
+* **lessons:** check lessons with dotf in pre-commit and retire the shell twin ([#2211](https://github.com/mlorentedev/dotfiles/issues/2211)) ([11c56bc](https://github.com/mlorentedev/dotfiles/commit/11c56bc095584a6df539ce8c232fde5e3a9d93cb))
+* **setup:** install uv through mise and poetry from the catalog ([#2186](https://github.com/mlorentedev/dotfiles/issues/2186)) ([9bde46c](https://github.com/mlorentedev/dotfiles/commit/9bde46c7b06d01e475f6e9b8ee6b9a053ecf4695))
+* **tools:** declare the class-3 CLIs as system entries in the catalog ([#2210](https://github.com/mlorentedev/dotfiles/issues/2210)) ([64a279c](https://github.com/mlorentedev/dotfiles/commit/64a279c28d2cc50167ba4cbb5b2471b3eae68105))
+* **tools:** install herdr through mise at 0.9.3 ([#2190](https://github.com/mlorentedev/dotfiles/issues/2190)) ([b9e67ff](https://github.com/mlorentedev/dotfiles/commit/b9e67ff53cddaa61bf12bcd592e5833dd97bff1a))
+* **tools:** install mise from the catalog ([#2185](https://github.com/mlorentedev/dotfiles/issues/2185)) ([75869c0](https://github.com/mlorentedev/dotfiles/commit/75869c0098e565ae080b362a991509dafee5b38c))
+* **tools:** install Python packages through mise and require Python 3.11 in doctor ([#2219](https://github.com/mlorentedev/dotfiles/issues/2219)) ([41ee37d](https://github.com/mlorentedev/dotfiles/commit/41ee37d8a7b9677745b12327634726d3a1b776f6))
+
+
+### Bug Fixes
+
+* **deploy:** narrow an existing directory that holds a private file ([#2171](https://github.com/mlorentedev/dotfiles/issues/2171)) ([9a6ab16](https://github.com/mlorentedev/dotfiles/commit/9a6ab16283e8f5081fc04daca82a4743f2a28c8e))
+* **doctor:** hold the age root to its declared mode, as secrets verify does ([#2206](https://github.com/mlorentedev/dotfiles/issues/2206)) ([70c4ffa](https://github.com/mlorentedev/dotfiles/commit/70c4ffaa063200e389459bec7cb2432492817d00))
+* **harness:** refresh the records only from a vault level with its upstream ([#2175](https://github.com/mlorentedev/dotfiles/issues/2175)) ([84c6c2e](https://github.com/mlorentedev/dotfiles/commit/84c6c2ea6b244ecaba31de9ca0cd148e5769bd5b))
+* **harness:** refresh the test skill record's sha and guard record shas in CI ([#2163](https://github.com/mlorentedev/dotfiles/issues/2163)) ([9199066](https://github.com/mlorentedev/dotfiles/commit/9199066bd2321e862e3b2bf975a4b026444f325a))
+* **hooks:** fail closed when a declared pre-commit gate cannot run ([#2184](https://github.com/mlorentedev/dotfiles/issues/2184)) ([035068f](https://github.com/mlorentedev/dotfiles/commit/035068f432d792da30b290c314eb0ec53e3bf59e))
+* **pi:** declare adaptive thinking on the Anthropic review models ([#2218](https://github.com/mlorentedev/dotfiles/issues/2218)) ([c8ee51d](https://github.com/mlorentedev/dotfiles/commit/c8ee51d7b6e7c5377dd6d09ca02ee1f840d2bd96))
+* **pr:** keep an exempt release diff out of the triage queue ([#2209](https://github.com/mlorentedev/dotfiles/issues/2209)) ([9720505](https://github.com/mlorentedev/dotfiles/commit/9720505a611b64f70560bf7aa9b36b1b77947f0c))
+* **setup-windows:** report a winget tool installed only when it resolves ([#2159](https://github.com/mlorentedev/dotfiles/issues/2159)) ([7af4667](https://github.com/mlorentedev/dotfiles/commit/7af4667a82ff7f3d0a371875a0c7fca61d32c0c0))
+* **setup:** run the linux-amd64 downloads on linux-amd64 only, and remove their leftovers elsewhere ([#2166](https://github.com/mlorentedev/dotfiles/issues/2166)) ([9c25aee](https://github.com/mlorentedev/dotfiles/commit/9c25aee932b75d6b2024e7101a743f66d309c26c))
+* **shell:** stop binding zsh-tied variable names in dual-shell scripts ([#2169](https://github.com/mlorentedev/dotfiles/issues/2169)) ([e861c29](https://github.com/mlorentedev/dotfiles/commit/e861c29fbcbb14c208597822e4429dc2deaddbe0))
+* **test:** feed the tied-name guard its file on stdin, since BSD sed fails on `--` ([#2181](https://github.com/mlorentedev/dotfiles/issues/2181)) ([0f8add9](https://github.com/mlorentedev/dotfiles/commit/0f8add92a3a9c47053379edfc41c0a4bf4eba6e0))
+* **tools:** read a tool's version from stdout before stderr ([#2213](https://github.com/mlorentedev/dotfiles/issues/2213)) ([385f36b](https://github.com/mlorentedev/dotfiles/commit/385f36b130e05c2259c055936e05c73da4e1f897))
+* **tools:** turn off mise's self-update notice in the rendered config ([#2198](https://github.com/mlorentedev/dotfiles/issues/2198)) ([44db9fc](https://github.com/mlorentedev/dotfiles/commit/44db9fc53694757d1951541afbef6f97a9a355d9))
+* **vault:** stop vault health passing the connection check on an obsidian error ([#2182](https://github.com/mlorentedev/dotfiles/issues/2182)) ([d98adab](https://github.com/mlorentedev/dotfiles/commit/d98adabbf5570b7e7425a2b6866a482f997e3d86))
+* **windows:** reconcile pi packages without dotf on PATH ([#2221](https://github.com/mlorentedev/dotfiles/issues/2221)) ([981d37e](https://github.com/mlorentedev/dotfiles/commit/981d37e0e69b36788ea5c918615023d51ba07d8d))
+
 ## [0.65.0](https://github.com/mlorentedev/dotfiles/compare/v0.64.0...v0.65.0) (2026-10-08)
 
 
