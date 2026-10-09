@@ -38,6 +38,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -49,6 +50,9 @@ type HealthOptions struct {
 	VaultDir  string
 	VaultName string
 	Verbose   bool
+	// GOOS decides the argv sent to obsidian; empty means runtime.GOOS. A seam
+	// so the golden corpus pins one platform's argv on every CI leg.
+	GOOS string
 }
 
 // deletedLineRe mirrors `grep '^.D '`: git status --short's Y-column (unstaged
@@ -157,13 +161,24 @@ func namesVault(out, name string) bool {
 	return false
 }
 
-// obsidianArgs builds `vault=<name> <sub...>`, the CLI's documented form
-// (https://obsidian.md/help/cli): the vault parameter comes first, and it is
-// the same on every OS. `--vault <name>` is not a parameter: the CLI ignored
-// it and answered for whichever vault was active, or "Vault not found." when
-// none was. `--no-sandbox` is an Electron flag the CLI reads as a command.
+// obsidianArgs builds `[--no-sandbox] vault=<name> <sub...>`. `vault=<name>`
+// first is the CLI's documented form (https://obsidian.md/help/cli);
+// `--vault <name>` is not a parameter, and the CLI ignored it and answered for
+// whichever vault was active, or "Vault not found." when none was.
+// `--no-sandbox` is for the Linux AppImage's Electron sandbox, which every
+// non-darwin call carried before; the macOS binary is a separate CLI
+// (obsidian-cli) that reads it as a command and fails every call (measured on
+// obsidian 1.14.4).
 func (h *healthRun) obsidianArgs(sub ...string) []string {
-	return append([]string{"vault=" + h.opts.VaultName}, sub...)
+	goos := h.opts.GOOS
+	if goos == "" {
+		goos = runtime.GOOS //nolint:forbidigo // the seam's production default
+	}
+	var args []string
+	if goos != "darwin" {
+		args = append(args, "--no-sandbox")
+	}
+	return append(append(args, "vault="+h.opts.VaultName), sub...)
 }
 
 // obsidianCmd runs `obsidian <obsidianArgs>` and returns its stdout with

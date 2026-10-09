@@ -152,6 +152,10 @@ func runGoldenCase(t *testing.T, c goldenCase) {
 		// set, which is how every case was captured.
 		VaultName: "knowledge",
 		Verbose:   strings.Contains(readTrimmed(t, filepath.Join(c.dir, "args")), "--verbose"),
+		// The argv depends on the OS, so each case pins one: darwin, where the
+		// corpus's argv was measured, unless the case names another in its goos
+		// file.
+		GOOS: goldenGOOS(t, c.dir),
 	})
 	if err != nil {
 		t.Fatalf("RunHealth: %v", err)
@@ -333,6 +337,17 @@ func copyTree(t *testing.T, src, dst string) {
 	if err != nil {
 		t.Fatalf("copy fixture %s: %v", src, err)
 	}
+}
+
+// goldenGOOS is the platform a case's argv was captured for: its goos file, or
+// darwin when it has none. Never runtime.GOOS — the same corpus must pass on
+// every CI leg.
+func goldenGOOS(t *testing.T, caseDir string) string {
+	t.Helper()
+	if goos := readTrimmed(t, filepath.Join(caseDir, "goos")); goos != "" {
+		return goos
+	}
+	return "darwin"
 }
 
 // readTrimmed reads an optional one-line fixture file; absent is "".

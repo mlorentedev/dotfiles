@@ -93,13 +93,16 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 
 - [x] Measured on obsidian 1.14.4 against the documentation (https://obsidian.md/help/cli): the
   CLI exits 0 and prints its errors on stdout. `--vault <name>` is not a parameter (the CLI
-  answered for the active vault, or "Vault not found."), `--no-sandbox` is read as a command,
+  answered for the active vault, or "Vault not found."), the macOS CLI reads `--no-sandbox` as a command,
   and `dead-ends` is not a command (`deadends` is), so its error line counted as one dead end
 - [x] Failing tests first: the `vault-not-found` golden case (exit 2, the CLI's own words),
-  `TestNamesVault` and `TestObsidianArgs`. The stubs answer in the real CLI's format. Each of
+  `TestNamesVault` and `TestObsidianArgsPerOS`. The stubs answer in the real CLI's format. Each of
   the three fixes is mutation-checked: reverting it fails the suite
-- [x] One argv on every OS, `vault=<name> <sub...>`, and `deadends`. The connection passes
-  only on the vault's `name<TAB><vault>` record
+- [x] `vault=<name> <sub...>` and `deadends`, with `--no-sandbox` in front everywhere but darwin
+  (the `linux-argv` golden case). The connection passes only on the vault's `name<TAB><vault>`
+  record
+- [ ] Linux: `dotf vault health` against the live vault on msi, to measure the
+  `--no-sandbox vault=<name>` form. Only darwin was measured
 - [x] The `obsidian` alias in `.zshrc` and `.bashrc` keeps `--no-sandbox` (an AppImage GUI
   launch flag) everywhere but darwin
 - [x] On the Mac, against the live vault: connected, and dead-ends now read 1918/2163 (88%),

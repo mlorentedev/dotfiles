@@ -71,12 +71,18 @@ func TestNamesVault(t *testing.T) {
 	}
 }
 
-// One argv on every OS, vault first: `--vault <name>` was silently ignored and
-// `--no-sandbox` read as a command (measured on obsidian 1.14.4).
-func TestObsidianArgs(t *testing.T) {
-	h := &healthRun{opts: HealthOptions{VaultName: "knowledge"}}
-	if got, want := strings.Join(h.obsidianArgs("unresolved", "format=json"), " "), "vault=knowledge unresolved format=json"; got != want {
-		t.Errorf("argv %q, want %q", got, want)
+// Vault first on every OS; --no-sandbox only off darwin, where the separate
+// CLI reads it as a command (measured on obsidian 1.14.4).
+func TestObsidianArgsPerOS(t *testing.T) {
+	for goos, want := range map[string]string{
+		"linux":   "--no-sandbox vault=knowledge unresolved format=json",
+		"windows": "--no-sandbox vault=knowledge unresolved format=json",
+		"darwin":  "vault=knowledge unresolved format=json",
+	} {
+		h := &healthRun{opts: HealthOptions{VaultName: "knowledge", GOOS: goos}}
+		if got := strings.Join(h.obsidianArgs("unresolved", "format=json"), " "); got != want {
+			t.Errorf("%s: argv %q, want %q", goos, got, want)
+		}
 	}
 }
 
