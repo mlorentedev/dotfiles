@@ -374,6 +374,18 @@ setup() {
         }
         { m = ($0 == "# mise: cli") }' "$DOTFILES_DIR/versions.conf")"
     [ -n "$pins" ]
+    # The awk above is a second reading of versions.conf; dotf's own reading
+    # (tools.ParseMiseTools) is what the sync rendered. They must agree, or this
+    # test checks a different pin set than the one dotf installs.
+    local rendered from_dotf
+    rendered="${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}/conf.d/dotfiles.toml"
+    from_dotf="$(awk '/^\[/ { t = ($0 == "[tools]"); next }
+        t && / = "/ { v = $3; gsub(/"/, "", v); print $1 "@" v }' "$rendered" | sort)"
+    [ "$(printf '%s\n' "$pins" | sort)" = "$from_dotf" ] || {
+        echo "versions.conf read here: $(printf '%s\n' "$pins" | sort | tr '\n' ' ')"
+        echo "rendered by dotf ($rendered): $(printf '%s' "$from_dotf" | tr '\n' ' ')"
+        false
+    }
     while IFS= read -r pin; do
         # From $HOME, so the checkout's own mise.toml cannot answer for the machine.
         bash -c 'cd "$HOME" && "$1" where "$2"' _ "$mise" "$pin" >/dev/null 2>&1 ||
