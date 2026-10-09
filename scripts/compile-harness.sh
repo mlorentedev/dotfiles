@@ -874,7 +874,9 @@ do_deploy() {
     #
     # A failure here does not stop the surfaces below, which do not depend on
     # these files existing: losing every skill and agent over one surface helps
-    # nobody. It still fails the run, at the end, so no caller reads success.
+    # nobody. It still fails this script, at the end, with exit 2. A caller
+    # has to act on that: setup-linux.sh downgrades it to a warning today, and
+    # making setup fail loudly is #2013 W4.
     local instructions_rc=0
     if jq -e '.agents.presence' "$MANIFEST" >/dev/null 2>&1; then
         deploy_instructions || instructions_rc=$?
