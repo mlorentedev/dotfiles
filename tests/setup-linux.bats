@@ -102,6 +102,20 @@ setup() {
     grep -q 'gh already installed' "$DOTFILES_DIR/setup-linux.sh"
 }
 
+# The guard below reads its names from the marks, so a lost mark shrinks it
+# silently: setup would have no installer and mise no pin for that tool. Each
+# CLI whose installer W2 deleted must stay marked.
+@test "versions.conf marks every CLI whose setup installer W2 deleted (#2013 W2)" {
+    local name missing=""
+    for name in age jq zoxide direnv shellcheck bats; do
+        awk -v v="$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')_VERSION" '
+            m && index($0, v "=") == 1 { found = 1 }
+            { m = ($0 == "# mise: cli") }
+            END { exit !found }' "$DOTFILES_DIR/versions.conf" || missing="$missing $name"
+    done
+    [ -z "$missing" ] || { echo "not marked '# mise: cli' in versions.conf:$missing"; false; }
+}
+
 @test "setup-linux.sh has no installer of its own for a CLI versions.conf marks for mise (#2013 W2)" {
     # mise installs these through `dotf tools sync` (ADR-044). An installer that
     # ran before the sync put a second, unpinned copy in ~/.local/bin on every

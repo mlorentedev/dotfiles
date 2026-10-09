@@ -186,7 +186,7 @@ log_info "Installing developer tools..."
 ensure_directory "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
 
-# tmux, xclip, gh, git-lfs, parallel, wget, eza and zoxide are `system` entries
+# tmux, xclip, gh, git-lfs, parallel, wget and eza are `system` entries
 # in packages.json (#2013 P5b): `dotf tools install` below installs them through
 # the OS manager, or says which `sudo` command to run once.
 
