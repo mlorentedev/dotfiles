@@ -120,13 +120,14 @@ Seven things now stand between that and a silent green:
 
 ### The review pool
 
-Three members, drawn with equal weight among those that answered their probe,
+Four members, drawn with equal weight among those that answered their probe,
 the way `dotf spec review` draws from `harness/reviewer-pool.json`:
 
 | Member | Provider | Declared in |
 |---|---|---|
 | `openai/mimo-v2.6-flash` | NaN | `.pr_agent.toml` `model`, the `models` step's `DECLARED_MODEL` |
 | `openai/deepseek-v4-flash` | NaN | `.pr_agent.toml` `fallback_models`, `DECLARED_FALLBACK_MODELS` |
+| `openai/glm5.3-flash` | NaN | `.pr_agent.toml` `fallback_models`, `DECLARED_FALLBACK_MODELS` (joined 2026-10-08; reviews only at `reasoning_effort: low`, see below) |
 | `anthropic/claude-haiku-5-5` | Anthropic | the `route` step's `ANTHROPIC_MODEL` and both Anthropic steps |
 
 `scripts/pr-agent-route.sh` draws the member that reviews first and writes it to
@@ -136,9 +137,16 @@ draw, so a saturated NaN model hands its share to the others for that run.
 One attempt talks to one provider, because PR-Agent's fallback chain shares one
 transport and NaN's would misroute an Anthropic model. So:
 
-- NaN drawn: the NaN attempt starts on the drawn model, with the other NaN model
-  behind it, and Anthropic is the second attempt.
+- NaN drawn: the NaN attempt starts on the drawn model, with the other NaN
+  models behind it in declared order, and Anthropic is the second attempt.
 - Anthropic drawn: Haiku reviews, and NaN is the second attempt.
+
+**glm5.3-flash needs `reasoning_effort: low`.** At its default it reasons until
+NaN closes the stream at 60,000 reasoning characters and publishes nothing
+(lesson 369). The NaN step sets `CONFIG__REASONING_EFFORT: low` and lists glm in
+`CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS`, because PR-Agent sends an effort to
+a model LiteLLM does not know only when it is listed. The setting covers the
+whole NaN attempt; deepseek accepts it and ignores it, mimo never receives it.
 
 The second attempt runs only when `pr-agent-publish-guard.sh --probe` measures
 that nothing was published. The Anthropic step appears twice in the workflow
@@ -179,15 +187,18 @@ per-key model allowlist, so the **workflow is the allowlist**, and
 |---|---|---|
 | `CONFIG__MODEL`, `CONFIG__MODEL_WEAK` | `anthropic/claude-haiku-5-5` | the cheapest current model; $0.10 / $0.50 per MTok up to 100K prompt tokens. Every model id the toml pins gets an override, or a call to it would leave Haiku for NaN |
 | `CONFIG__FALLBACK_MODELS` | `[]` | no chain: a failure ends the attempt, it never escalates to a pricier model |
-| `CONFIG__MAX_MODEL_TOKENS`, `CONFIG__CUSTOM_MODEL_MAX_TOKENS` | `70000` | PR-Agent clips the diff to this. With the new tokenizer counting about 30% more, 70K × 1.3 stays under the 100K price step |
-| `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` | `16000` | LiteLLM's output cap for a Claude model it does not know. Its default, 4096, is shared with thinking and truncated reviews |
-| effort | not sent (`medium`, the model's default) | PR-Agent sends no effort to Claude models; nothing here raises it |
+| `CONFIG__MAX_MODEL_TOKENS`, `CONFIG__CUSTOM_MODEL_MAX_TOKENS` | `200000` | the NaN attempt's cap, so every member reviews the same diff (owner's choice, 2026-10-08). With Claude's tokenizer counting about 30% more, a diff past ~75K of PR-Agent's tokens crosses the 100K price step and that request pays $0.50 / $2.50 |
+| `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` | `32000` | LiteLLM's output cap for a Claude model it does not know. Its default, 4096, is shared with thinking and truncated reviews |
+| `CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING`, `CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE`, `CONFIG__REASONING_EFFORT` | `true`, `["anthropic/claude-haiku-5-5"]`, `high` | adaptive thinking at high effort (the API default is `medium`). PR-Agent's built-in pattern does not match Haiku, so the override names it; measured with LiteLLM 1.103.0, `thinking` and `output_config` reach the API unchanged |
+| `CONFIG__AI_TIMEOUT` | `360` | the call is not streamed, so this bounds the whole answer, thinking included; it ends inside the step's 8 minutes |
 | temperature | not sent (`CONFIG__NO_TEMPERATURE_MODELS`) | Haiku 5.5 answers 400 to a non-default temperature, and PR-Agent's default is 0.2 |
-| step `timeout-minutes` | `8` | at most two attempts run; the job's 30 minutes cover the worst pair, the probes and the publication measurements |
+| step `timeout-minutes` | `8` | at most two attempts run; the job's 31 minutes cover the worst pair, the probes and the publication measurements |
 
-A worst-case review is about 70K input plus 16K output tokens, roughly $0.015,
-and the draw's probe a few dozen tokens per run. With a third of the reviews
-drawn to Haiku, a month costs cents. The spend limit is the backstop, not the
+A worst-case review is about 260K input plus 32K output tokens at the higher
+prices, roughly $0.21; a test fails if the caps allow more than $0.25. A review
+under the price step costs about $0.02, and the draw's probe a few dozen tokens
+per run. With a quarter of about 190 monthly reviews drawn to Haiku, a month
+costs $1 to $3, $10 at the very worst. The spend limit is the backstop, not the
 budget.
 
 **Owner setup, once per key rotation:**

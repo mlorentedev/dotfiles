@@ -137,6 +137,20 @@ out() { sed -n "s/^$1=//p" "$OUT"; }
     [ -z "$(out nan_model)" ]
 }
 
+@test "route: a preflight that failed on its setup stops the draw instead of paying for every review" {
+    NAN_OUTCOME=failure NAN_MODEL="" NAN_FALLBACKS="" NAN_PREFLIGHT_EXIT=2 route
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"::error::The NaN preflight failed on its setup (exit 2)"* ]] || false
+    [ ! -s "$STUB_ARGV_LOG" ]
+    [ ! -s "$OUT" ]
+}
+
+@test "route: a preflight in which no model answered (exit 1) still hands over to Anthropic" {
+    NAN_OUTCOME=failure NAN_MODEL="" NAN_FALLBACKS="" NAN_PREFLIGHT_EXIT=1 PR_AGENT_DRAW=0 route
+    [ "$status" -eq 0 ]
+    [ "$(out first)" = "anthropic" ]
+}
+
 @test "route: no member at all answers first=none, and the job summary says so" {
     export GITHUB_STEP_SUMMARY="$BATS_TEST_TMPDIR/summary"
     NAN_OUTCOME=failure NAN_MODEL="" STUB_CODE=529 route

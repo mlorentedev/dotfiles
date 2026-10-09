@@ -155,7 +155,7 @@ jobs:
     # retry sleeps). The second attempt runs only when the first published nothing
     # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
     # longer than before.
-    timeout-minutes: 30
+    timeout-minutes: 31
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -364,10 +364,16 @@ jobs:
         env:
           NAN_API_KEY: ${{ secrets.NAN_API_KEY }}
           DECLARED_MODEL: openai/mimo-v2.6-flash
-          DECLARED_FALLBACK_MODELS: '["openai/deepseek-v4-flash"]'
+          DECLARED_FALLBACK_MODELS: '["openai/deepseek-v4-flash", "openai/glm5.3-flash"]'
+        # The exit code travels to the draw: 1 (no NaN model answered) is an
+        # outage the pool absorbs, 2 (a broken setup) must stop it.
+        # continue-on-error leaves only `outcome`, which is `failure` for both.
         run: |
+          rc=0
           ./scripts/pr-agent-model-preflight.sh --model "${DECLARED_MODEL}" \
-            --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT"
+            --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT" || rc=$?
+          echo "exit=${rc}" >> "$GITHUB_OUTPUT"
+          exit "$rc"
       # AI-045 AC9 (#1923): the CI review pool. Every member that answered its
       # probe (the NaN models above, and the Anthropic model probed here) is
       # drawn with equal weight, the way `dotf spec review` draws its reviewer,
@@ -389,6 +395,7 @@ jobs:
           NAN_OUTCOME: ${{ steps.models.outcome }}
           NAN_MODEL: ${{ steps.models.outputs.model }}
           NAN_FALLBACKS: ${{ steps.models.outputs.fallbacks }}
+          NAN_PREFLIGHT_EXIT: ${{ steps.models.outputs.exit }}
           ANTHROPIC_MODEL: anthropic/claude-haiku-5-5
           # For the probe only; it travels to curl on stdin, never on argv.
           PR_AGENT_ANTHROPIC_API_KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
@@ -406,27 +413,30 @@ jobs:
       #   the test that pins them. Haiku 5.5 costs $0.10 / $0.50 per million
       #   input / output tokens for prompts up to 100,000 tokens, and five times
       #   that above it.
-      # - The PROMPT is capped at 70,000 tokens (`max_model_tokens`; the
+      # - The PROMPT is capped at 200,000 tokens (`max_model_tokens`; the
       #   `custom_` twin is needed because PR-Agent's registry does not know the
-      #   model). PR-Agent counts with its own tokenizer, and Claude's counts the
-      #   same text about 30% larger, so 70,000 stays under the 100,000 price
-      #   step. A larger diff is clipped, as it is on NaN.
-      # - The OUTPUT is capped at 16,000 tokens. LiteLLM sends 4,096 for a Claude
+      #   model), the same as the NaN attempt, so every pool member reviews the
+      #   same diff. The owner chose parity over the price step (2026-10-08):
+      #   PR-Agent's tokenizer counts about 30% fewer tokens than Claude's, so a
+      #   diff past roughly 75,000 of PR-Agent's crosses 100,000 and pays the
+      #   higher prices for that request.
+      # - The OUTPUT is capped at 32,000 tokens. LiteLLM sends 4,096 for a Claude
       #   model it does not know (DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS), and the
       #   model's thinking counts toward the cap, so a review could be cut short
-      #   and published as nothing. The worst case is about $0.015 a review.
-      # - EFFORT is not sent, which on Haiku 5.5 IS `medium`: the API default,
-      #   and Anthropic's recommended start "for most work, including agentic
-      #   coding" (platform.claude.com/docs/en/build-with-claude/effort). Sending
-      #   it would route through PR-Agent's adaptive-thinking switch, against a
-      #   LiteLLM that does not know the model yet: a request shape nobody has
-      #   measured, for no change in behaviour.
+      #   and published as nothing. Worst case, a 260,000-token prompt with a
+      #   full answer, is about $0.21 a review.
+      # - EFFORT is `high`, with adaptive thinking (Haiku 5.5's API default is
+      #   `medium`). PR-Agent sends `thinking` and `output_config` only for a
+      #   model it recognises as adaptive, and its built-in pattern does not
+      #   match Haiku, hence the override list. Measured with LiteLLM 1.103.0,
+      #   the version PR-Agent v0.47.0 pins: both reach the API unchanged and the
+      #   answer carries a thinking block.
       # - TEMPERATURE is never sent: Haiku 5.5 answers 400 to any non-default
       #   value, and PR-Agent sends 0.2 unless the model is listed here.
       # - The call is not streamed. PR-Agent forces streaming only for an
       #   OpenAI-compatible base URL, and none is set for Anthropic. `ai_timeout`
-      #   therefore bounds the whole answer, so it is raised from 120 s to 180 s.
-      #   The step's 8 minutes bound everything else.
+      #   therefore bounds the whole answer, thinking included, so it is raised
+      #   from 120 s to 360 s. The step's 8 minutes bound everything else.
       #
       # Same action, same pin, same github_action_config as the NaN attempt: a
       # test holds the review settings equal, so either provider reviews what
@@ -444,11 +454,14 @@ jobs:
           CONFIG__MODEL: anthropic/claude-haiku-5-5
           CONFIG__MODEL_WEAK: anthropic/claude-haiku-5-5
           CONFIG__FALLBACK_MODELS: "[]"
-          CONFIG__MAX_MODEL_TOKENS: "70000"
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "70000"
+          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           CONFIG__NO_TEMPERATURE_MODELS: '["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]'
-          CONFIG__AI_TIMEOUT: "180"
-          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "16000"
+          CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING: "true"
+          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5"]'
+          CONFIG__REASONING_EFFORT: high
+          CONFIG__AI_TIMEOUT: "360"
+          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
@@ -543,6 +556,19 @@ jobs:
           LITELLM__CUSTOM_LLM_PROVIDER: openai
           LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
           LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
+          # glm5.3-flash reasons until NaN closes the stream unless its effort is
+          # lowered: at its default and at `medium` it spent all 16K output
+          # tokens thinking, hit NaN's 60,000-reasoning-character ceiling and
+          # returned no review. At `low` it reviewed a 37K-token diff in 285 s
+          # and a 97K-token one in 215 s, with half the ceiling to spare
+          # (measured 2026-10-08, AI-045 AC9). LiteLLM does not know the model,
+          # so PR-Agent sends an effort only to the ids listed here. The effort
+          # is one setting for the whole attempt, and deepseek-v4-flash already
+          # receives PR-Agent's default (`medium`) because LiteLLM marks it
+          # reasoning-capable; it now receives `low`, which it accepts and does
+          # not act on (ai/nan/README.md). mimo-v2.6-flash receives none.
+          CONFIG__REASONING_EFFORT: low
+          CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS: '["glm5.3-flash"]'
           # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
           # the entries whose `consumers` list this repo, so the reviewer holds
           # one credential rather than an ambient set — the failure surface stays
@@ -639,11 +665,14 @@ jobs:
           CONFIG__MODEL: anthropic/claude-haiku-5-5
           CONFIG__MODEL_WEAK: anthropic/claude-haiku-5-5
           CONFIG__FALLBACK_MODELS: "[]"
-          CONFIG__MAX_MODEL_TOKENS: "70000"
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "70000"
+          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           CONFIG__NO_TEMPERATURE_MODELS: '["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]'
-          CONFIG__AI_TIMEOUT: "180"
-          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "16000"
+          CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING: "true"
+          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5"]'
+          CONFIG__REASONING_EFFORT: high
+          CONFIG__AI_TIMEOUT: "360"
+          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'

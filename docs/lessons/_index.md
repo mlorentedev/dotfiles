@@ -389,5 +389,9 @@ tags: [lessons, index, dotfiles]
 | [368 - Two checks of one property must share one predicate](lesson-368-two-checks-of-one-property-must-share-one-predicate.md) | 2026-10-08 |
 =======
 | [368 - read shifts fields left when the first one is empty](lesson-368-read-shifts-fields-left-when-the-first-one-is-empty.md) | 2026-10-08 |
+<<<<<<< HEAD
 >>>>>>> c38ece0e (feat(ci): draw PR-Agent's first reviewer from a NaN + Claude Haiku pool)
+=======
+| [369 - A reasoning model at its default effort can think away the whole answer](lesson-369-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
+>>>>>>> 47a1747c (feat(ci): add glm5.3-flash to the review pool and give Haiku NaN's budget)
 <!-- END GENERATED -->

@@ -155,6 +155,16 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     _guard
     [ "$status" -eq 1 ]
     [[ "$output" == *"PR-Agent reported success but published no review"* ]] || false
+    [[ "$output" == *"NaN's per-model concurrency limit"* ]] || false
+}
+
+@test "an Anthropic attempt that published nothing is not blamed on NaN" {
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS='[]'
+    ATTEMPTS=$(printf 'success anthropic/claude-haiku-5-5\nskipped m\n') _guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"PR-Agent reported success but published no review"* ]] || false
+    [[ "$output" == *"No cause is measured yet for the Anthropic attempt"* ]] || false
+    [[ "$output" != *"NaN"* ]] || false
 }
 
 @test "the published review names the attempt that produced it" {

@@ -170,7 +170,8 @@ case "$outcome" in
     "")
         if [ "${ROUTE_OUTCOME:-}" = "failure" ]; then
             echo "::error::no review attempt ran: the draw itself failed, so no member was" \
-                "chosen. Its step names why (an unknown PR_AGENT_PROVIDER fails it on purpose)."
+                "chosen. Its step names why (an unknown PR_AGENT_PROVIDER, or a NaN preflight" \
+                "that failed on its setup, fails it on purpose)."
         else
             echo "::error::no review attempt ran: no member of the review pool answered its probe" \
                 "(the preflight's and the draw's warnings name each one)."
@@ -214,8 +215,19 @@ if [ "$found" -gt 0 ]; then
 fi
 echo "::error::PR-Agent reported success but published no review" \
     "(no github-actions[bot] comment updated since ${STARTED} carries any of ${markers})."
-echo "::error::Two causes are measured. A diff too large for a non-streamed answer: NaN's edge"
-echo "::error::cuts one at about 125 s, and PR-Agent then exits cleanly (run 36680454975, 42K tokens;"
-echo "::error::#1858). Or NaN's per-model concurrency limit, shared with pi, qq and hive (#1107)."
+# The measured causes are NaN's; naming them under an Anthropic attempt would
+# send whoever reads this to the wrong provider.
+case "$model" in
+    anthropic/*)
+        echo "::error::No cause is measured yet for the Anthropic attempt. Its step log has the answer"
+        echo "::error::PR-Agent received: look for an output cut at DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS"
+        echo "::error::or an error PR-Agent logged and then exited cleanly on."
+        ;;
+    *)
+        echo "::error::Two causes are measured. A diff too large for a non-streamed answer: NaN's edge"
+        echo "::error::cuts one at about 125 s, and PR-Agent then exits cleanly (run 36680454975, 42K tokens;"
+        echo "::error::#1858). Or NaN's per-model concurrency limit, shared with pi, qq and hive (#1107)."
+        ;;
+esac
 note
 exit 1

@@ -34,6 +34,7 @@
 #   NAN_OUTCOME            the preflight step's outcome (`success` when a NaN model answered)
 #   NAN_MODEL              the preflight's first NaN model that answered
 #   NAN_FALLBACKS          JSON array of the other NaN models that answered, in declared order
+#   NAN_PREFLIGHT_EXIT     the preflight's exit code; 2 (a broken setup) fails the draw
 #   ANTHROPIC_MODEL        the pool's Anthropic member, `anthropic/<id>`
 #   PR_AGENT_ANTHROPIC_API_KEY  its key; empty means the member is unavailable (never printed)
 #   PR_AGENT_PROVIDER      the override above
@@ -51,7 +52,8 @@
 #   nan_fallbacks=<JSON array>   the NaN attempt's fallback chain
 #   note=<text>                  why a member was out of the draw, for the final guard
 #
-# Exit: 0 routed (first may be `none`), 1 unknown PR_AGENT_PROVIDER, 2 usage.
+# Exit: 0 routed (first may be `none`), 1 unknown PR_AGENT_PROVIDER or a NaN
+# preflight that failed on its setup, 2 usage.
 
 set -uo pipefail
 
@@ -83,6 +85,16 @@ case "$provider" in
         exit 1
         ;;
 esac
+
+# The preflight's exit 2 is a broken setup (no NAN_API_KEY, a missing tool, a
+# bad argument), not a NaN outage. Read as "no NaN member answered", it would
+# send every review to the paid member until someone noticed, so it stops here.
+if [ "${NAN_PREFLIGHT_EXIT:-}" = "2" ]; then
+    printf '::error::The NaN preflight failed on its setup (exit 2), not on NaN: its step names the cause'
+    printf ' (a missing NAN_API_KEY, tool or argument). Nothing is drawn, so a broken setup cannot move every'
+    printf ' review onto the paid Anthropic key.\n'
+    exit 1
+fi
 
 # The NaN members that answered, in declared order.
 nan=()

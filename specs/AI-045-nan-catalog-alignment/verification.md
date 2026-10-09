@@ -51,19 +51,27 @@ Prevention PRs (AC6-AC10), 2026-10-01:
 
 AC9, 2026-10-08:
 
-- AC9 -> `tests/pr-agent-route.bats` (19, stub curl) drives the draw by index for each member, a 300-draw run that reaches
+- AC9 -> `tests/pr-agent-route.bats` (21, stub curl) drives the draw by index for each member, a 300-draw run that reaches
   all three with at least 60 each, members out of the draw (401/404/429/529/timeout, no key: no probe at all), the four
   override values and an unknown one (fails before any probe), and the key on stdin only. `tests/pr-agent-route-real.bats`
   (4) runs the real curl against a local server: the `x-api-key` from `-K -`, `/v1/messages` with `anthropic-version`,
   a refusal, a hang and a stalled body. `tests/pr-agent-config.bats` pins the step order and conditions, one credential
-  per step, the model for `model` and `model_weak`, an empty chain, `max_model_tokens` x 1.3 under the 100K price step,
-  `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS=16000`, no temperature and no effort key, the two Anthropic copies identical, and the
-  action pin and ten review settings shared by all three attempts. `tests/pr-agent-publish-guard.bats` (22) runs the
+  per step, the model for `model` and `model_weak`, an empty chain, a prompt cap equal to the NaN attempt's,
+  `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS=32000`, a worst review under $0.25 at the over-100K prices, adaptive thinking at
+  `high` with the override naming the model, `ai_timeout` inside the step, no temperature, the two Anthropic copies identical,
+  the NaN attempt's `low` effort listed for glm5.3-flash only, the preflight's exit code reaching the draw, and the
+  action pin and ten review settings shared by all three attempts. `tests/pr-agent-publish-guard.bats` (23) runs the
   guard: the probe's answers and the final guard judging the last attempt in `ATTEMPTS`; its empty-outcome case found a
   real defect (lesson 368). Mutations, each turned red: an unanswered member admitted, the key check dropped, `nan-only`
   probing, an unknown override accepted, the drawn NaN model not first, a constant draw, the non-numeric count check
-  dropped, `CONFIG__MODEL_WEAK` dropped. One mutant survived and was equivalent (a redundant `nan-only` clause, removed).
-  Live evidence is pending: the owner's `dotf secrets sync ci`, then each forced route and a real second attempt.
+  dropped, `CONFIG__MODEL_WEAK` dropped, the setup-error stop disabled, the Anthropic branch of the no-review message
+  removed, the output cap doubled, glm's effort list dropped or its level raised, the job timeout back to 30. One mutant survived and was equivalent (a redundant `nan-only` clause, removed).
+  Live evidence on #2188: run 37879933613 attempt 1 (forced Anthropic: Haiku published, NaN skipped) and attempt 2 (the
+  draw picked mimo, which published; Anthropic skipped). glm5.3-flash, streamed from NaN on review prompts with 16K
+  output tokens: default effort 289 s and `medium` 338 s, both `finish_reason: length` with no content (the
+  60,000-reasoning-character ceiling); `low` 285 s on 37,251 prompt tokens (45,651 reasoning characters, a review) and
+  215 s on 96,707 (33,541, a review). Pending: Haiku's first run with thinking, glm5.3-flash's first
+  drawn review, and a real second attempt.
 
 ## Decisions made during implementation
 

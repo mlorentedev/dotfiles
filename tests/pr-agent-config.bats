@@ -650,8 +650,14 @@ steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 m = next(s for s in steps if s.get('id') == 'models')
 r = next(s for s in steps if s.get('id') == 'route')
 print(m.get('continue-on-error', False), r['env']['NAN_OUTCOME'])
+print(r['env']['NAN_PREFLIGHT_EXIT'])
+print('echo \"exit=\${rc}\" >> \"\$GITHUB_OUTPUT\"' in m['run'], m['run'].rstrip().endswith('exit \"\$rc\"'))
 "
-    [ "$output" = 'True ${{ steps.models.outcome }}' ]
+    # continue-on-error leaves `outcome` failure for exit 1 and exit 2 alike, so
+    # the code itself travels to the draw, which stops on a broken setup.
+    [ "${lines[0]}" = 'True ${{ steps.models.outcome }}' ]
+    [ "${lines[1]}" = '${{ steps.models.outputs.exit }}' ]
+    [ "${lines[2]}" = 'True True' ]
     run _step_if "s.get('name') == 'Fail if no review was published'"
     [[ "$output" != *"steps.models.outcome"* ]] || false
 }
@@ -1036,6 +1042,27 @@ for s in [s for s in steps if 'pr-agent' in s.get('uses', '')]:
     [ "${#lines[@]}" -eq 3 ]
 }
 
+# AI-045 AC9: glm5.3-flash at its default effort thinks until NaN closes the
+# stream and publishes nothing (measured 2026-10-08). PR-Agent sends an effort
+# to a model LiteLLM does not know only when it is listed, so the list and the
+# level are what keep it a reviewer.
+@test "pr-agent: the NaN attempt lowers glm5.3-flash's effort, and lists only chain members" {
+    run python3 -c "
+import json, yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+by = {s.get('id'): s for s in steps}
+e = by['pr_agent']['env']
+listed = json.loads(e.get('CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS', '[]'))
+m = by['models']['env']
+chain = [m['DECLARED_MODEL']] + json.loads(m['DECLARED_FALLBACK_MODELS'])
+print(e.get('CONFIG__REASONING_EFFORT'), listed)
+print(all(any(c == x or c.endswith('/' + x) for c in chain) for x in listed))
+"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "low ['glm5.3-flash']" ]
+    [ "${lines[1]}" = "True" ]
+}
+
 # A job timeout shorter than its Action step would hide the Action's own bound.
 @test "pr-agent: the job outlives both bounded Actions and the probes before them" {
     # At most two attempts run, one per provider. The worst pair, plus the
@@ -1077,13 +1104,23 @@ print(a1['env'] == a2['env'] and a1['uses'] == a2['uses'] and a1['timeout-minute
 print(by['route']['env']['ANTHROPIC_MODEL'] == model)
 print(json.loads(e['CONFIG__FALLBACK_MODELS']))
 print(model in json.loads(e['CONFIG__NO_TEMPERATURE_MODELS']))
-# Haiku 5.5's price steps up fivefold above 100,000 prompt tokens, and Claude's
-# tokenizer counts about 30% more than PR-Agent's: the cap must leave that margin.
-print(int(e['CONFIG__MAX_MODEL_TOKENS']) * 1.3 < 100000, e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
+# The prompt cap equals the NaN attempt's, so every pool member reviews the same
+# diff (the owner chose parity over Haiku's 100,000-token price step, 2026-10-08).
+nan = by['pr_agent']['env']
+print(e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'] == nan['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
 # LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short.
 print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'])
-# Effort travels as nothing, which on Haiku 5.5 is medium; no thinking switch either.
-print(sorted(k for k in e if 'EFFORT' in k.upper() or 'THINKING' in k.upper()))
+# The worst review the caps allow, at the prices above 100,000 prompt tokens
+# ($0.50 in, $2.50 out per million) with Claude's tokenizer ~30% larger, stays
+# under $0.25. Raising either cap past that fails here, on purpose.
+worst = int(e['CONFIG__MAX_MODEL_TOKENS']) * 1.3 * 0.50e-6 + int(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']) * 2.50e-6
+print(worst < 0.25)
+# Adaptive thinking at high effort. PR-Agent's built-in pattern does not match
+# Haiku, so the override must name exactly this model or nothing is sent.
+print(e['CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING'], json.loads(e['CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE']) == [model], e['CONFIG__REASONING_EFFORT'])
+# The call is not streamed, so ai_timeout bounds the whole answer; it must end
+# inside the step, or the step's kill would hide PR-Agent's own timeout.
+print(int(e['CONFIG__AI_TIMEOUT']) < a1['timeout-minutes'] * 60)
 # Every model id .pr_agent.toml pins (model, model_weak, any later one) is a NaN
 # id. Each needs its own override here, or a call to it leaves Haiku for NaN.
 import tomllib
@@ -1097,10 +1134,12 @@ print(pinned, all(e.get('CONFIG__' + k.upper()) == model for k in pinned))
     [ "${lines[2]}" = "True" ]
     [ "${lines[3]}" = "[]" ]
     [ "${lines[4]}" = "True" ]
-    [ "${lines[5]}" = "True True" ]
-    [ "${lines[6]}" = "16000" ]
-    [ "${lines[7]}" = "[]" ]
-    [ "${lines[8]}" = "['model', 'model_weak'] True" ]
+    [ "${lines[5]}" = "True" ]
+    [ "${lines[6]}" = "32000" ]
+    [ "${lines[7]}" = "True" ]
+    [ "${lines[8]}" = "true True high" ]
+    [ "${lines[9]}" = "True" ]
+    [ "${lines[10]}" = "['model', 'model_weak'] True" ]
 }
 
 # The fallback reviews what the NaN attempt would have: same action, same pin,
