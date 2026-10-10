@@ -144,6 +144,39 @@ func TestCheckDockerEngine(t *testing.T) {
 	}
 }
 
+// On Linux `docker info` also fails when the daemon runs and the socket refuses
+// this user, the state apt's docker.io leaves until the user joins the docker
+// group. Advising `systemctl start` there sends the owner after a daemon that is
+// already up (pr-agent on #2237).
+func TestCheckDockerEngine_SocketPermissionDenied(t *testing.T) {
+	denied := "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock"
+	for _, tc := range []struct {
+		name, goos, errOut, want, notWant string
+	}{
+		{"linux, socket refuses the user → the docker group", "linux", denied, "usermod -aG docker", "systemctl"},
+		{"linux, daemon down → the systemd unit", "linux", "Cannot connect to the Docker daemon. Is the docker daemon running?", "systemctl start docker", "usermod"},
+		{"darwin, denied → the Colima remedy, no Linux group", "darwin", denied, "dotf doctor --fix", "usermod"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sys := newSys(nil, []string{"docker"}, nil)
+			sys.GOOS = tc.goos
+			sys.CommandOutputBounded = func(time.Duration, string, ...string) (string, string, error) {
+				return "", tc.errOut, errors.New("exit status 1")
+			}
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkDockerEngine(sys, rep, false)
+
+			if rep.Warnings() != 1 || rep.Failures() != 0 {
+				t.Fatalf("want one WARN and no FAIL\n%s", buf.String())
+			}
+			if !strings.Contains(buf.String(), tc.want) || strings.Contains(buf.String(), tc.notWant) {
+				t.Fatalf("want %q and not %q\n%s", tc.want, tc.notWant, buf.String())
+			}
+		})
+	}
+}
+
 // With --fix on darwin doctor starts Colima itself, so the owner is handed no
 // manual step (#2013 P5b). The fake engine answers only after the start ran.
 func TestCheckDockerEngine_FixStartsColima(t *testing.T) {

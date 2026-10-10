@@ -31,8 +31,17 @@ func checkDockerEngine(sys *System, rep *Report, fix bool) {
 		return
 	}
 
-	if v := dockerServerVersion(sys); v != "" {
+	v, errOut := dockerInfo(sys)
+	if v != "" {
 		rep.Pass("engine reachable: server " + v)
+		return
+	}
+	if sys.GOOS == "linux" && strings.Contains(strings.ToLower(errOut), "permission denied") {
+		// The daemon runs and the socket refuses this user: starting the unit
+		// again changes nothing. apt's docker.io creates the docker group but
+		// adds nobody to it.
+		rep.Warn("the docker engine is running but this user cannot open its socket " +
+			"(run: sudo usermod -aG docker $USER, then log in again)")
 		return
 	}
 	if fix && sys.GOOS == "darwin" && sys.has("brew") && sys.has("colima") {
@@ -43,11 +52,18 @@ func checkDockerEngine(sys *System, rep *Report, fix bool) {
 }
 
 func dockerServerVersion(sys *System) string {
-	out, _, err := sys.CommandOutputBounded(dockerEngineTimeout, "docker", "info", "--format", "{{.ServerVersion}}")
+	v, _ := dockerInfo(sys)
+	return v
+}
+
+// dockerInfo returns the engine's server version, or "" and the CLI's stderr,
+// which is what tells a stopped engine from a socket this user cannot open.
+func dockerInfo(sys *System) (version, errOut string) {
+	out, errOut, err := sys.CommandOutputBounded(dockerEngineTimeout, "docker", "info", "--format", "{{.ServerVersion}}")
 	if err != nil {
-		return ""
+		return "", errOut
 	}
-	return strings.TrimSpace(out)
+	return strings.TrimSpace(out), ""
 }
 
 // startColima registers Colima as a launchd service, which also starts it now
