@@ -309,11 +309,11 @@ func writeSettingsAtomically(path string, doc map[string]any) error {
 // process running setup. Those differ exactly when it matters: a `go run` or a
 // build-tree binary would otherwise be baked into a hook that outlives it.
 //
-// The `.exe` suffix is not cosmetic. Adoption of the entry the setup scripts
-// wrote before this command existed is by EXACT command equality (sameCommand),
-// and setup-windows.ps1 emitted `"…\dotf.exe" mem session-start`. Resolving to a
-// suffix-less path there would match nothing and append a SECOND session-start
-// hook on the first Windows run — the duplicate this merge exists to prevent.
+// The `.exe` suffix is not cosmetic. setup-windows.ps1 emitted
+// `"…\dotf.exe" mem session-start`, and an unmarked entry is adopted by its
+// command signature (harness.isOurs). A suffix-less path would still be adopted,
+// but it would differ from the deployed line, so every Windows run would rewrite
+// a hook that was already correct.
 func resolveDotfPath(home string) string {
 	name := "dotf"
 	if runtime.GOOS == "windows" {

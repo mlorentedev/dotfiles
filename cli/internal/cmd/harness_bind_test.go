@@ -133,9 +133,9 @@ func hookCommands(t *testing.T, doc map[string]any, event string) []string {
 // command was built around, from the adopting side.
 //
 // The deployed SessionStart hook runs our exact command and carries no marker.
-// `isOurs` does not recognise it (its substring fallback only covers the gate),
-// so without `sameCommand`'s exact-command adoption rule, bind would APPEND a
-// second entry and every session would run `dotf mem session-start` twice.
+// `isOurs` recognises it by its command signature (the dotf binary followed by
+// the manifest's arguments); without that, bind would APPEND a second entry and
+// every session would run `dotf mem session-start` twice.
 func TestBindAdoptsTheUnmarkedMemHookInsteadOfDuplicating(t *testing.T) {
 	home, raw, dotf := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
