@@ -53,10 +53,9 @@ func dockerEngineRemedy(goos string) string {
 // standalone v1 binary and plugin v2.39.1 are both present, and either check
 // alone would have described that box wrongly.
 //
-// Absence is a SKIP, never a FAIL: the repo provisions compose in no installer
-// block, no versions.conf pin and no contract binary, so failing on it would red
-// a box that never asked for it — the same reasoning BUG-052 applied to
-// terraform.
+// Absence is a SKIP, never a FAIL: only darwin declares compose (packages.json,
+// brew), so failing on it would red a Linux or Windows box that never asked
+// for it — the same reasoning BUG-052 applied to terraform.
 func checkDockerCompose(sys *System, rep *Report) {
 	rep.Section("Docker Compose")
 
@@ -73,9 +72,19 @@ func checkDockerCompose(sys *System, rep *Report) {
 	}
 
 	if sys.has("docker-compose") {
+		// Homebrew's docker-compose is the v2 binary, which `docker compose`
+		// finds only once docker-config registers its directory as a CLI
+		// plugin dir. Calling that "legacy v1" passed a Mac on which every
+		// `docker compose` failed (#2013 P5b).
+		out, _ := sys.CommandOutput("docker-compose", "version")
+		if v := strings.TrimSpace(out); strings.Contains(v, "v2.") {
+			rep.Warn("compose v2 is installed but `docker compose` cannot find it (" + v +
+				"); run: dotf deploy docker-config")
+			return
+		}
 		rep.Pass("docker-compose found (legacy standalone v1; `docker compose` is the supported form)")
 		return
 	}
 
-	rep.Skip("compose not installed (optional — the repo provisions neither the plugin nor the binary)")
+	rep.Skip("compose not installed (optional on this OS)")
 }

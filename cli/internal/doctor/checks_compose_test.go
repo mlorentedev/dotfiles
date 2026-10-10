@@ -10,9 +10,9 @@ import (
 // doctor covered nowhere. Compose v2 ships as a `docker` CLI plugin, not a
 // binary, so a PATH test alone answers wrongly on a current install — measured
 // on msi 2026-09-02, where the v1 binary and plugin v2.39.1 are both present.
-// The repo provisions compose in no installer, versions.conf entry or contract
-// binary, so absence is a SKIP; a FAIL would red every box that never wanted it
-// (the BUG-052 reasoning that put terraform in optionalTools).
+// Only darwin declares compose (packages.json, brew), so absence is a SKIP; a
+// FAIL would red every box that never wanted it (the BUG-052 reasoning that put
+// terraform in optionalTools).
 func TestCheckDockerCompose(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -33,6 +33,14 @@ func TestCheckDockerCompose(t *testing.T) {
 			name:       "only the v1 binary → pass, flagged legacy",
 			onPath:     []string{"docker", "docker-compose"},
 			wantSubstr: "legacy",
+		},
+		{
+			// Homebrew's docker-compose is v2 but unregistered until
+			// docker-config deploys: `docker compose` fails, so not a pass.
+			name:       "v2 binary not registered as a plugin → warn naming the deploy",
+			onPath:     []string{"docker", "docker-compose"},
+			cmdOut:     map[string]string{"docker-compose version": "Docker Compose version v2.40.0"},
+			wantSubstr: "dotf deploy docker-config",
 		},
 		{
 			name:       "docker present, no compose either way → skip",
