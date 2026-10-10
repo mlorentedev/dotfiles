@@ -16,9 +16,15 @@ import (
 //
 // It plans only: the same Plan `dotf tools install --dry-run` runs, which asks
 // the package manager and `sudo -n true` and never installs. Only apt
-// escalates, so on macOS and Windows this check has nothing to report.
+// escalates, so the check plans apt entries alone: elsewhere it could only
+// spend a `brew list` or a multi-second `winget list` per entry on an answer
+// that is never a sudo wait.
 func checkSystemPackages(sys *System, cfg *Config, rep *Report) {
 	rep.Section("System packages (packages.json)")
+	if manager, _ := (tools.Source{}).SystemPackage(sys.GOOS); manager != "apt" {
+		rep.Skip("only apt asks for sudo, and " + sys.GOOS + " installs through another manager")
+		return
+	}
 	in := &tools.Installer{
 		GOOS:       sys.GOOS,
 		HasCommand: sys.has,

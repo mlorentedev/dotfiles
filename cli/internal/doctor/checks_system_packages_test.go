@@ -58,3 +58,24 @@ func TestCheckSystemPackages_PassesWhenSudoDoesNotAsk(t *testing.T) {
 		t.Errorf("want PASS\n%s", out)
 	}
 }
+
+// Off Linux nothing escalates, so the check asks no package manager anything:
+// a winget query costs seconds per entry, for an answer that cannot be a wait.
+func TestCheckSystemPackages_AsksNoManagerOffLinux(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "packages.json"), catalogWithAptEntries)
+	for _, goos := range []string{"darwin", "windows"} {
+		sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, []string{"brew", "winget", "sudo"}, nil)
+		sys.GOOS = goos
+		var asked []string
+		sys.CommandOutput = func(name string, args ...string) (string, error) {
+			asked = append(asked, name)
+			return "", nil
+		}
+		var buf bytes.Buffer
+		checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+		if len(asked) != 0 || strings.Contains(buf.String(), "[WARN]") {
+			t.Errorf("%s: asked %v\n%s", goos, asked, buf.String())
+		}
+	}
+}
