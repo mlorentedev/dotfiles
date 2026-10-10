@@ -6,9 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
@@ -16,10 +16,6 @@ import (
 // DefaultCloneURL is what the checkout step clones when the checkout is
 // absent and the caller names no other upstream.
 const DefaultCloneURL = "https://github.com/mlorentedev/dotfiles.git"
-
-// checkoutMarker is a file at the root of every dotfiles checkout. A directory
-// without it is someone else's repository, and the step refuses to touch it.
-const checkoutMarker = "versions.conf"
 
 // checkout makes the dotfiles checkout exist and keeps it level with its
 // upstream. Every later step reads the checkout, so it runs first. Absent, it
@@ -122,9 +118,10 @@ func checkoutAbsent(path string) (bool, error) {
 	return len(entries) == 0, nil
 }
 
+// isDotfilesCheckout refuses someone else's repository before git touches it.
 func isDotfilesCheckout(path string) error {
-	if _, err := os.Stat(filepath.Join(path, checkoutMarker)); err != nil {
-		return fmt.Errorf("%s is not a dotfiles checkout (no %s), so it was left untouched; pass --repo or set DOTFILES_REPO_DIR", path, checkoutMarker)
+	if !env.IsDotfilesCheckout(path) {
+		return fmt.Errorf("%s is not a dotfiles checkout (no %s), so it was left untouched; pass --repo or set DOTFILES_REPO_DIR", path, env.CheckoutMarker)
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 )
 
@@ -158,5 +159,22 @@ func TestConvergePlan_FromZeroPlansTheCloneFirst(t *testing.T) {
 	}
 	if _, err := os.Stat(want); err == nil {
 		t.Error("a plan must not clone")
+	}
+}
+
+// Run from inside another project, converge plans against the declared
+// checkout instead of refusing the project it happens to stand in.
+func TestConvergePlan_FromAnotherProjectUsesTheDeclaredCheckout(t *testing.T) {
+	_, home := convergeFixture(t)
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(other)
+
+	if got, want := convergeCheckout(home), env.DefaultCheckoutDir(home); got != want {
+		t.Errorf("convergeCheckout() = %q, want the default checkout %q", got, want)
 	}
 }

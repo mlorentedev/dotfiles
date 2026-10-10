@@ -91,12 +91,13 @@ var convergeOptions = func() converge.Options {
 }
 
 // convergeCheckout is the checkout a run converges from when --repo names
-// none: the one the working directory is in, else the declared location
+// none: the dotfiles checkout the working directory is in (another project's
+// repository does not count), else the declared location
 // (DOTFILES_REPO_DIR, machine.json, the contract), else the default. The last
 // two may not exist yet: the checkout step clones them, which is how a machine
 // from zero gets one.
 func convergeCheckout(home string) string {
-	if r := env.RepoDir(); r != "" {
+	if r := env.RepoDir(); r != "" && env.IsDotfilesCheckout(r) {
 		return r
 	}
 	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" {

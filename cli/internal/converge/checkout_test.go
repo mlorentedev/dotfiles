@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 )
 
@@ -49,7 +50,7 @@ func newCheckoutFixture(t *testing.T) checkoutFixture {
 	f := checkoutFixture{upstream: filepath.Join(root, "upstream.git"), writer: filepath.Join(root, "writer")}
 	gitAt(t, root, "init", "-q", "--bare", f.upstream)
 	gitAt(t, root, "clone", "-q", f.upstream, f.writer)
-	commitFile(t, f.writer, checkoutMarker, "DOTF_VERSION=1\n")
+	commitFile(t, f.writer, env.CheckoutMarker, "DOTF_VERSION=1\n")
 	f.env = Env{RepoRoot: filepath.Join(root, "Projects", "dotfiles"), GOOS: "linux"}
 	f.step = checkout{run: gitconfig.ExecRunner, url: f.upstream, has: onPath}
 	return f
@@ -113,7 +114,7 @@ func TestCheckout_LeavesADirtyCheckoutAlone(t *testing.T) {
 	f := newCheckoutFixture(t)
 	gitAt(t, f.writer, "clone", "-q", f.upstream, f.env.RepoRoot)
 	commitFile(t, f.writer, "README.md", "new\n")
-	if err := os.WriteFile(filepath.Join(f.env.RepoRoot, checkoutMarker), []byte("local edit\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(f.env.RepoRoot, env.CheckoutMarker), []byte("local edit\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	before := gitAt(t, f.env.RepoRoot, "rev-parse", "HEAD")
@@ -139,7 +140,7 @@ func TestCheckout_RefusesARepositoryThatIsNotDotfiles(t *testing.T) {
 	}
 
 	if _, err := f.step.Reconcile(f.env, false); err == nil || !strings.Contains(err.Error(), "not a dotfiles checkout") {
-		t.Fatalf("want a refusal naming the missing %s, got %v", checkoutMarker, err)
+		t.Fatalf("want a refusal naming the missing %s, got %v", env.CheckoutMarker, err)
 	}
 }
 
