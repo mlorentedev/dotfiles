@@ -118,9 +118,9 @@ func TestMirror_NamesADeclaredTargetTheCheckoutLacks(t *testing.T) {
 	}
 }
 
-// Mirroring never prunes: a file only the mirror has survives. Orphan removal
-// is `dotf doctor --fix`'s (#802), and a setup that deleted would be a second
-// pruner with its own idea of what is stale.
+// Mirroring never prunes harness/: a record only the mirror has survives.
+// Orphan removal there is `dotf doctor --fix`'s (#802). Only the trees of plain
+// checkout copies are pruned by Mirror (prune_test.go).
 func TestMirror_DoesNotPrune(t *testing.T) {
 	repo, deploy := mirrorRepo(t), t.TempDir()
 	orphan := filepath.Join(deploy, "harness", "skills", "retired", "SKILL.md")

@@ -969,7 +969,7 @@ func matchPinFloorFrom(rep *Report, tool, installed, pin, source string) {
 // every shell still reads the stale deploy-dir copy. A
 // missing repo / deploy-dir / non-git repo is a SKIP (the shell twin's exit 2),
 // because `dotf doctor` legitimately runs where one side is absent (CI, fresh box).
-func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
+func checkDeployDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Repo↔deploy-dir drift")
 
 	repo := resolveRepoDir(sys)
@@ -982,7 +982,9 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 		rep.Skip("deploy-dir absent: " + deploy + " (run setup)")
 		return
 	}
-	if !isDir(filepath.Join(repo, ".git")) {
+	// pathExists, not isDir: in a linked worktree .git is a file naming the
+	// gitdir, and the check skipped every worktree as "not a git repo".
+	if !pathExists(filepath.Join(repo, ".git")) {
 		rep.Skip("not a git repo: " + repo)
 		return
 	}
@@ -1015,6 +1017,51 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 	}
 	if drift == 0 {
 		rep.Pass(fmt.Sprintf("repo and deploy-dir agree (%d managed files checked)", checked))
+	}
+	checkDeployDirLeftovers(sys, rep, repo, deploy, fix)
+}
+
+// checkDeployDirLeftovers is the other half of the drift check, the one it
+// skips by comparing only files on both sides: a file the checkout deleted that
+// the deploy dir still has (#2266). harness.Mirror prunes these on every setup
+// and converge; this reports them on a box that has not mirrored since, and
+// --fix removes them through the same function. An orphan git never tracked is
+// only named, because absence from the checkout does not make it garbage (#802).
+func checkDeployDirLeftovers(sys *System, rep *Report, repo, deploy string, fix bool) {
+	git := func(dir string, args ...string) (string, error) {
+		return sys.CommandOutput("git", append([]string{"-C", dir}, args...)...)
+	}
+	o, err := harness.ScanOrphans(repo, deploy, git)
+	if err != nil {
+		rep.Warn("deploy-dir leftover scan failed: " + err.Error())
+		return
+	}
+	for _, rel := range o.Unknown {
+		rep.Warn(rel + " is in the deploy dir but not in the checkout, and git history does not show it deleted — left in place; move it out of " + deploy + " if it is yours")
+	}
+	if o.Skipped != "" {
+		rep.Warn("deploy-dir leftovers not classified: " + o.Skipped)
+	}
+	for _, rel := range o.Unreadable {
+		rep.Warn(rel + " in the deploy dir could not be read, so it was not checked for leftovers")
+	}
+	switch {
+	case len(o.Deleted) == 0:
+		if len(o.Unknown)+len(o.Unreadable) == 0 {
+			rep.Pass("deploy dir holds no leftovers of files the checkout deleted")
+		}
+	case !fix:
+		for _, rel := range o.Deleted {
+			rep.Fail("leftover: " + rel + " — deleted from the checkout, still in the deploy dir (run: dotf doctor --fix, or dotf converge)")
+		}
+	default:
+		if err := harness.PruneOrphans(deploy, o.Deleted); err != nil {
+			rep.Fail("failed to prune deploy-dir leftovers: " + err.Error())
+			return
+		}
+		for _, rel := range o.Deleted {
+			rep.Fix("pruned deploy-dir leftover: " + rel)
+		}
 	}
 }
 

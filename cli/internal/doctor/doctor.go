@@ -123,7 +123,7 @@ func Run(opts Options) (int, error) {
 		checkPiExtensions(sys, cfg, rep, opts.Fix)
 		checkPiPackageRequirements(sys, cfg, rep)
 		checkHarnessDrift(sys, cfg, rep, opts.Fix)
-		checkDeployDrift(sys, cfg, rep)
+		checkDeployDrift(sys, cfg, rep, opts.Fix)
 		checkHomeDeployDrift(sys, cfg, rep)
 		checkDockerEngine(sys, rep, opts.Fix)
 		checkColimaSize(sys, rep, opts.Fix)
