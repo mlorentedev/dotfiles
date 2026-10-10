@@ -344,8 +344,13 @@ setup() {
 
 @test "opencode tui.json deployed by dotf deploy, not by a setup block (#1843 B11)" {
     # The setup copy was deleted; the `opencode-tui` entry of ai/deploy.json is
-    # now the only writer, so this fails if that entry stops applying.
-    cmp "$REPO_DIR/ai/opencode/tui.json" "$HOME/.config/opencode/tui.json"
+    # now the only writer, so this fails if that entry stops applying. The entry
+    # merges (#2260), which writes plain JSON: compare values, not bytes, with
+    # the source's whole-line comments dropped.
+    [ -f "$HOME/.config/opencode/tui.json" ]
+    want=$(grep -v '^[[:space:]]*//' "$REPO_DIR/ai/opencode/tui.json" | jq -S .)
+    got=$(jq -S . "$HOME/.config/opencode/tui.json")
+    [ "$want" = "$got" ]
 }
 
 @test "opencode commands deployed to ~/.config/opencode/commands/ (SDD-008)" {
