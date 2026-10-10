@@ -23,7 +23,7 @@ func newEnvPersistCmd() *cobra.Command {
 	var check bool
 	cmd := &cobra.Command{
 		Use:   "persist",
-		Short: "Write the resolved contract variables into the per-user persistent scope (Windows: HKCU\\Environment)",
+		Short: "Write the resolved contract variables into the per-user persistent scope (Windows: HKCU\\Environment, macOS: the launchd session)",
 		Long: "persist resolves every structural variable exactly as `generate` does\n" +
 			"(env-contract.json defaults + machine.json overrides) and writes each one\n" +
 			"into the OS's per-user persistent environment, the scope a process\n" +
@@ -32,7 +32,10 @@ func newEnvPersistCmd() *cobra.Command {
 			"The names it wrote are recorded in the store as " + env.ManagedMarker + " (';'-joined);\n" +
 			"a name that record lists and the contract no longer names is deleted on the\n" +
 			"next run; a variable dotf never wrote is never touched.\n" +
-			"Where the OS has no such scope (Linux, macOS) it is a no-op: the rc files\n" +
+			"On macOS the scope is the user's launchd session (`launchctl setenv`), which\n" +
+			"apps launched from the Dock inherit; logout clears it, so `dotf converge`\n" +
+			"installs a login agent that runs this command again at every login.\n" +
+			"Where the OS has no such scope (Linux) it is a no-op: the rc files\n" +
 			"source paths.sh and unit files carry their own environment.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,

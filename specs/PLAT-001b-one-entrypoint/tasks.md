@@ -74,6 +74,18 @@ created: "2026-10-06"
 - [x] On the Mac: `go run ./cmd/dotf converge --plan --only configs-deploy` reports 20 configs in sync, `agy-settings` to deploy, 1 not for this machine
 - [ ] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
 
+### PR 2e — the macOS environment step: `env-persist` (#2013 S3)
+
+> GUI apps on macOS read no rc file, only the user's launchd session (F-021). The owner released S3 from S1 (2026-10-09), so it lands as a converge step now and S1 absorbs the login agent later.
+
+- [x] [AC11] Failing tests, then `env.LaunchdUserEnv`: `launchctl getenv/setenv/unsetenv` as the darwin `UserEnvStore`. An unset name reads as absent (getenv exits 0 and prints nothing), so an empty value is refused; Persist twice changes nothing
+- [x] [AC11] `env.LaunchAgentPlist`: `~/.local/bin/dotf env persist` at load, absolute paths, well-formed XML
+- [x] [AC11] [AC3] [AC5] Failing tests, then `env-persist` (darwin, last in the registry, closing ADR-045's configs step): the plan writes nothing; the apply sets the variables, writes the plist and bootstraps it only when `launchctl print` fails or the plist changed (bootout first); the probe requires the plist current, the agent loaded and no drift; a second run reports 0 changes; a failed bootstrap fails the run
+- [x] Doctor's persisted-environment check runs on macOS through the same store, and names `dotf converge --only env-persist` there; `dotf env persist --help` describes the macOS scope
+- [x] On the Mac: the plan listed 11 variables, the marker and the agent; the apply loaded the agent (`last exit code = 0`); a second run reported `0 changed`; `launchctl getenv VAULT_PATH` answers
+- [x] Windows check (#2013 wave rule; the registry, doctor and `env` are shared paths): `test (windows-latest)` passed on `9babaddf`. Its first run caught the plist rendered with `filepath.Join`, now `path.Join`, because launchd reads POSIX paths whatever OS renders it
+- [ ] [AC11] Owner, at the Mac: quit and relaunch an app from the Dock and confirm it sees `VAULT_PATH` (the agent's shell cannot launch a GUI app without inheriting its own environment)
+
 ### PR 3 — the persisted report (#1843 B7)
 
 - [x] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory

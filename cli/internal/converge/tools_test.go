@@ -110,13 +110,14 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // lands already has its instructions (ADR-045 decision 4). The configs come
 // after the tools, which answer each entry's `requires`, and before git-config,
 // whose probe needs the dotfiles.gitconfig include target that a config entry
-// deploys.
+// deploys. env-persist closes the configs step: the env files are configs too
+// (ADR-045 decision 4, step 5).
 func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	var names []string
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "records-mirror,records-harness,tools,configs-deploy,git-config" {
+	if got := strings.Join(names, ","); got != "records-mirror,records-harness,tools,configs-deploy,git-config,env-persist" {
 		t.Errorf("registry order: %s", got)
 	}
 }

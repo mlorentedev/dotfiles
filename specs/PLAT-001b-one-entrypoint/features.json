@@ -96,5 +96,12 @@
     "verification": "cd cli && go test ./internal/deploy/ -run '^TestRun_APlanOfARenderedEntryCreatesNoDirectory$' -count=1 -v | grep -q -- '--- PASS: TestRun_APlanOfARenderedEntryCreatesNoDirectory'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f15",
+    "behavior": "AC11: on macOS, converge writes the contract variables into the launchd session and loads the login agent; a second run changes nothing",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestEnvPersist_ApplyThenSecondRunIsZero$' -count=1 -v | grep -q -- '--- PASS: TestEnvPersist_ApplyThenSecondRunIsZero'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
