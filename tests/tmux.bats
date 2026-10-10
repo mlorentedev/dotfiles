@@ -84,5 +84,10 @@ copy_with() {
     run tmux -L "$socket" show -sv copy-command
     tmux -L "$socket" kill-server 2>/dev/null || true
     [ "$status" -eq 0 ]
-    [ "$output" = "$(copy_command)" ]
+    local want
+    want=$(copy_command)
+    [ "$output" = "$want" ] || {
+        printf 'tmux %s shows: %s\nthe file has:  %s\n' "$(tmux -V)" "$output" "$want"
+        false
+    }
 }
