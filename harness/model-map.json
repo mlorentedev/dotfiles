@@ -146,10 +146,10 @@
     "mid": {
       "claude": "sonnet",
       "copilot": "gpt-5.6-sol",
-      "gemini": "gemini-3.7-flash-high",
+      "gemini": "gemini-3.8-flash-high",
       "nan": "deepseek-v4-flash",
       "opencode": "qwen3.6-plus",
-      "$comment_gemini": "agy's interactive default, routed 2026-10-01 so the pin in ai/agy/settings.json resolves (HARNESS-067 round-1 finding 1, #902). agy writes the picker label `Gemini 3.7 Flash (High)`; `agy models` lists its id as gemini-3.7-flash-high. Compile-time only: no chain carries it, so `dotf agent run` dispatch is unchanged."
+      "$comment_gemini": "agy's interactive default, routed 2026-10-01 so the pin in ai/agy/settings.json resolves (HARNESS-067 round-1 finding 1, #902). agy writes the picker label `Gemini 3.8 Flash (High)`; `agy models` lists its id as gemini-3.8-flash-high (moved from 3.7 by the owner, 2026-10-09, #902). Compile-time only: no chain carries it, so `dotf agent run` dispatch is unchanged."
     },
     "low": {
       "claude": "haiku",
