@@ -98,13 +98,17 @@ utils() {
 }
 
 @test "aliases.zsh: ls stays the system ls when eza is absent, and is eza when present" {
-    command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
-    # Without eza: PATH holds only the system dirs, which never ship eza.
-    run env PATH="/usr/bin:/bin" zsh -f -c '. "$1"; alias ls; whence -w ll' _ "$REPO/.zsh/aliases.zsh"
+    local zsh_bin
+    zsh_bin="$(command -v zsh)" || skip "zsh not installed"
+    # aliases.zsh runs nothing at load but the `command -v` builtin, so PATH can
+    # hold exactly the eza under test. A system dir would measure the host: apt
+    # installs eza into /usr/bin (#2194).
+    mkdir -p "$TMP/empty"
+    run env PATH="$TMP/empty" "$zsh_bin" -f -c '. "$1"; alias ls; whence -w ll' _ "$REPO/.zsh/aliases.zsh"
     [[ "$output" != *eza* ]] || false
     [[ "$output" == *"ll: alias"* ]] || false
     printf '#!/bin/sh\nexit 0\n' > "$TMP/bin/eza"
     chmod +x "$TMP/bin/eza"
-    run env PATH="$TMP/bin:/usr/bin:/bin" zsh -f -c '. "$1"; alias ls' _ "$REPO/.zsh/aliases.zsh"
+    run env PATH="$TMP/bin" "$zsh_bin" -f -c '. "$1"; alias ls' _ "$REPO/.zsh/aliases.zsh"
     [[ "$output" == *"eza --group-directories-first"* ]] || false
 }
