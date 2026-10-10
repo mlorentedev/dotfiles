@@ -22,6 +22,7 @@ type fakeRunner struct {
 	markets  []string
 	marketsJ string // raw list output, when set, instead of markets
 	sticky   map[string]bool
+	rmFails  map[string]bool // RemoveMarketplace exits non-zero, registry untouched
 	removed  []string
 }
 
@@ -52,6 +53,9 @@ func (f *fakeRunner) Marketplaces() (string, error) {
 
 func (f *fakeRunner) RemoveMarketplace(name string) error {
 	f.removed = append(f.removed, name)
+	if f.rmFails[name] {
+		return errors.New("permission denied")
+	}
 	if f.sticky[name] {
 		return nil
 	}
@@ -203,5 +207,43 @@ func TestRetireRefusesAnUnparseableList(t *testing.T) {
 	}
 	if len(r.removed) != 0 {
 		t.Fatalf("removed %v after an unreadable list", r.removed)
+	}
+}
+
+// A failed removal keeps the CLI's own message, and the second list still
+// judges it: the operator sees why, not only that it is still there.
+func TestRetireKeepsTheCLIErrorOfAFailedRemoval(t *testing.T) {
+	r := &fakeRunner{markets: []string{"old"}, rmFails: map[string]bool{"old": true}}
+	rep, err := newSyncer(r).Retire([]string{"old"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(rep.Failed, []string{"old"}) {
+		t.Fatalf("report %+v, want old failed", rep)
+	}
+	if cause := rep.Causes["old"]; cause == nil || !strings.Contains(cause.Error(), "permission denied") {
+		t.Fatalf("cause %v, want the CLI's error", rep.Causes["old"])
+	}
+}
+
+// An entry without a name means the list's shape changed. Read leniently it
+// would be an empty registry, and every retired marketplace would look gone.
+func TestRetireRefusesAListEntryWithoutAName(t *testing.T) {
+	r := &fakeRunner{marketsJ: `[{"id":"old","source":"github"}]`}
+	if _, err := newSyncer(r).Retire([]string{"old"}, false); err == nil {
+		t.Fatal("want an error for an entry without a name")
+	}
+}
+
+// The shape of `claude plugin marketplace list --json`, captured from Claude
+// Code on 2026-10-10 rather than written to match the parser.
+func TestRetireReadsTheCapturedListShape(t *testing.T) {
+	r := &fakeRunner{marketsJ: `[{"name":"claude-plugins-official","source":"github","repo":"anthropics/claude-plugins-official","installLocation":"/home/u/.claude/plugins/marketplaces/claude-plugins-official"},{"name":"thedotmack","source":"github","repo":"thedotmack/claude-mem","installLocation":"/home/u/.claude/plugins/marketplaces/thedotmack"}]`}
+	rep, err := newSyncer(r).Retire([]string{"thedotmack"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(rep.Removed, []string{"thedotmack"}) {
+		t.Fatalf("report %+v, want thedotmack to be removed", rep)
 	}
 }

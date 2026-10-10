@@ -144,6 +144,10 @@ func retireMarketplaces(w io.Writer, step string, s claude.Syncer, names []strin
 		deployRow(w, verb, step, "retired marketplace %s", name)
 	}
 	for _, name := range rep.Failed {
+		if cause := rep.Causes[name]; cause != nil {
+			deployRow(w, "failed", step, "retired marketplace %s is still registered: %v", name, cause)
+			continue
+		}
 		deployRow(w, "failed", step, "retired marketplace %s is still registered", name)
 	}
 	if len(rep.Failed) > 0 {

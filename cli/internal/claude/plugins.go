@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 )
 
@@ -134,9 +133,11 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 
 // RetireReport is what one Retire found and did. Removed holds marketplaces
 // whose registration is gone afterwards (or would be removed, on a dry run);
-// Failed holds those still registered when Retire finished.
+// Failed holds those still registered when Retire finished, and Causes the
+// CLI's error for each of them whose removal exited non-zero.
 type RetireReport struct {
 	Removed, Failed []string
+	Causes          map[string]error
 	Restored        int
 }
 
@@ -155,6 +156,7 @@ func (s Syncer) Retire(names []string, dryRun bool) (RetireReport, error) {
 	if err != nil {
 		return rep, err
 	}
+	causes := map[string]error{}
 	for _, name := range names {
 		switch {
 		case !registered[name]:
@@ -164,26 +166,34 @@ func (s Syncer) Retire(names []string, dryRun bool) (RetireReport, error) {
 			restored, err := Guard(s.ClaudeJSON, s.Floor, func() error { return s.Run.RemoveMarketplace(name) })
 			rep.Restored += b2i(restored)
 			if err != nil {
-				rep.Failed = append(rep.Failed, name)
+				causes[name] = err
 			}
 		}
 	}
 	if dryRun {
 		return rep, nil
 	}
+	// The second list judges every name, a failed removal included: the end
+	// state decides, and the CLI's error only explains a survivor.
 	after, err := s.marketplaces(&rep)
 	if err != nil {
 		return rep, err
 	}
 	for _, name := range names {
-		if !registered[name] || slices.Contains(rep.Failed, name) {
+		if !registered[name] {
 			continue
 		}
-		if after[name] {
-			rep.Failed = append(rep.Failed, name)
+		if !after[name] {
+			rep.Removed = append(rep.Removed, name)
 			continue
 		}
-		rep.Removed = append(rep.Removed, name)
+		rep.Failed = append(rep.Failed, name)
+		if causes[name] != nil {
+			if rep.Causes == nil {
+				rep.Causes = map[string]error{}
+			}
+			rep.Causes[name] = causes[name]
+		}
 	}
 	return rep, nil
 }
@@ -209,7 +219,12 @@ func (s Syncer) marketplaces(rep *RetireReport) (map[string]bool, error) {
 		return nil, fmt.Errorf("claude plugin marketplace list --json: %w", err)
 	}
 	set := map[string]bool{}
-	for _, m := range list {
+	for i, m := range list {
+		if m.Name == "" {
+			// The list's shape changed. Read leniently it would be an empty
+			// registry, and every retired marketplace would look gone.
+			return nil, fmt.Errorf("claude plugin marketplace list --json: entry %d has no name", i)
+		}
 		set[m.Name] = true
 	}
 	return set, nil
