@@ -46,7 +46,7 @@ replaces it with the pinned release.
 | `tools` | Installs the tools in `packages.json`; `install --dry-run` shows the plan first |
 | `deploy` | Installs agent configs from the checkout to their deployed locations |
 | `env` | Resolves per-machine paths (`paths.sh` / `paths.ps1`) |
-| `update` | Fast-forwards the repository and re-runs setup (opt-in, run by a scheduler) |
+| `update` | Fast-forwards the repository and converges from it (opt-in, run by a scheduler) |
 | `agent`, `harness`, `pi`, `orca`, `mem`, `vault`, `search` | Agent harness and knowledge-vault tooling for this repository |
 | `version` | Prints the version |
 
@@ -63,7 +63,15 @@ reported skipped). Records come next: the harness mirror, then the agents'
 instruction files, so no agent runs before its instructions exist. Then the
 tools, then every `ai/deploy.json` config that applies to this machine
 (`configs-deploy`, the loop behind `dotf deploy`), then the git config, and on
-macOS the launchd environment (`env-persist`).
+macOS the launchd environment (`env-persist`). On Linux and Windows the setup
+script runs last (`legacy-setup`), for whatever no native step covers yet. It
+cannot plan or say what it changed, so it is reported `[OPAQUE]`, never as
+converged, and a second run's `0 changed` speaks for the native steps only.
+`DOTFILES_SELFUPDATE_SETUP_CMD` names another setup command. A converge run
+from inside a setup script that converge started skips this step, so the two
+cannot call each other in a loop.
+
+`dotf update` runs the same converge after a clean fast-forward, and only then.
 
 Without `--repo`, the checkout is the one the working directory is in, else the
 declared `DOTFILES_REPO_DIR`, else `~/Projects/dotfiles`: the working directory
