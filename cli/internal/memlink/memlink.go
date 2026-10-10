@@ -33,7 +33,9 @@ func Ensure(cwd, target, project, vault string) (string, error) {
 	}
 
 	// Already linked, or a non-empty real dir (the agent's own data)? Leave it.
-	if isLink(target) {
+	// A dangling link is not "linked": its source moved or was archived, and
+	// it is replaced below when a current source resolves.
+	if isLink(target) && !isDangling(target) {
 		return "", nil
 	}
 	if isDir(target) && dirNotEmpty(target) {
@@ -48,8 +50,9 @@ func Ensure(cwd, target, project, vault string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return "", err
 	}
-	// Remove an empty placeholder target dir so the link can be created.
-	if isDir(target) {
+	// Remove an empty placeholder dir, or a dangling link, so the link can be
+	// created. os.Remove on a link removes the link, never what it names.
+	if isDir(target) || isDangling(target) {
 		_ = os.Remove(target)
 	}
 	if err := createLink(src, target); err != nil {
@@ -75,6 +78,9 @@ const (
 	StateRepairable
 	// StateNoSource: no vault source resolves for this project — nothing to link.
 	StateNoSource
+	// StateDangling: target is a link whose source no longer exists, and no
+	// current source resolves to replace it. Writes through it fail.
+	StateDangling
 )
 
 // Status classifies target without mutating it, mirroring Ensure's decision
@@ -83,13 +89,16 @@ func Status(cwd, target, project, vault string) LinkState {
 	if project == "" {
 		project = filepath.Base(cwd)
 	}
-	if isLink(target) {
+	if isLink(target) && !isDangling(target) {
 		return StateLinked
 	}
 	if isDir(target) && dirNotEmpty(target) {
 		return StateRealDir
 	}
 	if resolveVaultMemory(cwd, project, vault) == "" {
+		if isDangling(target) {
+			return StateDangling
+		}
 		return StateNoSource
 	}
 	return StateRepairable
@@ -267,6 +276,16 @@ func isDir(p string) bool {
 func isLink(p string) bool {
 	info, err := os.Lstat(p)
 	return err == nil && info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0
+}
+
+// isDangling reports whether p is a link whose source does not exist: Lstat
+// finds the link, Stat cannot follow it.
+func isDangling(p string) bool {
+	if !isLink(p) {
+		return false
+	}
+	_, err := os.Stat(p)
+	return err != nil
 }
 
 // dirNotEmpty reports whether p is a readable directory holding at least one entry
