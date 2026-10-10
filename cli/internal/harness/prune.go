@@ -69,9 +69,12 @@ type Orphans struct {
 // that repository's ignore rules, and a catch-all one would skip every file
 // without a word. Inside a git checkout a failing git also ignores nothing,
 // but that is not silent: the second result says why, for the caller to report.
+// So does a .git that cannot be checked, which is not proof of a tarball.
 func IgnoredInCheckout(repoRoot string, git GitRunner) (map[string]bool, string) {
-	if _, err := os.Lstat(filepath.Join(repoRoot, ".git")); err != nil {
+	if _, err := os.Lstat(filepath.Join(repoRoot, ".git")); errors.Is(err, fs.ErrNotExist) {
 		return nil, ""
+	} else if err != nil {
+		return nil, "the checkout's .git could not be checked (" + err.Error() + "), so its ignored files were mirrored"
 	}
 	args := append([]string{"ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "harness"}, DeployDirTrees...)
 	out, err := git(repoRoot, args...)

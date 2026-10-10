@@ -339,6 +339,30 @@ func TestIgnoredInCheckout_FailsOpenAndSaysSoOnlyInAGitCheckout(t *testing.T) {
 	}
 }
 
+// A .git that cannot be checked is not a tarball: the mirror would copy the
+// ignored files, so the reason is reported, as a failing git's is.
+func TestIgnoredInCheckout_ReportsAGitDirItCannotCheck(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs a directory the test user cannot search")
+	}
+	parent := t.TempDir()
+	checkout := filepath.Join(parent, "checkout")
+	writeFile(t, filepath.Join(checkout, ".git"), "gitdir: /nowhere\n")
+	if err := os.Chmod(parent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
+	never := func(string, ...string) (string, error) {
+		t.Error("git was asked about a checkout whose .git could not be checked")
+		return "", nil
+	}
+
+	got, why := IgnoredInCheckout(checkout, never)
+	if len(got) != 0 || !strings.Contains(why, ".git could not be checked") {
+		t.Errorf("got %v, %q; want nothing ignored and the reason named", got, why)
+	}
+}
+
 // The no-git path end to end, with the real git: a checkout without .git
 // mirrors every file and reports nothing, even extracted inside another
 // repository. git walks up from such a tree, so asking it would apply the
