@@ -323,6 +323,16 @@ setup() {
     [ "$status" -eq 0 ] || { echo "$output"; return 1; }
 }
 
+@test "copilot config is deployed now that the npm catalog put copilot on PATH (#1312)" {
+    # The inverse, an entry skipped while its required command is absent, is
+    # pinned by TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent; the
+    # container now carries copilot, so this asserts the present side.
+    command -v copilot >/dev/null 2>&1
+    for f in copilot-instructions.md settings.json config.json mcp-config.json; do
+        [ -f "$HOME/.copilot/$f" ] || { echo "missing: ~/.copilot/$f"; return 1; }
+    done
+}
+
 @test "AGENTS.md deployed to ~/.config/opencode/AGENTS.md (cross-agent SSOT)" {
     # opencode reads AGENTS.md natively (per upstream docs). Deploying the
     # repo-root canonical SSOT verbatim gives opencode the same system prompt
