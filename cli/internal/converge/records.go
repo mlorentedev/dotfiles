@@ -40,7 +40,7 @@ type Options struct {
 	UID       int
 	// DotfPath is the dotf binary the bound hooks name;
 	// harness.ResolveDotfPath in production. Unset, the records-bind step
-	// fails rather than guess.
+	// is skipped with the reason rather than guess.
 	DotfPath func(home string) string
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
