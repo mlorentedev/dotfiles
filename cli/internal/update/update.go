@@ -78,6 +78,10 @@ const (
 	StatusCurrent       = "current"
 	StatusAhead         = "ahead"
 	StatusFastForwarded = "fast-forwarded"
+	// StatusBehind is Assess's answer for a clean checkout its upstream
+	// strictly contains: Sync would fast-forward it. Sync itself never
+	// returns it.
+	StatusBehind = "behind"
 )
 
 // Sync brings the checkout git operates on level with its upstream, by a
@@ -91,6 +95,21 @@ const (
 // ff-failed|fast-forwarded. A git command that fails is read as the condition
 // it would have ruled out (an unreadable status is "dirty"), never as clean.
 func Sync(repo string, git func(args ...string) (string, error)) Outcome {
+	out := Assess(repo, git)
+	if out.Status != StatusBehind {
+		return out
+	}
+	if _, err := git("merge", "--ff-only", "@{u}"); err != nil {
+		return Outcome{Status: "ff-failed", Message: "fast-forward to " + out.Upstream + " failed unexpectedly (worktree left untouched)", Upstream: out.Upstream}
+	}
+	return Outcome{Status: StatusFastForwarded, Message: "fast-forwarded to " + out.Upstream, Upstream: out.Upstream}
+}
+
+// Assess is Sync up to the merge: it fetches, so the upstream it compares is
+// current, and reports StatusBehind where Sync would fast-forward. The fetch
+// moves remote-tracking refs only; HEAD and the worktree are never touched, so
+// a plan can call it.
+func Assess(repo string, git func(args ...string) (string, error)) Outcome {
 	if _, err := git("rev-parse", "--git-dir"); err != nil {
 		return Outcome{Status: "not-a-repo", Message: "not a git repo: " + repo}
 	}
@@ -135,10 +154,7 @@ func Sync(repo string, git func(args ...string) (string, error)) Outcome {
 	case base != local:
 		return Outcome{Status: "diverged", Message: "local branch has diverged from " + upstream + " (non fast-forward)", Upstream: upstream}
 	}
-	if _, err := git("merge", "--ff-only", "@{u}"); err != nil {
-		return Outcome{Status: "ff-failed", Message: "fast-forward to " + upstream + " failed unexpectedly (worktree left untouched)", Upstream: upstream}
-	}
-	return Outcome{Status: StatusFastForwarded, Message: "fast-forwarded to " + upstream, Upstream: upstream}
+	return Outcome{Status: StatusBehind, Message: "behind " + upstream, Upstream: upstream}
 }
 
 // skip is a tiny helper so every benign branch reads as one line and always

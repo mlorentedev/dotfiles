@@ -128,6 +128,15 @@ func DotfilesDir(home string) string {
 	return filepath.Join(home, ".dotfiles")
 }
 
+// DefaultCheckoutDir is where the dotfiles checkout lives when nothing names
+// it: DOTFILES_REPO_DIR's contract default on every OS. It is a literal because
+// it has to answer before any checkout, and so any contract, exists (a machine
+// from zero); TestDefaultCheckoutDirMatchesTheContract keeps it equal to the
+// contract's default.
+func DefaultCheckoutDir(home string) string {
+	return filepath.Join(home, "Projects", "dotfiles")
+}
+
 // MachinePath returns the per-machine override file location, honoring
 // $XDG_CONFIG_HOME and falling back to <home>/.config/dotfiles/machine.json
 // (Windows: %USERPROFILE%\.config\dotfiles\machine.json).

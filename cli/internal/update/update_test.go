@@ -150,3 +150,28 @@ func TestSync(t *testing.T) {
 		})
 	}
 }
+
+// Assess is Sync without the merge: a plan calls it, so it must report where
+// Sync would fast-forward and never move HEAD.
+func TestAssess_ReportsBehindAndNeverMerges(t *testing.T) {
+	var calls []string
+	g := healthyGit()
+	run := func(args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		return g.run(args...)
+	}
+
+	out := Assess("/repo", run)
+
+	if out.Status != StatusBehind || out.Upstream != "origin/main" {
+		t.Fatalf("Assess = %+v, want behind origin/main", out)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "merge ") {
+			t.Fatalf("Assess must not merge, calls: %v", calls)
+		}
+	}
+	if got := Sync("/repo", g.run).Status; got != StatusFastForwarded {
+		t.Errorf("Sync on the same checkout = %q, want %q", got, StatusFastForwarded)
+	}
+}

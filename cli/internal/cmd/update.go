@@ -66,7 +66,7 @@ func repoForUpdate() string {
 	if r := env.RepoDir(); r != "" {
 		return r
 	}
-	return filepath.Join(env.Home(), "Projects", "dotfiles")
+	return env.DefaultCheckoutDir(env.Home())
 }
 
 // dirExists reports whether p exists and is a directory. Shared by the repo-dir

@@ -39,13 +39,10 @@ func newConvergeCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if repo == "" {
-				repo = env.RepoDir()
-			}
-			if repo == "" {
-				return fmt.Errorf("cannot locate the dotfiles checkout — pass --repo, set DOTFILES_REPO_DIR, or run from inside it")
-			}
 			home := env.Home()
+			if repo == "" {
+				repo = convergeCheckout(home)
+			}
 			e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
 			reg := converge.Registry(convergeOptions())
 			if len(only) > 0 {
@@ -85,11 +82,27 @@ var convergeOptions = func() converge.Options {
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		GitRun:           gitconfig.ExecRunner,
+		CloneURL:         os.Getenv("DOTFILES_REPO"),
 		RenderConfigs:    strictDeployRenderer,
 		ResolvePath:      env.ResolvePath,
 		Launchctl:        env.ExecLaunchctl,
 		UID:              os.Getuid(),
 	}
+}
+
+// convergeCheckout is the checkout a run converges from when --repo names
+// none: the one the working directory is in, else the declared location
+// (DOTFILES_REPO_DIR, machine.json, the contract), else the default. The last
+// two may not exist yet: the checkout step clones them, which is how a machine
+// from zero gets one.
+func convergeCheckout(home string) string {
+	if r := env.RepoDir(); r != "" {
+		return r
+	}
+	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" {
+		return r
+	}
+	return env.DefaultCheckoutDir(home)
 }
 
 var convergeTag = map[converge.Status]string{
