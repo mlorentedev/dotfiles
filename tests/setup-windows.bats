@@ -949,11 +949,11 @@ FIXTURE
     [[ "$status" -eq 0 ]] || false
 }
 
-# --- DX-004: opencode tui.json deploy (Linux parity) ---
+# --- DX-004: opencode tui.json is a dotf deploy entry on every OS (#1843 B11) ---
 
-@test "setup-windows.ps1 deploys opencode tui.json (DX-004 AC4)" {
-    grep -qF 'ai\opencode\tui.json' "$PS1_SCRIPT"
-    grep -qF '.config\opencode\tui.json' "$PS1_SCRIPT"
+@test "setup-windows.ps1 leaves opencode tui.json to dotf deploy (DX-004 AC4)" {
+    refute_grep_fixed 'ai\opencode\tui.json' "$PS1_SCRIPT"
+    grep -qF '`opencode-tui` entry of ai/deploy.json' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 mirrors the harness inputs through dotf harness mirror (WIN-007)" {

@@ -55,10 +55,11 @@
     "first run machine.json — which {COPILOT_HOME} needs to resolve — does not",
     "exist yet. The contract's default for COPILOT_HOME is this very path.",
     "",
-    "opencode is deliberately absent: it is gated on testing whether it resolves",
-    "{env:VAR} itself rather than assuming it, which is the assumption that made",
-    "#987 expensive. Claude's MCP servers and plugins are not files, so they are",
-    "converge steps of a bare `dotf deploy`, not entries here (CLI-063, #1339).",
+    "opencode.jsonc is deliberately absent: it is gated on testing whether opencode",
+    "resolves {env:VAR} itself rather than assuming it, which is the assumption that",
+    "made #987 expensive (#1843 B12). Its tui.json carries no secrets and is here.",
+    "Claude's MCP servers and plugins are not files, so they are converge steps of",
+    "a bare `dotf deploy`, not entries here (CLI-063, #1339).",
     "",
     "claude-settings merges ai/claude/settings.json into the settings.json Claude",
     "Code reads, under CLAUDE_CONFIG_DIR (the contract default is ~/.claude). Every",
@@ -83,6 +84,14 @@
   ],
   "version": 3,
   "configs": [
+    {
+      "name": "opencode-tui",
+      "src": "ai/opencode/tui.json",
+      "dst": "{HOME}/.config/opencode/tui.json",
+      "render": false,
+      "mode": "0644",
+      "requires": "opencode"
+    },
     {
       "name": "pi",
       "src": "ai/pi/models.json",

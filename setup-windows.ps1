@@ -1274,22 +1274,8 @@ if ($dotfPath) {
     Write-Warn "dotf not found - pi packages not reconciled"
 }
 
-# Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
-# Plain copy: unlike opencode.jsonc this file carries no secrets, so no env-var
-# substitution (DX-004). opencode reads .config\opencode\tui.json natively.
-# Linux parity: setup-linux.sh tui.json deploy block.
-$tuiSrc = Join-Path $DotfilesDir 'ai\opencode\tui.json'
-$tuiDst = Join-Path $env:USERPROFILE '.config\opencode\tui.json'
-if (Test-Path -LiteralPath $tuiSrc -PathType Leaf) {
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $tuiSrc -Destination $tuiDst)
-    } else {
-        Copy-Item -LiteralPath $tuiSrc -Destination $tuiDst -Force
-        Write-Success "Deployed tui.json to $tuiDst (fallback)"
-    }
-} else {
-    Write-Warn "tui.json source missing at $tuiSrc"
-}
+# opencode's tui.json is the `opencode-tui` entry of ai/deploy.json, installed
+# by the bare `dotf deploy` above (#1843 B11).
 
 # OpenCode commands are deployed from the committed vault skill records by
 # Deploy-SkillRecord near the end of this script (SDD-008, option A): each

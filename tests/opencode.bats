@@ -274,12 +274,12 @@ PY
     [[ -f "$AGENTS_MD" ]] || false
 }
 
-@test "setup-linux.sh deploys AGENTS.md to ~/.config/opencode/ (opencode global SSOT)" {
-    # opencode reads ~/.config/opencode/AGENTS.md natively (per upstream docs).
-    # Unlike claude/agy/copilot which use pointer files, opencode loads the
-    # canonical filename so we copy the full SSOT verbatim.
-    grep -qF '$HOME/.config/opencode/AGENTS.md' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'AGENTS.md source missing' "$DOTFILES_DIR/setup-linux.sh"
+@test "opencode's AGENTS.md is a presence target dotf harness instructions deploys (#1843 B11)" {
+    # opencode reads ~/.config/opencode/AGENTS.md natively, so the full SSOT is
+    # deployed, not a pointer. One Go path deploys it on every OS; setup-linux.sh
+    # no longer carries its own copy.
+    jq -e '.agents.presence[] | select(.agent == "opencode" and .file == ".config/opencode/AGENTS.md" and .source == "AGENTS.md")' "$DOTFILES_DIR/harness/manifest.json"
+    refute_grep_fixed '$HOME/.config/opencode/AGENTS.md' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-windows.ps1 deploys AGENTS.md to ~/.config/opencode/ (cross-OS parity)" {
@@ -356,9 +356,8 @@ PY
     grep -qE '"display_thinking":[[:space:]]*"ctrl\+o"' "$TUI_CFG"
 }
 
-@test "setup-linux.sh deploys tui.json as a plain copy, no secret substitution (DX-004 AC3)" {
-    grep -q 'TUI_SRC="\$CURRENT_DIR/ai/opencode/tui.json"' "$SETUP_SCRIPT"
-    grep -q 'cmp -s "\$TUI_SRC" "\$TUI_DST"' "$SETUP_SCRIPT"
-    # tui.json carries no secrets: it must NOT go through dotf secrets render
-    refute_grep 'dotf secrets render "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
+@test "tui.json is a plain deploy entry, no secret substitution (DX-004 AC3, #1843 B11)" {
+    # tui.json carries no secrets: a verbatim copy, never `dotf secrets render`.
+    jq -e '.configs[] | select(.name == "opencode-tui" and .src == "ai/opencode/tui.json" and .dst == "{HOME}/.config/opencode/tui.json" and .render == false)' "$DOTFILES_DIR/ai/deploy.json"
+    refute_grep 'TUI_(SRC|DST)=' "$SETUP_SCRIPT"
 }
