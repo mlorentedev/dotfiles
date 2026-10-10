@@ -17,7 +17,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC6, AC7, AC9 -> PRs 4b and 6
 - [x] AC2, AC3 (hook bindings are records) -> `records-bind` / tests `TestRecordsBind_PlanWritesNothingApplyConvergesAndRerunIsANoOp`, `TestRecordsBind_HooksWithStrippedMarkersAreConverged`, `TestRecordsBind_NoResolverWiredIsSkippedNotPassed`, `TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite`, `TestRegistry_ToolsRunAfterRecords` (order), `TestCheckHookBinding_FailsOnDriftAndFixBindsIt` (doctor)
 - [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
-- [x] AC12 (catalog in the tools step) -> tests `TestToolsCatalog_OneApplyConvergesAFreshMachine` (install, sync, install order, waits reported and accepted by the probe, 0 changes on the next plan), `TestToolsCatalog_AFailedInstallFailsTheStepAndTheProbe`, `TestToolsCatalog_ARefusedEntryFailsThePlan`, `TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt`, `TestInstall_AMissingManagerIsANamedSkip`; five mutations killed (no second pass, sync first, probe failing on a wait, npm not a manager, plan ignoring sudo)
+- [x] AC12 (catalog in the tools step) -> tests `TestToolsCatalog_OneApplyConvergesAFreshMachine` (install, sync, install order, waits reported and accepted by the probe, 0 changes on the next plan), `TestToolsCatalog_AFailedInstallFailsTheStepAndTheProbe` (attempted and reported once), `TestToolsCatalog_AManagerItInstalledButCannotReachFailsTheProbe`, `TestToolsCatalog_ARefusedEntryFailsThePlan`, `TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt`, `TestInstall_AMissingManagerIsANamedSkip`; nine mutations killed (no second pass, sync first, retry walking every entry, probe failing on a genuine wait, mise or uv unreachable accepted, npm not a manager, plan ignoring sudo, sudo asked per entry)
 
 ## Test status
 
@@ -61,6 +61,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The legacy step is reported skipped on darwin rather than left out of the registry. AC5 already reads "not supported on darwin", and the report then says why no setup ran.
 - A script that cannot plan gets its own status, `opaque`. Counting it as a change would make every second run report one, and counting it as converged would hide what the script did.
 - The catalog joins the `tools` step instead of becoming its own: the runner calls each step once, and the uv tools can only land after the mise sync, so two steps would leave them to a second run.
+- On Linux the catalog moves from a WARN inside setup to a step that fails the run: one unreachable release now stops `configs-deploy` and the steps after it on the hourly `dotf update`, where setup used to log and continue. Accepted: a failure is named in the report and the next run retries, and a converge that reports success over a missing tool is the defect this spec removes. Windows already ran the same catalog from setup, with a non-interactive winget.
+- A fresh machine's PATH may not reach what converge placed (`~/.local/bin`, the mise shims): the probe fails naming the manager rather than accept a wait. Putting those directories on the PATH of non-interactive callers is #2013 W2b.
 
 ## Promotion candidates
 

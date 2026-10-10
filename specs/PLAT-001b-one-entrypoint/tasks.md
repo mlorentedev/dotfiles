@@ -70,7 +70,7 @@ created: "2026-10-06"
 - [x] [AC12] Catalog in the `tools` step (#2013): converge installs `packages.json` on every OS, which nothing did on darwin
   - An apply walks install, mise sync, install, the order of `setup-linux.sh`: the first pass places mise, the sync brings uv, and the second pass installs what waited on it, so one run converges a fresh machine
   - `tools.Installer.Plan` gains the two outcomes the apply already skipped, so plan, apply and probe agree: `missing-manager` now covers npm as well as uv (node is installed by nothing yet, T4b), and `needs-sudo` asks the apply's own `sudo -n true` classifier up front. Without it the probe would re-plan an apt entry as `install` and fail every unattended Linux `dotf update`
-  - The probe fails on an entry still to install or refused; it reports a wait or a needs-sudo instead of failing
+  - The probe fails on an entry still to install or refused, and on a manager this machine's tools install (mise from the catalog, uv as a mise pin) that the run's PATH cannot reach; it reports a genuine wait (npm, which nothing installs yet) or a needs-sudo instead of failing. The second pass walks only what waited, so a failure is attempted and reported once
   - The setup scripts keep their own install lines until #2275 makes `install.sh` hand off to converge
   - On the Mac: `converge --plan --only tools` lists the same ten entries as `dotf tools install --dry-run`
 

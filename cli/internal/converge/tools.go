@@ -41,7 +41,7 @@ func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
 	cat := r.walk(entries, !dryRun)
 	res, serr := r.syncHalf(env, dryRun)
 	if !dryRun {
-		cat.add(r.walk(entries, true))
+		cat.then(r.walk(cat.retry(), true))
 	}
 	res.Changes += len(cat.changed)
 	res.Detail = joinDetail(cat.detail(dryRun), res.Detail)
@@ -63,12 +63,17 @@ func (r toolsSync) Probe(env Env) error {
 	if err := left.err(); err != nil {
 		return err
 	}
-	if r.unavailable() != "" {
-		return nil
-	}
 	s, pins, err := r.sync(env)
 	if err != nil {
 		return err
+	}
+	if r.catalog != nil {
+		if lost := unreachable(left, provided(entries, pins, env.GOOS), !r.has("mise")); len(lost) > 0 {
+			return fmt.Errorf("installed by this machine's tools but not on PATH: %s", strings.Join(lost, ", "))
+		}
+	}
+	if r.unavailable() != "" {
+		return nil
 	}
 	p, err := s.Plan(pins)
 	if err != nil {

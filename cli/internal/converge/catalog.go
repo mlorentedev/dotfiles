@@ -21,15 +21,33 @@ type CatalogInstaller interface {
 // would install), and what it left for a reason converge cannot change.
 type catalogPass struct {
 	changed  []string // installed or upgraded; in a plan, to install or upgrade
-	waiting  []string // "hive (uv)": the manager arrives later, or never on this machine
+	waiting  []wait   // the manager arrives later in the run, or never on this machine
 	needSudo []string // "gh (run: sudo apt-get …)": dotf never asks for a password
 	failed   []error
 }
 
-func (p *catalogPass) add(o catalogPass) {
+// wait is an entry whose package manager is not on PATH.
+type wait struct {
+	tool    tools.Tool
+	manager string
+}
+
+// retry is what a second pass walks: only the entries that waited, so a
+// failure is attempted and reported once.
+func (p catalogPass) retry() []tools.Tool {
+	entries := make([]tools.Tool, 0, len(p.waiting))
+	for _, w := range p.waiting {
+		entries = append(entries, w.tool)
+	}
+	return entries
+}
+
+// then folds a second pass into the first: its installs and failures add up,
+// and its waits are what is still waiting.
+func (p *catalogPass) then(o catalogPass) {
 	p.changed = append(p.changed, o.changed...)
 	p.failed = append(p.failed, o.failed...)
-	p.waiting, p.needSudo = o.waiting, o.needSudo // the later pass is the current state
+	p.waiting = o.waiting
 }
 
 func loadCatalog(env Env) ([]tools.Tool, error) {
@@ -48,7 +66,7 @@ func walkCatalog(in CatalogInstaller, entries []tools.Tool, apply bool) catalogP
 		case tools.PlanInstall, tools.PlanUpgrade:
 			p.record(in, t, apply)
 		case tools.PlanMissingManager:
-			p.waiting = append(p.waiting, t.Name+" ("+strings.TrimPrefix(plan.Note, "waits on ")+")")
+			p.waiting = append(p.waiting, wait{t, strings.TrimPrefix(plan.Note, "waits on ")})
 		case tools.PlanNeedsSudo:
 			p.needSudo = append(p.needSudo, t.Name+" ("+plan.Note+")")
 		case tools.PlanRefused:
@@ -89,10 +107,45 @@ func (p catalogPass) detail(dryRun bool) string {
 		parts = append(parts, "catalog "+verb+": "+strings.Join(p.changed, ", "))
 	}
 	if len(p.waiting) > 0 {
-		parts = append(parts, "waiting on a manager: "+strings.Join(p.waiting, ", "))
+		waits := make([]string, 0, len(p.waiting))
+		for _, w := range p.waiting {
+			waits = append(waits, w.tool.Name+" ("+w.manager+")")
+		}
+		parts = append(parts, "waiting on a manager: "+strings.Join(waits, ", "))
 	}
 	if len(p.needSudo) > 0 {
 		parts = append(parts, "needs sudo: "+strings.Join(p.needSudo, ", "))
 	}
 	return strings.Join(parts, "; ")
+}
+
+// unreachable names the managers this machine's own tool layer installs (a
+// catalog entry for this OS, or a mise pin) that a pass still waited on, or
+// that the sync could not find. After an apply that is not a wait but a PATH
+// that does not reach what converge placed, and the probe fails on it.
+func unreachable(p catalogPass, provided map[string]bool, miseMissing bool) []string {
+	var out []string
+	if miseMissing && provided["mise"] {
+		out = append(out, "mise")
+	}
+	for _, w := range p.waiting {
+		if provided[w.manager] {
+			out = append(out, w.manager+" (for "+w.tool.Name+")")
+		}
+	}
+	return out
+}
+
+// provided is every tool name this OS's tool layer installs.
+func provided(entries []tools.Tool, pins []tools.MiseTool, goos string) map[string]bool {
+	names := map[string]bool{}
+	for _, t := range entries {
+		if t.SupportsOS(goos) {
+			names[t.Name] = true
+		}
+	}
+	for _, t := range pins {
+		names[t.Name] = true
+	}
+	return names
 }

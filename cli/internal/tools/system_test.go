@@ -392,6 +392,19 @@ func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
 		t.Errorf("a plan ran %v", w.ran)
 	}
 
+	in := w.installer("linux")
+	in.Plan(ghTool())
+	in.Plan(ghTool())
+	asked := 0
+	for _, q := range w.queries {
+		if q[0] == "sudo" {
+			asked++
+		}
+	}
+	if asked != 2 { // the first Plan above, and this installer's one question
+		t.Errorf("sudo asked %d times across three plans on two installers, want 2", asked)
+	}
+
 	root := newWorld("apt-get")
 	root.root = true
 	if p := root.installer("linux").Plan(ghTool()); p.Action != PlanInstall || len(root.queries) != 1 {

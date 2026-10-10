@@ -25,6 +25,7 @@ type machine struct {
 	path    map[string]bool
 	present map[string]bool
 	fail    map[string]error
+	offPath map[string]bool // installed where this process's PATH does not reach
 	log     []string
 }
 
@@ -57,7 +58,7 @@ func (c fakeCatalog) Install(t tools.Tool) (tools.Result, error) {
 	if err := c.m.fail[t.Name]; err != nil {
 		return tools.Skipped, err
 	}
-	c.m.present[t.Name], c.m.path[t.Name] = true, true
+	c.m.present[t.Name], c.m.path[t.Name] = true, !c.m.offPath[t.Name]
 	c.m.log = append(c.m.log, "install "+t.Name)
 	return tools.Installed, nil
 }
@@ -66,17 +67,32 @@ func (c fakeCatalog) Install(t tools.Tool) (tools.Result, error) {
 func freshMachine(t *testing.T) (toolsSync, Env, *machine) {
 	t.Helper()
 	env := toolsEnv(t)
-	writeFixture(t, env.RepoRoot, map[string]string{"packages.json": catalogFixture})
-	m := &machine{path: map[string]bool{}, present: map[string]bool{}, fail: map[string]error{}}
-	run, stdout, _ := fakeMise()
-	logged := func(name string, args ...string) ([]byte, error) {
-		if name == "mise" && args[0] == "install" {
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"packages.json": catalogFixture,
+		"versions.conf": "# mise: cli\nJQ_VERSION=1.8.2\n# mise: cli\nUV_VERSION=0.12.18\n",
+	})
+	m := &machine{path: map[string]bool{}, present: map[string]bool{}, fail: map[string]error{}, offPath: map[string]bool{}}
+	synced := false
+	run := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && args[0] == "install":
 			m.log = append(m.log, "mise install")
-			m.path["uv"] = true
+			synced, m.path["uv"] = true, !m.offPath["uv"]
+			return nil, nil
+		case name == "/bin/jq":
+			return []byte("jq-1.8.2"), nil
+		case name == "/bin/uv":
+			return []byte("uv 0.12.18"), nil
 		}
-		return run(name, args...)
+		return nil, errors.New("unexpected: " + name)
 	}
-	r := toolsSync{run: logged, stdout: stdout, has: m.has, getenv: func(string) string { return "" }, catalog: fakeCatalog{m}}
+	stdout := func(name string, args ...string) ([]byte, error) {
+		if synced && name == "mise" && args[0] == "which" {
+			return []byte("/bin/" + args[len(args)-1] + "\n"), nil
+		}
+		return nil, errors.New("not installed")
+	}
+	r := toolsSync{run: run, stdout: stdout, has: m.has, getenv: func(string) string { return "" }, catalog: fakeCatalog{m}}
 	return r, env, m
 }
 
@@ -128,8 +144,34 @@ func TestToolsCatalog_AFailedInstallFailsTheStepAndTheProbe(t *testing.T) {
 	if !m.present["hive"] || res.Changes != 1 {
 		t.Errorf("hive present=%v, changes=%d: a failure must not stop the other entries", m.present["hive"], res.Changes)
 	}
+	if n := strings.Count(err.Error(), "checksum mismatch"); n != 1 {
+		t.Errorf("the failure was attempted or reported %d times, want once: %v", n, err)
+	}
 	if err := r.Probe(env); err == nil || !strings.Contains(err.Error(), "mise") {
 		t.Errorf("probe: want mise still to install, got %v", err)
+	}
+}
+
+// A manager this machine's own tools install, placed where this process's PATH
+// does not reach, is not a wait: a fresh machine whose PATH lacks ~/.local/bin
+// or the mise shims would otherwise report OK with the sync never run and the
+// uv tools never installed, and a second run would report 0 changes.
+func TestToolsCatalog_AManagerItInstalledButCannotReachFailsTheProbe(t *testing.T) {
+	for _, tc := range []struct{ off, want string }{
+		{"mise", "mise"},
+		{"uv", "uv (for hive)"},
+	} {
+		t.Run(tc.off, func(t *testing.T) {
+			r, env, m := freshMachine(t)
+			m.offPath[tc.off] = true
+			if _, err := r.Reconcile(env, false); err != nil {
+				t.Fatal(err)
+			}
+			err := r.Probe(env)
+			if err == nil || !strings.Contains(err.Error(), "not on PATH: "+tc.want) {
+				t.Errorf("probe: want %q named as unreachable, got %v", tc.want, err)
+			}
+		})
 	}
 }
 

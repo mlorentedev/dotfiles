@@ -261,10 +261,14 @@ func (in *Installer) needsSudoPassword(argv []string) bool {
 	if len(argv) < 2 || argv[0] != "sudo" || argv[1] != "-n" {
 		return false
 	}
-	query := in.Query
-	if query == nil {
-		query = ExecRunner
+	if in.sudoRefuses == nil {
+		query := in.Query
+		if query == nil {
+			query = ExecRunner
+		}
+		_, err := query("sudo", "-n", "true")
+		refuses := err != nil
+		in.sudoRefuses = &refuses
 	}
-	_, err := query("sudo", "-n", "true")
-	return err != nil
+	return *in.sudoRefuses
 }

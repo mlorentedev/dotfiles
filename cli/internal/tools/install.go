@@ -100,6 +100,9 @@ type Installer struct {
 	// IsRoot reports whether dotf runs with root privileges, which decides if an
 	// apt install needs sudo. Nil means an effective uid of 0.
 	IsRoot func() bool
+	// sudoRefuses caches needsSudoPassword's answer: a plan asks it per apt
+	// entry, and every `sudo -n` refusal is a line in the auth log.
+	sudoRefuses *bool
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.

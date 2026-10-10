@@ -407,4 +407,5 @@ tags: [lessons, index, dotfiles]
 | [387 - Before deleting the older writer, ask when it was the only one](lesson-387-before-deleting-the-older-writer-ask-when-it-was-the-only-one.md) | 2026-10-10 |
 | [389 - An identity key a co-owner can drop is not an identity](lesson-389-an-identity-key-a-co-owner-can-drop-is-not-an-identity.md) | 2026-10-10 |
 | [390 - A tree without .git still gets an answer from git](lesson-390-a-tree-without-git-still-gets-an-answer-from-git.md) | 2026-10-10 |
+| [391 - A re-planning probe needs every outcome the apply skips](lesson-391-a-re-planning-probe-needs-every-outcome-the-apply-skips.md) | 2026-10-10 |
 <!-- END GENERATED -->
