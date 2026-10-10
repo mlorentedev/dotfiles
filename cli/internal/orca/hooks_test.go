@@ -269,3 +269,51 @@ func TestTuneHooks_KeepsEachFilesMode(t *testing.T) {
 		}
 	}
 }
+
+// What Orca generates on Linux and macOS: bash hooks running copilot-hook.sh,
+// with the same 5 s timeout (measured on msi, 2026-10-10, #2252).
+const orcaJSONBash5s = `{
+  "version": 1,
+  "hooks": {
+    "SessionStart": [{"type": "command", "bash": "x", "timeoutSec": 5}],
+    "PreToolUse":   [{"type": "command", "bash": "y", "timeoutSec": 5}]
+  }
+}
+`
+
+func TestTimeoutFloorApplies(t *testing.T) {
+	for _, tc := range []struct {
+		name, content string
+		want          bool
+	}{
+		{"powershell hooks", orcaJSON5s, true},
+		{"bash hooks", orcaJSONBash5s, false},
+		{"one powershell entry among bash", `{"hooks":{"A":[{"bash":"x","timeoutSec":5}],"B":[{"powershell":"y","timeoutSec":5}]}}`, true},
+		{"unparseable is left to the caller", `{"hooks": [`, true},
+	} {
+		if got := TimeoutFloorApplies([]byte(tc.content)); got != tc.want {
+			t.Errorf("%s: TimeoutFloorApplies = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// The floor is the PowerShell hook's (lesson 111). A bash hook's 5 s is left
+// alone: no drift, no write, no backup, so a converge on Linux stops tuning a
+// file the next Orca start reverts (#2252).
+func TestTuneHooks_LeavesBashHookTimeoutsAlone(t *testing.T) {
+	c, s := hookFixture(t, orcaJSONBash5s, "")
+	rep, err := TuneHooks(c, s, DefaultHookTimeout, false, fixedNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.TimeoutFloorApplies || rep.Drift() || rep.Changed != 0 || len(rep.Backups) != 0 {
+		t.Fatalf("a bash hook must not be tuned: %+v", rep)
+	}
+	got, err := os.ReadFile(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != orcaJSONBash5s {
+		t.Fatalf("orca.json was rewritten:\n%s", got)
+	}
+}
