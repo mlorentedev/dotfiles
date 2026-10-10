@@ -61,7 +61,11 @@ created: "2026-10-06"
   - `compile-harness.sh` delegates `deploy_instructions` to it when the installed dotf carries the subcommand (the `dotf_knows_subcommand` probe) and keeps the copy as the fallback, so no release is needed to land it
 - [ ] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
-- [ ] `records-bind`: the `harness bind` logic with its dry-run
+- [x] `records-bind` (#2232): `harness.Bind` returns one outcome per target and `dotf harness bind` renders it, so converge and doctor count changes without parsing text
+  - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; no dotf path resolver wired fails loudly
+  - Hooks whose markers another writer stripped are converged (`TestRecordsBind_HooksWithStrippedMarkersAreConverged`), resting on #2276's identity by command signature
+  - Doctor's `Harness hook bindings` section plans the same bind: drift FAILs naming the harness and `dotf doctor --fix`, which binds; `setup-linux.sh` already promised this check
+  - On the Mac: `converge --plan --only records-bind` -> `2 harness(es) in sync`, pi and opencode skipped (emit:false); `doctor --verbose` -> claude and agy `hooks current`
 
 ### PR 2d — the configs reconciler (#1843 B15)
 

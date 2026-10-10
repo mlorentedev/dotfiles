@@ -15,6 +15,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
 - [ ] AC6, AC7, AC9 -> PRs 4b and 6
+- [x] AC2, AC3 (hook bindings are records) -> `records-bind` / tests `TestRecordsBind_PlanWritesNothingApplyConvergesAndRerunIsANoOp`, `TestRecordsBind_HooksWithStrippedMarkersAreConverged`, `TestRecordsBind_NoResolverWiredFailsLoudly`, `TestRegistry_ToolsRunAfterRecords` (order), `TestCheckHookBinding_FailsOnDriftAndFixBindsIt` (doctor)
 - [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
 
 ## Test status
@@ -38,6 +39,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - Test suite (PR 4a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Real-git checkout tests (clone then idempotent, behind fast-forwarded, dirty left alone, foreign repo refused, no git from zero). Live: a scratch HOME planned the clone and six steps `waits for checkout`; `--only checkout` cloned from GitHub, then `already current`
 - Test suite (PR 5, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Mutations: a child without the guard env fails `TestExecSetup_RunsTheOverrideMarkedAndFromTheCheckout`; an opaque result reported as a change fails both `TestLegacySetup_*Opaque*` tests
+- Test suite (records-bind, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint 2.12.2 after a cache clean -> 0 issues
+- Manual run (records-bind): `converge --plan --only records-bind` -> `[ OK ] records-bind 2 harness(es) in sync`, pi and opencode skipped (emit:false); `doctor --verbose` -> `Harness hook bindings`: claude and agy `hooks current`
+- Doctor's `statusOfLine` test helper did not recognise `[FIX ]`, so any test asserting a fix read `-1`; it does now
 
 ## Decisions made during implementation
 

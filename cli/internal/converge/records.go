@@ -38,6 +38,10 @@ type Options struct {
 	// env-persist step is skipped.
 	Launchctl env.LaunchctlRunner
 	UID       int
+	// DotfPath is the dotf binary the bound hooks name;
+	// harness.ResolveDotfPath in production. Unset, the records-bind step
+	// fails rather than guess.
+	DotfPath func(home string) string
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -60,6 +64,7 @@ func Registry(o Options) []Reconciler {
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
+		recordsBind{dotf: o.DotfPath, has: onPath},
 		gitConfig{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		legacySetup{run: o.RunSetup},
