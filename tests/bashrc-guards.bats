@@ -107,3 +107,16 @@ load_rc() {
     [[ "$output" == *"java=$jdk"$'\n'* ]] || false
     [[ "$output" == *"$jdk/bin:"* ]] || false
 }
+
+@test "terraform completion calls the terraform that PATH resolves, and none is set without one" {
+    run load_rc 'complete -p terraform 2>/dev/null || echo none'
+    [ "$status" -eq 0 ]
+    [ "$output" = "none" ]
+    printf '#!/bin/sh\n' > "$SANDBOX/bin/terraform"
+    chmod +x "$SANDBOX/bin/terraform"
+    run load_rc 'complete -p terraform'
+    [ "$status" -eq 0 ]
+    # bash prints the command quoted: -C '<path>' terraform
+    [[ "$output" == *"-C '$SANDBOX/bin/terraform' terraform" ]] || false
+}
+
