@@ -97,4 +97,5 @@ journalctl --user -u dotfiles-selfupdate.service --since today
 
 `dotf update` resolves the repo via the ADR-025 seam, defaulting to `$HOME/Projects/dotfiles`;
 override with `DOTFILES_REPO_DIR`. The setup command converge runs last can be overridden with
-`DOTFILES_SELFUPDATE_SETUP_CMD`.
+`DOTFILES_SELFUPDATE_SETUP_CMD`. It replaces only that last step: the native converge steps
+run regardless, so a no-op override no longer makes the timer pull-only.

@@ -56,7 +56,9 @@ func setupScript(goos string) string {
 
 // ExecSetup runs the checkout's setup script for e.GOOS, or the command
 // DOTFILES_SELFUPDATE_SETUP_CMD names, from the checkout and with the
-// terminal's output, marked with LegacySetupGuardEnv.
+// terminal's output, marked with LegacySetupGuardEnv. Its stdin stays closed:
+// the script runs unattended under a timer and under `curl … | bash` alike,
+// so a prompt fails fast instead of reading the pipe (sudo reads the tty).
 func ExecSetup(e Env) error {
 	cmd := os.Getenv(setupOverrideEnv)
 	if cmd == "" {
@@ -70,6 +72,6 @@ func ExecSetup(e Env) error {
 	}
 	c.Dir = e.RepoRoot
 	c.Env = append(os.Environ(), LegacySetupGuardEnv+"=1")
-	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	c.Stdout, c.Stderr = os.Stdout, os.Stderr
 	return c.Run()
 }
