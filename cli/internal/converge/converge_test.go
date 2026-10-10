@@ -16,6 +16,7 @@ type fake struct {
 	changes   int
 	err       error
 	probeErr  error
+	gate      string
 
 	applied, planned, probed bool
 }
@@ -29,7 +30,7 @@ func (f *fake) Reconcile(_ Env, dryRun bool) (Result, error) {
 	} else {
 		f.applied = true
 	}
-	return Result{Changes: f.changes, Detail: f.name + " detail"}, f.err
+	return Result{Changes: f.changes, Detail: f.name + " detail", Gate: f.gate}, f.err
 }
 
 func (f *fake) Probe(Env) error {
@@ -52,6 +53,34 @@ func TestRun_PlanReportsEveryReconcilerAndAppliesNothing(t *testing.T) {
 	}
 	if rep.Entries[0].Changes != 3 {
 		t.Errorf("changes: want 3, got %d", rep.Entries[0].Changes)
+	}
+}
+
+// A checkout still to clone holds back every later plan: they would read files
+// that do not exist yet. An apply makes the change first, so it runs them all.
+func TestRun_GateHoldsBackLaterPlansOnly(t *testing.T) {
+	gate := func() (*fake, *fake) {
+		return &fake{name: "checkout", changes: 1, gate: "waits for checkout"}, &fake{name: "records"}
+	}
+
+	co, records := gate()
+	rep, err := Run([]Reconciler{co, records}, Env{GOOS: "linux"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if records.planned {
+		t.Error("a plan behind a gate must not run")
+	}
+	if got := statuses(rep); got != "checkout=change records=skipped" || rep.Entries[1].Detail != "waits for checkout" {
+		t.Errorf("plan: %s, %q", got, rep.Entries[1].Detail)
+	}
+
+	co, records = gate()
+	if _, err := Run([]Reconciler{co, records}, Env{GOOS: "linux"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !records.applied {
+		t.Error("an apply must run past a gate: the change it waits for is made")
 	}
 }
 

@@ -92,13 +92,24 @@ created: "2026-10-06"
 - [x] [AC3] Implement the report (JSON, one entry per reconciler, the run's result and error), written atomically under `env.StateDir()`, which the skill gate's ledger now shares; a plan writes none. `cli/README.md` documents `converge`, which shipped in PR 2a without a section
 - [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file
 
-### PR 4 — one entrypoint: `install.sh` and `install.ps1` at the root
+### PR 4a — the checkout step, so converge can run from zero
+
+Ships first, on its own release: from zero, `install.sh` downloads the *released* dotf and execs `converge`, so the entrypoint swap in 4b only works once a release can clone the checkout.
+
+- [x] `update.Assess`: the fast-forward decision without the merge, so a plan reports `behind` and moves nothing; `Sync` is Assess plus `merge --ff-only`
+- [x] Add the checkout reconciler (clone if absent, fast-forward under ADR-019 D2), first in the registry; it refuses a directory that is not a dotfiles checkout, and names `xcode-select --install` on macOS when git is missing
+- [x] `Result.Gate`: under a plan, a step that has not converged yet (a clone or a fast-forward pending) holds back the steps after it (`waits for checkout`) instead of planning against a tree the apply would change first; an apply ignores it
+- [x] `dotf converge` without `--repo` resolves the checkout like `dotf deploy`: the working directory's dotfiles checkout (`env.IsDotfilesCheckout`; another project's repository does not count), else `DOTFILES_REPO_DIR`, else `env.DefaultCheckoutDir` (drift-tested against `env-contract.json`)
+- [x] Real-git tests: clone then idempotent, behind fast-forwarded (plan leaves HEAD), dirty left alone, foreign repo refused, no git from zero; a cmd test plans the clone first from an empty cwd
+
+### PR 4b — one entrypoint: `install.sh` and `install.ps1` at the root
+
+Gated on a release that carries 4a.
 
 - [ ] [AC7] Failing test: no live file names `install-dotf.sh`, `install-dotf.ps1` or `DOTFILES_SKIP_SETUP` (allow-list: `docs/adr/` including audits, `docs/lessons/`, `specs/` — live specs describe the migration they deliver — and `CHANGELOG.md`)
 - [ ] [AC6] `git mv scripts/install-dotf.{sh,ps1}` to the root `install.{sh,ps1}`, replacing the old `install.sh`; the standalone path ends in `exec dotf converge "$@"`, the sourced `install_dotf` contract is unchanged
 - [ ] [AC6] bats (bash 3.2 and zsh) and Pester: a bad checksum and an unreachable release fail and place nothing; the hand-off execs `dotf converge` with the arguments
 - [ ] [AC7] Move every live reference: setup twins, `checks_tools.go`, `stdout_contract_test.go`, the vault-maintenance scripts, README, `cli/README.md`, SECURITY.md, the release runbook
-- [ ] Add the checkout reconciler (clone if absent, fast-forward under ADR-019 D2), first in the registry
 
 ### PR 5 — legacy reconcilers and `dotf update`
 
