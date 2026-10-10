@@ -357,6 +357,17 @@ setup() {
     grep -q 'Single Source of Truth' "$HOME/.config/opencode/AGENTS.md"
 }
 
+@test "opencode.jsonc deployed by dotf deploy, private, not by a setup block (#1843 B12)" {
+    # The `opencode` entry of ai/deploy.json is the only writer. The container
+    # holds no secrets, so the render leaves the {env:VAR} placeholders, which
+    # opencode resolves itself (measured, see ai/deploy.json): the file must
+    # still be installed, at 0600 because on a real machine it holds API keys.
+    f="$HOME/.config/opencode/opencode.jsonc"
+    [ -f "$f" ]
+    [ "$(stat -c '%a' "$f")" = "600" ]
+    grep -qF '"$schema"' "$f"
+}
+
 @test "opencode tui.json deployed by dotf deploy, not by a setup block (#1843 B11)" {
     # The setup copy was deleted; the `opencode-tui` entry of ai/deploy.json is
     # now the only writer, so this fails if that entry stops applying. The entry
