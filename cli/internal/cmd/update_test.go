@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // TestRepoForUpdatePrefersExistingCascadeDir: a cascade value that names a real
@@ -24,6 +26,9 @@ func TestRepoForUpdateFallsBackToWalkUpWhenCascadeMissing(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(repo, env.CheckoutMarker), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	sub := filepath.Join(repo, "cli")
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
@@ -41,5 +46,24 @@ func TestRepoForUpdateFallsBackToWalkUpWhenCascadeMissing(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("repoForUpdate() = %q, want walk-up root %q", got, want)
+	}
+}
+
+// A `dotf update` run from inside another project must not fast-forward that
+// project: the walk-up only counts when it lands on a dotfiles checkout.
+func TestRepoForUpdateIgnoresAnotherProjectsRepository(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("DOTFILES_REPO_DIR", filepath.Join(home, "does-not-exist"))
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(other)
+
+	if got, want := repoForUpdate(), env.DefaultCheckoutDir(home); got != want {
+		t.Errorf("repoForUpdate() = %q, want the default checkout %q", got, want)
 	}
 }
