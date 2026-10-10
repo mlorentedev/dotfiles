@@ -63,3 +63,73 @@ func TestCheckDockerCompose(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckDockerEngine: a docker CLI with no engine behind it is the state the
+// Mac lands in after `dotf tools install` until Colima runs, and every
+// `docker compose` in kubelab fails there. It is a WARN with the start command
+// for the OS, never a FAIL: the Windows gate fails on any unlisted [FAIL] line
+// and its runner's engine is not ours to start.
+func TestCheckDockerEngine(t *testing.T) {
+	cases := []struct {
+		name       string
+		goos       string
+		onPath     []string
+		cmdOut     map[string]string
+		wantWarn   int
+		wantSubstr string
+	}{
+		{
+			name:       "engine answers → pass naming the server version",
+			goos:       "darwin",
+			onPath:     []string{"docker"},
+			cmdOut:     map[string]string{"docker info --format {{.ServerVersion}}": "28.5.1"},
+			wantSubstr: "28.5.1",
+		},
+		{
+			name:       "darwin, engine down → warn with the Colima service command",
+			goos:       "darwin",
+			onPath:     []string{"docker"},
+			wantWarn:   1,
+			wantSubstr: "brew services start colima",
+		},
+		{
+			name:       "linux, engine down → warn with the systemd unit",
+			goos:       "linux",
+			onPath:     []string{"docker"},
+			wantWarn:   1,
+			wantSubstr: "systemctl start docker",
+		},
+		{
+			name:       "windows, engine down → warn naming Docker Desktop",
+			goos:       "windows",
+			onPath:     []string{"docker"},
+			wantWarn:   1,
+			wantSubstr: "Docker Desktop",
+		},
+		{
+			name:       "no docker → skip",
+			goos:       "darwin",
+			wantSubstr: "not on PATH",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sys := newSys(nil, tc.onPath, tc.cmdOut)
+			sys.GOOS = tc.goos
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkDockerEngine(sys, rep)
+
+			if rep.Failures() != 0 {
+				t.Fatalf("failures = %d, want 0\n%s", rep.Failures(), buf.String())
+			}
+			if rep.Warnings() != tc.wantWarn {
+				t.Fatalf("warnings = %d, want %d\n%s", rep.Warnings(), tc.wantWarn, buf.String())
+			}
+			if !strings.Contains(buf.String(), tc.wantSubstr) {
+				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
+			}
+		})
+	}
+}

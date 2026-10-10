@@ -188,6 +188,41 @@
       }
     },
     {
+      "name": "colima",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "colima",
+        "command": "colima"
+      }
+    },
+    {
+      "name": "docker",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker",
+        "command": "docker"
+      }
+    },
+    {
+      "name": "docker-compose",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker-compose",
+        "command": "docker-compose"
+      }
+    },
+    {
+      "name": "docker-buildx",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker-buildx"
+      }
+    },
+    {
       "name": "pre-commit",
       "version": "4.6.2",
       "profile": "full",

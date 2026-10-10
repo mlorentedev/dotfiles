@@ -98,7 +98,9 @@ This channel is only for `dotf`, mise, and tools mise cannot install. Everything
 
 ## Adding a system package to the catalog
 
-`dotf` reads `source.type: "system"`: a package the OS manager owns, named once per manager. **No entry ships yet.** The installed `dotf` fails on a type it does not know, so entries wait for the release that carries this reader to be the `DOTF_VERSION` pin (#2013 P5b).
+`dotf` reads `source.type: "system"`: a package the OS manager owns, named once per manager. Entries ship since 0.65.0, the first release carrying the reader, became the `DOTF_VERSION` pin (#2013 P5b).
+
+**Docker on the Mac** is Colima: the brew entries colima, docker, docker-compose and docker-buildx, then once `brew services start colima`, which Homebrew keeps running across logins. The compose and buildx plugins live in `/opt/homebrew/lib/docker/cli-plugins`, outside the docker CLI's default search path; the `docker-config` deploy entry adds that directory to `~/.docker/config.json` wherever colima is installed. `dotf doctor` warns under *Docker engine* while the engine is down.
 
 ```json
 { "name": "gh", "source": { "type": "system", "apt": "gh", "brew": "gh", "winget": "GitHub.cli", "command": "gh" } }

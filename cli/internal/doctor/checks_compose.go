@@ -1,6 +1,45 @@
 package doctor
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
+
+// dockerEngineTimeout bounds `docker info`: a stale socket can leave it waiting
+// on a daemon that never answers, and doctor is the last step of setup.
+const dockerEngineTimeout = 5 * time.Second
+
+// checkDockerEngine reports whether the docker CLI has an engine behind it. On
+// the Mac the engine is Colima's VM, which Homebrew runs as a launchd service
+// once `brew services start colima` has been run (#2013 P5b); until then the
+// CLI is installed and every `docker compose` fails. A WARN, never a FAIL: an
+// engine is stopped on purpose as often as by accident, and the Windows gate
+// fails on any [FAIL] line its known-failures list does not name.
+func checkDockerEngine(sys *System, rep *Report) {
+	rep.Section("Docker engine")
+
+	if !sys.has("docker") {
+		rep.Skip("docker not on PATH (see Core tools)")
+		return
+	}
+
+	out, _, err := sys.CommandOutputBounded(dockerEngineTimeout, "docker", "info", "--format", "{{.ServerVersion}}")
+	if v := strings.TrimSpace(out); err == nil && v != "" {
+		rep.Pass("engine reachable: server " + v)
+		return
+	}
+	rep.Warn("docker has no engine to talk to (" + dockerEngineRemedy(sys.GOOS) + ")")
+}
+
+func dockerEngineRemedy(goos string) string {
+	switch goos {
+	case "darwin":
+		return "run once: brew services start colima; launchd restarts it at login"
+	case "windows":
+		return "start Docker Desktop"
+	}
+	return "start it: sudo systemctl start docker"
+}
 
 // checkDockerCompose covers the one name in setup-linux.sh's check_dependencies
 // list that no doctor section, contract binary or package list mentioned:
