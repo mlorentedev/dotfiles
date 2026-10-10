@@ -598,7 +598,7 @@ setup() {
     # The first run converged pi's packages, so the second run's reconcile must
     # install and remove nothing (#1484). A reinstall that rewrote the same bytes
     # would pass the hash diff below; the reconcile's own count does not.
-    printf '%s\n' "$output" | grep -q 'pi packages: changed=0 ' || {
+    printf '%s\n' "$output" | grep -q '^pi packages already reconciled ' || {
         echo "the second run's pi package reconcile was not a no-op:" >&2
         printf '%s\n' "$output" | grep 'pi packages' >&2
         return 1
