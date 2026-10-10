@@ -289,7 +289,9 @@ func TestInstallNpm_Fresh(t *testing.T) {
 	if res != Installed {
 		t.Errorf("Result = %v, want Installed", res)
 	}
-	want := "npm install -g --prefix /home/u/.local @bitwarden/cli@2026.5.0"
+	// filepath, not a literal: the test also runs on a Windows host, where
+	// filepath.Dir turns /home/u/.local/bin into \home\u\.local.
+	want := "npm install -g --prefix " + filepath.FromSlash("/home/u/.local") + " @bitwarden/cli@2026.5.0"
 	if len(rec) != 1 || rec[0] != want {
 		t.Errorf("Run calls = %v, want exactly [%q]", rec, want)
 	}
