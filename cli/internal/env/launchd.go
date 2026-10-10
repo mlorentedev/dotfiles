@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -78,8 +79,10 @@ func LaunchAgentPath(home string) string {
 // running binary: a `go run` build lives in a temp dir that outlives nothing.
 // launchd expands no `~`, so every path is absolute.
 func LaunchAgentPlist(home string) []byte {
-	dotf := filepath.Join(home, ".local", "bin", "dotf")
-	log := filepath.Join(home, "Library", "Logs", "dotf-env-persist.log")
+	// launchd reads these on macOS, so they are POSIX paths on every OS that
+	// renders them, never filepath's separator.
+	dotf := path.Join(home, ".local", "bin", "dotf")
+	log := path.Join(home, "Library", "Logs", "dotf-env-persist.log")
 	return []byte(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
