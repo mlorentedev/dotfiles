@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -86,6 +87,8 @@ var convergeOptions = func() converge.Options {
 		GitRun:           gitconfig.ExecRunner,
 		RenderConfigs:    strictDeployRenderer,
 		ResolvePath:      env.ResolvePath,
+		Launchctl:        env.ExecLaunchctl,
+		UID:              os.Getuid(),
 	}
 }
 
