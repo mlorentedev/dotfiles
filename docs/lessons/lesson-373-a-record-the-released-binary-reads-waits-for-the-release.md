@@ -39,6 +39,10 @@ a promise.
 - **Before changing a record (`versions.conf`, `packages.json`, a deploy manifest), ask which
   binary reads it.** If it is the released `dotf`, the change waits for a release that
   understands it. The same rule split P5a from P5b (#1814 class).
+- **The record need not be new to break the old reader.** A plain `# mise: cli` pin, a
+  marker every release reads, broke the same way for kubectl, helm, argocd and four more
+  (#2013): the released binary probes `--version`, which they reject, so the sync fails
+  naming them. Ask what the reader *does* with the entry, not only whether it parses it.
 - **A strict parser is what makes the window dangerous.** Rejecting unknown input is right,
   and it means a new keyword is a breaking change for every older reader.
 - **mise refuses `python@3.12.6`.** It verifies GitHub artifact attestations for
