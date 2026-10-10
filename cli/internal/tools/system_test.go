@@ -274,8 +274,10 @@ func TestInstallSystem_NoManagerOnPathIsASkipNamingIt(t *testing.T) {
 	if len(w.ran) != 0 {
 		t.Errorf("ran %v without a manager", w.ran)
 	}
-	if p := in.Plan(ghTool()); p.Action != PlanMissingManager {
-		t.Errorf("Plan = %q, want %q", p.Action, PlanMissingManager)
+	// The plan names the manager as the uv and npm waits do, so a converge
+	// report reads "gh (brew)", not "gh ()".
+	if p := in.Plan(ghTool()); p.Action != PlanMissingManager || p.Note != "waits on brew" {
+		t.Errorf("Plan = %q %q, want %q naming brew", p.Action, p.Note, PlanMissingManager)
 	}
 }
 

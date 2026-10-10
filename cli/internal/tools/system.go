@@ -206,7 +206,7 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 	case p.Installed != "":
 		p.Action = PlanSkip
 	case in.missingSystemTool(t) != "":
-		p.Action = PlanMissingManager
+		p.Action, p.Note = PlanMissingManager, "waits on "+in.missingSystemTool(t)
 	default:
 		p.Action = PlanInstall
 		manager, pkg := t.Source.SystemPackage(in.GOOS)
