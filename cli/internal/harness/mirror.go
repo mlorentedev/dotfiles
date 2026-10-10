@@ -42,10 +42,10 @@ type MirrorResult struct {
 	Missing []string
 }
 
-// Mirror copies the harness inputs the deploy-dir consumers read — the whole
-// harness/ tree and every file harness/manifest.json declares as an injection
-// target — from the checkout at repoRoot into deployDir, preserving relative
-// paths. It replaces the bash+jq block setup-linux.sh carried and the block
+// Mirror copies the inputs the deploy-dir consumers read — the whole harness/
+// tree, every file harness/manifest.json declares as an injection target, and
+// the deploy-dir set (DeployDirFiles, DeployDirTrees) — from the checkout at
+// repoRoot into deployDir, preserving relative paths. It replaces the bash+jq block setup-linux.sh carried and the block
 // setup-windows.ps1 never had (WIN-007/#1288): `dotf doctor` reads
 // model-map.json and model-pins.json from the deploy dir, so a Windows box
 // failed both checks after every setup, with a remedy ("re-run setup") that
@@ -94,6 +94,9 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 			return res, err
 		}
 		res.Targets = append(res.Targets, rel)
+	}
+	if err := mirrorDeployDir(repoRoot, deployDir, dryRun, &res); err != nil {
+		return res, err
 	}
 	if len(res.Missing) > 0 {
 		return res, fmt.Errorf("%w: %v", ErrMissingTargets, res.Missing)
