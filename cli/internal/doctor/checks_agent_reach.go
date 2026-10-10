@@ -39,11 +39,11 @@ func checkHiveBackendCanServe(sys *System, rep *Report) {
 	// assertion is that script's own concern — claiming a verdict here from a
 	// host that cannot see the unit would be a guess wearing a check's clothes.
 	if sys.GOOS == "windows" {
-		rep.Info("skipped: the daemon is a Scheduled Task on Windows, not a systemd unit")
+		rep.Info("skipped: the daemon is a Scheduled Task on Windows, not a systemd unit (whether it answers is the hive daemon section)")
 		return
 	}
 	if _, err := sys.LookPath("systemctl"); err != nil {
-		rep.Info("skipped: no systemctl on this host, so no supervised hive daemon to inspect")
+		rep.Info("skipped: no systemctl on this host, so no unit carries the worker contract (whether the daemon answers is the hive daemon section)")
 		return
 	}
 

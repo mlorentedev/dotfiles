@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-063-spec-gate-adjacency"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-09"
 issue: "mlorentedev/dotfiles#858"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -82,21 +82,26 @@ fixture file holding #849's real title and body, not a mocked API.
 
 Observable outcomes. Each must be testable.
 
-- [ ] On a PR that closes an issue, CI emits an advisory report naming every other
+- [x] On every PR with a readable feed, CI emits an advisory report naming every
       open issue whose title or body references a **production** file in the diff
       (production as `_excluded()` already defines it, and excluding active spec
       folders), and which file matched. Narrowed from "a file in the diff" after
       measuring against the live backlog: template and doc filenames matched 34 of
-      37 rows and buried the signal — see `verification.md`.
-- [ ] **Red-tested against #851.** Replaying #851's changed-file list
+      37 rows and buried the signal — see `verification.md`. Widened at close from
+      "a PR that closes an issue": the shipped trigger is any PR, and the run that
+      proved it in CI was a release PR closing nothing (review round 1, Question).
+      The PR's own closing issues are still excluded from its report.
+- [x] **Red-tested against #851.** Replaying #851's changed-file list
       (`scripts/knowledge-crystallize.sh`, `.ps1`) against a fixture holding #849
       as open flags it. The fixture keeps #849's real formatting, so the test fails
       if matching is ever run over stripped text.
-- [ ] The check never fails the gate: a PR with adjacent issues exits with the
+- [x] The check never fails the gate: a PR with adjacent issues exits with the
       same status it would have exited with before this change.
-- [ ] With no `--adjacency-issues` file and no token, `check-spec-gate.sh` produces
+- [x] With no `--adjacency-issues` file and no token, `check-spec-gate.sh` produces
       byte-identical output to the current version, keeping the offline pre-push
-      path (#854) intact.
+      path (#854) intact. Holds (no `gh` call is reachable from the adjacency path),
+      but its test now diffs against a `main` that contains the feature; re-pinning
+      it to a golden output is #2303.
 
 ## References
 

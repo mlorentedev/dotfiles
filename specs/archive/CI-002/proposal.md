@@ -1,7 +1,7 @@
 ---
 id: "CI-002"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-03"
 issue: "mlorentedev/dotfiles#1478"
 tags: [spec, proposal]
