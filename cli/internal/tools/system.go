@@ -209,6 +209,12 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 		p.Action = PlanMissingManager
 	default:
 		p.Action = PlanInstall
+		manager, pkg := t.Source.SystemPackage(in.GOOS)
+		if argv := in.systemInstallArgv(manager, pkg); in.needsSudoPassword(argv) {
+			// The classifier the apply uses after sudo -n refuses, asked up
+			// front, so a plan never promises an install the apply skips.
+			p.Action, p.Note = PlanNeedsSudo, sudoCommand(argv)
+		}
 	}
 	return p
 }
@@ -230,7 +236,7 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 			// A named outcome, not a failure: nothing is wrong with the entry
 			// or the machine, only the privilege dotf may not ask for. It says
 			// what to run, and the other tools still converge.
-			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, strings.Join(append([]string{"sudo"}, argv[2:]...), " "))
+			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; %s\n", t.Name, sudoCommand(argv))
 			return Skipped, nil
 		}
 		return Skipped, fmt.Errorf("%s: %s: %w", t.Name, strings.Join(argv, " "), err)
@@ -240,6 +246,11 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s installed via %s (%s)\n", t.Name, manager, pkg)
 	return Installed, nil
+}
+
+// sudoCommand is what to run by hand for a `sudo -n` argv dotf could not run.
+func sudoCommand(argv []string) string {
+	return "run: " + strings.Join(append([]string{"sudo"}, argv[2:]...), " ")
 }
 
 // needsSudoPassword reports whether a failed install failed because sudo wanted

@@ -91,14 +91,16 @@ var convergeOptions = func() converge.Options {
 		RunHarnessDeploy: converge.CompileHarnessDeploy,
 		MiseRun:          run,
 		MiseStdout:       stdout,
-		GitRun:           gitconfig.ExecRunner,
-		CloneURL:         os.Getenv("DOTFILES_REPO"),
-		RenderConfigs:    strictDeployRenderer,
-		ResolvePath:      env.ResolvePath,
-		Launchctl:        env.ExecLaunchctl,
-		UID:              os.Getuid(),
-		RunSetup:         converge.ExecSetup,
-		DotfPath:         harness.ResolveDotfPath,
+		// Install progress goes to stderr, apart from the report on stdout.
+		ToolsCatalog:  &tools.Installer{Dest: filepath.Join(env.Home(), ".local", "bin"), Out: os.Stderr},
+		GitRun:        gitconfig.ExecRunner,
+		CloneURL:      os.Getenv("DOTFILES_REPO"),
+		RenderConfigs: strictDeployRenderer,
+		ResolvePath:   env.ResolvePath,
+		Launchctl:     env.ExecLaunchctl,
+		UID:           os.Getuid(),
+		RunSetup:      converge.ExecSetup,
+		DotfPath:      harness.ResolveDotfPath,
 	}
 }
 

@@ -302,6 +302,7 @@ func TestInstallSystem_PresenceRule(t *testing.T) {
 	})
 	t.Run("dpkg config-files only is absent", func(t *testing.T) {
 		w := newWorld("apt-get", "sudo")
+		w.sudoOK = true
 		if p := w.installer("linux").Plan(ghTool()); p.Action != PlanInstall || p.Installed != "" {
 			t.Errorf("Plan = %+v, want install of an absent package", p)
 		}
@@ -325,6 +326,7 @@ func TestInstallSystem_PresenceRule(t *testing.T) {
 // A dry run reaches only the queries, never the manager's install.
 func TestPlanSystem_NeverRuns(t *testing.T) {
 	w := newWorld("apt-get", "sudo")
+	w.sudoOK = true
 	in := w.installer("linux")
 	if p := in.Plan(ghTool()); p.Action != PlanInstall {
 		t.Errorf("Plan = %+v", p)
@@ -374,6 +376,26 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 	}
 	if len(w.ran) != 1 || w.ran[0][1] != "-n" {
 		t.Errorf("ran %v, want one `sudo -n` attempt and no prompt", w.ran)
+	}
+}
+
+// A plan asks the apply's own classifier, so it never promises an install the
+// apply would skip for want of a password: a converge probe re-plans after the
+// apply, and an `install` row there would fail every unattended run.
+func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
+	w := newWorld("apt-get", "sudo")
+	p := w.installer("linux").Plan(ghTool())
+	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" {
+		t.Errorf("Plan = %+v, want needs-sudo naming the command", p)
+	}
+	if len(w.ran) != 0 {
+		t.Errorf("a plan ran %v", w.ran)
+	}
+
+	root := newWorld("apt-get")
+	root.root = true
+	if p := root.installer("linux").Plan(ghTool()); p.Action != PlanInstall || len(root.queries) != 1 {
+		t.Errorf("as root: Plan = %+v, queries %v; want install and no sudo query", p, root.queries)
 	}
 }
 

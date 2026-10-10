@@ -17,6 +17,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC6, AC7, AC9 -> PRs 4b and 6
 - [x] AC2, AC3 (hook bindings are records) -> `records-bind` / tests `TestRecordsBind_PlanWritesNothingApplyConvergesAndRerunIsANoOp`, `TestRecordsBind_HooksWithStrippedMarkersAreConverged`, `TestRecordsBind_NoResolverWiredIsSkippedNotPassed`, `TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite`, `TestRegistry_ToolsRunAfterRecords` (order), `TestCheckHookBinding_FailsOnDriftAndFixBindsIt` (doctor)
 - [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
+- [x] AC12 (catalog in the tools step) -> tests `TestToolsCatalog_OneApplyConvergesAFreshMachine` (install, sync, install order, waits reported and accepted by the probe, 0 changes on the next plan), `TestToolsCatalog_AFailedInstallFailsTheStepAndTheProbe`, `TestToolsCatalog_ARefusedEntryFailsThePlan`, `TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt`, `TestInstall_AMissingManagerIsANamedSkip`; five mutations killed (no second pass, sync first, probe failing on a wait, npm not a manager, plan ignoring sudo)
 
 ## Test status
 
@@ -42,6 +43,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Test suite (records-bind, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint 2.12.2 after a cache clean -> 0 issues
 - Manual run (records-bind): `converge --plan --only records-bind` -> `[ OK ] records-bind 2 harness(es) in sync`, pi and opencode skipped (emit:false); `doctor --verbose` -> `Harness hook bindings`: claude and agy `hooks current`
 - Doctor's `statusOfLine` test helper did not recognise `[FIX ]`, so any test asserting a fix read `-1`; it does now
+- Manual run (catalog, macOS arm64): `converge --plan --only tools` -> `catalog to install: poetry, colima, docker, docker-compose, docker-buildx, ansible, ansible-lint, aws, gopls, btop`, the ten rows `dotf tools install --dry-run` reports; not applied from an unreleased build
 
 ## Decisions made during implementation
 
@@ -58,6 +60,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - A plan gates the steps after a pending clone or fast-forward (`Result.Gate`, lesson 385).
 - The legacy step is reported skipped on darwin rather than left out of the registry. AC5 already reads "not supported on darwin", and the report then says why no setup ran.
 - A script that cannot plan gets its own status, `opaque`. Counting it as a change would make every second run report one, and counting it as converged would hide what the script did.
+- The catalog joins the `tools` step instead of becoming its own: the runner calls each step once, and the uv tools can only land after the mise sync, so two steps would leave them to a second run.
 
 ## Promotion candidates
 

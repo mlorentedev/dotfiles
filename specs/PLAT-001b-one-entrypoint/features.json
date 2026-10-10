@@ -110,5 +110,12 @@
     "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestLegacySetup_|TestExecSetup_)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLegacySetup_ApplyRunsTheScriptAndStaysOpaque' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLegacySetup_SkipsInsideASetupRunItStarted'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f17",
+    "behavior": "AC12: converge installs the packages.json catalog on every OS (install, mise sync, install), reporting a missing manager or a needed sudo instead of failing",
+    "verification": "cd cli && out=$(go test ./internal/converge/ ./internal/tools/ -run '^(TestToolsCatalog_|TestPlanSystem_NeedsSudo|TestInstall_AMissingManager)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestToolsCatalog_OneApplyConvergesAFreshMachine' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
