@@ -47,8 +47,8 @@ created: "2026-10-06"
 - [x] The documented `~/.local/bin/shellcheck` and `~/.local/bin/bats` paths are gone from CLAUDE.md, `specs/CI-002` verification commands and `guard-no-gui.bats`, whose shellcheck test skipped on every machine set up through mise; ADR-004 carries an update note. CI installs its own bats and is unchanged
 - [x] Review triage: the guard catches an installer by any of three shapes: its log line, the `~/.local/bin/<name>` path it writes, or a `/<name>/releases/download/` asset. Mutation-checked with one installer of each shape. The mark format needs no second check: `tools.ParseMiseTools` refuses a mark that is not directly followed by a pin, so the guard and dotf read the same set
 - [x] Review triage: the integration PATH also carries `~/.local/bin`, as a shell after setup does. Without it, the three dotf tests in `verify-setup.bats` (#696, #915) skipped on every run, `main` included, while the image builds dotf from the checkout into `~/.local/bin`. A missing dotf now fails them instead of skipping
-- [ ] doctor reports a leftover `~/.local/bin` copy of a marked pin (placed by the deleted blocks on existing machines; shadowed by mise in a shell, but what a GUI-launched or cron process finds first). Go, needs a release
-- [ ] `disable_update_warning` in the rendered mise config: a catalog-pinned mise prints "run mise self-update" on every call, and self-update steps outside the pin
+- [x] doctor reports a leftover `~/.local/bin` copy of a marked pin (placed by the deleted blocks on existing machines; shadowed by mise in a shell, but what a GUI-launched or cron process finds first). Go, needs a release. Shipped in #2196 (`90549a9e`, released in 0.66.0, the current pin): a WARN naming each copy, and `dotf doctor --fix` links it to mise's shim
+- [x] `disable_update_warning` in the rendered mise config: a catalog-pinned mise prints "run mise self-update" on every call, and self-update steps outside the pin. Shipped in #2198 (`44db9fc5`, released in 0.66.0): `cli/internal/tools/mise.go` writes it under `[settings]`, pinned by `mise_test.go`
 
 ### H1 — herdr through mise (#2013 track H)
 
