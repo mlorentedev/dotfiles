@@ -441,7 +441,7 @@ jobs:
         id: pins
         run: |
           . ./versions.conf
-          for v in PYTHON_VERSION AGE_VERSION BATS_VERSION; do
+          for v in PYTHON_VERSION PYYAML_VERSION AGE_VERSION BATS_VERSION; do
             eval "val=\${$v:-}"
             [ -n "$val" ] || { echo "::error::$v missing from versions.conf"; exit 1; }
             echo "$v=$val" >> "$GITHUB_OUTPUT"
@@ -453,13 +453,18 @@ jobs:
           cache-dependency-path: cli/go.sum
 
       # The suite reads workflow YAML and a pinned toml with Python (3.11+ for
-      # tomllib, PyYAML for the rest). macOS ships 3.9 without either.
+      # tomllib, PyYAML for the rest). macOS ships 3.9 without either. These
+      # are the exact pins a machine gets from mise (#2062). setup-python's
+      # manifest lags upstream, so a pin it does not carry yet fails this step
+      # loudly; it carried 3.13.16 when that was pinned.
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ steps.pins.outputs.PYTHON_VERSION }}
 
       - name: Install the suite's Python dependencies
-        run: python3 -m pip install --quiet pyyaml pre-commit
+        env:
+          PYYAML_VERSION: ${{ steps.pins.outputs.PYYAML_VERSION }}
+        run: python3 -m pip install --quiet "pyyaml==$PYYAML_VERSION" pre-commit
 
       # Pinned release, as the Linux job does, but for the runner's own arch.
       - name: Install age (pinned release, darwin)

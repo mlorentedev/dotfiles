@@ -101,7 +101,7 @@ func TestCheckPython_APackageMissingOrBelowItsPinFails(t *testing.T) {
 		"missing": {"python3 --version": "Python 3.12.6"},
 		"below":   {"python3 --version": "Python 3.12.6", "python3 -c " + tools.PyDistVersion + " pyyaml": "5.4.1\n"},
 	} {
-		s, cfg := pythonFixture(t, "darwin", pythonVersions, []string{"python3"}, answer)
+		s, cfg := pythonFixture(t, "darwin", pythonVersions, []string{"python3", "mise"}, answer)
 		rep, out := runCheckPython(s, cfg)
 		if rep.Failures() != 1 || !strings.Contains(out, "cannot import at their pin: pyyaml") {
 			t.Errorf("%s: want one FAIL naming pyyaml\n%s", name, out)
@@ -120,5 +120,25 @@ func TestCheckPython_APackageOnlyMisePythonHasNamesThePath(t *testing.T) {
 	rep, out := runCheckPython(s, cfg)
 	if rep.Failures() != 1 || !strings.Contains(out, "mise's python at /m/python3 has them") || strings.Contains(out, "run: dotf tools sync") {
 		t.Errorf("want one FAIL naming mise's python and the PATH, not the sync\n%s", out)
+	}
+}
+
+// Without mise nothing manages the packages, as checkMiseTools reports for the
+// CLIs: a missing package warns, naming that, and is no failure (#2062; on
+// Windows mise waits for the ADR-044 Windows wave, #2013). The floor still
+// fails without mise: TestCheckPython_AbsentFails.
+func TestCheckPython_APackageMissingWithoutMiseWarns(t *testing.T) {
+	for _, goos := range []string{"windows", "darwin"} {
+		py := "python3"
+		if goos == "windows" {
+			py = "python"
+		}
+		s, cfg := pythonFixture(t, goos, pythonVersions, []string{py}, map[string]string{
+			py + " --version": "Python 3.12.10",
+		})
+		rep, out := runCheckPython(s, cfg)
+		if rep.Failures() != 0 || rep.Warnings() != 1 || !strings.Contains(out, "cannot import at their pin: pyyaml") || !strings.Contains(out, "mise not on PATH") {
+			t.Errorf("%s: want one WARN naming pyyaml and the missing mise, no FAIL\n%s", goos, out)
+		}
 	}
 }

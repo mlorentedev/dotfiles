@@ -161,7 +161,15 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] The dead `~/Applications/python-<ver>` layout leaves doctor (`versionedHomes`, `versionMatches`, `toolHomeVars`) and the rc files: nothing installs it
 - [x] Guard: `tests/versions-conf.bats` refuses the python-package marker and a marked `PYTHON_VERSION` until PR2 relaxes it; both mutations fail it
 - [x] On the Mac, through a scratch `versions.conf` (`--versions`): `python@3.12.6` is refused for lacking GitHub attestations, `3.13.16` installs with PyYAML 6.0.3, a second run does nothing, and `mise install python@3.13.16` alone also leaves `import yaml` working
-- [ ] PR2, after the release: mark `PYTHON_VERSION=3.13.16` and `PYYAML_VERSION=6.0.3`, relax the guard to the `DOTF_VERSION` condition, read the pins in CI's macOS job (check first that `actions/setup-python`'s manifest has 3.13.16: it lags upstream, so the job may need a floor instead of the exact pin), and remove the user-site PyYAML the Mac's system 3.9 carries
+- [x] PR2: see the next section
+
+### Python — PR2, the pins (after v0.66.0 carried the parser)
+
+- [x] Mark `PYTHON_VERSION=3.13.16` (`# mise: cli`) and `PYYAML_VERSION=6.0.3` (`# mise: python-package`)
+- [x] Guard: `tests/versions-conf.bats` now requires `DOTF_VERSION >= 0.66.0` while python is marked, and that both lines stay marked; six mutations (0.65.0, 0.100.0, 1.0.0, package marker removed but python still marked under 0.65.0, package marker removed, python unmarked) give the expected verdict
+- [x] CI's macOS job reads `PYYAML_VERSION` and installs `pyyaml==` that pin; `actions/setup-python`'s manifest carries 3.13.16 (checked 2026-10-09), so the job keeps the exact pin rather than a floor
+- [x] Windows (owner decision 2026-10-09): `test-windows` failed `[Python]` with `python cannot import at their pin: pyyaml (install mise, ...)`, a remedy Windows cannot take with mise disabled. Without mise a missing package now warns, as `Pinned CLIs (mise)` does for the CLIs; the 3.11 floor still fails everywhere (`TestCheckPython_APackageMissingWithoutMiseWarns`, red before the change)
+- [ ] On the Mac, after merge: `dotf tools sync`, `pip3 uninstall --user pyyaml` from the system 3.9, then `dotf doctor` passes `[Python]` and `[Pinned CLIs (mise)]`
 
 ## Closing
 
