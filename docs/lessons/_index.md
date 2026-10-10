@@ -409,4 +409,5 @@ tags: [lessons, index, dotfiles]
 | [390 - A tree without .git still gets an answer from git](lesson-390-a-tree-without-git-still-gets-an-answer-from-git.md) | 2026-10-10 |
 | [391 - A re-planning probe needs every outcome the apply skips](lesson-391-a-re-planning-probe-needs-every-outcome-the-apply-skips.md) | 2026-10-10 |
 | [392 - lsof's exit status is not the verdict of a process scan](lesson-392-lsof-exit-status-is-not-the-verdict-of-a-process-scan.md) | 2026-10-10 |
+| [393 - An Electron app's state and liveness follow Electron, not its binary](lesson-393-an-electron-apps-state-and-liveness-follow-electron-not-its-binary.md) | 2026-10-10 |
 <!-- END GENERATED -->
