@@ -9,10 +9,16 @@ import (
 
 // BindMarker identifies a hook entry this repository owns.
 //
-// OWNERSHIP IS BY MARKER, NEVER BY POSITION, and that replaces a latent bug
-// rather than merely being tidier. `merge_claude_settings()` in setup-linux.sh
-// wrote `.hooks.SessionStart[0].hooks[0].command` — a positional claim that
-// held only because ours happens to sit at index 0 today. Measured 2026-08-26,
+// OWNERSHIP IS BY MARKER WHEN IT IS PRESENT, ELSE BY COMMAND SIGNATURE, NEVER BY
+// POSITION. The marker is a key the harness does not know, and a co-owner of the
+// file may drop it: measured 2026-10-10 (#2232), ~/.claude/settings.json was
+// rewritten with every hook intact and every marker gone. So the marker is
+// written but never required; see isOurs.
+//
+// Position-free identity replaces a latent bug rather than merely being tidier.
+// `merge_claude_settings()` in setup-linux.sh wrote
+// `.hooks.SessionStart[0].hooks[0].command` — a positional claim that held only
+// because ours happened to sit at index 0. Measured 2026-08-26,
 // the deployed ~/.claude/settings.json carries 12 events of which **10 belong to
 // Orca**, and all four of agy's belong to Orca. The day a third party prepends a
 // group to an event we also write, a positional writer silently overwrites a
@@ -121,10 +127,10 @@ func mergeEvent(groups []any, c HookCommand) ([]any, bool, error) {
 		inner, _ := group["hooks"].([]any)
 		for hi, h := range inner {
 			obj, ok := h.(map[string]any)
-			if !ok || (!isOurs(obj, c.ID) && !sameCommand(obj, c.Command)) {
+			if !ok || !isOurs(obj, c.ID, c.Command) {
 				continue
 			}
-			if sameHook(obj, want) {
+			if sameHook(withoutMarker(obj), withoutMarker(want)) {
 				return groups, false, nil
 			}
 			inner[hi] = want
@@ -154,39 +160,68 @@ func hookObject(c HookCommand) map[string]any {
 	return obj
 }
 
-// isOurs recognises our entry.
+// isOurs recognises our entry, in three ways, any of which is enough.
 //
-// The sidecar field is checked FIRST because it survives a command edit — the
-// case that matters, since the whole point of re-emission is that the command
-// changes. The command-substring fallback exists for entries written before the
-// marker existed, and for a harness that strips unknown keys from a hook object:
-// if one does, the sidecar silently vanishes and only the fallback would
-// recognise our own entry, so losing it would make every run append a duplicate.
-func isOurs(obj map[string]any, id string) bool {
+//   - The marker, when it is there: it survives a change to the command's
+//     arguments, the case re-emission exists for.
+//   - The command signature: a `dotf` binary followed by exactly the arguments
+//     we emit, wherever the binary lives. This is what holds when a co-owner of
+//     the file has dropped the marker (#2232), and it adopts an unmarked entry
+//     that the positional setup path wrote. It cannot claim a third party's
+//     hook: one running our binary with our arguments IS ours.
+//   - Pre-marker gate entries, from before the marker existed, whose
+//     arguments may differ from today's.
+//
+// What none of them recognises is an unmarked entry whose arguments changed
+// since it was written, other than the gate: the manifest's retire list names
+// such a hook by id, and only the marker or the gate rule finds it.
+func isOurs(obj map[string]any, id, command string) bool {
 	if m, ok := obj[managedKey].(string); ok && m == BindMarker+":"+id {
 		return true
 	}
-	// Pre-marker gate entries, from before this field existed.
-	if id == "gate" {
-		cmd, _ := obj["command"].(string)
-		return strings.Contains(cmd, "dotf harness gate")
+	cmd, _ := obj["command"].(string)
+	if got, ok := dotfArgs(cmd); ok {
+		if want, ok := dotfArgs(command); ok && got == want {
+			return true
+		}
 	}
-	return false
+	return id == "gate" && strings.Contains(cmd, "dotf harness gate")
 }
 
-// sameCommand adopts an unmarked entry that already runs exactly the command we
-// are about to emit.
-//
-// Without it, `bind` taking over a hook that `merge_claude_settings` wrote
-// positionally would APPEND A DUPLICATE rather than adopt it: the existing entry
-// carries no marker, and `isOurs`'s substring fallback only recognises the gate.
-// Measured on the deployed file — `SessionStart` runs `dotf mem session-start`,
-// which matches neither. Exact-command equality is the safe adoption rule: it
-// cannot claim a third party's hook, because a hook running our exact command IS
-// ours regardless of who wrote it.
-func sameCommand(obj map[string]any, want string) bool {
-	cmd, _ := obj["command"].(string)
-	return want != "" && cmd == want
+// dotfArgs splits a hook command into the arguments after its binary, when the
+// binary is dotf: bare or double-quoted (Windows quotes it), with either path
+// separator, as `dotf` or `dotf.exe`.
+func dotfArgs(cmd string) (string, bool) {
+	var bin, rest string
+	if strings.HasPrefix(cmd, `"`) {
+		end := strings.Index(cmd[1:], `"`)
+		if end < 0 {
+			return "", false
+		}
+		bin, rest = cmd[1:end+1], cmd[end+2:]
+	} else {
+		bin, rest, _ = strings.Cut(cmd, " ")
+	}
+	base := bin[strings.LastIndexAny(bin, `/\`)+1:]
+	if base != "dotf" && base != "dotf.exe" {
+		return "", false
+	}
+	return strings.TrimLeft(rest, " "), true
+}
+
+// withoutMarker returns a hook object without the marker, so that whether an
+// entry is current does not depend on a key a co-owner of the file may drop.
+// Comparing with it, an entry that lost only its marker is current: rewriting
+// it would put the marker back for the next writer to strip, and every run
+// would report a change.
+func withoutMarker(obj map[string]any) map[string]any {
+	out := make(map[string]any, len(obj))
+	for k, v := range obj {
+		if k != managedKey {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // sameHook reports whether the existing entry already says what we want, so an
@@ -198,8 +233,12 @@ func sameHook(got, want map[string]any) bool {
 }
 
 // ForeignHookCount reports how many hook entries in a document belong to
-// somebody else. Used by the verification to assert AC6 on real data rather than
-// on a fixture built to pass.
+// somebody else: neither marked ours nor running the dotf binary. Used by the
+// verification to assert AC6 on real data rather than on a fixture built to
+// pass. It is coarser than isOurs, which also requires the manifest's exact
+// arguments: an unmarked dotf entry with other arguments is not counted here,
+// and TestMergeHooksLeavesADotfEntryWithOtherArgumentsUntouched pins that bind
+// still leaves it alone.
 func ForeignHookCount(doc map[string]any) int {
 	hooks, _ := doc["hooks"].(map[string]any)
 	n := 0
@@ -216,7 +255,9 @@ func ForeignHookCount(doc map[string]any) int {
 				if !ok {
 					continue
 				}
-				if m, ok := obj[managedKey].(string); !ok || !strings.HasPrefix(m, BindMarker+":") {
+				m, _ := obj[managedKey].(string)
+				cmd, _ := obj["command"].(string)
+				if _, isDotf := dotfArgs(cmd); !isDotf && !strings.HasPrefix(m, BindMarker+":") {
 					n++
 				}
 			}
@@ -330,7 +371,7 @@ func RetireHooks(doc map[string]any, event, id string) (map[string]any, bool) {
 		inner, _ := group["hooks"].([]any)
 		left := make([]any, 0, len(inner))
 		for _, h := range inner {
-			if obj, ok := h.(map[string]any); ok && isOurs(obj, id) {
+			if obj, ok := h.(map[string]any); ok && isOurs(obj, id, "") {
 				changed = true
 				continue
 			}
