@@ -8,11 +8,20 @@
     "install succeeds.",
     "",
     "setup-linux.sh and setup-windows.ps1 still carry the same list hardcoded",
-    "until the cutover; tests/claude-plugins.bats fails when the three disagree."
+    "until the cutover; tests/claude-plugins.bats fails when the three disagree.",
+    "",
+    "retired_marketplaces: names `dotf deploy` removes with `claude plugin",
+    "marketplace remove` when the box still registers them, then lists again and",
+    "fails if one survived. A retired marketplace keeps re-cloning with autoUpdate",
+    "after its plugin is gone (thedotmack: claude-mem, retired by MEM-002, #1431).",
+    "None may be the marketplace of a plugin above."
   ],
   "plugins": [
     "gopls-lsp@claude-plugins-official",
     "security-guidance@claude-plugins-official",
     "frontend-design@claude-plugins-official"
+  ],
+  "retired_marketplaces": [
+    "thedotmack"
   ]
 }
