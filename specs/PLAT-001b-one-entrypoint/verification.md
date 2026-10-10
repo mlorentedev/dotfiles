@@ -14,7 +14,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63`; the report in PR 3 / tests `TestConverge_SecondRunIsANoOpAndPersistsTheReport`, `TestWriteReport_RecordsTheRunAndItsOutcome`
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
-- [ ] AC6, AC7, AC9 -> PRs 4b and 6
+- [ ] AC6 (install, probe, hand-off) -> PR 4b / bats `tests/install.bats` (bash 3.2 and zsh): bad checksum and unreachable release place nothing, an unrunnable binary is never placed, a raw stream hands `--plan --only tools` to `<dest>/dotf converge`, `DOTF_BIN_DIR` moves the install, a kept pinned dotf is the one that converges, a failed install never hands off; Pester `install.ps1 executed` (args and exit status). Open until the release floor: `the pinned dotf can converge from zero` fails while `versions.conf` pins 0.66.0
+- [x] AC7 (no live reference to the old names) -> PR 4b / bats `tests/install-old-name-guard.bats`; a planted reference in README fails it
+- [ ] AC9 -> PR 6
 - [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
 
 ## Test status
@@ -37,6 +39,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Manual run (PR 2c-2): `dotf harness instructions --dry-run` against the Mac's real HOME, whose files `compile-harness.sh` wrote, reports claude, opencode and pi current and skips copilot (not on PATH)
 
 - Test suite (PR 4a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Real-git checkout tests (clone then idempotent, behind fast-forwarded, dirty left alone, foreign repo refused, no git from zero). Live: a scratch HOME planned the clone and six steps `waits for checkout`; `--only checkout` cloned from GitHub, then `already current`
+- Test suite (PR 4b, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; the full bats suite -> one failure, the release floor (by design until 0.67.0). Mutations: dropping the `exec` fails the three hand-off tests; disabling the exec probe fails `a release binary that verifies but cannot run here is never placed`
 - Test suite (PR 5, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Mutations: a child without the guard env fails `TestExecSetup_RunsTheOverrideMarkedAndFromTheCheckout`; an opaque result reported as a change fails both `TestLegacySetup_*Opaque*` tests
 
 ## Decisions made during implementation
@@ -53,6 +56,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - PR 4 was split (2026-10-10). From zero, the entrypoint runs the *released* dotf, so swapping `install.sh` before a release carries the checkout step would hand a new machine a converge that cannot clone. And Linux from zero ran `setup-linux.sh`, which only the legacy step (PR 5) brings back. So 4a and PR 5 land first, and 4b waits for the release carrying both.
 - A plan gates the steps after a pending clone or fast-forward (`Result.Gate`, lesson 385).
 - The legacy step is reported skipped on darwin rather than left out of the registry. AC5 already reads "not supported on darwin", and the report then says why no setup ran.
+- PR 4b: executed, every installer argument goes to `dotf converge`; the version, install directory and release location come from `DOTF_VERSION`, `DOTF_BIN_DIR` and `DOTF_RELEASE_BASE`, so `curl … | bash -s -- --plan` needs no installer flags of its own. The hand-off uses the binary `install_dotf` vetted (`DOTF_BIN`), never a PATH lookup: a fresh machine has no `~/.local/bin` on PATH. Under `irm | iex` the ps1 never calls `exit`, which would close the caller's shell.
+- PR 4b: a test pins `DOTF_VERSION` at or above 0.67.0, the first release whose converge clones and runs setup. It is the gate that keeps this PR from landing before that release.
 - A script that cannot plan gets its own status, `opaque`. Counting it as a change would make every second run report one, and counting it as converged would hide what the script did.
 
 ## Promotion candidates

@@ -39,7 +39,7 @@
     "behavior": "AC6: install.sh installs dotf at the pin with checksum and exec probe, hands off to converge, and places nothing on failure (bash 3.2 and zsh)",
     "verification": "bats tests/install.bats",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PR 4b: 23/24 ok under bash 3.2 and zsh; the remaining failure is the release floor (versions.conf pins 0.66.0 < 0.67.0), by design until the release"
   },
   {
     "id": "PLAT-001b-one-entrypoint-f7",
@@ -52,8 +52,8 @@
     "id": "PLAT-001b-one-entrypoint-f8",
     "behavior": "AC7: no live file references the old installer names or the clone-and-setup flow",
     "verification": "bats tests/install-old-name-guard.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "PR 4b: bats tests/install-old-name-guard.bats -> 2/2 ok; a planted reference in README.md fails it"
   },
   {
     "id": "PLAT-001b-one-entrypoint-f9",
