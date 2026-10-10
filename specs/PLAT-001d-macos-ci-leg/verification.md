@@ -9,7 +9,7 @@ created: "2026-10-07"
 
 > Delivered in three PRs (see `tasks.md`). The evidence below was measured on the combined change, rebased onto `main` at e65182a7 after #2070 replaced `tests/knowledge-crystallize-go-parity.bats` with a Go test. That file left the tier, which went from 285 tests to 272. Re-measured after #2150 retired `tests/vault-health-golden.bats` (19 tagged tests) and #2146 added one runner test: the tier is 254, the full suite 1804; the figures below are that re-measurement, on the head of #2147 over `main` at 3d1f07d1. The ticks below record that measurement: AC4 is made true by #2145, AC2, AC3 and AC6 by #2146, AC5 by #2147, so on #2145's tree alone the commands for AC2, AC3, AC5 and AC6 (and `features.json` f2 to f6) name files that do not exist yet. Every `features.json` entry stays `pending` until `dotf spec archive` runs them on `main` after the third PR.
 
-- [x] AC1 (Go injection seams) -> `cd cli && go test ./internal/doctor/ -run 'TestContractOS|TestCheckContractPath_Dialects|TestCheckContractEnvVars_WindowsDialect'`: doctor reads `System.GOOS` for the darwin and windows dialects, so layer 1 needs no new work. Gap noted, not fixed: `checks_catalog.go:95` and `checks_repodir.go:101` read `runtime.GOOS` directly.
+- [x] AC1 (Go injection seams) -> `cd cli && go test ./internal/doctor/ -run 'TestContractOS|TestCheckContractPath_Dialects|TestCheckContractEnvVars_WindowsDialect'`: doctor reads `System.GOOS` for the darwin and windows dialects, so layer 1 needs no new work. Correction at archive (review F1): the gap this line recorded, `checks_catalog.go` and `checks_repodir.go` reading `runtime.GOOS` directly, was already closed by #2095 (`7f648fd6`, with `goos_seam_test.go`) before this spec's base; #2061 is closed.
 - [x] AC2 (tier tagged, non-empty, passes under bash 3.2 with no `sha256sum`) -> `PATH="/bin:...(no /sbin)" ./scripts/run-bats.sh --expect-bash 3 --filter-tags os-sensitive` -> `bash 3.2.57 at /bin/bash`, `254 test(s) tagged os-sensitive`, 254 ok, 0 not ok
 - [x] AC3 (tag mistakes fail) -> `tests/guard-bats-tags.bats` (mutation: `file_tag=` in `tests/utils.bats` turns test 2 red), `tests/run-bats-real.bats` ("a tag no test carries fails the run")
 - [x] AC4 (classified and resolved) -> table below; `bats --jobs 8 --no-parallelize-within-files tests/*.bats` -> 1804 tests, 0 failed, 99 skipped (each with a reason), with the pinned Python 3.12 on `PATH`. Under the system Python 3.9, the 13 `pr-agent-config` tests that `import tomllib` (3.11+) fail; that is class (b), environment only, tracked in #2062
@@ -75,9 +75,15 @@ Declined on #2147 because the Linux job shares the defect; it is fixed for both 
 - `run-bats.sh` fails an empty tag selection itself. bats exits 0 on zero matches, so a mistyped tag would turn the leg into a green no-op.
 - No separate "zsh leg": bats runs under bash on every OS, and the tagged tests start zsh themselves. The job asserts zsh exists and the bash major version is 3 instead.
 - GNU parallel is installed by a workflow step (`brew install parallel`), with the same `::error` preflight as Linux. Its declaration belongs to #2013 P5b (a system-package source in the catalog); `packages.json` is untouched here.
-- Gaps found and ticketed rather than fixed: `test-windows` still selects by file list instead of the tag (noted on #2059, the Windows-leg slimming issue); `checks_catalog.go` and `checks_repodir.go` bypass the `GOOS` seam (#2061); Python 3.12 and PyYAML are an undeclared dependency of the suite on a developer Mac (#2062).
+- Gaps found and ticketed rather than fixed: `test-windows` still selects by file list instead of the tag (noted on #2059, the Windows-leg slimming issue); Python 3.12 and PyYAML are an undeclared dependency of the suite on a developer Mac (#2062).
 
-- AC5 closed (2026-10-10): `test-macos` was green on the PR that added it (#2063, run 37590992834, branch `ci/macos-leg`), and on main both tiers pass. Run 38014809265 (push of `e04219c2`, #2222) reports `bats, os-sensitive tier (bash 3.2)=success` and `bats, full suite (bash 3.2, main only)=success`.
+- AC5 closed (2026-10-09): `test-macos` was green on the PR that added it (#2063, run 37590992834, branch `ci/macos-leg`), and on main both tiers pass. Run 38014809265 (push of `e04219c2`, #2222) reports `bats, os-sensitive tier (bash 3.2)=success` and `bats, full suite (bash 3.2, main only)=success`.
+
+## Review dispositions (archive review, `nan/mimo-v2.6-flash`, PASS-WITH-GAPS)
+
+- F1 (Minor, REAL), stale seam gap: corrected in this file (AC1 line and the gaps line). The same sentence in `proposal.md` "Risks" is declined as an edit: the review closed the contract set, and a post-review edit to it would re-open the verdict. The correction lives here.
+- F2 (Minor, REAL), counts drifted: re-measured at archive on `b6fd39e9` by the reviewer: os-sensitive tier **268**, full suite **1896** tests, 0 failed. The figures above (254/257, 1804) stay as the measurements of their date; the tier grew with later PRs that tagged their own tests.
+- F3 (Minor, SPECULATIVE), the `>= 100` floor tolerates partial tier loss: declined. A per-file tag manifest is the second copy of the tag list this spec rejected on purpose (see the design decision above); the floor catches the wholesale loss it was built for.
 
 ## Promotion candidates
 
