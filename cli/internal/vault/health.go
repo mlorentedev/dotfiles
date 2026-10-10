@@ -445,7 +445,7 @@ func unresolvedExempt(source string) bool { return linkExempt(checkUnresolved, s
 type linkTally struct {
 	listed       []string // notes the CLI listed that count
 	exemptListed int      // notes the CLI listed in an exempt zone
-	attachments  int      // non-markdown files the CLI listed
+	attachments  []string // non-markdown files the CLI listed
 	population   int      // markdown files that count
 	exemptFiles  int      // markdown files in an exempt zone
 }
@@ -459,7 +459,7 @@ func (h *healthRun) tally(check linkCheck, out string) linkTally {
 		rel := strings.TrimSpace(l)
 		switch ext := filepath.Ext(rel); {
 		case ext != "" && ext != ".md":
-			t.attachments++
+			t.attachments = append(t.attachments, rel)
 		case linkExempt(check, rel):
 			t.exemptListed++
 		default:
@@ -544,8 +544,8 @@ func (h *healthRun) section3OrphansDeadEnds() {
 			h.info("Not counted: %d file(s) under %s (%d orphaned), which have no incoming links by design",
 				orphans.exemptFiles, exemptZones(checkOrphans, "and"), orphans.exemptListed)
 		}
-		if orphans.attachments > 0 {
-			h.info("Not counted: %d attachment(s) no note links to", orphans.attachments)
+		if len(orphans.attachments) > 0 {
+			h.info("Not counted: %d attachment(s) no note links to", len(orphans.attachments))
 		}
 	}
 
@@ -580,6 +580,9 @@ func (h *healthRun) section3OrphansDeadEnds() {
 
 	if h.opts.Verbose && orphanCount > 0 {
 		h.printTruncated("Orphan files", strings.Join(orphans.listed, "\n"), orphanCount, 20)
+	}
+	if h.opts.Verbose && orphansErr == nil && len(orphans.attachments) > 0 {
+		h.printTruncated("Unlinked attachments", strings.Join(orphans.attachments, "\n"), len(orphans.attachments), 20)
 	}
 	if h.opts.Verbose && deadErr == nil && deadCount > 0 {
 		h.printTruncated("Dead-end files", strings.Join(deadEnds.listed, "\n"), deadCount, 20)
