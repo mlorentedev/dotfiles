@@ -232,9 +232,12 @@ func sameHook(got, want map[string]any) bool {
 }
 
 // ForeignHookCount reports how many hook entries in a document belong to
-// somebody else: neither marked ours nor running the dotf binary, the same
-// identity isOurs applies when the marker is gone. Used by the verification to assert AC6 on real data rather than
-// on a fixture built to pass.
+// somebody else: neither marked ours nor running the dotf binary. Used by the
+// verification to assert AC6 on real data rather than on a fixture built to
+// pass. It is coarser than isOurs, which also requires the manifest's exact
+// arguments: an unmarked dotf entry with other arguments is not counted here,
+// and TestMergeHooksLeavesADotfEntryWithOtherArgumentsUntouched pins that bind
+// still leaves it alone.
 func ForeignHookCount(doc map[string]any) int {
 	hooks, _ := doc["hooks"].(map[string]any)
 	n := 0

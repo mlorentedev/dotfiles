@@ -913,6 +913,29 @@ func TestMergeHooksNeverAdoptsAnotherBinaryWithOurArguments(t *testing.T) {
 	}
 }
 
+// The signature is the binary AND the exact arguments: an unmarked dotf entry
+// running something the manifest does not declare is not ours to rewrite, so it
+// stays byte-identical and ours is appended beside it.
+func TestMergeHooksLeavesADotfEntryWithOtherArgumentsUntouched(t *testing.T) {
+	doc := decode(t, `{"hooks":{"SessionStart":[
+	  {"matcher":"","hooks":[{"type":"command","command":"/x/dotf mem session-start --legacy-flag","timeout":7}]}
+	]}}`)
+	before, _ := json.Marshal(doc["hooks"].(map[string]any)["SessionStart"].([]any)[0])
+	out, _, err := MergeHooks(doc, []HookCommand{{
+		Event: "SessionStart", ID: "mem", Command: "/x/dotf mem session-start", UseMatcher: true, Timeout: 30,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := out["hooks"].(map[string]any)["SessionStart"].([]any)
+	if after, _ := json.Marshal(groups[0]); string(after) != string(before) {
+		t.Errorf("the other dotf entry was rewritten:\nbefore %s\nafter  %s", before, after)
+	}
+	if got := hookCommandsIn(out, "SessionStart"); len(got) != 2 || got[1] != "/x/dotf mem session-start" {
+		t.Errorf("SessionStart = %v, want the other entry kept and ours appended", got)
+	}
+}
+
 func TestDotfArgsRecognisesOnlyTheDotfBinary(t *testing.T) {
 	for _, c := range []struct {
 		cmd, args string
