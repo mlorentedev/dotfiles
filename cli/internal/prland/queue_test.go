@@ -45,6 +45,8 @@ func (g *queueGH) run(_ context.Context, args ...string) ([]byte, error) {
 	case strings.HasPrefix(line, "pr merge"):
 		g.calls = append(g.calls, line)
 		return nil, nil
+	case strings.HasPrefix(line, "api "):
+		return grantAnswer(false)
 	}
 	return nil, errors.New("unexpected gh call: " + line)
 }
