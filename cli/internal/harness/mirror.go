@@ -46,6 +46,9 @@ type MirrorResult struct {
 	// See ScanOrphans.
 	Pruned, Unpruned []string
 	PruneSkipped     string
+	// IgnoreSkipped says why git could not list the checkout's ignored files,
+	// when it could not, so they were mirrored (IgnoredInCheckout).
+	IgnoreSkipped string
 	// Unreadable are deploy-dir entries the leftover scan could not read, so
 	// they were not checked (Orphans.Unreadable).
 	Unreadable []string
@@ -92,7 +95,8 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 		return res, err
 	}
 
-	ignored := IgnoredInCheckout(repoRoot, ExecGit)
+	ignored, ignoreSkipped := IgnoredInCheckout(repoRoot, ExecGit)
+	res.IgnoreSkipped = ignoreSkipped
 	if err := mirrorTree(repoRoot, deployDir, "harness", ignored, dryRun, &res); err != nil {
 		return res, err
 	}

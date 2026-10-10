@@ -314,12 +314,45 @@ func TestMirror_SkipsAFileTheCheckoutIgnores(t *testing.T) {
 	}
 }
 
-// Without readable git (a tarball checkout) nothing counts as ignored, so the
-// mirror copies the working tree as it always did.
-func TestIgnoredInCheckout_IsEmptyWithoutGit(t *testing.T) {
-	broken := func(string, ...string) (string, error) { return "", os.ErrNotExist }
-	if got := IgnoredInCheckout(t.TempDir(), broken); len(got) != 0 {
-		t.Errorf("want nothing ignored, got %v", got)
+// Without .git (a tarball checkout) nothing counts as ignored, silently, so the
+// mirror copies the working tree as it always did. Inside a git checkout a
+// failing git ignores nothing too, but says why, so the copy is not silent.
+func TestIgnoredInCheckout_FailsOpenAndSaysSoOnlyInAGitCheckout(t *testing.T) {
+	broken := func(string, ...string) (string, error) { return "", os.ErrPermission }
+
+	tarball := t.TempDir()
+	if got, why := IgnoredInCheckout(tarball, broken); len(got) != 0 || why != "" {
+		t.Errorf("tarball: got %v, %q; want nothing ignored and nothing to report", got, why)
+	}
+
+	checkout := t.TempDir()
+	writeFile(t, filepath.Join(checkout, ".git"), "gitdir: /nowhere\n")
+	got, why := IgnoredInCheckout(checkout, broken)
+	if len(got) != 0 || !strings.Contains(why, "so they were mirrored") {
+		t.Errorf("git checkout: got %v, %q; want nothing ignored and the failure named", got, why)
+	}
+}
+
+// The no-git path end to end, with the real git: a tree outside any repository
+// mirrors every file, and nothing is reported.
+func TestMirror_CopiesTheWorkingTreeOfATarballCheckout(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := mirrorRepo(t)
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(repo))
+	writeFile(t, filepath.Join(repo, "scripts", "CLAUDE.md"), "local\n")
+
+	deploy := t.TempDir()
+	res, err := Mirror(repo, deploy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(deploy, "scripts", "CLAUDE.md")); err != nil {
+		t.Errorf("a tarball checkout's file was not mirrored: %v", err)
+	}
+	if res.IgnoreSkipped != "" {
+		t.Errorf("a tarball checkout reported %q; it has no git to fail", res.IgnoreSkipped)
 	}
 }
 
