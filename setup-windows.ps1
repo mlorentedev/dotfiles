@@ -1320,8 +1320,7 @@ Ensure-Directory $AgyAppData
 $env:GEMINI_DIR = "$GeminiHome"
 
 # 1. agy settings.json is a `dotf deploy` entry (ai/deploy.json `agy-settings`,
-#    AI-042/#1334): its trustedWorkspaces carry {HOME} and render per machine,
-#    which a verbatim copy could not do (SDD-007: no legacy Gemini-CLI write).
+#    AI-042/#1334), merged so agy's own trust and grants survive (#902).
 
 # .geminiignore and AGY.md are `dotf deploy` entries (ai/deploy.json
 # `agy-geminiignore`, `agy-instructions`; #1843 B11), deployed by the bare

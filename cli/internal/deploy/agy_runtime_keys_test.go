@@ -71,15 +71,17 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 
 	got := readObject(t, dst)
 
+	// #902: the template no longer names these keys, so the deploy leaves them
+	// exactly as the machine has them: nothing removed, nothing added.
 	ws, _ := got["trustedWorkspaces"].([]any)
-	if len(ws) != 3 || ws[0] != "/home/u/Projects/ts-bridge" {
-		t.Errorf("the runtime-trusted workspace was destroyed: %v", got["trustedWorkspaces"])
+	if len(ws) != 1 || ws[0] != "/home/u/Projects/ts-bridge" {
+		t.Errorf("trustedWorkspaces is machine-local and must pass through untouched: %v", got["trustedWorkspaces"])
 	}
 
 	perms, _ := got["permissions"].(map[string]any)
 	allow, _ := perms["allow"].([]any)
-	if len(allow) != 6 || allow[0] != "mcp(hive-vault/*)" {
-		t.Errorf("the runtime-granted permission was destroyed: %v", perms)
+	if len(allow) != 1 || allow[0] != "mcp(hive-vault/*)" {
+		t.Errorf("permissions.allow is machine-local and must pass through untouched: %v", perms)
 	}
 
 	// The other half of the contract: dotfiles still owns what it declares.
@@ -98,5 +100,29 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	}
 	if got["model"] != tmpl["model"] {
 		t.Errorf("model = %v, template declares %v", got["model"], tmpl["model"])
+	}
+}
+
+// TestAgyTemplateCarriesNoMachineLocalKeys pins the owner decision on #902:
+// `permissions.allow` and `trustedWorkspaces` are what agy grants and trusts on
+// one machine, so the repo does not ship them. With the merge strategy a
+// shipped list is unioned into every machine's list on every deploy, and doctor
+// reports drift whenever a machine's list holds less than the template's.
+func TestAgyTemplateCarriesNoMachineLocalKeys(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("../../..", "ai", "agy", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tmpl map[string]any
+	if err := json.Unmarshal(raw, &tmpl); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := tmpl["trustedWorkspaces"]; ok {
+		t.Error("ai/agy/settings.json ships trustedWorkspaces, which is machine-local (#902)")
+	}
+	if perms, ok := tmpl["permissions"].(map[string]any); ok {
+		if _, ok := perms["allow"]; ok {
+			t.Error("ai/agy/settings.json ships permissions.allow, which is machine-local (#902)")
+		}
 	}
 }
