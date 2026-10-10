@@ -110,22 +110,47 @@ setup() {
 
 # The released dotf reads this file too: setup and doctor run DOTF_VERSION's
 # binary, not this tree's. Up to v0.65.0 its parser rejects every "# mise:"
-# comment except "# mise: cli", so "# mise: python-package" would turn every
-# machine's `dotf tools sync` and doctor into a parse error until a release
-# carrying ParseMisePins is the pinned one (#2062). Marking PYTHON_VERSION
-# early is no safer: that binary would install mise's python without its
-# packages, and its shim would shadow the system python the suite imports yaml
-# from. Relax this in the PR that marks both, once DOTF_VERSION carries the
-# parser.
-@test "versions.conf marks python for mise only once DOTF_VERSION parses the python-package marker" {
-    # The released parser trims each line and matches markers case-blind, so
-    # an indented or differently cased marker counts the same.
-    run awk '
-        marked { marked = 0; if ($0 ~ /^[[:space:]]*PYTHON_VERSION[[:space:]]*=/) { print NR ": PYTHON_VERSION is marked"; bad = 1 } }
-        tolower($0) ~ /^[[:space:]]*#[[:space:]]*mise[[:space:]]*:/ {
-            t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t)
-            if (t != "# mise: cli") { print NR ": " t; bad = 1 } else { marked = 1 }
+# comment except "# mise: cli", so "# mise: python-package" turns that
+# machine's `dotf tools sync` and doctor into a parse error. Marking
+# PYTHON_VERSION under such a binary is no safer: it installs mise's python
+# without its packages, and that shim shadows the system python the suite
+# imports yaml from (#2062, lesson 373). v0.66.0 is the first release that
+# reads both, so DOTF_VERSION must not drop below it while either is marked.
+@test "versions.conf marks python for mise only while DOTF_VERSION parses the python-package marker" {
+    # The released parser trims each line, so an indented marker counts the
+    # same; the version compare is numeric per field (0.100.0 > 0.66.0).
+    run awk -v floor="0.66.0" '
+        function ge(a, b,   x, y, i) {
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) return x[i] + 0 > y[i] + 0
+            return 1
         }
-        END { exit bad }' "$VERSIONS_CONF"
+        marked { marked = 0; if ($0 ~ /^[[:space:]]*PYTHON_VERSION[[:space:]]*=/) uses = "PYTHON_VERSION is marked" }
+        {
+            t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t)
+            if (t == "# mise: cli") marked = 1
+            if (t == "# mise: python-package") uses = "a python-package marker"
+        }
+        /^DOTF_VERSION=/ { dotf = $0; sub(/^DOTF_VERSION=/, "", dotf) }
+        END {
+            if (dotf == "") { print "no DOTF_VERSION"; exit 1 }
+            if (uses != "" && !ge(dotf, floor)) { print uses " but DOTF_VERSION=" dotf " is below " floor; exit 1 }
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}
+
+# Python is a hard dependency of the toolchain (#2062): the suite imports
+# tomllib and yaml, and doctor fails without them. Unmarking either line would
+# leave a machine's python to whatever the OS ships (3.9 on macOS).
+@test "versions.conf declares python and pyyaml for mise (#2062)" {
+    run awk '
+        m == "cli" && /^PYTHON_VERSION=/ { py = 1 }
+        m == "pkg" && /^PYYAML_VERSION=/ { yaml = 1 }
+        { m = ($0 == "# mise: cli") ? "cli" : ($0 == "# mise: python-package") ? "pkg" : "" }
+        END {
+            if (!py) print "PYTHON_VERSION is not under \"# mise: cli\""
+            if (!yaml) print "PYYAML_VERSION is not under \"# mise: python-package\""
+            exit !(py && yaml)
+        }' "$VERSIONS_CONF"
     [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
 }
