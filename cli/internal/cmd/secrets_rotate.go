@@ -79,7 +79,7 @@ func newSecretsRotateCmd() *cobra.Command {
 			}
 			var repos []string
 			if pushToCI {
-				if repos, err = ciTargets(s); err != nil {
+				if repos, err = ciTargets(s, varArg); err != nil {
 					return err
 				}
 			}
@@ -195,8 +195,12 @@ func probeSuffix(s *secrets.Secret) string {
 // anything is written. A registry defect found after the write would leave the
 // vault on the new value and CI on the old one, which is the half-rotation
 // --push-ci exists to remove, so every consumer must be pushable first.
-func ciTargets(s *secrets.Secret) ([]string, error) {
+func ciTargets(s *secrets.Secret, varArg string) ([]string, error) {
 	one := &secrets.Registry{Secrets: []secrets.Secret{*s}}
+	rotated := varArg
+	if vs := s.Vars(); rotated == "" && len(vs) == 1 {
+		rotated = vs[0]
+	}
 	var repos []string
 	for _, c := range s.Consumers {
 		repo, ok := strings.CutPrefix(c, "ci:")
@@ -206,14 +210,34 @@ func ciTargets(s *secrets.Secret) ([]string, error) {
 		if !initrepo.ValidRepoSlug(repo) {
 			return nil, fmt.Errorf("%s declares an invalid ci consumer %q (want ci:owner/name); nothing was rotated", s.ID, c)
 		}
-		// SelectCI skips what Actions cannot hold (file, floor, GITHUB_*). A ci:
-		// consumer left with nothing to upload would report a push that never happens.
-		if sel := one.SelectCI(repo); len(sel.Upload) == 0 {
-			return nil, fmt.Errorf("%s declares %s but holds nothing GitHub Actions can store (%s); nothing was rotated", s.ID, c, skipReason(sel))
+		if err := checkPushable(s.ID, c, one.SelectCI(repo), rotated); err != nil {
+			return nil, err
 		}
 		repos = append(repos, repo)
 	}
 	return repos, nil
+}
+
+// checkPushable holds a ci: consumer to the one upload a rotation can justify:
+// exactly the var that was rotated, and nothing else.
+func checkPushable(id, consumer string, sel secrets.CISelection, rotated string) error {
+	// SelectCI skips what Actions cannot hold (file, floor, GITHUB_*). A ci:
+	// consumer left with nothing to upload would report a push that never happens.
+	if len(sel.Upload) == 0 {
+		return fmt.Errorf("%s declares %s but holds nothing GitHub Actions can store (%s); nothing was rotated", id, consumer, skipReason(sel))
+	}
+	// A ci: consumer names a secret, not which of its vars the repo holds, so a
+	// multi-var push would create a copy nothing reads in every repo (#2306).
+	if len(sel.Upload) > 1 {
+		return fmt.Errorf("%s exposes %d vars and %s does not say which it holds, so the push would create copies nothing reads; "+
+			"nothing was rotated (rotate without --push-ci, then `dotf secrets sync ci --repo <repo> <VAR>`)", id, len(sel.Upload), consumer)
+	}
+	// SelectCI may have filtered the rotated var out and left a sibling, whose
+	// value this rotation never wrote, fingerprinted or probed.
+	if v := sel.Upload[0].Var; v != rotated {
+		return fmt.Errorf("%s would push %s to %s, but %s is the var being rotated; nothing was rotated", id, v, consumer, rotated)
+	}
+	return nil
 }
 
 func skipReason(sel secrets.CISelection) string {

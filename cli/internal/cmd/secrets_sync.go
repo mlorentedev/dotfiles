@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -116,6 +117,9 @@ func pushCI(out io.Writer, sel secrets.CISelection, repo string, dryRun, skipVer
 	if err != nil {
 		return err
 	}
+	if err := checkAligned(env, sel.Upload, repo); err != nil {
+		return err
+	}
 
 	// Pre-upload liveness gate: an entry marked `validate: github-token` must
 	// authenticate before ANY upload, so a dead/expired PAT is never pushed to
@@ -149,6 +153,21 @@ func pushCI(out io.Writer, sel secrets.CISelection, repo string, dryRun, skipVer
 			return err
 		}
 		_, _ = fmt.Fprintf(out, "set %s → %s\n", name, repo)
+	}
+	return nil
+}
+
+// checkAligned asserts what both loops in pushCI assume: EnvFor answered one
+// "name=value" per entry, in the selection's order. A dropped entry would pair
+// one secret's name with another's value, so it is an error before any upload.
+func checkAligned(env []string, upload []secrets.Entry, repo string) error {
+	if len(env) != len(upload) {
+		return fmt.Errorf("resolved %d of %d ci secrets for %s; nothing uploaded", len(env), len(upload), repo)
+	}
+	for i, kv := range env {
+		if !strings.HasPrefix(kv, upload[i].Var+"=") {
+			return fmt.Errorf("resolved ci secrets for %s are out of order at %s; nothing uploaded", repo, upload[i].Var)
+		}
 	}
 	return nil
 }

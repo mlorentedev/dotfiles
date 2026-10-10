@@ -411,16 +411,25 @@ func rotateOn(t *testing.T, reg string, setter secrets.GitHubSecretSetter, args 
 // A ci: consumer that cannot be pushed is a registry bug known before any write. It
 // fails before the rotation, so the vault and CI are never left on different values.
 func TestRotate_PushCIRefusesAnUnpushableCIConsumerBeforeRotating(t *testing.T) {
-	cases := map[string]struct{ consumers, env, want string }{
+	cases := map[string]struct {
+		consumers, env, want string
+		args                 []string // a multi-var secret is rotated by naming its var
+	}{
 		"malformed slug":  {consumers: `[ci:o/a, "ci:", local]`, env: "DOCKERHUB_TOKEN", want: "invalid ci consumer"},
 		"reserved by GHA": {consumers: `[ci:o/a, local]`, env: "GITHUB_PAT", want: "nothing GitHub Actions can store"},
+		// #2306: one credential under two names would land in CI under both.
+		"two vars": {consumers: `[ci:o/a, local]`, env: "[DOCKERHUB_TOKEN, DOCKER_PAT]", want: "does not say which it holds",
+			args: []string{"DOCKER_PAT"}},
+		// SelectCI drops GITHUB_*, leaving a sibling this rotation never wrote.
+		"rotated var filtered out": {consumers: `[ci:o/a, local]`, env: "[DOCKERHUB_TOKEN, GITHUB_PAT]", want: "is the var being rotated",
+			args: []string{"GITHUB_PAT"}},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			reg := strings.Replace(pushCIRegistry, "[ci:o/a, ci:o/b, local]", tc.consumers, 1)
 			reg = strings.Replace(reg, "expose: { env: DOCKERHUB_TOKEN }", "expose: { env: "+tc.env+" }", 1)
 			uploads := fakeSetter{}
-			rw, out, err := rotateOn(t, reg, uploads, "--push-ci")
+			rw, out, err := rotateOn(t, reg, uploads, append(tc.args, "--push-ci")...)
 			if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "nothing was rotated") {
 				t.Fatalf("want a refusal containing %q before rotating, got %v\n%s", tc.want, err, out)
 			}
@@ -457,5 +466,79 @@ func TestRotate_PushCIFailureOnOneRepoStillPushesTheOthers(t *testing.T) {
 	}
 	if setter.fakeSetter["o/b|DOCKERHUB_TOKEN"] != "new-value" {
 		t.Errorf("o/b was not pushed after o/a failed: %v\n%s", setter.fakeSetter, out)
+	}
+}
+
+// A blank value would clear the credential while the fingerprint still changes
+// (<hash> -> (empty)), so the rotation would report its own proof as success.
+func TestRotate_RefusesAnEmptyValue(t *testing.T) {
+	rw := &fakeRW{fields: map[string]string{"dockerhub/PAT": "old-value"}}
+	out := rotateHarness(t, rw, &fakeSyncer{})
+	useTempRegistry(t, rotateRegistry)
+
+	cmd := newSecretsRotateCmd()
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetIn(strings.NewReader("\n"))
+	err := cmd.RunE(cmd, []string{"DOCKERHUB_TOKEN"})
+	if err == nil || !strings.Contains(err.Error(), "refusing to write an empty value") {
+		t.Fatalf("want the empty-value refusal, got %v\n%s", err, out.String())
+	}
+	if rw.setCalls != 0 {
+		t.Errorf("an empty value reached the vault (%d write(s))", rw.setCalls)
+	}
+}
+
+// A declared probe with no implementation is reported as unverified, never as
+// silence, which an operator would read as "nothing to check".
+func TestRotate_ReportsAnUnimplementedProbeAsUnverified(t *testing.T) {
+	rw := &fakeRW{fields: map[string]string{"dockerhub/PAT": "old-value"}}
+	out := rotateHarness(t, rw, &fakeSyncer{})
+	useTempRegistry(t, strings.Replace(rotateRegistry,
+		"expose: { env: DOCKERHUB_TOKEN }", "expose: { env: DOCKERHUB_TOKEN }\n    validate: dockerhub", 1))
+
+	cmd := newSecretsRotateCmd()
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetIn(strings.NewReader("new-value"))
+	if err := cmd.RunE(cmd, []string{"DOCKERHUB_TOKEN"}); err != nil {
+		t.Fatalf("rotate: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "validate: dockerhub — liveness unverified") {
+		t.Errorf("want the unimplemented probe named as unverified\n%s", out.String())
+	}
+}
+
+// rotate has already probed the new value, so the push skips its own gate: one
+// probe per rotation, not one per repo on top of it.
+func TestRotate_PushCIProbesTheNewValueOnce(t *testing.T) {
+	v := &fakeValidator{}
+	useGHTokenValidator(t, v)
+	uploads := fakeSetter{}
+	reg := strings.Replace(pushCIRegistry,
+		"expose: { env: DOCKERHUB_TOKEN }", "expose: { env: DOCKERHUB_TOKEN }\n    validate: github-token", 1)
+	_, out, err := rotateOn(t, reg, uploads, "--push-ci")
+	if err != nil {
+		t.Fatalf("rotate --push-ci: %v\n%s", err, out)
+	}
+	if len(v.calls) != 1 {
+		t.Errorf("want one probe of the new value, got %d\n%s", len(v.calls), out)
+	}
+	if len(uploads) != 2 {
+		t.Errorf("want both ci consumers pushed, got %v", uploads)
+	}
+}
+
+// The guard refuses a push it cannot justify, not every multi-var secret: when
+// SelectCI leaves exactly the rotated var, that var is what reaches CI.
+func TestRotate_PushCIPushesTheRotatedVarWhenItsSiblingIsFiltered(t *testing.T) {
+	reg := strings.Replace(pushCIRegistry, "expose: { env: DOCKERHUB_TOKEN }", "expose: { env: [DOCKERHUB_TOKEN, GITHUB_PAT] }", 1)
+	uploads := fakeSetter{}
+	_, out, err := rotateOn(t, reg, uploads, "DOCKERHUB_TOKEN", "--push-ci")
+	if err != nil {
+		t.Fatalf("rotate --push-ci: %v\n%s", err, out)
+	}
+	if len(uploads) != 2 || uploads["o/a|DOCKERHUB_TOKEN"] != "new-value" || uploads["o/b|DOCKERHUB_TOKEN"] != "new-value" {
+		t.Errorf("want DOCKERHUB_TOKEN alone pushed to both repos, got %v\n%s", uploads, out)
 	}
 }
