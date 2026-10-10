@@ -21,8 +21,11 @@ type Options struct {
 	// tools.HomeRunners in production. Unset, the tools step is skipped.
 	MiseRun, MiseStdout tools.Runner
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
-	// production. Unset, the git-config step is skipped.
+	// production. Unset, the checkout and git-config steps are skipped.
 	GitRun gitconfig.Runner
+	// CloneURL is what the checkout step clones when the checkout is absent;
+	// empty means DefaultCloneURL.
+	CloneURL string
 	// RenderConfigs substitutes {env:VAR} in a staged config and returns
 	// deploy.ErrRenderIncomplete when the secret store could not answer;
 	// ResolvePath resolves {VAR} in a destination (env.ResolvePath). Unset,
@@ -37,10 +40,16 @@ type Options struct {
 }
 
 // Registry is the ordered list of reconcilers a run drives. The order extends
-// ADR-041 decision 4: records come before anything that reads them (ADR-045
-// decision 4). Later reconcilers are appended by the rows that port them.
+// ADR-041 decision 4: the checkout comes first, since every step reads it, and
+// records come before anything that reads them (ADR-045 decision 4). Later
+// reconcilers are appended by the rows that port them.
 func Registry(o Options) []Reconciler {
+	url := o.CloneURL
+	if url == "" {
+		url = DefaultCloneURL
+	}
 	return []Reconciler{
+		checkout{run: o.GitRun, url: url, has: onPath},
 		recordsMirror{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},

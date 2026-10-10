@@ -55,7 +55,8 @@ Env:
 // only when it points at a real directory: on a fresh machine with no
 // machine.json the contract default is the phantom ~/Projects/dotfiles, which
 // must not win over a discoverable checkout (#696). It then falls back to the
-// .git walk-up (interactive `dotf update` from inside a checkout), and finally to
+// .git walk-up when it lands on a dotfiles checkout (interactive `dotf update`
+// from inside one; another project's repository is not fast-forwarded), and finally to
 // the literal default for a bare scheduler env (systemd --user / Task Scheduler)
 // with neither a seeded machine.json nor a discoverable repo — reproducing the
 // shell twins' '${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}'.
@@ -63,10 +64,10 @@ func repoForUpdate() string {
 	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" && dirExists(r) {
 		return r
 	}
-	if r := env.RepoDir(); r != "" {
+	if r := env.RepoDir(); r != "" && env.IsDotfilesCheckout(r) {
 		return r
 	}
-	return filepath.Join(env.Home(), "Projects", "dotfiles")
+	return env.DefaultCheckoutDir(env.Home())
 }
 
 // dirExists reports whether p exists and is a directory. Shared by the repo-dir
