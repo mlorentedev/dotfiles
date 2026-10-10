@@ -19,7 +19,7 @@ created: "2026-09-03"
 
 ## Implementation
 
-- [x] [AC1] [AC2] [AC3] The skip guard, first in the reconcile chain and loud about what it did not verify. Shipped in both twins in #1482; it moved into `dotf pi packages apply` (`cli/internal/cmd/pi.go`, `skipEnv`) with HARNESS-139 (#1628), which both twins now call.
+- [x] [AC1] [AC2] [AC3] The skip guard, first in the reconcile chain and loud about what it did not verify. Shipped in both twins in #1482; it moved into `dotf pi packages apply` (`cli/internal/cmd/pi.go`, `skipEnv`) with HARNESS-139 (#1628). f6 pins that both twins call that command.
 - [x] [AC4] [AC5] The `pi` path filter and the `pull_request`-only `env:` line on `test-windows` (#1482).
 - [x] [AC6] Mutation pass: five mutations in #1482. Re-proven at close against the Go guard: f5 probes for pi before the skip, and the test fails.
 - [x] [AC2] Close-out fix: `TestPiPackagesApplySkipIsFirstAndLoud` could not fail. Its fixture answers every probe, so a probe before the skip passed unseen. Any probe now fails the test.
