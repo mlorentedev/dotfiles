@@ -39,7 +39,7 @@ created: "2026-09-25"
 - [x] [AC4] Add the release-please `pull-request-footer`. A case runs the checker on the footer text.
 - [x] [AC6] Add the section to the PR template, and to DoD §2: the vault's `pattern-change-lifecycle.md`, then the compiled render.
 - [x] [AC7] Write ADR-039 (knowledge is asked for by the PR that produces it) and lesson-301 (knowledge goes where a mechanism asks for it). This PR's own section names them.
-- [ ] Before the merge: tell live peers, and add the section to the bodies of open PRs.
+- [x] Before the merge: tell live peers, and add the section to the bodies of open PRs. Lapsed rather than done: #1759 merged without it. The gate made it moot, since every open PR body was judged on its next edit or push, and every PR since carries the section (knowledge-gate green on the last five merges, 2026-10-10).
 
 ## Slice 3: promotions at archive (PR 3)
 
@@ -53,8 +53,10 @@ created: "2026-09-25"
 ## Slice 4: required (waits on #1451)
 
 - [ ] Add `knowledge-gate` (app 15368) to dotfiles' required checks in `forge/branch-protection.json`, and apply it with `dotf forge protection apply` (#1746, merged). Its preflight refuses a context that has not reported on one of the last 5 merged PRs, so this waits until the wiring has run. `dotf forge protection check` is then clean.
+  - [x] Declared in `forge/branch-protection.json` (2026-10-10). The preflight condition holds: `knowledge-gate` passed on #2289, #2290, #2292, #2293 and #2295, and `apply --dry-run` plans the one change with nothing refused.
+  - [ ] The owner runs `dotf forge protection apply`; `dotf forge protection check` is then clean.
 
 ## Closing
 
-- [ ] Every acceptance criterion has a feature in `features.json` with a command that fails without the change.
+- [x] Every acceptance criterion has a feature in `features.json` with a command that fails without the change (f1-f7).
 - [ ] `verification.md` filled; independent adversarial review before the archive.

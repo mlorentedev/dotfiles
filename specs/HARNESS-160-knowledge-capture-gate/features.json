@@ -38,7 +38,14 @@
     "id": "HARNESS-160-knowledge-capture-gate-f6",
     "behavior": "AC6: the PR template and the verification.md template describe the section and the answer grammar",
     "verification": "grep -q '^## Knowledge' .github/pull_request_template.md && grep -q 'yes: <path>' cli/internal/spec/templates/verification.md",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 at 3187ea8d: the PR template has the section and the verification template the yes/no grammar"
+  },
+  {
+    "id": "HARNESS-160-knowledge-capture-gate-f7",
+    "behavior": "AC7: the wiring PR (#1759) passed its own gate naming a lesson and an ADR, and both files exist",
+    "verification": "test -f docs/adr/adr-039-knowledge-asked-for-by-the-pr.md && test -f docs/lessons/lesson-301-knowledge-goes-where-a-mechanism-asks-for-it.md && gh pr view 1759 --json body -q .body | grep -q '^- ADR: docs/adr/adr-039'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 at 3187ea8d: #1759 body names lesson-301 and ADR-039, knowledge-gate passed on it"
   }
 ]

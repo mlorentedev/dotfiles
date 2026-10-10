@@ -16,9 +16,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - The workflow's triggers and concurrency: `tests/knowledge-gate-workflow.bats`, 5 cases.
   - 8 mutations of the wiring, each killed.
 - [x] **AC4:** the release-please footer passes the checker: the `release-please footer` case.
-- [ ] **AC5:** the promotion pre-flight lands in the archive PR (branch `feat/archive-promotion-check`), with 12 cases, 10 mutations, and the command's vault wiring.
-- [ ] **AC6:** the PR template and DoD §2 land in the wiring PR; the `verification.md` template lands in the archive PR.
-- [ ] **AC7:** the wiring PR's own section names ADR-039 and lesson 301. It is checked when the PR opens.
+- [x] **AC5:** the promotion pre-flight merged in #1761 (`030ade1e`), with 12 cases, 10 mutations, and the command's vault wiring. `go test ./internal/spec -run Promotion` passes at `3187ea8d`.
+- [x] **AC6:** the PR template and DoD §2 merged in #1759 (`2e73eab3`), the `verification.md` template in #1761. DoD §2 is in the vault's `pattern-change-lifecycle.md` and in every compiled harness instruction file. Feature f6.
+- [x] **AC7:** #1759's own section names `docs/lessons/lesson-301-knowledge-goes-where-a-mechanism-asks-for-it.md` and `docs/adr/adr-039-knowledge-asked-for-by-the-pr.md`, and `knowledge-gate` passed on its head. Feature f7.
 
 ## Test status
 
@@ -34,13 +34,17 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **A reason copied verbatim from the template (`<reason>`) is refused.**
 - **The vault edits are held.** The DoD line (`659b33c8`) and the promotion template (`aec3300b`) are reverted in vault `99530771` until their PRs merge, because the template made every local `go test` on main fail `TestEmbeddedTemplatesMatchVault`.
 
+## Required check (slice 4)
+
+`knowledge-gate` is declared required in `forge/branch-protection.json`. `dotf forge protection apply --dry-run` on 2026-10-10: `changed=1 (0 applied, 1 planned) … 0 refused`. Applying it is the owner's step; `dotf forge protection check` reports the one drift until then.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-301-knowledge-goes-where-a-mechanism-asks-for-it.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-039-knowledge-asked-for-by-the-pr.md
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. yes: 00_meta/patterns/pattern-change-lifecycle.md
 
 ## Archive checklist
 
