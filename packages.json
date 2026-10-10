@@ -266,6 +266,15 @@
         "winget": "Amazon.AWSCLI",
         "command": "aws"
       }
+    },
+    {
+      "name": "gopls",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "gopls",
+        "command": "gopls"
+      }
     }
   ]
 }
