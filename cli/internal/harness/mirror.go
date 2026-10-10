@@ -92,7 +92,8 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 		return res, err
 	}
 
-	if err := mirrorTree(repoRoot, deployDir, "harness", dryRun, &res); err != nil {
+	ignored := IgnoredInCheckout(repoRoot, ExecGit)
+	if err := mirrorTree(repoRoot, deployDir, "harness", ignored, dryRun, &res); err != nil {
 		return res, err
 	}
 	for _, rel := range targets {
@@ -106,7 +107,7 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 		}
 		res.Targets = append(res.Targets, rel)
 	}
-	if err := mirrorDeployDir(repoRoot, deployDir, dryRun, &res); err != nil {
+	if err := mirrorDeployDir(repoRoot, deployDir, ignored, dryRun, &res); err != nil {
 		return res, err
 	}
 	orphans, err := ScanOrphans(repoRoot, deployDir, ExecGit)
@@ -159,7 +160,7 @@ func manifestTargets(path string) ([]string, error) {
 
 // mirrorTree copies every regular file under <repoRoot>/<sub> to
 // <deployDir>/<sub>, walking in a deterministic order.
-func mirrorTree(repoRoot, deployDir, sub string, dryRun bool, res *MirrorResult) error {
+func mirrorTree(repoRoot, deployDir, sub string, ignored map[string]bool, dryRun bool, res *MirrorResult) error {
 	root := filepath.Join(repoRoot, sub)
 	if !isDir(root) {
 		return fmt.Errorf("%s: not a directory in the checkout", filepath.ToSlash(sub))
@@ -182,6 +183,9 @@ func mirrorTree(repoRoot, deployDir, sub string, dryRun bool, res *MirrorResult)
 		rel, err := filepath.Rel(repoRoot, src)
 		if err != nil {
 			return err
+		}
+		if ignored[filepath.ToSlash(rel)] {
+			continue
 		}
 		if err := mirrorFile(src, filepath.Join(deployDir, rel), dryRun, res); err != nil {
 			return err

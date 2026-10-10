@@ -20,6 +20,8 @@ func fakeGit(t *testing.T, shallow string, deleted ...string) GitRunner {
 			return shallow + "\n", nil
 		case len(args) > 0 && args[0] == "log":
 			return strings.Join(deleted, "\n") + "\n", nil
+		case len(args) > 0 && args[0] == "ls-files":
+			return "", nil
 		}
 		t.Fatalf("unexpected git call: %v", args)
 		return "", nil
@@ -59,15 +61,18 @@ func TestScanOrphans_SplitsDeletedLeftoversFromFilesGitNeverTracked(t *testing.T
 	}
 }
 
-// A converged deploy dir costs no git call: the history is read only to
-// classify an orphan, and most runs find none.
+// A converged deploy dir reads no history: the log is read only to classify
+// an orphan, and most runs find none. The ignored-file listing is the one call.
 func TestScanOrphans_ReadsNoHistoryWhenNothingIsOrphaned(t *testing.T) {
 	repo, deploy := t.TempDir(), t.TempDir()
 	writeFile(t, filepath.Join(repo, "scripts", "live.sh"), "live\n")
 	writeFile(t, filepath.Join(deploy, "scripts", "live.sh"), "live\n")
 
-	never := func(string, ...string) (string, error) {
-		t.Fatal("git called with no orphan to classify")
+	never := func(_ string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "ls-files" {
+			return "", nil
+		}
+		t.Fatalf("git %v called with no orphan to classify", args)
 		return "", nil
 	}
 	got, err := ScanOrphans(repo, deploy, never)
@@ -267,6 +272,53 @@ func TestMirror_PrunesLeftoversTheCheckoutDeletedAndARerunPrunesNothing(t *testi
 	}
 	if len(again.Pruned) != 0 || again.Updated != 0 {
 		t.Errorf("re-run: want 0 pruned / 0 updated, got %v / %d", again.Pruned, again.Updated)
+	}
+}
+
+// A file the checkout ignores is local to it (scripts/CLAUDE.md, a
+// claude-mem output, #2268): the mirror never deploys it, and a copy an older
+// mirror deployed is named as an orphan rather than read as part of the set.
+// git never tracked it, so it is not pruned.
+func TestMirror_SkipsAFileTheCheckoutIgnores(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := mirrorRepo(t)
+	writeFile(t, filepath.Join(repo, ".gitignore"), "scripts/CLAUDE.md\n")
+	writeFile(t, filepath.Join(repo, "scripts", "live.sh"), "live\n")
+	gitIn(t, repo, "init", "-q")
+	gitIn(t, repo, "add", "-A")
+	gitIn(t, repo, "commit", "-q", "-m", "one")
+	writeFile(t, filepath.Join(repo, "scripts", "CLAUDE.md"), "local\n")
+
+	deploy := t.TempDir()
+	if _, err := Mirror(repo, deploy); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(deploy, "scripts", "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Error("an ignored file was mirrored")
+	}
+	if _, err := os.Stat(filepath.Join(deploy, "scripts", "live.sh")); err != nil {
+		t.Error("a tracked file was not mirrored")
+	}
+
+	// The copy an older mirror left is an orphan, named and kept.
+	writeFile(t, filepath.Join(deploy, "scripts", "CLAUDE.md"), "local\n")
+	res, err := Mirror(repo, deploy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(res.Unpruned, []string{"scripts/CLAUDE.md"}) || len(res.Pruned) != 0 {
+		t.Errorf("pruned %v, unpruned %v; want the stale copy named and kept", res.Pruned, res.Unpruned)
+	}
+}
+
+// Without readable git (a tarball checkout) nothing counts as ignored, so the
+// mirror copies the working tree as it always did.
+func TestIgnoredInCheckout_IsEmptyWithoutGit(t *testing.T) {
+	broken := func(string, ...string) (string, error) { return "", os.ErrNotExist }
+	if got := IgnoredInCheckout(t.TempDir(), broken); len(got) != 0 {
+		t.Errorf("want nothing ignored, got %v", got)
 	}
 }
 

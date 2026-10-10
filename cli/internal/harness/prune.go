@@ -49,12 +49,35 @@ type Orphans struct {
 	Unreadable []string
 }
 
-// ScanOrphans lists the orphans of the pruned trees. It reads the checkout's
-// history only when there is an orphan to classify, so a converged deploy dir
-// costs no git call. A tree the checkout lacks is not scanned: that is the
-// wrong checkout or a broken one, and reading every deployed file there as an
-// orphan would prune the whole tree.
+// IgnoredInCheckout is every untracked file git ignores under the deploy-dir
+// trees and harness/, slash-separated and relative to the checkout. The mirror
+// skips them: a local, ignored or generated file in a checkout is not part of
+// what it deploys (scripts/CLAUDE.md, a claude-mem output, reached PATH this
+// way, #2268). A checkout git cannot read (a tarball) ignores nothing, so it
+// mirrors as it always did.
+func IgnoredInCheckout(repoRoot string, git GitRunner) map[string]bool {
+	args := append([]string{"ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "harness"}, DeployDirTrees...)
+	out, err := git(repoRoot, args...)
+	if err != nil {
+		return nil
+	}
+	ignored := map[string]bool{}
+	for _, rel := range strings.Split(out, "\x00") {
+		if rel != "" {
+			ignored[rel] = true
+		}
+	}
+	return ignored
+}
+
+// ScanOrphans lists the orphans of the pruned trees: deployed files the
+// checkout does not have, or has only as an ignored file the mirror skips. It
+// reads the checkout's history only when there is an orphan to classify, so a
+// converged deploy dir costs one cheap ls-files and no log. A tree the checkout
+// lacks is not scanned: that is the wrong checkout or a broken one, and reading
+// every deployed file there as an orphan would prune the whole tree.
 func ScanOrphans(repoRoot, deployDir string, git GitRunner) (Orphans, error) {
+	ignored := IgnoredInCheckout(repoRoot, git)
 	var orphans, unreadable []string
 	for _, tree := range PrunedDeployDirTrees {
 		if !isDir(filepath.Join(repoRoot, tree)) || !isDir(filepath.Join(deployDir, tree)) {
@@ -77,7 +100,7 @@ func ScanOrphans(repoRoot, deployDir string, git GitRunner) (Orphans, error) {
 			if err != nil {
 				return err
 			}
-			if _, err := os.Lstat(filepath.Join(repoRoot, rel)); errors.Is(err, fs.ErrNotExist) {
+			if _, err := os.Lstat(filepath.Join(repoRoot, rel)); errors.Is(err, fs.ErrNotExist) || ignored[filepath.ToSlash(rel)] {
 				orphans = append(orphans, filepath.ToSlash(rel))
 			}
 			return nil
