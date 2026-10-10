@@ -306,13 +306,31 @@ setup() {
 # Section 10: Graceful skips (optional tools not present)
 # =============================================================================
 
-@test "copilot config NOT deployed when the copilot binary is absent (the container has no Node, so the npm catalog skips it: #1312)" {
-    # Post-BUG-001 (PR #40): setup-linux.sh uses detect-and-act. The
-    # gh-copilot extension is no longer auto-installed; ~/.copilot is created
-    # only if the extension is genuinely present. In the integration container
-    # gh is installed (as a dev tool) but gh-copilot is not, so the directory
-    # should NOT exist — confirming the skip path is silent and correct.
-    [ ! -d "$HOME/.copilot" ]
+@test "the npm catalog installs into ~/.local as the user, never into npm's root-owned prefix [#2251]" {
+    # Precondition, asserted so the guard cannot pass vacuously: npm is present
+    # and its default global prefix is not writable by this user. If the
+    # container ever gains a user-owned Node (nvm), this fails here instead of
+    # the test below silently proving nothing.
+    command -v npm >/dev/null 2>&1
+    prefix=$(npm config get prefix)
+    [ ! -w "$prefix/lib" ]
+    for tool in bw yarn opencode copilot; do
+        [ -x "$HOME/.local/bin/$tool" ] || { echo "missing: ~/.local/bin/$tool"; return 1; }
+        [ "$(stat -c %U "$HOME/.local/bin/$tool")" = testuser ]
+    done
+    # A converged box re-runs clean: setup's `|| log_warning` would hide a failure.
+    run dotf tools install
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
+@test "copilot config is deployed now that the npm catalog put copilot on PATH (#1312)" {
+    # The inverse, an entry skipped while its required command is absent, is
+    # pinned by TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent; the
+    # container now carries copilot, so this asserts the present side.
+    command -v copilot >/dev/null 2>&1
+    for f in copilot-instructions.md settings.json config.json mcp-config.json; do
+        [ -f "$HOME/.copilot/$f" ] || { echo "missing: ~/.copilot/$f"; return 1; }
+    done
 }
 
 @test "AGENTS.md deployed to ~/.config/opencode/AGENTS.md (cross-agent SSOT)" {

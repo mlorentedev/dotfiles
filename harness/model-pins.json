@@ -256,7 +256,7 @@
           "prefix": "",
           "spelling": "display-name",
           "pool": "gemini",
-          "why": "The model agy resolves at start (its log reads `Resolving model Gemini 3.8 Flash (High)`, the deployed value). Written as the picker label, so the rule is declared: `Gemini 3.7 Flash (High)` is `gemini-3.7-flash-high`."
+          "why": "The model agy resolves at start (its log reads `Resolving model Gemini 3.8 Flash (High)`, the deployed value). Written as the picker label, so the rule is declared: `Gemini 3.8 Flash (High)` is `gemini-3.8-flash-high`."
         }
       ]
     },

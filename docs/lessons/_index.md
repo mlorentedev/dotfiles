@@ -396,4 +396,6 @@ tags: [lessons, index, dotfiles]
 | [375 - A ratio reads its numerator and denominator from different sources](lesson-375-a-ratio-reads-its-numerator-and-denominator-from-different-sources.md) | 2026-10-09 |
 | [376 - A check whose only writer is barred on an OS can never pass there](lesson-376-a-check-whose-only-writer-is-barred-can-never-pass.md) | 2026-10-09 |
 | [377 - A merge into a tool-owned file assumes the tool reads a fragment](lesson-377-a-merge-into-a-tool-owned-file-assumes-the-tool-reads-a-fragment.md) | 2026-10-09 |
+| [378 - An unattended deploy must not trade a secret for its placeholder](lesson-378-an-unattended-deploy-must-not-trade-a-secret-for-its-placeholder.md) | 2026-10-09 |
+| [379 - A path CI asserts is skipped is a path CI never tests](lesson-379-a-path-ci-asserts-is-skipped-is-a-path-ci-never-tests.md) | 2026-10-10 |
 <!-- END GENERATED -->

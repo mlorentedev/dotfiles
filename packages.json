@@ -236,6 +236,55 @@
         "type": "uv-tool",
         "package": "pre-commit"
       }
+    },
+    {
+      "name": "ansible",
+      "version": "2.21.4",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "ansible-core",
+        "platforms": ["linux", "darwin"]
+      }
+    },
+    {
+      "name": "ansible-lint",
+      "version": "26.9.0",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "ansible-lint",
+        "platforms": ["linux", "darwin"]
+      }
+    },
+    {
+      "name": "aws",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "awscli",
+        "winget": "Amazon.AWSCLI",
+        "command": "aws"
+      }
+    },
+    {
+      "name": "gopls",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "gopls",
+        "command": "gopls"
+      }
+    },
+    {
+      "name": "btop",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "btop",
+        "brew": "btop",
+        "command": "btop"
+      }
     }
   ]
 }

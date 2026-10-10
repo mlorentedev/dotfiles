@@ -295,7 +295,7 @@ func TestInstallAll_UnknownTypeDoesNotFailTheRun(t *testing.T) {
 	if err := installAll(in, selected, io.Discard); err != nil {
 		t.Fatalf("installAll: %v", err)
 	}
-	if len(ran) != 1 || !strings.HasPrefix(ran[0], "npm install -g @bitwarden/cli@2026.5.0") {
+	if len(ran) != 1 || !strings.HasPrefix(ran[0], "npm install -g") || !strings.HasSuffix(ran[0], " @bitwarden/cli@2026.5.0") {
 		t.Errorf("the tool after the unknown type did not install: ran %v", ran)
 	}
 }

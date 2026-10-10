@@ -63,6 +63,17 @@ created: "2026-10-06"
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [ ] `records-bind`: the `harness bind` logic with its dry-run
 
+### PR 2d — the configs reconciler (#1843 B15)
+
+> Found while landing #2236: converge had no step for `ai/deploy.json`, so a template change (the agy model pin) still needed `dotf deploy` on every machine. ADR-045 decision 4 already orders `configs` after `tools`.
+
+- [x] [AC10] Failing tests, then `deploy.Run`: one loop for `dotf deploy` and converge (OS selector, `requires`, deploy, private-dir tightening); `dotf deploy` prints its rows from the result
+- [x] [AC1] Failing test, then a plan of a rendered entry stages in a scratch directory and creates nothing under HOME
+- [x] [AC10] Failing test, then `deploy.ErrRenderIncomplete`: a strict renderer turns a placeholder the store could not resolve into a skip that keeps the installed file (lesson 378)
+- [x] [AC10] [AC3] `configs-deploy` between `tools` and `git-config` (git-config's probe needs the include target a config entry deploys); plan, apply, probe and a second plan with 0 changes; a template change fails the probe until applied; no renderer wired fails loudly
+- [x] On the Mac: `go run ./cmd/dotf converge --plan --only configs-deploy` reports 20 configs in sync, `agy-settings` to deploy, 1 not for this machine
+- [ ] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+
 ### PR 3 — the persisted report (#1843 B7)
 
 - [x] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory

@@ -75,5 +75,26 @@
     "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent$' -count=1 -v | grep -q -- '--- PASS: TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f12",
+    "behavior": "AC10: a template change merged to main is planned by converge's configs step, fails its probe until applied, and lands on apply",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestConfigsDeploy_ATemplateChangeIsPlannedAndFailsTheProbeUntilApplied$' -count=1 -v | grep -q -- '--- PASS: TestConfigsDeploy_ATemplateChangeIsPlannedAndFailsTheProbeUntilApplied'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f13",
+    "behavior": "AC10: a render the secret store could not complete keeps the installed config and the run goes on",
+    "verification": "cd cli && go test ./internal/deploy/ -run '^TestRun_AnIncompleteRenderKeepsTheInstalledFile$' -count=1 -v | grep -q -- '--- PASS: TestRun_AnIncompleteRenderKeepsTheInstalledFile'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f14",
+    "behavior": "AC1: a plan of a rendered config creates nothing under HOME",
+    "verification": "cd cli && go test ./internal/deploy/ -run '^TestRun_APlanOfARenderedEntryCreatesNoDirectory$' -count=1 -v | grep -q -- '--- PASS: TestRun_APlanOfARenderedEntryCreatesNoDirectory'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
