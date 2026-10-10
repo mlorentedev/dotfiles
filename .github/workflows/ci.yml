@@ -78,6 +78,7 @@ jobs:
               - '.claude/**'
               - 'AGENTS.md'
               - 'install.sh'
+              - 'install.ps1'
               - 'env-contract.json'
               - 'machine.json.example'
               - 'session-start-config.json'
