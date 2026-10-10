@@ -93,6 +93,8 @@ func (q *queueFake) options(repo, _ string) prland.Options {
 			case strings.HasPrefix(line, "pr merge"):
 				q.merges = append(q.merges, f[2])
 				return nil, nil
+			case strings.HasPrefix(line, "api "):
+				return []byte(`{"type":"file"}`), nil // the repository opts in
 			}
 			return nil, errors.New("unexpected gh call: " + line)
 		},
