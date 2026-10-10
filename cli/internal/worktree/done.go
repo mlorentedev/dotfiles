@@ -67,7 +67,7 @@ func validateDoneOptions(opts DoneOptions) (string, string, error) {
 	return absRepo, absWT, nil
 }
 
-// callerInside is the ancestor walk of done_proc_linux.go / done_proc_other.go,
+// callerInside is the ancestor walk of done_proc_{linux,darwin,other}.go,
 // behind a variable so a test can drive the refusal on every platform.
 var callerInside = isCallerInside
 

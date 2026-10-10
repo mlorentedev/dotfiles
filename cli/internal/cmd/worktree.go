@@ -413,7 +413,7 @@ not a directory resolves to <repo>-wt-<slug> beside the repository.`,
 
 // callerCwd is the directory `worktree done` checks it is not removing from
 // under its caller. When the cwd cannot be read, the launching shell's $PWD
-// stands in, so the check does not silently drop out: off Linux and darwin there is no
+// stands in, so the check does not silently drop out: on Windows there is no
 // ancestor walk behind it.
 func callerCwd(getwd func() (string, error), getenv func(string) string) string {
 	if cwd, err := getwd(); err == nil {
