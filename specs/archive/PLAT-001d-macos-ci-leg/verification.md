@@ -93,7 +93,7 @@ Declined on #2147 because the Linux job shares the defect; it is fixed for both 
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/PLAT-001d-macos-ci-leg/` -> `specs/archive/PLAT-001d-macos-ci-leg/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/PLAT-001d-macos-ci-leg/` -> `specs/archive/PLAT-001d-macos-ci-leg/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
