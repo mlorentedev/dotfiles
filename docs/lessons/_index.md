@@ -402,4 +402,5 @@ tags: [lessons, index, dotfiles]
 | [382 - A retirement is desired state, not a one-cycle migration](lesson-382-a-retirement-is-desired-state-not-a-one-cycle-migration.md) | 2026-10-10 |
 | [383 - A sweep that only adds links cannot converge them](lesson-383-a-sweep-that-only-adds-links-cannot-converge-them.md) | 2026-10-10 |
 | [384 - A sandbox HOME does not isolate Claude Code](lesson-384-a-sandbox-home-does-not-isolate-claude-code.md) | 2026-10-10 |
+| [386 - What the checkout deleted is a leftover; what it never had is not](lesson-386-what-the-checkout-deleted-is-a-leftover-what-it-never-had-is-not.md) | 2026-10-10 |
 <!-- END GENERATED -->

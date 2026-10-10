@@ -3,6 +3,7 @@ package converge
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -86,5 +87,55 @@ func TestRecordsMirror_ADeclaredTargetTheCheckoutLacksFails(t *testing.T) {
 	}
 	if err := r.Probe(env); err == nil {
 		t.Error("probe passed with a declared target missing")
+	}
+}
+
+// A script the checkout deleted is a pending change until it is gone: the plan
+// counts and names it, the apply removes it, and the probe and a second plan
+// see nothing left (#2266).
+func TestRecordsMirror_PrunesALeftoverTheCheckoutDeleted(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	env := recordsEnv(t)
+	writeFixture(t, env.RepoRoot, map[string]string{"scripts/live.sh": "live\n", "scripts/old.sh": "retired\n"})
+	for _, args := range [][]string{
+		{"init", "-q"}, {"add", "-A"}, {"commit", "-q", "-m", "one"},
+		{"rm", "-q", "scripts/old.sh"}, {"commit", "-q", "-m", "two"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", env.RepoRoot, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	r := recordsMirror{}
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(env.DeployDir, "scripts", "old.sh")
+	writeFixture(t, env.DeployDir, map[string]string{"scripts/old.sh": "retired\n"})
+
+	plan, err := r.Reconcile(env, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Changes != 1 || !strings.Contains(plan.Detail, "scripts/old.sh") {
+		t.Errorf("plan: want 1 change naming scripts/old.sh, got %d (%s)", plan.Changes, plan.Detail)
+	}
+	if err := r.Probe(env); err == nil {
+		t.Error("probe passed with a leftover in the deploy dir")
+	}
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the apply left %s: %v", stale, err)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Errorf("probe after apply: %v", err)
+	}
+	if again, err := r.Reconcile(env, true); err != nil || again.Changes != 0 {
+		t.Errorf("second plan: want 0 changes, got %d, err %v", again.Changes, err)
 	}
 }

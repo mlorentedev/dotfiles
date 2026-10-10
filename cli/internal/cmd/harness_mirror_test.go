@@ -186,3 +186,28 @@ func TestHarnessMirrorCmd_ExplicitRepoWithoutAManifestFails(t *testing.T) {
 		t.Fatalf("a checkout with no manifest must fail naming it, got %v", err)
 	}
 }
+
+// An orphan the checkout's history cannot prove deleted stays where it is, and
+// the command says so on stderr, with the reason, instead of hiding it in a
+// count. The fixture's .git is only a marker, so no history is readable.
+func TestHarnessMirrorCmd_NamesAnOrphanItLeaves(t *testing.T) {
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[]}`)
+	writeMirrorFixture(t, filepath.Join(repo, "scripts", "live.sh"), "live\n")
+	mine := filepath.Join(deploy, "scripts", "mine.sh")
+	writeMirrorFixture(t, mine, "the user's own\n")
+
+	out, stderr, err := runHarnessMirror(t, repo, deploy)
+	if err != nil {
+		t.Fatalf("%v\n%s%s", err, out, stderr)
+	}
+	if !strings.Contains(stderr, "left scripts/mine.sh in the deploy dir") || !strings.Contains(stderr, "history") {
+		t.Errorf("the orphan and the reason must be named:\n%s", stderr)
+	}
+	if !strings.Contains(out, "0 pruned") {
+		t.Errorf("the count must say nothing was pruned:\n%s", out)
+	}
+	if _, err := os.Stat(mine); err != nil {
+		t.Error("an unproven orphan was removed")
+	}
+}

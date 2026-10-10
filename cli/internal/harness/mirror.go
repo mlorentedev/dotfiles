@@ -40,6 +40,12 @@ type MirrorResult struct {
 	// Missing are the declared targets the checkout lacks; non-empty implies
 	// the returned error wraps ErrMissingTargets.
 	Missing []string
+	// Pruned are the leftovers removed from the pruned deploy-dir trees (or,
+	// in a plan, that would be); Unpruned are orphans git never tracked, left
+	// in place; PruneSkipped says why no orphan could be proven a leftover.
+	// See ScanOrphans.
+	Pruned, Unpruned []string
+	PruneSkipped     string
 }
 
 // Mirror copies the inputs the deploy-dir consumers read — the whole harness/
@@ -52,8 +58,10 @@ type MirrorResult struct {
 // could not clear them.
 //
 // Idempotent: a file whose bytes and permission bits already match is left
-// untouched, mtime included. It never prunes — `dotf doctor --fix` owns orphan
-// removal, the semantic #802 settled for every mirror in this repository.
+// untouched, mtime included. It prunes only the trees that hold nothing but
+// checkout copies (PrunedDeployDirTrees), and there only a file the checkout's
+// history deleted: #802's arm for generated copies. harness/ and the secrets
+// stay with `dotf doctor --fix`, the semantic #802 settled for them.
 //
 // The target list is DERIVED from the manifest, never restated here: the day
 // it was a hardcoded pair, a third target (#1176) needed a copy line nobody
@@ -97,6 +105,16 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 	}
 	if err := mirrorDeployDir(repoRoot, deployDir, dryRun, &res); err != nil {
 		return res, err
+	}
+	orphans, err := ScanOrphans(repoRoot, deployDir, ExecGit)
+	if err != nil {
+		return res, err
+	}
+	res.Pruned, res.Unpruned, res.PruneSkipped = orphans.Deleted, orphans.Unknown, orphans.Skipped
+	if !dryRun {
+		if err := PruneOrphans(deployDir, orphans.Deleted); err != nil {
+			return res, err
+		}
 	}
 	if len(res.Missing) > 0 {
 		return res, fmt.Errorf("%w: %v", ErrMissingTargets, res.Missing)
