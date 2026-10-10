@@ -13,7 +13,9 @@
 #
 # Cases changed after the retirement are Go behaviour changes, reviewed in the
 # PR that made them, not re-captures: the first is the expected-noise exclusion
-# for templates, archive, sessions and memory (#1979).
+# for templates, archive, sessions and memory (#1979); the second is the
+# dead-ends exclusion of templates, archive, sessions and certification notes,
+# with attachments set apart from both link-graph counts (#2197).
 #
 # Captured at git revision 147e4ed (informational only).
 

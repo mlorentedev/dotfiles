@@ -79,6 +79,18 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
     or not), so a dry run on a fresh machine predicts the tightening the real run makes; doctor keeps
     `PrivateDirs` (file present). A 0700 directory that receives only a public file stays 0700.
 
+- **#2197, the dead-ends count** (`8109bc0d`):
+  - `linkExemptions` in `cli/internal/vault/health.go` is the one declaration of what each link-graph
+    count leaves out; the "Not counted" lines are written from it. Attachments are set apart from both
+    counts.
+  - Tests: golden `deadends-expected-noise` (every zone but `memory/`, an attachment in both listings),
+    `TestLinkExemptPerCheck` and `TestExemptZones`; five goldens re-pinned for the wording and the
+    folder line. Mutations killed: each of the five rules, the attachment filter, the folder line.
+  - `go test -count=1 ./internal/vault/ ./internal/cmd/` ok; golangci-lint 0 issues; `GOOS=windows go vet` ok.
+  - Live vault on the Mac: dead-ends 1936/2184 (88%) -> 671/1182 (56%), still FAIL, top folders
+    `50_work/20-products` (109), `50_work/30-clients` (103), `10_projects/kubelab` (75); orphans
+    408/1042 (39%, WARN) -> 161/1042 (15%, PASS), with 307 unlinked attachments on their own line.
+
 ## Promotion candidates
 
 - [ ] Lesson for the repo's `docs/lessons/`? <decided at archive>
