@@ -13,7 +13,9 @@
 package memlink
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -279,13 +281,15 @@ func isLink(p string) bool {
 }
 
 // isDangling reports whether p is a link whose source does not exist: Lstat
-// finds the link, Stat cannot follow it.
+// finds the link, and Stat reports the source missing. Any other Stat error
+// (permissions, I/O) is not proof of absence, so the link counts as live and
+// is never removed on it.
 func isDangling(p string) bool {
 	if !isLink(p) {
 		return false
 	}
 	_, err := os.Stat(p)
-	return err != nil
+	return errors.Is(err, fs.ErrNotExist)
 }
 
 // dirNotEmpty reports whether p is a readable directory holding at least one entry
