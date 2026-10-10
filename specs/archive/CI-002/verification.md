@@ -72,7 +72,9 @@ it quoted rather than in what it said.
   `setup-linux.sh`'s reconcile block has never executed in CI at all — it logs
   `npm not found — skipping pi package reconcile` and stops. Pre-existing gap, recorded in
   the proposal, not introduced or fixed by this PR. The Linux guard is verified
-  structurally and by mutation only.
+  structurally and by mutation only. *(Historical, written before #2285: the image has
+  carried npm since #2254, and #2285 (closing #1484) now runs the reconcile in
+  `integration` and asserts its convergence. See the archive review dispositions below.)*
 - **The end-to-end effect on job duration.** That is measured by the first `pull_request`
   run after this lands, and it is owed rather than claimed.
 - **Why an install costs ~421s.** Out of scope; #1472.
