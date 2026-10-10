@@ -201,6 +201,26 @@ a runner one, so the known-failures list was not its home; the fix is setup conv
   (doctor FAIL naming `dotf deploy`, not repairable by `Apply`); the converge detail says "applied" only
   for what a run changed and names what it left. Both mutation-checked
 
+## #2197 — the dead-ends count read genres without links and attachments
+
+`Dead-ends: 1936/2184 (88%)` failed every session start. The owner decided (2026-10-09) which notes
+leave the count: `90_archive/`, `00_meta/templates/`, the `sessions/` journals and `20_certifications/`.
+
+- [x] One table, `linkExemptions` in `cli/internal/vault/health.go`, declares the exempt zones of all
+  three link-graph counts; orphans, dead-ends and unresolved links read it, and so do the report's
+  "Not counted" lines. The vault's `00_meta/_ssot.md` points at it, rather than holding a list Go would
+  have to parse
+- [x] Attachments are set apart from both counts: the CLI lists them, the markdown population does not
+  hold them (469 of 1936 dead-ends, 249 of 408 orphans). Orphans report them on their own line (lesson 375)
+- [x] A dead-ends WARN or FAIL names its top three folders, so the session-start line says where the
+  unlinked notes are; `--verbose` lists them
+- [x] Golden case `deadends-expected-noise`: every exempt zone but `memory/` (GUARD-001 refuses that path
+  outside the vault, so `TestLinkExemptPerCheck` pins it), a research note that still counts, an
+  attachment in both listings. Six mutations killed (each rule, the attachment filter, the folder line)
+- [x] On the Mac, against the live vault: dead-ends 671/1182 (56%), still FAIL; orphans 161/1042 (15%),
+  from a 39% WARN. Thresholds kept at 30/50: what remains is products, clients, project research and
+  memory, knowledge notes the FAIL is meant to name
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
