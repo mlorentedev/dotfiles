@@ -16,10 +16,10 @@ How the tools this repository depends on reach a machine, and how to add one. No
 
 | Tool class | Channel | Declared in | Converged by |
 |---|---|---|---|
-| Pinned single-binary CLIs (age, bats, direnv, fzf, golangci-lint, herdr, jq, lazygit, shellcheck, uv, zoxide) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: the CLIs listed today on Linux and macOS (Windows after its session, #2013 H2), the toolchains from Wave 3 |
+| Pinned single-binary CLIs (age, bats, cloudflared, direnv, fzf, golangci-lint, herdr, jq, lazygit, mkcert, shellcheck, terraform, trivy, uv, zoxide) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: the CLIs listed today on Linux and macOS (Windows after its session, #2013 H2), the toolchains from Wave 3 |
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
-| PyPI tools (hive) | `uv tool` | `packages.json` | `dotf tools install` |
+| PyPI tools (hive, ansible, ansible-lint) | `uv tool` | `packages.json` | `dotf tools install` |
 | Tools with no cross-OS channel (git, gh, uv, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | the setup script for each OS today; `packages.json` `source.type: system` entries once a release that reads the type is the pin (#2013 D8) | setup today; then `dotf tools install` |
 
 How a pin is read depends on the channel:
@@ -61,6 +61,7 @@ LAZYGIT_VERSION=0.66.0
 - **What doctor checks and fixes.** `dotf doctor` fails when a marked pin does not run at its pin through mise, or when a marked python package is missing from mise's Python. Its `[Python]` section fails when the shell's `python3` (`python` on Windows) is below 3.11 or cannot import a marked package. On a machine without mise (Windows, until its ADR-044 wave) a missing package only warns: nothing there manages it. `dotf doctor --fix` runs the sync whenever anything is pending, so it may run `mise install` for every pin, not only the one that failed. A `[Python]` failure that survives the fix names the PATH: mise has a Python that clears the floor, and the shell does not resolve it.
 - **Copies left in `~/.local/bin`.** Before mise owned these CLIs, setup downloaded some of them into `~/.local/bin` (#2013 W2). An activated shell puts mise first, but any PATH that lists `~/.local/bin` without mise's shims ahead of it (a systemd unit, a launchd plist, a cron line) runs the old copy, a version no pin governs. Once every pin runs through mise, `dotf doctor` warns about each regular file in `~/.local/bin` named like an executable mise provides for a pin, companions included (`uvx`, `age-keygen`). `dotf doctor --fix` replaces each one with a link to mise's shim rather than deleting it, so a consumer that relied on `~/.local/bin` keeps finding the tool, now at its pin. It links only to a shim that exists (otherwise: `mise reshim`), in one rename, and never touches a symlink.
 - **Verification.** After `mise install`, every tool must resolve through `mise which` and report a version at or above its pin, or sync fails naming it. Sync does not go through PATH, which only gains the mise shims with #2013 row W2b; until then, run a tool with `mise exec -- <tool>`.
+- **The version probe.** Sync runs the binary named like the tool with `--version` and takes the first `x.y.z` it prints. Some CLIs reject that flag (kubectl, helm, argocd, kustomize, hcloud, k9s, kubeconform); their arguments live in `versionArgs` in `cli/internal/tools/mise.go`. A tool marked before the released `dotf` carries its row makes every machine's sync fail naming it, while CI, which builds `dotf` from the tree, stays green. So a new row ships first, and the pin waits for the release; `tests/versions-conf.bats` holds that order for the seven above (#2013, lesson 373).
 
 ## Adding a GitHub-release tool to the catalog
 

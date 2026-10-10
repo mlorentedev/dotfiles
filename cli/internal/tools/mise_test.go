@@ -403,3 +403,28 @@ func TestSync_APackageBelowItsPinIsMissing(t *testing.T) {
 		t.Fatalf("want pyyaml missing below its pin, got %+v", plan)
 	}
 }
+
+// kubectl rejects `--version` as an unknown flag. Probed with it, an install
+// at its pin reads as missing and every sync fails naming it; probed with its
+// row in versionArgs, it runs at its pin.
+func TestSync_ProbesAToolWithoutVersionFlagThroughItsArgs(t *testing.T) {
+	tools := []MiseTool{{"kubectl", "1.37.1"}}
+	run := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && len(args) == 2 && args[0] == "which":
+			return []byte("/mise/installs/kubectl\n"), nil
+		case name == "/mise/installs/kubectl" && strings.Join(args, " ") == "version --client":
+			return []byte("Client Version: v1.37.1\nKustomize Version: v5.8.1\n"), nil
+		case name == "/mise/installs/kubectl":
+			return []byte("error: unknown flag: " + strings.Join(args, " ") + "\n"), errors.New("exit status 1")
+		}
+		return nil, errors.New("unexpected call: " + name + " " + strings.Join(args, " "))
+	}
+	plan, err := MiseSync{ConfigDir: t.TempDir(), Run: run}.Plan(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Missing) != 0 {
+		t.Errorf("kubectl at its pin reads as missing: %v", plan.Missing)
+	}
+}

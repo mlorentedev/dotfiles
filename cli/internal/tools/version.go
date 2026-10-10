@@ -34,10 +34,17 @@ func ExecRunner(name string, args ...string) ([]byte, error) {
 // still used when the command exits non-zero: several tools print the version
 // and then complain about something unrelated.
 func ProbeVersion(name string, run Runner) string {
+	return ProbeVersionArgs(name, run, "--version")
+}
+
+// ProbeVersionArgs is ProbeVersion for a tool that reports its version some
+// other way than `--version` (kubectl's `version --client`, kubeconform's
+// `-v`): the same extraction over `<name> <args>`.
+func ProbeVersionArgs(name string, run Runner, args ...string) string {
 	if run == nil {
 		run = ExecRunner
 	}
-	out, err := run(name, "--version")
+	out, err := run(name, args...)
 	if err != nil && len(out) == 0 {
 		return ""
 	}

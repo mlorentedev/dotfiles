@@ -350,6 +350,22 @@ func (s MiseSync) which(name string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// versionArgs names the pinned CLIs that do not answer `--version` with
+// their version, and what they answer instead. Without a row, such a tool
+// installs and never counts as running at its pin: every sync fails naming it
+// and doctor stays red. Measured on darwin-arm64, all seven reject the flag
+// as unknown. A tool must not be marked in versions.conf before a released
+// dotf carries its row; tests/versions-conf.bats holds that order.
+var versionArgs = map[string][]string{
+	"argocd":      {"version", "--client"},
+	"helm":        {"version"},
+	"hcloud":      {"version"},
+	"k9s":         {"version", "--short"},
+	"kubeconform": {"-v"},
+	"kubectl":     {"version", "--client"},
+	"kustomize":   {"version"},
+}
+
 // runsAtPin resolves the tool through mise and runs it: an install is real
 // only when the binary executes and reports at least the pin (lesson 337).
 func (s MiseSync) runsAtPin(t MiseTool) bool {
@@ -357,7 +373,11 @@ func (s MiseSync) runsAtPin(t MiseTool) bool {
 	if path == "" {
 		return false
 	}
-	v := ProbeVersion(path, s.Run)
+	args, ok := versionArgs[t.Name]
+	if !ok {
+		args = []string{"--version"}
+	}
+	v := ProbeVersionArgs(path, s.Run, args...)
 	return v != "" && atLeast(v, t.Version)
 }
 

@@ -3,6 +3,7 @@ package tools
 import (
 	"errors"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -55,6 +56,36 @@ func TestExecRunner_ReadsStdoutBeforeStderr(t *testing.T) {
 			run := func(string, ...string) ([]byte, error) { return ExecRunner("sh", "-c", tc.script) }
 			if got := ProbeVersion("x", run); got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// A tool with no `--version` flag is probed with the arguments it does take,
+// through the same extraction. The banners are the real ones, captured on
+// darwin-arm64 from the mise installs (#2013).
+func TestProbeVersionArgs(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		out  string
+		want string
+	}{
+		{name: "argocd client build", args: []string{"version", "--client"}, out: "argocd: v3.5.3+c9c369e\n  BuildDate: 2026-09-14T07:38:20Z\n", want: "3.5.3"},
+		{name: "kubectl client before its kustomize", args: []string{"version", "--client"}, out: "Client Version: v1.37.1\nKustomize Version: v5.8.1\n", want: "1.37.1"},
+		{name: "helm build info", args: []string{"version"}, out: `version.BuildInfo{Version:"v4.3.0", GitCommit:"bec5b06", GoVersion:"go1.27.1", KubeClientVersion:"v1.37"}` + "\n", want: "4.3.0"},
+		{name: "k9s short", args: []string{"version", "--short"}, out: "Version              v0.51.0\nCommit               558caaf\nDate                 2026-06-06T14:04:25Z\n", want: "0.51.0"},
+		{name: "kubeconform", args: []string{"-v"}, out: "v0.8.0\n", want: "0.8.0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			run := func(_ string, args ...string) ([]byte, error) { got = args; return []byte(tc.out), nil }
+			if v := ProbeVersionArgs("x", run, tc.args...); v != tc.want {
+				t.Errorf("version = %q, want %q", v, tc.want)
+			}
+			if strings.Join(got, " ") != strings.Join(tc.args, " ") {
+				t.Errorf("ran with %v, want %v", got, tc.args)
 			}
 		})
 	}
