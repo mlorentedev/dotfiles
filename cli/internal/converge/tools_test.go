@@ -112,13 +112,14 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // after the tools, which answer each entry's `requires`, and before git-config,
 // whose probe needs the dotfiles.gitconfig include target that a config entry
 // deploys. env-persist closes the configs step: the env files are configs too
-// (ADR-045 decision 4, step 5).
+// (ADR-045 decision 4, step 5). The setup script runs last, after every native
+// step (PLAT-001b PR 5).
 func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	var names []string
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,records-harness,tools,configs-deploy,git-config,env-persist" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,records-harness,tools,configs-deploy,git-config,env-persist,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }

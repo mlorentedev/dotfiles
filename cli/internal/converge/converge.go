@@ -32,6 +32,10 @@ type Result struct {
 	// as skipped with this reason instead of failing on files that do not
 	// exist. An apply ignores it: the change is made before they run.
 	Gate string
+	// Opaque says the step cannot tell what it changed, or would change: a
+	// script that only reports its exit status. The run reports it as opaque,
+	// never as converged or changed, and Changes is not counted.
+	Opaque bool
 }
 
 // Reconciler converges one part of the machine.
@@ -56,10 +60,11 @@ const (
 	StatusChange                // changed, or would change under a plan
 	StatusSkipped               // not applicable here, or not reached
 	StatusFailed
+	StatusOpaque // ran, or would run, but cannot say what it changed
 )
 
 func (s Status) String() string {
-	return [...]string{"ok", "change", "skipped", "failed"}[s]
+	return [...]string{"ok", "change", "skipped", "failed", "opaque"}[s]
 }
 
 // Entry is one reconciler's line in a report.
@@ -154,6 +159,8 @@ func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 	switch {
 	case err != nil:
 		e.Status, e.Detail = StatusFailed, err.Error()
+	case res.Opaque:
+		e.Status, e.Changes = StatusOpaque, 0
 	case res.Changes > 0:
 		e.Status = StatusChange
 	default:

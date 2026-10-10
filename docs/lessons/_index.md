@@ -403,5 +403,6 @@ tags: [lessons, index, dotfiles]
 | [383 - A sweep that only adds links cannot converge them](lesson-383-a-sweep-that-only-adds-links-cannot-converge-them.md) | 2026-10-10 |
 | [384 - A sandbox HOME does not isolate Claude Code](lesson-384-a-sandbox-home-does-not-isolate-claude-code.md) | 2026-10-10 |
 | [385 - A plan past the step that creates its input reports noise](lesson-385-a-plan-past-the-step-that-creates-its-input-reports-noise.md) | 2026-10-10 |
+| [386 - What the checkout deleted is a leftover; what it never had is not](lesson-386-what-the-checkout-deleted-is-a-leftover-what-it-never-had-is-not.md) | 2026-10-10 |
 | [387 - Before deleting the older writer, ask when it was the only one](lesson-387-before-deleting-the-older-writer-ask-when-it-was-the-only-one.md) | 2026-10-10 |
 <!-- END GENERATED -->

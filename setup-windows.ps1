@@ -612,7 +612,9 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 # One Go implementation for both OSes (setup-linux.sh calls the same command).
 # Windows never had this block: doctor failed both registries after every setup
 # with a remedy ("re-run setup") that could not clear them. Idempotent (prints
-# "N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# "N updated, M unchanged, K pruned"). It prunes .zsh\, ssh\ and scripts\ of
+# files the checkout's history deleted (#2266); harness\ and the secrets stay
+# with doctor --fix (#802).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
     dotf harness mirror --repo $DotfilesDir
     if ($LASTEXITCODE -ne 0) {

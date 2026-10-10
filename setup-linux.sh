@@ -446,7 +446,9 @@ fi
 # hardcoded pair missed the third target) and resolved jq by path because the
 # lookup raced its own install (#1202) -- both now moot in Go. Runs AFTER
 # --refresh so the snapshot matches the refreshed repo state. Idempotent
-# ("N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# ("N updated, M unchanged, K pruned"). It prunes .zsh/, ssh/ and scripts/ of
+# files the checkout's history deleted, which the additive copy above leaves
+# behind (#2266); harness/ and the secrets stay with doctor --fix (#802).
 # A declared target the checkout lacks is named and exits non-zero after
 # mirroring the rest: setup does not abort (it is long and idempotent), but the
 # warning is loud and verify-setup.bats fails on the resulting gap.
