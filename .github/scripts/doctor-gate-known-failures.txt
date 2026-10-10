@@ -4,7 +4,10 @@
 # was written for -- tests/doctor-gate.Tests.ps1 asserts the pattern matches its
 # example, so a regex that is valid but wrong (a "\s" meant as a backslash) cannot
 # sit here silently. The gate fails on any [FAIL] not listed here AND on any
-# entry that no longer matches, so this list only shrinks as tickets close.
+# entry that no longer matches, so a pending entry leaves when its ticket's fix
+# lands. An entry marked "Permanent" is a runner-only condition the owner chose
+# to keep listed rather than change the runner; it names the ticket that decided
+# so, and the stale check still applies to it.
 # A real-box defect never goes here: it is fixed or ticketed, and the gate stays
 # red until then.
 
@@ -12,6 +15,7 @@
 # #2212: the setup step has no GH_TOKEN (CI-004 AC8), so setup's converge leaves
 # the credential helper to a later login; the gate step has the token, so gh
 # reads as logged in and the helper as repairable. A real box is logged in, or
-# not, for both. Runner-only, like TEST-005.
+# not, for both. Permanent (owner decision on #2212, 2026-10-09): giving the
+# setup step the token would hand it to the third-party installers setup runs.
 # example:   [FAIL] GitHub's credential helper needs the shell's PATH, so a GUI app, launchd or cron cannot authenticate (https://github.com: no helper; https://gist.github.com: no helper) (run: dotf doctor --fix, which runs gh auth setup-git)
 GitHub's credential helper needs the shell's PATH, so a GUI app, launchd or cron cannot authenticate \(https://github\.com: no helper; https://gist\.github\.com: no helper\)
