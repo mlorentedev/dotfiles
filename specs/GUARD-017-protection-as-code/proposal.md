@@ -95,8 +95,9 @@ repository is reviewed on its own.
 - Rolling `spec-gate` out to other repos. That is W1.6 (#1627), which reads its
   target list from this declaration.
 - Rulesets and merge queues (web#375), until ADR-049 is accepted. ADR-049
-  (proposed 2026-10-10) brings the queue declaration into `forge/` through
-  a driver per forge; rulesets are free for public repositories, so the
+  (proposed 2026-10-10) puts every repository behind gitea-mq and brings its
+  half of the protection (merge methods, `strict`, the `gitea-mq` check) into
+  `forge/` (#2249); rulesets are free for public repositories, so the
   paid-plan premise no longer holds for them.
 - Scheduling the drift check in CI. That needs an admin-scoped machine
   identity, which is decision (d) of the CI-identity note. Until then, drift is

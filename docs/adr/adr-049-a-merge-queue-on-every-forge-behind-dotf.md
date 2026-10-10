@@ -6,12 +6,12 @@ owner: manu
 date: "2026-10-10"
 supersedes: []
 extends: [adr-047-standing-merge-grant-opt-in-per-repository]
-issue: mlorentedev/dotfiles#2246
+issue: mlorentedev/dotfiles#2249
 tags: [architecture, decision, forge, ci, merge-queue, iac]
 created: "2026-10-10"
 ---
 
-# ADR-049: Every repository lands through a merge queue, on GitHub, GitLab and Gitea, behind one `dotf` interface
+# ADR-049: Every repository lands through one merge queue, gitea-mq on kubelab's prod VPS, behind `dotf pr land`
 
 ## Context
 
@@ -38,17 +38,35 @@ Zuul, Chromium's CQ, Uber's SubmitQueue and GitHub's merge queue. A PR is tested
 PRs ahead of it, right before it lands. Nobody updates a branch, and the expensive jobs run only on the queue's
 candidate.
 
-The owner works on three forges, and has repositories with pull requests on each (owner, 2026-10-10). What each
-offers was checked on 2026-10-10:
+The owner's repositories with pull requests live on GitHub and on a self-hosted Gitea. GitLab is not deployed
+(kubelab ADR-050 D3 names it only as a future adapter). What each offers was checked on 2026-10-10:
 
 | Forge | Native queue | Without a paid plan |
 |---|---|---|
-| GitHub | Merge queue, available only to repositories that an organization owns | Free organization, public repositories |
-| GitLab | Merge trains, Premium and Ultimate tiers only | marge-bot, a maintained community fork (v1.1.0, 2026-02), BSD-3 |
-| Gitea / Forgejo | None; go-gitea/gitea#36392 is an unaccepted proposal | gitea-mq (Gitea and GitHub, MIT, needs PostgreSQL), or shunt |
+| GitHub | Merge queue, available only to repositories that an organization owns | Free organization with public repositories, or a sidecar |
+| Gitea / Forgejo | None; go-gitea/gitea#36392 is an unaccepted proposal | gitea-mq, or shunt |
+| GitLab | Merge trains, Premium and Ultimate tiers only | marge-bot |
 
-No free tool covers all three forges. Zuul has drivers for GitHub and GitLab but none for Gitea, and it is
-heavy to operate.
+[gitea-mq](https://github.com/Mic92/gitea-mq) is the only free queue that serves GitHub and Gitea from one
+process. It is MIT-licensed Go, needs PostgreSQL, and publishes a multi-arch image (`ghcr.io/mic92/gitea-mq`).
+Reading its source (2026-10-10) settled how it lands a PR on GitHub:
+
+- **Default mode** arms the forge's auto-merge, so it needs `allow_auto_merge=true`. With the App's
+  Administration permission, its auto-setup turns that setting on.
+- **Label mode** enqueues a PR that carries the merge label. When the PR's run on the `gitea-mq/<pr>` branch
+  passes, gitea-mq merges it itself through the API (`finalizeLabeledMerge`, `internal/poller/poller.go`), with
+  the repository's default merge method. No auto-merge is involved.
+- **Batch mode** (`GITEA_MQ_BATCH_MAX` ≠ 1) fast-forwards the target branch and lands merge commits, so a
+  squash-only repository keeps the batch size at 1.
+
+kubelab has a place to run it (measured 2026-10-10):
+
+- The prod VPS (Hetzner CAX21, ARM64) is always on and public.
+- It already receives github.com webhooks (Argo CD, n8n) and runs pr-agent, a webhook service of the same
+  shape (HMAC, Traefik, SOPS secrets).
+- It has a shared PostgreSQL with per-application tenants.
+- Its namespace quota leaves 1,568 Mi of requests and 1,792 Mi of limits free at steady state. In the worst
+  case (CronJobs and every rolling deploy at once) it leaves 832 Mi of requests and 128 Mi of limits.
 
 dotfiles is the canonical project for every other repository, and every development agent uses `dotf`
 (owner, 2026-10-10).
@@ -57,72 +75,78 @@ dotfiles is the canonical project for every other repository, and every developm
 
 1. **Every repository with pull requests lands through a merge queue.** `strict` comes off where the queue is
    on, because the queue gives the same guarantee without the update cascade.
-2. **Agents land through one interface, whatever the forge.** `dotf pr land <n>` enqueues: on GitHub it adds
-   the PR to the merge queue, on GitLab it assigns the merge request to marge-bot, and on Gitea it applies
-   gitea-mq's label. A forge adapter sits behind the command. No agent updates a branch or calls a forge's merge
-   API directly.
-3. **The engine is the forge's own where one exists, and a sidecar only where it does not.**
-   - **GitHub:** the native merge queue. The repositories move to a free organization.
-   - **Gitea:** gitea-mq.
-   - **GitLab:** marge-bot, or merge trains if the instance has Premium.
-
-   Each sidecar is deployed on kubelab as code (Helm), next to the forge it serves.
-4. **The queue is declared as code in dotfiles.** `forge/` declares, per repository:
-   - the queue (merge method, build concurrency, group size, "only merge non-failing");
-   - the required checks.
+2. **One engine for GitHub and Gitea: gitea-mq in label mode, with a batch size of 1.** One process serves both
+   forges.
+   - The GitHub App gets no Administration permission. Its auto-setup is therefore skipped, and
+     `allow_auto_merge` stays `false`.
+   - Repositories are squash-only, so the default merge method it uses is a squash.
+3. **It runs on kubelab's prod VPS** as a prod-overlay service modelled on pr-agent, with a PostgreSQL tenant
+   provisioned on the deploy path. It passes kubelab ADR-028's 3 AM test because the GitHub repositories it
+   serves are always on. Deployment is kubelab#2156.
+4. **Agents land through one interface.** `dotf pr land <n>` checks the same conditions as today, adds the
+   merge label, and waits for the PR to merge or be ejected. No agent updates a branch or calls a forge's merge
+   API directly. A GitLab adapter (marge-bot or merge trains) is added behind the same command only if a GitLab
+   instance comes into use.
+5. **The queue's half of the protection is declared as code in dotfiles.** `forge/` declares, per repository:
+   - the allowed merge methods;
+   - `strict`;
+   - the required checks, including `gitea-mq`.
 
    `dotf forge … apply/check` converges each forge idempotently, a second run reports `changed=0`, and
-   `dotf doctor` reports drift. This extends GUARD-017 from classic branch protection to the queue, through a
-   driver per forge.
-5. **CI has two lanes, published as templates from dotfiles:**
+   `dotf doctor` reports drift. The rulesets that gitea-mq's auto-setup would have created are this
+   declaration's job. This extends GUARD-017.
+6. **CI has two lanes, published as templates from dotfiles:**
    - **Pull-request lane:** lint, unit tests and the review, fast, on every push.
-   - **Queue lane:** the expensive jobs (Windows, macOS, integration), only on the queue's candidate. That is
-     `merge_group` on GitHub, `gitea-mq/*` branches on Gitea, and marge-bot's pipeline on GitLab.
+   - **Queue lane:** the expensive jobs (Windows, macOS, integration), on `push` to `gitea-mq/**` branches.
 
-   Every required check reports in both lanes, or the queue waits for it forever. The LLM review never runs in
-   the queue lane. The templates ship as reusable workflows for GitHub (which Gitea Actions also reads) and as
-   an `include:` for GitLab, so other repositories consume them instead of copying them.
-6. **Enqueueing is the supervised act.** The queue lands a PR only after it was deliberately enqueued, under
-   the same conditions as a merge today: the user authorized that PR, or the ADR-047 grant holds. The rule in
-   the git-workflow pattern ("merge is a supervised action, never a queued automatic one") changes in the vault
-   to say so. That is an owner edit, because it changes the agents' own rules. `allow_auto_merge` stays
-   `false`: the native GitHub queue does not need it.
+   Every required check reports in the queue lane, or the queue waits for it forever. The LLM review never
+   runs there. The templates are reusable workflows, which Gitea Actions also reads, so other repositories
+   consume them instead of copying them.
+7. **Enqueueing is the supervised act.** A PR is labelled only under the conditions that authorize a merge
+   today: the user authorized that PR, or the ADR-047 grant holds.
+   - The rule in the git-workflow pattern ("merge is a supervised action, never a queued automatic one")
+     changes in the vault to say so. That is an owner edit, because it changes the agents' own rules, and it
+     lands before any agent enqueues.
+   - `allow_auto_merge` stays `false` on every repository.
+8. **dotfiles pilots it (#2249).** Other repositories follow one at a time, and only once the pilot is stable.
 
 ## Consequences
 
-- **The GitHub repositories move to an organization.** Only the owner can create it (GitHub has no API for a
-  free organization) and approve each transfer. Git and web redirects survive a transfer. These do not, and
-  are part of the move:
-  - GitHub App installations (pr-agent, CodeRabbit) are reinstalled on the organization;
-  - collaborators become outside collaborators unless teams are created;
-  - `add-to-project.yml` looks up the user's Project.
-
-  Whether a user-level Project accepts items from organization repositories is not verified. It must be
-  checked before the first transfer, and if the answer is no, the board moves too.
-- **The first day of the queue is the dangerous one.** `review-attestation`, `spec-gate` and
-  `knowledge-gate` trigger only on pull-request, comment and workflow-run events today. Without a
-  `merge_group` trigger, they never report on the candidate, and nothing lands. The rollout adds those
-  triggers before it turns the queue on, and the GUARD-017 preflight (a check must have reported before it is
-  required) covers the queue lane too.
-- **kubelab carries the Gitea and GitLab queues.** When the cluster is down, PRs on those forges do not land.
-  GitHub does not depend on it, which is the deciding reason against gitea-mq on GitHub.
-- **The rollout goes repository by repository:** dotfiles first, measured on head commits per merge and time
-  to `main` against the numbers above, then kubelab, hive and the rest.
-- GUARD-017's out-of-scope line on rulesets and merge queues is withdrawn, because rulesets are free for public
-  repositories. The other layers are rows on the epic, specified when the WIP limit allows:
-  - the `dotf pr land` adapters;
-  - the CI templates;
-  - the sidecar deployments.
+- **The VPS is on the merge path of every repository.** While it is down, CI still runs but nothing lands. The
+  break-glass is the owner merging by hand. The service gets an Uptime Kuma probe and a Grafana alert.
+- **A young dependency is on that path.** gitea-mq's first commit is from 2026-02-09, it has one release
+  (`v0.1.0`), and one author wrote most of it. That author runs the GitHub backend on their own repositories.
+  The image is pinned by digest, and the code is small and MIT-licensed, so a fork is the fallback.
+- **The shared PostgreSQL is the tight resource**, not the service: its limit is 256 Mi, half of it
+  `shared_buffers`. gitea-mq gets a small connection pool, and Postgres is measured before and after the tenant
+  lands.
+- **Throughput is serial:** one PR per queue-lane run. That is about 4 to 7 merges an hour against a measured
+  1.2. `GITEA_MQ_SKIP_QUEUE_IF_UP_TO_DATE` lands a PR already on top of `main` without a second run.
+- **The queue lane must exist before the check is required.** `review-attestation`, `spec-gate` and
+  `knowledge-gate` trigger only on pull-request, comment and workflow-run events today. The rollout makes each
+  report on `gitea-mq/**` branches before `gitea-mq` becomes required, and the GUARD-017 preflight (a check
+  must have reported before it is required) covers the queue lane too.
+- **Repositories become squash-only.** The merge and rebase buttons go away.
+- **The Gitea queue works only while Gitea does.** Gitea runs on the on-demand Beelink, so the queue adds no
+  availability there; it adds the same serialization.
+- **The rollout is measured.** On dotfiles, head commits per merge and time to `main` are compared with the
+  numbers above before any other repository moves.
 
 ## Alternatives rejected
 
+- **GitHub's native merge queue, with gitea-mq only for Gitea.** It needs no service of ours for GitHub, and
+  GitHub runs it. But it is available only to organization-owned repositories, so every GitHub repository
+  would move to an organization. GitHub App installations would have to be reinstalled, collaborators would
+  become outside collaborators, and whether the user-level Project board accepts organization issues is
+  unverified. It would also mean two engines and two adapters behind `dotf pr land`.
+- **gitea-mq in default or batch mode.** Default mode needs `allow_auto_merge=true`, which ADR-047 and the
+  git-workflow pattern forbid. Batch mode lands merge commits and makes the App a bypass actor that pushes to
+  `main`.
 - **Drop `strict` and revert on breakage.** It needs no tooling. With several landers in parallel, two PRs that
   pass alone and break `main` together become routine, and a revert is itself a change that waits for CI.
-- **gitea-mq for GitHub too.** That would be one engine for two forges, with no transfer. On GitHub it turns
-  on `allow_auto_merge`, which ADR-047 and the git-workflow pattern forbid. It also needs the Administration
-  permission, a bypass on the ruleset it creates, and an inbound webhook, so kubelab would have to accept
-  traffic from the internet and would become the merge path of every repository.
+- **A queue written into `dotf` and run as a CI job.** It needs no service, but it means maintaining a
+  home-grown queue, with the same bypass to push to `main`.
 - **Mergify, Aviator, Trunk or Graphite.** They work only on GitHub and are paid, or free with conditions.
-- **Zuul for every forge.** It has no Gitea driver, and it is a CI system to operate, not a queue to adopt.
+- **Zuul.** It has no Gitea driver, and it is a CI system to operate, not a queue to adopt.
 - **Serial landing with `dotf pr land` alone.** This is today's state. Its lock is local to one machine, so it
   does not hold once several agents and people land at the same time.
