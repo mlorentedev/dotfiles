@@ -9,13 +9,21 @@ import (
 // on a daemon that never answers, and doctor is the last step of setup.
 const dockerEngineTimeout = 5 * time.Second
 
+// engineProbeAttempts × engineProbeInterval bound the wait after --fix starts
+// Colima: its VM takes tens of seconds to boot. Tests zero the interval.
+var (
+	engineProbeAttempts = 30
+	engineProbeInterval = 3 * time.Second
+)
+
 // checkDockerEngine reports whether the docker CLI has an engine behind it. On
 // the Mac the engine is Colima's VM, which Homebrew runs as a launchd service
-// once `brew services start colima` has been run (#2013 P5b); until then the
-// CLI is installed and every `docker compose` fails. A WARN, never a FAIL: an
+// once `brew services start colima` has run (#2013 P5b); until then the CLI is
+// installed and every `docker compose` fails. With --fix doctor runs that
+// command itself, so no step is left to the owner. A WARN, never a FAIL: an
 // engine is stopped on purpose as often as by accident, and the Windows gate
 // fails on any [FAIL] line its known-failures list does not name.
-func checkDockerEngine(sys *System, rep *Report) {
+func checkDockerEngine(sys *System, rep *Report, fix bool) {
 	rep.Section("Docker engine")
 
 	if !sys.has("docker") {
@@ -23,18 +31,47 @@ func checkDockerEngine(sys *System, rep *Report) {
 		return
 	}
 
-	out, _, err := sys.CommandOutputBounded(dockerEngineTimeout, "docker", "info", "--format", "{{.ServerVersion}}")
-	if v := strings.TrimSpace(out); err == nil && v != "" {
+	if v := dockerServerVersion(sys); v != "" {
 		rep.Pass("engine reachable: server " + v)
+		return
+	}
+	if fix && sys.GOOS == "darwin" && sys.has("brew") && sys.has("colima") {
+		startColima(sys, rep)
 		return
 	}
 	rep.Warn("docker has no engine to talk to (" + dockerEngineRemedy(sys.GOOS) + ")")
 }
 
+func dockerServerVersion(sys *System) string {
+	out, _, err := sys.CommandOutputBounded(dockerEngineTimeout, "docker", "info", "--format", "{{.ServerVersion}}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+// startColima registers Colima as a launchd service, which also starts it now
+// and at every login, then waits for the engine to answer.
+func startColima(sys *System, rep *Report) {
+	if _, errOut, err := sys.CommandOutputBounded(time.Minute, "brew", "services", "start", "colima"); err != nil {
+		rep.Warn("brew services start colima failed: " + strings.TrimSpace(errOut+" "+err.Error()))
+		return
+	}
+	rep.Fix("started Colima as a launchd service (brew services start colima)")
+	for i := 0; i < engineProbeAttempts; i++ {
+		if v := dockerServerVersion(sys); v != "" {
+			rep.Pass("engine reachable: server " + v)
+			return
+		}
+		time.Sleep(engineProbeInterval)
+	}
+	rep.Warn("Colima is starting but the engine has not answered yet; re-run dotf doctor in a minute")
+}
+
 func dockerEngineRemedy(goos string) string {
 	switch goos {
 	case "darwin":
-		return "run once: brew services start colima; launchd restarts it at login"
+		return "run: dotf doctor --fix, which starts Colima as a launchd service"
 	case "windows":
 		return "start Docker Desktop"
 	}

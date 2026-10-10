@@ -100,7 +100,7 @@ This channel is only for `dotf`, mise, and tools mise cannot install. Everything
 
 `dotf` reads `source.type: "system"`: a package the OS manager owns, named once per manager. Entries ship since 0.65.0, the first release carrying the reader, became the `DOTF_VERSION` pin (#2013 P5b).
 
-**Docker on the Mac** is Colima: the brew entries colima, docker, docker-compose and docker-buildx, then once `brew services start colima`, which Homebrew keeps running across logins. The compose and buildx plugins live in `/opt/homebrew/lib/docker/cli-plugins`, outside the docker CLI's default search path; the `docker-config` deploy entry adds that directory to `~/.docker/config.json` wherever colima is installed. `dotf doctor` warns under *Docker engine* while the engine is down.
+**Docker on the Mac** is Colima: the brew entries colima, docker, docker-compose and docker-buildx, then `dotf doctor --fix`, which runs `brew services start colima` once; Homebrew keeps it running across logins. The compose and buildx plugins live in `/opt/homebrew/lib/docker/cli-plugins`, outside the docker CLI's default search path; the `docker-config` deploy entry adds that directory to `~/.docker/config.json` wherever colima is installed. `dotf doctor` warns under *Docker engine* while the engine is down, and `--fix` starts it.
 
 ```json
 { "name": "gh", "source": { "type": "system", "apt": "gh", "brew": "gh", "winget": "GitHub.cli", "command": "gh" } }

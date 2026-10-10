@@ -53,7 +53,7 @@ func checkCoreTools(sys *System, c *Contract, rep *Report) {
 // read it (`kubectl --version` is an unknown flag).
 func coreToolRemedy(tool, goos string) string {
 	if tool == "docker" && goos == "darwin" {
-		return " (run: dotf tools install, then brew services start colima)"
+		return " (run: dotf tools install, then dotf doctor --fix to start Colima)"
 	}
 	return ""
 }

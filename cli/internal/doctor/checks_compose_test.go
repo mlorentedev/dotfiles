@@ -2,8 +2,10 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestCheckDockerCompose pins the one tool setup's check_dependencies named that
@@ -98,7 +100,7 @@ func TestCheckDockerEngine(t *testing.T) {
 			goos:       "darwin",
 			onPath:     []string{"docker"},
 			wantWarn:   1,
-			wantSubstr: "brew services start colima",
+			wantSubstr: "dotf doctor --fix",
 		},
 		{
 			name:       "linux, engine down → warn with the systemd unit",
@@ -127,7 +129,7 @@ func TestCheckDockerEngine(t *testing.T) {
 			sys.GOOS = tc.goos
 			var buf bytes.Buffer
 			rep := capture(&buf)
-			checkDockerEngine(sys, rep)
+			checkDockerEngine(sys, rep, false)
 
 			if rep.Failures() != 0 {
 				t.Fatalf("failures = %d, want 0\n%s", rep.Failures(), buf.String())
@@ -137,6 +139,58 @@ func TestCheckDockerEngine(t *testing.T) {
 			}
 			if !strings.Contains(buf.String(), tc.wantSubstr) {
 				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
+			}
+		})
+	}
+}
+
+// With --fix on darwin doctor starts Colima itself, so the owner is handed no
+// manual step (#2013 P5b). The fake engine answers only after the start ran.
+func TestCheckDockerEngine_FixStartsColima(t *testing.T) {
+	engineProbeInterval = 0
+	t.Cleanup(func() { engineProbeInterval = 3 * time.Second })
+
+	for _, tc := range []struct {
+		name        string
+		goos        string
+		fix         bool
+		onPath      []string
+		wantStarted bool
+		wantSubstr  string
+	}{
+		{"darwin --fix starts the service and passes", "darwin", true, []string{"docker", "brew", "colima"}, true, "engine reachable: server 28.5.1"},
+		{"no --fix only advises", "darwin", false, []string{"docker", "brew", "colima"}, false, "dotf doctor --fix"},
+		{"linux --fix leaves systemd alone", "linux", true, []string{"docker", "brew", "colima"}, false, "systemctl start docker"},
+		{"colima absent: nothing to start", "darwin", true, []string{"docker", "brew"}, false, "dotf doctor --fix"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sys := newSys(nil, tc.onPath, nil)
+			sys.GOOS = tc.goos
+			started := false
+			sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, string, error) {
+				switch strings.Join(append([]string{name}, args...), " ") {
+				case "brew services start colima":
+					started = true
+					return "Successfully started `colima`", "", nil
+				case "docker info --format {{.ServerVersion}}":
+					if started {
+						return "28.5.1", "", nil
+					}
+				}
+				return "", "", errors.New("down")
+			}
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkDockerEngine(sys, rep, tc.fix)
+
+			if started != tc.wantStarted {
+				t.Fatalf("started = %v, want %v\n%s", started, tc.wantStarted, buf.String())
+			}
+			if !strings.Contains(buf.String(), tc.wantSubstr) {
+				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
+			}
+			if rep.Failures() != 0 {
+				t.Fatalf("an engine check never FAILs\n%s", buf.String())
 			}
 		})
 	}
