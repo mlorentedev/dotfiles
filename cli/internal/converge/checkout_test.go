@@ -84,8 +84,9 @@ func TestCheckout_ClonesFromZeroThenIsIdempotent(t *testing.T) {
 	}
 }
 
-// A checkout behind its upstream: the plan reports the fast-forward and leaves
-// HEAD alone; the apply moves it, by a fast-forward only.
+// A checkout behind its upstream: the plan reports the fast-forward, leaves
+// HEAD alone and holds back the steps that would read the old tree; the apply
+// moves it, by a fast-forward only.
 func TestCheckout_FastForwardsABehindCheckout(t *testing.T) {
 	f := newCheckoutFixture(t)
 	gitAt(t, f.writer, "clone", "-q", f.upstream, f.env.RepoRoot)
@@ -93,8 +94,8 @@ func TestCheckout_FastForwardsABehindCheckout(t *testing.T) {
 	before := gitAt(t, f.env.RepoRoot, "rev-parse", "HEAD")
 
 	plan, err := f.step.Reconcile(f.env, true)
-	if err != nil || plan.Changes != 1 || plan.Gate != "" {
-		t.Fatalf("plan = %+v, %v; want one fast-forward and no gate", plan, err)
+	if err != nil || plan.Changes != 1 || plan.Gate == "" {
+		t.Fatalf("plan = %+v, %v; want one fast-forward and a gate", plan, err)
 	}
 	if got := gitAt(t, f.env.RepoRoot, "rev-parse", "HEAD"); got != before {
 		t.Fatal("a plan must not move HEAD")

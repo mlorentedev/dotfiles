@@ -66,9 +66,12 @@ tools, then every `ai/deploy.json` config that applies to this machine
 macOS the launchd environment (`env-persist`).
 
 Without `--repo`, the checkout is the one the working directory is in, else the
-declared `DOTFILES_REPO_DIR`, else `~/Projects/dotfiles`. `DOTFILES_REPO` names
-another upstream to clone. On a machine from zero, `--plan` shows the clone and
-reports the steps after it as `waits for checkout`.
+declared `DOTFILES_REPO_DIR`, else `~/Projects/dotfiles`: the working directory
+first, as `dotf deploy` and `dotf harness mirror` resolve it, whereas `dotf
+update` prefers the declared checkout. `DOTFILES_REPO` names another upstream to
+clone. When the checkout would change (a clone from zero, or a fast-forward),
+`--plan` shows that change and reports the steps after it as `waits for
+checkout`, because they would read the tree as it is before the change.
 
 ```sh
 dotf converge --plan     # what each reconciler would change; writes nothing

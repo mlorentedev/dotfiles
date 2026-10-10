@@ -98,8 +98,8 @@ Ships first, on its own release: from zero, `install.sh` downloads the *released
 
 - [x] `update.Assess`: the fast-forward decision without the merge, so a plan reports `behind` and moves nothing; `Sync` is Assess plus `merge --ff-only`
 - [x] Add the checkout reconciler (clone if absent, fast-forward under ADR-019 D2), first in the registry; it refuses a directory that is not a dotfiles checkout, and names `xcode-select --install` on macOS when git is missing
-- [x] `Result.Gate`: under a plan, a step that has not converged yet holds back the steps after it (`waits for checkout`) instead of planning against a checkout that does not exist; an apply ignores it
-- [x] `dotf converge` without `--repo` resolves the checkout like `dotf update`: the working directory, else `DOTFILES_REPO_DIR`, else `env.DefaultCheckoutDir` (drift-tested against `env-contract.json`)
+- [x] `Result.Gate`: under a plan, a step that has not converged yet (a clone or a fast-forward pending) holds back the steps after it (`waits for checkout`) instead of planning against a tree the apply would change first; an apply ignores it
+- [x] `dotf converge` without `--repo` resolves the checkout like `dotf deploy`: the working directory's dotfiles checkout (`env.IsDotfilesCheckout`; another project's repository does not count), else `DOTFILES_REPO_DIR`, else `env.DefaultCheckoutDir` (drift-tested against `env-contract.json`)
 - [x] Real-git tests: clone then idempotent, behind fast-forwarded (plan leaves HEAD), dirty left alone, foreign repo refused, no git from zero; a cmd test plans the clone first from an empty cwd
 
 ### PR 4b — one entrypoint: `install.sh` and `install.ps1` at the root

@@ -86,7 +86,13 @@ func syncResult(out update.Outcome) (Result, error) {
 	case update.StatusCurrent, update.StatusAhead:
 		return Result{Detail: out.Message}, nil
 	case update.StatusBehind:
-		return Result{Changes: 1, Detail: "to apply: fast-forward to " + out.Upstream}, nil
+		// Only a plan stops here (an apply fast-forwards), and the later steps
+		// would read the tree as it is before the fast-forward.
+		return Result{
+			Changes: 1,
+			Detail:  "to apply: fast-forward to " + out.Upstream,
+			Gate:    "waits for checkout: fast-forward to " + out.Upstream + " first",
+		}, nil
 	case update.StatusFastForwarded:
 		return Result{Changes: 1, Detail: out.Message}, nil
 	case "ff-failed":

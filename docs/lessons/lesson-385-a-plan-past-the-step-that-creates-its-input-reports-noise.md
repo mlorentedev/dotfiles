@@ -23,8 +23,10 @@ step whose output is the next step's input.
 
 ## The Solution
 `converge.Result` carries a `Gate`. A step that has not converged yet under a plan sets it (the
-checkout sets `waits for checkout: not cloned yet`), and `Run` reports every later step skipped with
-that reason instead of reconciling it. An apply ignores the gate, since the step really ran. A plan
+checkout sets `waits for checkout: not cloned yet`, or names the fast-forward it would apply), and
+`Run` reports every later step skipped with that reason instead of reconciling it. A checkout that
+is merely behind counts too: the later steps would read the old tree, and the apply reads the new
+one. An apply ignores the gate, since the step really ran. A plan
 from zero now reads: the clone, then the remaining steps waiting for it.
 
 ## Takeaways
