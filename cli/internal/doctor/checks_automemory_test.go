@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -84,4 +85,24 @@ func TestCheckAutoMemoryLink(t *testing.T) {
 			t.Error("--fix must NOT destroy the agent's own data dir")
 		}
 	})
+}
+
+// A link whose vault source was archived, with nothing current to replace it:
+// writes through it fail, so it is a WARN naming the target, not a PASS.
+func TestCheckAutoMemoryLinkWarnsOnADanglingLinkItCannotRepair(t *testing.T) {
+	home := t.TempDir()
+	vault := t.TempDir()
+	sys := newSys(map[string]string{"HOME": home, "VAULT_PATH": vault}, nil, nil)
+	start := "/work/archived"
+	target := memlink.ClaudeMemoryTarget(home, start)
+	mkdirAll(t, filepath.Dir(target))
+	if err := os.Symlink(filepath.Join(vault, "10_projects", "archived", "memory"), target); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkAutoMemoryLink(sys, start, rep, true)
+	if !strings.Contains(buf.String(), "link is broken") || strings.Contains(buf.String(), "[PASS]") {
+		t.Fatalf("want a broken-link WARN, got\n%s", buf.String())
+	}
 }

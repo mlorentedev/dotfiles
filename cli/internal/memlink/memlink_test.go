@@ -331,6 +331,59 @@ func TestEnsure(t *testing.T) {
 	})
 }
 
+// --- a dangling link: the vault source it named moved or was archived -------
+
+// danglingLink leaves target a link to a directory that no longer exists, the
+// state a vault project leaves behind when it moves to 50_work or 90_archive.
+func danglingLink(t *testing.T, target string) {
+	t.Helper()
+	gone := filepath.Join(t.TempDir(), "10_projects", "moved", "memory")
+	mkdirAll(t, gone)
+	mkdirAll(t, filepath.Dir(target))
+	if err := createLink(gone, target); err != nil {
+		t.Fatalf("createLink: %v", err)
+	}
+	if err := os.RemoveAll(filepath.Dir(filepath.Dir(gone))); err != nil {
+		t.Fatalf("remove link source: %v", err)
+	}
+}
+
+func TestDanglingLink(t *testing.T) {
+	t.Run("a source resolves: Status is repairable and Ensure relinks to it", func(t *testing.T) {
+		vault := t.TempDir()
+		writeFile(t, filepath.Join(vault, "10_projects", "p", "memory", "MEMORY.md"), "current")
+		target := filepath.Join(t.TempDir(), "agent", "p", "memory")
+		danglingLink(t, target)
+
+		if got := Status("/w/p", target, "p", vault); got != StateRepairable {
+			t.Fatalf("Status = %v, want StateRepairable", got)
+		}
+		msg, err := Ensure("/w/p", target, "p", vault)
+		if err != nil || msg == "" {
+			t.Fatalf("Ensure: msg=%q err=%v, want a relink", msg, err)
+		}
+		got, err := os.ReadFile(filepath.Join(target, "MEMORY.md"))
+		if err != nil || string(got) != "current" {
+			t.Fatalf("read through the relinked target: %q, %v", got, err)
+		}
+	})
+
+	t.Run("no source resolves: Status says dangling and Ensure leaves it", func(t *testing.T) {
+		target := filepath.Join(t.TempDir(), "agent", "x", "memory")
+		danglingLink(t, target)
+
+		if got := Status("/nowhere/x", target, "x", t.TempDir()); got != StateDangling {
+			t.Fatalf("Status = %v, want StateDangling", got)
+		}
+		if msg, err := Ensure("/nowhere/x", target, "x", t.TempDir()); err != nil || msg != "" {
+			t.Fatalf("Ensure: msg=%q err=%v, want a no-op", msg, err)
+		}
+		if !isLink(target) {
+			t.Fatal("Ensure removed a link it had nothing to replace with")
+		}
+	})
+}
+
 // --- createLink: path components containing a cmd.exe word delimiter -------
 
 // On Windows, mklink runs through cmd.exe's own tokenizer (createLink's
