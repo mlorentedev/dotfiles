@@ -953,7 +953,9 @@ FIXTURE
 
 @test "setup-windows.ps1 leaves opencode tui.json to dotf deploy (DX-004 AC4)" {
     refute_grep_fixed 'ai\opencode\tui.json' "$PS1_SCRIPT"
-    grep -qF '`opencode-tui` entry of ai/deploy.json' "$PS1_SCRIPT"
+    # The entry itself, not the comment naming it: it must exist and must not
+    # be restricted to platforms that exclude Windows.
+    jq -e '.configs[] | select(.name == "opencode-tui") | select(.platforms == null or (.platforms | index("windows")))' "$DOTFILES_DIR/ai/deploy.json"
 }
 
 @test "setup-windows.ps1 mirrors the harness inputs through dotf harness mirror (WIN-007)" {

@@ -280,6 +280,9 @@ PY
     # no longer carries its own copy.
     jq -e '.agents.presence[] | select(.agent == "opencode" and .file == ".config/opencode/AGENTS.md" and .source == "AGENTS.md")' "$DOTFILES_DIR/harness/manifest.json"
     refute_grep_fixed '$HOME/.config/opencode/AGENTS.md' "$DOTFILES_DIR/setup-linux.sh"
+    # pi's copy left setup-linux.sh in the same change, so its target is pinned too.
+    jq -e '.agents.presence[] | select(.agent == "pi" and .file == ".pi/agent/AGENTS.md" and .source == "AGENTS.md")' "$DOTFILES_DIR/harness/manifest.json"
+    refute_grep 'PI_AGENTS_DST' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-windows.ps1 deploys AGENTS.md to ~/.config/opencode/ (cross-OS parity)" {
