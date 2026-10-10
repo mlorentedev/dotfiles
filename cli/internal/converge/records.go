@@ -103,6 +103,9 @@ func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
 	if len(res.Unreadable) > 0 {
 		detail += "; unreadable, not checked for leftovers: " + strings.Join(res.Unreadable, ", ")
 	}
+	if res.IgnoreSkipped != "" {
+		detail += "; " + res.IgnoreSkipped
+	}
 	return Result{Changes: res.Updated + len(res.Pruned), Detail: detail}, nil
 }
 

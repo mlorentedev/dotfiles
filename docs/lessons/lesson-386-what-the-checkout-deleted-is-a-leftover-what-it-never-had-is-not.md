@@ -48,3 +48,7 @@ answer would read as "never ours".
   `git rev-parse --is-shallow-repository` first. CI checks out at depth 1.
 - **In a linked worktree `.git` is a file.** `isDir(".git")` skipped doctor's whole repo-to-deploy-dir
   drift section in every worktree. Use an existence check.
+- **The deploy set is the checkout minus what git ignores.** The mirror walked the working tree, so a
+  gitignored claude-mem output (`scripts/CLAUDE.md`) reached `PATH` (#2268). The mirror now skips
+  `git ls-files --others --ignored --exclude-standard`, and the leftover scan counts an ignored file as
+  absent, so an old copy is named instead of reading as "in sync". Without git nothing is ignored.
