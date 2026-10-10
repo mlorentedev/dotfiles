@@ -333,18 +333,18 @@ func TestIgnoredInCheckout_FailsOpenAndSaysSoOnlyInAGitCheckout(t *testing.T) {
 	}
 }
 
-// The no-git path end to end, with the real git: a tree outside any repository
-// mirrors every file, and nothing is reported.
+// The no-git path end to end, with the real git: a checkout without .git
+// mirrors every file and reports nothing, even extracted inside another
+// repository. git walks up from such a tree, so asking it would apply the
+// enclosing repository's ignore rules, and a catch-all one skips every file.
 func TestMirror_CopiesTheWorkingTreeOfATarballCheckout(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
 	repo := mirrorRepo(t)
-	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(repo))
-	// A .gitignore naming the file: a tarball has no git to apply it, and the
-	// ceiling keeps an enclosing repository from applying it instead, so the
-	// file must still be mirrored.
-	writeFile(t, filepath.Join(repo, ".gitignore"), "scripts/CLAUDE.md\n")
+	enclosing := filepath.Dir(repo)
+	gitIn(t, enclosing, "init", "-q")
+	writeFile(t, filepath.Join(enclosing, ".gitignore"), "*\n")
 	writeFile(t, filepath.Join(repo, "scripts", "CLAUDE.md"), "local\n")
 
 	deploy := t.TempDir()
@@ -352,8 +352,10 @@ func TestMirror_CopiesTheWorkingTreeOfATarballCheckout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(deploy, "scripts", "CLAUDE.md")); err != nil {
-		t.Errorf("a tarball checkout's file was not mirrored: %v", err)
+	for _, rel := range []string{"scripts/CLAUDE.md", "harness/skills/handoff/SKILL.md"} {
+		if _, err := os.Stat(filepath.Join(deploy, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("a tarball checkout's %s was not mirrored: %v", rel, err)
+		}
 	}
 	if res.IgnoreSkipped != "" {
 		t.Errorf("a tarball checkout reported %q; it has no git to fail", res.IgnoreSkipped)

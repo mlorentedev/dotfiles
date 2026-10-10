@@ -64,15 +64,18 @@ type Orphans struct {
 // requires each to be tracked.
 //
 // A checkout without .git (a tarball) ignores nothing and mirrors as it always
-// did. Inside a git checkout a failing git also ignores nothing, but that is
-// not silent: the second result says why, for the caller to report.
+// did. That is decided before git is asked, not after it fails: git walks up
+// from such a tree, so a tarball extracted inside another repository would get
+// that repository's ignore rules, and a catch-all one would skip every file
+// without a word. Inside a git checkout a failing git also ignores nothing,
+// but that is not silent: the second result says why, for the caller to report.
 func IgnoredInCheckout(repoRoot string, git GitRunner) (map[string]bool, string) {
+	if _, err := os.Lstat(filepath.Join(repoRoot, ".git")); err != nil {
+		return nil, ""
+	}
 	args := append([]string{"ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "harness"}, DeployDirTrees...)
 	out, err := git(repoRoot, args...)
 	if err != nil {
-		if _, serr := os.Lstat(filepath.Join(repoRoot, ".git")); serr != nil {
-			return nil, ""
-		}
 		return nil, "git could not list the checkout's ignored files (" + err.Error() + "), so they were mirrored"
 	}
 	ignored := map[string]bool{}
