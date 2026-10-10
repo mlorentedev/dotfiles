@@ -23,6 +23,22 @@ The first review (`review.md`, FAIL, agy/gemini-3.1-pro-high, committed in
    unrelated to this spec (installed `dotf` 0.62.0 against the 0.63.0 pin, and an
    `orca.json` hook timeout).
 
+   **The upstream catalog flaps, so this value has moved since.** #2011
+   (`946afa50`, 2026-10-05) set 128000 / 16000 because models.dev reported that
+   then. On 2026-10-10 both sources report 163840 / 16384 again:
+
+   ```text
+   models.dev  openrouter/deepseek/deepseek-chat  limit {'context': 163840, 'output': 16384}
+   openrouter  /api/v1/models deepseek/deepseek-chat  163840 16384
+   ```
+
+   so `ai/pi/models.json` is back to those values. A pinned literal against a
+   catalog that changes every few days drifts by design; sourcing pi's limits
+   from the catalog is the model-config SSOT work of #902, not this spec. The
+   doctor check stays the guard. Owed with the Windows items below: a
+   `dotf doctor` run on a machine that has opencode's catalog cached (this Mac
+   SKIPs the section) showing `[ OK ]` for these values.
+
 2. **The proposal named `CREATE_NO_WINDOW`, the code does not use it (Major).**
    Fixed: `proposal.md` What #1 now describes `HideWindow` with
    `DETACHED_PROCESS`, and why (lesson-333).

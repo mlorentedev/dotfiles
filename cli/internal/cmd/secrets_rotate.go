@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +37,7 @@ var bwSyncer daemonSyncer
 // rotation that writes to the wrong field satisfies the second and fails the
 // first, which is precisely the case that looked successful by hand.
 func newSecretsRotateCmd() *cobra.Command {
-	var dryRun bool
+	var dryRun, pushToCI bool
 	c := &cobra.Command{
 		Use:   "rotate <id> [var]",
 		Short: "Replace a secret's value and prove the replacement took (write, sync, re-resolve, probe)",
@@ -45,13 +49,15 @@ func newSecretsRotateCmd() *cobra.Command {
 			"  4. write it through the same idempotent path as `set`\n" +
 			"  5. sync the bw serve daemon, so reads stop answering from a stale cache\n" +
 			"  6. re-resolve through the normal read path and fingerprint again\n" +
-			"  7. run the entry's `validate:` liveness probe when it declares one\n\n" +
+			"  7. run the entry's `validate:` liveness probe when it declares one\n" +
+			"  8. with --push-ci, upload the new value to every repo whose CI consumes it\n\n" +
 			"The fingerprints are the point. A liveness probe cannot tell a rotated\n" +
 			"credential from an old one that was never revoked — both authenticate. A\n" +
 			"changed fingerprint proves the value was actually replaced.\n\n" +
 			"  printf %s \"$new\" | dotf secrets rotate DOCKERHUB_TOKEN\n" +
 			"  dotf secrets rotate DOCKERHUB_TOKEN          # prompts (hidden)\n" +
-			"  dotf secrets rotate DOCKERHUB_TOKEN --dry-run",
+			"  dotf secrets rotate DOCKERHUB_TOKEN --dry-run\n" +
+			"  dotf secrets rotate DOCKERHUB_TOKEN --push-ci",
 		Args:         cobra.RangeArgs(1, 2),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,10 +77,20 @@ func newSecretsRotateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runRotate(cmd, s, item, field, isFile, dryRun)
+			var repos []string
+			if pushToCI {
+				if repos, err = ciTargets(s); err != nil {
+					return err
+				}
+			}
+			if err := runRotate(cmd, s, item, field, isFile, dryRun); err != nil || !pushToCI {
+				return err
+			}
+			return pushRotatedToCI(cmd.OutOrStdout(), s, repos, dryRun)
 		},
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report the intended rotation and the current fingerprint without writing")
+	c.Flags().BoolVar(&pushToCI, "push-ci", false, "after a proven rotation, upload the new value to every ci:<repo> consumer's Actions secrets")
 	return c
 }
 
@@ -173,4 +189,70 @@ func probeSuffix(s *secrets.Secret) string {
 		return " (no liveness probe declared)"
 	}
 	return " (then probe: " + s.Validate + ")"
+}
+
+// ciTargets resolves the repos a --push-ci rotation will upload to, before
+// anything is written. A registry defect found after the write would leave the
+// vault on the new value and CI on the old one, which is the half-rotation
+// --push-ci exists to remove, so every consumer must be pushable first.
+func ciTargets(s *secrets.Secret) ([]string, error) {
+	one := &secrets.Registry{Secrets: []secrets.Secret{*s}}
+	var repos []string
+	for _, c := range s.Consumers {
+		repo, ok := strings.CutPrefix(c, "ci:")
+		if !ok {
+			continue
+		}
+		if !initrepo.ValidRepoSlug(repo) {
+			return nil, fmt.Errorf("%s declares an invalid ci consumer %q (want ci:owner/name); nothing was rotated", s.ID, c)
+		}
+		// SelectCI skips what Actions cannot hold (file, floor, GITHUB_*). A ci:
+		// consumer left with nothing to upload would report a push that never happens.
+		if sel := one.SelectCI(repo); len(sel.Upload) == 0 {
+			return nil, fmt.Errorf("%s declares %s but holds nothing GitHub Actions can store (%s); nothing was rotated", s.ID, c, skipReason(sel))
+		}
+		repos = append(repos, repo)
+	}
+	return repos, nil
+}
+
+func skipReason(sel secrets.CISelection) string {
+	if len(sel.Skipped) == 0 {
+		return "no env var to upload"
+	}
+	return sel.Skipped[0].Reason
+}
+
+// pushRotatedToCI hands a proven rotation to every repo whose CI consumes the
+// secret, through the same upload path as `sync ci`. Without it a rotation leaves
+// GitHub Actions on the retired credential until someone remembers the second
+// command.
+//
+// It runs only after runRotate succeeded, so the value it resolves is the one just
+// read back and, where the entry declares one, already probed live; the upload's
+// own liveness gate is skipped for that reason. One failed repo does not stop the
+// others: the error names every repo still on the old value.
+func pushRotatedToCI(out io.Writer, s *secrets.Secret, repos []string, dryRun bool) error {
+	if len(repos) == 0 {
+		_, _ = fmt.Fprintf(out, "note     %s has no ci: consumer — nothing to push\n", s.ID)
+		return nil
+	}
+	if dryRun {
+		_, _ = fmt.Fprintf(out, "would push to ci  %s\n", strings.Join(repos, ", "))
+		return nil
+	}
+	one := &secrets.Registry{Secrets: []secrets.Secret{*s}}
+	var failed []string
+	var errs []error
+	for _, repo := range repos {
+		if err := pushCI(out, one.SelectCI(repo), repo, false, true); err != nil {
+			failed = append(failed, repo)
+			errs = append(errs, fmt.Errorf("%s: %w", repo, err))
+		}
+	}
+	if len(failed) == 0 {
+		return nil
+	}
+	return fmt.Errorf("rotated, but %s still hold the old value (finish each with `dotf secrets sync ci --repo <repo>`): %w",
+		strings.Join(failed, ", "), errors.Join(errs...))
 }
