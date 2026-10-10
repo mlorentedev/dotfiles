@@ -18,31 +18,24 @@ setup() {
     SANDBOX="$BATS_TEST_TMPDIR/sandbox"
     mkdir -p "$SANDBOX/home" "$SANDBOX/dotfiles" "$SANDBOX/bin" "$SANDBOX/inherited"
     cp "$REPO/versions.conf" "$SANDBOX/dotfiles/"
-    # The rc's PATH holds the test's own directories and links to RC_TOOLS,
-    # never a host directory: with /usr/bin on it, a host mise, direnv, zoxide
-    # or dotf switches on a block the test assumes is off (#2149, the same rule
-    # as tests/zshrc-guards.bats).
-    mkdir -p "$SANDBOX/sysbin"
-    for tool in $RC_TOOLS; do
-        target=$(command -v "$tool") || continue
-        ln -s "$target" "$SANDBOX/sysbin/$tool"
-    done
 }
 
-# The external commands the rc runs whatever the host has. Empty: every one it
-# calls sits behind a `command -v` guard, and a missing one fails the load
-# through its "command not found" on stderr.
-RC_TOOLS=""
-
 # load_rc PROBE: source the repo's .bashrc in an interactive bash with a scratch
-# HOME, then evaluate PROBE in the same shell. PATH holds a directory standing
-# for what the login shell or the OS put there, then the links to RC_TOOLS. An
-# interactive bash without a terminal reports that it
-# has no job control on stderr; that notice is the harness's, not the rc's, and
-# is dropped. Anything else on stderr fails the load.
+# HOME, then evaluate PROBE in the same shell. PATH holds the test's stubs and a
+# directory standing for what the login shell or the OS put there, and never a
+# host directory: with /usr/bin on it, a host mise, direnv, zoxide or dotf would
+# switch on a block the tests assume is off (#2149, as tests/zshrc-guards.bats).
+# Every external command the rc runs sits behind a `command -v` guard, so it
+# needs no system directory; one that does not fails the load with "command not
+# found". HOMEBREW_PREFIX reads as already loaded, since brew is run by absolute
+# path and a PATH cannot hide it; LOAD_RC_BREW="" unsets it for the brew test.
+# An interactive bash without a terminal reports that it has no job control on
+# stderr; that notice is the harness's, not the rc's, and is dropped. Anything
+# else on stderr fails the load.
 load_rc() {
     env -i HOME="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" \
-        PATH="$SANDBOX/bin:$SANDBOX/inherited:$SANDBOX/sysbin" TERM=dumb \
+        PATH="$SANDBOX/bin:$SANDBOX/inherited" TERM=dumb \
+        HOMEBREW_PREFIX="${LOAD_RC_BREW-$SANDBOX/brew-loaded}" \
         "$BASH_BIN" --norc --noprofile -i -c '. "$1"; eval "$2"' _ "$REPO/.bashrc" "$1" \
         2>"$SANDBOX/stderr" </dev/null || {
         rc=$?
@@ -59,7 +52,8 @@ load_rc() {
 @test "the inherited PATH survives the rc: it is prepended to, never replaced" {
     run load_rc 'printf "%s\n" "$PATH"'
     [ "$status" -eq 0 ]
-    [[ "$output" == *":$SANDBOX/inherited:"* ]] || false
+    # Prepended to only: the inherited entries are still last.
+    [[ "$output" == *":$SANDBOX/bin:$SANDBOX/inherited" ]] || false
     # The user's own bin directory is still first among what the rc adds.
     [[ "$output" == "$SANDBOX/home/.local/bin:"* || "$output" == *":$SANDBOX/home/.local/bin:"* ]] || false
 }
@@ -75,6 +69,26 @@ load_rc() {
     run load_rc 'for t in '"$probes"'; do p=$(type -P "$t") && printf "leak: %s -> %s\n" "$t" "$p"; done; true'
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+@test "brew shellenv runs exactly when brew is installed and not yet loaded" {
+    # Already loaded: a nested shell inherits the prefix and its PATH, and the rc
+    # does not run brew again.
+    run load_rc 'IFS=:; printf "%s\n" $PATH'
+    [ "$status" -eq 0 ]
+    [[ "$output" != *homebrew* ]] || false
+    LOAD_RC_BREW="" run load_rc 'IFS=:; printf "%s\n" $PATH'
+    [ "$status" -eq 0 ]
+    # Which direction runs depends on the host, since the rc probes brew's two
+    # absolute install paths: the Linux job proves the absent side, a Mac with
+    # Homebrew the present side.
+    for brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [ -x "$brew" ]; then
+            [[ "$output" == *$'\n'"${brew%/brew}"$'\n'* ]] || false
+            return
+        fi
+    done
+    [[ "$output" != *homebrew* ]] || false
 }
 
 @test "no *_HOME names a directory that is not there, and none reaches PATH" {

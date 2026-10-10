@@ -140,11 +140,15 @@ unset -f _dotfiles_home
 # shell, the desktop session or the OS (/etc/paths on macOS, environment.d on
 # Linux), and an rc that resets it drops whatever those added (#2013 W6).
 
-# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel.
-for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-    [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
-done
-unset _brew
+# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel,
+# and not already loaded. A nested shell inherits HOMEBREW_PREFIX with the PATH
+# shellenv built, so it does not run brew again.
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+    done
+    unset _brew
+fi
 
 # Prepend Tool Paths (priority over system), for the homes that exist
 [[ -n "${JAVA_HOME:-}" ]] && export PATH="$JAVA_HOME/bin:$PATH"
