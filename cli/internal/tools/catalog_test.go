@@ -267,6 +267,13 @@ func TestLoad_AcceptsACaskEntry(t *testing.T) {
 	if c.Tools[0].SupportsOS("linux") || c.Tools[0].SupportsOS("windows") || !c.Tools[0].SupportsOS("darwin") {
 		t.Error("a cask installs on darwin only")
 	}
+
+	// The platforms reachability check resolves through SystemPackage, so a
+	// cask is a package darwin can install.
+	withPlatforms := `{"tools":[{"name":"obsidian","source":{"type":"system","cask":"obsidian","platforms":["darwin"]}}]}`
+	if _, err := Load(writeCatalog(t, withPlatforms)); err != nil {
+		t.Errorf("a cask entry with platforms [darwin] must load: %v", err)
+	}
 }
 
 // The skip for an OS the entry names no manager for is the platform skip every

@@ -26,6 +26,8 @@ type world struct {
 	noEffect  bool  // Run exits 0 but installs nothing
 	queries   [][]string
 	out       strings.Builder
+	apps      map[string]string // cask -> the `app` artifact `brew info` reports
+	bundles   map[string]bool   // app bundles on disk, from any channel
 }
 
 func newWorld(managers ...string) *world {
@@ -41,6 +43,7 @@ func (w *world) installer(goos string) *Installer {
 		GOOS: goos, GOARCH: "amd64", Dest: "unused", Out: &w.out,
 		IsRoot:     func() bool { return w.root },
 		HasCommand: func(name string) bool { return w.managers[name] },
+		AppExists:  func(bundle string) bool { return w.bundles[bundle] },
 		Query: func(name string, args ...string) ([]byte, error) {
 			w.queries = append(w.queries, append([]string{name}, args...))
 			pkg := ""
@@ -58,6 +61,13 @@ func (w *world) installer(goos string) *Installer {
 				return []byte("sudo: a password is required"), fmt.Errorf("exit 1")
 			case "brew":
 				pkg = args[len(args)-1]
+				if args[0] == "info" {
+					app, ok := w.apps[pkg]
+					if !ok {
+						return nil, fmt.Errorf("exit 1")
+					}
+					return []byte(`{"casks":[{"token":"` + pkg + `","artifacts":[{"uninstall":[{"quit":"x"}]},{"app":[` + app + `]},{"zap":[]}]}]}`), nil
+				}
 				if w.installed[pkg] {
 					return []byte(pkg + " 2.40.0\n"), nil
 				}
@@ -139,8 +149,8 @@ func TestInstallSystem_CaskIsQueriedAndInstalledAsACask(t *testing.T) {
 		t.Errorf("ran %v, want exactly %q", w.ran, "brew install --cask obsidian")
 	}
 	for _, q := range w.queries {
-		if q[0] == "brew" && strings.Join(q, " ") != "brew list --cask --versions obsidian" {
-			t.Errorf("queried %v; a cask is listed with --cask", q)
+		if q[0] == "brew" && !strings.Contains(strings.Join(q, " "), " --cask ") {
+			t.Errorf("queried %v; a cask is asked about with --cask", q)
 		}
 	}
 
@@ -148,6 +158,40 @@ func TestInstallSystem_CaskIsQueriedAndInstalledAsACask(t *testing.T) {
 	if res, err := w.installer("darwin").Install(obsidian); err != nil || res != Skipped || len(w.ran) != 0 {
 		t.Errorf("second run: %v, %v, ran %v; want Skipped and nothing run", res, err, w.ran)
 	}
+}
+
+// An app installed by hand (dragged into /Applications, a vendor installer) is not
+// in `brew list --cask`, and `brew install --cask` refuses to overwrite its
+// bundle, so an entry for it failed on every run. The bundle on disk is the
+// cask's presence, as a declared command on PATH is a formula's.
+func TestInstallSystem_CaskAppInstalledOutsideBrewIsPresent(t *testing.T) {
+	obsidian := Tool{Name: "obsidian", Profile: "full", Source: Source{Type: "system", Cask: "obsidian"}}
+	for _, tc := range []struct {
+		name, app, bundle string
+		present           bool
+	}{
+		{"the bundle the cask names is on disk", `"Obsidian.app"`, "Obsidian.app", true},
+		{"an app renamed by its target is looked up by the target", `{"target":"Obsidian Beta.app"}`, "Obsidian Beta.app", true},
+		{"no bundle on disk is absent", `"Obsidian.app"`, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld("brew")
+			w.apps = map[string]string{"obsidian": tc.app}
+			w.bundles = map[string]bool{tc.bundle: tc.bundle != ""}
+			p := w.installer("darwin").Plan(obsidian)
+			if got := p.Action == PlanSkip; got != tc.present {
+				t.Errorf("Plan = %+v; present = %v, want %v", p, got, tc.present)
+			}
+		})
+	}
+	t.Run("a formula never falls back to an app bundle", func(t *testing.T) {
+		w := newWorld("brew")
+		w.apps = map[string]string{"gh": `"gh.app"`}
+		w.bundles = map[string]bool{"gh.app": true}
+		if p := w.installer("darwin").Plan(ghTool()); p.Action != PlanInstall {
+			t.Errorf("Plan = %+v, want install", p)
+		}
+	})
 }
 
 // A system package is not pinned, so presence is the whole criterion and a second
