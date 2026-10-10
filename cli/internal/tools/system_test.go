@@ -387,7 +387,7 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
 	w := newWorld("apt-get", "sudo")
 	p := w.installer("linux").Plan(ghTool())
-	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" {
+	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" || p.Package != "gh" {
 		t.Errorf("Plan = %+v, want needs-sudo naming the command", p)
 	}
 	if len(w.ran) != 0 {
@@ -423,5 +423,20 @@ func TestInstallSystem_AptFailureWithWorkingSudoIsAnError(t *testing.T) {
 	_, err := w.installer("linux").Install(ghTool())
 	if err == nil || !strings.Contains(err.Error(), "sudo -n apt-get install -y --no-remove gh") {
 		t.Errorf("want an error carrying the command, got %v", err)
+	}
+}
+
+// The combined command is the per-package one with every package on it, and
+// nothing at all for no packages (#2308).
+func TestSudoInstallCommand(t *testing.T) {
+	if got := SudoInstallCommand(nil); got != "" {
+		t.Errorf("no packages: got %q, want \"\"", got)
+	}
+	if got, want := SudoInstallCommand([]string{"gh", "parallel"}), "sudo apt-get install -y --no-remove gh parallel"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	w := newWorld("apt-get", "sudo")
+	if got, want := "run: "+SudoInstallCommand([]string{"gh"}), w.installer("linux").Plan(ghTool()).Note; got != want {
+		t.Errorf("one package: combined %q drifts from the per-package note %q", got, want)
 	}
 }

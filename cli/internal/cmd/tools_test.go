@@ -330,6 +330,29 @@ func TestInstallAll_NeedsSudoDoesNotFailTheRun(t *testing.T) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
 	}
+	// And one command for both at the end, so a fresh machine is one paste (#2308).
+	if want := "\n  sudo apt-get install -y --no-remove gh tmux\n"; !strings.Contains(out.String(), want) {
+		t.Errorf("output lacks the combined command %q:\n%s", want, out.String())
+	}
+}
+
+// A run where sudo was never in the way prints no combined command.
+func TestInstallAll_NoSudoNoCombinedCommand(t *testing.T) {
+	var out strings.Builder
+	in := &tools.Installer{
+		GOOS: "linux", GOARCH: "amd64", Dest: t.TempDir(), Out: &out,
+		HasCommand: func(string) bool { return true },
+		IsRoot:     func() bool { return true },
+		Query:      func(string, ...string) ([]byte, error) { return []byte("install ok installed"), nil },
+		Run:        func(string, ...string) error { return nil },
+	}
+	selected := []tools.Tool{{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh"}}}
+	if err := installAll(in, selected, io.Discard); err != nil {
+		t.Fatalf("installAll: %v", err)
+	}
+	if strings.Contains(out.String(), "one command") {
+		t.Errorf("no package needed sudo, yet:\n%s", out.String())
+	}
 }
 
 // dryRunCatalog writes a catalog of the given tool objects and points the
