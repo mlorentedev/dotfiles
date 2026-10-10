@@ -221,6 +221,22 @@ leave the count: `90_archive/`, `00_meta/templates/`, the `sessions/` journals a
   from a 39% WARN. Thresholds kept at 30/50: what remains is products, clients, project research and
   memory, knowledge notes the FAIL is meant to name
 
+## #2013 P2 — darwin read the env-contract as linux, silently
+
+Doctor's `contractOS` mapped darwin to linux and its report named no OS, and `env.defaultFor` held
+the same rule a second time. The rule now has one definition, and darwin is a key of its own.
+
+- [x] `env.ForOS` resolves every per-OS contract value (a default, the PATH entries) and `env.AppliesOn`
+  every `required_on` scope: darwin reads its own key, else linux's; windows inherits nothing. Doctor's
+  `contractOS` and `env.defaultFor` are gone, and `checks_profile.go` reads through the same function
+- [x] A declared darwin key wins even when empty, so darwin can opt out of a linux default
+- [x] The contract sections name the OS they read: `(contract, darwin; undeclared keys read linux)`
+- [x] `env-contract.json` states the rule in `_comment`. No darwin value is added: none differs from linux
+  today, and the first is `HERDR_CONFIG_PATH` (#2013 H4)
+- [x] A test reads the real contract and fails on a key that is not linux, darwin or windows (a `macos`
+  key would be read by no OS) and on a darwin value that repeats the linux one. Mutation-checked, as is
+  the fallback (eight tests fail without it)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

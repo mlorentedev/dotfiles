@@ -18,7 +18,7 @@ type ResolvedVar struct {
 func Resolve(c *contract, m *machine, goos, home string) []ResolvedVar {
 	var out []ResolvedVar
 	for _, v := range c.EnvVars {
-		raw := defaultFor(v.Default, goos)
+		raw, _, _ := ForOS(v.Default, goos)
 		if raw == "" {
 			continue
 		}
@@ -31,23 +31,6 @@ func Resolve(c *contract, m *machine, goos, home string) []ResolvedVar {
 		out = append(out, ResolvedVar{Name: v.Name, Value: expand(val, home)})
 	}
 	return out
-}
-
-// defaultFor selects the default for goos. darwin falls back to the linux
-// (POSIX) default when no explicit darwin key exists.
-func defaultFor(def map[string]string, goos string) string {
-	if def == nil {
-		return ""
-	}
-	if v, ok := def[goos]; ok && v != "" {
-		return v
-	}
-	if goos == "darwin" {
-		if v, ok := def["linux"]; ok {
-			return v
-		}
-	}
-	return ""
 }
 
 // expand substitutes the home placeholders used across the contract's per-OS

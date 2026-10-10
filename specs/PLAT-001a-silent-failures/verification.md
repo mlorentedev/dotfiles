@@ -50,6 +50,7 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
 - `golangci-lint run` (v2.12.2, the pin in `versions.conf`): 0 issues.
 - No regressions in the existing Go suite: yes.
 - Bats baseline on darwin, taken before this change: 1632/1776 pass. The 144 failures already exist on `main` and are recorded as F-054 in #2013. W1 changes no shell file.
+- #2013 P2: `go test ./internal/env/ ./internal/doctor/` ok; removing the darwin fallback fails eight tests across both packages, and a `macos` key or a darwin copy of a linux value fails `TestTheRealContractKeysByKnownOSAndCopiesNothing`.
 
 ## Decisions made during implementation
 
