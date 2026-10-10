@@ -15,7 +15,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
 - [ ] AC6, AC7, AC9 -> PRs 4b and 6
-- [x] AC2, AC3 (hook bindings are records) -> `records-bind` / tests `TestRecordsBind_PlanWritesNothingApplyConvergesAndRerunIsANoOp`, `TestRecordsBind_HooksWithStrippedMarkersAreConverged`, `TestRecordsBind_NoResolverWiredFailsLoudly`, `TestRegistry_ToolsRunAfterRecords` (order), `TestCheckHookBinding_FailsOnDriftAndFixBindsIt` (doctor)
+- [x] AC2, AC3 (hook bindings are records) -> `records-bind` / tests `TestRecordsBind_PlanWritesNothingApplyConvergesAndRerunIsANoOp`, `TestRecordsBind_HooksWithStrippedMarkersAreConverged`, `TestRecordsBind_NoResolverWiredIsSkippedNotPassed`, `TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite`, `TestRegistry_ToolsRunAfterRecords` (order), `TestCheckHookBinding_FailsOnDriftAndFixBindsIt` (doctor)
 - [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
 
 ## Test status

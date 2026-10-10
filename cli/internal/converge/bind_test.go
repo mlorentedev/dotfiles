@@ -128,3 +128,25 @@ func TestRecordsBind_NoResolverWiredIsSkippedNotPassed(t *testing.T) {
 		t.Errorf("an unwired step wrote hooks:\n%s", raw)
 	}
 }
+
+// TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite: claude's hooks are
+// written before its retirement fails on an unreadable file, and the step
+// reports that change with its error rather than zero.
+func TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite(t *testing.T) {
+	env := bindEnv(t)
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"harness/manifest.json": `{"agents": {"bind": [
+		  {"agent": "claude", "file": ".claude/settings.json", "format": "command-hook", "matcher": true,
+		   "emit_hooks": [{"id": "mem-session-start", "event": "SessionStart", "command": "mem session-start", "timeout": 30}],
+		   "retire": [{"file": ".old/settings.json", "event": "SessionStart", "id": "mem-session-start"}]}
+		]}}`,
+	})
+	writeFixture(t, env.Home, map[string]string{".old/settings.json": "{not json"})
+	res, err := newRecordsBind().Reconcile(env, false)
+	if err == nil {
+		t.Fatal("want the unreadable retirement to fail the step")
+	}
+	if res.Changes != 1 {
+		t.Errorf("the hooks were written before the failure; want 1 change, got %+v", res)
+	}
+}

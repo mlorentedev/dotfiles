@@ -43,12 +43,11 @@ func (r recordsBind) Reconcile(env Env, dryRun bool) (Result, error) {
 	if r.dotf == nil || r.has == nil {
 		return Result{Skip: noResolver}, nil
 	}
+	// On an error Bind still returns what it wrote before failing, and the
+	// runner records a result's changes alongside its error.
 	outcomes, err := r.run(env, dryRun)
-	if err != nil {
-		return Result{}, err
-	}
 	changed := bindChanges(outcomes)
-	return Result{Changes: len(changed), Detail: bindDetail(outcomes, changed, dryRun)}, nil
+	return Result{Changes: len(changed), Detail: bindDetail(outcomes, changed, dryRun)}, err
 }
 
 // Probe re-plans: after an apply, no target may still need a write or a

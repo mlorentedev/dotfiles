@@ -62,9 +62,10 @@ created: "2026-10-06"
 - [ ] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [x] `records-bind` (#2232): `harness.Bind` returns one outcome per target and `dotf harness bind` renders it, so converge and doctor count changes without parsing text
-  - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; no dotf path resolver wired fails loudly
+  - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; with no dotf path resolver wired the step is skipped and says so, as the other steps report a runner they were not given
   - Hooks whose markers another writer stripped are converged (`TestRecordsBind_HooksWithStrippedMarkersAreConverged`), resting on #2276's identity by command signature
-  - Doctor's `Harness hook bindings` section plans the same bind: drift FAILs naming the harness and `dotf doctor --fix`, which binds; `setup-linux.sh` already promised this check
+  - Doctor's `Harness hook bindings` section plans the same bind: drift FAILs naming the harness and `dotf doctor --fix`, which binds. Both setup scripts' bind warnings already promised this check (#2232), and it is now true
+  - A target that fails after writing (a retirement it cannot read) still counts its write: `harness.Bind` returns that outcome with the error (#2281), and the step passes both to the runner, which records changes alongside an error
   - On the Mac: `converge --plan --only records-bind` -> `2 harness(es) in sync`, pi and opencode skipped (emit:false); `doctor --verbose` -> claude and agy `hooks current`
 
 ### PR 2d — the configs reconciler (#1843 B15)
