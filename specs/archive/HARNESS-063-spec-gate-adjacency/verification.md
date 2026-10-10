@@ -132,11 +132,11 @@ port. The check demonstrates itself on its own PR.
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons.md`? **yes** — reusing a helper inherits
+- [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-176-reusing-a-helper-inherits-its-error-policy-not-jus.md — reusing a helper inherits
       its *error policy*, not just its code: `_strip_markdown_code` is correct
       where a false positive is expensive and wrong where a false negative is.
 - [ ] ADR-worthy decision? **no** — no architectural boundary moved.
-- [ ] New pattern candidate for `00_meta/patterns/`? **not yet** — the underlying
+- [ ] New pattern candidate for `00_meta/patterns/`? no: not yet — the underlying
       insight is already covered by `pattern-verify-state-before-acting`; revisit
       if the error-policy-inheritance angle recurs in a second project.
 
@@ -147,8 +147,8 @@ port. The check demonstrates itself on its own PR.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-063-spec-gate-adjacency/` -> `specs/archive/HARNESS-063-spec-gate-adjacency/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-063-spec-gate-adjacency/` -> `specs/archive/HARNESS-063-spec-gate-adjacency/`
 - [ ] Bitácora board ticket moved to Done / closed with PR link (ADR-018)
 
 > **Not archived by this PR.** #858 adopted two directions; this PR ships one.
@@ -170,3 +170,12 @@ Round 1 (`nan/qwen3.8-flash`, FAIL) is committed unchanged with this PR. Disposi
 | 9 | The review base is 769 commits behind | **Existing ticket:** #1727, with this instance added. |
 | Q | AC1 says "a PR that closes an issue", but it fires on every PR | **Applied.** AC1 now states the shipped trigger. |
 | — | `_report_adjacent_issues` at 39 lines and CC ~16 | **Ticketed:** #2303. |
+
+## Review round 2 dispositions (2026-10-10)
+
+Round 2 (`agy/gemini-3.1-pro-high`, PASS WITH GAPS, reviewed `ca4685d2`) is committed unchanged with this PR.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `git diff --name-only` quotes paths, so `*"$base"*` misses them | **Ticketed:** #2303, corrected by measurement. Spaces are not quoted, only control characters, `"`, `\` and non-ASCII bytes. The repo has 0 such paths, so this is theoretical. The fix is `-c core.quotePath=false`. |
+| 2-4 | Substring noise, step summary escaping, renamed files | **Already ticketed:** #2303. |
