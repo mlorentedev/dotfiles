@@ -341,8 +341,9 @@ func TestMirror_CopiesTheWorkingTreeOfATarballCheckout(t *testing.T) {
 	}
 	repo := mirrorRepo(t)
 	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(repo))
-	// A .gitignore naming the file, so only the missing .git can be why it is
-	// mirrored: a tarball has no git to apply the ignore rules.
+	// A .gitignore naming the file: a tarball has no git to apply it, and the
+	// ceiling keeps an enclosing repository from applying it instead, so the
+	// file must still be mirrored.
 	writeFile(t, filepath.Join(repo, ".gitignore"), "scripts/CLAUDE.md\n")
 	writeFile(t, filepath.Join(repo, "scripts", "CLAUDE.md"), "local\n")
 
