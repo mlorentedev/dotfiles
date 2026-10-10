@@ -9,14 +9,16 @@ import (
 )
 
 // configsEnv is a checkout whose ai/deploy.json declares one entry for every
-// OS and one that requires a command the machine lacks, and an empty HOME.
+// OS, one that requires a command the machine lacks, and one for another OS,
+// and an empty HOME.
 func configsEnv(t *testing.T) Env {
 	t.Helper()
 	repo := t.TempDir()
 	writeFixture(t, repo, map[string]string{
-		"ai/deploy.json": `{"version": 3, "configs": [
+		"ai/deploy.json": `{"version": 4, "configs": [
 		  {"name": "agent", "src": "ai/agent.json", "dst": "{HOME}/.agent/settings.json", "mode": "0644"},
-		  {"name": "absent", "src": "ai/absent.json", "dst": "{HOME}/.absent/settings.json", "mode": "0644", "requires": "absent-tool"}
+		  {"name": "absent", "src": "ai/absent.json", "dst": "{HOME}/.absent/settings.json", "mode": "0644", "requires": "absent-tool"},
+		  {"name": "winonly", "src": "ai/absent.json", "dst": "{HOME}/.win/settings.json", "mode": "0644", "platforms": ["windows"]}
 		]}`,
 		"ai/agent.json":  `{"model":"pinned"}`,
 		"ai/absent.json": `{}`,
@@ -42,6 +44,13 @@ func TestConfigsDeploy_PlanWritesNothingApplyConvergesAndRerunIsANoOp(t *testing
 	}
 	if plan.Changes != 1 || !strings.Contains(plan.Detail, "agent") {
 		t.Errorf("plan: want 1 change naming agent, got %d (%s)", plan.Changes, plan.Detail)
+	}
+	// An absent command and another OS are different reasons: the first is a
+	// config that applies here and did not land, so it is named, not counted.
+	for _, want := range []string{"absent (absent-tool not installed)", "1 not for this machine"} {
+		if !strings.Contains(plan.Detail, want) {
+			t.Errorf("plan detail %q does not say %q", plan.Detail, want)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(env.Home, ".agent")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("the plan wrote under HOME: %v", err)

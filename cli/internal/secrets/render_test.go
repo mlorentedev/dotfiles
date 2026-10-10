@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -160,6 +161,40 @@ func TestRender_AbsentSecret_QuietMissing(t *testing.T) {
 	}
 	if len(res.Unresolved) != 0 {
 		t.Errorf("absent must not be Unresolved; Unresolved = %v", res.Unresolved)
+	}
+}
+
+// lockedBW answers every read the way a locked Bitwarden vault does.
+type lockedBW struct{}
+
+func (lockedBW) Field(string, string) (string, error) {
+	return "", fmt.Errorf("%w: bw get", ErrBWVaultLocked)
+}
+
+// A locked vault is a transient failure, not an absent secret: it lands in
+// Unresolved. converge's strict renderer keys on exactly this split, keeping
+// the installed config on Unresolved, so a locked vault reported as Missing
+// would install the placeholder over the resolved value (lesson 378, #2245).
+func TestRender_LockedVault_UnresolvedNotMissing(t *testing.T) {
+	reg := parseRenderReg(t, `
+version: 1
+secrets:
+  - {id: s, plane: app, backend: bw, bw: {item: some-item, field: api-token}, expose: {env: SOME_VAR}}
+`)
+	path := renderFixture(t, `x={env:SOME_VAR}`)
+
+	res, err := Render(path, reg, &Loader{BW: lockedBW{}}, "/h")
+	if err != nil {
+		t.Fatalf("Render must not fail on a locked vault: %v", err)
+	}
+	if len(res.Missing) != 0 {
+		t.Errorf("a locked vault is not an absent secret; Missing = %v", res.Missing)
+	}
+	if len(res.Unresolved) != 1 || res.Unresolved[0].Var != "SOME_VAR" {
+		t.Fatalf("Unresolved = %v, want one entry for SOME_VAR", res.Unresolved)
+	}
+	if !errors.Is(res.Unresolved[0].Err, ErrBWVaultLocked) {
+		t.Errorf("the lock is not carried in the error: %v", res.Unresolved[0].Err)
 	}
 }
 

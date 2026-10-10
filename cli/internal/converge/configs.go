@@ -80,12 +80,14 @@ func (r configsDeploy) Probe(env Env) error {
 // entries that do not apply here, so a run that skipped a config never reads
 // as one that converged it.
 func configsDetail(res deploy.RunResult, changed []string, dryRun bool) string {
-	var kept []string
+	var kept, absent []string
 	notHere := 0
 	for _, s := range res.Steps {
 		switch {
 		case s.Kept:
 			kept = append(kept, s.Name)
+		case s.Absent != "":
+			absent = append(absent, fmt.Sprintf("%s (%s not installed)", s.Name, s.Absent))
 		case s.Skipped != "":
 			notHere++
 		}
@@ -94,12 +96,15 @@ func configsDetail(res deploy.RunResult, changed []string, dryRun bool) string {
 	if dryRun {
 		verb = "to deploy"
 	}
-	parts := []string{fmt.Sprintf("%d config(s) in sync", len(res.Steps)-len(changed)-len(kept)-notHere)}
+	parts := []string{fmt.Sprintf("%d config(s) in sync", len(res.Steps)-len(changed)-len(kept)-len(absent)-notHere)}
 	if len(changed) > 0 {
 		parts = append(parts, fmt.Sprintf("%d %s: %s", len(changed), verb, strings.Join(changed, ", ")))
 	}
 	if len(kept) > 0 {
 		parts = append(parts, "kept (secrets locked): "+strings.Join(kept, ", "))
+	}
+	if len(absent) > 0 {
+		parts = append(parts, "skipped, command absent: "+strings.Join(absent, ", "))
 	}
 	if notHere > 0 {
 		parts = append(parts, fmt.Sprintf("%d not for this machine", notHere))

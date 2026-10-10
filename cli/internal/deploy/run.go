@@ -29,7 +29,10 @@ type Step struct {
 	Skipped string // why the entry did not run here; empty when it ran
 	// Kept marks a skip caused by an incomplete render: the entry applies
 	// here, and the installed file stays until the secret store answers.
-	Kept    bool
+	Kept bool
+	// Absent names the `requires` command missing from PATH, when that is why
+	// the entry did not run: it applies to this OS, unlike a platform skip.
+	Absent  string
 	Outcome Outcome
 }
 
@@ -71,7 +74,7 @@ func Run(man *Manifest, targets []Config, o RunOptions) (RunResult, error) {
 		case !c.AppliesOn(o.GOOS):
 			step.Skipped = "not for " + o.GOOS
 		case c.Requires != "" && (o.Available == nil || !o.Available(c.Requires)):
-			step.Skipped = c.Requires + " not installed"
+			step.Skipped, step.Absent = c.Requires+" not installed", c.Requires
 		default:
 			out, err := Deploy(c, o.RepoRoot, o.Home, o.Resolve, o.Render, o.DryRun)
 			if errors.Is(err, ErrRenderIncomplete) {
