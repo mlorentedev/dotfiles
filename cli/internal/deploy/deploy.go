@@ -782,13 +782,15 @@ type mergeFormat struct {
 	encode       func(map[string]any) ([]byte, error)
 }
 
-// jsonMerge drops `//` header lines from the destination on read only:
-// Copilot rewrites its config.json with a `// User settings belong in
-// settings.json` header. The merged file is plain JSON, and the tool that wants
-// a header puts it back.
+// jsonMerge drops whole-line `//` comments on read, from both sides. Copilot
+// rewrites its config.json with a `// User settings belong in settings.json`
+// header, and opencode's tui.json source documents its keys with comment lines
+// (#2260). The merged file is plain JSON, and the tool that wants a header puts
+// it back. A comment line names no value, so dropping it changes nothing the
+// repo owns.
 var jsonMerge = mergeFormat{
 	what:         "a JSON object",
-	decodeSource: decodeJSONMap,
+	decodeSource: func(raw []byte) (map[string]any, error) { return decodeJSONMap(stripLineComments(raw)) },
 	decodeDest:   func(raw []byte) (map[string]any, error) { return decodeJSONMap(stripLineComments(raw)) },
 	encode:       func(m map[string]any) ([]byte, error) { return encodeJSON(m) },
 }

@@ -269,3 +269,46 @@ func TestParseManifest_ValidatesStrategyByName(t *testing.T) {
 		t.Errorf("strategies: %q %q", m.Configs[0].strategy(), m.Configs[1].strategy())
 	}
 }
+
+// #2260: opencode's tui.json source documents itself with whole-line `//`
+// comments, and Orca registers a `plugin` key in the deployed copy. A merge
+// must read the commented source, keep Orca's key, and report a re-run in sync.
+func TestDeploy_MergeReadsACommentedSourceAndKeepsAForeignKey(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join(root, "ai", "opencode", "tui.json")
+	if err := os.MkdirAll(filepath.Dir(src), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "// OpenCode TUI configuration.\n// Schema: https://opencode.ai/tui.json\n{\n  \"$schema\": \"https://opencode.ai/tui.json\",\n  // Follow the terminal palette.\n  \"theme\": \"opencode\"\n}\n"
+	if err := os.WriteFile(src, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	dst := filepath.Join(home, ".config", "opencode", "tui.json")
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	orca := "// OpenCode TUI configuration.\n{\n  \"theme\": \"old\",\n  \"plugin\": [\"file:///home/u/.config/opencode/plugins/orca/tui.js\"]\n}\n"
+	if err := os.WriteFile(dst, []byte(orca), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := Config{Name: "opencode-tui", Src: "ai/opencode/tui.json", Dst: "{HOME}/.config/opencode/tui.json", Mode: "0644", Strategy: StrategyMerge}
+
+	if _, err := Deploy(c, root, home, noResolve, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	got := readObject(t, dst)
+	if got["theme"] != "opencode" || got["$schema"] != "https://opencode.ai/tui.json" {
+		t.Errorf("managed keys not written: %v", got)
+	}
+	if plugins, _ := got["plugin"].([]any); len(plugins) != 1 {
+		t.Errorf("Orca's plugin key was lost: %v", got)
+	}
+	again, err := Deploy(c, root, home, noResolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Changed {
+		t.Error("a re-run over the merged file must report it in sync")
+	}
+}
