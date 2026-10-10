@@ -248,3 +248,144 @@ func TestRotate_SyncFailureWarnsButDoesNotFail(t *testing.T) {
 		t.Errorf("the sync failure must be surfaced\n%s", out.String())
 	}
 }
+
+// AC4: an entry declaring `validate:` is probed with the NEW value after the
+// read-back, and a probe that refuses it fails the rotation even though the write
+// and the fingerprint change both succeeded.
+func TestRotate_ProbesTheNewValueAndFailsWhenItDoesNotAuthenticate(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		probe   error
+		wantErr bool
+		wantOut string
+	}{
+		{"live", nil, false, "verified live github token"},
+		{"refused", errors.New("401 Bad credentials"), true, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rw := &fakeRW{fields: map[string]string{"github-bitacora-pat/api-token": "old-pat"}}
+			out := rotateHarness(t, rw, &fakeSyncer{})
+			v := &fakeValidator{err: tc.probe}
+			useGHTokenValidator(t, v)
+
+			cmd := newSecretsRotateCmd()
+			cmd.SetOut(out)
+			cmd.SetErr(out)
+			cmd.SetIn(strings.NewReader("new-pat"))
+			useTempRegistry(t, rotateRegistry)
+
+			err := cmd.RunE(cmd, []string{"BITACORA_PAT"})
+			if len(v.calls) != 1 || v.calls[0] != "new-pat" {
+				t.Fatalf("the probe must run once against the new value, got %d call(s)", len(v.calls))
+			}
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "does not authenticate") {
+					t.Fatalf("a refused probe must fail the rotation, got %v\n%s", err, out.String())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("rotate: %v\n%s", err, out.String())
+			}
+			if !strings.Contains(out.String(), tc.wantOut) {
+				t.Errorf("want %q in the output\n%s", tc.wantOut, out.String())
+			}
+		})
+	}
+}
+
+// pushCIRegistry: a secret two repos consume in CI, and one no CI consumes.
+const pushCIRegistry = `
+version: 1
+secrets:
+  - id: DOCKERHUB_TOKEN
+    plane: app
+    backend: bw
+    bw: { item: dockerhub, field: PAT, folder: Dotfiles/apps }
+    expose: { env: DOCKERHUB_TOKEN }
+    consumers: [ci:o/a, ci:o/b, local]
+  - id: LOCAL_ONLY
+    plane: app
+    backend: bw
+    bw: { item: local-only, field: key, folder: Dotfiles/apps }
+    expose: { env: LOCAL_ONLY }
+`
+
+// runRotateWith rotates id to "new-value" with the given flags and returns the
+// uploads the GitHub seam received.
+func runRotateWith(t *testing.T, fields map[string]string, args ...string) (fakeSetter, string, error) {
+	t.Helper()
+	rw := &fakeRW{fields: fields}
+	out := rotateHarness(t, rw, &fakeSyncer{})
+	uploads := fakeSetter{}
+	useGHSecretSetter(t, uploads)
+	useTempRegistry(t, pushCIRegistry)
+
+	cmd := newSecretsRotateCmd()
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetIn(strings.NewReader("new-value"))
+	cmd.SetArgs(args)
+	err := cmd.Execute()
+	return uploads, out.String(), err
+}
+
+// --push-ci hands the rotated value to every repo whose CI consumes the secret, so
+// a rotation does not leave GitHub Actions on the retired credential.
+func TestRotate_PushCIUploadsTheNewValueToEveryCIConsumer(t *testing.T) {
+	uploads, out, err := runRotateWith(t, map[string]string{"dockerhub/PAT": "old-value"},
+		"DOCKERHUB_TOKEN", "--push-ci")
+	if err != nil {
+		t.Fatalf("rotate --push-ci: %v\n%s", err, out)
+	}
+	for _, key := range []string{"o/a|DOCKERHUB_TOKEN", "o/b|DOCKERHUB_TOKEN"} {
+		if uploads[key] != "new-value" {
+			t.Errorf("%s: want the rotated value uploaded, got %q\n%s", key, uploads[key], out)
+		}
+	}
+	if len(uploads) != 2 {
+		t.Errorf("want exactly the two ci consumers, got %v", uploads)
+	}
+	if strings.Contains(out, "new-value") {
+		t.Errorf("rotate --push-ci printed the secret value\n%s", out)
+	}
+}
+
+// Without the flag nothing leaves the vault: pushing to CI is an explicit act.
+func TestRotate_WithoutPushCIUploadsNothing(t *testing.T) {
+	uploads, out, err := runRotateWith(t, map[string]string{"dockerhub/PAT": "old-value"}, "DOCKERHUB_TOKEN")
+	if err != nil {
+		t.Fatalf("rotate: %v\n%s", err, out)
+	}
+	if len(uploads) != 0 {
+		t.Errorf("rotate without --push-ci uploaded %v", uploads)
+	}
+}
+
+// A secret no CI consumes rotates normally and says there was nothing to push,
+// rather than failing a rotation that succeeded.
+func TestRotate_PushCIWithNoCIConsumerSaysSo(t *testing.T) {
+	uploads, out, err := runRotateWith(t, map[string]string{"local-only/key": "old-value"},
+		"LOCAL_ONLY", "--push-ci")
+	if err != nil {
+		t.Fatalf("rotate --push-ci: %v\n%s", err, out)
+	}
+	if len(uploads) != 0 || !strings.Contains(out, "no ci: consumer") {
+		t.Errorf("want no upload and a note naming the absence, got %v\n%s", uploads, out)
+	}
+}
+
+// --dry-run names the repos a real run would push to, and pushes nothing.
+func TestRotate_DryRunPushCINamesTheReposAndUploadsNothing(t *testing.T) {
+	uploads, out, err := runRotateWith(t, map[string]string{"dockerhub/PAT": "old-value"},
+		"DOCKERHUB_TOKEN", "--push-ci", "--dry-run")
+	if err != nil {
+		t.Fatalf("rotate --dry-run --push-ci: %v\n%s", err, out)
+	}
+	if len(uploads) != 0 {
+		t.Errorf("--dry-run uploaded %v", uploads)
+	}
+	if !strings.Contains(out, "o/a") || !strings.Contains(out, "o/b") {
+		t.Errorf("--dry-run must name both repos it would push to\n%s", out)
+	}
+}

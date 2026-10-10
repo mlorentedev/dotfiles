@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-037-secrets-rotate-f1",
+    "behavior": "AC1: rotate writes, syncs the backend and re-reads through the read path",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestRotate_WritesSyncsAndProvesTheChange$' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  },
+  {
+    "id": "CLI-037-secrets-rotate-f2",
+    "behavior": "AC2: before/after fingerprints, never the value; an unchanged read-back fails",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestRotate_(WritesSyncsAndProvesTheChange|FailsWhenTheReadPathStillServesTheOldValue)$' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  },
+  {
+    "id": "CLI-037-secrets-rotate-f3",
+    "behavior": "AC3: a no-op is refused and nothing is written; rotate never creates",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestRotate_(RefusesANoOp|RefusesToCreate)$' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  },
+  {
+    "id": "CLI-037-secrets-rotate-f4",
+    "behavior": "AC4: the declared probe runs on the new value and a refusal fails the rotation",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestRotate_ProbesTheNewValueAndFailsWhenItDoesNotAuthenticate$' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  },
+  {
+    "id": "CLI-037-secrets-rotate-f5",
+    "behavior": "AC5: --dry-run reports fingerprint, probe and CI repos, writing nothing",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestRotate_DryRun' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  },
+  {
+    "id": "CLI-037-secrets-rotate-f6",
+    "behavior": "AC6: the write path runs through bw serve, no ambient BW_SESSION",
+    "verification": "cd cli && out=$(go test ./internal/secrets -count=1 -run '^TestSelectBWBackend_ReadAndWriteAlwaysAgree$|^TestBWServeWriter_SetField_UpdatesAndPreserves$' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  },
+  {
+    "id": "CLI-037-secrets-rotate-f7",
+    "behavior": "AC7: --push-ci uploads to every ci consumer and nothing else; no flag, no upload; no consumer is a note",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestRotate_(PushCI|WithoutPushCI)' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 in the closing worktree"
+  }
+]

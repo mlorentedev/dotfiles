@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
@@ -85,63 +86,71 @@ func newSecretsSyncCiCmd() *cobra.Command {
 			if sel.Upload, err = scopeUpload(sel.Upload, names, repo); err != nil {
 				return err
 			}
-			out := cmd.OutOrStdout()
-			for _, sk := range sel.Skipped {
-				_, _ = fmt.Fprintf(out, "skip %s: %s\n", sk.ID, sk.Reason)
-			}
-			if len(sel.Upload) == 0 {
-				_, _ = fmt.Fprintf(out, "no ci secrets selected for %s\n", repo)
-				return nil
-			}
-
-			// One Loader path resolves both age and bw entries — the backend-agnostic
-			// boundary ADR-029 introduces. Fail-fast: a resolution error aborts before any
-			// upload, so the repo is never left with a partial secret set.
-			env, err := secretLoader().EnvFor(sel.Upload, nil)
-			if err != nil {
-				return err
-			}
-
-			// Pre-upload liveness gate: an entry marked `validate: github-token` must
-			// authenticate before ANY upload, so a dead/expired PAT is never pushed to
-			// Actions (the BITACORA_PAT incident — a redeploy refreshed updated_at on a
-			// 401 token). Opt-in per entry; liveness can't be probed generically across
-			// providers, so unmarked secrets are untouched. --skip-verify bypasses.
-			if !skipVerify {
-				for i, kv := range env {
-					e := sel.Upload[i]
-					if e.Validate != "github-token" {
-						continue
-					}
-					name := e.Var
-					value := kv[len(name)+1:]
-					if err := ghTokenValidator.Validate(value); err != nil {
-						return fmt.Errorf("%s failed its github-token liveness check — refusing to upload a dead "+
-							"credential (rotate it, or re-run with --skip-verify): %w", name, err)
-					}
-					_, _ = fmt.Fprintf(out, "verified %s (live github token)\n", name)
-				}
-			}
-
-			for i, kv := range env {
-				name := sel.Upload[i].Var
-				value := kv[len(name)+1:] // EnvFor returns "name=value"
-				if dryRun {
-					_, _ = fmt.Fprintf(out, "would set %s → %s (%d bytes)\n", name, repo, len(value))
-					continue
-				}
-				if err := ghSecretSetter.SetSecret(repo, name, value); err != nil {
-					return err
-				}
-				_, _ = fmt.Fprintf(out, "set %s → %s\n", name, repo)
-			}
-			return nil
+			return pushCI(cmd.OutOrStdout(), sel, repo, dryRun, skipVerify)
 		},
 	}
 	c.Flags().StringVar(&repo, "repo", "", "target repo owner/name (default: current repo's origin)")
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report VAR→repo without uploading (names + byte lengths, never values)")
 	c.Flags().BoolVar(&skipVerify, "skip-verify", false, "skip the github-token liveness check for entries marked validate: github-token")
 	return c
+}
+
+// pushCI uploads a CI selection to one repo's GitHub Actions secrets: it reports
+// the skipped entries, resolves every value before uploading any, gates entries
+// marked `validate: github-token` on liveness, then sets each secret. `sync ci`
+// and `rotate --push-ci` share it, so a rotated credential reaches CI through the
+// same gate as a synced one.
+func pushCI(out io.Writer, sel secrets.CISelection, repo string, dryRun, skipVerify bool) error {
+	for _, sk := range sel.Skipped {
+		_, _ = fmt.Fprintf(out, "skip %s: %s\n", sk.ID, sk.Reason)
+	}
+	if len(sel.Upload) == 0 {
+		_, _ = fmt.Fprintf(out, "no ci secrets selected for %s\n", repo)
+		return nil
+	}
+
+	// One Loader path resolves both age and bw entries — the backend-agnostic
+	// boundary ADR-029 introduces. Fail-fast: a resolution error aborts before any
+	// upload, so the repo is never left with a partial secret set.
+	env, err := secretLoader().EnvFor(sel.Upload, nil)
+	if err != nil {
+		return err
+	}
+
+	// Pre-upload liveness gate: an entry marked `validate: github-token` must
+	// authenticate before ANY upload, so a dead/expired PAT is never pushed to
+	// Actions (the BITACORA_PAT incident — a redeploy refreshed updated_at on a
+	// 401 token). Opt-in per entry; liveness can't be probed generically across
+	// providers, so unmarked secrets are untouched. --skip-verify bypasses.
+	if !skipVerify {
+		for i, kv := range env {
+			e := sel.Upload[i]
+			if e.Validate != "github-token" {
+				continue
+			}
+			name := e.Var
+			value := kv[len(name)+1:]
+			if err := ghTokenValidator.Validate(value); err != nil {
+				return fmt.Errorf("%s failed its github-token liveness check — refusing to upload a dead "+
+					"credential (rotate it, or re-run with --skip-verify): %w", name, err)
+			}
+			_, _ = fmt.Fprintf(out, "verified %s (live github token)\n", name)
+		}
+	}
+
+	for i, kv := range env {
+		name := sel.Upload[i].Var
+		value := kv[len(name)+1:] // EnvFor returns "name=value"
+		if dryRun {
+			_, _ = fmt.Fprintf(out, "would set %s → %s (%d bytes)\n", name, repo, len(value))
+			continue
+		}
+		if err := ghSecretSetter.SetSecret(repo, name, value); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(out, "set %s → %s\n", name, repo)
+	}
+	return nil
 }
 
 // scopeUpload narrows a repo's CI selection to the named GitHub secrets, or keeps it
