@@ -344,8 +344,16 @@ setup() {
 
 @test "opencode tui.json deployed by dotf deploy, not by a setup block (#1843 B11)" {
     # The setup copy was deleted; the `opencode-tui` entry of ai/deploy.json is
-    # now the only writer, so this fails if that entry stops applying.
-    cmp "$REPO_DIR/ai/opencode/tui.json" "$HOME/.config/opencode/tui.json"
+    # now the only writer, so this fails if that entry stops applying. The entry
+    # merges (#2260): the file is plain JSON and may hold keys the repo does not
+    # own (Orca's `plugin`). So the check is the merge's own invariant, that
+    # overlaying the source on the deployed file changes nothing, not equality.
+    # jq's `*` replaces arrays where the merge unions them; the source has none.
+    # Both sides drop comment lines: a merge that changes nothing does not
+    # rewrite, so a file an earlier `replace` deployed keeps the source's.
+    [ -f "$HOME/.config/opencode/tui.json" ]
+    src=$(grep -v '^[[:space:]]*//' "$REPO_DIR/ai/opencode/tui.json" | jq -c .)
+    grep -v '^[[:space:]]*//' "$HOME/.config/opencode/tui.json" | jq -e --argjson src "$src" '. * $src == .'
 }
 
 @test "opencode commands deployed to ~/.config/opencode/commands/ (SDD-008)" {

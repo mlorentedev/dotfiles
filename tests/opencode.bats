@@ -359,8 +359,12 @@ PY
     grep -qE '"display_thinking":[[:space:]]*"ctrl\+o"' "$TUI_CFG"
 }
 
-@test "tui.json is a plain deploy entry, no secret substitution (DX-004 AC3, #1843 B11)" {
-    # tui.json carries no secrets: a verbatim copy, never `dotf secrets render`.
-    jq -e '.configs[] | select(.name == "opencode-tui" and .src == "ai/opencode/tui.json" and .dst == "{HOME}/.config/opencode/tui.json" and .render == false)' "$DOTFILES_DIR/ai/deploy.json"
+@test "tui.json is a merged deploy entry, no secret substitution (DX-004 AC3, #1843 B11, #2260)" {
+    # tui.json carries no secrets: never `dotf secrets render`. It is merged, not
+    # replaced: Orca registers its status plugin under `plugin` in the deployed
+    # file, and a replace deleted that key on every `dotf deploy` (#2260).
+    jq -e '.configs[] | select(.name == "opencode-tui" and .src == "ai/opencode/tui.json" and .dst == "{HOME}/.config/opencode/tui.json" and .render == false and .strategy == "merge")' "$DOTFILES_DIR/ai/deploy.json"
+    # The repo must not claim the key Orca owns, or the merge would overwrite it.
+    refute_grep '"plugin"' "$DOTFILES_DIR/ai/opencode/tui.json"
     refute_grep 'TUI_(SRC|DST)=' "$SETUP_SCRIPT"
 }
