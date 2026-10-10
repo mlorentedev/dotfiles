@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,9 +25,14 @@ var PrunedDeployDirTrees = []string{".zsh", "ssh", "scripts"}
 // GitRunner runs git with args in dir and returns its stdout.
 type GitRunner func(dir string, args ...string) (string, error)
 
-// ExecGit is the production GitRunner.
+// ExecGit is the production GitRunner. A failure carries git's own stderr,
+// because "exit status 128" alone names neither the cause nor the remedy.
 func ExecGit(dir string, args ...string) (string, error) {
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output() //nolint:gosec // fixed binary, args built here
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && len(bytes.TrimSpace(exitErr.Stderr)) > 0 {
+		err = fmt.Errorf("%w: %s", err, bytes.TrimSpace(exitErr.Stderr))
+	}
 	return string(out), err
 }
 
