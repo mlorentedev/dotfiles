@@ -182,6 +182,34 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] Windows (owner decision 2026-10-09): `test-windows` failed `[Python]` with `python cannot import at their pin: pyyaml (install mise, ...)`, a remedy Windows cannot take with mise disabled. Without mise a missing package now warns, as `Pinned CLIs (mise)` does for the CLIs; the 3.11 floor still fails everywhere (`TestCheckPython_APackageMissingWithoutMiseWarns`, red before the change)
 - [x] On the Mac, after merge: `dotf tools sync`, `pip3 uninstall --user pyyaml` from the system 3.9, then `dotf doctor` passes `[Python]` and `[Pinned CLIs (mise)]`
 
+### Toolset A — kubelab essentials (owner decision on #2013, 2026-10-09)
+
+- [x] `versionArgs` in `cli/internal/tools/mise.go`: the sync probes argocd, helm, hcloud, k9s, kubeconform, kubectl and kustomize with the arguments they take; all seven reject `--version` as an unknown flag (measured on darwin-arm64 in an isolated mise). `TestProbeVersionArgs` (real banners), `TestSync_ProbesAToolWithoutVersionFlagThroughItsArgs` (fails with the kubectl row removed)
+- [x] Guard: `tests/versions-conf.bats` refuses those seven under `# mise: cli` while `DOTF_VERSION` <= 0.66.0. Five mutations give the expected verdict: argocd marked under 0.66.0 fails, an indented kubectl marker under 0.66.0 fails, argocd marked under 0.67.0 and 0.100.0 passes, argocd unmarked passes
+- [x] Marked for mise, in their own delimited group: terraform 1.16.4 (sha256), mkcert 1.4.4 (release digest only), cloudflared 2026.9.3 (release digest only), trivy 0.74.0 (checksums + cosign)
+- [x] Catalog: `ansible` (uv-tool `ansible-core` 2.21.4) and `ansible-lint` 26.9.0, linux and darwin only (no native Windows control node, kubelab lesson-296); `aws` as `system` (brew `awscli`, winget `Amazon.AWSCLI`), no apt entry, because apt carries CLI v1 where it carries it at all and v2 ships only through AWS's installer, so Linux takes that installer
+- [x] From the worktree on the Mac: `dotf tools sync --dry-run` lists `to install: cloudflared, mkcert, terraform, trivy`; `dotf tools install --dry-run` plans `install` for ansible 2.21.4, ansible-lint 26.9.0 and aws
+- [ ] After the release carrying `versionArgs` is the `DOTF_VERSION` pin: mark argocd 3.5.3, kustomize 5.8.1, hcloud 1.69.0 (Toolset A), k9s 0.51.0 and kubeconform 0.8.0 (Toolset B), and kubectl 1.35.8 and helm 3.21.4 (measured by P5b). The guard's `last` is 0.66.0, the newest release without the table: a release cut before this PR merges must raise it
+- Windows: every mise pin waits for Windows mise (#2013); the catalog entries above install there today only where they name a winget package
+
+### Toolset B — k8s daily and lint (stacked on Toolset A)
+
+- [x] Marked for mise in the toolset group: kubectx and kubens 0.11.0, stern 1.34.0 and shfmt 3.14.1 (sha256); yq 4.53.6 (sha512 + cosign); tflint 0.64.0, hadolint 2.15.1 and actionlint 1.7.12 (checksums + GitHub artifact attestations). Each answers `--version` with its version (measured on darwin-arm64 in an isolated mise), so the released dotf counts them
+- [x] k9s 0.51.0 and kubeconform 0.8.0 reject `--version` and wait with the rest of the Toolset A deferral
+- [x] `gopls` as a `system` entry, brew only. No mise registry entry, Go is not under mise, and apt's gopls lags the pinned Go by several releases, so Linux and Windows have no declared channel for it until Go moves to mise (Wave 3)
+- [x] No setup script installs any of these, so each has one owner (`tests/packages-json.bats`, #2195)
+- [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds actionlint, hadolint, kubectx, kubens, shfmt, stern, tflint and yq to the install list; `dotf tools install --dry-run` plans `install` for gopls
+- Windows: every mise pin waits for Windows mise (#2013)
+
+### Toolset C — ergonomics (stacked on Toolset B)
+
+- [x] Marked for mise in the toolset group: delta 0.19.2, fd 10.5.0 and bat 0.26.1. Their aqua entries declare no checksum, so mise checks the release digest only (the herdr precedent). Each answers `--version` with its version, measured on darwin-arm64 in an isolated mise
+- [x] Debian's packages rename two of them (`fdfind`, `batcat`); through mise they keep their own names on every OS, and no rc file aliases either
+- [x] `btop` as a `system` entry (apt, brew): aqua's btop carries a Linux asset only, and upstream ships no Windows build (btop4win is a separate project), so Windows has no entry
+- Not in scope: making delta git's pager. Declaring the tool does not change `core.pager`; that is a config decision for the owner
+- [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds bat, delta and fd to the install list; `dotf tools install --dry-run` plans `install` for btop
+- Windows: every mise pin waits for Windows mise (#2013)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
