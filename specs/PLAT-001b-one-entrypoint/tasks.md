@@ -113,10 +113,10 @@ Gated on a release that carries 4a.
 
 ### PR 5 — legacy reconcilers and `dotf update`
 
-- [ ] [P] Failing test: on linux and windows the legacy reconciler runs the setup script after every native reconciler and plans `opaque`; on darwin it is absent from the registry
-- [ ] Implement the legacy reconciler
-- [ ] [AC8] Failing test: `dotf update` runs `dotf converge` after a fast-forward, keeps exit 0 on every non-actionable case, and exits non-zero only on a converge failure
-- [ ] [AC8] Route `dotf update` through `converge`; keep `DOTFILES_SELFUPDATE_SETUP_CMD` as an override until #1843 A5 decides the scheduled path
+- [x] [P] Failing test: on linux and windows the legacy reconciler runs the setup script after every native reconciler and plans `opaque`; on darwin it is reported skipped with the OS named (AC5), rather than absent, so the report says why no setup ran
+- [x] Implement the legacy reconciler: `StatusOpaque` (never counted as changed or converged), last in the registry, and a guard env so a setup script that calls `dotf converge` cannot start itself again
+- [x] [AC8] Failing test: `dotf update` runs `dotf converge` after a fast-forward, keeps exit 0 on every non-actionable case, and exits non-zero only on a converge failure
+- [x] [AC8] Route `dotf update` through `converge` (one `runConverge` path for both commands); `DOTFILES_SELFUPDATE_SETUP_CMD` stays an override, now of the command the legacy step runs, until #1843 A5 decides the scheduled path
 
 ### PR 6 — from-zero proof (#2013 X1)
 

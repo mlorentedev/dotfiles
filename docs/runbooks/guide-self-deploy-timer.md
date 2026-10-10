@@ -9,7 +9,7 @@ created: "2026-06-09"
 # Runbook: dotfiles self-deploy timer (OPS-001)
 
 > Opt-in automation that keeps a machine converged to `origin/main` by pulling the dotfiles repo
-> (fast-forward only) and re-running the idempotent setup. Design: [ADR-019](../adr/adr-019-self-deploy-fast-forward-only.md).
+> (fast-forward only) and converging from it (`dotf converge`, whose last step re-runs the setup script on Linux and Windows). Design: [ADR-019](../adr/adr-019-self-deploy-fast-forward-only.md).
 > Issue: [#295](https://github.com/mlorentedev/dotfiles/issues/295).
 
 ## What it does
@@ -20,9 +20,9 @@ Once a day the timer runs `dotf update` (the Go port of the former
 1. Skips if the repo worktree is **dirty** (uncommitted changes).
 2. `git fetch`es; skips on a network failure.
 3. Fast-forwards `main` **only** if it can; skips on diverged/non-ff history.
-4. Re-runs `setup` **only if `HEAD` actually moved**.
+4. Runs `dotf converge` **only if `HEAD` actually moved**. Its last step re-runs the setup script.
 
-Every skip exits 0 (benign). Only a setup command that runs and fails exits non-zero.
+Every skip exits 0 (benign). Only a converge that runs and fails exits non-zero.
 
 ```mermaid
 flowchart TB
@@ -34,7 +34,7 @@ flowchart TB
     FF -- no --> S3["skip — diverged (exit 0)"]
     FF -- yes --> M{HEAD moved?}
     M -- no --> S4["skip — already current (exit 0)"]
-    M -- yes --> SETUP["re-run setup"]
+    M -- yes --> SETUP["dotf converge (setup script last)"]
     SETUP --> OK([exit 0]) & ERR(["exit ≠0 — only real failure"])
 ```
 
@@ -86,7 +86,7 @@ Get-ScheduledTaskInfo -TaskName DotfilesSelfUpdate   # LastRunTime / LastTaskRes
 | `[skip] ... diverged ... (non fast-forward)` | local commits not on `origin/main` | push or reconcile your branch; non-ff is never auto-resolved |
 | `[skip] git fetch failed (network?)` | offline / remote unreachable | transient; next slot retries |
 | `[skip] No upstream configured` | current branch has no `@{u}` | `git branch --set-upstream-to=origin/main` |
-| service shows **failed** | `setup` itself errored (not a skip) | read `journalctl --user -u dotfiles-selfupdate.service` |
+| service shows **failed** | a converge step errored, the setup script included (not a skip) | read `journalctl --user -u dotfiles-selfupdate.service`; the report names the failing step, and `~/.local/state/dotfiles/converge/last.json` keeps it |
 
 ```bash
 # Linux logs
@@ -96,5 +96,6 @@ journalctl --user -u dotfiles-selfupdate.service --since today
 ## Override the target repo
 
 `dotf update` resolves the repo via the ADR-025 seam, defaulting to `$HOME/Projects/dotfiles`;
-override with `DOTFILES_REPO_DIR`. The setup command it re-runs can be overridden with
-`DOTFILES_SELFUPDATE_SETUP_CMD`.
+override with `DOTFILES_REPO_DIR`. The setup command converge runs last can be overridden with
+`DOTFILES_SELFUPDATE_SETUP_CMD`. It replaces only that last step: the native converge steps
+run regardless, so a no-op override no longer makes the timer pull-only.
