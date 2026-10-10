@@ -38,12 +38,17 @@ type Options struct {
 	// env-persist step is skipped.
 	Launchctl env.LaunchctlRunner
 	UID       int
+	// RunSetup runs the setup script of this OS; ExecSetup in production.
+	// Unset, the legacy-setup step is skipped.
+	RunSetup func(Env) error
 }
 
 // Registry is the ordered list of reconcilers a run drives. The order extends
 // ADR-041 decision 4: the checkout comes first, since every step reads it, and
-// records come before anything that reads them (ADR-045 decision 4). Later
-// reconcilers are appended by the rows that port them.
+// records come before anything that reads them (ADR-045 decision 4). The
+// setup script runs last, after every native step, for whatever the native
+// steps do not cover yet; each row that ports a block of it adds a native
+// reconciler before it.
 func Registry(o Options) []Reconciler {
 	url := o.CloneURL
 	if url == "" {
@@ -57,6 +62,7 @@ func Registry(o Options) []Reconciler {
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		gitConfig{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
+		legacySetup{run: o.RunSetup},
 	}
 }
 
