@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // convergeFixture is a checkout with a harness tree and one manifest target,
@@ -118,7 +122,81 @@ func TestConverge_SecondRunIsANoOpAndPersistsTheReport(t *testing.T) {
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatalf("report is not JSON: %v\n%s", err, raw)
 	}
-	if got.Result != "ok" || got.Changed != 0 || len(got.Entries) == 0 || got.Entries[0].Status != "ok" {
+	records := ""
+	for _, e := range got.Entries {
+		if e.Name == "records-mirror" {
+			records = e.Status
+		}
+	}
+	if got.Result != "ok" || got.Changed != 0 || records != "ok" {
 		t.Errorf("second run's report should record a converged machine:\n%s", raw)
+	}
+}
+
+// A machine from zero: no checkout anywhere, run from outside any repository.
+// The plan resolves the default checkout path, plans the clone, and holds the
+// steps that read the checkout back instead of failing on its absence.
+func TestConvergePlan_FromZeroPlansTheCloneFirst(t *testing.T) {
+	_, home := convergeFixture(t)
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Chdir(t.TempDir())
+	saved := convergeOptions
+	convergeOptions = func() converge.Options {
+		o := saved()
+		o.GitRun = gitconfig.ExecRunner
+		o.CloneURL = "https://example.invalid/dotfiles.git"
+		return o
+	}
+
+	stdout, _, err := execute(t, "converge", "--plan")
+	if err != nil {
+		t.Fatalf("a plan from zero must not fail: %v\n%s", err, stdout)
+	}
+	want := filepath.Join(home, "Projects", "dotfiles")
+	for _, s := range []string{"checkout", "clone https://example.invalid/dotfiles.git into " + want, "waits for checkout"} {
+		if !strings.Contains(stdout, s) {
+			t.Errorf("plan lacks %q:\n%s", s, stdout)
+		}
+	}
+	if _, err := os.Stat(want); err == nil {
+		t.Error("a plan must not clone")
+	}
+}
+
+// Run from inside another project, converge plans against the declared
+// checkout instead of refusing the project it happens to stand in.
+func TestConvergePlan_FromAnotherProjectUsesTheDeclaredCheckout(t *testing.T) {
+	_, home := convergeFixture(t)
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(other)
+
+	if got, want := convergeCheckout(home), env.DefaultCheckoutDir(home); got != want {
+		t.Errorf("convergeCheckout() = %q, want the default checkout %q", got, want)
+	}
+}
+
+// The tools step puts on PATH the dirs the production wiring names, so they
+// must be where the catalog installs and where mise keeps its shims: a dir
+// that drifts from the installer's Dest leaves what it installs unreachable.
+func TestConvergeOptions_ToolsBinDirsAreWhereTheToolLayerPlaces(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("MISE_DATA_DIR", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	o := convergeOptions()
+	in, ok := o.ToolsCatalog.(*tools.Installer)
+	if !ok {
+		t.Fatalf("ToolsCatalog is %T, want *tools.Installer", o.ToolsCatalog)
+	}
+	want := []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), in.Dest}
+	if strings.Join(o.ToolsBinDirs, "|") != strings.Join(want, "|") {
+		t.Errorf("ToolsBinDirs = %v, want %v", o.ToolsBinDirs, want)
 	}
 }

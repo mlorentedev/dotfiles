@@ -14,7 +14,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63`; the report in PR 3 / tests `TestConverge_SecondRunIsANoOpAndPersistsTheReport`, `TestWriteReport_RecordsTheRunAndItsOutcome`
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
-- [ ] AC6–AC9 -> PRs 4 to 6
+- [ ] AC6, AC7, AC9 -> PRs 4b and 6
+- [x] AC2, AC3 (hook bindings are records) -> `records-bind` / tests `TestRecordsBind_PlanWritesNothingApplyConvergesAndRerunIsANoOp`, `TestRecordsBind_HooksWithStrippedMarkersAreConverged`, `TestRecordsBind_NoResolverWiredIsSkippedNotPassed`, `TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite`, `TestRegistry_ToolsRunAfterRecords` (order), `TestCheckHookBinding_FailsOnDriftAndFixBindsIt` (doctor)
+- [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
+- [x] AC12 (catalog in the tools step) -> tests `TestToolsCatalog_OneApplyConvergesAFreshMachine` (install, sync, install order, waits reported and accepted by the probe, 0 changes on the next plan), `TestToolsCatalog_AFailedInstallFailsTheStepAndTheProbe` (attempted and reported once), `TestToolsCatalog_AManagerItInstalledButCannotReachFailsTheProbe`, `TestToolsCatalog_ARefusedEntryFailsThePlan`, `TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt`, `TestInstall_AMissingManagerIsANamedSkip`; nine mutations killed (no second pass, sync first, retry walking every entry, probe failing on a genuine wait, mise or uv unreachable accepted, npm not a manager, plan ignoring sudo, sudo asked per entry)
 
 ## Test status
 
@@ -35,6 +38,13 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - End to end (PR 2c-2): a throwaway HOME with a stub `copilot` and this branch's `dotf` on PATH; `compile-harness.sh --deploy` run twice, both rc=0. The second run delegated (`instructions current` for claude, opencode, pi and copilot), the copilot file holds one catalog region and no empty slot, and `dotf harness instructions --dry-run` then reports every target current
 - Manual run (PR 2c-2): `dotf harness instructions --dry-run` against the Mac's real HOME, whose files `compile-harness.sh` wrote, reports claude, opencode and pi current and skips copilot (not on PATH)
 
+- Test suite (PR 4a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Real-git checkout tests (clone then idempotent, behind fast-forwarded, dirty left alone, foreign repo refused, no git from zero). Live: a scratch HOME planned the clone and six steps `waits for checkout`; `--only checkout` cloned from GitHub, then `already current`
+- Test suite (PR 5, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Mutations: a child without the guard env fails `TestExecSetup_RunsTheOverrideMarkedAndFromTheCheckout`; an opaque result reported as a change fails both `TestLegacySetup_*Opaque*` tests
+- Test suite (records-bind, macOS arm64): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; golangci-lint 2.12.2 after a cache clean -> 0 issues
+- Manual run (records-bind): `converge --plan --only records-bind` -> `[ OK ] records-bind 2 harness(es) in sync`, pi and opencode skipped (emit:false); `doctor --verbose` -> `Harness hook bindings`: claude and agy `hooks current`
+- Doctor's `statusOfLine` test helper did not recognise `[FIX ]`, so any test asserting a fix read `-1`; it does now
+- Manual run (catalog, macOS arm64): `converge --plan --only tools` -> `catalog to install: poetry, colima, docker, docker-compose, docker-buildx, ansible, ansible-lint, aws, gopls, btop`, the ten rows `dotf tools install --dry-run` reports; not applied from an unreleased build
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -45,6 +55,16 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - PR 2b runs `compile-harness.sh --deploy` as the records-harness reconciler instead of porting it: the script already deploys the instruction files, the skill catalog and the presence regions in the right order on Linux and macOS, so a port in 2b would have needed a new marker parser and a `dotf` release before the twins could use it (#1814 class). The comparator moved to `harness.StripRegions` is blind to a changed enforced region (F-064), which the 2c port fixes.
 
 - PR 2c-1: deploy-only regions are identified by kind, on both sides: the presence roster, the skill catalog (its BEGIN line names it; pinned against compile-harness.sh) and the empty slot a source reserves for that catalog. Absence from the source was the first rule. It produced a false drift on Windows CI for copilot and would have treated a stale enforced region as deploy-only; the enforced region, with its sha and provenance, is now always compared literally
+
+- PR 4 was split (2026-10-10). From zero, the entrypoint runs the *released* dotf, so swapping `install.sh` before a release carries the checkout step would hand a new machine a converge that cannot clone. And Linux from zero ran `setup-linux.sh`, which only the legacy step (PR 5) brings back. So 4a and PR 5 land first, and 4b waits for the release carrying both.
+- A plan gates the steps after a pending clone or fast-forward (`Result.Gate`, lesson 385).
+- The legacy step is reported skipped on darwin rather than left out of the registry. AC5 already reads "not supported on darwin", and the report then says why no setup ran.
+- A script that cannot plan gets its own status, `opaque`. Counting it as a change would make every second run report one, and counting it as converged would hide what the script did.
+- The catalog joins the `tools` step instead of becoming its own: the runner calls each step once, and the uv tools can only land after the mise sync, so two steps would leave them to a second run.
+- On Linux the catalog moves from a WARN inside setup to a step that fails the run: one unreachable release now stops `configs-deploy` and the steps after it on the hourly `dotf update`, where setup used to log and continue. Accepted: a failure is named in the report and the next run retries, and a converge that reports success over a missing tool is the defect this spec removes. Windows already ran the same catalog from setup, with a non-interactive winget.
+- converge reaches what it places whatever PATH its caller had: the tools step appends to its own process's PATH the directories the tool layer places into (mise's shims, the catalog's `~/.local/bin`), keeping the caller's entries first (`TestTools_ReachesWhereTheToolLayerPlacesWhateverTheCallersPath`). pr-agent found the gap on #2289: the hourly `dotf update` unit runs with a minimal PATH, and the probe would have failed the step on every run. The rc half of #2013 W2b (`mise activate`, the shims on interactive and GUI PATHs) stays W2b.
+- Not the contract's `required_path_entries`, applied at the entrypoint: on a fresh machine the contract only exists after the checkout step, and it does not name the mise shims. Not `Environment=PATH=` in the unit: that fixes one caller on one OS, and the Windows task and a future launchd job would each need a copy.
+- A manager still out of reach after that (mise or uv placed where no listed dir points) fails the probe, naming the manager, rather than accept a wait.
 
 ## Promotion candidates
 

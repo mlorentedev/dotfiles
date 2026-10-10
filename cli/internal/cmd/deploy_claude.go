@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -34,6 +35,15 @@ func (c claudeCLI) List() (string, error) {
 
 func (c claudeCLI) Install(id string) error {
 	return c.combined("plugin", "install", id)
+}
+
+func (c claudeCLI) Marketplaces() (string, error) {
+	out, err := c.command("plugin", "marketplace", "list", "--json").Output()
+	return string(out), err
+}
+
+func (c claudeCLI) RemoveMarketplace(name string) error {
+	return c.combined("plugin", "marketplace", "remove", name)
 }
 
 func (c claudeCLI) McpGet(name string) (string, error) {
@@ -96,11 +106,12 @@ func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error 
 	if !ok {
 		return nil
 	}
-	ids, err := claude.LoadPlugins(filepath.Join(repoRoot, filepath.FromSlash(claude.PluginsRel)))
+	list, err := claude.LoadPlugins(filepath.Join(repoRoot, filepath.FromSlash(claude.PluginsRel)))
 	if err != nil {
 		return fmt.Errorf("%s: %w", step, err)
 	}
-	rep, err := s.Sync(ids, dryRun)
+	retireErr := retireMarketplaces(w, step, s, list.RetiredMarketplaces, dryRun)
+	rep, err := s.Sync(list.Plugins, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
 	if err != nil {
 		return fmt.Errorf("%s: %w", step, err)
@@ -110,7 +121,37 @@ func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error 
 		deployRow(w, "failed", step, "%s did not install", id)
 	}
 	if len(rep.Failed) > 0 {
-		return fmt.Errorf("%s: %d plugin(s) failed to install: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", "))
+		return errors.Join(retireErr, fmt.Errorf("%s: %d plugin(s) failed to install: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", ")))
+	}
+	return retireErr
+}
+
+// retireMarketplaces removes the retired marketplaces a box still registers,
+// before the installs: a failure is reported by name and returned, and the
+// installs still run. It replaces the MEM-002 blocks the setups carried, which
+// never removed the registration (#1431).
+func retireMarketplaces(w io.Writer, step string, s claude.Syncer, names []string, dryRun bool) error {
+	rep, err := s.Retire(names, dryRun)
+	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
+	if err != nil {
+		return fmt.Errorf("%s: %w", step, err)
+	}
+	verb := "removed"
+	if dryRun {
+		verb = "would remove"
+	}
+	for _, name := range rep.Removed {
+		deployRow(w, verb, step, "retired marketplace %s", name)
+	}
+	for _, name := range rep.Failed {
+		if cause := rep.Causes[name]; cause != nil {
+			deployRow(w, "failed", step, "retired marketplace %s is still registered: %v", name, cause)
+			continue
+		}
+		deployRow(w, "failed", step, "retired marketplace %s is still registered", name)
+	}
+	if len(rep.Failed) > 0 {
+		return fmt.Errorf("%s: retired marketplace(s) still registered: %s", step, strings.Join(rep.Failed, ", "))
 	}
 	return nil
 }

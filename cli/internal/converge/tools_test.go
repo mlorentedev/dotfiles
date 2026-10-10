@@ -106,17 +106,21 @@ func (*skipper) Reconcile(Env, bool) (Result, error) {
 }
 func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 
-// The order is the contract: records first, so an agent that starts once a tool
+// The order is the contract: the checkout first, since every step reads it
+// (PLAT-001b PR 4a); then records, so an agent that starts once a tool
 // lands already has its instructions (ADR-045 decision 4). The configs come
 // after the tools, which answer each entry's `requires`, and before git-config,
 // whose probe needs the dotfiles.gitconfig include target that a config entry
-// deploys.
+// deploys. records-bind follows configs-deploy, which seeds the settings files
+// the hooks merge into. env-persist closes the configs step: the env files are configs too
+// (ADR-045 decision 4, step 5). The setup script runs last, after every native
+// step (PLAT-001b PR 5).
 func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	var names []string
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "records-mirror,records-harness,tools,configs-deploy,git-config" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,records-harness,tools,configs-deploy,records-bind,git-config,env-persist,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }

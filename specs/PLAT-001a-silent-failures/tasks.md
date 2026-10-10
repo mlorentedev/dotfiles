@@ -35,6 +35,10 @@ created: "2026-10-05"
 
 - [x] W7: the first `dotf deploy` that replaces a file the machine already had keeps it once as `<dst>.pre-dotf`, and never overwrites that backup (`TestDeploy_KeepsThePreviousFileOnceBeforeReplacingIt`, `TestDeploy_AFreshDestinationNeedsNoBackup`); `dotf deploy` reports it
 - [x] W6: `.zshrc` works on a machine that has not run setup. oh-my-zsh is loaded only when it is installed, with compinit as the fallback; the `*_HOME` toolchain homes are exported and put on PATH only when their directory exists (F-041); brew shellenv is loaded when brew is installed; terraform completion uses the terraform on PATH (F-042); the Mac's hand-made case-insensitive completion is adopted
+- [x] W6 (`.bashrc`): the rc stops replacing PATH with a fixed system list, so what the login shell, the desktop session or the OS put there survives (`/opt/homebrew/bin` would not have, once P7b deploys `.bashrc` to darwin). The `*_HOME` homes are exported only when their directory exists and reach PATH only then (F-041), and brew shellenv runs when brew is installed: the rules `.zshrc` already follows
+- [x] W6 (both rcs): brew shellenv runs only when `HOMEBREW_PREFIX` is not already loaded, so a nested shell does not run brew again. Brew is run by absolute path, which no test PATH can hide, so both guard suites pin the prefix and only the brew test unsets it; each proves both directions, mutation-checked. The bash suite's PATH holds no host directory (#2149)
+  - `tests/bashrc-guards.bats` sources the real rc in an interactive bash with a scratch HOME: the inherited PATH entry survives, a missing home is neither exported nor on PATH, and an existing one is both
+  - Mutation-checked: restoring the PATH reset fails the first test; dropping the directory guard fails the second
 - [x] W2b (shells): `mise activate` in `.zshrc`, `.bashrc` and the PowerShell profile, guarded on mise being installed, before direnv and zoxide; the profile also initialises zoxide on Windows; parity test `every shell activates mise when it is installed`
 - [x] P6 (#1843 B2, zsh and tmux rows): `.zshrc`, `.zsh/*` and `tmux.conf` are `ai/deploy.json` entries with `requires: zsh` / `tmux`, and their `deploy_file` lines leave `setup-linux.sh`; the end-of-setup re-enforcement of `.zshrc` calls `dotf deploy zshrc`. `.bashrc`, `.profile`, `.inputrc`, `.gitconfig` and `ssh/config` wait for #1843 B1's OS selector, which needs a manifest version the installed dotf cannot read
 - [x] On the Mac: `dotf deploy` deployed `.zshrc` (keeping the hand-made one as `~/.zshrc.pre-dotf`) and `~/.zsh/*`, skipped tmux (not installed); a second run is `in sync`; a new zsh starts without warnings and resolves age, jq, direnv, zoxide, fzf and go through mise
@@ -220,6 +224,23 @@ leave the count: `90_archive/`, `00_meta/templates/`, the `sessions/` journals a
 - [x] On the Mac, against the live vault: dead-ends 671/1182 (56%), still FAIL; orphans 161/1042 (15%),
   from a 39% WARN. Thresholds kept at 30/50: what remains is products, clients, project research and
   memory, knowledge notes the FAIL is meant to name
+
+## #2013 P2 — darwin read the env-contract as linux, silently
+
+Doctor's `contractOS` mapped darwin to linux and its report named no OS, and `env.defaultFor` held
+the same rule a second time. The rule now has one definition, and darwin is a key of its own.
+
+- [x] `env.ForOS` resolves every per-OS contract value (a default, the PATH entries) and `env.AppliesOn`
+  every `required_on` scope: darwin reads its own key, else linux's; windows inherits nothing. Doctor's
+  `contractOS` and `env.defaultFor` are gone, and `checks_profile.go` reads through the same function
+- [x] A declared darwin key wins even when empty, so darwin can opt out of a linux default
+- [x] The contract sections name the OS they read: `(contract, darwin; undeclared keys read linux)`
+- [x] An OS with no PATH-entries key, directly or by fallback, warns rather than printing an empty section that reads as a clean PATH
+- [x] `env-contract.json` states the rule in `_comment`. No darwin value is added: none differs from linux
+  today, and the first is `HERDR_CONFIG_PATH` (#2013 H4)
+- [x] A test reads the real contract and fails on a key that is not linux, darwin or windows (a `macos`
+  key would be read by no OS) and on a darwin value that repeats the linux one. Mutation-checked, as is
+  the fallback (eight tests fail without it)
 
 ## Closing
 

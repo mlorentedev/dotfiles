@@ -58,7 +58,7 @@
   {
     "id": "PLAT-001b-one-entrypoint-f9",
     "behavior": "AC8: dotf update runs converge and keeps its exit semantics",
-    "verification": "cd cli && go test ./internal/update/ -count=1 && go test ./internal/update/ -run '^TestUpdate_RunsConvergeAfterAFastForward$' -count=1 -v | grep -q -- '--- PASS: TestUpdate_RunsConvergeAfterAFastForward'",
+    "verification": "cd cli && go test ./internal/update/ -count=1 && go test ./internal/cmd/ -run '^TestUpdate_ConvergesAfterAFastForward$' -count=1 -v | grep -q -- '--- PASS: TestUpdate_ConvergesAfterAFastForward'",
     "state": "pending",
     "evidence": ""
   },
@@ -94,6 +94,27 @@
     "id": "PLAT-001b-one-entrypoint-f14",
     "behavior": "AC1: a plan of a rendered config creates nothing under HOME",
     "verification": "cd cli && go test ./internal/deploy/ -run '^TestRun_APlanOfARenderedEntryCreatesNoDirectory$' -count=1 -v | grep -q -- '--- PASS: TestRun_APlanOfARenderedEntryCreatesNoDirectory'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f15",
+    "behavior": "AC11: on macOS, converge writes the contract variables into the launchd session and loads the login agent; a second run changes nothing",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestEnvPersist_ApplyThenSecondRunIsZero$' -count=1 -v | grep -q -- '--- PASS: TestEnvPersist_ApplyThenSecondRunIsZero'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f16",
+    "behavior": "PR 5: on linux and windows the setup script runs after every native step and is reported opaque, never run by a plan, skipped on darwin and inside a setup run converge started",
+    "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestLegacySetup_|TestExecSetup_)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLegacySetup_ApplyRunsTheScriptAndStaysOpaque' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLegacySetup_SkipsInsideASetupRunItStarted'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f17",
+    "behavior": "AC12: converge installs the packages.json catalog on every OS (install, mise sync, install), reporting a missing manager or a needed sudo instead of failing",
+    "verification": "cd cli && out=$(go test ./internal/converge/ ./internal/tools/ -run '^(TestToolsCatalog_|TestPlanSystem_NeedsSudo|TestInstall_AMissingManager)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestToolsCatalog_OneApplyConvergesAFreshMachine' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt'",
     "state": "pending",
     "evidence": ""
   }

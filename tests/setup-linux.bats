@@ -376,23 +376,22 @@ setup() {
     grep -B5 'claude plugin list' "$DOTFILES_DIR/setup-windows.ps1" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
-# --- MEM-002: retire claude-mem — no longer installed; one-cycle cleanup runs ---
-# claude-mem is no longer in the plugin install loop (ADR-016 Q2). Both setups
-# instead ship an idempotent cleanup that uninstalls the plugin + prunes its
-# leftover cache/marketplace dirs on the next run. These lock in BOTH the
-# removal (no marketplace registration, plugin absent from the loop) and the
-# presence of the cleanup block.
+# --- MEM-002: retire claude-mem — no longer installed (ADR-016 Q2) ---
+# Neither setup registers its marketplace, and neither carries a cleanup block:
+# the retirement is `retired_marketplaces` in ai/claude/plugins.json, which
+# `dotf deploy` converges on every OS (#1431).
 
 @test "setup scripts no longer register the thedotmack marketplace (MEM-002)" {
     refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "setup scripts ship the idempotent claude-mem cleanup block (MEM-002)" {
-    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'MEM-002' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'MEM-002' "$DOTFILES_DIR/setup-windows.ps1"
+@test "the claude-mem retirement is data, not a setup block (MEM-002, #1431)" {
+    # `dotf deploy` removes the marketplace and checks it is gone; the setup
+    # blocks it replaces stripped a settings.json key Claude Code stopped using.
+    jq -e '.retired_marketplaces | index("thedotmack")' "$DOTFILES_DIR/ai/claude/plugins.json"
+    refute_grep_fixed 'claude plugin uninstall claude-mem@thedotmack' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed 'claude plugin uninstall claude-mem@thedotmack' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- doctor + env-contract.json (cross-OS parity) ---
@@ -766,4 +765,15 @@ $block"
     # passes the invocation directory to `dotf env set`.
     grep -q 'dotf env set DOTFILES_REPO_DIR "\$SEED_REPO_DIR"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+}
+
+# #1843 B13: the auto-memory sweep linked every vault project by guessing its
+# repo at ~/Projects/<name>, and moved a real memory dir aside. memlink links
+# the project a session opens and never moves data, so no setup carries a sweep.
+@test "neither setup sweeps auto-memory links; memlink owns them (#1843 B13)" {
+    local f
+    for f in "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1"; do
+        refute_grep 'Deploying auto-memory|Migrating orphan memory|Backing up existing memory' "$f"
+    done
+    refute_grep_fixed 'function Get-ClaudeProjectKey' "$DOTFILES_DIR/scripts/utils.ps1"
 }

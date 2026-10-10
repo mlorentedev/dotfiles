@@ -57,17 +57,19 @@ func TestCheckSecrets_FixSetsTheDeclaredModeOnAFileAuthorityRoot(t *testing.T) {
 	var buf bytes.Buffer
 	rep := capture(&buf)
 	checkSecrets(sys, cfg, rep, true)
-	if rep.Failures() != 0 {
-		t.Errorf("a repaired mode is not a failure\n%s", buf.String())
+	if rep.Failures() != 0 || !strings.Contains(buf.String(), "set to the declared mode") {
+		t.Errorf("a repaired mode is reported as a repair, not a failure\n%s", buf.String())
 	}
 	if fi, _ := os.Stat(key); fi.Mode().Perm() != 0o600 {
 		t.Errorf("--fix must leave the key at 0600, got %04o", fi.Mode().Perm())
 	}
-	// Idempotent: a second run has nothing to repair.
+	// Idempotent: a second run has nothing to repair. Asserted on the repair
+	// message, not on the digits "0644": the report prints the key's temp path,
+	// and macOS's random temp names contained them (…Root2064490071).
 	buf.Reset()
 	rep = capture(&buf)
 	checkSecrets(sys, cfg, rep, true)
-	if rep.Failures() != 0 || strings.Contains(buf.String(), "0644") {
+	if rep.Failures() != 0 || strings.Contains(buf.String(), "set to the declared mode") {
 		t.Errorf("second run must be clean\n%s", buf.String())
 	}
 }

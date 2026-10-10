@@ -398,4 +398,16 @@ tags: [lessons, index, dotfiles]
 | [377 - A merge into a tool-owned file assumes the tool reads a fragment](lesson-377-a-merge-into-a-tool-owned-file-assumes-the-tool-reads-a-fragment.md) | 2026-10-09 |
 | [378 - An unattended deploy must not trade a secret for its placeholder](lesson-378-an-unattended-deploy-must-not-trade-a-secret-for-its-placeholder.md) | 2026-10-09 |
 | [379 - A path CI asserts is skipped is a path CI never tests](lesson-379-a-path-ci-asserts-is-skipped-is-a-path-ci-never-tests.md) | 2026-10-10 |
+| [381 - A GUI app on macOS reads the launchd session, not the shell](lesson-381-a-gui-app-on-macos-reads-the-launchd-session-not-the-shell.md) | 2026-10-10 |
+| [382 - A retirement is desired state, not a one-cycle migration](lesson-382-a-retirement-is-desired-state-not-a-one-cycle-migration.md) | 2026-10-10 |
+| [383 - A sweep that only adds links cannot converge them](lesson-383-a-sweep-that-only-adds-links-cannot-converge-them.md) | 2026-10-10 |
+| [384 - A sandbox HOME does not isolate Claude Code](lesson-384-a-sandbox-home-does-not-isolate-claude-code.md) | 2026-10-10 |
+| [385 - A plan past the step that creates its input reports noise](lesson-385-a-plan-past-the-step-that-creates-its-input-reports-noise.md) | 2026-10-10 |
+| [386 - What the checkout deleted is a leftover; what it never had is not](lesson-386-what-the-checkout-deleted-is-a-leftover-what-it-never-had-is-not.md) | 2026-10-10 |
+| [387 - Before deleting the older writer, ask when it was the only one](lesson-387-before-deleting-the-older-writer-ask-when-it-was-the-only-one.md) | 2026-10-10 |
+| [389 - An identity key a co-owner can drop is not an identity](lesson-389-an-identity-key-a-co-owner-can-drop-is-not-an-identity.md) | 2026-10-10 |
+| [390 - A tree without .git still gets an answer from git](lesson-390-a-tree-without-git-still-gets-an-answer-from-git.md) | 2026-10-10 |
+| [391 - A re-planning probe needs every outcome the apply skips](lesson-391-a-re-planning-probe-needs-every-outcome-the-apply-skips.md) | 2026-10-10 |
+| [392 - lsof's exit status is not the verdict of a process scan](lesson-392-lsof-exit-status-is-not-the-verdict-of-a-process-scan.md) | 2026-10-10 |
+| [393 - An Electron app's state and liveness follow Electron, not its binary](lesson-393-an-electron-apps-state-and-liveness-follow-electron-not-its-binary.md) | 2026-10-10 |
 <!-- END GENERATED -->

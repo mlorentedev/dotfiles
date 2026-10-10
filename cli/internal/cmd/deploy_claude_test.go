@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -19,7 +20,27 @@ type fakeClaude struct {
 	registered map[string]string
 	added      []string
 	removed    []string
-	calls      []string // step order: "mcp" or "plugin", per call
+	calls      []string // step order: "mcp", "market" or "plugin", per call
+	markets    []string // registered marketplaces; a removal drops one
+	sticky     map[string]bool
+	unmarketed []string // removals asked for
+}
+
+func (f *fakeClaude) Marketplaces() (string, error) {
+	f.calls = append(f.calls, "market")
+	parts := make([]string, 0, len(f.markets))
+	for _, m := range f.markets {
+		parts = append(parts, `{"name":"`+m+`"}`)
+	}
+	return "[" + strings.Join(parts, ",") + "]", nil
+}
+
+func (f *fakeClaude) RemoveMarketplace(name string) error {
+	f.unmarketed = append(f.unmarketed, name)
+	if !f.sticky[name] {
+		f.markets = slices.DeleteFunc(f.markets, func(m string) bool { return m == name })
+	}
+	return nil
 }
 
 func (f *fakeClaude) McpGet(name string) (string, error) {
@@ -64,7 +85,7 @@ func pluginRepo(t *testing.T) string {
 	t.Helper()
 	repo := twoConfigRepo(t)
 	writeMirrorFixture(t, filepath.Join(repo, "ai", "claude", "plugins.json"),
-		`{"plugins":["a@m","b@m"]}`)
+		`{"plugins":["a@m","b@m"],"retired_marketplaces":["old"]}`)
 	writeMirrorFixture(t, filepath.Join(repo, "mcp-servers.json"),
 		`{"servers":[{"name":"web","transport":"http","args":"https://example.test/mcp"},`+
 			`{"name":"hive","transport":"stdio","args":"hive client","prerequisite_binary":"uv","prerequisite_command":"uv tool install hive-vault"}]}`)
@@ -272,5 +293,35 @@ func TestMcpAddArgvMatchesTheTwins(t *testing.T) {
 	got := strings.Join(mcpAddArgv("seq", "stdio", []string{"npx", "-y", "pkg"}), " ")
 	if want := "mcp add --transport stdio seq --scope user -- npx -y pkg"; got != want {
 		t.Fatalf("argv %q, want %q", got, want)
+	}
+}
+
+// A retired marketplace still registered is removed, and the row says so.
+func TestDeployCmd_RemovesARetiredMarketplace(t *testing.T) {
+	withPath(t, "uv")
+	fake := &fakeClaude{listed: "a@m b@m", markets: []string{"m", "old"}}
+	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if strings.Join(fake.unmarketed, ",") != "old" || !strings.Contains(out, row("removed", "claude-plugins")+"retired marketplace old") {
+		t.Errorf("removed %v; the row must name it:\n%s", fake.unmarketed, out)
+	}
+}
+
+// The #1431 class: the CLI exits 0 and the registration survives. The run
+// fails and names it, and the plugin installs still run.
+func TestDeployCmd_ARetiredMarketplaceThatSurvivesFailsTheRun(t *testing.T) {
+	withPath(t, "uv")
+	fake := &fakeClaude{listed: "a@m", markets: []string{"old"}, sticky: map[string]bool{"old": true}}
+	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
+	if err == nil || !strings.Contains(err.Error(), "old") {
+		t.Fatalf("a surviving registration must fail the deploy: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, row("failed", "claude-plugins")+"retired marketplace old is still registered") {
+		t.Errorf("the failure must be named:\n%s", out)
+	}
+	if strings.Join(fake.installed, ",") != "b@m" {
+		t.Errorf("plugins did not converge after the retire failure: installed %v", fake.installed)
 	}
 }

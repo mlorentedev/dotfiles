@@ -115,7 +115,7 @@ setup() {
 linux_pi_fallback_present() {
     local block
     block="$(awk '/^# pi packages \(HARNESS-139/ { in_block=1; started=1 }
-        /^# Deploy opencode TUI config/ && in_block { ended=1; exit }
+        /^# opencode.s tui[.]json [(]theme, keybinds[)]/ && in_block { ended=1; exit }
         in_block { print }
         END { if (!started || !ended) exit 1 }' "$1")" || return 1
     grep -qF 'elif [ -x "$HOME/.local/bin/dotf" ]; then' <<<"$block" &&
@@ -126,7 +126,7 @@ linux_pi_fallback_present() {
     local mutant="$BATS_TEST_TMPDIR/no-pi-fallback.sh"
     linux_pi_fallback_present "$SETUP_SH"
     awk '/^# pi packages \(HARNESS-139/ { pi=1 }
-         /^# Deploy opencode TUI config/ { pi=0 }
+         /^# opencode.s tui[.]json [(]theme, keybinds[)]/ { pi=0 }
          pi && /elif \[ -x "\$HOME\/\.local\/bin\/dotf" \]; then/ { next }
          pi && /_dotf="\$HOME\/\.local\/bin\/dotf"/ { next }
          { print }' "$SETUP_SH" > "$mutant"

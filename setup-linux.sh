@@ -446,7 +446,9 @@ fi
 # hardcoded pair missed the third target) and resolved jq by path because the
 # lookup raced its own install (#1202) -- both now moot in Go. Runs AFTER
 # --refresh so the snapshot matches the refreshed repo state. Idempotent
-# ("N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# ("N updated, M unchanged, K pruned"). It prunes .zsh/, ssh/ and scripts/ of
+# files the checkout's history deleted, which the additive copy above leaves
+# behind (#2266); harness/ and the secrets stay with doctor --fix (#802).
 # A declared target the checkout lacks is named and exits non-zero after
 # mirroring the rest: setup does not abort (it is long and idempotent), but the
 # warning is loud and verify-setup.bats fails on the resulting gap.
@@ -501,50 +503,14 @@ log_info "Setting up OpenCode configuration..."
 # directories) and is safe to delete once `command -v opencode` resolves the
 # npm one; the rc files no longer put ~/.opencode/bin on PATH.
 
-# Deploy opencode.jsonc with deploy-time {env:VAR} substitution (SDD-009).
-# Source ships placeholders like {env:NAN_API_KEY}; we substitute the literal
-# age-decrypted value at deploy time so the deployed config is self-contained
-# (no runtime env-var propagation needed when opencode launches from a
-# non-shell parent). Placeholders without a resolvable mapping are left intact
-# and opencode's runtime resolver acts as fallback.
-ensure_directory "$HOME/.config/opencode"
-OPENCODE_CONFIG_SRC="$CURRENT_DIR/ai/opencode/opencode.jsonc"
-OPENCODE_CONFIG_DST="$HOME/.config/opencode/opencode.jsonc"
-if [ -f "$OPENCODE_CONFIG_SRC" ]; then
-    OPENCODE_CONFIG_TMP=$(mktemp)
-    cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
-    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020/ADR-028). Gate on the subcommand SUCCEEDING, not just dotf's presence: a
-    # stale dotf passes `command -v` but fails `secrets render`, and under set -e that
-    # would abort setup. Running it in the `if` condition exempts it from set -e; if it
-    # fails, the {env:VAR} placeholders are left intact for opencode's runtime resolver.
-    if command -v dotf >/dev/null 2>&1 && dotf secrets render "$OPENCODE_CONFIG_TMP"; then
-        : # materialized via dotf secrets render
-    else
-        log_warning "dotf secrets render unavailable; opencode.jsonc deployed with literal {env:VAR} placeholders (resolved at runtime)"
-    fi
-    mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
-    log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
-else
-    log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
-fi
+# ~/.config/opencode/opencode.jsonc is the `opencode` entry of ai/deploy.json,
+# rendered with its {env:VAR} secrets by the bare `dotf deploy` below on every
+# OS (SDD-009, #1843 B12).
 
-# Deploy the canonical AGENTS.md as opencode's global system prompt.
-# OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
-# claude/agy/copilot which use pointer files, opencode reads the filename
-# "AGENTS.md" natively so we copy the full SSOT (~22KB) verbatim.
-AGENTS_SRC="$CURRENT_DIR/AGENTS.md"
-AGENTS_DST="$HOME/.config/opencode/AGENTS.md"
-if [ -f "$AGENTS_SRC" ]; then
-    if [ -f "$AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$AGENTS_DST"; then
-        log_info "AGENTS.md (opencode) already in sync"
-    else
-        cp "$AGENTS_SRC" "$AGENTS_DST"
-        log_success "Deployed AGENTS.md to $AGENTS_DST"
-    fi
-else
-    log_warning "AGENTS.md source missing at $AGENTS_SRC"
-fi
+# opencode's and pi's AGENTS.md (the canonical SSOT, read natively under that
+# name) are harness/manifest.json agents.presence targets, deployed by
+# `dotf harness instructions` through the `compile-harness.sh --deploy` call
+# near the end of this script (#1843 B11).
 
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
 # agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
@@ -633,16 +599,6 @@ else
 fi
 unset _dotf
 
-PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"
-if [ -f "$AGENTS_SRC" ]; then
-    if [ -f "$PI_AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$PI_AGENTS_DST"; then
-        log_info "AGENTS.md (pi) already in sync"
-    else
-        cp "$AGENTS_SRC" "$PI_AGENTS_DST"
-        log_success "Deployed AGENTS.md to $PI_AGENTS_DST"
-    fi
-fi
-
 # Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
 # settings.json exists on the machine -- nothing pi itself writes at runtime
 # touches that array, only theme/lastChangelogVersion/defaultModel are (the
@@ -705,21 +661,9 @@ else
 fi
 unset _dotf
 
-# Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
-# Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
-# carries no secrets, so it deploys verbatim. opencode reads tui.json natively.
-TUI_SRC="$CURRENT_DIR/ai/opencode/tui.json"
-TUI_DST="$HOME/.config/opencode/tui.json"
-if [ -f "$TUI_SRC" ]; then
-    if [ -f "$TUI_DST" ] && cmp -s "$TUI_SRC" "$TUI_DST"; then
-        log_info "opencode tui.json already in sync"
-    else
-        cp "$TUI_SRC" "$TUI_DST"
-        log_success "Deployed tui.json to $TUI_DST"
-    fi
-else
-    log_warning "tui.json source missing at $TUI_SRC"
-fi
+# opencode's tui.json (theme, keybinds) carries no secrets and is the
+# `opencode-tui` entry of ai/deploy.json, installed by the bare `dotf deploy`
+# above (#1843 B11).
 
 # opencode commands are deployed from the vault skill records by
 # `compile-harness.sh --deploy` (SDD-008): each committed record under
@@ -1058,161 +1002,9 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
-# MEM-002: retire claude-mem — one-cycle cleanup, prune after rollout.
-# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
-# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
-# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
-# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
-# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
-# idempotent — a no-op on a clean machine.
-log_info "Removing retired claude-mem plugin (MEM-002, if present)..."
-if command -v claude >/dev/null 2>&1; then
-    _snap=$(snapshot_claude_json)
-    claude plugin uninstall claude-mem@thedotmack >/dev/null 2>&1 || true
-    restore_claude_json_if_truncated "$_snap"
-fi
-_claude_cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-rm -rf "$_claude_cfg/plugins/cache/thedotmack/claude-mem" \
-       "$_claude_cfg/plugins/marketplaces/thedotmack-claude-mem" \
-       "$_claude_cfg/plugins/marketplaces/thedotmack" 2>/dev/null || true
-# The dir removal above is undone on the next Claude start if `thedotmack` is still
-# registered in settings.json — Claude re-clones the marketplace and its SessionStart
-# self-heal hook re-activates claude-mem. The settings merge below is additive (it
-# never strips keys), so delete the marketplace registration explicitly here. Guarded
-# on jq + an existing target; idempotent (the jq -e test skips an already-clean file).
-_claude_settings="$_claude_cfg/settings.json"
-if command -v jq >/dev/null 2>&1 && [ -f "$_claude_settings" ] && \
-   jq -e '.extraKnownMarketplaces.thedotmack' "$_claude_settings" >/dev/null 2>&1; then
-    if _stripped=$(jq 'del(.extraKnownMarketplaces.thedotmack)
-          | if (.extraKnownMarketplaces == {}) then del(.extraKnownMarketplaces) else . end' \
-          "$_claude_settings" 2>/dev/null) && [ -n "$_stripped" ]; then
-        printf '%s\n' "$_stripped" > "$_claude_settings"
-        log_info "Removed retired claude-mem marketplace registration from settings.json"
-    fi
-fi
-
-# Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
-# per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
-# when target missing. Preserves user customizations (Read paths,
-# additionalDirectories, third-party hooks like GitGuardian) by only
-# touching the keys declared as "ours" in the template.
-#
-# HOOKS ARE NOT THIS FUNCTION'S ANY MORE (HARNESS-045 AC1). They are emitted by
-# `dotf harness bind` below, from harness/manifest.json, and this function must
-# not gain a second hooks writer: the jq ASSIGNMENT it used to carry replaced the
-# whole SessionStart array, which DELETED a live third-party group -- measured
-# against a copy of the deployed file on 2026-08-27. A bats guard refuses the
-# literal, so do not quote it back here.
-merge_claude_settings() {
-    local template_path="$1"
-    local target_path="$2"
-
-    if [ ! -f "$template_path" ]; then
-        log_warning "Claude settings template not found at $template_path, skipping merge"
-        return 0
-    fi
-
-    if ! command -v jq >/dev/null 2>&1; then
-        log_warning "jq not found, skipping settings merge (install jq and re-run)"
-        return 0
-    fi
-
-    local template_substituted
-    template_substituted=$(jq '.permissions.allow = (.permissions.allow | unique)' \
-        "$template_path" 2>/dev/null)
-    if [ -z "$template_substituted" ]; then
-        log_warning "Claude settings template is not readable as JSON, skipping merge"
-        return 0
-    fi
-
-    if [ ! -f "$target_path" ]; then
-        log_info "Bootstrapping ~/.claude/settings.json from template (file did not exist)"
-        echo "$template_substituted" > "$target_path"
-        log_success "Claude settings.json bootstrapped from template"
-        return 0
-    fi
-
-    # Per-key merge via single jq invocation. Policy table in proposal.md:
-    # model, effortLevel, outputStyle, advisorModel, crossSessionInbound,
-    # attribution, autoCompactEnabled, precomputeCompactionEnabled, language:
-    # template wins.
-    # permissions.allow: UNION (deduped). enabledPlugins, env: object merge
-    # (template wins on conflict). All other keys: existing preserved.
-    # `hooks` is ABSENT from this policy on purpose -- `dotf harness bind` owns it.
-    #
-    # `env` carries feature flags Claude Code reads from its OWN process
-    # environment -- settings.env is Object.assign'd into process.env at
-    # startup, which is how CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL
-    # reaches the gate that decides whether /advisor exists at all. It merges
-    # per-key rather than replacing, so a machine-local flag a user added by
-    # hand survives a redeploy.
-    #
-    # `outputStyle` joins the template-wins set because the policy is an explicit
-    # ALLOW-LIST: a key added to the template and not named here is silently a
-    # no-op on every existing installation, reaching only machines bootstrapped
-    # from scratch. Measured on this repo's own box — the key sat in the template
-    # while the deployed file had no `outputStyle` at all. It belongs with `model`
-    # and `effortLevel`: same file, same kind of setting, dotfiles-owned.
-    # Guarded with `has()`, NOT with `// empty`. In jq a condition that evaluates
-    # to `empty` makes the whole if-expression produce nothing, so `// empty`
-    # here does not mean "leave it alone when absent" — it means the entire merge
-    # yields an empty result, `merged` is empty, and the function bails with
-    # "merge produced empty output, skipping write". A template that ever omits
-    # this one optional key would then deploy NOTHING: not model, not
-    # effortLevel, not permissions, not hooks.
-    #
-    # `attribution` is whole-object template-wins, NOT the per-key merge `env`
-    # gets. It is entirely dotfiles-owned policy: the standing order is that no
-    # git or GitHub artifact carries AI attribution, and Claude Code's default
-    # is the opposite -- `attribution.commit`/`.pr` default to the standard
-    # trailer and `sessionUrl` defaults to true. Until now that order was
-    # enforced only by an instruction every agent had to remember, which is the
-    # weaker half of this repo's own "a hook that fires beats an agent that
-    # remembers". Empty string hides the attribution; false drops the
-    # Claude-Session trailer and the PR-body link. A per-key merge here would
-    # let a stale subkey survive and quietly reinstate a trailer, so the object
-    # replaces wholesale.
-    #
-    # `crossSessionInbound` decides whether messages from the user's other
-    # sessions are delivered or held for manual approval. Measured on this box
-    # with four parallel sessions: 4 of 8 peer messages expired unapproved,
-    # including a reply to a peer's direct question. "accept" is what makes
-    # multi-session coordination a channel rather than a coin flip.
-    local merged
-    merged=$(jq --argjson tmpl "$template_substituted" '
-        .model = $tmpl.model
-        | .effortLevel = $tmpl.effortLevel
-        | (if ($tmpl | has("outputStyle")) then .outputStyle = $tmpl.outputStyle else . end)
-        | (if ($tmpl | has("advisorModel")) then .advisorModel = $tmpl.advisorModel else . end)
-        | (if ($tmpl | has("crossSessionInbound")) then .crossSessionInbound = $tmpl.crossSessionInbound else . end)
-        | (if ($tmpl | has("attribution")) then .attribution = $tmpl.attribution else . end)
-        | (if ($tmpl | has("autoCompactEnabled")) then .autoCompactEnabled = $tmpl.autoCompactEnabled else . end)
-        | (if ($tmpl | has("precomputeCompactionEnabled")) then .precomputeCompactionEnabled = $tmpl.precomputeCompactionEnabled else . end)
-        | (if ($tmpl | has("autoCompactWindow")) then .autoCompactWindow = $tmpl.autoCompactWindow else . end)
-        | (if ($tmpl | has("autoContinueAtUsageLimit")) then .autoContinueAtUsageLimit = $tmpl.autoContinueAtUsageLimit else . end)
-        | (if ($tmpl | has("cleanupPeriodDays")) then .cleanupPeriodDays = $tmpl.cleanupPeriodDays else . end)
-        | (if ($tmpl | has("language")) then .language = $tmpl.language else . end)
-        | (if ($tmpl | has("env")) then .env = ((.env // {}) + $tmpl.env) else . end)
-        | .permissions = (.permissions // {})
-        | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
-        | .enabledPlugins = ((.enabledPlugins // {}) + $tmpl.enabledPlugins)
-    ' "$target_path" 2>/dev/null)
-    if [ -z "$merged" ]; then
-        log_warning "Claude settings merge produced empty output, skipping write"
-        return 0
-    fi
-
-    echo "$merged" > "$target_path"
-    log_success "Claude settings.json merged from template (user customizations preserved)"
-}
-
-# SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
-# settings.json lives at ai/claude/settings.json. merge_claude_settings applies
-# the per-key policy for model/permissions/env/plugins and bootstraps if missing.
-log_info "Applying Claude settings.json template..."
-CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
-merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS"
+# ~/.claude/settings.json is the `claude-settings` entry of ai/deploy.json, merged
+# by the `dotf deploy` above (CLI-063, #2000). Its per-key policy and the no-trailer
+# attribution are pinned by cli/internal/deploy/claude_settings_test.go.
 
 # HARNESS-045 AC1: hooks are emitted by `dotf harness bind`, for every harness
 # declared in harness/manifest.json's `agents.bind` -- not just Claude's. It is
@@ -1252,106 +1044,10 @@ else
 fi
 unset _dotf
 
-# Deploy auto-memory symlinks (vault → Claude Code)
-# Memory lives in the knowledge vault, not in this repo (see ADR-007)
-# Scans both 10_projects/ and 50_work/ for memory directories.
-# VAULT_ROOT honors the ADR-025 seam ($VAULT_PATH, set by the sourced paths.sh)
-# with the legacy default as fallback — parity with the agy hive-vault block above.
-VAULT_ROOT="${VAULT_PATH:-$HOME/Projects/knowledge}"
-VAULT_PROJECTS="$VAULT_ROOT/10_projects"
-VAULT_WORK="$VAULT_ROOT/50_work"
-if [ -d "$VAULT_ROOT" ]; then
-    log_info "Deploying auto-memory symlinks from vault..."
-    linked_memory_count=0
-
-    # Helper: create symlink for a vault memory dir
-    _link_memory() {
-        local memory_source="$1" cwd_path="$2" project_name="$3"
-        local encoded_path target_dir
-
-        encoded_path=$(printf '%s' "$cwd_path" | sed 's|/|-|g')
-        target_dir="$HOME/.claude/projects/$encoded_path/memory"
-
-        ensure_directory "$HOME/.claude/projects/$encoded_path"
-
-        if [ -L "$target_dir" ]; then
-            rm "$target_dir"
-        elif [ -d "$target_dir" ] && [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then
-            log_warning "Backing up existing memory for $project_name"
-            mv "$target_dir" "${target_dir}.bak.$(date +%s)"
-        elif [ -d "$target_dir" ]; then
-            rmdir "$target_dir" 2>/dev/null || true
-        fi
-
-        # Count SUCCESSES, not attempts. Incrementing unconditionally made the
-        # summary below report links that were never created — a counter
-        # answering "how many did I try" while its message claims "how many
-        # worked".
-        if ln -s "$memory_source" "$target_dir"; then
-            linked_memory_count=$((linked_memory_count + 1))
-        else
-            log_warning "could not link auto-memory for ${project_name}: ln -s failed"
-        fi
-    }
-
-    # 10_projects/*: convention — repo at ~/Projects/<name>
-    if [ -d "$VAULT_PROJECTS" ]; then
-        for project_dir in "$VAULT_PROJECTS"/*/; do
-            [ -d "$project_dir" ] || continue
-            memory_source="${project_dir}memory"
-            [ -d "$memory_source" ] || continue
-
-            project_name=$(basename "$project_dir")
-            cwd_path="$HOME/Projects/$project_name"
-            _link_memory "$memory_source" "$cwd_path" "$project_name"
-        done
-    fi
-
-    # 50_work/**/memory: work projects — CWD is the vault path itself
-    if [ -d "$VAULT_WORK" ]; then
-        # `find` used to run inside the process substitution, where its exit
-        # status is discarded and `2>/dev/null` hid the reason. A failed scan then
-        # linked nothing while setup reported success. Run it first, keep its
-        # status, and say so when it fails.
-        if ! work_memory_dirs=$(find "$VAULT_WORK" -type d -name "memory" 2>&1); then
-            log_warning "scanning ${VAULT_WORK} for memory dirs failed: ${work_memory_dirs}"
-            work_memory_dirs=""
-        fi
-        while read -r memory_source; do
-            [ -n "$memory_source" ] || continue
-            project_dir=$(dirname "$memory_source")
-            project_name=$(basename "$project_dir")
-            cwd_path="$project_dir"
-            _link_memory "$memory_source" "$cwd_path" "$project_name"
-        done < <(printf '%s\n' "$work_memory_dirs")
-    fi
-
-    if [ "$linked_memory_count" -gt 0 ]; then
-        log_success "Linked auto-memory for $linked_memory_count project(s) from vault"
-    fi
-
-    # Migrate orphan memories: local Claude Code memories not yet in vault
-    for claude_project in "$HOME/.claude/projects"/*/; do
-        [ -d "$claude_project" ] || continue
-        memory_dir="${claude_project}memory"
-        # Skip if no memory, already a symlink, or empty
-        [ -d "$memory_dir" ] && [ ! -L "$memory_dir" ] && [ "$(ls -A "$memory_dir" 2>/dev/null)" ] || continue
-
-        # Extract project name from encoded path (last segment after Projects-)
-        encoded_name=$(basename "$claude_project")
-        project_name=$(printf '%s' "$encoded_name" | sed 's/.*-Projects-//')
-        [ -n "$project_name" ] || continue
-
-        vault_memory="$VAULT_PROJECTS/$project_name/memory"
-        # Only migrate if the vault project exists but has no memory dir yet
-        if [ -d "$VAULT_PROJECTS/$project_name" ] && [ ! -d "$vault_memory" ]; then
-            log_info "Migrating orphan memory: $project_name → vault"
-            mv "$memory_dir" "$vault_memory" && ln -s "$vault_memory" "$memory_dir" \
-                && log_success "Migrated and linked: $project_name" \
-                || log_error "Failed to migrate memory for $project_name"
-        fi
-    done
-fi
+# Claude's auto-memory dir is linked to its vault source per project by
+# memlink (cli/internal/memlink): the session-start hook links the project a
+# session opens, on every OS, and `dotf doctor --fix` repairs the current one,
+# a dangling link included. A real memory dir is never moved aside (#1843 B13).
 
 # Deploy all skills from the committed records to their per-agent $HOME paths
 # (SDD-008, option A). Renders each harness/skills/<n> record to ~/.claude/skills,

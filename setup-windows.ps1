@@ -36,14 +36,13 @@ param(
 # ============================================================================
 # BUG-005: AUTO-REEXEC UNDER PWSH IF RUNNING ON WINDOWS POWERSHELL 5.1
 # ============================================================================
-# SDD-002 (PR #51) added Merge-ClaudeSettings which uses
-# `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0
-# (https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-70)
-# that does NOT exist in Windows PowerShell 5.1. The natural Windows command
-# `PowerShell -ExecutionPolicy Bypass -File .\setup-windows.ps1` resolves
-# `PowerShell` to 5.1, the Merge function's wide try/catch swallows the
-# ParameterBindingException as if it were a JSON parse error, and the
-# settings.json merge is silently skipped.
+# This script is verified under pwsh 7 only: CI starts it from Windows
+# PowerShell 5.1 and this block re-execs it. 5.1 differs at run time, not just
+# in syntax (Set-Content and Out-File default encodings, for one), so a run that
+# stayed on 5.1 would execute code nothing tests. BUG-005 was that failure: the
+# settings merge used `ConvertFrom-Json -AsHashtable`, absent from 5.1, and its
+# try/catch skipped the merge silently. That merge is now `dotf deploy` (#2000);
+# the single tested runtime is why the re-exec stays.
 #
 # Defense: detect the host version up front; if pwsh (7+) is on PATH,
 # re-exec under it; otherwise fail loud with an install hint. Named parameters
@@ -60,8 +59,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
         exit $LASTEXITCODE
     } else {
         Write-Host "[ERROR] Windows PowerShell $($PSVersionTable.PSVersion) detected and pwsh (PowerShell 7+) is not installed." -ForegroundColor Red
-        Write-Host "        This script requires PowerShell 7+ for ConvertFrom-Json -AsHashtable" -ForegroundColor Red
-        Write-Host "        support in Merge-ClaudeSettings (introduced by SDD-002 / PR #51)." -ForegroundColor Red
+        Write-Host "        This script is verified under PowerShell 7+ only." -ForegroundColor Red
         Write-Host "        Install via: winget install Microsoft.PowerShell" -ForegroundColor Red
         Write-Host "        Then re-run this script." -ForegroundColor Red
         exit 1
@@ -195,114 +193,6 @@ function Register-HiveScheduledTask {
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $script:HiveTaskLogonType -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
         -Settings $Settings -Principal $principal -Description $Description -Force -ErrorAction Stop | Out-Null
-}
-
-# Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
-# per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
-# when target missing. Preserves user customizations (Read paths,
-# additionalDirectories, third-party hooks like GitGuardian) by only
-# touching the keys declared as "ours" in the template.
-#
-# HOOKS ARE NOT THIS FUNCTION'S ANY MORE (HARNESS-045 AC1). They are emitted by
-# `dotf harness bind` below, from harness/manifest.json, and this function must
-# not gain a second hooks writer: the assignment it used to carry
-# ($existing['hooks']['SessionStart'] = $template[...]) deleted a live
-# third-party group, the identical defect measured on the Linux twin.
-function Merge-ClaudeSettings {
-    [CmdletBinding()]
-    # "Settings" is the canonical Claude Code config-file name (settings.json);
-    # the function operates on the whole file, not one setting -- using
-    # `Setting` (singular) would be misleading. Plural noun warning suppressed.
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
-    param(
-        [Parameter(Mandatory)][string]$TemplatePath,
-        [Parameter(Mandatory)][string]$TargetPath
-    )
-
-    if (-not (Test-Path $TemplatePath)) {
-        Write-Warn "Claude settings template not found at $TemplatePath, skipping merge"
-        return
-    }
-
-    try {
-        $template = (Get-Content $TemplatePath -Raw) | ConvertFrom-Json -AsHashtable
-    } catch {
-        Write-Warn "Claude settings template is not valid JSON: $_"
-        return
-    }
-
-    # Bootstrap if target missing
-    if (-not (Test-Path $TargetPath)) {
-        Write-Info "Bootstrapping ~/.claude/settings.json from template (file did not exist)"
-        $template | ConvertTo-Json -Depth 10 | Set-Content $TargetPath -Encoding UTF8
-        Write-Success "Claude settings.json bootstrapped from template"
-        return
-    }
-
-    # Read existing target
-    try {
-        $existing = Get-Content $TargetPath -Raw | ConvertFrom-Json -AsHashtable
-    } catch {
-        Write-Warn "Claude settings.json at $TargetPath is not valid JSON, skipping merge: $_"
-        return
-    }
-    if ($null -eq $existing) { $existing = @{} }
-
-    # Per-key merge policy (table in proposal.md). The policy is an ALLOW-LIST,
-    # so a key added to the template and not named here is a silent no-op on
-    # every existing installation -- which is exactly what happened to
-    # outputStyle. Keep this list in step with setup-linux.sh's jq expression.
-    if ($template.ContainsKey('model')) { $existing['model'] = $template['model'] }
-    if ($template.ContainsKey('effortLevel')) { $existing['effortLevel'] = $template['effortLevel'] }
-    if ($template.ContainsKey('outputStyle')) { $existing['outputStyle'] = $template['outputStyle'] }
-    if ($template.ContainsKey('advisorModel')) { $existing['advisorModel'] = $template['advisorModel'] }
-    if ($template.ContainsKey('crossSessionInbound')) { $existing['crossSessionInbound'] = $template['crossSessionInbound'] }
-    if ($template.ContainsKey('autoCompactEnabled')) { $existing['autoCompactEnabled'] = $template['autoCompactEnabled'] }
-    if ($template.ContainsKey('precomputeCompactionEnabled')) { $existing['precomputeCompactionEnabled'] = $template['precomputeCompactionEnabled'] }
-    if ($template.ContainsKey('autoCompactWindow')) { $existing['autoCompactWindow'] = $template['autoCompactWindow'] }
-    if ($template.ContainsKey('autoContinueAtUsageLimit')) { $existing['autoContinueAtUsageLimit'] = $template['autoContinueAtUsageLimit'] }
-    if ($template.ContainsKey('cleanupPeriodDays')) { $existing['cleanupPeriodDays'] = $template['cleanupPeriodDays'] }
-    if ($template.ContainsKey('language')) { $existing['language'] = $template['language'] }
-
-    # attribution: whole-object replace, NOT the per-key merge env gets below.
-    # It is dotfiles-owned policy -- the standing order is that no git or GitHub
-    # artifact carries AI attribution, and Claude Code defaults the other way
-    # (commit/pr default to the standard trailer, sessionUrl defaults to true).
-    # A per-key merge would let a stale subkey survive and quietly reinstate a
-    # trailer, so the object replaces wholesale.
-    if ($template.ContainsKey('attribution')) { $existing['attribution'] = $template['attribution'] }
-
-    # env: object merge (template wins on conflict). These are feature flags
-    # Claude Code reads from its OWN process environment -- settings.env is
-    # merged into process.env at startup, which is how
-    # CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL reaches the gate deciding
-    # whether /advisor exists. Per-key so a machine-local flag survives.
-    if ($template.ContainsKey('env')) {
-        if (-not $existing.ContainsKey('env')) { $existing['env'] = @{} }
-        foreach ($envKey in $template['env'].Keys) {
-            $existing['env'][$envKey] = $template['env'][$envKey]
-        }
-    }
-
-    # permissions.allow: UNION (template + existing, deduped)
-    if ($template.ContainsKey('permissions') -and $template['permissions'].ContainsKey('allow')) {
-        if (-not $existing.ContainsKey('permissions')) { $existing['permissions'] = @{} }
-        if (-not $existing['permissions'].ContainsKey('allow')) { $existing['permissions']['allow'] = @() }
-        $merged = @(@($existing['permissions']['allow']) + @($template['permissions']['allow']) | Select-Object -Unique)
-        $existing['permissions']['allow'] = $merged
-    }
-
-    # enabledPlugins: object merge (template wins on conflict). User-added
-    # plugins beyond the 14 universal ones survive.
-    if ($template.ContainsKey('enabledPlugins')) {
-        if (-not $existing.ContainsKey('enabledPlugins')) { $existing['enabledPlugins'] = @{} }
-        foreach ($plugin in $template['enabledPlugins'].Keys) {
-            $existing['enabledPlugins'][$plugin] = $template['enabledPlugins'][$plugin]
-        }
-    }
-
-    $existing | ConvertTo-Json -Depth 10 | Set-Content $TargetPath -Encoding UTF8
-    Write-Success "Claude settings.json merged from template (user customizations preserved)"
 }
 
 # ============================================================================
@@ -460,9 +350,8 @@ Install-AgentBinary -Name "Antigravity CLI (agy)" -Command "agy" -InstallerUrl "
 
 Write-Info "Deploying Claude configuration..."
 
-# Bulk copy all Claude config files EXCEPT settings.json (SDD-002: handled by
-# Merge-ClaudeSettings below, which applies the per-key merge policy preserving
-# user customizations; its hooks come from `dotf harness bind`).
+# Bulk copy all Claude config files EXCEPT settings.json: `dotf deploy` merges
+# it (the claude-settings entry), and its hooks come from `dotf harness bind`.
 $claudeSource = "$DotfilesDir\ai\claude"
 if (Test-Path $claudeSource) {
     Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
@@ -723,7 +612,9 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 # One Go implementation for both OSes (setup-linux.sh calls the same command).
 # Windows never had this block: doctor failed both registries after every setup
 # with a remedy ("re-run setup") that could not clear them. Idempotent (prints
-# "N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# "N updated, M unchanged, K pruned"). It prunes .zsh\, ssh\ and scripts\ of
+# files the checkout's history deleted (#2266); harness\ and the secrets stay
+# with doctor --fix (#802).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
     dotf harness mirror --repo $DotfilesDir
     if ($LASTEXITCODE -ne 0) {
@@ -896,143 +787,10 @@ if ($claudeCmd) {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
 
-# MEM-002: retire claude-mem -- one-cycle cleanup, prune after rollout.
-# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
-# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
-# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
-# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
-# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
-# idempotent -- a no-op on a clean machine.
-Write-Info "Removing retired claude-mem plugin (MEM-002, if present)..."
-if ($claudeCmd) {
-    Backup-AndRestoreClaudeJson -Action {
-        try {
-            & claude plugin uninstall claude-mem@thedotmack 2>$null | Out-Null
-        } catch {
-            # Non-fatal -- already absent or transient CLI issue.
-        }
-    }
-}
-$claudeCfg = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
-foreach ($stale in @(
-        (Join-Path $claudeCfg 'plugins\cache\thedotmack\claude-mem'),
-        (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack-claude-mem'),
-        (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack'))) {
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $stale
-}
-# The dir removal above is undone on the next Claude start if 'thedotmack' is still
-# registered in settings.json -- Claude re-clones the marketplace and its SessionStart
-# self-heal hook re-activates claude-mem. The settings merge later is additive (it
-# never strips keys), so delete the marketplace registration explicitly here.
-$claudeSettings = Join-Path $claudeCfg 'settings.json'
-if (Test-Path $claudeSettings) {
-    try {
-        $cfg = Get-Content $claudeSettings -Raw | ConvertFrom-Json
-        $mk = $cfg.extraKnownMarketplaces
-        if ($mk -and ($mk.PSObject.Properties.Name -contains 'thedotmack')) {
-            $mk.PSObject.Properties.Remove('thedotmack')
-            if ($mk.PSObject.Properties.Count -eq 0) { $cfg.PSObject.Properties.Remove('extraKnownMarketplaces') }
-            $cfg | ConvertTo-Json -Depth 10 | Set-Content $claudeSettings -Encoding UTF8
-            Write-Info "Removed retired claude-mem marketplace registration from settings.json"
-        }
-    } catch {
-        # Non-fatal -- malformed/locked settings.json; the merge step re-validates.
-    }
-}
-
-# Deploy auto-memory junctions from vault (see ADR-007)
-# Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
-# Scans both 10_projects/ and 50_work/ for memory directories.
-# VaultRoot honors the ADR-025 seam ($env:VAULT_PATH, set by the sourced
-# paths.ps1) with the legacy default as fallback - parity with setup-linux.sh.
-$VaultRoot = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE "Projects\knowledge" }
-$VaultProjects = Join-Path $VaultRoot "10_projects"
-if (Test-Path $VaultRoot) {
-    Write-Info "Deploying auto-memory junctions from vault..."
-
-    # Collect all memory/ dirs: 10_projects/* and recursive scan of 50_work/
-    $memoryDirs = @()
-    if (Test-Path $VaultProjects) {
-        foreach ($projDir in (Get-ChildItem -Path $VaultProjects -Directory)) {
-            $mem = Join-Path $projDir.FullName "memory"
-            if (Test-Path $mem) { $memoryDirs += @{ Source = $mem; ProjectDir = $projDir.FullName; Scope = '10_projects' } }
-        }
-    }
-    $VaultWork = Join-Path $VaultRoot "50_work"
-    if (Test-Path $VaultWork) {
-        Get-ChildItem -Path $VaultWork -Filter "memory" -Directory -Recurse | ForEach-Object {
-            $memoryDirs += @{ Source = $_.FullName; ProjectDir = $_.Parent.FullName; Scope = '50_work' }
-        }
-    }
-
-    foreach ($entry in $memoryDirs) {
-        $memorySource = $entry.Source
-        $projectDir = $entry.ProjectDir
-        $projectName = Split-Path -Leaf $projectDir
-
-        # Determine CWD path based on vault scope
-        if ($entry.Scope -eq '10_projects') {
-            # Convention: repo lives at ~/Projects/<name>
-            $cwdPath = Join-Path $env:USERPROFILE "Projects\$projectName"
-        } else {
-            # Work projects: CWD is the vault path itself
-            $cwdPath = $projectDir
-        }
-
-        # Key MUST match Claude Code / memlink.ClaudeProjectKey (':' maps to '-',
-        # not deleted). Get-ClaudeProjectKey (utils.ps1) sources it from `dotf`
-        # so this junction target can never drift from the Go layer again (#689).
-        $encodedPath = Get-ClaudeProjectKey $cwdPath
-        $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encodedPath\memory"
-        $parentDir = Split-Path $targetDir -Parent
-
-        Ensure-Directory $parentDir
-
-        # Handle existing target: junction=recreate, real dir with files=backup, empty=remove
-        if (Test-Path $targetDir) {
-            $item = Get-Item $targetDir -Force
-            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                # cmd rmdir removes the junction point without deleting target contents
-                cmd /c rmdir $targetDir 2>&1 | Out-Null
-            } elseif ((Get-ChildItem $targetDir -ErrorAction SilentlyContinue).Count -gt 0) {
-                Write-Warn "Backing up existing memory for $projectName"
-                Rename-Item $targetDir "$($targetDir).bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
-            } else {
-                Remove-Item $targetDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        New-Item -ItemType Junction -Path $targetDir -Target $memorySource -Force | Out-Null
-        Write-Success "Linked auto-memory: $projectName"
-    }
-
-    # Migrate orphan memories: local Claude Code memories not yet in vault
-    $claudeProjects = Join-Path $env:USERPROFILE ".claude\projects"
-    if (Test-Path $claudeProjects) {
-        $claudeDirs = Get-ChildItem -Path $claudeProjects -Directory
-        foreach ($cpDir in $claudeDirs) {
-            $memDir = Join-Path $cpDir.FullName "memory"
-            if (-not (Test-Path $memDir)) { continue }
-            if ((Get-Item $memDir).Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
-            $files = Get-ChildItem -Path $memDir -ErrorAction SilentlyContinue
-            if (-not $files) { continue }
-
-            $encodedName = $cpDir.Name
-            if ($encodedName -match 'Projects-(.+)$') {
-                $projectName = $Matches[1]
-                $vaultMemory = Join-Path $VaultProjects "$projectName\memory"
-                $vaultProject = Join-Path $VaultProjects $projectName
-                if ((Test-Path $vaultProject) -and -not (Test-Path $vaultMemory)) {
-                    Write-Info "Migrating orphan memory: $projectName -> vault"
-                    Copy-Item $memDir $vaultMemory -Recurse -Force
-                    Remove-Item $memDir -Recurse -Force
-                    New-Item -ItemType Junction -Path $memDir -Target $vaultMemory -Force | Out-Null
-                    Write-Success "Migrated and linked: $projectName"
-                }
-            }
-        }
-    }
-}
+# Claude's auto-memory dir is linked to its vault source per project by
+# memlink (cli/internal/memlink): the session-start hook links the project a
+# session opens, on every OS, and `dotf doctor --fix` repairs the current one,
+# a dangling link included. A real memory dir is never moved aside (#1843 B13).
 
 # Vault-hosted skills are no longer junctioned into ~/.claude/skills (that was
 # the BUG-100 fragility source). They are migrated into the vault SSOT, compiled
@@ -1056,47 +814,11 @@ $npmSeen = Get-Command npm -ErrorAction SilentlyContinue
 Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
 
 # ============================================================================
-# 2d. OPENCODE CONFIG + COMMANDS (AI-014)
+# 2d. OPENCODE (AI-014)
 # ============================================================================
-# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036). This block
-# deploys the canonical config + skill-derived commands using the same
-# reconcile-not-skip pattern as setup-linux.sh (AI-011, lines 415-465).
-# Both files: SHA256 byte-equality test before overwrite so user-side edits
-# that match upstream do not trigger a noisy "Deployed" log.
-
-$opencodeConfigSrc = "$DotfilesDir\ai\opencode\opencode.jsonc"
-$opencodeConfigDst = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
-if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
-    # SDD-009: stage source to a temp file, substitute {env:VAR} placeholders
-    # with age-decrypted values (mirror of bash setup-linux.sh logic), then
-    # deploy the substituted artifact. Deploy-File's SHA256 check then
-    # operates on rendered-vs-deployed (not source-vs-deployed) so idempotence
-    # still works after substitution.
-    $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
-    Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
-    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020/ADR-028). dotf presence is not success: a stale binary runs but exits
-    # non-zero, so check $LASTEXITCODE; if render did not succeed, leave the {env:VAR}
-    # placeholders intact for opencode's runtime resolver rather than a half-rendered file.
-    $opencodeRendered = $false
-    if (Get-Command dotf -ErrorAction SilentlyContinue) {
-        & dotf secrets render $opencodeConfigTmp
-        $opencodeRendered = ($LASTEXITCODE -eq 0)
-    }
-    if (-not $opencodeRendered) {
-        Write-Warn "dotf secrets render unavailable/failed; deploying opencode.jsonc with literal {env:VAR} placeholders (resolved at runtime)"
-    }
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
-    } else {
-        Ensure-Directory (Split-Path $opencodeConfigDst -Parent)
-        Copy-Item -LiteralPath $opencodeConfigTmp -Destination $opencodeConfigDst -Force
-        Write-Success "Deployed opencode.jsonc to $opencodeConfigDst (fallback)"
-    }
-    Remove-Item -LiteralPath $opencodeConfigTmp -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
-}
+# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036).
+# opencode.jsonc is the `opencode` entry of ai/deploy.json, rendered with its
+# {env:VAR} secrets by `dotf deploy` below (SDD-009, #1843 B12).
 
 # Deploy the canonical AGENTS.md as opencode's global system prompt.
 # OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
@@ -1274,22 +996,8 @@ if ($dotfPath) {
     Write-Warn "dotf not found - pi packages not reconciled"
 }
 
-# Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
-# Plain copy: unlike opencode.jsonc this file carries no secrets, so no env-var
-# substitution (DX-004). opencode reads .config\opencode\tui.json natively.
-# Linux parity: setup-linux.sh tui.json deploy block.
-$tuiSrc = Join-Path $DotfilesDir 'ai\opencode\tui.json'
-$tuiDst = Join-Path $env:USERPROFILE '.config\opencode\tui.json'
-if (Test-Path -LiteralPath $tuiSrc -PathType Leaf) {
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $tuiSrc -Destination $tuiDst)
-    } else {
-        Copy-Item -LiteralPath $tuiSrc -Destination $tuiDst -Force
-        Write-Success "Deployed tui.json to $tuiDst (fallback)"
-    }
-} else {
-    Write-Warn "tui.json source missing at $tuiSrc"
-}
+# opencode's tui.json is the `opencode-tui` entry of ai/deploy.json, installed
+# by the bare `dotf deploy` above (#1843 B11).
 
 # OpenCode commands are deployed from the committed vault skill records by
 # Deploy-SkillRecord near the end of this script (SDD-008, option A): each
@@ -1684,16 +1392,9 @@ if (Test-Path $obsCliSource) {
 # 7c. REGISTER SESSIONSTART HOOK
 # ============================================================================
 
-Write-Info "Applying Claude settings.json template..."
-
-# SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
-# settings.json lives at ai/claude/settings.json. Merge-ClaudeSettings applies
-# the per-key policy for model/permissions/env/plugins. Bootstraps a fresh
-# settings.json if missing (closes the v1 doble-paso friction).
-$ClaudeSettings = "$ClaudeHome\settings.json"
-$ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
-
-Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings
+# ~/.claude/settings.json is the `claude-settings` entry of ai/deploy.json, merged
+# by the `dotf deploy` above (CLI-063, #2000). Its per-key policy and the no-trailer
+# attribution are pinned by cli/internal/deploy/claude_settings_test.go.
 
 # HARNESS-045 AC1: hooks are emitted by `dotf harness bind`, for every harness
 # declared in harness/manifest.json's `agents.bind`. One Go binary on both OSes,

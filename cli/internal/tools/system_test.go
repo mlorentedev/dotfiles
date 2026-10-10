@@ -274,8 +274,10 @@ func TestInstallSystem_NoManagerOnPathIsASkipNamingIt(t *testing.T) {
 	if len(w.ran) != 0 {
 		t.Errorf("ran %v without a manager", w.ran)
 	}
-	if p := in.Plan(ghTool()); p.Action != PlanMissingManager {
-		t.Errorf("Plan = %q, want %q", p.Action, PlanMissingManager)
+	// The plan names the manager as the uv and npm waits do, so a converge
+	// report reads "gh (brew)", not "gh ()".
+	if p := in.Plan(ghTool()); p.Action != PlanMissingManager || p.Note != "waits on brew" {
+		t.Errorf("Plan = %q %q, want %q naming brew", p.Action, p.Note, PlanMissingManager)
 	}
 }
 
@@ -302,6 +304,7 @@ func TestInstallSystem_PresenceRule(t *testing.T) {
 	})
 	t.Run("dpkg config-files only is absent", func(t *testing.T) {
 		w := newWorld("apt-get", "sudo")
+		w.sudoOK = true
 		if p := w.installer("linux").Plan(ghTool()); p.Action != PlanInstall || p.Installed != "" {
 			t.Errorf("Plan = %+v, want install of an absent package", p)
 		}
@@ -325,6 +328,7 @@ func TestInstallSystem_PresenceRule(t *testing.T) {
 // A dry run reaches only the queries, never the manager's install.
 func TestPlanSystem_NeverRuns(t *testing.T) {
 	w := newWorld("apt-get", "sudo")
+	w.sudoOK = true
 	in := w.installer("linux")
 	if p := in.Plan(ghTool()); p.Action != PlanInstall {
 		t.Errorf("Plan = %+v", p)
@@ -374,6 +378,39 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 	}
 	if len(w.ran) != 1 || w.ran[0][1] != "-n" {
 		t.Errorf("ran %v, want one `sudo -n` attempt and no prompt", w.ran)
+	}
+}
+
+// A plan asks the apply's own classifier, so it never promises an install the
+// apply would skip for want of a password: a converge probe re-plans after the
+// apply, and an `install` row there would fail every unattended run.
+func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
+	w := newWorld("apt-get", "sudo")
+	p := w.installer("linux").Plan(ghTool())
+	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" {
+		t.Errorf("Plan = %+v, want needs-sudo naming the command", p)
+	}
+	if len(w.ran) != 0 {
+		t.Errorf("a plan ran %v", w.ran)
+	}
+
+	in := w.installer("linux")
+	in.Plan(ghTool())
+	in.Plan(ghTool())
+	asked := 0
+	for _, q := range w.queries {
+		if q[0] == "sudo" {
+			asked++
+		}
+	}
+	if asked != 2 { // the first Plan above, and this installer's one question
+		t.Errorf("sudo asked %d times across three plans on two installers, want 2", asked)
+	}
+
+	root := newWorld("apt-get")
+	root.root = true
+	if p := root.installer("linux").Plan(ghTool()); p.Action != PlanInstall || len(root.queries) != 1 {
+		t.Errorf("as root: Plan = %+v, queries %v; want install and no sudo query", p, root.queries)
 	}
 }
 

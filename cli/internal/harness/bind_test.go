@@ -114,7 +114,7 @@ func TestMergeHooksReplacesOurOwnEntryRatherThanAccumulating(t *testing.T) {
 	}
 }
 
-// The latent bug this design replaces: `merge_claude_settings` writes
+// The latent bug this design replaced: `merge_claude_settings` wrote
 // `.hooks.<event>[0].hooks[0].command`, so a foreign group sitting at index 0
 // gets silently overwritten. Find-by-marker must survive that ordering.
 func TestMergeHooksSurvivesAForeignGroupAtIndexZero(t *testing.T) {
@@ -248,7 +248,8 @@ func TestMergeAgainstTheRealDeployedSettings(t *testing.T) {
 
 	// A COUNT is the wrong assertion here, and it fails on any machine bound
 	// before the marker field existed. Such a machine carries an UNMARKED gate
-	// entry, which `ForeignHookCount` counts as foreign and which `isOurs`
+	// entry, which `ForeignHookCount` counted as foreign until it learned the
+	// dotf signature (#2232), and which `isOurs`
 	// deliberately adopts by command substring — so the count drops by one while
 	// nothing was lost. Measured on this box, 15 -> 14, with no third-party hook
 	// touched.
@@ -283,7 +284,14 @@ func countOurs(doc map[string]any, event string) int {
 		}
 		inner, _ := group["hooks"].([]any)
 		for _, h := range inner {
-			if obj, ok := h.(map[string]any); ok && (isOurs(obj, "gate") || isOurs(obj, "mem")) {
+			obj, ok := h.(map[string]any)
+			if !ok {
+				continue
+			}
+			// Ours by marker, or by running the dotf binary: an adopted entry
+			// that matched without its marker is left as it is (#2232).
+			cmd, _ := obj["command"].(string)
+			if _, isDotf := dotfArgs(cmd); isDotf || isOurs(obj, "gate", "") || isOurs(obj, "mem", "") {
 				n++
 			}
 		}
@@ -814,4 +822,156 @@ func TestLoadBindTargetsRefusesAFormatInTheWrongKey(t *testing.T) {
 			t.Error("no bind targets must stay an error: it is indistinguishable from a manifest that moved")
 		}
 	})
+}
+
+// stripMarkers drops every `_managed` key, the way a co-owner of the file that
+// does not know the key rewrites it (#2232).
+func stripMarkers(doc map[string]any) {
+	hooks, _ := doc["hooks"].(map[string]any)
+	for _, v := range hooks {
+		groups, _ := v.([]any)
+		for _, g := range groups {
+			group, _ := g.(map[string]any)
+			inner, _ := group["hooks"].([]any)
+			for _, h := range inner {
+				if obj, ok := h.(map[string]any); ok {
+					delete(obj, managedKey)
+				}
+			}
+		}
+	}
+}
+
+// The measurement behind #2232: bound with markers, then rewritten by another
+// writer with every hook intact and every marker gone. That is converged, not
+// drift; reporting a change would make every run rewrite the file and every
+// later strip undo it.
+func TestMergeHooksIsCurrentWhenOnlyTheMarkerWasStripped(t *testing.T) {
+	dotf := "/Users/x/.local/bin/dotf"
+	cmds := []HookCommand{
+		{Event: "PreToolUse", ID: "gate", Command: dotf + " harness gate --harness claude", UseMatcher: true, Timeout: 5},
+		{Event: "SessionStart", ID: "mem", Command: dotf + " mem session-start", UseMatcher: true, Timeout: 30},
+		{Event: "SessionEnd", ID: "mem-end", Command: dotf + " mem session-end", UseMatcher: true, Timeout: 30},
+		{Event: "UserPromptSubmit", ID: "suggest", Command: dotf + " harness suggest --from-hook", UseMatcher: true, Timeout: 5},
+	}
+	doc, _, err := MergeHooks(map[string]any{}, cmds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stripMarkers(doc)
+
+	out, changed, err := MergeHooks(doc, cmds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		raw, _ := json.Marshal(out)
+		t.Fatalf("hooks that lost only their markers were reported as changed:\n%s", raw)
+	}
+	for _, c := range cmds {
+		if got := countOurs(out, c.Event); got != 1 {
+			t.Errorf("%s carries %d of our hooks, want 1", c.Event, got)
+		}
+	}
+}
+
+// Without its marker, an entry is still found by its signature when the
+// binary moved, so it is replaced in place rather than duplicated.
+func TestMergeHooksReplacesAnUnmarkedEntryWhoseBinaryMoved(t *testing.T) {
+	doc := decode(t, `{"hooks":{"SessionStart":[
+	  {"matcher":"","hooks":[{"type":"command","command":"/old/bin/dotf mem session-start","timeout":30}]}
+	]}}`)
+	out, changed, err := MergeHooks(doc, []HookCommand{{
+		Event: "SessionStart", ID: "mem", Command: "/new/bin/dotf mem session-start", UseMatcher: true, Timeout: 30,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Error("a moved binary must be rewritten")
+	}
+	if got := hookCommandsIn(out, "SessionStart"); len(got) != 1 || got[0] != "/new/bin/dotf mem session-start" {
+		t.Errorf("SessionStart = %v, want only the new command", got)
+	}
+}
+
+// The signature names the dotf binary, so a third party running another
+// program with the same arguments is never adopted.
+func TestMergeHooksNeverAdoptsAnotherBinaryWithOurArguments(t *testing.T) {
+	doc := decode(t, `{"hooks":{"SessionStart":[
+	  {"matcher":"","hooks":[{"type":"command","command":"/usr/bin/other mem session-start"}]}
+	]}}`)
+	out, _, err := MergeHooks(doc, []HookCommand{{
+		Event: "SessionStart", ID: "mem", Command: "/x/dotf mem session-start", UseMatcher: true,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := hookCommandsIn(out, "SessionStart")
+	if len(got) != 2 || got[0] != "/usr/bin/other mem session-start" {
+		t.Errorf("SessionStart = %v, want the foreign hook untouched and ours appended", got)
+	}
+}
+
+// The signature is the binary AND the exact arguments: an unmarked dotf entry
+// running something the manifest does not declare is not ours to rewrite, so it
+// stays byte-identical and ours is appended beside it.
+func TestMergeHooksLeavesADotfEntryWithOtherArgumentsUntouched(t *testing.T) {
+	doc := decode(t, `{"hooks":{"SessionStart":[
+	  {"matcher":"","hooks":[{"type":"command","command":"/x/dotf mem session-start --legacy-flag","timeout":7}]}
+	]}}`)
+	before, _ := json.Marshal(doc["hooks"].(map[string]any)["SessionStart"].([]any)[0])
+	out, _, err := MergeHooks(doc, []HookCommand{{
+		Event: "SessionStart", ID: "mem", Command: "/x/dotf mem session-start", UseMatcher: true, Timeout: 30,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := out["hooks"].(map[string]any)["SessionStart"].([]any)
+	if after, _ := json.Marshal(groups[0]); string(after) != string(before) {
+		t.Errorf("the other dotf entry was rewritten:\nbefore %s\nafter  %s", before, after)
+	}
+	if got := hookCommandsIn(out, "SessionStart"); len(got) != 2 || got[1] != "/x/dotf mem session-start" {
+		t.Errorf("SessionStart = %v, want the other entry kept and ours appended", got)
+	}
+}
+
+func TestDotfArgsRecognisesOnlyTheDotfBinary(t *testing.T) {
+	for _, c := range []struct {
+		cmd, args string
+		ok        bool
+	}{
+		{"/home/x/.local/bin/dotf mem session-start", "mem session-start", true},
+		{"dotf harness gate --harness claude", "harness gate --harness claude", true},
+		{`"C:\Users\x\.local\bin\dotf.exe" harness gate --harness claude`, "harness gate --harness claude", true},
+		{`C:\tools\dotf.exe mem session-end`, "mem session-end", true},
+		{`"/path with space/dotf" mem session-start`, "mem session-start", true},
+		{"/usr/bin/other harness gate --harness claude", "", false},
+		{"/usr/bin/dotfx mem session-start", "", false},
+		{"sh /home/x/.orca/agent-hooks/claude-hook.sh", "", false},
+		{`"unterminated mem session-start`, "", false},
+		{"", "", false},
+	} {
+		args, ok := dotfArgs(c.cmd)
+		if ok != c.ok || args != c.args {
+			t.Errorf("dotfArgs(%q) = %q, %v; want %q, %v", c.cmd, args, ok, c.args, c.ok)
+		}
+	}
+}
+
+func hookCommandsIn(doc map[string]any, event string) []string {
+	hooks, _ := doc["hooks"].(map[string]any)
+	groups, _ := hooks[event].([]any)
+	var out []string
+	for _, g := range groups {
+		group, _ := g.(map[string]any)
+		inner, _ := group["hooks"].([]any)
+		for _, h := range inner {
+			if obj, ok := h.(map[string]any); ok {
+				cmd, _ := obj["command"].(string)
+				out = append(out, cmd)
+			}
+		}
+	}
+	return out
 }

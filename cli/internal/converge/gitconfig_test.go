@@ -161,7 +161,7 @@ func TestSelect_KeepsRegistryOrderAndRefusesAnUnknownName(t *testing.T) {
 	if err != nil || len(got) != 2 || got[0].Name() != "records-mirror" || got[1].Name() != "git-config" {
 		t.Fatalf("got %v %v", got, err)
 	}
-	if _, err := Select(reg, []string{"git-confg"}); err == nil || !strings.Contains(err.Error(), "git-confg") || !strings.Contains(err.Error(), "known: records-mirror") {
+	if _, err := Select(reg, []string{"git-confg"}); err == nil || !strings.Contains(err.Error(), "git-confg") || !strings.Contains(err.Error(), "known: checkout, records-mirror") {
 		t.Errorf("want an error naming the typo and the known names, got %v", err)
 	}
 }

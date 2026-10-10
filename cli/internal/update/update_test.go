@@ -46,12 +46,12 @@ func TestUpdate(t *testing.T) {
 	tests := []struct {
 		name          string
 		mutate        func(g fakeGit) // tweak the healthy fake for this branch
-		setupErr      error           // RunSetup result
+		setupErr      error           // Converge result
 		wantStatus    string
 		wantMsgSubstr string // if set, out.Message must contain it
 		wantMsgSuffix string // if set, out.Message must end with it
 		wantErr       bool
-		setupRuns     bool // whether RunSetup must be invoked
+		setupRuns     bool // whether Converge must be invoked
 	}{
 		{name: "not a repo", mutate: func(g fakeGit) { g.fail["rev-parse --git-dir"] = true }, wantStatus: "not-a-repo", wantMsgSubstr: "nothing to self-update"},
 		// An unreadable status must fail safe (skip, not proceed as if clean) —
@@ -71,8 +71,8 @@ func TestUpdate(t *testing.T) {
 		// ever runs what the upstream holds, so it stays a "diverged" skip.
 		{name: "ahead is a diverged skip", mutate: func(g fakeGit) { g.out["merge-base HEAD @{u}"] = "bbbb" }, wantStatus: "diverged", wantMsgSubstr: "diverged from origin/main (non fast-forward)"},
 		{name: "ff failed", mutate: func(g fakeGit) { g.fail["merge --ff-only @{u}"] = true }, wantStatus: "ff-failed"},
-		{name: "clean ff runs setup", mutate: func(g fakeGit) {}, wantStatus: "updated", setupRuns: true},
-		{name: "setup failure is the only error", mutate: func(g fakeGit) {}, setupErr: errors.New("boom"), wantStatus: "setup-failed", wantErr: true, setupRuns: true},
+		{name: "clean ff converges", mutate: func(g fakeGit) {}, wantStatus: "updated", setupRuns: true},
+		{name: "converge failure is the only error", mutate: func(g fakeGit) {}, setupErr: errors.New("boom"), wantStatus: "converge-failed", wantErr: true, setupRuns: true},
 	}
 
 	for _, tt := range tests {
@@ -82,7 +82,7 @@ func TestUpdate(t *testing.T) {
 			ranSetup := false
 			d := Deps{
 				Git: g.run,
-				RunSetup: func() error {
+				Converge: func() error {
 					ranSetup = true
 					return tt.setupErr
 				},
@@ -103,7 +103,7 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("message = %q, want it to end with %q", out.Message, tt.wantMsgSuffix)
 			}
 			if ranSetup != tt.setupRuns {
-				t.Errorf("RunSetup invoked = %v, want %v — a skip branch must never re-run setup", ranSetup, tt.setupRuns)
+				t.Errorf("Converge invoked = %v, want %v — a skip branch must never converge", ranSetup, tt.setupRuns)
 			}
 		})
 	}
@@ -148,5 +148,30 @@ func TestSync(t *testing.T) {
 				t.Errorf("fast-forward attempted = %v, want %v", merged, tt.wantFF)
 			}
 		})
+	}
+}
+
+// Assess is Sync without the merge: a plan calls it, so it must report where
+// Sync would fast-forward and never move HEAD.
+func TestAssess_ReportsBehindAndNeverMerges(t *testing.T) {
+	var calls []string
+	g := healthyGit()
+	run := func(args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		return g.run(args...)
+	}
+
+	out := Assess("/repo", run)
+
+	if out.Status != StatusBehind || out.Upstream != "origin/main" {
+		t.Fatalf("Assess = %+v, want behind origin/main", out)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "merge ") {
+			t.Fatalf("Assess must not merge, calls: %v", calls)
+		}
+	}
+	if got := Sync("/repo", g.run).Status; got != StatusFastForwarded {
+		t.Errorf("Sync on the same checkout = %q, want %q", got, StatusFastForwarded)
 	}
 }
