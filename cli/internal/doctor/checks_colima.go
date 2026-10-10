@@ -167,7 +167,7 @@ func setYAMLLine(raw []byte, key string, v int) []byte {
 // relaunches it on a clean exit, so a direct `colima stop` or `start` races it.
 // A VM running outside the service is left alone with the command to run.
 func restartColima(sys *System, rep *Report, want string) {
-	if out, _, err := sys.CommandOutputBounded(dockerEngineTimeout, "brew", "services", "info", "colima", "--json"); err != nil || !strings.Contains(strings.ReplaceAll(out, " ", ""), `"running":true`) {
+	if !colimaServiceRunning(sys) {
 		rep.Warn("Colima runs outside brew services; apply " + want + " with: colima stop && brew services start colima")
 		return
 	}
@@ -175,6 +175,26 @@ func restartColima(sys *System, rep *Report, want string) {
 		rep.Warn("brew services restart colima failed: " + strings.TrimSpace(errOut+" "+err.Error()))
 		return
 	}
-	rep.Fix("restarted Colima at " + want + " (brew services restart colima); its containers stopped")
-	waitForEngine(sys, rep)
+	// The repair is the VM running at the size, not the engine answering: the
+	// stopping VM can still answer `docker info` on the first probe.
+	for i := 0; i < engineProbeAttempts; i++ {
+		if running, cpu, mem := colimaRunningSize(sys); running && cpu == colimaCPU && mem == colimaMemoryGiB<<30 {
+			rep.Fix("restarted Colima at " + want + " (brew services restart colima); its containers stopped")
+			return
+		}
+		time.Sleep(engineProbeInterval)
+	}
+	rep.Warn("restarted Colima (its containers stopped), but the VM has not reported " + want + " yet; re-run dotf doctor in a minute")
+}
+
+// colimaServiceRunning reports whether Homebrew's launchd service runs Colima.
+func colimaServiceRunning(sys *System) bool {
+	out, _, err := sys.CommandOutputBounded(dockerEngineTimeout, "brew", "services", "info", "colima", "--json")
+	if err != nil {
+		return false
+	}
+	var services []struct {
+		Running bool `json:"running"`
+	}
+	return json.Unmarshal([]byte(out), &services) == nil && len(services) == 1 && services[0].Running
 }

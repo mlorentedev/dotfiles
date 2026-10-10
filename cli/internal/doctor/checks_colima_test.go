@@ -40,6 +40,7 @@ func TestCheckColimaSize(t *testing.T) {
 		list        string // colima list --json; "" = command fails
 		service     bool   // brew services reports colima running
 		fix         bool
+		stuck       bool // the VM keeps reporting its old size after the restart
 		wantSubstr  string
 		wantWarn    int
 		wantRestart bool
@@ -60,6 +61,8 @@ func TestCheckColimaSize(t *testing.T) {
 			wantSubstr: "its containers stopped", wantRestart: true, wantFile: colimaYAML("4", "8")},
 		{name: "file in sync, VM at the old size, --fix → restart only", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22, service: true, fix: true,
 			wantSubstr: "restarted Colima at 4 CPU, 8 GiB", wantRestart: true},
+		{name: "restart that never reaches the size → warn, no repair claimed", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22, service: true, fix: true, stuck: true,
+			wantWarn: 1, wantSubstr: "has not reported 4 CPU, 8 GiB yet", wantRestart: true},
 		{name: "VM at the old size, no --fix → warn naming the running size", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22,
 			wantWarn: 1, wantSubstr: "the VM runs with 2 CPU, 2 GiB"},
 		{name: "running outside the service → edit, no restart, the command named", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("2", "2"), list: vmRunning22, fix: true,
@@ -85,6 +88,9 @@ func TestCheckColimaSize(t *testing.T) {
 			sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, string, error) {
 				switch strings.Join(append([]string{name}, args...), " ") {
 				case "colima list --json":
+					if restarted && !tc.stuck {
+						return vmRunning44 + "\n", "", nil
+					}
 					if tc.list != "" {
 						return tc.list + "\n", "", nil
 					}
