@@ -95,5 +95,5 @@ Declined on #2147 because the Linux job shares the defect; it is fixed for both 
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/PLAT-001d-macos-ci-leg/` -> `specs/archive/PLAT-001d-macos-ci-leg/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): the spec's only ticket is the epic #2013, which stays open for its other tracks; the archive is recorded on the epic with this PR's link
 - [x] Promotions above executed (if any)
