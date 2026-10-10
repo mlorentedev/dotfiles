@@ -10,7 +10,7 @@ import (
 // setup copies it under $HOME, and says whether the two are expected to stay
 // byte-identical.
 //
-// The map cannot reuse isManagedDeployPath: that predicate serves the repo →
+// The map cannot reuse harness.IsDeployDirPath: that predicate serves the repo →
 // deploy-dir leg, where a file keeps its relative path. On this leg the path
 // may change (ssh/config → .ssh/config was one, before it moved to
 // ai/deploy.json), so the mapping has to be explicit — and explicit means it can drift from setup, which is what

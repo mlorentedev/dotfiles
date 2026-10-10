@@ -963,9 +963,10 @@ func matchPinFloorFrom(rep *Report, tool, installed, pin, source string) {
 }
 
 // checkDeployDrift ports the standalone diff-check twin (healthcheck §11): for
-// every git-tracked file under the managed allowlist, byte-compare the repo copy
-// against the deployed ~/.dotfiles copy. Drift means the repo was edited without
-// re-running setup, so every shell still reads the stale deploy-dir copy. A
+// every git-tracked file in the deploy-dir set (harness.IsDeployDirPath, the
+// same set the mirror copies), byte-compare the repo copy against the deployed
+// ~/.dotfiles copy. Drift means the repo moved and nothing re-mirrored it, so
+// every shell still reads the stale deploy-dir copy. A
 // missing repo / deploy-dir / non-git repo is a SKIP (the shell twin's exit 2),
 // because `dotf doctor` legitimately runs where one side is absent (CI, fresh box).
 func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
@@ -995,7 +996,7 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 	drift, checked := 0, 0
 	for _, rel := range strings.Split(out, "\n") {
 		rel = strings.TrimSpace(rel)
-		if rel == "" || !isManagedDeployPath(rel) {
+		if rel == "" || !harness.IsDeployDirPath(rel) {
 			continue
 		}
 		repoFile := filepath.Join(repo, filepath.FromSlash(rel))
@@ -1008,7 +1009,7 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 		}
 		checked++
 		if !filesEqual(repoFile, deployFile) {
-			rep.Fail("drift: " + rel + " — repo differs from deploy-dir (run setup to refresh ~/.dotfiles)")
+			rep.Fail("drift: " + rel + " — repo differs from deploy-dir (run `dotf converge` to refresh it)")
 			drift++
 		}
 	}
@@ -1031,21 +1032,4 @@ func resolveRepoDir(sys *System) string {
 		}
 	}
 	return ""
-}
-
-// isManagedDeployPath reports whether a git-tracked repo path is one setup copies
-// into the deploy-dir. It MUST mirror the copy block in setup-linux.sh (and the
-// Windows guards in setup-windows.ps1); diff-check kept them in sync by comment,
-// and this port inherits that coupling (CLI-019 follow-up: a grep-guard test).
-func isManagedDeployPath(rel string) bool {
-	switch rel {
-	case "versions.conf", ".zshrc", ".bashrc", ".profile", "tmux.conf":
-		return true
-	}
-	for _, prefix := range []string{".zsh/", "ssh/", "scripts/", "sensitive/"} {
-		if strings.HasPrefix(rel, prefix) {
-			return true
-		}
-	}
-	return false
 }

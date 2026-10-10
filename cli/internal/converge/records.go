@@ -35,8 +35,9 @@ func Registry(o Options) []Reconciler {
 	}
 }
 
-// recordsMirror mirrors harness/ and every manifest target from the checkout
-// into the deploy dir (harness.Mirror). It is the first step of the records
+// recordsMirror mirrors harness/, every manifest target and the deploy-dir set
+// (rc files, versions.conf, scripts/ …) from the checkout into the deploy dir
+// (harness.Mirror). On macOS it is the only thing that refreshes them (#2224). It is the first step of the records
 // phase: the instruction files and the hook bindings read what it mirrors.
 type recordsMirror struct{}
 
@@ -57,7 +58,7 @@ func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
 	}
 	return Result{
 		Changes: res.Updated,
-		Detail: fmt.Sprintf("harness/ + %d target(s) → %s (%d %s, %d unchanged)",
+		Detail: fmt.Sprintf("harness/ + %d target(s) + the deploy-dir set → %s (%d %s, %d unchanged)",
 			len(res.Targets), env.DeployDir, res.Updated, verb, res.Unchanged),
 	}, nil
 }
