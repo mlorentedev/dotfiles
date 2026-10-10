@@ -131,7 +131,8 @@ func deletedPaths(repoRoot string, git GitRunner) (map[string]bool, string) {
 }
 
 // PruneOrphans removes each path from deployDir, then every directory the
-// removal left empty, up to but not including the tree root. It refuses a path
+// removal left empty, up to but not including the tree root. A path it cannot
+// remove is reported in the joined error after the rest are pruned. It refuses a path
 // outside the pruned trees before removing anything, so a wrong list cannot
 // reach sensitive/ or climb out of the deploy dir.
 func PruneOrphans(deployDir string, rels []string) error {
@@ -140,10 +141,15 @@ func PruneOrphans(deployDir string, rels []string) error {
 			return fmt.Errorf("refusing to prune %q: not inside %v", rel, PrunedDeployDirTrees)
 		}
 	}
+	var errs []error
 	for _, rel := range rels {
 		p := filepath.Join(deployDir, filepath.FromSlash(rel))
 		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("pruning %s: %w", rel, err)
+			// Keep going: one leftover in a directory the user cannot write
+			// (an old sudo setup) must not shield the rest. The failure still
+			// surfaces, because a leftover left on PATH is a real defect.
+			errs = append(errs, fmt.Errorf("pruning %s: %w", rel, err))
+			continue
 		}
 		root := filepath.Join(deployDir, prunedTree(rel))
 		for dir := filepath.Dir(p); dir != root && strings.HasPrefix(dir, root); dir = filepath.Dir(dir) {
@@ -152,7 +158,7 @@ func PruneOrphans(deployDir string, rels []string) error {
 			}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // prunedTree is the pruned tree a clean, slash-separated relative path lies

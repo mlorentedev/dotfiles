@@ -2,7 +2,9 @@ package doctor
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -182,6 +184,29 @@ func TestCheckDeployDirLeftovers(t *testing.T) {
 		}
 		if !pathExists(filepath.Join(deploy, "scripts", "old.sh")) {
 			t.Error("--fix removed a file git never tracked")
+		}
+	})
+
+	t.Run("an unreadable entry is named and the check does not pass", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("needs POSIX permissions enforced on the test user")
+		}
+		repo, deploy, cmdOut := setup(t, false)
+		if err := os.Remove(filepath.Join(deploy, "scripts", "old.sh")); err != nil {
+			t.Fatal(err)
+		}
+		locked := filepath.Join(deploy, "scripts", "locked")
+		mkdirAll(t, locked)
+		if err := os.Chmod(locked, 0); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+		rep, out := run(repo, deploy, cmdOut, false)
+		if rep.Failures() != 0 || !strings.Contains(out, "scripts/locked in the deploy dir could not be read") {
+			t.Fatalf("want a warning naming the unreadable entry, no failure:\n%s", out)
+		}
+		if strings.Contains(out, "no leftovers") {
+			t.Errorf("an unchecked entry must not read as a clean deploy dir:\n%s", out)
 		}
 	})
 

@@ -180,6 +180,30 @@ func TestPruneOrphans_RemovesTheFilesAndTheDirectoriesTheyEmptied(t *testing.T) 
 	}
 }
 
+// A leftover the user cannot remove is reported, and does not shield the
+// leftovers after it.
+func TestPruneOrphans_ReportsALeftoverItCannotRemoveAndPrunesTheRest(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions enforced on the test user")
+	}
+	deploy := t.TempDir()
+	ro := filepath.Join(deploy, "scripts", "ro")
+	writeFile(t, filepath.Join(ro, "old.sh"), "x\n")
+	writeFile(t, filepath.Join(deploy, "scripts", "z.sh"), "x\n")
+	if err := os.Chmod(ro, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
+
+	err := PruneOrphans(deploy, []string{"scripts/ro/old.sh", "scripts/z.sh"})
+	if err == nil || !strings.Contains(err.Error(), "scripts/ro/old.sh") {
+		t.Errorf("the leftover it could not remove must be named, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(deploy, "scripts", "z.sh")); !os.IsNotExist(err) {
+		t.Error("a failure on one leftover stopped the prune of the next")
+	}
+}
+
 // PruneOrphans refuses a path outside the pruned trees, so a caller that
 // passed the wrong list cannot reach sensitive/ or climb out of the deploy dir.
 func TestPruneOrphans_RefusesAPathOutsideThePrunedTrees(t *testing.T) {
