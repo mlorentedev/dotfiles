@@ -398,6 +398,7 @@ tags: [lessons, index, dotfiles]
 | [377 - A merge into a tool-owned file assumes the tool reads a fragment](lesson-377-a-merge-into-a-tool-owned-file-assumes-the-tool-reads-a-fragment.md) | 2026-10-09 |
 | [378 - An unattended deploy must not trade a secret for its placeholder](lesson-378-an-unattended-deploy-must-not-trade-a-secret-for-its-placeholder.md) | 2026-10-09 |
 | [379 - A path CI asserts is skipped is a path CI never tests](lesson-379-a-path-ci-asserts-is-skipped-is-a-path-ci-never-tests.md) | 2026-10-10 |
+| [380 - A check keyed on the supervisor skips the host without one](lesson-380-a-check-keyed-on-the-supervisor-skips-the-host-without-one.md) | 2026-10-10 |
 | [381 - A GUI app on macOS reads the launchd session, not the shell](lesson-381-a-gui-app-on-macos-reads-the-launchd-session-not-the-shell.md) | 2026-10-10 |
 | [382 - A retirement is desired state, not a one-cycle migration](lesson-382-a-retirement-is-desired-state-not-a-one-cycle-migration.md) | 2026-10-10 |
 | [383 - A sweep that only adds links cannot converge them](lesson-383-a-sweep-that-only-adds-links-cannot-converge-them.md) | 2026-10-10 |

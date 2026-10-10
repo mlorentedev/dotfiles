@@ -132,21 +132,55 @@ port. The check demonstrates itself on its own PR.
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons.md`? **yes** — reusing a helper inherits
+- [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-176-reusing-a-helper-inherits-its-error-policy-not-jus.md — reusing a helper inherits
       its *error policy*, not just its code: `_strip_markdown_code` is correct
       where a false positive is expensive and wrong where a false negative is.
 - [ ] ADR-worthy decision? **no** — no architectural boundary moved.
-- [ ] New pattern candidate for `00_meta/patterns/`? **not yet** — the underlying
+- [ ] New pattern candidate for `00_meta/patterns/`? no: not yet — the underlying
       insight is already covered by `pattern-verify-state-before-acting`; revisit
       if the error-policy-inheritance angle recurs in a second project.
 
+## Closing status (2026-10-10)
+
+- AC1-AC4 hold on main: features f1-f4 pass, each command requiring a matching test that passes (a `bats -f` filter that matches nothing exits 0).
+- **The fixture-shape inventory did not ship.** This spec deferred it to #857's fix; #857 closed through #862 and #866 without it. It is #858's remaining direction, so the archive of this spec must reference #858, not close it, and the inventory stays tracked there (comment on #858, 2026-10-10).
+
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-063-spec-gate-adjacency/` -> `specs/archive/HARNESS-063-spec-gate-adjacency/`
-- [ ] Bitácora board ticket moved to Done / closed with PR link (ADR-018)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-063-spec-gate-adjacency/` -> `specs/archive/HARNESS-063-spec-gate-adjacency/`
+- [ ] Bitácora board ticket moved to Done / closed with PR link (ADR-018). Left unticked on purpose: #858 stays open for its second direction, the fixture-shape inventory.
 
 > **Not archived by this PR.** #858 adopted two directions; this PR ships one.
 > The fixture-shape inventory travels with #857, and that is the PR that closes
 > #858 and archives this spec. This PR's body carries `Refs #858`, so
 > `_check_archive_on_merge` correctly leaves the spec active.
+>
+> **Superseded 2026-10-10.** #857 closed through #862 and #866 without the
+> inventory, so no PR is left to carry it. #2304 archives this spec for the
+> direction that shipped and still carries only `Refs #858`. The fixture-shape
+> inventory stays open on #858 (see "Closing status" above).
+
+## Review round 1 dispositions (2026-10-10)
+
+Round 1 (`nan/qwen3.8-flash`, FAIL) is committed unchanged with this PR. Dispositions:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The wiring pin is satisfied by a comment | **Applied.** `tests/spec-gate-pr.bats` scopes the check to the `Run SDD spec-gate` step. It passes on the workflow as it stands and fails when the flag line is deleted. |
+| 2 | `tasks.md` and `proposal.md` record the work as undone | **Applied.** Every box is ticked against what shipped, with notes where a pin is weaker than its box, and `status: verifying`. |
+| 3 | `--limit 500` truncates the feed silently | **Applied.** The collect step emits `::warning::` when the feed reaches the limit (420 open today). It has a step-scoped bats pin, and the check was exercised at 500 and 420 lines. |
+| 4, 5, 7, 8 | Substring noise, untested deny-list, renamed files, report escaping | **Ticketed:** #2303. |
+| 6 | The AC4 pin diffs against a `main` that contains the feature | **Ticketed:** #2303 (golden offline output). The criterion holds and is noted on AC4. |
+| 9 | The review base is 769 commits behind | **Existing ticket:** #1727, with this instance added. |
+| Q | AC1 says "a PR that closes an issue", but it fires on every PR | **Applied.** AC1 now states the shipped trigger. |
+| — | `_report_adjacent_issues` at 39 lines and CC ~16 | **Ticketed:** #2303. |
+
+## Review round 2 dispositions (2026-10-10)
+
+Round 2 (`agy/gemini-3.1-pro-high`, PASS WITH GAPS, reviewed `ca4685d2`) is committed unchanged with this PR.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `git diff --name-only` quotes paths, so `*"$base"*` misses them | **Ticketed:** #2303, corrected by measurement. Spaces are not quoted, only control characters, `"`, `\` and non-ASCII bytes. The repo has 0 such paths, so this is theoretical. The fix is `-c core.quotePath=false`. |
+| 2-4 | Substring noise, step summary escaping, renamed files | **Already ticketed:** #2303. |

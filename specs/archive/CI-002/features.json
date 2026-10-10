@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CI-002-f1",
+    "behavior": "AC1/AC2/AC3: `dotf pi packages apply`, which both setup twins call, skips on DOTFILES_SKIP_PI_PACKAGES before any probe and says nothing was installed or verified",
+    "verification": "cd cli && out=$(go test ./internal/cmd -count=1 -run '^TestPiPackagesApplySkipIsFirstAndLoud$' -v) && printf '%s' \"$out\" | grep -q '^--- PASS'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 at dbed0e3c plus this PR's test fix"
+  },
+  {
+    "id": "CI-002-f2",
+    "behavior": "AC3: the skip wording that says what was NOT verified is pinned in the command",
+    "verification": "out=$(bats tests/pi-packages.bats -f 'says what was NOT verified') && printf '%s' \"$out\" | grep -q '^ok ' && ! printf '%s' \"$out\" | grep -q '# skip'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 at dbed0e3c plus this PR's test fix"
+  },
+  {
+    "id": "CI-002-f3",
+    "behavior": "AC4: CI never sets the skip on a push, and the workflow is valid YAML",
+    "verification": "out=$(bats tests/pi-packages.bats -f 'never sets the skip on a push') && printf '%s' \"$out\" | grep -q '^ok ' && ! printf '%s' \"$out\" | grep -q '# skip' && python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))\"",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 at dbed0e3c plus this PR's test fix"
+  },
+  {
+    "id": "CI-002-f4",
+    "behavior": "AC5: the pi filter covers the manifest, both twins, the Go reconcile and wherever PI_VERSION is declared",
+    "verification": "out=$(bats tests/pi-packages.bats -f 'covers the manifest and BOTH twins') && printf '%s' \"$out\" | grep -q '^ok ' && ! printf '%s' \"$out\" | grep -q '# skip' && out=$(bats tests/pi-packages.bats -f 'wherever PI_VERSION is DECLARED') && printf '%s' \"$out\" | grep -q '^ok ' && ! printf '%s' \"$out\" | grep -q '# skip'",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 at dbed0e3c plus this PR's test fix"
+  },
+  {
+    "id": "CI-002-f5",
+    "behavior": "AC6: the skip-ordering test fails against a mutated tree that probes for pi before honouring the skip",
+    "verification": "b=$(mktemp) && cp cli/internal/cmd/pi.go \"$b\" && python3 -c \"p='cli/internal/cmd/pi.go'; s=open(p).read(); a='\\tif os.Getenv(skipEnv) != \\\"\\\" {'; b='\\tif _, err := piLookPath(\\\"pi\\\"); err != nil {\\n\\t\\treturn nil\\n\\t}\\n' + a; assert a in s; open(p,'w').write(s.replace(a,b,1))\" && (cd cli && ! go test ./internal/cmd -count=1 -run '^TestPiPackagesApplySkipIsFirstAndLoud$' >/dev/null 2>&1); rc=$?; cp \"$b\" cli/internal/cmd/pi.go; rm -f \"$b\"; exit $rc",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 after the review fixes"
+  },
+  {
+    "id": "CI-002-f6",
+    "behavior": "AC1: both setup twins delegate the reconcile to `dotf pi packages apply`, so the Go skip is the one both honour",
+    "verification": "grep -Eq '^[[:space:]]*\"\\$_dotf\" pi packages apply' setup-linux.sh && grep -Eq '^[[:space:]]*& \\$dotfPath pi packages apply' setup-windows.ps1",
+    "state": "passing",
+    "evidence": "exit 0 on 2026-10-10 after the review fixes"
+  }
+]
