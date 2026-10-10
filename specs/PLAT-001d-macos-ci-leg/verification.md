@@ -77,6 +77,8 @@ Declined on #2147 because the Linux job shares the defect; it is fixed for both 
 - GNU parallel is installed by a workflow step (`brew install parallel`), with the same `::error` preflight as Linux. Its declaration belongs to #2013 P5b (a system-package source in the catalog); `packages.json` is untouched here.
 - Gaps found and ticketed rather than fixed: `test-windows` still selects by file list instead of the tag (noted on #2059, the Windows-leg slimming issue); `checks_catalog.go` and `checks_repodir.go` bypass the `GOOS` seam (#2061); Python 3.12 and PyYAML are an undeclared dependency of the suite on a developer Mac (#2062).
 
+- AC5 closed (2026-10-10): `test-macos` was green on the PR that added it (#2063, run 37590992834, branch `ci/macos-leg`), and on main both tiers pass. Run 38014809265 (push of `e04219c2`, #2222) reports `bats, os-sensitive tier (bash 3.2)=success` and `bats, full suite (bash 3.2, main only)=success`.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-342-linux-green-says-nothing-about-the-bsd-half-of-every-unix-tool.md
