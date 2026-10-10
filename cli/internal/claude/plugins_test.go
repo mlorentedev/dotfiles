@@ -238,12 +238,12 @@ func TestRetireRefusesAListEntryWithoutAName(t *testing.T) {
 // The shape of `claude plugin marketplace list --json`, captured from Claude
 // Code on 2026-10-10 rather than written to match the parser.
 func TestRetireReadsTheCapturedListShape(t *testing.T) {
-	r := &fakeRunner{marketsJ: `[{"name":"claude-plugins-official","source":"github","repo":"anthropics/claude-plugins-official","installLocation":"/home/u/.claude/plugins/marketplaces/claude-plugins-official"},{"name":"thedotmack","source":"github","repo":"thedotmack/claude-mem","installLocation":"/home/u/.claude/plugins/marketplaces/thedotmack"}]`}
-	rep, err := newSyncer(r).Retire([]string{"thedotmack"}, true)
+	r := &fakeRunner{marketsJ: `[{"name":"claude-plugins-official","source":"github","repo":"anthropics/claude-plugins-official","installLocation":"/home/u/.claude/plugins/marketplaces/claude-plugins-official"},{"name":"old","source":"github","repo":"someone/old-plugins","installLocation":"/home/u/.claude/plugins/marketplaces/old"}]`}
+	rep, err := newSyncer(r).Retire([]string{"old"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(rep.Removed, []string{"thedotmack"}) {
-		t.Fatalf("report %+v, want thedotmack to be removed", rep)
+	if !reflect.DeepEqual(rep.Removed, []string{"old"}) {
+		t.Fatalf("report %+v, want old to be removed", rep)
 	}
 }
