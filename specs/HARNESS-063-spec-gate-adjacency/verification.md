@@ -140,6 +140,11 @@ port. The check demonstrates itself on its own PR.
       insight is already covered by `pattern-verify-state-before-acting`; revisit
       if the error-policy-inheritance angle recurs in a second project.
 
+## Closing status (2026-10-10)
+
+- AC1-AC4 hold on main: features f1-f4 pass, each command requiring a matching test that passes (a `bats -f` filter that matches nothing exits 0).
+- **The fixture-shape inventory did not ship.** This spec deferred it to #857's fix; #857 closed through #862 and #866 without it. It is #858's remaining direction, so the archive of this spec must reference #858, not close it, and the inventory stays tracked there (comment on #858, 2026-10-10).
+
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
