@@ -11,7 +11,8 @@ import (
 func readyFacts() Facts {
 	return Facts{
 		State: "OPEN", HeadSHA: "abc123", HeadRef: "feat/x", BaseRef: "main", MergeState: "CLEAN",
-		Checks: []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}},
+		Checks:        []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}},
+		GrantDeclared: true,
 	}
 }
 
@@ -35,6 +36,7 @@ func TestDecide_NamesEveryConditionThatFails(t *testing.T) {
 		"draft":             {func(f *Facts) { f.IsDraft = true }, "draft"},
 		"closed":            {func(f *Facts) { f.State = "CLOSED" }, "not open"},
 		"release-please PR": {func(f *Facts) { f.HeadRef = "release-please--branches--main" }, "release-please"},
+		"no merge grant":    {func(f *Facts) { f.GrantDeclared = false }, GrantFile},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -57,6 +59,8 @@ type fakeGH struct {
 	deps      string   // JSON for `pr list --base`
 	calls     []string // every mutating call, in order
 	views     int
+	noGrant   bool   // the base branch has no grant file
+	grantRef  string // the contents path the grant was read from
 }
 
 func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
@@ -80,8 +84,63 @@ func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
 	case strings.HasPrefix(line, "pr edit"), strings.HasPrefix(line, "pr merge"):
 		g.calls = append(g.calls, line)
 		return nil, nil
+	case strings.HasPrefix(line, "api "):
+		g.grantRef = line
+		return grantAnswer(g.noGrant)
 	}
 	return nil, errors.New("unexpected gh call: " + line)
+}
+
+// grantAnswer is what `gh api .../contents/<GrantFile>` says.
+func grantAnswer(absent bool) ([]byte, error) {
+	if absent {
+		return []byte(`{"message":"Not Found","status":"404"}`), errors.New("gh: Not Found (HTTP 404)")
+	}
+	return []byte(`{"type":"file"}`), nil
+}
+
+// The grant is read from the base branch, never the head: a PR cannot opt its
+// own repository in by adding the file.
+func TestLand_RefusesInARepositoryWithoutTheGrant(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`, noGrant: true}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Merged || len(g.calls) != 0 || !strings.Contains(strings.Join(res.Reasons, ";"), GrantFile) {
+		t.Errorf("want a refusal naming %s and no mutation, got %+v, calls %v", GrantFile, res, g.calls)
+	}
+	want := "api repos/{owner}/{repo}/contents/" + GrantFile + "?ref=main"
+	if g.grantRef != want {
+		t.Errorf("grant read as %q, want %q", g.grantRef, want)
+	}
+}
+
+func TestLand_ReadsTheGrantOfTheNamedRepository(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`}
+
+	if _, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged, Repo: "o/r"}, 30); err != nil {
+		t.Fatal(err)
+	}
+	if want := "api repos/o/r/contents/" + GrantFile + "?ref=main"; g.grantRef != want {
+		t.Errorf("grant read as %q, want %q", g.grantRef, want)
+	}
+}
+
+// Only a 404 means "not declared"; any other failure is an unanswered
+// question, and an unanswered question never lands a PR.
+func TestLand_AnUnreadableGrantIsAnError(t *testing.T) {
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		if args[0] == "api" {
+			return nil, errors.New("gh: HTTP 502")
+		}
+		return (&fakeGH{view: readyView, checks: greenChecks, deps: `[]`}).run(ctx, args...)
+	}
+	res, err := Land(context.Background(), Options{Run: run, Untriaged: noneUntriaged}, 30)
+	if err == nil || res.Merged {
+		t.Errorf("want an error and no merge, got %+v, %v", res, err)
+	}
 }
 
 const readyView = `{"state":"OPEN","isDraft":false,"headRefOid":"abc123","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"CLEAN"}`
@@ -315,6 +374,8 @@ func failingMergeGH(restoreFails bool) (Runner, *[]string) {
 		case strings.HasPrefix(line, "pr merge"):
 			calls = append(calls, line)
 			return nil, errors.New("head branch was modified")
+		case strings.HasPrefix(line, "api "):
+			return grantAnswer(false)
 		case strings.HasPrefix(line, "pr edit"):
 			calls = append(calls, line)
 			if restoreFails && strings.HasSuffix(line, "--base feat/x") {

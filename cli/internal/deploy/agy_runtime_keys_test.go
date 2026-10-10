@@ -71,15 +71,24 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 
 	got := readObject(t, dst)
 
+	// The template's grants and trust paths are the baseline every machine
+	// gets. The merge unions them into the machine's lists, so an entry the
+	// machine added survives and no baseline entry is missing.
 	ws, _ := got["trustedWorkspaces"].([]any)
-	if len(ws) != 3 || ws[0] != "/home/u/Projects/ts-bridge" {
-		t.Errorf("the runtime-trusted workspace was destroyed: %v", got["trustedWorkspaces"])
+	if !containsAll(ws, "/home/u/Projects/ts-bridge") {
+		t.Errorf("a trust path the machine added was lost: %v", got["trustedWorkspaces"])
+	}
+	if !containsAll(ws, filepath.ToSlash(home)+"/Projects/*") {
+		t.Errorf("the baseline trust path is missing: %v", got["trustedWorkspaces"])
 	}
 
 	perms, _ := got["permissions"].(map[string]any)
 	allow, _ := perms["allow"].([]any)
-	if len(allow) != 6 || allow[0] != "mcp(hive-vault/*)" {
-		t.Errorf("the runtime-granted permission was destroyed: %v", perms)
+	if !containsAll(allow, "mcp(hive-vault/*)") {
+		t.Errorf("a grant the machine added was lost: %v", perms)
+	}
+	if !containsAll(allow, baselineGrants...) {
+		t.Errorf("the baseline grants are missing: %v", perms)
 	}
 
 	// The other half of the contract: dotfiles still owns what it declares.
@@ -99,4 +108,47 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	if got["model"] != tmpl["model"] {
 		t.Errorf("model = %v, template declares %v", got["model"], tmpl["model"])
 	}
+}
+
+// baselineGrants is the minimum agy needs to work on every machine (owner,
+// #2236). A machine may add to it; the merge never leaves it holding less.
+var baselineGrants = []string{"command(*)", "read_file(*)", "write_file(*)", "read_url(*)", "search_web(*)"}
+
+// TestAgyTemplateShipsTheBaselineGrants pins the owner decision on #2236: the
+// grants and the trust paths are one baseline shipped to every machine.
+func TestAgyTemplateShipsTheBaselineGrants(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("../../..", "ai", "agy", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tmpl map[string]any
+	if err := json.Unmarshal(raw, &tmpl); err != nil {
+		t.Fatal(err)
+	}
+	ws, _ := tmpl["trustedWorkspaces"].([]any)
+	if !containsAll(ws, "{HOME}/Projects/*", "{HOME}/Projects/Workspace/*") {
+		t.Errorf("ai/agy/settings.json must ship the baseline trust paths: %v", tmpl["trustedWorkspaces"])
+	}
+	perms, _ := tmpl["permissions"].(map[string]any)
+	allow, _ := perms["allow"].([]any)
+	if !containsAll(allow, baselineGrants...) {
+		t.Errorf("ai/agy/settings.json must ship the baseline grants: %v", perms)
+	}
+}
+
+// containsAll reports whether list holds every one of want.
+func containsAll(list []any, want ...string) bool {
+	for _, w := range want {
+		found := false
+		for _, v := range list {
+			if v == w {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

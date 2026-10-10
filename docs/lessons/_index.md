@@ -395,4 +395,5 @@ tags: [lessons, index, dotfiles]
 | [374 - A generated file git merged is no longer generated](lesson-374-a-generated-file-git-merged-is-no-longer-generated.md) | 2026-10-09 |
 | [375 - A ratio reads its numerator and denominator from different sources](lesson-375-a-ratio-reads-its-numerator-and-denominator-from-different-sources.md) | 2026-10-09 |
 | [376 - A check whose only writer is barred on an OS can never pass there](lesson-376-a-check-whose-only-writer-is-barred-can-never-pass.md) | 2026-10-09 |
+| [377 - A merge into a tool-owned file assumes the tool reads a fragment](lesson-377-a-merge-into-a-tool-owned-file-assumes-the-tool-reads-a-fragment.md) | 2026-10-09 |
 <!-- END GENERATED -->

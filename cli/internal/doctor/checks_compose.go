@@ -74,6 +74,11 @@ func startColima(sys *System, rep *Report) {
 		return
 	}
 	rep.Fix("started Colima as a launchd service (brew services start colima)")
+	waitForEngine(sys, rep)
+}
+
+// waitForEngine polls the engine Colima is booting until it answers.
+func waitForEngine(sys *System, rep *Report) {
 	for i := 0; i < engineProbeAttempts; i++ {
 		if v := dockerServerVersion(sys); v != "" {
 			rep.Pass("engine reachable: server " + v)
