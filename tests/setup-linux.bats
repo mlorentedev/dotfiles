@@ -766,3 +766,14 @@ $block"
     grep -q 'dotf env set DOTFILES_REPO_DIR "\$SEED_REPO_DIR"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'dotf env set DOTFILES_REPO_DIR "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
 }
+
+# #1843 B13: the auto-memory sweep linked every vault project by guessing its
+# repo at ~/Projects/<name>, and moved a real memory dir aside. memlink links
+# the project a session opens and never moves data, so no setup carries a sweep.
+@test "neither setup sweeps auto-memory links; memlink owns them (#1843 B13)" {
+    local f
+    for f in "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1"; do
+        refute_grep 'Deploying auto-memory|Migrating orphan memory|Backing up existing memory' "$f"
+    done
+    refute_grep_fixed 'function Get-ClaudeProjectKey' "$DOTFILES_DIR/scripts/utils.ps1"
+}

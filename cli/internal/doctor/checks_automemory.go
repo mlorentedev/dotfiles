@@ -41,7 +41,14 @@ func checkAutoMemoryLink(sys *System, start string, rep *Report, fix bool) {
 		// mean destroying it, which memlink refuses by contract — so do NOT --fix;
 		// flag it for a manual reconcile (knowledge#120).
 		rep.Warn("auto-memory is a real directory, not a vault link: " + target +
-			" — /handoff writes here, not the vault. Reconcile by hand (merge into the vault source, then relink); --fix will not overwrite real data.")
+			" — /handoff writes here, not the vault. Reconcile by hand (merge into the vault source, or move it to the vault project's memory/ when it has none, then relink); --fix will not overwrite real data.")
+
+	case memlink.StateDangling:
+		// The vault source this link named moved or was archived, and no
+		// current source resolves. Writes through it fail, so say so; --fix has
+		// nothing to point it at.
+		rep.Warn("auto-memory link is broken: " + target +
+			" names a vault source that no longer exists, and none resolves for this project. Restore the vault project, or remove the link.")
 
 	case memlink.StateRepairable:
 		if !fix {
