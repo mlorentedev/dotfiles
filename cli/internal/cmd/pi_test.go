@@ -92,6 +92,11 @@ func TestPiPackagesApplyFailureExitsNonZero(t *testing.T) {
 // AC4: the skip comes first, before any probe, even with no manifest at all.
 func TestPiPackagesApplySkipIsFirstAndLoud(t *testing.T) {
 	agentDir, calls := piRepo(t, piManifest, `{"packages":[]}`)
+	// piRepo answers every probe, so a probe before the skip would pass unseen.
+	piLookPath = func(name string) (string, error) {
+		t.Errorf("probed for %q before honouring %s", name, skipEnv)
+		return "", errors.New("not found")
+	}
 	t.Setenv(skipEnv, "1")
 	t.Setenv("DOTFILES_REPO_DIR", t.TempDir())
 	out, _, err := execute(t, "pi", "packages", "apply", "--agent-dir", agentDir)

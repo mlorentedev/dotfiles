@@ -13,31 +13,27 @@ created: "2026-09-03"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/CI-002`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Branch created from main (PR 1: #1482, `91e38344`)
+- [x] `proposal.md` is complete and acceptance criteria are testable
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
-
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+- [x] [AC1] [AC2] [AC3] The skip guard, first in the reconcile chain and loud about what it did not verify. Shipped in both twins in #1482; it moved into `dotf pi packages apply` (`cli/internal/cmd/pi.go`, `skipEnv`) with HARNESS-139 (#1628). f6 pins that both twins call that command.
+- [x] [AC4] [AC5] The `pi` path filter and the `pull_request`-only `env:` line on `test-windows` (#1482).
+- [x] [AC6] Mutation pass: five mutations in #1482. Re-proven at close against the Go guard: f5 probes for pi before the skip, and the test fails.
+- [x] [AC2] Close-out fix: `TestPiPackagesApplySkipIsFirstAndLoud` could not fail. Its fixture answers every probe, so a probe before the skip passed unseen. Any probe now fails the test.
+- [x] PR 2, the wider filter audit: measured and **declined**. See `verification.md`, "PR 2".
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 
