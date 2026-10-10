@@ -923,47 +923,11 @@ $npmSeen = Get-Command npm -ErrorAction SilentlyContinue
 Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
 
 # ============================================================================
-# 2d. OPENCODE CONFIG + COMMANDS (AI-014)
+# 2d. OPENCODE (AI-014)
 # ============================================================================
-# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036). This block
-# deploys the canonical config + skill-derived commands using the same
-# reconcile-not-skip pattern as setup-linux.sh (AI-011, lines 415-465).
-# Both files: SHA256 byte-equality test before overwrite so user-side edits
-# that match upstream do not trigger a noisy "Deployed" log.
-
-$opencodeConfigSrc = "$DotfilesDir\ai\opencode\opencode.jsonc"
-$opencodeConfigDst = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
-if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
-    # SDD-009: stage source to a temp file, substitute {env:VAR} placeholders
-    # with age-decrypted values (mirror of bash setup-linux.sh logic), then
-    # deploy the substituted artifact. Deploy-File's SHA256 check then
-    # operates on rendered-vs-deployed (not source-vs-deployed) so idempotence
-    # still works after substitution.
-    $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
-    Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
-    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020/ADR-028). dotf presence is not success: a stale binary runs but exits
-    # non-zero, so check $LASTEXITCODE; if render did not succeed, leave the {env:VAR}
-    # placeholders intact for opencode's runtime resolver rather than a half-rendered file.
-    $opencodeRendered = $false
-    if (Get-Command dotf -ErrorAction SilentlyContinue) {
-        & dotf secrets render $opencodeConfigTmp
-        $opencodeRendered = ($LASTEXITCODE -eq 0)
-    }
-    if (-not $opencodeRendered) {
-        Write-Warn "dotf secrets render unavailable/failed; deploying opencode.jsonc with literal {env:VAR} placeholders (resolved at runtime)"
-    }
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
-    } else {
-        Ensure-Directory (Split-Path $opencodeConfigDst -Parent)
-        Copy-Item -LiteralPath $opencodeConfigTmp -Destination $opencodeConfigDst -Force
-        Write-Success "Deployed opencode.jsonc to $opencodeConfigDst (fallback)"
-    }
-    Remove-Item -LiteralPath $opencodeConfigTmp -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
-}
+# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036).
+# opencode.jsonc is the `opencode` entry of ai/deploy.json, rendered with its
+# {env:VAR} secrets by `dotf deploy` below (SDD-009, #1843 B12).
 
 # Deploy the canonical AGENTS.md as opencode's global system prompt.
 # OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike

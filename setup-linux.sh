@@ -501,33 +501,9 @@ log_info "Setting up OpenCode configuration..."
 # directories) and is safe to delete once `command -v opencode` resolves the
 # npm one; the rc files no longer put ~/.opencode/bin on PATH.
 
-# Deploy opencode.jsonc with deploy-time {env:VAR} substitution (SDD-009).
-# Source ships placeholders like {env:NAN_API_KEY}; we substitute the literal
-# age-decrypted value at deploy time so the deployed config is self-contained
-# (no runtime env-var propagation needed when opencode launches from a
-# non-shell parent). Placeholders without a resolvable mapping are left intact
-# and opencode's runtime resolver acts as fallback.
-ensure_directory "$HOME/.config/opencode"
-OPENCODE_CONFIG_SRC="$CURRENT_DIR/ai/opencode/opencode.jsonc"
-OPENCODE_CONFIG_DST="$HOME/.config/opencode/opencode.jsonc"
-if [ -f "$OPENCODE_CONFIG_SRC" ]; then
-    OPENCODE_CONFIG_TMP=$(mktemp)
-    cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
-    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020/ADR-028). Gate on the subcommand SUCCEEDING, not just dotf's presence: a
-    # stale dotf passes `command -v` but fails `secrets render`, and under set -e that
-    # would abort setup. Running it in the `if` condition exempts it from set -e; if it
-    # fails, the {env:VAR} placeholders are left intact for opencode's runtime resolver.
-    if command -v dotf >/dev/null 2>&1 && dotf secrets render "$OPENCODE_CONFIG_TMP"; then
-        : # materialized via dotf secrets render
-    else
-        log_warning "dotf secrets render unavailable; opencode.jsonc deployed with literal {env:VAR} placeholders (resolved at runtime)"
-    fi
-    mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
-    log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
-else
-    log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
-fi
+# ~/.config/opencode/opencode.jsonc is the `opencode` entry of ai/deploy.json,
+# rendered with its {env:VAR} secrets by the bare `dotf deploy` below on every
+# OS (SDD-009, #1843 B12).
 
 # opencode's and pi's AGENTS.md (the canonical SSOT, read natively under that
 # name) are harness/manifest.json agents.presence targets, deployed by

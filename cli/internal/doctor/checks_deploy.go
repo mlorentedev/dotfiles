@@ -360,11 +360,11 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	cfgPath := filepath.Join(home, ".config", "opencode", "opencode.jsonc")
 	switch {
 	case !pathExists(cfgPath):
-		rep.Fail("opencode.jsonc missing: " + cfgPath + " (run setup)")
+		rep.Fail("opencode.jsonc missing: " + cfgPath + " (run: dotf deploy opencode)")
 	case fileContains(cfgPath, `"$schema":`):
 		rep.Pass("opencode.jsonc deployed with $schema declaration")
 	default:
-		rep.Fail("opencode.jsonc missing $schema declaration (re-run setup to redeploy)")
+		rep.Fail("opencode.jsonc missing $schema declaration (run: dotf deploy opencode)")
 	}
 
 	// pi binary + version. pi is optional → SKIP when truly absent, but FAIL when

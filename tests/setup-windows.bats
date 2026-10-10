@@ -382,19 +382,6 @@ setup() {
     grep -qF 'dotf tools install' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
-    # Post-SDD-007: the inline Copy-Item + Get-FileHash block was extracted
-    # into Deploy-File in scripts/utils.ps1 (atomic + idempotent by SHA256).
-    # Post-SDD-009: Deploy-File now operates on the staged-substituted tmp
-    # file ($opencodeConfigTmp) rather than the raw source.
-    grep -qF 'opencode.jsonc' "$PS1_SCRIPT"
-    grep -qE 'Deploy-File.*opencodeConfigTmp' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 opencode deploy renders via dotf secrets render (SDD-009/#587)" {
-    grep -qE 'dotf secrets render \$opencodeConfigTmp' "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {
     # opencode commands (and claude/agy skills) are now rendered from the committed
     # vault skill records by Deploy-SkillRecord, honoring per-skill targets[], with
