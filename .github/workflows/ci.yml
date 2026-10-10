@@ -796,7 +796,7 @@ jobs:
       # Scheduled Task's last result and the daemon's own output. Print both on a
       # red run, so it explains itself without a Windows box.
       - name: Hive daemon diagnostics (on failure)
-        if: failure()
+        if: failure() && (github.event_name == 'push' || needs.changes.outputs.code == 'true')
         shell: pwsh
         run: |
           schtasks /Query /TN HiveVaultDaemon /V /FO LIST 2>&1 | Select-String -Pattern 'Status|Last Run Time|Last Result|Run As User|Logon Mode|Task To Run'
