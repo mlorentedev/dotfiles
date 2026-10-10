@@ -13,6 +13,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -97,6 +98,7 @@ var convergeOptions = func() converge.Options {
 		Launchctl:        env.ExecLaunchctl,
 		UID:              os.Getuid(),
 		RunSetup:         converge.ExecSetup,
+		DotfPath:         harness.ResolveDotfPath,
 	}
 }
 

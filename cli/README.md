@@ -62,7 +62,9 @@ absent and fast-forwarded when its upstream is ahead, under the same rule as
 reported skipped). Records come next: the harness mirror, then the agents'
 instruction files, so no agent runs before its instructions exist. Then the
 tools, then every `ai/deploy.json` config that applies to this machine
-(`configs-deploy`, the loop behind `dotf deploy`), then the git config, and on
+(`configs-deploy`, the loop behind `dotf deploy`), then the hooks each
+harness's settings file declares (`records-bind`, the engine behind
+`dotf harness bind`), then the git config, and on
 macOS the launchd environment (`env-persist`). On Linux and Windows the setup
 script runs last (`legacy-setup`), for whatever no native step covers yet. It
 cannot plan or say what it changed, so it is reported `[OPAQUE]`, never as
