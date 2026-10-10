@@ -192,6 +192,15 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [ ] After the release carrying `versionArgs` is the `DOTF_VERSION` pin: mark argocd 3.5.3, kustomize 5.8.1, hcloud 1.69.0 (Toolset A), k9s 0.51.0 and kubeconform 0.8.0 (Toolset B), and kubectl 1.35.8 and helm 3.21.4 (measured by P5b). The guard's `last` is 0.66.0, the newest release without the table: a release cut before this PR merges must raise it
 - Windows: every mise pin waits for Windows mise (#2013); the catalog entries above install there today only where they name a winget package
 
+### Toolset B — k8s daily and lint (stacked on Toolset A)
+
+- [x] Marked for mise in the toolset group: kubectx and kubens 0.11.0, stern 1.34.0 and shfmt 3.14.1 (sha256); yq 4.53.6 (sha512 + cosign); tflint 0.64.0, hadolint 2.15.1 and actionlint 1.7.12 (checksums + GitHub artifact attestations). Each answers `--version` with its version (measured on darwin-arm64 in an isolated mise), so the released dotf counts them
+- [x] k9s 0.51.0 and kubeconform 0.8.0 reject `--version` and wait with the rest of the Toolset A deferral
+- [x] `gopls` as a `system` entry, brew only. No mise registry entry, Go is not under mise, and apt's gopls lags the pinned Go by several releases, so Linux and Windows have no declared channel for it until Go moves to mise (Wave 3)
+- [x] No setup script installs any of these, so each has one owner (`tests/packages-json.bats`, #2195)
+- [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds actionlint, hadolint, kubectx, kubens, shfmt, stern, tflint and yq to the install list; `dotf tools install --dry-run` plans `install` for gopls
+- Windows: every mise pin waits for Windows mise (#2013)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
