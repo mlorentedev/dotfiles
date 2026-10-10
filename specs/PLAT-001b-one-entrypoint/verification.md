@@ -14,7 +14,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC3 (second run is a no-op, report persisted) -> no-op proven in `b70aa63`; the report in PR 3 / tests `TestConverge_SecondRunIsANoOpAndPersistsTheReport`, `TestWriteReport_RecordsTheRunAndItsOutcome`
 - [x] AC4 (failed probe fails the run, naming it) -> commit `b70aa63` / tests `TestRun_FailedProbeFailsTheRunNamingTheReconciler`, `TestRecordsMirror_ProbeFailsWhileTheDeployDirDiffers`
 - [x] AC5 (unlisted OS is skipped, named) -> commit `b70aa63` / test `TestRun_UnlistedPlatformIsSkippedNotPassed`
-- [ ] AC6–AC9 -> PRs 4 to 6
+- [ ] AC6, AC7, AC9 -> PRs 4b and 6
+- [x] AC8 (`dotf update` converges, exit semantics kept) -> PR 5 / tests `TestUpdate_ConvergesAfterAFastForward` (cmd, real git: nothing to pull converges nothing; a push is fast-forwarded and converged, the setup script running once on Linux and Windows), the `internal/update` table (every skip exits 0; `converge-failed` is the only error)
 
 ## Test status
 
@@ -35,6 +36,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - End to end (PR 2c-2): a throwaway HOME with a stub `copilot` and this branch's `dotf` on PATH; `compile-harness.sh --deploy` run twice, both rc=0. The second run delegated (`instructions current` for claude, opencode, pi and copilot), the copilot file holds one catalog region and no empty slot, and `dotf harness instructions --dry-run` then reports every target current
 - Manual run (PR 2c-2): `dotf harness instructions --dry-run` against the Mac's real HOME, whose files `compile-harness.sh` wrote, reports claude, opencode and pi current and skips copilot (not on PATH)
 
+- Test suite (PR 4a, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Real-git checkout tests (clone then idempotent, behind fast-forwarded, dirty left alone, foreign repo refused, no git from zero). Live: a scratch HOME planned the clone and six steps `waits for checkout`; `--only checkout` cloned from GitHub, then `already current`
+- Test suite (PR 5, macOS arm64): Go build, vet, `GOOS=windows` and `GOOS=linux` vet, `go test ./...` -> ok; golangci-lint -> 0 issues. Mutations: a child without the guard env fails `TestExecSetup_RunsTheOverrideMarkedAndFromTheCheckout`; an opaque result reported as a change fails both `TestLegacySetup_*Opaque*` tests
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -45,6 +49,11 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - PR 2b runs `compile-harness.sh --deploy` as the records-harness reconciler instead of porting it: the script already deploys the instruction files, the skill catalog and the presence regions in the right order on Linux and macOS, so a port in 2b would have needed a new marker parser and a `dotf` release before the twins could use it (#1814 class). The comparator moved to `harness.StripRegions` is blind to a changed enforced region (F-064), which the 2c port fixes.
 
 - PR 2c-1: deploy-only regions are identified by kind, on both sides: the presence roster, the skill catalog (its BEGIN line names it; pinned against compile-harness.sh) and the empty slot a source reserves for that catalog. Absence from the source was the first rule. It produced a false drift on Windows CI for copilot and would have treated a stale enforced region as deploy-only; the enforced region, with its sha and provenance, is now always compared literally
+
+- PR 4 was split (2026-10-10). From zero, the entrypoint runs the *released* dotf, so swapping `install.sh` before a release carries the checkout step would hand a new machine a converge that cannot clone. And Linux from zero ran `setup-linux.sh`, which only the legacy step (PR 5) brings back. So 4a and PR 5 land first, and 4b waits for the release carrying both.
+- A plan gates the steps after a pending clone or fast-forward (`Result.Gate`, lesson 385).
+- The legacy step is reported skipped on darwin rather than left out of the registry. AC5 already reads "not supported on darwin", and the report then says why no setup ran.
+- A script that cannot plan gets its own status, `opaque`. Counting it as a change would make every second run report one, and counting it as converged would hide what the script did.
 
 ## Promotion candidates
 
