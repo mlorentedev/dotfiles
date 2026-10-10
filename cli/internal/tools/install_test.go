@@ -626,29 +626,37 @@ func TestInstall_PlatformsGateIsASkipNotAFailure(t *testing.T) {
 	}
 }
 
-// setup-linux.sh runs `dotf tools install` before it installs uv, so on a fresh
-// box the first run finds no uv. That is a named skip, as a missing
-// prerequisite_binary is on the MCP path, not a failure; the next run installs
-// hive. The plan says the same thing the apply does.
-func TestInstallUvTool_MissingUvIsANamedSkip(t *testing.T) {
-	var rec []string
-	var out strings.Builder
-	in := newNpmInstaller("", &rec, nil)
-	in.Out = &out
-	in.HasCommand = func(name string) bool { return name != "uv" }
-	res, err := in.Install(hiveTool())
-	if err != nil || res != Skipped || len(rec) != 0 {
-		t.Fatalf("Install without uv = %v, %v, calls %v; want Skipped, nil, none", res, err, rec)
-	}
-	if !strings.Contains(out.String(), "uv is not on PATH") {
-		t.Errorf("the skip does not name uv:\n%s", out.String())
-	}
-	if got := in.Plan(hiveTool()).Action; got != PlanMissingManager {
-		t.Errorf("Plan without uv = %q, want %q", got, PlanMissingManager)
-	}
-	in.CurrentVersion = func(string) string { return "4.2.2" }
-	if got := in.Plan(hiveTool()).Action; got != PlanSkip {
-		t.Errorf("Plan at the pin without uv = %q, want %q: an installed tool needs no manager", got, PlanSkip)
+// The first catalog pass on a fresh machine finds no uv (mise installs it in
+// the sync that follows) and no npm (nothing installs node yet). Each is a named
+// skip, not a failure, and the plan says what the apply does, so a converge
+// probe does not read the wait as an unfinished install.
+func TestInstall_AMissingManagerIsANamedSkip(t *testing.T) {
+	bw := Tool{Name: "bw", Version: "2026.9.0", Source: Source{Type: "npm", Package: "@bitwarden/cli"}}
+	for _, tc := range []struct {
+		tool    Tool
+		manager string
+	}{{hiveTool(), "uv"}, {bw, "npm"}} {
+		t.Run(tc.manager, func(t *testing.T) {
+			var rec []string
+			var out strings.Builder
+			in := newNpmInstaller("", &rec, nil)
+			in.Out = &out
+			in.HasCommand = func(name string) bool { return name != tc.manager }
+			res, err := in.Install(tc.tool)
+			if err != nil || res != Skipped || len(rec) != 0 {
+				t.Fatalf("Install without %s = %v, %v, calls %v; want Skipped, nil, none", tc.manager, res, err, rec)
+			}
+			if !strings.Contains(out.String(), tc.manager+" is not on PATH") {
+				t.Errorf("the skip does not name %s:\n%s", tc.manager, out.String())
+			}
+			if p := in.Plan(tc.tool); p.Action != PlanMissingManager || p.Note != "waits on "+tc.manager {
+				t.Errorf("Plan without %s = %+v, want %q naming it", tc.manager, p, PlanMissingManager)
+			}
+			in.CurrentVersion = func(string) string { return tc.tool.Version }
+			if got := in.Plan(tc.tool).Action; got != PlanSkip {
+				t.Errorf("Plan at the pin without %s = %q, want %q: an installed tool needs no manager", tc.manager, got, PlanSkip)
+			}
+		})
 	}
 }
 

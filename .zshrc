@@ -126,11 +126,15 @@ unset -f _dotfiles_home
 # Start with system paths or current path
 # export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel.
-for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-    [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
-done
-unset _brew
+# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel,
+# and not already loaded. A nested shell inherits HOMEBREW_PREFIX with the PATH
+# shellenv built, so it does not run brew again.
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+    done
+    unset _brew
+fi
 
 # Prepend Tool Paths (priority over system), for the homes that exist
 [[ -n "${JAVA_HOME:-}" ]] && export PATH="$JAVA_HOME/bin:$PATH"

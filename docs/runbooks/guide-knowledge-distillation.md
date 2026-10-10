@@ -250,7 +250,7 @@ Full parity with Linux. All components have PowerShell equivalents:
 | Crystallize | `dotf vault crystallize` (same binary, no per-OS twin) | `dotf vault crystallize` |
 | Weekly maintenance | `vault-maintenance-weekly.sh` (crontab) | `vault-maintenance-weekly.ps1` (Task Scheduler) |
 | Memory link type | Symlink (`ln -s`) | Junction (`New-Item -ItemType Junction`) |
-| Notification | `notify-send` | `System.Windows.Forms.NotifyIcon` |
+| Notification | `notify-send`; on macOS, Notification Center via `osascript` | `System.Windows.Forms.NotifyIcon` |
 | Skills (`/insights`, `/crystallize`, `/vault-doctor`) | Work unchanged | Work unchanged |
 
 **Windows-specific notes:**

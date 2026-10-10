@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Tests for ai/claude/settings.json template (SDD-002)
 # The template is the SSOT for the "dotfiles-owned" subset of ~/.claude/settings.json.
-# Per-key merge policy is documented in specs/SDD-002-settings-portability/proposal.md.
+# It is merged by the claude-settings entry of ai/deploy.json; the per-key policy is pinned by cli/internal/deploy/claude_settings_test.go.
 
 load 'lib/refute'
 
@@ -33,71 +33,16 @@ setup() {
     [[ "$(jq -r '.effortLevel' "$SETTINGS_TEMPLATE")" == "xhigh" ]] || false
 }
 
-@test "every dotfiles-owned top-level key is named in both merge policies" {
-    # The merge policy is an ALLOW-LIST in two places -- a jq expression in
-    # setup-linux.sh and an if-chain in setup-windows.ps1. A key added to the
-    # template and named in neither is a SILENT no-op on every existing
-    # installation, reaching only machines bootstrapped from scratch.
-    #
-    # This test used to enumerate `model effortLevel outputStyle` by hand and
-    # claim in a comment that the structured keys were "handled by name in both
-    # scripts". That claim was FALSE for `env`, and nothing checked it: the
-    # template carried CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS while the deployed
-    # settings.json had no `env` key at all -- the same failure outputStyle had
-    # already caused once. A hand-written list cannot catch the key nobody
-    # thought to add to it, so the list now comes FROM THE TEMPLATE: any new
-    # top-level key must be named in both policies or this fails.
-    # Scoped to the two merge function BODIES, not to the whole scripts. Both
-    # files say `ContainsKey(...)` and `$tmpl.` in unrelated places --
-    # setup-windows.ps1 has `$tool.ContainsKey('Version')` in its winget loop --
-    # so a whole-file grep would let a template key named `Version` satisfy this
-    # guard while Merge-ClaudeSettings ignored it. A guard that passes on the
-    # broken thing is the defect this whole test exists to prevent.
-    local linux_merge windows_merge key
-    linux_merge="$(sed -n '/^merge_claude_settings() {/,/^}/p' "$DOTFILES_DIR/setup-linux.sh")"
-    windows_merge="$(sed -n '/^function Merge-ClaudeSettings {/,/^}/p' "$DOTFILES_DIR/setup-windows.ps1")"
-    # An empty extract would fail every key below, which is the safe direction,
-    # but say so explicitly rather than blaming the first key.
-    [ -n "$linux_merge" ] || { echo "could not extract merge_claude_settings from setup-linux.sh" >&2; return 1; }
-    [ -n "$windows_merge" ] || { echo "could not extract Merge-ClaudeSettings from setup-windows.ps1" >&2; return 1; }
-
-    while IFS= read -r key; do
-        # `$schema` is editor metadata for JSON language servers. It is never
-        # deployed, so it is exempt BY NAME -- a stated decision, not a gap.
-        if [ "$key" = "\$schema" ]; then continue; fi
-        printf '%s\n' "$linux_merge" | grep -qF -- "\$tmpl.$key" \
-            || { echo "merge_claude_settings never mentions '$key'" >&2; return 1; }
-        printf '%s\n' "$windows_merge" | grep -qF -- "ContainsKey('$key')" \
-            || { echo "Merge-ClaudeSettings never mentions '$key'" >&2; return 1; }
-    done < <(jq -r 'keys[]' "$SETTINGS_TEMPLATE")
-}
-
-@test "the merge carries env through and preserves machine-local entries" {
-    # `env` is how a feature flag reaches Claude Code's own process
-    # environment: settings.env is merged into process.env at startup, which is
-    # what makes CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL able to un-hide
-    # /advisor. Asserting the SHIPPED jq expression, not a copy of it.
-    local expr existing out
-    expr="$(sed -n "/^    merged=\$(jq --argjson tmpl /,/^    ' \"\$target_path\"/p" \
-        "$DOTFILES_DIR/setup-linux.sh" \
-        | sed -e "1s/.*jq --argjson tmpl \"\$template_substituted\" '//" -e "\$d")"
-    [ -n "$expr" ]
-
-    existing='{"model":"sonnet","env":{"MACHINE_LOCAL":"keep"}}'
-    out="$(printf '%s' "$existing" | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"enabledPlugins":{},"env":{"CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL":"1"}}' \
-        "$expr" 2>&1)"
-    [ -n "$out" ]
-    # template key arrives...
-    [ "$(printf '%s' "$out" | jq -r '.env.CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL')" = "1" ]
-    # ...and the machine-local one is not clobbered
-    [ "$(printf '%s' "$out" | jq -r '.env.MACHINE_LOCAL')" = "keep" ]
-
-    # a target with no env at all must still receive it
-    out="$(printf '%s' '{"model":"sonnet"}' | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"enabledPlugins":{},"env":{"A":"1"}}' \
-        "$expr" 2>&1)"
-    [ "$(printf '%s' "$out" | jq -r '.env.A')" = "1" ]
+@test "neither setup script merges settings.json -- dotf deploy is its one writer" {
+    # The twins merged this template with jq and PowerShell next to the
+    # claude-settings entry of ai/deploy.json, so every setup wrote the file twice
+    # under two policies (#2000). The Go merge and its per-key policy are pinned by
+    # cli/internal/deploy/claude_settings_test.go. A twin coming back is a second
+    # writer whose policy nothing tests.
+    local f
+    for f in setup-linux.sh setup-windows.ps1; do
+        refute_grep 'merge_claude_settings|Merge-ClaudeSettings|ai[/\\]claude[/\\]settings\.json' "$DOTFILES_DIR/$f" || return 1
+    done
 }
 
 @test "template env enables the advisor tool" {
@@ -221,43 +166,8 @@ setup() {
     [[ "$(jq -r '.language' "$SETTINGS_TEMPLATE")" == "spanish" ]] || false
 }
 
-@test "the merge expression survives a template that omits an optional key" {
-    # jq: a condition that evaluates to `empty` makes the WHOLE if-expression
-    # produce nothing, so `if ($tmpl.key // empty) then ... else . end` does not
-    # mean "leave it alone when absent" -- it means the entire merge pipeline
-    # yields an empty result. merge_claude_settings then logs "merge produced
-    # empty output, skipping write" and NO key deploys: not model, not
-    # effortLevel, not permissions, not hooks. `has()` is the guard that means
-    # what the other one looks like it means.
-    #
-    # Extracted from setup-linux.sh so this tests the shipped expression rather
-    # than a copy of it.
-    local expr existing out
-    expr="$(sed -n "/^    merged=\$(jq --argjson tmpl /,/^    ' \"\$target_path\"/p" \
-        "$DOTFILES_DIR/setup-linux.sh" \
-        | sed -e "1s/.*jq --argjson tmpl \"\$template_substituted\" '//" -e "\$d")"
-    [ -n "$expr" ]
-    existing='{"model":"sonnet","userCustom":"preserve me"}'
-
-    # a template WITHOUT the optional key must still merge everything else
-    out="$(printf '%s' "$existing" | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","permissions":{"allow":[]},"enabledPlugins":{}}' \
-        "$expr" 2>&1)"
-    [ -n "$out" ]
-    [ "$(printf '%s' "$out" | jq -r '.model')" = "opus" ]
-    [ "$(printf '%s' "$out" | jq -r '.userCustom')" = "preserve me" ]
-
-    # and a template WITH it must carry it through
-    out="$(printf '%s' "$existing" | jq --argjson tmpl \
-        '{"model":"opus","effortLevel":"xhigh","outputStyle":"Concise","permissions":{"allow":[]},"enabledPlugins":{}}' \
-        "$expr" 2>&1)"
-    [ "$(printf '%s' "$out" | jq -r '.outputStyle')" = "Concise" ]
-}
-
-@test "template has outputStyle and both merge policies propagate it" {
+@test "template has outputStyle" {
     [[ "$(jq -r '.outputStyle' "$SETTINGS_TEMPLATE")" != "null" ]] || false
-    grep -q 'outputStyle' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'outputStyle' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # --- hooks: NOT this template's, and NOT either merge function's (HARNESS-045) ---
@@ -270,23 +180,6 @@ setup() {
     # positional assignment that deleted a live third-party group all over again.
     run jq -e '.hooks' "$SETTINGS_TEMPLATE"
     [ "$status" -ne 0 ]
-}
-
-@test "neither merge function writes hooks (single writer: dotf harness bind)" {
-    # Scoped to the two merge BODIES, same extraction as the allow-list guard
-    # above: a mention elsewhere in either script (the bind call itself, a
-    # comment) is not a second writer.
-    local linux_merge windows_merge
-    linux_merge="$(sed -n '/^merge_claude_settings() {/,/^}/p' "$DOTFILES_DIR/setup-linux.sh")"
-    windows_merge="$(sed -n '/^function Merge-ClaudeSettings {/,/^}/p' "$DOTFILES_DIR/setup-windows.ps1")"
-    [ -n "$linux_merge" ] || { echo "could not extract merge_claude_settings from setup-linux.sh" >&2; return 1; }
-    [ -n "$windows_merge" ] || { echo "could not extract Merge-ClaudeSettings from setup-windows.ps1" >&2; return 1; }
-
-    printf '%s\n' "$linux_merge" | grep -qF '.hooks' \
-        && { echo "merge_claude_settings still writes .hooks -- bind is the only writer" >&2; return 1; }
-    printf '%s\n' "$windows_merge" | grep -qF "['hooks']" \
-        && { echo "Merge-ClaudeSettings still writes hooks -- bind is the only writer" >&2; return 1; }
-    return 0
 }
 
 @test "both setup scripts pass --repo-root to bind, never inferring it from the cwd" {

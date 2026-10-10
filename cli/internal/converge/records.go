@@ -3,6 +3,7 @@ package converge
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -20,6 +21,15 @@ type Options struct {
 	// MiseRun and MiseStdout run mise and the tools it installs;
 	// tools.HomeRunners in production. Unset, the tools step is skipped.
 	MiseRun, MiseStdout tools.Runner
+	// ToolsCatalog plans and installs the packages.json entries; a
+	// tools.Installer in production. Unset, the tools step runs the mise
+	// sync alone.
+	ToolsCatalog CatalogInstaller
+	// ToolsBinDirs are where the tool layer places what it installs: mise's
+	// shims and the catalog's install dir. The tools step puts each one this
+	// process's PATH lacks on it, so what it installs it can reach whatever
+	// PATH its caller had.
+	ToolsBinDirs []string
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the checkout and git-config steps are skipped.
 	GitRun gitconfig.Runner
@@ -37,6 +47,10 @@ type Options struct {
 	// env-persist step is skipped.
 	Launchctl env.LaunchctlRunner
 	UID       int
+	// DotfPath is the dotf binary the bound hooks name;
+	// harness.ResolveDotfPath in production. Unset, the records-bind step
+	// is skipped with the reason rather than guess.
+	DotfPath func(home string) string
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -57,8 +71,9 @@ func Registry(o Options) []Reconciler {
 		checkout{run: o.GitRun, url: url, has: onPath},
 		recordsMirror{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
-		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},
+		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
+		recordsBind{dotf: o.DotfPath, has: onPath},
 		gitConfig{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		legacySetup{run: o.RunSetup},
@@ -75,9 +90,9 @@ func (recordsMirror) Name() string        { return "records-mirror" }
 func (recordsMirror) Platforms() []string { return nil }
 
 func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
-	mirror, verb := harness.Mirror, "updated"
+	mirror, verb, pruneVerb := harness.Mirror, "updated", "pruned"
 	if dryRun {
-		mirror, verb = harness.PlanMirror, "to write"
+		mirror, verb, pruneVerb = harness.PlanMirror, "to write", "to prune"
 	}
 	res, err := mirror(env.RepoRoot, env.DeployDir)
 	if errors.Is(err, harness.ErrCheckoutIsDeployDir) {
@@ -86,11 +101,21 @@ func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	return Result{
-		Changes: res.Updated,
-		Detail: fmt.Sprintf("harness/ + %d target(s) + the deploy-dir set → %s (%d %s, %d unchanged)",
-			len(res.Targets), env.DeployDir, res.Updated, verb, res.Unchanged),
-	}, nil
+	detail := fmt.Sprintf("harness/ + %d target(s) + the deploy-dir set → %s (%d %s, %d unchanged, %d %s)",
+		len(res.Targets), env.DeployDir, res.Updated, verb, res.Unchanged, len(res.Pruned), pruneVerb)
+	if len(res.Pruned) > 0 {
+		detail += "; leftovers: " + strings.Join(res.Pruned, ", ")
+	}
+	if len(res.Unpruned) > 0 {
+		detail += "; left in place, not proven deleted: " + strings.Join(res.Unpruned, ", ")
+	}
+	if len(res.Unreadable) > 0 {
+		detail += "; unreadable, not checked for leftovers: " + strings.Join(res.Unreadable, ", ")
+	}
+	if res.IgnoreSkipped != "" {
+		detail += "; " + res.IgnoreSkipped
+	}
+	return Result{Changes: res.Updated + len(res.Pruned), Detail: detail}, nil
 }
 
 // Probe re-plans the mirror: after an apply, nothing may still differ.
@@ -104,6 +129,9 @@ func (recordsMirror) Probe(env Env) error {
 	}
 	if res.Updated > 0 {
 		return fmt.Errorf("%d file(s) in %s still differ from the checkout", res.Updated, env.DeployDir)
+	}
+	if len(res.Pruned) > 0 {
+		return fmt.Errorf("leftovers the checkout deleted are still in %s: %s", env.DeployDir, strings.Join(res.Pruned, ", "))
 	}
 	return nil
 }

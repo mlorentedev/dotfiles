@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package worktree
 
@@ -6,7 +6,7 @@ package worktree
 // a caller can say why nothing was reaped instead of reporting an empty sweep.
 const processDiscoverySupported = false
 
-// isHostProcessInside answers `Inside: true` unconditionally off Linux, because
+// isHostProcessInside answers `Inside: true` unconditionally off Linux and darwin, because
 // there is no implementation here and the caller deletes the worktree on a
 // false.
 //

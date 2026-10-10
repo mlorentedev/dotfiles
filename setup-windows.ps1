@@ -36,14 +36,13 @@ param(
 # ============================================================================
 # BUG-005: AUTO-REEXEC UNDER PWSH IF RUNNING ON WINDOWS POWERSHELL 5.1
 # ============================================================================
-# SDD-002 (PR #51) added Merge-ClaudeSettings which uses
-# `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0
-# (https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-70)
-# that does NOT exist in Windows PowerShell 5.1. The natural Windows command
-# `PowerShell -ExecutionPolicy Bypass -File .\setup-windows.ps1` resolves
-# `PowerShell` to 5.1, the Merge function's wide try/catch swallows the
-# ParameterBindingException as if it were a JSON parse error, and the
-# settings.json merge is silently skipped.
+# This script is verified under pwsh 7 only: CI starts it from Windows
+# PowerShell 5.1 and this block re-execs it. 5.1 differs at run time, not just
+# in syntax (Set-Content and Out-File default encodings, for one), so a run that
+# stayed on 5.1 would execute code nothing tests. BUG-005 was that failure: the
+# settings merge used `ConvertFrom-Json -AsHashtable`, absent from 5.1, and its
+# try/catch skipped the merge silently. That merge is now `dotf deploy` (#2000);
+# the single tested runtime is why the re-exec stays.
 #
 # Defense: detect the host version up front; if pwsh (7+) is on PATH,
 # re-exec under it; otherwise fail loud with an install hint. Named parameters
@@ -60,8 +59,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
         exit $LASTEXITCODE
     } else {
         Write-Host "[ERROR] Windows PowerShell $($PSVersionTable.PSVersion) detected and pwsh (PowerShell 7+) is not installed." -ForegroundColor Red
-        Write-Host "        This script requires PowerShell 7+ for ConvertFrom-Json -AsHashtable" -ForegroundColor Red
-        Write-Host "        support in Merge-ClaudeSettings (introduced by SDD-002 / PR #51)." -ForegroundColor Red
+        Write-Host "        This script is verified under PowerShell 7+ only." -ForegroundColor Red
         Write-Host "        Install via: winget install Microsoft.PowerShell" -ForegroundColor Red
         Write-Host "        Then re-run this script." -ForegroundColor Red
         exit 1
@@ -195,114 +193,6 @@ function Register-HiveScheduledTask {
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $script:HiveTaskLogonType -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
         -Settings $Settings -Principal $principal -Description $Description -Force -ErrorAction Stop | Out-Null
-}
-
-# Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
-# per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
-# when target missing. Preserves user customizations (Read paths,
-# additionalDirectories, third-party hooks like GitGuardian) by only
-# touching the keys declared as "ours" in the template.
-#
-# HOOKS ARE NOT THIS FUNCTION'S ANY MORE (HARNESS-045 AC1). They are emitted by
-# `dotf harness bind` below, from harness/manifest.json, and this function must
-# not gain a second hooks writer: the assignment it used to carry
-# ($existing['hooks']['SessionStart'] = $template[...]) deleted a live
-# third-party group, the identical defect measured on the Linux twin.
-function Merge-ClaudeSettings {
-    [CmdletBinding()]
-    # "Settings" is the canonical Claude Code config-file name (settings.json);
-    # the function operates on the whole file, not one setting -- using
-    # `Setting` (singular) would be misleading. Plural noun warning suppressed.
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
-    param(
-        [Parameter(Mandatory)][string]$TemplatePath,
-        [Parameter(Mandatory)][string]$TargetPath
-    )
-
-    if (-not (Test-Path $TemplatePath)) {
-        Write-Warn "Claude settings template not found at $TemplatePath, skipping merge"
-        return
-    }
-
-    try {
-        $template = (Get-Content $TemplatePath -Raw) | ConvertFrom-Json -AsHashtable
-    } catch {
-        Write-Warn "Claude settings template is not valid JSON: $_"
-        return
-    }
-
-    # Bootstrap if target missing
-    if (-not (Test-Path $TargetPath)) {
-        Write-Info "Bootstrapping ~/.claude/settings.json from template (file did not exist)"
-        $template | ConvertTo-Json -Depth 10 | Set-Content $TargetPath -Encoding UTF8
-        Write-Success "Claude settings.json bootstrapped from template"
-        return
-    }
-
-    # Read existing target
-    try {
-        $existing = Get-Content $TargetPath -Raw | ConvertFrom-Json -AsHashtable
-    } catch {
-        Write-Warn "Claude settings.json at $TargetPath is not valid JSON, skipping merge: $_"
-        return
-    }
-    if ($null -eq $existing) { $existing = @{} }
-
-    # Per-key merge policy (table in proposal.md). The policy is an ALLOW-LIST,
-    # so a key added to the template and not named here is a silent no-op on
-    # every existing installation -- which is exactly what happened to
-    # outputStyle. Keep this list in step with setup-linux.sh's jq expression.
-    if ($template.ContainsKey('model')) { $existing['model'] = $template['model'] }
-    if ($template.ContainsKey('effortLevel')) { $existing['effortLevel'] = $template['effortLevel'] }
-    if ($template.ContainsKey('outputStyle')) { $existing['outputStyle'] = $template['outputStyle'] }
-    if ($template.ContainsKey('advisorModel')) { $existing['advisorModel'] = $template['advisorModel'] }
-    if ($template.ContainsKey('crossSessionInbound')) { $existing['crossSessionInbound'] = $template['crossSessionInbound'] }
-    if ($template.ContainsKey('autoCompactEnabled')) { $existing['autoCompactEnabled'] = $template['autoCompactEnabled'] }
-    if ($template.ContainsKey('precomputeCompactionEnabled')) { $existing['precomputeCompactionEnabled'] = $template['precomputeCompactionEnabled'] }
-    if ($template.ContainsKey('autoCompactWindow')) { $existing['autoCompactWindow'] = $template['autoCompactWindow'] }
-    if ($template.ContainsKey('autoContinueAtUsageLimit')) { $existing['autoContinueAtUsageLimit'] = $template['autoContinueAtUsageLimit'] }
-    if ($template.ContainsKey('cleanupPeriodDays')) { $existing['cleanupPeriodDays'] = $template['cleanupPeriodDays'] }
-    if ($template.ContainsKey('language')) { $existing['language'] = $template['language'] }
-
-    # attribution: whole-object replace, NOT the per-key merge env gets below.
-    # It is dotfiles-owned policy -- the standing order is that no git or GitHub
-    # artifact carries AI attribution, and Claude Code defaults the other way
-    # (commit/pr default to the standard trailer, sessionUrl defaults to true).
-    # A per-key merge would let a stale subkey survive and quietly reinstate a
-    # trailer, so the object replaces wholesale.
-    if ($template.ContainsKey('attribution')) { $existing['attribution'] = $template['attribution'] }
-
-    # env: object merge (template wins on conflict). These are feature flags
-    # Claude Code reads from its OWN process environment -- settings.env is
-    # merged into process.env at startup, which is how
-    # CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL reaches the gate deciding
-    # whether /advisor exists. Per-key so a machine-local flag survives.
-    if ($template.ContainsKey('env')) {
-        if (-not $existing.ContainsKey('env')) { $existing['env'] = @{} }
-        foreach ($envKey in $template['env'].Keys) {
-            $existing['env'][$envKey] = $template['env'][$envKey]
-        }
-    }
-
-    # permissions.allow: UNION (template + existing, deduped)
-    if ($template.ContainsKey('permissions') -and $template['permissions'].ContainsKey('allow')) {
-        if (-not $existing.ContainsKey('permissions')) { $existing['permissions'] = @{} }
-        if (-not $existing['permissions'].ContainsKey('allow')) { $existing['permissions']['allow'] = @() }
-        $merged = @(@($existing['permissions']['allow']) + @($template['permissions']['allow']) | Select-Object -Unique)
-        $existing['permissions']['allow'] = $merged
-    }
-
-    # enabledPlugins: object merge (template wins on conflict). User-added
-    # plugins beyond the 14 universal ones survive.
-    if ($template.ContainsKey('enabledPlugins')) {
-        if (-not $existing.ContainsKey('enabledPlugins')) { $existing['enabledPlugins'] = @{} }
-        foreach ($plugin in $template['enabledPlugins'].Keys) {
-            $existing['enabledPlugins'][$plugin] = $template['enabledPlugins'][$plugin]
-        }
-    }
-
-    $existing | ConvertTo-Json -Depth 10 | Set-Content $TargetPath -Encoding UTF8
-    Write-Success "Claude settings.json merged from template (user customizations preserved)"
 }
 
 # ============================================================================
@@ -460,9 +350,8 @@ Install-AgentBinary -Name "Antigravity CLI (agy)" -Command "agy" -InstallerUrl "
 
 Write-Info "Deploying Claude configuration..."
 
-# Bulk copy all Claude config files EXCEPT settings.json (SDD-002: handled by
-# Merge-ClaudeSettings below, which applies the per-key merge policy preserving
-# user customizations; its hooks come from `dotf harness bind`).
+# Bulk copy all Claude config files EXCEPT settings.json: `dotf deploy` merges
+# it (the claude-settings entry), and its hooks come from `dotf harness bind`.
 $claudeSource = "$DotfilesDir\ai\claude"
 if (Test-Path $claudeSource) {
     Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
@@ -723,7 +612,9 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 # One Go implementation for both OSes (setup-linux.sh calls the same command).
 # Windows never had this block: doctor failed both registries after every setup
 # with a remedy ("re-run setup") that could not clear them. Idempotent (prints
-# "N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# "N updated, M unchanged, K pruned"). It prunes .zsh\, ssh\ and scripts\ of
+# files the checkout's history deleted (#2266); harness\ and the secrets stay
+# with doctor --fix (#802).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
     dotf harness mirror --repo $DotfilesDir
     if ($LASTEXITCODE -ne 0) {
@@ -750,10 +641,12 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     if ($LASTEXITCODE -ne 0 -or -not $hiveVer) { $hiveVer = $null }
 }
 if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
-    & hive service install *> $null
+    # Keep the output: since hive 4.3.1, install waits for the daemon to answer and
+    # exits 1 with its state, the only clue to why it is down.
+    $hiveSvcOut = (& hive service install 2>&1 | Out-String).Trim()
     $hiveSvcRc = $LASTEXITCODE
     if ($hiveSvcRc -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
-    else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
+    else { Write-Warn "hive service install exited $hiveSvcRc (non-fatal; client works via fallback): $hiveSvcOut" }
 
     # ADR-025 + HARNESS-024 (#446): the hive serve daemon runs as a Scheduled Task
     # and inherits the User-scope environment (not the shell paths.ps1). Persist
@@ -923,47 +816,11 @@ $npmSeen = Get-Command npm -ErrorAction SilentlyContinue
 Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PATH -split ';' | Where-Object { $_ }).Count), $(if ($npmSeen) { $npmSeen.Source } else { 'absent' }))
 
 # ============================================================================
-# 2d. OPENCODE CONFIG + COMMANDS (AI-014)
+# 2d. OPENCODE (AI-014)
 # ============================================================================
-# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036). This block
-# deploys the canonical config + skill-derived commands using the same
-# reconcile-not-skip pattern as setup-linux.sh (AI-011, lines 415-465).
-# Both files: SHA256 byte-equality test before overwrite so user-side edits
-# that match upstream do not trigger a noisy "Deployed" log.
-
-$opencodeConfigSrc = "$DotfilesDir\ai\opencode\opencode.jsonc"
-$opencodeConfigDst = Join-Path $env:USERPROFILE '.config\opencode\opencode.jsonc'
-if (Test-Path -LiteralPath $opencodeConfigSrc -PathType Leaf) {
-    # SDD-009: stage source to a temp file, substitute {env:VAR} placeholders
-    # with age-decrypted values (mirror of bash setup-linux.sh logic), then
-    # deploy the substituted artifact. Deploy-File's SHA256 check then
-    # operates on rendered-vs-deployed (not source-vs-deployed) so idempotence
-    # still works after substitution.
-    $opencodeConfigTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "opencode-$PID.jsonc")
-    Copy-Item -LiteralPath $opencodeConfigSrc -Destination $opencodeConfigTmp -Force
-    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020/ADR-028). dotf presence is not success: a stale binary runs but exits
-    # non-zero, so check $LASTEXITCODE; if render did not succeed, leave the {env:VAR}
-    # placeholders intact for opencode's runtime resolver rather than a half-rendered file.
-    $opencodeRendered = $false
-    if (Get-Command dotf -ErrorAction SilentlyContinue) {
-        & dotf secrets render $opencodeConfigTmp
-        $opencodeRendered = ($LASTEXITCODE -eq 0)
-    }
-    if (-not $opencodeRendered) {
-        Write-Warn "dotf secrets render unavailable/failed; deploying opencode.jsonc with literal {env:VAR} placeholders (resolved at runtime)"
-    }
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $opencodeConfigTmp -Destination $opencodeConfigDst)
-    } else {
-        Ensure-Directory (Split-Path $opencodeConfigDst -Parent)
-        Copy-Item -LiteralPath $opencodeConfigTmp -Destination $opencodeConfigDst -Force
-        Write-Success "Deployed opencode.jsonc to $opencodeConfigDst (fallback)"
-    }
-    Remove-Item -LiteralPath $opencodeConfigTmp -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Warn "opencode.jsonc source missing: $opencodeConfigSrc"
-}
+# Binary install: packages.json (npm) via dotf tools install (AI-034, ADR-036).
+# opencode.jsonc is the `opencode` entry of ai/deploy.json, rendered with its
+# {env:VAR} secrets by `dotf deploy` below (SDD-009, #1843 B12).
 
 # Deploy the canonical AGENTS.md as opencode's global system prompt.
 # OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
@@ -1537,16 +1394,9 @@ if (Test-Path $obsCliSource) {
 # 7c. REGISTER SESSIONSTART HOOK
 # ============================================================================
 
-Write-Info "Applying Claude settings.json template..."
-
-# SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
-# settings.json lives at ai/claude/settings.json. Merge-ClaudeSettings applies
-# the per-key policy for model/permissions/env/plugins. Bootstraps a fresh
-# settings.json if missing (closes the v1 doble-paso friction).
-$ClaudeSettings = "$ClaudeHome\settings.json"
-$ClaudeSettingsTemplate = "$DotfilesDir\ai\claude\settings.json"
-
-Merge-ClaudeSettings -TemplatePath $ClaudeSettingsTemplate -TargetPath $ClaudeSettings
+# ~/.claude/settings.json is the `claude-settings` entry of ai/deploy.json, merged
+# by the `dotf deploy` above (CLI-063, #2000). Its per-key policy and the no-trailer
+# attribution are pinned by cli/internal/deploy/claude_settings_test.go.
 
 # HARNESS-045 AC1: hooks are emitted by `dotf harness bind`, for every harness
 # declared in harness/manifest.json's `agents.bind`. One Go binary on both OSes,

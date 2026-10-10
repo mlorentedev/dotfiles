@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // The dotfiles section of the PowerShell profile is delimited by these two
@@ -213,7 +215,8 @@ func contractDefault(sys *System, c *Contract, name string) string {
 	}
 	for _, e := range c.EnvVars {
 		if e.Name == name {
-			return expandHome(sys, e.Default[contractOS(sys)])
+			raw, _, _ := envpkg.ForOS(e.Default, sys.GOOS)
+			return expandHome(sys, raw)
 		}
 	}
 	return ""

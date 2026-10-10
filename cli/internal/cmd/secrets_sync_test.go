@@ -316,3 +316,20 @@ func TestScopeUploadDedupesNames(t *testing.T) {
 		t.Fatalf("want B then A, each once, got %+v", got)
 	}
 }
+
+// pushCI zips EnvFor's answer with the selection by index; a misaligned answer
+// must stop the upload rather than set one secret's name to another's value.
+func TestCheckAligned_RefusesAMisalignedResolution(t *testing.T) {
+	upload := []secrets.Entry{{Var: "A"}, {Var: "B"}}
+	for name, env := range map[string][]string{
+		"dropped":   {"A=1"},
+		"reordered": {"B=2", "A=1"},
+	} {
+		if err := checkAligned(env, upload, "o/a"); err == nil || !strings.Contains(err.Error(), "nothing uploaded") {
+			t.Errorf("%s: want a refusal, got %v", name, err)
+		}
+	}
+	if err := checkAligned([]string{"A=1", "B=2"}, upload, "o/a"); err != nil {
+		t.Errorf("aligned: %v", err)
+	}
+}

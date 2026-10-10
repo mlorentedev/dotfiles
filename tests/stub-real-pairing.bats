@@ -30,6 +30,9 @@ setup() {
 # going stale for that one suite specifically would have gone undetected. That
 # is the exact failure mode this file exists to catch, reproduced inside itself.
 #
+#   bashrc-guards             stubs `terraform` as an empty executable that is never run, for the
+#                             same reason as zshrc-guards below: the subject is the .bashrc guard,
+#                             and a real terraform gives the same answer.
 #   bitacora-reconcile        stubs `gh` — a real run mutates the live GitHub project board
 #   bitacora-rollout          stubs `gh` — same; a real run adds items to the live board. This
 #                             suite is a worked example of the limitation BUG-055 names: #884 was
@@ -65,15 +68,22 @@ setup() {
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
+#   tmux                      stubs the clipboard tools (pbcopy, wl-copy, xclip, clip.exe) to record
+#                             which one copy-command picks per OS. A real one writes the developer's
+#                             clipboard, needs a display server, or exists on one OS only. tmux itself
+#                             is driven for real in the same suite: it parses the file and reads
+#                             copy-command back as written. It also stubs `infocmp`, whose real
+#                             answer is fixed by the host's terminfo, to reach both default-terminal
+#                             branches on one machine.
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
 #   zshrc-guards              stubs `terraform` as an empty executable that is never run. The
 #                             subject is the .zshrc guard: completion is registered only when PATH
 #                             resolves a terraform, and against that path. A real terraform gives
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
-EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
+EXEMPT_SUITES="bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
 hermes-setup install model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline
-vault-maintenance-weekly zshrc-guards"
+tmux vault-maintenance-weekly zshrc-guards"
 
 exempt() {
     local base
@@ -162,7 +172,7 @@ stubs_a_binary() {
     # guard, it misinforms the person deciding whether to add a row. Measured in
     # sync when this was written; that is exactly when to pin it.
     local documented authoritative
-    documented=$(sed -n '/^#   bitacora-reconcile/,/^EXEMPT_SUITES=/p' "$TESTS/stub-real-pairing.bats" \
+    documented=$(sed -n '/^#   [a-z]/,/^EXEMPT_SUITES=/p' "$TESTS/stub-real-pairing.bats" \
         | grep -oE '^#   [a-z][a-z0-9-]+' | awk '{print $2}' | sort -u)
     # Split explicitly, never by unquoted expansion: zsh does not word-split an
     # unquoted parameter, so `for x in $VAR` yields ONE field there and N in bash.

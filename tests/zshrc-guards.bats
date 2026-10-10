@@ -38,10 +38,13 @@ RC_TOOLS="mv"
 # load_rc PROBE: source the repo's .zshrc in a scratch HOME, then evaluate PROBE
 # in the same shell. stdout is the probe's. Anything the rc writes to stderr
 # fails the load: zsh reports the probe's status, so an rc that errors midway
-# would otherwise still exit 0 in every test.
+# would otherwise still exit 0 in every test. HOMEBREW_PREFIX reads as already
+# loaded, since the rc runs brew by absolute path and a PATH cannot hide it;
+# LOAD_RC_BREW="" unsets it for the brew test.
 load_rc() {
     env -i HOME="$SANDBOX/home" ZDOTDIR="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" \
         PATH="$SANDBOX/bin:$SANDBOX/sysbin" TERM=dumb \
+        HOMEBREW_PREFIX="${LOAD_RC_BREW-$SANDBOX/brew-loaded}" \
         "$ZSH_BIN" -f -c '. "$1"; eval "$2"' _ "$REPO/.zshrc" "$1" 2>"$SANDBOX/stderr" || return
     if [ -s "$SANDBOX/stderr" ]; then
         printf 'stderr: %s\n' "$(cat "$SANDBOX/stderr")"
@@ -76,8 +79,13 @@ load_rc() {
     [ -z "$output" ]
 }
 
-@test "brew shellenv runs exactly when brew is installed" {
+@test "brew shellenv runs exactly when brew is installed and not yet loaded" {
+    # Already loaded: a nested shell inherits the prefix and its PATH, and the rc
+    # does not run brew again.
     run load_rc 'print -rl -- $path'
+    [ "$status" -eq 0 ]
+    [[ "$output" != *homebrew* ]] || false
+    LOAD_RC_BREW="" run load_rc 'print -rl -- $path'
     [ "$status" -eq 0 ]
     # Which direction runs depends on the host, since the rc probes brew's two
     # absolute install paths: the Linux job proves the absent side, a Mac with

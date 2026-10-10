@@ -47,7 +47,7 @@ func IsDeployDirPath(rel string) bool {
 // an error: the drift check compares only files present on both sides, and a
 // test asserts every entry exists in the real checkout, so a rename cannot
 // drop one silently.
-func mirrorDeployDir(repoRoot, deployDir string, dryRun bool, res *MirrorResult) error {
+func mirrorDeployDir(repoRoot, deployDir string, ignored map[string]bool, dryRun bool, res *MirrorResult) error {
 	for _, rel := range DeployDirFiles {
 		src := filepath.Join(repoRoot, filepath.FromSlash(rel))
 		if !isRegular(src) {
@@ -61,7 +61,7 @@ func mirrorDeployDir(repoRoot, deployDir string, dryRun bool, res *MirrorResult)
 		if !isDir(filepath.Join(repoRoot, sub)) {
 			continue
 		}
-		if err := mirrorTree(repoRoot, deployDir, sub, dryRun, res); err != nil {
+		if err := mirrorTree(repoRoot, deployDir, sub, ignored, dryRun, res); err != nil {
 			return err
 		}
 	}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -184,5 +185,50 @@ func TestHarnessMirrorCmd_ExplicitRepoWithoutAManifestFails(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "manifest.json") {
 		t.Fatalf("a checkout with no manifest must fail naming it, got %v", err)
+	}
+}
+
+// An orphan the checkout's history cannot prove deleted stays where it is, and
+// the command says so on stderr, with the reason, instead of hiding it in a
+// count. The fixture's .git is only a marker, so no history is readable.
+func TestHarnessMirrorCmd_NamesAnOrphanItLeaves(t *testing.T) {
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[]}`)
+	writeMirrorFixture(t, filepath.Join(repo, "scripts", "live.sh"), "live\n")
+	mine := filepath.Join(deploy, "scripts", "mine.sh")
+	writeMirrorFixture(t, mine, "the user's own\n")
+
+	out, stderr, err := runHarnessMirror(t, repo, deploy)
+	if err != nil {
+		t.Fatalf("%v\n%s%s", err, out, stderr)
+	}
+	if !strings.Contains(stderr, "left scripts/mine.sh in the deploy dir") || !strings.Contains(stderr, "cannot be read") {
+		t.Errorf("the orphan and the reason must be named:\n%s", stderr)
+	}
+	if !strings.Contains(out, "0 pruned") {
+		t.Errorf("the count must say nothing was pruned:\n%s", out)
+	}
+	if _, err := os.Stat(mine); err != nil {
+		t.Error("an unproven orphan was removed")
+	}
+}
+
+// Inside a git checkout whose git fails, ignored files are mirrored, and the
+// command says so with git's own reason rather than copying them silently.
+// runHarnessMirror marks the checkout with an empty .git directory, which git
+// refuses as a repository.
+func TestHarnessMirrorCmd_NamesAGitFailureThatMirrorsIgnoredFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[]}`)
+
+	out, stderr, err := runHarnessMirror(t, repo, deploy)
+	if err != nil {
+		t.Fatalf("%v\n%s%s", err, out, stderr)
+	}
+	if !strings.Contains(stderr, "so they were mirrored") || !strings.Contains(stderr, "not a git repository") {
+		t.Errorf("the git failure and its cause must be named:\n%s", stderr)
 	}
 }
