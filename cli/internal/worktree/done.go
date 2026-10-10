@@ -71,6 +71,11 @@ func validateDoneOptions(opts DoneOptions) (string, string, error) {
 // behind a variable so a test can drive the refusal on every platform.
 var callerInside = isCallerInside
 
+// maxAncestorDepth bounds the ancestor walk. A real chain (dotf, a shell, an
+// agent, a terminal, a session manager, init) is under a dozen; the bound only
+// keeps a malformed process table from looping.
+const maxAncestorDepth = 64
+
 // ancestor is a process the caller runs under, named in a refusal so the
 // operator can tell which one sits in the worktree.
 type ancestor struct {
