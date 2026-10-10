@@ -5,10 +5,11 @@
 # every [FAIL] line matches an entry in the known-failures list AND every entry
 # matches at least one line. The second half is what keeps the list honest: an
 # entry whose failure no longer occurs is reported as STALE and fails the gate,
-# so the list can only shrink as tickets close, never rot into a blanket allow.
+# so the list never rots into a blanket allow.
 #
 # Known failures are runner-only conditions with an owning ticket (see the
-# list's comments). A real-box defect is never added there; it is fixed or
+# list's comments): a fix pending, or one the owner decided to keep listed
+# ("Permanent", #2212). A real-box defect is never added there; it is fixed or
 # ticketed, and the gate stays red until then.
 #
 # ASCII-only by repo convention (pattern-powershell-ascii-only).
@@ -76,8 +77,9 @@ if ($MyInvocation.InvocationName -ne '.') {
     # The runner has no Bitwarden identity and must never hold one that resolves
     # real secrets, so [Bitwarden reach] reports "unauthenticated" by design.
     # Declare that to doctor (TEST-005, #1313) rather than allow-listing the FAIL:
-    # the known-failures list is for runner-only conditions with a fix pending,
-    # and a runner that will never log in is not a pending fix. doctor reads the
+    # a runner that will never log in is a declared property of the runner, not
+    # a [FAIL] to match (the list's Permanent entries are the owner's exception,
+    # #2212). doctor reads the
     # flag in that one branch only; every other reach tier still runs.
     $env:DOTFILES_DOCTOR_NO_IDENTITY = '1'
     Write-Host "doctor gate: DOTFILES_DOCTOR_NO_IDENTITY=1 (no Bitwarden identity on this runner, declared)"
