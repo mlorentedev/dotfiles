@@ -58,7 +58,8 @@ because their flags and failure modes are not obvious from `--help`.
 Runs an ordered list of reconcilers, each converging one part of the machine
 from data in the checkout. Records come first: the harness mirror,
 then the agents' instruction files, so no agent runs before its instructions
-exist.
+exist. Then the tools, then every `ai/deploy.json` config that applies to this
+machine (`configs-deploy`, the loop behind `dotf deploy`), then the git config.
 
 ```sh
 dotf converge --plan     # what each reconciler would change; writes nothing
@@ -73,6 +74,9 @@ dotf converge            # apply, then prove each reconciler's post-condition
 - **Platforms.** A reconciler that does not apply to this OS is reported as
   `skipped`, naming the OS, never as passed.
 - **Idempotence.** A second run on a converged machine reports `0 changed`.
+- **Secrets.** A config whose secrets the store cannot resolve during the run
+  (locked or unreachable) keeps its installed file, and the report names it as
+  `kept (secrets locked)`; it never installs the placeholder over the value.
 - **Report.** Every apply writes a report to
   `$XDG_STATE_HOME/dotfiles/converge/last.json` (default
   `~/.local/state/dotfiles/converge/last.json`). It records the result, the

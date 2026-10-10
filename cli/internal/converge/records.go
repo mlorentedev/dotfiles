@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -21,6 +22,12 @@ type Options struct {
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the git-config step is skipped.
 	GitRun gitconfig.Runner
+	// RenderConfigs substitutes {env:VAR} in a staged config and returns
+	// deploy.ErrRenderIncomplete when the secret store could not answer;
+	// ResolvePath resolves {VAR} in a destination (env.ResolvePath). Unset,
+	// the configs step fails rather than install unrendered placeholders.
+	RenderConfigs deploy.Renderer
+	ResolvePath   func(string) string
 }
 
 // Registry is the ordered list of reconcilers a run drives. The order extends
@@ -31,6 +38,7 @@ func Registry(o Options) []Reconciler {
 		recordsMirror{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},
+		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		gitConfig{run: o.GitRun, has: onPath},
 	}
 }

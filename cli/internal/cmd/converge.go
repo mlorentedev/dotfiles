@@ -79,7 +79,14 @@ func newConvergeCmd() *cobra.Command {
 // convergeOptions wires the registry's side effects; tests replace it.
 var convergeOptions = func() converge.Options {
 	run, stdout := tools.HomeRunners(env.Home())
-	return converge.Options{RunHarnessDeploy: converge.CompileHarnessDeploy, MiseRun: run, MiseStdout: stdout, GitRun: gitconfig.ExecRunner}
+	return converge.Options{
+		RunHarnessDeploy: converge.CompileHarnessDeploy,
+		MiseRun:          run,
+		MiseStdout:       stdout,
+		GitRun:           gitconfig.ExecRunner,
+		RenderConfigs:    strictDeployRenderer,
+		ResolvePath:      env.ResolvePath,
+	}
 }
 
 var convergeTag = map[converge.Status]string{

@@ -107,13 +107,16 @@ func (*skipper) Reconcile(Env, bool) (Result, error) {
 func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 
 // The order is the contract: records first, so an agent that starts once a tool
-// lands already has its instructions (ADR-045 decision 4).
+// lands already has its instructions (ADR-045 decision 4). The configs come
+// after the tools, which answer each entry's `requires`, and before git-config,
+// whose probe needs the dotfiles.gitconfig include target that a config entry
+// deploys.
 func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	var names []string
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "records-mirror,records-harness,tools,git-config" {
+	if got := strings.Join(names, ","); got != "records-mirror,records-harness,tools,configs-deploy,git-config" {
 		t.Errorf("registry order: %s", got)
 	}
 }
