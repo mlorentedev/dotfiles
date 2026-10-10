@@ -390,26 +390,72 @@ func TestRotate_DryRunPushCINamesTheReposAndUploadsNothing(t *testing.T) {
 	}
 }
 
-// A malformed ci: consumer is a registry bug. It fails before any upload, as
-// `sync ci` refuses an invalid --repo, rather than calling GitHub with an empty
-// or garbled repo after the valid ones were already pushed.
-func TestRotate_PushCIRefusesAMalformedCIConsumerBeforeUploading(t *testing.T) {
+// rotateOn rotates DOCKERHUB_TOKEN to "new-value" against reg, uploading through
+// setter, and returns the vault fake so a test can see whether anything was written.
+func rotateOn(t *testing.T, reg string, setter secrets.GitHubSecretSetter, args ...string) (*fakeRW, string, error) {
+	t.Helper()
 	rw := &fakeRW{fields: map[string]string{"dockerhub/PAT": "old-value"}}
 	out := rotateHarness(t, rw, &fakeSyncer{})
-	uploads := fakeSetter{}
-	useGHSecretSetter(t, uploads)
-	useTempRegistry(t, strings.Replace(pushCIRegistry, "[ci:o/a, ci:o/b, local]", "[ci:o/a, \"ci:\", local]", 1))
+	useGHSecretSetter(t, setter)
+	useTempRegistry(t, reg)
 
 	cmd := newSecretsRotateCmd()
 	cmd.SetOut(out)
 	cmd.SetErr(out)
 	cmd.SetIn(strings.NewReader("new-value"))
-	cmd.SetArgs([]string{"DOCKERHUB_TOKEN", "--push-ci"})
+	cmd.SetArgs(append([]string{"DOCKERHUB_TOKEN"}, args...))
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "invalid ci consumer") {
-		t.Fatalf("want a refusal naming the malformed consumer, got %v\n%s", err, out)
+	return rw, out.String(), err
+}
+
+// A ci: consumer that cannot be pushed is a registry bug known before any write. It
+// fails before the rotation, so the vault and CI are never left on different values.
+func TestRotate_PushCIRefusesAnUnpushableCIConsumerBeforeRotating(t *testing.T) {
+	cases := map[string]struct{ consumers, env, want string }{
+		"malformed slug":  {consumers: `[ci:o/a, "ci:", local]`, env: "DOCKERHUB_TOKEN", want: "invalid ci consumer"},
+		"reserved by GHA": {consumers: `[ci:o/a, local]`, env: "GITHUB_PAT", want: "nothing GitHub Actions can store"},
 	}
-	if len(uploads) != 0 {
-		t.Errorf("nothing may be uploaded when a consumer is malformed, got %v", uploads)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			reg := strings.Replace(pushCIRegistry, "[ci:o/a, ci:o/b, local]", tc.consumers, 1)
+			reg = strings.Replace(reg, "expose: { env: DOCKERHUB_TOKEN }", "expose: { env: "+tc.env+" }", 1)
+			uploads := fakeSetter{}
+			rw, out, err := rotateOn(t, reg, uploads, "--push-ci")
+			if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "nothing was rotated") {
+				t.Fatalf("want a refusal containing %q before rotating, got %v\n%s", tc.want, err, out)
+			}
+			if got := rw.fields["dockerhub/PAT"]; got != "old-value" {
+				t.Errorf("the vault was written (%q) although the push was known to be impossible", got)
+			}
+			if len(uploads) != 0 {
+				t.Errorf("nothing may be uploaded, got %v", uploads)
+			}
+		})
+	}
+}
+
+// failingSetter refuses uploads to one repo and records the rest.
+type failingSetter struct {
+	fakeSetter
+	refuse string
+}
+
+func (f failingSetter) SetSecret(repo, name, value string) error {
+	if repo == f.refuse {
+		return errors.New("HTTP 403")
+	}
+	return f.fakeSetter.SetSecret(repo, name, value)
+}
+
+// One repo refusing the upload must not strand the others on the retired value,
+// and the error must name every repo that still holds it.
+func TestRotate_PushCIFailureOnOneRepoStillPushesTheOthers(t *testing.T) {
+	setter := failingSetter{fakeSetter: fakeSetter{}, refuse: "o/a"}
+	_, out, err := rotateOn(t, pushCIRegistry, setter, "--push-ci")
+	if err == nil || !strings.Contains(err.Error(), "o/a still hold the old value") {
+		t.Fatalf("want an error naming o/a as stale, got %v\n%s", err, out)
+	}
+	if setter.fakeSetter["o/b|DOCKERHUB_TOKEN"] != "new-value" {
+		t.Errorf("o/b was not pushed after o/a failed: %v\n%s", setter.fakeSetter, out)
 	}
 }

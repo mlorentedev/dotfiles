@@ -13,7 +13,7 @@ created: "2026-08-15"
 - [x] **AC4:** `TestRotate_ProbesTheNewValueAndFailsWhenItDoesNotAuthenticate` (added 2026-10-10; mutations "drop the probe call" and "swallow its error" both fail it).
 - [x] **AC5:** `TestRotate_DryRunWritesNothing`, `TestRotate_DryRunPushCINamesTheReposAndUploadsNothing`.
 - [x] **AC6:** #1007 (`fe2f1913`) put the write path on `bw serve`: `TestSelectBWBackend_ReadAndWriteAlwaysAgree`, `TestBWServeWriter_SetField_UpdatesAndPreserves`. #993 closed 2026-08-16.
-- [x] **AC7:** `TestRotate_PushCIUploadsTheNewValueToEveryCIConsumer`, `TestRotate_WithoutPushCIUploadsNothing`, `TestRotate_PushCIWithNoCIConsumerSaysSo`, `TestRotate_PushCIRefusesAMalformedCIConsumerBeforeUploading`. Mutations: no push, dry-run pushes, push without the flag, every consumer read as CI; all killed.
+- [x] **AC7:** `TestRotate_PushCIUploadsTheNewValueToEveryCIConsumer`, `TestRotate_WithoutPushCIUploadsNothing`, `TestRotate_PushCIWithNoCIConsumerSaysSo`, `TestRotate_PushCIRefusesAnUnpushableCIConsumerBeforeRotating` (a malformed slug and a `GITHUB_*` var both fail before the vault is written), `TestRotate_PushCIFailureOnOneRepoStillPushesTheOthers`. Mutations: no push, dry-run pushes, push without the flag, every consumer read as CI, stop at the first failed repo, skip the unpushable check, validate after the write; all killed.
 
 ## Test status
 

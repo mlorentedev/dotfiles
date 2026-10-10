@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -76,10 +77,16 @@ func newSecretsRotateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var repos []string
+			if pushToCI {
+				if repos, err = ciTargets(s); err != nil {
+					return err
+				}
+			}
 			if err := runRotate(cmd, s, item, field, isFile, dryRun); err != nil || !pushToCI {
 				return err
 			}
-			return pushRotatedToCI(cmd.OutOrStdout(), s, dryRun)
+			return pushRotatedToCI(cmd.OutOrStdout(), s, repos, dryRun)
 		},
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report the intended rotation and the current fingerprint without writing")
@@ -184,28 +191,48 @@ func probeSuffix(s *secrets.Secret) string {
 	return " (then probe: " + s.Validate + ")"
 }
 
-// pushRotatedToCI hands a proven rotation to every repo whose CI consumes the
-// secret, through the same upload path as `sync ci`. Without it a rotation leaves
-// GitHub Actions on the retired credential until someone remembers the second
-// command, which is the silent half-rotation rotate exists to remove.
-//
-// It runs only after runRotate succeeded, so the value it resolves is the one just
-// read back and, where the entry declares one, already probed live; the upload's
-// own liveness gate is skipped for that reason.
-func pushRotatedToCI(out io.Writer, s *secrets.Secret, dryRun bool) error {
+// ciTargets resolves the repos a --push-ci rotation will upload to, before
+// anything is written. A registry defect found after the write would leave the
+// vault on the new value and CI on the old one, which is the half-rotation
+// --push-ci exists to remove, so every consumer must be pushable first.
+func ciTargets(s *secrets.Secret) ([]string, error) {
+	one := &secrets.Registry{Secrets: []secrets.Secret{*s}}
 	var repos []string
 	for _, c := range s.Consumers {
 		repo, ok := strings.CutPrefix(c, "ci:")
 		if !ok {
 			continue
 		}
-		// Every consumer is checked before the first upload, so a registry typo
-		// cannot leave some repos on the new credential and the rest on the old.
 		if !initrepo.ValidRepoSlug(repo) {
-			return fmt.Errorf("rotated, but %s declares an invalid ci consumer %q (want ci:owner/name); nothing was pushed", s.ID, c)
+			return nil, fmt.Errorf("%s declares an invalid ci consumer %q (want ci:owner/name); nothing was rotated", s.ID, c)
+		}
+		// SelectCI skips what Actions cannot hold (file, floor, GITHUB_*). A ci:
+		// consumer left with nothing to upload would report a push that never happens.
+		if sel := one.SelectCI(repo); len(sel.Upload) == 0 {
+			return nil, fmt.Errorf("%s declares %s but holds nothing GitHub Actions can store (%s); nothing was rotated", s.ID, c, skipReason(sel))
 		}
 		repos = append(repos, repo)
 	}
+	return repos, nil
+}
+
+func skipReason(sel secrets.CISelection) string {
+	if len(sel.Skipped) == 0 {
+		return "no env var to upload"
+	}
+	return sel.Skipped[0].Reason
+}
+
+// pushRotatedToCI hands a proven rotation to every repo whose CI consumes the
+// secret, through the same upload path as `sync ci`. Without it a rotation leaves
+// GitHub Actions on the retired credential until someone remembers the second
+// command.
+//
+// It runs only after runRotate succeeded, so the value it resolves is the one just
+// read back and, where the entry declares one, already probed live; the upload's
+// own liveness gate is skipped for that reason. One failed repo does not stop the
+// others: the error names every repo still on the old value.
+func pushRotatedToCI(out io.Writer, s *secrets.Secret, repos []string, dryRun bool) error {
 	if len(repos) == 0 {
 		_, _ = fmt.Fprintf(out, "note     %s has no ci: consumer — nothing to push\n", s.ID)
 		return nil
@@ -215,10 +242,17 @@ func pushRotatedToCI(out io.Writer, s *secrets.Secret, dryRun bool) error {
 		return nil
 	}
 	one := &secrets.Registry{Secrets: []secrets.Secret{*s}}
+	var failed []string
+	var errs []error
 	for _, repo := range repos {
 		if err := pushCI(out, one.SelectCI(repo), repo, false, true); err != nil {
-			return fmt.Errorf("rotated, but pushing to %s failed (finish with `dotf secrets sync ci --repo %s`): %w", repo, repo, err)
+			failed = append(failed, repo)
+			errs = append(errs, fmt.Errorf("%s: %w", repo, err))
 		}
 	}
-	return nil
+	if len(failed) == 0 {
+		return nil
+	}
+	return fmt.Errorf("rotated, but %s still hold the old value (finish each with `dotf secrets sync ci --repo <repo>`): %w",
+		strings.Join(failed, ", "), errors.Join(errs...))
 }
