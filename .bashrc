@@ -93,9 +93,8 @@ export NAN_BASE_URL="https://api.nan.builders/v1"
 # time at once.
 #
 # THE GUARD MUST NOT DEPEND ON $PATH. It runs here, but `~/.local/bin` — where
-# dotf lives — is prepended ~40 lines below, and the line before that REPLACES
-# PATH outright. So `command -v dotf` succeeds only when the parent process
-# happened to export it already.
+# dotf lives — is prepended ~40 lines below. So `command -v dotf` succeeds only
+# when the parent process happened to export it already.
 #
 # Measured 2026-08-27: a terminal with a clean PATH skipped this whole block, so
 # `pi` and `opencode` were never wrapped, ran without their injected credentials,
@@ -123,23 +122,39 @@ export NINJA_HOME="$HOME/.console-ninja"
 # Tool Versions (single source of truth)
 [[ -f "$DOTFILES_DIR/versions.conf" ]] && . "$DOTFILES_DIR/versions.conf"
 
-# Tool Homes (constructed from versions.conf)
-export JAVA_HOME="$APPS_HOME/jdk-${JAVA_VERSION}"
-export MAVEN_HOME="$APPS_HOME/apache-maven-${MAVEN_VERSION}"
-export MINIKUBE_HOME="$APPS_HOME/minikube-${MINIKUBE_VERSION}"
-export GO_HOME="$APPS_HOME/go-${GO_VERSION}"
+# Tool Homes (constructed from versions.conf), exported only when the
+# directory exists. A JAVA_HOME naming a directory that is not there breaks
+# macOS's /usr/bin/java stub, and on a machine whose toolchains come from mise
+# (ADR-044) none of these exist (#2013 F-041). The same rule as .zshrc.
+_dotfiles_home() { [[ -d "$2" ]] && export "$1=$2"; }
+_dotfiles_home JAVA_HOME "$APPS_HOME/jdk-${JAVA_VERSION}"
+_dotfiles_home MAVEN_HOME "$APPS_HOME/apache-maven-${MAVEN_VERSION}"
+_dotfiles_home MINIKUBE_HOME "$APPS_HOME/minikube-${MINIKUBE_VERSION}"
+_dotfiles_home GO_HOME "$APPS_HOME/go-${GO_VERSION}"
+unset -f _dotfiles_home
 
 # ==========================
 #    PATH CONFIGURATION
 # ==========================
-# Ensure system paths are present
-export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+# PATH is only ever prepended to, never replaced: it arrives from the login
+# shell, the desktop session or the OS (/etc/paths on macOS, environment.d on
+# Linux), and an rc that resets it drops whatever those added (#2013 W6).
 
-# Prepend Tool Paths (priority over system)
-export PATH="$JAVA_HOME/bin:$PATH"
-export PATH="$MAVEN_HOME/bin:$PATH"
-export PATH="$MINIKUBE_HOME:$PATH"
-export PATH="$GO_HOME/bin:$PATH"
+# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel,
+# and not already loaded. A nested shell inherits HOMEBREW_PREFIX with the PATH
+# shellenv built, so it does not run brew again.
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+    done
+    unset _brew
+fi
+
+# Prepend Tool Paths (priority over system), for the homes that exist
+[[ -n "${JAVA_HOME:-}" ]] && export PATH="$JAVA_HOME/bin:$PATH"
+[[ -n "${MAVEN_HOME:-}" ]] && export PATH="$MAVEN_HOME/bin:$PATH"
+[[ -n "${MINIKUBE_HOME:-}" ]] && export PATH="$MINIKUBE_HOME:$PATH"
+[[ -n "${GO_HOME:-}" ]] && export PATH="$GO_HOME/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"
 export PATH="$NINJA_HOME/.bin:$PATH"
 export PATH="$DOTFILES_DIR/scripts:$PATH"
