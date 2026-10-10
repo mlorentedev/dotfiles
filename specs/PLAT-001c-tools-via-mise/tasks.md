@@ -114,6 +114,8 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 - [x] `bash`, brew only and with no `command` (/bin/bash 3.2 would satisfy one), for `env bash` on the Mac (#2202). The PATH half was already true: `.zshrc` evals `brew shellenv`, which puts `/opt/homebrew/bin` (or `/usr/local/bin` on Intel) ahead of `/bin`, and `dotf env` declares path variables, not PATH. The 3.2 guard is unchanged: CI's macOS leg runs bats with `/bin` first and `--expect-bash 3`; the guard's comment now says so
 - [ ] Second half: `git lfs install` as a converge reconciler beside `git-config` once #2208 lands (#2201); the darwin casks from the owner's list in the vault runbook `runbook-macos-workstation-setup`
 - [ ] Out of P5b: docker and kubectl wait on the owner's runtime choice (Docker Desktop, OrbStack or Colima), and doctor keeps reporting them
+- [x] Cask reader (#2013 P5b): a `cask` key, darwin only, never beside `brew`. Measured on the Mac (Homebrew 7.0.9): `brew list --versions appcleaner` exits 1 for an installed cask and `brew list --cask --versions appcleaner` prints `appcleaner 3.7`, so a cask under `brew` would plan an install on every run and fail the post-condition. Tests `TestInstallSystem_CaskIsQueriedAndInstalledAsACask`, `TestLoad_AcceptsACaskEntry` and two `TestLoad_RejectsMalformedSystemEntries` rows; mutations (formula query for a cask, install without `--cask`, the both-keys check off) each turn a test red
+- [ ] Cask entries: the 16 casks on the Mac, after the release carrying the reader is the `DOTF_VERSION` pin. Unlike a new source type, which an older dotf skips, a new key is refused by the older reader's key allowlist and the whole catalog fails to load
 
 ### W2b — shims on PATH (after #2013 P6/P7)
 

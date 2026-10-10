@@ -125,6 +125,31 @@ func TestInstallSystem_ArgvPerManager(t *testing.T) {
 	}
 }
 
+// A cask is a separate brew namespace: `brew list --versions <cask>` exits 1 for
+// an installed cask (measured, Homebrew 7.0.9), so querying it as a formula
+// would plan an install on every run and fail the post-condition after it.
+func TestInstallSystem_CaskIsQueriedAndInstalledAsACask(t *testing.T) {
+	obsidian := Tool{Name: "obsidian", Profile: "full", Source: Source{Type: "system", Cask: "obsidian"}}
+	w := newWorld("brew")
+	res, err := w.installer("darwin").Install(obsidian)
+	if err != nil || res != Installed {
+		t.Fatalf("Install = %v, %v; want Installed, nil\n%s", res, err, w.out.String())
+	}
+	if len(w.ran) != 1 || strings.Join(w.ran[0], " ") != "brew install --cask obsidian" {
+		t.Errorf("ran %v, want exactly %q", w.ran, "brew install --cask obsidian")
+	}
+	for _, q := range w.queries {
+		if q[0] == "brew" && strings.Join(q, " ") != "brew list --cask --versions obsidian" {
+			t.Errorf("queried %v; a cask is listed with --cask", q)
+		}
+	}
+
+	w.ran, w.queries = nil, nil
+	if res, err := w.installer("darwin").Install(obsidian); err != nil || res != Skipped || len(w.ran) != 0 {
+		t.Errorf("second run: %v, %v, ran %v; want Skipped and nothing run", res, err, w.ran)
+	}
+}
+
 // A system package is not pinned, so presence is the whole criterion and a second
 // run must run no manager command at all.
 func TestInstallSystem_SecondRunRunsNothing(t *testing.T) {

@@ -25,8 +25,11 @@ const systemPresent = "present"
 // managerBinary is the executable that runs a manager's installs, which must be
 // on PATH for an install to be possible.
 func managerBinary(manager string) string {
-	if manager == "apt" {
+	switch manager {
+	case "apt":
 		return "apt-get"
+	case "brew-cask":
+		return "brew"
 	}
 	return manager
 }
@@ -63,6 +66,9 @@ func (in *Installer) managerLists(manager, pkg string) bool {
 	case "brew":
 		out, err := query("brew", "list", "--versions", pkg)
 		return err == nil && strings.TrimSpace(string(out)) != ""
+	case "brew-cask":
+		out, err := query("brew", "list", "--cask", "--versions", pkg)
+		return err == nil && strings.TrimSpace(string(out)) != ""
 	case "winget":
 		// Builds differ on the exit code for "no match", and the sentence it
 		// prints does not echo the id, so a hit is a listing that names it.
@@ -88,6 +94,8 @@ func (in *Installer) systemInstallArgv(manager, pkg string) []string {
 		return argv
 	case "brew":
 		return []string{"brew", "install", pkg}
+	case "brew-cask":
+		return []string{"brew", "install", "--cask", pkg}
 	default: // winget
 		return []string{"winget", "install", "--id", pkg, "-e", "--accept-source-agreements", "--accept-package-agreements"}
 	}
