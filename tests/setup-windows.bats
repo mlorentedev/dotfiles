@@ -214,10 +214,6 @@ setup() {
     grep -q 'Setting up secrets system' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 registers SessionStart hook" {
-    grep -q 'SessionStart' "$PS1_SCRIPT"
-}
-
 # HARNESS-045 AC1: the hook command is no longer a literal in this script. It is
 # declared in harness/manifest.json and emitted by `dotf harness bind` -- ONE Go
 # binary on both OSes rather than a per-OS shim, which is the whole point of the
@@ -513,15 +509,10 @@ FIXTURE
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
-# SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
-# `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that
-# does NOT exist in Windows PowerShell 5.1. When the user invokes
-# `PowerShell -ExecutionPolicy Bypass -File .\setup-windows.ps1` (Windows
-# default `PowerShell` resolves to 5.1.x), the inner try/catch swallows the
-# ParameterBindingException as if it were a JSON parse error and the per-key
-# merge from ai/claude/settings.json is silently skipped. Preamble at the top
-# of the script detects PSVersion.Major < 7 and re-execs under pwsh, or fails
-# loud with winget install hint if pwsh is missing.
+# The script is verified under pwsh 7 only. BUG-005 was the settings merge
+# silently skipping under 5.1 (`ConvertFrom-Json -AsHashtable`); that merge is
+# `dotf deploy` now (#2000), and the re-exec keeps every run on the tested
+# runtime. Preamble re-execs under pwsh, or fails loud with a winget hint.
 
 @test "setup-windows.ps1 detects PowerShell version major (BUG-005)" {
     grep -qF 'PSVersionTable.PSVersion.Major' "$PS1_SCRIPT"
@@ -711,46 +702,24 @@ FIXTURE
 }
 
 # --- SDD-002: settings.json template merge ---
-# Both setup scripts read ai/claude/settings.json as SSOT for the dotfiles-owned
-# subset of ~/.claude/settings.json. Per-key merge policy documented in
-# specs/SDD-002-settings-portability/proposal.md.
+# ai/claude/settings.json is the SSOT for the dotfiles-owned subset of
+# ~/.claude/settings.json, merged by `dotf deploy` (ai/deploy.json claude-settings).
+# Neither setup script copies or merges it (#2000).
 
-@test "SDD-002: setup-windows.ps1 defines Merge-ClaudeSettings function" {
-    grep -qE '^function Merge-ClaudeSettings' "$PS1_SCRIPT"
-}
-
-@test "SDD-002: setup-windows.ps1 calls Merge-ClaudeSettings (not inline hashtable)" {
-    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
-    # The legacy inline hook hashtable must be gone
+@test "SDD-002: neither script carries the legacy inline hook builders" {
+    # The settings merge is `dotf deploy`'s claude-settings entry (#2000) and the
+    # hooks are `dotf harness bind`'s (HARNESS-045 AC1). These were the inline
+    # writers both replaced.
     refute_grep '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
-    # ...and so must the hook parameters: the function takes template + target
-    # only now, because hooks are `dotf harness bind`'s (HARNESS-045 AC1).
     refute_grep_fixed '-HookCommand' "$PS1_SCRIPT"
     refute_grep_fixed '-SessionEndCommand' "$PS1_SCRIPT"
-}
-
-@test "SDD-002: setup-windows.ps1 references the template path ai\\claude\\settings.json" {
-    grep -qF 'ai\claude\settings.json' "$PS1_SCRIPT"
+    refute_grep_fixed 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "SDD-002: setup-windows.ps1 bulk copy of ai/claude/* excludes settings.json" {
     # -- separator before pattern starting with dash so grep does not parse it
     # as a flag (same fix pattern as the BUG-002 CORE PRINCIPLE assert).
     grep -qF -- "-Exclude 'settings.json'" "$PS1_SCRIPT"
-}
-
-@test "SDD-002: setup-linux.sh defines merge_claude_settings function" {
-    grep -qE '^merge_claude_settings\(\)' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "SDD-002: setup-linux.sh calls merge_claude_settings (not inline HOOK_ENTRY)" {
-    grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
-    # The legacy inline HOOK_ENTRY jq -n heredoc must be gone
-    refute_grep_fixed 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "SDD-002: setup-linux.sh references the template path ai/claude/settings.json" {
-    grep -qF 'ai/claude/settings.json' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "SDD-002: setup-linux.sh never copies ai/claude/settings.json verbatim" {
@@ -760,11 +729,6 @@ FIXTURE
     refute_grep 'cp -rf "\$_claude_src"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'cp .*ai/claude/settings\.json' "$DOTFILES_DIR/setup-linux.sh"
     [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .strategy' "$DOTFILES_DIR/ai/deploy.json")" = "merge" ]
-}
-
-@test "SDD-002: parity -- both scripts log the bootstrap message" {
-    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$PS1_SCRIPT"
-    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # HARNESS-045 AC1 inverted this parity guard. Both scripts used to substitute a
