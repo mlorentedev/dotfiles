@@ -201,6 +201,15 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds actionlint, hadolint, kubectx, kubens, shfmt, stern, tflint and yq to the install list; `dotf tools install --dry-run` plans `install` for gopls
 - Windows: every mise pin waits for Windows mise (#2013)
 
+### Toolset C — ergonomics (stacked on Toolset B)
+
+- [x] Marked for mise in the toolset group: delta 0.19.2, fd 10.5.0 and bat 0.26.1. Their aqua entries declare no checksum, so mise checks the release digest only (the herdr precedent). Each answers `--version` with its version, measured on darwin-arm64 in an isolated mise
+- [x] Debian's packages rename two of them (`fdfind`, `batcat`); through mise they keep their own names on every OS, and no rc file aliases either
+- [x] `btop` as a `system` entry (apt, brew): aqua's btop carries a Linux asset only, and upstream ships no Windows build (btop4win is a separate project), so Windows has no entry
+- Not in scope: making delta git's pager. Declaring the tool does not change `core.pager`; that is a config decision for the owner
+- [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds bat, delta and fd to the install list; `dotf tools install --dry-run` plans `install` for btop
+- Windows: every mise pin waits for Windows mise (#2013)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
