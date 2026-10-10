@@ -398,6 +398,10 @@ var linkExemptions = []struct {
 	{"00_meta/templates/", false, []linkCheck{checkDeadEnds, checkUnresolved}},
 	// Course study notes: not linked knowledge (owner, 2026-10-09).
 	{"20_certifications/", false, []linkCheck{checkDeadEnds}},
+	// Work product and client records: leaf notes kept per product or client,
+	// not linked knowledge (owner, 2026-10-09).
+	{"50_work/20-products/", false, []linkCheck{checkDeadEnds}},
+	{"50_work/30-clients/", false, []linkCheck{checkDeadEnds}},
 	// Session journals: a chronological record, not a linked note.
 	{"sessions", true, []linkCheck{checkOrphans, checkDeadEnds}},
 	// Agent memory files: read by the agent, never linked to.

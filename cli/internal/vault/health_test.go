@@ -122,7 +122,10 @@ func TestLinkExemptPerCheck(t *testing.T) {
 		{"10_projects/p/sessions/2026-10-09.md", true, true, false},
 		{"10_projects/p/memory/feedback.md", true, false, false},
 		{"00_meta/templates.md", false, false, false},
-		{"50_work/20-products/x.md", false, false, false},
+		{"50_work/20-products/x.md", false, true, false},
+		{"50_work/30-clients/acme/x.md", false, true, false},
+		{"50_work/25-applications/x.md", false, false, false},
+		{"50_work/20-products.md", false, false, false},
 	}
 	for _, tt := range tests {
 		if got := linkExempt(checkOrphans, tt.rel); got != tt.orphan {
@@ -138,7 +141,7 @@ func TestLinkExemptPerCheck(t *testing.T) {
 }
 
 func TestExemptZones(t *testing.T) {
-	if got, want := exemptZones(checkDeadEnds, "and"), "90_archive/, 00_meta/templates/, 20_certifications/ and sessions/"; got != want {
+	if got, want := exemptZones(checkDeadEnds, "and"), "90_archive/, 00_meta/templates/, 20_certifications/, 50_work/20-products/, 50_work/30-clients/ and sessions/"; got != want {
 		t.Errorf("exemptZones(dead-ends) = %q, want %q", got, want)
 	}
 	if got, want := exemptZones(checkUnresolved, "or"), "90_archive/ or 00_meta/templates/"; got != want {
