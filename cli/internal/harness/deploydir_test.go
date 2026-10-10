@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -47,8 +48,8 @@ func TestDeployDirSetExistsInTheCheckout(t *testing.T) {
 }
 
 // setupCopy matches setup-linux.sh's copy lines into the deploy dir:
-// `safe_copy "$CURRENT_DIR/<file>" …` and `cp -rf "$CURRENT_DIR/<dir>/…" …`.
-var setupCopy = regexp.MustCompile(`(?m)^\s*(?:safe_copy|cp -rf) "\$CURRENT_DIR/([^"/]+)(/[^"]*)?"`)
+// `safe_copy` or `cp -f "$CURRENT_DIR/<file>" …` and `cp -rf "$CURRENT_DIR/<dir>/…" …`.
+var setupCopy = regexp.MustCompile(`(?m)^\s*(?:safe_copy|cp -rf|cp -f) "\$CURRENT_DIR/([^"/]+)(/[^"]*)?"`)
 
 // Until setup-linux.sh's early copy block is deleted, it and the mirror are two
 // writers of one set. They must name the same paths, or doctor checks a path
@@ -68,6 +69,15 @@ func TestDeployDirSetMatchesSetupCopyBlock(t *testing.T) {
 	}
 	if len(files) == 0 || len(trees) == 0 {
 		t.Fatal("no copy lines found in setup-linux.sh: the parser or the script changed shape")
+	}
+	// A copy written another way (cp -a, install, a loop) would escape the
+	// parser and let the writers diverge with this test green, so every line
+	// that copies from the checkout into the deploy dir must be one it read.
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.Contains(line, `"$CURRENT_DIR/`) && strings.Contains(line, `"$DOTFILES_DIR/`) &&
+			!setupCopy.MatchString(line) {
+			t.Errorf("setup-linux.sh copies into the deploy dir in a form this test cannot read: %s", strings.TrimSpace(line))
+		}
 	}
 	assertSameSet(t, "files", files, DeployDirFiles)
 	assertSameSet(t, "trees", trees, DeployDirTrees)

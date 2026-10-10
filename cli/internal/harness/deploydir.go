@@ -21,6 +21,7 @@ var (
 	DeployDirFiles = []string{
 		"versions.conf", "packages.json", "mcp-servers.json",
 		".zshrc", ".bashrc", ".profile", ".inputrc", ".editorconfig", "tmux.conf",
+		"env-contract.json",
 	}
 	// DeployDirTrees are directories copied whole.
 	DeployDirTrees = []string{".zsh", "ssh", "scripts", "sensitive", "secrets"}
