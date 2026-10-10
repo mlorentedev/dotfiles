@@ -342,16 +342,11 @@ setup() {
 
 # --- MEM-002: retire claude-mem — plugin no longer installed on Windows ---
 # claude-mem is no longer in the $plugins array and the thedotmack marketplace is
-# no longer registered (ADR-016 Q2). setup-windows.ps1 instead ships an
-# idempotent cleanup that uninstalls the plugin + prunes leftover dirs.
+# no longer registered (ADR-016 Q2). Removing a stale registration is
+# `dotf deploy`'s job (ai/claude/plugins.json `retired_marketplaces`, #1431).
 
 @test "setup-windows.ps1 no longer registers the thedotmack marketplace (MEM-002)" {
     refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 ships the idempotent claude-mem cleanup block (MEM-002)" {
-    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$PS1_SCRIPT"
-    grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
 # --- OPS-042 (#1336): yarn is a catalog tool; obsidian is not npm at all ---

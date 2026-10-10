@@ -1024,39 +1024,6 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
-# MEM-002: retire claude-mem — one-cycle cleanup, prune after rollout.
-# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
-# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
-# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
-# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
-# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
-# idempotent — a no-op on a clean machine.
-log_info "Removing retired claude-mem plugin (MEM-002, if present)..."
-if command -v claude >/dev/null 2>&1; then
-    _snap=$(snapshot_claude_json)
-    claude plugin uninstall claude-mem@thedotmack >/dev/null 2>&1 || true
-    restore_claude_json_if_truncated "$_snap"
-fi
-_claude_cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-rm -rf "$_claude_cfg/plugins/cache/thedotmack/claude-mem" \
-       "$_claude_cfg/plugins/marketplaces/thedotmack-claude-mem" \
-       "$_claude_cfg/plugins/marketplaces/thedotmack" 2>/dev/null || true
-# The dir removal above is undone on the next Claude start if `thedotmack` is still
-# registered in settings.json — Claude re-clones the marketplace and its SessionStart
-# self-heal hook re-activates claude-mem. The settings merge below is additive (it
-# never strips keys), so delete the marketplace registration explicitly here. Guarded
-# on jq + an existing target; idempotent (the jq -e test skips an already-clean file).
-_claude_settings="$_claude_cfg/settings.json"
-if command -v jq >/dev/null 2>&1 && [ -f "$_claude_settings" ] && \
-   jq -e '.extraKnownMarketplaces.thedotmack' "$_claude_settings" >/dev/null 2>&1; then
-    if _stripped=$(jq 'del(.extraKnownMarketplaces.thedotmack)
-          | if (.extraKnownMarketplaces == {}) then del(.extraKnownMarketplaces) else . end' \
-          "$_claude_settings" 2>/dev/null) && [ -n "$_stripped" ]; then
-        printf '%s\n' "$_stripped" > "$_claude_settings"
-        log_info "Removed retired claude-mem marketplace registration from settings.json"
-    fi
-fi
-
 # Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
 # per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
 # when target missing. Preserves user customizations (Read paths,

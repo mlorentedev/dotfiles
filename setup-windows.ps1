@@ -896,50 +896,6 @@ if ($claudeCmd) {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
 
-# MEM-002: retire claude-mem -- one-cycle cleanup, prune after rollout.
-# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
-# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
-# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
-# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
-# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
-# idempotent -- a no-op on a clean machine.
-Write-Info "Removing retired claude-mem plugin (MEM-002, if present)..."
-if ($claudeCmd) {
-    Backup-AndRestoreClaudeJson -Action {
-        try {
-            & claude plugin uninstall claude-mem@thedotmack 2>$null | Out-Null
-        } catch {
-            # Non-fatal -- already absent or transient CLI issue.
-        }
-    }
-}
-$claudeCfg = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
-foreach ($stale in @(
-        (Join-Path $claudeCfg 'plugins\cache\thedotmack\claude-mem'),
-        (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack-claude-mem'),
-        (Join-Path $claudeCfg 'plugins\marketplaces\thedotmack'))) {
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $stale
-}
-# The dir removal above is undone on the next Claude start if 'thedotmack' is still
-# registered in settings.json -- Claude re-clones the marketplace and its SessionStart
-# self-heal hook re-activates claude-mem. The settings merge later is additive (it
-# never strips keys), so delete the marketplace registration explicitly here.
-$claudeSettings = Join-Path $claudeCfg 'settings.json'
-if (Test-Path $claudeSettings) {
-    try {
-        $cfg = Get-Content $claudeSettings -Raw | ConvertFrom-Json
-        $mk = $cfg.extraKnownMarketplaces
-        if ($mk -and ($mk.PSObject.Properties.Name -contains 'thedotmack')) {
-            $mk.PSObject.Properties.Remove('thedotmack')
-            if ($mk.PSObject.Properties.Count -eq 0) { $cfg.PSObject.Properties.Remove('extraKnownMarketplaces') }
-            $cfg | ConvertTo-Json -Depth 10 | Set-Content $claudeSettings -Encoding UTF8
-            Write-Info "Removed retired claude-mem marketplace registration from settings.json"
-        }
-    } catch {
-        # Non-fatal -- malformed/locked settings.json; the merge step re-validates.
-    }
-}
-
 # Deploy auto-memory junctions from vault (see ADR-007)
 # Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
 # Scans both 10_projects/ and 50_work/ for memory directories.
