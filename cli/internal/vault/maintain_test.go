@@ -323,8 +323,11 @@ func TestNotifyCommand_ReachesEachOSNotifier(t *testing.T) {
 	if got := mac.Args[len(mac.Args)-2:]; got[0] != title || got[1] != body {
 		t.Errorf("darwin passes %q, want the title and body as argv", got)
 	}
-	if script := strings.Join(mac.Args[:len(mac.Args)-2], " "); strings.Contains(script, "maintenance") {
-		t.Errorf("darwin splices the text into the script: %s", script)
+	script := strings.Join(mac.Args[:len(mac.Args)-2], " ")
+	for _, text := range []string{"maintenance", "issue line"} {
+		if strings.Contains(script, text) {
+			t.Errorf("darwin splices %q into the script: %s", text, script)
+		}
 	}
 
 	linux := notifyCommand("linux", UrgencyLow, title, body, yes, none, 1000)
