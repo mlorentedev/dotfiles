@@ -149,7 +149,7 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 			len(copies), localBin, strings.Join(paths, ", ")))
 		return
 	}
-	shims := tools.MiseShimsDir(home, sys.Getenv)
+	shims := tools.MiseShimsDir(home, sys.GOOS, sys.Getenv)
 	for _, name := range copies {
 		dst := filepath.Join(localBin, name)
 		shim := filepath.Join(shims, name)
