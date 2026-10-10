@@ -90,9 +90,15 @@ copy_with() {
     run tmux -L "$socket" show -sv copy-command
     tmux -L "$socket" kill-server 2>/dev/null || true
     [ "$status" -eq 0 ]
-    local want
+    local want got
     want=$(copy_command)
-    [ "$output" = "$want" ] || {
+    # tmux 3.4 (Ubuntu's, measured in CI) vis-escapes what it prints
+    # (server_client_print, VIS_CSTYLE) and shows \$ for a stored $; 3.8 prints
+    # it raw. Undo that one escape; the script holds no backslash of its own, so
+    # the undo is exact.
+    [[ "$want" != *\\* ]] || false
+    got=$(printf '%s' "$output" | sed 's/\\\$/$/g')
+    [ "$got" = "$want" ] || {
         printf 'tmux %s shows: %s\nthe file has:  %s\n' "$(tmux -V)" "$output" "$want"
         false
     }
