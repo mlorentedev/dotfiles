@@ -145,3 +145,12 @@ func TestBindReportsNothingForATargetThatFailedBeforeWriting(t *testing.T) {
 		t.Fatalf("want an error and no outcome, got %+v, %v", out, err)
 	}
 }
+
+// TestBindRefusesOptionsWithoutHas: Has decides whether a requires_command
+// target is skipped, and a caller that forgot it gets an error, not a nil-func
+// panic on the first target that names one.
+func TestBindRefusesOptionsWithoutHas(t *testing.T) {
+	if _, err := Bind(nil, BindOptions{Home: t.TempDir()}); err == nil || !strings.Contains(err.Error(), "Has is required") {
+		t.Fatalf("want a refusal naming Has, got %v", err)
+	}
+}

@@ -2,6 +2,7 @@ package harness
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,7 +22,8 @@ type BindOptions struct {
 	// Only binds a single agent; empty binds every declared target.
 	Only   string
 	DryRun bool
-	// Has reports whether a command is on PATH, for requires_command.
+	// Has reports whether a command is on PATH, for requires_command. Required:
+	// Bind refuses options without it.
 	Has func(string) bool
 }
 
@@ -45,6 +47,9 @@ type BindOutcome struct {
 // one naming `requires_command` is skipped when that binary is absent: an
 // uninstalled harness is not a failure.
 func Bind(targets []BindTarget, o BindOptions) ([]BindOutcome, error) {
+	if o.Has == nil {
+		return nil, errors.New("harness.Bind: BindOptions.Has is required")
+	}
 	var out []BindOutcome
 	for _, t := range targets {
 		if o.Only != "" && t.Agent != o.Only {
