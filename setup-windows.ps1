@@ -641,10 +641,12 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     if ($LASTEXITCODE -ne 0 -or -not $hiveVer) { $hiveVer = $null }
 }
 if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([version]$hiveVer -ge [version]'1.32.0')) {
-    & hive service install *> $null
+    # Keep the output: since hive 4.3.1, install waits for the daemon to answer and
+    # exits 1 with its state, the only clue to why it is down.
+    $hiveSvcOut = (& hive service install 2>&1 | Out-String).Trim()
     $hiveSvcRc = $LASTEXITCODE
     if ($hiveSvcRc -eq 0) { Write-Success "Installed hive daemon service (Scheduled Task, v$hiveVer)" }
-    else { Write-Warn "hive service install failed (non-fatal; client works via fallback)" }
+    else { Write-Warn "hive service install exited $hiveSvcRc (non-fatal; client works via fallback): $hiveSvcOut" }
 
     # ADR-025 + HARNESS-024 (#446): the hive serve daemon runs as a Scheduled Task
     # and inherits the User-scope environment (not the shell paths.ps1). Persist
