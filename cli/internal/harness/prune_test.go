@@ -275,9 +275,10 @@ func TestMirror_PrunesLeftoversTheCheckoutDeletedAndARerunPrunesNothing(t *testi
 	}
 }
 
-// A file the checkout ignores is local to it (scripts/CLAUDE.md, a
-// claude-mem output, #2268): the mirror never deploys it, and a copy an older
-// mirror deployed is named as an orphan rather than read as part of the set.
+// A file the checkout ignores is local to it (scripts/CLAUDE.md, written by a
+// retired memory tool, #2268): the mirror never deploys it, and a copy an
+// older mirror deployed is named as an orphan rather than read as part of the
+// set.
 // git never tracked it, so it is not pruned.
 func TestMirror_SkipsAFileTheCheckoutIgnores(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {

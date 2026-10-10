@@ -52,9 +52,9 @@ type Orphans struct {
 // IgnoredInCheckout is every untracked file git ignores under the deploy-dir
 // trees and harness/, slash-separated and relative to the checkout. The mirror
 // skips them: a local, ignored or generated file in a checkout is not part of
-// what it deploys (scripts/CLAUDE.md, a claude-mem output, reached PATH this
-// way, #2268). A checkout git cannot read (a tarball) ignores nothing, so it
-// mirrors as it always did.
+// what it deploys (scripts/CLAUDE.md, a retired memory tool's output, reached
+// PATH this way, #2268). A checkout git cannot read (a tarball) ignores
+// nothing, so it mirrors as it always did.
 func IgnoredInCheckout(repoRoot string, git GitRunner) map[string]bool {
 	args := append([]string{"ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "harness"}, DeployDirTrees...)
 	out, err := git(repoRoot, args...)
