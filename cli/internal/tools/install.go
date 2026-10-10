@@ -100,6 +100,9 @@ type Installer struct {
 	// IsRoot reports whether dotf runs with root privileges, which decides if an
 	// apt install needs sudo. Nil means an effective uid of 0.
 	IsRoot func() bool
+	// sudoRefuses caches needsSudoPassword's answer: a plan asks it per apt
+	// entry, and every `sudo -n` refusal is a line in the auth log.
+	sudoRefuses *bool
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
@@ -204,8 +207,13 @@ const (
 	// PlanRefused: the entry is one Install refuses with an error (#1892).
 	PlanRefused PlanAction = "refused"
 	// PlanMissingManager: the tool needs installing but its package manager is
-	// not on PATH yet (uv, before setup has installed it). Install skips it.
+	// not on PATH yet (uv before mise has installed it, npm before node).
+	// Install skips it; Note names the manager.
 	PlanMissingManager PlanAction = "missing-manager"
+	// PlanNeedsSudo: a system package that only root can install, on a host
+	// where sudo wants a password dotf never asks for. Install skips it and
+	// prints the command; Note carries the same command.
+	PlanNeedsSudo PlanAction = "needs-sudo"
 )
 
 // Plan is one row of a dry run: the installed version ("" when absent), the pin
@@ -282,8 +290,8 @@ func (in *Installer) Plan(t Tool) Plan {
 	switch {
 	case action == actionSkip:
 		p.Action = PlanSkip
-	case in.missingManager(t):
-		p.Action = PlanMissingManager
+	case in.missingManager(t) != "":
+		p.Action, p.Note = PlanMissingManager, "waits on "+in.missingManager(t)
 	case action == actionUpgrade:
 		p.Action = PlanUpgrade
 	default:
@@ -292,11 +300,16 @@ func (in *Installer) Plan(t Tool) Plan {
 	return p
 }
 
-// missingManager reports a uv tool whose package manager is not on PATH. On a
-// fresh Linux box setup runs `dotf tools install` before it installs uv, so the
-// first run meets exactly this; the next run installs the tool.
-func (in *Installer) missingManager(t Tool) bool {
-	return t.Source.Type == "uv-tool" && !in.HasCommand("uv")
+// missingManager names the package manager a uv-tool or npm entry needs when
+// it is not on PATH, else "". The first catalog pass on a fresh machine meets
+// exactly this: uv arrives with the mise sync that follows it, and npm with
+// node, which nothing installs yet. The entry waits for a later pass.
+func (in *Installer) missingManager(t Tool) string {
+	manager := map[string]string{"uv-tool": "uv", "npm": "npm"}[t.Source.Type]
+	if manager == "" || in.HasCommand(manager) {
+		return ""
+	}
+	return manager
 }
 
 // installRelease provisions a github-release tool: download → verify sha256 →
@@ -338,6 +351,9 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 	action := decideAction(in.current(t), t.Version)
 	if action == actionSkip {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
+		return Skipped, nil
+	}
+	if in.skipMissingManager(t) {
 		return Skipped, nil
 	}
 	args := append(in.npmPrefixArgs(), pkg+"@"+t.Version)
@@ -383,8 +399,7 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
 		return Skipped, nil
 	}
-	if in.missingManager(t) {
-		_, _ = fmt.Fprintf(in.Out, "%s: uv is not on PATH; skipping (the next run installs it once uv is there)\n", t.Name)
+	if in.skipMissingManager(t) {
 		return Skipped, nil
 	}
 	// --force replaces an entry point another installer left in ~/.local/bin,
@@ -404,6 +419,15 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s via uv (%s)\n", t.Name, t.Version, res, pkg)
 	return res, nil
+}
+
+// skipMissingManager prints why an entry waits and reports whether it does.
+func (in *Installer) skipMissingManager(t Tool) bool {
+	manager := in.missingManager(t)
+	if manager != "" {
+		_, _ = fmt.Fprintf(in.Out, "%s: %s is not on PATH; skipping (the next run installs it once %s is there)\n", t.Name, manager, manager)
+	}
+	return manager != ""
 }
 
 // pathVersion is the npm default version probe: `<name> --version`, resolving
