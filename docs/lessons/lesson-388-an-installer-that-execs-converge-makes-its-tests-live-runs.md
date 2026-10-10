@@ -28,9 +28,10 @@ the binary the installer had just verified and placed.
 ## The Solution
 - Every test that executes the entrypoint confines `HOME` and `PATH` (`PATH=/usr/bin:/bin` plus
   a stub directory), so the only `dotf` it can reach is a fixture that records its arguments.
-- `install_dotf` records the binary it vetted in `DOTF_BIN` (`$script:DotfBin` in PowerShell): the
+- `install_dotf` records the binary it vetted in `_dotf_bin` (`$script:DotfBin` in PowerShell): the
   `dotf` on `PATH` when it kept it, the file it placed when it installed one. The hand-off execs
-  that path, never a `PATH` lookup.
+  that path, never a `PATH` lookup. The name is private on purpose: CI already exports `DOTF_BIN`
+  for the test suites, and `setup-linux.sh` sources the installer into its own shell.
 - The hand-off tests assert the full command line the stub received, including the binary's path,
   so a regression to a `PATH` lookup fails them.
 

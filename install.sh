@@ -16,7 +16,7 @@
 #
 # Executed, every argument goes to `dotf converge`. DOTF_VERSION, DOTF_BIN_DIR
 # and DOTF_RELEASE_BASE override the version, the install directory and the
-# release location.
+# release location, executed or sourced.
 #
 # Sourced (setup-linux.sh), it only defines install_dotf [version] [dest_dir]
 # [base_url], which bats drives against a file:// fixture with no network.
@@ -185,12 +185,12 @@ _dotf_fetch() {
 # install_dotf [version] [dest_dir] [base_url]: idempotently install the pinned
 # `dotf` release. No-op when the pinned version is already on PATH; converges on
 # drift. Returns non-zero (no binary left in dest) on any download/verify error.
-# On success DOTF_BIN names the binary it vetted: the one on PATH when it kept
+# On success _dotf_bin names the binary it vetted: the one on PATH when it kept
 # it, else the one it placed in dest_dir, which a fresh machine does not have
 # on PATH yet.
 install_dotf() {
     version="${1:-${DOTF_VERSION:-}}"
-    dest="${2:-$HOME/.local/bin}"
+    dest="${2:-${DOTF_BIN_DIR:-$HOME/.local/bin}}"
     base="${3:-$DOTF_RELEASE_BASE}"
 
     if [ -z "$version" ]; then
@@ -221,12 +221,12 @@ install_dotf() {
     # reached. tests/install.bats assumed one gate and there were two.
     if [ "$_dotf_current" = "dev" ]; then
         log_info "dotf is a source build (dev); leaving it in place (remove it to converge to the $version release)"
-        DOTF_BIN="$(command -v dotf)"
+        _dotf_bin="$(command -v dotf)"
         return 0
     fi
     if [ "$_dotf_current" = "$version" ]; then
         log_info "dotf $version already installed; skipping"
-        DOTF_BIN="$(command -v dotf)"
+        _dotf_bin="$(command -v dotf)"
         return 0
     fi
     if [ -n "$_dotf_current" ]; then
@@ -242,13 +242,6 @@ install_dotf() {
         "$_dotf_artifact" "$_dotf_tmp"
     _dotf_rc=$?
 
-    # Exec probe before anything is placed: a binary that verifies but cannot
-    # run here (wrong arch, a broken build) must not replace a working one.
-    if [ "$_dotf_rc" -eq 0 ] && ! "$_dotf_tmp/dotf" version >/dev/null 2>&1; then
-        log_error "install_dotf: the downloaded dotf $version does not run on this machine"
-        _dotf_rc=1
-    fi
-
     if [ "$_dotf_rc" -eq 0 ]; then
         ensure_directory "$dest"
         # Stage beside the target, then rename into place. Writing *onto* a live
@@ -258,17 +251,27 @@ install_dotf() {
         # such restriction, is atomic, and leaves any already-running process on
         # its own inode. Staging inside $dest keeps it on one filesystem, which
         # is what makes the rename atomic rather than a copy.
+        #
+        # The staged copy is also the one the exec probe runs, before the
+        # rename: a binary that verifies but cannot run here (wrong arch, a
+        # broken build) must not replace a working one. Probing it in $dest
+        # rather than in the temp dir keeps a noexec /tmp from refusing a good
+        # release.
         _dotf_staged="$dest/.dotf.new.$$"
-        if cp "$_dotf_tmp/dotf" "$_dotf_staged" &&
-            chmod 0755 "$_dotf_staged" &&
-            mv -f "$_dotf_staged" "$dest/dotf"; then
+        if ! { cp "$_dotf_tmp/dotf" "$_dotf_staged" && chmod 0755 "$_dotf_staged"; }; then
+            log_error "install_dotf: failed to place binary in $dest"
+            _dotf_rc=1
+        elif ! "$_dotf_staged" version >/dev/null 2>&1; then
+            log_error "install_dotf: the downloaded dotf $version does not run on this machine"
+            _dotf_rc=1
+        elif mv -f "$_dotf_staged" "$dest/dotf"; then
             log_success "dotf $version installed to $dest/dotf"
-            DOTF_BIN="$dest/dotf"
+            _dotf_bin="$dest/dotf"
         else
-            rm -f "$_dotf_staged"
             log_error "install_dotf: failed to place binary in $dest"
             _dotf_rc=1
         fi
+        rm -f "$_dotf_staged"
     fi
 
     rm -rf "$_dotf_tmp"
@@ -286,6 +289,6 @@ if ! (return 0 2>/dev/null); then
         # shellcheck source=/dev/null
         . "$_DOTF_SCRIPT_DIR/versions.conf"
     fi
-    install_dotf "" "${DOTF_BIN_DIR:-$HOME/.local/bin}" || exit 1
-    exec "$DOTF_BIN" converge "$@"
+    install_dotf || exit 1
+    exec "$_dotf_bin" converge "$@"
 fi
