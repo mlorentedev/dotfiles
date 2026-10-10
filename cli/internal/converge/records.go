@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -28,6 +29,11 @@ type Options struct {
 	// the configs step fails rather than install unrendered placeholders.
 	RenderConfigs deploy.Renderer
 	ResolvePath   func(string) string
+	// Launchctl runs launchctl and returns stdout; env.ExecLaunchctl in
+	// production, and UID is the user whose gui domain it targets. Unset, the
+	// env-persist step is skipped.
+	Launchctl env.LaunchctlRunner
+	UID       int
 }
 
 // Registry is the ordered list of reconcilers a run drives. The order extends
@@ -40,6 +46,7 @@ func Registry(o Options) []Reconciler {
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		gitConfig{run: o.GitRun, has: onPath},
+		envPersist{launchctl: o.Launchctl, uid: o.UID},
 	}
 }
 
