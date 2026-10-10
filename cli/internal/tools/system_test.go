@@ -104,8 +104,8 @@ func TestInstallSystem_ArgvPerManager(t *testing.T) {
 		managers   []string
 		want       string
 	}{
-		{"apt through sudo -n, which never prompts", "linux", false, []string{"apt-get", "sudo"}, "sudo -n apt-get install -y gh"},
-		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"}, "apt-get install -y gh"},
+		{"apt through sudo -n, which never prompts", "linux", false, []string{"apt-get", "sudo"}, "sudo -n apt-get install -y --no-remove gh"},
+		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"}, "apt-get install -y --no-remove gh"},
 		{"brew", "darwin", false, []string{"brew"}, "brew install gh"},
 		{"winget names the id, exact match, and both agreements", "windows", false, []string{"winget"},
 			"winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements"},
@@ -300,7 +300,7 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 	if err != nil || res != Skipped {
 		t.Fatalf("Install = %v, %v; want Skipped, nil", res, err)
 	}
-	if want := "gh: needs sudo; run: sudo apt-get install -y gh"; !strings.Contains(w.out.String(), want) {
+	if want := "gh: needs sudo; run: sudo apt-get install -y --no-remove gh"; !strings.Contains(w.out.String(), want) {
 		t.Errorf("output %q lacks %q", w.out.String(), want)
 	}
 	if len(w.ran) != 1 || w.ran[0][1] != "-n" {
@@ -315,7 +315,7 @@ func TestInstallSystem_AptFailureWithWorkingSudoIsAnError(t *testing.T) {
 	w.sudoOK = true
 	w.failRun = fmt.Errorf("exit status 100")
 	_, err := w.installer("linux").Install(ghTool())
-	if err == nil || !strings.Contains(err.Error(), "sudo -n apt-get install -y gh") {
+	if err == nil || !strings.Contains(err.Error(), "sudo -n apt-get install -y --no-remove gh") {
 		t.Errorf("want an error carrying the command, got %v", err)
 	}
 }

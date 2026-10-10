@@ -201,7 +201,9 @@
       "profile": "full",
       "source": {
         "type": "system",
+        "apt": "docker.io",
         "brew": "docker",
+        "winget": "Docker.DockerDesktop",
         "command": "docker"
       }
     },

@@ -19,17 +19,18 @@ func TestCheckCoreTools_MissingFails(t *testing.T) {
 	}
 }
 
-// The repo provisions docker on the Mac (brew entries, #2013 P5b), so its FAIL
-// there names the command that clears it. Where nothing provisions a tool the
-// FAIL stays bare.
+// The repo provisions docker on every OS (packages.json, #2013 P5b), so its FAIL
+// names the command that clears it, plus starting Colima on the Mac. Where
+// nothing provisions a tool the FAIL stays bare.
 func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
 	cases := []struct {
 		goos, want, absent string
 	}{
 		{"darwin", "docker not in PATH (run: dotf tools install", ""},
-		{"linux", "docker not in PATH\n", "(run:"},
-		{"windows", "docker not in PATH\n", "(run:"},
+		{"linux", "docker not in PATH (run: dotf tools install)\n", "Colima"},
+		{"windows", "docker not in PATH (run: dotf tools install)\n", "Colima"},
 		{"darwin", "kubectl not in PATH\n", ""},
+		{"linux", "kubectl not in PATH\n", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.goos+"/"+tc.want, func(t *testing.T) {
