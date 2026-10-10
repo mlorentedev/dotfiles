@@ -9,11 +9,6 @@ import (
 	"strings"
 )
 
-// maxAncestorDepth bounds the walk. A real chain (dotf, a shell, an agent, a
-// terminal, a session manager, init) is under a dozen; the bound only keeps a
-// malformed /proc from looping.
-const maxAncestorDepth = 64
-
 // isCallerInside walks from the caller's parent up to init and reports the
 // first process whose working directory is target or below it.
 //
