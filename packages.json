@@ -275,6 +275,16 @@
         "brew": "gopls",
         "command": "gopls"
       }
+    },
+    {
+      "name": "btop",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "btop",
+        "brew": "btop",
+        "command": "btop"
+      }
     }
   ]
 }
