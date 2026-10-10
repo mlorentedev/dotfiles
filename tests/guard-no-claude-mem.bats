@@ -10,11 +10,11 @@
 #   - docs/ and specs/ (historical records, ADRs, troubleshooting archive).
 #   - *.md anywhere (prose).
 #   - this guard file itself.
-#   - the MEM-002 one-cycle uninstall/cleanup block in setup-{linux,windows}:
-#     it MUST name the plugin to remove it. The block is delimited by a
-#     `# MEM-002:` marker and the next blank line; we strip it before scanning,
-#     so an UNRELATED claude-mem line in a setup script is still caught.
-#     Prune the block after rollout; this guard then tightens automatically.
+#   - a block marked `# MEM-002:` up to the next blank line, which may name the
+#     plugin to remove it (setup-windows.ps1's retired-script removal list). It
+#     is stripped before scanning, so an UNRELATED claude-mem line is still
+#     caught. The marketplace cleanup itself left the setups for `dotf deploy`
+#     (ai/claude/plugins.json `retired_marketplaces`, #1431).
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -72,16 +72,10 @@ collect_hits() {
     [ -z "$output" ]
 }
 
-@test "the MEM-002 cleanup block IS present in both setup scripts (anti-regression)" {
-    # The guard must not pass merely because the cleanup was also deleted.
-    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$REPO/setup-linux.sh"
-    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$REPO/setup-windows.ps1"
-}
-
-@test "MEM-002 also strips the thedotmack marketplace from settings.json (both setups)" {
-    # Removing the plugin dirs without removing the extraKnownMarketplaces.thedotmack
-    # registration leaves Claude re-cloning the marketplace on the next start (the
-    # settings merge is additive). Both setups must delete the registration too.
-    grep -qF 'extraKnownMarketplaces.thedotmack' "$REPO/setup-linux.sh"
-    grep -qF 'extraKnownMarketplaces' "$REPO/setup-windows.ps1"
+@test "the retirement is still declared, so this guard does not pass because it was deleted" {
+    # The setup cleanup blocks are gone (#1431): `dotf deploy` removes the
+    # marketplace from ai/claude/plugins.json `retired_marketplaces` and checks
+    # the CLI's own registry afterwards. Dropping the entry would let the
+    # marketplace re-clone with autoUpdate on any box that still registers it.
+    jq -e '.retired_marketplaces | index("thedotmack")' "$REPO/ai/claude/plugins.json"
 }
