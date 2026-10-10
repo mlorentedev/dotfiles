@@ -93,3 +93,55 @@ func TestBindOneRefusesAFormatItDoesNotKnow(t *testing.T) {
 		t.Errorf("a refused format must not create a file (err %v)", err)
 	}
 }
+
+// TestBindKeepsTheOutcomeOfATargetThatFailedAfterWriting: the merge is written
+// before the retirements run, so a retirement that fails leaves a rewritten
+// file behind. Bind must return that target's outcome with the error, or its
+// caller reports nothing for a file it changed.
+func TestBindKeepsTheOutcomeOfATargetThatFailedAfterWriting(t *testing.T) {
+	home := t.TempDir()
+	broken := filepath.Join(home, ".old", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(broken), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(broken, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target := BindTarget{
+		Agent: "claude", File: ".claude/settings.json", Format: "command-hook",
+		EmitHooks: []EmitHook{{ID: "start", Event: "SessionStart", Command: "mem session-start", Timeout: 5}},
+		Retire:    []RetiredHook{{File: ".old/settings.json", Event: "SessionStart", ID: "start"}},
+	}
+	out, err := Bind([]BindTarget{target}, BindOptions{Home: home, Binary: "/opt/dotf", GOOS: "linux", Has: func(string) bool { return true }})
+	if err == nil {
+		t.Fatal("want the unreadable retirement to fail the bind")
+	}
+	if len(out) != 1 || out[0].Agent != "claude" || !out[0].Changed {
+		t.Fatalf("want the failing target's outcome with Changed=true, got %+v", out)
+	}
+	if _, statErr := os.Stat(filepath.Join(home, ".claude", "settings.json")); statErr != nil {
+		t.Errorf("the merge was written before the retirement failed: %v", statErr)
+	}
+}
+
+// TestBindReportsNothingForATargetThatFailedBeforeWriting: a settings file that
+// cannot be read fails the bind before anything is written, and an outcome for
+// it would render as "hooks already current".
+func TestBindReportsNothingForATargetThatFailedBeforeWriting(t *testing.T) {
+	home := t.TempDir()
+	settings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target := BindTarget{
+		Agent: "claude", File: ".claude/settings.json", Format: "command-hook",
+		EmitHooks: []EmitHook{{ID: "start", Event: "SessionStart", Command: "mem session-start", Timeout: 5}},
+	}
+	out, err := Bind([]BindTarget{target}, BindOptions{Home: home, Binary: "/opt/dotf", GOOS: "linux", Has: func(string) bool { return true }})
+	if err == nil || len(out) != 0 {
+		t.Fatalf("want an error and no outcome, got %+v, %v", out, err)
+	}
+}

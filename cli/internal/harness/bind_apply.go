@@ -38,7 +38,8 @@ type BindOutcome struct {
 
 // Bind emits every selected target's hooks into its settings file and retires
 // the hooks a target no longer emits. On an error it returns the outcomes of the
-// targets before the failing one, so a caller can still report them.
+// targets before the failing one, and the failing one's too when it wrote
+// before the error, so a caller can still report every change made.
 //
 // A target declaring `emit: false` is skipped visibly rather than forgotten, and
 // one naming `requires_command` is skipped when that binary is absent: an
@@ -58,10 +59,17 @@ func Bind(targets []BindTarget, o BindOptions) ([]BindOutcome, error) {
 		default:
 			token := HookBinaryTokenForTarget(o.Binary, o.GOOS, t.Format)
 			changed, retired, err := bindOne(t, o.Home, token, o.DryRun)
+			res.Changed, res.Retired = changed, retired
 			if err != nil {
+				// bindOne can fail after writing (a retirement that cannot be
+				// read): that target's outcome is kept, since it changed a file.
+				// One that failed before writing changed nothing, and an outcome
+				// for it would read as "already current".
+				if res.Changed || len(res.Retired) > 0 {
+					out = append(out, res)
+				}
 				return out, fmt.Errorf("%s: %w", t.Agent, err)
 			}
-			res.Changed, res.Retired = changed, retired
 		}
 		out = append(out, res)
 	}
