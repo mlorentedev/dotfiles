@@ -320,8 +320,14 @@ func TestMirror_SkipsAFileTheCheckoutIgnores(t *testing.T) {
 func TestIgnoredInCheckout_FailsOpenAndSaysSoOnlyInAGitCheckout(t *testing.T) {
 	broken := func(string, ...string) (string, error) { return "", os.ErrPermission }
 
+	// A tarball is decided before git is asked: an enclosing repository would
+	// answer, and its ignore rules are not the checkout's.
+	enclosing := func(string, ...string) (string, error) {
+		t.Error("git was asked about a checkout without .git")
+		return "scripts/live.sh\x00", nil
+	}
 	tarball := t.TempDir()
-	if got, why := IgnoredInCheckout(tarball, broken); len(got) != 0 || why != "" {
+	if got, why := IgnoredInCheckout(tarball, enclosing); len(got) != 0 || why != "" {
 		t.Errorf("tarball: got %v, %q; want nothing ignored and nothing to report", got, why)
 	}
 
@@ -341,6 +347,9 @@ func TestMirror_CopiesTheWorkingTreeOfATarballCheckout(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
+	// A ceiling in the environment would stop git short of the enclosing
+	// repository and hide the defect this test exists for.
+	t.Setenv("GIT_CEILING_DIRECTORIES", "")
 	repo := mirrorRepo(t)
 	enclosing := filepath.Dir(repo)
 	gitIn(t, enclosing, "init", "-q")
