@@ -56,10 +56,22 @@ because their flags and failure modes are not obvious from `--help`.
 ### `dotf converge` — bring the machine to its declared state
 
 Runs an ordered list of reconcilers, each converging one part of the machine
-from data in the checkout. Records come first: the harness mirror,
-then the agents' instruction files, so no agent runs before its instructions
-exist. Then the tools, then every `ai/deploy.json` config that applies to this
-machine (`configs-deploy`, the loop behind `dotf deploy`), then the git config.
+from data in the checkout. The checkout itself comes first: it is cloned when
+absent and fast-forwarded when its upstream is ahead, under the same rule as
+`dotf update` (a dirty, diverged or offline checkout is left as it is and
+reported skipped). Records come next: the harness mirror, then the agents'
+instruction files, so no agent runs before its instructions exist. Then the
+tools, then every `ai/deploy.json` config that applies to this machine
+(`configs-deploy`, the loop behind `dotf deploy`), then the git config, and on
+macOS the launchd environment (`env-persist`).
+
+Without `--repo`, the checkout is the one the working directory is in, else the
+declared `DOTFILES_REPO_DIR`, else `~/Projects/dotfiles`: the working directory
+first, as `dotf deploy` and `dotf harness mirror` resolve it, whereas `dotf
+update` prefers the declared checkout. `DOTFILES_REPO` names another upstream to
+clone. When the checkout would change (a clone from zero, or a fast-forward),
+`--plan` shows that change and reports the steps after it as `waits for
+checkout`, because they would read the tree as it is before the change.
 
 ```sh
 dotf converge --plan     # what each reconciler would change; writes nothing

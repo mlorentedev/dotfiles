@@ -506,3 +506,27 @@ func TestStateDir_IgnoresARelativeXDGStateHome(t *testing.T) {
 		t.Fatalf("StateDir() = %q, %v; want an absolute path from the home", d, err)
 	}
 }
+
+// DefaultCheckoutDir answers before any contract exists, so it is a literal;
+// this keeps it equal to DOTFILES_REPO_DIR's contract default on every OS.
+func TestDefaultCheckoutDirMatchesTheContract(t *testing.T) {
+	c, err := loadContract(filepath.Join("..", "..", "..", "env-contract.json"))
+	if err != nil {
+		t.Fatalf("load real env-contract.json: %v", err)
+	}
+	home := filepath.Join("home", "me")
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		var got string
+		for _, rv := range Resolve(c, nil, goos, home) {
+			if rv.Name == "DOTFILES_REPO_DIR" {
+				got = rv.Value
+			}
+		}
+		if got == "" {
+			t.Fatalf("%s: the contract declares no DOTFILES_REPO_DIR default", goos)
+		}
+		if want := DefaultCheckoutDir(home); filepath.ToSlash(strings.ReplaceAll(got, `\`, "/")) != filepath.ToSlash(want) {
+			t.Errorf("%s: contract default %q, DefaultCheckoutDir %q", goos, got, want)
+		}
+	}
+}

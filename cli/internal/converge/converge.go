@@ -27,6 +27,11 @@ type Result struct {
 	// right now (a prerequisite it cannot provide itself). The run reports it
 	// as skipped with this reason, never as passed, and does not probe it.
 	Skip string
+	// Gate, under a plan, says the reconcilers after this one read what this
+	// change has not made yet (a checkout still to clone). They are reported
+	// as skipped with this reason instead of failing on files that do not
+	// exist. An apply ignores it: the change is made before they run.
+	Gate string
 }
 
 // Reconciler converges one part of the machine.
@@ -107,30 +112,38 @@ func Select(reconcilers []Reconciler, names []string) ([]Reconciler, error) {
 func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 	rep := Report{DryRun: dryRun, GOOS: env.GOOS}
 	var failed error
+	gate := ""
 	for _, r := range reconcilers {
-		if failed != nil {
+		switch {
+		case failed != nil:
 			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: "not reached"})
 			continue
+		case gate != "":
+			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: gate})
+			continue
 		}
-		entry, err := runOne(r, env, dryRun)
+		entry, g, err := runOne(r, env, dryRun)
 		rep.Entries = append(rep.Entries, entry)
 		if err != nil {
 			failed = fmt.Errorf("converge: %s: %w", r.Name(), err)
+		}
+		if dryRun && g != "" {
+			gate = g
 		}
 	}
 	return rep, failed
 }
 
-func runOne(r Reconciler, env Env, dryRun bool) (Entry, error) {
+func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 	e := Entry{Name: r.Name()}
 	if !platform.Supports(r.Platforms(), env.GOOS) {
 		e.Status, e.Detail = StatusSkipped, "not supported on "+env.GOOS
-		return e, nil
+		return e, "", nil
 	}
 	res, err := r.Reconcile(env, dryRun)
 	if err == nil && res.Skip != "" {
 		e.Status, e.Detail = StatusSkipped, res.Skip
-		return e, nil
+		return e, "", nil
 	}
 	e.Changes, e.Detail = res.Changes, res.Detail
 	if err == nil && !dryRun {
@@ -146,7 +159,7 @@ func runOne(r Reconciler, env Env, dryRun bool) (Entry, error) {
 	default:
 		e.Status = StatusOK
 	}
-	return e, err
+	return e, res.Gate, err
 }
 
 // Summary counts the entries by status, for the report's last line.

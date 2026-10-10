@@ -128,6 +128,26 @@ func DotfilesDir(home string) string {
 	return filepath.Join(home, ".dotfiles")
 }
 
+// CheckoutMarker is a file at the root of every dotfiles checkout. A git
+// repository without it is some other project.
+const CheckoutMarker = "versions.conf"
+
+// IsDotfilesCheckout reports whether dir is the root of a dotfiles checkout.
+// A resolver that walks up from the working directory finds any repository;
+// this is what tells the dotfiles one apart.
+func IsDotfilesCheckout(dir string) bool {
+	return fileExists(filepath.Join(dir, CheckoutMarker))
+}
+
+// DefaultCheckoutDir is where the dotfiles checkout lives when nothing names
+// it: DOTFILES_REPO_DIR's contract default on every OS. It is a literal because
+// it has to answer before any checkout, and so any contract, exists (a machine
+// from zero); TestDefaultCheckoutDirMatchesTheContract keeps it equal to the
+// contract's default.
+func DefaultCheckoutDir(home string) string {
+	return filepath.Join(home, "Projects", "dotfiles")
+}
+
 // MachinePath returns the per-machine override file location, honoring
 // $XDG_CONFIG_HOME and falling back to <home>/.config/dotfiles/machine.json
 // (Windows: %USERPROFILE%\.config\dotfiles\machine.json).
