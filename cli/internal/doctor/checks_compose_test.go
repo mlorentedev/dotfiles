@@ -194,7 +194,10 @@ func TestCheckDockerEngine_FixStartsColima(t *testing.T) {
 		{"darwin --fix starts the service and passes", "darwin", true, []string{"docker", "brew", "colima"}, true, "engine reachable: server 28.5.1"},
 		{"no --fix only advises", "darwin", false, []string{"docker", "brew", "colima"}, false, "dotf doctor --fix"},
 		{"linux --fix leaves systemd alone", "linux", true, []string{"docker", "brew", "colima"}, false, "systemctl start docker"},
-		{"colima absent: nothing to start", "darwin", true, []string{"docker", "brew"}, false, "dotf doctor --fix"},
+		// --fix has nothing to start without colima, so pointing back at it would
+		// be circular: the remedy names the install that makes --fix work.
+		{"colima absent: install it first", "darwin", true, []string{"docker", "brew"}, false, "colima is not installed (run: dotf tools install, then dotf doctor --fix)"},
+		{"brew absent: install it first", "darwin", true, []string{"docker", "colima"}, false, "Homebrew is not installed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sys := newSys(nil, tc.onPath, nil)

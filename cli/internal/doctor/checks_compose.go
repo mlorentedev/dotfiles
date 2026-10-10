@@ -48,7 +48,7 @@ func checkDockerEngine(sys *System, rep *Report, fix bool) {
 		startColima(sys, rep)
 		return
 	}
-	rep.Warn("docker has no engine to talk to (" + dockerEngineRemedy(sys.GOOS) + ")")
+	rep.Warn("docker has no engine to talk to (" + dockerEngineRemedy(sys) + ")")
 }
 
 func dockerServerVersion(sys *System) string {
@@ -84,9 +84,18 @@ func startColima(sys *System, rep *Report) {
 	rep.Warn("Colima is starting but the engine has not answered yet; re-run dotf doctor in a minute")
 }
 
-func dockerEngineRemedy(goos string) string {
-	switch goos {
+func dockerEngineRemedy(sys *System) string {
+	switch sys.GOOS {
 	case "darwin":
+		// --fix starts Colima through Homebrew, so naming --fix while either
+		// is missing would send the owner back to the command that just
+		// did nothing.
+		if !sys.has("brew") {
+			return "Homebrew is not installed; install it from https://brew.sh, then run: dotf tools install, then dotf doctor --fix"
+		}
+		if !sys.has("colima") {
+			return "colima is not installed (run: dotf tools install, then dotf doctor --fix)"
+		}
 		return "run: dotf doctor --fix, which starts Colima as a launchd service"
 	case "windows":
 		return "start Docker Desktop"
