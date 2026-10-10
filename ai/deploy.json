@@ -71,7 +71,15 @@
     "merge create a settings.json holding nothing but compaction, and the seed then",
     "sees a file and never writes defaultProvider/defaultModel (#1938). reserveTokens",
     "is round(0.6 x contextWindow) from ai/pi/models.json, so compaction triggers at",
-    "40% of the window; tests/pi-config.bats derives and asserts every value."
+    "40% of the window; tests/pi-config.bats derives and asserts every value.",
+    "",
+    "docker-config merges cliPluginsExtraDirs into ~/.docker/config.json so the",
+    "docker CLI finds the compose and buildx plugins Homebrew installs under",
+    "/opt/homebrew/lib/docker/cli-plugins, a directory outside its default search",
+    "path (#2013 P5b). It requires colima, which only the brew catalog entry",
+    "provisions, so it applies on the Mac and skips elsewhere without needing",
+    "`platforms`. Merge keeps what docker and colima write there (auths,",
+    "currentContext); mode 0600 because auths can hold registry credentials."
   ],
   "version": 3,
   "configs": [
@@ -242,6 +250,15 @@
       "mode": "0644",
       "strategy": "merge",
       "requires": "claude"
+    },
+    {
+      "name": "docker-config",
+      "src": "ai/docker/config.json",
+      "dst": "{HOME}/.docker/config.json",
+      "render": false,
+      "mode": "0600",
+      "strategy": "merge",
+      "requires": "colima"
     }
   ]
 }

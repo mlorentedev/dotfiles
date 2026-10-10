@@ -19,6 +19,36 @@ func TestCheckCoreTools_MissingFails(t *testing.T) {
 	}
 }
 
+// The repo provisions docker on every OS (packages.json, #2013 P5b), so its FAIL
+// names the command that clears it, plus starting Colima on the Mac. Where
+// nothing provisions a tool the FAIL stays bare.
+func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
+	cases := []struct {
+		goos, want, absent string
+	}{
+		{"darwin", "docker not in PATH (run: dotf tools install", ""},
+		{"linux", "docker not in PATH (run: dotf tools install)\n", "Colima"},
+		{"windows", "docker not in PATH (run: dotf tools install)\n", "Colima"},
+		{"darwin", "kubectl not in PATH\n", ""},
+		{"linux", "kubectl not in PATH\n", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.goos+"/"+tc.want, func(t *testing.T) {
+			sys := newSys(nil, nil, nil)
+			sys.GOOS = tc.goos
+			var buf bytes.Buffer
+			checkCoreTools(sys, nil, capture(&buf))
+			out := buf.String()
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("want %q in\n%s", tc.want, out)
+			}
+			if tc.absent != "" && strings.Contains(out, tc.absent) {
+				t.Errorf("did not want %q in\n%s", tc.absent, out)
+			}
+		})
+	}
+}
+
 func TestCheckCoreTools_SkipsContractCovered(t *testing.T) {
 	// git+jq are contract-covered → core-tools must not re-report them. With
 	// neither on PATH, the only failures should be the OTHER core tools.
