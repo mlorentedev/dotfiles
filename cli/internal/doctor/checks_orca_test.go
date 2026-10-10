@@ -29,6 +29,7 @@ func TestCheckOrcaHook(t *testing.T) {
 		{"hook Invoke-WebRequest → fail", "", "Invoke-WebRequest -Uri $u -Method Post", 1, "slow Invoke-WebRequest"},
 		{"both files healthy → two passes", `{"hooks":{"a":{"timeoutSec":60}}}`, "[System.Net.HttpWebRequest]", 0, "timeoutSec >= 30"},
 		{"both files broken → two fails", `{"hooks":{"a":{"timeoutSec":5}}}`, "Invoke-WebRequest", 2, "Invoke-WebRequest"},
+		{"bash hooks at 5 s → pass, the floor is PowerShell's (#2252)", `{"hooks":{"PreToolUse":[{"type":"command","bash":"x","timeoutSec":5}]}}`, "", 0, "the timeoutSec floor does not apply"},
 	}
 
 	for _, tc := range cases {

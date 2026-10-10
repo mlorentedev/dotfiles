@@ -83,28 +83,42 @@ func TuneTimeout(content []byte, min int) []byte {
 	})
 }
 
-// TimeoutFloorApplies reports whether orca.json registers a hook that runs
-// PowerShell. The floor exists for PowerShell's cold start (lesson 111). On
-// Linux and macOS Orca registers `bash` hooks that run copilot-hook.sh, whose
-// curl bounds itself with --max-time 1.5, so Orca's 5 s cannot fire there, and
-// a tune would only be reverted at the next Orca start (#2252). Content that
-// does not parse is treated as applying, which leaves its handling to the
-// caller's own validity check.
+// TimeoutFloorApplies reports whether orca.json holds a hook the timeout floor
+// is for. The floor exists for PowerShell's cold start (lesson 111). On Linux
+// and macOS Orca registers `bash` hooks that run copilot-hook.sh, whose curl
+// bounds itself with --max-time 1.5, so Orca's 5 s cannot fire there, and a
+// tune would only be reverted at the next Orca start (#2252). So the floor is
+// waived only when every entry carrying a timeoutSec runs bash and not
+// PowerShell; any other shape, or content that does not parse, keeps it.
 func TimeoutFloorApplies(content []byte) bool {
-	var doc struct {
-		Hooks map[string][]map[string]json.RawMessage `json:"hooks"`
-	}
+	var doc any
 	if err := json.Unmarshal(content, &doc); err != nil {
 		return true
 	}
-	for _, entries := range doc.Hooks {
-		for _, e := range entries {
-			if _, ok := e["powershell"]; ok {
-				return true
+	entries, bashOnly := 0, 0
+	var walk func(v any)
+	walk = func(v any) {
+		switch node := v.(type) {
+		case map[string]any:
+			if _, ok := node["timeoutSec"]; ok {
+				entries++
+				_, bash := node["bash"]
+				_, ps := node["powershell"]
+				if bash && !ps {
+					bashOnly++
+				}
+			}
+			for _, child := range node {
+				walk(child)
+			}
+		case []any:
+			for _, child := range node {
+				walk(child)
 			}
 		}
 	}
-	return false
+	walk(doc)
+	return entries == 0 || bashOnly < entries
 }
 
 // ScriptUsesInvokeWebRequest reports the slow POST — the second DX-006 signal.

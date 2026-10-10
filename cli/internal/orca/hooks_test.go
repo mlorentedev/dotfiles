@@ -289,6 +289,8 @@ func TestTimeoutFloorApplies(t *testing.T) {
 		{"powershell hooks", orcaJSON5s, true},
 		{"bash hooks", orcaJSONBash5s, false},
 		{"one powershell entry among bash", `{"hooks":{"A":[{"bash":"x","timeoutSec":5}],"B":[{"powershell":"y","timeoutSec":5}]}}`, true},
+		{"an entry carrying both shells", `{"hooks":{"A":[{"bash":"x","powershell":"y","timeoutSec":5}]}}`, true},
+		{"an entry naming no shell", `{"hooks":{"x":{"timeoutSec":5}}}`, true},
 		{"unparseable is left to the caller", `{"hooks": [`, true},
 	} {
 		if got := TimeoutFloorApplies([]byte(tc.content)); got != tc.want {
