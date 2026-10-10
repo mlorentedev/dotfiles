@@ -3,6 +3,7 @@ package converge
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -75,9 +76,9 @@ func (recordsMirror) Name() string        { return "records-mirror" }
 func (recordsMirror) Platforms() []string { return nil }
 
 func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
-	mirror, verb := harness.Mirror, "updated"
+	mirror, verb, pruneVerb := harness.Mirror, "updated", "pruned"
 	if dryRun {
-		mirror, verb = harness.PlanMirror, "to write"
+		mirror, verb, pruneVerb = harness.PlanMirror, "to write", "to prune"
 	}
 	res, err := mirror(env.RepoRoot, env.DeployDir)
 	if errors.Is(err, harness.ErrCheckoutIsDeployDir) {
@@ -86,11 +87,18 @@ func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	return Result{
-		Changes: res.Updated,
-		Detail: fmt.Sprintf("harness/ + %d target(s) + the deploy-dir set → %s (%d %s, %d unchanged)",
-			len(res.Targets), env.DeployDir, res.Updated, verb, res.Unchanged),
-	}, nil
+	detail := fmt.Sprintf("harness/ + %d target(s) + the deploy-dir set → %s (%d %s, %d unchanged, %d %s)",
+		len(res.Targets), env.DeployDir, res.Updated, verb, res.Unchanged, len(res.Pruned), pruneVerb)
+	if len(res.Pruned) > 0 {
+		detail += "; leftovers: " + strings.Join(res.Pruned, ", ")
+	}
+	if len(res.Unpruned) > 0 {
+		detail += "; left in place, not proven deleted: " + strings.Join(res.Unpruned, ", ")
+	}
+	if len(res.Unreadable) > 0 {
+		detail += "; unreadable, not checked for leftovers: " + strings.Join(res.Unreadable, ", ")
+	}
+	return Result{Changes: res.Updated + len(res.Pruned), Detail: detail}, nil
 }
 
 // Probe re-plans the mirror: after an apply, nothing may still differ.
@@ -104,6 +112,9 @@ func (recordsMirror) Probe(env Env) error {
 	}
 	if res.Updated > 0 {
 		return fmt.Errorf("%d file(s) in %s still differ from the checkout", res.Updated, env.DeployDir)
+	}
+	if len(res.Pruned) > 0 {
+		return fmt.Errorf("leftovers the checkout deleted are still in %s: %s", env.DeployDir, strings.Join(res.Pruned, ", "))
 	}
 	return nil
 }
