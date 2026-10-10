@@ -394,4 +394,5 @@ tags: [lessons, index, dotfiles]
 | [373 - A record the released binary reads waits for the release](lesson-373-a-record-the-released-binary-reads-waits-for-the-release.md) | 2026-10-09 |
 | [374 - A generated file git merged is no longer generated](lesson-374-a-generated-file-git-merged-is-no-longer-generated.md) | 2026-10-09 |
 | [375 - A ratio reads its numerator and denominator from different sources](lesson-375-a-ratio-reads-its-numerator-and-denominator-from-different-sources.md) | 2026-10-09 |
+| [376 - A check whose only writer is barred on an OS can never pass there](lesson-376-a-check-whose-only-writer-is-barred-can-never-pass.md) | 2026-10-09 |
 <!-- END GENERATED -->

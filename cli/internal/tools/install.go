@@ -100,6 +100,10 @@ type Installer struct {
 	// IsRoot reports whether dotf runs with root privileges, which decides if an
 	// apt install needs sudo. Nil means an effective uid of 0.
 	IsRoot func() bool
+	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
+	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
+	// the answer.
+	AppExists func(bundle string) bool
 }
 
 func (in *Installer) defaults() {
@@ -117,6 +121,9 @@ func (in *Installer) defaults() {
 	}
 	if in.Out == nil {
 		in.Out = os.Stdout
+	}
+	if in.AppExists == nil {
+		in.AppExists = appInApplications
 	}
 	if in.HasCommand == nil {
 		in.HasCommand = func(name string) bool {
