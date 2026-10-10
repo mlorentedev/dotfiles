@@ -105,3 +105,12 @@ The plan was to split the `code` filter so that a PR touching only Go skips the 
 - [x] Lesson for the repo's `docs/lessons.md`? no: the fixture-answers-every-probe defect is an instance of lesson 267 (a mutation harness must prove the mutation landed); the fix is in the test itself.
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: declining the split adds no contract; the measurement and decision are recorded here, beside the filter they concern.
 - [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: path-filtered CI is decided per repo from its own PR mix.
+
+## Archive review dispositions (2026-10-10)
+
+The archive review (`PASS WITH GAPS`) is committed unchanged with this PR.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `integration` does not receive `DOTFILES_SKIP_PI_PACKAGES`, so it reconciles on every PR | **Declined, measured.** This is now real rather than theoretical: since #2285 (which closes #1484), the image carries npm and the reconcile runs on purpose. `verify-setup.bats` asserts that it converges and that the second run is a no-op. On main run `13:45–13:50Z`, the reconcile line (`changed=9 … 0 failed`) lands 91 s into the docker build, inside a 4m44s job. The 15-minute cost this spec removed was the Windows leg's. Passing the skip to `integration` would turn #1484's convergence test red. |
+| 2 | Any non-empty value skips, `"0"` included | **Declined.** "Set means skip" is the contract the workflow is written against: its expression yields `'1'` or `''`. The warning line names the variable, so a mistaken skip is loud and not silent. Parsing truthy strings would add a second spelling of the same switch. |
