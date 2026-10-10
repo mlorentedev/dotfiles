@@ -11,7 +11,7 @@ import (
 )
 
 // configsDeploy converges every ai/deploy.json entry that applies to this
-// machine (#1843 B13): the agent settings, shell rc files, git and ssh configs
+// machine (#1843 B15): the agent settings, shell rc files, git and ssh configs
 // `dotf deploy` installs. It runs deploy.Run, the loop behind `dotf deploy`, so
 // a template change merged to main reaches the machine on the next converge
 // with no manual step. Every OS.

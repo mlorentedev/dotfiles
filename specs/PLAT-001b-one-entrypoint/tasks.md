@@ -63,7 +63,7 @@ created: "2026-10-06"
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [ ] `records-bind`: the `harness bind` logic with its dry-run
 
-### PR 2d — the configs reconciler (#1843 B13)
+### PR 2d — the configs reconciler (#1843 B15)
 
 > Found while landing #2236: converge had no step for `ai/deploy.json`, so a template change (the agy model pin) still needed `dotf deploy` on every machine. ADR-045 decision 4 already orders `configs` after `tools`.
 

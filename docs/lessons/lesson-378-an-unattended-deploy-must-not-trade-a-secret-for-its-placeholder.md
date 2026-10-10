@@ -10,7 +10,7 @@ created: "2026-10-09"
 
 ## Context
 `dotf deploy` installs the `ai/deploy.json` configs by hand. To make a template change reach every machine
-without that step, `dotf converge` gained a `configs-deploy` reconciler that runs the same loop (#1843 B13).
+without that step, `dotf converge` gained a `configs-deploy` reconciler that runs the same loop (#1843 B15).
 Converge is meant to run after `dotf update`, when nobody is at the keyboard.
 
 ## The Trap
