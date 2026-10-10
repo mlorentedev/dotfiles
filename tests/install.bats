@@ -1,20 +1,22 @@
 #!/usr/bin/env bats
-# Tests for scripts/install-dotf.sh — the dotf release fetch/verify/install.
+# Tests for install.sh — the root entrypoint: dotf release fetch/verify/install,
+# then the hand-off to `dotf converge`.
 #
 # The script is sourced and its functions driven against a file:// fixture, so
 # there is no network here. A fake `dotf` binary that echoes its version stands
-# in for the real release artifact.
+# in for the real release artifact; when DOTF_ARGS_LOG is set it also records
+# the arguments it was called with, which is how the hand-off is observed.
 
 # bats file_tags=os-sensitive
 
 load 'lib/os'
 
 setup() {
-    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    REPO_DIR="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     TMP="$(mktemp -d "/tmp/bats_installdotf_XXXXXX")"
 
     # shellcheck source=/dev/null
-    . "$SCRIPTS_DIR/install-dotf.sh"
+    . "$REPO_DIR/install.sh"
 
     # Neutralise the ONE lookup that reaches outside the fixture. Without this
     # the tests read whatever dotf the developer has installed: a source build
@@ -41,6 +43,7 @@ setup() {
     mkdir -p "$PKG"
     cat > "$PKG/dotf" <<EOF
 #!/bin/sh
+[ -z "\${DOTF_ARGS_LOG:-}" ] || printf '%s\n' "\$0 \$*" >> "\$DOTF_ARGS_LOG"
 echo "dotf version $VERSION"
 EOF
     chmod +x "$PKG/dotf"
@@ -125,23 +128,23 @@ teardown() {
     # Old binaries answer on stderr (BUG-070/#915), current ones on stdout.
     # Both must parse, which is why the call merges the streams.
     printf '#!/bin/sh\necho "dotf version 1.2.3"\n'      > "$STUB/dotf"; chmod +x "$STUB/dotf"
-    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    run bash -c ". '$REPO_DIR/install.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
     [ "$output" = "1.2.3" ]
 
     printf '#!/bin/sh\necho "dotf version dev" >&2\n'    > "$STUB/dotf"; chmod +x "$STUB/dotf"
-    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    run bash -c ". '$REPO_DIR/install.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
     [ "$output" = "dev" ]
 
     # A `go install …@latest` build prints its pseudo-version. The lookup must
     # read it as 0.0.0: neither `dev` (which would skip the install) nor the pin.
     printf '#!/bin/sh\necho "dotf version 0.0.0-20260930012845-db2b904794b4"\n' > "$STUB/dotf"; chmod +x "$STUB/dotf"
-    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    run bash -c ". '$REPO_DIR/install.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
     [ "$output" = "0.0.0" ]
 
     # Unrecognisable output must yield empty, so the caller converges rather
     # than matching a branch by accident.
     printf '#!/bin/sh\necho "not a version"\n'           > "$STUB/dotf"; chmod +x "$STUB/dotf"
-    run bash -c ". '$SCRIPTS_DIR/install-dotf.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
+    run bash -c ". '$REPO_DIR/install.sh'; export PATH=\"$STUB:\$PATH\"; _dotf_current_version"
     [ -z "$output" ]
 }
 
@@ -156,7 +159,7 @@ teardown() {
     # measured identical (empty, silent) without them, fatal with them.
     empty="$TMP/nothing"; mkdir -p "$empty"
 
-    run bash -c "set -euo pipefail; . '$SCRIPTS_DIR/install-dotf.sh'; \
+    run bash -c "set -euo pipefail; . '$REPO_DIR/install.sh'; \
                  export PATH='$empty:/usr/bin:/bin'; \
                  v=\$(_dotf_current_version); printf 'survived:[%s]' \"\$v\""
     [ "$status" -eq 0 ]
@@ -176,7 +179,7 @@ teardown() {
     # pipefail promotes that to the pipeline's status, set -e kills the caller.
     printf '#!/bin/sh\necho "not a version"\n' > "$unusable/dotf"
     chmod +x "$unusable/dotf"
-    run bash -c "set -euo pipefail; . '$SCRIPTS_DIR/install-dotf.sh'; \
+    run bash -c "set -euo pipefail; . '$REPO_DIR/install.sh'; \
                  export PATH='$unusable:/usr/bin:/bin'; \
                  v=\$(_dotf_current_version); printf 'survived:[%s]' \"\$v\""
     [ "$status" -eq 0 ]
@@ -189,7 +192,7 @@ teardown() {
     printf '#!/bin/sh\necho "dotf: /home/dev/x: not found" >&2\nexit 127\n' \
         > "$unusable/dotf"
     chmod +x "$unusable/dotf"
-    run bash -c "set -euo pipefail; . '$SCRIPTS_DIR/install-dotf.sh'; \
+    run bash -c "set -euo pipefail; . '$REPO_DIR/install.sh'; \
                  export PATH='$unusable:/usr/bin:/bin'; \
                  v=\$(_dotf_current_version); printf 'survived:[%s]' \"\$v\""
     [ "$status" -eq 0 ]
@@ -276,8 +279,11 @@ teardown() {
     # versions.conf. Execute it directly (NOT sourced) with DOTF_VERSION unset and no
     # arg, pointed at a non-existent file:// base so it never touches the network. It
     # must get PAST the "no version given" check and name the pinned versions.conf value.
-    pinned="$(grep -m1 '^DOTF_VERSION=' "$SCRIPTS_DIR/../versions.conf" | cut -d= -f2)"
-    run env -u DOTF_VERSION DOTF_RELEASE_BASE="file://$TMP/nope" "$SCRIPTS_DIR/install-dotf.sh"
+    pinned="$(grep -m1 '^DOTF_VERSION=' "$REPO_DIR/versions.conf" | cut -d= -f2)"
+    # PATH and HOME are confined: executed, the script hands off to converge,
+    # and a developer's pinned dotf on PATH would otherwise be the one it runs.
+    run env -u DOTF_VERSION HOME="$TMP/standalone-home" PATH="/usr/bin:/bin" \
+        DOTF_RELEASE_BASE="file://$TMP/nope" "$REPO_DIR/install.sh"
     [[ "$output" != *"no version given"* ]] || false
     [[ "$output" == *"$pinned"* ]] || false
 }
@@ -293,7 +299,7 @@ teardown() {
 
     run bash -c "env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
         DOTF_VERSION='$VERSION' DOTF_RELEASE_BASE='$BASE' \
-        bash < '$SCRIPTS_DIR/install-dotf.sh'"
+        bash < '$REPO_DIR/install.sh'"
     [ "$status" -eq 0 ]
     [[ "$output" != *"command_exists"* ]] || false
     [ -x "$pipe_home/.local/bin/dotf" ]
@@ -328,7 +334,7 @@ teardown() {
 
     run bash -c "env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
         DOTF_RELEASE_BASE='$BASE' DOTF_RELEASE_API='file://$FIXTURE/latest.json' \
-        bash < '$SCRIPTS_DIR/install-dotf.sh'"
+        bash < '$REPO_DIR/install.sh'"
     [ "$status" -eq 0 ]
 
     run "$pipe_home/.local/bin/dotf"
@@ -350,7 +356,104 @@ EOF
 
     run bash -c "cd '$untrusted' && env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
         DOTF_VERSION='$VERSION' DOTF_RELEASE_BASE='$BASE' RAW_INSTALL_MARKER='$marker' \
-        bash < '$SCRIPTS_DIR/install-dotf.sh'"
+        bash < '$REPO_DIR/install.sh'"
     [ "$status" -eq 0 ]
     [ ! -e "$marker" ]
+}
+
+@test "a raw installer stream hands its arguments to dotf converge, run from where it installed it" {
+    # The one-entrypoint contract (PLAT-001b): after the install, the machine
+    # belongs to converge. A fresh machine has no ~/.local/bin on PATH, so the
+    # hand-off must use the binary the installer placed, not a PATH lookup.
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    pipe_home="$TMP/handoff-home"
+    pipe_path="$TMP/handoff-path"
+    log="$TMP/handoff.log"
+    mkdir -p "$pipe_path"
+
+    run bash -c "env HOME='$pipe_home' PATH='$pipe_path:/usr/bin:/bin' \
+        DOTF_VERSION='$VERSION' DOTF_RELEASE_BASE='$BASE' DOTF_ARGS_LOG='$log' \
+        bash -s -- --plan --only tools < '$REPO_DIR/install.sh'"
+    [ "$status" -eq 0 ]
+    # The exec probe ran the downloaded binary first, then converge got the args.
+    [ "$(tail -n 1 "$log")" = "$pipe_home/.local/bin/dotf converge --plan --only tools" ]
+}
+
+@test "DOTF_BIN_DIR names the install directory, and converge runs from there" {
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    log="$TMP/bindir.log"
+    run env HOME="$TMP/bindir-home" PATH="/usr/bin:/bin" DOTF_BIN_DIR="$DEST" DOTF_VERSION="$VERSION" \
+        DOTF_RELEASE_BASE="$BASE" DOTF_ARGS_LOG="$log" "$REPO_DIR/install.sh"
+    [ "$status" -eq 0 ]
+    [ -x "$DEST/dotf" ]
+    [ ! -e "$TMP/bindir-home/.local/bin/dotf" ]
+    [ "$(tail -n 1 "$log")" = "$DEST/dotf converge" ]
+}
+
+@test "with the pinned dotf already on PATH, converge runs that one and nothing is installed" {
+    onpath="$TMP/onpath"
+    log="$TMP/onpath.log"
+    mkdir -p "$onpath"
+    cp "$PKG/dotf" "$onpath/dotf"
+
+    run env HOME="$TMP/onpath-home" PATH="$onpath:/usr/bin:/bin" DOTF_VERSION="$VERSION" \
+        DOTF_RELEASE_BASE="file://$TMP/nope" DOTF_ARGS_LOG="$log" "$REPO_DIR/install.sh" --plan
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already installed"* ]] || false
+    [ ! -e "$TMP/onpath-home/.local/bin/dotf" ]
+    [ "$(tail -n 1 "$log")" = "$onpath/dotf converge --plan" ]
+}
+
+@test "a failed install never hands off to converge" {
+    printf '%s  %s\n' "deadbeefdeadbeef" "$ART" > "$FIXTURE/v$VERSION/checksums.txt"
+
+    log="$TMP/failed.log"
+    run env HOME="$TMP/failed-home" PATH="/usr/bin:/bin" DOTF_VERSION="$VERSION" \
+        DOTF_RELEASE_BASE="$BASE" DOTF_ARGS_LOG="$log" "$REPO_DIR/install.sh"
+    [ "$status" -ne 0 ]
+    [ ! -e "$log" ]
+}
+
+@test "a release binary that verifies but cannot run here is never placed" {
+    # The exec probe: the checksum proves the bytes are the published ones, not
+    # that they run on this machine (wrong arch, a broken build). An unrunnable
+    # binary must not replace the working one already in dest.
+    printf '#!/bin/sh\nexit 126\n' > "$PKG/dotf"
+    tar -czf "$FIXTURE/v$VERSION/$ART" -C "$PKG" dotf
+    ( cd "$FIXTURE/v$VERSION" && sha256sum "$ART" > checksums.txt )
+
+    mkdir -p "$DEST"
+    printf '#!/bin/sh\necho "dotf version 0.0.1"\n' > "$DEST/dotf"
+    chmod 0755 "$DEST/dotf"
+
+    run install_dotf "$VERSION" "$DEST" "$BASE"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"does not run"* ]] || false
+    run "$DEST/dotf"
+    [ "$output" = "dotf version 0.0.1" ]
+}
+
+@test "the pinned dotf can converge from zero" {
+    # From zero, install.sh hands off to a RELEASED dotf. Before the floor its
+    # converge can neither clone the checkout (PLAT-001b PR 4a) nor run the
+    # setup script (PR 5), so a fresh machine would get dotf and nothing else.
+    # release-please raises the pin with every release; this only fails while
+    # main still pins a release older than the entrypoint it ships.
+    floor="0.67.0"
+    pinned="$(grep -m1 '^DOTF_VERSION=' "$REPO_DIR/versions.conf" | cut -d= -f2)"
+    [ -n "$pinned" ]
+    run awk -v a="$pinned" -v b="$floor" 'BEGIN {
+        split(a, x, "."); split(b, y, ".")
+        for (i = 1; i <= 3; i++) {
+            if (x[i] + 0 > y[i] + 0) exit 0
+            if (x[i] + 0 < y[i] + 0) exit 1
+        }
+        exit 0
+    }'
+    [ "$status" -eq 0 ] || {
+        printf 'versions.conf pins dotf %s, below %s\n' "$pinned" "$floor"
+        false
+    }
 }

@@ -1,39 +1,34 @@
 <#
 .SYNOPSIS
-    Fetch, verify, and install the `dotf` CLI release binary on Windows.
+    The one entrypoint on Windows: install `dotf`, then hand the machine to
+    `dotf converge`.
 
 .DESCRIPTION
     The ADR-020 bootstrap step for Windows (WIN-006): download the pinned `dotf`
     release zip from GitHub, verify its sha256 against the release checksums.txt,
-    and install dotf.exe to ~/.local/bin - user-space, no admin. The PowerShell
-    twin of scripts/install-dotf.sh.
+    prove it runs, and install dotf.exe to ~/.local/bin - user-space, no admin.
+    Everything after that is `dotf converge`, which clones the checkout when it
+    is absent (PLAT-001b). The PowerShell twin of install.sh.
 
-    Dot-sourced by setup-windows.ps1 (which then calls Install-Dotf); also runnable
-    standalone to (re)install or upgrade. DOTF_VERSION is the pinned version
-    (versions.conf SSOT); the function takes version/dest/base as parameters so
-    bats can drive it against a file:// fixture with no network.
+    Executed, every argument goes to `dotf converge`. DOTF_VERSION, DOTF_BIN_DIR
+    and DOTF_RELEASE_BASE override the version, the install directory and the
+    release location. The version defaults to the DOTF_VERSION line in a
+    checkout's versions.conf, then to the latest published release.
 
-.PARAMETER Version
-    dotf version to install. Defaults to $env:DOTF_VERSION, then the DOTF_VERSION
-    line in versions.conf, then the latest published release for raw recovery.
-
-.EXAMPLE
-    # One-line bootstrap - no clone, no admin:
-    irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.ps1 | iex
+    Dot-sourced (setup-windows.ps1), it only defines Install-Dotf, which bats and
+    Pester drive against a file:// fixture with no network.
 
 .EXAMPLE
-    # From a checkout:
-    . .\scripts\install-dotf.ps1 ; Install-Dotf
+    # A machine from zero - no clone, no admin:
+    irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.ps1 | iex
+
+.EXAMPLE
+    # From a checkout, planning first:
+    .\install.ps1 --plan
 #>
-[CmdletBinding()]
-param(
-    [string]$Version,
-    [string]$Dest = (Join-Path $env:USERPROFILE '.local\bin'),
-    [string]$BaseUrl = 'https://github.com/mlorentedev/dotfiles/releases/download'
-)
 
 # Map the host architecture to the goreleaser arch token, or $null when
-# unsupported (the analogue of install-dotf.sh's `return 1`).
+# unsupported (the analogue of install.sh's `return 1`).
 function Get-DotfArch {
     [CmdletBinding()]
     param([string]$Arch = $env:PROCESSOR_ARCHITECTURE)
@@ -45,14 +40,14 @@ function Get-DotfArch {
 }
 
 # Resolve the pinned version: explicit arg, then $env:DOTF_VERSION, then the
-# DOTF_VERSION line in versions.conf (the SSOT). Mirrors install-dotf.sh.
+# DOTF_VERSION line in versions.conf (the SSOT). Mirrors install.sh.
 function Get-DotfVersion {
     [CmdletBinding()]
     param([string]$Version)
     if ($Version) { return $Version }
     if ($env:DOTF_VERSION) { return $env:DOTF_VERSION }
     $versionsConf = if ($PSScriptRoot) {
-        Join-Path $PSScriptRoot '..\versions.conf'
+        Join-Path $PSScriptRoot 'versions.conf'
     }
     if ($versionsConf -and (Test-Path $versionsConf)) {
         $match = Select-String -Path $versionsConf -Pattern '^DOTF_VERSION=(.+)$' | Select-Object -First 1
@@ -78,7 +73,7 @@ function Get-DotfVersion {
 # Place $Source at $Target, tolerating a *live* dotf. Windows locks a running
 # image: it refuses to overwrite or delete dotf.exe while any dotf process is
 # live, but it *does* allow renaming one. So stage the new binary beside the
-# target, park the live one, then swap - the analogue of install-dotf.sh's
+# target, park the live one, then swap - the analogue of install.sh's
 # atomic mv (BUG-037). Throws on failure, having restored the previous binary.
 function Set-DotfBinary {
     [CmdletBinding()]
@@ -122,16 +117,19 @@ function Set-DotfBinary {
 # already on PATH; converges on drift. Returns $true on success, $false on any
 # download/verify error (no binary left in Dest). Never throws - setup wires it
 # `if (-not (Install-Dotf)) { Write-Warn ... }`, the analogue of `|| log_warning`.
+# On success $script:DotfBin names the binary it vetted: the one on PATH when it
+# kept it, else the one it placed in Dest, which a fresh machine does not have
+# on PATH yet.
 function Install-Dotf {
     [CmdletBinding()]
     param(
         [string]$Version,
-        [string]$Dest = (Join-Path $env:USERPROFILE '.local\bin'),
-        [string]$BaseUrl = 'https://github.com/mlorentedev/dotfiles/releases/download'
+        [string]$Dest = $(if ($env:DOTF_BIN_DIR) { $env:DOTF_BIN_DIR } else { Join-Path $env:USERPROFILE '.local\bin' }),
+        [string]$BaseUrl = $(if ($env:DOTF_RELEASE_BASE) { $env:DOTF_RELEASE_BASE } else { 'https://github.com/mlorentedev/dotfiles/releases/download' })
     )
 
     # Function-scoped, so dot-sourcing this script (setup-windows.ps1 does
-    # `. install-dotf.ps1`) never leaks Stop/StrictMode into the caller's scope -
+    # `. install.ps1`) never leaks Stop/StrictMode into the caller's scope -
     # only this function's body runs strict. Also required for the try/catch below
     # to catch non-terminating errors regardless of the caller's preference.
     Set-StrictMode -Version Latest
@@ -160,14 +158,16 @@ function Install-Dotf {
             # `dev` is what a source build reports. A source build on PATH is
             # deliberate (a dev box, or CI building the PR under test) and the
             # release installer must not replace it; remove it to converge.
-            # Parity with install-dotf.sh.
+            # Parity with install.sh.
             $current = if ($verRaw -match '(\d+\.\d+\.\d+|dev)') { $Matches[1] } else { '' }
             if ($current -eq 'dev') {
                 Write-Host "dotf is a source build (dev); leaving it in place (remove it to converge to the $Version release)"
+                $script:DotfBin = (Get-Command dotf).Source
                 return $true
             }
             if ($current -eq $Version) {
                 Write-Host "dotf $Version already installed; skipping"
+                $script:DotfBin = (Get-Command dotf).Source
                 return $true
             }
             if ($current) { Write-Host "dotf $current drifted from pinned $Version; converging" }
@@ -195,22 +195,36 @@ function Install-Dotf {
         if (-not (Test-Path $exe)) {
             throw "dotf.exe not found in $artifact"
         }
+        # Exec probe before anything is placed: a binary that verifies but
+        # cannot run here must not replace a working one.
+        $null = & $exe version 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "the downloaded dotf $Version does not run on this machine"
+        }
         New-Item -ItemType Directory -Force -Path $Dest | Out-Null
         $target = Join-Path $Dest 'dotf.exe'
         Set-DotfBinary -Source $exe -Target $target
         Write-Host "dotf $Version installed to $target"
+        $script:DotfBin = $target
         return $true
     } catch {
-        Write-Warning "install-dotf: $($_.Exception.Message)"
+        Write-Warning "install: $($_.Exception.Message)"
         return $false
     } finally {
         if ($work) { Remove-Item -Recurse -Force -Path $work -ErrorAction SilentlyContinue }
     }
 }
 
-# Standalone run-guard: install when EXECUTED, not when dot-sourced.
-# $MyInvocation.InvocationName is '.' under dot-sourcing (setup-windows.ps1 does
-# `. install-dotf.ps1`, which must only define the functions).
+# Standalone run-guard: install and converge when EXECUTED, not when
+# dot-sourced. $MyInvocation.InvocationName is '.' under dot-sourcing
+# (setup-windows.ps1 does `. install.ps1`, which must only define the
+# functions).
 if ($MyInvocation.InvocationName -ne '.') {
-    $null = Install-Dotf -Version $Version -Dest $Dest -BaseUrl $BaseUrl
+    if (-not (Install-Dotf)) {
+        throw 'install.ps1: dotf could not be installed, so nothing was converged'
+    }
+    & $script:DotfBin converge @args
+    # A file run reports converge's status. Under `irm | iex` there is no
+    # script to leave, and `exit` would close the caller's shell.
+    if ($PSCommandPath) { exit $LASTEXITCODE }
 }

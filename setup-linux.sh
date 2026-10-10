@@ -230,12 +230,12 @@ fi
 
 # dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
 # checksum-verified, into ~/.local/bin. Idempotent; converges on drift.
-if [ -f ./scripts/install-dotf.sh ]; then
+if [ -f ./install.sh ]; then
     # shellcheck source=/dev/null
-    . ./scripts/install-dotf.sh
+    . ./install.sh
     install_dotf || log_warning "dotf installation failed (continuing; see healthcheck)"
 else
-    log_warning "scripts/install-dotf.sh not found; skipping dotf install"
+    log_warning "install.sh not found; skipping dotf install"
 fi
 
 # Catalog tools (CLI-029, packages.json) and the mise-pinned CLIs (ADR-044,
@@ -617,7 +617,7 @@ if [ -n "$_dotf" ]; then
     # After deploy, which writes the file the include names (#2207).
     "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
 else
-    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy')"
+    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./install.sh: it installs dotf, then converges)"
 fi
 unset _dotf
 
@@ -1322,7 +1322,7 @@ if command -v dotf >/dev/null 2>&1; then
     dotf doctor || log_warning "dotf doctor reported one or more FAIL items -- review output above; re-run with 'dotf doctor'"
     echo
 else
-    log_warning "dotf not on PATH -- skipping post-setup diagnostics (run ./scripts/install-dotf.sh, then 'dotf doctor')"
+    log_warning "dotf not on PATH -- skipping post-setup diagnostics (run ./install.sh, then 'dotf doctor')"
 fi
 
 log_info "To apply changes immediately, run:"

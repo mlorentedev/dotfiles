@@ -607,17 +607,17 @@ if (-not ($claudeCmd -and $npxCmd)) {
 
 # dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
 # (user-space, no admin) - the PowerShell twin of setup-linux.sh sourcing
-# install-dotf.sh. goreleaser already publishes the Windows zip, so nothing is
+# install.sh. goreleaser already publishes the Windows zip, so nothing is
 # compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
 # automatically; non-fatal, like the Linux side (`install_dotf || log_warning`).
-$installDotfScript = Join-Path $PSScriptRoot 'scripts\install-dotf.ps1'
+$installDotfScript = Join-Path $PSScriptRoot 'install.ps1'
 if (Test-Path $installDotfScript) {
     . $installDotfScript
     if (-not (Install-Dotf)) {
         Write-Warn "dotf installation failed (continuing; the env steps below auto-skip)"
     }
 } else {
-    Write-Warn "scripts\install-dotf.ps1 not found; skipping dotf install"
+    Write-Warn "install.ps1 not found; skipping dotf install"
 }
 
 # ============================================================================
@@ -1069,7 +1069,7 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
         Write-Warn "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
     }
 } else {
-    Write-Warn "dotf not on PATH -- skipping agent config deploy (run install-dotf.ps1, then 'dotf deploy')"
+    Write-Warn "dotf not on PATH -- skipping agent config deploy (run install.ps1, then 'dotf deploy')"
 }
 
 $piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'

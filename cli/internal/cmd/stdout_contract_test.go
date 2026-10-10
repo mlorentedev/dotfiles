@@ -87,7 +87,7 @@ func TestStdoutContracts(t *testing.T) {
 			name:     "version — the installer greps this to decide idempotence",
 			args:     []string{"version"},
 			wantSub:  "dotf version",
-			consumer: `install-dotf.sh: dotf version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'`,
+			consumer: `install.sh: dotf version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'`,
 		},
 		{
 			// The resolved id is substituted straight into rendered agent

@@ -35,7 +35,7 @@ func main() {
 //
 // A build from a checkout keeps "dev". Go marks those with vcs.* settings, or
 // with "(devel)" when it cannot read the repository (a linked worktree). "dev"
-// is a contract: install-dotf.{sh,ps1} skip replacing a source build on it, and
+// is a contract: install.{sh,ps1} skip replacing a source build on it, and
 // doctor skips the pin check for it. The commit stays empty either way. A module
 // version holds at most a 12-character hash, and doctor's provenance check reads
 // only a full stamp.

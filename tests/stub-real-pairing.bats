@@ -50,7 +50,7 @@ setup() {
 #                             stub there is not standing in for a real run — it proves the guard yields
 #                             to a test's own stub.
 #   hermes-setup              stubs remote installers — a real run provisions an agent host
-#   install-dotf              stubs the release download — a real run fetches from GitHub releases
+#   install                   stubs the release download — a real run fetches from GitHub releases
 #   model-canary              stubs `gh` and the canary: a real run opens, rewrites or closes a
 #                             live issue, and the real canary needs the NaN key. The Go probe is
 #                             driven by its own stub-server tests. The API's verdict on the gh
@@ -72,7 +72,7 @@ setup() {
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
 EXEMPT_SUITES="bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
-hermes-setup install-dotf model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline
+hermes-setup install model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline
 vault-maintenance-weekly zshrc-guards"
 
 exempt() {

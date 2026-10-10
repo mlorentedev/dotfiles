@@ -100,10 +100,10 @@ After the last merge, check the regenerated release PR before its merge:
    scripts/compile-harness.sh --deploy
    ```
 
-6. **Install** the version pinned in `versions.conf`:
+6. **Install** the version pinned in `versions.conf`. It then runs `dotf converge`, which finds the records and skills of steps 4 and 5 already current:
 
    ```bash
-   scripts/install-dotf.sh
+   ./install.sh
    ```
 
 7. **Verify by effect, not by the version string alone:**
@@ -122,5 +122,5 @@ After the last merge, check the regenerated release PR before its merge:
 ## When it goes wrong
 
 - **No assets after 15 minutes.** Run `gh run list --repo mlorentedev/dotfiles --workflow cli`. A failed goreleaser job leaves the tag without binaries. Fix the release; do not install a source build instead.
-- **`install-dotf.sh` says the binary "drifted from pinned".** That is its normal convergence line, not an error.
+- **`install.sh` says the binary "drifted from pinned".** That is its normal convergence line, not an error.
 - **The hook still suggests a retired skill.** Either the records were not mirrored (step 4), or the machine still runs an older binary (step 6).

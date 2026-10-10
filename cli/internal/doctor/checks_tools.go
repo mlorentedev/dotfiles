@@ -334,7 +334,7 @@ func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 	pin := cfg.Versions["DOTF_VERSION"]
 	switch {
 	case !sys.has("dotf"):
-		rep.Skip("dotf not in PATH (run ./scripts/install-dotf.sh or setup)")
+		rep.Skip("dotf not in PATH (run ./install.sh: it installs the pinned dotf, then converges)")
 	case pin == "":
 		rep.Pass("dotf in PATH (DOTF_VERSION not pinned — match not verified)")
 	default:
@@ -352,7 +352,7 @@ func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 			// merged into doctor since it was built is not running at all on this
 			// machine — a categorically worse gap than an ordinary tool being one
 			// version behind, where the check itself still runs.
-			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./scripts/install-dotf.sh)", got, pin))
+			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./install.sh: it installs the pin, then converges)", got, pin))
 		}
 	}
 }

@@ -531,7 +531,7 @@ setup() {
     [ -d "$resolved/.git" ]
 }
 
-@test "dotf version reaches stdout so install-dotf can grep the semver [#915]" {
+@test "dotf version reaches stdout so install.sh can grep the semver [#915]" {
     command -v dotf >/dev/null 2>&1
     local ver
     ver="$(dotf version 2>/dev/null)"

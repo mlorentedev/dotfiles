@@ -68,7 +68,7 @@ deleted_paths() {
 
 # test_twins_for <scripts/NAME.(sh|ps1)>: the test files that would cover it.
 # Both spellings of the Pester name are checked: the repo carries
-# install-dotf-ps1.Tests.ps1 as well as windows-defaults.Tests.ps1.
+# install-ps1.Tests.ps1 as well as windows-defaults.Tests.ps1.
 test_twins_for() {
     stem="$(basename "$1")"
     stem="${stem%.sh}"

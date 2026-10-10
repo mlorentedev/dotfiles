@@ -103,7 +103,7 @@ cat ~/.claude/settings.json | jq '.enabledPlugins'
 ## `dotf init` not found (Linux/macOS)
 
 ```bash
-# dotf must be on PATH (installed by setup + install-dotf)
+# dotf must be on PATH (installed by setup + install.sh)
 command -v dotf
 dotf init --help
 ```
