@@ -50,6 +50,11 @@ func checkOrcaHookJSON(rep *Report, orcaJSON string, fix bool) {
 		// still cannot load — a success message about an operation whose goal
 		// was never checked.
 		rep.Fail("orca.json is not valid JSON — fix or remove it; refusing to tune a file Orca cannot load")
+	case !orca.TimeoutFloorApplies(b):
+		// Linux and macOS: Orca registers bash hooks whose curl bounds itself
+		// at 1.5 s. The floor is the PowerShell hook's, and a tune here would
+		// be reverted at the next Orca start (#2252).
+		rep.Pass("orca.json registers no PowerShell hook, so the timeoutSec floor does not apply")
 	case orca.TimeoutBelow(b, orca.DefaultHookTimeout):
 		if fix {
 			tuned := orca.TuneTimeout(b, orca.DefaultHookTimeout)

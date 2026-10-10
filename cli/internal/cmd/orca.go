@@ -129,6 +129,8 @@ func reportOrcaHookCheck(w io.Writer, rep *orca.HookTuneReport, hookConfig, hook
 	switch {
 	case rep.ConfigExists && rep.ConfigDrift:
 		_, _ = fmt.Fprintf(w, "drift: %s has a hook timeoutSec < %d\n", hookConfig, timeout)
+	case rep.ConfigExists && !rep.TimeoutFloorApplies:
+		_, _ = fmt.Fprintln(w, "ok: orca.json registers no PowerShell hook, so the timeoutSec floor does not apply")
 	case rep.ConfigExists:
 		_, _ = fmt.Fprintf(w, "ok: orca.json hook timeouts >= %d\n", timeout)
 	}
