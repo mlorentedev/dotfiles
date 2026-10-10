@@ -42,7 +42,8 @@ copy_command() {
 
 # copy_with TOOLS [ENV...]: run copy-command the way tmux does (/bin/sh -c) on a
 # PATH holding only stubs for TOOLS and cat, feeding it "text"; print what the
-# chosen stub received, or nothing when no tool was there.
+# chosen stub received, or nothing when no tool was there, and return
+# copy-command's own status.
 copy_with() {
     local tools=$1 stub="$BATS_TEST_TMPDIR/stub" out="$BATS_TEST_TMPDIR/out" t
     shift
@@ -54,8 +55,10 @@ copy_with() {
         printf '#!/bin/sh\n{ printf "%%s %%s <" "${0##*/}" "$*"; cat; } > "%s"\n' "$out" > "$stub/$t"
         chmod +x "$stub/$t"
     done
-    printf 'text' | env -i PATH="$stub" "$@" /bin/sh -c "$(copy_command)"
+    local rc=0
+    printf 'text' | env -i PATH="$stub" "$@" /bin/sh -c "$(copy_command)" || rc=$?
     [ ! -f "$out" ] || cat "$out"
+    return "$rc"
 }
 
 @test "every copy binding pipes to copy-command and names no tool of its own" {
@@ -68,8 +71,11 @@ copy_with() {
     [ "$(copy_with "pbcopy xclip")" = "pbcopy  <text" ]
     [ "$(copy_with "wl-copy xclip" WAYLAND_DISPLAY=wayland-0)" = "wl-copy  <text" ]
     # An X11 session on a machine that also has wl-copy installed.
-    [ "$(copy_with "wl-copy xclip")" = "xclip -selection clipboard -in <text" ]
+    [ "$(copy_with "wl-copy xclip" DISPLAY=:0)" = "xclip -selection clipboard -in <text" ]
     [ "$(copy_with "clip.exe")" = "clip.exe  <text" ]
+    # WSL, or SSH, with xclip installed and no display to reach: xclip would
+    # fail with "Can't open display" and the chain would never reach clip.exe.
+    [ "$(copy_with "xclip clip.exe")" = "clip.exe  <text" ]
     run copy_with ""
     [ "$status" -eq 0 ]
     [ -z "$output" ]

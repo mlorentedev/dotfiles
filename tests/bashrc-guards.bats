@@ -109,7 +109,10 @@ load_rc() {
 }
 
 @test "terraform completion calls the terraform that PATH resolves, and none is set without one" {
-    run load_rc 'complete -p terraform 2>/dev/null || echo none'
+    # The premise first: no terraform resolves in the sandbox, so a host binary
+    # leaking onto its PATH fails here, by name, instead of changing the answer
+    # (#2149 measured that leak in the zsh twin).
+    run load_rc 'command -v terraform || complete -p terraform 2>/dev/null || echo none'
     [ "$status" -eq 0 ]
     [ "$output" = "none" ]
     printf '#!/bin/sh\n' > "$SANDBOX/bin/terraform"
