@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -41,6 +42,30 @@ var deployRenderer = func(path string) error {
 	}
 	_, err = secrets.Render(path, reg, secretLoader(), env.Home())
 	return err
+}
+
+// strictDeployRenderer is deployRenderer for a run nobody watches, converge's
+// configs step: a placeholder the secret store could not resolve (locked or
+// unreachable, as opposed to a secret this machine never holds) is
+// deploy.ErrRenderIncomplete, so the entry keeps its installed file instead of
+// trading a resolved value for its placeholder.
+func strictDeployRenderer(path string) error {
+	reg, err := loadRegistry()
+	if err != nil {
+		return err
+	}
+	res, err := secrets.Render(path, reg, secretLoader(), env.Home())
+	if err != nil {
+		return err
+	}
+	if len(res.Unresolved) > 0 {
+		vars := make([]string, 0, len(res.Unresolved))
+		for _, u := range res.Unresolved {
+			vars = append(vars, u.Var)
+		}
+		return fmt.Errorf("%w: %s", deploy.ErrRenderIncomplete, strings.Join(vars, ", "))
+	}
+	return nil
 }
 
 // deployCommandAvailable is the PATH seam behind a manifest entry's `requires`
@@ -106,40 +131,17 @@ func newDeployCmd() *cobra.Command {
 			}
 
 			w := cmd.OutOrStdout()
-			deployed := map[string]bool{}
-			for _, target := range targets {
-				if !target.AppliesOn(runtime.GOOS) {
-					deployRow(w, "skipped", target.Name, "(not for %s)", runtime.GOOS)
-					continue
-				}
-				if target.Requires != "" && !deployCommandAvailable(target.Requires) {
-					deployRow(w, "skipped", target.Name, "(%s not installed)", target.Requires)
-					continue
-				}
-				res, err := deploy.Deploy(target, repoRoot, env.Home(), env.ResolvePath, deployRenderer, dryRun)
-				if err != nil {
-					return err
-				}
-				deployed[target.Name] = true
-				switch {
-				case !res.Changed:
-					deployRow(w, "in sync", res.Name, "%s", res.Dst)
-				case res.ModeFixed && dryRun:
-					deployRow(w, "would fix mode", res.Name, "%s", res.Dst)
-				case res.ModeFixed:
-					// Content was in sync; only the declared mode was missing on
-					// the file (CLI-055: an inherited ACL on a 0600).
-					deployRow(w, "mode fixed", res.Name, "%s", res.Dst)
-				case dryRun:
-					deployRow(w, "would deploy", res.Name, "%s", res.Dst)
-				default:
-					deployRow(w, "deployed", res.Name, "%s", res.Dst)
-				}
-				if res.BackedUp != "" {
-					deployRow(w, "", "", "kept the previous file at %s", res.BackedUp)
-				}
-			}
-			if err := tightenPrivateDirs(w, man, deployed, dryRun); err != nil {
+			res, err := deploy.Run(man, targets, deploy.RunOptions{
+				RepoRoot:  repoRoot,
+				Home:      env.Home(),
+				GOOS:      runtime.GOOS,
+				Resolve:   env.ResolvePath,
+				Render:    deployRenderer,
+				Available: deployCommandAvailable,
+				DryRun:    dryRun,
+			})
+			printDeploySteps(w, res, dryRun)
+			if err != nil {
 				return err
 			}
 			// A bare deploy converges everything the setups own, including the
@@ -162,32 +164,42 @@ func newDeployCmd() *cobra.Command {
 	return c
 }
 
-// tightenPrivateDirs narrows each directory that holds a private file this run
-// deployed, with the rule doctor --fix uses (deploy.TightenDir). A directory
-// that already existed kept the mode it was created with, so a 0600 written
-// into a 0755 ~/.pi/agent left it open until someone ran doctor --fix (#2161).
-// Only the entries this run deployed count, so `dotf deploy pi` never narrows
-// ~/.ssh as a side effect.
-func tightenPrivateDirs(w io.Writer, man *deploy.Manifest, deployed map[string]bool, dryRun bool) error {
-	dirs, err := man.PrivateDirsOf(env.Home(), env.ResolvePath, deployed)
-	if err != nil {
-		return err
-	}
-	for _, dir := range dirs {
-		from, to, changed, err := deploy.TightenDir(dir, runtime.GOOS, dryRun)
-		if err != nil {
-			return fmt.Errorf("tightening %s, which holds a private deployed file: %w", dir, err)
-		}
-		if !changed {
+// printDeploySteps writes one row per entry, then one per directory the run
+// narrowed because it holds a private file this run deployed (#2161). Only the
+// entries this run deployed count, so `dotf deploy pi` never narrows ~/.ssh as
+// a side effect.
+func printDeploySteps(w io.Writer, res deploy.RunResult, dryRun bool) {
+	for _, s := range res.Steps {
+		if s.Skipped != "" {
+			deployRow(w, "skipped", s.Name, "(%s)", s.Skipped)
 			continue
 		}
-		verb := "tightened"
-		if dryRun {
-			verb = "would tighten"
+		o := s.Outcome
+		switch {
+		case !o.Changed:
+			deployRow(w, "in sync", o.Name, "%s", o.Dst)
+		case o.ModeFixed && dryRun:
+			deployRow(w, "would fix mode", o.Name, "%s", o.Dst)
+		case o.ModeFixed:
+			// Content was in sync; only the declared mode was missing on
+			// the file (CLI-055: an inherited ACL on a 0600).
+			deployRow(w, "mode fixed", o.Name, "%s", o.Dst)
+		case dryRun:
+			deployRow(w, "would deploy", o.Name, "%s", o.Dst)
+		default:
+			deployRow(w, "deployed", o.Name, "%s", o.Dst)
 		}
-		deployRow(w, verb, "", "%s from %04o to %04o", dir, from, to)
+		if o.BackedUp != "" {
+			deployRow(w, "", "", "kept the previous file at %s", o.BackedUp)
+		}
 	}
-	return nil
+	verb := "tightened"
+	if dryRun {
+		verb = "would tighten"
+	}
+	for _, d := range res.Tightened {
+		deployRow(w, verb, "", "%s from %04o to %04o", d.Dir, d.From, d.To)
+	}
 }
 
 func names(m *deploy.Manifest) string {

@@ -76,6 +76,7 @@ The design is ADR-045 (`docs/adr/adr-045-one-entrypoint-converges-every-os.md`);
 - [ ] AC6: `install.sh` (bash 3.2 and zsh) and `install.ps1` install `dotf` at the stable pin with checksum and exec probe, then hand off to `dotf converge`; with no network or a bad checksum they fail and place nothing.
 - [ ] AC7: no live file outside the historical records (ADRs and audits, lessons, specs, the changelog) references `install-dotf.sh`, `install-dotf.ps1` or the old clone-and-setup flow, enforced by a test.
 - [ ] AC8: `dotf update` runs `dotf converge`, keeps its exit semantics, and its existing tests pass.
+- [ ] AC10: `dotf converge` deploys every `ai/deploy.json` config that applies to the machine, so a template change merged to main lands without a manual `dotf deploy`; a config whose secrets the store cannot resolve during the run keeps its installed file and is named in the report (#1843 B15).
 - [ ] AC9: a from-zero CI job on `macos-latest` runs `install.sh`, then `dotf doctor`, then a second converge with zero native changes.
 
 ## References

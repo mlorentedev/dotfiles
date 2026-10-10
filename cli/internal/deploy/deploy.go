@@ -582,7 +582,19 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 		return out, err
 	}
 	out.Dst = dst
-	staged, err := stage(c, dst, srcData, mode)
+	// A plan only compares, and staging beside dst would create its directory;
+	// it stages in a scratch directory instead and leaves the filesystem as it
+	// found it.
+	stageAt := dst
+	if dryRun {
+		scratch, err := os.MkdirTemp("", "dotf-plan-*")
+		if err != nil {
+			return out, fmt.Errorf("config %q: plan: %w", c.Name, err)
+		}
+		defer func() { _ = os.RemoveAll(scratch) }()
+		stageAt = filepath.Join(scratch, filepath.Base(dst))
+	}
+	staged, err := stage(c, stageAt, srcData, mode)
 	if err != nil {
 		return out, err
 	}

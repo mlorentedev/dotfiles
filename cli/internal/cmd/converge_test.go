@@ -18,6 +18,7 @@ func convergeFixture(t *testing.T) (repo, home string) {
 	for rel, content := range map[string]string{
 		"harness/manifest.json": `{"targets":[{"file":"AGENTS.md"}]}`,
 		"AGENTS.md":             "# AGENTS\n",
+		"ai/deploy.json":        `{"version": 3, "configs": []}`,
 	} {
 		p := filepath.Join(repo, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -31,7 +32,11 @@ func convergeFixture(t *testing.T) (repo, home string) {
 	// not have; a test that needs it opts in with its own runner (lesson 335).
 	saved := convergeOptions
 	convergeOptions = func() converge.Options {
-		return converge.Options{RunHarnessDeploy: func(converge.Env) error { return nil }}
+		return converge.Options{
+			RunHarnessDeploy: func(converge.Env) error { return nil },
+			RenderConfigs:    func(string) error { return nil },
+			ResolvePath:      func(string) string { return "" },
+		}
 	}
 	t.Cleanup(func() { convergeOptions = saved })
 	t.Setenv("HOME", home)
