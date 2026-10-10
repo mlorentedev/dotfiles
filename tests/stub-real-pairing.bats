@@ -72,7 +72,9 @@ setup() {
 #                             which one copy-command picks per OS. A real one writes the developer's
 #                             clipboard, needs a display server, or exists on one OS only. tmux itself
 #                             is driven for real in the same suite: it parses the file and reads
-#                             copy-command back as written.
+#                             copy-command back as written. It also stubs `infocmp`, whose real
+#                             answer is fixed by the host's terminfo, to reach both default-terminal
+#                             branches on one machine.
 #   vault-maintenance-weekly  stubs `cron`/`hive` — a real run installs a crontab entry
 #   zshrc-guards              stubs `terraform` as an empty executable that is never run. The
 #                             subject is the .zshrc guard: completion is registered only when PATH

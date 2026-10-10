@@ -73,8 +73,9 @@ copy_with() {
     # An X11 session on a machine that also has wl-copy installed.
     [ "$(copy_with "wl-copy xclip" DISPLAY=:0)" = "xclip -selection clipboard -in <text" ]
     [ "$(copy_with "clip.exe")" = "clip.exe  <text" ]
-    # WSL, or SSH, with xclip installed and no display to reach: xclip would
-    # fail with "Can't open display" and the chain would never reach clip.exe.
+    # WSL, or SSH, with xclip installed and DISPLAY unset: the DISPLAY guard
+    # skips xclip, so the chain reaches clip.exe. A stale DISPLAY still execs
+    # xclip, which has already read the text, so no later branch could copy it.
     [ "$(copy_with "xclip clip.exe")" = "clip.exe  <text" ]
     run copy_with ""
     [ "$status" -eq 0 ]
@@ -102,4 +103,24 @@ copy_with() {
         printf 'tmux %s shows: %s\nthe file has:  %s\n' "$(tmux -V)" "$output" "$want"
         false
     }
+}
+
+# default_terminal_with: the default-terminal a real tmux settles on when the
+# host's infocmp answers with the given exit status.
+default_terminal_with() {
+    local bin="$BATS_TEST_TMPDIR/bin" socket="tmux_bats_term_$$_$1"
+    mkdir -p "$bin"
+    printf '#!/bin/sh\nexit %s\n' "$1" > "$bin/infocmp"
+    chmod +x "$bin/infocmp"
+    PATH="$bin:$PATH" tmux -f "$CONFIG_FILE" -L "$socket" new-session -d -s test 'sleep 5'
+    tmux -L "$socket" show -gv default-terminal
+    tmux -L "$socket" kill-server 2>/dev/null || true
+}
+
+@test "tmux picks tmux-256color only where its terminfo entry exists" {
+    if ! command -v tmux >/dev/null 2>&1; then
+        skip "tmux not installed"
+    fi
+    [ "$(default_terminal_with 0)" = "tmux-256color" ]
+    [ "$(default_terminal_with 1)" = "screen-256color" ]
 }
