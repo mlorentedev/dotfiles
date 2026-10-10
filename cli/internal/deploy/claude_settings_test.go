@@ -40,6 +40,15 @@ func TestPerKeyMergePolicy(t *testing.T) {
 			keep:  []string{`"Bash(box:*)"`},
 			apply: []string{`"WebSearch"`},
 		},
+		{
+			// The twins replaced attribution whole so a stale trailer could not
+			// survive. The merge overwrites each scalar the template declares,
+			// which clears it just the same.
+			name:  "attribution clears a stale trailer",
+			box:   `{"attribution":{"commit":"Co-Authored-By: x","pr":"Generated with x","sessionUrl":true}}`,
+			tmpl:  `{"attribution":{"commit":"","pr":"","sessionUrl":false}}`,
+			apply: []string{`"commit": ""`, `"pr": ""`, `"sessionUrl": false`},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
