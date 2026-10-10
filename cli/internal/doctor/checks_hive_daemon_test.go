@@ -102,6 +102,48 @@ func TestHiveDaemon_HealthyPasses(t *testing.T) {
 	}
 }
 
+// The command exits 0 only when healthy, so a healthy line paired with an
+// error is a probe that died after printing: it must not pass.
+func TestHiveDaemon_HealthyLineWithAnErrorIsNoPass(t *testing.T) {
+	sys := &System{
+		GOOS:                 "linux",
+		LookPath:             lookPathFor("uv", "hive"),
+		CommandOutputBounded: statusSeam("hive daemon: healthy\n", "", errors.New("hive timed out after 20s")),
+	}
+
+	got := runHiveDaemon(sys, hiveServers(t, "hive client"))
+
+	if strings.Contains(got, "[ OK ]") || !strings.Contains(got, "timed out") {
+		t.Fatalf("a failed probe must not pass on a healthy line, got: %s", got)
+	}
+}
+
+// The gate reads the registration as registration does (strings.Fields), and
+// a registration that outlived its prerequisite still launches the shim while
+// `hive` is installed.
+func TestHiveDaemon_GateMatchesWhatAgentsLaunch(t *testing.T) {
+	cases := map[string]struct {
+		args    string
+		present []string
+	}{
+		"extra spacing":                {"hive  client", []string{"uv", "hive"}},
+		"prerequisite gone, hive kept": {"hive client", []string{"hive"}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			sys := &System{
+				GOOS:                 "darwin",
+				LookPath:             lookPathFor(c.present...),
+				CommandOutputBounded: statusSeam("hive daemon: down\n", "", errExit1),
+			}
+
+			if got := runHiveDaemon(sys, hiveServers(t, c.args)); !strings.Contains(got, "the hive daemon is down") {
+				t.Fatalf("the daemon must be checked, got: %q", got)
+			}
+		})
+	}
+}
+
 // No verdict line is a different state from "down": the probe itself did not
 // answer, and the report must not claim the daemon's state.
 func TestHiveDaemon_NoVerdictIsNotReportedAsDown(t *testing.T) {
@@ -159,7 +201,7 @@ func TestHiveDaemon_SilentWhenNoAgentLaunchesHiveClient(t *testing.T) {
 	}{
 		"no hive entry":           {func(t *testing.T) *Config { return hiveServers(t, "") }, []string{"uv", "hive"}},
 		"per-session server":      {func(t *testing.T) *Config { return hiveServers(t, "uvx hive-vault") }, []string{"uv", "hive"}},
-		"prerequisite absent":     {func(t *testing.T) *Config { return hiveServers(t, "hive client") }, []string{"hive"}},
+		"neither uv nor hive":     {func(t *testing.T) *Config { return hiveServers(t, "hive client") }, nil},
 		"no server list deployed": {func(t *testing.T) *Config { return &Config{DotfilesDir: t.TempDir()} }, []string{"uv", "hive"}},
 	}
 	for name, c := range cases {

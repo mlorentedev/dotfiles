@@ -51,6 +51,11 @@ func checkHiveDaemonAnswers(sys *System, cfg *Config, rep *Report) {
 		}
 		rep.Fail("`hive service status` gave no verdict, so whether the daemon answers is unknown (" +
 			detail + "). Every agent's `hive client` depends on it.")
+	case state == "healthy" && err != nil:
+		// The command exits 0 only when healthy, so a healthy line with an
+		// error is a probe that died after printing: no verdict either.
+		rep.Fail("`hive service status` printed healthy but failed (" + err.Error() +
+			"), so whether the daemon answers is unknown. Every agent's `hive client` depends on it.")
 	case state == "healthy":
 		rep.Pass("the hive daemon answers on its pinned port, so `hive client` can connect")
 	default:
@@ -60,8 +65,10 @@ func checkHiveDaemonAnswers(sys *System, cfg *Config, rep *Report) {
 }
 
 // hiveClientRegistered reports whether agents on this host launch `hive client`.
-// The claim needs the declaration AND its prerequisite: Register skips a server
-// whose prerequisite binary is absent, and then nothing launches the shim.
+// The claim needs the declaration AND either its prerequisite or hive itself:
+// Register skips a server whose prerequisite binary is absent, but a host that
+// still has `hive` may hold a registration made before the prerequisite went
+// away, and that one still launches the shim.
 func hiveClientRegistered(sys *System, cfg *Config, rep *Report) bool {
 	servers, err := claude.LoadServers(filepath.Join(cfg.DotfilesDir, claude.ServersRel))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -73,13 +80,18 @@ func hiveClientRegistered(sys *System, cfg *Config, rep *Report) bool {
 		return false
 	}
 	for _, s := range servers {
-		if s.Name != "hive" || !strings.HasPrefix(s.Args, "hive client") {
+		// Tokens, not a prefix: registration splits Args with strings.Fields.
+		args := strings.Fields(s.Args)
+		if s.Name != "hive" || len(args) < 2 || args[0] != "hive" || args[1] != "client" {
 			continue
 		}
 		if s.PrerequisiteBinary == "" {
 			return true
 		}
-		_, err := sys.LookPath(s.PrerequisiteBinary)
+		if _, err := sys.LookPath(s.PrerequisiteBinary); err == nil {
+			return true
+		}
+		_, err := sys.LookPath("hive")
 		return err == nil
 	}
 	return false
