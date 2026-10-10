@@ -83,6 +83,7 @@ created: "2026-10-06"
 - [x] [AC11] [AC3] [AC5] Failing tests, then `env-persist` (darwin, last in the registry, closing ADR-045's configs step): the plan writes nothing; the apply sets the variables, writes the plist and bootstraps it only when `launchctl print` fails or the plist changed (bootout first); the probe requires the plist current, the agent loaded and no drift; a second run reports 0 changes; a failed bootstrap fails the run
 - [x] Doctor's persisted-environment check runs on macOS through the same store, and names `dotf converge --only env-persist` there; `dotf env persist --help` describes the macOS scope
 - [x] On the Mac: the plan listed 11 variables, the marker and the agent; the apply loaded the agent (`last exit code = 0`); a second run reported `0 changed`; `launchctl getenv VAULT_PATH` answers
+- [x] Windows check (#2013 wave rule; the registry, doctor and `env` are shared paths): `test (windows-latest)` passed on `9babaddf`. Its first run caught the plist rendered with `filepath.Join`, now `path.Join`, because launchd reads POSIX paths whatever OS renders it
 - [ ] [AC11] Owner, at the Mac: quit and relaunch an app from the Dock and confirm it sees `VAULT_PATH` (the agent's shell cannot launch a GUI app without inheriting its own environment)
 
 ### PR 3 — the persisted report (#1843 B7)
