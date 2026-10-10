@@ -2,6 +2,7 @@ package orca
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -82,6 +83,44 @@ func TuneTimeout(content []byte, min int) []byte {
 	})
 }
 
+// TimeoutFloorApplies reports whether orca.json holds a hook the timeout floor
+// is for. The floor exists for PowerShell's cold start (lesson 111). On Linux
+// and macOS Orca registers `bash` hooks that run copilot-hook.sh, whose curl
+// bounds itself with --max-time 1.5, so Orca's 5 s cannot fire there, and a
+// tune would only be reverted at the next Orca start (#2252). So the floor is
+// waived only when every entry carrying a timeoutSec runs bash and not
+// PowerShell; any other shape, or content that does not parse, keeps it.
+func TimeoutFloorApplies(content []byte) bool {
+	var doc any
+	if err := json.Unmarshal(content, &doc); err != nil {
+		return true
+	}
+	entries, bashOnly := 0, 0
+	var walk func(v any)
+	walk = func(v any) {
+		switch node := v.(type) {
+		case map[string]any:
+			if _, ok := node["timeoutSec"]; ok {
+				entries++
+				_, bash := node["bash"]
+				_, ps := node["powershell"]
+				if bash && !ps {
+					bashOnly++
+				}
+			}
+			for _, child := range node {
+				walk(child)
+			}
+		case []any:
+			for _, child := range node {
+				walk(child)
+			}
+		}
+	}
+	walk(doc)
+	return entries == 0 || bashOnly < entries
+}
+
 // ScriptUsesInvokeWebRequest reports the slow POST — the second DX-006 signal.
 // The marker is a literal, so it needs no regexp.
 func ScriptUsesInvokeWebRequest(content []byte) bool {
@@ -125,7 +164,10 @@ func TuneScript(content []byte) (out []byte, ok bool) {
 // HookTuneReport is what one TuneHooks run found and did.
 type HookTuneReport struct {
 	ConfigExists, ScriptExists bool
-	ConfigDrift, ScriptDrift   bool
+	// TimeoutFloorApplies: orca.json registers a PowerShell hook, so its
+	// timeouts are held to the floor (see TimeoutFloorApplies).
+	TimeoutFloorApplies      bool
+	ConfigDrift, ScriptDrift bool
 	// ScriptUnrecognised: Invoke-WebRequest is present but its line has an
 	// unknown shape; the script was left unchanged.
 	ScriptUnrecognised bool
@@ -141,7 +183,7 @@ func (r *HookTuneReport) Drift() bool { return r.ConfigDrift || r.ScriptDrift }
 func (r *HookTuneReport) Nothing() bool { return !r.ConfigExists && !r.ScriptExists }
 
 // TuneHooks measures both files and, unless check is set, repairs them: every
-// timeout below minTimeout is raised, the POST is swapped, and each changed
+// timeout below minTimeout is raised where the floor applies, the POST is swapped, and each changed
 // file is backed up beside itself first (`<file>.bak.<stamp>`) and written
 // atomically. A file that does not exist is skipped; both absent is nothing
 // to do.
@@ -152,7 +194,8 @@ func TuneHooks(hookConfig, hookScript string, minTimeout int, check bool, now fu
 		return rep, err
 	}
 	rep.ConfigExists = cfg != nil
-	rep.ConfigDrift = rep.ConfigExists && TimeoutBelow(cfg, minTimeout)
+	rep.TimeoutFloorApplies = rep.ConfigExists && TimeoutFloorApplies(cfg)
+	rep.ConfigDrift = rep.TimeoutFloorApplies && TimeoutBelow(cfg, minTimeout)
 	scr, err := readOptional(hookScript)
 	if err != nil {
 		return rep, err

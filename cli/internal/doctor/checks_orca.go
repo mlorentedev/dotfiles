@@ -30,55 +30,71 @@ func checkOrcaHook(sys *System, rep *Report, fix bool) {
 	}
 
 	if pathExists(orcaJSON) {
-		switch b, err := os.ReadFile(orcaJSON); { //nolint:gosec // the user's own hook file
-		case err != nil:
-			rep.Fail("orca.json unreadable: " + err.Error())
-		case !json.Valid(b):
-			// Before any repair: the tuner is a regex, so it happily rewrites a
-			// malformed document into a differently malformed one and the write
-			// succeeds. Reporting Fix there would claim a repair on a file Orca
-			// still cannot load — a success message about an operation whose goal
-			// was never checked.
-			rep.Fail("orca.json is not valid JSON — fix or remove it; refusing to tune a file Orca cannot load")
-		case orca.TimeoutBelow(b, orca.DefaultHookTimeout):
-			if fix {
-				tuned := orca.TuneTimeout(b, orca.DefaultHookTimeout)
-				if !json.Valid(tuned) {
-					// The input parsed and the output does not: the tuner broke it.
-					// Never write that, and never call it a Fix.
-					rep.Fail("tuning orca.json would have produced invalid JSON — left untouched")
-				} else if err := os.WriteFile(orcaJSON, tuned, 0o644); err != nil { //nolint:gosec // the user's own hook file
-					rep.Fail("failed to tune orca.json: " + err.Error())
-				} else {
-					rep.Fix("orca.json: bumped hook timeoutSec to 30")
-				}
-			} else {
-				rep.Fail("orca.json hook timeoutSec < 30 — run `dotf doctor --fix` or `dotf orca tune-hooks`")
-			}
-		default:
-			rep.Pass("orca.json hook timeoutSec >= 30")
-		}
+		checkOrcaHookJSON(rep, orcaJSON, fix)
 	}
-
 	if pathExists(orcaHook) {
-		if !fileContains(orcaHook, "Invoke-WebRequest") {
-			rep.Pass("copilot-hook.ps1 uses fast HttpWebRequest")
-			return
+		checkOrcaHookScript(rep, orcaHook, fix)
+	}
+}
+
+// checkOrcaHookJSON is the JSON half of checkOrcaHook: the hook timeout in
+// orca.json, tuned in place under --fix.
+func checkOrcaHookJSON(rep *Report, orcaJSON string, fix bool) {
+	switch b, err := os.ReadFile(orcaJSON); { //nolint:gosec // the user's own hook file
+	case err != nil:
+		rep.Fail("orca.json unreadable: " + err.Error())
+	case !json.Valid(b):
+		// Before any repair: the tuner is a regex, so it happily rewrites a
+		// malformed document into a differently malformed one and the write
+		// succeeds. Reporting Fix there would claim a repair on a file Orca
+		// still cannot load — a success message about an operation whose goal
+		// was never checked.
+		rep.Fail("orca.json is not valid JSON — fix or remove it; refusing to tune a file Orca cannot load")
+	case !orca.TimeoutFloorApplies(b):
+		// Linux and macOS: Orca registers bash hooks whose curl bounds itself
+		// at 1.5 s. The floor is the PowerShell hook's, and a tune here would
+		// be reverted at the next Orca start (#2252).
+		rep.Pass("orca.json registers no PowerShell hook, so the timeoutSec floor does not apply")
+	case orca.TimeoutBelow(b, orca.DefaultHookTimeout):
+		if fix {
+			tuned := orca.TuneTimeout(b, orca.DefaultHookTimeout)
+			if !json.Valid(tuned) {
+				// The input parsed and the output does not: the tuner broke it.
+				// Never write that, and never call it a Fix.
+				rep.Fail("tuning orca.json would have produced invalid JSON — left untouched")
+			} else if err := os.WriteFile(orcaJSON, tuned, 0o644); err != nil { //nolint:gosec // the user's own hook file
+				rep.Fail("failed to tune orca.json: " + err.Error())
+			} else {
+				rep.Fix("orca.json: bumped hook timeoutSec to 30")
+			}
+		} else {
+			rep.Fail("orca.json hook timeoutSec < 30 — run `dotf doctor --fix` or `dotf orca tune-hooks`")
 		}
-		if !fix {
-			rep.Fail("copilot-hook.ps1 uses slow Invoke-WebRequest — run `dotf doctor --fix` or `dotf orca tune-hooks`")
-			return
-		}
-		// CLI-062: the script half of the repair, once PowerShell-only, through
-		// the same package `dotf orca tune-hooks` uses — backup beside the file,
-		// atomic write, and an unrecognised POST line left alone rather than guessed.
-		switch res, err := orca.TuneScriptFile(orcaHook, time.Now); {
-		case err != nil:
-			rep.Fail("failed to tune copilot-hook.ps1: " + err.Error())
-		case res.Unrecognised:
-			rep.Fail("copilot-hook.ps1 has Invoke-WebRequest but the POST line is unrecognised — left unchanged; review it by hand")
-		default:
-			rep.Fix("copilot-hook.ps1: Invoke-WebRequest -> HttpWebRequest (backup " + res.Backup + ")")
-		}
+	default:
+		rep.Pass("orca.json hook timeoutSec >= 30")
+	}
+}
+
+// checkOrcaHookScript is the script half of checkOrcaHook: the slow
+// Invoke-WebRequest POST in copilot-hook.ps1, rewritten under --fix.
+func checkOrcaHookScript(rep *Report, orcaHook string, fix bool) {
+	if !fileContains(orcaHook, "Invoke-WebRequest") {
+		rep.Pass("copilot-hook.ps1 uses fast HttpWebRequest")
+		return
+	}
+	if !fix {
+		rep.Fail("copilot-hook.ps1 uses slow Invoke-WebRequest — run `dotf doctor --fix` or `dotf orca tune-hooks`")
+		return
+	}
+	// CLI-062: the script half of the repair, once PowerShell-only, through
+	// the same package `dotf orca tune-hooks` uses — backup beside the file,
+	// atomic write, and an unrecognised POST line left alone rather than guessed.
+	switch res, err := orca.TuneScriptFile(orcaHook, time.Now); {
+	case err != nil:
+		rep.Fail("failed to tune copilot-hook.ps1: " + err.Error())
+	case res.Unrecognised:
+		rep.Fail("copilot-hook.ps1 has Invoke-WebRequest but the POST line is unrecognised — left unchanged; review it by hand")
+	default:
+		rep.Fix("copilot-hook.ps1: Invoke-WebRequest -> HttpWebRequest (backup " + res.Backup + ")")
 	}
 }

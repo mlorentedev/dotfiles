@@ -26,17 +26,16 @@ setup() {
     refute_grep_fixed 'OPENCODE_VERSION' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode config deploy is declarative always-overwrite (no cmp -s skip)" {
-    # fix/linux-deploy-always-overwrite: the opencode block aligns with the
-    # Windows always-overwrite strategy. The staged-substituted tmp file is
-    # moved into place on every run (substitution may have changed content);
-    # there is no "already in sync" skip path that could mask drift.
-    refute_grep 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
-    grep -q 'mv "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
-}
-
-@test "setup-linux.sh opencode deploy renders via dotf secrets render (SDD-009/#587)" {
-    grep -q 'dotf secrets render "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
+@test "opencode.jsonc is a rendered, private deploy entry, not a setup block (SDD-009, #1843 B12)" {
+    # The setup blocks staged, rendered and moved the file by hand on each OS.
+    # The `opencode` entry of ai/deploy.json does the same through `dotf deploy`:
+    # render the {env:VAR} secrets, install at 0600 because the result holds
+    # API keys.
+    jq -e '.configs[] | select(.name == "opencode" and .src == "ai/opencode/opencode.jsonc" and .dst == "{HOME}/.config/opencode/opencode.jsonc" and .render == true and .mode == "0600" and .requires == "opencode")' "$DOTFILES_DIR/ai/deploy.json"
+    # Every OS: a `platforms` list would have to name both.
+    jq -e '.configs[] | select(.name == "opencode") | .platforms == null' "$DOTFILES_DIR/ai/deploy.json"
+    refute_grep 'OPENCODE_CONFIG_(SRC|DST|TMP)' "$SETUP_SCRIPT"
+    refute_grep 'opencodeConfig(Src|Dst|Tmp)' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup-linux.sh opencode block has post-deploy assertion, probed through dotf tools version (ADR-036)" {
