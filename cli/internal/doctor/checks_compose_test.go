@@ -45,9 +45,9 @@ func TestCheckDockerCompose(t *testing.T) {
 			wantSubstr: "dotf deploy docker-config",
 		},
 		{
-			name:       "docker present, no compose either way → skip",
+			name:       "docker present, no compose either way → reported",
 			onPath:     []string{"docker"},
-			wantSubstr: "not installed",
+			wantSubstr: "compose",
 		},
 		{
 			// Without docker there is nothing for a plugin to hang off; the
@@ -69,6 +69,36 @@ func TestCheckDockerCompose(t *testing.T) {
 			}
 			if !strings.Contains(buf.String(), tc.wantSubstr) {
 				t.Fatalf("output missing %q\n%s", tc.wantSubstr, buf.String())
+			}
+		})
+	}
+}
+
+// Docker without compose is a gap on every OS that provisions docker, and the
+// remedy differs: darwin declares compose, so tools install fixes it. Linux has
+// no compose row yet, and the plugin must come from docker's own source, since
+// Ubuntu's docker-compose-v2 displaces Docker's docker-ce. A SKIP that called it
+// "optional" hid a box where every `docker compose` failed.
+func TestCheckDockerCompose_MissingIsAWarnNamingTheSource(t *testing.T) {
+	for _, tc := range []struct {
+		goos, want string
+		warn       bool
+	}{
+		{"darwin", "dotf tools install", true},
+		{"linux", "docker-compose-plugin", true},
+		{"windows", "Docker Desktop", false},
+	} {
+		t.Run(tc.goos, func(t *testing.T) {
+			sys := newSys(nil, []string{"docker"}, nil)
+			sys.GOOS = tc.goos
+			var buf bytes.Buffer
+			rep := capture(&buf)
+			checkDockerCompose(sys, rep)
+			if got := rep.Warnings() == 1; got != tc.warn || rep.Failures() != 0 {
+				t.Fatalf("warnings = %d, failures = %d; want a warn: %v\n%s", rep.Warnings(), rep.Failures(), tc.warn, buf.String())
+			}
+			if !strings.Contains(buf.String(), tc.want) {
+				t.Fatalf("output missing %q\n%s", tc.want, buf.String())
 			}
 		})
 	}

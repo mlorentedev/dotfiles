@@ -115,9 +115,10 @@ func dockerEngineRemedy(sys *System) string {
 // standalone v1 binary and plugin v2.39.1 are both present, and either check
 // alone would have described that box wrongly.
 //
-// Absence is a SKIP, never a FAIL: only darwin declares compose (packages.json,
-// brew), so failing on it would red a Linux or Windows box that never asked
-// for it — the same reasoning BUG-052 applied to terraform.
+// Absence is a WARN on darwin and Linux, where docker is provisioned and every
+// `docker compose` fails without the plugin, and never a FAIL: the Windows gate
+// fails on any unlisted [FAIL] line, and an engine-less box is not broken. On
+// Windows compose ships inside Docker Desktop, so its absence is a SKIP.
 func checkDockerCompose(sys *System, rep *Report) {
 	rep.Section("Docker Compose")
 
@@ -148,5 +149,16 @@ func checkDockerCompose(sys *System, rep *Report) {
 		return
 	}
 
-	rep.Skip("compose not installed (optional on this OS)")
+	switch sys.GOOS {
+	case "darwin":
+		rep.Warn("docker is installed without compose (run: dotf tools install)")
+	case "linux":
+		// No compose row on Linux yet: Ubuntu's docker-compose-v2 depends on
+		// docker.io and would displace Docker's docker-ce, so the plugin has
+		// to come from whichever source the engine came from.
+		rep.Warn("docker is installed without compose; install the plugin from docker's own source: " +
+			"sudo apt-get install docker-compose-v2 with Ubuntu's docker.io, docker-compose-plugin with Docker's docker-ce")
+	default:
+		rep.Skip("compose not found; on Windows it ships with Docker Desktop")
+	}
 }
