@@ -137,6 +137,7 @@ func Run(opts Options) (int, error) {
 		checkBranchProtection(sys, rep)
 		checkAntigravity(sys, rep)
 		checkOrcaHook(sys, rep, opts.Fix)
+		checkHookBinding(sys, rep, opts.Fix)
 	}
 
 	rep.Summary()

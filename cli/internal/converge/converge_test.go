@@ -17,6 +17,7 @@ type fake struct {
 	err       error
 	probeErr  error
 	gate      string
+	skip      string
 
 	applied, planned, probed bool
 }
@@ -29,6 +30,9 @@ func (f *fake) Reconcile(_ Env, dryRun bool) (Result, error) {
 		f.planned = true
 	} else {
 		f.applied = true
+	}
+	if f.skip != "" {
+		return Result{Skip: f.skip}, f.err
 	}
 	return Result{Changes: f.changes, Detail: f.name + " detail", Gate: f.gate}, f.err
 }
@@ -97,6 +101,23 @@ func TestRun_UnlistedPlatformIsSkippedNotPassed(t *testing.T) {
 	e := rep.Entries[0]
 	if e.Status != StatusSkipped || !strings.Contains(e.Detail, "darwin") {
 		t.Errorf("want skipped naming darwin, got %s %q", e.Status, e.Detail)
+	}
+}
+
+// A step that skips itself has nothing to verify: probing it would fail the
+// run on a precondition the skip already reported.
+func TestRun_ASkippedStepIsNeverProbed(t *testing.T) {
+	unwired := &fake{name: "records-bind", skip: "no resolver", probeErr: errors.New("no resolver")}
+
+	rep, err := Run([]Reconciler{unwired}, Env{GOOS: "linux"}, false)
+	if err != nil {
+		t.Fatalf("a skipped step failed the run: %v", err)
+	}
+	if unwired.probed {
+		t.Error("the runner probed a step that skipped itself")
+	}
+	if e := rep.Entries[0]; e.Status != StatusSkipped || e.Detail != "no resolver" {
+		t.Errorf("want skipped with the reason, got %s %q", e.Status, e.Detail)
 	}
 }
 
