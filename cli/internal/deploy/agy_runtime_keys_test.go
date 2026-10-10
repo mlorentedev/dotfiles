@@ -78,7 +78,7 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	if !containsAll(ws, "/home/u/Projects/ts-bridge") {
 		t.Errorf("a trust path the machine added was lost: %v", got["trustedWorkspaces"])
 	}
-	if !containsAll(ws, home+"/Projects/*") {
+	if !containsAll(ws, filepath.ToSlash(home)+"/Projects/*") {
 		t.Errorf("the baseline trust path is missing: %v", got["trustedWorkspaces"])
 	}
 
