@@ -345,7 +345,7 @@ setup() {
 @test "opencode tui.json deployed by dotf deploy, not by a setup block (#1843 B11)" {
     # The setup copy was deleted; the `opencode-tui` entry of ai/deploy.json is
     # now the only writer, so this fails if that entry stops applying.
-    cmp "$DOTFILES_DIR/ai/opencode/tui.json" "$HOME/.config/opencode/tui.json"
+    cmp "$REPO_DIR/ai/opencode/tui.json" "$HOME/.config/opencode/tui.json"
 }
 
 @test "opencode commands deployed to ~/.config/opencode/commands/ (SDD-008)" {

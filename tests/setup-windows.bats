@@ -584,7 +584,7 @@ FIXTURE
 @test "setup-windows.ps1 pi package reconcile resolves dotf outside PATH (#1925)" {
     local block
     block="$(awk '/^# pi packages \(HARNESS-139/ { in_block=1 }
-        /^# Deploy opencode TUI config/ { in_block=0 }
+        /^# opencode.s tui[.]json is the/ { in_block=0 }
         in_block' "$PS1_SCRIPT")"
     [ -n "$block" ]
     grep -qF 'Test-Path "$env:USERPROFILE\.local\bin\dotf.exe"' <<<"$block"
