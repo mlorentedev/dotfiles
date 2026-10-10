@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
@@ -194,9 +195,16 @@ func probeSuffix(s *secrets.Secret) string {
 func pushRotatedToCI(out io.Writer, s *secrets.Secret, dryRun bool) error {
 	var repos []string
 	for _, c := range s.Consumers {
-		if repo, ok := strings.CutPrefix(c, "ci:"); ok {
-			repos = append(repos, repo)
+		repo, ok := strings.CutPrefix(c, "ci:")
+		if !ok {
+			continue
 		}
+		// Every consumer is checked before the first upload, so a registry typo
+		// cannot leave some repos on the new credential and the rest on the old.
+		if !initrepo.ValidRepoSlug(repo) {
+			return fmt.Errorf("rotated, but %s declares an invalid ci consumer %q (want ci:owner/name); nothing was pushed", s.ID, c)
+		}
+		repos = append(repos, repo)
 	}
 	if len(repos) == 0 {
 		_, _ = fmt.Fprintf(out, "note     %s has no ci: consumer — nothing to push\n", s.ID)

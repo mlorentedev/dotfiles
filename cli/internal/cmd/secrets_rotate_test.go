@@ -389,3 +389,27 @@ func TestRotate_DryRunPushCINamesTheReposAndUploadsNothing(t *testing.T) {
 		t.Errorf("--dry-run must name both repos it would push to\n%s", out)
 	}
 }
+
+// A malformed ci: consumer is a registry bug. It fails before any upload, as
+// `sync ci` refuses an invalid --repo, rather than calling GitHub with an empty
+// or garbled repo after the valid ones were already pushed.
+func TestRotate_PushCIRefusesAMalformedCIConsumerBeforeUploading(t *testing.T) {
+	rw := &fakeRW{fields: map[string]string{"dockerhub/PAT": "old-value"}}
+	out := rotateHarness(t, rw, &fakeSyncer{})
+	uploads := fakeSetter{}
+	useGHSecretSetter(t, uploads)
+	useTempRegistry(t, strings.Replace(pushCIRegistry, "[ci:o/a, ci:o/b, local]", "[ci:o/a, \"ci:\", local]", 1))
+
+	cmd := newSecretsRotateCmd()
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetIn(strings.NewReader("new-value"))
+	cmd.SetArgs([]string{"DOCKERHUB_TOKEN", "--push-ci"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "invalid ci consumer") {
+		t.Fatalf("want a refusal naming the malformed consumer, got %v\n%s", err, out)
+	}
+	if len(uploads) != 0 {
+		t.Errorf("nothing may be uploaded when a consumer is malformed, got %v", uploads)
+	}
+}
