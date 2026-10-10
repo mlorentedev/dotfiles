@@ -13,48 +13,22 @@ created: "2026-08-15"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/CLI-037-secrets-rotate`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions"
+- [x] Command shipped before the spec was filled: #1003 (`36448473`), then the write path on `bw serve` in #1007 (`fe2f1913`)
+- [x] `proposal.md` filled from #996 (2026-10-10)
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
-
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+- [x] [AC1] [AC2] [AC3] Tests for write + sync + read-back, the unchanged-fingerprint failure, the no-op refusal and the refusal to create; `secrets_rotate.go` (#1003)
+- [x] [AC5] `--dry-run` test and implementation (#1003)
+- [x] [AC6] Write path through `bw serve` (#1007)
+- [x] [AC4] Failing tests for the probe: a live token passes and is reported, a refused one fails the rotation, and the probe receives the new value. The code was in #1003; the tests were missing. Two mutations (drop the probe call, swallow its error) each fail them
+- [x] [AC7] Failing tests for `--push-ci`: both CI consumers get the new value and nothing else, no flag uploads nothing, no CI consumer is a note, `--dry-run` names the repos
+- [x] [AC7] Extract `pushCI` from `secrets sync ci` and implement `--push-ci` on it, so a rotated value reaches CI through the same skip rules. Four mutations each killed
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-
-## Machine-readable features
-
-This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
-
-**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
-
-Minimal `features.json` skeleton (drop into `<repo>/specs/CLI-037-secrets-rotate/features.json`):
-
-```json
-[
-  {
-    "id": "CLI-037-secrets-rotate-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+- [x] Every acceptance criterion is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] `go build`, `go vet` (also `GOOS=windows`), `go test ./...` and golangci-lint pass
+- [x] `verification.md` filled in
+- [ ] Independent adversarial review, then archive
