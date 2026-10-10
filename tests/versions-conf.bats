@@ -161,7 +161,9 @@ setup() {
 # running at their pin" and doctor red, while CI, which builds dotf from the
 # tree, stays green (lesson 373). The tree's dotf asks them the right way
 # (versionArgs in cli/internal/tools/mise.go); each may be marked once
-# DOTF_VERSION is a release carrying it (#2013).
+# DOTF_VERSION is a release carrying it (#2013). `last` is the newest release
+# without the table: if a release ships before versionArgs merges, raise it to
+# that release, and check a release's notes name versionArgs before marking.
 @test "versions.conf marks no CLI without --version while DOTF_VERSION probes only --version" {
     run awk -v last="0.66.0" '
         function gt(a, b,   x, y, i) {
