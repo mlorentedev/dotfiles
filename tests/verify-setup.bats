@@ -175,6 +175,21 @@ setup() {
     grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"
 }
 
+@test "~/.claude/settings.json is merged by dotf deploy, not by a setup block (#2000)" {
+    # The `claude-settings` entry of ai/deploy.json is the only writer since the
+    # jq and PowerShell twins went, so this fails if that entry stops applying on
+    # a fresh box. The merge's invariant: every template key holds the template's
+    # value. attribution is in the template, so a trailer cannot come back.
+    command -v jq >/dev/null 2>&1 || skip "jq not on PATH"
+    local f="$HOME/.claude/settings.json" tmpl="$REPO_DIR/ai/claude/settings.json"
+    [ -f "$f" ]
+    jq -e --slurpfile t "$tmpl" '
+        . as $box | $t[0] | del(.["$schema"], .permissions, .env, .enabledPlugins)
+        | to_entries | all(.value == $box[.key])' "$f"
+    # permissions, env and enabledPlugins are merged, so the box may extend them.
+    jq -e --slurpfile t "$tmpl" '{permissions, env, enabledPlugins} | contains($t[0] | {permissions, env, enabledPlugins})' "$f"
+}
+
 @test "~/.claude/skills has at least 15 directories" {
     count=$(find "$HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)
     [ "$count" -ge 15 ]
@@ -226,6 +241,16 @@ setup() {
     [ -f "$settings" ]
     "$jq_bin" -e '.defaultModel | type == "string"' "$settings"
     "$jq_bin" -e '.compaction.modelOverrides["nan/deepseek-v4-flash"].reserveTokens == 600000' "$settings"
+}
+
+# #1484: the image carries npm since #2254, so setup installs pi and runs the pi
+# package reconcile for real. Its exit status is a warning by design, so the
+# result is what is checked (lesson 379): pi's settings.json records every
+# package ai/pi/packages.json declares and nothing it does not.
+@test "pi packages converge on ai/pi/packages.json [#1484]" {
+    [ -x "$HOME/.local/bin/pi" ] || { echo "setup did not install pi into ~/.local/bin"; return 1; }
+    run dotf pi packages check --repo "$REPO_DIR"
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
 }
 
 # =============================================================================
@@ -342,6 +367,17 @@ setup() {
     grep -q 'Single Source of Truth' "$HOME/.config/opencode/AGENTS.md"
 }
 
+@test "opencode.jsonc deployed by dotf deploy, private, not by a setup block (#1843 B12)" {
+    # The `opencode` entry of ai/deploy.json is the only writer. The container
+    # holds no secrets, so the render leaves the {env:VAR} placeholders, which
+    # opencode resolves itself (measured, see ai/deploy.json): the file must
+    # still be installed, at 0600 because on a real machine it holds API keys.
+    f="$HOME/.config/opencode/opencode.jsonc"
+    [ -f "$f" ]
+    [ "$(stat -c '%a' "$f")" = "600" ]
+    grep -qF '"$schema"' "$f"
+}
+
 @test "opencode tui.json deployed by dotf deploy, not by a setup block (#1843 B11)" {
     # The setup copy was deleted; the `opencode-tui` entry of ai/deploy.json is
     # now the only writer, so this fails if that entry stops applying. The entry
@@ -383,12 +419,6 @@ setup() {
     # rendered command carries provenance + drops name: (opencode keys off filename)
     grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/spec.md"
     refute_grep '^name:' "$HOME/.config/opencode/commands/spec.md"
-}
-
-@test "no MCP servers registered (claude CLI absent)" {
-    # setup-linux.sh skips MCP registration when claude is not found
-    # Just verify it didn't crash — the container built successfully
-    true
 }
 
 @test "shellcheck comes from mise at its pin, with no copy in ~/.local/bin to shadow it (#2013 W2)" {
@@ -575,6 +605,15 @@ setup() {
         printf '%s\n' "$output" | tail -40 >&2
         return 1
     fi
+
+    # The first run converged pi's packages, so the second run's reconcile must
+    # install and remove nothing (#1484). A reinstall that rewrote the same bytes
+    # would pass the hash diff below; the reconcile's own count does not.
+    printf '%s\n' "$output" | grep -q '^pi packages already reconciled ' || {
+        echo "the second run's pi package reconcile was not a no-op:" >&2
+        printf '%s\n' "$output" | grep 'pi packages' >&2
+        return 1
+    }
 
     # Collect hashes after second run
     find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
