@@ -133,9 +133,9 @@ func hookCommands(t *testing.T, doc map[string]any, event string) []string {
 // command was built around, from the adopting side.
 //
 // The deployed SessionStart hook runs our exact command and carries no marker.
-// `isOurs` does not recognise it (its substring fallback only covers the gate),
-// so without `sameCommand`'s exact-command adoption rule, bind would APPEND a
-// second entry and every session would run `dotf mem session-start` twice.
+// `isOurs` recognises it by its command signature (the dotf binary followed by
+// the manifest's arguments); without that, bind would APPEND a second entry and
+// every session would run `dotf mem session-start` twice.
 func TestBindAdoptsTheUnmarkedMemHookInsteadOfDuplicating(t *testing.T) {
 	home, raw, dotf := bindFixture(t, liveShapedSettings)
 	root := repoRootForTest(t)
@@ -180,7 +180,7 @@ func TestBindNeverTouchesAForeignHook(t *testing.T) {
 	for _, ev := range []string{"SessionStart", "PreToolUse", "Stop"} {
 		for _, want := range hookCommands(t, before, ev) {
 			if want == dotf+" mem session-start" || want == dotf+" mem session-end" {
-				continue // ours; adopted and re-emitted with a marker
+				continue // ours; adopted in place
 			}
 			if !contains(hookCommands(t, after, ev), want) {
 				t.Errorf("bind deleted a foreign %s hook: %q\nafter: %v",
@@ -189,10 +189,10 @@ func TestBindNeverTouchesAForeignHook(t *testing.T) {
 		}
 	}
 
-	// Ours become marked, so the foreign count DROPS by exactly the two we
-	// adopted -- never below that, which would mean a third party's entry was
-	// claimed or removed.
-	if got, want := harness.ForeignHookCount(after), beforeForeign-2; got != want {
+	// Our unmarked entries run the dotf binary, so they were never counted as
+	// foreign: the count is unchanged. Below it would mean a third party's
+	// entry was claimed or removed.
+	if got, want := harness.ForeignHookCount(after), beforeForeign; got != want {
 		t.Errorf("foreign hook count = %d, want %d (was %d before)", got, want, beforeForeign)
 	}
 }
