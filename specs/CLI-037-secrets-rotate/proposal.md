@@ -48,7 +48,7 @@ From #996, plus its `--push-ci` flag:
 - [x] **AC4.** An entry declaring `validate:` is probed with the new value after the write, and a failing probe fails the rotation.
 - [x] **AC5.** `--dry-run` reports the intended action, the current fingerprint, the probe and the CI repos that would be pushed, writing nothing.
 - [x] **AC6.** Works with no ambient `BW_SESSION` through `bw serve` (#993, fixed by #1007).
-- [x] **AC7.** `--push-ci` uploads the rotated value to every `ci:<repo>` consumer and to nothing else; without the flag nothing is uploaded; a secret with no CI consumer says so and still succeeds.
+- [x] **AC7.** `--push-ci` uploads the rotated value to every `ci:<repo>` consumer and to nothing else; without the flag nothing is uploaded; a secret with no CI consumer says so and still succeeds; a malformed `ci:` consumer is refused before anything is uploaded.
 
 ## References
 

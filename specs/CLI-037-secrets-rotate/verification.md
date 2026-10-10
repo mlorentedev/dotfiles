@@ -13,7 +13,7 @@ created: "2026-08-15"
 - [x] **AC4:** `TestRotate_ProbesTheNewValueAndFailsWhenItDoesNotAuthenticate` (added 2026-10-10; mutations "drop the probe call" and "swallow its error" both fail it).
 - [x] **AC5:** `TestRotate_DryRunWritesNothing`, `TestRotate_DryRunPushCINamesTheReposAndUploadsNothing`.
 - [x] **AC6:** #1007 (`fe2f1913`) put the write path on `bw serve`: `TestSelectBWBackend_ReadAndWriteAlwaysAgree`, `TestBWServeWriter_SetField_UpdatesAndPreserves`. #993 closed 2026-08-16.
-- [x] **AC7:** `TestRotate_PushCIUploadsTheNewValueToEveryCIConsumer`, `TestRotate_WithoutPushCIUploadsNothing`, `TestRotate_PushCIWithNoCIConsumerSaysSo`. Mutations: no push, dry-run pushes, push without the flag, every consumer read as CI; all killed.
+- [x] **AC7:** `TestRotate_PushCIUploadsTheNewValueToEveryCIConsumer`, `TestRotate_WithoutPushCIUploadsNothing`, `TestRotate_PushCIWithNoCIConsumerSaysSo`, `TestRotate_PushCIRefusesAMalformedCIConsumerBeforeUploading`. Mutations: no push, dry-run pushes, push without the flag, every consumer read as CI; all killed.
 
 ## Test status
 
@@ -26,6 +26,7 @@ created: "2026-08-15"
 
 - **`--push-ci` reuses `sync ci`'s upload half rather than shelling out to it or copying it.** `pushCI` now carries the skip reporting, resolve-before-upload and liveness gate for both commands.
 - **The push skips its own liveness gate.** It runs only after the rotation was read back and, where declared, probed live; probing the same value twice adds a network call and no information.
+- **Every `ci:` consumer is validated before the first upload** (`initrepo.ValidRepoSlug`, the guard `sync ci` applies to `--repo`), so a registry typo cannot leave some repos rotated and the rest on the old credential.
 - **A secret with no CI consumer is a note, not an error,** because the rotation itself succeeded.
 - **Every `ci:` consumer is pushed, not the current repo's only.** A rotated credential that stays old in one consuming repo is the half-rotation this command exists to remove.
 
