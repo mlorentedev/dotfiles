@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -304,5 +305,43 @@ func TestRunMaintainNilNotifierIsSafe(t *testing.T) {
 
 	if err := RunMaintain(io.Discard, opts); err != nil {
 		t.Fatalf("a nil Notifier must be a no-op, got %v", err)
+	}
+}
+
+// Each OS reaches its own notifier. macOS has Notification Center through
+// osascript, and the text travels as argv, so a quote in it cannot alter the
+// script. Linux skips the notification when notify-send is absent.
+func TestNotifyCommand_ReachesEachOSNotifier(t *testing.T) {
+	none := func(string) string { return "" }
+	yes := func(string) bool { return true }
+	title, body := `Vault "maintenance"`, "3 issue line(s)"
+
+	mac := notifyCommand("darwin", UrgencyNormal, title, body, yes, none, 501)
+	if mac == nil || mac.Args[0] != "osascript" {
+		t.Fatalf("darwin: %v, want osascript", mac)
+	}
+	if got := mac.Args[len(mac.Args)-2:]; got[0] != title || got[1] != body {
+		t.Errorf("darwin passes %q, want the title and body as argv", got)
+	}
+	script := strings.Join(mac.Args[:len(mac.Args)-2], " ")
+	for _, text := range []string{"maintenance", "issue line"} {
+		if strings.Contains(script, text) {
+			t.Errorf("darwin splices %q into the script: %s", text, script)
+		}
+	}
+
+	linux := notifyCommand("linux", UrgencyLow, title, body, yes, none, 1000)
+	if linux == nil || strings.Join(linux.Args, "|") != "notify-send|-u|low|"+title+"|"+body {
+		t.Errorf("linux: %v", linux)
+	}
+	if !slices.Contains(linux.Env, "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus") {
+		t.Error("linux: no session bus default for a cron caller")
+	}
+	if c := notifyCommand("linux", UrgencyLow, title, body, func(string) bool { return false }, none, 1000); c != nil {
+		t.Errorf("linux without notify-send: %v, want nothing to run", c)
+	}
+
+	if win := notifyCommand("windows", UrgencyLow, title, body, yes, none, 0); win == nil || win.Args[0] != "powershell" {
+		t.Errorf("windows: %v, want powershell", win)
 	}
 }

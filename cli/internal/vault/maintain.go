@@ -224,11 +224,29 @@ func RunMaintain(w io.Writer, opts MaintainOptions) error {
 	return nil
 }
 
-// NotifyDesktop is the default Notifier: notify-send on Linux, a NotifyIcon
-// balloon via powershell on Windows. Both are fire-and-forget — every error is
-// discarded, matching the twins.
+// NotifyDesktop is the default Notifier: Notification Center via osascript on
+// macOS, a NotifyIcon balloon via powershell on Windows, notify-send elsewhere.
+// It is fire-and-forget: every error is discarded, matching the twins.
 func NotifyDesktop(urgency Urgency, title, body string) {
-	switch runtime.GOOS {
+	has := func(name string) bool { _, err := exec.LookPath(name); return err == nil }
+	if cmd := notifyCommand(runtime.GOOS, urgency, title, body, has, os.Getenv, os.Getuid()); cmd != nil {
+		_ = cmd.Run()
+	}
+}
+
+// notifyCommand is the command NotifyDesktop runs on goos, or nil when that
+// OS's notifier is not installed.
+func notifyCommand(goos string, urgency Urgency, title, body string, has func(string) bool, getenv func(string) string, uid int) *exec.Cmd {
+	switch goos {
+	case "darwin":
+		// The text reaches AppleScript as argv, never spliced into the script,
+		// so a quote in a title cannot break or extend it. Notification Center
+		// has no urgency level.
+		return exec.Command("osascript",
+			"-e", "on run argv",
+			"-e", "display notification (item 2 of argv) with title (item 1 of argv)",
+			"-e", "end run",
+			title, body)
 	case "windows":
 		// The balloon dies with the process that owns it, so the .ps1's
 		// Start-Sleep 11 (one second past the 10s ShowBalloonTip) is load-bearing
@@ -242,22 +260,20 @@ $b.Visible = $true
 $b.ShowBalloonTip(10000)
 Start-Sleep -Seconds 11
 $b.Dispose()`, title, body)
-		_ = exec.Command("powershell", "-NoProfile", "-Command", script).Run()
-	default:
-		if _, err := exec.LookPath("notify-send"); err != nil {
-			return
-		}
-		cmd := exec.Command("notify-send", "-u", string(urgency), title, body)
-		// The .sh defaults both when unset because cron inherits neither
-		// (scripts/vault-maintenance-weekly.sh:43-44).
-		cmd.Env = os.Environ()
-		if os.Getenv("DISPLAY") == "" {
-			cmd.Env = append(cmd.Env, "DISPLAY=:0")
-		}
-		if os.Getenv("DBUS_SESSION_BUS_ADDRESS") == "" {
-			cmd.Env = append(cmd.Env,
-				fmt.Sprintf("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%d/bus", os.Getuid()))
-		}
-		_ = cmd.Run()
+		return exec.Command("powershell", "-NoProfile", "-Command", script)
 	}
+	if !has("notify-send") {
+		return nil
+	}
+	cmd := exec.Command("notify-send", "-u", string(urgency), title, body)
+	// The .sh defaults both when unset because cron inherits neither
+	// (scripts/vault-maintenance-weekly.sh:43-44).
+	cmd.Env = os.Environ()
+	if getenv("DISPLAY") == "" {
+		cmd.Env = append(cmd.Env, "DISPLAY=:0")
+	}
+	if getenv("DBUS_SESSION_BUS_ADDRESS") == "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%d/bus", uid))
+	}
+	return cmd
 }
