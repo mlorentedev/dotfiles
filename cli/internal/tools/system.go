@@ -161,10 +161,15 @@ func appInApplications(bundle string) bool {
 // converge, CI) never hangs on a prompt; dotf neither caches credentials nor
 // prompts for one. The setup scripts avoid sudo and ask the user to run it
 // once, which is what installSystem falls back to when sudo needs a password.
+//
+// --no-remove makes apt abort instead of removing a package to satisfy the new
+// one: with -y it would otherwise remove what conflicts without asking, and
+// Ubuntu's docker-compose-v2 depends on docker.io, which displaces Docker's
+// docker-ce on a box that runs it (#2013 P5b).
 func (in *Installer) systemInstallArgv(manager, pkg string) []string {
 	switch manager {
 	case "apt":
-		argv := []string{"apt-get", "install", "-y", pkg}
+		argv := []string{"apt-get", "install", "-y", "--no-remove", pkg}
 		if !in.IsRoot() {
 			argv = append([]string{"sudo", "-n"}, argv...)
 		}
