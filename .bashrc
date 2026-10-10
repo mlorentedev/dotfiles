@@ -229,7 +229,10 @@ command -v zoxide >/dev/null && eval "$(zoxide init bash)"
 if [ -f /usr/share/bash-completion/bash_completion ]; then
     . /usr/share/bash-completion/bash_completion
 fi
-complete -o nospace -C /usr/bin/terraform terraform
+# Terraform completion, from whichever terraform is on PATH (#2013 F-042)
+if command -v terraform >/dev/null; then
+    complete -o nospace -C "$(command -v terraform)" terraform
+fi
 
 # Stop xtrace and surface the profile log path if profiling was enabled
 if [[ -n "${DOTFILES_PROFILE:-}" ]]; then
