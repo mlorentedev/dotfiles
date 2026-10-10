@@ -84,8 +84,10 @@ dotfiles is the canonical project for every other repository, and every developm
    provisioned on the deploy path. It passes kubelab ADR-028's 3 AM test because the GitHub repositories it
    serves are always on. Deployment is kubelab#2156.
 4. **Agents land through one interface.** `dotf pr land <n>` checks the same conditions as today, adds the
-   merge label, and waits for the PR to merge or be ejected. No agent updates a branch or calls a forge's merge
-   API directly. A GitLab adapter (marge-bot or merge trains) is added behind the same command only if a GitLab
+   merge label, and returns. It does not hold the session while the queue runs: an agent hands the PR over,
+   as it does with CI today. `dotf pr land --status <n>` reads where the PR is (queued, testing, merged or
+   ejected with gitea-mq's reason) for an agent whose next step depends on the merge. No agent updates a
+   branch or calls a forge's merge API directly. A GitLab adapter (marge-bot or merge trains) is added behind the same command only if a GitLab
    instance comes into use.
 5. **The queue's half of the protection is declared as code in dotfiles.** `forge/` declares, per repository:
    - the allowed merge methods;
@@ -93,14 +95,20 @@ dotfiles is the canonical project for every other repository, and every developm
    - the required checks, including `gitea-mq`.
 
    `dotf forge … apply/check` converges each forge idempotently, a second run reports `changed=0`, and
-   `dotf doctor` reports drift. The rulesets that gitea-mq's auto-setup would have created are this
-   declaration's job. This extends GUARD-017.
+   `dotf doctor` reports drift. The required `gitea-mq` check that its auto-setup would have added through a
+   ruleset is added here, through the classic branch protection that `forge/` already manages. That works on
+   every plan, public or private, so no ruleset is needed. This extends GUARD-017.
 6. **CI has two lanes, published as templates from dotfiles:**
    - **Pull-request lane:** lint, unit tests and the review, fast, on every push.
    - **Queue lane:** the expensive jobs (Windows, macOS, integration), on `push` to `gitea-mq/**` branches.
 
-   Every required check reports in the queue lane, or the queue waits for it forever. The LLM review never
-   runs there. The templates are reusable workflows, which Gitea Actions also reads, so other repositories
+   gitea-mq waits on the merge branch for every check that branch protection requires, so every required
+   check reports in the queue lane, or the queue waits for it forever. The checks that judge the PR itself
+   (`review-attestation`, `spec-gate`, `knowledge-gate`) are not re-run there, and the LLM review never runs
+   there. Their queue-lane job passes only if the same check passed on the PR head that the candidate merges.
+   That head is the merge commit's second parent, so the check reads it from the commit and never from the
+   branch name: a branch named to match would otherwise grant the check (git-workflow, "branch-name
+   matching"). GitHub still enforces the PR-lane checks on the PR head when gitea-mq merges it. The templates are reusable workflows, which Gitea Actions also reads, so other repositories
    consume them instead of copying them.
 7. **Enqueueing is the supervised act.** A PR is labelled only under the conditions that authorize a merge
    today: the user authorized that PR, or the ADR-047 grant holds.
