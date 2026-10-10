@@ -231,6 +231,7 @@ the same rule a second time. The rule now has one definition, and darwin is a ke
   `contractOS` and `env.defaultFor` are gone, and `checks_profile.go` reads through the same function
 - [x] A declared darwin key wins even when empty, so darwin can opt out of a linux default
 - [x] The contract sections name the OS they read: `(contract, darwin; undeclared keys read linux)`
+- [x] An OS with no PATH-entries key, directly or by fallback, warns rather than printing an empty section that reads as a clean PATH
 - [x] `env-contract.json` states the rule in `_comment`. No darwin value is added: none differs from linux
   today, and the first is `HERDR_CONFIG_PATH` (#2013 H4)
 - [x] A test reads the real contract and fails on a key that is not linux, darwin or windows (a `macos`

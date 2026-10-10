@@ -64,7 +64,13 @@ func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 // will set it on next login), never a hard FAIL.
 func checkContractPath(sys *System, c *Contract, rep *Report) {
 	rep.Section("PATH entries (contract" + contractScope(sys) + ")")
-	entries, _, _ := envpkg.ForOS(c.RequiredPathEntries, sys.GOOS)
+	entries, _, ok := envpkg.ForOS(c.RequiredPathEntries, sys.GOOS)
+	if !ok {
+		// An OS the contract has no key for checks nothing, and an empty
+		// section would read as a clean PATH.
+		rep.Warn("no required PATH entries declared for " + envpkg.ContractOS(sys.GOOS) + " — add its key to env-contract.json")
+		return
+	}
 	for _, entry := range entries {
 		expanded := expandHome(sys, entry)
 		if pathContains(sys, expanded) {

@@ -154,3 +154,17 @@ func TestCheckContractOnDarwin(t *testing.T) {
 		}
 	})
 }
+
+// TestCheckContractPathWarnsOnAnOSWithNoKey: an OS the contract declares no
+// entries for (directly or by fallback) warns, rather than printing an empty
+// section that reads as a clean PATH.
+func TestCheckContractPathWarnsOnAnOSWithNoKey(t *testing.T) {
+	contract := &Contract{RequiredPathEntries: map[string][]string{"linux": {"$HOME/.local/bin"}}}
+	s := newSys(map[string]string{"HOME": t.TempDir()}, nil, nil)
+	s.GOOS = "freebsd"
+	var buf bytes.Buffer
+	checkContractPath(s, contract, capture(&buf))
+	if out := buf.String(); !strings.Contains(out, "no required PATH entries declared for freebsd") {
+		t.Errorf("want a WARN naming the OS with no key\n%s", out)
+	}
+}
