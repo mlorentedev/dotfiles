@@ -2,6 +2,7 @@ package harness
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -44,6 +45,28 @@ func TestDeployDirSetExistsInTheCheckout(t *testing.T) {
 		if !isDir(filepath.Join(root, d)) {
 			t.Errorf("DeployDirTrees names %q, which the checkout does not have", d)
 		}
+	}
+}
+
+// The mirror filters what git ignores only where it walks a tree. A file it
+// copies by name is a declaration, so it must be tracked: an ignored local file
+// under one of these names would deploy, the #2268 defect by another door.
+func TestMirrorNamedFilesAreTracked(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	root := repoRootForTest(t)
+	if err := exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree").Run(); err != nil {
+		t.Skip("the checkout is not a git repository")
+	}
+	targets, err := manifestTargets(filepath.Join(root, filepath.FromSlash(ManifestFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	named := append(append([]string{}, DeployDirFiles...), targets...)
+	args := append([]string{"-C", root, "ls-files", "--error-unmatch", "--"}, named...)
+	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil { //nolint:gosec // fixed binary, args built here
+		t.Errorf("a file the mirror copies by name is not tracked:\n%s", out)
 	}
 }
 

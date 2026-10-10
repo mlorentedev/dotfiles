@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -209,5 +210,25 @@ func TestHarnessMirrorCmd_NamesAnOrphanItLeaves(t *testing.T) {
 	}
 	if _, err := os.Stat(mine); err != nil {
 		t.Error("an unproven orphan was removed")
+	}
+}
+
+// Inside a git checkout whose git fails, ignored files are mirrored, and the
+// command says so with git's own reason rather than copying them silently.
+// runHarnessMirror marks the checkout with an empty .git directory, which git
+// refuses as a repository.
+func TestHarnessMirrorCmd_NamesAGitFailureThatMirrorsIgnoredFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "harness", "manifest.json"), `{"targets":[]}`)
+
+	out, stderr, err := runHarnessMirror(t, repo, deploy)
+	if err != nil {
+		t.Fatalf("%v\n%s%s", err, out, stderr)
+	}
+	if !strings.Contains(stderr, "so they were mirrored") || !strings.Contains(stderr, "not a git repository") {
+		t.Errorf("the git failure and its cause must be named:\n%s", stderr)
 	}
 }

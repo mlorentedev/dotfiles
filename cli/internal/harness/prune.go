@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,9 +25,14 @@ var PrunedDeployDirTrees = []string{".zsh", "ssh", "scripts"}
 // GitRunner runs git with args in dir and returns its stdout.
 type GitRunner func(dir string, args ...string) (string, error)
 
-// ExecGit is the production GitRunner.
+// ExecGit is the production GitRunner. A failure carries git's own stderr,
+// because "exit status 128" alone names neither the cause nor the remedy.
 func ExecGit(dir string, args ...string) (string, error) {
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output() //nolint:gosec // fixed binary, args built here
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && len(bytes.TrimSpace(exitErr.Stderr)) > 0 {
+		err = fmt.Errorf("%w: %s", err, bytes.TrimSpace(exitErr.Stderr))
+	}
 	return string(out), err
 }
 
@@ -49,12 +55,49 @@ type Orphans struct {
 	Unreadable []string
 }
 
-// ScanOrphans lists the orphans of the pruned trees. It reads the checkout's
-// history only when there is an orphan to classify, so a converged deploy dir
-// costs no git call. A tree the checkout lacks is not scanned: that is the
-// wrong checkout or a broken one, and reading every deployed file there as an
-// orphan would prune the whole tree.
+// IgnoredInCheckout is every untracked file git ignores under the deploy-dir
+// trees and harness/, slash-separated and relative to the checkout. The mirror
+// skips them when it walks a tree: a local, ignored or generated file in a
+// checkout is not part of what it deploys (scripts/CLAUDE.md, a retired memory
+// tool's output, reached PATH this way, #2268). The files the mirror copies by
+// name (DeployDirFiles, the manifest targets) are declarations, and a test
+// requires each to be tracked.
+//
+// A checkout without .git (a tarball) ignores nothing and mirrors as it always
+// did. That is decided before git is asked, not after it fails: git walks up
+// from such a tree, so a tarball extracted inside another repository would get
+// that repository's ignore rules, and a catch-all one would skip every file
+// without a word. Inside a git checkout a failing git also ignores nothing,
+// but that is not silent: the second result says why, for the caller to report.
+// So does a .git that cannot be checked, which is not proof of a tarball.
+func IgnoredInCheckout(repoRoot string, git GitRunner) (map[string]bool, string) {
+	if _, err := os.Lstat(filepath.Join(repoRoot, ".git")); errors.Is(err, fs.ErrNotExist) {
+		return nil, ""
+	} else if err != nil {
+		return nil, "the checkout's .git could not be checked (" + err.Error() + "), so its ignored files were mirrored"
+	}
+	args := append([]string{"ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "harness"}, DeployDirTrees...)
+	out, err := git(repoRoot, args...)
+	if err != nil {
+		return nil, "git could not list the checkout's ignored files (" + err.Error() + "), so they were mirrored"
+	}
+	ignored := map[string]bool{}
+	for _, rel := range strings.Split(out, "\x00") {
+		if rel != "" {
+			ignored[rel] = true
+		}
+	}
+	return ignored, ""
+}
+
+// ScanOrphans lists the orphans of the pruned trees: deployed files the
+// checkout does not have, or has only as an ignored file the mirror skips. It
+// reads the checkout's history only when there is an orphan to classify, so a
+// converged deploy dir costs one cheap ls-files and no log. A tree the checkout
+// lacks is not scanned: that is the wrong checkout or a broken one, and reading
+// every deployed file there as an orphan would prune the whole tree.
 func ScanOrphans(repoRoot, deployDir string, git GitRunner) (Orphans, error) {
+	ignored, _ := IgnoredInCheckout(repoRoot, git) // Mirror reports a failure
 	var orphans, unreadable []string
 	for _, tree := range PrunedDeployDirTrees {
 		if !isDir(filepath.Join(repoRoot, tree)) || !isDir(filepath.Join(deployDir, tree)) {
@@ -77,7 +120,7 @@ func ScanOrphans(repoRoot, deployDir string, git GitRunner) (Orphans, error) {
 			if err != nil {
 				return err
 			}
-			if _, err := os.Lstat(filepath.Join(repoRoot, rel)); errors.Is(err, fs.ErrNotExist) {
+			if _, err := os.Lstat(filepath.Join(repoRoot, rel)); errors.Is(err, fs.ErrNotExist) || ignored[filepath.ToSlash(rel)] {
 				orphans = append(orphans, filepath.ToSlash(rel))
 			}
 			return nil

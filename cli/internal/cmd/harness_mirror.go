@@ -71,6 +71,9 @@ func newHarnessMirrorCmd() *cobra.Command {
 // reportPrune names every leftover the mirror removed and every orphan it had
 // to leave, so a prune is never silent and an unproven orphan is never hidden.
 func reportPrune(cmd *cobra.Command, res harness.MirrorResult) {
+	if res.IgnoreSkipped != "" {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "harness mirror: %s\n", res.IgnoreSkipped)
+	}
 	for _, rel := range res.Pruned {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "harness mirror: pruned %s (deleted from the checkout)\n", rel)
 	}

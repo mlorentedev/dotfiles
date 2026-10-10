@@ -139,3 +139,21 @@ func TestRecordsMirror_PrunesALeftoverTheCheckoutDeleted(t *testing.T) {
 		t.Errorf("second plan: want 0 changes, got %d, err %v", again.Changes, err)
 	}
 }
+
+// The converge detail carries the same warning as the command: a git failure
+// inside a checkout mirrors ignored files, and the report says so.
+func TestRecordsMirror_NamesAGitFailureThatMirrorsIgnoredFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	env := recordsEnv(t)
+	writeFixture(t, env.RepoRoot, map[string]string{".git": "gitdir: " + filepath.Join(env.RepoRoot, "nowhere") + "\n"})
+
+	res, err := recordsMirror{}.Reconcile(env, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Detail, "so they were mirrored") {
+		t.Errorf("the detail must name the git failure: %s", res.Detail)
+	}
+}

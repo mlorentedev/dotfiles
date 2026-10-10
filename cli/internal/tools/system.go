@@ -206,9 +206,15 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 	case p.Installed != "":
 		p.Action = PlanSkip
 	case in.missingSystemTool(t) != "":
-		p.Action = PlanMissingManager
+		p.Action, p.Note = PlanMissingManager, "waits on "+in.missingSystemTool(t)
 	default:
 		p.Action = PlanInstall
+		manager, pkg := t.Source.SystemPackage(in.GOOS)
+		if argv := in.systemInstallArgv(manager, pkg); in.needsSudoPassword(argv) {
+			// The classifier the apply uses after sudo -n refuses, asked up
+			// front, so a plan never promises an install the apply skips.
+			p.Action, p.Note = PlanNeedsSudo, sudoCommand(argv)
+		}
 	}
 	return p
 }
@@ -230,7 +236,7 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 			// A named outcome, not a failure: nothing is wrong with the entry
 			// or the machine, only the privilege dotf may not ask for. It says
 			// what to run, and the other tools still converge.
-			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, strings.Join(append([]string{"sudo"}, argv[2:]...), " "))
+			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; %s\n", t.Name, sudoCommand(argv))
 			return Skipped, nil
 		}
 		return Skipped, fmt.Errorf("%s: %s: %w", t.Name, strings.Join(argv, " "), err)
@@ -242,6 +248,11 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	return Installed, nil
 }
 
+// sudoCommand is what to run by hand for a `sudo -n` argv dotf could not run.
+func sudoCommand(argv []string) string {
+	return "run: " + strings.Join(append([]string{"sudo"}, argv[2:]...), " ")
+}
+
 // needsSudoPassword reports whether a failed install failed because sudo wanted
 // a password. sudo -n exits 1 for that and for any other failure of the command,
 // so the failure is classified by asking sudo again with a command that cannot
@@ -250,10 +261,14 @@ func (in *Installer) needsSudoPassword(argv []string) bool {
 	if len(argv) < 2 || argv[0] != "sudo" || argv[1] != "-n" {
 		return false
 	}
-	query := in.Query
-	if query == nil {
-		query = ExecRunner
+	if in.sudoRefuses == nil {
+		query := in.Query
+		if query == nil {
+			query = ExecRunner
+		}
+		_, err := query("sudo", "-n", "true")
+		refuses := err != nil
+		in.sudoRefuses = &refuses
 	}
-	_, err := query("sudo", "-n", "true")
-	return err != nil
+	return *in.sudoRefuses
 }
