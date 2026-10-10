@@ -228,7 +228,7 @@ setup() {
     "$jq_bin" -e '.compaction.modelOverrides["nan/deepseek-v4-flash"].reserveTokens == 600000' "$settings"
 }
 
-# #1484: the image carries npm since #2251, so setup installs pi and runs the pi
+# #1484: the image carries npm since #2254, so setup installs pi and runs the pi
 # package reconcile for real. Its exit status is a warning by design, so the
 # result is what is checked (lesson 379): pi's settings.json records every
 # package ai/pi/packages.json declares and nothing it does not.
@@ -585,6 +585,15 @@ setup() {
         printf '%s\n' "$output" | tail -40 >&2
         return 1
     fi
+
+    # The first run converged pi's packages, so the second run's reconcile must
+    # install and remove nothing (#1484). A reinstall that rewrote the same bytes
+    # would pass the hash diff below; the reconcile's own count does not.
+    printf '%s\n' "$output" | grep -q 'pi packages: changed=0 ' || {
+        echo "the second run's pi package reconcile was not a no-op:" >&2
+        printf '%s\n' "$output" | grep 'pi packages' >&2
+        return 1
+    }
 
     # Collect hashes after second run
     find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
