@@ -479,7 +479,7 @@ if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; th
         log_success "Claude Code installed"
     elif command -v npm >/dev/null 2>&1; then
         log_info "Falling back to npm install for Claude Code..."
-        npm install -g @anthropic-ai/claude-code || log_warning "Claude Code install failed"
+        npm install -g --prefix "$HOME/.local" @anthropic-ai/claude-code || log_warning "Claude Code install failed"
     else
         log_warning "Claude Code install failed — re-run setup or install manually"
     fi

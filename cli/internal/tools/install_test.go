@@ -257,14 +257,14 @@ func bwTool() Tool {
 
 // newNpmInstaller wires an Installer whose npm Run is recorded into rec and whose
 // PATH version probe is faked via CurrentVersion (current = installed version,
-// "" = absent). Dest is irrelevant — npm globals never touch it. A successful Run
+// "" = absent). Dest's parent is the npm prefix on Linux and macOS. A successful Run
 // installs the version its argv names, as npm and uv do, so the post-install
 // probe sees the tool on PATH; the probe tests override CurrentVersion.
 func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
 	return &Installer{
 		GOOS:           "linux",
 		GOARCH:         "amd64",
-		Dest:           "/unused",
+		Dest:           "/home/u/.local/bin",
 		Out:            io.Discard,
 		CurrentVersion: func(string) string { return current },
 		Run: func(name string, args ...string) error {
@@ -289,8 +289,22 @@ func TestInstallNpm_Fresh(t *testing.T) {
 	if res != Installed {
 		t.Errorf("Result = %v, want Installed", res)
 	}
-	want := "npm install -g @bitwarden/cli@2026.5.0"
+	want := "npm install -g --prefix /home/u/.local @bitwarden/cli@2026.5.0"
 	if len(rec) != 1 || rec[0] != want {
+		t.Errorf("Run calls = %v, want exactly [%q]", rec, want)
+	}
+}
+
+// Windows keeps npm's default prefix, %APPDATA%\npm: it is user-owned and on
+// PATH there, and --prefix would place the shims at the prefix root instead.
+func TestInstallNpm_WindowsKeepsTheDefaultPrefix(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS = "windows"
+	if _, err := in.Install(bwTool()); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if want := "npm install -g @bitwarden/cli@2026.5.0"; len(rec) != 1 || rec[0] != want {
 		t.Errorf("Run calls = %v, want exactly [%q]", rec, want)
 	}
 }
@@ -547,9 +561,11 @@ func hiveTool() Tool {
 
 // uv replaces a different installed version with the pinned one, in either
 // direction, and exits 0 when the pin is already installed (measured with uv
-// 0.9.29), so one argv covers install and upgrade.
+// 0.9.29), so one argv covers install and upgrade. --force lets it replace an
+// entry point another installer left in ~/.local/bin, which uv otherwise
+// refuses with exit 2; decideAction runs it only below the pin or when absent.
 func TestInstallUvTool(t *testing.T) {
-	const want = "uv tool install hive-vault==4.2.2"
+	const want = "uv tool install --force hive-vault==4.2.2"
 	cases := []struct {
 		name, current string
 		want          Result
@@ -580,7 +596,7 @@ func TestInstallUvTool(t *testing.T) {
 func TestInstallUvTool_Failures(t *testing.T) {
 	var rec []string
 	_, err := newNpmInstaller("", &rec, errors.New("exit status 2")).Install(hiveTool())
-	if err == nil || !strings.Contains(err.Error(), "uv tool install hive-vault==4.2.2") {
+	if err == nil || !strings.Contains(err.Error(), "uv tool install --force hive-vault==4.2.2") {
 		t.Errorf("a failed uv run returned %v, want the argv named", err)
 	}
 	noPkg := hiveTool()

@@ -340,9 +340,9 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
 		return Skipped, nil
 	}
-	spec := pkg + "@" + t.Version
-	if err := in.Run("npm", "install", "-g", spec); err != nil {
-		return Skipped, fmt.Errorf("%s: npm install -g %s: %w", t.Name, spec, err)
+	args := append(in.npmPrefixArgs(), pkg+"@"+t.Version)
+	if err := in.Run("npm", args...); err != nil {
+		return Skipped, fmt.Errorf("%s: npm %s: %w", t.Name, strings.Join(args, " "), err)
 	}
 	if err := in.verifyOnPath(t, "npm"); err != nil {
 		return Skipped, err
@@ -353,6 +353,21 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s via npm (%s)\n", t.Name, t.Version, res, pkg)
 	return res, nil
+}
+
+// npmPrefixArgs is the `npm install -g` argv up to the package. On Linux and
+// macOS it names Dest's parent (~/.local) as the prefix, so the binaries land in
+// Dest: user-owned, and on PATH for shells and GUI launchers alike. A bare -g
+// lands wherever the first npm on PATH points, which is root's /usr/local (EACCES)
+// when nvm is not loaded and a per-node-version tree other environments cannot
+// see when it is (lesson 105). setup-linux.sh installs pi this way for the same
+// reason. Windows keeps npm's default prefix, %APPDATA%\npm, which is user-owned
+// and on PATH; --prefix there would place the shims at the prefix root.
+func (in *Installer) npmPrefixArgs() []string {
+	if in.GOOS == "windows" {
+		return []string{"install", "-g"}
+	}
+	return []string{"install", "-g", "--prefix", filepath.Dir(in.Dest)}
 }
 
 // installUvTool provisions a PyPI-distributed tool (source.type "uv-tool") with
@@ -372,9 +387,13 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s: uv is not on PATH; skipping (the next run installs it once uv is there)\n", t.Name)
 		return Skipped, nil
 	}
+	// --force replaces an entry point another installer left in ~/.local/bin,
+	// which uv otherwise refuses with exit 2, so the run could never converge.
+	// decideAction above only gets here below the pin or when absent, so a tool
+	// at or above it is never touched.
 	spec := pkg + "==" + t.Version
-	if err := in.Run("uv", "tool", "install", spec); err != nil {
-		return Skipped, fmt.Errorf("%s: uv tool install %s: %w", t.Name, spec, err)
+	if err := in.Run("uv", "tool", "install", "--force", spec); err != nil {
+		return Skipped, fmt.Errorf("%s: uv tool install --force %s: %w", t.Name, spec, err)
 	}
 	if err := in.verifyOnPath(t, "uv"); err != nil {
 		return Skipped, err
