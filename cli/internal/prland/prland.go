@@ -26,6 +26,9 @@ type Facts struct {
 	MergeState string // CLEAN | BEHIND | DIRTY | BLOCKED | UNSTABLE | ...
 	Checks     []Check
 	Untriaged  bool // the triage queue lists this PR
+	// GrantDeclared is whether the base branch carries GrantFile, the
+	// repository's opt-in to the standing merge grant.
+	GrantDeclared bool
 	// UnknownFor is how long --wait waited on an UNKNOWN merge state with
 	// every check green, so a refusal can say that waiting was tried.
 	UnknownFor time.Duration
@@ -41,6 +44,12 @@ type Check struct {
 // releasePrefix marks release-please branches. Cutting a release is the
 // owner's decision, so a match only ever forfeits the merge, never grants one.
 const releasePrefix = "release-please--"
+
+// GrantFile opts a repository in to the standing merge grant: an agent may
+// merge a PR it opened once CI, conflicts and triage hold (pattern-git-workflow
+// §9, #2178). It is read from the base branch, so a PR cannot add it to grant
+// itself the merge.
+const GrantFile = ".github/merge-grant.yml"
 
 // Decide returns every reason the PR cannot land; none means it can.
 func Decide(f Facts) []string {
@@ -70,6 +79,9 @@ func Decide(f Facts) []string {
 	}
 	if f.Untriaged {
 		r = append(r, "reviewer output awaits triage")
+	}
+	if !f.GrantDeclared {
+		r = append(r, "the repository has not opted in to the standing merge grant ("+GrantFile+" on "+f.BaseRef+"): the owner merges this PR")
 	}
 	return r
 }
@@ -121,7 +133,15 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	if err != nil {
 		return Result{Number: number}, err
 	}
-	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: Decide(f)}
+	granted, err := grantDeclared(ctx, o, f.BaseRef)
+	if err != nil {
+		return Result{Number: number}, err
+	}
+	decide := func(f Facts) []string {
+		f.GrantDeclared = granted
+		return Decide(f)
+	}
+	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: decide(f)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
 	updates := 0
@@ -135,7 +155,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		if f, err = settle(ctx, gh, o, number, true); err != nil {
 			return res, err
 		}
-		res.HeadSHA, res.Reasons = f.HeadSHA, Decide(f)
+		res.HeadSHA, res.Reasons = f.HeadSHA, decide(f)
 	}
 	// A bare "BEHIND" after three updates reads as if none was tried. Say the
 	// base outran CI, which is the race #2083 describes, not a stale branch.
@@ -146,6 +166,24 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		return res, nil
 	}
 	return merge(gh, n, f, res)
+}
+
+// grantDeclared reports whether base carries GrantFile. Only a 404 means it
+// does not; any other failure is an error, because an unanswered question
+// must not read as either answer.
+func grantDeclared(ctx context.Context, o Options, base string) (bool, error) {
+	repo := o.Repo
+	if repo == "" {
+		repo = "{owner}/{repo}" // gh api fills these from the current repository
+	}
+	_, err := o.Run(ctx, "api", "repos/"+repo+"/contents/"+GrantFile+"?ref="+base)
+	switch {
+	case err == nil:
+		return true, nil
+	case strings.Contains(err.Error(), "HTTP 404"):
+		return false, nil
+	}
+	return false, fmt.Errorf("read %s on %s: %w", GrantFile, base, err)
 }
 
 // settle reads the facts and, when wait is set, keeps pausing and re-reading
