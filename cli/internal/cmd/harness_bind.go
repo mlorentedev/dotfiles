@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -105,258 +102,40 @@ func resolveBindInputs(repoRoot, homeDir, dotfPath string) (root, home, binary s
 	}
 	binary = dotfPath
 	if binary == "" {
-		binary = resolveDotfPath(home)
+		binary = harness.ResolveDotfPath(home)
 	}
 	return root, home, binary, nil
 }
 
-// bindTargets emits every selected target, reporting one stable status tag per
-// line: `skip`, `ok`, `would update` or `bind`. Tests assert those tags, not the
-// prose after them.
+// bindTargets binds every selected target and reports one stable status tag
+// per line: `skip`, `ok`, `would update` or `bind`. Tests assert those tags, not
+// the prose after them.
 func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home, binary string, dryRun bool) error {
-	for _, t := range targets {
-		if harnessName != "" && t.Agent != harnessName {
-			continue
-		}
-		if !t.Emits() {
-			_, _ = fmt.Fprintf(out, "skip %s: declared emit:false (%s)\n", t.Agent, t.Format)
-			continue
-		}
-		if t.RequiresCommand != "" {
-			if _, err := exec.LookPath(t.RequiresCommand); err != nil {
-				_, _ = fmt.Fprintf(out, "skip %s: %s is not installed\n", t.Agent, t.RequiresCommand)
-				continue
-			}
-		}
-		hookBinary := hookBinaryTokenForTarget(binary, runtime.GOOS, t.Format)
-		changed, retired, err := bindOne(t, home, hookBinary, dryRun)
-		if err != nil {
-			return fmt.Errorf("%s: %w", t.Agent, err)
-		}
+	outcomes, err := harness.Bind(targets, harness.BindOptions{
+		Home: home, Binary: binary, GOOS: runtime.GOOS, Only: harnessName, DryRun: dryRun,
+		Has: func(name string) bool { _, err := exec.LookPath(name); return err == nil },
+	})
+	for _, o := range outcomes {
 		switch {
-		case !changed:
+		case o.Skip != "":
+			_, _ = fmt.Fprintf(out, "skip %s: %s\n", o.Agent, o.Skip)
+			continue
+		case !o.Changed:
 			// Never an error: "already current" is the steady state the
 			// idempotence doctrine asks for (changed=0 on a re-run).
-			_, _ = fmt.Fprintf(out, "ok   %s: hooks already current\n", t.Agent)
+			_, _ = fmt.Fprintf(out, "ok   %s: hooks already current\n", o.Agent)
 		case dryRun:
-			_, _ = fmt.Fprintf(out, "would update %s: %s\n", t.Agent, t.File)
+			_, _ = fmt.Fprintf(out, "would update %s: %s\n", o.Agent, o.File)
 		default:
-			_, _ = fmt.Fprintf(out, "bind %s: %s\n", t.Agent, t.File)
+			_, _ = fmt.Fprintf(out, "bind %s: %s\n", o.Agent, o.File)
 		}
-		for _, r := range retired {
+		for _, r := range o.Retired {
 			verb := "retire"
 			if dryRun {
 				verb = "would retire"
 			}
-			_, _ = fmt.Fprintf(out, "%s %s: %s (%s on %s)\n", verb, t.Agent, r.File, r.ID, r.Event)
+			_, _ = fmt.Fprintf(out, "%s %s: %s (%s on %s)\n", verb, o.Agent, r.File, r.ID, r.Event)
 		}
 	}
-	return nil
-}
-
-// bindOne merges one target's hooks into its settings file, then retires the
-// hooks the target says it no longer emits. It reports whether the file changed
-// and which retirements took effect.
-//
-// The new home is written BEFORE the old entry is retired. The other order would
-// leave a harness with no hook at all if the write failed halfway, and a gate that
-// is briefly doubled is the smaller harm than one that is briefly absent.
-func bindOne(t harness.BindTarget, home, binary string, dryRun bool) (bool, []harness.RetiredHook, error) {
-	cmds, err := t.HookCommands(binary)
-	if err != nil {
-		return false, nil, err
-	}
-	path := filepath.Join(home, filepath.FromSlash(t.File))
-
-	doc, err := readSettingsDoc(path)
-	if err != nil {
-		return false, nil, err
-	}
-
-	var (
-		merged  map[string]any
-		changed bool
-	)
-	// STRICT, with no default arm that falls back to claude's shape. That fallback
-	// is exactly how a format this code did not know would be written into a file
-	// of a different shape, and an unknown format is a refusal, not a guess.
-	switch t.Format {
-	case "command-hook", "":
-		merged, changed, err = harness.MergeHooks(doc, cmds)
-	case harness.NamedHooksFormat:
-		merged, changed, err = harness.MergeNamedHooks(doc, harness.BindMarker, cmds)
-	default:
-		return false, nil, fmt.Errorf("unsupported bind format %q for %s", t.Format, t.Agent)
-	}
-	if err != nil {
-		return false, nil, err
-	}
-	if changed && !dryRun {
-		if err := writeSettingsAtomically(path, merged); err != nil {
-			return false, nil, err
-		}
-	}
-
-	var retired []harness.RetiredHook
-	for _, r := range t.Retire {
-		did, err := retireOne(home, r, dryRun)
-		if err != nil {
-			return changed, retired, err
-		}
-		if did {
-			retired = append(retired, r)
-		}
-	}
-	return changed, retired, nil
-}
-
-// retireOne removes one retired hook from its file, reporting whether it was
-// there. An absent file is nothing to retire and is NOT created: retiring must
-// never bring a file into being.
-func retireOne(home string, r harness.RetiredHook, dryRun bool) (bool, error) {
-	path := filepath.Join(home, filepath.FromSlash(r.File))
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("stat %s: %w", path, err)
-	}
-	doc, err := readSettingsDoc(path)
-	if err != nil {
-		return false, err
-	}
-	pruned, changed := harness.RetireHooks(doc, r.Event, r.ID)
-	if !changed || dryRun {
-		return changed, nil
-	}
-	if err := writeSettingsAtomically(path, pruned); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// readSettingsDoc decodes a settings file. An absent or blank file is an empty
-// document: there is nothing to preserve, so bootstrapping is fine.
-func readSettingsDoc(path string) (map[string]any, error) {
-	doc := map[string]any{}
-	raw, readErr := os.ReadFile(path) // #nosec G304 -- path comes from the manifest's own declaration
-	switch {
-	case readErr == nil:
-		if len(strings.TrimSpace(string(raw))) > 0 {
-			if err := json.Unmarshal(raw, &doc); err != nil {
-				// Refuse rather than bootstrap over it. A settings file that is
-				// present but unparseable is a file someone is editing, and
-				// replacing it loses their work - the opposite of the merge's
-				// whole purpose.
-				return nil, fmt.Errorf("%s is not valid JSON, refusing to overwrite it: %w", path, err)
-			}
-		}
-	case os.IsNotExist(readErr):
-		// Bootstrapping an absent file is fine: there is nothing to preserve.
-	default:
-		return nil, fmt.Errorf("read %s: %w", path, readErr)
-	}
-	return doc, nil
-}
-
-// writeSettingsAtomically renders doc and replaces path with it in one step.
-//
-// Temp + rename IN THE SAME DIRECTORY: a rename across filesystems is not
-// atomic, and a half-written settings file is a harness that will not start.
-func writeSettingsAtomically(path string, doc map[string]any) error {
-	encoded, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode %s: %w", path, err)
-	}
-	encoded = append(encoded, '\n')
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".settings-*.json")
-	if err != nil {
-		return fmt.Errorf("create temp beside %s: %w", path, err)
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }()
-	if _, err := tmp.Write(encoded); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("write %s: %w", tmpName, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", tmpName, err)
-	}
-	// An existing file keeps its mode: a file we share with another tool (agy's
-	// hooks.json is written by Orca too) is not ours to re-permission. A new one
-	// starts private.
-	mode := os.FileMode(0o600)
-	if fi, statErr := os.Stat(path); statErr == nil {
-		mode = fi.Mode().Perm()
-	}
-	if err := os.Chmod(tmpName, mode); err != nil {
-		return fmt.Errorf("chmod %s: %w", tmpName, err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("rename onto %s: %w", path, err)
-	}
-	return nil
-}
-
-// resolveDotfPath picks the absolute binary path emitted into hook commands.
-//
-// It prefers ~/.local/bin/dotf — the path the installer writes and the one the
-// session hooks already carried — over whatever happens to be on the PATH of the
-// process running setup. Those differ exactly when it matters: a `go run` or a
-// build-tree binary would otherwise be baked into a hook that outlives it.
-//
-// The `.exe` suffix is not cosmetic. setup-windows.ps1 emitted
-// `"…\dotf.exe" mem session-start`, and an unmarked entry is adopted by its
-// command signature (harness.isOurs). A suffix-less path would still be adopted,
-// but it would differ from the deployed line, so every Windows run would rewrite
-// a hook that was already correct.
-func resolveDotfPath(home string) string {
-	name := "dotf"
-	if runtime.GOOS == "windows" {
-		name = "dotf.exe"
-	}
-	installed := filepath.Join(home, ".local", "bin", name)
-	if _, err := os.Stat(installed); err == nil {
-		return installed
-	}
-	if p, err := exec.LookPath("dotf"); err == nil {
-		abs, err := filepath.Abs(p)
-		if err == nil {
-			return abs
-		}
-		return p
-	}
-	return installed
-}
-
-// hookBinaryToken renders the binary path as it appears inside a hook command
-// line, quoting it where the shell that runs the hook would otherwise split it.
-//
-// goos is a parameter rather than a read of runtime.GOOS so both branches are
-// testable from either OS — the Windows leg of this behaviour cannot be
-// exercised on the machine that develops it otherwise.
-//
-// Windows command-hook targets are quoted unconditionally, matching byte-for-byte
-// what setup-windows.ps1 already deployed, because anything else fails to adopt
-// that entry and duplicates it. Elsewhere the path is bare unless it contains a
-// space, where quoting is the only correct shell rendering.
-func hookBinaryToken(path, goos string) string {
-	if goos == "windows" || strings.ContainsAny(path, " \t") {
-		return `"` + path + `"`
-	}
-	return path
-}
-
-func hookBinaryTokenForTarget(path, goos, format string) string {
-	// agy's Windows hook runner treats quotes around the first token as literal
-	// executable-name characters. Its default dotf installation path has no spaces.
-	if goos == "windows" && format == harness.NamedHooksFormat &&
-		!strings.ContainsAny(path, " \t") {
-		return path
-	}
-	return hookBinaryToken(path, goos)
+	return err
 }
