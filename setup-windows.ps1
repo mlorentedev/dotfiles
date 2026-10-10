@@ -896,99 +896,10 @@ if ($claudeCmd) {
     Write-Warn "Claude Code CLI not found, skipping plugin installation"
 }
 
-# Deploy auto-memory junctions from vault (see ADR-007)
-# Junctions are bidirectional (like Linux symlinks) and require no admin privileges.
-# Scans both 10_projects/ and 50_work/ for memory directories.
-# VaultRoot honors the ADR-025 seam ($env:VAULT_PATH, set by the sourced
-# paths.ps1) with the legacy default as fallback - parity with setup-linux.sh.
-$VaultRoot = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE "Projects\knowledge" }
-$VaultProjects = Join-Path $VaultRoot "10_projects"
-if (Test-Path $VaultRoot) {
-    Write-Info "Deploying auto-memory junctions from vault..."
-
-    # Collect all memory/ dirs: 10_projects/* and recursive scan of 50_work/
-    $memoryDirs = @()
-    if (Test-Path $VaultProjects) {
-        foreach ($projDir in (Get-ChildItem -Path $VaultProjects -Directory)) {
-            $mem = Join-Path $projDir.FullName "memory"
-            if (Test-Path $mem) { $memoryDirs += @{ Source = $mem; ProjectDir = $projDir.FullName; Scope = '10_projects' } }
-        }
-    }
-    $VaultWork = Join-Path $VaultRoot "50_work"
-    if (Test-Path $VaultWork) {
-        Get-ChildItem -Path $VaultWork -Filter "memory" -Directory -Recurse | ForEach-Object {
-            $memoryDirs += @{ Source = $_.FullName; ProjectDir = $_.Parent.FullName; Scope = '50_work' }
-        }
-    }
-
-    foreach ($entry in $memoryDirs) {
-        $memorySource = $entry.Source
-        $projectDir = $entry.ProjectDir
-        $projectName = Split-Path -Leaf $projectDir
-
-        # Determine CWD path based on vault scope
-        if ($entry.Scope -eq '10_projects') {
-            # Convention: repo lives at ~/Projects/<name>
-            $cwdPath = Join-Path $env:USERPROFILE "Projects\$projectName"
-        } else {
-            # Work projects: CWD is the vault path itself
-            $cwdPath = $projectDir
-        }
-
-        # Key MUST match Claude Code / memlink.ClaudeProjectKey (':' maps to '-',
-        # not deleted). Get-ClaudeProjectKey (utils.ps1) sources it from `dotf`
-        # so this junction target can never drift from the Go layer again (#689).
-        $encodedPath = Get-ClaudeProjectKey $cwdPath
-        $targetDir = Join-Path $env:USERPROFILE ".claude\projects\$encodedPath\memory"
-        $parentDir = Split-Path $targetDir -Parent
-
-        Ensure-Directory $parentDir
-
-        # Handle existing target: junction=recreate, real dir with files=backup, empty=remove
-        if (Test-Path $targetDir) {
-            $item = Get-Item $targetDir -Force
-            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                # cmd rmdir removes the junction point without deleting target contents
-                cmd /c rmdir $targetDir 2>&1 | Out-Null
-            } elseif ((Get-ChildItem $targetDir -ErrorAction SilentlyContinue).Count -gt 0) {
-                Write-Warn "Backing up existing memory for $projectName"
-                Rename-Item $targetDir "$($targetDir).bak.$(Get-Date -Format 'yyyyMMddHHmmss')"
-            } else {
-                Remove-Item $targetDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        New-Item -ItemType Junction -Path $targetDir -Target $memorySource -Force | Out-Null
-        Write-Success "Linked auto-memory: $projectName"
-    }
-
-    # Migrate orphan memories: local Claude Code memories not yet in vault
-    $claudeProjects = Join-Path $env:USERPROFILE ".claude\projects"
-    if (Test-Path $claudeProjects) {
-        $claudeDirs = Get-ChildItem -Path $claudeProjects -Directory
-        foreach ($cpDir in $claudeDirs) {
-            $memDir = Join-Path $cpDir.FullName "memory"
-            if (-not (Test-Path $memDir)) { continue }
-            if ((Get-Item $memDir).Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
-            $files = Get-ChildItem -Path $memDir -ErrorAction SilentlyContinue
-            if (-not $files) { continue }
-
-            $encodedName = $cpDir.Name
-            if ($encodedName -match 'Projects-(.+)$') {
-                $projectName = $Matches[1]
-                $vaultMemory = Join-Path $VaultProjects "$projectName\memory"
-                $vaultProject = Join-Path $VaultProjects $projectName
-                if ((Test-Path $vaultProject) -and -not (Test-Path $vaultMemory)) {
-                    Write-Info "Migrating orphan memory: $projectName -> vault"
-                    Copy-Item $memDir $vaultMemory -Recurse -Force
-                    Remove-Item $memDir -Recurse -Force
-                    New-Item -ItemType Junction -Path $memDir -Target $vaultMemory -Force | Out-Null
-                    Write-Success "Migrated and linked: $projectName"
-                }
-            }
-        }
-    }
-}
+# Claude's auto-memory dir is linked to its vault source per project by
+# memlink (cli/internal/memlink): the session-start hook links the project a
+# session opens, on every OS, and `dotf doctor --fix` repairs the current one,
+# a dangling link included. A real memory dir is never moved aside (#1843 B13).
 
 # Vault-hosted skills are no longer junctioned into ~/.claude/skills (that was
 # the BUG-100 fragility source). They are migrated into the vault SSOT, compiled
