@@ -75,6 +75,20 @@ RUN mkdir -p /home/testuser/.config/age \
 # Copy repo to ~/dotfiles-repo (NOT ~/.dotfiles) to trigger the copy branch
 COPY --chown=testuser:testuser . /home/testuser/dotfiles-repo
 
+# Built from a linked worktree, the copied .git is a file naming a gitdir on the
+# host that does not exist here, so every git call in the repo exits 128 and
+# five verify-setup tests fail falsely (#2253). Such a build gets a one-commit
+# repository of the copied tree, the shape of CI's depth-1 checkout. A build
+# from a full clone, as in CI, keeps its real .git directory untouched.
+RUN cd /home/testuser/dotfiles-repo \
+    && if [ -f .git ]; then \
+        rm .git \
+        && git init -q -b main \
+        && git add -A \
+        && git -c user.name=integration -c user.email=integration@localhost \
+            commit -q -m "integration snapshot of a worktree build"; \
+    fi
+
 # dotf from this tree, where install_dotf places the release. It reports
 # `dev`, and install_dotf leaves a dev build in place (a DOTF_VERSION env
 # override cannot express this: setup-linux.sh sources versions.conf, which
