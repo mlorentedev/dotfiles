@@ -1,7 +1,7 @@
 // OpenCode TUI configuration — managed by dotfiles.
 //
 // SSOT: ai/opencode/tui.json (this file).
-// Deploy target: ~/.config/opencode/tui.json (via setup-linux.sh / setup-windows.ps1).
+// Deploy target: ~/.config/opencode/tui.json (the `opencode-tui` entry of ai/deploy.json).
 // Plain copy — no secret substitution (unlike opencode.jsonc); contains no secrets.
 // Schema: https://opencode.ai/tui.json  (NOTE: a different schema from config.json).
 // Spec: specs/DX-004-opencode-tui-config/.

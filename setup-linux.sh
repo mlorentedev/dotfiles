@@ -529,22 +529,10 @@ else
     log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
 fi
 
-# Deploy the canonical AGENTS.md as opencode's global system prompt.
-# OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
-# claude/agy/copilot which use pointer files, opencode reads the filename
-# "AGENTS.md" natively so we copy the full SSOT (~22KB) verbatim.
-AGENTS_SRC="$CURRENT_DIR/AGENTS.md"
-AGENTS_DST="$HOME/.config/opencode/AGENTS.md"
-if [ -f "$AGENTS_SRC" ]; then
-    if [ -f "$AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$AGENTS_DST"; then
-        log_info "AGENTS.md (opencode) already in sync"
-    else
-        cp "$AGENTS_SRC" "$AGENTS_DST"
-        log_success "Deployed AGENTS.md to $AGENTS_DST"
-    fi
-else
-    log_warning "AGENTS.md source missing at $AGENTS_SRC"
-fi
+# opencode's and pi's AGENTS.md (the canonical SSOT, read natively under that
+# name) are harness/manifest.json agents.presence targets, deployed by
+# `dotf harness instructions` through the `compile-harness.sh --deploy` call
+# near the end of this script (#1843 B11).
 
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
 # agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
@@ -633,16 +621,6 @@ else
 fi
 unset _dotf
 
-PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"
-if [ -f "$AGENTS_SRC" ]; then
-    if [ -f "$PI_AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$PI_AGENTS_DST"; then
-        log_info "AGENTS.md (pi) already in sync"
-    else
-        cp "$AGENTS_SRC" "$PI_AGENTS_DST"
-        log_success "Deployed AGENTS.md to $PI_AGENTS_DST"
-    fi
-fi
-
 # Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
 # settings.json exists on the machine -- nothing pi itself writes at runtime
 # touches that array, only theme/lastChangelogVersion/defaultModel are (the
@@ -705,21 +683,9 @@ else
 fi
 unset _dotf
 
-# Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
-# Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
-# carries no secrets, so it deploys verbatim. opencode reads tui.json natively.
-TUI_SRC="$CURRENT_DIR/ai/opencode/tui.json"
-TUI_DST="$HOME/.config/opencode/tui.json"
-if [ -f "$TUI_SRC" ]; then
-    if [ -f "$TUI_DST" ] && cmp -s "$TUI_SRC" "$TUI_DST"; then
-        log_info "opencode tui.json already in sync"
-    else
-        cp "$TUI_SRC" "$TUI_DST"
-        log_success "Deployed tui.json to $TUI_DST"
-    fi
-else
-    log_warning "tui.json source missing at $TUI_SRC"
-fi
+# opencode's tui.json (theme, keybinds) carries no secrets and is the
+# `opencode-tui` entry of ai/deploy.json, installed by the bare `dotf deploy`
+# above (#1843 B11).
 
 # opencode commands are deployed from the vault skill records by
 # `compile-harness.sh --deploy` (SDD-008): each committed record under

@@ -579,7 +579,7 @@ FIXTURE
 @test "setup-windows.ps1 pi package reconcile resolves dotf outside PATH (#1925)" {
     local block
     block="$(awk '/^# pi packages \(HARNESS-139/ { in_block=1 }
-        /^# Deploy opencode TUI config/ { in_block=0 }
+        /^# opencode.s tui[.]json is the/ { in_block=0 }
         in_block' "$PS1_SCRIPT")"
     [ -n "$block" ]
     grep -qF 'Test-Path "$env:USERPROFILE\.local\bin\dotf.exe"' <<<"$block"
@@ -944,11 +944,13 @@ FIXTURE
     [[ "$status" -eq 0 ]] || false
 }
 
-# --- DX-004: opencode tui.json deploy (Linux parity) ---
+# --- DX-004: opencode tui.json is a dotf deploy entry on every OS (#1843 B11) ---
 
-@test "setup-windows.ps1 deploys opencode tui.json (DX-004 AC4)" {
-    grep -qF 'ai\opencode\tui.json' "$PS1_SCRIPT"
-    grep -qF '.config\opencode\tui.json' "$PS1_SCRIPT"
+@test "setup-windows.ps1 leaves opencode tui.json to dotf deploy (DX-004 AC4)" {
+    refute_grep_fixed 'ai\opencode\tui.json' "$PS1_SCRIPT"
+    # The entry itself, not the comment naming it: it must exist and must not
+    # be restricted to platforms that exclude Windows.
+    jq -e '.configs[] | select(.name == "opencode-tui") | select(.platforms == null or (.platforms | index("windows")))' "$DOTFILES_DIR/ai/deploy.json"
 }
 
 @test "setup-windows.ps1 mirrors the harness inputs through dotf harness mirror (WIN-007)" {
