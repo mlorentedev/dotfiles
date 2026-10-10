@@ -175,6 +175,21 @@ setup() {
     grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"
 }
 
+@test "~/.claude/settings.json is merged by dotf deploy, not by a setup block (#2000)" {
+    # The `claude-settings` entry of ai/deploy.json is the only writer since the
+    # jq and PowerShell twins went, so this fails if that entry stops applying on
+    # a fresh box. The merge's invariant: every template key holds the template's
+    # value. attribution is in the template, so a trailer cannot come back.
+    command -v jq >/dev/null 2>&1 || skip "jq not on PATH"
+    local f="$HOME/.claude/settings.json" tmpl="$REPO_DIR/ai/claude/settings.json"
+    [ -f "$f" ]
+    jq -e --slurpfile t "$tmpl" '
+        . as $box | $t[0] | del(.["$schema"], .permissions, .env, .enabledPlugins)
+        | to_entries | all(.value == $box[.key])' "$f"
+    # permissions, env and enabledPlugins are merged, so the box may extend them.
+    jq -e --slurpfile t "$tmpl" '{permissions, env, enabledPlugins} | contains($t[0] | {permissions, env, enabledPlugins})' "$f"
+}
+
 @test "~/.claude/skills has at least 15 directories" {
     count=$(find "$HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)
     [ "$count" -ge 15 ]
@@ -383,12 +398,6 @@ setup() {
     # rendered command carries provenance + drops name: (opencode keys off filename)
     grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/spec.md"
     refute_grep '^name:' "$HOME/.config/opencode/commands/spec.md"
-}
-
-@test "no MCP servers registered (claude CLI absent)" {
-    # setup-linux.sh skips MCP registration when claude is not found
-    # Just verify it didn't crash — the container built successfully
-    true
 }
 
 @test "shellcheck comes from mise at its pin, with no copy in ~/.local/bin to shadow it (#2013 W2)" {
