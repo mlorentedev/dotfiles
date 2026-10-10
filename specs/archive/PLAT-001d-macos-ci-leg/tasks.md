@@ -34,7 +34,7 @@ created: "2026-10-07"
 - [x] [AC6] `ci.yml`: `test` calls `run-bats.sh`
 - [x] [AC5] `ci.yml`: new non-required `test-macos` on the `code` filter
 - [x] [AC5] Assert bash 3.2 and zsh in the job rather than assume them
-- [ ] [AC5] First green run of `test-macos` on the PR that adds the job (first measured on #2063, run 37590992834); the main-only full-suite step runs after merge
+- [x] [AC5] First green run of `test-macos` on the PR that adds the job (first measured on #2063, run 37590992834); the main-only full-suite step runs after merge (green on main, run 38014809265, 2026-10-10)
 
 ## Closing
 
