@@ -114,7 +114,7 @@ func TestMergeHooksReplacesOurOwnEntryRatherThanAccumulating(t *testing.T) {
 	}
 }
 
-// The latent bug this design replaces: `merge_claude_settings` writes
+// The latent bug this design replaced: `merge_claude_settings` wrote
 // `.hooks.<event>[0].hooks[0].command`, so a foreign group sitting at index 0
 // gets silently overwritten. Find-by-marker must survive that ordering.
 func TestMergeHooksSurvivesAForeignGroupAtIndexZero(t *testing.T) {

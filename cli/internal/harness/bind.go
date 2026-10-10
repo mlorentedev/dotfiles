@@ -11,8 +11,8 @@ import (
 //
 // OWNERSHIP IS BY MARKER, NEVER BY POSITION, and that replaces a latent bug
 // rather than merely being tidier. `merge_claude_settings()` in setup-linux.sh
-// writes `.hooks.SessionStart[0].hooks[0].command` — a positional claim that
-// holds only because ours happens to sit at index 0 today. Measured 2026-08-26,
+// wrote `.hooks.SessionStart[0].hooks[0].command` — a positional claim that
+// held only because ours happens to sit at index 0 today. Measured 2026-08-26,
 // the deployed ~/.claude/settings.json carries 12 events of which **10 belong to
 // Orca**, and all four of agy's belong to Orca. The day a third party prepends a
 // group to an event we also write, a positional writer silently overwrites a

@@ -159,7 +159,7 @@ func TestBindAdoptsTheUnmarkedMemHookInsteadOfDuplicating(t *testing.T) {
 
 // TestBindNeverTouchesAForeignHook is the defect from the destroying side.
 //
-// `merge_claude_settings` assigns `.hooks.SessionStart = $tmpl.hooks.SessionStart`.
+// `merge_claude_settings` assigned `.hooks.SessionStart = $tmpl.hooks.SessionStart`.
 // Simulated against a copy of the live file, that took SessionStart from two
 // groups to one and deleted Orca's. This asserts the replacement does not: every
 // foreign command present before bind is present after, and the count of foreign
