@@ -149,12 +149,17 @@ port. The check demonstrates itself on its own PR.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/HARNESS-063-spec-gate-adjacency/` -> `specs/archive/HARNESS-063-spec-gate-adjacency/`
-- [ ] Bitácora board ticket moved to Done / closed with PR link (ADR-018)
+- [ ] Bitácora board ticket moved to Done / closed with PR link (ADR-018). Left unticked on purpose: #858 stays open for its second direction, the fixture-shape inventory.
 
 > **Not archived by this PR.** #858 adopted two directions; this PR ships one.
 > The fixture-shape inventory travels with #857, and that is the PR that closes
 > #858 and archives this spec. This PR's body carries `Refs #858`, so
 > `_check_archive_on_merge` correctly leaves the spec active.
+>
+> **Superseded 2026-10-10.** #857 closed through #862 and #866 without the
+> inventory, so no PR is left to carry it. #2304 archives this spec for the
+> direction that shipped and still carries only `Refs #858`. The fixture-shape
+> inventory stays open on #858 (see "Closing status" above).
 
 ## Review round 1 dispositions (2026-10-10)
 
