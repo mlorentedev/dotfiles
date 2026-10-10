@@ -109,6 +109,7 @@ func Run(opts Options) (int, error) {
 		checkBWMapping(sys, cfg, rep)
 		checkAgentConfigSecrets(sys, rep)
 		checkHiveBackendCanServe(sys, rep)
+		checkHiveDaemonAnswers(sys, cfg, rep)
 		checkDisasterRecovery(sys, cfg, rep)
 		checkPATExpiry(sys, cfg, rep)
 		checkGuardHooks(sys, cfg, rep, opts.Fix)
