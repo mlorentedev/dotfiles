@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -127,6 +128,35 @@ func TestScanOrphans_SkipsATreeTheCheckoutDoesNotHave(t *testing.T) {
 	}
 	if len(got.Deleted)+len(got.Unknown) != 0 {
 		t.Errorf("ssh/ is absent from the checkout, so it must not be scanned: %+v", got)
+	}
+}
+
+// An entry the scan cannot read is named and skipped. It must not fail the
+// scan, and with it the whole mirror: the mirror never read the deploy dir
+// before it pruned, so one locked directory there would be a new way to fail.
+func TestScanOrphans_NamesAnUnreadableDirectoryAndScansTheRest(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions enforced on the test user")
+	}
+	repo, deploy := t.TempDir(), t.TempDir()
+	writeFile(t, filepath.Join(repo, "scripts", "live.sh"), "live\n")
+	writeFile(t, filepath.Join(deploy, "scripts", "old.sh"), "retired\n")
+	locked := filepath.Join(deploy, "scripts", "locked")
+	writeFile(t, filepath.Join(locked, "x.sh"), "x\n")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	got, err := ScanOrphans(repo, deploy, fakeGit(t, "false", "scripts/old.sh"))
+	if err != nil {
+		t.Fatalf("an unreadable entry failed the scan: %v", err)
+	}
+	if !reflect.DeepEqual(got.Unreadable, []string{"scripts/locked"}) {
+		t.Errorf("unreadable = %v, want [scripts/locked]", got.Unreadable)
+	}
+	if !reflect.DeepEqual(got.Deleted, []string{"scripts/old.sh"}) {
+		t.Errorf("the rest of the tree was not scanned: %+v", got)
 	}
 }
 

@@ -46,6 +46,9 @@ type MirrorResult struct {
 	// See ScanOrphans.
 	Pruned, Unpruned []string
 	PruneSkipped     string
+	// Unreadable are deploy-dir entries the leftover scan could not read, so
+	// they were not checked (Orphans.Unreadable).
+	Unreadable []string
 }
 
 // Mirror copies the inputs the deploy-dir consumers read — the whole harness/
@@ -110,7 +113,7 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 	if err != nil {
 		return res, err
 	}
-	res.Pruned, res.Unpruned, res.PruneSkipped = orphans.Deleted, orphans.Unknown, orphans.Skipped
+	res.Pruned, res.Unpruned, res.PruneSkipped, res.Unreadable = orphans.Deleted, orphans.Unknown, orphans.Skipped, orphans.Unreadable
 	if !dryRun {
 		if err := PruneOrphans(deployDir, orphans.Deleted); err != nil {
 			return res, err

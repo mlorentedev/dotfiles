@@ -42,6 +42,11 @@ type Orphans struct {
 	// Skipped says why the history could not be read, when it could not; every
 	// orphan is then Unknown.
 	Skipped string
+	// Unreadable are entries under the pruned trees the scan could not read (a
+	// root-owned 0700 directory, say). They were not checked for leftovers. One
+	// of them must not fail the mirror: before the prune existed, the mirror
+	// never read the deploy dir at all.
+	Unreadable []string
 }
 
 // ScanOrphans lists the orphans of the pruned trees. It reads the checkout's
@@ -50,14 +55,23 @@ type Orphans struct {
 // wrong checkout or a broken one, and reading every deployed file there as an
 // orphan would prune the whole tree.
 func ScanOrphans(repoRoot, deployDir string, git GitRunner) (Orphans, error) {
-	var orphans []string
+	var orphans, unreadable []string
 	for _, tree := range PrunedDeployDirTrees {
 		if !isDir(filepath.Join(repoRoot, tree)) || !isDir(filepath.Join(deployDir, tree)) {
 			continue
 		}
 		err := filepath.WalkDir(filepath.Join(deployDir, tree), func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
+			if err != nil {
+				if rel, rerr := filepath.Rel(deployDir, p); rerr == nil {
+					unreadable = append(unreadable, filepath.ToSlash(rel))
+				}
+				if d != nil && d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if d.IsDir() {
+				return nil
 			}
 			rel, err := filepath.Rel(deployDir, p)
 			if err != nil {
@@ -73,12 +87,12 @@ func ScanOrphans(repoRoot, deployDir string, git GitRunner) (Orphans, error) {
 		}
 	}
 	if len(orphans) == 0 {
-		return Orphans{}, nil
+		return Orphans{Unreadable: unreadable}, nil
 	}
 	sort.Strings(orphans)
 
 	deleted, skipped := deletedPaths(repoRoot, git)
-	o := Orphans{Skipped: skipped}
+	o := Orphans{Skipped: skipped, Unreadable: unreadable}
 	for _, rel := range orphans {
 		if deleted[rel] {
 			o.Deleted = append(o.Deleted, rel)

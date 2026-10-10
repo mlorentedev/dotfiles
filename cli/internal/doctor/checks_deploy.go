@@ -1042,9 +1042,12 @@ func checkDeployDirLeftovers(sys *System, rep *Report, repo, deploy string, fix 
 	if o.Skipped != "" {
 		rep.Warn("deploy-dir leftovers not classified: " + o.Skipped)
 	}
+	for _, rel := range o.Unreadable {
+		rep.Warn(rel + " in the deploy dir could not be read, so it was not checked for leftovers")
+	}
 	switch {
 	case len(o.Deleted) == 0:
-		if len(o.Unknown) == 0 {
+		if len(o.Unknown)+len(o.Unreadable) == 0 {
 			rep.Pass("deploy dir holds no leftovers of files the checkout deleted")
 		}
 	case !fix:

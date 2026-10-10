@@ -201,7 +201,7 @@ func TestHarnessMirrorCmd_NamesAnOrphanItLeaves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s%s", err, out, stderr)
 	}
-	if !strings.Contains(stderr, "left scripts/mine.sh in the deploy dir") || !strings.Contains(stderr, "history") {
+	if !strings.Contains(stderr, "left scripts/mine.sh in the deploy dir") || !strings.Contains(stderr, "cannot be read") {
 		t.Errorf("the orphan and the reason must be named:\n%s", stderr)
 	}
 	if !strings.Contains(out, "0 pruned") {

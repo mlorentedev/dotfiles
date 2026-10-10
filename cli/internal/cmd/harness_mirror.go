@@ -74,6 +74,9 @@ func reportPrune(cmd *cobra.Command, res harness.MirrorResult) {
 	for _, rel := range res.Pruned {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "harness mirror: pruned %s (deleted from the checkout)\n", rel)
 	}
+	for _, rel := range res.Unreadable {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "harness mirror: could not read %s, so it was not checked for leftovers\n", rel)
+	}
 	if len(res.Unpruned) == 0 {
 		return
 	}

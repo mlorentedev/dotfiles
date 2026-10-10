@@ -80,6 +80,9 @@ func (recordsMirror) Reconcile(env Env, dryRun bool) (Result, error) {
 	if len(res.Unpruned) > 0 {
 		detail += "; left in place, not proven deleted: " + strings.Join(res.Unpruned, ", ")
 	}
+	if len(res.Unreadable) > 0 {
+		detail += "; unreadable, not checked for leftovers: " + strings.Join(res.Unreadable, ", ")
+	}
 	return Result{Changes: res.Updated + len(res.Pruned), Detail: detail}, nil
 }
 
