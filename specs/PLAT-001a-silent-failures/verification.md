@@ -50,6 +50,7 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
 - `golangci-lint run` (v2.12.2, the pin in `versions.conf`): 0 issues.
 - No regressions in the existing Go suite: yes.
 - Bats baseline on darwin, taken before this change: 1632/1776 pass. The 144 failures already exist on `main` and are recorded as F-054 in #2013. W1 changes no shell file.
+- Test suite (W6 `.bashrc`, macOS, bash 3.2): `bats` on every suite naming `.bashrc` (`git grep -l bashrc -- tests/*.bats`) -> 497/497 ok; `shellcheck tests/bashrc-guards.bats` clean
 
 ## Decisions made during implementation
 
