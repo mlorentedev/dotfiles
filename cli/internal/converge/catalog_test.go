@@ -2,6 +2,9 @@ package converge
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -189,4 +192,56 @@ type refusing struct{ CatalogInstaller }
 
 func (refusing) Plan(t tools.Tool) tools.Plan {
 	return tools.Plan{Name: t.Name, Action: tools.PlanRefused, Note: "no checksums file declared"}
+}
+
+// The step reaches what the tool layer places whatever PATH its caller had:
+// the hourly `dotf update` runs with a minimal one, and before this every run
+// there skipped the sync and, with the catalog wired, failed the probe on a
+// mise sitting in ~/.local/bin. The caller's entries stay first, and a run
+// adds each directory once.
+func TestTools_ReachesWhereTheToolLayerPlacesWhateverTheCallersPath(t *testing.T) {
+	bins := t.TempDir()
+	mise := filepath.Join(bins, "mise")
+	if runtime.GOOS == "windows" {
+		mise += ".exe"
+	}
+	if err := os.WriteFile(mise, []byte("#!/bin/sh\n"), 0o755); err != nil { //nolint:gosec // a fake binary must be executable
+		t.Fatal(err)
+	}
+	caller := t.TempDir()
+	r := toolsSync{has: onPath, bins: []string{bins, caller, bins}}
+	for _, call := range []struct {
+		name string
+		run  func() error
+	}{
+		{"reconcile", func() error { _, err := r.Reconcile(toolsEnv(t), true); return err }},
+		{"probe", func() error { return r.Probe(toolsEnv(t)) }},
+	} {
+		t.Run(call.name, func(t *testing.T) {
+			t.Setenv("PATH", caller)
+			if onPath("mise") {
+				t.Fatal("precondition: mise must not be on the caller's PATH")
+			}
+			_ = call.run()
+			want := caller + string(os.PathListSeparator) + bins
+			if got := os.Getenv("PATH"); got != want {
+				t.Errorf("PATH = %q, want %q", got, want)
+			}
+			if !onPath("mise") {
+				t.Error("mise in the tool layer's dir is not reachable after the step")
+			}
+		})
+	}
+}
+
+func TestRegistry_HandsTheToolLayerDirsToTheToolsStep(t *testing.T) {
+	for _, rec := range Registry(Options{ToolsBinDirs: []string{"/shims", "/bin"}}) {
+		if ts, ok := rec.(toolsSync); ok {
+			if strings.Join(ts.bins, "|") != "/shims|/bin" {
+				t.Errorf("tools step bins = %v", ts.bins)
+			}
+			return
+		}
+	}
+	t.Fatal("the registry has no tools step")
 }

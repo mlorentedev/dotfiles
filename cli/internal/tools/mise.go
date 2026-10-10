@@ -164,14 +164,22 @@ func MiseConfigDir(home string, getenv func(string) string) string {
 }
 
 // MiseShimsDir is where mise keeps its shims: MISE_DATA_DIR/shims, else
-// $XDG_DATA_HOME/mise/shims, else ~/.local/share/mise/shims. A shim runs the
-// tool at the version mise's config selects, with or without `mise activate`.
-func MiseShimsDir(home string, getenv func(string) string) string {
+// $XDG_DATA_HOME/mise/shims, else the OS default data dir's shims:
+// %LOCALAPPDATA%\mise\shims on Windows, ~/.local/share/mise/shims elsewhere. A
+// shim runs the tool at the version mise's config selects, with or without
+// `mise activate`.
+func MiseShimsDir(home, goos string, getenv func(string) string) string {
 	if d := getenv("MISE_DATA_DIR"); d != "" {
 		return filepath.Join(d, "shims")
 	}
 	if x := getenv("XDG_DATA_HOME"); x != "" {
 		return filepath.Join(x, "mise", "shims")
+	}
+	if goos == "windows" {
+		if l := getenv("LOCALAPPDATA"); l != "" {
+			return filepath.Join(l, "mise", "shims")
+		}
+		return filepath.Join(home, "AppData", "Local", "mise", "shims")
 	}
 	return filepath.Join(home, ".local", "share", "mise", "shims")
 }

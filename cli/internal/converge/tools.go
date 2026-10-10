@@ -25,12 +25,16 @@ type toolsSync struct {
 	has         func(string) bool // is a command on PATH
 	getenv      func(string) string
 	catalog     CatalogInstaller // nil: the catalog half is not wired
+	bins        []string         // where the tool layer places binaries; see reach
 }
 
 func (toolsSync) Name() string        { return "tools" }
 func (toolsSync) Platforms() []string { return nil }
 
 func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
+	if err := r.reach(); err != nil {
+		return Result{}, err
+	}
 	if r.catalog == nil && r.unavailable() != "" {
 		return Result{Skip: r.unavailable()}, nil
 	}
@@ -52,6 +56,9 @@ func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
 // upgrade (a wait on a manager and a needs-sudo are reported, not failed),
 // the rendered mise config is current, and every pinned CLI runs at its pin.
 func (r toolsSync) Probe(env Env) error {
+	if err := r.reach(); err != nil {
+		return err
+	}
 	entries, err := r.entries(env)
 	if err != nil {
 		return err
@@ -120,6 +127,30 @@ func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
 		res.Changes++
 	}
 	return res, err
+}
+
+// reach appends to this process's PATH each directory the tool layer places
+// binaries in that PATH lacks, keeping the caller's own entries first. Every
+// lookup after it, in this step and in the steps that follow, then finds what
+// the step installed: the hourly `dotf update` runs with a minimal PATH, and
+// a fresh machine has no rc that adds ~/.local/bin or mise's shims yet.
+func (r toolsSync) reach() error {
+	path := os.Getenv("PATH")
+	have := map[string]bool{}
+	for _, dir := range filepath.SplitList(path) {
+		have[dir] = true
+	}
+	for _, dir := range r.bins {
+		if have[dir] {
+			continue
+		}
+		have[dir] = true
+		if path != "" {
+			path += string(os.PathListSeparator)
+		}
+		path += dir
+	}
+	return os.Setenv("PATH", path)
 }
 
 // unavailable names what the mise half lacks on this machine, or "".

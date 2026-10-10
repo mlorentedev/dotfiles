@@ -25,6 +25,11 @@ type Options struct {
 	// tools.Installer in production. Unset, the tools step runs the mise
 	// sync alone.
 	ToolsCatalog CatalogInstaller
+	// ToolsBinDirs are where the tool layer places what it installs: mise's
+	// shims and the catalog's install dir. The tools step puts each one this
+	// process's PATH lacks on it, so what it installs it can reach whatever
+	// PATH its caller had.
+	ToolsBinDirs []string
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the checkout and git-config steps are skipped.
 	GitRun gitconfig.Runner
@@ -66,7 +71,7 @@ func Registry(o Options) []Reconciler {
 		checkout{run: o.GitRun, url: url, has: onPath},
 		recordsMirror{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
-		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog},
+		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath},
 		gitConfig{run: o.GitRun, has: onPath},

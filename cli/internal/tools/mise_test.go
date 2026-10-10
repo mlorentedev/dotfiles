@@ -182,17 +182,24 @@ func TestMiseConfigDir_FollowsMiseOwnResolution(t *testing.T) {
 
 func TestMiseShimsDir_FollowsMiseOwnResolution(t *testing.T) {
 	home := filepath.FromSlash("/home/u")
+	local := filepath.FromSlash("/profiles/u/Local")
 	cases := []struct {
+		goos string
 		env  map[string]string
 		want string
 	}{
-		{map[string]string{"MISE_DATA_DIR": "/d/mise", "XDG_DATA_HOME": "/xdg"}, filepath.Join("/d/mise", "shims")},
-		{map[string]string{"XDG_DATA_HOME": "/xdg"}, filepath.Join("/xdg", "mise", "shims")},
-		{map[string]string{}, filepath.Join(home, ".local", "share", "mise", "shims")},
+		{"linux", map[string]string{"MISE_DATA_DIR": "/d/mise", "XDG_DATA_HOME": "/xdg"}, filepath.Join("/d/mise", "shims")},
+		{"linux", map[string]string{"XDG_DATA_HOME": "/xdg"}, filepath.Join("/xdg", "mise", "shims")},
+		{"linux", map[string]string{}, filepath.Join(home, ".local", "share", "mise", "shims")},
+		{"darwin", map[string]string{"LOCALAPPDATA": local}, filepath.Join(home, ".local", "share", "mise", "shims")},
+		// mise's Windows default is %LOCALAPPDATA%\mise, not the XDG one.
+		{"windows", map[string]string{"LOCALAPPDATA": local}, filepath.Join(local, "mise", "shims")},
+		{"windows", map[string]string{}, filepath.Join(home, "AppData", "Local", "mise", "shims")},
+		{"windows", map[string]string{"XDG_DATA_HOME": "/xdg", "LOCALAPPDATA": local}, filepath.Join("/xdg", "mise", "shims")},
 	}
 	for _, tc := range cases {
-		if got := MiseShimsDir(home, func(k string) string { return tc.env[k] }); got != tc.want {
-			t.Errorf("%v: got %q, want %q", tc.env, got, tc.want)
+		if got := MiseShimsDir(home, tc.goos, func(k string) string { return tc.env[k] }); got != tc.want {
+			t.Errorf("%s %v: got %q, want %q", tc.goos, tc.env, got, tc.want)
 		}
 	}
 }

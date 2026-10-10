@@ -86,13 +86,16 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 
 // convergeOptions wires the registry's side effects; tests replace it.
 var convergeOptions = func() converge.Options {
-	run, stdout := tools.HomeRunners(env.Home())
+	home := env.Home()
+	run, stdout := tools.HomeRunners(home)
+	dest := filepath.Join(home, ".local", "bin")
 	return converge.Options{
 		RunHarnessDeploy: converge.CompileHarnessDeploy,
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		// Install progress goes to stderr, apart from the report on stdout.
-		ToolsCatalog:  &tools.Installer{Dest: filepath.Join(env.Home(), ".local", "bin"), Out: os.Stderr},
+		ToolsCatalog:  &tools.Installer{Dest: dest, Out: os.Stderr},
+		ToolsBinDirs:  []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest},
 		GitRun:        gitconfig.ExecRunner,
 		CloneURL:      os.Getenv("DOTFILES_REPO"),
 		RenderConfigs: strictDeployRenderer,

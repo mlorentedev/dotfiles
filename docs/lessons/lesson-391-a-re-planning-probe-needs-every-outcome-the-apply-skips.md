@@ -35,6 +35,11 @@ without testing anything (lesson 328).
   (mise from the catalog, uv as a mise pin) that is still out of reach fails the probe and is named.
 - The second pass walks only the entries that waited, so a failure is attempted and reported once.
 - Tests include a machine where an installed tool does not land on `PATH`.
+- The step does not depend on its caller's `PATH` to find what it placed. pr-agent caught the third
+  case on #2289: the hourly `dotf update` unit runs with a minimal `PATH`, so the new probe would
+  have failed every run on a mise in `~/.local/bin`. The tools step now appends to its own
+  process's `PATH` the directories the tool layer places into (mise's shims, the catalog's install
+  dir), keeping the caller's entries first, and every later step inherits it.
 
 ## Takeaways
 - A step whose probe re-plans inherits every disagreement between plan and apply. Before wiring a
@@ -43,3 +48,6 @@ without testing anything (lesson 328).
   "still waiting" is a defect, so report it as one.
 - A fake that puts a tool on `PATH` as soon as it installs it hides the fresh-machine case. Model
   where the tool lands separately from what the process can reach.
+- A step that installs a tool and then looks it up by name answers for its caller's `PATH`, not
+  for the machine. Make the step reach where it installs, rather than ask each caller (a systemd
+  unit, a scheduled task, a fresh shell) to repeat the same `PATH`.

@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // convergeFixture is a checkout with a harness tree and one manifest target,
@@ -176,5 +178,25 @@ func TestConvergePlan_FromAnotherProjectUsesTheDeclaredCheckout(t *testing.T) {
 
 	if got, want := convergeCheckout(home), env.DefaultCheckoutDir(home); got != want {
 		t.Errorf("convergeCheckout() = %q, want the default checkout %q", got, want)
+	}
+}
+
+// The tools step puts on PATH the dirs the production wiring names, so they
+// must be where the catalog installs and where mise keeps its shims: a dir
+// that drifts from the installer's Dest leaves what it installs unreachable.
+func TestConvergeOptions_ToolsBinDirsAreWhereTheToolLayerPlaces(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("MISE_DATA_DIR", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	o := convergeOptions()
+	in, ok := o.ToolsCatalog.(*tools.Installer)
+	if !ok {
+		t.Fatalf("ToolsCatalog is %T, want *tools.Installer", o.ToolsCatalog)
+	}
+	want := []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), in.Dest}
+	if strings.Join(o.ToolsBinDirs, "|") != strings.Join(want, "|") {
+		t.Errorf("ToolsBinDirs = %v, want %v", o.ToolsBinDirs, want)
 	}
 }
