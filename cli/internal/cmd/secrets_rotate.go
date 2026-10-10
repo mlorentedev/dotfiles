@@ -208,8 +208,15 @@ func ciTargets(s *secrets.Secret) ([]string, error) {
 		}
 		// SelectCI skips what Actions cannot hold (file, floor, GITHUB_*). A ci:
 		// consumer left with nothing to upload would report a push that never happens.
-		if sel := one.SelectCI(repo); len(sel.Upload) == 0 {
+		sel := one.SelectCI(repo)
+		if len(sel.Upload) == 0 {
 			return nil, fmt.Errorf("%s declares %s but holds nothing GitHub Actions can store (%s); nothing was rotated", s.ID, c, skipReason(sel))
+		}
+		// A ci: consumer names a secret, not which of its vars the repo holds, so a
+		// multi-var push would create a copy nothing reads in every repo (#2306).
+		if len(sel.Upload) > 1 {
+			return nil, fmt.Errorf("%s exposes %d vars and %s does not say which it holds, so the push would create copies nothing reads; "+
+				"nothing was rotated (rotate without --push-ci, then `dotf secrets sync ci --repo %s <VAR>`)", s.ID, len(sel.Upload), c, repo)
 		}
 		repos = append(repos, repo)
 	}
