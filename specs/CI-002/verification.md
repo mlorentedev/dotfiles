@@ -76,3 +76,32 @@ it quoted rather than in what it said.
 - **The end-to-end effect on job duration.** That is measured by the first `pull_request`
   run after this lands, and it is owed rather than claimed.
 - **Why an install costs ~421s.** Out of scope; #1472.
+
+## Closing status (2026-10-10)
+
+The skip guard moved out of the setup twins into `dotf pi packages apply` (HARNESS-139, #1628). Both twins call that command, so AC1-AC3 now hold through one implementation instead of two. The bats suite pins the CI side (AC4, AC5) and the wording (AC3), and the Go test pins the ordering (AC2). `features.json` f1-f5 were rewritten to point there: the old f1, f2 and f5 grepped and mutated shell blocks that no longer exist.
+
+**A test that could not fail, found closing.** `TestPiPackagesApplySkipIsFirstAndLoud` claims the skip comes before any probe. But its `piRepo` fixture answers every `piLookPath` call, so a mutation that probes for pi first still passed (f5 exited 1 on its first run). The test now fails on any probe, and f5 kills that mutation.
+
+## PR 2: the wider filter audit, declined on measurement
+
+The plan was to split the `code` filter so that a PR touching only Go skips the Windows bootstrap. Measured over the 300 PRs merged since 2026-07-12:
+
+| Changed paths | PRs |
+|---|---|
+| `cli/**` only | 106 |
+| `cli/**` + `tests/**` | 6 |
+| Linux shell only | 0 |
+| Windows only | 0 |
+| Mixed | 161 |
+| No code | 27 |
+
+- **The conservative split** skips Windows only for Linux-shell-only PRs, and the reverse. It saves nothing, because neither class occurs.
+- **The synthesis's split** skips Windows for Go-only PRs. That drops `test-windows` from about a third of PRs, and the trend widens the cost: setup logic is moving into `cli/**` (setup-script LOC went from 3,907 on 2026-10-03 to 3,069 on 2026-10-10). That job is the coverage that caught hive#484 on dotfiles#2255 this week.
+- **Decision (owner, 2026-10-10):** no split. The `pi` filter from PR 1 stays the only path gate on `test-windows`.
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons.md`? no: the fixture-answers-every-probe defect is an instance of lesson 267 (a mutation harness must prove the mutation landed); the fix is in the test itself.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: declining the split adds no contract; the measurement and decision are recorded here, beside the filter they concern.
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: path-filtered CI is decided per repo from its own PR mix.
