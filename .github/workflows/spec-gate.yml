@@ -65,9 +65,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh issue list --state open --limit 500 --json number,title,body \
+          limit=500
+          gh issue list --state open --limit "$limit" --json number,title,body \
             --jq '.[] | [.number, ((.title + " " + (.body // "")) | gsub("[\n\r\t]"; " "))] | @tsv' \
             > "$RUNNER_TEMP/adjacency.tsv" || rm -f "$RUNNER_TEMP/adjacency.tsv"
+          # A full page means the list was cut, and the report would read a partial
+          # backlog as the whole one. Say so (420 open on 2026-10-10).
+          if [ -f "$RUNNER_TEMP/adjacency.tsv" ] && [ "$(wc -l < "$RUNNER_TEMP/adjacency.tsv")" -ge "$limit" ]; then
+            echo "::warning::adjacency feed hit --limit $limit; open issues past it are not checked"
+          fi
 
       # Labels, body and author are NOT taken from github.event.pull_request.*
       # any more: a re-run replays the original payload, so a payload-sourced
