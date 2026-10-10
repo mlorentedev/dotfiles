@@ -57,3 +57,5 @@ The archive review (`nan/qwen3.8-flash`, `PASS-WITH-GAPS`, reviewed `bade1483`) 
 | 6 | A repeated `ci:` consumer uploads twice | **Declined.** `gh secret set` overwrites, so this is noise without corruption, and the registry holds no duplicate pair today. |
 | Q | The push re-resolves through the read path instead of uploading the value that was just probed | **Answered.** This is safe because the reader, the writer and the syncer come from one pinned backend (`bwBackend()`), and the confirmation step has already proved that the read path serves the new value. Should `secretLoader()` ever resolve through a different backend from `bwRead()`, the push would no longer be covered by that proof. That case belongs with #2306's rework of `SelectCI`. |
 
+
+**PR review follow-up (#2307):** PR-Agent showed that a count-only guard still let through a secret whose rotated var `SelectCI` filters out, leaving a sibling var. The guard (`checkPushable`) now requires the single upload to be the rotated var. Tests: the `rotated var filtered out` case and `TestRotate_PushCIPushesTheRotatedVarWhenItsSiblingIsFiltered`. Three mutations, all killed.

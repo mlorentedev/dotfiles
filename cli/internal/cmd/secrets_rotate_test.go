@@ -420,6 +420,9 @@ func TestRotate_PushCIRefusesAnUnpushableCIConsumerBeforeRotating(t *testing.T) 
 		// #2306: one credential under two names would land in CI under both.
 		"two vars": {consumers: `[ci:o/a, local]`, env: "[DOCKERHUB_TOKEN, DOCKER_PAT]", want: "does not say which it holds",
 			args: []string{"DOCKER_PAT"}},
+		// SelectCI drops GITHUB_*, leaving a sibling this rotation never wrote.
+		"rotated var filtered out": {consumers: `[ci:o/a, local]`, env: "[DOCKERHUB_TOKEN, GITHUB_PAT]", want: "is the var being rotated",
+			args: []string{"GITHUB_PAT"}},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -523,5 +526,19 @@ func TestRotate_PushCIProbesTheNewValueOnce(t *testing.T) {
 	}
 	if len(uploads) != 2 {
 		t.Errorf("want both ci consumers pushed, got %v", uploads)
+	}
+}
+
+// The guard refuses a push it cannot justify, not every multi-var secret: when
+// SelectCI leaves exactly the rotated var, that var is what reaches CI.
+func TestRotate_PushCIPushesTheRotatedVarWhenItsSiblingIsFiltered(t *testing.T) {
+	reg := strings.Replace(pushCIRegistry, "expose: { env: DOCKERHUB_TOKEN }", "expose: { env: [DOCKERHUB_TOKEN, GITHUB_PAT] }", 1)
+	uploads := fakeSetter{}
+	_, out, err := rotateOn(t, reg, uploads, "DOCKERHUB_TOKEN", "--push-ci")
+	if err != nil {
+		t.Fatalf("rotate --push-ci: %v\n%s", err, out)
+	}
+	if len(uploads) != 2 || uploads["o/a|DOCKERHUB_TOKEN"] != "new-value" || uploads["o/b|DOCKERHUB_TOKEN"] != "new-value" {
+		t.Errorf("want DOCKERHUB_TOKEN alone pushed to both repos, got %v\n%s", uploads, out)
 	}
 }
