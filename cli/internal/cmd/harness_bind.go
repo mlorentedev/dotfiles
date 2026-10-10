@@ -17,10 +17,10 @@ import (
 // and the only writer of the `hooks` key in a harness settings file.
 //
 // WHY IT REPLACES SHELL RATHER THAN JOINING IT. `merge_claude_settings()` in
-// setup-linux.sh does `.hooks.SessionStart = $tmpl.hooks.SessionStart` — an
+// setup-linux.sh did `.hooks.SessionStart = $tmpl.hooks.SessionStart` — an
 // ASSIGNMENT, not a merge. Simulated against a copy of the deployed file on
 // 2026-08-27: SessionStart went from 2 groups to 1, deleting a live third-party
-// hook. setup-windows.ps1 carries the identical defect at its own lines. Adding
+// hook. setup-windows.ps1 carried the identical defect at its own lines. Adding
 // a second writer beside them would not have fixed it; the assignment had to go,
 // and then the file needs exactly one owner. That is this repository's most
 // repeated lesson, now on its seventh surface: THE WRITER TOUCHES ONLY WHAT IT
