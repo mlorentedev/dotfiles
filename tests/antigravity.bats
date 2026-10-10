@@ -148,11 +148,9 @@ setup() {
         || { echo "agy-settings strategy is '$strategy'; runtime state is destroyed on every deploy" >&2; return 1; }
 }
 
-@test "the agy template ships the deny list but no machine-local grants or trust (#902)" {
-    # permissions.allow and trustedWorkspaces are what agy grants and trusts on
-    # one machine (owner, 2026-10-09). The deny list stays the repo's.
-    [ "$(jq -c 'has("trustedWorkspaces")' "$DOTFILES_DIR/ai/agy/settings.json")" = "false" ] || false
-    [ "$(jq -c '.permissions | has("allow")' "$DOTFILES_DIR/ai/agy/settings.json")" = "false" ] || false
+@test "AI-042: the agy template restores managed lists through merge union" {
+    [ "$(jq -c '.trustedWorkspaces' "$DOTFILES_DIR/ai/agy/settings.json")" = \
+        '["{HOME}/Projects/*","{HOME}/Projects/Workspace/*"]' ]
     [ "$(jq -c '.permissions.deny' "$DOTFILES_DIR/ai/agy/settings.json")" = \
         '["command(rm -rf /)","command(rm -rf ~/*)"]' ]
 }

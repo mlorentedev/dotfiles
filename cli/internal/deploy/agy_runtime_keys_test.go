@@ -71,17 +71,24 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 
 	got := readObject(t, dst)
 
-	// #902: the template no longer names these keys, so the deploy leaves them
-	// exactly as the machine has them: nothing removed, nothing added.
+	// The template's grants and trust paths are the baseline every machine
+	// gets. The merge unions them into the machine's lists, so an entry the
+	// machine added survives and no baseline entry is missing.
 	ws, _ := got["trustedWorkspaces"].([]any)
-	if len(ws) != 1 || ws[0] != "/home/u/Projects/ts-bridge" {
-		t.Errorf("trustedWorkspaces is machine-local and must pass through untouched: %v", got["trustedWorkspaces"])
+	if !containsAll(ws, "/home/u/Projects/ts-bridge") {
+		t.Errorf("a trust path the machine added was lost: %v", got["trustedWorkspaces"])
+	}
+	if !containsAll(ws, home+"/Projects/*") {
+		t.Errorf("the baseline trust path is missing: %v", got["trustedWorkspaces"])
 	}
 
 	perms, _ := got["permissions"].(map[string]any)
 	allow, _ := perms["allow"].([]any)
-	if len(allow) != 1 || allow[0] != "mcp(hive-vault/*)" {
-		t.Errorf("permissions.allow is machine-local and must pass through untouched: %v", perms)
+	if !containsAll(allow, "mcp(hive-vault/*)") {
+		t.Errorf("a grant the machine added was lost: %v", perms)
+	}
+	if !containsAll(allow, baselineGrants...) {
+		t.Errorf("the baseline grants are missing: %v", perms)
 	}
 
 	// The other half of the contract: dotfiles still owns what it declares.
@@ -103,12 +110,13 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	}
 }
 
-// TestAgyTemplateCarriesNoMachineLocalKeys pins the owner decision on #902:
-// `permissions.allow` and `trustedWorkspaces` are what agy grants and trusts on
-// one machine, so the repo does not ship them. With the merge strategy a
-// shipped list is unioned into every machine's list on every deploy, and doctor
-// reports drift whenever a machine's list holds less than the template's.
-func TestAgyTemplateCarriesNoMachineLocalKeys(t *testing.T) {
+// baselineGrants is the minimum agy needs to work on every machine (owner,
+// #2236). A machine may add to it; the merge never leaves it holding less.
+var baselineGrants = []string{"command(*)", "read_file(*)", "write_file(*)", "read_url(*)", "search_web(*)"}
+
+// TestAgyTemplateShipsTheBaselineGrants pins the owner decision on #2236: the
+// grants and the trust paths are one baseline shipped to every machine.
+func TestAgyTemplateShipsTheBaselineGrants(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("../../..", "ai", "agy", "settings.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -117,12 +125,30 @@ func TestAgyTemplateCarriesNoMachineLocalKeys(t *testing.T) {
 	if err := json.Unmarshal(raw, &tmpl); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := tmpl["trustedWorkspaces"]; ok {
-		t.Error("ai/agy/settings.json ships trustedWorkspaces, which is machine-local (#902)")
+	ws, _ := tmpl["trustedWorkspaces"].([]any)
+	if !containsAll(ws, "{HOME}/Projects/*", "{HOME}/Projects/Workspace/*") {
+		t.Errorf("ai/agy/settings.json must ship the baseline trust paths: %v", tmpl["trustedWorkspaces"])
 	}
-	if perms, ok := tmpl["permissions"].(map[string]any); ok {
-		if _, ok := perms["allow"]; ok {
-			t.Error("ai/agy/settings.json ships permissions.allow, which is machine-local (#902)")
+	perms, _ := tmpl["permissions"].(map[string]any)
+	allow, _ := perms["allow"].([]any)
+	if !containsAll(allow, baselineGrants...) {
+		t.Errorf("ai/agy/settings.json must ship the baseline grants: %v", perms)
+	}
+}
+
+// containsAll reports whether list holds every one of want.
+func containsAll(list []any, want ...string) bool {
+	for _, w := range want {
+		found := false
+		for _, v := range list {
+			if v == w {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
 		}
 	}
+	return true
 }
