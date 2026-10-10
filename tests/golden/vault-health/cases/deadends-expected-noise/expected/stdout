@@ -16,7 +16,7 @@ Vault: knowledge (<VAULT>)
   INFO: Not counted: 1 attachment(s) no note links to
   WARN: Dead-ends: 2/4 (50%) — consider adding outgoing links
   INFO: Most dead-ends: 00_meta (1), 10_projects/p (1)
-  INFO: Not counted: 5 file(s) under 90_archive/, 00_meta/templates/, 20_certifications/ and sessions/ (5 dead-ends), which have no outgoing links by design
+  INFO: Not counted: 5 file(s) under 90_archive/, 00_meta/templates/, 20_certifications/, 50_work/20-products/, 50_work/30-clients/ and sessions/ (5 dead-ends), which have no outgoing links by design
   --- Unlinked attachments ---
 00_meta/diagram.png
   --- Dead-end files ---

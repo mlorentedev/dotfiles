@@ -10,6 +10,10 @@
     "  system          a package the OS manager owns, for what no cross-OS channel carries:",
     "                    apt / brew / winget  the package name per manager (linux / darwin / windows);",
     "                                         a manager with no name skips the entry on that OS",
+    "                    cask                 a Homebrew cask (GUI app, font) instead of a brew formula;",
+    "                                         darwin only, never beside brew in one entry. A dotf older",
+    "                                         than the reader REFUSES the key (the whole catalog fails to",
+    "                                         load), so no cask entry ships before that release is the pin",
     "                    command              optional: the executable it puts on PATH; found there,",
     "                                         the entry is satisfied whichever channel installed it",
     "                  A system entry has no version: it is not pinned, presence is what converges,",
@@ -185,6 +189,43 @@
         "brew": "eza",
         "winget": "eza-community.eza",
         "command": "eza"
+      }
+    },
+    {
+      "name": "colima",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "colima",
+        "command": "colima"
+      }
+    },
+    {
+      "name": "docker",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "docker.io",
+        "brew": "docker",
+        "winget": "Docker.DockerDesktop",
+        "command": "docker"
+      }
+    },
+    {
+      "name": "docker-compose",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker-compose",
+        "command": "docker-compose"
+      }
+    },
+    {
+      "name": "docker-buildx",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker-buildx"
       }
     },
     {
