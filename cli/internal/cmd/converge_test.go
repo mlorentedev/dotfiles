@@ -23,6 +23,7 @@ func convergeFixture(t *testing.T) (repo, home string) {
 		"harness/manifest.json": `{"targets":[{"file":"AGENTS.md"}]}`,
 		"AGENTS.md":             "# AGENTS\n",
 		"ai/deploy.json":        `{"version": 3, "configs": []}`,
+		"env-contract.json":     `{"env_vars": []}`,
 	} {
 		p := filepath.Join(repo, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -56,7 +57,7 @@ func TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"converge plan", "records-mirror", "[CHANGE]", "2 to write", "1 to change"} {
+	for _, want := range []string{"converge plan", "records-mirror", "env-generate", "[CHANGE]", "3 to write", "paths.sh to write", "2 to change"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("plan output lacks %q:\n%s", want, stdout)
 		}
