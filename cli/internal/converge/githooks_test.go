@@ -95,6 +95,10 @@ func TestGitHooks_KeepsAForeignHooksPath(t *testing.T) {
 	if err := step.Probe(env); err != nil {
 		t.Errorf("probe: %v", err)
 	}
+	// The foreign path is never a change, so the step converges with it in place.
+	if again, err := step.Reconcile(env, false); err != nil || again.Changes != 0 {
+		t.Errorf("second run = %+v, %v; want 0 changes with the foreign hooksPath kept", again, err)
+	}
 }
 
 // A wiring that did not take fails the probe: an unset hooksPath is a guard
