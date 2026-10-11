@@ -1,5 +1,5 @@
 ---
-id: "lesson-394-bash-32-prints-a-completion-spec-unquoted"
+id: "lesson-395-bash-32-prints-a-completion-spec-unquoted"
 type: lesson
 status: active
 title: "bash 3.2 prints a completion spec unquoted, and an untagged test only meets it on main"
