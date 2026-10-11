@@ -1,7 +1,7 @@
 ---
 id: "TOOL-013-pr-agent-reviewer"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-16"
 issue: "mlorentedev/dotfiles#786"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

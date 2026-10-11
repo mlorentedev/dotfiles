@@ -49,9 +49,24 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
   index left stale when its directory emptied (DOCS-020 `verification.md`). On #2211, run 37887978561
   reviewed with `openai/mimo-v2.6-flash` and raised three findings; one was applied in `17553abc`
   ([triage](https://github.com/mlorentedev/dotfiles/pull/2211#issuecomment-6074931691)). The
-  findings arrive as one review comment that links each file and line, not as inline diff comments:
-  #1107 turned `auto_improve` off, the only pass that posts inline, to halve NaN demand per PR; the
-  decision and its measurement are in `pr-agent.yml`. `/improve` still posts inline on demand.
+  findings arrive inline since #2325 (`inline_key_issues = true`, merged 2026-10-11T02:25:20Z as
+  `7186bc0a`), from the same `/review` call #1107 kept to one per PR. Every PR-Agent review in the
+  window that followed, read on 2026-10-11 with
+  `gh api repos/mlorentedev/dotfiles/pulls/<n>/reviews` and `.../pulls/<n>/comments`, filtered to
+  `github-actions[bot]`:
+
+  | PR | Review id | State | Head | Submitted | Inline comments |
+  |---|---|---|---|---|---|
+  | #2326 | 5481615000 | COMMENTED | `3df52387` | 02:30:22Z | 2 |
+  | #2327 | 5481624169 | COMMENTED | `44e8809d` | 02:34:41Z | 1 |
+  | #2329 | 5481712753 | COMMENTED | `e3086b93` | 03:18:07Z | 1 |
+  | #2332 | 5481717209 | COMMENTED | `47fa3db2` | 03:20:18Z | 1 |
+  | #2334 | 5481759720 | COMMENTED | `71df0865` | 03:41:06Z | 2 |
+  | #2335 | 5481828782 | COMMENTED | `5d2ddab3` | 04:07:07Z | 2 |
+
+  A finding with no line (path "PR description") stays in the summary comment: #2333's only finding
+  was one, and that PR has no review object. `/improve` still posts suggestions on demand. Recorded
+  on #786 ([comment](https://github.com/mlorentedev/dotfiles/issues/786#issuecomment-6105247189)).
 - AC2: `.pr_agent.toml` names `mimo-v2.6-flash` with `deepseek-v4-flash` as fallback; `qwen3.6` is
   `model_weak`, which the review never uses.
 - AC3: `ignore.glob` keeps `sensitive/**` out of the call (f3).
@@ -66,7 +81,11 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
 - AC9: holds on `main`: one Action, `fail_on_tool_errors`, the fallback inside its attempt. AI-045
   (#2188) adds an attempt on a second provider by recorded decision.
 - Blocked tasks: #983 and #939 are both closed.
-- No earlier `review.md` exists for this spec, in git history or in the Linux worktrees.
+- Review history: round 1 FAILed on F1, inline delivery untested (landed as `883654cb`, #2324). The fix was #2325 and the live evidence #2335. Round 2 (2026-10-11, `nan/deepseek-v4-flash` via pi) PASSed against `e31c4ee4`.
+- Round 2 dispositions:
+  - Review base spans 708 commits (Minor, REAL, launcher). Already ticketed as #1551; this case is recorded there.
+  - `features.json` still `pending` (Minor, REAL). No harness writes pass states in this repo, and the agent may not. The reviewer re-ran all nine verifications fresh: 73/73 with one network skip, and 62/62. The mechanism is #1905 (SDD-045).
+  - Inline comments read back as `line: null` (SPECULATIVE). They are line-anchored when published: on #2337, PR-Agent's review 5481888670 posted its four findings at `cli/internal/doctor/checks_deploy.go:427`, `cli/internal/doctor/scope_test.go:110`, `docs/runbooks/guide-new-machine.md:37` and `cli/internal/doctor/doctor.go:278`. GitHub then nulls `line` on outdated comments after a later push.
 
 ## Promotion candidates
 
@@ -76,7 +95,7 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/TOOL-013-pr-agent-reviewer/` -> `specs/archive/TOOL-013-pr-agent-reviewer/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/TOOL-013-pr-agent-reviewer/` -> `specs/archive/TOOL-013-pr-agent-reviewer/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Independent adversarial review passes for the final contract
+- [x] Independent adversarial review passes for the final contract (`review.md`, verdict PASS)
