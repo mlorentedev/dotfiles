@@ -139,6 +139,29 @@ setup() {
     [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
 }
 
+# "# mise: latest" (#2013 D9) is a third marker, and every release up to
+# v0.67.0 rejects it as a near miss: the whole tools step of converge, and
+# doctor, fail on that machine. The first release carrying the parser is the
+# floor. If 0.68.0 ships without it, raise the floor to the release that does.
+@test "versions.conf uses the latest marker only while DOTF_VERSION parses it" {
+    run awk -v floor="0.68.0" '
+        function ge(a, b,   x, y, i) {
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) return x[i] + 0 > y[i] + 0
+            return 1
+        }
+        {
+            t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t)
+            if (t == "# mise: latest") uses = 1
+        }
+        /^DOTF_VERSION=/ { dotf = $0; sub(/^DOTF_VERSION=/, "", dotf) }
+        END {
+            if (dotf == "") { print "no DOTF_VERSION"; exit 1 }
+            if (uses && !ge(dotf, floor)) { print "a \"# mise: latest\" marker but DOTF_VERSION=" dotf " is below " floor; exit 1 }
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}
+
 # Python is a hard dependency of the toolchain (#2062): the suite imports
 # tomllib and yaml, and doctor fails without them. Unmarking either line would
 # leave a machine's python to whatever the OS ships (3.9 on macOS).
