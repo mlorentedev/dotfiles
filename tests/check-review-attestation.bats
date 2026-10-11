@@ -628,6 +628,18 @@ EOF
     [[ "$output" == *"attested"* ]] || false
 }
 
+# TOOL-013 F1: with inline_key_issues PR-Agent posts its located findings as a
+# COMMENTED review from the shared automation login, with an empty body, and the
+# Guide comment may carry no findings row. The Guide here deliberately lacks the
+# review marker, so only the reviews[] door can attest: the declared login must
+# be enough there, or a PR whose findings all went inline reads as unreviewed.
+@test "TOOL-013: PR-Agent's inline-findings review attests through reviews[]" {
+    run "$SCRIPT" --payload "$F/pr-agent-inline-review.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attested — reviewed by: github-actions"* ]] || false
+    [[ "$output" != *"comment-shaped"* ]] || false
+}
+
 @test "#1033: a member's review attests without being declared anywhere" {
     run "$SCRIPT" --payload "$F/human-reviewed.json"
     [ "$status" -eq 0 ]

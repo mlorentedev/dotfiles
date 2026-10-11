@@ -6,6 +6,7 @@
     "pr_agent/algo/ai_handlers/litellm_ai_handler.py": "c054647f43692f80dee89cd0c0b113424ed86959",
     "pr_agent/algo/comment_identity.py": "819a3cd08a6c286376f5f2579561df66e143fb87",
     "pr_agent/algo/file_filter.py": "4f675e95cdda2291aad1ade889e0e105a301a961",
+    "pr_agent/algo/inline_comment_dedup.py": "72504124dc547b3c2ea7add36e32973d949a0b86",
     "pr_agent/algo/review_finding_state.py": "768ecafe88794b200d59805a48ce213c73ff3a69",
     "pr_agent/git_providers/github_provider.py": "e0937f73819539ec387ebe412dc5555d720cce95",
     "pr_agent/servers/github_action_runner.py": "19a73d6bbd645d2ca29f75c86ac585cb067defd6",

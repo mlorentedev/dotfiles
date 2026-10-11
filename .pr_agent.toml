@@ -152,8 +152,10 @@ repo_context_files = ["AGENTS.md", ".claude/CLAUDE.md"]
 # regions, CLAUDE.md the repo-specific tables and verification commands.
 
 [pr_reviewer]
-# Inline comments on the diff, which is the half CodeRabbit's free tier withholds
-# on private repos and the reason this work exists.
+# Inline comments on the diff are the half CodeRabbit's free tier withholds on
+# private repos and the reason this work exists (TOOL-013 AC1). They come from
+# inline_key_issues below, on the one automatic `/review` call: `/improve`, the
+# other inline path, is off on the automatic path since #1107 halved demand.
 require_score_review = false
 require_tests_review = true
 require_security_review = true
@@ -175,6 +177,19 @@ final_update_message = false
 # The upstream default of 3 findings would let a compliance FAIL crowd out a
 # defect, so the cap leaves room for both.
 num_max_findings = 5
+
+# Upstream default is false, so the automatic review published no inline comment
+# at all and AC1 was met only on paper (the TOOL-013 archive review, F1). With it,
+# each key issue that names a file in the diff and a line range inside it is
+# posted as an inline review comment from the SAME `/review` response: no second
+# inference call, so #1107's demand halving holds. A finding with lines 0 (a
+# harness compliance FAIL on a branch name, a PR title) or a file outside the
+# diff stays in the summary, and so does every finding whose inline publication
+# upstream cannot verify. Re-reviews do not repost: upstream fingerprints each
+# published finding (pr_agent/algo/inline_comment_dedup.py, in the audited
+# contract). A summary whose findings all went inline has no key-issues row at
+# all, which is not "No major issues": the triage reads pulls/N/comments too.
+inline_key_issues = true
 
 extra_instructions = """
 Run a HARNESS COMPLIANCE pass over the two context files (AGENTS.md and
@@ -230,12 +245,11 @@ Rules to avoid false positives and ensure high-precision determinism:
 """
 
 [pr_code_suggestions]
-# This section did not exist, and its absence made the `[pr_reviewer]` comment
-# above false. That comment says inline comments on the diff are "the reason this
-# work exists" — but `review` never posts inline by design; `improve` does, and
-# without this section `improve` ran on defaults with dual publishing DISABLED.
-# Measured across #1042, #1047 and #1051: 2 PR-Agent comments each, **0 inline**.
-# The stated reason for the tool being here had never been configured.
+# Configures `/improve`, which since #1107 runs only when someone asks for it on a
+# PR: the automatic path is `review` alone, and its inline comments come from
+# [pr_reviewer] inline_key_issues. This section once carried the inline claim
+# itself; measured across #1042, #1047 and #1051 before it existed, `improve` ran
+# with dual publishing DISABLED and posted 0 inline comments.
 #
 # Only the settings that actually change behaviour are listed. Three more were
 # proposed — commitable_code_suggestions, focus_only_on_problems and
@@ -244,8 +258,8 @@ Rules to avoid false positives and ensure high-precision determinism:
 # action is pinned by tag, so those defaults cannot drift under us without a
 # deliberate bump.
 
-# Default is -1, which DISABLES inline publishing entirely. This is the line that
-# makes the [pr_reviewer] claim true. 7 is the score upstream's own scoring
+# Default is -1, which DISABLES inline publishing of an asked-for `/improve`
+# entirely. 7 is the score upstream's own scoring
 # mechanism calls "medium" (new_score_mechanism_th_medium), so it is the
 # documented boundary above which a suggestion is more than stylistic — not a
 # recommendation for this setting specifically, which upstream does not give.
@@ -278,7 +292,12 @@ publish_output_no_suggestions = false
 # that used to sit here re-included nothing, and named a file that no longer
 # exists. A PR touching only these paths reaches PR-Agent as an empty diff, and
 # the workflow skips the run rather than reporting it as a failure (#1618).
+#
+# Declaring glob REPLACES upstream's list rather than extending it (a section-level
+# set replaces the whole section), and upstream's list at the pin is
+# ['vendor/**'], so that entry is carried here or it silently stops applying.
 glob = [
+  "vendor/**",
   "sensitive/**",
   "specs/**/review-transcript.jsonl*",
 ]

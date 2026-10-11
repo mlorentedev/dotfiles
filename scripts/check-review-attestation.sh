@@ -240,7 +240,10 @@ UNQUALIFIED="$(printf '%s' "$PR_JSON" | jq -r --arg a "$PR_AUTHOR" --slurpfile c
 # reviews[] is empty on a PR it genuinely reviewed — measured on #1037 and #1042,
 # both carrying a real Guide and both reading as unattested (#1045). The gate
 # built to make green mean "reviewed" was calling the repo's own reviewer
-# unreviewed, which is #906's failure with the sign flipped.
+# unreviewed, which is #906's failure with the sign flipped. Since
+# `inline_key_issues` (TOOL-013 F1), a review with located findings also posts a
+# COMMENTED review from that login and attests above, by the declared login; this
+# path still carries a review whose findings all stayed in its Guide.
 #
 # Matched on a DECLARED (login, marker) pair, never on "a bot commented": the
 # latter would let a labeler or release bot attest through the comments door,
