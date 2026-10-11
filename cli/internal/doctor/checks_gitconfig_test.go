@@ -30,30 +30,68 @@ func gitSys(t *testing.T, loggedIn bool) (*System, map[string][]string) {
 	}
 	s := newSys(map[string]string{"HOME": home}, []string{"git", "gh"}, nil)
 	s.CommandStdoutDir = func(_, name string, args ...string) (string, error) {
-		cmd := name + " " + strings.Join(args, " ")
-		switch {
-		case strings.HasPrefix(cmd, "git config --global --get-all "):
-			v, ok := cfg[args[3]]
-			if !ok {
-				return "", gitExitErr(1)
-			}
-			return strings.Join(v, "\n") + "\n", nil
-		case strings.HasPrefix(cmd, "git config --global --add "):
-			cfg[args[3]] = append(cfg[args[3]], args[4])
-		case cmd == "gh auth status --hostname github.com":
-			if !loggedIn {
-				return "", gitExitErr(1)
-			}
-		case cmd == "gh auth setup-git":
-			for _, h := range gitconfig.CredentialHosts {
-				cfg["credential."+h+".helper"] = []string{"", "!" + gh + " auth git-credential"}
-			}
-		default:
-			t.Fatalf("unexpected command: %s", cmd)
-		}
-		return "", nil
+		return gitFake(t, cfg, gh, loggedIn, name, args...)
+	}
+	// The login question is asked without the environment's tokens, so it
+	// reaches gh through CommandOutputEnv; same answers here.
+	s.CommandOutputEnv = func(_ []string, name string, args ...string) (string, error) {
+		return gitFake(t, cfg, gh, loggedIn, name, args...)
 	}
 	return s, cfg
+}
+
+func gitFake(t *testing.T, cfg map[string][]string, gh string, loggedIn bool, name string, args ...string) (string, error) {
+	t.Helper()
+	cmd := name + " " + strings.Join(args, " ")
+	switch {
+	case strings.HasPrefix(cmd, "git config --global --get-all "):
+		v, ok := cfg[args[3]]
+		if !ok {
+			return "", gitExitErr(1)
+		}
+		return strings.Join(v, "\n") + "\n", nil
+	case strings.HasPrefix(cmd, "git config --global --add "):
+		cfg[args[3]] = append(cfg[args[3]], args[4])
+	case cmd == "gh auth status --hostname github.com":
+		if !loggedIn {
+			return "", gitExitErr(1)
+		}
+	case cmd == "gh auth setup-git":
+		for _, h := range gitconfig.CredentialHosts {
+			cfg["credential."+h+".helper"] = []string{"", "!" + gh + " auth git-credential"}
+		}
+	default:
+		t.Fatalf("unexpected command: %s", cmd)
+	}
+	return "", nil
+}
+
+// A login that exists only as a token in doctor's environment is not one the
+// helper can use from a GUI app or a scheduled task, so the helper is blocked
+// (WARN), not repairable (FAIL). CI's doctor gate has GH_TOKEN and its setup
+// step does not; asking with the token went red on test-windows (#2319).
+func TestCheckGitConfig_AnEnvironmentTokenIsNotALogin(t *testing.T) {
+	s, _ := gitSys(t, true)
+	var asked []string
+	s.CommandOutputEnv = func(env []string, name string, args ...string) (string, error) {
+		for _, kv := range env {
+			if strings.HasPrefix(kv, "GH_TOKEN=") || strings.HasPrefix(kv, "GITHUB_TOKEN=") {
+				t.Errorf("gh was asked with %s in its environment", strings.SplitN(kv, "=", 2)[0])
+			}
+		}
+		asked = append(asked, name+" "+strings.Join(args, " "))
+		return "", gitExitErr(1) // no stored login
+	}
+	t.Setenv("GH_TOKEN", "x")
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkGitConfig(s, rep, false)
+	if rep.Failures() != 1 || rep.Warnings() != 1 || !strings.Contains(b.String(), "gh auth login") {
+		t.Errorf("want the include FAIL and a helper WARN naming the login\n%s", b.String())
+	}
+	if len(asked) != 1 || asked[0] != "gh auth status --hostname github.com" {
+		t.Errorf("asked %v, want one stored-login question", asked)
+	}
 }
 
 func TestCheckGitConfig_ABareHelperAndNoIncludeFailNamingTheFix(t *testing.T) {

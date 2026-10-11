@@ -13,8 +13,9 @@ import (
 // dotfiles.gitconfig, and GitHub's credential helper is gh's absolute form,
 // which a process without the shell's PATH can still run. Every OS.
 type gitConfig struct {
-	run gitconfig.Runner  // gitconfig.ExecRunner in production
-	has func(string) bool // is a command on PATH
+	run    gitconfig.Runner  // gitconfig.ExecRunner in production
+	stored gitconfig.Runner  // gitconfig.StoredLoginRunner in production; nil means run
+	has    func(string) bool // is a command on PATH
 }
 
 func (gitConfig) Name() string        { return "git-config" }
@@ -22,10 +23,11 @@ func (gitConfig) Platforms() []string { return nil }
 
 func (r gitConfig) machine(env Env) gitconfig.Machine {
 	return gitconfig.Machine{
-		Home:   env.Home,
-		Run:    r.run,
-		OnPath: r.has,
-		Exists: func(p string) bool { _, err := os.Stat(p); return err == nil },
+		Home:       env.Home,
+		Run:        r.run,
+		OnPath:     r.has,
+		Exists:     func(p string) bool { _, err := os.Stat(p); return err == nil },
+		StoredAuth: r.stored,
 	}
 }
 

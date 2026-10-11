@@ -97,6 +97,7 @@ var convergeOptions = func() converge.Options {
 		ToolsCatalog:  &tools.Installer{Dest: dest, Out: os.Stderr},
 		ToolsBinDirs:  []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest},
 		GitRun:        gitconfig.ExecRunner,
+		GitStoredAuth: gitconfig.StoredLoginRunner,
 		CloneURL:      os.Getenv("DOTFILES_REPO"),
 		RenderConfigs: strictDeployRenderer,
 		ResolvePath:   env.ResolvePath,

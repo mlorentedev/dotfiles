@@ -33,6 +33,9 @@ type Options struct {
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the checkout and git-config steps are skipped.
 	GitRun gitconfig.Runner
+	// GitStoredAuth asks gh for its stored login, without the environment's
+	// tokens; gitconfig.StoredLoginRunner in production. Unset means GitRun.
+	GitStoredAuth gitconfig.Runner
 	// CloneURL is what the checkout step clones when the checkout is absent;
 	// empty means DefaultCloneURL.
 	CloneURL string
@@ -75,7 +78,7 @@ func Registry(o Options) []Reconciler {
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath},
-		gitConfig{run: o.GitRun, has: onPath},
+		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		legacySetup{run: o.RunSetup},
 	}

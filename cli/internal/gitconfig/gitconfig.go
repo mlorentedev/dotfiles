@@ -21,8 +21,10 @@ package gitconfig
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -49,6 +51,33 @@ func ExecRunner(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).Output() //nolint:gosec // git or gh, fixed arguments
 }
 
+// envTokens are the variables gh reads a token from before its stored login.
+var envTokens = []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
+
+// WithoutEnvTokens is environ minus the variables gh would take a token from,
+// so gh answers for the login it stored, which is the one a GUI app, launchd,
+// cron or a scheduled task can use (#2319). Names compare case-insensitively:
+// Windows resolves them that way, so gh there reads a `gh_token` as GH_TOKEN,
+// and dropping a lower-case twin on other OSes costs nothing.
+func WithoutEnvTokens(environ []string) []string {
+	out := make([]string, 0, len(environ))
+	for _, kv := range environ {
+		name, _, _ := strings.Cut(kv, "=")
+		if !slices.Contains(envTokens, strings.ToUpper(name)) {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
+// StoredLoginRunner is the production Machine.StoredAuth: the command on PATH
+// with WithoutEnvTokens(os.Environ()), its stdout.
+func StoredLoginRunner(name string, args ...string) ([]byte, error) {
+	cmd := exec.Command(name, args...) //nolint:gosec // gh, fixed arguments
+	cmd.Env = WithoutEnvTokens(os.Environ())
+	return cmd.Output()
+}
+
 // Machine is what Inspect and Apply need: the runner and the questions they
 // ask the filesystem and PATH. Every field is a seam for tests (lesson 335).
 type Machine struct {
@@ -56,6 +85,13 @@ type Machine struct {
 	Run    Runner
 	OnPath func(name string) bool
 	Exists func(path string) bool
+	// StoredAuth runs `gh auth status` with the environment's tokens removed
+	// (StoredLoginRunner in production). A GH_TOKEN in this process is not a
+	// login the helper can use from a GUI app or a scheduled task, and the
+	// two callers did not agree on it: CI's setup step has no token and saw a
+	// blocked helper, its doctor step has one and saw a repairable helper
+	// nobody repaired (#2319). Nil means Run.
+	StoredAuth Runner
 }
 
 // State is the global git configuration as far as the dotfiles care.
@@ -219,8 +255,12 @@ func ghBlocked(m Machine) string {
 	}
 	// Only the exit status is read: `gh auth status` masks the token, and its
 	// output is discarded either way.
-	if _, err := m.Run("gh", "auth", "status", "--hostname", "github.com"); err != nil {
-		return "gh is not logged in to github.com (run: gh auth login)"
+	stored := m.StoredAuth
+	if stored == nil {
+		stored = m.Run
+	}
+	if _, err := stored("gh", "auth", "status", "--hostname", "github.com"); err != nil {
+		return "gh is not logged in to github.com (run: gh auth login; a token in the environment does not count, since a GUI app or scheduled task does not inherit it)"
 	}
 	return ""
 }
