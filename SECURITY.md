@@ -7,7 +7,7 @@ Only the latest release of `dotf` gets security fixes. Fixes ship as a new relea
 | Version | Supported |
 |---|---|
 | Latest release | Yes |
-| Anything older | No: upgrade with `./scripts/install-dotf.sh` or `scripts/install-dotf.ps1` |
+| Anything older | No: upgrade with `./install.sh` or `install.ps1` |
 
 ## Reporting a vulnerability
 
@@ -39,7 +39,7 @@ This is a personal project maintained by one person, so the times below are targ
 In scope:
 
 - the `dotf` CLI (`cli/`);
-- the install and bootstrap scripts (`scripts/install-dotf.sh`, `scripts/install-dotf.ps1`, `setup-linux.sh`, `setup-windows.ps1`);
+- the install and bootstrap scripts (`install.sh`, `install.ps1`, `setup-linux.sh`, `setup-windows.ps1`);
 - secret handling: `dotf secrets`, `secrets/registry.yaml` and the backup and escrow paths;
 - the GitHub Actions workflows in `.github/workflows/`.
 

@@ -10,9 +10,10 @@ Personal development environment: shell configs, AI tool integration, and encryp
 
 ## Quick Start
 
-### Linux
+### Linux and macOS
 
-**Checkout bootstrap** (factory-fresh machine — needs only `git` and `curl`):
+**One entrypoint** (a factory-fresh machine needs only `curl`; on macOS,
+`git` comes with `xcode-select --install`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
@@ -20,24 +21,21 @@ curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.s
 
 > **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | less`
 
-**CLI recovery or upgrade** (does not clone a checkout or run full setup):
+`install.sh` downloads the latest `dotf` release, verifies its checksum, proves
+it runs, places it in `~/.local/bin`, and hands the machine to `dotf converge`.
+Converge clones the checkout when it is absent (`DOTFILES_REPO_DIR`, else
+`~/Projects/dotfiles`; the upstream is `DOTFILES_REPO`), fast-forwards it when
+it is present, and applies every step. Running it again is safe: a converged
+machine reports zero changes.
+
+Every argument goes to `dotf converge`. To see what it would change first:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | bash
-dotf version
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash -s -- --plan
 ```
 
-> **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | less`
-
-The recovery installer resolves the latest published release, verifies its
-checksum, and replaces only the user-local `dotf` binary. Use checkout bootstrap
-when you want to deploy the complete dotfiles configuration.
-
-Override the clone target with `DOTFILES_DIR` or the upstream URL with `DOTFILES_REPO`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | DOTFILES_DIR=/tmp/df bash
-```
+From a checkout, `./install.sh` installs the version `versions.conf` pins
+instead of the latest release. `DOTF_BIN_DIR` moves the install directory.
 
 Or **manually**:
 
@@ -52,7 +50,20 @@ source ~/.zshrc
 
 ### Windows (PowerShell)
 
-**Checkout bootstrap:**
+**One entrypoint** (no clone, no admin):
+
+```powershell
+irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.ps1 | iex
+```
+
+The same contract as `install.sh`: install `dotf`, then `dotf converge`. From a
+checkout, `.\install.ps1 --plan` plans first.
+
+The POSIX and PowerShell entrypoints share one contract, but each uses the
+platform-native interpreter. A factory-fresh Windows machine cannot run a Bash
+payload until Bash has been installed.
+
+**Manually**:
 
 ```powershell
 git clone https://github.com/mlorentedev/dotfiles.git
@@ -60,17 +71,6 @@ cd dotfiles
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 # Restart PowerShell after setup
 ```
-
-**CLI recovery or upgrade** (does not clone a checkout or run full setup):
-
-```powershell
-irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.ps1 | iex
-dotf version
-```
-
-The POSIX and PowerShell recovery commands share the same release-install
-contract, but each uses the platform-native interpreter. A factory-fresh Windows
-machine cannot run a Bash payload until Bash has been installed.
 
 Optional: add `-WithDefaults` to also apply ~15 HKCU engineering defaults
 (show file extensions/hidden files, disable advertising ID and Bing-in-Start,

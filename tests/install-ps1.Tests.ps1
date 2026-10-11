@@ -1,18 +1,20 @@
-# Pester 5 behavioral guard for install-dotf.ps1's binary placement (BUG-037).
+# Pester 5 behavioral guard for install.ps1's binary placement (BUG-037) and
+# its hand-off to `dotf converge` (PLAT-001b).
 #
 # Windows refuses to overwrite or delete a *running* image, so `Copy-Item -Force`
 # straight onto dotf.exe failed every upgrade attempted while a long-lived
 # `dotf secrets run -- <agent>` wrapper held the binary open. Set-DotfBinary
 # parks the live image and renames the staged one in, which Windows does allow.
 #
-# The .sh twin is covered behaviorally on Linux (tests/install-dotf.bats, real
-# ETXTBSY). install-dotf-ps1.bats only greps the source - that is why this class
+# The .sh twin is covered behaviorally on Linux (tests/install.bats, real
+# ETXTBSY). install-ps1.bats only greps the source - that is why this class
 # of defect escaped CI on the Windows side, so the swap is exercised for real here.
 
 BeforeAll {
     # Dot-sourcing defines the functions without tripping the standalone
     # run-guard (`$MyInvocation.InvocationName -ne '.'`), so nothing installs.
-    . (Join-Path $PSScriptRoot '..\scripts\install-dotf.ps1')
+    $script:InstallPs1 = Join-Path $PSScriptRoot '..\install.ps1'
+    . $script:InstallPs1
 
     # Open $Path the way the Windows loader holds a running executable: readable
     # and renamable (FileShare.Read + Delete), but never overwritable. Returns the
@@ -159,5 +161,62 @@ Describe 'Set-DotfBinary' {
         # fresh file and it survived one run, so its absence is not asserted -
         # the next upgrade overwrites it with Copy-Item -Force anyway.
         Test-Path -LiteralPath "$($script:Target).old" | Should -BeFalse
+    }
+}
+
+Describe 'install.ps1 executed' {
+    # Invoke-WebRequest has no file:// support, so the download path cannot run
+    # here; the hand-off is driven through the "pinned version already on PATH"
+    # branch, which reaches the same `& $script:DotfBin converge @args`.
+    BeforeEach {
+        $script:Saved = @{
+            PATH          = $env:PATH
+            DOTF_VERSION  = $env:DOTF_VERSION
+            DOTF_ARGS_LOG = $env:DOTF_ARGS_LOG
+        }
+        $script:OnPath = Join-Path $TestDrive 'onpath'
+        New-Item -ItemType Directory -Force -Path $script:OnPath | Out-Null
+        $script:Log = Join-Path $TestDrive 'args.log'
+        Remove-Item -LiteralPath $script:Log -ErrorAction SilentlyContinue
+        # A stand-in dotf that reports the pinned version and records its
+        # arguments, the way tests/install.bats observes the .sh hand-off.
+        Set-Content -LiteralPath (Join-Path $script:OnPath 'dotf.cmd') -Value @(
+            '@echo off'
+            'if defined DOTF_ARGS_LOG echo %*>>"%DOTF_ARGS_LOG%"'
+            'echo dotf version 9.9.9'
+        )
+        $env:PATH = "$($script:OnPath);$env:PATH"
+        $env:DOTF_VERSION = '9.9.9'
+        $env:DOTF_ARGS_LOG = $script:Log
+    }
+
+    AfterEach {
+        foreach ($name in $script:Saved.Keys) {
+            if ($null -eq $script:Saved[$name]) {
+                Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+            } else {
+                Set-Item "Env:$name" $script:Saved[$name]
+            }
+        }
+    }
+
+    It 'hands its arguments to dotf converge through the dotf it kept' -Skip:(-not $IsWindows) {
+        $pwsh = (Get-Process -Id $PID).Path
+        & $pwsh -NoProfile -File $script:InstallPs1 --plan --only tools | Out-Null
+        $LASTEXITCODE | Should -Be 0
+        (Get-Content -LiteralPath $script:Log | Select-Object -Last 1).Trim() |
+            Should -BeExactly 'converge --plan --only tools'
+    }
+
+    It 'reports the exit status of converge' -Skip:(-not $IsWindows) {
+        # converge fails with its own status; `version` still answers the pin.
+        Set-Content -LiteralPath (Join-Path $script:OnPath 'dotf.cmd') -Value @(
+            '@echo off'
+            'if "%1"=="converge" exit /b 3'
+            'echo dotf version 9.9.9'
+        )
+        $pwsh = (Get-Process -Id $PID).Path
+        & $pwsh -NoProfile -File $script:InstallPs1 | Out-Null
+        $LASTEXITCODE | Should -Be 3
     }
 }

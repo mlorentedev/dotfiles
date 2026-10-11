@@ -23,6 +23,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 ## Test status
 
 - `bats tests/check-knowledge-gate.bats tests/spec-gate-pr.bats tests/knowledge-gate-workflow.bats tests/stub-real-pairing.bats`: 62 run, 0 failures, on the wiring branch rebased onto main after #1732.
+- Re-run at `18029443` for the archive (2026-10-10): 63 run (34 + 19 + 5 + 5), 0 failures. `actionlint .github/workflows/knowledge-gate.yml` exits 0.
 - `cd cli && go test ./...` passes. `compile-harness.sh --check` reports no drift, and `actionlint` passes on `knowledge-gate.yml`.
 - No regressions: the adapter's existing cases, and spec-gate's, are unchanged and pass.
 
@@ -48,7 +49,18 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-160-knowledge-capture-gate/` -> `specs/archive/HARNESS-160-knowledge-capture-gate/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-160-knowledge-capture-gate/` -> `specs/archive/HARNESS-160-knowledge-capture-gate/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+## Archive review dispositions (2026-10-10)
+
+The archive review (`PASS`, reviewed `18029443`) is committed unchanged with this PR. Its four Minor findings:
+
+| Finding | Disposition |
+|---------|-------------|
+| A code fence inside an HTML comment opens a fence the stripper never closes (a false red, fail-closed) | Ticketed: #2310 (BUG-119), with the reproducer and the single-pass fix. |
+| The "Test status" counts no longer reproduce | Applied: the counts are re-measured above (63 run, 0 failures). |
+| `proposal.md` lists "declaring the check required" as out of scope, but Slice 4 did it | Accepted as a scope widening, recorded here rather than in the contract set: the owner applied the protection on 2026-10-10 (#2298), so the proposal bullet describes the plan before that decision. |
+| `actionlint` was not run by the reviewer | Applied: it is installed now and passes on `knowledge-gate.yml`. |

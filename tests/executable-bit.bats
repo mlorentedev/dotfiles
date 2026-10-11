@@ -6,6 +6,10 @@
 # point -- and README documents the same invocation, so a fresh clone failed at
 # the first step with exit 126. Machines already set up noticed nothing.
 #
+# Since PLAT-001b the bootstrap is `install.sh` -> `dotf converge`, whose
+# legacy-setup step runs the checkout's setup-linux.sh as a program, with no
+# interpreter in front of it: the same exit 126 on a lost bit.
+#
 # CI could not see it and would not have. `tests/Dockerfile.integration` runs
 # `bash setup-linux.sh` with an explicit interpreter, which works at any mode, so
 # the integration job exercises the script without ever exercising the path that
@@ -96,15 +100,17 @@ _invoked_scripts() {
     _invoked_scripts | grep -qx 'setup-linux.sh'
 }
 
-@test "install.sh execs setup-linux.sh, the invocation this guard protects" {
-    # Pins the premise. If the bootstrap stops calling the script this way, the
-    # guard above is still correct but no longer load-bearing, and whoever
+@test "converge runs setup-linux.sh as a program, the invocation this guard protects" {
+    # Pins the premise. The bootstrap reaches the script through converge's
+    # legacy-setup step (cli/internal/converge/legacy.go), which executes the
+    # path itself rather than `bash <path>`. If that ever gains an interpreter,
+    # the guard above is still correct but no longer load-bearing, and whoever
     # changed it should see this fail and re-read the comment at the top.
     #
-    # ANCHORED to the start of a line, so a commented-out `# exec ./setup-linux.sh`
-    # cannot satisfy it while `bash setup-linux.sh` is the line that actually
-    # runs -- a reviewer's finding on this PR, and the same shape as the two
-    # exclusions above: evidence that merely MENTIONS the invocation is not
-    # evidence that it happens.
-    grep -qE '^[[:space:]]*exec[[:space:]]+\./setup-linux\.sh' "$DOTFILES_DIR/install.sh"
+    # ANCHORED to the start of a line, so a commented-out call cannot satisfy
+    # it: evidence that merely MENTIONS the invocation is not evidence that it
+    # happens.
+    legacy="$DOTFILES_DIR/cli/internal/converge/legacy.go"
+    grep -qE '^[[:space:]]*c = exec\.Command\(cmd\)' "$legacy"
+    grep -qF 'return "setup-linux.sh"' "$legacy"
 }
