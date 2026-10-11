@@ -459,8 +459,10 @@ PY
 # asserted [pr_code_suggestions] dual publishing, which configures `/improve` --
 # a command the automatic path stopped running in #1107 -- so it stayed green
 # while the automatic review posted no inline comment at all (archive review F1).
-# This one reads the setting the automatic path consults, and checks that the
-# path it guards is the one that runs: `review` automatic, `improve` not.
+# This one reads the setting the automatic path consults, and checks that
+# `review`, the command that reads it, runs automatically on every PR-Agent step.
+# Whether `improve` also runs is #1107's cost decision, not this guard's: turning
+# it back on adds a second inline path and removes none.
 @test "pr-agent: the automatic review publishes its findings inline" {
     run python3 - "$CFG" "$WF" <<'PY'
 import sys, tomllib, yaml

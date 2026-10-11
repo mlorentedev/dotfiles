@@ -60,7 +60,11 @@ created: "2026-08-16"
       the guard reads that setting and checks `review` runs automatically, and the config comments
       no longer claim `/improve` carries the inline path (F2); `vendor/**` is carried in the ignore
       list (F3). The registry and classifier say inline findings attest through `reviews[]`, and the
-      triage skill reads `pulls/N/comments`.
+      triage skill reads `pulls/N/comments`. Evidence on 2026-10-11 (#2325): `bats
+      tests/pr-agent-config.bats` 73/73 (one network-leg skip, which passes under
+      `DOTF_TEST_NETWORK=1`) and `tests/check-review-attestation.bats` 62/62; mutations of
+      `inline_key_issues`, `auto_review`, `vendor/**` and the declared login each turn their test red.
+      The `11/11` above is the count when this spec first closed.
 - [ ] AC1 live evidence: the first PR reviewed after the fix merges carries a COMMENTED review by
       `github-actions` with inline comments; then `verification.md` AC1 is rewritten from it
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
