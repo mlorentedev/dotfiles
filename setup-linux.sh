@@ -524,6 +524,9 @@ if [ -n "$_dotf" ]; then
     "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
     # After deploy, which writes the file the include names (#2207).
     "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
+    # Its own call: a dotf older than the step refuses the name, and must not
+    # take git-config down with it (#2013 X1).
+    "$_dotf" converge --only git-hooks || log_warning "dotf converge --only git-hooks failed -- a dotf older than the step cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
 else
     log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./install.sh: it installs dotf, then converges)"
 fi

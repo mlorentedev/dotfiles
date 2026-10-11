@@ -890,6 +890,12 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
     }
+    # Its own call: a dotf older than the step refuses the name, and must not
+    # take git-config down with it (#2013 X1).
+    & dotf converge --only git-hooks
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf converge --only git-hooks failed -- a dotf older than the step cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
+    }
 } else {
     Write-Warn "dotf not on PATH -- skipping agent config deploy (run install.ps1, then 'dotf deploy')"
 }
