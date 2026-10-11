@@ -137,7 +137,18 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 ### PR 6 — from-zero proof (#2013 X1)
 
 - [ ] [AC9] CI job on clean `macos-latest` and `ubuntu-latest`: `install.sh`, `dotf doctor`, then a second `dotf converge` that reports zero native changes. It asserts the first run converged before it checks idempotence (lesson 328). Runs on pull requests to `main` and on push to `main`, so the default branch carries a run the verification can read; non-required until green
-- [ ] Runbook `docs/runbooks/guide-new-machine.md`: the one-liner per OS, what `--plan` shows, how to read the report, what `skipped` on darwin means
+- [x] Runbook `docs/runbooks/guide-new-machine.md`: the one-liner per OS, what `--plan` shows, how to read the report, what `skipped` on darwin means; it also orders the identity restore (#2013 D10)
+
+### PR 6a — doctor scopes its checks: machine or identity (#2013 D10)
+
+- [x] Failing test: every entry of the doctor sweep has a kind, and none is left at the zero value; an identity entry names its section and its restore step, once (`TestSweep_EveryCheckIsClassified`)
+- [x] Failing test: an identity entry's section is a title some check prints, so the SKIP lands under the heading a default run shows (`TestSweep_IdentitySectionsAreTheTitlesTheChecksPrint`)
+- [x] Failing test: end to end on a machine with no identity, the default scope reports the missing vault and `--scope machine` runs no identity check, printing one SKIP per identity entry and never failing on one (`TestRun_MachineScopeSkipsEveryIdentityCheck`)
+- [x] Implement the sweep table (`check{kind, section, restore, run}`), `Options.Scope`, `ParseScope` and `dotf doctor --scope all|machine`; a plain `dotf doctor` is unchanged
+- [x] Split the two checks that mixed both kinds: `checkAgeIdentity` (the key) from `checkSecretsTooling` (the binaries), and `checkAgentSecretConfigs` (configs rendered from secrets) from `checkOpenCode` (the binaries)
+- [x] ADR-045 amendment for D10, D11 and D12; the runbook orders the restore the SKIP lines cite
+- [ ] Follow-up: X1 (#2331) runs `dotf doctor --scope machine`
+- [ ] Follow-up: test-windows runs `--scope machine` and drops the identity it fabricates (age key, vault skeleton, `obsidian.cmd` stub)
 
 ### PR 6b — the git-hooks step (#2013 X1 finding)
 
