@@ -216,7 +216,7 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds bat, delta and fd to the install list; `dotf tools install --dry-run` plans `install` for btop
 - Windows: every mise pin waits for Windows mise (#2013)
 
-### Agents at latest (#2013 D9, P5b agent half)
+### Agents at latest (#2013 D9, row P5c)
 
 - [x] PR1: `# mise: latest` marker; render `latest`; `mise outdated --json` then `mise upgrade` in the sync and converge; doctor plans without asking; `tests/versions-conf.bats` holds the marker behind DOTF_VERSION 0.68.0
 - [x] PR1: dry-run on the Mac with a scratch versions.conf marking claude and agy: `claude latest (at least 2.1.296)`, `agy latest (at least 1.3.2)`, `to install: agy, claude`

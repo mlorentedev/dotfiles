@@ -80,7 +80,7 @@ The owner made Python >= 3.11 a hard dependency of `dotf` (#2062): the Mac's `py
 
 ## Amendment 2026-10-10: the coding agents track latest (#2013 D9)
 
-The owner placed P5b (#2317, converge installs no coding agent on macOS) under this spec, ahead of X1, and decided the channel: Claude Code, pi and agy install through mise (`aqua:anthropics/claude-code`, `aqua:earendil-works/pi`, `aqua:google-antigravity/antigravity-cli`), tracking their newest release rather than an exact pin (ADR-044, amendment 2026-10-10). Two PRs again:
+The owner placed P5c (#2317, converge installs no coding agent on macOS; first labelled P5b, which an earlier row already held) under this spec, ahead of X1, and decided the channel: Claude Code, pi and agy install through mise (`aqua:anthropics/claude-code`, `aqua:earendil-works/pi`, `aqua:google-antigravity/antigravity-cli`), tracking their newest release rather than an exact pin (ADR-044, amendment 2026-10-10). Two PRs again:
 
 - **PR1 (this one):** the reader. `ParseMisePins` reads `# mise: latest`; the sync renders those tools as `latest`, asks `mise outdated` and runs `mise upgrade`; doctor plans without the network. `versions.conf` is unchanged.
 - **PR2, after the release carrying PR1 is the `DOTF_VERSION` pin:** mark the three agents, turn Claude Code's own auto-updater off so mise is the one writer, and delete the agent install blocks from `setup-linux.sh`. Windows keeps `Install-AgentBinary` until Windows mise is measured.
