@@ -70,6 +70,7 @@ func Registry(o Options) []Reconciler {
 	return []Reconciler{
 		checkout{run: o.GitRun, url: url, has: onPath},
 		recordsMirror{},
+		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},

@@ -117,5 +117,12 @@
     "verification": "cd cli && out=$(go test ./internal/converge/ ./internal/tools/ -run '^(TestToolsCatalog_|TestPlanSystem_NeedsSudo|TestInstall_AMissingManager)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestToolsCatalog_OneApplyConvergesAFreshMachine' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f18",
+    "behavior": "AC13: converge renders the contract's path file after the mirror and before any install, repairs a stale one, and a rerun reports it up to date",
+    "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestEnvGenerate_|TestRegistry_ToolsRunAfterRecords$)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestEnvGenerate_RepairsAStaleFile' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRegistry_ToolsRunAfterRecords'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
