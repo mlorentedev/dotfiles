@@ -28,8 +28,12 @@ type recordsHarness struct {
 	has func(string) bool // is a command on PATH
 }
 
-func (recordsHarness) Name() string        { return "records-harness" }
-func (recordsHarness) Platforms() []string { return []string{"linux", "darwin"} }
+func (recordsHarness) Name() string { return "records-harness" }
+
+// RevisitAfter re-runs the deploy after tools changed the machine: an agent
+// tools installs had no instruction files when this step first ran (#2013 D11).
+func (recordsHarness) RevisitAfter() string { return "tools" }
+func (recordsHarness) Platforms() []string  { return []string{"linux", "darwin"} }
 
 func (r recordsHarness) Reconcile(env Env, dryRun bool) (Result, error) {
 	stale, err := r.staleInstructions(env)

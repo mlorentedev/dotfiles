@@ -22,6 +22,7 @@ type world struct {
 	root      bool
 	ran       [][]string
 	failRun   error // returned by Run
+	failIndex error // returned by Run for `apt-get update` alone
 	sudoOK    bool  // `sudo -n true` succeeds, so sudo itself is not what refused
 	noEffect  bool  // Run exits 0 but installs nothing
 	queries   [][]string
@@ -88,6 +89,12 @@ func (w *world) installer(goos string) *Installer {
 		},
 		Run: func(name string, args ...string) error {
 			w.ran = append(w.ran, append([]string{name}, args...))
+			if args[len(args)-1] == "update" {
+				if w.failRun != nil {
+					return w.failRun
+				}
+				return w.failIndex
+			}
 			if w.failRun != nil {
 				return w.failRun
 			}
@@ -112,24 +119,31 @@ func TestInstallSystem_ArgvPerManager(t *testing.T) {
 		name, goos string
 		root       bool
 		managers   []string
-		want       string
+		want       []string
 	}{
-		{"apt through sudo -n, which never prompts", "linux", false, []string{"apt-get", "sudo"}, "sudo -n apt-get install -y --no-remove gh"},
-		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"}, "apt-get install -y --no-remove gh"},
-		{"brew", "darwin", false, []string{"brew"}, "brew install gh"},
+		{"apt through sudo -n, which never prompts, after refreshing its index", "linux", false, []string{"apt-get", "sudo"},
+			[]string{"sudo -n apt-get update", "sudo -n apt-get install -y --no-remove gh"}},
+		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"},
+			[]string{"apt-get update", "apt-get install -y --no-remove gh"}},
+		{"brew", "darwin", false, []string{"brew"}, []string{"brew install gh"}},
 		{"winget names the id, exact match, and both agreements", "windows", false, []string{"winget"},
-			"winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements"},
+			[]string{"winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			w := newWorld(tc.managers...)
 			w.root = tc.root
+			w.sudoOK = true
 			res, err := w.installer(tc.goos).Install(ghTool())
 			if err != nil || res != Installed {
 				t.Fatalf("Install = %v, %v; want Installed, nil\n%s", res, err, w.out.String())
 			}
-			if len(w.ran) != 1 || strings.Join(w.ran[0], " ") != tc.want {
-				t.Errorf("ran %v, want exactly %q", w.ran, tc.want)
+			var ran []string
+			for _, argv := range w.ran {
+				ran = append(ran, strings.Join(argv, " "))
+			}
+			if strings.Join(ran, "; ") != strings.Join(tc.want, "; ") {
+				t.Errorf("ran %q, want exactly %q", ran, tc.want)
 			}
 		})
 	}
@@ -373,11 +387,61 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 	if err != nil || res != Skipped {
 		t.Fatalf("Install = %v, %v; want Skipped, nil", res, err)
 	}
-	if want := "gh: needs sudo; run: sudo apt-get install -y --no-remove gh"; !strings.Contains(w.out.String(), want) {
+	if want := "gh: needs sudo; run: sudo apt-get update && sudo apt-get install -y --no-remove gh"; !strings.Contains(w.out.String(), want) {
 		t.Errorf("output %q lacks %q", w.out.String(), want)
 	}
-	if len(w.ran) != 1 || w.ran[0][1] != "-n" {
-		t.Errorf("ran %v, want one `sudo -n` attempt and no prompt", w.ran)
+	if len(w.ran) != 1 || w.ran[0][1] != "-n" || w.ran[0][len(w.ran[0])-1] != "gh" {
+		t.Errorf("ran %v, want one `sudo -n` install attempt, no prompt, and no index refresh sudo would refuse", w.ran)
+	}
+	if strings.Contains(w.out.String(), "index refresh failed") {
+		t.Errorf("a refresh sudo would refuse is the install's needs-sudo line, not a warning of its own: %q", w.out.String())
+	}
+}
+
+// A fresh machine's apt index is stale: the runner image's lists named a
+// libgit2 build its mirror had already dropped, so `apt-get install eza` failed
+// with a 404 and converge stopped on its first apt entry (#2013 X1, run
+// 38107367419). One refresh per run, before the first install and never on a
+// run with nothing to install.
+func TestInstallSystem_AptRefreshesItsIndexOnceBeforeTheFirstInstall(t *testing.T) {
+	w := newWorld("apt-get")
+	w.root = true
+	in := w.installer("linux")
+	parallel := Tool{Name: "parallel", Profile: "full", Source: Source{Type: "system", Apt: "parallel"}}
+	for _, tool := range []Tool{ghTool(), parallel} {
+		if res, err := in.Install(tool); err != nil || res != Installed {
+			t.Fatalf("Install(%s) = %v, %v", tool.Name, res, err)
+		}
+	}
+	var ran []string
+	for _, argv := range w.ran {
+		ran = append(ran, strings.Join(argv, " "))
+	}
+	want := "apt-get update; apt-get install -y --no-remove gh; apt-get install -y --no-remove parallel"
+	if got := strings.Join(ran, "; "); got != want {
+		t.Errorf("ran %q, want %q", got, want)
+	}
+
+	w.ran = nil
+	if res, err := w.installer("linux").Install(ghTool()); err != nil || res != Skipped || len(w.ran) != 0 {
+		t.Errorf("a present package: Install = %v, %v, ran %v; want Skipped and no refresh", res, err, w.ran)
+	}
+}
+
+// A refresh that fails for another reason (a third-party source that 404s, no
+// network for the lists) warns and installs from the index as it is: the
+// install's own failure, if any, is the error, so one broken source does not
+// block every package.
+func TestInstallSystem_AFailedIndexRefreshWarnsAndStillInstalls(t *testing.T) {
+	w := newWorld("apt-get")
+	w.root = true
+	w.failIndex = fmt.Errorf("exit status 100")
+	res, err := w.installer("linux").Install(ghTool())
+	if err != nil || res != Installed {
+		t.Fatalf("Install = %v, %v; want Installed, nil", res, err)
+	}
+	if want := "apt index refresh failed (apt-get update: exit status 100)"; !strings.Contains(w.out.String(), want) {
+		t.Errorf("output %q lacks %q", w.out.String(), want)
 	}
 }
 
@@ -387,7 +451,7 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
 	w := newWorld("apt-get", "sudo")
 	p := w.installer("linux").Plan(ghTool())
-	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" || p.Package != "gh" {
+	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get update && sudo apt-get install -y --no-remove gh" || p.Package != "gh" {
 		t.Errorf("Plan = %+v, want needs-sudo naming the command", p)
 	}
 	if len(w.ran) != 0 {
@@ -432,7 +496,7 @@ func TestSudoInstallCommand(t *testing.T) {
 	if got := SudoInstallCommand(nil); got != "" {
 		t.Errorf("no packages: got %q, want \"\"", got)
 	}
-	if got, want := SudoInstallCommand([]string{"gh", "parallel"}), "sudo apt-get install -y --no-remove gh parallel"; got != want {
+	if got, want := SudoInstallCommand([]string{"gh", "parallel"}), "sudo apt-get update && sudo apt-get install -y --no-remove gh parallel"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 	w := newWorld("apt-get", "sudo")

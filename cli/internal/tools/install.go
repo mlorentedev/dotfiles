@@ -106,6 +106,9 @@ type Installer struct {
 	// sudoDeferred is every apt package Install skipped for want of a sudo
 	// password, so a run can print one command for all of them (SudoDeferred).
 	sudoDeferred []string
+	// aptIndexAsked records that this Installer has run `apt-get update`, which
+	// it does once, before its first apt install (refreshAptIndex).
+	aptIndexAsked bool
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.

@@ -20,6 +20,7 @@ type fake struct {
 	skip      string
 
 	applied, planned, probed bool
+	applies                  int
 }
 
 func (f *fake) Name() string        { return f.name }
@@ -30,6 +31,7 @@ func (f *fake) Reconcile(_ Env, dryRun bool) (Result, error) {
 		f.planned = true
 	} else {
 		f.applied = true
+		f.applies++
 	}
 	if f.skip != "" {
 		return Result{Skip: f.skip}, f.err
@@ -175,5 +177,118 @@ func TestWriteReport_RecordsTheRunAndItsOutcome(t *testing.T) {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("report lacks %s:\n%s", want, raw)
 		}
+	}
+}
+
+// revisiting is a fake that declares the step whose change re-runs it.
+type revisiting struct {
+	*fake
+	after string
+}
+
+func (r revisiting) RevisitAfter() string { return r.after }
+
+// An agent the tools step installs needs the instruction files a step before
+// it skipped, so a step whose apply changed the machine re-runs the earlier
+// reconcilers that declared it (#2013 D11): measured on macos-latest, the
+// second converge deployed .copilot/copilot-instructions.md and was not a no-op.
+func TestRun_AChangeRerunsTheStepsThatRevisitIt(t *testing.T) {
+	harness := revisiting{&fake{name: "harness"}, "tools"}
+	tools, later := &fake{name: "tools", changes: 2}, &fake{name: "later"}
+
+	rep, err := Run([]Reconciler{harness, tools, later}, Env{GOOS: "linux"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if harness.applies != 2 {
+		t.Errorf("harness applied %d times, want 2 (its own turn, then after tools)", harness.applies)
+	}
+	var names []string
+	for _, e := range rep.Entries {
+		names = append(names, e.Name)
+	}
+	if got := strings.Join(names, " "); got != "harness tools harness later" {
+		t.Errorf("entries %q, want the revisit right after tools", got)
+	}
+	if d := rep.Entries[2].Detail; !strings.HasPrefix(d, "after tools: ") {
+		t.Errorf("revisit detail %q does not say what re-ran it", d)
+	}
+}
+
+// A converged machine pays nothing: no change, no revisit. A plan never
+// revisits, since nothing it reports has been installed yet.
+func TestRun_NoChangeOrAPlanRevisitsNothing(t *testing.T) {
+	harness := revisiting{&fake{name: "harness"}, "tools"}
+	if _, err := Run([]Reconciler{harness, &fake{name: "tools"}}, Env{GOOS: "linux"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if harness.applies != 1 {
+		t.Errorf("a converged tools step re-ran harness: %d applies", harness.applies)
+	}
+
+	elsewhere := revisiting{&fake{name: "harness", platforms: []string{"darwin"}}, "tools"}
+	rep, err := Run([]Reconciler{elsewhere, &fake{name: "tools", changes: 1}}, Env{GOOS: "windows"}, false)
+	if err != nil || len(rep.Entries) != 2 {
+		t.Errorf("a step this OS does not run was revisited: %d entries, err %v", len(rep.Entries), err)
+	}
+
+	planned := revisiting{&fake{name: "harness"}, "tools"}
+	rep, err = Run([]Reconciler{planned, &fake{name: "tools", changes: 1}}, Env{GOOS: "linux"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Entries) != 2 || planned.applied {
+		t.Errorf("a plan revisited: %d entries, applied %v", len(rep.Entries), planned.applied)
+	}
+}
+
+// failsOnRevisit passes its own turn and fails its probe when re-run.
+type failsOnRevisit struct{ revisiting }
+
+func (f failsOnRevisit) Probe(Env) error {
+	if f.applies > 1 {
+		return errors.New("instruction file missing")
+	}
+	return nil
+}
+
+// A failing revisit fails the run like any step, naming it, and nothing after
+// it runs.
+func TestRun_AFailedRevisitStopsTheRun(t *testing.T) {
+	harness := failsOnRevisit{revisiting{&fake{name: "harness"}, "tools"}}
+	tools, later := &fake{name: "tools", changes: 1}, &fake{name: "later"}
+
+	rep, err := Run([]Reconciler{harness, tools, later}, Env{GOOS: "linux"}, false)
+	if err == nil || !strings.Contains(err.Error(), "converge: harness:") {
+		t.Fatalf("err = %v, want the run failed naming harness", err)
+	}
+	if later.applied {
+		t.Error("a step after the failed revisit ran")
+	}
+	if got := statuses(rep); got != "harness=ok tools=change harness=failed later=skipped" {
+		t.Errorf("statuses: %s", got)
+	}
+}
+
+// The registry wires D11: records-harness revisits after tools, and tools runs
+// after it, so the revisit is reachable.
+func TestRegistry_RecordsHarnessRevisitsAfterTools(t *testing.T) {
+	reg := Registry(Options{})
+	pos := map[string]int{}
+	for i, r := range reg {
+		pos[r.Name()] = i
+	}
+	var h Reconciler
+	for _, r := range reg {
+		if r.Name() == "records-harness" {
+			h = r
+		}
+	}
+	rv, ok := h.(Revisiter)
+	if !ok || rv.RevisitAfter() != "tools" {
+		t.Fatalf("records-harness does not revisit after tools")
+	}
+	if pos["tools"] <= pos["records-harness"] {
+		t.Errorf("tools (%d) must run after records-harness (%d)", pos["tools"], pos["records-harness"])
 	}
 }
