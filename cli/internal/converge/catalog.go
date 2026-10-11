@@ -22,7 +22,8 @@ type CatalogInstaller interface {
 type catalogPass struct {
 	changed  []string // installed or upgraded; in a plan, to install or upgrade
 	waiting  []wait   // the manager arrives later in the run, or never on this machine
-	needSudo []string // "gh (run: sudo apt-get …)": dotf never asks for a password
+	needSudo []string // tool names: dotf never asks for a password
+	sudoPkgs []string // their apt packages, for one SudoInstallCommand
 	failed   []error
 }
 
@@ -47,6 +48,8 @@ func (p catalogPass) retry() []tools.Tool {
 func (p *catalogPass) then(o catalogPass) {
 	p.changed = append(p.changed, o.changed...)
 	p.failed = append(p.failed, o.failed...)
+	p.needSudo = append(p.needSudo, o.needSudo...)
+	p.sudoPkgs = append(p.sudoPkgs, o.sudoPkgs...)
 	p.waiting = o.waiting
 }
 
@@ -68,7 +71,8 @@ func walkCatalog(in CatalogInstaller, entries []tools.Tool, apply bool) catalogP
 		case tools.PlanMissingManager:
 			p.waiting = append(p.waiting, wait{t, strings.TrimPrefix(plan.Note, "waits on ")})
 		case tools.PlanNeedsSudo:
-			p.needSudo = append(p.needSudo, t.Name+" ("+plan.Note+")")
+			p.needSudo = append(p.needSudo, t.Name)
+			p.sudoPkgs = append(p.sudoPkgs, plan.Package)
 		case tools.PlanRefused:
 			p.failed = append(p.failed, fmt.Errorf("%s: %s", t.Name, plan.Note))
 		}
@@ -114,7 +118,8 @@ func (p catalogPass) detail(dryRun bool) string {
 		parts = append(parts, "waiting on a manager: "+strings.Join(waits, ", "))
 	}
 	if len(p.needSudo) > 0 {
-		parts = append(parts, "needs sudo: "+strings.Join(p.needSudo, ", "))
+		parts = append(parts, "needs sudo: "+strings.Join(p.needSudo, ", ")+
+			" (run once: "+tools.SudoInstallCommand(p.sudoPkgs)+")")
 	}
 	return strings.Join(parts, "; ")
 }

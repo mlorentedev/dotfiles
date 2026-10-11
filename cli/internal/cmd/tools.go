@@ -161,6 +161,11 @@ func installAll(in *tools.Installer, selected []tools.Tool, errOut io.Writer) er
 			failed = append(failed, t.Name)
 		}
 	}
+	// One command for every package that waited on a sudo password, so a fresh
+	// machine is one paste, not one per package (#2308).
+	if cmd := in.SudoDeferred(); cmd != "" {
+		_, _ = fmt.Fprintf(in.Out, "\nInstall the packages that need sudo with one command:\n  %s\n", cmd)
+	}
 	if len(failed) > 0 {
 		return fmt.Errorf("failed to install: %s", strings.Join(failed, ", "))
 	}

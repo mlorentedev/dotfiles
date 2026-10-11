@@ -30,7 +30,7 @@ type Tool struct {
 // Source declares how to fetch a tool. Four kinds:
 //   - "github-release": a pinned per-OS/arch release binary, verified against the
 //     release checksums by the installer (CLI-029 PR-B), mirroring the
-//     deterministic age/install-dotf pattern rather than relying on winget/apt.
+//     deterministic age/install.sh pattern rather than relying on winget/apt.
 //   - "npm": a globally-installed npm package (Package), pinned by Version. Used
 //     for tools whose first-class distribution is npm and that do not ship a
 //     raw, checksum-manifested github-release binary — e.g. the Bitwarden CLI

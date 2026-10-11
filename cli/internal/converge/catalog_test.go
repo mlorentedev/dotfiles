@@ -45,7 +45,7 @@ func (c fakeCatalog) Plan(t tools.Tool) tools.Plan {
 	case c.m.present[t.Name]:
 		p.Action = tools.PlanSkip
 	case t.Source.Type == "system":
-		p.Action, p.Note = tools.PlanNeedsSudo, "run: sudo apt-get install -y gh"
+		p.Action, p.Note, p.Package = tools.PlanNeedsSudo, "run: sudo apt-get install -y "+t.Source.Apt, t.Source.Apt
 	case manager != "" && !c.m.path[manager]:
 		p.Action, p.Note = tools.PlanMissingManager, "waits on "+manager
 	default:
@@ -109,7 +109,7 @@ func TestToolsCatalog_OneApplyConvergesAFreshMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"catalog to install: mise", "hive (uv)", "bw (npm)", "gh (run: sudo apt-get install -y gh)", "mise is not on PATH"} {
+	for _, want := range []string{"catalog to install: mise", "hive (uv)", "bw (npm)", "needs sudo: gh (run once: sudo apt-get install -y --no-remove gh)", "mise is not on PATH"} {
 		if !strings.Contains(plan.Detail, want) {
 			t.Errorf("plan detail lacks %q: %s", want, plan.Detail)
 		}
@@ -244,4 +244,23 @@ func TestRegistry_HandsTheToolLayerDirsToTheToolsStep(t *testing.T) {
 		}
 	}
 	t.Fatal("the registry has no tools step")
+}
+
+// Every entry that waits on a sudo password is in ONE command, not one per
+// package: a fresh Linux box has up to nine apt entries (#2308).
+func TestWalkCatalog_NeedsSudoIsOneCommandForEveryPackage(t *testing.T) {
+	m := &machine{path: map[string]bool{}, present: map[string]bool{}, fail: map[string]error{}, offPath: map[string]bool{}}
+	entries := []tools.Tool{
+		{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh"}},
+		{Name: "docker", Source: tools.Source{Type: "system", Apt: "docker.io"}},
+		{Name: "parallel", Source: tools.Source{Type: "system", Apt: "parallel"}},
+	}
+	got := walkCatalog(fakeCatalog{m}, entries, true).detail(false)
+	want := "needs sudo: gh, docker, parallel (run once: sudo apt-get install -y --no-remove gh docker.io parallel)"
+	if got != want {
+		t.Errorf("detail = %q\nwant     %q", got, want)
+	}
+	if strings.Count(got, "sudo apt-get") != 1 {
+		t.Errorf("want one command, got %q", got)
+	}
 }

@@ -10,7 +10,7 @@ $ErrorActionPreference = "Continue"
 
 # Scheduled Task environments do not reliably inherit the interactive user PATH
 # (unlike cron, which never does at all) -- harden the same way as the .sh twin
-# rather than assume it. $env:USERPROFILE\.local\bin is install-dotf.ps1's install target.
+# rather than assume it. $env:USERPROFILE\.local\bin is install.ps1's install target.
 $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 
 $LogDir = "$env:LOCALAPPDATA\vault-maintenance"

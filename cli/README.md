@@ -11,13 +11,14 @@ commands expect that repository's layout.
 
 ## Install
 
-From a release (checksum-verified, installs to `~/.local/bin`):
+From a release (checksum-verified and exec-probed, installs to `~/.local/bin`),
+then hands the machine to `dotf converge`; `bash -s -- --plan` plans instead:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
 ```
 
-On Windows, run `scripts/install-dotf.ps1` from a checkout.
+On Windows: `irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.ps1 | iex`.
 
 With Go:
 
