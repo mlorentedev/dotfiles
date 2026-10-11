@@ -261,7 +261,8 @@
       "dst": "{HOME}/.pi/agent/settings.json",
       "render": false,
       "mode": "0644",
-      "strategy": "merge"
+      "strategy": "merge",
+      "requires": "pi"
     },
     {
       "name": "claude-settings",
