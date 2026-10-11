@@ -11,6 +11,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/identity"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -44,6 +45,9 @@ func convergeFixture(t *testing.T) (repo, home string) {
 		}
 	}
 	t.Cleanup(func() { convergeOptions = saved })
+	// The identity epilogue reads bw, gh and the vault of whoever runs the
+	// test; the fixture is a machine with none of them and no terminal.
+	stubIdentity(t, identity.Facts{}, nil)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DOTFILES_DIR", "")
