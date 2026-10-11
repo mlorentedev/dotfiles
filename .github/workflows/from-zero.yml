@@ -80,6 +80,7 @@ jobs:
       # that before reading the second run, so a step that warned and went on
       # is named here and not mistaken for drift below.
       - name: The first converge succeeded
+        id: first
         run: |
           report="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/converge/last.json"
           cat "$report"
@@ -91,7 +92,10 @@ jobs:
       - name: dotf doctor
         run: dotf doctor
 
+      # Its own signal: a red doctor must not hide whether the machine is
+      # idempotent, so this runs whenever the first converge succeeded.
       - name: Second converge changes nothing
+        if: ${{ !cancelled() && steps.first.outcome == 'success' }}
         run: |
           dotf converge
           report="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/converge/last.json"

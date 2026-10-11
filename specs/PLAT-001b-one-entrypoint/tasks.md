@@ -139,7 +139,7 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [ ] [AC9] CI job on clean `macos-latest` and `ubuntu-latest`: `install.sh`, `dotf doctor`, then a second `dotf converge` that reports zero native changes. It asserts the first run converged before it checks idempotence (lesson 328). Runs on pull requests to `main` and on push to `main`, so the default branch carries a run the verification can read; non-required until green
 - [x] `.github/workflows/from-zero.yml`: the job above, the PR's source build on PATH (install.sh keeps a `dev` build), `DOTFILES_REPO_DIR` at the workspace, `GITHUB_TOKEN` for mise's downloads; the owner's trigger (install path on PRs, every push to main, 2026-10-10)
 - [ ] Gap, deliberate: the job never exercises install.sh's clone-when-absent path (the workspace is the checkout) nor its release download (covered by the file:// fixture in `tests/install.bats`)
-- [ ] After #2013 P5b PR2 (the agents under `# mise: latest`): X1 asserts `claude`, `pi` and `agy` resolve on PATH after the first converge, on both runners
+- [ ] After #2013 P5c PR2 (the agents under `# mise: latest`): X1 asserts `claude`, `pi` and `agy` resolve on PATH after the first converge, on both runners
 - [ ] Each red cause of the first runs becomes a row on the #2013 ledger, or is fixed here when it is the job's own
 - [ ] Runbook `docs/runbooks/guide-new-machine.md`: the one-liner per OS, what `--plan` shows, how to read the report, what `skipped` on darwin means
 
