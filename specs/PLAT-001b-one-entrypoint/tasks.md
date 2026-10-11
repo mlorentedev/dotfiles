@@ -73,6 +73,11 @@ created: "2026-10-06"
   - The probe fails on an entry still to install or refused, and on a manager this machine's tools install (mise from the catalog, uv as a mise pin) that the run's PATH cannot reach; it reports a genuine wait (npm, which nothing installs yet) or a needs-sudo instead of failing. The second pass walks only what waited, so a failure is attempted and reported once
   - The setup scripts keep their own install lines until #2275 makes `install.sh` hand off to converge
   - On the Mac: `converge --plan --only tools` lists the same ten entries as `dotf tools install --dry-run`
+- [x] [AC13] Path file in converge (#2013 P6, F-005): an `env-generate` step between `records-mirror` and `records-harness`
+  - The rc files render `paths.sh` only when it is missing; a contract or `machine.json` change left it stale, doctor failed it and nothing repaired it
+  - Plan reads `env.Generate` in check mode, apply writes, the probe re-checks; the deploy dir it writes into exists once the mirror has run
+  - `configs-deploy` stays after `tools`: entries that `require` an agent would be skipped on a fresh machine's first run and deployed on the second, which breaks AC3
+  - F-052 (`CLAUDE_CONFIG_DIR` before the first `claude` run) was already closed by #1992: the deploy's one `claude` call pins it (`deploy_claude.go`)
 
 ### PR 2d — the configs reconciler (#1843 B15)
 
