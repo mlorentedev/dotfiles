@@ -100,3 +100,13 @@ Two constraints decide the version and the order:
 
 - **The pin must be an attested build.** mise verifies GitHub artifact attestations for python-build-standalone by default, and `python@3.12.6` predates them (`No GitHub artifact attestations found`). The pin moves to 3.13.16. Turning the verification off is rejected.
 - **The markers wait for the release.** The released `dotf` up to v0.65.0 rejects every `# mise:` comment except `# mise: cli`. So the pins are marked only once `DOTF_VERSION` carries the parser; `tests/versions-conf.bats` enforces it.
+
+## Amendment 2026-10-10 (#2013 D9, the coding agents track latest)
+
+The owner decided that the coding agents (Claude Code, pi and agy) install through mise like every pinned CLI, but stay at their newest release instead of an exact pin. Their upstreams ship almost daily, and the owner wants the newest one on every machine without a bump PR per release.
+
+- **A third marker, `# mise: latest`.** The pin under it is a floor, so the other readers of `versions.conf` (the setup scripts, doctor's floor match, CI's pi reconcile) keep comparing a version. `dotf tools sync` renders the tool as `latest`, and requires it to run at or above the floor after the sync, as it does for exact pins.
+- **The sync upgrades.** `mise install` keeps an installed version of a tool requested as `latest`, so the sync also asks `mise outdated --json <tools>` and runs `mise upgrade <tools>` for the ones it names. `mise upgrade` uninstalls the version it replaced (`upgrade.auto_prune`). A run that turns an exact pin into `latest` upgrades in the same run.
+- **Doctor does not ask.** `mise outdated` reaches the network, and a release upstream is not a fault on the machine, so doctor plans without it. `dotf converge` and `dotf tools sync` ask.
+- **Accepted costs.** Two machines can run different versions until each converges, and a broken upstream release arrives untested. The alternative the owner kept in reserve is an exact pin with a bot that opens the bump PR, which the from-zero CI job (#2013 X1) would test.
+- **Release order.** Every released `dotf` up to v0.67.0 rejects the marker as a near miss, which fails the whole tools step. `versions.conf` uses it only once `DOTF_VERSION` carries the parser; `tests/versions-conf.bats` enforces it.
