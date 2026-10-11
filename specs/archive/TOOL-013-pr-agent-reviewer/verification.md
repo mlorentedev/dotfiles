@@ -81,7 +81,11 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
 - AC9: holds on `main`: one Action, `fail_on_tool_errors`, the fallback inside its attempt. AI-045
   (#2188) adds an attempt on a second provider by recorded decision.
 - Blocked tasks: #983 and #939 are both closed.
-- No earlier `review.md` exists for this spec, in git history or in the Linux worktrees.
+- Review history: round 1 FAILed on F1, inline delivery untested (landed as `883654cb`, #2324). The fix was #2325 and the live evidence #2335. Round 2 (2026-10-11, `nan/deepseek-v4-flash` via pi) PASSed against `e31c4ee4`.
+- Round 2 dispositions:
+  - Review base spans 708 commits (Minor, REAL, launcher). Already ticketed as #1551; this case is recorded there.
+  - `features.json` still `pending` (Minor, REAL). No harness writes pass states in this repo, and the agent may not. The reviewer re-ran all nine verifications fresh: 73/73 with one network skip, and 62/62. The mechanism is #1905 (SDD-045).
+  - Inline comments read back as `line: null` (SPECULATIVE). They are line-anchored when published: on #2337, PR-Agent's review 5481888670 posted its four findings at `cli/internal/doctor/checks_deploy.go:427`, `cli/internal/doctor/scope_test.go:110`, `docs/runbooks/guide-new-machine.md:37` and `cli/internal/doctor/doctor.go:278`. GitHub then nulls `line` on outdated comments after a later push.
 
 ## Promotion candidates
 
@@ -91,7 +95,7 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/TOOL-013-pr-agent-reviewer/` -> `specs/archive/TOOL-013-pr-agent-reviewer/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/TOOL-013-pr-agent-reviewer/` -> `specs/archive/TOOL-013-pr-agent-reviewer/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Independent adversarial review passes for the final contract
