@@ -124,7 +124,8 @@ load_rc() {
     run load_rc 'complete -p terraform'
     [ "$status" -eq 0 ]
     # bash 5 prints the command quoted (-C '<path>' terraform) and bash 3.2,
-    # which the macOS leg runs, does not (lesson 395): compare without quotes.
-    [[ "$(printf '%s' "$output" | tr -d "'")" == *"-C $SANDBOX/bin/terraform terraform" ]] || false
+    # which the macOS leg runs, does not (lesson 395): accept either form.
+    [[ "$output" == *"-C '$SANDBOX/bin/terraform' terraform" ||
+        "$output" == *"-C $SANDBOX/bin/terraform terraform" ]] || false
 }
 

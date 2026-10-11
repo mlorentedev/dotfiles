@@ -21,7 +21,7 @@ only the files tagged `os-sensitive` and this file had no tag. The full suite ru
 to main, and `test-macos` is not a required check yet (W10), so the red run blocked nothing.
 
 ## Solution
-The assertion strips single quotes before it compares, so both shells' forms match. The file now
+The assertion accepts either form, quoted or not. The file now
 carries `# bats file_tags=os-sensitive`: it sources the rc under the host's bash, so whatever the rc
 prints depends on the bash version. A change to it now meets bash 3.2 on its own pull request.
 
