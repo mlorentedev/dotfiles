@@ -25,7 +25,10 @@
     "review output, for a reviewer that does not use the reviews API. PR-Agent",
     "(#786) runs under GITHUB_TOKEN as github-actions and publishes through the",
     "COMMENTS api, so its reviews never enter reviews[] and the gate read every",
-    "PR-Agent-reviewed PR as unattested (#1045). Empty for a reviewer that files",
+    "PR-Agent-reviewed PR as unattested (#1045). Since `inline_key_issues`",
+    "(TOOL-013 F1), a review with located findings ALSO posts a COMMENTED review",
+    "from that login, which attests through the declared-login rule; the marker",
+    "still covers a review whose findings all stayed in its Guide. Empty for a reviewer that files",
     "proper reviews: CodeRabbit's auto-summary comment is not a review, and must",
     "not attest.",
     "",
@@ -91,7 +94,7 @@
         "## PR Reviewer Guide",
         "## Incremental PR Reviewer Guide"
       ],
-      "why": "PR-Agent (TOOL-013, #786/#1032) posts as github-actions via GITHUB_TOKEN and publishes through the comments API, not the reviews API — so reviews[] is empty on a PR it genuinely reviewed. Measured on #1037 (Guide at 00:05:21) and #1042 (00:16:58), both reading `reviews[]: 0`. The marker is the `review` command's own heading; `## PR Code Suggestions` (the `improve` command) is deliberately NOT here — suggestions are not a review."
+      "why": "PR-Agent (TOOL-013, #786/#1032) posts as github-actions via GITHUB_TOKEN and publishes through the comments API, not the reviews API — so reviews[] is empty on a PR it genuinely reviewed. Measured on #1037 (Guide at 00:05:21) and #1042 (00:16:58), both reading `reviews[]: 0`. Since `inline_key_issues` (TOOL-013 F1), findings that name a file and lines also arrive as a COMMENTED review from this login, which attests by the declared login; the marker remains the attestation for a review with no located findings. The marker is the `review` command's own heading; `## PR Code Suggestions` (the `improve` command) is deliberately NOT here — suggestions are not a review."
     }
   ],
   "escape": {

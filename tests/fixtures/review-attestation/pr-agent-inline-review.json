@@ -1,0 +1,3 @@
+{"number":7,"state":"OPEN","author":{"login":"mlorentedev"},"labels":[],"body":"body",
+ "comments":[{"author":{"login":"github-actions"},"body":"<!-- pr-agent:review:full --> Guide edited, findings posted inline"}],
+ "reviews":[{"author":{"login":"github-actions"},"authorAssociation":"NONE","state":"COMMENTED","body":""}]}
