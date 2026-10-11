@@ -43,12 +43,13 @@ func newToolsSyncCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("versions.conf: %w — run from the repo, pass --versions, or set DOTFILES_DIR", err)
 			}
-			pins, err := tools.ParseMiseTools(raw)
+			all, err := tools.ParseMisePins(raw)
 			if err != nil {
 				return err
 			}
+			pins := all.Tools
 			run, stdout := syncRunners()
-			s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home(), os.Getenv), Run: run, Stdout: stdout}
+			s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home(), os.Getenv), Run: run, Stdout: stdout, PythonPackages: all.PythonPackages}
 			if dryRun {
 				return printSyncPlan(cmd.OutOrStdout(), s, pins)
 			}
@@ -86,16 +87,24 @@ func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {
 	for _, t := range pins {
 		_, _ = fmt.Fprintf(w, "  %s %s\n", t.Name, t.Version)
 	}
-	if len(p.Missing) == 0 {
+	for _, pkg := range s.PythonPackages {
+		_, _ = fmt.Fprintf(w, "  python package %s %s (%s)\n", pkg.Name, pkg.Version, s.PythonPackagesPath())
+	}
+	if len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
 		_, _ = fmt.Fprintf(w, "%d tool(s) at their pin; nothing to install\n", len(pins))
 		return nil
 	}
-	_, _ = fmt.Fprintf(w, "to install: %s\n", strings.Join(p.Missing, ", "))
+	if len(p.Missing) > 0 {
+		_, _ = fmt.Fprintf(w, "to install: %s\n", strings.Join(p.Missing, ", "))
+	}
+	if len(p.MissingPackages) > 0 {
+		_, _ = fmt.Fprintf(w, "python packages to install: %s\n", strings.Join(p.MissingPackages, ", "))
+	}
 	return nil
 }
 
 func printSyncResult(w io.Writer, s tools.MiseSync, pins []tools.MiseTool, p tools.SyncPlan) {
-	if !p.ConfigChanged && len(p.Missing) == 0 {
+	if !p.ConfigChanged && len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
 		_, _ = fmt.Fprintf(w, "%d tool(s) at their pin; nothing to do\n", len(pins))
 		return
 	}
@@ -104,6 +113,9 @@ func printSyncResult(w io.Writer, s tools.MiseSync, pins []tools.MiseTool, p too
 	}
 	if len(p.Missing) > 0 {
 		_, _ = fmt.Fprintf(w, "installed: %s\n", strings.Join(p.Missing, ", "))
+	}
+	if len(p.MissingPackages) > 0 {
+		_, _ = fmt.Fprintf(w, "installed python packages: %s\n", strings.Join(p.MissingPackages, ", "))
 	}
 	_, _ = fmt.Fprintf(w, "%d tool(s) at their pin\n", len(pins))
 }

@@ -78,6 +78,23 @@ setup() {
     refute_grep_fixed '{env:' "$PI_MODELS"
 }
 
+# pi decides the thinking shape per model, not per API: it sends adaptive thinking
+# only when the model declares compat.forceAdaptiveThinking, and otherwise the
+# budget form ({"type": "enabled"}). Claude 5.x rejects the budget form with a
+# 400, so a custom Claude model without the flag fails every request it makes;
+# the second-signer and fallback reviews (ADR-046) died this way on their first
+# live run. An older Claude model that needs budget thinking must say so here.
+@test "every reasoning model on the Anthropic Messages API declares adaptive thinking" {
+    command -v jq >/dev/null || skip "jq not available"
+    # One filter feeds both checks, so the non-empty guard counts exactly the set
+    # the flag is asserted on: a renamed `reasoning` or `api` empties it and fails.
+    local set='[.providers[] | . as $p | (.models // [])[]
+        | select((.api // $p.api) == "anthropic-messages" and .reasoning == true)]'
+    [ "$(jq "$set | length" "$PI_MODELS")" -gt 0 ] || { echo "no Anthropic reasoning model found: the filter matches nothing"; return 1; }
+    bad="$(jq -r "$set | .[] | select(.compat.forceAdaptiveThinking != true) | .id" "$PI_MODELS")"
+    [ -z "$bad" ] || { echo "Anthropic reasoning models without compat.forceAdaptiveThinking: $bad"; return 1; }
+}
+
 @test "ai/pi/models.json is valid JSON" {
     command -v jq >/dev/null || skip "jq not available"
     jq empty "$PI_MODELS"

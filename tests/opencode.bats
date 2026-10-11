@@ -26,17 +26,16 @@ setup() {
     refute_grep_fixed 'OPENCODE_VERSION' "$SETUP_SCRIPT"
 }
 
-@test "setup-linux.sh opencode config deploy is declarative always-overwrite (no cmp -s skip)" {
-    # fix/linux-deploy-always-overwrite: the opencode block aligns with the
-    # Windows always-overwrite strategy. The staged-substituted tmp file is
-    # moved into place on every run (substitution may have changed content);
-    # there is no "already in sync" skip path that could mask drift.
-    refute_grep 'cmp -s "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
-    grep -q 'mv "\$OPENCODE_CONFIG_TMP" "\$OPENCODE_CONFIG_DST"' "$SETUP_SCRIPT"
-}
-
-@test "setup-linux.sh opencode deploy renders via dotf secrets render (SDD-009/#587)" {
-    grep -q 'dotf secrets render "\$OPENCODE_CONFIG_TMP"' "$SETUP_SCRIPT"
+@test "opencode.jsonc is a rendered, private deploy entry, not a setup block (SDD-009, #1843 B12)" {
+    # The setup blocks staged, rendered and moved the file by hand on each OS.
+    # The `opencode` entry of ai/deploy.json does the same through `dotf deploy`:
+    # render the {env:VAR} secrets, install at 0600 because the result holds
+    # API keys.
+    jq -e '.configs[] | select(.name == "opencode" and .src == "ai/opencode/opencode.jsonc" and .dst == "{HOME}/.config/opencode/opencode.jsonc" and .render == true and .mode == "0600" and .requires == "opencode")' "$DOTFILES_DIR/ai/deploy.json"
+    # Every OS: a `platforms` list would have to name both.
+    jq -e '.configs[] | select(.name == "opencode") | .platforms == null' "$DOTFILES_DIR/ai/deploy.json"
+    refute_grep 'OPENCODE_CONFIG_(SRC|DST|TMP)' "$SETUP_SCRIPT"
+    refute_grep 'opencodeConfig(Src|Dst|Tmp)' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup-linux.sh opencode block has post-deploy assertion, probed through dotf tools version (ADR-036)" {
@@ -274,12 +273,15 @@ PY
     [[ -f "$AGENTS_MD" ]] || false
 }
 
-@test "setup-linux.sh deploys AGENTS.md to ~/.config/opencode/ (opencode global SSOT)" {
-    # opencode reads ~/.config/opencode/AGENTS.md natively (per upstream docs).
-    # Unlike claude/agy/copilot which use pointer files, opencode loads the
-    # canonical filename so we copy the full SSOT verbatim.
-    grep -qF '$HOME/.config/opencode/AGENTS.md' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'AGENTS.md source missing' "$DOTFILES_DIR/setup-linux.sh"
+@test "opencode's AGENTS.md is a presence target dotf harness instructions deploys (#1843 B11)" {
+    # opencode reads ~/.config/opencode/AGENTS.md natively, so the full SSOT is
+    # deployed, not a pointer. One Go path deploys it on every OS; setup-linux.sh
+    # no longer carries its own copy.
+    jq -e '.agents.presence[] | select(.agent == "opencode" and .file == ".config/opencode/AGENTS.md" and .source == "AGENTS.md")' "$DOTFILES_DIR/harness/manifest.json"
+    refute_grep_fixed '$HOME/.config/opencode/AGENTS.md' "$DOTFILES_DIR/setup-linux.sh"
+    # pi's copy left setup-linux.sh in the same change, so its target is pinned too.
+    jq -e '.agents.presence[] | select(.agent == "pi" and .file == ".pi/agent/AGENTS.md" and .source == "AGENTS.md")' "$DOTFILES_DIR/harness/manifest.json"
+    refute_grep 'PI_AGENTS_DST' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-windows.ps1 deploys AGENTS.md to ~/.config/opencode/ (cross-OS parity)" {
@@ -356,9 +358,12 @@ PY
     grep -qE '"display_thinking":[[:space:]]*"ctrl\+o"' "$TUI_CFG"
 }
 
-@test "setup-linux.sh deploys tui.json as a plain copy, no secret substitution (DX-004 AC3)" {
-    grep -q 'TUI_SRC="\$CURRENT_DIR/ai/opencode/tui.json"' "$SETUP_SCRIPT"
-    grep -q 'cmp -s "\$TUI_SRC" "\$TUI_DST"' "$SETUP_SCRIPT"
-    # tui.json carries no secrets: it must NOT go through dotf secrets render
-    refute_grep 'dotf secrets render "\$TUI_(SRC|DST)"' "$SETUP_SCRIPT"
+@test "tui.json is a merged deploy entry, no secret substitution (DX-004 AC3, #1843 B11, #2260)" {
+    # tui.json carries no secrets: never `dotf secrets render`. It is merged, not
+    # replaced: Orca registers its status plugin under `plugin` in the deployed
+    # file, and a replace deleted that key on every `dotf deploy` (#2260).
+    jq -e '.configs[] | select(.name == "opencode-tui" and .src == "ai/opencode/tui.json" and .dst == "{HOME}/.config/opencode/tui.json" and .render == false and .strategy == "merge")' "$DOTFILES_DIR/ai/deploy.json"
+    # The repo must not claim the key Orca owns, or the merge would overwrite it.
+    refute_grep '"plugin"' "$DOTFILES_DIR/ai/opencode/tui.json"
+    refute_grep 'TUI_(SRC|DST)=' "$SETUP_SCRIPT"
 }

@@ -39,8 +39,11 @@ setup() {
     grep -q 'Setting up PowerShell profile' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 deploys Git configuration" {
-    grep -q 'Setting up Git configuration' "$PS1_SCRIPT"
+@test "setup-windows.ps1 converges git config after dotf deploy, never copies ~/.gitconfig (#2207)" {
+    refute_grep 'gitconfigSource|Copy-Item[^#]*\.gitconfig' "$PS1_SCRIPT"
+    deploy=$(grep -nE '^    & dotf deploy[[:space:]]*$' "$PS1_SCRIPT" | cut -d: -f1)
+    converge=$(grep -n '^    & dotf converge --only git-config' "$PS1_SCRIPT" | cut -d: -f1)
+    [ -n "$deploy" ] && [ -n "$converge" ] && [ "$converge" -gt "$deploy" ]
 }
 
 @test "setup-windows.ps1 deploys versions.conf" {
@@ -211,10 +214,6 @@ setup() {
     grep -q 'Setting up secrets system' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 registers SessionStart hook" {
-    grep -q 'SessionStart' "$PS1_SCRIPT"
-}
-
 # HARNESS-045 AC1: the hook command is no longer a literal in this script. It is
 # declared in harness/manifest.json and emitted by `dotf harness bind` -- ONE Go
 # binary on both OSes rather than a per-OS shim, which is the whole point of the
@@ -339,16 +338,11 @@ setup() {
 
 # --- MEM-002: retire claude-mem — plugin no longer installed on Windows ---
 # claude-mem is no longer in the $plugins array and the thedotmack marketplace is
-# no longer registered (ADR-016 Q2). setup-windows.ps1 instead ships an
-# idempotent cleanup that uninstalls the plugin + prunes leftover dirs.
+# no longer registered (ADR-016 Q2). Removing a stale registration is
+# `dotf deploy`'s job (ai/claude/plugins.json `retired_marketplaces`, #1431).
 
 @test "setup-windows.ps1 no longer registers the thedotmack marketplace (MEM-002)" {
     refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 ships the idempotent claude-mem cleanup block (MEM-002)" {
-    grep -qF 'claude plugin uninstall claude-mem@thedotmack' "$PS1_SCRIPT"
-    grep -qF 'MEM-002' "$PS1_SCRIPT"
 }
 
 # --- OPS-042 (#1336): yarn is a catalog tool; obsidian is not npm at all ---
@@ -382,19 +376,6 @@ setup() {
     refute_grep_fixed "ContainsKey('Version')" "$PS1_SCRIPT"
     jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm")' "$DOTFILES_DIR/packages.json" >/dev/null
     grep -qF 'dotf tools install' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 deploys opencode.jsonc via Deploy-File helper (SDD-007)" {
-    # Post-SDD-007: the inline Copy-Item + Get-FileHash block was extracted
-    # into Deploy-File in scripts/utils.ps1 (atomic + idempotent by SHA256).
-    # Post-SDD-009: Deploy-File now operates on the staged-substituted tmp
-    # file ($opencodeConfigTmp) rather than the raw source.
-    grep -qF 'opencode.jsonc' "$PS1_SCRIPT"
-    grep -qE 'Deploy-File.*opencodeConfigTmp' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 opencode deploy renders via dotf secrets render (SDD-009/#587)" {
-    grep -qE 'dotf secrets render \$opencodeConfigTmp' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {
@@ -528,15 +509,10 @@ FIXTURE
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
-# SDD-002 (PR #51) introduced Merge-ClaudeSettings which uses
-# `ConvertFrom-Json -AsHashtable` -- a parameter added in PowerShell 7.0 that
-# does NOT exist in Windows PowerShell 5.1. When the user invokes
-# `PowerShell -ExecutionPolicy Bypass -File .\setup-windows.ps1` (Windows
-# default `PowerShell` resolves to 5.1.x), the inner try/catch swallows the
-# ParameterBindingException as if it were a JSON parse error and the per-key
-# merge from ai/claude/settings.json is silently skipped. Preamble at the top
-# of the script detects PSVersion.Major < 7 and re-execs under pwsh, or fails
-# loud with winget install hint if pwsh is missing.
+# The script is verified under pwsh 7 only. BUG-005 was the settings merge
+# silently skipping under 5.1 (`ConvertFrom-Json -AsHashtable`); that merge is
+# `dotf deploy` now (#2000), and the re-exec keeps every run on the tested
+# runtime. Preamble re-execs under pwsh, or fails loud with a winget hint.
 
 @test "setup-windows.ps1 detects PowerShell version major (BUG-005)" {
     grep -qF 'PSVersionTable.PSVersion.Major' "$PS1_SCRIPT"
@@ -576,6 +552,16 @@ FIXTURE
 
 @test "setup-windows.ps1 checks for winget" {
     grep -q 'Get-Command winget' "$PS1_SCRIPT"
+}
+
+@test "setup-windows.ps1 pi package reconcile resolves dotf outside PATH (#1925)" {
+    local block
+    block="$(awk '/^# pi packages \(HARNESS-139/ { in_block=1 }
+        /^# opencode.s tui[.]json is the/ { in_block=0 }
+        in_block' "$PS1_SCRIPT")"
+    [ -n "$block" ]
+    grep -qF 'Test-Path "$env:USERPROFILE\.local\bin\dotf.exe"' <<<"$block"
+    grep -qF '& $dotfPath pi packages apply --repo $DotfilesDir' <<<"$block"
 }
 
 @test "setup-windows.ps1 installs age via winget" {
@@ -633,8 +619,10 @@ FIXTURE
     jq -e '.tools[] | select(.name == "poetry" and (.source.platforms == null))' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
-@test "parity: both scripts install age" {
-    grep -q 'command -v age' "$DOTFILES_DIR/setup-linux.sh"
+# Linux gets age and zoxide from mise (`dotf tools sync` reads the "# mise: cli"
+# mark in versions.conf, #2013 W2); Windows from winget until its own session.
+@test "parity: both OSes install age (Linux through mise)" {
+    grep -B1 '^AGE_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'FiloSottile.age' "$PS1_SCRIPT"
 }
 
@@ -653,8 +641,8 @@ FIXTURE
     grep -q 'GitHub.cli' "$PS1_SCRIPT"
 }
 
-@test "parity: both scripts install zoxide" {
-    grep -q 'command -v zoxide' "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: both OSes install zoxide (Linux through mise)" {
+    grep -B1 '^ZOXIDE_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'ajeetdsouza.zoxide' "$PS1_SCRIPT"
 }
 
@@ -714,46 +702,24 @@ FIXTURE
 }
 
 # --- SDD-002: settings.json template merge ---
-# Both setup scripts read ai/claude/settings.json as SSOT for the dotfiles-owned
-# subset of ~/.claude/settings.json. Per-key merge policy documented in
-# specs/SDD-002-settings-portability/proposal.md.
+# ai/claude/settings.json is the SSOT for the dotfiles-owned subset of
+# ~/.claude/settings.json, merged by `dotf deploy` (ai/deploy.json claude-settings).
+# Neither setup script copies or merges it (#2000).
 
-@test "SDD-002: setup-windows.ps1 defines Merge-ClaudeSettings function" {
-    grep -qE '^function Merge-ClaudeSettings' "$PS1_SCRIPT"
-}
-
-@test "SDD-002: setup-windows.ps1 calls Merge-ClaudeSettings (not inline hashtable)" {
-    grep -qF 'Merge-ClaudeSettings -TemplatePath' "$PS1_SCRIPT"
-    # The legacy inline hook hashtable must be gone
+@test "SDD-002: neither script carries the legacy inline hook builders" {
+    # The settings merge is `dotf deploy`'s claude-settings entry (#2000) and the
+    # hooks are `dotf harness bind`'s (HARNESS-045 AC1). These were the inline
+    # writers both replaced.
     refute_grep '\$hookEntry\s*=\s*@\{' "$PS1_SCRIPT"
-    # ...and so must the hook parameters: the function takes template + target
-    # only now, because hooks are `dotf harness bind`'s (HARNESS-045 AC1).
     refute_grep_fixed '-HookCommand' "$PS1_SCRIPT"
     refute_grep_fixed '-SessionEndCommand' "$PS1_SCRIPT"
-}
-
-@test "SDD-002: setup-windows.ps1 references the template path ai\\claude\\settings.json" {
-    grep -qF 'ai\claude\settings.json' "$PS1_SCRIPT"
+    refute_grep_fixed 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "SDD-002: setup-windows.ps1 bulk copy of ai/claude/* excludes settings.json" {
     # -- separator before pattern starting with dash so grep does not parse it
     # as a flag (same fix pattern as the BUG-002 CORE PRINCIPLE assert).
     grep -qF -- "-Exclude 'settings.json'" "$PS1_SCRIPT"
-}
-
-@test "SDD-002: setup-linux.sh defines merge_claude_settings function" {
-    grep -qE '^merge_claude_settings\(\)' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "SDD-002: setup-linux.sh calls merge_claude_settings (not inline HOOK_ENTRY)" {
-    grep -qF 'merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE"' "$DOTFILES_DIR/setup-linux.sh"
-    # The legacy inline HOOK_ENTRY jq -n heredoc must be gone
-    refute_grep_fixed 'HOOK_ENTRY=$(jq -n' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "SDD-002: setup-linux.sh references the template path ai/claude/settings.json" {
-    grep -qF 'ai/claude/settings.json' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "SDD-002: setup-linux.sh never copies ai/claude/settings.json verbatim" {
@@ -763,11 +729,6 @@ FIXTURE
     refute_grep 'cp -rf "\$_claude_src"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'cp .*ai/claude/settings\.json' "$DOTFILES_DIR/setup-linux.sh"
     [ "$(jq -r '.configs[] | select(.name=="claude-settings") | .strategy' "$DOTFILES_DIR/ai/deploy.json")" = "merge" ]
-}
-
-@test "SDD-002: parity -- both scripts log the bootstrap message" {
-    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$PS1_SCRIPT"
-    grep -qF "Bootstrapping ~/.claude/settings.json from template" "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # HARNESS-045 AC1 inverted this parity guard. Both scripts used to substitute a
@@ -934,11 +895,13 @@ FIXTURE
     [[ "$status" -eq 0 ]] || false
 }
 
-# --- DX-004: opencode tui.json deploy (Linux parity) ---
+# --- DX-004: opencode tui.json is a dotf deploy entry on every OS (#1843 B11) ---
 
-@test "setup-windows.ps1 deploys opencode tui.json (DX-004 AC4)" {
-    grep -qF 'ai\opencode\tui.json' "$PS1_SCRIPT"
-    grep -qF '.config\opencode\tui.json' "$PS1_SCRIPT"
+@test "setup-windows.ps1 leaves opencode tui.json to dotf deploy (DX-004 AC4)" {
+    refute_grep_fixed 'ai\opencode\tui.json' "$PS1_SCRIPT"
+    # The entry itself, not the comment naming it: it must exist and must not
+    # be restricted to platforms that exclude Windows.
+    jq -e '.configs[] | select(.name == "opencode-tui") | select(.platforms == null or (.platforms | index("windows")))' "$DOTFILES_DIR/ai/deploy.json"
 }
 
 @test "setup-windows.ps1 mirrors the harness inputs through dotf harness mirror (WIN-007)" {

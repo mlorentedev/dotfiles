@@ -56,6 +56,7 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		rep.Warn("user-scope environment unreadable (" + err.Error() + ")")
 		return
 	}
+	fix, who := persistRemedy(sys.GOOS)
 	if len(drift) == 0 && len(retired) == 0 && !stale {
 		rep.Pass(fmt.Sprintf("%d contract variable(s) persisted at user scope", len(vars)))
 		return
@@ -64,8 +65,8 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		// Every variable is in place; only the ownership record lags the
 		// contract (a box that persisted before the record existed, or a
 		// leftover a hand edit removed). One run rewrites it.
-		rep.Warn(fmt.Sprintf("%d contract variable(s) persisted at user scope, but the ownership record (%s) is out of date — run `dotf env persist`",
-			len(vars), envpkg.ManagedMarker))
+		rep.Warn(fmt.Sprintf("%d contract variable(s) persisted at user scope, but the ownership record (%s) is out of date — run %s",
+			len(vars), envpkg.ManagedMarker, fix))
 		return
 	}
 	if len(drift) > 0 {
@@ -73,16 +74,26 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		for _, v := range drift {
 			names = append(names, v.Name)
 		}
-		rep.Warn(fmt.Sprintf("%d contract variable(s) missing or stale at user scope (%s) — profile-less processes such as Copilot tool calls see none of them; run `dotf env persist`",
-			len(drift), strings.Join(names, ", ")))
+		rep.Warn(fmt.Sprintf("%d contract variable(s) missing or stale at user scope (%s) — %s see none of them; run %s",
+			len(drift), strings.Join(names, ", "), who, fix))
 	}
 	if len(retired) > 0 {
 		// CLI-065 (#1363): a name the contract retired but the ownership marker
 		// still lists — profile-less processes keep inheriting a value nothing
 		// declares. The same command sweeps it; nothing else is touched.
-		rep.Warn(fmt.Sprintf("%d retired name(s) still persisted at user scope (%s) — run `dotf env persist` to sweep them",
-			len(retired), strings.Join(retired, ", ")))
+		rep.Warn(fmt.Sprintf("%d retired name(s) still persisted at user scope (%s) — run %s to sweep them",
+			len(retired), strings.Join(retired, ", "), fix))
 	}
+}
+
+// persistRemedy names the command that repairs the user scope, and who reads
+// it. On macOS the scope is the launchd session, which logout clears, so the
+// fix is the converge step that also loads the login agent re-applying it.
+func persistRemedy(goos string) (fix, who string) {
+	if goos == "darwin" {
+		return "`dotf converge --only env-persist`", "apps launched from the Dock, Finder or Spotlight"
+	}
+	return "`dotf env persist`", "profile-less processes such as Copilot tool calls"
 }
 
 // userEnvAdapter lets the doctor seam (a function) satisfy env.UserEnvReader —

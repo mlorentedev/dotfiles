@@ -39,15 +39,15 @@ deleted() {
 }
 
 @test "the -ps1 Pester spelling is covered too" {
-    # The repo carries install-dotf-ps1.Tests.ps1 alongside plain
+    # The repo carries install-ps1.Tests.ps1 alongside plain
     # windows-defaults.Tests.ps1; matching only one spelling would let the other
-    # through, and it is the one attached to the biggest remaining pair.
-    deleted scripts/install-dotf.sh scripts/install-dotf.ps1
-    : > tests/install-dotf-ps1.Tests.ps1
+    # through.
+    deleted scripts/obs-cli.sh scripts/obs-cli.ps1
+    : > tests/obs-cli-ps1.Tests.ps1
 
     run "$GUARD" --deleted-from "$WORK/deleted.txt"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"tests/install-dotf-ps1.Tests.ps1"* ]] || false
+    [[ "$output" == *"tests/obs-cli-ps1.Tests.ps1"* ]] || false
 }
 
 @test "a retirement that took its tests along passes" {

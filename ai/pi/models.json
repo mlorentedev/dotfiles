@@ -47,8 +47,43 @@
             "cacheRead": 0,
             "cacheWrite": 0
           },
-          "contextWindow": 128000,
-          "maxTokens": 16000
+          "contextWindow": 163840,
+          "maxTokens": 16384
+        }
+      ]
+    },
+    "anthropic-review": {
+      "baseUrl": "https://api.anthropic.com",
+      "api": "anthropic-messages",
+      "apiKey": "${REVIEW_ANTHROPIC_API_KEY}",
+      "models": [
+        {
+          "id": "claude-haiku-5-5",
+          "name": "Claude Haiku 5.5 (review key)",
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 200000,
+          "maxTokens": 32000,
+          "compat": {
+            "forceAdaptiveThinking": true
+          }
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "name": "Claude Sonnet 5.5 (review key)",
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 200000,
+          "maxTokens": 32000,
+          "compat": {
+            "forceAdaptiveThinking": true
+          }
         }
       ]
     }

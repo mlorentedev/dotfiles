@@ -68,3 +68,21 @@ func TestRunOrcaTuneHooksCheckNamesEachFilesState(t *testing.T) {
 		t.Fatalf("want config ok and script drift:\n%s", out.String())
 	}
 }
+
+// On Linux and macOS Orca registers bash hooks, which the timeout floor does
+// not cover: --check passes and says why, rather than reporting drift no
+// converge can hold (#2252).
+func TestRunOrcaTuneHooksCheckPassesABashHook(t *testing.T) {
+	dir := t.TempDir()
+	cfg, scr := filepath.Join(dir, "orca.json"), filepath.Join(dir, "copilot-hook.ps1")
+	if err := os.WriteFile(cfg, []byte(`{"hooks":{"PreToolUse":[{"type":"command","bash":"x","timeoutSec":5}]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runOrcaTuneHooks(&out, cfg, scr, 30, true); err != nil {
+		t.Fatalf("--check must pass a bash hook: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "the timeoutSec floor does not apply") {
+		t.Fatalf("want the reason named:\n%s", out.String())
+	}
+}

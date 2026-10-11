@@ -16,7 +16,7 @@ Vault: knowledge (<VAULT>)
 
 [4/7] Unresolved Links
   WARN: Unresolved links: 3
-  INFO: Not counted: 2 unresolved link(s) found only in 00_meta/templates/ or 90_archive/ (placeholders and archived notes)
+  INFO: Not counted: 2 unresolved link(s) found only in 90_archive/ or 00_meta/templates/ (placeholders and archived notes)
 
 [5/7] Frontmatter Coverage
   PASS: id: 5/5 (100%)

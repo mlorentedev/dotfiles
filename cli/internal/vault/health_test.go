@@ -109,6 +109,46 @@ func TestOrphanExempt(t *testing.T) {
 	}
 }
 
+// Each zone of linkExemptions applies to the counts it names and no other;
+// memory/ is pinned here for the same GUARD-001 reason as above.
+func TestLinkExemptPerCheck(t *testing.T) {
+	tests := []struct {
+		rel                         string
+		orphan, deadEnd, unresolved bool
+	}{
+		{"90_archive/old.md", true, true, true},
+		{"00_meta/templates/t.md", false, true, true},
+		{"20_certifications/lfs/n.md", false, true, false},
+		{"10_projects/p/sessions/2026-10-09.md", true, true, false},
+		{"10_projects/p/memory/feedback.md", true, false, false},
+		{"00_meta/templates.md", false, false, false},
+		{"50_work/20-products/x.md", false, true, false},
+		{"50_work/30-clients/acme/x.md", false, true, false},
+		{"50_work/25-applications/x.md", false, false, false},
+		{"50_work/20-products.md", false, false, false},
+	}
+	for _, tt := range tests {
+		if got := linkExempt(checkOrphans, tt.rel); got != tt.orphan {
+			t.Errorf("orphans: linkExempt(%q) = %v, want %v", tt.rel, got, tt.orphan)
+		}
+		if got := linkExempt(checkDeadEnds, tt.rel); got != tt.deadEnd {
+			t.Errorf("dead-ends: linkExempt(%q) = %v, want %v", tt.rel, got, tt.deadEnd)
+		}
+		if got := linkExempt(checkUnresolved, tt.rel); got != tt.unresolved {
+			t.Errorf("unresolved: linkExempt(%q) = %v, want %v", tt.rel, got, tt.unresolved)
+		}
+	}
+}
+
+func TestExemptZones(t *testing.T) {
+	if got, want := exemptZones(checkDeadEnds, "and"), "90_archive/, 00_meta/templates/, 20_certifications/, 50_work/20-products/, 50_work/30-clients/ and sessions/"; got != want {
+		t.Errorf("exemptZones(dead-ends) = %q, want %q", got, want)
+	}
+	if got, want := exemptZones(checkUnresolved, "or"), "90_archive/ or 00_meta/templates/"; got != want {
+		t.Errorf("exemptZones(unresolved) = %q, want %q", got, want)
+	}
+}
+
 func TestCountNonBlank(t *testing.T) {
 	tests := []struct {
 		name string

@@ -582,7 +582,19 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 		return out, err
 	}
 	out.Dst = dst
-	staged, err := stage(c, dst, srcData, mode)
+	// A plan only compares, and staging beside dst would create its directory;
+	// it stages in a scratch directory instead and leaves the filesystem as it
+	// found it.
+	stageAt := dst
+	if dryRun {
+		scratch, err := os.MkdirTemp("", "dotf-plan-*")
+		if err != nil {
+			return out, fmt.Errorf("config %q: plan: %w", c.Name, err)
+		}
+		defer func() { _ = os.RemoveAll(scratch) }()
+		stageAt = filepath.Join(scratch, filepath.Base(dst))
+	}
+	staged, err := stage(c, stageAt, srcData, mode)
 	if err != nil {
 		return out, err
 	}
@@ -770,13 +782,15 @@ type mergeFormat struct {
 	encode       func(map[string]any) ([]byte, error)
 }
 
-// jsonMerge drops `//` header lines from the destination on read only:
-// Copilot rewrites its config.json with a `// User settings belong in
-// settings.json` header. The merged file is plain JSON, and the tool that wants
-// a header puts it back.
+// jsonMerge drops whole-line `//` comments on read, from both sides. Copilot
+// rewrites its config.json with a `// User settings belong in settings.json`
+// header, and opencode's tui.json source documents its keys with comment lines
+// (#2260). The merged file is plain JSON, and the tool that wants a header puts
+// it back. A comment line names no value, so dropping it changes nothing the
+// repo owns.
 var jsonMerge = mergeFormat{
 	what:         "a JSON object",
-	decodeSource: decodeJSONMap,
+	decodeSource: func(raw []byte) (map[string]any, error) { return decodeJSONMap(stripLineComments(raw)) },
 	decodeDest:   func(raw []byte) (map[string]any, error) { return decodeJSONMap(stripLineComments(raw)) },
 	encode:       func(m map[string]any) ([]byte, error) { return encodeJSON(m) },
 }

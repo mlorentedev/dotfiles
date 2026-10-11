@@ -202,6 +202,23 @@ _knowledge_repo() {
     grep -qF 'pull-requests: read' "$WORKFLOW"
 }
 
+@test "spec-gate workflow: a truncated adjacency feed is announced, not read as complete" {
+    run awk '
+        /- name: Collect open issues for the adjacency report/ { step = 1; next }
+        step && /- name: /                                    { step = 0 }
+        step && /::warning::adjacency feed hit --limit/       { found = 1 }
+        END { exit !found }' "$WORKFLOW"
+    [ "$status" -eq 0 ]
+}
+
 @test "spec-gate workflow: the adjacency feed it collects is actually consumed" {
-    grep -qF -- '--adjacency-issues' "$WORKFLOW"
+    # Scoped to the gate step: a file-wide grep was satisfied by the comment
+    # that mentions the flag, so deleting the wiring left this green (#860
+    # shipped exactly that: a feed collected and never passed).
+    run awk '
+        /- name: Run SDD spec-gate/  { step = 1; next }
+        step && /- name: /           { step = 0 }
+        step && /--adjacency-issues/ { found = 1 }
+        END { exit !found }' "$WORKFLOW"
+    [ "$status" -eq 0 ]
 }

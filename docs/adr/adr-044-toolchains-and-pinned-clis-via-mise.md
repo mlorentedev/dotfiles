@@ -89,3 +89,14 @@ Research for #2013 (epic comment *Toolchain research*) compared five managers ag
 ## Clarification 2026-10-06 (PLAT-001c T2)
 
 A mise pin is an exact version, not a floor. `dotf tools sync` renders it into `~/.config/mise/conf.d/dotfiles.toml`, and mise activates exactly that version, which is also what the committed lock reproduces. This differs from ADR-036 decision 1, where catalog pins are floors that are never downgraded. An older version reaches a machine only when the pin is lowered in `versions.conf`, which is a reviewed change. mise reads a hand-written `~/.config/mise/config.toml` with precedence over `conf.d` (measured, mise 2026.10.3): a newer version pinned there is kept, and an older one makes the sync's post-condition fail, naming the tool.
+
+## Clarification 2026-10-09 (#2062, Python as a hard dependency)
+
+The owner made Python >= 3.11 a hard dependency of `dotf` (#2062), and Python is the Wave 3 canary. Decision 4's "mise does not manage Python packages" keeps its meaning for environments: uv still owns virtual environments and `uv tool`. The exception is narrow. The libraries the suite itself imports from the bare interpreter (PyYAML today) are marked `# mise: python-package` in `versions.conf`, and `dotf tools sync` lists them in a file that mise's `python.default_packages_file` setting names. mise installs them into every Python it installs, and the sync pip-installs them into a pinned Python installed before the package was declared. Both paths are measured on the Mac (mise 2026.10.3): mise reads the setting from `conf.d`, and a `mise install python@3.13.16` with no `dotf` involved leaves `import yaml` at 6.0.3.
+
+`dotf doctor` fails when the Python a shell resolves is below 3.11, or cannot import a declared package at its pin. When mise already has a Python that clears the floor, the failure names the PATH, because a sync would change nothing.
+
+Two constraints decide the version and the order:
+
+- **The pin must be an attested build.** mise verifies GitHub artifact attestations for python-build-standalone by default, and `python@3.12.6` predates them (`No GitHub artifact attestations found`). The pin moves to 3.13.16. Turning the verification off is rejected.
+- **The markers wait for the release.** The released `dotf` up to v0.65.0 rejects every `# mise:` comment except `# mise: cli`. So the pins are marked only once `DOTF_VERSION` carries the parser; `tests/versions-conf.bats` enforces it.

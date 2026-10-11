@@ -68,14 +68,13 @@ setup() {
     grep -qE 'AGE_VERSION#v|expected \$\{AGE_VERSION' "$CI"
 }
 
-@test "setup-linux.sh: age install pins AGE_VERSION rather than fetching latest" {
-    local setup_sh="$REPO/setup-linux.sh"
-    grep -q 'AGE_VERSION' "$setup_sh"
-    grep -q 'FiloSottile/age/releases/download/v' "$setup_sh"
-    local age_section
-    age_section="$(sed -n '/Installing age/,/age already installed/p' "$setup_sh")"
-    if echo "$age_section" | grep -q 'filippo.io/age/latest' || echo "$age_section" | grep -q 'releases/latest'; then
-        printf 'setup-linux.sh still fetches latest age instead of pinned AGE_VERSION\n' >&2
+@test "setup-linux.sh: age comes from mise at AGE_VERSION, not from a download of its own" {
+    # The pin is honoured by `dotf tools sync`, which reads the "# mise: cli"
+    # mark on the line before it (#2013 W2). setup-linux.sh no longer fetches
+    # age, pinned or latest.
+    grep -B1 '^AGE_VERSION=' "$REPO/versions.conf" | grep -qx '# mise: cli'
+    if grep -vE '^[[:space:]]*#' "$REPO/setup-linux.sh" | grep -qE 'FiloSottile/age/releases|filippo\.io/age'; then
+        printf 'setup-linux.sh still downloads age itself\n' >&2
         return 1
     fi
 }

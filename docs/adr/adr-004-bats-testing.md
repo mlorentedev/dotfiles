@@ -30,6 +30,8 @@ Use [BATS](https://github.com/bats-core/bats-core) (Bash Automated Testing Syste
 
 BATS installed at `~/.local/bin/bats`. Test files in `tests/*.bats`.
 
+> **Update (2026-10-08):** bats is a `versions.conf` pin installed by mise (`dotf tools sync`, ADR-044), not by setup into `~/.local/bin` (#2013 W2). CI still installs its own copy there.
+
 ## Consequences
 
 ### Positive

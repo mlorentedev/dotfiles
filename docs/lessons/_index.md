@@ -385,5 +385,33 @@ tags: [lessons, index, dotfiles]
 | [364 - A regenerate-from-SSOT step must know which way its clone is off](lesson-364-a-regenerate-from-ssot-step-must-know-which-way-its-clone-is-off.md) | 2026-10-08 |
 | [365 - A CLI that exits 0 on its own errors is answered by content, not by output](lesson-365-a-cli-that-exits-0-on-its-own-errors-is-answered-by-content.md) | 2026-10-08 |
 | [366 - A config the tool also writes is co-owned, whatever its format](lesson-366-a-config-the-tool-also-writes-is-co-owned-whatever-its-format.md) | 2026-10-08 |
+| [367 - A gate that needs a binary is only as present as the binary](lesson-367-a-gate-that-needs-a-binary-is-only-as-present-as-the-binary.md) | 2026-10-08 |
 | [368 - Two checks of one property must share one predicate](lesson-368-two-checks-of-one-property-must-share-one-predicate.md) | 2026-10-08 |
+| [369 - read shifts fields left when the first one is empty](lesson-369-read-shifts-fields-left-when-the-first-one-is-empty.md) | 2026-10-08 |
+| [370 - A reasoning model at its default effort can think away the whole answer](lesson-370-a-reasoning-model-at-its-default-effort-can-think-away-the-whole-answer.md) | 2026-10-08 |
+| [371 - A paid model is bounded by every layer that supplies a default](lesson-371-a-paid-model-is-bounded-by-every-layer-that-supplies-a-default.md) | 2026-10-08 |
+| [372 - A dry run proves the launch, not the request](lesson-372-a-dry-run-proves-the-launch-not-the-request.md) | 2026-10-09 |
+| [373 - A record the released binary reads waits for the release](lesson-373-a-record-the-released-binary-reads-waits-for-the-release.md) | 2026-10-09 |
+| [374 - A generated file git merged is no longer generated](lesson-374-a-generated-file-git-merged-is-no-longer-generated.md) | 2026-10-09 |
+| [375 - A ratio reads its numerator and denominator from different sources](lesson-375-a-ratio-reads-its-numerator-and-denominator-from-different-sources.md) | 2026-10-09 |
+| [376 - A check whose only writer is barred on an OS can never pass there](lesson-376-a-check-whose-only-writer-is-barred-can-never-pass.md) | 2026-10-09 |
+| [377 - A merge into a tool-owned file assumes the tool reads a fragment](lesson-377-a-merge-into-a-tool-owned-file-assumes-the-tool-reads-a-fragment.md) | 2026-10-09 |
+| [378 - An unattended deploy must not trade a secret for its placeholder](lesson-378-an-unattended-deploy-must-not-trade-a-secret-for-its-placeholder.md) | 2026-10-09 |
+| [379 - A path CI asserts is skipped is a path CI never tests](lesson-379-a-path-ci-asserts-is-skipped-is-a-path-ci-never-tests.md) | 2026-10-10 |
+| [380 - A check keyed on the supervisor skips the host without one](lesson-380-a-check-keyed-on-the-supervisor-skips-the-host-without-one.md) | 2026-10-10 |
+| [381 - A GUI app on macOS reads the launchd session, not the shell](lesson-381-a-gui-app-on-macos-reads-the-launchd-session-not-the-shell.md) | 2026-10-10 |
+| [382 - A retirement is desired state, not a one-cycle migration](lesson-382-a-retirement-is-desired-state-not-a-one-cycle-migration.md) | 2026-10-10 |
+| [383 - A sweep that only adds links cannot converge them](lesson-383-a-sweep-that-only-adds-links-cannot-converge-them.md) | 2026-10-10 |
+| [384 - A sandbox HOME does not isolate Claude Code](lesson-384-a-sandbox-home-does-not-isolate-claude-code.md) | 2026-10-10 |
+| [385 - A plan past the step that creates its input reports noise](lesson-385-a-plan-past-the-step-that-creates-its-input-reports-noise.md) | 2026-10-10 |
+| [386 - What the checkout deleted is a leftover; what it never had is not](lesson-386-what-the-checkout-deleted-is-a-leftover-what-it-never-had-is-not.md) | 2026-10-10 |
+| [387 - Before deleting the older writer, ask when it was the only one](lesson-387-before-deleting-the-older-writer-ask-when-it-was-the-only-one.md) | 2026-10-10 |
+| [388 - An installer that execs converge makes its tests live runs](lesson-388-an-installer-that-execs-converge-makes-its-tests-live-runs.md) | 2026-10-10 |
+| [389 - An identity key a co-owner can drop is not an identity](lesson-389-an-identity-key-a-co-owner-can-drop-is-not-an-identity.md) | 2026-10-10 |
+| [390 - A tree without .git still gets an answer from git](lesson-390-a-tree-without-git-still-gets-an-answer-from-git.md) | 2026-10-10 |
+| [391 - A re-planning probe needs every outcome the apply skips](lesson-391-a-re-planning-probe-needs-every-outcome-the-apply-skips.md) | 2026-10-10 |
+| [392 - lsof's exit status is not the verdict of a process scan](lesson-392-lsof-exit-status-is-not-the-verdict-of-a-process-scan.md) | 2026-10-10 |
+| [393 - An Electron app's state and liveness follow Electron, not its binary](lesson-393-an-electron-apps-state-and-liveness-follow-electron-not-its-binary.md) | 2026-10-10 |
+| [394 - A prompt can only ask for what the response schema carries](lesson-394-a-prompt-can-only-ask-for-what-the-response-schema-carries.md) | 2026-10-11 |
+| [395 - An environment token is not a stored login](lesson-395-an-environment-token-is-not-a-stored-login.md) | 2026-10-11 |
 <!-- END GENERATED -->

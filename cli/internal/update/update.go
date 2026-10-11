@@ -1,11 +1,13 @@
 // Package update implements `dotf update`: the opt-in, scheduler-invoked
-// self-deploy that fast-forwards the dotfiles repo and re-runs the idempotent
-// setup. It is the Go port of scripts/dotfiles-selfupdate.{sh,ps1} (CLI-027 /
-// AUDIT-007), collapsing the bash + PowerShell twins into one tested path.
+// self-deploy that fast-forwards the dotfiles repo and converges the machine
+// from it (`dotf converge`, which runs the setup script as its last step on
+// Linux and Windows). It is the Go port of scripts/dotfiles-selfupdate.{sh,ps1}
+// (CLI-027 / AUDIT-007), collapsing the bash + PowerShell twins into one
+// tested path.
 //
 // The load-bearing contract: every non-actionable condition (not a repo, dirty
 // worktree, offline, no upstream, already current, diverged) is a benign SKIP
-// (nil error). The ONLY error is a real setup failure after a successful
+// (nil error). The ONLY error is a real converge failure after a successful
 // fast-forward — so a systemd timer / Scheduled Task run reports failure only
 // when the deploy genuinely broke, never for the routine "nothing to do".
 package update
@@ -16,17 +18,16 @@ import (
 )
 
 // Deps abstracts the external surfaces so Run is unit-testable with no real git
-// or setup exec. Git runs `git -C <repo> <args...>` and returns trimmed stdout
-// (a non-nil error means the git command itself failed). RunSetup executes the
-// setup command. Production wires these to os/exec (OS-aware for the setup shell)
-// in the command layer.
+// or converge. Git runs `git -C <repo> <args...>` and returns trimmed stdout
+// (a non-nil error means the git command itself failed). Converge applies
+// `dotf converge` to the checkout; the command layer wires it.
 type Deps struct {
 	Git      func(args ...string) (string, error)
-	RunSetup func() error
+	Converge func() error
 }
 
-// Config is the resolved run configuration. The setup command is captured by the
-// production RunSetup closure, so it is not a field here.
+// Config is the resolved run configuration. The converge run is captured by the
+// production Converge closure, so it is not a field here.
 type Config struct {
 	Repo string // dotfiles checkout to fast-forward (DOTFILES_REPO_DIR)
 }
@@ -34,14 +35,14 @@ type Config struct {
 // Outcome classifies a run for the caller to log. Every Outcome except the
 // setup-failure path is returned with a nil error.
 type Outcome struct {
-	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|diverged|ff-failed|updated|setup-failed
+	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|diverged|ff-failed|updated|converge-failed
 	Message  string // human-readable line
 	Upstream string // the upstream branch, once resolved (e.g. origin/main)
 	Detail   string // multi-line evidence for the status (the dirtying paths), printed after Message
 }
 
 // Run executes the self-update against cfg.Repo using the injected Deps. It
-// returns a non-nil error ONLY when the idempotent setup fails after a clean
+// returns a non-nil error ONLY when the converge fails after a clean
 // fast-forward; every other branch is a benign skip (nil error) so a scheduled
 // run does not report spurious failures.
 func Run(cfg Config, d Deps) (Outcome, error) {
@@ -64,10 +65,10 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 	default:
 		return skip(out.Status, out.Message+" — skipping self-update")
 	}
-	// Clean fast-forward landed → re-run the idempotent setup. THE only error path.
-	if err := d.RunSetup(); err != nil {
-		return Outcome{Status: "setup-failed", Message: "setup failed — see output above"},
-			fmt.Errorf("setup: %w", err)
+	// Clean fast-forward landed → converge from it. THE only error path.
+	if err := d.Converge(); err != nil {
+		return Outcome{Status: "converge-failed", Message: "converge failed — see the report above"},
+			fmt.Errorf("converge: %w", err)
 	}
 	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + out.Upstream + ")"}, nil
 }
@@ -78,6 +79,10 @@ const (
 	StatusCurrent       = "current"
 	StatusAhead         = "ahead"
 	StatusFastForwarded = "fast-forwarded"
+	// StatusBehind is Assess's answer for a clean checkout its upstream
+	// strictly contains: Sync would fast-forward it. Sync itself never
+	// returns it.
+	StatusBehind = "behind"
 )
 
 // Sync brings the checkout git operates on level with its upstream, by a
@@ -91,6 +96,21 @@ const (
 // ff-failed|fast-forwarded. A git command that fails is read as the condition
 // it would have ruled out (an unreadable status is "dirty"), never as clean.
 func Sync(repo string, git func(args ...string) (string, error)) Outcome {
+	out := Assess(repo, git)
+	if out.Status != StatusBehind {
+		return out
+	}
+	if _, err := git("merge", "--ff-only", "@{u}"); err != nil {
+		return Outcome{Status: "ff-failed", Message: "fast-forward to " + out.Upstream + " failed unexpectedly (worktree left untouched)", Upstream: out.Upstream}
+	}
+	return Outcome{Status: StatusFastForwarded, Message: "fast-forwarded to " + out.Upstream, Upstream: out.Upstream}
+}
+
+// Assess is Sync up to the merge: it fetches, so the upstream it compares is
+// current, and reports StatusBehind where Sync would fast-forward. The fetch
+// moves remote-tracking refs only; HEAD and the worktree are never touched, so
+// a plan can call it.
+func Assess(repo string, git func(args ...string) (string, error)) Outcome {
 	if _, err := git("rev-parse", "--git-dir"); err != nil {
 		return Outcome{Status: "not-a-repo", Message: "not a git repo: " + repo}
 	}
@@ -135,10 +155,7 @@ func Sync(repo string, git func(args ...string) (string, error)) Outcome {
 	case base != local:
 		return Outcome{Status: "diverged", Message: "local branch has diverged from " + upstream + " (non fast-forward)", Upstream: upstream}
 	}
-	if _, err := git("merge", "--ff-only", "@{u}"); err != nil {
-		return Outcome{Status: "ff-failed", Message: "fast-forward to " + upstream + " failed unexpectedly (worktree left untouched)", Upstream: upstream}
-	}
-	return Outcome{Status: StatusFastForwarded, Message: "fast-forwarded to " + upstream, Upstream: upstream}
+	return Outcome{Status: StatusBehind, Message: "behind " + upstream, Upstream: upstream}
 }
 
 // skip is a tiny helper so every benign branch reads as one line and always

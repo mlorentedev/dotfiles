@@ -19,6 +19,14 @@ import (
 // trailing comment as part of the version.
 const MiseMarker = "# mise: cli"
 
+// MisePythonPackageMarker marks the pin on the next line as a package the
+// Python that mise installs must carry (#2062): FOO_VERSION is the PyPI
+// distribution `foo`. `dotf tools sync` lists it in the file mise's
+// python.default_packages_file setting names, so mise installs it into every
+// Python it installs, and installs it into the pinned Python itself when that
+// one was installed before the package was declared.
+const MisePythonPackageMarker = "# mise: python-package"
+
 // nearMissRE matches a comment that reads like the marker (`#mise: cli`,
 // `# MISE: cli`, `# mise:cli`). Left alone it would be an ordinary comment and
 // the pin under it would silently never install.
@@ -30,46 +38,93 @@ type MiseTool struct {
 	Version string
 }
 
-// ParseMiseTools returns the pins versions.conf marks with MiseMarker, sorted
-// by name. The tool name comes from the variable: FOO_BAR_VERSION is mise's
-// `foo-bar`, whose short name resolves to the aqua backend. A marker that is
-// not directly followed by a non-empty *_VERSION pin is an error, and so is a
-// comment that reads like the marker but is not exactly it, so a marker can
-// never silently mark nothing.
-func ParseMiseTools(versionsConf []byte) ([]MiseTool, error) {
+// MisePins is everything versions.conf marks for mise.
+type MisePins struct {
+	Tools          []MiseTool // MiseMarker: installed by mise
+	PythonPackages []MiseTool // MisePythonPackageMarker: installed into mise's Python
+}
+
+// ParseMisePins returns the pins versions.conf marks, each list sorted by
+// name. The name comes from the variable: FOO_BAR_VERSION is mise's `foo-bar`,
+// whose short name resolves to the aqua backend, or the PyPI distribution
+// `foo-bar`. A marker that is not directly followed by a non-empty *_VERSION
+// pin is an error, and so is a comment that reads like a marker but is not
+// exactly one, so a marker can never silently mark nothing. A python package
+// with no python pin is an error too: nothing would install it.
+func ParseMisePins(versionsConf []byte) (MisePins, error) {
 	lines := strings.Split(strings.ReplaceAll(string(versionsConf), "\r\n", "\n"), "\n")
-	var out []MiseTool
+	var p MisePins
 	for i, l := range lines {
-		if strings.TrimSpace(l) != MiseMarker {
+		marker := strings.TrimSpace(l)
+		var dst *[]MiseTool
+		switch marker {
+		case MiseMarker:
+			dst = &p.Tools
+		case MisePythonPackageMarker:
+			dst = &p.PythonPackages
+		default:
 			if nearMissRE.MatchString(l) {
-				return nil, fmt.Errorf("versions.conf line %d: %q looks like the marker but is not %q; fix it, or the pin under it is never installed", i+1, strings.TrimSpace(l), MiseMarker)
+				return MisePins{}, fmt.Errorf("versions.conf line %d: %q looks like a marker but is neither %q nor %q; fix it, or the pin under it is never installed", i+1, marker, MiseMarker, MisePythonPackageMarker)
 			}
 			continue
 		}
 		if i+1 >= len(lines) {
-			return nil, fmt.Errorf("versions.conf line %d: %q marks no pin", i+1, MiseMarker)
+			return MisePins{}, fmt.Errorf("versions.conf line %d: %q marks no pin", i+1, marker)
 		}
 		key, value, ok := strings.Cut(strings.TrimSpace(lines[i+1]), "=")
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 		if !ok || !strings.HasSuffix(key, "_VERSION") || value == "" {
-			return nil, fmt.Errorf("versions.conf line %d: %q must be followed by a NAME_VERSION=<pin> line", i+1, MiseMarker)
+			return MisePins{}, fmt.Errorf("versions.conf line %d: %q must be followed by a NAME_VERSION=<pin> line", i+1, marker)
 		}
 		name := strings.ToLower(strings.ReplaceAll(strings.TrimSuffix(key, "_VERSION"), "_", "-"))
-		out = append(out, MiseTool{Name: name, Version: value})
+		*dst = append(*dst, MiseTool{Name: name, Version: value})
 	}
-	if len(out) == 0 {
+	if len(p.Tools) == 0 {
 		// A versions.conf with no marker (one deployed before the markers
 		// existed, say) would render an empty config over a converged one and
 		// report success.
-		return nil, fmt.Errorf("versions.conf has no %q pins: nothing to sync", MiseMarker)
+		return MisePins{}, fmt.Errorf("versions.conf has no %q pins: nothing to sync", MiseMarker)
 	}
-	sort.Slice(out, func(a, b int) bool { return out[a].Name < out[b].Name })
-	return out, nil
+	if len(p.PythonPackages) > 0 && !hasTool(p.Tools, "python") {
+		return MisePins{}, fmt.Errorf("versions.conf marks python packages (%s) but no PYTHON_VERSION under %q: nothing would install them", names(p.PythonPackages), MiseMarker)
+	}
+	for _, l := range [][]MiseTool{p.Tools, p.PythonPackages} {
+		sort.Slice(l, func(a, b int) bool { return l[a].Name < l[b].Name })
+	}
+	return p, nil
+}
+
+// ParseMiseTools returns the tools ParseMisePins reads, for a caller that
+// needs only those.
+func ParseMiseTools(versionsConf []byte) ([]MiseTool, error) {
+	p, err := ParseMisePins(versionsConf)
+	if err != nil {
+		return nil, err
+	}
+	return p.Tools, nil
+}
+
+func hasTool(tools []MiseTool, name string) bool {
+	for _, t := range tools {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func names(tools []MiseTool) string {
+	n := make([]string, len(tools))
+	for i, t := range tools {
+		n[i] = t.Name
+	}
+	return strings.Join(n, ", ")
 }
 
 // RenderMiseConfig is the mise config `dotf tools sync` owns: exact pins,
-// sorted, under a header naming the generator.
-func RenderMiseConfig(tools []MiseTool) []byte {
+// sorted, under a header naming the generator. A non-empty pythonPackages is
+// the file mise reads the packages for every Python it installs from.
+func RenderMiseConfig(tools []MiseTool, pythonPackages string) []byte {
 	var b bytes.Buffer
 	b.WriteString("# Generated by `dotf tools sync` from versions.conf (lines marked \"" + MiseMarker + "\").\n")
 	b.WriteString("# Do not edit: change the pin in versions.conf and re-run the sync.\n\n[tools]\n")
@@ -79,6 +134,20 @@ func RenderMiseConfig(tools []MiseTool) []byte {
 	// mise is pinned in packages.json; its update notice says `mise self-update`,
 	// which would move it past that pin.
 	b.WriteString("\n[settings]\ndisable_update_warning = true\n")
+	if pythonPackages != "" {
+		fmt.Fprintf(&b, "python.default_packages_file = %q\n", filepath.ToSlash(pythonPackages))
+	}
+	return b.Bytes()
+}
+
+// RenderPythonPackages is the requirements file mise installs into every
+// Python it installs (`pip install -r`): one exact pin per line.
+func RenderPythonPackages(pkgs []MiseTool) []byte {
+	var b bytes.Buffer
+	b.WriteString("# Generated by `dotf tools sync` from versions.conf (lines marked \"" + MisePythonPackageMarker + "\").\n")
+	for _, p := range pkgs {
+		fmt.Fprintf(&b, "%s==%s\n", p.Name, p.Version)
+	}
 	return b.Bytes()
 }
 
@@ -94,6 +163,27 @@ func MiseConfigDir(home string, getenv func(string) string) string {
 	return filepath.Join(home, ".config", "mise")
 }
 
+// MiseShimsDir is where mise keeps its shims: MISE_DATA_DIR/shims, else
+// $XDG_DATA_HOME/mise/shims, else the OS default data dir's shims:
+// %LOCALAPPDATA%\mise\shims on Windows, ~/.local/share/mise/shims elsewhere. A
+// shim runs the tool at the version mise's config selects, with or without
+// `mise activate`.
+func MiseShimsDir(home, goos string, getenv func(string) string) string {
+	if d := getenv("MISE_DATA_DIR"); d != "" {
+		return filepath.Join(d, "shims")
+	}
+	if x := getenv("XDG_DATA_HOME"); x != "" {
+		return filepath.Join(x, "mise", "shims")
+	}
+	if goos == "windows" {
+		if l := getenv("LOCALAPPDATA"); l != "" {
+			return filepath.Join(l, "mise", "shims")
+		}
+		return filepath.Join(home, "AppData", "Local", "mise", "shims")
+	}
+	return filepath.Join(home, ".local", "share", "mise", "shims")
+}
+
 // MiseSync converges the pinned CLIs through mise. It owns one file,
 // <ConfigDir>/conf.d/dotfiles.toml, and never touches the rest of the mise
 // config: a hand-written config.toml keeps working beside it.
@@ -103,12 +193,28 @@ type MiseSync struct {
 	// Stdout runs `mise which`, whose stdout alone is the path: a warning mise
 	// prints on stderr must not become part of it. Nil means Run.
 	Stdout Runner
+	// PythonPackages must be importable from mise's Python at their pin
+	// (MisePythonPackageMarker). Nil means the sync owns no packages file.
+	PythonPackages []MiseTool
 }
 
 // SyncPlan is what a sync would change.
 type SyncPlan struct {
-	ConfigChanged bool     // the rendered config differs from the file
-	Missing       []string // tools that are absent or below their pin
+	ConfigChanged   bool     // the rendered config or packages file differs from the file
+	Missing         []string // tools that are absent or below their pin
+	MissingPackages []string // python packages mise's Python lacks at their pin
+}
+
+// PythonPackagesPath is the requirements file the sync owns beside its config.
+func (s MiseSync) PythonPackagesPath() string {
+	return filepath.Join(s.ConfigDir, "conf.d", "dotfiles-python-packages.txt")
+}
+
+func (s MiseSync) render(tools []MiseTool) []byte {
+	if len(s.PythonPackages) == 0 {
+		return RenderMiseConfig(tools, "")
+	}
+	return RenderMiseConfig(tools, s.PythonPackagesPath())
 }
 
 // ConfigPath is the file the sync owns.
@@ -122,12 +228,20 @@ func (s MiseSync) Plan(tools []MiseTool) (SyncPlan, error) {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return SyncPlan{}, err
 	}
-	p := SyncPlan{ConfigChanged: !bytes.Equal(have, RenderMiseConfig(tools))}
+	p := SyncPlan{ConfigChanged: !bytes.Equal(have, s.render(tools))}
+	if len(s.PythonPackages) > 0 {
+		pkgs, err := os.ReadFile(s.PythonPackagesPath())
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return SyncPlan{}, err
+		}
+		p.ConfigChanged = p.ConfigChanged || !bytes.Equal(pkgs, RenderPythonPackages(s.PythonPackages))
+	}
 	for _, t := range tools {
 		if !s.runsAtPin(t) {
 			p.Missing = append(p.Missing, t.Name)
 		}
 	}
+	p.MissingPackages = s.missingPythonPackages()
 	return p, nil
 }
 
@@ -141,15 +255,24 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 		return p, err
 	}
 	if p.ConfigChanged {
-		if err := writeFileAtomic(s.ConfigPath(), RenderMiseConfig(tools)); err != nil {
+		// The packages file first: the config names it, and mise reads it
+		// when it installs a Python.
+		if len(s.PythonPackages) > 0 {
+			if err := writeFileAtomic(s.PythonPackagesPath(), RenderPythonPackages(s.PythonPackages)); err != nil {
+				return p, err
+			}
+		}
+		if err := writeFileAtomic(s.ConfigPath(), s.render(tools)); err != nil {
 			return p, err
 		}
 	}
-	if !p.ConfigChanged && len(p.Missing) == 0 {
+	if !p.ConfigChanged && len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
 		return p, nil
 	}
-	if out, err := s.Run("mise", "install"); err != nil {
-		return p, fmt.Errorf("mise install: %w\n%s", err, strings.TrimSpace(string(out)))
+	if p.ConfigChanged || len(p.Missing) > 0 {
+		if out, err := s.Run("mise", "install"); err != nil {
+			return p, fmt.Errorf("mise install: %w\n%s", err, strings.TrimSpace(string(out)))
+		}
 	}
 	after, err := s.Plan(tools)
 	if err != nil {
@@ -158,22 +281,111 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 	if len(after.Missing) > 0 {
 		return p, fmt.Errorf("after mise install, not running at their pin: %s", strings.Join(after.Missing, ", "))
 	}
+	if len(after.MissingPackages) == 0 {
+		return p, nil
+	}
+	// mise installs the packages only into a Python it installs; a Python
+	// already at its pin when a package was declared gets it here.
+	if err := s.pipInstall(after.MissingPackages); err != nil {
+		return p, err
+	}
+	if after, err = s.Plan(tools); err != nil {
+		return p, err
+	}
+	if len(after.MissingPackages) > 0 {
+		return p, fmt.Errorf("after pip install, python packages not importable at their pin: %s", strings.Join(after.MissingPackages, ", "))
+	}
 	return p, nil
+}
+
+// PyDistVersion prints the installed version of the distribution named by
+// its first argument, and fails when it is not installed.
+const PyDistVersion = "import importlib.metadata as m, sys; print(m.version(sys.argv[1]))"
+
+// missingPythonPackages names the declared packages mise's Python does not
+// carry at or above their pin. With no Python resolved, every one is missing.
+func (s MiseSync) missingPythonPackages() []string {
+	if len(s.PythonPackages) == 0 {
+		return nil
+	}
+	python := s.which("python")
+	var missing []string
+	for _, pkg := range s.PythonPackages {
+		if python == "" {
+			missing = append(missing, pkg.Name)
+			continue
+		}
+		out, err := s.Run(python, "-c", PyDistVersion, pkg.Name)
+		v := semverRE.Find(out)
+		if err != nil || v == nil || !atLeast(string(v), pkg.Version) {
+			missing = append(missing, pkg.Name)
+		}
+	}
+	return missing
+}
+
+// pipInstall installs the named declared packages at their pin into mise's
+// Python.
+func (s MiseSync) pipInstall(missing []string) error {
+	python := s.which("python")
+	if python == "" {
+		return errors.New("mise resolves no python to install the python packages into")
+	}
+	args := []string{"-m", "pip", "install", "--quiet", "--disable-pip-version-check"}
+	for _, pkg := range s.PythonPackages {
+		for _, name := range missing {
+			if pkg.Name == name {
+				args = append(args, pkg.Name+"=="+pkg.Version)
+			}
+		}
+	}
+	if out, err := s.Run(python, args...); err != nil {
+		return fmt.Errorf("pip install into mise's python: %w\n%s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// which is the path mise resolves for an executable, or "".
+func (s MiseSync) which(name string) string {
+	run := s.Stdout
+	if run == nil {
+		run = s.Run
+	}
+	out, err := run("mise", "which", name)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// versionArgs names the pinned CLIs that do not answer `--version` with
+// their version, and what they answer instead. Without a row, such a tool
+// installs and never counts as running at its pin: every sync fails naming it
+// and doctor stays red. Measured on darwin-arm64, all seven reject the flag
+// as unknown. A tool must not be marked in versions.conf before a released
+// dotf carries its row; tests/versions-conf.bats holds that order.
+var versionArgs = map[string][]string{
+	"argocd":      {"version", "--client"},
+	"helm":        {"version"},
+	"hcloud":      {"version"},
+	"k9s":         {"version", "--short"},
+	"kubeconform": {"-v"},
+	"kubectl":     {"version", "--client"},
+	"kustomize":   {"version"},
 }
 
 // runsAtPin resolves the tool through mise and runs it: an install is real
 // only when the binary executes and reports at least the pin (lesson 337).
 func (s MiseSync) runsAtPin(t MiseTool) bool {
-	which := s.Stdout
-	if which == nil {
-		which = s.Run
-	}
-	out, err := which("mise", "which", t.Name)
-	path := strings.TrimSpace(string(out))
-	if err != nil || path == "" {
+	path := s.which(t.Name)
+	if path == "" {
 		return false
 	}
-	v := ProbeVersion(path, s.Run)
+	args, ok := versionArgs[t.Name]
+	if !ok {
+		args = []string{"--version"}
+	}
+	v := ProbeVersionArgs(path, s.Run, args...)
 	return v != "" && atLeast(v, t.Version)
 }
 

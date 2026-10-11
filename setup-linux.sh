@@ -65,7 +65,6 @@ if [ "$CURRENT_DIR" != "$DOTFILES_DIR" ]; then
     if [ -f "$CURRENT_DIR/.bashrc" ]; then
         safe_copy "$CURRENT_DIR/.bashrc" "$DOTFILES_DIR/" 2>/dev/null || true
     fi    
-    safe_copy "$CURRENT_DIR/.gitconfig" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/tmux.conf" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.inputrc" "$DOTFILES_DIR/" 2>/dev/null || true
     safe_copy "$CURRENT_DIR/.editorconfig" "$DOTFILES_DIR/" 2>/dev/null || true
@@ -88,19 +87,14 @@ log_info "Deploying main dotfiles..."
 # ~/.ssh/config (0600) and the public key are `dotf deploy` entries on every
 # OS (ai/deploy.json ssh-config, ssh-pubkey; #2013 P7).
 
-# Git configuration
-log_info "Setting up Git configuration..."
-if [ -f "$DOTFILES_DIR/.gitconfig" ]; then
-    deploy_file "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
-else
-    log_warning ".gitconfig not found in dotfiles"
-fi
+# ~/.gitconfig is co-owned by git, gh and the user, so nothing deploys over it
+# (#2207): `dotf deploy` below writes ~/.config/git/dotfiles.gitconfig and
+# `dotf converge --only git-config` after it adds the include and gh's helper.
 
 # readline config (POLISH-004): case-insensitive completion + smart history.
 deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
-chmod +x "$DOTFILES_DIR/scripts/install-precommit.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
 
 # Copy sensitive directory (encrypted *.secret.age files; the mapping lives in secrets/registry.yaml)
@@ -187,47 +181,18 @@ log_info "Installing developer tools..."
 ensure_directory "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
 
-# tmux (system package — this script avoids sudo, so user installs it once)
-if ! command -v tmux >/dev/null 2>&1; then
-    log_warning "tmux not installed. Run: sudo apt install -y tmux"
-else
-    log_info "tmux installed: $(tmux -V)"
-fi
+# tmux, xclip, gh, git-lfs, parallel, wget and eza are `system` entries
+# in packages.json (#2013 P5b): `dotf tools install` below installs them through
+# the OS manager, or says which `sudo` command to run once.
 
-# xclip (X11 clipboard bridge — required for tmux mouse-copy to system clipboard)
-if ! command -v xclip >/dev/null 2>&1; then
-    log_warning "xclip not installed. Run: sudo apt install -y xclip  (needed for tmux clipboard integration on X11)"
-else
-    log_info "xclip installed: $(xclip -version 2>&1 | head -n1)"
-fi
-
-# These blocks fetch linux-amd64 release assets (#2013 F-030). Elsewhere they
-# would place a binary the OS cannot execute ahead of a working copy on PATH,
-# so they run on linux-amd64 only, and any such leftover is removed. Interim:
-# #2013 W2 moves these tools to mise and deletes the blocks.
+# age, jq, zoxide, direnv, shellcheck and bats are pinned in versions.conf and
+# installed by `dotf tools sync` below (mise, ADR-044); setup has no installer
+# of its own for them (#2013 W2). eza and gh are not in mise yet: these blocks
+# fetch linux-amd64 release assets (F-030). Elsewhere they would place a binary
+# the OS cannot execute ahead of a working copy on PATH, so they run on
+# linux-amd64 only, and any such leftover is removed, along with those of the
+# tools the deleted blocks used to place.
 if host_is_linux_amd64; then
-    # age (file encryption — required by secrets system; pins AGE_VERSION from versions.conf)
-    if ! command -v age >/dev/null 2>&1; then
-        log_info "Installing age..."
-        AGE_VER="${AGE_VERSION:-1.3.1}"
-        _age_tmp="$(mktemp -d)"
-        if curl -Lo "$_age_tmp/age.tar.gz" "https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz" 2>/dev/null \
-            && tar xzf "$_age_tmp/age.tar.gz" -C "$_age_tmp" \
-            && cp "$_age_tmp/age/age" "$_age_tmp/age/age-keygen" "$HOME/.local/bin/" \
-            && "$HOME/.local/bin/age" --version >/dev/null 2>&1; then
-            rm -rf "$_age_tmp"
-            log_success "age installed (v${AGE_VER})"
-        else
-            rm -rf "$_age_tmp"
-            # A placed copy that does not run would turn this failure into
-            # "age already installed" on the next run (command -v finds it).
-            rm -f "$HOME/.local/bin/age" "$HOME/.local/bin/age-keygen"
-            log_warning "age installation failed"
-        fi
-    else
-        log_info "age already installed"
-    fi
-
     # eza (modern ls replacement)
     if ! command -v eza >/dev/null 2>&1; then
         log_info "Installing eza..."
@@ -239,17 +204,6 @@ if host_is_linux_amd64; then
             || log_warning "eza installation failed"
     else
         log_info "eza already installed"
-    fi
-
-    # jq (JSON processor — required by Claude hook registration)
-    if ! command -v jq >/dev/null 2>&1; then
-        log_info "Installing jq..."
-        curl -Lo "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" 2>/dev/null \
-            && chmod +x "$HOME/.local/bin/jq" \
-            && log_success "jq installed" \
-            || log_warning "jq installation failed"
-    else
-        log_info "jq already installed"
     fi
 
     # gh (GitHub CLI — required by Copilot setup)
@@ -270,18 +224,18 @@ if host_is_linux_amd64; then
         log_info "gh already installed"
     fi
 else
-    log_warning "Skipping the linux-amd64 downloads of age, eza, jq and gh on $(uname -s)/$(uname -m): they come from dotf tools install (mise) or the OS package manager (#2013 W2)"
-    remove_unrunnable_tool age age-keygen eza jq gh
+    log_warning "Skipping the linux-amd64 downloads of eza and gh on $(uname -s)/$(uname -m): install them with the OS package manager (#2013 W2)"
+    remove_unrunnable_tool age age-keygen eza jq gh shellcheck
 fi
 
 # dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
 # checksum-verified, into ~/.local/bin. Idempotent; converges on drift.
-if [ -f ./scripts/install-dotf.sh ]; then
+if [ -f ./install.sh ]; then
     # shellcheck source=/dev/null
-    . ./scripts/install-dotf.sh
+    . ./install.sh
     install_dotf || log_warning "dotf installation failed (continuing; see healthcheck)"
 else
-    log_warning "scripts/install-dotf.sh not found; skipping dotf install"
+    log_warning "install.sh not found; skipping dotf install"
 fi
 
 # Catalog tools (CLI-029, packages.json) and the mise-pinned CLIs (ADR-044,
@@ -331,61 +285,6 @@ else
     log_warning "dotf not found; skipping memory-sink guard install (run 'dotf hooks install' after setup)"
 fi
 unset _dotf_hooks
-
-# zoxide (smarter cd)
-if ! command -v zoxide >/dev/null 2>&1; then
-    log_info "Installing zoxide..."
-    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh 2>/dev/null \
-        && log_success "zoxide installed" \
-        || log_warning "zoxide installation failed"
-else
-    log_info "zoxide already installed"
-fi
-
-# direnv (per-directory environment variables)
-if ! command -v direnv >/dev/null 2>&1; then
-    log_info "Installing direnv..."
-    curl -sfL https://direnv.net/install.sh | bin_path="$HOME/.local/bin" bash 2>/dev/null \
-        && log_success "direnv installed" \
-        || log_warning "direnv installation failed"
-else
-    log_info "direnv already installed"
-fi
-
-# Same linux-amd64 gate as the age/eza/jq/gh blocks above (#2013 F-030).
-if host_is_linux_amd64; then
-    # ShellCheck (shell script linter)
-    if ! command -v shellcheck >/dev/null 2>&1; then
-        log_info "Installing shellcheck..."
-        # Versioned asset (the `-stable` alias 404s post-v0.10) + `-f` so an HTTP error
-        # fails the curl loudly instead of saving the 404 body as a bogus "tarball" that
-        # only blows up later at xz. The tarball's internal dir is shellcheck-v<ver>/.
-        _sc_ver="v${SHELLCHECK_VERSION:-0.11.0}"
-        curl -fsSLo /tmp/shellcheck.tar.xz "https://github.com/koalaman/ShellCheck/releases/download/${_sc_ver}/shellcheck-${_sc_ver}.linux.x86_64.tar.xz" \
-            && tar xJf /tmp/shellcheck.tar.xz -C /tmp \
-            && cp "/tmp/shellcheck-${_sc_ver}/shellcheck" "$HOME/.local/bin/" \
-            && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${_sc_ver}" \
-            && log_success "shellcheck installed" \
-            || log_warning "shellcheck installation failed"
-    else
-        log_info "shellcheck already installed"
-    fi
-else
-    log_warning "Skipping the linux-amd64 download of shellcheck on $(uname -s)/$(uname -m): it comes from dotf tools install (mise) (#2013 W2)"
-    remove_unrunnable_tool shellcheck
-fi
-
-# bats (Bash Automated Testing System)
-if ! command -v bats >/dev/null 2>&1; then
-    log_info "Installing bats..."
-    git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core 2>/dev/null \
-        && /tmp/bats-core/install.sh "$HOME/.local" 2>/dev/null \
-        && rm -rf /tmp/bats-core \
-        && log_success "bats installed" \
-        || log_warning "bats installation failed"
-else
-    log_info "bats already installed"
-fi
 
 # Antigravity CLI (agy) install — idempotent per pattern-setup-script-idempotence.
 # Official install URL: https://antigravity.google/cli/install.sh
@@ -547,7 +446,9 @@ fi
 # hardcoded pair missed the third target) and resolved jq by path because the
 # lookup raced its own install (#1202) -- both now moot in Go. Runs AFTER
 # --refresh so the snapshot matches the refreshed repo state. Idempotent
-# ("N updated, M unchanged"); never prunes (doctor --fix owns orphans, #802).
+# ("N updated, M unchanged, K pruned"). It prunes .zsh/, ssh/ and scripts/ of
+# files the checkout's history deleted, which the additive copy above leaves
+# behind (#2266); harness/ and the secrets stay with doctor --fix (#802).
 # A declared target the checkout lacks is named and exits non-zero after
 # mirroring the rest: setup does not abort (it is long and idempotent), but the
 # warning is loud and verify-setup.bats fails on the resulting gap.
@@ -580,7 +481,7 @@ if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; th
         log_success "Claude Code installed"
     elif command -v npm >/dev/null 2>&1; then
         log_info "Falling back to npm install for Claude Code..."
-        npm install -g @anthropic-ai/claude-code || log_warning "Claude Code install failed"
+        npm install -g --prefix "$HOME/.local" @anthropic-ai/claude-code || log_warning "Claude Code install failed"
     else
         log_warning "Claude Code install failed — re-run setup or install manually"
     fi
@@ -602,50 +503,14 @@ log_info "Setting up OpenCode configuration..."
 # directories) and is safe to delete once `command -v opencode` resolves the
 # npm one; the rc files no longer put ~/.opencode/bin on PATH.
 
-# Deploy opencode.jsonc with deploy-time {env:VAR} substitution (SDD-009).
-# Source ships placeholders like {env:NAN_API_KEY}; we substitute the literal
-# age-decrypted value at deploy time so the deployed config is self-contained
-# (no runtime env-var propagation needed when opencode launches from a
-# non-shell parent). Placeholders without a resolvable mapping are left intact
-# and opencode's runtime resolver acts as fallback.
-ensure_directory "$HOME/.config/opencode"
-OPENCODE_CONFIG_SRC="$CURRENT_DIR/ai/opencode/opencode.jsonc"
-OPENCODE_CONFIG_DST="$HOME/.config/opencode/opencode.jsonc"
-if [ -f "$OPENCODE_CONFIG_SRC" ]; then
-    OPENCODE_CONFIG_TMP=$(mktemp)
-    cp "$OPENCODE_CONFIG_SRC" "$OPENCODE_CONFIG_TMP"
-    # Deploy-time {env:VAR} materialization via the dotf CLI (over secrets/registry.yaml,
-    # ADR-020/ADR-028). Gate on the subcommand SUCCEEDING, not just dotf's presence: a
-    # stale dotf passes `command -v` but fails `secrets render`, and under set -e that
-    # would abort setup. Running it in the `if` condition exempts it from set -e; if it
-    # fails, the {env:VAR} placeholders are left intact for opencode's runtime resolver.
-    if command -v dotf >/dev/null 2>&1 && dotf secrets render "$OPENCODE_CONFIG_TMP"; then
-        : # materialized via dotf secrets render
-    else
-        log_warning "dotf secrets render unavailable; opencode.jsonc deployed with literal {env:VAR} placeholders (resolved at runtime)"
-    fi
-    mv "$OPENCODE_CONFIG_TMP" "$OPENCODE_CONFIG_DST"
-    log_success "Deployed opencode.jsonc (deploy-time secrets) to $OPENCODE_CONFIG_DST"
-else
-    log_warning "opencode.jsonc source missing: $OPENCODE_CONFIG_SRC"
-fi
+# ~/.config/opencode/opencode.jsonc is the `opencode` entry of ai/deploy.json,
+# rendered with its {env:VAR} secrets by the bare `dotf deploy` below on every
+# OS (SDD-009, #1843 B12).
 
-# Deploy the canonical AGENTS.md as opencode's global system prompt.
-# OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
-# claude/agy/copilot which use pointer files, opencode reads the filename
-# "AGENTS.md" natively so we copy the full SSOT (~22KB) verbatim.
-AGENTS_SRC="$CURRENT_DIR/AGENTS.md"
-AGENTS_DST="$HOME/.config/opencode/AGENTS.md"
-if [ -f "$AGENTS_SRC" ]; then
-    if [ -f "$AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$AGENTS_DST"; then
-        log_info "AGENTS.md (opencode) already in sync"
-    else
-        cp "$AGENTS_SRC" "$AGENTS_DST"
-        log_success "Deployed AGENTS.md to $AGENTS_DST"
-    fi
-else
-    log_warning "AGENTS.md source missing at $AGENTS_SRC"
-fi
+# opencode's and pi's AGENTS.md (the canonical SSOT, read natively under that
+# name) are harness/manifest.json agents.presence targets, deployed by
+# `dotf harness instructions` through the `compile-harness.sh --deploy` call
+# near the end of this script (#1843 B11).
 
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
 # agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
@@ -727,20 +592,12 @@ _dotf=""
 if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
 if [ -n "$_dotf" ]; then
     "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
+    # After deploy, which writes the file the include names (#2207).
+    "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
 else
-    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./scripts/install-dotf.sh, then 'dotf deploy')"
+    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./install.sh: it installs dotf, then converges)"
 fi
 unset _dotf
-
-PI_AGENTS_DST="$PI_AGENT_DIR/AGENTS.md"
-if [ -f "$AGENTS_SRC" ]; then
-    if [ -f "$PI_AGENTS_DST" ] && cmp -s "$AGENTS_SRC" "$PI_AGENTS_DST"; then
-        log_info "AGENTS.md (pi) already in sync"
-    else
-        cp "$AGENTS_SRC" "$PI_AGENTS_DST"
-        log_success "Deployed AGENTS.md to $PI_AGENTS_DST"
-    fi
-fi
 
 # Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
 # settings.json exists on the machine -- nothing pi itself writes at runtime
@@ -804,21 +661,9 @@ else
 fi
 unset _dotf
 
-# Deploy opencode TUI config (theme + keybinds incl. the display_thinking toggle).
-# Plain copy — no secret substitution (DX-004): unlike opencode.jsonc this file
-# carries no secrets, so it deploys verbatim. opencode reads tui.json natively.
-TUI_SRC="$CURRENT_DIR/ai/opencode/tui.json"
-TUI_DST="$HOME/.config/opencode/tui.json"
-if [ -f "$TUI_SRC" ]; then
-    if [ -f "$TUI_DST" ] && cmp -s "$TUI_SRC" "$TUI_DST"; then
-        log_info "opencode tui.json already in sync"
-    else
-        cp "$TUI_SRC" "$TUI_DST"
-        log_success "Deployed tui.json to $TUI_DST"
-    fi
-else
-    log_warning "tui.json source missing at $TUI_SRC"
-fi
+# opencode's tui.json (theme, keybinds) carries no secrets and is the
+# `opencode-tui` entry of ai/deploy.json, installed by the bare `dotf deploy`
+# above (#1843 B11).
 
 # opencode commands are deployed from the vault skill records by
 # `compile-harness.sh --deploy` (SDD-008): each committed record under
@@ -1157,161 +1002,9 @@ else
     log_warning "Claude Code CLI not found, skipping plugin installation"
 fi
 
-# MEM-002: retire claude-mem — one-cycle cleanup, prune after rollout.
-# claude-mem (the @thedotmack conversation-memory plugin + its marketplace) is no
-# longer installed (ADR-016 Q2: drop the L0 store). Converge existing machines to
-# "no claude-mem" on the next setup: uninstall the plugin if the CLI is present,
-# then remove any leftover plugin cache + marketplace dirs (both the GitHub repo
-# name `thedotmack-claude-mem` and the legacy `thedotmack` fallback). Silent and
-# idempotent — a no-op on a clean machine.
-log_info "Removing retired claude-mem plugin (MEM-002, if present)..."
-if command -v claude >/dev/null 2>&1; then
-    _snap=$(snapshot_claude_json)
-    claude plugin uninstall claude-mem@thedotmack >/dev/null 2>&1 || true
-    restore_claude_json_if_truncated "$_snap"
-fi
-_claude_cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-rm -rf "$_claude_cfg/plugins/cache/thedotmack/claude-mem" \
-       "$_claude_cfg/plugins/marketplaces/thedotmack-claude-mem" \
-       "$_claude_cfg/plugins/marketplaces/thedotmack" 2>/dev/null || true
-# The dir removal above is undone on the next Claude start if `thedotmack` is still
-# registered in settings.json — Claude re-clones the marketplace and its SessionStart
-# self-heal hook re-activates claude-mem. The settings merge below is additive (it
-# never strips keys), so delete the marketplace registration explicitly here. Guarded
-# on jq + an existing target; idempotent (the jq -e test skips an already-clean file).
-_claude_settings="$_claude_cfg/settings.json"
-if command -v jq >/dev/null 2>&1 && [ -f "$_claude_settings" ] && \
-   jq -e '.extraKnownMarketplaces.thedotmack' "$_claude_settings" >/dev/null 2>&1; then
-    if _stripped=$(jq 'del(.extraKnownMarketplaces.thedotmack)
-          | if (.extraKnownMarketplaces == {}) then del(.extraKnownMarketplaces) else . end' \
-          "$_claude_settings" 2>/dev/null) && [ -n "$_stripped" ]; then
-        printf '%s\n' "$_stripped" > "$_claude_settings"
-        log_info "Removed retired claude-mem marketplace registration from settings.json"
-    fi
-fi
-
-# Merge `ai/claude/settings.json` template into the deployed `~/.claude/settings.json`
-# per the per-key policy in specs/SDD-002-settings-portability/proposal.md. Bootstrap
-# when target missing. Preserves user customizations (Read paths,
-# additionalDirectories, third-party hooks like GitGuardian) by only
-# touching the keys declared as "ours" in the template.
-#
-# HOOKS ARE NOT THIS FUNCTION'S ANY MORE (HARNESS-045 AC1). They are emitted by
-# `dotf harness bind` below, from harness/manifest.json, and this function must
-# not gain a second hooks writer: the jq ASSIGNMENT it used to carry replaced the
-# whole SessionStart array, which DELETED a live third-party group -- measured
-# against a copy of the deployed file on 2026-08-27. A bats guard refuses the
-# literal, so do not quote it back here.
-merge_claude_settings() {
-    local template_path="$1"
-    local target_path="$2"
-
-    if [ ! -f "$template_path" ]; then
-        log_warning "Claude settings template not found at $template_path, skipping merge"
-        return 0
-    fi
-
-    if ! command -v jq >/dev/null 2>&1; then
-        log_warning "jq not found, skipping settings merge (install jq and re-run)"
-        return 0
-    fi
-
-    local template_substituted
-    template_substituted=$(jq '.permissions.allow = (.permissions.allow | unique)' \
-        "$template_path" 2>/dev/null)
-    if [ -z "$template_substituted" ]; then
-        log_warning "Claude settings template is not readable as JSON, skipping merge"
-        return 0
-    fi
-
-    if [ ! -f "$target_path" ]; then
-        log_info "Bootstrapping ~/.claude/settings.json from template (file did not exist)"
-        echo "$template_substituted" > "$target_path"
-        log_success "Claude settings.json bootstrapped from template"
-        return 0
-    fi
-
-    # Per-key merge via single jq invocation. Policy table in proposal.md:
-    # model, effortLevel, outputStyle, advisorModel, crossSessionInbound,
-    # attribution, autoCompactEnabled, precomputeCompactionEnabled, language:
-    # template wins.
-    # permissions.allow: UNION (deduped). enabledPlugins, env: object merge
-    # (template wins on conflict). All other keys: existing preserved.
-    # `hooks` is ABSENT from this policy on purpose -- `dotf harness bind` owns it.
-    #
-    # `env` carries feature flags Claude Code reads from its OWN process
-    # environment -- settings.env is Object.assign'd into process.env at
-    # startup, which is how CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL
-    # reaches the gate that decides whether /advisor exists at all. It merges
-    # per-key rather than replacing, so a machine-local flag a user added by
-    # hand survives a redeploy.
-    #
-    # `outputStyle` joins the template-wins set because the policy is an explicit
-    # ALLOW-LIST: a key added to the template and not named here is silently a
-    # no-op on every existing installation, reaching only machines bootstrapped
-    # from scratch. Measured on this repo's own box — the key sat in the template
-    # while the deployed file had no `outputStyle` at all. It belongs with `model`
-    # and `effortLevel`: same file, same kind of setting, dotfiles-owned.
-    # Guarded with `has()`, NOT with `// empty`. In jq a condition that evaluates
-    # to `empty` makes the whole if-expression produce nothing, so `// empty`
-    # here does not mean "leave it alone when absent" — it means the entire merge
-    # yields an empty result, `merged` is empty, and the function bails with
-    # "merge produced empty output, skipping write". A template that ever omits
-    # this one optional key would then deploy NOTHING: not model, not
-    # effortLevel, not permissions, not hooks.
-    #
-    # `attribution` is whole-object template-wins, NOT the per-key merge `env`
-    # gets. It is entirely dotfiles-owned policy: the standing order is that no
-    # git or GitHub artifact carries AI attribution, and Claude Code's default
-    # is the opposite -- `attribution.commit`/`.pr` default to the standard
-    # trailer and `sessionUrl` defaults to true. Until now that order was
-    # enforced only by an instruction every agent had to remember, which is the
-    # weaker half of this repo's own "a hook that fires beats an agent that
-    # remembers". Empty string hides the attribution; false drops the
-    # Claude-Session trailer and the PR-body link. A per-key merge here would
-    # let a stale subkey survive and quietly reinstate a trailer, so the object
-    # replaces wholesale.
-    #
-    # `crossSessionInbound` decides whether messages from the user's other
-    # sessions are delivered or held for manual approval. Measured on this box
-    # with four parallel sessions: 4 of 8 peer messages expired unapproved,
-    # including a reply to a peer's direct question. "accept" is what makes
-    # multi-session coordination a channel rather than a coin flip.
-    local merged
-    merged=$(jq --argjson tmpl "$template_substituted" '
-        .model = $tmpl.model
-        | .effortLevel = $tmpl.effortLevel
-        | (if ($tmpl | has("outputStyle")) then .outputStyle = $tmpl.outputStyle else . end)
-        | (if ($tmpl | has("advisorModel")) then .advisorModel = $tmpl.advisorModel else . end)
-        | (if ($tmpl | has("crossSessionInbound")) then .crossSessionInbound = $tmpl.crossSessionInbound else . end)
-        | (if ($tmpl | has("attribution")) then .attribution = $tmpl.attribution else . end)
-        | (if ($tmpl | has("autoCompactEnabled")) then .autoCompactEnabled = $tmpl.autoCompactEnabled else . end)
-        | (if ($tmpl | has("precomputeCompactionEnabled")) then .precomputeCompactionEnabled = $tmpl.precomputeCompactionEnabled else . end)
-        | (if ($tmpl | has("autoCompactWindow")) then .autoCompactWindow = $tmpl.autoCompactWindow else . end)
-        | (if ($tmpl | has("autoContinueAtUsageLimit")) then .autoContinueAtUsageLimit = $tmpl.autoContinueAtUsageLimit else . end)
-        | (if ($tmpl | has("cleanupPeriodDays")) then .cleanupPeriodDays = $tmpl.cleanupPeriodDays else . end)
-        | (if ($tmpl | has("language")) then .language = $tmpl.language else . end)
-        | (if ($tmpl | has("env")) then .env = ((.env // {}) + $tmpl.env) else . end)
-        | .permissions = (.permissions // {})
-        | .permissions.allow = (((.permissions.allow // []) + $tmpl.permissions.allow) | unique)
-        | .enabledPlugins = ((.enabledPlugins // {}) + $tmpl.enabledPlugins)
-    ' "$target_path" 2>/dev/null)
-    if [ -z "$merged" ]; then
-        log_warning "Claude settings merge produced empty output, skipping write"
-        return 0
-    fi
-
-    echo "$merged" > "$target_path"
-    log_success "Claude settings.json merged from template (user customizations preserved)"
-}
-
-# SDD-002 (PR #51): single source of truth for the "dotfiles-owned" subset of
-# settings.json lives at ai/claude/settings.json. merge_claude_settings applies
-# the per-key policy for model/permissions/env/plugins and bootstraps if missing.
-log_info "Applying Claude settings.json template..."
-CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-CLAUDE_SETTINGS_TEMPLATE="$CURRENT_DIR/ai/claude/settings.json"
-merge_claude_settings "$CLAUDE_SETTINGS_TEMPLATE" "$CLAUDE_SETTINGS"
+# ~/.claude/settings.json is the `claude-settings` entry of ai/deploy.json, merged
+# by the `dotf deploy` above (CLI-063, #2000). Its per-key policy and the no-trailer
+# attribution are pinned by cli/internal/deploy/claude_settings_test.go.
 
 # HARNESS-045 AC1: hooks are emitted by `dotf harness bind`, for every harness
 # declared in harness/manifest.json's `agents.bind` -- not just Claude's. It is
@@ -1351,106 +1044,10 @@ else
 fi
 unset _dotf
 
-# Deploy auto-memory symlinks (vault → Claude Code)
-# Memory lives in the knowledge vault, not in this repo (see ADR-007)
-# Scans both 10_projects/ and 50_work/ for memory directories.
-# VAULT_ROOT honors the ADR-025 seam ($VAULT_PATH, set by the sourced paths.sh)
-# with the legacy default as fallback — parity with the agy hive-vault block above.
-VAULT_ROOT="${VAULT_PATH:-$HOME/Projects/knowledge}"
-VAULT_PROJECTS="$VAULT_ROOT/10_projects"
-VAULT_WORK="$VAULT_ROOT/50_work"
-if [ -d "$VAULT_ROOT" ]; then
-    log_info "Deploying auto-memory symlinks from vault..."
-    linked_memory_count=0
-
-    # Helper: create symlink for a vault memory dir
-    _link_memory() {
-        local memory_source="$1" cwd_path="$2" project_name="$3"
-        local encoded_path target_dir
-
-        encoded_path=$(printf '%s' "$cwd_path" | sed 's|/|-|g')
-        target_dir="$HOME/.claude/projects/$encoded_path/memory"
-
-        ensure_directory "$HOME/.claude/projects/$encoded_path"
-
-        if [ -L "$target_dir" ]; then
-            rm "$target_dir"
-        elif [ -d "$target_dir" ] && [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then
-            log_warning "Backing up existing memory for $project_name"
-            mv "$target_dir" "${target_dir}.bak.$(date +%s)"
-        elif [ -d "$target_dir" ]; then
-            rmdir "$target_dir" 2>/dev/null || true
-        fi
-
-        # Count SUCCESSES, not attempts. Incrementing unconditionally made the
-        # summary below report links that were never created — a counter
-        # answering "how many did I try" while its message claims "how many
-        # worked".
-        if ln -s "$memory_source" "$target_dir"; then
-            linked_memory_count=$((linked_memory_count + 1))
-        else
-            log_warning "could not link auto-memory for ${project_name}: ln -s failed"
-        fi
-    }
-
-    # 10_projects/*: convention — repo at ~/Projects/<name>
-    if [ -d "$VAULT_PROJECTS" ]; then
-        for project_dir in "$VAULT_PROJECTS"/*/; do
-            [ -d "$project_dir" ] || continue
-            memory_source="${project_dir}memory"
-            [ -d "$memory_source" ] || continue
-
-            project_name=$(basename "$project_dir")
-            cwd_path="$HOME/Projects/$project_name"
-            _link_memory "$memory_source" "$cwd_path" "$project_name"
-        done
-    fi
-
-    # 50_work/**/memory: work projects — CWD is the vault path itself
-    if [ -d "$VAULT_WORK" ]; then
-        # `find` used to run inside the process substitution, where its exit
-        # status is discarded and `2>/dev/null` hid the reason. A failed scan then
-        # linked nothing while setup reported success. Run it first, keep its
-        # status, and say so when it fails.
-        if ! work_memory_dirs=$(find "$VAULT_WORK" -type d -name "memory" 2>&1); then
-            log_warning "scanning ${VAULT_WORK} for memory dirs failed: ${work_memory_dirs}"
-            work_memory_dirs=""
-        fi
-        while read -r memory_source; do
-            [ -n "$memory_source" ] || continue
-            project_dir=$(dirname "$memory_source")
-            project_name=$(basename "$project_dir")
-            cwd_path="$project_dir"
-            _link_memory "$memory_source" "$cwd_path" "$project_name"
-        done < <(printf '%s\n' "$work_memory_dirs")
-    fi
-
-    if [ "$linked_memory_count" -gt 0 ]; then
-        log_success "Linked auto-memory for $linked_memory_count project(s) from vault"
-    fi
-
-    # Migrate orphan memories: local Claude Code memories not yet in vault
-    for claude_project in "$HOME/.claude/projects"/*/; do
-        [ -d "$claude_project" ] || continue
-        memory_dir="${claude_project}memory"
-        # Skip if no memory, already a symlink, or empty
-        [ -d "$memory_dir" ] && [ ! -L "$memory_dir" ] && [ "$(ls -A "$memory_dir" 2>/dev/null)" ] || continue
-
-        # Extract project name from encoded path (last segment after Projects-)
-        encoded_name=$(basename "$claude_project")
-        project_name=$(printf '%s' "$encoded_name" | sed 's/.*-Projects-//')
-        [ -n "$project_name" ] || continue
-
-        vault_memory="$VAULT_PROJECTS/$project_name/memory"
-        # Only migrate if the vault project exists but has no memory dir yet
-        if [ -d "$VAULT_PROJECTS/$project_name" ] && [ ! -d "$vault_memory" ]; then
-            log_info "Migrating orphan memory: $project_name → vault"
-            mv "$memory_dir" "$vault_memory" && ln -s "$vault_memory" "$memory_dir" \
-                && log_success "Migrated and linked: $project_name" \
-                || log_error "Failed to migrate memory for $project_name"
-        fi
-    done
-fi
+# Claude's auto-memory dir is linked to its vault source per project by
+# memlink (cli/internal/memlink): the session-start hook links the project a
+# session opens, on every OS, and `dotf doctor --fix` repairs the current one,
+# a dangling link included. A real memory dir is never moved aside (#1843 B13).
 
 # Deploy all skills from the committed records to their per-agent $HOME paths
 # (SDD-008, option A). Renders each harness/skills/<n> record to ~/.claude/skills,
@@ -1584,7 +1181,7 @@ if command -v dotf >/dev/null 2>&1; then
     dotf doctor || log_warning "dotf doctor reported one or more FAIL items -- review output above; re-run with 'dotf doctor'"
     echo
 else
-    log_warning "dotf not on PATH -- skipping post-setup diagnostics (run ./scripts/install-dotf.sh, then 'dotf doctor')"
+    log_warning "dotf not on PATH -- skipping post-setup diagnostics (run ./install.sh, then 'dotf doctor')"
 fi
 
 log_info "To apply changes immediately, run:"

@@ -39,7 +39,7 @@
     "behavior": "AC6: install.sh installs dotf at the pin with checksum and exec probe, hands off to converge, and places nothing on failure (bash 3.2 and zsh)",
     "verification": "bats tests/install.bats",
     "state": "pending",
-    "evidence": ""
+    "evidence": "PR 4b: 23/24 ok under bash 3.2 and zsh; the remaining failure is the release floor (versions.conf pins 0.66.0 < 0.67.0), by design until the release"
   },
   {
     "id": "PLAT-001b-one-entrypoint-f7",
@@ -52,13 +52,13 @@
     "id": "PLAT-001b-one-entrypoint-f8",
     "behavior": "AC7: no live file references the old installer names or the clone-and-setup flow",
     "verification": "bats tests/install-old-name-guard.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "PR 4b: bats tests/install-old-name-guard.bats -> 2/2 ok; a planted reference in README.md fails it"
   },
   {
     "id": "PLAT-001b-one-entrypoint-f9",
     "behavior": "AC8: dotf update runs converge and keeps its exit semantics",
-    "verification": "cd cli && go test ./internal/update/ -count=1 && go test ./internal/update/ -run '^TestUpdate_RunsConvergeAfterAFastForward$' -count=1 -v | grep -q -- '--- PASS: TestUpdate_RunsConvergeAfterAFastForward'",
+    "verification": "cd cli && go test ./internal/update/ -count=1 && go test ./internal/cmd/ -run '^TestUpdate_ConvergesAfterAFastForward$' -count=1 -v | grep -q -- '--- PASS: TestUpdate_ConvergesAfterAFastForward'",
     "state": "pending",
     "evidence": ""
   },
@@ -73,6 +73,55 @@
     "id": "PLAT-001b-one-entrypoint-f11",
     "behavior": "AC2: the records step runs the skill deploy (compile-harness.sh --deploy) on every apply, even when the instruction files are current",
     "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent$' -count=1 -v | grep -q -- '--- PASS: TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f12",
+    "behavior": "AC10: a template change merged to main is planned by converge's configs step, fails its probe until applied, and lands on apply",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestConfigsDeploy_ATemplateChangeIsPlannedAndFailsTheProbeUntilApplied$' -count=1 -v | grep -q -- '--- PASS: TestConfigsDeploy_ATemplateChangeIsPlannedAndFailsTheProbeUntilApplied'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f13",
+    "behavior": "AC10: a render the secret store could not complete keeps the installed config and the run goes on",
+    "verification": "cd cli && go test ./internal/deploy/ -run '^TestRun_AnIncompleteRenderKeepsTheInstalledFile$' -count=1 -v | grep -q -- '--- PASS: TestRun_AnIncompleteRenderKeepsTheInstalledFile'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f14",
+    "behavior": "AC1: a plan of a rendered config creates nothing under HOME",
+    "verification": "cd cli && go test ./internal/deploy/ -run '^TestRun_APlanOfARenderedEntryCreatesNoDirectory$' -count=1 -v | grep -q -- '--- PASS: TestRun_APlanOfARenderedEntryCreatesNoDirectory'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f15",
+    "behavior": "AC11: on macOS, converge writes the contract variables into the launchd session and loads the login agent; a second run changes nothing",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestEnvPersist_ApplyThenSecondRunIsZero$' -count=1 -v | grep -q -- '--- PASS: TestEnvPersist_ApplyThenSecondRunIsZero'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f16",
+    "behavior": "PR 5: on linux and windows the setup script runs after every native step and is reported opaque, never run by a plan, skipped on darwin and inside a setup run converge started",
+    "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestLegacySetup_|TestExecSetup_)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLegacySetup_ApplyRunsTheScriptAndStaysOpaque' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLegacySetup_SkipsInsideASetupRunItStarted'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f17",
+    "behavior": "AC12: converge installs the packages.json catalog on every OS (install, mise sync, install), reporting a missing manager or a needed sudo instead of failing",
+    "verification": "cd cli && out=$(go test ./internal/converge/ ./internal/tools/ -run '^(TestToolsCatalog_|TestPlanSystem_NeedsSudo|TestInstall_AMissingManager)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestToolsCatalog_OneApplyConvergesAFreshMachine' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f18",
+    "behavior": "AC13: converge renders the contract's path file after the mirror and before any install, repairs a stale one, and a rerun reports it up to date",
+    "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestEnvGenerate_|TestRegistry_ToolsRunAfterRecords$)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestEnvGenerate_RepairsAStaleFile' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRegistry_ToolsRunAfterRecords'",
     "state": "pending",
     "evidence": ""
   }

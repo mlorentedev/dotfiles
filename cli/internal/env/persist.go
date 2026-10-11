@@ -35,7 +35,7 @@ type UserEnvStore interface {
 }
 
 // ErrUserEnvUnsupported is returned by NewUserEnvStore where no per-user
-// persistent scope exists that a profile-less process reads (Linux, macOS):
+// persistent scope exists that a profile-less process reads (Linux):
 // there the rc files already source paths.sh, and persisting is a no-op.
 var ErrUserEnvUnsupported = errors.New("no per-user persistent environment scope on this OS")
 

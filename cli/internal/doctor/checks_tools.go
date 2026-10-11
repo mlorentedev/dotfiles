@@ -41,9 +41,25 @@ func checkCoreTools(sys *System, c *Contract, rep *Report) {
 		if sys.has(tool) {
 			rep.Pass(tool + " found")
 		} else {
-			rep.Fail(tool + " not in PATH")
+			rep.Fail(tool + " not in PATH" + coreToolRemedy(tool, sys.GOOS))
 		}
 	}
+}
+
+// coreToolRemedy names the command that provisions a missing core tool, only
+// where the repo provisions it: docker through its packages.json entry, which
+// is Colima's CLI on the Mac, docker.io on Linux and Docker Desktop on Windows
+// (#2013 P5b). Elsewhere the FAIL stays bare rather than guess; kubectl gets a
+// remedy with its mise pin, which waits on a release whose version probe can
+// read it (`kubectl --version` is an unknown flag).
+func coreToolRemedy(tool, goos string) string {
+	if tool != "docker" {
+		return ""
+	}
+	if goos == "darwin" {
+		return " (run: dotf tools install, then dotf doctor --fix to start Colima)"
+	}
+	return " (run: dotf tools install)"
 }
 
 // toolHome pairs a *_HOME env var with the binary expected under its bin/.
@@ -55,7 +71,6 @@ type toolHome struct {
 var versionedHomes = []toolHome{
 	{"JAVA_HOME", "java"},
 	{"MAVEN_HOME", "mvn"},
-	{"PYTHON_HOME", "python3"},
 	{"GO_HOME", "go"},
 }
 
@@ -131,7 +146,6 @@ type versionedDir struct {
 var versionMatches = []versionedDir{
 	{"Java", "JAVA_VERSION", "jdk-"},
 	{"Maven", "MAVEN_VERSION", "apache-maven-"},
-	{"Python", "PYTHON_VERSION", "python-"},
 	{"Minikube", "MINIKUBE_VERSION", "minikube-"},
 	{"Go", "GO_VERSION", "go-"},
 }
@@ -242,7 +256,7 @@ func checkGitWindowsFloor(sys *System, cfg *Config, rep *Report) {
 // is intentionally omitted: it is owned by the env-contract section (which also
 // validates its path), so listing it here would double-report.
 var toolHomeVars = []string{
-	"APPS_HOME", "JAVA_HOME", "MAVEN_HOME", "PYTHON_HOME", "GO_HOME", "MINIKUBE_HOME",
+	"APPS_HOME", "JAVA_HOME", "MAVEN_HOME", "GO_HOME", "MINIKUBE_HOME",
 }
 
 // checkToolHomeEnvVars reproduces healthcheck section 5: the tool-home vars are
@@ -320,7 +334,7 @@ func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 	pin := cfg.Versions["DOTF_VERSION"]
 	switch {
 	case !sys.has("dotf"):
-		rep.Skip("dotf not in PATH (run ./scripts/install-dotf.sh or setup)")
+		rep.Skip("dotf not in PATH (run ./install.sh: it installs the pinned dotf, then converges)")
 	case pin == "":
 		rep.Pass("dotf in PATH (DOTF_VERSION not pinned — match not verified)")
 	default:
@@ -338,7 +352,7 @@ func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 			// merged into doctor since it was built is not running at all on this
 			// machine — a categorically worse gap than an ordinary tool being one
 			// version behind, where the check itself still runs.
-			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./scripts/install-dotf.sh)", got, pin))
+			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./install.sh: it installs the pin, then converges)", got, pin))
 		}
 	}
 }

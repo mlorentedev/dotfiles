@@ -229,6 +229,8 @@ func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
 		{"a version", `{"type":"system","apt":"gh"}`, `"version":"2.40.0",`, "not pinned"},
 		{"a name that is a flag", `{"type":"system","apt":"-y"}`, "", "apt"},
 		{"a name with a space", `{"type":"system","brew":"gh cli"}`, "", "brew"},
+		{"a cask name that is a flag", `{"type":"system","cask":"--force"}`, "", "cask"},
+		{"a formula and a cask for one OS", `{"type":"system","brew":"gh","cask":"gh"}`, "", "both a brew formula and a cask"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -250,6 +252,27 @@ func TestLoad_AcceptsASystemEntry(t *testing.T) {
 	s := c.Tools[0].Source
 	if s.Apt != "gh" || s.Brew != "gh" || s.Winget != "GitHub.cli" || s.Command != "gh" {
 		t.Errorf("source = %+v", s)
+	}
+}
+
+func TestLoad_AcceptsACaskEntry(t *testing.T) {
+	body := `{"tools":[{"name":"obsidian","source":{"type":"system","cask":"obsidian"}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatalf("a cask-only system entry must load: %v", err)
+	}
+	if m, pkg := c.Tools[0].Source.SystemPackage("darwin"); m != "brew-cask" || pkg != "obsidian" {
+		t.Errorf("SystemPackage(darwin) = %s, %s; want brew-cask, obsidian", m, pkg)
+	}
+	if c.Tools[0].SupportsOS("linux") || c.Tools[0].SupportsOS("windows") || !c.Tools[0].SupportsOS("darwin") {
+		t.Error("a cask installs on darwin only")
+	}
+
+	// The platforms reachability check resolves through SystemPackage, so a
+	// cask is a package darwin can install.
+	withPlatforms := `{"tools":[{"name":"obsidian","source":{"type":"system","cask":"obsidian","platforms":["darwin"]}}]}`
+	if _, err := Load(writeCatalog(t, withPlatforms)); err != nil {
+		t.Errorf("a cask entry with platforms [darwin] must load: %v", err)
 	}
 }
 
@@ -286,4 +309,29 @@ func TestTheRepoCatalogUsesOnlyKnownSourceTypes(t *testing.T) {
 			t.Errorf("tool %q has source type %q, which this dotf would skip (known: %v)", tool.Name, tool.Source.Type, KnownSourceTypes)
 		}
 	}
+}
+
+// macOS ships /bin/bash 3.2, and `env bash` there needs brew's bash 5 (#2202).
+// The entry must not declare `command: bash`: a command found on PATH satisfies
+// a system entry, and /bin/bash is always found, so the install would never
+// run. Presence is brew's own record instead. Only brew names it: Linux ships a
+// current bash, and Windows has none to replace.
+func TestTheRepoCatalogDeclaresBrewBashWithoutACommand(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "bash" {
+			continue
+		}
+		if tool.Source.Type != "system" || tool.Source.Brew != "bash" || tool.Source.Apt != "" || tool.Source.Winget != "" {
+			t.Errorf("bash source = %+v, want system, brew only", tool.Source)
+		}
+		if tool.Source.Command != "" {
+			t.Errorf("bash declares command %q, which /bin/bash 3.2 would satisfy", tool.Source.Command)
+		}
+		return
+	}
+	t.Fatal("packages.json declares no bash entry")
 }

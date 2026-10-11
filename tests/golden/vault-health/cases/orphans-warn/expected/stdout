@@ -13,6 +13,7 @@ Vault: knowledge (<VAULT>)
 [3/7] Orphans & Dead-Ends
   WARN: Orphans: 4/10 (40%) — consider adding backlinks
   WARN: Dead-ends: 4/10 (40%) — consider adding outgoing links
+  INFO: Most dead-ends: (vault root) (4) (--verbose lists them)
 
 [4/7] Unresolved Links
   PASS: No unresolved links

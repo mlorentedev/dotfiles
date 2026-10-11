@@ -91,28 +91,24 @@ utils() {
         g == 1 && /^(else|fi)$/ { g = 0 }
         /^[[:space:]]*#/ || /log_(warning|info)/ { next }
         /linux-amd64|x86_64-unknown-linux|linux\.x86_64|linux_amd64/ && g != 1 { print NR": "$0 }
-        END { if (gates < 2) print "only " gates + 0 " gate(s) found" }
+        END { if (gates < 1) print "no gate found" }
     ' "$REPO/setup-linux.sh"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "setup-linux.sh: age is reported installed only after the placed binary runs" {
-    grep -qF '&& "$HOME/.local/bin/age" --version >/dev/null 2>&1; then' "$REPO/setup-linux.sh"
-    # A failed post-condition removes the copies, or the next run's command -v
-    # fast path would log "age already installed" for a binary that cannot run.
-    awk '/age installation failed/ { print prev } { prev = $0 }' "$REPO/setup-linux.sh" \
-        | grep -qF 'rm -f "$HOME/.local/bin/age" "$HOME/.local/bin/age-keygen"'
-}
-
 @test "aliases.zsh: ls stays the system ls when eza is absent, and is eza when present" {
-    command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
-    # Without eza: PATH holds only the system dirs, which never ship eza.
-    run env PATH="/usr/bin:/bin" zsh -f -c '. "$1"; alias ls; whence -w ll' _ "$REPO/.zsh/aliases.zsh"
+    local zsh_bin
+    zsh_bin="$(command -v zsh)" || skip "zsh not installed"
+    # aliases.zsh runs nothing at load but the `command -v` builtin, so PATH can
+    # hold exactly the eza under test. A system dir would measure the host: apt
+    # installs eza into /usr/bin (#2194).
+    mkdir -p "$TMP/empty"
+    run env PATH="$TMP/empty" "$zsh_bin" -f -c '. "$1"; alias ls; whence -w ll' _ "$REPO/.zsh/aliases.zsh"
     [[ "$output" != *eza* ]] || false
     [[ "$output" == *"ll: alias"* ]] || false
     printf '#!/bin/sh\nexit 0\n' > "$TMP/bin/eza"
     chmod +x "$TMP/bin/eza"
-    run env PATH="$TMP/bin:/usr/bin:/bin" zsh -f -c '. "$1"; alias ls' _ "$REPO/.zsh/aliases.zsh"
+    run env PATH="$TMP/bin" "$zsh_bin" -f -c '. "$1"; alias ls' _ "$REPO/.zsh/aliases.zsh"
     [[ "$output" == *"eza --group-directories-first"* ]] || false
 }

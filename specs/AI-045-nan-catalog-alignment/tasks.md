@@ -56,7 +56,42 @@ created: "2026-09-29"
 - [x] [AC8] Real sibling, local: against NaN on 2026-10-01, nine models, 26 s; it found `mimo-v2.5` (401) still
       offered by the deployed `~/.pi/agent/settings.json` `enabledModels`
 - [x] [AC8] Real sibling, CI: a `workflow_dispatch` run of `model-canary.yml` after merge; run id recorded on #1860 (run 36887489906, green, 6/6 answered)
-- [ ] [AC9] #1923: third attempt outside NaN, gated on its credential (blocked: provider funding and `dotf secrets sync ci`)
+- [x] [AC9] #1923: a review pool across providers. `scripts/pr-agent-route.sh` draws, with equal weight, among the
+      members that answered their probe (mimo-v2.6-flash, deepseek-v4-flash, glm5.3-flash on NaN; `anthropic/claude-haiku-5-5`, gated
+      on its credential). The other provider is the second attempt, run only on a measured absence of a published review
+      (`scripts/pr-agent-publish-guard.sh --probe`); `unknown` never runs it. `vars.PR_AGENT_PROVIDER` overrides the draw
+      (`nan-only` stops all Anthropic spending). Tests pin the draw, the override, the gating, the outcome chain, the
+      model, the input/output caps and the single credential per step
+- [x] [AC9] Key synced to CI from the branch registry, after a live probe of the key answered 2xx (2026-10-08)
+- [x] [AC9] Live run, Anthropic route: `PR_AGENT_PROVIDER=anthropic`, Haiku reviewed first and published, NaN skipped
+      (run 37879933613 attempt 1)
+- [x] [AC9] Live run, NaN route: override removed, the draw picked `openai/mimo-v2.6-flash`, which published, and the
+      Anthropic second attempt was skipped (run 37879933613 attempt 2). A draw, not `PR_AGENT_PROVIDER=nan`: the same
+      route, reached the way production reaches it
+- [x] [AC9] Owner decisions, 2026-10-08: glm5.3-flash joins the NaN chain (four members at equal weight), and Haiku gets
+      the NaN attempt's 200K prompt cap, 32K output and adaptive thinking at `high` effort. LiteLLM 1.103.0 (PR-Agent
+      v0.47.0's pin) measured forwarding `thinking` and `output_config` unchanged; the budget test bounds the worst review
+      under $0.25
+- [x] [AC9] glm5.3-flash measured on review-sized prompts before admission: no review at its default effort or `medium`,
+      a review at `low` on 37K and 97K tokens (lesson 370); the NaN attempt sends `low`, pinned by a test
+- [x] [AC9] Live run, Haiku with thinking: drawn with no override, the step log carries PR-Agent's `Using adaptive
+      thinking for model anthropic/claude-haiku-5-5 with output_config effort 'high'` and a review is published
+      (run 37885509177)
+- [x] [AC9] Live run, glm5.3-flash: drawn with no override, `reasoning_effort` low in the log, a complete review published
+      in 74 s (run 37886959259)
+- [x] [AC9] Amendment B (2026-10-09): the weighted draw from the pool's `pr_agent` blocks, the Sonnet risk route (1,500
+      changed lines or the `deep-review` label, read with `gh api` because `issue_comment` carries neither), the
+      allowlist in `scripts/pr-agent-route.sh`, the routed model and effort in both Anthropic steps, run details on every
+      attempt, `retry_same_model_on_timeout = false` on NaN. Tests pin the exact share of every point of the shipped
+      pool's weight, the risk route and its fallback, the allowlist, a price row and cost ceiling per allowed model, and
+      the pool's NaN members equal to the preflight's chain
+- [x] [AC9] Amendment B, archive gate: `signs` and `vendor` in the pool, `review-second.md` required on `risk: high`,
+      `--second` and `--fallback-reason` on `dotf spec review`, and pool loading refusing an Anthropic first signer
+      (commit 77c89fd5)
+- [x] [AC9] Live run, Sonnet risk route: #2188 itself (3,682 changed lines) at `ready_for_review` reviewed first on
+      Sonnet with adaptive thinking, published, and the review's run details name the model (run 37907390670)
+- [ ] [AC9] Live run, second attempt: the first real failure of a first attempt after merge that runs the other
+      provider; run id on #1923 (a failure cannot be forced from CI without spending the shared NaN pool)
 - [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block
 - [x] [AC10] Live run of the PR that adds the queue shows GitHub accepts it: run 36835280780 started its `review` job and published a review (an unknown key fails the workflow before any job starts)
 - [x] [AC10] On `main`, two reviews that overlap in time both complete and neither is cancelled; record the run ids on #1923. A cancelled review run there means the job-level queue is ignored: revert the block (runs 36881054024, 36881389377, 36881441749 queued together, ran in turn, none cancelled; #1923 comment 5934615584)

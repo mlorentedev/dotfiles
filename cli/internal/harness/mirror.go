@@ -40,20 +40,34 @@ type MirrorResult struct {
 	// Missing are the declared targets the checkout lacks; non-empty implies
 	// the returned error wraps ErrMissingTargets.
 	Missing []string
+	// Pruned are the leftovers removed from the pruned deploy-dir trees (or,
+	// in a plan, that would be); Unpruned are orphans git never tracked, left
+	// in place; PruneSkipped says why no orphan could be proven a leftover.
+	// See ScanOrphans.
+	Pruned, Unpruned []string
+	PruneSkipped     string
+	// IgnoreSkipped says why git could not list the checkout's ignored files,
+	// when it could not, so they were mirrored (IgnoredInCheckout).
+	IgnoreSkipped string
+	// Unreadable are deploy-dir entries the leftover scan could not read, so
+	// they were not checked (Orphans.Unreadable).
+	Unreadable []string
 }
 
-// Mirror copies the harness inputs the deploy-dir consumers read — the whole
-// harness/ tree and every file harness/manifest.json declares as an injection
-// target — from the checkout at repoRoot into deployDir, preserving relative
-// paths. It replaces the bash+jq block setup-linux.sh carried and the block
+// Mirror copies the inputs the deploy-dir consumers read — the whole harness/
+// tree, every file harness/manifest.json declares as an injection target, and
+// the deploy-dir set (DeployDirFiles, DeployDirTrees) — from the checkout at
+// repoRoot into deployDir, preserving relative paths. It replaces the bash+jq block setup-linux.sh carried and the block
 // setup-windows.ps1 never had (WIN-007/#1288): `dotf doctor` reads
 // model-map.json and model-pins.json from the deploy dir, so a Windows box
 // failed both checks after every setup, with a remedy ("re-run setup") that
 // could not clear them.
 //
 // Idempotent: a file whose bytes and permission bits already match is left
-// untouched, mtime included. It never prunes — `dotf doctor --fix` owns orphan
-// removal, the semantic #802 settled for every mirror in this repository.
+// untouched, mtime included. It prunes only the trees that hold nothing but
+// checkout copies (PrunedDeployDirTrees), and there only a file the checkout's
+// history deleted: #802's arm for generated copies. harness/ and the secrets
+// stay with `dotf doctor --fix`, the semantic #802 settled for them.
 //
 // The target list is DERIVED from the manifest, never restated here: the day
 // it was a hardcoded pair, a third target (#1176) needed a copy line nobody
@@ -81,7 +95,9 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 		return res, err
 	}
 
-	if err := mirrorTree(repoRoot, deployDir, "harness", dryRun, &res); err != nil {
+	ignored, ignoreSkipped := IgnoredInCheckout(repoRoot, ExecGit)
+	res.IgnoreSkipped = ignoreSkipped
+	if err := mirrorTree(repoRoot, deployDir, "harness", ignored, dryRun, &res); err != nil {
 		return res, err
 	}
 	for _, rel := range targets {
@@ -94,6 +110,19 @@ func mirror(repoRoot, deployDir string, dryRun bool) (MirrorResult, error) {
 			return res, err
 		}
 		res.Targets = append(res.Targets, rel)
+	}
+	if err := mirrorDeployDir(repoRoot, deployDir, ignored, dryRun, &res); err != nil {
+		return res, err
+	}
+	orphans, err := ScanOrphans(repoRoot, deployDir, ExecGit)
+	if err != nil {
+		return res, err
+	}
+	res.Pruned, res.Unpruned, res.PruneSkipped, res.Unreadable = orphans.Deleted, orphans.Unknown, orphans.Skipped, orphans.Unreadable
+	if !dryRun {
+		if err := PruneOrphans(deployDir, orphans.Deleted); err != nil {
+			return res, err
+		}
 	}
 	if len(res.Missing) > 0 {
 		return res, fmt.Errorf("%w: %v", ErrMissingTargets, res.Missing)
@@ -135,7 +164,7 @@ func manifestTargets(path string) ([]string, error) {
 
 // mirrorTree copies every regular file under <repoRoot>/<sub> to
 // <deployDir>/<sub>, walking in a deterministic order.
-func mirrorTree(repoRoot, deployDir, sub string, dryRun bool, res *MirrorResult) error {
+func mirrorTree(repoRoot, deployDir, sub string, ignored map[string]bool, dryRun bool, res *MirrorResult) error {
 	root := filepath.Join(repoRoot, sub)
 	if !isDir(root) {
 		return fmt.Errorf("%s: not a directory in the checkout", filepath.ToSlash(sub))
@@ -158,6 +187,9 @@ func mirrorTree(repoRoot, deployDir, sub string, dryRun bool, res *MirrorResult)
 		rel, err := filepath.Rel(repoRoot, src)
 		if err != nil {
 			return err
+		}
+		if ignored[filepath.ToSlash(rel)] {
+			continue
 		}
 		if err := mirrorFile(src, filepath.Join(deployDir, rel), dryRun, res); err != nil {
 			return err

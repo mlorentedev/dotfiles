@@ -2,7 +2,8 @@
 # No document tells the reader to clone the repository INTO ~/.dotfiles, or to
 # pull and run setup from there. That is the deploy target setup writes into,
 # and setup refuses to run from it (#695), so a doc that says so fails the
-# reader on the first command. The runbook ai-tools-setup.md said exactly that
+# reader on the first command. The runbook ai-tools-setup.md (since replaced by
+# guide-agent-provisioning.md) said exactly that
 # until this guard existed.
 
 load 'lib/refute'

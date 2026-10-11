@@ -42,8 +42,8 @@ func TurnCapHint(runner, transcript string) string {
 // resolved through the pool, and the transcript is read where the launcher
 // writes it (TranscriptPath). Without a sidecar, a pool entry or a transcript
 // there is nothing to read, and err is returned as it was.
-func withTurnCapHint(err error, repoRoot, specID, specDir string) error {
-	req, found, rerr := ReadReviewRequest(specDir)
+func withTurnCapHint(err error, repoRoot, specID, specDir string, slot ReviewSlot) error {
+	req, found, rerr := ReadReviewRequestIn(specDir, slot)
 	if rerr != nil || !found || req.Reviewer == "" {
 		return err
 	}
@@ -55,7 +55,7 @@ func withTurnCapHint(err error, repoRoot, specID, specDir string) error {
 		if strings.TrimSpace(e.ID) != req.Reviewer {
 			continue
 		}
-		if hint := TurnCapHint(e.Runner, TranscriptPath(repoRoot, specID)); hint != "" {
+		if hint := TurnCapHint(e.Runner, TranscriptPathIn(repoRoot, specID, slot)); hint != "" {
 			return fmt.Errorf("%w\n%s", err, hint)
 		}
 		break

@@ -62,7 +62,7 @@ teardown() {
 }
 
 @test "vault-maintenance-weekly.sh hardens PATH with ~/.local/bin before calling bare dotf" {
-    # cron runs with a minimal PATH that excludes ~/.local/bin (install-dotf.sh's
+    # cron runs with a minimal PATH that excludes ~/.local/bin (install.sh's
     # install target); without this dotf silently resolves to nothing under
     # `|| true` every Sunday. The behavioral regression guard is below.
     grep -qF 'export PATH="$HOME/.local/bin:$PATH"' "$MAINT_SCRIPT"

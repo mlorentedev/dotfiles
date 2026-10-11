@@ -16,6 +16,8 @@ type fake struct {
 	changes   int
 	err       error
 	probeErr  error
+	gate      string
+	skip      string
 
 	applied, planned, probed bool
 }
@@ -29,7 +31,10 @@ func (f *fake) Reconcile(_ Env, dryRun bool) (Result, error) {
 	} else {
 		f.applied = true
 	}
-	return Result{Changes: f.changes, Detail: f.name + " detail"}, f.err
+	if f.skip != "" {
+		return Result{Skip: f.skip}, f.err
+	}
+	return Result{Changes: f.changes, Detail: f.name + " detail", Gate: f.gate}, f.err
 }
 
 func (f *fake) Probe(Env) error {
@@ -55,6 +60,34 @@ func TestRun_PlanReportsEveryReconcilerAndAppliesNothing(t *testing.T) {
 	}
 }
 
+// A checkout still to clone holds back every later plan: they would read files
+// that do not exist yet. An apply makes the change first, so it runs them all.
+func TestRun_GateHoldsBackLaterPlansOnly(t *testing.T) {
+	gate := func() (*fake, *fake) {
+		return &fake{name: "checkout", changes: 1, gate: "waits for checkout"}, &fake{name: "records"}
+	}
+
+	co, records := gate()
+	rep, err := Run([]Reconciler{co, records}, Env{GOOS: "linux"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if records.planned {
+		t.Error("a plan behind a gate must not run")
+	}
+	if got := statuses(rep); got != "checkout=change records=skipped" || rep.Entries[1].Detail != "waits for checkout" {
+		t.Errorf("plan: %s, %q", got, rep.Entries[1].Detail)
+	}
+
+	co, records = gate()
+	if _, err := Run([]Reconciler{co, records}, Env{GOOS: "linux"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !records.applied {
+		t.Error("an apply must run past a gate: the change it waits for is made")
+	}
+}
+
 func TestRun_UnlistedPlatformIsSkippedNotPassed(t *testing.T) {
 	linuxOnly := &fake{name: "legacy", platforms: []string{"linux", "windows"}}
 
@@ -68,6 +101,23 @@ func TestRun_UnlistedPlatformIsSkippedNotPassed(t *testing.T) {
 	e := rep.Entries[0]
 	if e.Status != StatusSkipped || !strings.Contains(e.Detail, "darwin") {
 		t.Errorf("want skipped naming darwin, got %s %q", e.Status, e.Detail)
+	}
+}
+
+// A step that skips itself has nothing to verify: probing it would fail the
+// run on a precondition the skip already reported.
+func TestRun_ASkippedStepIsNeverProbed(t *testing.T) {
+	unwired := &fake{name: "records-bind", skip: "no resolver", probeErr: errors.New("no resolver")}
+
+	rep, err := Run([]Reconciler{unwired}, Env{GOOS: "linux"}, false)
+	if err != nil {
+		t.Fatalf("a skipped step failed the run: %v", err)
+	}
+	if unwired.probed {
+		t.Error("the runner probed a step that skipped itself")
+	}
+	if e := rep.Entries[0]; e.Status != StatusSkipped || e.Detail != "no resolver" {
+		t.Errorf("want skipped with the reason, got %s %q", e.Status, e.Detail)
 	}
 }
 

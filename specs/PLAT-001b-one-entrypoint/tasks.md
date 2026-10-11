@@ -61,7 +61,46 @@ created: "2026-10-06"
   - `compile-harness.sh` delegates `deploy_instructions` to it when the installed dotf carries the subcommand (the `dotf_knows_subcommand` probe) and keeps the copy as the fallback, so no release is needed to land it
 - [ ] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
-- [ ] `records-bind`: the `harness bind` logic with its dry-run
+- [x] `records-bind` (#2232): `harness.Bind` returns one outcome per target and `dotf harness bind` renders it, so converge and doctor count changes without parsing text
+  - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; with no dotf path resolver wired the step is skipped and says so, as the other steps report a runner they were not given
+  - Hooks whose markers another writer stripped are converged (`TestRecordsBind_HooksWithStrippedMarkersAreConverged`), resting on #2276's identity by command signature
+  - Doctor's `Harness hook bindings` section plans the same bind: drift FAILs naming the harness and `dotf doctor --fix`, which binds. Both setup scripts' bind warnings already promised this check (#2232), and it is now true
+  - A target that fails after writing (a retirement it cannot read) still counts its write: `harness.Bind` returns that outcome with the error (#2281), and the step passes both to the runner, which records changes alongside an error
+  - On the Mac: `converge --plan --only records-bind` -> `2 harness(es) in sync`, pi and opencode skipped (emit:false); `doctor --verbose` -> claude and agy `hooks current`
+- [x] [AC12] Catalog in the `tools` step (#2013): converge installs `packages.json` on every OS, which nothing did on darwin
+  - An apply walks install, mise sync, install, the order of `setup-linux.sh`: the first pass places mise, the sync brings uv, and the second pass installs what waited on it, so one run converges a fresh machine
+  - `tools.Installer.Plan` gains the two outcomes the apply already skipped, so plan, apply and probe agree: `missing-manager` now covers npm as well as uv (node is installed by nothing yet, T4b), and `needs-sudo` asks the apply's own `sudo -n true` classifier up front. Without it the probe would re-plan an apt entry as `install` and fail every unattended Linux `dotf update`
+  - The probe fails on an entry still to install or refused, and on a manager this machine's tools install (mise from the catalog, uv as a mise pin) that the run's PATH cannot reach; it reports a genuine wait (npm, which nothing installs yet) or a needs-sudo instead of failing. The second pass walks only what waited, so a failure is attempted and reported once
+  - The setup scripts keep their own install lines until #2275 makes `install.sh` hand off to converge
+  - On the Mac: `converge --plan --only tools` lists the same ten entries as `dotf tools install --dry-run`
+- [x] [AC13] Path file in converge (#2013 P6, F-005): an `env-generate` step between `records-mirror` and `records-harness`
+  - The rc files render `paths.sh` only when it is missing; a contract or `machine.json` change left it stale, doctor failed it and nothing repaired it
+  - Plan reads `env.Generate` in check mode, apply writes, the probe re-checks; the deploy dir it writes into exists once the mirror has run
+  - `configs-deploy` stays after `tools`: entries that `require` an agent would be skipped on a fresh machine's first run and deployed on the second, which breaks AC3
+  - F-052 (`CLAUDE_CONFIG_DIR` before the first `claude` run) was already closed by #1992: the deploy's one `claude` call pins it (`deploy_claude.go`)
+
+### PR 2d — the configs reconciler (#1843 B15)
+
+> Found while landing #2236: converge had no step for `ai/deploy.json`, so a template change (the agy model pin) still needed `dotf deploy` on every machine. ADR-045 decision 4 already orders `configs` after `tools`.
+
+- [x] [AC10] Failing tests, then `deploy.Run`: one loop for `dotf deploy` and converge (OS selector, `requires`, deploy, private-dir tightening); `dotf deploy` prints its rows from the result
+- [x] [AC1] Failing test, then a plan of a rendered entry stages in a scratch directory and creates nothing under HOME
+- [x] [AC10] Failing test, then `deploy.ErrRenderIncomplete`: a strict renderer turns a placeholder the store could not resolve into a skip that keeps the installed file (lesson 378)
+- [x] [AC10] [AC3] `configs-deploy` between `tools` and `git-config` (git-config's probe needs the include target a config entry deploys); plan, apply, probe and a second plan with 0 changes; a template change fails the probe until applied; no renderer wired fails loudly
+- [x] On the Mac: `go run ./cmd/dotf converge --plan --only configs-deploy` reports 20 configs in sync, `agy-settings` to deploy, 1 not for this machine
+- [ ] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+
+### PR 2e — the macOS environment step: `env-persist` (#2013 S3)
+
+> GUI apps on macOS read no rc file, only the user's launchd session (F-021). The owner released S3 from S1 (2026-10-09), so it lands as a converge step now and S1 absorbs the login agent later.
+
+- [x] [AC11] Failing tests, then `env.LaunchdUserEnv`: `launchctl getenv/setenv/unsetenv` as the darwin `UserEnvStore`. An unset name reads as absent (getenv exits 0 and prints nothing), so an empty value is refused; Persist twice changes nothing
+- [x] [AC11] `env.LaunchAgentPlist`: `~/.local/bin/dotf env persist` at load, absolute paths, well-formed XML
+- [x] [AC11] [AC3] [AC5] Failing tests, then `env-persist` (darwin, last in the registry, closing ADR-045's configs step): the plan writes nothing; the apply sets the variables, writes the plist and bootstraps it only when `launchctl print` fails or the plist changed (bootout first); the probe requires the plist current, the agent loaded and no drift; a second run reports 0 changes; a failed bootstrap fails the run
+- [x] Doctor's persisted-environment check runs on macOS through the same store, and names `dotf converge --only env-persist` there; `dotf env persist --help` describes the macOS scope
+- [x] On the Mac: the plan listed 11 variables, the marker and the agent; the apply loaded the agent (`last exit code = 0`); a second run reported `0 changed`; `launchctl getenv VAULT_PATH` answers
+- [x] Windows check (#2013 wave rule; the registry, doctor and `env` are shared paths): `test (windows-latest)` passed on `9babaddf`. Its first run caught the plist rendered with `filepath.Join`, now `path.Join`, because launchd reads POSIX paths whatever OS renders it
+- [ ] [AC11] Owner, at the Mac: quit and relaunch an app from the Dock and confirm it sees `VAULT_PATH` (the agent's shell cannot launch a GUI app without inheriting its own environment)
 
 ### PR 3 — the persisted report (#1843 B7)
 
@@ -69,20 +108,31 @@ created: "2026-10-06"
 - [x] [AC3] Implement the report (JSON, one entry per reconciler, the run's result and error), written atomically under `env.StateDir()`, which the skill gate's ledger now shares; a plan writes none. `cli/README.md` documents `converge`, which shipped in PR 2a without a section
 - [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file
 
-### PR 4 — one entrypoint: `install.sh` and `install.ps1` at the root
+### PR 4a — the checkout step, so converge can run from zero
 
-- [ ] [AC7] Failing test: no live file names `install-dotf.sh`, `install-dotf.ps1` or `DOTFILES_SKIP_SETUP` (allow-list: `docs/adr/` including audits, `docs/lessons/`, `specs/` — live specs describe the migration they deliver — and `CHANGELOG.md`)
-- [ ] [AC6] `git mv scripts/install-dotf.{sh,ps1}` to the root `install.{sh,ps1}`, replacing the old `install.sh`; the standalone path ends in `exec dotf converge "$@"`, the sourced `install_dotf` contract is unchanged
-- [ ] [AC6] bats (bash 3.2 and zsh) and Pester: a bad checksum and an unreachable release fail and place nothing; the hand-off execs `dotf converge` with the arguments
-- [ ] [AC7] Move every live reference: setup twins, `checks_tools.go`, `stdout_contract_test.go`, the vault-maintenance scripts, README, `cli/README.md`, SECURITY.md, the release runbook
-- [ ] Add the checkout reconciler (clone if absent, fast-forward under ADR-019 D2), first in the registry
+Ships first, on its own release: from zero, `install.sh` downloads the *released* dotf and execs `converge`, so the entrypoint swap in 4b only works once a release can clone the checkout.
+
+- [x] `update.Assess`: the fast-forward decision without the merge, so a plan reports `behind` and moves nothing; `Sync` is Assess plus `merge --ff-only`
+- [x] Add the checkout reconciler (clone if absent, fast-forward under ADR-019 D2), first in the registry; it refuses a directory that is not a dotfiles checkout, and names `xcode-select --install` on macOS when git is missing
+- [x] `Result.Gate`: under a plan, a step that has not converged yet (a clone or a fast-forward pending) holds back the steps after it (`waits for checkout`) instead of planning against a tree the apply would change first; an apply ignores it
+- [x] `dotf converge` without `--repo` resolves the checkout like `dotf deploy`: the working directory's dotfiles checkout (`env.IsDotfilesCheckout`; another project's repository does not count), else `DOTFILES_REPO_DIR`, else `env.DefaultCheckoutDir` (drift-tested against `env-contract.json`)
+- [x] Real-git tests: clone then idempotent, behind fast-forwarded (plan leaves HEAD), dirty left alone, foreign repo refused, no git from zero; a cmd test plans the clone first from an empty cwd
+
+### PR 4b — one entrypoint: `install.sh` and `install.ps1` at the root
+
+Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails while `versions.conf` pins an older one.
+
+- [x] [AC7] Failing test: no live file names `install-dotf.sh`, `install-dotf.ps1` or `DOTFILES_SKIP_SETUP` (allow-list: `docs/adr/` including audits, `docs/lessons/`, `specs/` — live specs describe the migration they deliver — and `CHANGELOG.md`)
+- [x] [AC6] `git mv scripts/install-dotf.{sh,ps1}` to the root `install.{sh,ps1}`, replacing the old `install.sh`; the standalone path ends in `exec dotf converge "$@"`, the sourced `install_dotf` contract is unchanged
+- [x] [AC6] bats (bash 3.2 and zsh) and Pester: a bad checksum and an unreachable release fail and place nothing; the hand-off execs `dotf converge` with the arguments
+- [x] [AC7] Move every live reference: setup twins, `checks_tools.go`, `stdout_contract_test.go`, the vault-maintenance scripts, README, `cli/README.md`, SECURITY.md, the release runbook
 
 ### PR 5 — legacy reconcilers and `dotf update`
 
-- [ ] [P] Failing test: on linux and windows the legacy reconciler runs the setup script after every native reconciler and plans `opaque`; on darwin it is absent from the registry
-- [ ] Implement the legacy reconciler
-- [ ] [AC8] Failing test: `dotf update` runs `dotf converge` after a fast-forward, keeps exit 0 on every non-actionable case, and exits non-zero only on a converge failure
-- [ ] [AC8] Route `dotf update` through `converge`; keep `DOTFILES_SELFUPDATE_SETUP_CMD` as an override until #1843 A5 decides the scheduled path
+- [x] [P] Failing test: on linux and windows the legacy reconciler runs the setup script after every native reconciler and plans `opaque`; on darwin it is reported skipped with the OS named (AC5), rather than absent, so the report says why no setup ran
+- [x] Implement the legacy reconciler: `StatusOpaque` (never counted as changed or converged), last in the registry, and a guard env so a setup script that calls `dotf converge` cannot start itself again
+- [x] [AC8] Failing test: `dotf update` runs `dotf converge` after a fast-forward, keeps exit 0 on every non-actionable case, and exits non-zero only on a converge failure
+- [x] [AC8] Route `dotf update` through `converge` (one `runConverge` path for both commands); `DOTFILES_SELFUPDATE_SETUP_CMD` stays an override, now of the command the legacy step runs, until #1843 A5 decides the scheduled path
 
 ### PR 6 — from-zero proof (#2013 X1)
 

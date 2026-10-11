@@ -30,7 +30,7 @@ type Tool struct {
 // Source declares how to fetch a tool. Four kinds:
 //   - "github-release": a pinned per-OS/arch release binary, verified against the
 //     release checksums by the installer (CLI-029 PR-B), mirroring the
-//     deterministic age/install-dotf pattern rather than relying on winget/apt.
+//     deterministic age/install.sh pattern rather than relying on winget/apt.
 //   - "npm": a globally-installed npm package (Package), pinned by Version. Used
 //     for tools whose first-class distribution is npm and that do not ship a
 //     raw, checksum-manifested github-release binary — e.g. the Bitwarden CLI
@@ -56,10 +56,15 @@ type Source struct {
 	// Unused by github-release sources.
 	Package string `json:"package,omitempty"`
 	// Apt, Brew and Winget are the package names for source.type "system", one
-	// per OS manager: an apt package, a Homebrew formula or cask, a winget id.
+	// per OS manager: an apt package, a Homebrew formula, a winget id.
 	Apt    string `json:"apt,omitempty"`
 	Brew   string `json:"brew,omitempty"`
 	Winget string `json:"winget,omitempty"`
+	// Cask is a Homebrew cask token, the darwin package of a GUI app or font.
+	// It is its own key, not a Brew value, because brew lists and installs
+	// casks in a separate namespace (`--cask`): queried as a formula, an
+	// installed cask reads as absent. An entry names a formula or a cask.
+	Cask string `json:"cask,omitempty"`
 	// Command is the executable a "system" entry puts on PATH. When it declares
 	// one, finding it there counts as installed whichever channel put it there,
 	// so a copy from another channel is never installed over (and installing
@@ -148,7 +153,7 @@ var KnownSourceTypes = []string{"github-release", "npm", "uv-tool", "system"}
 // systemKeys are the source keys a "system" entry may carry. The typed decoder
 // drops any other key without a word, so a misspelt or unsupported manager
 // (pacman, dnf) would read as "no name for this OS" and skip in silence.
-var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "winget": true, "command": true, "platforms": true}
+var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "winget": true, "command": true, "platforms": true}
 
 // sourceKeys lists, per tool, the keys its source object carries, for the checks
 // the typed decode cannot make.
@@ -173,11 +178,14 @@ func sourceKeys(b []byte) ([]map[string]json.RawMessage, error) {
 func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	for key := range keys {
 		if !systemKeys[key] {
-			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, winget, command or platforms)", t.Name, key)
+			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, winget, command or platforms)", t.Name, key)
 		}
 	}
-	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Winget == "" {
-		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew or winget)", t.Name)
+	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Cask == "" && t.Source.Winget == "" {
+		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew, cask or winget)", t.Name)
+	}
+	if t.Source.Brew != "" && t.Source.Cask != "" {
+		return fmt.Errorf("tool %q: system source names both a brew formula and a cask; darwin installs one package per entry", t.Name)
 	}
 	// platforms narrows the OSes an entry names a package for; when it leaves
 	// none, the entry loads and then skips everywhere without a word.
@@ -195,7 +203,7 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	if t.Version != "" {
 		return fmt.Errorf("tool %q: system packages are not pinned, so version %q has no effect; remove it", t.Name, t.Version)
 	}
-	for manager, pkg := range map[string]string{"apt": t.Source.Apt, "brew": t.Source.Brew, "winget": t.Source.Winget, "command": t.Source.Command} {
+	for manager, pkg := range map[string]string{"apt": t.Source.Apt, "brew": t.Source.Brew, "cask": t.Source.Cask, "winget": t.Source.Winget, "command": t.Source.Command} {
 		// The name becomes one argument of the manager's command line: a flag
 		// or a second word would change what that command does.
 		if strings.HasPrefix(pkg, "-") || strings.ContainsAny(pkg, " \t\n") {
@@ -219,13 +227,16 @@ func (t Tool) SupportsOS(goos string) bool {
 }
 
 // SystemPackage is the manager and package name a "system" entry gives goos:
-// apt on linux, brew on darwin, winget on windows. The package is "" when the
+// apt on linux, brew on darwin (brew-cask for a cask), winget on windows. The package is "" when the
 // entry names none there, or goos has no manager.
 func (s Source) SystemPackage(goos string) (manager, pkg string) {
 	switch goos {
 	case "linux":
 		return "apt", s.Apt
 	case "darwin":
+		if s.Cask != "" {
+			return "brew-cask", s.Cask
+		}
 		return "brew", s.Brew
 	case "windows":
 		return "winget", s.Winget

@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -129,6 +132,8 @@ func reportOrcaHookCheck(w io.Writer, rep *orca.HookTuneReport, hookConfig, hook
 	switch {
 	case rep.ConfigExists && rep.ConfigDrift:
 		_, _ = fmt.Fprintf(w, "drift: %s has a hook timeoutSec < %d\n", hookConfig, timeout)
+	case rep.ConfigExists && !rep.TimeoutFloorApplies:
+		_, _ = fmt.Fprintln(w, "ok: orca.json registers no PowerShell hook, so the timeoutSec floor does not apply")
 	case rep.ConfigExists:
 		_, _ = fmt.Fprintf(w, "ok: orca.json hook timeouts >= %d\n", timeout)
 	}
@@ -167,7 +172,8 @@ func newOrcaExportCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "export",
 		Short: "Extract keybindings and clean settings from Orca into dotfiles repo",
-		Long: "export reads ~/.orca/keybindings.json and ~/.config/orca/orca-data.json,\n" +
+		Long: "export reads ~/.orca/keybindings.json and orca-data.json from Orca's data\n" +
+			"directory (~/.config/orca, ~/Library/Application Support/orca, %APPDATA%\\orca),\n" +
 			"extracts non-ephemeral settings, and writes formatted JSON files into\n" +
 			"ai/orca/ in the dotfiles checkout.",
 		SilenceUsage: true,
@@ -183,7 +189,7 @@ func runOrcaExport(w io.Writer) error {
 		return fmt.Errorf("cannot locate dotfiles checkout — set DOTFILES_REPO_DIR or run from inside it")
 	}
 	home := env.Home()
-	orcaUserDataDir := filepath.Join(home, ".config", "orca")
+	orcaUserDataDir := orca.UserDataDir(home, runtime.GOOS, os.Getenv)
 	orcaHomeDir := filepath.Join(home, ".orca")
 
 	rep, err := orca.Export(repoRoot, orcaUserDataDir, orcaHomeDir)
@@ -210,7 +216,7 @@ func newOrcaTuneCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "tune",
 		Short: "Apply recommended baseline tuning to orca-data.json",
-		Long: "tune checks ~/.config/orca/orca-data.json and ensures recommended baseline settings\n" +
+		Long: "tune checks orca-data.json in Orca's data directory and ensures recommended baseline settings\n" +
 			"(agent hibernation, base ref refresh, telemetry opt-out) are applied.\n" +
 			"It guards against running Orca processes and creates timestamped backups before writing.",
 		SilenceUsage: true,
@@ -223,10 +229,13 @@ func newOrcaTuneCmd() *cobra.Command {
 }
 
 func runOrcaTune(w io.Writer, dryRun bool) error {
-	home := env.Home()
-	orcaUserDataDir := filepath.Join(home, ".config", "orca")
+	orcaUserDataDir := orca.UserDataDir(env.Home(), runtime.GOOS, os.Getenv)
 
-	rep, err := orca.Tune(orcaUserDataDir, dryRun, orca.DefaultProcessChecker)
+	rep, err := orca.Tune(orcaUserDataDir, dryRun, orca.RunningIn(orcaUserDataDir))
+	if errors.Is(err, orca.ErrOrcaRunning) {
+		// Name the directory: a lock a crashed Orca left behind is diagnosed there.
+		return fmt.Errorf("%w (Orca's lock lives in %s)", err, orcaUserDataDir)
+	}
 	if err != nil {
 		return err
 	}

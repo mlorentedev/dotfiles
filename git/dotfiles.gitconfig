@@ -1,0 +1,12 @@
+# The dotfiles' global git settings. `dotf deploy` installs this file at
+# ~/.config/git/dotfiles.gitconfig and `dotf converge` (git-config) makes
+# ~/.gitconfig include it. ~/.gitconfig itself belongs to git, gh and the
+# user: `git config --global`, `gh auth setup-git` and `dotf hooks install`
+# write it, so nothing deploys over it (#2207).
+#
+# No credential helper here: `gh auth setup-git` writes GitHub's, with the
+# absolute path of the gh that runs it, which a process without the shell's
+# PATH (a GUI app, launchd, cron) can still run.
+[user]
+	email = mlorentedev@gmail.com
+	name = Manu

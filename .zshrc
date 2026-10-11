@@ -116,7 +116,6 @@ export NINJA_HOME="$HOME/.console-ninja"
 _dotfiles_home() { [[ -d "$2" ]] && export "$1=$2"; }
 _dotfiles_home JAVA_HOME "$APPS_HOME/jdk-${JAVA_VERSION}"
 _dotfiles_home MAVEN_HOME "$APPS_HOME/apache-maven-${MAVEN_VERSION}"
-_dotfiles_home PYTHON_HOME "$APPS_HOME/python-${PYTHON_VERSION}"
 _dotfiles_home MINIKUBE_HOME "$APPS_HOME/minikube-${MINIKUBE_VERSION}"
 _dotfiles_home GO_HOME "$APPS_HOME/go-${GO_VERSION}"
 unset -f _dotfiles_home
@@ -127,16 +126,19 @@ unset -f _dotfiles_home
 # Start with system paths or current path
 # export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel.
-for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-    [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
-done
-unset _brew
+# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel,
+# and not already loaded. A nested shell inherits HOMEBREW_PREFIX with the PATH
+# shellenv built, so it does not run brew again.
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+    done
+    unset _brew
+fi
 
 # Prepend Tool Paths (priority over system), for the homes that exist
 [[ -n "${JAVA_HOME:-}" ]] && export PATH="$JAVA_HOME/bin:$PATH"
 [[ -n "${MAVEN_HOME:-}" ]] && export PATH="$MAVEN_HOME/bin:$PATH"
-[[ -n "${PYTHON_HOME:-}" ]] && export PATH="$PYTHON_HOME/bin:$PATH"
 [[ -n "${MINIKUBE_HOME:-}" ]] && export PATH="$MINIKUBE_HOME:$PATH"
 [[ -n "${GO_HOME:-}" ]] && export PATH="$GO_HOME/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"          # Go workspace bin

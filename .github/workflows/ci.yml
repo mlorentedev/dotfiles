@@ -48,7 +48,7 @@ jobs:
               - '.zshrc'
               - '.bashrc'
               - '.profile'
-              - '.gitconfig'
+              - 'git/**'
               - 'tmux.conf'
               - '.inputrc'
               - '.editorconfig'
@@ -78,6 +78,7 @@ jobs:
               - '.claude/**'
               - 'AGENTS.md'
               - 'install.sh'
+              - 'install.ps1'
               - 'env-contract.json'
               - 'machine.json.example'
               - 'session-start-config.json'
@@ -441,7 +442,7 @@ jobs:
         id: pins
         run: |
           . ./versions.conf
-          for v in PYTHON_VERSION AGE_VERSION BATS_VERSION; do
+          for v in PYTHON_VERSION PYYAML_VERSION AGE_VERSION BATS_VERSION; do
             eval "val=\${$v:-}"
             [ -n "$val" ] || { echo "::error::$v missing from versions.conf"; exit 1; }
             echo "$v=$val" >> "$GITHUB_OUTPUT"
@@ -453,13 +454,18 @@ jobs:
           cache-dependency-path: cli/go.sum
 
       # The suite reads workflow YAML and a pinned toml with Python (3.11+ for
-      # tomllib, PyYAML for the rest). macOS ships 3.9 without either.
+      # tomllib, PyYAML for the rest). macOS ships 3.9 without either. These
+      # are the exact pins a machine gets from mise (#2062). setup-python's
+      # manifest lags upstream, so a pin it does not carry yet fails this step
+      # loudly; it carried 3.13.16 when that was pinned.
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ steps.pins.outputs.PYTHON_VERSION }}
 
       - name: Install the suite's Python dependencies
-        run: python3 -m pip install --quiet pyyaml pre-commit
+        env:
+          PYYAML_VERSION: ${{ steps.pins.outputs.PYYAML_VERSION }}
+        run: python3 -m pip install --quiet "pyyaml==$PYYAML_VERSION" pre-commit
 
       # Pinned release, as the Linux job does, but for the runner's own arch.
       - name: Install age (pinned release, darwin)
@@ -786,6 +792,24 @@ jobs:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
           GH_TOKEN: ${{ github.token }}
         run: pwsh -NoProfile -File .github/scripts/doctor-gate.ps1
+
+      # The evidence of why the hive daemon is down lives only on the runner: the
+      # Scheduled Task's last result and the daemon's own output. Print both on a
+      # red run, so it explains itself without a Windows box.
+      - name: Hive daemon diagnostics (on failure)
+        if: failure() && (github.event_name == 'push' || needs.changes.outputs.code == 'true')
+        shell: pwsh
+        run: |
+          schtasks /Query /TN HiveVaultDaemon /V /FO LIST 2>&1 | Select-String -Pattern 'Status|Last Run Time|Last Result|Run As User|Logon Mode|Task To Run'
+          hive service status 2>&1
+          $hive = (Get-Command hive -ErrorAction SilentlyContinue).Source
+          if (-not $hive) { 'hive is not on PATH'; exit 0 }
+          $p = Start-Process -FilePath $hive -ArgumentList 'serve' -NoNewWindow -PassThru `
+            -RedirectStandardOutput "$env:RUNNER_TEMP\serve.out" -RedirectStandardError "$env:RUNNER_TEMP\serve.err"
+          if ($p.WaitForExit(20000)) { "hive serve exited $($p.ExitCode)" }
+          else { Stop-Process -Id $p.Id -Force; 'hive serve was still running after 20 s' }
+          Get-Content "$env:RUNNER_TEMP\serve.out", "$env:RUNNER_TEMP\serve.err" -ErrorAction SilentlyContinue | Select-Object -Last 40
+          exit 0
 
       # #1605: the Pester that runs the suite is pinned in versions.conf and
       # cached. It was `Install-Module -MinimumVersion 5.5.0` on every run, so

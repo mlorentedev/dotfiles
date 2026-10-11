@@ -149,8 +149,13 @@ jobs:
       group: pr-agent-review-${{ github.repository }}
       cancel-in-progress: false
       queue: max
-    # One bounded PR-Agent attempt (12 minutes) plus setup.
-    timeout-minutes: 17
+    # At most two bounded PR-Agent attempts, one per provider (12 minutes on NaN,
+    # 8 on Anthropic), plus the probes before them, setup, and the two publication
+    # measurements and the final guard after them (each up to three API calls with
+    # retry sleeps). The second attempt runs only when the first published nothing
+    # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
+    # longer than before.
+    timeout-minutes: 31
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -297,17 +302,22 @@ jobs:
           else
             echo "reviewable=true" >> "$GITHUB_OUTPUT"
           fi
-      # The job has no full checkout: only the two scripts that decide, before
-      # PR-Agent starts, whether it runs (TOOL-023's push gate) and on which
-      # model (AI-045's preflight). They are fetched from the PR's merge ref,
-      # the same trust as this workflow file, and forks never reach this job.
+      # The job has no full checkout: only the scripts that decide whether
+      # PR-Agent runs (TOOL-023's push gate), on which model (AI-045's
+      # preflight and the pool draw), and whether it published (the guard,
+      # which also gates the second attempt), plus the pool whose weights the
+      # draw reads. They are fetched from the PR's merge ref, the same
+      # trust as this workflow file, and forks never reach this job.
       - name: Check out the reviewer's scripts
         if: steps.reviewable.outputs.reviewable != 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: |
+            harness/reviewer-pool.json
             scripts/pr-agent-push-gate.sh
             scripts/pr-agent-model-preflight.sh
+            scripts/pr-agent-route.sh
+            scripts/pr-agent-publish-guard.sh
           sparse-checkout-cone-mode: false
           persist-credentials: false
       # TOOL-023: the push gate decides BEFORE PR-Agent starts. A push PR-Agent
@@ -338,34 +348,196 @@ jobs:
       # published nothing and the job still went green, then it answered 401.
       # PR-Agent's own fallback catches a refusal but not a hang, and neither
       # case tells anyone the declared model is dead. The script probes each
-      # model once, hands PR-Agent the first one that answers, and names every
-      # one that did not in a warning and in the job summary. It fails the job
-      # when none answers. It only skips dead entries, in declared order; it
-      # never picks a model outside the chain.
+      # model once, passes on the ones that answer, in declared order, and names
+      # every one that did not in a warning and in the job summary. It never
+      # admits a model outside the chain; the draw below picks among the rest.
       #
       # The chain is declared HERE, not read from `.pr_agent.toml`, because
       # PR-Agent reads that file from the default branch, so a PR changing the
       # model would still probe the old one. A test holds the two equal.
-      - name: Pick the first declared model that answers
+      #
+      # When none answers, NaN is out of the review pool for this run, and the
+      # pool's Anthropic member reviews (AI-045 AC9). So the failure does not end
+      # the job here; the final guard reports what happened, naming this step.
+      - name: Probe the declared NaN chain
         id: models
         if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
+        continue-on-error: true
         env:
           NAN_API_KEY: ${{ secrets.NAN_API_KEY }}
           DECLARED_MODEL: openai/mimo-v2.6-flash
-          DECLARED_FALLBACK_MODELS: '["openai/deepseek-v4-flash"]'
+          DECLARED_FALLBACK_MODELS: '["openai/deepseek-v4-flash", "openai/glm5.3-flash"]'
+        # The exit code travels to the draw: 1 (no NaN model answered) is an
+        # outage the pool absorbs, 2 (a broken setup) must stop it.
+        # continue-on-error leaves only `outcome`, which is `failure` for both.
         run: |
+          rc=0
           ./scripts/pr-agent-model-preflight.sh --model "${DECLARED_MODEL}" \
-            --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT"
+            --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT" || rc=$?
+          echo "exit=${rc}" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+      # AI-045 AC9 (#1923): the CI review pool. Every member that answered its
+      # probe (the NaN models above, and Haiku, probed here) is drawn by the
+      # `weight` harness/reviewer-pool.json gives it, so each member's share of
+      # the reviews is a declared number, and a member that is saturated or dead
+      # is simply not in the draw. A PR at or past `pr_agent_risk` (its changed
+      # lines, or the label) reviews first on Sonnet instead, when Sonnet
+      # answers. One attempt talks to one provider: the other provider is the
+      # second attempt, which runs only on a measured absence of a published
+      # review. `vars.PR_AGENT_PROVIDER` overrides the draw (draw, nan,
+      # anthropic, nan-only); `nan-only` stops all spending on the Anthropic key
+      # without a PR. The script's header has the rules, including the
+      # allowlist of Anthropic models; the job summary names the member drawn.
+      #
+      # The size and labels are read here rather than from the event, because
+      # an `issue_comment` event carries neither. A failed read leaves them
+      # empty: the route then says so, and the label alone can still route.
+      - name: Draw the reviewer from the pool
+        id: route
+        if: >
+          !cancelled() && steps.credential.outcome == 'success'
+            && steps.reviewable.outcome == 'success'
+            && steps.reviewable.outputs.reviewable != 'false'
+            && steps.push_gate.outputs.run != 'false'
+        env:
+          NAN_OUTCOME: ${{ steps.models.outcome }}
+          NAN_MODEL: ${{ steps.models.outputs.model }}
+          NAN_FALLBACKS: ${{ steps.models.outputs.fallbacks }}
+          NAN_PREFLIGHT_EXIT: ${{ steps.models.outputs.exit }}
+          # For the probe only; it travels to curl on stdin, never on argv.
+          PR_AGENT_ANTHROPIC_API_KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
+          PR_AGENT_PROVIDER: ${{ vars.PR_AGENT_PROVIDER }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          if pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}"); then
+            PR_CHANGED_LINES=$(jq -r '.additions + .deletions' <<<"$pr")
+            PR_LABELS=$(jq -c '[.labels[].name]' <<<"$pr")
+          else
+            PR_CHANGED_LINES="" PR_LABELS="[]"
+          fi
+          export PR_CHANGED_LINES PR_LABELS
+          ./scripts/pr-agent-route.sh --output "$GITHUB_OUTPUT"
+      # The Anthropic attempt. It appears twice, first and second, because steps
+      # cannot be reordered at run time; a test holds the two identical.
+      # Everything that shapes its cost is stated here and pinned by tests,
+      # because the key it holds pays per token:
+      #
+      # - The MODEL is the one the draw chose, for `model` and `model_weak`,
+      #   with no fallback chain: Haiku when drawn, Sonnet on the risk route.
+      #   The API key cannot be restricted to a model in the Claude Console
+      #   (workspaces carry spend and rate limits, not an allowlist), so the
+      #   allowlist is ALLOWED_ANTHROPIC in scripts/pr-agent-route.sh, which
+      #   fails the draw on any other model, and the test that pins it. Haiku
+      #   5.5 costs $0.10 / $0.50 per million input / output tokens for prompts
+      #   up to 100,000 tokens, and five times that above it; Sonnet 5.5 costs
+      #   $2 / $10 with no price step.
+      # - The PROMPT is capped at 200,000 tokens (`max_model_tokens`; the
+      #   `custom_` twin is needed because PR-Agent's registry does not know the
+      #   model), the same as the NaN attempt, so every pool member reviews the
+      #   same diff. The owner chose parity over the price step (2026-10-08):
+      #   PR-Agent's tokenizer counts about 30% fewer tokens than Claude's, so a
+      #   diff past roughly 75,000 of PR-Agent's crosses 100,000 and pays the
+      #   higher prices for that request.
+      # - The OUTPUT is capped at 32,000 tokens. LiteLLM sends 4,096 for a Claude
+      #   model it does not know (DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS), and the
+      #   model's thinking counts toward the cap, so a review could be cut short
+      #   and published as nothing. Worst case, a 260,000-token prompt with a
+      #   full answer, is about $0.21 a review on Haiku and $0.84 on Sonnet.
+      # - EFFORT is the member's `reasoning_effort` in the pool (Haiku `high`,
+      #   Sonnet `medium`), with adaptive thinking. PR-Agent sends `thinking`
+      #   and `output_config` only for a model it recognises as adaptive, and
+      #   its built-in pattern does not match these ids, hence the override
+      #   list, which names every allowed model. Measured with LiteLLM 1.103.0,
+      #   the version PR-Agent v0.47.0 pins: both reach the API unchanged and the
+      #   answer carries a thinking block.
+      # - TEMPERATURE is never sent: Haiku 5.5 answers 400 to any non-default
+      #   value, and PR-Agent sends 0.2 unless the model is listed here. Both
+      #   allowed models are listed, so neither depends on accepting it.
+      # - The call is not streamed. PR-Agent forces streaming only for an
+      #   OpenAI-compatible base URL, and none is set for Anthropic. `ai_timeout`
+      #   therefore bounds the whole answer, thinking included, so it is raised
+      #   from 120 s to 360 s. The step's 8 minutes bound everything else.
+      #
+      # Same action, same pin, same github_action_config as the NaN attempt: a
+      # test holds the review settings equal, so either provider reviews what
+      # the other would have.
+      - name: PR-Agent on Anthropic, drawn first
+        id: pr_agent_anthropic_first
+        if: "!cancelled() && steps.route.outputs.first == 'anthropic'"
+        timeout-minutes: 8
+        continue-on-error: true
+        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The only inference credential this step holds; NaN's is not here.
+          ANTHROPIC__KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
+          CONFIG__MODEL: ${{ steps.route.outputs.anthropic_model }}
+          CONFIG__MODEL_WEAK: ${{ steps.route.outputs.anthropic_model }}
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          CONFIG__NO_TEMPERATURE_MODELS: >-
+            ["anthropic/claude-haiku-5-5", "claude-haiku-5-5",
+            "anthropic/claude-sonnet-5-5", "claude-sonnet-5-5"]
+          CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING: "true"
+          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"]'
+          CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
+          CONFIG__AI_TIMEOUT: "360"
+          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
+          # Below: identical to the NaN attempt's review settings (a test checks it).
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          CONFIG__OUTPUT_RUN_DETAILS: "true"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          github_action_config.handle_push_trigger: "true"
+          github_action_config.push_commands: >-
+            ${{ steps.push_gate.outputs.mode == 'incremental' && '["/review -i"]' || '["/review"]' }}
+          github_action_config.push_trigger_ignore_bot_commits: "true"
+          github_action_config.push_trigger_ignore_merge_commits: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_improve: "false"
+          github_action_config.fail_on_tool_errors: "true"
+      # The NaN attempt, when NaN was drawn first, or when the Anthropic attempt
+      # published nothing. The rule that no second Action runs on an ambiguous
+      # failure stands, and the probe keeps it by measuring rather than
+      # guessing: it asks the final guard's question (a github-actions[bot]
+      # comment carrying a declared marker, updated since this run started) and
+      # only a definite "no" runs the next attempt. If the first attempt
+      # published after the probe looked, `persistent_comment` makes the second
+      # EDIT that one Guide rather than add another. `!cancelled()`, not
+      # `always()`: a run superseded by a newer push must not spend a second
+      # Action on a diff nobody will read.
+      - name: Measure whether the Anthropic attempt published
+        id: published_after_anthropic
+        if: >
+          !cancelled() && steps.route.outputs.first == 'anthropic'
+            && steps.route.outputs.second == 'nan'
+            && (github.event_name == 'pull_request'
+              || (github.event_name == 'issue_comment'
+                  && contains(github.event.comment.body, '/review')))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          BASE_REF: ${{ github.event.repository.default_branch }}
+          STARTED: ${{ steps.start.outputs.started }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+        run: ./scripts/pr-agent-publish-guard.sh --probe --output "$GITHUB_OUTPUT"
       - name: PR-Agent
         id: pr_agent
-        if: steps.reviewable.outputs.reviewable != 'false' && steps.push_gate.outputs.run != 'false'
+        if: >
+          !cancelled() && (steps.route.outputs.first == 'nan'
+            || steps.published_after_anthropic.outputs.published == 'false')
         # #1913: a bounded attempt. A hang on the primary used to hold the job
         # until its own timeout and publish nothing (run 36805617985), because
         # `ai_timeout` does not fire on a hang (AI-045). 12 minutes covers the
         # slowest review measured on mimo-v2.6-flash (10.5 min, run 36806962325).
-        # A tool error fails the job; the publication guard still runs on /review.
-        # No second Action runs on an ambiguous failure.
+        # A tool error or a timeout does not end the job: the probe below
+        # measures whether anything was published, the Anthropic attempt runs
+        # only on a measured absence, and the final guard reports the outcome of
+        # the last attempt that ran. An ambiguous failure never runs a second Action.
         timeout-minutes: 12
+        continue-on-error: true
         # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
         # whoever can move it decides what runs here, and what runs here holds
         # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
@@ -389,10 +561,11 @@ jobs:
           # PR that introduces the file reviews with upstream's gpt-5.6 and NaN rejects
           # the key. The workflow file IS read from the PR head, so the model travels
           # here and the toml keeps every other setting. Env wins over the file in
-          # PR-Agent's settings order. The preflight above picks the model from the
-          # chain it declares, which a test keeps equal to the toml's.
-          CONFIG__MODEL: ${{ steps.models.outputs.model }}
-          CONFIG__FALLBACK_MODELS: ${{ steps.models.outputs.fallbacks }}
+          # PR-Agent's settings order. The preflight above probes the chain it
+          # declares, which a test keeps equal to the toml's, and the draw puts
+          # the NaN member it picked first.
+          CONFIG__MODEL: ${{ steps.route.outputs.nan_model }}
+          CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           # AI-045 AC6 (#1858, #1923): stream every NaN call. Non-streamed, NaN's edge
           # cuts the answer at about 125 s, and a request it holds open sits silent
@@ -407,6 +580,23 @@ jobs:
           LITELLM__CUSTOM_LLM_PROVIDER: openai
           LITELLM__FORCE_STREAMING_CUSTOM_LLM_PROVIDER: openai
           LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
+          # glm5.3-flash reasons until NaN closes the stream unless its effort is
+          # lowered: at its default and at `medium` it spent all 16K output
+          # tokens thinking, hit NaN's 60,000-reasoning-character ceiling and
+          # returned no review. At `low` it reviewed a 37K-token diff in 285 s
+          # and a 97K-token one in 215 s, with half the ceiling to spare
+          # (measured 2026-10-08, AI-045 AC9). LiteLLM does not know the model,
+          # so PR-Agent sends an effort only to the ids listed here. The effort
+          # is one setting for the whole attempt, and deepseek-v4-flash already
+          # receives PR-Agent's default (`medium`) because LiteLLM marks it
+          # reasoning-capable; it now receives `low`, which it accepts and does
+          # not act on (ai/nan/README.md). mimo-v2.6-flash receives none.
+          CONFIG__REASONING_EFFORT: low
+          CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS: '["glm5.3-flash"]'
+          # A timed-out call moves to the next model of the chain instead of
+          # retrying the one that just timed out: a NaN model that times out once
+          # is usually saturated, and a retry spends the step's 12 minutes on it.
+          CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
           # One secret, delivered by name. `dotf secrets sync ci` uploads exactly
           # the entries whose `consumers` list this repo, so the reviewer holds
           # one credential rather than an ambient set — the failure surface stays
@@ -414,6 +604,10 @@ jobs:
           # where whole-registry injection means one broken item mapping can take
           # down authentication for everything.
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          # The review names the model that wrote it (model, tokens, time, AI
+          # calls), so a reader of the comment knows which pool member reviewed
+          # without opening the run. Every attempt sets it.
+          CONFIG__OUTPUT_RUN_DETAILS: "true"
           # Stated rather than defaulted, so the event lists are visible rather
           # than implied — leaving that implicit is what let the workflow's own
           # trigger list drift away unnoticed (#1053).
@@ -474,25 +668,65 @@ jobs:
           github_action_config.auto_improve: "false"
           github_action_config.fail_on_tool_errors: "true"
 
-      # A review that did not happen must not report success (#1107).
-      #
-      # PR-Agent swallows a failed inference into a clean exit. Measured on run
-      # 32325012314: green job, no review, because the model returned
-      # `litellm.RateLimitError: deepseek-v4-flash concurrency limit: max 5
-      # simultaneous requests`. Six PRs in one session were affected. ADR-032
-      # already forbids it — the top tier "queues or escalates, NEVER degrades
-      # silently" — so this makes the degrade loud and does nothing else.
+      - name: Measure whether the NaN attempt published
+        id: published_after_nan
+        if: >
+          !cancelled() && steps.route.outputs.first == 'nan'
+            && steps.route.outputs.second == 'anthropic'
+            && (github.event_name == 'pull_request'
+              || (github.event_name == 'issue_comment'
+                  && contains(github.event.comment.body, '/review')))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          BASE_REF: ${{ github.event.repository.default_branch }}
+          STARTED: ${{ steps.start.outputs.started }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+        run: ./scripts/pr-agent-publish-guard.sh --probe --output "$GITHUB_OUTPUT"
+      # The Anthropic attempt again, second this time; see its first copy above.
+      - name: PR-Agent on Anthropic, after NaN published nothing
+        id: pr_agent_anthropic_second
+        if: "!cancelled() && steps.published_after_nan.outputs.published == 'false'"
+        timeout-minutes: 8
+        continue-on-error: true
+        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The only inference credential this step holds; NaN's is not here.
+          ANTHROPIC__KEY: ${{ secrets.PR_AGENT_ANTHROPIC_API_KEY }}
+          CONFIG__MODEL: ${{ steps.route.outputs.anthropic_model }}
+          CONFIG__MODEL_WEAK: ${{ steps.route.outputs.anthropic_model }}
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          CONFIG__NO_TEMPERATURE_MODELS: >-
+            ["anthropic/claude-haiku-5-5", "claude-haiku-5-5",
+            "anthropic/claude-sonnet-5-5", "claude-sonnet-5-5"]
+          CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING: "true"
+          CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"]'
+          CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
+          CONFIG__AI_TIMEOUT: "360"
+          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
+          # Below: identical to the NaN attempt's review settings (a test checks it).
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: false
+          CONFIG__OUTPUT_RUN_DETAILS: "true"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          github_action_config.handle_push_trigger: "true"
+          github_action_config.push_commands: >-
+            ${{ steps.push_gate.outputs.mode == 'incremental' && '["/review -i"]' || '["/review"]' }}
+          github_action_config.push_trigger_ignore_bot_commits: "true"
+          github_action_config.push_trigger_ignore_merge_commits: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_improve: "false"
+          github_action_config.fail_on_tool_errors: "true"
+      # A review that did not happen must not report success (#1107). The logic
+      # lives in scripts/pr-agent-publish-guard.sh, which the probe above shares,
+      # so "published" has one definition; its header records the bindings
+      # (author, start stamp, marker from the default branch) and why each exists.
       #
       # `fallback_models` names a second NaN model for CONCURRENCY (per-model
-      # limit, measured), never to soften the quality bar. The marker comes from the
-      # registry, over the API since this job has no checkout, at the BASE ref
-      # since a PR supplying it could redefine it. Two more bindings, both
-      # measured as gaps by CodeRabbit on the yt-metrics-cli and svqtriana ports
-      # (2026-09-06): the comment must be AUTHORED by github-actions[bot] (on a
-      # public repo anyone can paste the marker text), and it must have been
-      # created or edited at or after this run's start stamp (`persistent_comment`
-      # edits the earlier Guide, which moves `updated_at`, so an untouched Guide
-      # from a previous run cannot vouch for this one). See #1107.
+      # limit, measured), never to soften the quality bar.
       - name: Fail if no review was published
         # Only the paths that actually run `/review`. An issue_comment invoking
         # `/describe` or `/improve` legitimately publishes no Guide, and failing
@@ -503,12 +737,11 @@ jobs:
         # was possible, and the NaN diagnosis below would be false (#1618).
         # And skip it when the push gate held a push below its threshold: no review
         # was asked for (TOOL-023).
-        # And skip it when no declared model answered: the preflight already failed
-        # the job, naming each model and its status (AI-045).
+        # It does run when no declared NaN model answered (AI-045 AC9): the
+        # Anthropic attempt may have reviewed, and when it did not, this names why.
         if: >
           always() && steps.credential.outcome != 'failure'
             && steps.reviewable.outcome != 'failure'
-            && steps.models.outcome != 'failure'
             && steps.reviewable.outputs.reviewable != 'false'
             && steps.push_gate.outputs.run != 'false'
             && (github.event_name == 'pull_request'
@@ -517,7 +750,7 @@ jobs:
         env:
           # `github.token`, not `secrets.GITHUB_TOKEN`: identical value, but it is
           # the automatic token rather than a declared repository secret, so the
-          # "exactly one secret" guard keeps counting what it was written to count.
+          # secret allowlist keeps counting what it was written to count.
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           # The repository's OWN default branch, never `pull_request.base.ref`: the base
@@ -526,105 +759,14 @@ jobs:
           BASE_REF: ${{ github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
-          PR_AGENT_OUTCOME: ${{ steps.pr_agent.outcome }}
-          REVIEW_MODEL: ${{ steps.models.outputs.model }}
-        run: |
-          set -euo pipefail
-          if [ "${PR_AGENT_OUTCOME:-}" = "cancelled" ] || [ "${PR_AGENT_OUTCOME:-}" = "failure" ]; then
-            echo "::error::PR-Agent ended ${PR_AGENT_OUTCOME} on ${REVIEW_MODEL:-its model}." \
-              "Inspect its logs; no second Action runs on an unclassified failure."
-            exit 1
-          fi
-          # A GitHub API call that FAILS is an outage, never "no marker declared"
-          # (#2069: a read timeout failed a PR that PR-Agent had reviewed). gh_api
-          # retries a failure, except a 404, which is an answer: the file is absent at
-          # that ref. A call that still fails leaves its stderr in $api_errors, which
-          # the steps below report instead of a misdiagnosis.
-          api_errors=$(mktemp)
-          gh_api() { # gh api arguments; prints the response, or returns 1
-            # Each attempt's output is buffered: gh prints an error body on stdout, and
-            # a failed attempt's body must not prefix the answer of the next one.
-            local attempt out err
-            out=$(mktemp); err=$(mktemp)
-            for attempt in 1 2 3; do
-              if gh api "$@" >"$out" 2>"$err"; then cat "$out"; rm -f "$out" "$err"; return 0; fi
-              if grep -q 'HTTP 404' "$err"; then rm -f "$out" "$err"; return 1; fi
-              if [ "$attempt" -lt 3 ]; then sleep $((attempt * ${GUARD_RETRY_SECONDS:-5})); fi
-            done
-            { printf 'gh api %s: ' "$1"; tr '\n' ' ' < "$err"; echo; } >> "$api_errors"
-            rm -f "$out" "$err"
-            return 1
-          }
-          # Every declared marker, as a JSON array: a full review carries "## PR
-          # Reviewer Guide", an incremental one "## Incremental PR Reviewer Guide"
-          # (TOOL-023). Prints nothing when none is declared, or when the read failed.
-          read_markers() { # $1 = ref
-            local content
-            content=$(gh_api "repos/${GITHUB_REPOSITORY}/contents/harness/review-attestation.json?ref=$1" \
-              --jq '.content') || return 0
-            printf '%s' "$content" | base64 -d 2>/dev/null \
-              | jq -c '[.reviewers[] | select(.login == "github-actions") | .review_markers[]?]
-                       | select(length > 0)' 2>/dev/null || true
-          }
-          markers=$(read_markers "${BASE_REF}")
-          if [ -z "$markers" ] && [ -z "${HEAD_SHA:-}" ]; then
-            # issue_comment events carry no pull_request payload; ask the API for the head.
-            HEAD_SHA=$(gh_api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha' || true)
-          fi
-          if [ -z "$markers" ] && [ -n "${HEAD_SHA:-}" ]; then
-            # The default branch has no github-actions entry yet: this is the PR that
-            # introduces it. The head registry only proves the entry EXISTS; the marker
-            # itself is PR-Agent's own heading, never text a PR could choose (a head-
-            # supplied marker such as "#" would match any bot comment, CWE-345). Author
-            # and start-stamp binding below still apply. Without this fallback the
-            # bootstrap PR of every repository failed with a bare "exit code 1".
-            if [ -n "$(read_markers "${HEAD_SHA}")" ]; then
-              markers='["PR Reviewer Guide"]'
-              echo "::notice::reviewer registry entry found only on the PR head;" \
-                "using PR-Agent's own heading as the marker"
-            fi
-          fi
-          if [ -z "$markers" ] && [ -s "$api_errors" ]; then
-            # The failed call may be the registry read or the head-SHA lookup; the
-            # detail lines below name it, so the headline names neither.
-            echo "::error::the GitHub API failed while determining whether a review marker is" \
-              "declared, so that is unknown. Re-run the job once the API answers."
-            sed 's/^/::error::/' "$api_errors"
-            exit 1
-          fi
-          if [ -z "$markers" ]; then
-            echo "::error::no review marker declared for github-actions in" \
-              "harness/review-attestation.json (checked ${BASE_REF} and the PR head)"
-            exit 1
-          fi
-          # --paginate emits one JSON array per page; `jq -s` slurps them into one
-          # array of arrays so the count spans every page (gh's own --slurp flag is
-          # not present on the runner's gh 2.46 and printed usage instead).
-          comments=$(gh_api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate) || {
-            # gh_api records an outage in $api_errors and returns 1 silently on a 404,
-            # so no line for this call means the endpoint answered 404.
-            if ! grep -q "/issues/${PR_NUMBER}/comments" "$api_errors"; then
-              echo "::error::listing the PR's comments answered 404: the PR, or this token's" \
-                "read access to it, is gone, so no published review can be verified."
-              exit 1
-            fi
-            echo "::error::the GitHub API failed while listing the PR's comments, so whether" \
-              "a review was published is unknown. Re-run the job once the API answers."
-            sed 's/^/::error::/' "$api_errors"
-            exit 1
-          }
-          found=$(printf '%s' "$comments" \
-            | jq -s --arg started "${STARTED}" --argjson markers "${markers}" \
-                '[.[][] | select(.user.login == "github-actions[bot]"
-                                 and (.updated_at >= $started)
-                                 and (.body as $b | any($markers[]; . as $m | $b | contains($m))))] | length')
-          if [ "$found" -gt 0 ]; then
-            echo "review published (markers: ${markers})"
-            exit 0
-          fi
-          echo "::error::PR-Agent reported success but published no review" \
-            "(no github-actions[bot] comment updated since ${STARTED} carries any of ${markers})."
-          echo "::error::Two causes are measured. A diff too large for a non-streamed answer: NaN's edge"
-          echo "::error::cuts one at about 125 s, and PR-Agent then exits cleanly (run 36680454975, 42K tokens;"
-          echo "::error::#1858). Or NaN's per-model concurrency limit, shared with pi, qq and hive (#1107)."
-          exit 1
+          # Every attempt in execution order, as `<outcome> <model>`; the guard
+          # judges the last one that ran.
+          ATTEMPTS: |
+            ${{ steps.pr_agent_anthropic_first.outcome }} ${{ steps.route.outputs.anthropic_model }}
+            ${{ steps.pr_agent.outcome }} ${{ steps.route.outputs.nan_model }}
+            ${{ steps.pr_agent_anthropic_second.outcome }} ${{ steps.route.outputs.anthropic_model }}
+          ROUTE_NOTE: ${{ steps.route.outputs.note }}
+          # A failed draw writes no outputs, so every attempt reads skipped; this
+          # tells that apart from a pool where no member answered.
+          ROUTE_OUTCOME: ${{ steps.route.outcome }}
+        run: ./scripts/pr-agent-publish-guard.sh

@@ -107,3 +107,78 @@ setup() {
     # bug while looking green. The resolve step must exit non-zero instead.
     grep -q 'GOLANGCI_LINT_VERSION missing from versions.conf' "$wf"
 }
+
+# The released dotf reads this file too: setup and doctor run DOTF_VERSION's
+# binary, not this tree's. Up to v0.65.0 its parser rejects every "# mise:"
+# comment except "# mise: cli", so "# mise: python-package" turns that
+# machine's `dotf tools sync` and doctor into a parse error. Marking
+# PYTHON_VERSION under such a binary is no safer: it installs mise's python
+# without its packages, and that shim shadows the system python the suite
+# imports yaml from (#2062, lesson 373). v0.66.0 is the first release that
+# reads both, so DOTF_VERSION must not drop below it while either is marked.
+@test "versions.conf marks python for mise only while DOTF_VERSION parses the python-package marker" {
+    # The released parser trims each line, so an indented marker counts the
+    # same; the version compare is numeric per field (0.100.0 > 0.66.0).
+    run awk -v floor="0.66.0" '
+        function ge(a, b,   x, y, i) {
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) return x[i] + 0 > y[i] + 0
+            return 1
+        }
+        marked { marked = 0; if ($0 ~ /^[[:space:]]*PYTHON_VERSION[[:space:]]*=/) uses = "PYTHON_VERSION is marked" }
+        {
+            t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t)
+            if (t == "# mise: cli") marked = 1
+            if (t == "# mise: python-package") uses = "a python-package marker"
+        }
+        /^DOTF_VERSION=/ { dotf = $0; sub(/^DOTF_VERSION=/, "", dotf) }
+        END {
+            if (dotf == "") { print "no DOTF_VERSION"; exit 1 }
+            if (uses != "" && !ge(dotf, floor)) { print uses " but DOTF_VERSION=" dotf " is below " floor; exit 1 }
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}
+
+# Python is a hard dependency of the toolchain (#2062): the suite imports
+# tomllib and yaml, and doctor fails without them. Unmarking either line would
+# leave a machine's python to whatever the OS ships (3.9 on macOS).
+@test "versions.conf declares python and pyyaml for mise (#2062)" {
+    run awk '
+        m == "cli" && /^PYTHON_VERSION=/ { py = 1 }
+        m == "pkg" && /^PYYAML_VERSION=/ { yaml = 1 }
+        { m = ($0 == "# mise: cli") ? "cli" : ($0 == "# mise: python-package") ? "pkg" : "" }
+        END {
+            if (!py) print "PYTHON_VERSION is not under \"# mise: cli\""
+            if (!yaml) print "PYYAML_VERSION is not under \"# mise: python-package\""
+            exit !(py && yaml)
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}
+
+# The released dotf probes a marked CLI with `<tool> --version`, and these
+# seven reject that flag. Up to v0.66.0 no release knows another way to ask
+# them, so marking one turns every machine's `dotf tools sync` into "not
+# running at their pin" and doctor red, while CI, which builds dotf from the
+# tree, stays green (lesson 373). The tree's dotf asks them the right way
+# (versionArgs in cli/internal/tools/mise.go); each may be marked once
+# DOTF_VERSION is a release carrying it (#2013). `last` is the newest release
+# without the table: if a release ships before versionArgs merges, raise it to
+# that release, and check a release's notes name versionArgs before marking.
+@test "versions.conf marks no CLI without --version while DOTF_VERSION probes only --version" {
+    run awk -v last="0.66.0" '
+        function gt(a, b,   x, y, i) {
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) return x[i] + 0 > y[i] + 0
+            return 0
+        }
+        marked && /^[[:space:]]*(ARGOCD|HELM|HCLOUD|K9S|KUBECONFORM|KUBECTL|KUSTOMIZE)_VERSION[[:space:]]*=/ {
+            n = $0; sub(/^[[:space:]]*/, "", n); sub(/_VERSION.*/, "", n); uses = uses " " n
+        }
+        { t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t); marked = (t == "# mise: cli") }
+        /^DOTF_VERSION=/ { dotf = $0; sub(/^DOTF_VERSION=/, "", dotf) }
+        END {
+            if (dotf == "") { print "no DOTF_VERSION"; exit 1 }
+            if (uses != "" && !gt(dotf, last)) { print "marked for mise:" uses ", but DOTF_VERSION=" dotf " probes them with --version"; exit 1 }
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}

@@ -97,6 +97,27 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 		}
 	})
 
+	// #2013 S3: on macOS the scope is the launchd session, which logout clears.
+	// `dotf env persist` alone would restore it until the next logout; the
+	// converge step also loads the login agent, so that is the remedy named.
+	t.Run("darwin drift → WARN naming the converge step and the GUI apps", func(t *testing.T) {
+		home := t.TempDir()
+		mirror := filepath.Join(home, ".dotfiles")
+		writeFile(t, filepath.Join(mirror, "env-contract.json"), persistContract)
+		sys := newSys(map[string]string{"HOME": home}, nil, nil)
+		sys.GOOS = "darwin"
+		sys.UserEnv = func(string) (string, bool, error) { return "", false, nil }
+		var buf bytes.Buffer
+		checkPersistedEnv(sys, &Config{DotfilesDir: mirror}, capture(&buf))
+		out := buf.String()
+		if got := statusOfLine(out, "dotf converge --only env-persist"); got != StatusWarn {
+			t.Fatalf("want a WARN naming the converge step, got %q\n%s", tagOf(got), out)
+		}
+		if statusOfLine(out, "launched from the Dock") != StatusWarn {
+			t.Errorf("the WARN must say who reads the scope on macOS\n%s", out)
+		}
+	})
+
 	t.Run("no seam → no section", func(t *testing.T) {
 		sys := newSys(nil, nil, nil)
 		sys.UserEnv = nil

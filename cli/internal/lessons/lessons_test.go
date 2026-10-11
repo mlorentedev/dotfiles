@@ -200,6 +200,25 @@ func TestPlan_RefusesAWikilinkThatNamesNoLesson(t *testing.T) {
 	}
 }
 
+// The index's prose is hand-written above the generated table, so a link there
+// dangles after a renumbering exactly as one in a lesson does. The deleted
+// shell guard scanned every file under the tree, indexes included.
+func TestPlan_RefusesAWikilinkInAnIndexThatNamesNoLesson(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"_index.md":                "# Index\n\nStart at [[lesson-001-a]].\n",
+		"lesson-001-a.md":          shapes["recent"],
+		"category/_index.md":       "# Category\n\nSee [[lesson-008-moved]].\n",
+		"category/lesson-003-c.md": shapes["recent"],
+	})
+	_, err := Plan(dir)
+	if err == nil || !strings.Contains(err.Error(), filepath.Join("category", "_index.md")+" links [[lesson-008-moved]]") {
+		t.Fatalf("want the dangling wikilink named with its index, got %v", err)
+	}
+	if strings.Contains(err.Error(), "[[lesson-001-a]]") {
+		t.Errorf("[[lesson-001-a]] resolves and was reported: %v", err)
+	}
+}
+
 func TestPlan_RefusesLessonsWithoutAnIndex(t *testing.T) {
 	dir := writeTree(t, map[string]string{"lesson-001-a.md": shapes["recent"]})
 	if _, err := Plan(dir); err == nil {

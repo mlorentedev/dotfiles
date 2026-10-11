@@ -11,6 +11,12 @@ setup() {
     export HOME="/home/testuser"
     export DOTFILES_DIR="$HOME/.dotfiles"
     export REPO_DIR="$HOME/dotfiles-repo"
+    # The PATH a user's shell has after setup: the rc files put ~/.local/bin on
+    # it (dotf, eza, gh), and `mise activate` puts the mise-pinned CLIs ahead
+    # of it, some of which setup installs only there (jq among them, #2013 W2).
+    # The entrypoint's PATH has neither, so without this the dotf tests below
+    # skipped on every run and verified nothing (#696, #915).
+    export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 }
 
 # =============================================================================
@@ -148,10 +154,6 @@ setup() {
     [ -x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh" ]
 }
 
-@test "install-precommit.sh is executable" {
-    [ -x "$DOTFILES_DIR/scripts/install-precommit.sh" ]
-}
-
 @test "dotfiles-sync.sh is executable" {
     [ -x "$DOTFILES_DIR/scripts/dotfiles-sync.sh" ]
 }
@@ -171,6 +173,21 @@ setup() {
 @test "~/.claude/CLAUDE.md deployed with AGENTS.md pointer marker" {
     [ -f "$HOME/.claude/CLAUDE.md" ]
     grep -q 'First, read `AGENTS.md`' "$HOME/.claude/CLAUDE.md"
+}
+
+@test "~/.claude/settings.json is merged by dotf deploy, not by a setup block (#2000)" {
+    # The `claude-settings` entry of ai/deploy.json is the only writer since the
+    # jq and PowerShell twins went, so this fails if that entry stops applying on
+    # a fresh box. The merge's invariant: every template key holds the template's
+    # value. attribution is in the template, so a trailer cannot come back.
+    command -v jq >/dev/null 2>&1 || skip "jq not on PATH"
+    local f="$HOME/.claude/settings.json" tmpl="$REPO_DIR/ai/claude/settings.json"
+    [ -f "$f" ]
+    jq -e --slurpfile t "$tmpl" '
+        . as $box | $t[0] | del(.["$schema"], .permissions, .env, .enabledPlugins)
+        | to_entries | all(.value == $box[.key])' "$f"
+    # permissions, env and enabledPlugins are merged, so the box may extend them.
+    jq -e --slurpfile t "$tmpl" '{permissions, env, enabledPlugins} | contains($t[0] | {permissions, env, enabledPlugins})' "$f"
 }
 
 @test "~/.claude/skills has at least 15 directories" {
@@ -226,6 +243,16 @@ setup() {
     "$jq_bin" -e '.compaction.modelOverrides["nan/deepseek-v4-flash"].reserveTokens == 600000' "$settings"
 }
 
+# #1484: the image carries npm since #2254, so setup installs pi and runs the pi
+# package reconcile for real. Its exit status is a warning by design, so the
+# result is what is checked (lesson 379): pi's settings.json records every
+# package ai/pi/packages.json declares and nothing it does not.
+@test "pi packages converge on ai/pi/packages.json [#1484]" {
+    [ -x "$HOME/.local/bin/pi" ] || { echo "setup did not install pi into ~/.local/bin"; return 1; }
+    run dotf pi packages check --repo "$REPO_DIR"
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
 # =============================================================================
 # Section 6: Generated files
 # =============================================================================
@@ -235,11 +262,23 @@ setup() {
     grep -q 'alias ' "$HOME/.bash/bash_aliases"
 }
 
-@test ".gitconfig deployed to home" {
-    [ -f "$HOME/.gitconfig" ]
+@test "~/.gitconfig includes the deployed dotfiles.gitconfig (#2207)" {
+    [ -f "$HOME/.config/git/dotfiles.gitconfig" ]
+    run git config --global --get-all include.path
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'~/.config/git/dotfiles.gitconfig'* ]] || false
 }
 
-@test ".gitconfig is a regular file (post-SDD-007 copy-only deploy)" {
+@test "the include is effective: git reads the dotfiles' user.name (#2207)" {
+    # The pointer alone proves nothing; this proves git expands ~/ in
+    # include.path and reads the deployed file. `--global` alone ignores
+    # includes, so `--includes` asks what a commit would see.
+    want=$(git config -f "$HOME/.config/git/dotfiles.gitconfig" user.name)
+    [ -n "$want" ]
+    [ "$(git config --global --includes user.name)" = "$want" ]
+}
+
+@test "~/.gitconfig is a regular file" {
     [ -f "$HOME/.gitconfig" ]
     [ ! -L "$HOME/.gitconfig" ]
 }
@@ -292,13 +331,31 @@ setup() {
 # Section 10: Graceful skips (optional tools not present)
 # =============================================================================
 
-@test "copilot config NOT deployed when the copilot binary is absent (the container has no Node, so the npm catalog skips it: #1312)" {
-    # Post-BUG-001 (PR #40): setup-linux.sh uses detect-and-act. The
-    # gh-copilot extension is no longer auto-installed; ~/.copilot is created
-    # only if the extension is genuinely present. In the integration container
-    # gh is installed (as a dev tool) but gh-copilot is not, so the directory
-    # should NOT exist — confirming the skip path is silent and correct.
-    [ ! -d "$HOME/.copilot" ]
+@test "the npm catalog installs into ~/.local as the user, never into npm's root-owned prefix [#2251]" {
+    # Precondition, asserted so the guard cannot pass vacuously: npm is present
+    # and its default global prefix is not writable by this user. If the
+    # container ever gains a user-owned Node (nvm), this fails here instead of
+    # the test below silently proving nothing.
+    command -v npm >/dev/null 2>&1
+    prefix=$(npm config get prefix)
+    [ ! -w "$prefix/lib" ]
+    for tool in bw yarn opencode copilot; do
+        [ -x "$HOME/.local/bin/$tool" ] || { echo "missing: ~/.local/bin/$tool"; return 1; }
+        [ "$(stat -c %U "$HOME/.local/bin/$tool")" = testuser ]
+    done
+    # A converged box re-runs clean: setup's `|| log_warning` would hide a failure.
+    run dotf tools install
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
+@test "copilot config is deployed now that the npm catalog put copilot on PATH (#1312)" {
+    # The inverse, an entry skipped while its required command is absent, is
+    # pinned by TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent; the
+    # container now carries copilot, so this asserts the present side.
+    command -v copilot >/dev/null 2>&1
+    for f in copilot-instructions.md settings.json config.json mcp-config.json; do
+        [ -f "$HOME/.copilot/$f" ] || { echo "missing: ~/.copilot/$f"; return 1; }
+    done
 }
 
 @test "AGENTS.md deployed to ~/.config/opencode/AGENTS.md (cross-agent SSOT)" {
@@ -308,6 +365,31 @@ setup() {
     [ -f "$HOME/.config/opencode/AGENTS.md" ]
     grep -q '^# AGENTS.md' "$HOME/.config/opencode/AGENTS.md"
     grep -q 'Single Source of Truth' "$HOME/.config/opencode/AGENTS.md"
+}
+
+@test "opencode.jsonc deployed by dotf deploy, private, not by a setup block (#1843 B12)" {
+    # The `opencode` entry of ai/deploy.json is the only writer. The container
+    # holds no secrets, so the render leaves the {env:VAR} placeholders, which
+    # opencode resolves itself (measured, see ai/deploy.json): the file must
+    # still be installed, at 0600 because on a real machine it holds API keys.
+    f="$HOME/.config/opencode/opencode.jsonc"
+    [ -f "$f" ]
+    [ "$(stat -c '%a' "$f")" = "600" ]
+    grep -qF '"$schema"' "$f"
+}
+
+@test "opencode tui.json deployed by dotf deploy, not by a setup block (#1843 B11)" {
+    # The setup copy was deleted; the `opencode-tui` entry of ai/deploy.json is
+    # now the only writer, so this fails if that entry stops applying. The entry
+    # merges (#2260): the file is plain JSON and may hold keys the repo does not
+    # own (Orca's `plugin`). So the check is the merge's own invariant, that
+    # overlaying the source on the deployed file changes nothing, not equality.
+    # jq's `*` replaces arrays where the merge unions them; the source has none.
+    # Both sides drop comment lines: a merge that changes nothing does not
+    # rewrite, so a file an earlier `replace` deployed keeps the source's.
+    [ -f "$HOME/.config/opencode/tui.json" ]
+    src=$(grep -v '^[[:space:]]*//' "$REPO_DIR/ai/opencode/tui.json" | jq -c .)
+    grep -v '^[[:space:]]*//' "$HOME/.config/opencode/tui.json" | jq -e --argjson src "$src" '. * $src == .'
 }
 
 @test "opencode commands deployed to ~/.config/opencode/commands/ (SDD-008)" {
@@ -337,12 +419,6 @@ setup() {
     # rendered command carries provenance + drops name: (opencode keys off filename)
     grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/spec.md"
     refute_grep '^name:' "$HOME/.config/opencode/commands/spec.md"
-}
-
-@test "no MCP servers registered (claude CLI absent)" {
-    # setup-linux.sh skips MCP registration when claude is not found
-    # Just verify it didn't crash — the container built successfully
-    true
 }
 
 @test "shellcheck comes from mise at its pin, with no copy in ~/.local/bin to shadow it (#2013 W2)" {
@@ -456,17 +532,13 @@ setup() {
 # (self-deploy is a silent no-op) and `dotf mem` says "run setup" though setup
 # ran — on every fresh machine. These guard exactly that class.
 
-# These two activate only once an available `dotf` binary carries `env set`.
-# The integration container installs the *released* dotf (scripts/install-dotf.sh
-# downloads the pinned release, it is not built from the PR source), and dotf is
-# not on the bats-time PATH, so a brand-new subcommand cannot be exercised here
-# until it ships in a release. They skip cleanly until then — the seed logic is
-# fully guarded by the Go unit tests (env set) + the `dotf doctor` repo-dir check.
-# Harness gap tracked separately (integration should test the PR's built binary).
+# The image builds dotf from this checkout into ~/.local/bin (tests/Dockerfile.integration),
+# so these run against the PR's own binary. A missing dotf is a failure, not a skip:
+# these skipped on every run while the bats PATH lacked ~/.local/bin, and so
+# verified nothing.
 
 @test "setup seeds machine.json with DOTFILES_REPO_DIR = the checkout [#696]" {
-    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
-    dotf env set --help >/dev/null 2>&1 || skip "installed dotf predates 'env set'; seed not exercised"
+    command -v dotf >/dev/null 2>&1
     machine="$HOME/.config/dotfiles/machine.json"
     [ -f "$machine" ]
     run grep -F "$REPO_DIR" "$machine"
@@ -478,8 +550,7 @@ setup() {
 }
 
 @test "dotf env path DOTFILES_REPO_DIR resolves to the real checkout [#696]" {
-    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
-    dotf env set --help >/dev/null 2>&1 || skip "installed dotf predates 'env set'; seed not exercised"
+    command -v dotf >/dev/null 2>&1
     # Captured through a plain $(...) with stderr discarded — the exact idiom
     # setup-linux.sh uses. `run` is avoided on purpose: it merges stdout and
     # stderr into $output, so it passed all the way through BUG-070 (#915)
@@ -490,8 +561,8 @@ setup() {
     [ -d "$resolved/.git" ]
 }
 
-@test "dotf version reaches stdout so install-dotf can grep the semver [#915]" {
-    command -v dotf >/dev/null 2>&1 || skip "dotf not on PATH in this container"
+@test "dotf version reaches stdout so install.sh can grep the semver [#915]" {
+    command -v dotf >/dev/null 2>&1
     local ver
     ver="$(dotf version 2>/dev/null)"
     [[ "$ver" == dotf\ version\ * ]] || false
@@ -534,6 +605,15 @@ setup() {
         printf '%s\n' "$output" | tail -40 >&2
         return 1
     fi
+
+    # The first run converged pi's packages, so the second run's reconcile must
+    # install and remove nothing (#1484). A reinstall that rewrote the same bytes
+    # would pass the hash diff below; the reconcile's own count does not.
+    printf '%s\n' "$output" | grep -q '^pi packages already reconciled ' || {
+        echo "the second run's pi package reconcile was not a no-op:" >&2
+        printf '%s\n' "$output" | grep 'pi packages' >&2
+        return 1
+    }
 
     # Collect hashes after second run
     find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \

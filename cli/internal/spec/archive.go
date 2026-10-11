@@ -157,7 +157,10 @@ type ArchiveOptions struct {
 // byte-bound review (#1153, epic #1625 W3.6) must exclude them from the tree it
 // hashes. review-request.json in particular is written at launch, after
 // reviewed_sha is fixed, so hashing it would make every review stale on arrival.
-var ReviewStateFiles = []string{ReviewFile, TranscriptFile, StderrPath(TranscriptFile), ReviewRequestFile}
+var ReviewStateFiles = []string{
+	ReviewFile, TranscriptFile, StderrPath(TranscriptFile), ReviewRequestFile,
+	SecondSigner.Review, SecondSigner.Transcript, StderrPath(SecondSigner.Transcript), SecondSigner.Request,
+}
 
 // IsReviewState reports whether name is one of ReviewStateFiles.
 //

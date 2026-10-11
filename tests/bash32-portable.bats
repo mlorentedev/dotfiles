@@ -20,7 +20,10 @@ BASH4_ONLY='(^|[^[:alnum:]_])(mapfile|readarray|coproc)([^[:alnum:]_]|$)|(declar
 
 # Every shell file bash runs: the scripts dir, the root bootstrap scripts, the
 # global git hooks and their library, the bash rc file, and the test suite itself
-# (bats sources every .bats file with the bash on PATH, 3.2 on a Mac). .zsh/ is
+# (bats sources every .bats file with the bash on PATH). That is 3.2 on a Mac
+# only with /bin first: the catalog installs brew's bash 5 ahead of it (#2202),
+# so CI's macOS leg runs `PATH="/bin:$PATH" ./scripts/run-bats.sh --expect-bash 3`,
+# and the same line reproduces it locally. .zsh/ is
 # zsh-only, and this file is skipped because its pattern table names every
 # construct on purpose.
 bash_files() {

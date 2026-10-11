@@ -5,7 +5,7 @@
 # Computes production diff LOC between two refs and validates that PRs above
 # the threshold include at least one file under specs/<feature-id>/ (active
 # spec folder, NOT specs/archive/). Used by .github/workflows/spec-gate.yml
-# and opt-in by pre-push hooks installed via scripts/install-precommit.sh.
+# and by the sdd-spec-gate pre-push hook in .pre-commit-config.yaml.
 #
 # Usage:
 #   check-spec-gate.sh --base-ref REF --head-ref REF [--threshold N] [--explain]

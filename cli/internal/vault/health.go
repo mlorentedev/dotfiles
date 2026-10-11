@@ -28,18 +28,22 @@ package vault
 // than the script: sections 3 and 4 no longer count what cannot be fixed by
 // design (#1979). Orphans exclude session journals, agent memory and the
 // archive, from the list and the population alike; unresolved links exclude
-// those whose every source is a template placeholder or an archived note. The
-// goldens for those sections are the Go contract from there on.
+// those whose every source is a template placeholder or an archived note.
+// Dead-ends exclude journals, templates, course notes and the archive, and both
+// link-graph counts set attachments apart (#2197); linkExemptions holds the
+// zones. The goldens for those sections are the Go contract from there on.
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -368,28 +372,147 @@ func (h *healthRun) section2Connectivity() (int, bool) {
 	return 0, false
 }
 
-// orphanExempt reports a vault-relative path that has no incoming links by
-// design: a session journal, an agent memory file, or anything archived.
-func orphanExempt(rel string) bool {
+// linkCheck names one of the link-graph counts a genre can be left out of.
+type linkCheck int
+
+const (
+	checkOrphans linkCheck = iota
+	checkDeadEnds
+	checkUnresolved
+)
+
+// linkExemptions declares, once, the notes each link-graph count leaves out
+// because they lack the links it measures by design (#1979, #2197). The zones
+// are those of the vault's 00_meta/_ssot.md, which points here for this list.
+// A rule matches a path prefix, or with segment set, any directory of that
+// name at any depth. The report names the zones from this table, so a rule
+// added here is a rule the report discloses.
+var linkExemptions = []struct {
+	match   string
+	segment bool
+	checks  []linkCheck
+}{
+	// Archived notes: links to what has moved or gone, and nothing links in.
+	{"90_archive/", false, []linkCheck{checkOrphans, checkDeadEnds, checkUnresolved}},
+	// Template skeletons: placeholders such as {{client_slug}} instead of links.
+	{"00_meta/templates/", false, []linkCheck{checkDeadEnds, checkUnresolved}},
+	// Course study notes: not linked knowledge (owner, 2026-10-09).
+	{"20_certifications/", false, []linkCheck{checkDeadEnds}},
+	// Work product and client records: leaf notes kept per product or client,
+	// not linked knowledge (owner, 2026-10-09).
+	{"50_work/20-products/", false, []linkCheck{checkDeadEnds}},
+	{"50_work/30-clients/", false, []linkCheck{checkDeadEnds}},
+	// Session journals: a chronological record, not a linked note.
+	{"sessions", true, []linkCheck{checkOrphans, checkDeadEnds}},
+	// Agent memory files: read by the agent, never linked to.
+	{"memory", true, []linkCheck{checkOrphans}},
+}
+
+// linkExempt reports whether the vault-relative path rel is left out of check.
+func linkExempt(check linkCheck, rel string) bool {
 	rel = filepath.ToSlash(rel)
-	if strings.HasPrefix(rel, "90_archive/") {
-		return true
-	}
 	dirs := strings.Split(rel, "/")
-	for _, d := range dirs[:len(dirs)-1] {
-		if d == "sessions" || d == "memory" {
+	dirs = dirs[:len(dirs)-1]
+	for _, e := range linkExemptions {
+		if !slices.Contains(e.checks, check) {
+			continue
+		}
+		if e.segment && slices.Contains(dirs, e.match) || !e.segment && strings.HasPrefix(rel, e.match) {
 			return true
 		}
 	}
 	return false
 }
 
-// unresolvedExempt reports a link source whose broken links are expected:
-// template placeholders such as {{client_slug}}, and archived notes that link
-// to IDs which never existed in the vault or moved out of it.
-func unresolvedExempt(source string) bool {
-	source = filepath.ToSlash(source)
-	return strings.HasPrefix(source, "00_meta/templates/") || strings.HasPrefix(source, "90_archive/")
+// exemptZones names the zones check leaves out, joined for a sentence:
+// "90_archive/, sessions/ and memory/".
+func exemptZones(check linkCheck, conj string) string {
+	var zones []string
+	for _, e := range linkExemptions {
+		if slices.Contains(e.checks, check) {
+			zones = append(zones, strings.TrimSuffix(e.match, "/")+"/")
+		}
+	}
+	if len(zones) < 2 {
+		return strings.Join(zones, "")
+	}
+	return strings.Join(zones[:len(zones)-1], ", ") + " " + conj + " " + zones[len(zones)-1]
+}
+
+// orphanExempt reports a vault-relative path that has no incoming links by design.
+func orphanExempt(rel string) bool { return linkExempt(checkOrphans, rel) }
+
+// unresolvedExempt reports a link source whose broken links are expected.
+func unresolvedExempt(source string) bool { return linkExempt(checkUnresolved, source) }
+
+// linkTally is one link-graph count over the markdown population.
+type linkTally struct {
+	listed       []string // notes the CLI listed that count
+	exemptListed int      // notes the CLI listed in an exempt zone
+	attachments  []string // non-markdown files the CLI listed
+	population   int      // markdown files that count
+	exemptFiles  int      // markdown files in an exempt zone
+}
+
+// tally splits a CLI listing for check. Attachments are set apart: the CLI
+// lists images and PDFs too, which the markdown population never held, so
+// counting them inflated the dead-ends reading from 56% to 88% (#2197).
+func (h *healthRun) tally(check linkCheck, out string) linkTally {
+	var t linkTally
+	for _, l := range nonBlankLines(out) {
+		rel := strings.TrimSpace(l)
+		switch ext := filepath.Ext(rel); {
+		case ext != "" && ext != ".md":
+			t.attachments = append(t.attachments, rel)
+		case linkExempt(check, rel):
+			t.exemptListed++
+		default:
+			t.listed = append(t.listed, rel)
+		}
+	}
+	for _, f := range h.mdFiles {
+		if rel, err := filepath.Rel(h.opts.VaultDir, f); err == nil && linkExempt(check, rel) {
+			t.exemptFiles++
+			continue
+		}
+		t.population++
+	}
+	return t
+}
+
+// topFolders names the n folders, two levels deep, holding most of paths.
+func topFolders(paths []string, n int) string {
+	counts := map[string]int{}
+	for _, p := range paths {
+		dirs := strings.Split(filepath.ToSlash(p), "/")
+		dirs = dirs[:len(dirs)-1]
+		if len(dirs) > 2 {
+			dirs = dirs[:2]
+		}
+		dir := strings.Join(dirs, "/")
+		if dir == "" {
+			dir = "(vault root)"
+		}
+		counts[dir]++
+	}
+	dirs := make([]string, 0, len(counts))
+	for d := range counts {
+		dirs = append(dirs, d)
+	}
+	sort.Slice(dirs, func(i, j int) bool {
+		if counts[dirs[i]] != counts[dirs[j]] {
+			return counts[dirs[i]] > counts[dirs[j]]
+		}
+		return dirs[i] < dirs[j]
+	})
+	if len(dirs) > n {
+		dirs = dirs[:n]
+	}
+	parts := make([]string, len(dirs))
+	for i, d := range dirs {
+		parts[i] = fmt.Sprintf("%s (%d)", d, counts[d])
+	}
+	return strings.Join(parts, ", ")
 }
 
 func nonBlankLines(s string) []string {
@@ -406,59 +529,67 @@ func (h *healthRun) section3OrphansDeadEnds() {
 	h.section("3/7", "Orphans & Dead-Ends")
 
 	orphansOut, orphansErr := h.obsidianList("orphans")
-	var orphans []string
-	exemptOrphans := 0
-	for _, l := range nonBlankLines(orphansOut) {
-		if orphanExempt(strings.TrimSpace(l)) {
-			exemptOrphans++
-			continue
-		}
-		orphans = append(orphans, l)
-	}
-	population, exemptFiles := 0, 0
-	for _, f := range h.mdFiles {
-		if rel, err := filepath.Rel(h.opts.VaultDir, f); err == nil && orphanExempt(rel) {
-			exemptFiles++
-			continue
-		}
-		population++
-	}
-	orphanCount := len(orphans)
-	deadOut, deadErr := h.obsidianList("deadends")
-	deadCount := countNonBlank(deadOut)
-
-	orphanPct := pct(orphanCount, population)
-	deadPct := pct(deadCount, h.totalFiles)
+	orphans := h.tally(checkOrphans, orphansOut)
+	orphanCount := len(orphans.listed)
+	orphanPct := pct(orphanCount, orphans.population)
 
 	switch {
 	case orphansErr != nil:
 		h.fail("Orphans: the obsidian CLI answered with an error: %s", orphansErr)
 	case orphanPct <= 30:
-		h.pass("Orphans: %d/%d (%d%%)", orphanCount, population, orphanPct)
+		h.pass("Orphans: %d/%d (%d%%)", orphanCount, orphans.population, orphanPct)
 	case orphanPct <= 50:
-		h.warn("Orphans: %d/%d (%d%%) — consider adding backlinks", orphanCount, population, orphanPct)
+		h.warn("Orphans: %d/%d (%d%%) — consider adding backlinks", orphanCount, orphans.population, orphanPct)
 	default:
-		h.fail("Orphans: %d/%d (%d%%) — too many isolated files", orphanCount, population, orphanPct)
+		h.fail("Orphans: %d/%d (%d%%) — too many isolated files", orphanCount, orphans.population, orphanPct)
 	}
-	if exemptFiles > 0 && orphansErr == nil {
-		h.info("Not counted: %d file(s) under sessions/, memory/ and 90_archive/ (%d orphaned), which have no incoming links by design",
-			exemptFiles, exemptOrphans)
+	if orphansErr == nil {
+		if orphans.exemptFiles > 0 {
+			h.info("Not counted: %d file(s) under %s (%d orphaned), which have no incoming links by design",
+				orphans.exemptFiles, exemptZones(checkOrphans, "and"), orphans.exemptListed)
+		}
+		if len(orphans.attachments) > 0 {
+			h.info("Not counted: %d attachment(s) no note links to", len(orphans.attachments))
+		}
 	}
+
+	deadOut, deadErr := h.obsidianList("deadends")
+	deadEnds := h.tally(checkDeadEnds, deadOut)
+	deadCount := len(deadEnds.listed)
+	deadPct := pct(deadCount, deadEnds.population)
 
 	switch {
 	case deadErr != nil:
 		h.fail("Dead-ends: the obsidian CLI answered with an error: %s", deadErr)
 	case deadPct <= 30:
-		h.pass("Dead-ends: %d/%d (%d%%)", deadCount, h.totalFiles, deadPct)
+		h.pass("Dead-ends: %d/%d (%d%%)", deadCount, deadEnds.population, deadPct)
 	case deadPct <= 50:
-		h.warn("Dead-ends: %d/%d (%d%%) — consider adding outgoing links", deadCount, h.totalFiles, deadPct)
+		h.warn("Dead-ends: %d/%d (%d%%) — consider adding outgoing links", deadCount, deadEnds.population, deadPct)
 	default:
-		h.fail("Dead-ends: %d/%d (%d%%) — too many files without outgoing links", deadCount, h.totalFiles, deadPct)
+		h.fail("Dead-ends: %d/%d (%d%%) — too many files without outgoing links", deadCount, deadEnds.population, deadPct)
+	}
+	if deadErr == nil {
+		if deadPct > 30 {
+			hint := " (--verbose lists them)"
+			if h.opts.Verbose {
+				hint = ""
+			}
+			h.info("Most dead-ends: %s%s", topFolders(deadEnds.listed, 3), hint)
+		}
+		if deadEnds.exemptFiles > 0 {
+			h.info("Not counted: %d file(s) under %s (%d dead-ends), which have no outgoing links by design",
+				deadEnds.exemptFiles, exemptZones(checkDeadEnds, "and"), deadEnds.exemptListed)
+		}
 	}
 
-	// The shell lists orphan files only — there is no dead-ends listing.
 	if h.opts.Verbose && orphanCount > 0 {
-		h.printTruncated("Orphan files", strings.Join(orphans, "\n"), orphanCount, 20)
+		h.printTruncated("Orphan files", strings.Join(orphans.listed, "\n"), orphanCount, 20)
+	}
+	if h.opts.Verbose && orphansErr == nil && len(orphans.attachments) > 0 {
+		h.printTruncated("Unlinked attachments", strings.Join(orphans.attachments, "\n"), len(orphans.attachments), 20)
+	}
+	if h.opts.Verbose && deadErr == nil && deadCount > 0 {
+		h.printTruncated("Dead-end files", strings.Join(deadEnds.listed, "\n"), deadCount, 20)
 	}
 }
 
@@ -512,7 +643,7 @@ func (h *healthRun) section4Unresolved() {
 		h.fail("Unresolved links: %d", count)
 	}
 	if exempt := len(all) - count; exempt > 0 {
-		h.info("Not counted: %d unresolved link(s) found only in 00_meta/templates/ or 90_archive/ (placeholders and archived notes)", exempt)
+		h.info("Not counted: %d unresolved link(s) found only in %s (placeholders and archived notes)", exempt, exemptZones(checkUnresolved, "or"))
 	}
 
 	if h.opts.Verbose && count > 0 {

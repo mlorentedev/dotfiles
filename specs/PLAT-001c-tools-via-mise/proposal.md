@@ -47,7 +47,7 @@ One PR per row of #2013 track T (Wave 1, CLIs only):
 
 ## Out of scope
 
-- **Toolchains through mise** (Java, Go, Python, Maven, Node): Wave 3, Mac first (ADR-044 decision 6).
+- **Toolchains through mise** (Java, Go, Maven, Node): Wave 3, Mac first (ADR-044 decision 6). Python is the exception; see the amendment below.
 - **Deleting the setup scripts' `linux-amd64` blocks** (#2013 W2): after T2 lands on every OS.
 - **Archive extraction in the installer** (#649): superseded by ADR-044, see the comment on #649.
 
@@ -66,8 +66,17 @@ One PR per row of #2013 track T (Wave 1, CLIs only):
 - [ ] AC4: `dotf tools install mise` installs the pinned mise on linux, darwin and windows, checksum-verified and exec-probed.
 - [ ] AC5: `dotf tools sync` renders `conf.d/dotfiles.toml` from `versions.conf`, installs, and fails naming any tool that does not run at or above its pin; a second run changes nothing.
 - [ ] AC6: `dotf converge` runs the tools step after the records step, and `--plan` reports the tools it would install.
-- [ ] AC7: a `system` entry is installed through the OS manager (`sudo -n apt-get install -y`, `brew install`, `winget install --id <id> -e` with both agreement flags), skipped with a message on an OS whose manager it does not name, a sudo password is reported as "needs sudo" with the command to run and does not fail the run, and a second run runs no manager command.
+- [ ] AC7: a `system` entry is installed through the OS manager (`sudo -n apt-get install -y --no-remove`, `brew install`, `winget install --id <id> -e` with both agreement flags), skipped with a message on an OS whose manager it does not name, a sudo password is reported as "needs sudo" with the command to run and does not fail the run, and a second run runs no manager command.
 - [ ] AC8: `Load` rejects a `system` entry that names no manager, names an unknown key, or declares a `version`, naming the entry; `Install` skips a source type it does not know instead of failing.
+
+- [ ] AC9: `dotf tools sync` installs mise's Python with the packages `versions.conf` marks `# mise: python-package`, through mise's `python.default_packages_file` on a fresh install and through pip into a Python already at its pin; `dotf doctor` fails when the shell's Python is below 3.11 or cannot import one of them at its pin, naming the remedy that clears it.
+
+## Amendment 2026-10-09: Python, the Wave 3 canary (#2062)
+
+The owner made Python >= 3.11 a hard dependency of `dotf` (#2062): the Mac's `python3` was the system 3.9.6, and the suite's TOML and YAML readers need 3.11 and PyYAML. Python moves to mise ahead of the other toolchains, in two PRs:
+
+- **PR1 (this one):** the reader and the check. `ParseMisePins` reads a second marker, `# mise: python-package`. `dotf tools sync` writes those packages to a file named by mise's `python.default_packages_file` and pip-installs any still missing. `dotf doctor` gains a Python section, `--fix` on the mise section runs the sync, and the dead `PYTHON_HOME` layout leaves doctor and the rc files. `versions.conf` is unchanged.
+- **PR2, after the release carrying PR1 is the `DOTF_VERSION` pin:** mark `PYTHON_VERSION` (moved to 3.13.16, an attested build) and `PYYAML_VERSION`. The released parser rejects the new marker, and a released sync would install a Python without its packages, so neither line can land earlier. `tests/versions-conf.bats` enforces the order.
 
 ## References
 

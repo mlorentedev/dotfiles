@@ -45,8 +45,9 @@ change.
 
 ```bash
 # --- Shell layer ---
-~/.local/bin/shellcheck scripts/*.sh setup-linux.sh
-~/.local/bin/bats tests/*.bats                        # ~1200 tests, bash+zsh
+# shellcheck and bats come from mise at their versions.conf pins (`dotf tools sync`)
+shellcheck scripts/*.sh setup-linux.sh
+bats tests/*.bats                                    # ~1200 tests, bash+zsh
 for f in scripts/*.sh setup-linux.sh; do bash -n "$f"; done
 
 # --- Go layer (cli/) ---
@@ -164,7 +165,7 @@ qf "explica..."       # one-shot long-context question via nan/deepseek-v4-flash
 ## Self-Verification Loop
 
 After modifying ANY shell script:
-1. `~/.local/bin/shellcheck <changed-file>`
-2. `~/.local/bin/bats tests/*.bats`
+1. `shellcheck <changed-file>`
+2. `bats tests/*.bats`
 3. Run every bats file that references each changed file, not just its own suite: `git grep -l <path-or-basename> -- tests` (lesson 347).
 4. If new lessons were learned, write them to `docs/lessons.md`.

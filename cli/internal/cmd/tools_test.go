@@ -295,7 +295,7 @@ func TestInstallAll_UnknownTypeDoesNotFailTheRun(t *testing.T) {
 	if err := installAll(in, selected, io.Discard); err != nil {
 		t.Fatalf("installAll: %v", err)
 	}
-	if len(ran) != 1 || !strings.HasPrefix(ran[0], "npm install -g @bitwarden/cli@2026.5.0") {
+	if len(ran) != 1 || !strings.HasPrefix(ran[0], "npm install -g") || !strings.HasSuffix(ran[0], " @bitwarden/cli@2026.5.0") {
 		t.Errorf("the tool after the unknown type did not install: ran %v", ran)
 	}
 }
@@ -325,10 +325,44 @@ func TestInstallAll_NeedsSudoDoesNotFailTheRun(t *testing.T) {
 	if len(ran) != 2 || ran[0][1] != "-n" || ran[1][1] != "-n" {
 		t.Errorf("want both tools attempted with sudo -n, ran %v", ran)
 	}
-	for _, want := range []string{"gh: needs sudo; run: sudo apt-get install -y gh", "tmux: needs sudo; run: sudo apt-get install -y tmux"} {
+	for _, want := range []string{"gh: needs sudo; run: sudo apt-get install -y --no-remove gh", "tmux: needs sudo; run: sudo apt-get install -y --no-remove tmux"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
+	}
+	// And one command for both at the end, so a fresh machine is one paste (#2308).
+	if want := "\n  sudo apt-get install -y --no-remove gh tmux\n"; !strings.Contains(out.String(), want) {
+		t.Errorf("output lacks the combined command %q:\n%s", want, out.String())
+	}
+}
+
+// A run where sudo was never in the way prints no combined command: as root
+// the absent package installs through apt directly, so installSystem runs to
+// its success path and defers nothing.
+func TestInstallAll_NoSudoNoCombinedCommand(t *testing.T) {
+	var out strings.Builder
+	installed := false
+	in := &tools.Installer{
+		GOOS: "linux", GOARCH: "amd64", Dest: t.TempDir(), Out: &out,
+		HasCommand: func(string) bool { return true },
+		IsRoot:     func() bool { return true },
+		Query: func(string, ...string) ([]byte, error) {
+			if installed {
+				return []byte("install ok installed"), nil
+			}
+			return nil, fmt.Errorf("exit 1")
+		},
+		Run: func(string, ...string) error { installed = true; return nil },
+	}
+	selected := []tools.Tool{{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh"}}}
+	if err := installAll(in, selected, io.Discard); err != nil {
+		t.Fatalf("installAll: %v", err)
+	}
+	if !strings.Contains(out.String(), "gh installed via apt") {
+		t.Fatalf("the install path did not run:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "one command") {
+		t.Errorf("no package needed sudo, yet:\n%s", out.String())
 	}
 }
 

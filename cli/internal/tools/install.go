@@ -69,8 +69,8 @@ func HTTPFetch(url, destPath string) error {
 
 // Installer fetches, verifies (sha256 vs the release checksums), and places a
 // catalog tool's release binary in Dest. It is the Go consolidation of the
-// install-dotf.{sh,ps1} bootstrap pattern, generalised from a single CLI to any
-// github-release tool in packages.json (CLI-029 PR-B). Unlike install-dotf, sops
+// install.{sh,ps1} bootstrap pattern, generalised from a single CLI to any
+// github-release tool in packages.json (CLI-029 PR-B). Unlike install.sh, sops
 // ships raw (un-archived) binaries, so there is no extraction step.
 type Installer struct {
 	GOOS, GOARCH string    // target platform; default runtime.GOOS/GOARCH
@@ -100,6 +100,16 @@ type Installer struct {
 	// IsRoot reports whether dotf runs with root privileges, which decides if an
 	// apt install needs sudo. Nil means an effective uid of 0.
 	IsRoot func() bool
+	// sudoRefuses caches needsSudoPassword's answer: a plan asks it per apt
+	// entry, and every `sudo -n` refusal is a line in the auth log.
+	sudoRefuses *bool
+	// sudoDeferred is every apt package Install skipped for want of a sudo
+	// password, so a run can print one command for all of them (SudoDeferred).
+	sudoDeferred []string
+	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
+	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
+	// the answer.
+	AppExists func(bundle string) bool
 }
 
 func (in *Installer) defaults() {
@@ -117,6 +127,9 @@ func (in *Installer) defaults() {
 	}
 	if in.Out == nil {
 		in.Out = os.Stdout
+	}
+	if in.AppExists == nil {
+		in.AppExists = appInApplications
 	}
 	if in.HasCommand == nil {
 		in.HasCommand = func(name string) bool {
@@ -197,8 +210,13 @@ const (
 	// PlanRefused: the entry is one Install refuses with an error (#1892).
 	PlanRefused PlanAction = "refused"
 	// PlanMissingManager: the tool needs installing but its package manager is
-	// not on PATH yet (uv, before setup has installed it). Install skips it.
+	// not on PATH yet (uv before mise has installed it, npm before node).
+	// Install skips it; Note names the manager.
 	PlanMissingManager PlanAction = "missing-manager"
+	// PlanNeedsSudo: a system package that only root can install, on a host
+	// where sudo wants a password dotf never asks for. Install skips it and
+	// prints the command; Note carries the same command.
+	PlanNeedsSudo PlanAction = "needs-sudo"
 )
 
 // Plan is one row of a dry run: the installed version ("" when absent), the pin
@@ -209,6 +227,9 @@ type Plan struct {
 	// Note says why: a skip that is not "already installed" (a source type this
 	// dotf does not know), an unsupported row's platform, a refusal's reason.
 	Note string
+	// Package is the apt package of a needs-sudo row, so a caller can collect
+	// every such row into one SudoInstallCommand.
+	Package string
 }
 
 // unknownTypeNote is the words for a source type this dotf cannot read, shared
@@ -275,8 +296,8 @@ func (in *Installer) Plan(t Tool) Plan {
 	switch {
 	case action == actionSkip:
 		p.Action = PlanSkip
-	case in.missingManager(t):
-		p.Action = PlanMissingManager
+	case in.missingManager(t) != "":
+		p.Action, p.Note = PlanMissingManager, "waits on "+in.missingManager(t)
 	case action == actionUpgrade:
 		p.Action = PlanUpgrade
 	default:
@@ -285,11 +306,16 @@ func (in *Installer) Plan(t Tool) Plan {
 	return p
 }
 
-// missingManager reports a uv tool whose package manager is not on PATH. On a
-// fresh Linux box setup runs `dotf tools install` before it installs uv, so the
-// first run meets exactly this; the next run installs the tool.
-func (in *Installer) missingManager(t Tool) bool {
-	return t.Source.Type == "uv-tool" && !in.HasCommand("uv")
+// missingManager names the package manager a uv-tool or npm entry needs when
+// it is not on PATH, else "". The first catalog pass on a fresh machine meets
+// exactly this: uv arrives with the mise sync that follows it, and npm with
+// node, which nothing installs yet. The entry waits for a later pass.
+func (in *Installer) missingManager(t Tool) string {
+	manager := map[string]string{"uv-tool": "uv", "npm": "npm"}[t.Source.Type]
+	if manager == "" || in.HasCommand(manager) {
+		return ""
+	}
+	return manager
 }
 
 // installRelease provisions a github-release tool: download → verify sha256 →
@@ -333,9 +359,12 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
 		return Skipped, nil
 	}
-	spec := pkg + "@" + t.Version
-	if err := in.Run("npm", "install", "-g", spec); err != nil {
-		return Skipped, fmt.Errorf("%s: npm install -g %s: %w", t.Name, spec, err)
+	if in.skipMissingManager(t) {
+		return Skipped, nil
+	}
+	args := append(in.npmPrefixArgs(), pkg+"@"+t.Version)
+	if err := in.Run("npm", args...); err != nil {
+		return Skipped, fmt.Errorf("%s: npm %s: %w", t.Name, strings.Join(args, " "), err)
 	}
 	if err := in.verifyOnPath(t, "npm"); err != nil {
 		return Skipped, err
@@ -346,6 +375,21 @@ func (in *Installer) installNpm(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s via npm (%s)\n", t.Name, t.Version, res, pkg)
 	return res, nil
+}
+
+// npmPrefixArgs is the `npm install -g` argv up to the package. On Linux and
+// macOS it names Dest's parent (~/.local) as the prefix, so the binaries land in
+// Dest: user-owned, and on PATH for shells and GUI launchers alike. A bare -g
+// lands wherever the first npm on PATH points, which is root's /usr/local (EACCES)
+// when nvm is not loaded and a per-node-version tree other environments cannot
+// see when it is (lesson 105). setup-linux.sh installs pi this way for the same
+// reason. Windows keeps npm's default prefix, %APPDATA%\npm, which is user-owned
+// and on PATH; --prefix there would place the shims at the prefix root.
+func (in *Installer) npmPrefixArgs() []string {
+	if in.GOOS == "windows" {
+		return []string{"install", "-g"}
+	}
+	return []string{"install", "-g", "--prefix", filepath.Dir(in.Dest)}
 }
 
 // installUvTool provisions a PyPI-distributed tool (source.type "uv-tool") with
@@ -361,13 +405,16 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s %s already installed; skipping\n", t.Name, t.Version)
 		return Skipped, nil
 	}
-	if in.missingManager(t) {
-		_, _ = fmt.Fprintf(in.Out, "%s: uv is not on PATH; skipping (the next run installs it once uv is there)\n", t.Name)
+	if in.skipMissingManager(t) {
 		return Skipped, nil
 	}
+	// --force replaces an entry point another installer left in ~/.local/bin,
+	// which uv otherwise refuses with exit 2, so the run could never converge.
+	// decideAction above only gets here below the pin or when absent, so a tool
+	// at or above it is never touched.
 	spec := pkg + "==" + t.Version
-	if err := in.Run("uv", "tool", "install", spec); err != nil {
-		return Skipped, fmt.Errorf("%s: uv tool install %s: %w", t.Name, spec, err)
+	if err := in.Run("uv", "tool", "install", "--force", spec); err != nil {
+		return Skipped, fmt.Errorf("%s: uv tool install --force %s: %w", t.Name, spec, err)
 	}
 	if err := in.verifyOnPath(t, "uv"); err != nil {
 		return Skipped, err
@@ -378,6 +425,15 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s via uv (%s)\n", t.Name, t.Version, res, pkg)
 	return res, nil
+}
+
+// skipMissingManager prints why an entry waits and reports whether it does.
+func (in *Installer) skipMissingManager(t Tool) bool {
+	manager := in.missingManager(t)
+	if manager != "" {
+		_, _ = fmt.Fprintf(in.Out, "%s: %s is not on PATH; skipping (the next run installs it once %s is there)\n", t.Name, manager, manager)
+	}
+	return manager != ""
 }
 
 // pathVersion is the npm default version probe: `<name> --version`, resolving

@@ -35,6 +35,10 @@ created: "2026-10-05"
 
 - [x] W7: the first `dotf deploy` that replaces a file the machine already had keeps it once as `<dst>.pre-dotf`, and never overwrites that backup (`TestDeploy_KeepsThePreviousFileOnceBeforeReplacingIt`, `TestDeploy_AFreshDestinationNeedsNoBackup`); `dotf deploy` reports it
 - [x] W6: `.zshrc` works on a machine that has not run setup. oh-my-zsh is loaded only when it is installed, with compinit as the fallback; the `*_HOME` toolchain homes are exported and put on PATH only when their directory exists (F-041); brew shellenv is loaded when brew is installed; terraform completion uses the terraform on PATH (F-042); the Mac's hand-made case-insensitive completion is adopted
+- [x] W6 (`.bashrc`): the rc stops replacing PATH with a fixed system list, so what the login shell, the desktop session or the OS put there survives (`/opt/homebrew/bin` would not have, once P7b deploys `.bashrc` to darwin). The `*_HOME` homes are exported only when their directory exists and reach PATH only then (F-041), and brew shellenv runs when brew is installed: the rules `.zshrc` already follows
+- [x] W6 (both rcs): brew shellenv runs only when `HOMEBREW_PREFIX` is not already loaded, so a nested shell does not run brew again. Brew is run by absolute path, which no test PATH can hide, so both guard suites pin the prefix and only the brew test unsets it; each proves both directions, mutation-checked. The bash suite's PATH holds no host directory (#2149)
+  - `tests/bashrc-guards.bats` sources the real rc in an interactive bash with a scratch HOME: the inherited PATH entry survives, a missing home is neither exported nor on PATH, and an existing one is both
+  - Mutation-checked: restoring the PATH reset fails the first test; dropping the directory guard fails the second
 - [x] W2b (shells): `mise activate` in `.zshrc`, `.bashrc` and the PowerShell profile, guarded on mise being installed, before direnv and zoxide; the profile also initialises zoxide on Windows; parity test `every shell activates mise when it is installed`
 - [x] P6 (#1843 B2, zsh and tmux rows): `.zshrc`, `.zsh/*` and `tmux.conf` are `ai/deploy.json` entries with `requires: zsh` / `tmux`, and their `deploy_file` lines leave `setup-linux.sh`; the end-of-setup re-enforcement of `.zshrc` calls `dotf deploy zshrc`. `.bashrc`, `.profile`, `.inputrc`, `.gitconfig` and `ssh/config` wait for #1843 B1's OS selector, which needs a manifest version the installed dotf cannot read
 - [x] On the Mac: `dotf deploy` deployed `.zshrc` (keeping the hand-made one as `~/.zshrc.pre-dotf`) and `~/.zsh/*`, skipped tmux (not installed); a second run is `in sync`; a new zsh starts without warnings and resolves age, jq, direnv, zoxide, fzf and go through mise
@@ -47,7 +51,7 @@ created: "2026-10-05"
 - [x] W6 (`.gitconfig`): the github.com and gist credential helpers run `!gh auth git-credential` through PATH. `/usr/bin/gh` is Linux's path; macOS has `/opt/homebrew/bin/gh` and Windows `gh.exe`. On the Mac, `git credential fill` through the repo `.gitconfig` alone returns a password line
 - [x] On the Mac: `dotf deploy ssh-config` and `ssh-pubkey` created `~/.ssh` 0700 with the config 0600 and the key 0644, `ssh -G rpi4` resolves the host, and a second run is in sync
 - [ ] P7b, after B1 is released and pinned: `.bashrc`, `.profile` and `.inputrc` as entries with `platforms: [linux, darwin]`, the manifest at version 4
-- [ ] `.gitconfig` is co-owned: every `git config --global` writes it, which is why doctor exempts it from the content check (measured drifting on a converged box 2026-09-02), so a replace entry would fight those tools on every run. The design for its row: the repo file deploys whole to a file dotfiles owns (`~/.config/dotfiles/gitconfig`), and `~/.gitconfig` keeps one `[include] path` to it, added idempotently, so tools keep writing `~/.gitconfig` and neither side overwrites the other
+- [x] `.gitconfig` is co-owned: every `git config --global` writes it, which is why doctor exempts it from the content check (measured drifting on a converged box 2026-09-02), so a replace entry would fight those tools on every run. The design for its row: the repo file deploys whole to a file dotfiles owns (`~/.config/dotfiles/gitconfig`), and `~/.gitconfig` keeps one `[include] path` to it, added idempotently, so tools keep writing `~/.gitconfig` and neither side overwrites the other Done by #2207 (#2208) with the include target at `~/.config/git/dotfiles.gitconfig`, deployed by the `gitconfig` entry and included through `dotf converge --only git-config`
 
 ## W2, W4, W5, W8–W10
 
@@ -63,7 +67,7 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] Review triage: `dotf deploy <name>` for an entry of another OS prints a `skipped` line and exits 0, not 1.
   A skip is not a failure (#1843 contract), and no script deploys a single entry by name, so a
   non-zero exit would only break `dotf deploy bashrc` typed on Windows without telling anyone more
-- [ ] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc`, `.gitconfig` and `ssh/config` to entries with `platforms: [linux, darwin]` and the manifest to version 4
+- [ ] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc` and `ssh/config` (`.gitconfig` left this list with #2207) to entries with `platforms: [linux, darwin]` and the manifest to version 4
 
 ## #2162 — the harness refresh reads a vault clone of unknown age
 
@@ -127,6 +131,116 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
   the new FAIL. It now says it checks presence only and points to `[Secrets integrity]` for the mode
 - [x] Runbook: the DR restore step was GNU-only (`install -D`); it is now `mkdir -p` plus
   `install -m 600`, which macOS has too, and says doctor catches a wrong mode
+
+## #2183 — the vault secret gate was off while doctor said it was active
+
+- [x] Failing test first: `TestVaultHooks_GateViaDispatcherWithoutPreCommit_Fails`. The fixture
+  is the measured shape: dispatcher wired, config present, no pre-commit on PATH. Before the fix
+  it reported "gitleaks gate active"
+- [x] `checkVaultHooks` FAILs in check mode when pre-commit is absent, before probing the stages.
+  The real-git worktree tests pin pre-commit as present, so they stay about hook layout
+- [x] Doctor resolves pre-commit the way the dispatcher does: PATH, then uv's tool bin dir
+  (`TestVaultHooks_PreCommitInUvBinDirOnly_Passes`). Otherwise the two disagree, and doctor
+  FAILs a gate that runs (found by the migration-debt audit)
+- [x] The dispatcher fails closed on pre-commit, pre-push and commit-msg when a repo declares a
+  config and pre-commit is missing. It stays a no-op on stages that cannot block, and it finds
+  pre-commit in uv's tool bin dir when PATH lacks it (GUI launchers)
+- [x] `pre-commit` 4.6.2 is a `uv-tool` entry in `packages.json` on every OS. Installed on the Mac
+  with `dotf tools install pre-commit`; the second run skips
+- [x] Review triage: the dispatcher also finds `pre-commit.exe` in uv's tool bin dir, the name uv installs on Windows and the name doctor's `preCommitPath` checks there. Before, doctor could report a gate that the hook then failed closed on (test `pre-commit.exe in uv's tool bin dir is found, as on Windows`, red before the fix)
+- [x] `scripts/install-precommit.sh` deleted. `pre-commit install` refuses under `core.hooksPath`
+  (measured), so the script could not work on a provisioned machine, and nothing called it. Its
+  config assertions moved to `tests/precommit-config.bats`
+
+## #2207 — git's credential helper needed the shell's PATH
+
+The third defect of one class on the Mac: a tool a non-interactive process runs, resolved through the
+interactive shell's PATH (the setup binaries, the vault's pre-commit gate #2184, and now gh as git's
+credential helper). obsidian-git asked for a GitHub password; `env -i ... git ls-remote` exited 128 with
+`gh: command not found`.
+
+Phase 1 (this PR, no setup change, so the pinned `dotf` keeps working):
+
+- [x] `cli/internal/gitconfig`: `Inspect` and `Apply`, one predicate for converge and doctor (lesson 368).
+  `~/.gitconfig` includes `~/.config/git/dotfiles.gitconfig`; GitHub's helper is gh's absolute form
+  (`IsAbsoluteGHHelper`: `!<abs path to an existing gh> auth git-credential`, quoted Windows paths
+  included). `gh auth setup-git` writes it with its own path on every OS; the include goes in through
+  `git config --global --add`
+- [x] Failing tests first: the bare helper and the missing include are both reported; apply converges and
+  a second run writes nothing; gh absent or logged out blocks only the helper and names the remedy; one
+  run against the real git binary under `GIT_CONFIG_GLOBAL`
+- [x] `git-config` converge reconciler (every OS), probed by re-inspecting; `dotf converge --only <names>`
+  runs a subset in registry order and refuses an unknown name
+- [x] Doctor `Git config (global)`: FAIL for what `--fix` can repair, WARN for what needs `gh auth login`;
+  `--fix` runs the same `Apply`
+- [x] `git/dotfiles.gitconfig` and the `gitconfig` deploy entry. Not `~/.config/git/config`: git reads that
+  path itself and writes into it when `~/.gitconfig` is absent, so a deploy over it would erase git's
+  writes
+- [x] On the Mac: `dotf deploy gitconfig`, then `converge --only git-config` -> 1 changed, then 0 changed;
+  doctor `Git config (global)` all ok; `env -i ... git ls-remote` exit 0
+- [x] Runbook `docs/runbooks/guide-git-config.md`
+
+Phase 2, moved into this PR. The doctor check made `test-windows` red: CI builds `dotf` from the PR, so
+the gate reported the include missing on a box whose setup never added it. That is a real-box state, not
+a runner one, so the known-failures list was not its home; the fix is setup converging it:
+
+- [x] Deleted the `.gitconfig` `deploy_file` block in `setup-linux.sh` and its `setup-windows.ps1` twin
+  (setup net -18 lines). Each calls `dotf converge --only git-config` once, right after `dotf deploy`
+  writes the file the include names. Setup stops overwriting `~/.gitconfig`
+- [x] Deleted the repo `.gitconfig`, its `safe_copy`, its `.gitattributes` line, its doctor home-deploy
+  exemption and its `isManagedDeployPath` entry; the CI `code` filter lists `git/**` instead
+- [x] Tests: setup-linux and setup-windows assert the converge call follows `dotf deploy` and nothing
+  copies `~/.gitconfig` (both mutation-checked: removing the call turns them red); `verify-setup.bats`
+  asserts the include and that it is effective (`git config --global --includes user.name` equals the
+  deployed value; `--global` alone ignores includes). Run end to end in a throwaway HOME with this
+  branch's build: deploy, converge 1 changed, `user.name` read through the include, second run 0 changed
+- [x] The window: the pinned 0.65.0 rejects `--only` (`unknown flag`, exit 1) and deploys the new
+  `gitconfig` entry (`in sync`, exit 0). Until a release moves `DOTF_VERSION`, setup on a fresh box warns
+  and leaves `~/.gitconfig` absent; an existing box keeps its file. The warning names the condition.
+  Recorded on #1814
+- [x] Runner-only remainder: the setup step has no `GH_TOKEN` (CI-004 AC8) and the gate step has, so the
+  helper reads as repairable only in the gate. Listed in `doctor-gate-known-failures.txt` against #2212,
+  which holds the owner's choice
+- [x] Review triage (`fa5f55aa`): `Inspect` reports `TargetMissing` when the deployed file is absent
+  (doctor FAIL naming `dotf deploy`, not repairable by `Apply`); the converge detail says "applied" only
+  for what a run changed and names what it left. Both mutation-checked
+
+## #2197 — the dead-ends count read genres without links and attachments
+
+`Dead-ends: 1936/2184 (88%)` failed every session start. The owner decided (2026-10-09) which notes
+leave the count: `90_archive/`, `00_meta/templates/`, the `sessions/` journals and `20_certifications/`.
+
+- [x] One table, `linkExemptions` in `cli/internal/vault/health.go`, declares the exempt zones of all
+  three link-graph counts; orphans, dead-ends and unresolved links read it, and so do the report's
+  "Not counted" lines. The vault's `00_meta/_ssot.md` points at it, rather than holding a list Go would
+  have to parse
+- [x] Attachments are set apart from both counts: the CLI lists them, the markdown population does not
+  hold them (469 of 1936 dead-ends, 249 of 408 orphans). Orphans report them on their own line (lesson 375)
+- [x] A dead-ends WARN or FAIL names its top three folders, so the session-start line says where the
+  unlinked notes are; `--verbose` lists them
+- [x] Golden case `deadends-expected-noise`: every exempt zone but `memory/` (GUARD-001 refuses that path
+  outside the vault, so `TestLinkExemptPerCheck` pins it), a research note that still counts, an
+  attachment in both listings. Six mutations killed (each rule, the attachment filter, the folder line)
+- [x] On the Mac, against the live vault: dead-ends 671/1182 (56%), still FAIL; orphans 161/1042 (15%),
+  from a 39% WARN. Thresholds kept at 30/50: what remains is products, clients, project research and
+  memory, knowledge notes the FAIL is meant to name
+
+## #2013 P2 — darwin read the env-contract as linux, silently
+
+Doctor's `contractOS` mapped darwin to linux and its report named no OS, and `env.defaultFor` held
+the same rule a second time. The rule now has one definition, and darwin is a key of its own.
+
+- [x] `env.ForOS` resolves every per-OS contract value (a default, the PATH entries) and `env.AppliesOn`
+  every `required_on` scope: darwin reads its own key, else linux's; windows inherits nothing. Doctor's
+  `contractOS` and `env.defaultFor` are gone, and `checks_profile.go` reads through the same function
+- [x] A declared darwin key wins even when empty, so darwin can opt out of a linux default
+- [x] The contract sections name the OS they read: `(contract, darwin; undeclared keys read linux)`
+- [x] An OS with no PATH-entries key, directly or by fallback, warns rather than printing an empty section that reads as a clean PATH
+- [x] `env-contract.json` states the rule in `_comment`. No darwin value is added: none differs from linux
+  today, and the first is `HERDR_CONFIG_PATH` (#2013 H4)
+- [x] A test reads the real contract and fails on a key that is not linux, darwin or windows (a `macos`
+  key would be read by no OS) and on a darwin value that repeats the linux one. Mutation-checked, as is
+  the fallback (eight tests fail without it)
 
 ## Closing
 

@@ -1,7 +1,10 @@
 package tools
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,8 +17,9 @@ import (
 // Presence is one rule, asked in one order (systemInstalled): the entry's
 // declared Command is on PATH, otherwise the manager's own record lists the
 // package. The command shortcut makes a copy from any other channel count and
-// needs no privilege to find; the record is the only answer for a library or a
-// GUI app, and the post-condition of every install (a manager that exits 0
+// needs no privilege to find; a cask has the same shortcut in its app bundle
+// (caskAppPresent). The record is the only answer for a library, and the
+// post-condition of every install (a manager that exits 0
 // without the package listed is an error, as an npm or uv install is).
 
 // systemPresent is the sentinel Plan.Installed carries for a system package that
@@ -25,8 +29,11 @@ const systemPresent = "present"
 // managerBinary is the executable that runs a manager's installs, which must be
 // on PATH for an install to be possible.
 func managerBinary(manager string) string {
-	if manager == "apt" {
+	switch manager {
+	case "apt":
 		return "apt-get"
+	case "brew-cask":
+		return "brew"
 	}
 	return manager
 }
@@ -63,11 +70,87 @@ func (in *Installer) managerLists(manager, pkg string) bool {
 	case "brew":
 		out, err := query("brew", "list", "--versions", pkg)
 		return err == nil && strings.TrimSpace(string(out)) != ""
+	case "brew-cask":
+		out, err := query("brew", "list", "--cask", "--versions", pkg)
+		if err == nil && strings.TrimSpace(string(out)) != "" {
+			return true
+		}
+		return in.caskAppPresent(query, pkg)
 	case "winget":
 		// Builds differ on the exit code for "no match", and the sentence it
 		// prints does not echo the id, so a hit is a listing that names it.
 		out, err := query("winget", "list", "--id", pkg, "-e", "--accept-source-agreements")
 		return err == nil && strings.Contains(strings.ToLower(string(out)), strings.ToLower(pkg))
+	}
+	return false
+}
+
+// caskAppPresent reports whether the app bundle a cask installs is already on
+// disk from another channel: dragged into /Applications, or put there by the
+// vendor's own installer. `brew list --cask` does not record such an app, and
+// `brew install --cask` refuses to overwrite its bundle, so without this an
+// entry for a hand-installed app failed on every run. The bundle name comes
+// from the cask itself (`brew info --json=v2`), never from the entry's name.
+func (in *Installer) caskAppPresent(query Runner, pkg string) bool {
+	out, err := query("brew", "info", "--cask", "--json=v2", pkg)
+	if err != nil {
+		return false
+	}
+	var info struct {
+		Casks []struct {
+			Artifacts []map[string]json.RawMessage `json:"artifacts"`
+		} `json:"casks"`
+	}
+	if json.Unmarshal(out, &info) != nil {
+		return false
+	}
+	for _, c := range info.Casks {
+		for _, artifact := range c.Artifacts {
+			for _, bundle := range appBundles(artifact["app"]) {
+				if in.AppExists(bundle) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// appBundles reads a cask's `app` artifact: each element is the bundle name, or
+// an object whose `target` renames it on install.
+func appBundles(raw json.RawMessage) []string {
+	var elems []json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &elems) != nil {
+		return nil
+	}
+	var names []string
+	for _, e := range elems {
+		var name string
+		if json.Unmarshal(e, &name) == nil {
+			names = append(names, name)
+			continue
+		}
+		var renamed struct {
+			Target string `json:"target"`
+		}
+		if json.Unmarshal(e, &renamed) == nil && renamed.Target != "" {
+			names = append(names, renamed.Target)
+		}
+	}
+	return names
+}
+
+// appInApplications is the default AppExists: the two directories Homebrew and
+// drag-installs put an app in.
+func appInApplications(bundle string) bool {
+	dirs := []string{"/Applications"}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(home, "Applications"))
+	}
+	for _, d := range dirs {
+		if _, err := os.Stat(filepath.Join(d, bundle)); err == nil {
+			return true
+		}
 	}
 	return false
 }
@@ -78,19 +161,31 @@ func (in *Installer) managerLists(manager, pkg string) bool {
 // converge, CI) never hangs on a prompt; dotf neither caches credentials nor
 // prompts for one. The setup scripts avoid sudo and ask the user to run it
 // once, which is what installSystem falls back to when sudo needs a password.
+//
+// --no-remove makes apt abort instead of removing a package to satisfy the new
+// one: with -y it would otherwise remove what conflicts without asking, and
+// Ubuntu's docker-compose-v2 depends on docker.io, which displaces Docker's
+// docker-ce on a box that runs it (#2013 P5b).
 func (in *Installer) systemInstallArgv(manager, pkg string) []string {
 	switch manager {
 	case "apt":
-		argv := []string{"apt-get", "install", "-y", pkg}
+		argv := aptInstallArgv(pkg)
 		if !in.IsRoot() {
 			argv = append([]string{"sudo", "-n"}, argv...)
 		}
 		return argv
 	case "brew":
 		return []string{"brew", "install", pkg}
+	case "brew-cask":
+		return []string{"brew", "install", "--cask", pkg}
 	default: // winget
 		return []string{"winget", "install", "--id", pkg, "-e", "--accept-source-agreements", "--accept-package-agreements"}
 	}
+}
+
+// aptInstallArgv installs pkgs through apt-get, without sudo.
+func aptInstallArgv(pkgs ...string) []string {
+	return append([]string{"apt-get", "install", "-y", "--no-remove"}, pkgs...)
 }
 
 // missingSystemTool names the first executable the install needs and PATH lacks
@@ -116,9 +211,15 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 	case p.Installed != "":
 		p.Action = PlanSkip
 	case in.missingSystemTool(t) != "":
-		p.Action = PlanMissingManager
+		p.Action, p.Note = PlanMissingManager, "waits on "+in.missingSystemTool(t)
 	default:
 		p.Action = PlanInstall
+		manager, pkg := t.Source.SystemPackage(in.GOOS)
+		if argv := in.systemInstallArgv(manager, pkg); in.needsSudoPassword(argv) {
+			// The classifier the apply uses after sudo -n refuses, asked up
+			// front, so a plan never promises an install the apply skips.
+			p.Action, p.Note, p.Package = PlanNeedsSudo, sudoCommand(argv), pkg
+		}
 	}
 	return p
 }
@@ -140,7 +241,8 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 			// A named outcome, not a failure: nothing is wrong with the entry
 			// or the machine, only the privilege dotf may not ask for. It says
 			// what to run, and the other tools still converge.
-			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, strings.Join(append([]string{"sudo"}, argv[2:]...), " "))
+			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; %s\n", t.Name, sudoCommand(argv))
+			in.sudoDeferred = append(in.sudoDeferred, pkg)
 			return Skipped, nil
 		}
 		return Skipped, fmt.Errorf("%s: %s: %w", t.Name, strings.Join(argv, " "), err)
@@ -152,6 +254,33 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	return Installed, nil
 }
 
+// sudoCommand is what to run by hand for a `sudo -n` argv dotf could not run.
+func sudoCommand(argv []string) string {
+	return "run: " + strings.Join(append([]string{"sudo"}, argv[2:]...), " ")
+}
+
+// SudoInstallCommand is the one command that installs every apt package in
+// pkgs, for a person to run once instead of one command per package (#2308).
+// apt is the only manager that escalates: brew refuses to run as root, and
+// winget elevates per installer through UAC, which no batch can collect. ""
+// for no packages.
+//
+// --no-remove holds for the batch as it does for one package, so a single
+// conflicting package (docker.io on a box that runs docker-ce) aborts the
+// whole command; apt names it, and the person installs the rest without it.
+func SudoInstallCommand(pkgs []string) string {
+	if len(pkgs) == 0 {
+		return ""
+	}
+	return "sudo " + strings.Join(aptInstallArgv(pkgs...), " ")
+}
+
+// SudoDeferred is the command for every apt package Install skipped because
+// sudo wanted a password, in the order Install met them; "" when none was.
+func (in *Installer) SudoDeferred() string {
+	return SudoInstallCommand(in.sudoDeferred)
+}
+
 // needsSudoPassword reports whether a failed install failed because sudo wanted
 // a password. sudo -n exits 1 for that and for any other failure of the command,
 // so the failure is classified by asking sudo again with a command that cannot
@@ -160,10 +289,14 @@ func (in *Installer) needsSudoPassword(argv []string) bool {
 	if len(argv) < 2 || argv[0] != "sudo" || argv[1] != "-n" {
 		return false
 	}
-	query := in.Query
-	if query == nil {
-		query = ExecRunner
+	if in.sudoRefuses == nil {
+		query := in.Query
+		if query == nil {
+			query = ExecRunner
+		}
+		_, err := query("sudo", "-n", "true")
+		refuses := err != nil
+		in.sudoRefuses = &refuses
 	}
-	_, err := query("sudo", "-n", "true")
-	return err != nil
+	return *in.sudoRefuses
 }

@@ -11,13 +11,14 @@ commands expect that repository's layout.
 
 ## Install
 
-From a release (checksum-verified, installs to `~/.local/bin`):
+From a release (checksum-verified and exec-probed, installs to `~/.local/bin`),
+then hands the machine to `dotf converge`; `bash -s -- --plan` plans instead:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
 ```
 
-On Windows, run `scripts/install-dotf.ps1` from a checkout.
+On Windows: `irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.ps1 | iex`.
 
 With Go:
 
@@ -46,7 +47,7 @@ replaces it with the pinned release.
 | `tools` | Installs the tools in `packages.json`; `install --dry-run` shows the plan first |
 | `deploy` | Installs agent configs from the checkout to their deployed locations |
 | `env` | Resolves per-machine paths (`paths.sh` / `paths.ps1`) |
-| `update` | Fast-forwards the repository and re-runs setup (opt-in, run by a scheduler) |
+| `update` | Fast-forwards the repository and converges from it (opt-in, run by a scheduler) |
 | `agent`, `harness`, `pi`, `orca`, `mem`, `vault`, `search` | Agent harness and knowledge-vault tooling for this repository |
 | `version` | Prints the version |
 
@@ -56,9 +57,32 @@ because their flags and failure modes are not obvious from `--help`.
 ### `dotf converge` — bring the machine to its declared state
 
 Runs an ordered list of reconcilers, each converging one part of the machine
-from data in the checkout. Records come first: the harness mirror,
-then the agents' instruction files, so no agent runs before its instructions
-exist.
+from data in the checkout. The checkout itself comes first: it is cloned when
+absent and fast-forwarded when its upstream is ahead, under the same rule as
+`dotf update` (a dirty, diverged or offline checkout is left as it is and
+reported skipped). Records come next: the harness mirror, then the agents'
+instruction files, so no agent runs before its instructions exist. Then the
+tools, then every `ai/deploy.json` config that applies to this machine
+(`configs-deploy`, the loop behind `dotf deploy`), then the hooks each
+harness's settings file declares (`records-bind`, the engine behind
+`dotf harness bind`), then the git config, and on
+macOS the launchd environment (`env-persist`). On Linux and Windows the setup
+script runs last (`legacy-setup`), for whatever no native step covers yet. It
+cannot plan or say what it changed, so it is reported `[OPAQUE]`, never as
+converged, and a second run's `0 changed` speaks for the native steps only.
+`DOTFILES_SELFUPDATE_SETUP_CMD` names another setup command. A converge run
+from inside a setup script that converge started skips this step, so the two
+cannot call each other in a loop.
+
+`dotf update` runs the same converge after a clean fast-forward, and only then.
+
+Without `--repo`, the checkout is the one the working directory is in, else the
+declared `DOTFILES_REPO_DIR`, else `~/Projects/dotfiles`: the working directory
+first, as `dotf deploy` and `dotf harness mirror` resolve it, whereas `dotf
+update` prefers the declared checkout. `DOTFILES_REPO` names another upstream to
+clone. When the checkout would change (a clone from zero, or a fast-forward),
+`--plan` shows that change and reports the steps after it as `waits for
+checkout`, because they would read the tree as it is before the change.
 
 ```sh
 dotf converge --plan     # what each reconciler would change; writes nothing
@@ -73,6 +97,9 @@ dotf converge            # apply, then prove each reconciler's post-condition
 - **Platforms.** A reconciler that does not apply to this OS is reported as
   `skipped`, naming the OS, never as passed.
 - **Idempotence.** A second run on a converged machine reports `0 changed`.
+- **Secrets.** A config whose secrets the store cannot resolve during the run
+  (locked or unreachable) keeps its installed file, and the report names it as
+  `kept (secrets locked)`; it never installs the placeholder over the value.
 - **Report.** Every apply writes a report to
   `$XDG_STATE_HOME/dotfiles/converge/last.json` (default
   `~/.local/state/dotfiles/converge/last.json`). It records the result, the

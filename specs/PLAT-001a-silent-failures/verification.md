@@ -50,6 +50,9 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
 - `golangci-lint run` (v2.12.2, the pin in `versions.conf`): 0 issues.
 - No regressions in the existing Go suite: yes.
 - Bats baseline on darwin, taken before this change: 1632/1776 pass. The 144 failures already exist on `main` and are recorded as F-054 in #2013. W1 changes no shell file.
+- Test suite (W6 `.bashrc`, macOS, bash 3.2): `bats` on every suite naming `.bashrc` (`git grep -l bashrc -- tests/*.bats`) -> 497/497 ok; `shellcheck tests/bashrc-guards.bats` clean
+- Test suite (W6 brew guard, macOS with Homebrew): `bats tests/bashrc-guards.bats tests/zshrc-guards.bats` -> 11/11 ok; with the `HOMEBREW_PREFIX` guard removed from both rcs, both brew tests fail; every suite naming either rc: 533/533 ok
+- #2013 P2: `go test ./internal/env/ ./internal/doctor/` ok; removing the darwin fallback fails eight tests across both packages, and a `macos` key or a darwin copy of a linux value fails `TestTheRealContractKeysByKnownOSAndCopiesNothing`.
 
 ## Decisions made during implementation
 
@@ -78,6 +81,18 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
   - Review round (PR-Agent on #2171): deploy reads `PrivateDirsOf` (the entries it deploys, file present
     or not), so a dry run on a fresh machine predicts the tightening the real run makes; doctor keeps
     `PrivateDirs` (file present). A 0700 directory that receives only a public file stays 0700.
+
+- **#2197, the dead-ends count** (`8109bc0d`):
+  - `linkExemptions` in `cli/internal/vault/health.go` is the one declaration of what each link-graph
+    count leaves out; the "Not counted" lines are written from it. Attachments are set apart from both
+    counts.
+  - Tests: golden `deadends-expected-noise` (every zone but `memory/`, an attachment in both listings),
+    `TestLinkExemptPerCheck` and `TestExemptZones`; five goldens re-pinned for the wording and the
+    folder line. Mutations killed: each of the five rules, the attachment filter, the folder line.
+  - `go test -count=1 ./internal/vault/ ./internal/cmd/` ok; golangci-lint 0 issues; `GOOS=windows go vet` ok.
+  - Live vault on the Mac: dead-ends 1936/2184 (88%) -> 671/1182 (56%), still FAIL, top folders
+    `50_work/20-products` (109), `50_work/30-clients` (103), `10_projects/kubelab` (75); orphans
+    408/1042 (39%, WARN) -> 161/1042 (15%, PASS), with 307 unlinked attachments on their own line.
 
 ## Promotion candidates
 

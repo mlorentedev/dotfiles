@@ -10,11 +10,15 @@
     "  system          a package the OS manager owns, for what no cross-OS channel carries:",
     "                    apt / brew / winget  the package name per manager (linux / darwin / windows);",
     "                                         a manager with no name skips the entry on that OS",
+    "                    cask                 a Homebrew cask (GUI app, font) instead of a brew formula;",
+    "                                         darwin only, never beside brew in one entry. A dotf older",
+    "                                         than the reader REFUSES the key (the whole catalog fails to",
+    "                                         load), so no cask entry ships before that release is the pin",
     "                    command              optional: the executable it puts on PATH; found there,",
     "                                         the entry is satisfied whichever channel installed it",
     "                  A system entry has no version: it is not pinned, presence is what converges,",
     "                  and it is never upgraded. A dotf that predates the type skips it with a warning,",
-    "                  so no system entry is added before a release carrying the reader is the pin.",
+    "                  so no system entry was added before a release carrying the reader was the pin (0.65.0).",
     "",
     "source.platforms (every type) narrows an entry to the listed GOOS values."
   ],
@@ -106,6 +110,180 @@
       "source": {
         "type": "uv-tool",
         "package": "poetry"
+      }
+    },
+    {
+      "name": "gh",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "gh",
+        "brew": "gh",
+        "winget": "GitHub.cli",
+        "command": "gh"
+      }
+    },
+    {
+      "name": "bash",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "bash"
+      }
+    },
+    {
+      "name": "git-lfs",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "git-lfs",
+        "brew": "git-lfs",
+        "command": "git-lfs"
+      }
+    },
+    {
+      "name": "tmux",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "tmux",
+        "brew": "tmux",
+        "command": "tmux"
+      }
+    },
+    {
+      "name": "xclip",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "xclip",
+        "command": "xclip"
+      }
+    },
+    {
+      "name": "parallel",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "parallel",
+        "brew": "parallel",
+        "command": "parallel"
+      }
+    },
+    {
+      "name": "wget",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "wget",
+        "brew": "wget",
+        "command": "wget"
+      }
+    },
+    {
+      "name": "eza",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "eza",
+        "brew": "eza",
+        "winget": "eza-community.eza",
+        "command": "eza"
+      }
+    },
+    {
+      "name": "colima",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "colima",
+        "command": "colima"
+      }
+    },
+    {
+      "name": "docker",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "docker.io",
+        "brew": "docker",
+        "winget": "Docker.DockerDesktop",
+        "command": "docker"
+      }
+    },
+    {
+      "name": "docker-compose",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker-compose",
+        "command": "docker-compose"
+      }
+    },
+    {
+      "name": "docker-buildx",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "docker-buildx"
+      }
+    },
+    {
+      "name": "pre-commit",
+      "version": "4.6.2",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "pre-commit"
+      }
+    },
+    {
+      "name": "ansible",
+      "version": "2.21.4",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "ansible-core",
+        "platforms": ["linux", "darwin"]
+      }
+    },
+    {
+      "name": "ansible-lint",
+      "version": "26.9.0",
+      "profile": "full",
+      "source": {
+        "type": "uv-tool",
+        "package": "ansible-lint",
+        "platforms": ["linux", "darwin"]
+      }
+    },
+    {
+      "name": "aws",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "awscli",
+        "winget": "Amazon.AWSCLI",
+        "command": "aws"
+      }
+    },
+    {
+      "name": "gopls",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "gopls",
+        "command": "gopls"
+      }
+    },
+    {
+      "name": "btop",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "btop",
+        "brew": "btop",
+        "command": "btop"
       }
     }
   ]

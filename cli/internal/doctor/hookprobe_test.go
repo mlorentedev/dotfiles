@@ -175,6 +175,90 @@ func TestVaultHooks_GateViaDispatcherFallback_MustPass(t *testing.T) {
 	}
 }
 
+// The false PASS measured on a Mac (2026-10-08): dispatcher deployed, config
+// present, pre-commit never installed. The dispatcher's chain needs the binary,
+// so every commit and push ran no gitleaks while doctor said "gate active".
+func TestVaultHooks_GateViaDispatcherWithoutPreCommit_Fails(t *testing.T) {
+	root := t.TempDir()
+	dispatcher := fullDispatcher(t, filepath.Join(root, "deploy", "git-hooks"))
+	vault := gitRepo(t, filepath.Join(root, "vault"))
+	writeFile(t, filepath.Join(vault, ".pre-commit-config.yaml"), "repos: []\n")
+
+	g := &probeGit{global: dispatcher, overrides: map[string]string{vault: dispatcher}}
+	sys := g.system(vault)
+	sys.LookPath = func(n string) (string, error) {
+		if n == "pre-commit" {
+			return "", errors.New("not found: pre-commit")
+		}
+		return "/usr/bin/" + n, nil
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+
+	checkVaultHooks(sys, rep, false)
+
+	if rep.Failures() != 1 {
+		t.Fatalf("a gate whose pre-commit is missing must FAIL, got %d:\n%s", rep.Failures(), buf.String())
+	}
+	if strings.Contains(buf.String(), "gate active") {
+		t.Errorf("must not report the gate active:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "pre-commit not on PATH") {
+		t.Errorf("want the missing tool named, got:\n%s", buf.String())
+	}
+}
+
+// The dispatcher finds pre-commit in uv's tool bin dir when PATH lacks it (a
+// GUI launcher's PATH), so doctor must resolve it the same way: otherwise the
+// two disagree, and doctor FAILs a gate that runs.
+func TestVaultHooks_PreCommitInUvBinDirOnly_Passes(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  map[string]string
+		dir  func(home string) string
+	}{
+		{"default ~/.local/bin", nil, func(h string) string { return filepath.Join(h, ".local", "bin") }},
+		{"XDG_BIN_HOME", map[string]string{"XDG_BIN_HOME": "xdg"}, func(h string) string { return filepath.Join(h, "xdg") }},
+		{"UV_TOOL_BIN_DIR wins", map[string]string{"UV_TOOL_BIN_DIR": "uvbin", "XDG_BIN_HOME": "xdg"}, func(h string) string { return filepath.Join(h, "uvbin") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			dispatcher := fullDispatcher(t, filepath.Join(root, "deploy", "git-hooks"))
+			vault := gitRepo(t, filepath.Join(root, "vault"))
+			writeFile(t, filepath.Join(vault, ".pre-commit-config.yaml"), "repos: []\n")
+			home := filepath.Join(root, "home")
+			writeExec(t, filepath.Join(tc.dir(home), "pre-commit"))
+
+			g := &probeGit{global: dispatcher, overrides: map[string]string{vault: dispatcher}}
+			sys := g.system(vault)
+			base := sys.Getenv
+			sys.Getenv = func(k string) string {
+				if k == "HOME" {
+					return home
+				}
+				if v, ok := tc.env[k]; ok {
+					return filepath.Join(home, v)
+				}
+				return base(k)
+			}
+			sys.LookPath = func(n string) (string, error) {
+				if n == "pre-commit" {
+					return "", errors.New("not found: pre-commit")
+				}
+				return "/usr/bin/" + n, nil
+			}
+			var buf bytes.Buffer
+			rep := capture(&buf)
+
+			checkVaultHooks(sys, rep, false)
+
+			if rep.Failures() != 0 || !strings.Contains(buf.String(), "gate active") {
+				t.Fatalf("pre-commit in uv's bin dir runs the gate; want PASS, got %d failures:\n%s", rep.Failures(), buf.String())
+			}
+		})
+	}
+}
+
 // The red direction for the same check: a dispatcher with no config for it to
 // act on is a gate in name only, because chaining into pre-commit with no
 // .pre-commit-config.yaml is a documented no-op.

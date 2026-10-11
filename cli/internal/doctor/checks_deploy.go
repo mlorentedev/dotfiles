@@ -360,11 +360,11 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	cfgPath := filepath.Join(home, ".config", "opencode", "opencode.jsonc")
 	switch {
 	case !pathExists(cfgPath):
-		rep.Fail("opencode.jsonc missing: " + cfgPath + " (run setup)")
+		rep.Fail("opencode.jsonc missing: " + cfgPath + " (run: dotf deploy opencode)")
 	case fileContains(cfgPath, `"$schema":`):
 		rep.Pass("opencode.jsonc deployed with $schema declaration")
 	default:
-		rep.Fail("opencode.jsonc missing $schema declaration (re-run setup to redeploy)")
+		rep.Fail("opencode.jsonc missing $schema declaration (run: dotf deploy opencode)")
 	}
 
 	// pi binary + version. pi is optional → SKIP when truly absent, but FAIL when
@@ -963,12 +963,13 @@ func matchPinFloorFrom(rep *Report, tool, installed, pin, source string) {
 }
 
 // checkDeployDrift ports the standalone diff-check twin (healthcheck §11): for
-// every git-tracked file under the managed allowlist, byte-compare the repo copy
-// against the deployed ~/.dotfiles copy. Drift means the repo was edited without
-// re-running setup, so every shell still reads the stale deploy-dir copy. A
+// every git-tracked file in the deploy-dir set (harness.IsDeployDirPath, the
+// same set the mirror copies), byte-compare the repo copy against the deployed
+// ~/.dotfiles copy. Drift means the repo moved and nothing re-mirrored it, so
+// every shell still reads the stale deploy-dir copy. A
 // missing repo / deploy-dir / non-git repo is a SKIP (the shell twin's exit 2),
 // because `dotf doctor` legitimately runs where one side is absent (CI, fresh box).
-func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
+func checkDeployDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Repo↔deploy-dir drift")
 
 	repo := resolveRepoDir(sys)
@@ -981,7 +982,9 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 		rep.Skip("deploy-dir absent: " + deploy + " (run setup)")
 		return
 	}
-	if !isDir(filepath.Join(repo, ".git")) {
+	// pathExists, not isDir: in a linked worktree .git is a file naming the
+	// gitdir, and the check skipped every worktree as "not a git repo".
+	if !pathExists(filepath.Join(repo, ".git")) {
 		rep.Skip("not a git repo: " + repo)
 		return
 	}
@@ -995,7 +998,7 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 	drift, checked := 0, 0
 	for _, rel := range strings.Split(out, "\n") {
 		rel = strings.TrimSpace(rel)
-		if rel == "" || !isManagedDeployPath(rel) {
+		if rel == "" || !harness.IsDeployDirPath(rel) {
 			continue
 		}
 		repoFile := filepath.Join(repo, filepath.FromSlash(rel))
@@ -1008,12 +1011,57 @@ func checkDeployDrift(sys *System, cfg *Config, rep *Report) {
 		}
 		checked++
 		if !filesEqual(repoFile, deployFile) {
-			rep.Fail("drift: " + rel + " — repo differs from deploy-dir (run setup to refresh ~/.dotfiles)")
+			rep.Fail("drift: " + rel + " — repo differs from deploy-dir (run `dotf converge` to refresh it)")
 			drift++
 		}
 	}
 	if drift == 0 {
 		rep.Pass(fmt.Sprintf("repo and deploy-dir agree (%d managed files checked)", checked))
+	}
+	checkDeployDirLeftovers(sys, rep, repo, deploy, fix)
+}
+
+// checkDeployDirLeftovers is the other half of the drift check, the one it
+// skips by comparing only files on both sides: a file the checkout deleted that
+// the deploy dir still has (#2266). harness.Mirror prunes these on every setup
+// and converge; this reports them on a box that has not mirrored since, and
+// --fix removes them through the same function. An orphan git never tracked is
+// only named, because absence from the checkout does not make it garbage (#802).
+func checkDeployDirLeftovers(sys *System, rep *Report, repo, deploy string, fix bool) {
+	git := func(dir string, args ...string) (string, error) {
+		return sys.CommandOutput("git", append([]string{"-C", dir}, args...)...)
+	}
+	o, err := harness.ScanOrphans(repo, deploy, git)
+	if err != nil {
+		rep.Warn("deploy-dir leftover scan failed: " + err.Error())
+		return
+	}
+	for _, rel := range o.Unknown {
+		rep.Warn(rel + " is in the deploy dir but not in the checkout, and git history does not show it deleted — left in place; move it out of " + deploy + " if it is yours")
+	}
+	if o.Skipped != "" {
+		rep.Warn("deploy-dir leftovers not classified: " + o.Skipped)
+	}
+	for _, rel := range o.Unreadable {
+		rep.Warn(rel + " in the deploy dir could not be read, so it was not checked for leftovers")
+	}
+	switch {
+	case len(o.Deleted) == 0:
+		if len(o.Unknown)+len(o.Unreadable) == 0 {
+			rep.Pass("deploy dir holds no leftovers of files the checkout deleted")
+		}
+	case !fix:
+		for _, rel := range o.Deleted {
+			rep.Fail("leftover: " + rel + " — deleted from the checkout, still in the deploy dir (run: dotf doctor --fix, or dotf converge)")
+		}
+	default:
+		if err := harness.PruneOrphans(deploy, o.Deleted); err != nil {
+			rep.Fail("failed to prune deploy-dir leftovers: " + err.Error())
+			return
+		}
+		for _, rel := range o.Deleted {
+			rep.Fix("pruned deploy-dir leftover: " + rel)
+		}
 	}
 }
 
@@ -1031,21 +1079,4 @@ func resolveRepoDir(sys *System) string {
 		}
 	}
 	return ""
-}
-
-// isManagedDeployPath reports whether a git-tracked repo path is one setup copies
-// into the deploy-dir. It MUST mirror the copy block in setup-linux.sh (and the
-// Windows guards in setup-windows.ps1); diff-check kept them in sync by comment,
-// and this port inherits that coupling (CLI-019 follow-up: a grep-guard test).
-func isManagedDeployPath(rel string) bool {
-	switch rel {
-	case "versions.conf", ".zshrc", ".bashrc", ".profile", ".gitconfig", "tmux.conf":
-		return true
-	}
-	for _, prefix := range []string{".zsh/", "ssh/", "scripts/", "sensitive/"} {
-		if strings.HasPrefix(rel, prefix) {
-			return true
-		}
-	}
-	return false
 }

@@ -167,14 +167,63 @@ add_linked_worktree() {
     [ ! -f "$ARGS_LOG" ]
 }
 
-@test "AC5: a missing pre-commit binary is a clean no-op, not a broken commit" {
-    # This dispatcher is wired machine-wide. Failing closed here would break
-    # `git commit` in every repo on the box that has a config but no pre-commit.
+@test "a declared gate with no pre-commit fails closed on every blocking stage" {
+    # A no-op here let every vault commit and push skip gitleaks on a Mac that
+    # never had pre-commit installed, while doctor reported the gate active.
     add_precommit_config
     cd "$FIXTURE"
 
-    run bash -c "PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-commit < /dev/null"
+    for stage in pre-commit pre-push commit-msg; do
+        run bash -c "unset UV_TOOL_BIN_DIR XDG_BIN_HOME; HOME='$WORK' PATH='$STUB:/usr/bin:/bin' '$CHAIN' $stage < /dev/null"
+        [ "$status" -eq 1 ] || false
+        [[ "$output" == *"pre-commit is not installed"* ]] || false
+        [[ "$output" == *"dotf tools install pre-commit"* ]] || false
+    done
+}
+
+@test "a declared gate with no pre-commit stays a no-op on a stage that cannot block" {
+    add_precommit_config
+    cd "$FIXTURE"
+
+    run bash -c "unset UV_TOOL_BIN_DIR XDG_BIN_HOME; HOME='$WORK' PATH='$STUB:/usr/bin:/bin' '$CHAIN' post-checkout a b 1 < /dev/null"
     [ "$status" -eq 0 ]
+}
+
+@test "pre-commit off PATH is found in uv's tool bin dir, as a GUI launcher's git needs" {
+    # obsidian-git commits the vault under launchd's PATH, which has no
+    # ~/.local/bin, where `uv tool install` puts pre-commit.
+    add_precommit_config
+    mkdir -p "$WORK/.local/bin"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > %s\n' "$ARGS_LOG" > "$WORK/.local/bin/pre-commit"
+    chmod +x "$WORK/.local/bin/pre-commit"
+    cd "$FIXTURE"
+
+    run bash -c "unset UV_TOOL_BIN_DIR XDG_BIN_HOME; HOME='$WORK' PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-push < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-push"* ]] || false
+
+    # UV_TOOL_BIN_DIR wins over the default, as in uv itself.
+    rm -f "$ARGS_LOG"
+    mkdir -p "$WORK/uvbin"
+    mv "$WORK/.local/bin/pre-commit" "$WORK/uvbin/pre-commit"
+    run bash -c "UV_TOOL_BIN_DIR='$WORK/uvbin' HOME='$WORK' PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-push < /dev/null"
+    [ "$status" -eq 0 ]
+    [ -f "$ARGS_LOG" ]
+}
+
+@test "pre-commit.exe in uv's tool bin dir is found, as on Windows" {
+    # uv installs pre-commit.exe there on Windows, and doctor looks for that
+    # name (preCommitPath); the dispatcher must find the same file, or doctor
+    # reports a gate the hook then fails closed on.
+    add_precommit_config
+    mkdir -p "$WORK/.local/bin"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > %s\n' "$ARGS_LOG" > "$WORK/.local/bin/pre-commit.exe"
+    chmod +x "$WORK/.local/bin/pre-commit.exe"
+    cd "$FIXTURE"
+
+    run bash -c "unset UV_TOOL_BIN_DIR XDG_BIN_HOME; HOME='$WORK' PATH='$STUB:/usr/bin:/bin' '$CHAIN' pre-push < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$ARGS_LOG")" == *"--hook-type pre-push"* ]] || false
 }
 
 @test "AC6: the fallback is stage-generic, not pre-push-only" {

@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-# cron runs with a minimal PATH that does not include ~/.local/bin (install-dotf.sh's
+# cron runs with a minimal PATH that does not include ~/.local/bin (install.sh's
 # install target), unlike an interactive shell. The old knowledge-crystallize.sh and
 # vault-health.sh calls used absolute paths and never needed this; `dotf` is invoked by
 # bare name below, so without this both steps silently no-op under `|| true` every Sunday.

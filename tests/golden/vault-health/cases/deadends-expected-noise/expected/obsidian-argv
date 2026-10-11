@@ -1,0 +1,5 @@
+vault=knowledge vault
+vault=knowledge orphans
+vault=knowledge deadends
+vault=knowledge unresolved verbose format=json
+vault=knowledge tags

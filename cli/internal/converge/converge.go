@@ -5,6 +5,8 @@ package converge
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
@@ -25,6 +27,15 @@ type Result struct {
 	// right now (a prerequisite it cannot provide itself). The run reports it
 	// as skipped with this reason, never as passed, and does not probe it.
 	Skip string
+	// Gate, under a plan, says the reconcilers after this one read what this
+	// change has not made yet (a checkout still to clone). They are reported
+	// as skipped with this reason instead of failing on files that do not
+	// exist. An apply ignores it: the change is made before they run.
+	Gate string
+	// Opaque says the step cannot tell what it changed, or would change: a
+	// script that only reports its exit status. The run reports it as opaque,
+	// never as converged or changed, and Changes is not counted.
+	Opaque bool
 }
 
 // Reconciler converges one part of the machine.
@@ -49,10 +60,11 @@ const (
 	StatusChange                // changed, or would change under a plan
 	StatusSkipped               // not applicable here, or not reached
 	StatusFailed
+	StatusOpaque // ran, or would run, but cannot say what it changed
 )
 
 func (s Status) String() string {
-	return [...]string{"ok", "change", "skipped", "failed"}[s]
+	return [...]string{"ok", "change", "skipped", "failed", "opaque"}[s]
 }
 
 // Entry is one reconciler's line in a report.
@@ -70,6 +82,33 @@ type Report struct {
 	Entries []Entry
 }
 
+// Select keeps the named reconcilers, in registry order. An unknown name is an
+// error that lists the known ones, so a typo cannot select nothing and pass.
+func Select(reconcilers []Reconciler, names []string) ([]Reconciler, error) {
+	want := map[string]bool{}
+	for _, n := range names {
+		want[n] = true
+	}
+	var out []Reconciler
+	known := make([]string, 0, len(reconcilers))
+	for _, r := range reconcilers {
+		known = append(known, r.Name())
+		if want[r.Name()] {
+			out = append(out, r)
+			delete(want, r.Name())
+		}
+	}
+	if len(want) > 0 {
+		unknown := make([]string, 0, len(want))
+		for n := range want {
+			unknown = append(unknown, n)
+		}
+		sort.Strings(unknown)
+		return nil, fmt.Errorf("unknown reconciler(s) %s (known: %s)", strings.Join(unknown, ", "), strings.Join(known, ", "))
+	}
+	return out, nil
+}
+
 // Run drives the reconcilers in order. A reconciler that does not list
 // env.GOOS is skipped, never passed. The first failure stops the run: the
 // reconcilers after it are reported as not reached, because a later step may
@@ -78,30 +117,38 @@ type Report struct {
 func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 	rep := Report{DryRun: dryRun, GOOS: env.GOOS}
 	var failed error
+	gate := ""
 	for _, r := range reconcilers {
-		if failed != nil {
+		switch {
+		case failed != nil:
 			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: "not reached"})
 			continue
+		case gate != "":
+			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: gate})
+			continue
 		}
-		entry, err := runOne(r, env, dryRun)
+		entry, g, err := runOne(r, env, dryRun)
 		rep.Entries = append(rep.Entries, entry)
 		if err != nil {
 			failed = fmt.Errorf("converge: %s: %w", r.Name(), err)
+		}
+		if dryRun && g != "" {
+			gate = g
 		}
 	}
 	return rep, failed
 }
 
-func runOne(r Reconciler, env Env, dryRun bool) (Entry, error) {
+func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 	e := Entry{Name: r.Name()}
 	if !platform.Supports(r.Platforms(), env.GOOS) {
 		e.Status, e.Detail = StatusSkipped, "not supported on "+env.GOOS
-		return e, nil
+		return e, "", nil
 	}
 	res, err := r.Reconcile(env, dryRun)
 	if err == nil && res.Skip != "" {
 		e.Status, e.Detail = StatusSkipped, res.Skip
-		return e, nil
+		return e, "", nil
 	}
 	e.Changes, e.Detail = res.Changes, res.Detail
 	if err == nil && !dryRun {
@@ -112,12 +159,14 @@ func runOne(r Reconciler, env Env, dryRun bool) (Entry, error) {
 	switch {
 	case err != nil:
 		e.Status, e.Detail = StatusFailed, err.Error()
+	case res.Opaque:
+		e.Status, e.Changes = StatusOpaque, 0
 	case res.Changes > 0:
 		e.Status = StatusChange
 	default:
 		e.Status = StatusOK
 	}
-	return e, err
+	return e, res.Gate, err
 }
 
 // Summary counts the entries by status, for the report's last line.

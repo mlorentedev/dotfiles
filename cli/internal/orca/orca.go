@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -22,15 +20,31 @@ var (
 // ProcessChecker reports whether an Orca instance is currently running.
 type ProcessChecker func() bool
 
-// DefaultProcessChecker checks for active orca-ide / AppImage / orca.exe processes.
-func DefaultProcessChecker() bool {
-	if runtime.GOOS == "windows" {
-		cmd := exec.Command("tasklist", "/FI", "IMAGENAME eq orca.exe", "/NH")
-		out, err := cmd.Output()
-		return err == nil && strings.Contains(string(out), "orca.exe")
+// UserDataDir is where Orca keeps its state: Electron's userData for the app
+// name "orca". Electron resolves it from appData, which is ~/Library/Application
+// Support on macOS, APPDATA (else the profile's AppData/Roaming) on Windows, and
+// XDG_CONFIG_HOME (else ~/.config) elsewhere; Orca pins the same value itself
+// on Windows (src/main/startup/windows-app-data-path.ts).
+func UserDataDir(home, goos string, getenv func(string) string) string {
+	switch goos {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "orca")
+	case "windows":
+		if dir := getenv("APPDATA"); dir != "" {
+			return filepath.Join(dir, "orca")
+		}
+		return filepath.Join(home, "AppData", "Roaming", "orca")
 	}
-	cmd := exec.Command("pgrep", "-f", "orca-ide|orca-linux.*AppImage")
-	return cmd.Run() == nil
+	if dir := getenv("XDG_CONFIG_HOME"); dir != "" {
+		return filepath.Join(dir, "orca")
+	}
+	return filepath.Join(home, ".config", "orca")
+}
+
+// RunningIn reports whether an Orca instance owns userDataDir, by the means
+// each OS has (running_unix.go, running_windows.go).
+func RunningIn(userDataDir string) ProcessChecker {
+	return func() bool { return running(userDataDir) }
 }
 
 // ExportReport captures what happened during settings export.

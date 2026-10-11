@@ -2,7 +2,9 @@ package doctor
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -102,7 +104,7 @@ func TestCheckDeployDrift(t *testing.T) {
 
 			var buf bytes.Buffer
 			rep := capture(&buf)
-			checkDeployDrift(sys, cfg, rep)
+			checkDeployDrift(sys, cfg, rep, false)
 
 			if rep.Failures() != tc.wantFailures {
 				t.Fatalf("failures = %d, want %d\n%s", rep.Failures(), tc.wantFailures, buf.String())
@@ -114,21 +116,105 @@ func TestCheckDeployDrift(t *testing.T) {
 	}
 }
 
-// TestIsManagedDeployPath pins the allowlist that MUST mirror setup's copy block.
-func TestIsManagedDeployPath(t *testing.T) {
-	managed := []string{
-		"versions.conf", ".zshrc", ".bashrc", ".profile", ".gitconfig", "tmux.conf",
-		".zsh/aliases.zsh", "ssh/config", "scripts/utils.sh", "sensitive/chatgpt.api-key.secret.age",
+// TestCheckDeployDirLeftovers drives the half of the drift check that looks at
+// files only the deploy dir has (#2266). git is faked through the same seam:
+// the shallow probe and the deleted-paths log, keyed on the temp repo.
+func TestCheckDeployDirLeftovers(t *testing.T) {
+	logKey := func(repo string) string {
+		return "git -C " + repo + " log --all --no-renames --diff-filter=D --name-only --pretty=format: -- .zsh ssh scripts"
 	}
-	unmanaged := []string{"README.md", "go.mod", "cli/main.go", "docs/lessons.md", ".github/workflows/ci.yml"}
-	for _, p := range managed {
-		if !isManagedDeployPath(p) {
-			t.Errorf("isManagedDeployPath(%q) = false, want true", p)
+	setup := func(t *testing.T, gitFile bool) (repo, deploy string, cmdOut map[string]string) {
+		repo, deploy = t.TempDir(), filepath.Join(t.TempDir(), "deploy")
+		if gitFile {
+			// A linked worktree: .git is a file naming the gitdir.
+			writeFile(t, filepath.Join(repo, ".git"), "gitdir: /elsewhere\n")
+		} else {
+			mkdirAll(t, filepath.Join(repo, ".git"))
 		}
-	}
-	for _, p := range unmanaged {
-		if isManagedDeployPath(p) {
-			t.Errorf("isManagedDeployPath(%q) = true, want false", p)
+		writeFile(t, filepath.Join(repo, "scripts", "live.sh"), "live")
+		writeFile(t, filepath.Join(deploy, "scripts", "live.sh"), "live")
+		writeFile(t, filepath.Join(deploy, "scripts", "old.sh"), "retired")
+		cmdOut = map[string]string{
+			"git -C " + repo + " ls-files":                          "scripts/live.sh",
+			"git -C " + repo + " rev-parse --is-shallow-repository": "false",
+			logKey(repo): "scripts/old.sh",
 		}
+		return repo, deploy, cmdOut
 	}
+	run := func(repo, deploy string, cmdOut map[string]string, fix bool) (*Report, string) {
+		sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, nil, cmdOut)
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkDeployDrift(sys, &Config{DotfilesDir: deploy}, rep, fix)
+		return rep, buf.String()
+	}
+
+	t.Run("a leftover fails and names the remedy", func(t *testing.T) {
+		repo, deploy, cmdOut := setup(t, false)
+		rep, out := run(repo, deploy, cmdOut, false)
+		if rep.Failures() != 1 || !strings.Contains(out, "leftover: scripts/old.sh") || !strings.Contains(out, "dotf doctor --fix") {
+			t.Fatalf("want one failure naming scripts/old.sh and the remedy:\n%s", out)
+		}
+		if !pathExists(filepath.Join(deploy, "scripts", "old.sh")) {
+			t.Error("a report without --fix removed the file")
+		}
+	})
+
+	t.Run("--fix prunes it and a re-run passes", func(t *testing.T) {
+		repo, deploy, cmdOut := setup(t, false)
+		rep, out := run(repo, deploy, cmdOut, true)
+		if rep.Failures() != 0 || !strings.Contains(out, "pruned deploy-dir leftover: scripts/old.sh") {
+			t.Fatalf("want the prune reported and no failure:\n%s", out)
+		}
+		if pathExists(filepath.Join(deploy, "scripts", "old.sh")) {
+			t.Error("--fix left the leftover")
+		}
+		_, out = run(repo, deploy, cmdOut, false)
+		if !strings.Contains(out, "no leftovers") {
+			t.Errorf("re-run should pass:\n%s", out)
+		}
+	})
+
+	t.Run("an orphan git never tracked is only named", func(t *testing.T) {
+		repo, deploy, cmdOut := setup(t, false)
+		cmdOut[logKey(repo)] = ""
+		rep, out := run(repo, deploy, cmdOut, true)
+		if rep.Failures() != 0 || !strings.Contains(out, "scripts/old.sh is in the deploy dir but not in the checkout") {
+			t.Fatalf("want a warning, no failure:\n%s", out)
+		}
+		if !pathExists(filepath.Join(deploy, "scripts", "old.sh")) {
+			t.Error("--fix removed a file git never tracked")
+		}
+	})
+
+	t.Run("an unreadable entry is named and the check does not pass", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("needs POSIX permissions enforced on the test user")
+		}
+		repo, deploy, cmdOut := setup(t, false)
+		if err := os.Remove(filepath.Join(deploy, "scripts", "old.sh")); err != nil {
+			t.Fatal(err)
+		}
+		locked := filepath.Join(deploy, "scripts", "locked")
+		mkdirAll(t, locked)
+		if err := os.Chmod(locked, 0); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+		rep, out := run(repo, deploy, cmdOut, false)
+		if rep.Failures() != 0 || !strings.Contains(out, "scripts/locked in the deploy dir could not be read") {
+			t.Fatalf("want a warning naming the unreadable entry, no failure:\n%s", out)
+		}
+		if strings.Contains(out, "no leftovers") {
+			t.Errorf("an unchecked entry must not read as a clean deploy dir:\n%s", out)
+		}
+	})
+
+	t.Run("a worktree checkout is checked, not skipped", func(t *testing.T) {
+		repo, deploy, cmdOut := setup(t, true)
+		_, out := run(repo, deploy, cmdOut, false)
+		if strings.Contains(out, "not a git repo") || !strings.Contains(out, "leftover: scripts/old.sh") {
+			t.Fatalf("a .git file is a worktree, not a missing repo:\n%s", out)
+		}
+	})
 }

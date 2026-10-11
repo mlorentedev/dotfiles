@@ -1,6 +1,6 @@
 # AGY.md
 
-> **SYSTEM META-INSTRUCTION:** Target tool: Google Antigravity CLI (`agy`). Target model: see `settings.json` (`modelConfigs.defaultModel`, currently `gemini-3.7-flash`).
+> **SYSTEM META-INSTRUCTION:** Target tool: Google Antigravity CLI (`agy`). Target model: see `settings.json` (top-level `model`).
 > **CAPABILITY HANDSHAKE:** Activate maximum reasoning depth and full context scanning. Do not simulate lower intelligence than the active model supports.
 >
 > **First, read `AGENTS.md` at the repo root** — canonical SSOT for behaviour rules across all agents (Standing Orders, Decision Hierarchy, Neural Hive Loop, MCP usage, Operational Rules). This file contains only agy-specific extensions on top.
@@ -27,9 +27,9 @@ In addition to the Response Protocol in `AGENTS.md`:
 
 ## Model Tier (per AGENTS.md "Model Selection")
 
-The active default lives in `ai/agy/settings.json` (`modelConfigs.defaultModel`). Single source of truth for model selection — update there, not here.
+The active default is the top-level `model` in `ai/agy/settings.json`, written as agy's picker label; `harness/model-map.json` (`tiers.mid.gemini`) routes the same id. Single source of truth for model selection — update there, not here. `modelConfigs.defaultModel` is not read by agy (harness/model-pins.json `excluded`).
 
-- **Default:** `gemini-3.7-flash` — daily driver (see `settings.json`).
+- **Default:** the `settings.json` `model` — daily driver.
 - **High-reasoning alias:** `chat-base` profile (`thinkingConfig.thinkingLevel: HIGH`) for hard debug / architecture / root-cause.
 
 Selection: configure via `agy` UI or per-prompt model override. Model IDs reflect the Antigravity CLI runtime; verify availability in `agy` itself if the listed model is rejected.

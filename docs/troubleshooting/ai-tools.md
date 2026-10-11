@@ -103,7 +103,7 @@ cat ~/.claude/settings.json | jq '.enabledPlugins'
 ## `dotf init` not found (Linux/macOS)
 
 ```bash
-# dotf must be on PATH (installed by setup + install-dotf)
+# dotf must be on PATH (installed by setup + install.sh)
 command -v dotf
 dotf init --help
 ```
@@ -124,7 +124,19 @@ type project-init
 - PowerShell profile not loaded (restart PowerShell)
 - `dotf` not installed / not on PATH (re-run setup-windows.ps1)
 
+## pi packages not reconciled (Windows)
+
+`setup-windows.ps1` installs `dotf.exe` in `~\.local\bin`, which may not be on
+the current session's PATH. The pi package step uses that path directly when
+`Get-Command dotf` cannot find it. If setup reports that `dotf` is missing,
+check `Test-Path "$env:USERPROFILE\.local\bin\dotf.exe"` and re-run setup if
+it is absent. If `dotf` reports that pi or npm is missing, inspect the earlier
+setup warnings and re-run setup after resolving them; the package step skips
+without claiming convergence. From the checkout root, run
+`& "$env:USERPROFILE\.local\bin\dotf.exe" pi packages check --repo $PWD.Path`
+to verify the declared packages after setup.
+
 ## Related
 
-- [Runbook: AI Tools Setup](../runbooks/ai-tools-setup.md)
+- [Runbook: Agent provisioning](../runbooks/guide-agent-provisioning.md)
 - [ADR-001: Custom Skills Over BMAD](../adr/adr-001-skill-based-ai-workflow.md)

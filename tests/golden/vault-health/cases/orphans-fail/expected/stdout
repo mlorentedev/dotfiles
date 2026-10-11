@@ -13,6 +13,7 @@ Vault: knowledge (<VAULT>)
 [3/7] Orphans & Dead-Ends
   FAIL: Orphans: 6/10 (60%) — too many isolated files
   FAIL: Dead-ends: 6/10 (60%) — too many files without outgoing links
+  INFO: Most dead-ends: (vault root) (6) (--verbose lists them)
 
 [4/7] Unresolved Links
   PASS: No unresolved links

@@ -1,18 +1,21 @@
 # Dotfiles
 
-Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Supported today on **Linux** and **Windows**. **macOS is planned** (roadmap) — there is no setup-macos.sh yet, so the Linux bootstrap is unverified on macOS.
+Personal development environment: shell configs, AI tool integration, and encrypted secrets management, on **Linux**, **Windows** and **macOS**.
 
 | Platform | Status | Bootstrap |
 |---|---|---|
-| Linux | Supported | `setup-linux.sh` |
-| Windows | Supported | `setup-windows.ps1` |
-| macOS | Planned (not yet implemented) | — |
+| Linux | Supported | `install.sh` → `dotf converge`, which runs `setup-linux.sh` as its last step |
+| Windows | Supported | `install.ps1` → `dotf converge`, which runs `setup-windows.ps1` as its last step |
+| macOS | Bring-up ([#2013](https://github.com/mlorentedev/dotfiles/issues/2013)) | `install.sh` → `dotf converge`; no setup script runs on a Mac (ADR-045) |
+
+On macOS, converge does not install Claude Code or agy yet ([#2317](https://github.com/mlorentedev/dotfiles/issues/2317)), and no from-zero CI job proves a fresh Mac yet (#2013 X1).
 
 ## Quick Start
 
-### Linux
+### Linux and macOS
 
-**Checkout bootstrap** (factory-fresh machine — needs only `git` and `curl`):
+**One entrypoint** (a factory-fresh machine needs only `curl`; on macOS,
+`git` comes with `xcode-select --install`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash
@@ -20,26 +23,23 @@ curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.s
 
 > **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | less`
 
-**CLI recovery or upgrade** (does not clone a checkout or run full setup):
+`install.sh` downloads the latest `dotf` release, verifies its checksum, proves
+it runs, places it in `~/.local/bin`, and hands the machine to `dotf converge`.
+Converge clones the checkout when it is absent (`DOTFILES_REPO_DIR`, else
+`~/Projects/dotfiles`; the upstream is `DOTFILES_REPO`), fast-forwards it when
+it is present, and applies every step. Running it again is safe: a converged
+machine reports zero changes.
+
+Every argument goes to `dotf converge`. To see what it would change first:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | bash
-dotf version
+curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | bash -s -- --plan
 ```
 
-> **Verify before piping:** `curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.sh | less`
+From a checkout, `./install.sh` installs the version `versions.conf` pins
+instead of the latest release. `DOTF_BIN_DIR` moves the install directory.
 
-The recovery installer resolves the latest published release, verifies its
-checksum, and replaces only the user-local `dotf` binary. Use checkout bootstrap
-when you want to deploy the complete dotfiles configuration.
-
-Override the clone target with `DOTFILES_DIR` or the upstream URL with `DOTFILES_REPO`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.sh | DOTFILES_DIR=/tmp/df bash
-```
-
-Or **manually**:
+Or **manually** (Linux; on macOS run `./install.sh` from the checkout instead, never `setup-linux.sh`):
 
 ```bash
 # Clone the repo to a checkout dir (NOT ~/.dotfiles — that is the deploy target
@@ -52,7 +52,20 @@ source ~/.zshrc
 
 ### Windows (PowerShell)
 
-**Checkout bootstrap:**
+**One entrypoint** (no clone, no admin):
+
+```powershell
+irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.ps1 | iex
+```
+
+The same contract as `install.sh`: install `dotf`, then `dotf converge`. From a
+checkout, `.\install.ps1 --plan` plans first.
+
+The POSIX and PowerShell entrypoints share one contract, but each uses the
+platform-native interpreter. A factory-fresh Windows machine cannot run a Bash
+payload until Bash has been installed.
+
+**Manually**:
 
 ```powershell
 git clone https://github.com/mlorentedev/dotfiles.git
@@ -60,17 +73,6 @@ cd dotfiles
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 # Restart PowerShell after setup
 ```
-
-**CLI recovery or upgrade** (does not clone a checkout or run full setup):
-
-```powershell
-irm https://raw.githubusercontent.com/mlorentedev/dotfiles/main/scripts/install-dotf.ps1 | iex
-dotf version
-```
-
-The POSIX and PowerShell recovery commands share the same release-install
-contract, but each uses the platform-native interpreter. A factory-fresh Windows
-machine cannot run a Bash payload until Bash has been installed.
 
 Optional: add `-WithDefaults` to also apply ~15 HKCU engineering defaults
 (show file extensions/hidden files, disable advertising ID and Bing-in-Start,
@@ -83,14 +85,14 @@ admin needed; some changes show after an Explorer restart.
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
 - **Encrypted secrets** — Bitwarden SSOT with an age-encrypted DR floor; injected into a single child process on demand via `dotf secrets run`, never into the ambient shell (ADR-028)
 - **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 37 custom skills, unified by `AGENTS.md` SSOT
-- **Cross-platform** — Atomic copy with drift assertion on both Linux and Windows (no admin required; ADR-012); macOS planned
+- **Cross-platform** — `dotf converge` on Linux, Windows and macOS; atomic copy with drift assertion, no admin required (ADR-012, ADR-045)
 - **Editor & shell ergonomics** — `.editorconfig` for cross-IDE consistency + `.inputrc` for case-insensitive tab-completion and arrow-key history search
 - **Tested** — 1200+ BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
 
 ```text
-├── setup-linux.sh              # Linux setup (copy + drift assertion, ADR-012); macOS planned
+├── setup-linux.sh              # Linux setup (copy + drift assertion, ADR-012); never run on macOS
 ├── setup-windows.ps1           # Windows setup (copies)
 ├── cli/                        # `dotf` Go CLI — primary user-facing tool, see cli/README.md for the subcommand list
 ├── scripts/                    # Shell utilities, on PATH (see Human entrypoints below)
@@ -283,13 +285,13 @@ Full reference and pane-layout recipes: [`docs/runbooks/guide-tmux.md`](docs/run
 
 **Windows:** git, PowerShell
 
-**macOS:** planned — not yet supported (no setup-macos.sh)
+**macOS:** `curl` and git (`xcode-select --install`); Homebrew for the catalog's brew entries
 
 **Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
 
 ## Contributing
 
-PRs ≥50 LOC of production diff must include an active `specs/<feature-id>/` folder (Spec-Driven Development). The `spec-gate` CI check enforces this; failures link back to `AGENTS.md` "Discipline Gate". Escape hatch: add the `skip-sdd` label AND a non-empty `## SDD skip rationale` section in the PR body. Optional local pre-push hook: `./scripts/install-precommit.sh --with-sdd-gate`.
+PRs ≥50 LOC of production diff must include an active `specs/<feature-id>/` folder (Spec-Driven Development). The `spec-gate` CI check enforces this; failures link back to `AGENTS.md` "Discipline Gate". Escape hatch: add the `skip-sdd` label AND a non-empty `## SDD skip rationale` section in the PR body. The same gate runs locally at pre-push through the global git-hooks dispatcher once pre-commit is installed (`dotf tools install pre-commit`).
 
 ## Documentation
 

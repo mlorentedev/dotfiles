@@ -91,11 +91,11 @@ run_preflight() {
     [[ "$output" != *"Fix the chain"* ]] || false
 }
 
-@test "preflight: when no declared model answers, the job fails before PR-Agent runs" {
+@test "preflight: when no declared model answers, the step fails and NaN leaves the pool" {
     export STUB_CODES="mimo-v2.6-flash=401 deepseek-v4-flash=429"
     run_preflight
     [ "$status" -eq 1 ]
-    [[ "$output" == *"::error::"* ]] || false
+    [[ "$output" == *"::warning::No model in PR-Agent's declared NaN chain answered"* ]] || false
     run ! grep -q '^model=' "$OUT"
 }
 

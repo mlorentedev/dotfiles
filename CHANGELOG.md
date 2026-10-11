@@ -1,5 +1,86 @@
 # Changelog
 
+## [0.67.0](https://github.com/mlorentedev/dotfiles/compare/v0.66.0...v0.67.0) (2026-10-10)
+
+
+### Features
+
+* **contract:** give darwin its own env-contract key ([#2284](https://github.com/mlorentedev/dotfiles/issues/2284)) ([784e034](https://github.com/mlorentedev/dotfiles/commit/784e034b48a0729f134ac10024e4167d7b0bac50))
+* **converge:** bind harness hooks as a converge step and report drift in doctor ([#2288](https://github.com/mlorentedev/dotfiles/issues/2288)) ([435689a](https://github.com/mlorentedev/dotfiles/commit/435689a9e08af6665c110b448894c82cb5c5ebcd))
+* **converge:** clone or fast-forward the checkout as the first step ([#2263](https://github.com/mlorentedev/dotfiles/issues/2263)) ([d52ef72](https://github.com/mlorentedev/dotfiles/commit/d52ef72193f8770f9009b4c3b62ad3ef8ba884f6))
+* **converge:** deploy the ai/deploy.json configs as a converge step ([#2245](https://github.com/mlorentedev/dotfiles/issues/2245)) ([7ab421e](https://github.com/mlorentedev/dotfiles/commit/7ab421e91ea1e1aa8009d1da0f9b9708a0d645ad))
+* **converge:** give macOS GUI apps the contract variables through launchd ([#2256](https://github.com/mlorentedev/dotfiles/issues/2256)) ([0433a42](https://github.com/mlorentedev/dotfiles/commit/0433a42f89e145e71ce548e7a01d41507c20198b))
+* **converge:** install the packages.json catalog in the tools step on every OS ([#2289](https://github.com/mlorentedev/dotfiles/issues/2289)) ([2cd821d](https://github.com/mlorentedev/dotfiles/commit/2cd821d921fe26464159d5bc4ff6023f3de47013))
+* **converge:** run the setup script last and route dotf update through converge ([#2274](https://github.com/mlorentedev/dotfiles/issues/2274)) ([d614102](https://github.com/mlorentedev/dotfiles/commit/d614102a1d43490d67f1c9c5e40f3f0096486b71))
+* **doctor:** keep Colima's VM at the declared 4 CPU and 8 GiB ([#2241](https://github.com/mlorentedev/dotfiles/issues/2241)) ([98c78a4](https://github.com/mlorentedev/dotfiles/commit/98c78a494d44e4e51be401fb9aaeb289883fc640))
+* **pr-land:** require a declared standing merge grant on the base branch ([#2229](https://github.com/mlorentedev/dotfiles/issues/2229)) ([3e1b993](https://github.com/mlorentedev/dotfiles/commit/3e1b9933c5642f025016ba5ed5479c53419d3bff)), closes [#2178](https://github.com/mlorentedev/dotfiles/issues/2178)
+* **secrets:** push a rotated value to its CI consumers with rotate --push-ci ([#2300](https://github.com/mlorentedev/dotfiles/issues/2300)) ([635a99b](https://github.com/mlorentedev/dotfiles/commit/635a99b79309cd73395531a7990855836390d5b4))
+* **tools:** pin delta, fd and bat through mise and declare btop ([#2240](https://github.com/mlorentedev/dotfiles/issues/2240)) ([b7afc9b](https://github.com/mlorentedev/dotfiles/commit/b7afc9b6ed6e37a7857d734ce773ea4c6dff2e7b)), closes [#2013](https://github.com/mlorentedev/dotfiles/issues/2013)
+* **tools:** pin Python 3.13.16 and PyYAML through mise ([#2222](https://github.com/mlorentedev/dotfiles/issues/2222)) ([e04219c](https://github.com/mlorentedev/dotfiles/commit/e04219c29791b1f1bc3b6a2ba3d85a754be2908d))
+* **tools:** pin the daily Kubernetes and lint CLIs through mise ([#2239](https://github.com/mlorentedev/dotfiles/issues/2239)) ([01379f5](https://github.com/mlorentedev/dotfiles/commit/01379f5924dc7f23064cd48b18ef34057ec201b5)), closes [#2013](https://github.com/mlorentedev/dotfiles/issues/2013)
+* **tools:** pin the kubelab essentials and probe CLIs without --version ([#2238](https://github.com/mlorentedev/dotfiles/issues/2238)) ([f6557b4](https://github.com/mlorentedev/dotfiles/commit/f6557b46dfae00c5d034e3443e165207b0f57af4)), closes [#2013](https://github.com/mlorentedev/dotfiles/issues/2013)
+* **tools:** provision Docker on macOS through Colima ([#2242](https://github.com/mlorentedev/dotfiles/issues/2242)) ([93b4cfc](https://github.com/mlorentedev/dotfiles/commit/93b4cfc9d6ffd56df0bc2ab316beff43784e9d43))
+* **tools:** read Homebrew casks as their own system key ([#2234](https://github.com/mlorentedev/dotfiles/issues/2234)) ([040c1fc](https://github.com/mlorentedev/dotfiles/commit/040c1fccd6d5d2f74ba04464645a13a077ca7d28))
+* **worktree:** probe process working directories on macOS for sweep and done ([#2293](https://github.com/mlorentedev/dotfiles/issues/2293)) ([95f9906](https://github.com/mlorentedev/dotfiles/commit/95f99060255ad647298ef2ed633611648fbb3db9))
+
+
+### Bug Fixes
+
+* **agy:** pin Gemini 3.8 Flash and keep the baseline grants ([#2236](https://github.com/mlorentedev/dotfiles/issues/2236)) ([7b7d013](https://github.com/mlorentedev/dotfiles/commit/7b7d013fd1c977b3362a0647f686884a900dbe6a))
+* **config:** copy to each OS's clipboard from tmux and complete the terraform on PATH ([#2290](https://github.com/mlorentedev/dotfiles/issues/2290)) ([6052c66](https://github.com/mlorentedev/dotfiles/commit/6052c6653d5c16735f9ec335219b80209a0f3e0d))
+* **converge:** mirror the deploy-dir set so macOS can clear repo drift ([#2230](https://github.com/mlorentedev/dotfiles/issues/2230)) ([873ae3a](https://github.com/mlorentedev/dotfiles/commit/873ae3a7a10679d8515b4629e6c595c6486ad7a1))
+* **deploy:** merge opencode's tui.json so Orca's plugin key survives a deploy ([#2265](https://github.com/mlorentedev/dotfiles/issues/2265)) ([d11a33b](https://github.com/mlorentedev/dotfiles/commit/d11a33b64fab23aa9e6f976067fe474d037e96d1))
+* **deploy:** retire Claude marketplaces through the CLI's registry, not a setup block ([#2259](https://github.com/mlorentedev/dotfiles/issues/2259)) ([b9c3b1d](https://github.com/mlorentedev/dotfiles/commit/b9c3b1da457faa34a5f4c617c3de8236af7b98fe))
+* **doctor:** fail when the hive daemon behind hive client does not answer ([#2255](https://github.com/mlorentedev/dotfiles/issues/2255)) ([cbf9e04](https://github.com/mlorentedev/dotfiles/commit/cbf9e04362caf76218ced17edc58b698d7566a9d))
+* **harness:** identify bound hooks by command signature when the marker is gone ([#2276](https://github.com/mlorentedev/dotfiles/issues/2276)) ([c4fbea7](https://github.com/mlorentedev/dotfiles/commit/c4fbea71af7011b2075f87e08e126b7156fcd8c2))
+* **harness:** keep the standing-grant pointer inside full-only so compact payloads stay strict ([#2248](https://github.com/mlorentedev/dotfiles/issues/2248)) ([ab3edc2](https://github.com/mlorentedev/dotfiles/commit/ab3edc280a1988a28ec850515b678300a0ffb218))
+* **harness:** mirror the checkout minus what git ignores ([#2277](https://github.com/mlorentedev/dotfiles/issues/2277)) ([7fc2858](https://github.com/mlorentedev/dotfiles/commit/7fc28586a6fb438350278b9d656a1d25c66806ad))
+* **harness:** prune deploy-dir copies the checkout deleted ([#2267](https://github.com/mlorentedev/dotfiles/issues/2267)) ([0fffda7](https://github.com/mlorentedev/dotfiles/commit/0fffda75c84a5cffcdc6997671977d0e6c711df9))
+* **orca:** find Orca's data and running instance by Electron's conventions on every OS ([#2295](https://github.com/mlorentedev/dotfiles/issues/2295)) ([722fd69](https://github.com/mlorentedev/dotfiles/commit/722fd69d9996fd6f91785c00ff838f9f698320c3))
+* **orca:** hold only PowerShell hooks to the timeout floor ([#2286](https://github.com/mlorentedev/dotfiles/issues/2286)) ([06d5321](https://github.com/mlorentedev/dotfiles/commit/06d5321159d24ce99620a1c847409b368d3f5e68))
+* **pi:** realign OpenRouter DeepSeek limits with the catalog and correct PI-002's record ([#2297](https://github.com/mlorentedev/dotfiles/issues/2297)) ([8f4c0ba](https://github.com/mlorentedev/dotfiles/commit/8f4c0babece81966fc6912fe79531c8c6e864c49))
+* **secrets:** close CLI-037 with its archive review gaps applied ([#2307](https://github.com/mlorentedev/dotfiles/issues/2307)) ([6d63256](https://github.com/mlorentedev/dotfiles/commit/6d63256710f8ebfd1a8cb33dfb7243284ba633c5))
+* **shell:** keep the inherited PATH in .bashrc and export only tool homes that exist ([#2283](https://github.com/mlorentedev/dotfiles/issues/2283)) ([4001e40](https://github.com/mlorentedev/dotfiles/commit/4001e402f8cc58622bf511eef0333fa7bcd58769))
+* **tools:** install npm catalog tools under ~/.local and let uv replace foreign entry points ([#2254](https://github.com/mlorentedev/dotfiles/issues/2254)) ([f50b3da](https://github.com/mlorentedev/dotfiles/commit/f50b3da9181dc9583535af580cc9391768e116bd))
+* **vault:** leave 50_work product and client records out of dead-ends ([#2233](https://github.com/mlorentedev/dotfiles/issues/2233)) ([bed5b11](https://github.com/mlorentedev/dotfiles/commit/bed5b1158e12422eb629b827f911d8e66647bdc7)), closes [#2197](https://github.com/mlorentedev/dotfiles/issues/2197)
+* **vault:** leave linkless genres and attachments out of the link-graph counts ([#2226](https://github.com/mlorentedev/dotfiles/issues/2226)) ([7568dff](https://github.com/mlorentedev/dotfiles/commit/7568dffbe382192932779100c80a1fa782624b9b))
+* **vault:** notify through Notification Center on macOS ([#2292](https://github.com/mlorentedev/dotfiles/issues/2292)) ([fd0d059](https://github.com/mlorentedev/dotfiles/commit/fd0d0593744dc25919677a69b55dc623b4d992ee))
+
+## [0.66.0](https://github.com/mlorentedev/dotfiles/compare/v0.65.0...v0.66.0) (2026-10-09)
+
+
+### Features
+
+* **ci:** draw PR-Agent's reviewer from a NaN + Claude Haiku pool ([#2188](https://github.com/mlorentedev/dotfiles/issues/2188)) ([5dbb724](https://github.com/mlorentedev/dotfiles/commit/5dbb724a19337779a2e57df80c4d07e538d2899f))
+* **deploy:** merge a TOML config the tool also writes ([#2192](https://github.com/mlorentedev/dotfiles/issues/2192)) ([e0be824](https://github.com/mlorentedev/dotfiles/commit/e0be824231b9504f94a3a71396dd4b2880adc301))
+* **doctor:** report and fix the ~/.local/bin copies that shadow mise's pinned CLIs ([#2196](https://github.com/mlorentedev/dotfiles/issues/2196)) ([90549a9](https://github.com/mlorentedev/dotfiles/commit/90549a9e6250c6e4df81512a35a9f32cdf8cb367))
+* **git:** converge git's global config without owning ~/.gitconfig ([#2208](https://github.com/mlorentedev/dotfiles/issues/2208)) ([0ecddb3](https://github.com/mlorentedev/dotfiles/commit/0ecddb362e78b57879602c11c08607dca731481e))
+* **lessons:** check lessons with dotf in pre-commit and retire the shell twin ([#2211](https://github.com/mlorentedev/dotfiles/issues/2211)) ([11c56bc](https://github.com/mlorentedev/dotfiles/commit/11c56bc095584a6df539ce8c232fde5e3a9d93cb))
+* **setup:** install uv through mise and poetry from the catalog ([#2186](https://github.com/mlorentedev/dotfiles/issues/2186)) ([9bde46c](https://github.com/mlorentedev/dotfiles/commit/9bde46c7b06d01e475f6e9b8ee6b9a053ecf4695))
+* **tools:** declare the class-3 CLIs as system entries in the catalog ([#2210](https://github.com/mlorentedev/dotfiles/issues/2210)) ([64a279c](https://github.com/mlorentedev/dotfiles/commit/64a279c28d2cc50167ba4cbb5b2471b3eae68105))
+* **tools:** install herdr through mise at 0.9.3 ([#2190](https://github.com/mlorentedev/dotfiles/issues/2190)) ([b9e67ff](https://github.com/mlorentedev/dotfiles/commit/b9e67ff53cddaa61bf12bcd592e5833dd97bff1a))
+* **tools:** install mise from the catalog ([#2185](https://github.com/mlorentedev/dotfiles/issues/2185)) ([75869c0](https://github.com/mlorentedev/dotfiles/commit/75869c0098e565ae080b362a991509dafee5b38c))
+* **tools:** install Python packages through mise and require Python 3.11 in doctor ([#2219](https://github.com/mlorentedev/dotfiles/issues/2219)) ([41ee37d](https://github.com/mlorentedev/dotfiles/commit/41ee37d8a7b9677745b12327634726d3a1b776f6))
+
+
+### Bug Fixes
+
+* **deploy:** narrow an existing directory that holds a private file ([#2171](https://github.com/mlorentedev/dotfiles/issues/2171)) ([9a6ab16](https://github.com/mlorentedev/dotfiles/commit/9a6ab16283e8f5081fc04daca82a4743f2a28c8e))
+* **doctor:** hold the age root to its declared mode, as secrets verify does ([#2206](https://github.com/mlorentedev/dotfiles/issues/2206)) ([70c4ffa](https://github.com/mlorentedev/dotfiles/commit/70c4ffaa063200e389459bec7cb2432492817d00))
+* **harness:** refresh the records only from a vault level with its upstream ([#2175](https://github.com/mlorentedev/dotfiles/issues/2175)) ([84c6c2e](https://github.com/mlorentedev/dotfiles/commit/84c6c2ea6b244ecaba31de9ca0cd148e5769bd5b))
+* **harness:** refresh the test skill record's sha and guard record shas in CI ([#2163](https://github.com/mlorentedev/dotfiles/issues/2163)) ([9199066](https://github.com/mlorentedev/dotfiles/commit/9199066bd2321e862e3b2bf975a4b026444f325a))
+* **hooks:** fail closed when a declared pre-commit gate cannot run ([#2184](https://github.com/mlorentedev/dotfiles/issues/2184)) ([035068f](https://github.com/mlorentedev/dotfiles/commit/035068f432d792da30b290c314eb0ec53e3bf59e))
+* **pi:** declare adaptive thinking on the Anthropic review models ([#2218](https://github.com/mlorentedev/dotfiles/issues/2218)) ([c8ee51d](https://github.com/mlorentedev/dotfiles/commit/c8ee51d7b6e7c5377dd6d09ca02ee1f840d2bd96))
+* **pr:** keep an exempt release diff out of the triage queue ([#2209](https://github.com/mlorentedev/dotfiles/issues/2209)) ([9720505](https://github.com/mlorentedev/dotfiles/commit/9720505a611b64f70560bf7aa9b36b1b77947f0c))
+* **setup-windows:** report a winget tool installed only when it resolves ([#2159](https://github.com/mlorentedev/dotfiles/issues/2159)) ([7af4667](https://github.com/mlorentedev/dotfiles/commit/7af4667a82ff7f3d0a371875a0c7fca61d32c0c0))
+* **setup:** run the linux-amd64 downloads on linux-amd64 only, and remove their leftovers elsewhere ([#2166](https://github.com/mlorentedev/dotfiles/issues/2166)) ([9c25aee](https://github.com/mlorentedev/dotfiles/commit/9c25aee932b75d6b2024e7101a743f66d309c26c))
+* **shell:** stop binding zsh-tied variable names in dual-shell scripts ([#2169](https://github.com/mlorentedev/dotfiles/issues/2169)) ([e861c29](https://github.com/mlorentedev/dotfiles/commit/e861c29fbcbb14c208597822e4429dc2deaddbe0))
+* **test:** feed the tied-name guard its file on stdin, since BSD sed fails on `--` ([#2181](https://github.com/mlorentedev/dotfiles/issues/2181)) ([0f8add9](https://github.com/mlorentedev/dotfiles/commit/0f8add92a3a9c47053379edfc41c0a4bf4eba6e0))
+* **tools:** read a tool's version from stdout before stderr ([#2213](https://github.com/mlorentedev/dotfiles/issues/2213)) ([385f36b](https://github.com/mlorentedev/dotfiles/commit/385f36b130e05c2259c055936e05c73da4e1f897))
+* **tools:** turn off mise's self-update notice in the rendered config ([#2198](https://github.com/mlorentedev/dotfiles/issues/2198)) ([44db9fc](https://github.com/mlorentedev/dotfiles/commit/44db9fc53694757d1951541afbef6f97a9a355d9))
+* **vault:** stop vault health passing the connection check on an obsidian error ([#2182](https://github.com/mlorentedev/dotfiles/issues/2182)) ([d98adab](https://github.com/mlorentedev/dotfiles/commit/d98adabbf5570b7e7425a2b6866a482f997e3d86))
+* **windows:** reconcile pi packages without dotf on PATH ([#2221](https://github.com/mlorentedev/dotfiles/issues/2221)) ([981d37e](https://github.com/mlorentedev/dotfiles/commit/981d37e0e69b36788ea5c918615023d51ba07d8d))
+
 ## [0.65.0](https://github.com/mlorentedev/dotfiles/compare/v0.64.0...v0.65.0) (2026-10-08)
 
 

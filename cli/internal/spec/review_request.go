@@ -72,6 +72,12 @@ type ReviewRequest struct {
 	// discards ReviewedSHA's commit no longer decides the question (#1566).
 	// Absent on requests written before SDD-042, which keep the SHA check.
 	ContractDigests map[string]string `json:"contract_digests,omitempty"`
+	// FallbackReason is why a `signs: fallback` pool member was launched as
+	// the first signer (AI-045, #1923): the classified failure of the first
+	// signers it stands in for. The launcher refuses a fallback member without
+	// one, and the archive gate refuses a fallback signature whose request
+	// carries none, so a fallback never signs by habit or by draw.
+	FallbackReason string `json:"fallback_reason,omitempty"`
 }
 
 // HeadSHA returns the repository HEAD, or "" when repoRoot is not a checkout.
@@ -96,7 +102,12 @@ func HeadSHA(repoRoot string) string {
 // the archive gate still refuses a request that did not travel, so failing
 // open here only moves the refusal later.
 func RequestIgnored(repoRoot, specDir string) bool {
-	path := filepath.Join(specDir, ReviewRequestFile)
+	return RequestIgnoredIn(repoRoot, specDir, FirstSigner)
+}
+
+// RequestIgnoredIn is RequestIgnored for the request of one signer's slot.
+func RequestIgnoredIn(repoRoot, specDir string, slot ReviewSlot) bool {
+	path := filepath.Join(specDir, slot.Request)
 	return exec.Command("git", "-C", repoRoot, "check-ignore", "-q", "--", path).Run() == nil
 }
 
@@ -296,21 +307,28 @@ func fileDigest(path string) string {
 // Replacing rather than appending: the sidecar describes the CURRENT outstanding
 // request, and a history of requests is what the transcript is for.
 func WriteReviewRequest(specDir, reviewedSHA, reviewer, baseSHA string) error {
+	return WriteReviewRequestIn(specDir, FirstSigner, reviewedSHA, reviewer, baseSHA, "")
+}
+
+// WriteReviewRequestIn records the launch of one signer's slot. fallbackReason
+// is empty unless a `signs: fallback` member was launched as the first signer.
+func WriteReviewRequestIn(specDir string, slot ReviewSlot, reviewedSHA, reviewer, baseSHA, fallbackReason string) error {
 	req := ReviewRequest{
 		ReviewedSHA:        reviewedSHA,
 		Reviewer:           reviewer,
 		RequestedAt:        time.Now().UTC().Format(time.RFC3339),
-		ReviewDigestBefore: fileDigest(filepath.Join(specDir, ReviewFile)),
+		ReviewDigestBefore: fileDigest(filepath.Join(specDir, slot.Review)),
 		BaseSHA:            baseSHA,
 		ContractDigests:    ContractDigests(specDir),
+		FallbackReason:     fallbackReason,
 	}
 	data, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encoding the review request: %w", err)
 	}
 	data = append(data, '\n')
-	if err := os.WriteFile(filepath.Join(specDir, ReviewRequestFile), data, 0o644); err != nil {
-		return fmt.Errorf("writing %s: %w", ReviewRequestFile, err)
+	if err := os.WriteFile(filepath.Join(specDir, slot.Request), data, 0o644); err != nil {
+		return fmt.Errorf("writing %s: %w", slot.Request, err)
 	}
 	return nil
 }
@@ -319,19 +337,24 @@ func WriteReviewRequest(specDir, reviewedSHA, reviewer, baseSHA string) error {
 // is not an error: reviews predating this file, and hand-written ones, are still
 // governed by the verdict and staleness checks.
 func ReadReviewRequest(specDir string) (ReviewRequest, bool, error) {
-	data, err := os.ReadFile(filepath.Join(specDir, ReviewRequestFile))
+	return ReadReviewRequestIn(specDir, FirstSigner)
+}
+
+// ReadReviewRequestIn loads the request of one signer's slot.
+func ReadReviewRequestIn(specDir string, slot ReviewSlot) (ReviewRequest, bool, error) {
+	data, err := os.ReadFile(filepath.Join(specDir, slot.Request))
 	if os.IsNotExist(err) {
 		return ReviewRequest{}, false, nil
 	}
 	if err != nil {
-		return ReviewRequest{}, false, fmt.Errorf("reading %s: %w", ReviewRequestFile, err)
+		return ReviewRequest{}, false, fmt.Errorf("reading %s: %w", slot.Request, err)
 	}
 	var req ReviewRequest
 	if err := json.Unmarshal(data, &req); err != nil {
 		// Loud, not skipped. An unparseable sidecar is the shape C15 forbids:
 		// treating it as absent would silently drop the guard exactly when the
 		// file that carries it is damaged.
-		return ReviewRequest{}, true, fmt.Errorf("%s is not valid JSON: %w", ReviewRequestFile, err)
+		return ReviewRequest{}, true, fmt.Errorf("%s is not valid JSON: %w", slot.Request, err)
 	}
 	return req, true, nil
 }
@@ -353,15 +376,20 @@ func ReadReviewRequest(specDir string) (ReviewRequest, bool, error) {
 // Detached launches are out of scope by construction: the command returns while
 // the reviewer is still running, so there is nothing yet to verify.
 func VerifyReviewProduced(specDir, transcript string) error {
-	digest := fileDigest(filepath.Join(specDir, ReviewFile))
+	return VerifyReviewProducedIn(specDir, FirstSigner, transcript)
+}
+
+// VerifyReviewProducedIn is VerifyReviewProduced for one signer's slot.
+func VerifyReviewProducedIn(specDir string, slot ReviewSlot, transcript string) error {
+	digest := fileDigest(filepath.Join(specDir, slot.Review))
 	if digest == "" {
 		return fmt.Errorf("the reviewer exited without writing %s -- that is a failed review, not a passing one\n"+
 			"what it did instead is in the transcript: %s\n"+
 			"re-run the review (a run ended by a turn cap, a rate limit, or a reviewer that talked itself out of the job leaves exactly this state)",
-			ReviewFile, transcript)
+			slot.Review, transcript)
 	}
 
-	req, found, err := ReadReviewRequest(specDir)
+	req, found, err := ReadReviewRequestIn(specDir, slot)
 	if err != nil {
 		return err
 	}
@@ -369,11 +397,11 @@ func VerifyReviewProduced(specDir, transcript string) error {
 		return fmt.Errorf("%s is byte-identical to what it held before this run -- the reviewer wrote no verdict\n"+
 			"what is on disk is the PREVIOUS round's, which is not a review of this change\n"+
 			"the transcript of the run that wrote nothing: %s",
-			ReviewFile, transcript)
+			slot.Review, transcript)
 	}
-	if _, _, err := FindReview(specDir); err != nil {
+	if _, _, err := FindReviewIn(specDir, slot); err != nil {
 		return fmt.Errorf("the reviewer wrote a malformed %s: %w\nreview transcript: %s",
-			ReviewFile, err, transcript)
+			slot.Review, err, transcript)
 	}
 	return nil
 }

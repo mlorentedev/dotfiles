@@ -53,9 +53,11 @@ The design is ADR-045 (`docs/adr/adr-045-one-entrypoint-converges-every-os.md`);
 ## Out of scope
 
 - **Porting the setup scripts' blocks into reconcilers.** That is tracks W, T, P and S of #2013 and B of #1843; each port is its own PR. This spec delivers the engine, the entrypoint and the first native reconciler.
+  One exception, added 2026-10-10: #2013 S3, the macOS environment step, is delivered here as the `env-persist` reconciler (AC11), because no setup script has a darwin block to port and the owner released S3 from S1. S1 and S2 stay out (see the next line).
+  A second, added 2026-10-10: the catalog install (`packages.json`) becomes part of the `tools` step (AC12). On darwin no setup runs, so without it AC9 could never pass: a fresh Mac would converge with no catalog tool and a second run would still have them to install.
 - **Packaging** (a Homebrew tap, Scoop, deb and rpm) and the repo split. #1843 defers both until the repo's final shape is settled.
 - **The `platforms` selector in `ai/deploy.json`, `env-contract.json` and doctor checks** (#1843 B1, #2013 P2 and P3). ADR-045 proposes the vocabulary; those rows own the schema changes.
-- **Scheduled convergence** (#1843 A5, B8).
+- **Scheduled convergence** (#1843 A5, B8). That includes S2, the hive daemon's LaunchAgent, which the owner routed through `dotf schedule`.
 
 ## Risks / open questions
 
@@ -76,6 +78,10 @@ The design is ADR-045 (`docs/adr/adr-045-one-entrypoint-converges-every-os.md`);
 - [ ] AC6: `install.sh` (bash 3.2 and zsh) and `install.ps1` install `dotf` at the stable pin with checksum and exec probe, then hand off to `dotf converge`; with no network or a bad checksum they fail and place nothing.
 - [ ] AC7: no live file outside the historical records (ADRs and audits, lessons, specs, the changelog) references `install-dotf.sh`, `install-dotf.ps1` or the old clone-and-setup flow, enforced by a test.
 - [ ] AC8: `dotf update` runs `dotf converge`, keeps its exit semantics, and its existing tests pass.
+- [ ] AC10: `dotf converge` deploys every `ai/deploy.json` config that applies to the machine, so a template change merged to main lands without a manual `dotf deploy`; a config whose secrets the store cannot resolve during the run keeps its installed file and is named in the report (#1843 B15).
+- [ ] AC11: on macOS, `dotf converge` writes the contract's path variables into the user's launchd session, so an app launched from the Dock sees `VAULT_PATH`. It also loads a login agent that runs `dotf env persist` at every login, and a second run reports zero changes (#2013 S3).
+- [ ] AC12: `dotf converge` installs the `packages.json` catalog on every OS in the order setup used (install, mise sync, install), so one run converges a fresh machine; an entry whose manager is absent or that needs a sudo password is reported, not failed, and the probe accepts it.
+- [ ] AC13: `dotf converge` renders the contract's path file (`paths.sh`, or `paths.ps1` on Windows) after the mirror and before any install, so a contract or `machine.json` change reaches the shell without a manual `dotf env generate`; a second run reports it up to date.
 - [ ] AC9: a from-zero CI job on `macos-latest` runs `install.sh`, then `dotf doctor`, then a second converge with zero native changes.
 
 ## References

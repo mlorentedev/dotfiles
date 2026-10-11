@@ -12,8 +12,9 @@ Vault: knowledge (<VAULT>)
 
 [3/7] Orphans & Dead-Ends
   PASS: Orphans: 1/4 (25%)
-  INFO: Not counted: 5 file(s) under sessions/, memory/ and 90_archive/ (5 orphaned), which have no incoming links by design
-  PASS: Dead-ends: 1/9 (11%)
+  INFO: Not counted: 5 file(s) under 90_archive/, sessions/ and memory/ (5 orphaned), which have no incoming links by design
+  PASS: Dead-ends: 1/4 (25%)
+  INFO: Not counted: 5 file(s) under 90_archive/, 00_meta/templates/, 20_certifications/, 50_work/20-products/, 50_work/30-clients/ and sessions/ (0 dead-ends), which have no outgoing links by design
 
 [4/7] Unresolved Links
   PASS: No unresolved links

@@ -119,6 +119,9 @@ func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 		if strings.TrimSpace(entry.ID) == "" {
 			return nil, fmt.Errorf("%s entry %d has a blank id", ReviewerPoolFile, i)
 		}
+		if vErr := validateSigns(entry); vErr != nil {
+			return nil, fmt.Errorf("%s: %w", ReviewerPoolFile, vErr)
+		}
 	}
 	if len(p.Pool) == 0 {
 		return nil, fmt.Errorf("%s declares an empty pool — remove the file to disable the check, or list the models allowed to review", ReviewerPoolFile)
@@ -145,7 +148,9 @@ func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 // stronger one: `reviewer:` is SELF-REPORTED. This defends against habit and
 // accident, not against an agent that lies about its identity — the same trust
 // level as the verdict field sitting three lines above it.
-func checkReviewerPool(repoRoot, reviewer string) error {
+//
+// reviewFile names the signature being checked, review.md or the second slot's.
+func checkReviewerPool(repoRoot, reviewFile, reviewer string) error {
 	pool, err := loadReviewerPool(repoRoot)
 	if err != nil {
 		return fmt.Errorf("%w\nfix the file", err)
@@ -168,5 +173,5 @@ func checkReviewerPool(repoRoot, reviewer string) error {
 	return fmt.Errorf("%s records reviewer %q, which is not in %s\n"+
 		"the models allowed to review are: %s\n"+
 		"re-run /adversarial-review on one of them, or declare `review: waived` with a reason in proposal.md",
-		ReviewFile, shown, ReviewerPoolFile, strings.Join(pool, ", "))
+		reviewFile, shown, ReviewerPoolFile, strings.Join(pool, ", "))
 }

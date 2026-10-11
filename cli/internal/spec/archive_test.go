@@ -577,6 +577,8 @@ func TestArchiveStillRefusesTheEmittedTagForm(t *testing.T) {
 // reviewed tree would make every review stale on arrival.
 func TestDraftScanSkipsEveryReviewStateFile(t *testing.T) {
 	want := []string{ReviewFile, TranscriptFile, StderrPath(TranscriptFile), ReviewRequestFile}
+	// The second signature (AI-045) writes the same four files under its own names.
+	want = append(want, SecondSigner.Review, SecondSigner.Transcript, StderrPath(SecondSigner.Transcript), SecondSigner.Request)
 	if len(ReviewStateFiles) != len(want) {
 		t.Fatalf("ReviewStateFiles = %v, want exactly %v", ReviewStateFiles, want)
 	}

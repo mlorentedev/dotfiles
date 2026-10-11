@@ -112,6 +112,29 @@ setup() {
     grep -q 'pi packages apply --repo "\$CURRENT_DIR" --pi "\$PI_BIN"' "$SETUP_SH"
 }
 
+linux_pi_fallback_present() {
+    local block
+    block="$(awk '/^# pi packages \(HARNESS-139/ { in_block=1; started=1 }
+        /^# opencode.s tui[.]json [(]theme, keybinds[)]/ && in_block { ended=1; exit }
+        in_block { print }
+        END { if (!started || !ended) exit 1 }' "$1")" || return 1
+    grep -qF 'elif [ -x "$HOME/.local/bin/dotf" ]; then' <<<"$block" &&
+        grep -qF '"$_dotf" pi packages apply --repo "$CURRENT_DIR" --pi "$PI_BIN"' <<<"$block"
+}
+
+@test "pi packages: Linux dotf fallback is scoped to its pi block (#1925)" {
+    local mutant="$BATS_TEST_TMPDIR/no-pi-fallback.sh"
+    linux_pi_fallback_present "$SETUP_SH"
+    awk '/^# pi packages \(HARNESS-139/ { pi=1 }
+         /^# opencode.s tui[.]json [(]theme, keybinds[)]/ { pi=0 }
+         pi && /elif \[ -x "\$HOME\/\.local\/bin\/dotf" \]; then/ { next }
+         pi && /_dotf="\$HOME\/\.local\/bin\/dotf"/ { next }
+         { print }' "$SETUP_SH" > "$mutant"
+    grep -qF '[ -x "$HOME/.local/bin/dotf" ]' "$mutant"
+    run linux_pi_fallback_present "$mutant"
+    [ "$status" -ne 0 ]
+}
+
 @test "pi packages: neither twin carries the reconcile loop any more" {
     # ADR-020 section 5: the port replaces the twins' logic, it does not sit
     # beside it. An install-only loop coming back would reintroduce the defect

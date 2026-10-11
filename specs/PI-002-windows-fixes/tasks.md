@@ -1,2 +1,2 @@
-- [x] Apply CREATE_NO_WINDOW fix in cli/internal/secrets/bwserve_windows.go
+- [x] Hide the `bw serve` window with `HideWindow: true` next to `DETACHED_PROCESS` in cli/internal/secrets/bwserve_windows.go (not `CREATE_NO_WINDOW`; lesson-333)
 - [x] Update limits in ai/pi/models.json

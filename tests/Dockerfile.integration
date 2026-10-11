@@ -55,6 +55,14 @@ RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go
     && rm -f /tmp/go.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
+# Node from apt, installed as root: npm's global prefix is then /usr, which
+# testuser cannot write. That is a real box without nvm loaded. Without Node the
+# npm catalog (bw, yarn, opencode, copilot) skipped here, so a `dotf tools
+# install` running a bare `npm install -g` passed every job and failed with
+# EACCES on the first machine that ran it (#2251).
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
 # Non-root user (setup-linux.sh uses $HOME)
 RUN useradd -m -s /bin/bash testuser
 USER testuser
@@ -66,6 +74,20 @@ RUN mkdir -p /home/testuser/.config/age \
 
 # Copy repo to ~/dotfiles-repo (NOT ~/.dotfiles) to trigger the copy branch
 COPY --chown=testuser:testuser . /home/testuser/dotfiles-repo
+
+# Built from a linked worktree, the copied .git is a file naming a gitdir on the
+# host that does not exist here, so every git call in the repo exits 128 and
+# five verify-setup tests fail falsely (#2253). Such a build gets a one-commit
+# repository of the copied tree, the shape of CI's depth-1 checkout. A build
+# from a full clone, as in CI, keeps its real .git directory untouched.
+RUN cd /home/testuser/dotfiles-repo \
+    && if [ -f .git ]; then \
+        rm .git \
+        && git init -q -b main \
+        && git add -A \
+        && git -c user.name=integration -c user.email=integration@localhost \
+            commit -q -m "integration snapshot of a worktree build"; \
+    fi
 
 # dotf from this tree, where install_dotf places the release. It reports
 # `dev`, and install_dotf leaves a dev build in place (a DOTF_VERSION env

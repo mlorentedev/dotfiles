@@ -26,6 +26,8 @@ type world struct {
 	noEffect  bool  // Run exits 0 but installs nothing
 	queries   [][]string
 	out       strings.Builder
+	apps      map[string]string // cask -> the `app` artifact `brew info` reports
+	bundles   map[string]bool   // app bundles on disk, from any channel
 }
 
 func newWorld(managers ...string) *world {
@@ -41,6 +43,7 @@ func (w *world) installer(goos string) *Installer {
 		GOOS: goos, GOARCH: "amd64", Dest: "unused", Out: &w.out,
 		IsRoot:     func() bool { return w.root },
 		HasCommand: func(name string) bool { return w.managers[name] },
+		AppExists:  func(bundle string) bool { return w.bundles[bundle] },
 		Query: func(name string, args ...string) ([]byte, error) {
 			w.queries = append(w.queries, append([]string{name}, args...))
 			pkg := ""
@@ -58,6 +61,13 @@ func (w *world) installer(goos string) *Installer {
 				return []byte("sudo: a password is required"), fmt.Errorf("exit 1")
 			case "brew":
 				pkg = args[len(args)-1]
+				if args[0] == "info" {
+					app, ok := w.apps[pkg]
+					if !ok {
+						return nil, fmt.Errorf("exit 1")
+					}
+					return []byte(`{"casks":[{"token":"` + pkg + `","artifacts":[{"uninstall":[{"quit":"x"}]},{"app":[` + app + `]},{"zap":[]}]}]}`), nil
+				}
 				if w.installed[pkg] {
 					return []byte(pkg + " 2.40.0\n"), nil
 				}
@@ -104,8 +114,8 @@ func TestInstallSystem_ArgvPerManager(t *testing.T) {
 		managers   []string
 		want       string
 	}{
-		{"apt through sudo -n, which never prompts", "linux", false, []string{"apt-get", "sudo"}, "sudo -n apt-get install -y gh"},
-		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"}, "apt-get install -y gh"},
+		{"apt through sudo -n, which never prompts", "linux", false, []string{"apt-get", "sudo"}, "sudo -n apt-get install -y --no-remove gh"},
+		{"apt as root has no sudo to ask", "linux", true, []string{"apt-get"}, "apt-get install -y --no-remove gh"},
 		{"brew", "darwin", false, []string{"brew"}, "brew install gh"},
 		{"winget names the id, exact match, and both agreements", "windows", false, []string{"winget"},
 			"winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements"},
@@ -123,6 +133,65 @@ func TestInstallSystem_ArgvPerManager(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A cask is a separate brew namespace: `brew list --versions <cask>` exits 1 for
+// an installed cask (measured, Homebrew 7.0.9), so querying it as a formula
+// would plan an install on every run and fail the post-condition after it.
+func TestInstallSystem_CaskIsQueriedAndInstalledAsACask(t *testing.T) {
+	obsidian := Tool{Name: "obsidian", Profile: "full", Source: Source{Type: "system", Cask: "obsidian"}}
+	w := newWorld("brew")
+	res, err := w.installer("darwin").Install(obsidian)
+	if err != nil || res != Installed {
+		t.Fatalf("Install = %v, %v; want Installed, nil\n%s", res, err, w.out.String())
+	}
+	if len(w.ran) != 1 || strings.Join(w.ran[0], " ") != "brew install --cask obsidian" {
+		t.Errorf("ran %v, want exactly %q", w.ran, "brew install --cask obsidian")
+	}
+	for _, q := range w.queries {
+		if q[0] == "brew" && !strings.Contains(strings.Join(q, " "), " --cask ") {
+			t.Errorf("queried %v; a cask is asked about with --cask", q)
+		}
+	}
+
+	w.ran, w.queries = nil, nil
+	if res, err := w.installer("darwin").Install(obsidian); err != nil || res != Skipped || len(w.ran) != 0 {
+		t.Errorf("second run: %v, %v, ran %v; want Skipped and nothing run", res, err, w.ran)
+	}
+}
+
+// An app installed by hand (dragged into /Applications, a vendor installer) is not
+// in `brew list --cask`, and `brew install --cask` refuses to overwrite its
+// bundle, so an entry for it failed on every run. The bundle on disk is the
+// cask's presence, as a declared command on PATH is a formula's.
+func TestInstallSystem_CaskAppInstalledOutsideBrewIsPresent(t *testing.T) {
+	obsidian := Tool{Name: "obsidian", Profile: "full", Source: Source{Type: "system", Cask: "obsidian"}}
+	for _, tc := range []struct {
+		name, app, bundle string
+		present           bool
+	}{
+		{"the bundle the cask names is on disk", `"Obsidian.app"`, "Obsidian.app", true},
+		{"an app renamed by its target is looked up by the target", `{"target":"Obsidian Beta.app"}`, "Obsidian Beta.app", true},
+		{"no bundle on disk is absent", `"Obsidian.app"`, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld("brew")
+			w.apps = map[string]string{"obsidian": tc.app}
+			w.bundles = map[string]bool{tc.bundle: tc.bundle != ""}
+			p := w.installer("darwin").Plan(obsidian)
+			if got := p.Action == PlanSkip; got != tc.present {
+				t.Errorf("Plan = %+v; present = %v, want %v", p, got, tc.present)
+			}
+		})
+	}
+	t.Run("a formula never falls back to an app bundle", func(t *testing.T) {
+		w := newWorld("brew")
+		w.apps = map[string]string{"gh": `"gh.app"`}
+		w.bundles = map[string]bool{"gh.app": true}
+		if p := w.installer("darwin").Plan(ghTool()); p.Action != PlanInstall {
+			t.Errorf("Plan = %+v, want install", p)
+		}
+	})
 }
 
 // A system package is not pinned, so presence is the whole criterion and a second
@@ -205,8 +274,10 @@ func TestInstallSystem_NoManagerOnPathIsASkipNamingIt(t *testing.T) {
 	if len(w.ran) != 0 {
 		t.Errorf("ran %v without a manager", w.ran)
 	}
-	if p := in.Plan(ghTool()); p.Action != PlanMissingManager {
-		t.Errorf("Plan = %q, want %q", p.Action, PlanMissingManager)
+	// The plan names the manager as the uv and npm waits do, so a converge
+	// report reads "gh (brew)", not "gh ()".
+	if p := in.Plan(ghTool()); p.Action != PlanMissingManager || p.Note != "waits on brew" {
+		t.Errorf("Plan = %q %q, want %q naming brew", p.Action, p.Note, PlanMissingManager)
 	}
 }
 
@@ -233,6 +304,7 @@ func TestInstallSystem_PresenceRule(t *testing.T) {
 	})
 	t.Run("dpkg config-files only is absent", func(t *testing.T) {
 		w := newWorld("apt-get", "sudo")
+		w.sudoOK = true
 		if p := w.installer("linux").Plan(ghTool()); p.Action != PlanInstall || p.Installed != "" {
 			t.Errorf("Plan = %+v, want install of an absent package", p)
 		}
@@ -256,6 +328,7 @@ func TestInstallSystem_PresenceRule(t *testing.T) {
 // A dry run reaches only the queries, never the manager's install.
 func TestPlanSystem_NeverRuns(t *testing.T) {
 	w := newWorld("apt-get", "sudo")
+	w.sudoOK = true
 	in := w.installer("linux")
 	if p := in.Plan(ghTool()); p.Action != PlanInstall {
 		t.Errorf("Plan = %+v", p)
@@ -300,11 +373,44 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 	if err != nil || res != Skipped {
 		t.Fatalf("Install = %v, %v; want Skipped, nil", res, err)
 	}
-	if want := "gh: needs sudo; run: sudo apt-get install -y gh"; !strings.Contains(w.out.String(), want) {
+	if want := "gh: needs sudo; run: sudo apt-get install -y --no-remove gh"; !strings.Contains(w.out.String(), want) {
 		t.Errorf("output %q lacks %q", w.out.String(), want)
 	}
 	if len(w.ran) != 1 || w.ran[0][1] != "-n" {
 		t.Errorf("ran %v, want one `sudo -n` attempt and no prompt", w.ran)
+	}
+}
+
+// A plan asks the apply's own classifier, so it never promises an install the
+// apply would skip for want of a password: a converge probe re-plans after the
+// apply, and an `install` row there would fail every unattended run.
+func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
+	w := newWorld("apt-get", "sudo")
+	p := w.installer("linux").Plan(ghTool())
+	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" || p.Package != "gh" {
+		t.Errorf("Plan = %+v, want needs-sudo naming the command", p)
+	}
+	if len(w.ran) != 0 {
+		t.Errorf("a plan ran %v", w.ran)
+	}
+
+	in := w.installer("linux")
+	in.Plan(ghTool())
+	in.Plan(ghTool())
+	asked := 0
+	for _, q := range w.queries {
+		if q[0] == "sudo" {
+			asked++
+		}
+	}
+	if asked != 2 { // the first Plan above, and this installer's one question
+		t.Errorf("sudo asked %d times across three plans on two installers, want 2", asked)
+	}
+
+	root := newWorld("apt-get")
+	root.root = true
+	if p := root.installer("linux").Plan(ghTool()); p.Action != PlanInstall || len(root.queries) != 1 {
+		t.Errorf("as root: Plan = %+v, queries %v; want install and no sudo query", p, root.queries)
 	}
 }
 
@@ -315,7 +421,22 @@ func TestInstallSystem_AptFailureWithWorkingSudoIsAnError(t *testing.T) {
 	w.sudoOK = true
 	w.failRun = fmt.Errorf("exit status 100")
 	_, err := w.installer("linux").Install(ghTool())
-	if err == nil || !strings.Contains(err.Error(), "sudo -n apt-get install -y gh") {
+	if err == nil || !strings.Contains(err.Error(), "sudo -n apt-get install -y --no-remove gh") {
 		t.Errorf("want an error carrying the command, got %v", err)
+	}
+}
+
+// The combined command is the per-package one with every package on it, and
+// nothing at all for no packages (#2308).
+func TestSudoInstallCommand(t *testing.T) {
+	if got := SudoInstallCommand(nil); got != "" {
+		t.Errorf("no packages: got %q, want \"\"", got)
+	}
+	if got, want := SudoInstallCommand([]string{"gh", "parallel"}), "sudo apt-get install -y --no-remove gh parallel"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	w := newWorld("apt-get", "sudo")
+	if got, want := "run: "+SudoInstallCommand([]string{"gh"}), w.installer("linux").Plan(ghTool()).Note; got != want {
+		t.Errorf("one package: combined %q drifts from the per-package note %q", got, want)
 	}
 }

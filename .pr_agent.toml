@@ -84,16 +84,28 @@ model = "openai/mimo-v2.6-flash"
 # no Google credential exists in the registry, and routing via OpenRouter would
 # spend a finite paid balance on every PR and add the second secret the guard
 # exists to prevent.
-fallback_models = ["openai/deepseek-v4-flash"]
+# 2026-10-08 (AI-045 AC9, #1923): glm5.3-flash joins the chain, and the chain
+# is no longer only a fallback. The workflow draws the FIRST reviewer with equal
+# weight from every member that answered its probe (this chain plus
+# claude-haiku-5-5 on Anthropic), so the lane argument above now reads per
+# review rather than per model: each review holds one slot of ONE model's
+# bucket, and only one review runs at a time repo-wide. glm5.3-flash's bucket is
+# 7 (harness/model-map.json), shared with opencode's default and the spec-review
+# pool. A review taking one of those seven is the trade accepted to stop mimo,
+# the smallest bucket (5) and quota (1B/month), from carrying every review.
+# glm reviews only at `reasoning_effort = "low"`, which the workflow sets: at
+# its default it thinks until NaN closes the stream and publishes nothing.
+fallback_models = ["openai/deepseek-v4-flash", "openai/glm5.3-flash"]
 
 # Cheap passes only — descriptions and commit summaries, never the review.
 model_weak = "openai/qwen3.6"
 
 # NaN models are absent from LiteLLM's registry, so the token budget must be
 # stated explicitly or LiteLLM assumes a small default and truncates the diff.
-# Both models here advertise 1M context — deepseek-v4-flash and mimo-v2.6-flash,
-# which is the line reviewer-pool.json draws around reasoning-class — so 200k is
-# a deliberate floor well inside either, raised only against measured need.
+# All three models here advertise 1M context (deepseek-v4-flash, mimo-v2.6-flash
+# and glm5.3-flash), which is the line reviewer-pool.json draws around
+# reasoning-class, so 200k is a deliberate floor well inside each, raised only
+# against measured need.
 custom_model_max_tokens = 200000
 max_model_tokens = 200000
 
@@ -148,11 +160,31 @@ require_security_review = true
 persistent_comment = true
 final_update_message = false
 
+# The harness compliance pass reports its FAILs as key issues, never as a
+# section of its own (#2287). The review is a YAML document under a fixed
+# schema, and a fixed schema carries only what it declares: told to "open every
+# review" with the pass and to report it "even when everything passes", the
+# model had no field for it. Measured on seven reviews: five dropped the pass,
+# two improvised a pseudo-ticket in ticket_compliance_check (a field present
+# only when a ticket is linked), and one wrote it as YAML comments above the
+# mapping, dropped the `review:` root, and lost a whole review on the last
+# attempt of the pool (run 38047143517). key_issues_to_review is the one field
+# every review has that carries a file and lines, which is what a compliance
+# FAIL names.
+#
+# The upstream default of 3 findings would let a compliance FAIL crowd out a
+# defect, so the cap leaves room for both.
+num_max_findings = 5
+
 extra_instructions = """
-Open every review with a HARNESS COMPLIANCE pass over the two context files
-(AGENTS.md and .claude/CLAUDE.md), stating PASS or FAIL per item with the
-offending file and line. Report it even when everything passes — a silent
-section is indistinguishable from a section that was skipped. Check at least:
+Run a HARNESS COMPLIANCE pass over the two context files (AGENTS.md and
+.claude/CLAUDE.md) on every review. Report each item that FAILS as an entry of
+key_issues_to_review, with issue_header "Harness compliance", the rule named in
+issue_content, and the offending file and lines. For an artifact that is not a
+file in the diff (branch name, PR title or body, a commit message), set
+relevant_file to that artifact's name and start_line and end_line to 0. Items
+that pass are not reported, and nothing is written outside the response's YAML
+mapping. Check at least:
 
 - English only in the durable record: commit messages, branch name, PR title and
   body, code comments. Conversation may be any language; artifacts may not.
@@ -172,7 +204,7 @@ section is indistinguishable from a section that was skipped. Check at least:
 - No auto-merge: nothing in the diff enables it, and no workflow merges a PR
   without a human.
 
-Then continue with the substance.
+Then review the substance.
 
 This repository already runs shellcheck, bats, golangci-lint, go vet and gitleaks
 in CI. Do not restate what a linter reports; that is covered and it is noise here.

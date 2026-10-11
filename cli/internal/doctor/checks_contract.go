@@ -3,6 +3,8 @@ package doctor
 import (
 	"fmt"
 	"regexp"
+
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // checkContractEnvVars reproduces doctor.sh section 1: each declared structural
@@ -12,20 +14,21 @@ import (
 // the parent shell, so "applying" the default means telling the user how to
 // persist it, not mutating an ephemeral child environment.
 func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
-	rep.Section("Environment variables (contract)")
-	osName := contractOS(sys)
+	rep.Section("Environment variables (contract" + contractScope(sys) + ")")
+	osName := envpkg.ContractOS(sys.GOOS)
 	for _, e := range c.EnvVars {
 		// A var scoped to a different OS than this one does not apply here.
-		if e.RequiredOn != "" && e.RequiredOn != osName {
+		if !envpkg.AppliesOn(e.RequiredOn, sys.GOOS) {
 			rep.Pass(fmt.Sprintf("%s (%s-scoped, skipped on %s)", e.Name, e.RequiredOn, osName))
 			continue
 		}
 
 		current := sys.Getenv(e.Name)
 		if current == "" {
-			def := expandHome(sys, e.Default[osName])
+			raw, _, _ := envpkg.ForOS(e.Default, sys.GOOS)
+			def := expandHome(sys, raw)
 			if def == "" {
-				if e.requiredOn(osName) {
+				if e.requiredHere() {
 					rep.Fail(e.Name + " unset and no default available (required)")
 				} else {
 					rep.Pass(e.Name + " unset (optional, no default)")
@@ -34,7 +37,7 @@ func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 			}
 			if fix {
 				rep.Fix(fmt.Sprintf("%s unset — add to your shell profile: export %s=%q", e.Name, e.Name, def))
-			} else if e.requiredOn(osName) {
+			} else if e.requiredHere() {
 				rep.Warn(fmt.Sprintf("%s unset (required); default %q — run --fix or set in profile", e.Name, def))
 			} else {
 				rep.Warn(fmt.Sprintf("%s unset; default %q would be reported with --fix", e.Name, def))
@@ -60,8 +63,15 @@ func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 // for this OS is actually on PATH. A miss is a WARN (advisory: the shell profile
 // will set it on next login), never a hard FAIL.
 func checkContractPath(sys *System, c *Contract, rep *Report) {
-	rep.Section("PATH entries (contract)")
-	for _, entry := range c.RequiredPathEntries[contractOS(sys)] {
+	rep.Section("PATH entries (contract" + contractScope(sys) + ")")
+	entries, _, ok := envpkg.ForOS(c.RequiredPathEntries, sys.GOOS)
+	if !ok {
+		// An OS the contract has no key for checks nothing, and an empty
+		// section would read as a clean PATH.
+		rep.Warn("no required PATH entries declared for " + envpkg.ContractOS(sys.GOOS) + " — add its key to env-contract.json")
+		return
+	}
+	for _, entry := range entries {
 		expanded := expandHome(sys, entry)
 		if pathContains(sys, expanded) {
 			rep.Pass(expanded + " in PATH")
@@ -105,17 +115,15 @@ func checkRequiredBinaries(sys *System, c *Contract, rep *Report) {
 	}
 }
 
-// contractOS maps the runtime GOOS to the env-contract's OS dialect key. The
-// contract declares only two dialects: "linux" (POSIX — $HOME paths, the shell
-// profiles) and "windows" ($env:USERPROFILE paths). macOS ("darwin") and the
-// "" test default share the POSIX/linux dialect, so only Windows branches. This
-// replaces the formerly hardcoded "linux" key, which made the env-contract sweep
-// report Linux paths on Windows — a false-positive drift every session (#551).
-func contractOS(sys *System) string {
-	if sys.GOOS == "windows" {
-		return "windows"
+// contractScope names, in a section header, the contract key this OS reads,
+// and the key it falls back to where an entry declares none of its own, so a
+// darwin report never reads as a linux one (#2013 P2).
+func contractScope(sys *System) string {
+	scope := ", " + envpkg.ContractOS(sys.GOOS)
+	if fb := envpkg.FallbackOS(sys.GOOS); fb != "" {
+		scope += "; undeclared keys read " + fb
 	}
-	return "linux"
+	return scope
 }
 
 // contractBinaryNames returns the set of binary names already version-checked by

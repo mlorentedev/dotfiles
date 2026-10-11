@@ -44,14 +44,6 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 			wantSubstr:   ".inputrc",
 		},
 		{
-			// Measured on msi 2026-09-02: the only file of the eleven observed
-			// drifting. Every `git config --global` rewrites it.
-			name:        "gitconfig drift → exempt, pass",
-			deployFiles: []file{{".gitconfig", "[user]\n\tname = repo"}},
-			homeFiles:   []file{{".gitconfig", "[user]\n\tname = local"}},
-			wantSubstr:  "exists",
-		},
-		{
 			// Installers (opencode, bun, NVM, ggshield) append PATH/init lines.
 			name:        "rc files drift → exempt, pass",
 			deployFiles: []file{{".bashrc", "base"}, {".profile", "base"}},
@@ -75,7 +67,7 @@ func TestCheckHomeDeployDrift(t *testing.T) {
 			wantSubstr:   "missing",
 		},
 		{
-			// setup guards .profile/.gitconfig/.bashrc on the SOURCE existing,
+			// setup guards .profile/.bashrc on the SOURCE existing,
 			// so "not provisioned" is a skip, never a failure (R4).
 			name:        "source absent from deploy dir → skip, not fail",
 			deployFiles: []file{{".inputrc", "f()"}},

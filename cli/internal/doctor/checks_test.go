@@ -19,6 +19,36 @@ func TestCheckCoreTools_MissingFails(t *testing.T) {
 	}
 }
 
+// The repo provisions docker on every OS (packages.json, #2013 P5b), so its FAIL
+// names the command that clears it, plus starting Colima on the Mac. Where
+// nothing provisions a tool the FAIL stays bare.
+func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
+	cases := []struct {
+		goos, want, absent string
+	}{
+		{"darwin", "docker not in PATH (run: dotf tools install", ""},
+		{"linux", "docker not in PATH (run: dotf tools install)\n", "Colima"},
+		{"windows", "docker not in PATH (run: dotf tools install)\n", "Colima"},
+		{"darwin", "kubectl not in PATH\n", ""},
+		{"linux", "kubectl not in PATH\n", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.goos+"/"+tc.want, func(t *testing.T) {
+			sys := newSys(nil, nil, nil)
+			sys.GOOS = tc.goos
+			var buf bytes.Buffer
+			checkCoreTools(sys, nil, capture(&buf))
+			out := buf.String()
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("want %q in\n%s", tc.want, out)
+			}
+			if tc.absent != "" && strings.Contains(out, tc.absent) {
+				t.Errorf("did not want %q in\n%s", tc.absent, out)
+			}
+		})
+	}
+}
+
 func TestCheckCoreTools_SkipsContractCovered(t *testing.T) {
 	// git+jq are contract-covered → core-tools must not re-report them. With
 	// neither on PATH, the only failures should be the OTHER core tools.
@@ -84,22 +114,22 @@ func TestCheckVersionedPaths(t *testing.T) {
 	writeFile(t, filepath.Join(goHomeNoBin, "README"), "x") // dir exists, no bin/go
 
 	env := map[string]string{
-		"HOME":        home,
-		"JAVA_HOME":   javaHome,
-		"GO_HOME":     goHomeNoBin,
-		"PYTHON_HOME": filepath.Join(home, "does-not-exist"),
-		// MAVEN_HOME, MINIKUBE_HOME unset → SKIP
+		"HOME":       home,
+		"JAVA_HOME":  javaHome,
+		"GO_HOME":    goHomeNoBin,
+		"MAVEN_HOME": filepath.Join(home, "does-not-exist"),
+		// MINIKUBE_HOME unset → SKIP
 	}
 	var buf bytes.Buffer
 	rep := capture(&buf)
 	checkVersionedPaths(newSys(env, nil, nil), rep)
 
-	// java ok; go dir-but-no-binary fail; python missing fail = 2 failures.
+	// java ok; go dir-but-no-binary fail; maven missing fail = 2 failures.
 	if rep.Failures() != 2 {
 		t.Fatalf("failures = %d, want 2\n%s", rep.Failures(), buf.String())
 	}
-	if !strings.Contains(buf.String(), "MAVEN_HOME (variable not set)") {
-		t.Error("unset MAVEN_HOME should SKIP")
+	if !strings.Contains(buf.String(), "MINIKUBE_HOME (variable not set)") {
+		t.Error("unset MINIKUBE_HOME should SKIP")
 	}
 }
 
@@ -477,7 +507,7 @@ func statusOfLine(output, needle string) Status {
 		if !strings.Contains(line, needle) {
 			continue
 		}
-		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip, StatusInfo} {
+		for _, s := range []Status{StatusPass, StatusFail, StatusWarn, StatusSkip, StatusInfo, StatusFix} {
 			if strings.Contains(line, statusTag[s]) {
 				return s
 			}

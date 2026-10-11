@@ -44,7 +44,7 @@ Thumbs.db
 node_modules/
 *.log
 
-# Go build artifacts — the CLI installs to ~/.local/bin via install-dotf; a local
+# Go build artifacts — the CLI installs to ~/.local/bin via install.sh; a local
 # `go build` in cli/ leaves an untracked binary that must never be committed.
 /cli/dotf
 /cli/dotf.exe
@@ -116,3 +116,5 @@ CLAUDE.md
 # been pushed at all (#998).
 specs/**/review-transcript.jsonl
 specs/**/review-transcript.jsonl.stderr
+specs/**/review-second-transcript.jsonl
+specs/**/review-second-transcript.jsonl.stderr
