@@ -415,4 +415,5 @@ tags: [lessons, index, dotfiles]
 | [394 - A prompt can only ask for what the response schema carries](lesson-394-a-prompt-can-only-ask-for-what-the-response-schema-carries.md) | 2026-10-11 |
 | [395 - An environment token is not a stored login](lesson-395-an-environment-token-is-not-a-stored-login.md) | 2026-10-11 |
 | [396 - bash 3.2 prints a completion spec unquoted, and an untagged test only meets it on main](lesson-396-bash-32-prints-a-completion-spec-unquoted.md) | 2026-10-10 |
+| [397 - A config guard must assert the path that runs](lesson-397-a-config-guard-must-assert-the-path-that-runs.md) | 2026-10-11 |
 <!-- END GENERATED -->

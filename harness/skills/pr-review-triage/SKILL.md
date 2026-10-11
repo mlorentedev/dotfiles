@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 4c62c8c6dd5f684f
+generated_sha: 1c72af7e0a65bd2d
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -119,7 +119,10 @@ Tell them apart by **content, not by author**: a real review names files, lines,
 ```bash
 gh api repos/<owner>/<repo>/pulls/<N> --jq '.created_at'
 gh api repos/<owner>/<repo>/issues/<N>/comments --jq '.[] | "\(.created_at)\t\(.user.login)\t\(.body[0:120])"'
+gh api repos/<owner>/<repo>/pulls/<N>/comments --jq '.[] | "\(.created_at)\t\(.user.login)\t\(.path):\(.line)"'
 ```
+
+**A summary is not the whole review.** A reviewer that publishes findings inline moves them out of its summary comment: PR-Agent with `inline_key_issues` posts each finding that names a file and lines as an inline review comment and drops it from its Guide, so a Guide whose findings all went inline has no findings row at all. That absence is not "nothing to say"; the second call above is where those findings are.
 
 Three outcomes, and only one means "no findings":
 

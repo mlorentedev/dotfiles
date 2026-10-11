@@ -454,17 +454,39 @@ PY
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
 
-# The reason this tool was adopted is inline comments on the diff — the half
-# CodeRabbit's free tier withholds on private repos. That claim sat in a
-# `[pr_reviewer]` comment for the tool's whole life while dual publishing was at
-# its default of -1 (disabled), and 0 inline comments were posted across #1042,
-# #1047 and #1051. Pinned as a decision, not a value: any threshold in [0-10]
-# publishes inline; -1 or a missing section silently stops.
-@test "pr-agent: inline suggestions are actually enabled, not merely claimed" {
+# The reason this tool was adopted is inline comments on the diff (TOOL-013 AC1),
+# the half CodeRabbit's free tier withholds on private repos. The previous guard
+# asserted [pr_code_suggestions] dual publishing, which configures `/improve` --
+# a command the automatic path stopped running in #1107 -- so it stayed green
+# while the automatic review posted no inline comment at all (archive review F1).
+# This one reads the setting the automatic path consults, and checks that the
+# path it guards is the one that runs: `review` automatic, `improve` not.
+@test "pr-agent: the automatic review publishes its findings inline" {
+    run python3 - "$CFG" "$WF" <<'PY'
+import sys, tomllib, yaml
+cfg = tomllib.load(open(sys.argv[1], 'rb'))
+if cfg.get('pr_reviewer', {}).get('inline_key_issues') is not True:
+    print('[pr_reviewer] inline_key_issues is not true: upstream defaults it to false, so no finding is posted inline')
+    sys.exit(1)
+wf = yaml.safe_load(open(sys.argv[2]))
+steps = [s for job in wf['jobs'].values() for s in job.get('steps', [])
+         if str(s.get('uses', '')).startswith('The-PR-Agent/pr-agent@')]
+if not steps:
+    print('no PR-Agent step found'); sys.exit(1)
+for s in steps:
+    env = s.get('env', {})
+    if env.get('github_action_config.auto_review') != 'true':
+        print('a PR-Agent step does not run review automatically, so inline_key_issues guards nothing'); sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# `/improve` still runs when asked for on a PR, and an asked-for run should
+# publish inline too: -1, the upstream default, disables that entirely.
+@test "pr-agent: an asked-for /improve publishes its suggestions inline" {
     run python3 -c "
 import sys, tomllib
-cfg = tomllib.load(open('$CFG', 'rb'))
-s = cfg.get('pr_code_suggestions')
+s = tomllib.load(open('$CFG', 'rb')).get('pr_code_suggestions')
 if s is None:
     print('no [pr_code_suggestions] section: improve runs on defaults, inline disabled'); sys.exit(1)
 t = s.get('dual_publishing_score_threshold', -1)
@@ -472,6 +494,13 @@ if not (0 <= t <= 10):
     print(f'dual_publishing_score_threshold={t} does not publish inline'); sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# Declaring [ignore] glob replaces upstream's list instead of extending it, and
+# upstream's list at the pin is ['vendor/**'] (TOOL-013 archive review, F3).
+@test "pr-agent: the ignore list keeps upstream's vendor/** default" {
+    run python3 -c 'import sys,tomllib; g=tomllib.load(open(sys.argv[1],"rb"))["ignore"]["glob"]; sys.exit(0 if "vendor/**" in g else 1)' "$CFG"
+    [ "$status" -eq 0 ] || { echo "declaring [ignore] glob dropped upstream's vendor/** default" >&2; false; }
 }
 
 # The linters own style in this repo and extra_instructions forbids restating
@@ -818,7 +847,8 @@ print('PR_AGENT_REF' not in filter_step['env'])
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
     for file_path in action.yaml pr_agent/settings/configuration.toml \
         pr_agent/agent/pr_agent.py pr_agent/algo/comment_identity.py \
-        pr_agent/algo/file_filter.py pr_agent/algo/review_finding_state.py \
+        pr_agent/algo/file_filter.py pr_agent/algo/inline_comment_dedup.py \
+        pr_agent/algo/review_finding_state.py \
         pr_agent/git_providers/github_provider.py pr_agent/servers/github_action_runner.py \
         pr_agent/tools/pr_reviewer.py; do
         jq -e --arg path "$file_path" '.files[$path] | test("^[0-9a-f]{40}$")' \
