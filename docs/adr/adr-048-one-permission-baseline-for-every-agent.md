@@ -21,7 +21,7 @@ inventory of the repo and of the Mac on 2026-10-09 (Copilot CLI 1.0.81) found tw
 | Harness | Allow | Deny | Trust | Approval |
 |---|---|---|---|---|
 | Claude Code | 35 narrow `Bash(...)`, MCP and web entries | 17 (secrets, force push, `reset --hard`, sudo, `env`, `curl\|sh`, `rm -rf`) | none shipped | prompt (default) |
-| agy | `command(*)`, `read_file(*)`, `write_file(*)`, `read_url(*)`, `search_web(*)` | 2 (`rm -rf /`, `rm -rf ~/*`) | `~/Projects/*`, `~/Projects/Workspace/*` | `always-proceed` |
+| agy | `command(*)`, `read_file(*)`, `write_file(*)`, `read_url(*)`, `search_web(*)` (dropped on 2026-10-10, see below) | 2 (`rm -rf /`, `rm -rf ~/*`) | `~/Projects/*`, `~/Projects/Workspace/*` | `always-proceed` |
 | Copilot CLI | none set; command allow is per-session `--allow-tool` only, URL allow (`allowedUrls`) persists in `config.json` | none set; command deny is per-session `--deny-tool`, URL deny (`deniedUrls`) persists | `~/Projects`, `~/Projects/*`, `~/Projects/Workspace{,/*}` | manual (default); `defaultPermissionMode` persists but is not set |
 | opencode | none at session level | none (only the `plan` agent denies edit and bash) | none | built-in default |
 | pi | no permission model: it runs every tool without asking | none | none | none |
@@ -81,8 +81,12 @@ The owner asked for a homogeneous minimum that lets every agent work. Agy's gran
   removes shell from the setup scripts, as the never-grow rule requires.
 - **Claude has two merge implementations** (the Go deploy, and `merge_claude_settings` in the setup scripts,
   "Divergence 18"). The renderer targets the Go path; the shell twin is a strangler-fig deletion.
-- **agy appears to strip `search_web(*)` when it rewrites its settings,** so doctor reports permanent drift on
-  the Mac. That has to be measured before the renderer declares the grant.
+- **agy strips `search_web(*)` when it rewrites its settings,** so doctor reported permanent drift on the Mac.
+  Measured on 2026-10-10 on macOS with agy 1.3.3 (#2312): agy ran a web search without asking, and its grant
+  list did not change. On that build web search needs no grant, and the kinds agy writes and keeps are
+  `command`, `read_file`, `write_file`, `read_url` and `mcp` (it had saved `mcp(hive-vault/vault_list)` itself).
+  The template no longer ships `search_web(*)`, and a test fails on any other kind. Linux and Windows were not
+  measured; if agy prompts for web search there, the grant it writes names the kind to add.
 - ADR-010's parity matrix gains a *Permissions* row.
 
 ## Alternatives rejected

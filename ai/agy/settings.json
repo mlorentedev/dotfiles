@@ -7,8 +7,7 @@
       "command(*)",
       "read_file(*)",
       "write_file(*)",
-      "read_url(*)",
-      "search_web(*)"
+      "read_url(*)"
     ],
     "deny": [
       "command(rm -rf /)",
