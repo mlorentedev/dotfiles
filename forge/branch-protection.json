@@ -24,6 +24,10 @@
               "app_id": 15368
             },
             {
+              "context": "knowledge-gate",
+              "app_id": 15368
+            },
+            {
               "context": "lint",
               "app_id": 15368
             },
