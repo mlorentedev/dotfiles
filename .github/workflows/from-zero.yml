@@ -89,8 +89,17 @@ jobs:
             exit 1
           }
 
+      # Doctor asks what a person sees in a new terminal, so it runs in the
+      # interactive shell the converge just configured: its rc file activates
+      # mise, which a bare CI step never sources, and without it every mise
+      # tool reads as missing from PATH.
       - name: dotf doctor
-        run: dotf doctor
+        run: |
+          if command -v zsh >/dev/null 2>&1; then
+            zsh -ic 'dotf doctor'
+          else
+            bash -ic 'dotf doctor'
+          fi
 
       # Its own signal: a red doctor must not hide whether the machine is
       # idempotent, so this runs whenever the first converge succeeded.
