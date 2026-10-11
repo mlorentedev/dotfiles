@@ -442,7 +442,7 @@ problems = []
 if "key_issues_to_review" not in flat:
     problems.append("the instructions do not name key_issues_to_review as the pass's home")
 for pattern in (r"\b[Oo]pen (every|each|the) review", r"\b([Bb]egin|[Ss]tart) (every|each|the) review",
-                r"even when everything passes", r"\bsection\b"):
+                r"even when everything passes", r"\b(with|as|in) an? (\w+ )?section\b"):
     if re.search(pattern, flat):
         problems.append(f"asks for content outside the schema: /{pattern}/")
 if cfg["pr_reviewer"].get("num_max_findings", 3) < 5:
