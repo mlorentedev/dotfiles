@@ -34,13 +34,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pinned age binary (honours AGE_VERSION from versions.conf, #1060)
-RUN curl -fsSL "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz" -o /tmp/age.tar.gz \
+RUN curl -fsSL --retry 3 --retry-all-errors "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz" -o /tmp/age.tar.gz \
     && tar -xzf /tmp/age.tar.gz -C /tmp \
     && cp /tmp/age/age /tmp/age/age-keygen /usr/local/bin/ \
     && rm -rf /tmp/age.tar.gz /tmp/age
 
 # Install bats-core from source
-RUN curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o /tmp/bats.tar.gz \
+RUN curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o /tmp/bats.tar.gz \
     && tar -xzf /tmp/bats.tar.gz -C /tmp \
     && /tmp/bats-core-${BATS_VERSION}/install.sh /usr/local \
     && rm -rf /tmp/bats.tar.gz /tmp/bats-core-${BATS_VERSION}
@@ -50,7 +50,7 @@ RUN curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS
 # `harness mirror`, so the integration job tested the last release and failed
 # on the PR that added the command (#1305). Same principle as the Windows job
 # (TEST-003, #1298): CI certifies the PR's binary, not the previous one's.
-RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz \
+RUN curl -fsSL --retry 3 --retry-all-errors "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz \
     && tar -C /usr/local -xzf /tmp/go.tar.gz \
     && rm -f /tmp/go.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -109,7 +109,7 @@ RUN mkdir -p /home/testuser/.local/bin \
 # rather than piped, because `sh` has no pipefail and `bash` reading an empty
 # pipe from a failed curl exits 0.
 RUN for attempt in 1 2 3 4 5; do \
-        curl -fsSL https://antigravity.google/cli/install.sh -o /tmp/agy-install.sh \
+        curl -fsSL --retry 3 --retry-all-errors https://antigravity.google/cli/install.sh -o /tmp/agy-install.sh \
             && bash /tmp/agy-install.sh \
             && test -x /home/testuser/.local/bin/agy \
             && break; \
