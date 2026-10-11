@@ -153,7 +153,8 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 ### PR 6b — the git-hooks step (#2013 X1 finding)
 
 - [x] Failing test: from zero, a plan names the mirror and the wiring and changes nothing; the apply makes both, the probe passes, and the next run reports 0 (`TestGitHooks_FromZeroDeploysAndWires`)
-- [x] Failing test: a foreign `core.hooksPath` is kept and named, only the mirror counts, and the probe passes (`TestGitHooks_KeepsAForeignHooksPath`); an unset hooksPath or a stale mirror fails the probe
+- [x] Failing test: a foreign `core.hooksPath` is kept and named, only the mirror counts, the probe passes, and the next run reports 0 (`TestGitHooks_KeepsAForeignHooksPath`); an unset hooksPath or a stale mirror fails the probe
+- [x] Failing test: only git's exit 1 reads as an unset hooksPath; any other read failure is an error and nothing is written, in `Inspect` and the install alike (`TestAFailedHooksPathReadIsNotAnUnsetOne`, PR-Agent on #2340)
 - [x] `hooks.Inspect` and `hooks.Apply`: what `dotf hooks install` would change, read without writing (the mirror compared as `copyTree` and `markExecutable` would write it, the bit ignored on Windows), and the install through a given runner
 - [x] The `git-hooks` reconciler, after `git-config`, every OS
 - [x] Replace the hooks blocks of `setup-linux.sh` and `setup-windows.ps1` (one twin pair) with `dotf converge --only git-hooks`, as git-config already is: a setup script run on its own (test-windows) still gets the dispatcher; `tests/guard-setup-no-hooks-install.bats` keeps the blocks out and the delegation in
