@@ -356,17 +356,6 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 		rep.Fail("opencode missing (run `dotf tools install opencode`)")
 	}
 
-	// opencode config + $schema.
-	cfgPath := filepath.Join(home, ".config", "opencode", "opencode.jsonc")
-	switch {
-	case !pathExists(cfgPath):
-		rep.Fail("opencode.jsonc missing: " + cfgPath + " (run: dotf deploy opencode)")
-	case fileContains(cfgPath, `"$schema":`):
-		rep.Pass("opencode.jsonc deployed with $schema declaration")
-	default:
-		rep.Fail("opencode.jsonc missing $schema declaration (run: dotf deploy opencode)")
-	}
-
 	// pi binary + version. pi is optional → SKIP when truly absent, but FAIL when
 	// it is configured (~/.pi present) yet unreachable on PATH — the Orca / GUI
 	// per-node-version PATH trap: pi installed under an nvm node version not on
@@ -387,6 +376,29 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 		rep.Skip("pi not installed (run setup, or npm i -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent)")
 	}
 
+	checkShadowedCatalogTools(sys, cfg, rep)
+}
+
+// checkAgentSecretConfigs holds what the agents need from the owner's secrets:
+// opencode.jsonc is rendered from them (converge keeps it while they are
+// locked), pi's models.json carries them, and the shell wrappers resolve them
+// before the agent starts. An identity check (#2013 D10), split from the
+// binaries above, which converge installs whatever the secrets' state.
+func checkAgentSecretConfigs(sys *System, rep *Report) {
+	rep.Section("Agent configs from secrets")
+	home := sys.home()
+
+	// opencode config + $schema.
+	cfgPath := filepath.Join(home, ".config", "opencode", "opencode.jsonc")
+	switch {
+	case !pathExists(cfgPath):
+		rep.Fail("opencode.jsonc missing: " + cfgPath + " (run: dotf deploy opencode)")
+	case fileContains(cfgPath, `"$schema":`):
+		rep.Pass("opencode.jsonc deployed with $schema declaration")
+	default:
+		rep.Fail("opencode.jsonc missing $schema declaration (run: dotf deploy opencode)")
+	}
+
 	// pi models.json + secret substitution state.
 	models := filepath.Join(home, ".pi", "agent", "models.json")
 	switch {
@@ -403,8 +415,6 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 		}
 	}
 
-	checkShadowedCatalogTools(sys, cfg, rep)
-
 	// Launchability. Everything above is a static predicate — files and PATH —
 	// and every one of them was green on a box where `pi` could not start
 	// (WIN-012/#1293). The shell wrappers (profile.ps1, .zshrc, .bashrc) run
@@ -412,7 +422,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	// exec'ing the binary; while those keys live in a locked Bitwarden vault the
 	// resolution fails and the agent never launches. Report the precondition the
 	// wrappers actually depend on, not a proxy for it.
-	if piConfigured || pathExists(cfgPath) {
+	if pathExists(models) || pathExists(cfgPath) {
 		reportAgentLaunchability(sys, rep)
 	}
 }

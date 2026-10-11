@@ -91,7 +91,17 @@ The macOS bring-up also showed what happens when agent instructions arrive late.
 - **Keeping `install.sh` as clone-and-setup.** The clone is a reconcilable step like any other. Leaving it in shell keeps the Linux and Windows front doors different.
 - **One polyglot installer for sh and PowerShell.** It is clever, brittle and unreadable; two short scripts with one contract are not duplication of logic, only of interpreter.
 
+## Amendment 2026-10-11 (#2013 D10, D11, D12, owner)
+
+The from-zero job (X1) ran this ADR's consequence, "then `dotf doctor` reports its state", on fresh macOS and Ubuntu runners. It found that the state has two kinds, and that the doctor did not tell them apart.
+
+- **D10: doctor classifies every check as machine or identity.** A machine check covers what converge installs and configures. An identity check covers what only the owner can restore: the age key, the Bitwarden session, the GitHub login and the knowledge vault. `dotf doctor --scope machine` runs the machine checks and prints one SKIP per identity check, naming the step of `docs/runbooks/guide-new-machine.md` that restores it. A plain `dotf doctor` is unchanged. A check mixing both kinds is split: the age binaries (machine) from the age key (identity), and the agent binaries (machine) from the configs rendered from secrets (identity). A check has no default kind, so one added without a decision fails a test. The hive daemon is a machine check: converge is meant to run it.
+- **D11: a step that a later step makes stale runs again.** records-harness writes instruction files only for the agents present, and the tools step installs agents after it. When the tools step changed something, converge re-runs records-harness in the same run, so the second converge has nothing left to do.
+- **D12: converge guides the identity restore on a terminal.** When converge runs on a TTY and the identity is missing, it ends by walking the person through the same steps (`bw login`, `dotf secrets unlock`, then `dotf secrets verify`; the age key and the vault named with where they come from). Without a TTY (CI, a scheduled run) it asks nothing: it prints the same steps and exits as it would have. Not implemented yet; the scope above is what makes it testable.
+
+The alternative was to fake an identity on the CI runners: a generated age key, an empty vault skeleton and a stub `obsidian`, as `test-windows` does. It makes the doctor green by testing directories, not the restore. Moving `test-windows` to `--scope machine` is a follow-up row on #2013.
+
 ## References
 
-- Epic #2013 (rows P0, P4, P9, X1; decisions D1, D2, D4), epic #1843 (rows B1, B6, B7, B11), #2016 (P9), CLI-090 (#1803).
+- Epic #2013 (rows P0, P4, P9, X1; decisions D1, D2, D4, D10, D11, D12), epic #1843 (rows B1, B6, B7, B11), #2016 (P9), CLI-090 (#1803).
 - ADR-003, ADR-019, ADR-020 (C7, §5), ADR-036, ADR-041 (decisions 4 and 7), ADR-044; lesson 337.

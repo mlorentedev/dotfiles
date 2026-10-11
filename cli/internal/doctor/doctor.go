@@ -16,6 +16,7 @@ type Options struct {
 	Fix      bool
 	Verbose  bool
 	Quick    bool    // env-contract sweep only — fast, for the SessionStart hook (CLI-013)
+	Scope    Scope   // ScopeAll (zero) runs every check; ScopeMachine skips the identity ones
 	System   *System // nil → realSystem()
 	StartDir string  // "" → os.Getwd()
 }
@@ -70,6 +71,9 @@ func Run(opts Options) (int, error) {
 	case opts.Fix:
 		mode = "fix"
 	}
+	if opts.Scope == ScopeMachine {
+		mode += ", machine scope"
+	}
 	_, _ = fmt.Fprintf(out, "dotf doctor [%s] — diagnostics for %s\n", mode, cfg.DotfilesDir)
 
 	contract := loadContractSection(sys, cfg, rep)
@@ -86,60 +90,14 @@ func Run(opts Options) (int, error) {
 	}
 
 	if !opts.Quick {
-		// healthcheck.sh 12-section sweep (minus diff-check + deep vault-health).
-		checkCoreTools(sys, contract, rep)
-		checkVersionedPaths(sys, rep)
-		checkVersionMatch(sys, cfg, rep)
-		checkSymlinks(sys, rep)
-		checkProfileFiles(sys, contract, rep, opts.Fix)
-		checkToolHomeEnvVars(sys, rep)
-		checkOptionalTools(sys, cfg, contract, rep)
-		checkMiseTools(sys, cfg, rep, opts.Fix)
-		checkSystemPackages(sys, cfg, rep)
-		checkPython(sys, cfg, rep)
-		checkVault(sys, rep)
-		checkVaultHooks(sys, rep, opts.Fix)
-		checkGitConfig(sys, rep, opts.Fix)
-		checkAutoMemoryLink(sys, start, rep, opts.Fix)
-		checkMemoryShape(sys, rep, opts.Fix)
-		checkPathFiles(sys, cfg, rep)
-		checkSecrets(sys, cfg, rep, opts.Fix)
-		checkSecretsTooling(sys, cfg, rep)
-		checkBitwardenReach(sys, rep)
-		checkBWServeDaemon(sys, cfg, rep)
-		checkBWMapping(sys, cfg, rep)
-		checkAgentConfigSecrets(sys, rep)
-		checkHiveBackendCanServe(sys, rep)
-		checkHiveDaemonAnswers(sys, cfg, rep)
-		checkDisasterRecovery(sys, cfg, rep)
-		checkPATExpiry(sys, cfg, rep)
-		checkGuardHooks(sys, cfg, rep, opts.Fix)
-		checkTmux(sys, rep)
-		checkOpenCode(sys, cfg, rep)
-		checkCopilot(sys, cfg, rep)
-		checkGolangciLint(sys, cfg, rep)
-		checkModelMap(cfg, rep)
-		checkModelPins(sys, cfg, rep)
-		checkModelLimits(sys, cfg, rep)
-		checkNaNQuota(sys, cfg, rep)
-		checkPiExtensions(sys, cfg, rep, opts.Fix)
-		checkPiPackageRequirements(sys, cfg, rep)
-		checkHarnessDrift(sys, cfg, rep, opts.Fix)
-		checkDeployDrift(sys, cfg, rep, opts.Fix)
-		checkHomeDeployDrift(sys, cfg, rep)
-		checkDockerEngine(sys, rep, opts.Fix)
-		checkColimaSize(sys, rep, opts.Fix)
-		checkDockerCompose(sys, rep)
-		checkDeployManifest(sys, rep, opts.Fix)
-		checkAgentPresence(sys, rep)
-		checkAgentSkillsMigrated(cfg, rep)
-		checkDotfProvenance(sys, cfg, rep)
-		checkRepoDirResolves(sys, rep)
-		checkSpecIssueState(sys, rep)
-		checkBranchProtection(sys, rep)
-		checkAntigravity(sys, rep)
-		checkOrcaHook(sys, rep, opts.Fix)
-		checkHookBinding(sys, rep, opts.Fix)
+		for _, c := range sweep(sys, cfg, contract, rep, opts, start) {
+			if opts.Scope == ScopeMachine && c.kind == kindIdentity {
+				rep.Section(c.section)
+				rep.Skip("an identity check, not run under --scope machine: " + c.restore)
+				continue
+			}
+			c.run()
+		}
 	}
 
 	rep.Summary()
@@ -204,4 +162,117 @@ func loadContractSection(sys *System, cfg *Config, rep *Report) *Contract {
 	// with `dotf env generate` (#697).
 	rep.Info("contract: " + cfg.ContractPath)
 	return contract
+}
+
+// Scope selects the checks a run covers (#2013 D10). Its zero value runs all of
+// them, so a plain `dotf doctor` is unchanged.
+type Scope int
+
+const (
+	ScopeAll     Scope = iota
+	ScopeMachine       // what converge produces; for a fresh machine or CI runner
+)
+
+// ParseScope reads the --scope flag: "all" (or "") and "machine".
+func ParseScope(s string) (Scope, error) {
+	switch s {
+	case "", "all":
+		return ScopeAll, nil
+	case "machine":
+		return ScopeMachine, nil
+	}
+	return ScopeAll, fmt.Errorf("doctor: unknown --scope %q (want all or machine)", s)
+}
+
+// kind is what a check needs before it can pass. The zero value is invalid:
+// every sweep entry names one of the other two, and a test holds it to that,
+// so a check added without a decision cannot fall into either scope by
+// default.
+type kind int
+
+const (
+	kindUnset    kind = iota
+	kindMachine       // installed and configured by converge
+	kindIdentity      // the owner's credentials or vault: restored, never converged
+)
+
+// What an identity check needs, as the SKIP line under --scope machine names
+// it. The steps are docs/runbooks/guide-new-machine.md's.
+const (
+	restoreAge   = "restore the age key from the offline backup (docs/runbooks/guide-new-machine.md, step 1)"
+	restoreBW    = "run `bw login`, then `dotf secrets unlock` (docs/runbooks/guide-new-machine.md, step 2)"
+	restoreGH    = "run `gh auth login` (docs/runbooks/guide-new-machine.md, step 3)"
+	restoreVault = "clone the knowledge vault (docs/runbooks/guide-new-machine.md, step 4)"
+)
+
+// check is one entry of the full sweep. section and restore are read only for
+// an identity check skipped by scope; section is the title its run reports
+// under.
+type check struct {
+	kind    kind
+	section string
+	restore string
+	run     func()
+}
+
+// sweep is the full diagnostic sweep (the healthcheck.sh sections and what
+// followed them), in report order, each check classified machine or identity.
+func sweep(sys *System, cfg *Config, contract *Contract, rep *Report, opts Options, start string) []check {
+	return []check{
+		{kind: kindMachine, run: func() { checkCoreTools(sys, contract, rep) }},
+		{kind: kindMachine, run: func() { checkVersionedPaths(sys, rep) }},
+		{kind: kindMachine, run: func() { checkVersionMatch(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkSymlinks(sys, rep) }},
+		{kind: kindMachine, run: func() { checkProfileFiles(sys, contract, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkToolHomeEnvVars(sys, rep) }},
+		{kind: kindMachine, run: func() { checkOptionalTools(sys, cfg, contract, rep) }},
+		{kind: kindMachine, run: func() { checkMiseTools(sys, cfg, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkSystemPackages(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkPython(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "Knowledge vault (presence)", restore: restoreVault, run: func() { checkVault(sys, rep) }},
+		{kind: kindIdentity, section: "Knowledge vault hooks (secret gate)", restore: restoreVault, run: func() { checkVaultHooks(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkGitConfig(sys, rep, opts.Fix) }},
+		{kind: kindIdentity, section: "Auto-memory vault link", restore: restoreVault, run: func() { checkAutoMemoryLink(sys, start, rep, opts.Fix) }},
+		{kind: kindIdentity, section: "Auto-memory file shape", restore: restoreVault, run: func() { checkMemoryShape(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkPathFiles(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "Secrets integrity", restore: restoreAge, run: func() { checkSecrets(sys, cfg, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkSecretsTooling(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "Age identity key", restore: restoreAge, run: func() { checkAgeIdentity(sys, rep) }},
+		{kind: kindIdentity, section: "Bitwarden reach (live secrets SSOT)", restore: restoreBW, run: func() { checkBitwardenReach(sys, rep) }},
+		{kind: kindIdentity, section: "bw serve daemon (optional local unlock cache)", restore: restoreBW, run: func() { checkBWServeDaemon(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "Bitwarden mapping (registry -> vault)", restore: restoreBW, run: func() { checkBWMapping(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkAgentConfigSecrets(sys, rep) }},
+		{kind: kindMachine, run: func() { checkHiveBackendCanServe(sys, rep) }},
+		{kind: kindMachine, run: func() { checkHiveDaemonAnswers(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "Disaster recovery", restore: restoreAge, run: func() { checkDisasterRecovery(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "PAT expiry", restore: restoreBW, run: func() { checkPATExpiry(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkGuardHooks(sys, cfg, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkTmux(sys, rep) }},
+		{kind: kindMachine, run: func() { checkOpenCode(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "Agent configs from secrets", restore: restoreBW, run: func() { checkAgentSecretConfigs(sys, rep) }},
+		{kind: kindMachine, run: func() { checkCopilot(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkGolangciLint(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkModelMap(cfg, rep) }},
+		{kind: kindMachine, run: func() { checkModelPins(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkModelLimits(sys, cfg, rep) }},
+		{kind: kindIdentity, section: "NaN quota", restore: restoreBW, run: func() { checkNaNQuota(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkPiExtensions(sys, cfg, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkPiPackageRequirements(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkHarnessDrift(sys, cfg, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkDeployDrift(sys, cfg, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkHomeDeployDrift(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkDockerEngine(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkColimaSize(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkDockerCompose(sys, rep) }},
+		{kind: kindMachine, run: func() { checkDeployManifest(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkAgentPresence(sys, rep) }},
+		{kind: kindMachine, run: func() { checkAgentSkillsMigrated(cfg, rep) }},
+		{kind: kindMachine, run: func() { checkDotfProvenance(sys, cfg, rep) }},
+		{kind: kindMachine, run: func() { checkRepoDirResolves(sys, rep) }},
+		{kind: kindIdentity, section: "spec-issue-state", restore: restoreGH, run: func() { checkSpecIssueState(sys, rep) }},
+		{kind: kindIdentity, section: "branch-protection", restore: restoreGH, run: func() { checkBranchProtection(sys, rep) }},
+		{kind: kindMachine, run: func() { checkAntigravity(sys, rep) }},
+		{kind: kindMachine, run: func() { checkOrcaHook(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkHookBinding(sys, rep, opts.Fix) }},
+	}
 }

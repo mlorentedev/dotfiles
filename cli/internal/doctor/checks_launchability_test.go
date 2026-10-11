@@ -13,8 +13,7 @@ import (
 // PATH predicate in the section stays green. WARN with the literal remedy;
 // PASS when the daemon is unlocked; silent while no key is bw-backed, because
 // the age floor needs no daemon.
-func TestCheckOpenCode_ReportsWrapperLaunchability(t *testing.T) {
-	cfg := &Config{Versions: map[string]string{"PI_VERSION": "0.79.1", "OPENCODE_VERSION": "1.0.0"}}
+func TestCheckAgentSecretConfigs_ReportsWrapperLaunchability(t *testing.T) {
 	run := func(t *testing.T, bwBacked int, status string) string {
 		t.Helper()
 		home := t.TempDir()
@@ -23,7 +22,7 @@ func TestCheckOpenCode_ReportsWrapperLaunchability(t *testing.T) {
 		sys.BWBackedSecrets = func() (int, error) { return bwBacked, nil }
 		sys.BWServeStatus = func() (string, error) { return status, nil }
 		var buf bytes.Buffer
-		checkOpenCode(sys, cfg, capture(&buf))
+		checkAgentSecretConfigs(sys, capture(&buf))
 		return buf.String()
 	}
 
