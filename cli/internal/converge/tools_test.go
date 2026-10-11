@@ -122,7 +122,7 @@ func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,configs-deploy,records-bind,git-config,env-persist,legacy-setup" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,configs-deploy,records-bind,git-config,git-hooks,env-persist,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }

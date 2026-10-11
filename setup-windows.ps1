@@ -510,41 +510,6 @@ if (Test-Path $installDotfScript) {
 }
 
 # ============================================================================
-# 1b2. GUARD-001 MEMORY-SINK HOOKS (#691)
-# ============================================================================
-# Deploy the dispatcher into the ~/.dotfiles mirror and wire core.hooksPath
-# machine-wide, so the guard that rejects MEMORY.md/memory/ outside the vault is
-# active in every repo -- parity with setup-linux.sh.
-#
-# CLI-072 (#1460) replaced the twin scripts\install-git-hooks.ps1 with
-# `dotf hooks install`, and MOVED THE STEP. It used to run ~270 lines above,
-# BEFORE Install-Dotf: repointing it in place would have invoked a binary that
-# did not exist yet, and the Write-Warn below would have swallowed that into a
-# silent skip of the memory-sink guard on every fresh box. The block was not
-# written expecting dotf to exist at that point, because when it was written it
-# did not need it to. The ordering is asserted by
-# tests/guard-setup-hooks-order.bats, since nothing else spans the two sites.
-#
-# The wired path (Join-Path $DotfilesDest 'git-hooks') equals the Go
-# filepath.Join(cfg.DotfilesDir, "git-hooks") that `dotf doctor` verifies.
-# Non-fatal: doctor verifies + repairs thereafter.
-$dotfExe = Get-Command dotf -ErrorAction SilentlyContinue
-if ($dotfExe) {
-    # Source and destination are named explicitly rather than left to defaults:
-    # when the repo IS the deploy dir they are the same directory, and passing
-    # both is what lets the #695 self-mirror guard see it instead of clearing
-    # its own source.
-    & $dotfExe.Source hooks install --source (Join-Path $PSScriptRoot 'git-hooks') --dotfiles-dir $DotfilesDest
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "GUARD-001 memory-sink hooks installed"
-    } else {
-        Write-Warn "GUARD-001 hooks install incomplete (continuing; run 'dotf doctor --fix')"
-    }
-} else {
-    Write-Warn "dotf not found; skipping memory-sink guard install (run 'dotf hooks install' after setup)"
-}
-
-# ============================================================================
 # DEPLOY SECRETS SYSTEM (early: before the opencode/agy config blocks below that
 # substitute secrets at deploy time, and after dotf is installed above so the
 # deploy-time fetch can read the registry). Cross-OS parity with setup-linux.sh,
@@ -924,6 +889,12 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     & dotf converge --only git-config
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
+    }
+    # Its own call: a dotf older than the step refuses the name, and must not
+    # take git-config down with it (#2013 X1).
+    & dotf converge --only git-hooks
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf converge --only git-hooks failed -- a dotf older than the step cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
     }
 } else {
     Write-Warn "dotf not on PATH -- skipping agent config deploy (run install.ps1, then 'dotf deploy')"
