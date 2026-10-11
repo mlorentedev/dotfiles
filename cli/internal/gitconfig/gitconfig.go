@@ -56,12 +56,14 @@ var envTokens = []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GIT
 
 // WithoutEnvTokens is environ minus the variables gh would take a token from,
 // so gh answers for the login it stored, which is the one a GUI app, launchd,
-// cron or a scheduled task can use (#2319).
+// cron or a scheduled task can use (#2319). Names compare case-insensitively:
+// Windows resolves them that way, so gh there reads a `gh_token` as GH_TOKEN,
+// and dropping a lower-case twin on other OSes costs nothing.
 func WithoutEnvTokens(environ []string) []string {
 	out := make([]string, 0, len(environ))
 	for _, kv := range environ {
 		name, _, _ := strings.Cut(kv, "=")
-		if !slices.Contains(envTokens, name) {
+		if !slices.Contains(envTokens, strings.ToUpper(name)) {
 			out = append(out, kv)
 		}
 	}

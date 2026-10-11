@@ -268,7 +268,7 @@ func TestInspect_AnEnvironmentTokenIsNotALogin(t *testing.T) {
 }
 
 func TestWithoutEnvTokens(t *testing.T) {
-	got := WithoutEnvTokens([]string{"PATH=/bin", "GH_TOKEN=a", "GITHUB_TOKEN=b", "GH_ENTERPRISE_TOKEN=c", "GITHUB_ENTERPRISE_TOKEN=d", "GH_HOST=x", "HOME=/h"})
+	got := WithoutEnvTokens([]string{"PATH=/bin", "GH_TOKEN=a", "GITHUB_TOKEN=b", "GH_ENTERPRISE_TOKEN=c", "GITHUB_ENTERPRISE_TOKEN=d", "gh_token=e", "Github_Token=f", "GH_HOST=x", "HOME=/h"})
 	if want := []string{"PATH=/bin", "GH_HOST=x", "HOME=/h"}; strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("got %v, want %v", got, want)
 	}
