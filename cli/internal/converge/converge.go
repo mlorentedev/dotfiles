@@ -52,6 +52,15 @@ type Reconciler interface {
 	Probe(env Env) error
 }
 
+// Revisiter is a reconciler whose result depends on what a later one changes:
+// the run applies it again right after that reconciler's apply changed the
+// machine. records-harness revisits after tools, because it deploys the
+// instruction files of the agents on PATH and tools installs agents (#2013
+// D11). A plan never revisits: nothing it reports has been made yet.
+type Revisiter interface {
+	RevisitAfter() string // the reconciler whose change re-runs this one
+}
+
 // Status is the outcome of one reconciler in a run.
 type Status int
 
@@ -117,6 +126,7 @@ func Select(reconcilers []Reconciler, names []string) ([]Reconciler, error) {
 func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 	rep := Report{DryRun: dryRun, GOOS: env.GOOS}
 	var failed error
+	var ran []Reconciler
 	gate := ""
 	for _, r := range reconcilers {
 		switch {
@@ -135,8 +145,30 @@ func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 		if dryRun && g != "" {
 			gate = g
 		}
+		if err == nil && !dryRun && entry.Status == StatusChange {
+			failed = revisit(&rep, ran, r.Name(), env)
+		}
+		ran = append(ran, r)
 	}
 	return rep, failed
+}
+
+// revisit applies again each reconciler that already ran and revisits after
+// the one named, in registry order, and appends their entries. The first
+// failure stops it and is returned, as Run's own loop does.
+func revisit(rep *Report, ran []Reconciler, after string, env Env) error {
+	for _, q := range ran {
+		if rv, ok := q.(Revisiter); !ok || rv.RevisitAfter() != after || !platform.Supports(q.Platforms(), env.GOOS) {
+			continue
+		}
+		entry, _, err := runOne(q, env, false)
+		entry.Detail = "after " + after + ": " + entry.Detail
+		rep.Entries = append(rep.Entries, entry)
+		if err != nil {
+			return fmt.Errorf("converge: %s: %w", q.Name(), err)
+		}
+	}
+	return nil
 }
 
 func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
