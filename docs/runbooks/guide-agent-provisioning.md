@@ -38,7 +38,7 @@ Claude Code's MCP servers and plugins are not a converge step yet (#1843 B10): a
 
 agy and Codex get the compact doctrine because each caps what it reads (agy 12,000 characters per rules file, Codex 32 KiB across the instruction chain); the reasons sit beside each row of `doctrine.deploy`.
 
-A `merge` entry writes only the keys the template names and keeps everything the agent wrote itself. One exception is open: agy removes `search_web(*)` from its grants on every save, so converge re-adds it each run (#2312).
+A `merge` entry writes only the keys the template names and keeps everything the agent wrote itself. The template must hold only grants the agent keeps: agy drops any grant kind it does not know on its next save, so converge would re-add it on every run (#2312).
 
 ## MCP servers
 
