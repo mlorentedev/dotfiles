@@ -65,8 +65,10 @@ created: "2026-08-16"
       `DOTF_TEST_NETWORK=1`) and `tests/check-review-attestation.bats` 62/62; mutations of
       `inline_key_issues`, `auto_review`, `vendor/**` and the declared login each turn their test red.
       The `11/11` above is the count when this spec first closed.
-- [ ] AC1 live evidence: the first PR reviewed after the fix merges carries a COMMENTED review by
+- [x] AC1 live evidence: the first PR reviewed after the fix merges carries a COMMENTED review by
       `github-actions` with inline comments; then `verification.md` AC1 is rewritten from it
+      (#2325 merged 02:25:20Z; #2326 at 02:30:22Z was the first, five more followed; the table is in
+      `verification.md` AC1)
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
 
 ## Follow-on, after the first production runs (#1044)
