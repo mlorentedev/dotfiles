@@ -37,7 +37,11 @@ func newConvergeCmd() *cobra.Command {
 			"not apply to this OS is reported as skipped, never as passed.\n\n" +
 			"Re-running on a converged machine reports 0 changed.\n\n" +
 			"--only runs the named reconcilers, in registry order, and leaves the\n" +
-			"persisted report of the last full run alone.",
+			"persisted report of the last full run alone.\n\n" +
+			"A full run that converged ends with the identity converge cannot\n" +
+			"produce (age key, Bitwarden, GitHub login, vault): on a terminal it walks\n" +
+			"the restore, as `dotf identity restore` does; elsewhere it prints what is\n" +
+			"left. Neither changes the exit status.",
 		Example:      "  dotf converge --plan\n  dotf converge\n  dotf converge --only git-config",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
@@ -45,7 +49,13 @@ func newConvergeCmd() *cobra.Command {
 			if repo == "" {
 				repo = convergeCheckout(env.Home())
 			}
-			return runConverge(cmd.OutOrStdout(), repo, plan, only)
+			err := runConverge(cmd.OutOrStdout(), repo, plan, only)
+			// The identity converge cannot produce: walked on a terminal,
+			// printed elsewhere, after a full run that converged (#2013 D12).
+			if err == nil && len(only) == 0 {
+				identityEpilogue(cmd.OutOrStdout(), plan)
+			}
+			return err
 		},
 	}
 	cmd.Flags().BoolVar(&plan, "plan", false, "report what would change and write nothing")

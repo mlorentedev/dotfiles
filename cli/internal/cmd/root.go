@@ -38,6 +38,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newAgentCmd())
 	root.AddCommand(newDeployCmd())
 	root.AddCommand(newConvergeCmd())
+	root.AddCommand(newIdentityCmd())
 	root.AddCommand(newLessonsCmd())
 	root.AddCommand(newOrcaCmd())
 	root.AddCommand(newPrCmd())

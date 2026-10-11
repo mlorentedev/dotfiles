@@ -36,6 +36,7 @@ replaces it with the pinned release.
 |---|---|
 | `converge` | Brings this machine to the state the checkout declares; `--plan` shows the changes first |
 | `doctor` | Checks this machine's tools, configs and secrets against the repository |
+| `identity` | `restore` walks the identity converge cannot produce (age key, Bitwarden, GitHub login, vault) on a terminal, and prints what is left elsewhere |
 | `secrets` | Resolves secrets and injects them into one child process (`dotf secrets run -- <cmd>`) |
 | `spec` | Scaffolds, reviews and archives spec folders for spec-driven development |
 | `pr` | Pull-request review loop helpers: `triage-queue` lists unanswered reviewer output; `land` merges PRs, one at a time and in the order given, only when CI, triage and freshness hold on one head, under a per-repository lock |
@@ -105,6 +106,9 @@ dotf converge            # apply, then prove each reconciler's post-condition
   `~/.local/state/dotfiles/converge/last.json`). It records the result, the
   error if any, the total changes, and each reconciler's status and detail. A
   plan writes no report.
+- **Identity.** A full run that converged ends with the identity: on a terminal
+  it walks the restore chain (`dotf identity restore`), elsewhere it prints
+  what is left. Neither touches the report or the exit status.
 
 ### `dotf review` — cross-model code review
 

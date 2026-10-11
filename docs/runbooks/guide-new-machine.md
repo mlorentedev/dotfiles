@@ -38,7 +38,7 @@ Every identity check prints a SKIP naming the step below that restores it. A FAI
 
 ## 2. Restore the identity
 
-The step numbers are the ones `dotf doctor --scope machine` cites.
+The step numbers are the ones `dotf doctor --scope machine` cites. On a terminal, the converge of step 1 ends by walking you through them: each step that is not done yet says why it matters and what it runs, Enter runs it and `s` skips it. A skipped step stops the walk, because every later step needs it. Resume with `dotf identity restore`; `dotf identity restore --plan` only lists what is left. Without a terminal, converge prints that list and asks nothing. The walk runs every command below except the age key, which it names and waits for. A `dotf secrets verify` that finds a secret missing is reported and the walk goes on: that is a gap in the registry, not in this machine.
 
 **Step 1: the age key.** It decrypts the offline floor, so nothing below starts without it. Restore it from the offline backup to `~/.config/age/key.txt` (or `AGE_KEY_PATH`), following [Secrets Governance § RECOVER](guide-secrets-governance.md#protocol--recover-disaster), step 1. Generate a new key only for a brand-new identity ([§ FIRST MACHINE](guide-secrets-governance.md#protocol--first-machine-age-key--ssh)).
 
@@ -52,7 +52,7 @@ dotf secrets verify      # every registry secret resolves (no values printed)
 
 Use `bw login`, not `bw unlock`, on a new machine or after a session expired: an expired refresh token cannot be unlocked.
 
-**Step 3: GitHub.**
+**Step 3: GitHub.** The vault is a private repository, cloned through gh's credential helper, and converge's git-config step only wires that helper once gh holds a login. The walk runs `dotf converge --only git-config` just before it clones the vault for that reason.
 
 ```bash
 gh auth login

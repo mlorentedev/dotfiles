@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/identity"
 )
 
 // Options configures a doctor run. System and StartDir are injection seams for
@@ -198,12 +200,12 @@ const (
 )
 
 // What an identity check needs, as the SKIP line under --scope machine names
-// it. The steps are docs/runbooks/guide-new-machine.md's.
+// it: the restore chain converge guides on a terminal (#2013 D12).
 const (
-	restoreAge   = "restore the age key from the offline backup (docs/runbooks/guide-new-machine.md, step 1)"
-	restoreBW    = "run `bw login`, then `dotf secrets unlock` (docs/runbooks/guide-new-machine.md, step 2)"
-	restoreGH    = "run `gh auth login` (docs/runbooks/guide-new-machine.md, step 3)"
-	restoreVault = "clone the knowledge vault (docs/runbooks/guide-new-machine.md, step 4)"
+	restoreAge   = identity.RestoreAge
+	restoreBW    = identity.RestoreBW
+	restoreGH    = identity.RestoreGH
+	restoreVault = identity.RestoreVault
 )
 
 // check is one entry of the full sweep. section and restore are read only for
