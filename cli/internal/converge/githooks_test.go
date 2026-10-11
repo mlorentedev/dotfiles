@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -42,7 +43,8 @@ func hooksEnv(t *testing.T) Env {
 		"git-hooks/pre-commit":               "#!/usr/bin/env bash\n",
 		"git-hooks/lib/memory-sink-guard.sh": "#!/usr/bin/env bash\nexit 0\n",
 	})
-	return Env{RepoRoot: repo, Home: t.TempDir(), DeployDir: t.TempDir(), GOOS: "linux"}
+	// The host OS: the mirror counts the executable bit only where chmod works.
+	return Env{RepoRoot: repo, Home: t.TempDir(), DeployDir: t.TempDir(), GOOS: runtime.GOOS}
 }
 
 func hooksStep(g *hooksGit) gitHooks {

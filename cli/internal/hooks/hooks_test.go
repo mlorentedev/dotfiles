@@ -17,8 +17,15 @@ import (
 // a test suite that can rewire the developer's global config is not a test
 // suite. The single integration test at the bottom is what proves this fake
 // speaks the real binary's dialect.
+// gitExit is the error git's exit status carries, as *exec.ExitError does.
+type gitExit int
+
+func (gitExit) Error() string   { return "exit status 1" }
+func (e gitExit) ExitCode() int { return int(e) }
+
 type fakeGit struct {
 	hooksPath string // what `--get core.hooksPath` returns; "" means unset
+	getErr    error  // when set, what the read fails with instead
 	setErr    error
 	writes    []string
 	reads     int
@@ -29,11 +36,14 @@ func (f *fakeGit) run(_ context.Context, args ...string) ([]byte, error) {
 	switch {
 	case strings.HasPrefix(joined, "config --global --get core.hooksPath"):
 		f.reads++
+		if f.getErr != nil {
+			return nil, f.getErr
+		}
 		if f.hooksPath == "" {
 			// git exits 1 on an unset key and prints nothing. Treating that as
 			// an error rather than as empty output is the dialect detail the
 			// integration test exists to confirm.
-			return nil, errors.New("exit status 1")
+			return nil, gitExit(1)
 		}
 		return []byte(f.hooksPath + "\n"), nil
 	case strings.HasPrefix(joined, "config --global core.hooksPath"):

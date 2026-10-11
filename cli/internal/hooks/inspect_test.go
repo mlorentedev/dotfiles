@@ -3,12 +3,15 @@ package hooks
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 )
 
+// inspect runs Inspect for the host's OS: the executable bit is part of a
+// current mirror only where chmod takes effect.
 func inspect(t *testing.T, g *fakeGit, src, dotfiles, goos string) State {
 	t.Helper()
 	st, err := Inspect(context.Background(), g.run, opts(src, dotfiles, nil), goos)
@@ -32,7 +35,7 @@ func TestInspect_AFreshMachineNeedsTheMirrorAndTheWiring(t *testing.T) {
 	dotfiles := t.TempDir()
 	g := &fakeGit{}
 
-	st := inspect(t, g, src, dotfiles, "linux")
+	st := inspect(t, g, src, dotfiles, runtime.GOOS)
 	if !st.MirrorStale || st.Wiring != WiringUnset || st.Changes() != 2 {
 		t.Errorf("got %+v (changes %d), want a stale mirror, unset wiring, 2 changes", st, st.Changes())
 	}
@@ -52,7 +55,7 @@ func TestInspect_AnAppliedMachineIsConverged(t *testing.T) {
 	g := &fakeGit{}
 	apply(t, g, src, dotfiles)
 
-	st := inspect(t, g, src, dotfiles, "linux")
+	st := inspect(t, g, src, dotfiles, runtime.GOOS)
 	if st.Changes() != 0 || st.Wiring != WiringMirror {
 		t.Errorf("got %+v (changes %d), want converged and wired to the mirror", st, st.Changes())
 	}
@@ -88,7 +91,7 @@ func TestInspect_FindsAStaleMirror(t *testing.T) {
 			apply(t, g, src, dotfiles)
 			mutate(t, src, filepath.Join(dotfiles, "git-hooks"))
 
-			st := inspect(t, g, src, dotfiles, "linux")
+			st := inspect(t, g, src, dotfiles, runtime.GOOS)
 			if !st.MirrorStale || st.Changes() != 1 {
 				t.Errorf("got %+v (changes %d), want a stale mirror and 1 change", st, st.Changes())
 			}
@@ -131,7 +134,7 @@ func TestInspect_ClassifiesTheWiring(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := inspect(t, &fakeGit{hooksPath: tc.hooksPath}, src, dotfiles, "linux")
+			st := inspect(t, &fakeGit{hooksPath: tc.hooksPath}, src, dotfiles, runtime.GOOS)
 			if st.Wiring != tc.want {
 				t.Errorf("hooksPath %q: got wiring %d, want %d", tc.hooksPath, st.Wiring, tc.want)
 			}
@@ -160,5 +163,22 @@ func writeTestFile(t *testing.T, p, body string) {
 	}
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A read that fails for any reason but "no such key" is an error, in Inspect
+// and in the install: read as unset, it would wire over a hooksPath nobody
+// could see.
+func TestAFailedHooksPathReadIsNotAnUnsetOne(t *testing.T) {
+	src := dispatcherTree(t, t.TempDir(), nil)
+	for _, readErr := range []error{gitExit(128), errors.New("git: executable file not found")} {
+		g := &fakeGit{getErr: readErr}
+		if _, err := Inspect(context.Background(), g.run, opts(src, t.TempDir(), nil), runtime.GOOS); err == nil {
+			t.Errorf("Inspect with read error %v: want an error", readErr)
+		}
+		var buf bytes.Buffer
+		if err := Apply(context.Background(), g.run, opts(src, t.TempDir(), &buf)); err == nil || len(g.writes) != 0 {
+			t.Errorf("Apply with read error %v: err %v, writes %v; want an error and no write", readErr, err, g.writes)
+		}
 	}
 }

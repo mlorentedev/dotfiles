@@ -66,8 +66,8 @@ func Inspect(ctx context.Context, run Runner, o Options, goos string) (State, er
 		return State{}, err
 	}
 	st.MirrorStale = !current
-	if b, err := run(ctx, "config", "--global", "--get", "core.hooksPath"); err == nil {
-		st.HooksPath = strings.TrimSpace(string(b))
+	if st.HooksPath, err = readHooksPath(ctx, run); err != nil {
+		return State{}, err
 	}
 	st.Wiring = wiringOf(st.HooksPath, st.Dest)
 	return st, nil
