@@ -2,8 +2,10 @@ package deploy
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -112,7 +114,7 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 
 // baselineGrants is the minimum agy needs to work on every machine (owner,
 // #2236). A machine may add to it; the merge never leaves it holding less.
-var baselineGrants = []string{"command(*)", "read_file(*)", "write_file(*)", "read_url(*)", "search_web(*)"}
+var baselineGrants = []string{"command(*)", "read_file(*)", "write_file(*)", "read_url(*)"}
 
 // TestAgyTemplateShipsTheBaselineGrants pins the owner decision on #2236: the
 // grants and the trust paths are one baseline shipped to every machine.
@@ -134,6 +136,26 @@ func TestAgyTemplateShipsTheBaselineGrants(t *testing.T) {
 	if !containsAll(allow, baselineGrants...) {
 		t.Errorf("ai/agy/settings.json must ship the baseline grants: %v", perms)
 	}
+	for _, g := range allow {
+		if !keptGrantKind(fmt.Sprint(g)) {
+			t.Errorf("ai/agy/settings.json grants %v, a kind agy drops on its next save, so converge never settles (#2312)", g)
+		}
+	}
+}
+
+// agyKeptGrantKinds are the grant kinds agy keeps when it rewrites its
+// settings, measured on the Mac on 2026-10-10. It drops any other kind on its
+// next save: search_web(*) was dropped, and web search needs no grant (#2312).
+var agyKeptGrantKinds = []string{"command(", "read_file(", "write_file(", "read_url(", "mcp("}
+
+// keptGrantKind reports whether grant is of a kind agy keeps.
+func keptGrantKind(grant string) bool {
+	for _, k := range agyKeptGrantKinds {
+		if strings.HasPrefix(grant, k) {
+			return true
+		}
+	}
+	return false
 }
 
 // containsAll reports whether list holds every one of want.
