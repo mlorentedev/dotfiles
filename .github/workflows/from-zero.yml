@@ -20,6 +20,8 @@ name: from-zero
 # test-macos.
 #
 # No continue-on-error anywhere: a red run that names its cause is the design.
+# doctor's FAILs that the #2013 ledger already owns are listed with their
+# owners and gated both ways (from-zero-doctor-gate.sh), not ignored.
 on:
   pull_request:
     paths:
@@ -36,6 +38,8 @@ on:
       - 'versions.conf'
       - 'env-contract.json'
       - '.github/workflows/from-zero.yml'
+      - '.github/scripts/from-zero-doctor-gate.sh'
+      - '.github/scripts/from-zero-known-failures.txt'
   push:
     branches: [main]
   workflow_dispatch:
@@ -104,13 +108,22 @@ jobs:
       # login, vault), and none is fabricated for it. Those checks print a SKIP
       # naming their restore step, so a FAIL here is a defect of the bootstrap
       # (#2013 D10, docs/runbooks/guide-new-machine.md).
+      #
+      # The FAILs the epic already owns are listed, each with its owner, in
+      # .github/scripts/from-zero-known-failures.txt. The gate fails on any
+      # other FAIL and on an entry no FAIL matches any more, so the list only
+      # shrinks and a regression still turns the job red.
       - name: dotf doctor --scope machine
         run: |
+          rc=0
           if command -v zsh >/dev/null 2>&1; then
-            zsh -ic 'dotf doctor --scope machine'
+            zsh -ic 'dotf doctor --scope machine' > "$RUNNER_TEMP/doctor.out" 2>&1 || rc=$?
           else
-            bash -ic 'dotf doctor --scope machine'
+            bash -ic 'dotf doctor --scope machine' > "$RUNNER_TEMP/doctor.out" 2>&1 || rc=$?
           fi
+          cat "$RUNNER_TEMP/doctor.out"
+          os=$(uname -s | tr '[:upper:]' '[:lower:]')
+          .github/scripts/from-zero-doctor-gate.sh "$os" "$rc" "$RUNNER_TEMP/doctor.out"
 
       # Its own signal: a red doctor must not hide whether the machine is
       # idempotent, so this runs whenever the first converge succeeded.
