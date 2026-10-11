@@ -413,4 +413,5 @@ tags: [lessons, index, dotfiles]
 | [392 - lsof's exit status is not the verdict of a process scan](lesson-392-lsof-exit-status-is-not-the-verdict-of-a-process-scan.md) | 2026-10-10 |
 | [393 - An Electron app's state and liveness follow Electron, not its binary](lesson-393-an-electron-apps-state-and-liveness-follow-electron-not-its-binary.md) | 2026-10-10 |
 | [394 - A prompt can only ask for what the response schema carries](lesson-394-a-prompt-can-only-ask-for-what-the-response-schema-carries.md) | 2026-10-11 |
+| [395 - An environment token is not a stored login](lesson-395-an-environment-token-is-not-a-stored-login.md) | 2026-10-11 |
 <!-- END GENERATED -->

@@ -1,6 +1,7 @@
 package doctor
 
 import (
+	"os"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
@@ -28,6 +29,10 @@ func checkGitConfig(sys *System, rep *Report, fix bool) {
 		},
 		OnPath: sys.has,
 		Exists: pathExists,
+		StoredAuth: func(name string, args ...string) ([]byte, error) {
+			out, err := sys.CommandOutputEnv(gitconfig.WithoutEnvTokens(os.Environ()), name, args...)
+			return []byte(out), err
+		},
 	}
 	st, err := gitconfig.Inspect(m)
 	if err != nil {
