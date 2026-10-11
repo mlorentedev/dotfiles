@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -29,6 +30,20 @@ func TestManifest_AnEntryRequiresWhatEverySiblingInItsDirectoryRequires(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The positive half: on a clean manifest the loop below never runs, so a
+	// read that came back empty, or an entry renamed away, would pass silently.
+	byName := map[string]Config{}
+	for _, c := range m.Configs {
+		byName[c.Name] = c
+	}
+	if c, ok := byName["pi-compaction"]; !ok || c.Requires != "pi" {
+		t.Errorf("pi-compaction: want declared with requires pi, got %+v (present: %t)", c, ok)
+	}
+	for name := range requiresExempt {
+		if _, ok := byName[name]; !ok {
+			t.Errorf("requiresExempt names %s, which %s no longer declares; drop the exemption", name, ManifestRel)
+		}
+	}
 	for _, name := range missingSiblingRequires(m.Configs) {
 		if _, ok := requiresExempt[name]; !ok {
 			t.Errorf("%s omits the requires every other entry in its directory declares; add it, or exempt it in requiresExempt with the reason", name)
@@ -39,6 +54,7 @@ func TestManifest_AnEntryRequiresWhatEverySiblingInItsDirectoryRequires(t *testi
 // missingSiblingRequires names each entry that declares no `requires` while
 // every other entry in its destination directory declares one and the same.
 // A directory holding configs for different tools ({HOME}) imposes nothing.
+// Sorted, so the result does not depend on map order.
 func missingSiblingRequires(configs []Config) []string {
 	byDir := map[string][]Config{}
 	for _, c := range configs {
@@ -52,6 +68,7 @@ func missingSiblingRequires(configs []Config) []string {
 			}
 		}
 	}
+	slices.Sort(missing)
 	return missing
 }
 
@@ -82,6 +99,12 @@ func TestMissingSiblingRequires(t *testing.T) {
 			{Name: "b", Dst: "{HOME}/.t/b", Requires: "t"},
 			{Name: "c", Dst: "{HOME}/.t/c"},
 		}, []string{"c"}},
+		{"two directories, one miss each, sorted", []Config{
+			{Name: "z", Dst: "{HOME}/.u/z"},
+			{Name: "u1", Dst: "{HOME}/.u/u1", Requires: "u"},
+			{Name: "a", Dst: "{HOME}/.t/a"},
+			{Name: "t1", Dst: "{HOME}/.t/t1", Requires: "t"},
+		}, []string{"a", "z"}},
 		{"siblings disagree", []Config{
 			{Name: "a", Dst: "{HOME}/a", Requires: "tmux"},
 			{Name: "b", Dst: "{HOME}/b", Requires: "zsh"},
@@ -97,7 +120,7 @@ func TestMissingSiblingRequires(t *testing.T) {
 	}
 	for _, tc := range cases {
 		got := missingSiblingRequires(tc.configs)
-		if len(got) != len(tc.want) || (len(got) == 1 && got[0] != tc.want[0]) {
+		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
 	}
