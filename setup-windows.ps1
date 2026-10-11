@@ -708,51 +708,8 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     Write-Warn "hive $shownVer predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 }
 
-# Claude Code plugins (requires claude CLI).
-# Idempotent: cache the installed-plugins list ONCE before the loop and skip
-# entries already present. CRITICAL: every `claude plugin install` writes to
-# %USERPROFILE%\.claude\.claude.json. The CLI does NOT preserve all fields
-# on rewrite -- subscription metadata (organizationType, organizationRateLimitTier),
-# the projects map, and onboarding flags get silently dropped. Re-running
-# install for already-installed plugins triggers silent .claude.json truncation
-# and forces re-authentication in every project. Same idempotence pattern as
-# MCP registration above. BUG-011: the pre-loop `claude plugin list` is now
-# also wrapped because it goes through the same #59870 deserialize-modify-
-# serialize path.
-if ($claudeCmd) {
-    Write-Info "Installing Claude Code plugins..."
-    $plugins = @(
-        "gopls-lsp@claude-plugins-official",
-        "security-guidance@claude-plugins-official",
-        "frontend-design@claude-plugins-official"
-    )
-    # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
-    # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
-    $installedPlugins = Backup-AndRestoreClaudeJson -Action {
-        try { (& claude plugin list 2>$null) -join "`n" } catch { "" }
-    }
-    $pluginsAdded = 0
-    $pluginsSkipped = 0
-    foreach ($plugin in $plugins) {
-        if ($installedPlugins -match [regex]::Escape($plugin)) {
-            $pluginsSkipped++
-            continue
-        }
-        # BUG-004: wrap the install with the snapshot/restore guard so the upstream
-        # truncation bug (#59870) cannot drop subscription state.
-        Backup-AndRestoreClaudeJson -Action {
-            try {
-                & claude plugin install $plugin 2>$null | Out-Null
-            } catch {
-                # Silently continue if a plugin fails
-            }
-        }
-        $pluginsAdded++
-    }
-    Write-Success "Claude Code plugins ready ($pluginsAdded added, $pluginsSkipped already present)"
-} else {
-    Write-Warn "Claude Code CLI not found, skipping plugin installation"
-}
+# Claude Code plugins are installed by the bare `dotf deploy` below, from
+# ai/claude/plugins.json: it counts each failure and names its cause (#2336).
 
 # Claude's auto-memory dir is linked to its vault source per project by
 # memlink (cli/internal/memlink): the session-start hook links the project a

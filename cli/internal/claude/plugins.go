@@ -84,10 +84,13 @@ type Syncer struct {
 
 // PluginReport is what one Sync found and did. Added holds only installs that
 // succeeded, or would be attempted on a dry run; a failed install is in Failed
-// and nowhere else (AC7; the PowerShell twin counts attempts, #1491).
+// and nowhere else (AC7; the PowerShell twin counted attempts, #1491), and
+// Causes holds what the CLI said for it. Every id Sync is given lands in
+// exactly one of Present, Added and Failed.
 type PluginReport struct {
 	Present, Added, Failed []string
-	Restored               int // .claude.json restores the guard made
+	Causes                 map[string]error // the install's error, for each id in Failed
+	Restored               int              // .claude.json restores the guard made
 }
 
 // Sync installs every id in ids that `claude plugin list` does not name.
@@ -123,6 +126,10 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 			rep.Restored += b2i(restored)
 			if err != nil {
 				rep.Failed = append(rep.Failed, id)
+				if rep.Causes == nil {
+					rep.Causes = map[string]error{}
+				}
+				rep.Causes[id] = err
 				continue
 			}
 			rep.Added = append(rep.Added, id)

@@ -1,42 +1,32 @@
 #!/usr/bin/env bats
-# ai/claude/plugins.json is the plugin list `dotf deploy` installs (CLI-063, #1339).
-# Until the cutover deletes them, both setup twins still carry the same list
-# hardcoded. This guard fails the moment the three disagree, so the port stays a
-# port and no list drifts while two of them still run.
+# ai/claude/plugins.json is the plugin list `dotf deploy` installs (CLI-063, #1339)
+# on every OS, counting each failure and naming its cause. The setup twins used
+# to carry the same list in a loop that counted attempts and discarded every
+# error, and printed SUCCESS after `dotf deploy` had just failed the same
+# installs (#2336). Neither may grow one back.
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export PLUGINS_JSON="$DOTFILES_DIR/ai/claude/plugins.json"
 }
 
-ssot_plugins() {
-    jq -r '.plugins[]' "$PLUGINS_JSON" | sort
-}
-
-# The ids quoted between `for plugin in \` and the `; do` that closes the list.
-linux_plugins() {
-    sed -n '/^    for plugin in \\$/,/; do$/p' "$DOTFILES_DIR/setup-linux.sh" |
-        grep -oE '"[^"]+@[^"]+"' | tr -d '"' | sort
-}
-
-# The ids quoted inside the `$plugins = @(` array. The file is CRLF.
-windows_plugins() {
-    tr -d '\r' < "$DOTFILES_DIR/setup-windows.ps1" |
-        sed -n '/^[[:space:]]*\$plugins = @($/,/^[[:space:]]*)$/p' |
-        grep -oE '"[^"]+@[^"]+"' | tr -d '"' | sort
-}
-
 @test "plugins.json is valid JSON with a non-empty plugins array of ids" {
     jq -e '.plugins | type == "array" and length > 0 and all(type == "string" and test("^[^@]+@[^@]+$"))' "$PLUGINS_JSON"
 }
 
-@test "setup-linux.sh installs exactly the plugins in plugins.json" {
-    [ -n "$(linux_plugins)" ]
-    [ "$(linux_plugins)" = "$(ssot_plugins)" ]
+# Comments are dropped first: a pointer to `dotf deploy` may name the command.
+@test "neither setup script installs a Claude Code plugin itself" {
+    for f in setup-linux.sh setup-windows.ps1; do
+        run bash -c "tr -d '\r' < '$DOTFILES_DIR/$f' | grep -v '^[[:space:]]*#' | grep -nE 'claude plugin (install|list)'"
+        [ "$status" -eq 1 ] || { echo "$f: $output"; false; }
+    done
 }
 
-# bats test_tags=os-sensitive
-@test "setup-windows.ps1 installs exactly the plugins in plugins.json" {
-    [ -n "$(windows_plugins)" ]
-    [ "$(windows_plugins)" = "$(ssot_plugins)" ]
+@test "neither setup script carries a plugin id from plugins.json" {
+    while IFS= read -r id; do
+        for f in setup-linux.sh setup-windows.ps1; do
+            run grep -nF "\"$id\"" "$DOTFILES_DIR/$f"
+            [ "$status" -eq 1 ] || { echo "$f carries $id: $output"; false; }
+        done
+    done < <(jq -r '.plugins[]' "$PLUGINS_JSON")
 }

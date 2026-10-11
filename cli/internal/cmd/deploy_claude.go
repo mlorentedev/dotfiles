@@ -118,7 +118,7 @@ func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error 
 	}
 	reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
 	for _, id := range rep.Failed {
-		deployRow(w, "failed", step, "%s did not install", id)
+		deployRow(w, "failed", step, "%s did not install: %v", id, rep.Causes[id])
 	}
 	if len(rep.Failed) > 0 {
 		return errors.Join(retireErr, fmt.Errorf("%s: %d plugin(s) failed to install: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", ")))
@@ -215,10 +215,16 @@ func reportRestored(w io.Writer, step, path string, n int) {
 	}
 }
 
+// reportCounts is a step's summary row. A failure is counted in it and sets its
+// state: a row reading "installed 0 added, 0 already present" for three
+// declared plugins that all failed hid every one of them (#2336).
 func reportCounts(w io.Writer, step string, dryRun bool, added, failed, present int) {
 	state, verb := "installed", "added"
 	switch {
-	case added == 0 && failed == 0:
+	case failed > 0:
+		deployRow(w, "failed", step, "%d %s, %d failed, %d already present", added, verb, failed, present)
+		return
+	case added == 0:
 		state = "in sync"
 	case dryRun:
 		state, verb = "would add", "missing"
