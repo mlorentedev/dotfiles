@@ -43,7 +43,8 @@ func TestEnvGenerate_PlanWritesNothingApplyConvergesAndRerunIsANoOp(t *testing.T
 	if err := r.Probe(e); err != nil {
 		t.Fatalf("probe after apply: %v", err)
 	}
-	if b, _ := os.ReadFile(out); !strings.Contains(string(b), filepath.Join(e.Home, "vault")) {
+	// The renderer substitutes $HOME textually and keeps the contract's "/".
+	if b, _ := os.ReadFile(out); !strings.Contains(string(b), e.Home+"/vault") {
 		t.Fatalf("%s does not carry the contract's VAULT_PATH:\n%s", out, b)
 	}
 

@@ -57,7 +57,8 @@ func TestConvergePlan_ListsApplicableReconcilersAndTouchesNothing(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"converge plan", "records-mirror", "env-generate", "[CHANGE]", "3 to write", "paths.sh to write", "2 to change"} {
+	pathFile := filepath.Base(env.DefaultOutput(runtime.GOOS, home)) // paths.ps1 on Windows
+	for _, want := range []string{"converge plan", "records-mirror", "env-generate", "[CHANGE]", "3 to write", pathFile + " to write", "2 to change"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("plan output lacks %q:\n%s", want, stdout)
 		}
