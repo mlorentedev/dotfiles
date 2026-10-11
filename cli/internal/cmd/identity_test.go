@@ -51,7 +51,7 @@ func TestConverge_WithoutATerminalEndsWithTheIdentityPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"identity: not restored yet", "1. [ OK ] age key", "2. [TODO] Bitwarden login: bw login --quiet"} {
+	for _, want := range []string{"identity: not restored yet", "[ OK ] age key (runbook step 1)", "[TODO] Bitwarden login (runbook step 2): bw login --quiet"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("output lacks %q:\n%s", want, stdout)
 		}
@@ -135,7 +135,7 @@ func TestIdentityRestore_RunsTheChainOnATerminal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout, "3. [TODO] Bitwarden unlock") || strings.Contains(stdout, "Enter") {
+	if !strings.Contains(stdout, "[TODO] Bitwarden unlock (runbook step 2)") || strings.Contains(stdout, "Enter") {
 		t.Errorf("--plan prints and asks nothing:\n%s", stdout)
 	}
 }

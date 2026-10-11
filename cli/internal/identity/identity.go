@@ -39,14 +39,17 @@ type Facts struct {
 // Step is one link of the chain. Run is what the guide runs for it, in order;
 // a step with no Run is done by hand (Manual says how) and the guide waits.
 // After runs once the step is done and only reports: what it finds is not
-// this chain's to fix, so it never stops it.
+// this chain's to fix, so it never stops it. Runbook is the step of
+// docs/runbooks/guide-new-machine.md it belongs to, the number doctor's SKIP
+// lines cite too; the unlock shares step 2 with the login.
 type Step struct {
-	Name   string
-	Why    string
-	Manual string
-	Run    [][]string
-	After  [][]string
-	Done   func(Facts) bool
+	Name    string
+	Runbook int
+	Why     string
+	Manual  string
+	Run     [][]string
+	After   [][]string
+	Done    func(Facts) bool
 }
 
 // Paths are where the restored identity lands on this machine.
@@ -64,10 +67,11 @@ const DefaultVaultURL = "https://github.com/mlorentedev/knowledge.git"
 // Steps is the restore chain in the runbook's order.
 func Steps(p Paths) []Step {
 	vault := Step{
-		Name: "knowledge vault",
-		Why:  "the agents' memory, and what doctor's vault checks read; git-config first wires gh's credential helper the private clone authenticates through",
-		Run:  [][]string{{p.Dotf, "converge", "--only", "git-config"}, {"git", "clone", p.VaultURL, p.Vault}},
-		Done: func(f Facts) bool { return f.Vault },
+		Name:    "knowledge vault",
+		Runbook: 4,
+		Why:     "the agents' memory, and what doctor's vault checks read; git-config first wires gh's credential helper the private clone authenticates through",
+		Run:     [][]string{{p.Dotf, "converge", "--only", "git-config"}, {"git", "clone", p.VaultURL, p.Vault}},
+		Done:    func(f Facts) bool { return f.Vault },
 	}
 	if p.Vault == "" {
 		// Never a clone into the working directory: say what is missing.
@@ -76,33 +80,37 @@ func Steps(p Paths) []Step {
 	}
 	return []Step{
 		{
-			Name:   "age key",
-			Why:    "it decrypts the offline floor; nothing below starts without it",
-			Manual: "restore it from the offline backup to " + p.AgeKey + " (docs/runbooks/guide-secrets-governance.md, § RECOVER, step 1)",
-			Done:   func(f Facts) bool { return f.AgeKey },
+			Name:    "age key",
+			Runbook: 1,
+			Why:     "it decrypts the offline floor; nothing below starts without it",
+			Manual:  "restore it from the offline backup to " + p.AgeKey + " (docs/runbooks/guide-secrets-governance.md, § RECOVER, step 1)",
+			Done:    func(f Facts) bool { return f.AgeKey },
 		},
 		{
-			Name: "Bitwarden login",
-			Why:  "every `dotf secrets` read resolves through Bitwarden (ADR-028)",
+			Name:    "Bitwarden login",
+			Runbook: 2,
+			Why:     "every `dotf secrets` read resolves through Bitwarden (ADR-028)",
 			// --quiet keeps the session key bw prints on stdout off the
 			// terminal; its prompts are on stderr.
 			Run:  [][]string{{"bw", "login", "--quiet"}},
 			Done: func(f Facts) bool { return f.BWLoggedIn },
 		},
 		{
-			Name: "Bitwarden unlock",
-			Why:  "the bw serve daemon every terminal shares; then each registry secret is resolved, no value printed",
-			Run:  [][]string{{p.Dotf, "secrets", "unlock"}},
+			Name:    "Bitwarden unlock",
+			Runbook: 2,
+			Why:     "the bw serve daemon every terminal shares; then each registry secret is resolved, no value printed",
+			Run:     [][]string{{p.Dotf, "secrets", "unlock"}},
 			// A secret missing from the store is a gap in the registry, not in
 			// this machine's identity: reported, never a stop.
 			After: [][]string{{p.Dotf, "secrets", "verify"}},
 			Done:  func(f Facts) bool { return f.BWUnlocked },
 		},
 		{
-			Name: "GitHub login",
-			Why:  "the vault is a private repository, cloned through gh's credential helper, which git-config wires only once gh holds a login",
-			Run:  [][]string{{"gh", "auth", "login"}},
-			Done: func(f Facts) bool { return f.GHLoggedIn },
+			Name:    "GitHub login",
+			Runbook: 3,
+			Why:     "the vault is a private repository, cloned through gh's credential helper, which git-config wires only once gh holds a login",
+			Run:     [][]string{{"gh", "auth", "login"}},
+			Done:    func(f Facts) bool { return f.GHLoggedIn },
 		},
 		vault,
 	}
@@ -125,14 +133,20 @@ func Plan(w io.Writer, steps []Step, f Facts) {
 		return
 	}
 	_, _ = fmt.Fprintln(w, "identity: not restored yet; on a terminal, `dotf identity restore` walks you through it:")
-	for i, s := range steps {
+	for _, s := range steps {
 		if s.Done(f) {
-			_, _ = fmt.Fprintf(w, "  %d. [ OK ] %s\n", i+1, s.Name)
+			_, _ = fmt.Fprintf(w, "  [ OK ] %s\n", label(s))
 			continue
 		}
-		_, _ = fmt.Fprintf(w, "  %d. [TODO] %s: %s\n", i+1, s.Name, how(s))
+		_, _ = fmt.Fprintf(w, "  [TODO] %s: %s\n", label(s), how(s))
 	}
 	_, _ = fmt.Fprintln(w, "  then: dotf converge, then dotf doctor (docs/runbooks/guide-new-machine.md)")
+}
+
+// label names a step with the runbook step it belongs to, so the guide and
+// doctor's SKIP lines count the same way.
+func label(s Step) string {
+	return fmt.Sprintf("%s (runbook step %d)", s.Name, s.Runbook)
 }
 
 func how(s Step) string {
@@ -170,12 +184,12 @@ func Guide(t Terminal, steps []Step, probe func() Facts, run Exec) {
 		return
 	}
 	_, _ = fmt.Fprintln(t.Out, "identity: restoring what converge cannot (docs/runbooks/guide-new-machine.md)")
-	for i, s := range steps {
+	for _, s := range steps {
 		if s.Done(f) {
-			_, _ = fmt.Fprintf(t.Out, "  %d. [ OK ] %s\n", i+1, s.Name)
+			_, _ = fmt.Fprintf(t.Out, "  [ OK ] %s\n", label(s))
 			continue
 		}
-		_, _ = fmt.Fprintf(t.Out, "  %d. %s: %s\n     %s\n", i+1, s.Name, s.Why, how(s))
+		_, _ = fmt.Fprintf(t.Out, "  %s: %s\n     %s\n", label(s), s.Why, how(s))
 		if !confirm(t.Out, in, s) {
 			stop(t.Out, s, "skipped")
 			return

@@ -3,6 +3,7 @@ package identity
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -165,11 +166,11 @@ func TestPlan_NamesWhatIsLeftAndRunsNothing(t *testing.T) {
 	Plan(&out, Steps(testPaths), Facts{AgeKey: true, BWLoggedIn: true})
 	got := out.String()
 	for _, want := range []string{
-		"1. [ OK ] age key",
-		"2. [ OK ] Bitwarden login",
-		"3. [TODO] Bitwarden unlock: dotf secrets unlock, then dotf secrets verify",
-		"4. [TODO] GitHub login: gh auth login",
-		"5. [TODO] knowledge vault: dotf converge --only git-config, then git clone https://example.test/knowledge.git /h/knowledge",
+		"[ OK ] age key (runbook step 1)",
+		"[ OK ] Bitwarden login (runbook step 2)",
+		"[TODO] Bitwarden unlock (runbook step 2): dotf secrets unlock, then dotf secrets verify",
+		"[TODO] GitHub login (runbook step 3): gh auth login",
+		"[TODO] knowledge vault (runbook step 4): dotf converge --only git-config, then git clone https://example.test/knowledge.git /h/knowledge",
 		"`dotf identity restore`",
 	} {
 		if !strings.Contains(got, want) {
@@ -184,6 +185,28 @@ func TestRestoreTextsNameTheRunbookStepsInOrder(t *testing.T) {
 	for i, r := range []string{RestoreAge, RestoreBW, RestoreGH, RestoreVault} {
 		if want := "guide-new-machine.md, step " + string(rune('1'+i)) + ")"; !strings.HasSuffix(r, want) {
 			t.Errorf("restore text %d = %q; want it to end %q", i, r, want)
+		}
+	}
+}
+
+// Each step of the guide carries the runbook step doctor's SKIP line cites for
+// the same check, so a person reading both counts the same way (#2342 review).
+func TestSteps_CountLikeDoctorsRestoreTexts(t *testing.T) {
+	cites := map[string]string{
+		"age key":          RestoreAge,
+		"Bitwarden login":  RestoreBW,
+		"Bitwarden unlock": RestoreBW,
+		"GitHub login":     RestoreGH,
+		"knowledge vault":  RestoreVault,
+	}
+	steps := Steps(testPaths)
+	if len(steps) != len(cites) {
+		t.Fatalf("%d steps; want %d", len(steps), len(cites))
+	}
+	for _, s := range steps {
+		want := fmt.Sprintf("step %d)", s.Runbook)
+		if r, ok := cites[s.Name]; !ok || !strings.HasSuffix(r, want) {
+			t.Errorf("%s is runbook step %d; doctor cites %q", s.Name, s.Runbook, r)
 		}
 	}
 }
