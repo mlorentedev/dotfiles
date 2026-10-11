@@ -166,6 +166,7 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] Failing test: without a terminal a converge ends with the identity plan and runs nothing; on a terminal it walks; `--plan` and `--only` never walk; the exit status is the converge's (`cli/internal/cmd/identity_test.go`)
 - [x] `internal/identity`, a leaf package: the chain, the plan, the guide, and the Restore texts doctor's SKIP lines cite (moved from doctor); `dotf identity restore [--plan]`; converge's epilogue
 - [x] Runbook, ADR-045 D12 and `cli/README.md` say what the walk runs, and why `gh auth login` is in the chain
+- [x] Lesson 398: under `curl | bash` stdin is the script, so the walk reads the person from `/dev/tty` and hands that terminal to `bw` and `gh`
 
 ## Closing
 
