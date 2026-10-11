@@ -26,6 +26,12 @@ on:
       - 'install.sh'
       - 'install.ps1'
       - 'cli/internal/converge/**'
+      # Converge's own path outside its package: the command and its identity
+      # epilogue, and the git-hooks step's installer.
+      - 'cli/internal/cmd/converge.go'
+      - 'cli/internal/cmd/identity.go'
+      - 'cli/internal/identity/**'
+      - 'cli/internal/hooks/**'
       - 'packages.json'
       - 'versions.conf'
       - 'env-contract.json'
