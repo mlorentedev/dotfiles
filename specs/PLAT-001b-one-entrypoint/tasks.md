@@ -139,6 +139,14 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [ ] [AC9] CI job on clean `macos-latest` and `ubuntu-latest`: `install.sh`, `dotf doctor`, then a second `dotf converge` that reports zero native changes. It asserts the first run converged before it checks idempotence (lesson 328). Runs on pull requests to `main` and on push to `main`, so the default branch carries a run the verification can read; non-required until green
 - [ ] Runbook `docs/runbooks/guide-new-machine.md`: the one-liner per OS, what `--plan` shows, how to read the report, what `skipped` on darwin means
 
+### PR 6b — the git-hooks step (#2013 X1 finding)
+
+- [x] Failing test: from zero, a plan names the mirror and the wiring and changes nothing; the apply makes both, the probe passes, and the next run reports 0 (`TestGitHooks_FromZeroDeploysAndWires`)
+- [x] Failing test: a foreign `core.hooksPath` is kept and named, only the mirror counts, and the probe passes (`TestGitHooks_KeepsAForeignHooksPath`); an unset hooksPath or a stale mirror fails the probe
+- [x] `hooks.Inspect` and `hooks.Apply`: what `dotf hooks install` would change, read without writing (the mirror compared as `copyTree` and `markExecutable` would write it, the bit ignored on Windows), and the install through a given runner
+- [x] The `git-hooks` reconciler, after `git-config`, every OS
+- [x] Delete the hooks blocks of `setup-linux.sh` and `setup-windows.ps1` (one twin pair); `tests/guard-setup-no-hooks-install.bats` keeps them out
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

@@ -65,14 +65,7 @@ type Options struct {
 // to surface the error and let the operator re-run. A caller that swallows it
 // turns every guard off silently, which is the one outcome worse than failing.
 func Install(ctx context.Context, o Options) error {
-	if o.homeDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("resolve home directory: %w", err)
-		}
-		o.homeDir = home
-	}
-	return install(ctx, execGit, o)
+	return Apply(ctx, execGit, o)
 }
 
 func install(ctx context.Context, run gitRunner, o Options) error {

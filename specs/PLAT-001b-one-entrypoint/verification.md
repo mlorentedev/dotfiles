@@ -74,6 +74,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - #2013 D11 (owner, 2026-10-10): an agent installed during the run gets its instruction files during that run. records-harness stays before tools (#2016, instructions-first) and declares `RevisitAfter() = "tools"`; the runner applies it again right after an apply in which tools changed the machine, reported as its own entry (`after tools: …`). Found by X1 on macos-latest: tools installed copilot after records-harness had skipped it, so the second converge deployed `.copilot/copilot-instructions.md`. A converged machine and a plan revisit nothing; a revisit's failure stops the run like any step. Alternatives declined: moving records-harness after tools (opens a window with an agent and no instructions) and gating on the catalog (compile-harness.sh gates on PATH too, so both sides would change).
 
+- #2013 X1 finding (2026-10-11): on macos-latest the GUARD-001 dispatcher was never installed, because `dotf hooks install` ran only from the setup twins and macOS has none. converge gains a `git-hooks` step on every OS, and both twin blocks go. A foreign `core.hooksPath` stays a WARN-shaped detail, not a change and not a probe failure: converge never takes over someone's hooks (the rule `wireHooksPath` already kept). Mutations caught: the probe ignoring an unset hooksPath, the probe ignoring a stale mirror, and a plan that applies. doctor's `checkGuardHooks --fix` still wires too; that third copy is #793's.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
