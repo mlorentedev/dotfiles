@@ -251,3 +251,25 @@ func TestAgainstRealGit(t *testing.T) {
 		t.Errorf("include.path after apply = %q (%v)", out, err)
 	}
 }
+
+// gh is asked about its stored login, not the token in this environment: a
+// GH_TOKEN is not a login a GUI app or a scheduled task inherits (#2319).
+func TestInspect_AnEnvironmentTokenIsNotALogin(t *testing.T) {
+	f := bareMachine() // f.ghOK: Run's gh, which sees the token, is logged in
+	m := machine(f, true)
+	m.StoredAuth = func(name string, args ...string) ([]byte, error) { return nil, exitErr(1) }
+	st, err := Inspect(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(st.Blocked, "gh auth login") || st.Repairable() != 1 {
+		t.Errorf("want the helper blocked on the login and only the include repairable: %+v", st)
+	}
+}
+
+func TestWithoutEnvTokens(t *testing.T) {
+	got := WithoutEnvTokens([]string{"PATH=/bin", "GH_TOKEN=a", "GITHUB_TOKEN=b", "GH_ENTERPRISE_TOKEN=c", "GITHUB_ENTERPRISE_TOKEN=d", "GH_HOST=x", "HOME=/h"})
+	if want := []string{"PATH=/bin", "GH_HOST=x", "HOME=/h"}; strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
