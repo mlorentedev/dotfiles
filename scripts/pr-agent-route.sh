@@ -192,7 +192,7 @@ answers() {
 key_ok=true
 if [ "$provider" != "nan-only" ] && [ -z "${PR_AGENT_ANTHROPIC_API_KEY:-}" ]; then
     key_ok=false
-    add_note "PR_AGENT_ANTHROPIC_API_KEY is not set, so no Anthropic model was in the review pool. Remedy: add ci:${GITHUB_REPOSITORY:-<repo>} to its consumers in dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY:-<repo>}"
+    add_note "PR_AGENT_ANTHROPIC_API_KEY is not set, so no Anthropic model was in the review pool. Remedy: add ci:${GITHUB_REPOSITORY:-<repo>} to its consumers in dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY:-<repo>} PR_AGENT_ANTHROPIC_API_KEY"
 fi
 
 anthropic=()

@@ -184,7 +184,7 @@ jobs:
           if [ "${HAS_NAN_API_KEY}" != "true" ]; then
             echo "::error::NAN_API_KEY is not set in this repository's Actions secrets, so PR-Agent cannot review."
             echo "::error::Remedy: add ci:${GITHUB_REPOSITORY} to NAN_API_KEY's consumers in" \
-              "dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY}"
+              "dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY} NAN_API_KEY"
             exit 1
           fi
       # A PR whose every file is in `.pr_agent.toml`'s [ignore] reaches the model
