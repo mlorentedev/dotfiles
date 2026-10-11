@@ -223,6 +223,18 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [ ] PR2 (after the release): mark CLAUDE, PI and AGY under `# mise: latest`; Claude's auto-updater off; delete the agent blocks in `setup-linux.sh` (the pi package reconcile stays); re-check whether aqua's agy has caught up with upstream (1.3.2 vs 1.3.3 on 2026-10-10)
 - Windows: the agents stay on `Install-AgentBinary` until Windows mise is measured (#2013)
 
+### apt index refresh (#2013 X1 finding, #2332)
+
+The first X1 run on ubuntu-latest failed its first converge: the runner's apt
+lists named a libgit2 build the mirror had dropped, so `apt-get install` 404ed.
+A fix to the AC7 path, so it lives here and not in a spec of its own.
+
+- [x] `refreshAptIndex`: one `apt-get update` per Installer, before the first apt install; none on a run with nothing to install
+- [x] When sudo wants a password the refresh is not attempted, like the install it precedes
+- [x] A refresh that fails for another reason warns and the install tries the index as it is
+- [x] The command handed to the person refreshes first: `SudoInstallCommand` prefixes `sudo apt-get update &&`, and the per-package line and the plan note reuse it (pr-agent finding on #2332: an install alone meets the same stale lists)
+- [ ] X1 on ubuntu-latest passes its first converge once #2332 is on main
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
