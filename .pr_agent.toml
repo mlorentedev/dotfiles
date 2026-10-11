@@ -160,11 +160,31 @@ require_security_review = true
 persistent_comment = true
 final_update_message = false
 
+# The harness compliance pass reports its FAILs as key issues, never as a
+# section of its own (#2287). The review is a YAML document under a fixed
+# schema, and a fixed schema carries only what it declares: told to "open every
+# review" with the pass and to report it "even when everything passes", the
+# model had no field for it. Measured on seven reviews: five dropped the pass,
+# two improvised a pseudo-ticket in ticket_compliance_check (a field present
+# only when a ticket is linked), and one wrote it as YAML comments above the
+# mapping, dropped the `review:` root, and lost a whole review on the last
+# attempt of the pool (run 38047143517). key_issues_to_review is the one field
+# every review has that carries a file and lines, which is what a compliance
+# FAIL names.
+#
+# The upstream default of 3 findings would let a compliance FAIL crowd out a
+# defect, so the cap leaves room for both.
+num_max_findings = 5
+
 extra_instructions = """
-Open every review with a HARNESS COMPLIANCE pass over the two context files
-(AGENTS.md and .claude/CLAUDE.md), stating PASS or FAIL per item with the
-offending file and line. Report it even when everything passes — a silent
-section is indistinguishable from a section that was skipped. Check at least:
+Run a HARNESS COMPLIANCE pass over the two context files (AGENTS.md and
+.claude/CLAUDE.md) on every review. Report each item that FAILS as an entry of
+key_issues_to_review, with issue_header "Harness compliance", the rule named in
+issue_content, and the offending file and lines. For an artifact that is not a
+file in the diff (branch name, PR title or body, a commit message), set
+relevant_file to that artifact's name and start_line and end_line to 0. Items
+that pass are not reported, and nothing is written outside the response's YAML
+mapping. Check at least:
 
 - English only in the durable record: commit messages, branch name, PR title and
   body, code comments. Conversation may be any language; artifacts may not.
@@ -184,7 +204,7 @@ section is indistinguishable from a section that was skipped. Check at least:
 - No auto-merge: nothing in the diff enables it, and no workflow merges a PR
   without a human.
 
-Then continue with the substance.
+Then review the substance.
 
 This repository already runs shellcheck, bats, golangci-lint, go vet and gitleaks
 in CI. Do not restate what a linter reports; that is covered and it is noise here.
