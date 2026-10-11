@@ -19,6 +19,7 @@ func newDoctorCmd() *cobra.Command {
 		fix     bool
 		verbose bool
 		quick   bool
+		scope   string
 	)
 
 	cmd := &cobra.Command{
@@ -41,17 +42,28 @@ With --fix it reports the exact shell-profile lines for any missing env default
 With --quick it runs ONLY the env-contract sweep (env vars, PATH, required
 binaries) and skips the heavy sections — chiefly the ~2.8s compile-harness drift
 gate. This is the fast subset the SessionStart hook wires in; --quick is
-report-only (it ignores --fix).`,
-		Example:       "  dotf doctor\n  dotf doctor --fix\n  dotf doctor --quick\n  dotf doctor --verbose",
+report-only (it ignores --fix).
+
+With --scope machine it checks what converge produces and skips the identity
+checks: the age key, Bitwarden, the gh login and the knowledge vault, which are
+the owner's to restore (docs/runbooks/guide-new-machine.md). Each one skipped
+prints a SKIP naming its restore step, and a skip never fails the run. It is
+the scope for a fresh machine before its identity is restored, and for CI.`,
+		Example:       "  dotf doctor\n  dotf doctor --fix\n  dotf doctor --quick\n  dotf doctor --verbose\n  dotf doctor --scope machine",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			sc, err := doctor.ParseScope(scope)
+			if err != nil {
+				return err
+			}
 			code, err := doctor.Run(doctor.Options{
 				Out:     cmd.OutOrStdout(),
 				Fix:     fix,
 				Verbose: verbose,
 				Quick:   quick,
+				Scope:   sc,
 			})
 			if err != nil {
 				cmd.PrintErrln("doctor:", err)
@@ -67,5 +79,6 @@ report-only (it ignores --fix).`,
 	cmd.Flags().BoolVar(&fix, "fix", false, "report safe env defaults to persist and wire safe repaired state (e.g. core.hooksPath)")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "list passing checks too (default summarises them per section)")
 	cmd.Flags().BoolVar(&quick, "quick", false, "env-contract sweep only — fast, no compile-harness gate (for the SessionStart hook)")
+	cmd.Flags().StringVar(&scope, "scope", "all", "all, or machine: skip the identity checks (age key, Bitwarden, gh login, vault)")
 	return cmd
 }

@@ -60,6 +60,15 @@ func checkSecretsTooling(sys *System, cfg *Config, rep *Report) {
 		// ADR-028 DR floor
 		rep.Fail("age not in PATH — re-run setup (the offline secrets recovery needs it)")
 	}
+}
+
+// checkAgeIdentity holds the age identity key: present, and able to decrypt
+// what is encrypted to it. The key is the owner's, restored from the offline
+// backup, so no converge can produce it: an identity check (#2013 D10), split
+// from the tools above, which converge does install.
+func checkAgeIdentity(sys *System, rep *Report) {
+	rep.Section("Age identity key")
+	hasAge := sys.has("age")
 
 	keyPath := sys.Getenv("AGE_KEY_PATH")
 	if keyPath == "" {
@@ -75,9 +84,10 @@ func checkSecretsTooling(sys *System, cfg *Config, rep *Report) {
 	rep.Pass("age identity key present (" + keyPath + "; its mode is checked under Secrets integrity)")
 
 	// Round-trip guard: proving the key decrypts needs both `age` (encrypt/decrypt)
-	// and `age-keygen` (derive the recipient). age absent already FAILed above; if
-	// only age-keygen is missing, WARN rather than FAIL — the key may be fine, we
-	// just cannot verify it here, and the escrow would surface a real break.
+	// and `age-keygen` (derive the recipient). age absent already FAILed under
+	// Secrets tooling; if only age-keygen is missing, WARN rather than FAIL —
+	// the key may be fine, we just cannot verify it here, and the escrow would
+	// surface a real break.
 	if !hasAge {
 		return
 	}

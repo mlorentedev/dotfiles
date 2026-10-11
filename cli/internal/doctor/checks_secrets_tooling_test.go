@@ -31,6 +31,7 @@ func runSecretsToolingFull(t *testing.T, env map[string]string, onPath []string,
 		sys.AgeRoundTrip = rt
 	}
 	checkSecretsTooling(sys, cfg, rep)
+	checkAgeIdentity(sys, rep)
 	rep.Summary()
 	return buf.String(), rep.Failures()
 }
