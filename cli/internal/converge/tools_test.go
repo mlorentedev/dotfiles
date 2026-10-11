@@ -126,3 +126,52 @@ func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 		t.Errorf("registry order: %s", got)
 	}
 }
+
+// A CLI marked "# mise: latest" that is installed and behind its newest
+// release is one change, named as an upgrade; applying it upgrades through
+// mise, and the probe then passes.
+func TestToolsSync_AnOutdatedLatestToolIsAnUpgrade(t *testing.T) {
+	repo := t.TempDir()
+	writeFixture(t, repo, map[string]string{"versions.conf": "# mise: latest\nJQ_VERSION=1.8.2\n"})
+	env := Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
+	have, upgrades := "1.8.2", 0
+	run := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && args[0] == "install":
+			return nil, nil
+		case name == "mise" && args[0] == "upgrade" && strings.Join(args[1:], " ") == "jq":
+			have, upgrades = "1.8.3", upgrades+1
+			return nil, nil
+		case name == "/bin/jq":
+			return []byte("jq-" + have), nil
+		}
+		return nil, errors.New("unexpected: " + name + " " + strings.Join(args, " "))
+	}
+	stdout := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && args[0] == "which":
+			return []byte("/bin/jq\n"), nil
+		case name == "mise" && args[0] == "outdated":
+			if have == "1.8.3" {
+				return []byte("{}"), nil
+			}
+			return []byte(`{"jq": {"requested": "latest", "current": "1.8.2", "latest": "1.8.3"}}`), nil
+		}
+		return nil, errors.New("unexpected: " + name + " " + strings.Join(args, " "))
+	}
+	r := toolsSync{run: run, stdout: stdout, has: func(string) bool { return true }, getenv: func(string) string { return "" }}
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	have, upgrades = "1.8.2", 0 // upstream releases 1.8.3 after the first converge
+	plan, err := r.Reconcile(env, true)
+	if err != nil || plan.Changes != 1 || !strings.Contains(plan.Detail, "to upgrade to their newest release: jq") {
+		t.Fatalf("plan: want one upgrade naming jq, got %+v, %v", plan, err)
+	}
+	if _, err := r.Reconcile(env, false); err != nil || upgrades != 1 {
+		t.Fatalf("apply: want one upgrade, got %d, %v", upgrades, err)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Fatalf("probe after the upgrade: %v", err)
+	}
+}

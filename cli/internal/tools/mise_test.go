@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -79,10 +80,33 @@ type fakeMise struct {
 	installed map[string]string // tool -> version
 	pending   []MiseTool
 	installs  int
+	// newest is each tool's newest release. `mise outdated` reports a tool
+	// only when the config at cfg requests it as "latest", as mise does: an
+	// exact pin is never outdated. `mise upgrade` installs the newest.
+	newest   map[string]string
+	cfg      string
+	outdates int
+	upgrades [][]string
 }
 
 func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
 	switch {
+	case name == "mise" && len(args) >= 2 && args[0] == "outdated" && args[1] == "--json":
+		f.outdates++
+		body, _ := os.ReadFile(f.cfg)
+		report := map[string]map[string]string{}
+		for _, tool := range args[2:] {
+			if strings.Contains(string(body), tool+` = "latest"`) && f.newest[tool] != "" && f.newest[tool] != f.installed[tool] {
+				report[tool] = map[string]string{"requested": "latest", "current": f.installed[tool], "latest": f.newest[tool]}
+			}
+		}
+		return json.Marshal(report)
+	case name == "mise" && len(args) >= 2 && args[0] == "upgrade":
+		f.upgrades = append(f.upgrades, args[1:])
+		for _, tool := range args[1:] {
+			f.installed[tool] = f.newest[tool]
+		}
+		return nil, nil
 	case name == "mise" && len(args) == 2 && args[0] == "which":
 		if _, ok := f.installed[args[1]]; ok {
 			return []byte("/mise/installs/" + args[1] + "\n"), nil
@@ -433,5 +457,112 @@ func TestSync_ProbesAToolWithoutVersionFlagThroughItsArgs(t *testing.T) {
 	}
 	if len(plan.Missing) != 0 {
 		t.Errorf("kubectl at its pin reads as missing: %v", plan.Missing)
+	}
+}
+
+func TestParseMisePins_ReadsTheLatestMarkerAsAFloorItTracks(t *testing.T) {
+	body := "# mise: cli\nAGE_VERSION=1.3.1\n# mise: latest\nCLAUDE_VERSION=2.1.296\n# mise: latest\nAGY_VERSION=1.3.2\n"
+	p, err := ParseMisePins([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(p.Tools); got != "age, agy, claude" {
+		t.Errorf("tools: got %q", got)
+	}
+	if got := strings.Join(p.Latest, ", "); got != "agy, claude" {
+		t.Errorf("latest: got %q", got)
+	}
+	for _, tool := range p.Tools {
+		if tool.Name == "claude" && tool.Version != "2.1.296" {
+			t.Errorf("claude's pin is its floor, got %q", tool.Version)
+		}
+	}
+}
+
+func TestParseMisePins_NearMissNamesTheLatestMarker(t *testing.T) {
+	_, err := ParseMisePins([]byte("# mise: cli\nAGE_VERSION=1.3.1\n# mise: latests\nCLAUDE_VERSION=2.1.296\n"))
+	if err == nil || !strings.Contains(err.Error(), MiseLatestMarker) {
+		t.Fatalf("want an error naming %q, got %v", MiseLatestMarker, err)
+	}
+}
+
+func TestRenderMiseConfig_RendersATrackedToolAsLatest(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}, "", "claude"))
+	if !strings.Contains(out, "age = \"1.3.1\"\nclaude = \"latest\"\n") {
+		t.Errorf("want age pinned and claude at latest:\n%s", out)
+	}
+}
+
+// newLatestSync is a sync tracking claude at latest, with claude's newest
+// release at newest.
+func newLatestSync(t *testing.T, installed map[string]string, newest string) (*fakeMise, MiseSync, []MiseTool) {
+	t.Helper()
+	cfgDir := t.TempDir()
+	tools := []MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}
+	f := &fakeMise{installed: installed, pending: tools, newest: map[string]string{"claude": newest},
+		cfg: filepath.Join(cfgDir, "conf.d", "dotfiles.toml")}
+	return f, MiseSync{ConfigDir: cfgDir, Run: f.run, Latest: []string{"claude"}, CheckUpgrades: true}, tools
+}
+
+func TestSync_UpgradesATrackedToolAndIsIdempotent(t *testing.T) {
+	f, s, tools := newLatestSync(t, map[string]string{}, "2.1.300")
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatal(err)
+	}
+	if f.installed["claude"] != "2.1.300" || len(f.upgrades) != 1 || strings.Join(f.upgrades[0], " ") != "claude" {
+		t.Fatalf("want claude upgraded to 2.1.300 by one `mise upgrade claude`, got %s after %v", f.installed["claude"], f.upgrades)
+	}
+	again, err := s.Apply(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Pending() || len(f.upgrades) != 1 {
+		t.Errorf("second run: want nothing to do, got %+v after %d upgrades", again, len(f.upgrades))
+	}
+}
+
+// A pin that turns into latest is upgraded by the run that writes the config,
+// not by the next one: mise install keeps the installed version.
+func TestSync_UpgradesInTheRunThatTurnsAPinIntoLatest(t *testing.T) {
+	f, s, tools := newLatestSync(t, map[string]string{"age": "1.3.1", "claude": "2.1.296"}, "2.1.300")
+	if err := os.MkdirAll(filepath.Dir(f.cfg), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f.cfg, RenderMiseConfig(tools, ""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Apply(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.installed["claude"] != "2.1.300" || strings.Join(p.Outdated, ",") != "claude" {
+		t.Errorf("want claude upgraded and reported in this run, got %s and %+v", f.installed["claude"], p)
+	}
+}
+
+func TestSync_FailsWhenTheUpgradeDoesNotTake(t *testing.T) {
+	_, s, tools := newLatestSync(t, map[string]string{}, "2.1.300")
+	run := s.Run
+	s.Run = func(name string, args ...string) ([]byte, error) {
+		if name == "mise" && len(args) > 0 && args[0] == "upgrade" {
+			return nil, nil // reports success and changes nothing
+		}
+		return run(name, args...)
+	}
+	if _, err := s.Apply(tools); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Fatalf("want an error naming claude, got %v", err)
+	}
+}
+
+// Doctor plans without CheckUpgrades: a newer release upstream is not drift,
+// and doctor must not reach the network to learn of it.
+func TestSync_PlansNoUpgradeWithoutCheckUpgrades(t *testing.T) {
+	f, s, tools := newLatestSync(t, map[string]string{"age": "1.3.1", "claude": "2.1.296"}, "2.1.300")
+	s.CheckUpgrades = false
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatal(err)
+	}
+	if f.outdates != 0 || len(f.upgrades) != 0 {
+		t.Errorf("want no `mise outdated` and no upgrade, got %d and %v", f.outdates, f.upgrades)
 	}
 }

@@ -577,6 +577,17 @@ setup() {
 # 2. Not mutate or duplicate deployed configuration (byte-identical deployed state)
 # 3. Leave the repo checkout clean
 
+# Hashes of what setup deploys, for the idempotence diff. ~/.claude/state is
+# Claude Code's own runtime state, not deployed config: the CLI writes
+# mcp-discover-verdicts.json there on its own schedule, so it appeared between
+# the two runs and failed this test on main (883654cb).
+_deployed_state_hashes() {
+    find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
+         "$HOME/.zsh" "$HOME/.bash" "$HOME/.ssh" \
+         -type f ! -path "*/.git/*" ! -path "$HOME/.claude/state/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum
+    sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config"
+}
+
 @test "POLISH-005: second setup-linux.sh run exits 0 cleanly with zero config diff" {
     local snap1="/tmp/snap1-$$.sha256"
     local snap2="/tmp/snap2-$$.sha256"
@@ -592,10 +603,7 @@ setup() {
     }
 
     # Collect hashes of deployed dotfiles and configs before second run
-    find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
-         "$HOME/.zsh" "$HOME/.bash" "$HOME/.ssh" \
-         -type f ! -path "*/.git/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum > "$snap1"
-    sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config" >> "$snap1"
+    _deployed_state_hashes > "$snap1"
 
     # Execute second run
     cd "$REPO_DIR"
@@ -616,10 +624,7 @@ setup() {
     }
 
     # Collect hashes after second run
-    find "$HOME/.dotfiles" "$HOME/.claude" "$HOME/.gemini" "$HOME/.config/opencode" \
-         "$HOME/.zsh" "$HOME/.bash" "$HOME/.ssh" \
-         -type f ! -path "*/.git/*" ! -name "*.log" 2>/dev/null | sort | xargs sha256sum > "$snap2"
-    sha256sum "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" "$HOME/.ssh/config" >> "$snap2"
+    _deployed_state_hashes > "$snap2"
 
     # Assert diff is empty. On failure, print it: bats shows only the failed line,
     # so without this the file that changed between the two runs, which is the

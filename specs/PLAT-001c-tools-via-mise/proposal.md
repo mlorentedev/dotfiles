@@ -78,6 +78,18 @@ The owner made Python >= 3.11 a hard dependency of `dotf` (#2062): the Mac's `py
 - **PR1 (this one):** the reader and the check. `ParseMisePins` reads a second marker, `# mise: python-package`. `dotf tools sync` writes those packages to a file named by mise's `python.default_packages_file` and pip-installs any still missing. `dotf doctor` gains a Python section, `--fix` on the mise section runs the sync, and the dead `PYTHON_HOME` layout leaves doctor and the rc files. `versions.conf` is unchanged.
 - **PR2, after the release carrying PR1 is the `DOTF_VERSION` pin:** mark `PYTHON_VERSION` (moved to 3.13.16, an attested build) and `PYYAML_VERSION`. The released parser rejects the new marker, and a released sync would install a Python without its packages, so neither line can land earlier. `tests/versions-conf.bats` enforces the order.
 
+## Amendment 2026-10-10: the coding agents track latest (#2013 D9)
+
+The owner placed P5c (#2317, converge installs no coding agent on macOS; first labelled P5b, which an earlier row already held) under this spec, ahead of X1, and decided the channel: Claude Code, pi and agy install through mise (`aqua:anthropics/claude-code`, `aqua:earendil-works/pi`, `aqua:google-antigravity/antigravity-cli`), tracking their newest release rather than an exact pin (ADR-044, amendment 2026-10-10). Two PRs again:
+
+- **PR1 (this one):** the reader. `ParseMisePins` reads `# mise: latest`; the sync renders those tools as `latest`, asks `mise outdated` and runs `mise upgrade`; doctor plans without the network. `versions.conf` is unchanged.
+- **PR2, after the release carrying PR1 is the `DOTF_VERSION` pin:** mark the three agents, turn Claude Code's own auto-updater off so mise is the one writer, and delete the agent install blocks from `setup-linux.sh`. Windows keeps `Install-AgentBinary` until Windows mise is measured.
+
+Acceptance for this amendment:
+
+- [ ] AC-D9a: a tool under `# mise: latest` renders as `latest`, runs at or above its floor after a sync, and is upgraded by the run that finds it behind (`TestSync_UpgradesATrackedToolAndIsIdempotent`, `TestSync_UpgradesInTheRunThatTurnsAPinIntoLatest`, `TestToolsSync_AnOutdatedLatestToolIsAnUpgrade`).
+- [ ] AC-D9b: on the Mac, after PR2, `dotf converge` installs the three agents through mise and a second run reports 0 changes.
+
 ## References
 
 - ADR-044 (decisions 1–6), ADR-036 (and its 2026-10-06 amendment), ADR-045 decision 4; lesson 337.

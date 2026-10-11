@@ -86,8 +86,8 @@ func (r toolsSync) Probe(env Env) error {
 	if err != nil {
 		return err
 	}
-	if p.ConfigChanged || len(p.Missing) > 0 || len(p.MissingPackages) > 0 {
-		return fmt.Errorf("after the sync, config current=%v, not at their pin: %s", !p.ConfigChanged, strings.Join(append(p.Missing, p.MissingPackages...), ", "))
+	if p.Pending() {
+		return fmt.Errorf("after the sync, config current=%v, not at their pin: %s", !p.ConfigChanged, strings.Join(append(append(p.Missing, p.MissingPackages...), p.Outdated...), ", "))
 	}
 	return nil
 }
@@ -122,7 +122,7 @@ func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
 		plan = s.Apply
 	}
 	p, err := plan(pins)
-	res := Result{Changes: len(p.Missing) + len(p.MissingPackages), Detail: syncDetail(p, len(pins), dryRun)}
+	res := Result{Changes: len(p.Missing) + len(p.MissingPackages) + len(p.Outdated), Detail: syncDetail(p, len(pins), dryRun)}
 	if p.ConfigChanged {
 		res.Changes++
 	}
@@ -187,17 +187,17 @@ func (r toolsSync) sync(env Env) (tools.MiseSync, []tools.MiseTool, error) {
 	if getenv == nil {
 		getenv = os.Getenv
 	}
-	s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home, getenv), Run: r.run, Stdout: r.stdout, PythonPackages: all.PythonPackages}
+	s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home, getenv), Run: r.run, Stdout: r.stdout, PythonPackages: all.PythonPackages, Latest: all.Latest, CheckUpgrades: true}
 	return s, all.Tools, nil
 }
 
 func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
-	if !p.ConfigChanged && len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
+	if !p.Pending() {
 		return fmt.Sprintf("%d pinned CLI(s) at their pin", total)
 	}
-	verb := "installed"
+	verb, up := "installed", "upgraded"
 	if dryRun {
-		verb = "to install"
+		verb, up = "to install", "to upgrade"
 	}
 	parts := []string{}
 	if p.ConfigChanged {
@@ -208,6 +208,9 @@ func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
 	}
 	if len(p.MissingPackages) > 0 {
 		parts = append(parts, "python packages "+verb+": "+strings.Join(p.MissingPackages, ", "))
+	}
+	if len(p.Outdated) > 0 {
+		parts = append(parts, up+" to their newest release: "+strings.Join(p.Outdated, ", "))
 	}
 	return strings.Join(parts, "; ")
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -49,7 +50,7 @@ func newToolsSyncCmd() *cobra.Command {
 			}
 			pins := all.Tools
 			run, stdout := syncRunners()
-			s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home(), os.Getenv), Run: run, Stdout: stdout, PythonPackages: all.PythonPackages}
+			s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home(), os.Getenv), Run: run, Stdout: stdout, PythonPackages: all.PythonPackages, Latest: all.Latest, CheckUpgrades: true}
 			if dryRun {
 				return printSyncPlan(cmd.OutOrStdout(), s, pins)
 			}
@@ -85,17 +86,24 @@ func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {
 	}
 	_, _ = fmt.Fprintf(w, "%s %s:\n", verb, s.ConfigPath())
 	for _, t := range pins {
+		if slices.Contains(s.Latest, t.Name) {
+			_, _ = fmt.Fprintf(w, "  %s latest (at least %s)\n", t.Name, t.Version)
+			continue
+		}
 		_, _ = fmt.Fprintf(w, "  %s %s\n", t.Name, t.Version)
 	}
 	for _, pkg := range s.PythonPackages {
 		_, _ = fmt.Fprintf(w, "  python package %s %s (%s)\n", pkg.Name, pkg.Version, s.PythonPackagesPath())
 	}
-	if len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
+	if len(p.Missing) == 0 && len(p.MissingPackages) == 0 && len(p.Outdated) == 0 {
 		_, _ = fmt.Fprintf(w, "%d tool(s) at their pin; nothing to install\n", len(pins))
 		return nil
 	}
 	if len(p.Missing) > 0 {
 		_, _ = fmt.Fprintf(w, "to install: %s\n", strings.Join(p.Missing, ", "))
+	}
+	if len(p.Outdated) > 0 {
+		_, _ = fmt.Fprintf(w, "to upgrade to their newest release: %s\n", strings.Join(p.Outdated, ", "))
 	}
 	if len(p.MissingPackages) > 0 {
 		_, _ = fmt.Fprintf(w, "python packages to install: %s\n", strings.Join(p.MissingPackages, ", "))
@@ -104,7 +112,7 @@ func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {
 }
 
 func printSyncResult(w io.Writer, s tools.MiseSync, pins []tools.MiseTool, p tools.SyncPlan) {
-	if !p.ConfigChanged && len(p.Missing) == 0 && len(p.MissingPackages) == 0 {
+	if !p.Pending() {
 		_, _ = fmt.Fprintf(w, "%d tool(s) at their pin; nothing to do\n", len(pins))
 		return
 	}
@@ -113,6 +121,9 @@ func printSyncResult(w io.Writer, s tools.MiseSync, pins []tools.MiseTool, p too
 	}
 	if len(p.Missing) > 0 {
 		_, _ = fmt.Fprintf(w, "installed: %s\n", strings.Join(p.Missing, ", "))
+	}
+	if len(p.Outdated) > 0 {
+		_, _ = fmt.Fprintf(w, "upgraded to their newest release: %s\n", strings.Join(p.Outdated, ", "))
 	}
 	if len(p.MissingPackages) > 0 {
 		_, _ = fmt.Fprintf(w, "installed python packages: %s\n", strings.Join(p.MissingPackages, ", "))
