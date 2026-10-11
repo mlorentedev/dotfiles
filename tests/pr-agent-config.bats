@@ -420,8 +420,38 @@ PY
 # leave the section looking present while it silently stops firing.
 @test "pr-agent: the harness compliance pass is unconditional" {
     grep -q 'HARNESS COMPLIANCE' "$CFG"
-    grep -q 'Report it even when everything passes' "$CFG"
+    grep -q 'on every review' "$CFG"
     refute_grep 'HARNESS COMPLIANCE.*(if |when relevant|where applicable)' "$CFG"
+}
+
+# The review is a YAML document under PR-Agent's fixed schema, and only what
+# the schema declares survives it (#2287). An instruction to "open" the review
+# with a section, or to report passes, asks for content no field carries: the
+# model dropped the section on 5 of 7 reviews and once wrote it above the
+# mapping, losing the `review:` root and the whole review. The pass reports its
+# FAILs through key_issues_to_review, the one field every review has that
+# carries a file and lines.
+@test "pr-agent: the harness compliance pass reports inside the review schema" {
+    run python3 - "$CFG" <<'PY'
+import re, sys, tomllib
+
+cfg = tomllib.load(open(sys.argv[1], "rb"))
+instructions = cfg["pr_reviewer"]["extra_instructions"]
+flat = " ".join(instructions.split())
+problems = []
+if "key_issues_to_review" not in flat:
+    problems.append("the instructions do not name key_issues_to_review as the pass's home")
+for pattern in (r"\b[Oo]pen (every|each|the) review", r"\b([Bb]egin|[Ss]tart) (every|each|the) review",
+                r"even when everything passes", r"\b(with|as|in) an? (\w+ )?section\b"):
+    if re.search(pattern, flat):
+        problems.append(f"asks for content outside the schema: /{pattern}/")
+if cfg["pr_reviewer"].get("num_max_findings", 3) < 5:
+    problems.append("num_max_findings below 5: a compliance FAIL would crowd out a defect")
+if problems:
+    print("\n".join(problems))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
 
 # The reason this tool was adopted is inline comments on the diff — the half
