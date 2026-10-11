@@ -69,11 +69,6 @@ setup() {
     [ "$sync" -lt "$install2" ]
 }
 
-@test "setup-linux.sh installs eza if missing" {
-    grep -q 'command -v eza' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'eza.*linux.*tar.gz' "$DOTFILES_DIR/setup-linux.sh"
-}
-
 @test "setup-linux.sh deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
     grep -qF 'DOTFILES_DIR/secrets' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'secrets/registry.yaml' "$DOTFILES_DIR/setup-linux.sh"
@@ -90,16 +85,6 @@ setup() {
     refute_grep 'load-secrets\.sh" >/dev/null 2>&1' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'secrets_show ' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'dotf secrets show OPENROUTER_API_KEY' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh installs gh if missing" {
-    grep -q 'command -v gh' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'cli/cli/releases' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh skips tools already installed" {
-    grep -q 'eza already installed' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'gh already installed' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # The guard below reads its names from the marks, so a lost mark shrinks it

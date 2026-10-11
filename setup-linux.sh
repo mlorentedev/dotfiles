@@ -186,47 +186,9 @@ export PATH="$HOME/.local/bin:$PATH"
 # the OS manager, or says which `sudo` command to run once.
 
 # age, jq, zoxide, direnv, shellcheck and bats are pinned in versions.conf and
-# installed by `dotf tools sync` below (mise, ADR-044); setup has no installer
-# of its own for them (#2013 W2). eza and gh are not in mise yet: these blocks
-# fetch linux-amd64 release assets (F-030). Elsewhere they would place a binary
-# the OS cannot execute ahead of a working copy on PATH, so they run on
-# linux-amd64 only, and any such leftover is removed, along with those of the
-# tools the deleted blocks used to place.
-if host_is_linux_amd64; then
-    # eza (modern ls replacement)
-    if ! command -v eza >/dev/null 2>&1; then
-        log_info "Installing eza..."
-        curl -Lo /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" 2>/dev/null \
-            && tar xzf /tmp/eza.tar.gz -C "$HOME/.local/bin/" \
-            && chmod +x "$HOME/.local/bin/eza" \
-            && rm -f /tmp/eza.tar.gz \
-            && log_success "eza installed" \
-            || log_warning "eza installation failed"
-    else
-        log_info "eza already installed"
-    fi
-
-    # gh (GitHub CLI — required by Copilot setup)
-    if ! command -v gh >/dev/null 2>&1; then
-        log_info "Installing GitHub CLI..."
-        GH_VERSION=$(curl -sI "https://github.com/cli/cli/releases/latest" 2>/dev/null | grep -i '^location:' | sed 's|.*/v||;s/[[:space:]]*$//')
-        if [ -n "$GH_VERSION" ]; then
-            curl -Lo /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" 2>/dev/null \
-                && tar xzf /tmp/gh.tar.gz -C /tmp \
-                && cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" "$HOME/.local/bin/" \
-                && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" \
-                && log_success "GitHub CLI installed" \
-                || log_warning "GitHub CLI installation failed"
-        else
-            log_warning "Could not determine gh version, skipping"
-        fi
-    else
-        log_info "gh already installed"
-    fi
-else
-    log_warning "Skipping the linux-amd64 downloads of eza and gh on $(uname -s)/$(uname -m): install them with the OS package manager (#2013 W2)"
-    remove_unrunnable_tool age age-keygen eza jq gh shellcheck
-fi
+# installed by `dotf tools sync` below (mise, ADR-044). setup has no installer
+# of its own for any of these tools: the hard-coded linux-amd64 downloads are
+# gone (#2013 W2, F-030), and tests/setup-no-arch-downloads.bats keeps them out.
 
 # dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
 # checksum-verified, into ~/.local/bin. Idempotent; converges on drift.
