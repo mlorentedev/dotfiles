@@ -216,38 +216,6 @@ if command -v dotf >/dev/null 2>&1; then
     dotf tools install || log_warning "dotf tools install failed (continuing; re-run 'dotf tools install')"
 fi
 
-# GUARD-001 memory-sink dispatcher (#398/#418): deploy git-hooks/ into the
-# ~/.dotfiles mirror and wire core.hooksPath machine-wide so the guard is active
-# in every repo. Idempotent; preserves an unrelated pre-existing hooksPath.
-#
-# CLI-072 moved this into `dotf hooks install`. The block used to cite ADR-020 C7
-# ("the deployed dotf release can't self-deploy these -- no source tree"), which
-# was never what C7 says: C7 keeps the step that provisions THE TOOLING in shell,
-# and by here dotf is already installed. The source tree is not needed either --
-# the installer reads git-hooks/ from this checkout, which is where setup runs.
-#
-# Resolved by path, not by name, for the #1202 reason documented further down:
-# install_dotf placed it in ~/.local/bin, which the rc files put on PATH but THIS
-# process may not have -- the integration container hits exactly that.
-_dotf_hooks=""
-if command -v dotf >/dev/null 2>&1; then
-    _dotf_hooks="dotf"
-elif [ -x "$HOME/.local/bin/dotf" ]; then
-    _dotf_hooks="$HOME/.local/bin/dotf"
-fi
-if [ -n "$_dotf_hooks" ]; then
-    # CURRENT_DIR is the checkout (line 22); DOTFILES_DIR the deploy mirror
-    # (line 25). Passed explicitly rather than left to the installer's defaults,
-    # because when the repo IS ~/.dotfiles -- the in-place layout line 23 already
-    # detects -- source and destination are the same directory, and naming both
-    # is what lets the #695 self-mirror guard see it.
-    "$_dotf_hooks" hooks install --source "$CURRENT_DIR/git-hooks" --dotfiles-dir "$DOTFILES_DIR" \
-        || log_warning "git-hooks install failed (continuing; see 'dotf doctor')"
-else
-    log_warning "dotf not found; skipping memory-sink guard install (run 'dotf hooks install' after setup)"
-fi
-unset _dotf_hooks
-
 # Antigravity CLI (agy) install — idempotent per pattern-setup-script-idempotence.
 # Official install URL: https://antigravity.google/cli/install.sh
 # If agy is not in PATH, install it automatically; otherwise skip.
@@ -556,6 +524,9 @@ if [ -n "$_dotf" ]; then
     "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
     # After deploy, which writes the file the include names (#2207).
     "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
+    # Its own call: a dotf older than the step refuses the name, and must not
+    # take git-config down with it (#2013 X1).
+    "$_dotf" converge --only git-hooks || log_warning "dotf converge --only git-hooks failed -- a dotf older than the step cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
 else
     log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./install.sh: it installs dotf, then converges)"
 fi

@@ -150,6 +150,15 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [ ] Follow-up: X1 (#2331) runs `dotf doctor --scope machine`
 - [ ] Follow-up: test-windows runs `--scope machine` and drops the identity it fabricates (age key, vault skeleton, `obsidian.cmd` stub)
 
+### PR 6b — the git-hooks step (#2013 X1 finding)
+
+- [x] Failing test: from zero, a plan names the mirror and the wiring and changes nothing; the apply makes both, the probe passes, and the next run reports 0 (`TestGitHooks_FromZeroDeploysAndWires`)
+- [x] Failing test: a foreign `core.hooksPath` is kept and named, only the mirror counts, the probe passes, and the next run reports 0 (`TestGitHooks_KeepsAForeignHooksPath`); an unset hooksPath or a stale mirror fails the probe
+- [x] Failing test: only git's exit 1 reads as an unset hooksPath; any other read failure is an error and nothing is written, in `Inspect` and the install alike (`TestAFailedHooksPathReadIsNotAnUnsetOne`, PR-Agent on #2340)
+- [x] `hooks.Inspect` and `hooks.Apply`: what `dotf hooks install` would change, read without writing (the mirror compared as `copyTree` and `markExecutable` would write it, the bit ignored on Windows), and the install through a given runner
+- [x] The `git-hooks` reconciler, after `git-config`, every OS
+- [x] Replace the hooks blocks of `setup-linux.sh` and `setup-windows.ps1` (one twin pair) with `dotf converge --only git-hooks`, as git-config already is: a setup script run on its own (test-windows) still gets the dispatcher; `tests/guard-setup-no-hooks-install.bats` keeps the blocks out and the delegation in
+
 ### PR 6c — converge guides the identity restore (#2013 D12)
 
 - [x] Failing test: from zero on a terminal, Enter at each prompt walks the chain in the runbook's order; the age key is waited for, never run; the chain ends restored (`TestGuide_FromZeroRunsTheChainInOrder`)
