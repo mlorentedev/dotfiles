@@ -168,6 +168,15 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] Runbook, ADR-045 D12 and `cli/README.md` say what the walk runs, and why `gh auth login` is in the chain
 - [x] Lesson 398: under `curl | bash` stdin is the script, so the walk reads the person from `/dev/tty` and hands that terminal to `bw` and `gh`
 
+### PR 6d — plugin failures counted and named (#2013 X1 finding, BUG-121 #2336)
+
+- [x] Failing test: every declared id lands in exactly one of Present, Added and Failed, and a failed install keeps the CLI's error (`TestSyncAccountsForEveryIDAndKeepsTheCause`)
+- [x] Failing test: a failed install puts `1 added, 1 failed, 0 already present` under a `failed` state and names the plugin with its cause (`TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun`)
+- [x] `PluginReport.Causes`, filled by `Syncer.Sync`; `reportCounts` counts failures for both claude steps, so the MCP summary gains the count too
+- [x] Delete the plugin loops of `setup-linux.sh` and `setup-windows.ps1` (one twin pair): both already run the bare `dotf deploy`, which installs `ai/claude/plugins.json`
+- [x] Guard: `tests/claude-plugins.bats` fails when either script runs `claude plugin install|list` outside a comment or quotes a declared id; the BUG-004/011 structure tests that read the deleted loops are retired, and the zero-usage list guard reads `plugins.json`
+- [ ] After merge: the next X1 run names why the installs fail on a fresh runner; record the cause on #2013
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

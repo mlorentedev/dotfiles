@@ -107,6 +107,27 @@ func TestSyncCountsOnlySuccessfulInstalls(t *testing.T) {
 	}
 }
 
+// Every declared id lands in exactly one bucket, and a failure keeps the
+// CLI's error: a fresh runner failed all three installs and the summary read
+// "0 added, 0 already present" with no cause anywhere (#2336).
+func TestSyncAccountsForEveryIDAndKeepsTheCause(t *testing.T) {
+	ids := []string{"a@m", "b@m", "c@m"}
+	r := &fakeRunner{listed: "a@m", failing: map[string]bool{"c@m": true}}
+	rep, err := newSyncer(r).Sync(ids, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(rep.Present) + len(rep.Added) + len(rep.Failed); n != len(ids) {
+		t.Errorf("report %+v accounts for %d of %d ids", rep, n, len(ids))
+	}
+	if cause := rep.Causes["c@m"]; cause == nil || !strings.Contains(cause.Error(), "install failed") {
+		t.Errorf("cause of c@m = %v; want the install's error", cause)
+	}
+	if len(rep.Causes) != len(rep.Failed) {
+		t.Errorf("causes %v for failed %v", rep.Causes, rep.Failed)
+	}
+}
+
 func TestSyncDryRunInstallsNothing(t *testing.T) {
 	r := &fakeRunner{}
 	rep, err := newSyncer(r).Sync([]string{"a@m"}, true)

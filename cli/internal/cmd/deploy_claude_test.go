@@ -206,8 +206,11 @@ func TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun(t *testing.T) {
 	if err == nil {
 		t.Fatalf("a failed install must fail the deploy:\n%s", out)
 	}
-	if !strings.Contains(out, "1 added") || !strings.Contains(out, row("failed", "claude-plugins")+"b@m") {
-		t.Errorf("the failed plugin must be named and not counted:\n%s", out)
+	if !strings.Contains(out, row("failed", "claude-plugins")+"1 added, 1 failed, 0 already present") {
+		t.Errorf("the summary must count the failure and say failed (#2336):\n%s", out)
+	}
+	if !strings.Contains(out, row("failed", "claude-plugins")+"b@m did not install: ") {
+		t.Errorf("the failed plugin must be named with its cause:\n%s", out)
 	}
 }
 

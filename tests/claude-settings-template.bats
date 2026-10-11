@@ -282,8 +282,8 @@ setup() {
 # these plugins were removed for zero recorded usage across every saved
 # session transcript (2026-08-06 audit) or, for `github`, being broken
 # (BUG-007). CI MUST fail if any returns to the template (accidental re-add,
-# copy-paste from old docs, etc.). The setup scripts' plugin install loops
-# are checked below as a cross-OS parity guard.
+# copy-paste from old docs, etc.). ai/claude/plugins.json, the list
+# `dotf deploy` installs on every OS, is checked below.
 @test "template enabledPlugins must NOT include plugins removed for zero usage" {
     for plugin in github code-simplifier claude-md-management claude-code-setup \
         ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
@@ -292,16 +292,11 @@ setup() {
     done
 }
 
-@test "setup-linux.sh plugin install loop must NOT include plugins removed for zero usage" {
+@test "plugins.json must NOT install plugins removed for zero usage" {
     for plugin in github code-simplifier claude-md-management claude-code-setup \
         ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
-        refute_grep "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-linux.sh"
+        run jq -e --arg id "${plugin}@claude-plugins-official" '.plugins | index($id)' "$DOTFILES_DIR/ai/claude/plugins.json"
+        [ "$status" -ne 0 ]
     done
 }
 
-@test "setup-windows.ps1 plugin install loop must NOT include plugins removed for zero usage" {
-    for plugin in github code-simplifier claude-md-management claude-code-setup \
-        ralph-loop code-review commit-commands pr-review-toolkit feature-dev; do
-        refute_grep "\"${plugin}@claude-plugins-official\"" "$DOTFILES_DIR/setup-windows.ps1"
-    done
-}
