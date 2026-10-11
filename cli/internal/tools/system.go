@@ -194,7 +194,8 @@ func (in *Installer) asRoot(argv []string) []string {
 // still runs no manager command.
 //
 // When sudo wants a password it is not attempted: the install that follows
-// is refused the same way, and that path names the command to run. A refresh
+// is refused the same way, and the command that path names refreshes the
+// index before it installs (SudoInstallCommand). A refresh
 // that fails for another reason (a third-party source that 404s) is a
 // warning, not the run's failure, and the install tries the index as it is.
 func (in *Installer) refreshAptIndex() {
@@ -246,7 +247,7 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 		if argv := in.systemInstallArgv(manager, pkg); in.needsSudoPassword(argv) {
 			// The classifier the apply uses after sudo -n refuses, asked up
 			// front, so a plan never promises an install the apply skips.
-			p.Action, p.Note, p.Package = PlanNeedsSudo, sudoCommand(argv), pkg
+			p.Action, p.Note, p.Package = PlanNeedsSudo, "run: "+SudoInstallCommand([]string{pkg}), pkg
 		}
 	}
 	return p
@@ -272,7 +273,7 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 			// A named outcome, not a failure: nothing is wrong with the entry
 			// or the machine, only the privilege dotf may not ask for. It says
 			// what to run, and the other tools still converge.
-			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; %s\n", t.Name, sudoCommand(argv))
+			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, SudoInstallCommand([]string{pkg}))
 			in.sudoDeferred = append(in.sudoDeferred, pkg)
 			return Skipped, nil
 		}
@@ -285,11 +286,6 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	return Installed, nil
 }
 
-// sudoCommand is what to run by hand for a `sudo -n` argv dotf could not run.
-func sudoCommand(argv []string) string {
-	return "run: " + strings.Join(append([]string{"sudo"}, argv[2:]...), " ")
-}
-
 // SudoInstallCommand is the one command that installs every apt package in
 // pkgs, for a person to run once instead of one command per package (#2308).
 // apt is the only manager that escalates: brew refuses to run as root, and
@@ -299,11 +295,15 @@ func sudoCommand(argv []string) string {
 // --no-remove holds for the batch as it does for one package, so a single
 // conflicting package (docker.io on a box that runs docker-ce) aborts the
 // whole command; apt names it, and the person installs the rest without it.
+//
+// It refreshes the index first: when sudo wants a password, dotf skips its own
+// refresh too (refreshAptIndex), so an install alone would meet the same stale
+// lists that 404ed on a fresh machine (#2013 X1).
 func SudoInstallCommand(pkgs []string) string {
 	if len(pkgs) == 0 {
 		return ""
 	}
-	return "sudo " + strings.Join(aptInstallArgv(pkgs...), " ")
+	return "sudo apt-get update && sudo " + strings.Join(aptInstallArgv(pkgs...), " ")
 }
 
 // SudoDeferred is the command for every apt package Install skipped because

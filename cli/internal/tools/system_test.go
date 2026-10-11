@@ -387,7 +387,7 @@ func TestInstallSystem_NeedsSudoIsNamedAndDoesNotFailTheRun(t *testing.T) {
 	if err != nil || res != Skipped {
 		t.Fatalf("Install = %v, %v; want Skipped, nil", res, err)
 	}
-	if want := "gh: needs sudo; run: sudo apt-get install -y --no-remove gh"; !strings.Contains(w.out.String(), want) {
+	if want := "gh: needs sudo; run: sudo apt-get update && sudo apt-get install -y --no-remove gh"; !strings.Contains(w.out.String(), want) {
 		t.Errorf("output %q lacks %q", w.out.String(), want)
 	}
 	if len(w.ran) != 1 || w.ran[0][1] != "-n" || w.ran[0][len(w.ran[0])-1] != "gh" {
@@ -451,7 +451,7 @@ func TestInstallSystem_AFailedIndexRefreshWarnsAndStillInstalls(t *testing.T) {
 func TestPlanSystem_NeedsSudoIsPlannedAsTheApplySkipsIt(t *testing.T) {
 	w := newWorld("apt-get", "sudo")
 	p := w.installer("linux").Plan(ghTool())
-	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get install -y --no-remove gh" || p.Package != "gh" {
+	if p.Action != PlanNeedsSudo || p.Note != "run: sudo apt-get update && sudo apt-get install -y --no-remove gh" || p.Package != "gh" {
 		t.Errorf("Plan = %+v, want needs-sudo naming the command", p)
 	}
 	if len(w.ran) != 0 {
@@ -496,7 +496,7 @@ func TestSudoInstallCommand(t *testing.T) {
 	if got := SudoInstallCommand(nil); got != "" {
 		t.Errorf("no packages: got %q, want \"\"", got)
 	}
-	if got, want := SudoInstallCommand([]string{"gh", "parallel"}), "sudo apt-get install -y --no-remove gh parallel"; got != want {
+	if got, want := SudoInstallCommand([]string{"gh", "parallel"}), "sudo apt-get update && sudo apt-get install -y --no-remove gh parallel"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 	w := newWorld("apt-get", "sudo")

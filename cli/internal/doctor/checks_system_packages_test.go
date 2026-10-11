@@ -42,7 +42,7 @@ func TestCheckSystemPackages_WarnsWithOneCommandForEveryPackage(t *testing.T) {
 	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "2 system package(s) wait on sudo") || !strings.Contains(out, "(gh, docker)") {
 		t.Fatalf("want a WARN naming gh and docker\n%s", out)
 	}
-	if !strings.Contains(out, "`sudo apt-get install -y --no-remove gh docker.io`") {
+	if !strings.Contains(out, "`sudo apt-get update && sudo apt-get install -y --no-remove gh docker.io`") {
 		t.Errorf("want the one combined command\n%s", out)
 	}
 	if strings.Contains(out, "tmux") || strings.Contains(out, "sops") {

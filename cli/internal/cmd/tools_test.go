@@ -325,13 +325,13 @@ func TestInstallAll_NeedsSudoDoesNotFailTheRun(t *testing.T) {
 	if len(ran) != 2 || ran[0][1] != "-n" || ran[1][1] != "-n" {
 		t.Errorf("want both tools attempted with sudo -n, ran %v", ran)
 	}
-	for _, want := range []string{"gh: needs sudo; run: sudo apt-get install -y --no-remove gh", "tmux: needs sudo; run: sudo apt-get install -y --no-remove tmux"} {
+	for _, want := range []string{"gh: needs sudo; run: sudo apt-get update && sudo apt-get install -y --no-remove gh", "tmux: needs sudo; run: sudo apt-get update && sudo apt-get install -y --no-remove tmux"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
 	}
 	// And one command for both at the end, so a fresh machine is one paste (#2308).
-	if want := "\n  sudo apt-get install -y --no-remove gh tmux\n"; !strings.Contains(out.String(), want) {
+	if want := "\n  sudo apt-get update && sudo apt-get install -y --no-remove gh tmux\n"; !strings.Contains(out.String(), want) {
 		t.Errorf("output lacks the combined command %q:\n%s", want, out.String())
 	}
 }

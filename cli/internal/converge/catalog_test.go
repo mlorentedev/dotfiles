@@ -109,7 +109,7 @@ func TestToolsCatalog_OneApplyConvergesAFreshMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"catalog to install: mise", "hive (uv)", "bw (npm)", "needs sudo: gh (run once: sudo apt-get install -y --no-remove gh)", "mise is not on PATH"} {
+	for _, want := range []string{"catalog to install: mise", "hive (uv)", "bw (npm)", "needs sudo: gh (run once: sudo apt-get update && sudo apt-get install -y --no-remove gh)", "mise is not on PATH"} {
 		if !strings.Contains(plan.Detail, want) {
 			t.Errorf("plan detail lacks %q: %s", want, plan.Detail)
 		}
@@ -256,11 +256,11 @@ func TestWalkCatalog_NeedsSudoIsOneCommandForEveryPackage(t *testing.T) {
 		{Name: "parallel", Source: tools.Source{Type: "system", Apt: "parallel"}},
 	}
 	got := walkCatalog(fakeCatalog{m}, entries, true).detail(false)
-	want := "needs sudo: gh, docker, parallel (run once: sudo apt-get install -y --no-remove gh docker.io parallel)"
+	want := "needs sudo: gh, docker, parallel (run once: sudo apt-get update && sudo apt-get install -y --no-remove gh docker.io parallel)"
 	if got != want {
 		t.Errorf("detail = %q\nwant     %q", got, want)
 	}
-	if strings.Count(got, "sudo apt-get") != 1 {
+	if strings.Count(got, "apt-get install") != 1 {
 		t.Errorf("want one command, got %q", got)
 	}
 }

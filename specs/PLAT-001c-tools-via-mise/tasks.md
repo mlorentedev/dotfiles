@@ -216,6 +216,18 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] From the worktree on the Mac: `dotf tools sync --dry-run` adds bat, delta and fd to the install list; `dotf tools install --dry-run` plans `install` for btop
 - Windows: every mise pin waits for Windows mise (#2013)
 
+### apt index refresh (#2013 X1 finding, #2332)
+
+The first X1 run on ubuntu-latest failed its first converge: the runner's apt
+lists named a libgit2 build the mirror had dropped, so `apt-get install` 404ed.
+A fix to the AC7 path, so it lives here and not in a spec of its own.
+
+- [x] `refreshAptIndex`: one `apt-get update` per Installer, before the first apt install; none on a run with nothing to install
+- [x] When sudo wants a password the refresh is not attempted, like the install it precedes
+- [x] A refresh that fails for another reason warns and the install tries the index as it is
+- [x] The command handed to the person refreshes first: `SudoInstallCommand` prefixes `sudo apt-get update &&`, and the per-package line and the plan note reuse it (pr-agent finding on #2332: an install alone meets the same stale lists)
+- [ ] X1 on ubuntu-latest passes its first converge once #2332 is on main
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
