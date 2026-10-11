@@ -63,8 +63,8 @@ func TestGuide_FromZeroRunsTheChainInOrder(t *testing.T) {
 	want := []string{
 		"bw login --quiet",
 		"dotf secrets unlock", "dotf secrets verify",
-		"gh auth login", "dotf converge --only git-config",
-		"git clone https://example.test/knowledge.git /h/knowledge",
+		"gh auth login",
+		"dotf converge --only git-config", "git clone https://example.test/knowledge.git /h/knowledge",
 	}
 	if strings.Join(m.ran, "|") != strings.Join(want, "|") {
 		t.Errorf("ran %q\nwant %q", m.ran, want)
@@ -168,8 +168,8 @@ func TestPlan_NamesWhatIsLeftAndRunsNothing(t *testing.T) {
 		"1. [ OK ] age key",
 		"2. [ OK ] Bitwarden login",
 		"3. [TODO] Bitwarden unlock: dotf secrets unlock, then dotf secrets verify",
-		"4. [TODO] GitHub login: gh auth login, then dotf converge --only git-config",
-		"5. [TODO] knowledge vault: git clone https://example.test/knowledge.git /h/knowledge",
+		"4. [TODO] GitHub login: gh auth login",
+		"5. [TODO] knowledge vault: dotf converge --only git-config, then git clone https://example.test/knowledge.git /h/knowledge",
 		"`dotf identity restore`",
 	} {
 		if !strings.Contains(got, want) {
@@ -197,5 +197,28 @@ func TestSteps_AnUnresolvedVaultPathIsNotCloned(t *testing.T) {
 	v := steps[len(steps)-1]
 	if v.Run != nil || !strings.Contains(v.Manual, "VAULT_PATH resolves to nothing") {
 		t.Errorf("vault step = %+v; want a manual step naming VAULT_PATH", v)
+	}
+}
+
+// A failed verify is reported and the chain goes on: a secret missing from the
+// store is the registry's gap, and nothing below needs it.
+func TestGuide_AFailedVerifyDoesNotStopTheChain(t *testing.T) {
+	m := &machine{f: Facts{AgeKey: true, BWLoggedIn: true}, fail: "dotf secrets verify"}
+	out := guide(m, "\n\n\n")
+	if got := strings.Join(m.ran, "|"); !strings.HasSuffix(got, "git clone https://example.test/knowledge.git /h/knowledge") {
+		t.Errorf("ran %q; want the chain to reach the vault", got)
+	}
+	if !strings.Contains(out, "[WARN] `dotf secrets verify` failed") || !strings.Contains(out, "identity: restored.") {
+		t.Errorf("want the verify warning and a restored chain:\n%s", out)
+	}
+}
+
+// Resuming after a GitHub login whose git-config run failed still wires the
+// credential helper: the vault step runs git-config before it clones.
+func TestGuide_TheVaultStepWiresTheHelperBeforeItClones(t *testing.T) {
+	m := &machine{f: Facts{AgeKey: true, BWLoggedIn: true, BWUnlocked: true, GHLoggedIn: true}}
+	guide(m, "\n")
+	if got := strings.Join(m.ran, "|"); got != "dotf converge --only git-config|git clone https://example.test/knowledge.git /h/knowledge" {
+		t.Errorf("ran %q", got)
 	}
 }

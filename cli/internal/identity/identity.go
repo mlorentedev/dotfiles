@@ -13,6 +13,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -37,11 +38,14 @@ type Facts struct {
 
 // Step is one link of the chain. Run is what the guide runs for it, in order;
 // a step with no Run is done by hand (Manual says how) and the guide waits.
+// After runs once the step is done and only reports: what it finds is not
+// this chain's to fix, so it never stops it.
 type Step struct {
 	Name   string
 	Why    string
 	Manual string
 	Run    [][]string
+	After  [][]string
 	Done   func(Facts) bool
 }
 
@@ -61,14 +65,14 @@ const DefaultVaultURL = "https://github.com/mlorentedev/knowledge.git"
 func Steps(p Paths) []Step {
 	vault := Step{
 		Name: "knowledge vault",
-		Why:  "the agents' memory, and what doctor's vault checks read",
-		Run:  [][]string{{"git", "clone", p.VaultURL, p.Vault}},
+		Why:  "the agents' memory, and what doctor's vault checks read; git-config first wires gh's credential helper the private clone authenticates through",
+		Run:  [][]string{{p.Dotf, "converge", "--only", "git-config"}, {"git", "clone", p.VaultURL, p.Vault}},
 		Done: func(f Facts) bool { return f.Vault },
 	}
 	if p.Vault == "" {
 		// Never a clone into the working directory: say what is missing.
 		vault.Run = nil
-		vault.Manual = "VAULT_PATH resolves to nothing on this machine: set it (machine.json, ADR-025), then clone " + p.VaultURL + " there"
+		vault.Manual = "VAULT_PATH resolves to nothing on this machine: set it (machine.json, ADR-025), run `dotf converge --only git-config`, then clone " + p.VaultURL + " there"
 	}
 	return []Step{
 		{
@@ -88,13 +92,16 @@ func Steps(p Paths) []Step {
 		{
 			Name: "Bitwarden unlock",
 			Why:  "the bw serve daemon every terminal shares; then each registry secret is resolved, no value printed",
-			Run:  [][]string{{p.Dotf, "secrets", "unlock"}, {p.Dotf, "secrets", "verify"}},
-			Done: func(f Facts) bool { return f.BWUnlocked },
+			Run:  [][]string{{p.Dotf, "secrets", "unlock"}},
+			// A secret missing from the store is a gap in the registry, not in
+			// this machine's identity: reported, never a stop.
+			After: [][]string{{p.Dotf, "secrets", "verify"}},
+			Done:  func(f Facts) bool { return f.BWUnlocked },
 		},
 		{
 			Name: "GitHub login",
-			Why:  "the vault is a private repository, cloned through gh's credential helper; converge's git-config step wires it once gh holds a login",
-			Run:  [][]string{{"gh", "auth", "login"}, {p.Dotf, "converge", "--only", "git-config"}},
+			Why:  "the vault is a private repository, cloned through gh's credential helper, which git-config wires only once gh holds a login",
+			Run:  [][]string{{"gh", "auth", "login"}},
 			Done: func(f Facts) bool { return f.GHLoggedIn },
 		},
 		vault,
@@ -132,9 +139,9 @@ func how(s Step) string {
 	if s.Run == nil {
 		return s.Manual
 	}
-	cmds := make([]string, len(s.Run))
-	for i, argv := range s.Run {
-		cmds[i] = strings.Join(argv, " ")
+	var cmds []string
+	for _, argv := range slices.Concat(s.Run, s.After) {
+		cmds = append(cmds, strings.Join(argv, " "))
 	}
 	return strings.Join(cmds, ", then ")
 }
@@ -184,6 +191,11 @@ func Guide(t Terminal, steps []Step, probe func() Facts, run Exec) {
 			return
 		}
 		_, _ = fmt.Fprintf(t.Out, "     [ OK ] %s\n", s.Name)
+		for _, argv := range s.After {
+			if err := run(argv); err != nil {
+				_, _ = fmt.Fprintf(t.Out, "     [WARN] `%s` failed: %v; the chain goes on, since nothing below needs it\n", strings.Join(argv, " "), err)
+			}
+		}
 	}
 	_, _ = fmt.Fprintln(t.Out, "identity: restored. Next: dotf converge, then dotf doctor")
 }
