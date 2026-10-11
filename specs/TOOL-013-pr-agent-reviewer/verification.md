@@ -49,9 +49,13 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
   index left stale when its directory emptied (DOCS-020 `verification.md`). On #2211, run 37887978561
   reviewed with `openai/mimo-v2.6-flash` and raised three findings; one was applied in `17553abc`
   ([triage](https://github.com/mlorentedev/dotfiles/pull/2211#issuecomment-6074931691)). The
-  findings arrive as one review comment that links each file and line, not as inline diff comments:
-  #1107 turned `auto_improve` off, the only pass that posts inline, to halve NaN demand per PR; the
-  decision and its measurement are in `pr-agent.yml`. `/improve` still posts inline on demand.
+  findings arrive inline since #2325 (`7186bc0a`, `[pr_reviewer] inline_key_issues = true`), from the
+  same `/review` call #1107 kept to one per PR. Live, read from the REST API on 2026-10-11 (#786
+  [comment](https://github.com/mlorentedev/dotfiles/issues/786#issuecomment-6105247189)): #2329, #2332
+  and #2334 each carry a `COMMENTED` review by `github-actions` with inline comments (1, 1 and 2; #2334's
+  are "Vacuous guard" and "Weak assertion" on `manifest_requires_test.go`, both applied in `81918709`).
+  A finding with no line (path "PR description") stays in the summary: #2333's only finding did, and
+  that PR has no review object. `/improve` still posts suggestions on demand.
 - AC2: `.pr_agent.toml` names `mimo-v2.6-flash` with `deepseek-v4-flash` as fallback; `qwen3.6` is
   `model_weak`, which the review never uses.
 - AC3: `ignore.glob` keeps `sensitive/**` out of the call (f3).
