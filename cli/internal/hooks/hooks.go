@@ -15,6 +15,7 @@ package hooks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -65,14 +66,7 @@ type Options struct {
 // to surface the error and let the operator re-run. A caller that swallows it
 // turns every guard off silently, which is the one outcome worse than failing.
 func Install(ctx context.Context, o Options) error {
-	if o.homeDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("resolve home directory: %w", err)
-		}
-		o.homeDir = home
-	}
-	return install(ctx, execGit, o)
+	return Apply(ctx, execGit, o)
 }
 
 func install(ctx context.Context, run gitRunner, o Options) error {
@@ -294,12 +288,10 @@ func isGuardDispatcher(dir string) bool {
 // Developing the hooks from a checkout points hooksPath at an equivalent
 // dispatcher, which is active and used to be reported INACTIVE on every run.
 func wireHooksPath(ctx context.Context, run gitRunner, target string, out io.Writer) error {
-	current := ""
-	if b, err := run(ctx, "config", "--global", "--get", "core.hooksPath"); err == nil {
-		current = strings.TrimSpace(string(b))
+	current, err := readHooksPath(ctx, run)
+	if err != nil {
+		return err
 	}
-	// An unset key makes git exit non-zero with no output, which is not an
-	// error here — it is the case this function exists to fix.
 
 	switch {
 	case current == "":
@@ -317,6 +309,23 @@ func wireHooksPath(ctx context.Context, run gitRunner, target string, out io.Wri
 			current, target)
 	}
 	return nil
+}
+
+// readHooksPath returns git's global core.hooksPath, "" when it is unset.
+// Only exit status 1 means unset (git config --get's "no such key"): any other
+// failure, an unreadable include or a git that did not run, is an error. Read
+// as unset, it would make the wiring overwrite a value it could not see, the
+// one thing it promises never to do.
+func readHooksPath(ctx context.Context, run gitRunner) (string, error) {
+	b, err := run(ctx, "config", "--global", "--get", "core.hooksPath")
+	if err == nil {
+		return strings.TrimSpace(string(b)), nil
+	}
+	var ec interface{ ExitCode() int }
+	if errors.As(err, &ec) && ec.ExitCode() == 1 {
+		return "", nil
+	}
+	return "", fmt.Errorf("read core.hooksPath: %w", err)
 }
 
 // samePath compares two hooksPath values as directories rather than as bytes.

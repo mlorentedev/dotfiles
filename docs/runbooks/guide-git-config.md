@@ -14,7 +14,7 @@ created: "2026-10-08"
 | File | Owner | Written by |
 |---|---|---|
 | `git/dotfiles.gitconfig` (repo) → `~/.config/git/dotfiles.gitconfig` | the dotfiles | `dotf deploy` (`gitconfig` entry), replaced whole |
-| `~/.gitconfig` | git, gh and you | `git config --global`, `gh auth setup-git`, `dotf hooks install` (`core.hooksPath`), and the `include.path` line `dotf converge` adds |
+| `~/.gitconfig` | git, gh and you | `git config --global`, `gh auth setup-git`, `dotf hooks install` and converge's `git-hooks` step (`core.hooksPath`), and the `include.path` line `dotf converge` adds |
 
 `~/.gitconfig` is co-owned, so nothing should deploy over it (lesson 366). The dotfiles' settings reach git through one line in it:
 
