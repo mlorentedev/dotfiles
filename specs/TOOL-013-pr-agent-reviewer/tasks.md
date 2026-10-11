@@ -67,7 +67,8 @@ created: "2026-08-16"
       The `11/11` above is the count when this spec first closed.
 - [x] AC1 live evidence: the first PR reviewed after the fix merges carries a COMMENTED review by
       `github-actions` with inline comments; then `verification.md` AC1 is rewritten from it
-      (#2329 at 03:18Z was the first, then #2332 and #2334; recorded on #786)
+      (#2325 merged 02:25:20Z; #2326 at 02:30:22Z was the first, five more followed; the table is in
+      `verification.md` AC1)
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
 
 ## Follow-on, after the first production runs (#1044)
