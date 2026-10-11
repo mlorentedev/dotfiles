@@ -169,17 +169,45 @@ func appInApplications(bundle string) bool {
 func (in *Installer) systemInstallArgv(manager, pkg string) []string {
 	switch manager {
 	case "apt":
-		argv := aptInstallArgv(pkg)
-		if !in.IsRoot() {
-			argv = append([]string{"sudo", "-n"}, argv...)
-		}
-		return argv
+		return in.asRoot(aptInstallArgv(pkg))
 	case "brew":
 		return []string{"brew", "install", pkg}
 	case "brew-cask":
 		return []string{"brew", "install", "--cask", pkg}
 	default: // winget
 		return []string{"winget", "install", "--id", pkg, "-e", "--accept-source-agreements", "--accept-package-agreements"}
+	}
+}
+
+// asRoot prefixes argv with `sudo -n` unless dotf already runs as root.
+func (in *Installer) asRoot(argv []string) []string {
+	if in.IsRoot() {
+		return argv
+	}
+	return append([]string{"sudo", "-n"}, argv...)
+}
+
+// refreshAptIndex runs `apt-get update` once per Installer, before its first
+// apt install. A fresh machine's index is stale: a hosted runner's lists named
+// a libgit2 build the mirror had dropped, so the first install 404ed (#2013
+// X1). A run with nothing to install never gets here, so a converged machine
+// still runs no manager command.
+//
+// When sudo wants a password it is not attempted: the install that follows
+// is refused the same way, and that path names the command to run. A refresh
+// that fails for another reason (a third-party source that 404s) is a
+// warning, not the run's failure, and the install tries the index as it is.
+func (in *Installer) refreshAptIndex() {
+	if in.aptIndexAsked {
+		return
+	}
+	in.aptIndexAsked = true
+	argv := in.asRoot([]string{"apt-get", "update"})
+	if in.needsSudoPassword(argv) {
+		return
+	}
+	if err := in.Run(argv[0], argv[1:]...); err != nil {
+		_, _ = fmt.Fprintf(in.Out, "apt index refresh failed (%s: %v); installing from the index as it is\n", strings.Join(argv, " "), err)
 	}
 }
 
@@ -234,6 +262,9 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	if missing := in.missingSystemTool(t); missing != "" {
 		_, _ = fmt.Fprintf(in.Out, "%s: %s is not on PATH; skipping (the next run installs it once %s is there)\n", t.Name, missing, missing)
 		return Skipped, nil
+	}
+	if manager == "apt" {
+		in.refreshAptIndex()
 	}
 	argv := in.systemInstallArgv(manager, pkg)
 	if err := in.Run(argv[0], argv[1:]...); err != nil {
