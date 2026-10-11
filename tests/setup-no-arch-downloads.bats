@@ -32,32 +32,50 @@ installers() {
     printf '%s\n' "$REPO/setup-linux.sh" "$REPO/setup-windows.ps1" "$REPO/install.sh" "$REPO/install.ps1" "$REPO"/scripts/*.sh
 }
 
-# Code lines only: a comment names the literal as prose.
+# Code lines only: a comment names the literal as prose. A literal is an OS
+# joined to an arch, either way round, in any of the separators release assets
+# use: linux-amd64, linux_x86_64, x86_64-unknown-linux-gnu, darwin-arm64,
+# aarch64-apple-darwin. An arch alone (`x86_64 | amd64)` in install.sh's
+# detection) is not an asset name, so it passes.
 arch_literals() {
     awk '
         /^[[:space:]]*#/ { next }
-        /linux-amd64|x86_64-unknown-linux|linux\.x86_64|linux_amd64/ { print FILENAME":"FNR": "$0 }
+        {
+            l = tolower($0)
+            if (l ~ /(linux|darwin|macos|windows)[-_.](amd64|x86_64|x64|arm64|aarch64)/ ||
+                l ~ /(amd64|x86_64|arm64|aarch64)[-_.](unknown[-_.])?(linux|apple|darwin|pc[-_.]windows)/)
+                print FILENAME":"FNR": "$0
+        }
     ' "$@"
 }
 
-@test "no installer names a linux-amd64 release asset (#2013 X2)" {
-    local files=()
+@test "no installer names one OS-arch's release asset (#2013 X2)" {
+    local files=() f
     while IFS= read -r f; do
-        [ -f "$f" ] && files+=("$f")
+        # Every named installer must exist: a rename would otherwise drop it
+        # from the scan while the guard stayed green.
+        [ -f "$f" ] || { echo "installer missing: $f"; return 1; }
+        files+=("$f")
     done < <(installers)
-    [ "${#files[@]}" -ge 5 ]
     run arch_literals "${files[@]}"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "the X2 guard sees a literal on a code line and ignores one in a comment" {
+@test "the X2 guard sees an OS-arch asset on a code line, in any spelling, and ignores prose and arch detection" {
     printf '#!/bin/sh\n# fetch foo_linux_amd64.tar.gz, as prose\n' > "$TMP/prose.sh"
     run arch_literals "$TMP/prose.sh"
     [ -z "$output" ]
-    printf '#!/bin/sh\ncurl -LO https://x/foo-linux-amd64.tar.gz\n' > "$TMP/code.sh"
-    run arch_literals "$TMP/code.sh"
-    [[ "$output" == *"code.sh:2:"* ]] || false
+    local asset
+    for asset in foo-linux-amd64.tar.gz foo_Linux_x86_64.tar.gz eza_x86_64-unknown-linux-gnu.tar.gz \
+        foo-darwin-arm64.zip foo-aarch64-apple-darwin.tar.gz foo_windows_amd64.zip; do
+        printf '#!/bin/sh\ncurl -LO https://x/%s\n' "$asset" > "$TMP/code.sh"
+        run arch_literals "$TMP/code.sh"
+        [[ "$output" == *"code.sh:2:"* ]] || { echo "missed: $asset"; false; }
+    done
+    printf 'case "$(uname -m)" in x86_64 | amd64) arch=amd64 ;; esac\n' > "$TMP/detect.sh"
+    run arch_literals "$TMP/detect.sh"
+    [ -z "$output" ]
 }
 
 @test "aliases.zsh: ls stays the system ls when eza is absent, and is eza when present" {
