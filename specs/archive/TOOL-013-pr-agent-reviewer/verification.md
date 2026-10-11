@@ -98,4 +98,4 @@ Read against `main` at `11c56bc0`. All nine `features.json` verifications exit 0
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/TOOL-013-pr-agent-reviewer/` -> `specs/archive/TOOL-013-pr-agent-reviewer/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Independent adversarial review passes for the final contract
+- [x] Independent adversarial review passes for the final contract (`review.md`, verdict PASS)
