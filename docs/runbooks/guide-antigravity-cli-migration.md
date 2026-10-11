@@ -98,4 +98,4 @@ echo "$ANTIGRAVITY_ENDPOINT"   # expect https://cloudcode-pa.googleapis.com
 - Decision spec: `specs/archive/AI-020-gemini-empirical-validation/` (matrix + evidence).
 - Follow-up: `specs/AI-024-antigravity-oauth-verification/` (OAuth/quota guard).
 - Upstream: <https://goo.gle/gemini-cli-migration>.
-- Related: [AI Tools Setup](ai-tools-setup.md).
+- Related: [Agent provisioning](guide-agent-provisioning.md).
