@@ -233,8 +233,12 @@ budget.
 
 ```bash
 dotf secrets unlock                                   # Bitwarden session
-dotf secrets sync ci --repo mlorentedev/dotfiles      # pushes both CI secrets
+dotf secrets sync ci --repo mlorentedev/dotfiles NAN_API_KEY PR_AGENT_ANTHROPIC_API_KEY
 ```
+
+Name both secrets. Without names, `sync ci` uploads every var a selected secret
+exposes, and `NAN_API_KEY` also exposes `HIVE_WORKER_API_KEY`, a copy no
+workflow here reads (#2306).
 
 Until the secret exists, Haiku is out of the draw and the `route` step prints a
 `::warning::` naming this command; the final guard repeats it when no review was

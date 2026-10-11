@@ -648,7 +648,8 @@ if bad:
 
 @test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
     grep -q "HAS_NAN_API_KEY: \${{ secrets.NAN_API_KEY != '' }}" "$WF"
-    grep -q "dotf secrets sync ci --repo" "$WF"
+    # The remedy names the secret: unnamed, sync ci also uploads its sibling vars (#2306).
+    grep -q "dotf secrets sync ci --repo \${GITHUB_REPOSITORY} NAN_API_KEY" "$WF"
 }
 
 @test "pr-agent: the guard reads the marker from the PR head when the base has no registry yet" {
