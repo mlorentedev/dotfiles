@@ -66,6 +66,9 @@ setup() {
 #                             was queued, and a failed read; neither can be produced on demand
 #                             against the live API. The real step runs on every reviewed PR (#1923)
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
+#   setup-no-arch-downloads   stubs `eza` as an executable that is never run. The subject is the
+#                             aliases.zsh guard: `ls` is eza only when PATH resolves one. A real
+#                             eza gives the same answer, as for zshrc-guards below (#2013 W2).
 #   shell-profile             stubs `zsh`/`bash` timing probes — a real run measures this machine, not a fixture
 #   skills-pipeline           stubs the deploy targets — a real run writes into the caller's own $HOME
 #   tmux                      stubs the clipboard tools (pbcopy, wl-copy, xclip, clip.exe) to record
@@ -82,7 +85,7 @@ setup() {
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
 EXEMPT_SUITES="bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
-hermes-setup install model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs shell-profile skills-pipeline
+hermes-setup install model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs setup-no-arch-downloads shell-profile skills-pipeline
 tmux vault-maintenance-weekly zshrc-guards"
 
 exempt() {
