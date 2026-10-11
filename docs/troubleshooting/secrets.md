@@ -84,7 +84,7 @@ ambient shell).
 terminal that started it on every OS (Linux `Setsid`; Windows `DETACHED_PROCESS`
 since #1304 — before that, closing the unlocking terminal killed it and every
 wrapper in every other terminal failed together, WIN-012). `dotf doctor` WARNs
-with this remedy under `[OpenCode + pi]` while the keys are bw-backed and no
+with this remedy under `[Agent configs from secrets]` while the keys are bw-backed and no
 unlocked daemon answers.
 
 ## Related

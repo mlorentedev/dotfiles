@@ -142,6 +142,15 @@
       }
     },
     {
+      "name": "zsh",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "zsh",
+        "command": "zsh"
+      }
+    },
+    {
       "name": "tmux",
       "profile": "full",
       "source": {

@@ -78,6 +78,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - PR 6: the assertions read `converge/last.json` (`result`, `changed`, the entries' `status`), never the printed report, so a reworded line cannot turn the job green. The first run is asserted converged before the second is read (lesson 328).
 - PR 6: no `continue-on-error`. The job is non-required (owner, 2026-10-10), so a red run blocks nothing and names its cause; a step that swallowed failure would report green over the defect the job exists to find.
 
+- #2013 D10 (owner, 2026-10-11): doctor classifies each check as machine or identity, and `--scope machine` skips the identity ones with a SKIP naming the restore step in `docs/runbooks/guide-new-machine.md`. Found by X1 run 38110204139: on fresh macOS and Ubuntu runners install.sh and both converges passed and only doctor failed, every identity FAIL (vault, age key, Bitwarden, DR drill, the gh-gated repo protection, the configs rendered from secrets) mixed with the machine ones. 15 of the 55 sweep entries are identity. `checkGitConfig` stays machine: without a gh login it only WARNs. Mutations, each caught by the tests above: no SKIP printed (M1), an entry left without a kind (M2), a renamed identity section (M3), the vault reclassified machine (M4), a typo in `ParseScope` (M5). Declined: fabricating identity on the runners as test-windows does, which turns the check into a test of empty directories.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

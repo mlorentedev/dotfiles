@@ -1,9 +1,9 @@
 name: from-zero
 
 # A machine from zero (#2013 X1, PLAT-001b PR 6): on a fresh hosted runner,
-# install.sh, then `dotf doctor`, then a second `dotf converge` that must
-# change nothing. It proves the one entrypoint brings up macOS and Linux, and
-# that the result is idempotent.
+# install.sh, then `dotf doctor --scope machine`, then a second `dotf converge`
+# that must change nothing. It proves the one entrypoint brings up macOS and
+# Linux, and that the result is idempotent.
 #
 # The `dotf` under test is the PR's source build, put on PATH before
 # install.sh runs. install.sh keeps a source build (it reports `dev`) and
@@ -93,12 +93,17 @@ jobs:
       # interactive shell the converge just configured: its rc file activates
       # mise, which a bare CI step never sources, and without it every mise
       # tool reads as missing from PATH.
-      - name: dotf doctor
+      #
+      # --scope machine: a runner has no identity (age key, Bitwarden, gh
+      # login, vault), and none is fabricated for it. Those checks print a SKIP
+      # naming their restore step, so a FAIL here is a defect of the bootstrap
+      # (#2013 D10, docs/runbooks/guide-new-machine.md).
+      - name: dotf doctor --scope machine
         run: |
           if command -v zsh >/dev/null 2>&1; then
-            zsh -ic 'dotf doctor'
+            zsh -ic 'dotf doctor --scope machine'
           else
-            bash -ic 'dotf doctor'
+            bash -ic 'dotf doctor --scope machine'
           fi
 
       # Its own signal: a red doctor must not hide whether the machine is
