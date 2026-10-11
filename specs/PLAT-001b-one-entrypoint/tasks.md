@@ -140,7 +140,7 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] `.github/workflows/from-zero.yml`: the job above, the PR's source build on PATH (install.sh keeps a `dev` build), `DOTFILES_REPO_DIR` at the workspace, `GITHUB_TOKEN` for mise's downloads; the owner's trigger (install path on PRs, every push to main, 2026-10-10)
 - [ ] Gap, deliberate: the job never exercises install.sh's clone-when-absent path (the workspace is the checkout) nor its release download (covered by the file:// fixture in `tests/install.bats`)
 - [ ] After #2013 P5c PR2 (the agents under `# mise: latest`): X1 asserts `claude`, `pi` and `agy` resolve on PATH after the first converge, on both runners
-- [ ] Each red cause of the first runs becomes a row on the #2013 ledger, or is fixed here when it is the job's own
+- [x] Each red cause of the first runs becomes a row on the #2013 ledger, or is fixed here when it is the job's own. Run 38115559203, classified on #2013: kubectl on darwin (PLAT-001c's `# mise: cli` pin), the hive daemon (S2), `.profile`/`.inputrc` on darwin (P7), `~/Applications` and `*_HOME` on linux (T3); the dispatcher became the git-hooks step (#2340), the plugin miscount BUG-121 (#2336), test-windows' fabricated identity the X4 row
 - [x] Runbook `docs/runbooks/guide-new-machine.md`: the one-liner per OS, what `--plan` shows, how to read the report, what `skipped` on darwin means; it also orders the identity restore (#2013 D10)
 
 ### PR 6a — doctor scopes its checks: machine or identity (#2013 D10)
