@@ -10,6 +10,10 @@
 # failing `[[ ]]` does not trip errexit, so only the last one would count.
 # shellcheck disable=SC2016  # the probes are bash code, expanded by the bash under test
 
+# The rc runs under the host's bash, so what it prints is the bash version's:
+# the macOS leg's 3.2 answers differently from Linux's 5 (lesson 394).
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     # Resolved here: env looks the shell up on the PATH it is given, which
@@ -119,7 +123,8 @@ load_rc() {
     chmod +x "$SANDBOX/bin/terraform"
     run load_rc 'complete -p terraform'
     [ "$status" -eq 0 ]
-    # bash prints the command quoted: -C '<path>' terraform
-    [[ "$output" == *"-C '$SANDBOX/bin/terraform' terraform" ]] || false
+    # bash 5 prints the command quoted (-C '<path>' terraform) and bash 3.2,
+    # which the macOS leg runs, does not (lesson 394): compare without quotes.
+    [[ "$(printf '%s' "$output" | tr -d "'")" == *"-C $SANDBOX/bin/terraform terraform" ]] || false
 }
 
