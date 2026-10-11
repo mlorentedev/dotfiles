@@ -138,5 +138,5 @@ to verify the declared packages after setup.
 
 ## Related
 
-- [Runbook: AI Tools Setup](../runbooks/ai-tools-setup.md)
+- [Runbook: Agent provisioning](../runbooks/guide-agent-provisioning.md)
 - [ADR-001: Custom Skills Over BMAD](../adr/adr-001-skill-based-ai-workflow.md)

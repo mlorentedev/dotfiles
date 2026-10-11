@@ -1,12 +1,14 @@
 # Dotfiles
 
-Personal development environment: shell configs, AI tool integration, and encrypted secrets management. Supported today on **Linux** and **Windows**. **macOS is planned** (roadmap) — there is no setup-macos.sh yet, so the Linux bootstrap is unverified on macOS.
+Personal development environment: shell configs, AI tool integration, and encrypted secrets management, on **Linux**, **Windows** and **macOS**.
 
 | Platform | Status | Bootstrap |
 |---|---|---|
-| Linux | Supported | `setup-linux.sh` |
-| Windows | Supported | `setup-windows.ps1` |
-| macOS | Planned (not yet implemented) | — |
+| Linux | Supported | `install.sh` → `dotf converge`, which runs `setup-linux.sh` as its last step |
+| Windows | Supported | `install.ps1` → `dotf converge`, which runs `setup-windows.ps1` as its last step |
+| macOS | Bring-up ([#2013](https://github.com/mlorentedev/dotfiles/issues/2013)) | `install.sh` → `dotf converge`; no setup script runs on a Mac (ADR-045) |
+
+On macOS, converge does not install Claude Code or agy yet ([#2317](https://github.com/mlorentedev/dotfiles/issues/2317)), and no from-zero CI job proves a fresh Mac yet (#2013 X1).
 
 ## Quick Start
 
@@ -37,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/mlorentedev/dotfiles/main/install.s
 From a checkout, `./install.sh` installs the version `versions.conf` pins
 instead of the latest release. `DOTF_BIN_DIR` moves the install directory.
 
-Or **manually**:
+Or **manually** (Linux; on macOS run `./install.sh` from the checkout instead, never `setup-linux.sh`):
 
 ```bash
 # Clone the repo to a checkout dir (NOT ~/.dotfiles — that is the deploy target
@@ -83,14 +85,14 @@ admin needed; some changes show after an Explorer restart.
 - **Dual-shell support** — All scripts work in both bash and zsh (POSIX-compatible)
 - **Encrypted secrets** — Bitwarden SSOT with an age-encrypted DR floor; injected into a single child process on demand via `dotf secrets run`, never into the ambient shell (ADR-028)
 - **AI integration** — Claude Code (primary) + OpenCode (secondary, Go subscription) + Gemini CLI with 37 custom skills, unified by `AGENTS.md` SSOT
-- **Cross-platform** — Atomic copy with drift assertion on both Linux and Windows (no admin required; ADR-012); macOS planned
+- **Cross-platform** — `dotf converge` on Linux, Windows and macOS; atomic copy with drift assertion, no admin required (ADR-012, ADR-045)
 - **Editor & shell ergonomics** — `.editorconfig` for cross-IDE consistency + `.inputrc` for case-insensitive tab-completion and arrow-key history search
 - **Tested** — 1200+ BATS tests + ShellCheck + PSScriptAnalyzer in CI
 
 ## Structure
 
 ```text
-├── setup-linux.sh              # Linux setup (copy + drift assertion, ADR-012); macOS planned
+├── setup-linux.sh              # Linux setup (copy + drift assertion, ADR-012); never run on macOS
 ├── setup-windows.ps1           # Windows setup (copies)
 ├── cli/                        # `dotf` Go CLI — primary user-facing tool, see cli/README.md for the subcommand list
 ├── scripts/                    # Shell utilities, on PATH (see Human entrypoints below)
@@ -283,7 +285,7 @@ Full reference and pane-layout recipes: [`docs/runbooks/guide-tmux.md`](docs/run
 
 **Windows:** git, PowerShell
 
-**macOS:** planned — not yet supported (no setup-macos.sh)
+**macOS:** `curl` and git (`xcode-select --install`); Homebrew for the catalog's brew entries
 
 **Recommended:** age, gh (GitHub CLI), direnv, zoxide, eza
 

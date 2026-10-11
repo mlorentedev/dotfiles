@@ -81,6 +81,7 @@ The design is ADR-045 (`docs/adr/adr-045-one-entrypoint-converges-every-os.md`);
 - [ ] AC10: `dotf converge` deploys every `ai/deploy.json` config that applies to the machine, so a template change merged to main lands without a manual `dotf deploy`; a config whose secrets the store cannot resolve during the run keeps its installed file and is named in the report (#1843 B15).
 - [ ] AC11: on macOS, `dotf converge` writes the contract's path variables into the user's launchd session, so an app launched from the Dock sees `VAULT_PATH`. It also loads a login agent that runs `dotf env persist` at every login, and a second run reports zero changes (#2013 S3).
 - [ ] AC12: `dotf converge` installs the `packages.json` catalog on every OS in the order setup used (install, mise sync, install), so one run converges a fresh machine; an entry whose manager is absent or that needs a sudo password is reported, not failed, and the probe accepts it.
+- [ ] AC13: `dotf converge` renders the contract's path file (`paths.sh`, or `paths.ps1` on Windows) after the mirror and before any install, so a contract or `machine.json` change reaches the shell without a manual `dotf env generate`; a second run reports it up to date.
 - [ ] AC9: a from-zero CI job on `macos-latest` runs `install.sh`, then `dotf doctor`, then a second converge with zero native changes.
 
 ## References
