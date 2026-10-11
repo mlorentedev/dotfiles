@@ -371,8 +371,9 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 		}
 	}
 	if len(p.Outdated) > 0 {
-		// upgrade also uninstalls the version it replaced (mise's
-		// upgrade.auto_prune), so an agent does not pile up a copy a day.
+		// upgrade also schedules the version it replaced for removal (mise
+		// 2026.10.3 lists it as "pruned in 1d"), so an agent does not pile up
+		// a copy per release.
 		if out, err := s.Run("mise", append([]string{"upgrade"}, p.Outdated...)...); err != nil {
 			return p, fmt.Errorf("mise upgrade: %w\n%s", err, strings.TrimSpace(string(out)))
 		}
