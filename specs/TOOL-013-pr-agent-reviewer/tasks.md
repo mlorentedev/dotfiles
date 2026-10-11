@@ -34,19 +34,17 @@ created: "2026-08-16"
       for it. Met by defects nobody planted, which is the stronger form: see
       `verification.md`, "Evidence for the archive" (#2039, #2211)
 
-## Blocked, and not by anything in this change
+## Formerly blocked, now resolved
 
-- [x] Deliver the key: `dotf secrets sync ci`. **Blocked by #983** (closed; AI-045 `tasks.md` records the
-      sync delivering CI keys on 2026-10-08, and every NaN review since authenticates with it) — the command
-      refuses the whole batch when any entry fails its liveness check, and
-      `BITACORA_PAT` is a dead token (HTTP 401). Until that is resolved, or the
-      operator passes `--skip-verify`, `NAN_API_KEY` cannot reach GitHub Actions
-      secrets and the workflow authenticates with an empty string. Worth noting
-      as a shape, not just an instance: one dead credential blocks delivery of
-      every other, which is #1004's batch-abort defect in a second command
-- [x] Verify the registry change end to end. **Blocked by #939** (closed) — `dotf`
-      resolves `DOTFILES_REPO_DIR` ahead of the cwd, so `secrets sync ci` reads
-      the registry in the main checkout, not this worktree
+- [x] Deliver the key: `dotf secrets sync ci`. Was blocked by #983 (now closed): the command refused
+      the whole batch when any entry failed its liveness check, and a dead `BITACORA_PAT` kept
+      `NAN_API_KEY` out of GitHub Actions secrets, so the workflow authenticated with an empty
+      string. AI-045 `tasks.md` records the sync delivering CI keys on 2026-10-08, and every NaN
+      review since authenticates with it. The shape stays worth naming: one dead credential
+      blocked delivery of every other, #1004's batch-abort defect in a second command.
+- [x] Verify the registry change end to end. Was blocked by #939 (now closed): `dotf` resolved
+      `DOTFILES_REPO_DIR` ahead of the cwd, so `secrets sync ci` read the registry in the main
+      checkout rather than the worktree.
 
 ## Closing
 
@@ -57,6 +55,14 @@ created: "2026-08-16"
 - [x] Tests pass (`bats tests/pr-agent-config.bats` — 11/11)
 - [x] `verification.md` filled in
 - [x] PR opened referencing this spec folder
+- [x] Archive review findings F1-F3 addressed (`review.md`, FAIL): `[pr_reviewer] inline_key_issues = true`
+      publishes the automatic review's located findings inline from the same `/review` call (F1);
+      the guard reads that setting and checks `review` runs automatically, and the config comments
+      no longer claim `/improve` carries the inline path (F2); `vendor/**` is carried in the ignore
+      list (F3). The registry and classifier say inline findings attest through `reviews[]`, and the
+      triage skill reads `pulls/N/comments`.
+- [ ] AC1 live evidence: the first PR reviewed after the fix merges carries a COMMENTED review by
+      `github-actions` with inline comments; then `verification.md` AC1 is rewritten from it
 - [ ] Adversarial review passes before archive (`dotf spec review TOOL-013-pr-agent-reviewer`)
 
 ## Follow-on, after the first production runs (#1044)
