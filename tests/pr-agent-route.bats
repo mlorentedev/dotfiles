@@ -292,7 +292,7 @@ every_point() {
     [ "$(out second)" = "none" ]
     [ "$(out route)" = "draw" ]
     [ ! -s "$STUB_ARGV_LOG" ]
-    [[ "$(out note)" == *"dotf secrets sync ci --repo o/r"* ]] || false
+    [[ "$(out note)" == *"dotf secrets sync ci --repo o/r PR_AGENT_ANTHROPIC_API_KEY"* ]] || false
 }
 
 @test "route: NaN down as a whole leaves Anthropic alone, with no second attempt" {

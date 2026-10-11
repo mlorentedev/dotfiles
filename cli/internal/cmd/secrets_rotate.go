@@ -277,6 +277,6 @@ func pushRotatedToCI(out io.Writer, s *secrets.Secret, repos []string, dryRun bo
 	if len(failed) == 0 {
 		return nil
 	}
-	return fmt.Errorf("rotated, but %s still hold the old value (finish each with `dotf secrets sync ci --repo <repo>`): %w",
+	return fmt.Errorf("rotated, but %s still hold the old value (finish each with `dotf secrets sync ci --repo <repo> <VAR>`): %w",
 		strings.Join(failed, ", "), errors.Join(errs...))
 }
