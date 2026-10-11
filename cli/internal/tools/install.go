@@ -103,6 +103,9 @@ type Installer struct {
 	// sudoRefuses caches needsSudoPassword's answer: a plan asks it per apt
 	// entry, and every `sudo -n` refusal is a line in the auth log.
 	sudoRefuses *bool
+	// sudoDeferred is every apt package Install skipped for want of a sudo
+	// password, so a run can print one command for all of them (SudoDeferred).
+	sudoDeferred []string
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
@@ -224,6 +227,9 @@ type Plan struct {
 	// Note says why: a skip that is not "already installed" (a source type this
 	// dotf does not know), an unsupported row's platform, a refusal's reason.
 	Note string
+	// Package is the apt package of a needs-sudo row, so a caller can collect
+	// every such row into one SudoInstallCommand.
+	Package string
 }
 
 // unknownTypeNote is the words for a source type this dotf cannot read, shared
