@@ -20,7 +20,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
 | PyPI tools (hive, ansible, ansible-lint) | `uv tool` | `packages.json` | `dotf tools install` |
-| Tools with no cross-OS channel (git, gh, uv, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | the setup script for each OS today; `packages.json` `source.type: system` entries once a release that reads the type is the pin (#2013 D8) | setup today; then `dotf tools install` |
+| Tools with no cross-OS channel (git, gh, eza, tmux, docker, system libraries, macOS casks) | the OS package manager: apt, winget, Homebrew | `packages.json` `source.type: system` entries (#2013 D8, P5b); Windows' winget loop in `setup-windows.ps1` until the Windows batch | `dotf tools install`, which converge's `tools` step runs; without passwordless sudo it prints the one `sudo apt-get install` command |
 
 How a pin is read depends on the channel:
 

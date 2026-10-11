@@ -57,42 +57,6 @@ exit_error() {
     exit $code
 }
 
-# host_is_linux_amd64: is this the one OS/arch that setup-linux.sh's hard-coded
-# release URLs fit? Those blocks fetch linux-amd64 assets; on any other host they
-# leave a binary that cannot execute ahead of a working copy on PATH (#2013
-# F-030: an ELF eza on macOS broke `ls`). Interim until #2013 W2 moves the tools
-# to mise and deletes the blocks, and this with them.
-host_is_linux_amd64() {
-    [ "$(uname -s)" = "Linux" ] || return 1
-    case "$(uname -m)" in
-        x86_64 | amd64) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# remove_unrunnable_tool: delete ~/.local/bin/<name> when the OS refuses to run it.
-# Exit 126 is "found but cannot execute" (another OS's or arch's build); such a
-# file only shadows the working copies later on PATH. bash also exits 126 for a
-# file without the execute bit, which says nothing about its platform, so only an
-# executable file is probed. A tool that runs, one that fails for any other
-# reason, a non-executable file and a symlink are left alone.
-# Usage: remove_unrunnable_tool age age-keygen eza
-remove_unrunnable_tool() {
-    local name file rc
-    for name in "$@"; do
-        file="$HOME/.local/bin/$name"
-        if [ ! -f "$file" ] || [ -L "$file" ] || [ ! -x "$file" ]; then
-            continue
-        fi
-        rc=0
-        "$file" --version </dev/null >/dev/null 2>&1 || rc=$?
-        if [ "$rc" -eq 126 ]; then
-            rm -f "$file"
-            log_warning "Removed $file: this OS cannot execute it (another platform's build, left by an earlier setup)"
-        fi
-    done
-}
-
 # version_gte: is an installed version at least the pinned minimum?
 # versions.conf pins are MINIMUMS, not exact pins (REFACTOR-013): an install
 # gate must upgrade when installed < pin, and leave a NEWER install untouched
