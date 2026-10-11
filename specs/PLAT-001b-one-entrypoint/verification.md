@@ -72,6 +72,11 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Not the contract's `required_path_entries`, applied at the entrypoint: on a fresh machine the contract only exists after the checkout step, and it does not name the mise shims. Not `Environment=PATH=` in the unit: that fixes one caller on one OS, and the Windows task and a future launchd job would each need a copy.
 - A manager still out of reach after that (mise or uv placed where no listed dir points) fails the probe, naming the manager, rather than accept a wait.
 
+- PR 6 (X1): the job runs the PR's source build, not the release. install.sh already keeps a `dev` build on PATH and hands the machine to it, so the job tests the converge in the diff that triggered it; the release download stays covered by the `file://` fixture in `tests/install.bats`. One path for pull requests and main.
+- PR 6: `DOTFILES_REPO_DIR` points converge and doctor at the workspace instead of `--repo`, because `dotf doctor` has no `--repo` and both must read the same checkout. On the runner's detached HEAD the checkout step answers `no-upstream` and is skipped, so converge reads the PR's tree.
+- PR 6: the assertions read `converge/last.json` (`result`, `changed`, the entries' `status`), never the printed report, so a reworded line cannot turn the job green. The first run is asserted converged before the second is read (lesson 328).
+- PR 6: no `continue-on-error`. The job is non-required (owner, 2026-10-10), so a red run blocks nothing and names its cause; a step that swallowed failure would report green over the defect the job exists to find.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
