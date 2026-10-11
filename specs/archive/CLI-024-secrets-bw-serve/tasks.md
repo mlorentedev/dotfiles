@@ -28,23 +28,24 @@ created: "2026-08-15"
 - [x] [AC1] [AC6] Implement `secrets unlock` + `secrets lock` (`Lock()` → `POST /lock`, idempotent: unlocking an already-unlocked daemon is a no-op success, not an error).
 - [x] [P] [AC2] Write failing test: a serve-backed `BWServeReader.Field(item, field)` against an `httptest.Server` fake returns the same value shape `BWGet.Field` does (same `fieldFromItem` extraction: login/notes/custom field), so it is a drop-in behind the `BWReader` seam.
 - [x] [AC2] Implement `BWServeReader` (`cli/internal/secrets/bwserve.go`), reusing `fieldFromItem` rather than duplicating field-extraction logic.
-- [x] [AC2] [AC3] Write failing test: `BWFallbackReader` selects the serve daemon when reachable+unlocked, and falls back to today's `BWGet` shellout when locked or absent — both paths covered. (Landed as a new `BWFallbackReader` type wired at `cmd/secrets.go`'s `bwReader` default, not inside `resolve.go`'s `resolvers()` map itself — `resolvers()` already delegates to whatever `BWReader` the `Loader.BW` field holds, so the dispatch table needed no change; neither consumer (`run`/`show`/`verify`) changes either way.)
-- [x] [AC2] [AC3] Implement the fallback selection (`BWFallbackReader`).
+- [x] [AC2] [AC3] Write failing test: the backend selection uses the serve daemon when reachable and unlocked, and falls back to today's `BWGet` shellout when locked or absent, both paths covered. (First landed as `BWFallbackReader`, chosen per read. #1611 replaced it with `SelectBWBackend`, which pins reader, writer and syncer to one side per command (BUG-084); the coverage is now `TestSelectBWBackend_ReadAndWriteAlwaysAgree` and `TestSelectBWBackend_ProbesOnce`.)
+- [x] [AC2] [AC3] Implement the fallback selection (now `SelectBWBackend` in `cli/internal/secrets/bwbackend.go`).
+- [x] [AC2] Write the benchmark test AC2 asks for: `TestBWServeReader_ReadCostIsBoundedPerSecret` gates the per-read cost (2 requests, no sync, no backoff over a 41-entry registry) and `BenchmarkBWServeReader_Field` measures it. Added after the first archive review found no benchmark.
 - [x] Refactor for clarity; re-run the full Go suite (`go test ./... -count=1`) + `golangci-lint run`.
 - [x] [AC4] Write failing test: a new doctor check (`cli/internal/doctor/checks_bw_serve.go`) reports absent/locked/unlocked daemon state as a distinct section (not merged into `checkBitwardenReach`'s existing tiers).
 - [x] [AC4] Implement the check. Also fixed a real nil-seam panic this surfaced in `TestRun_RegistersTheBitwardenReachSection` (the shared `newSys()` test fixture needed a default for the new `BWServeStatus` seam, same pattern as `BWBackedSecrets`/`AgeRoundTrip`).
-- [ ] [AC2] Live (this operator's unlocked session, password typed by the operator, never by the agent): benchmark `dotf secrets verify` against a running unlocked daemon; record the wall-clock against the 14-50s CLI-shellout baseline measured in the OPS-021 spike.
-- [ ] [AC1] [AC6] Live (same session): `dotf secrets unlock` end-to-end, confirm the password never appears in `ps`, shell history, or any written file; `dotf secrets lock`; re-run `unlock` twice to confirm idempotency.
-- [ ] [AC2] [AC3] Live (same session): with the daemon left unlocked, confirm an UNATTENDED `dotf secrets run` (detached tmux, no TTY) succeeds with no prompt — the actual failure mode reported in #976 (`pi`/`opencode`/`pollex` broken since #961 flipped `NAN_API_KEY` age→bw, and `pi` is the adversarial-review primary). See `verification.md` for the exact repro command.
+- [x] [AC2] Live (this operator's unlocked session, password typed by the operator, never by the agent): benchmark `dotf secrets verify` against a running unlocked daemon; record the wall-clock against the 14-50s CLI-shellout baseline measured in the OPS-021 spike.
+- [x] [AC1] [AC6] Live (same session): `dotf secrets unlock` end-to-end, confirm the password never appears in `ps`, shell history, or any written file; `dotf secrets lock`; re-run `unlock` twice to confirm idempotency.
+- [x] [AC2] [AC3] Live (same session): with the daemon left unlocked, confirm an UNATTENDED `dotf secrets run` (detached tmux, no TTY) succeeds with no prompt — the actual failure mode reported in #976 (`pi`/`opencode`/`pollex` broken since #961 flipped `NAN_API_KEY` age→bw, and `pi` is the adversarial-review primary). See `verification.md` for the exact repro command.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features
