@@ -40,7 +40,7 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		return
 	}
 	home := sys.home()
-	s := miseSync(sys, all.PythonPackages)
+	s := miseSync(sys, all.PythonPackages, all.Latest)
 	p, err := s.Plan(pins)
 	if err != nil {
 		rep.Fail("mise plan: " + err.Error())
@@ -76,7 +76,8 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 
 // miseSync is the sync `dotf tools sync` runs, with mise run from HOME so a
 // project mise.toml in the working directory cannot answer for the machine.
-func miseSync(sys *System, pythonPackages []tools.MiseTool) tools.MiseSync {
+// It never asks `mise outdated`: a release upstream is not a fault here.
+func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) tools.MiseSync {
 	home := sys.home()
 	return tools.MiseSync{
 		ConfigDir: tools.MiseConfigDir(home, sys.Getenv),
@@ -89,6 +90,7 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool) tools.MiseSync {
 			return []byte(out), err
 		},
 		PythonPackages: pythonPackages,
+		Latest:         latest,
 	}
 }
 
