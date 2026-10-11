@@ -79,3 +79,17 @@ func TestCheckSystemPackages_AsksNoManagerOffLinux(t *testing.T) {
 		}
 	}
 }
+
+// A Linux box without apt (Fedora, Arch) is a skip, not an OK: nothing there
+// could be planned, so "none waits on sudo" would be a false answer.
+func TestCheckSystemPackages_SkipsALinuxWithoutApt(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "packages.json"), catalogWithAptEntries)
+	sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, []string{"sudo"}, nil)
+	sys.GOOS = "linux"
+	var buf bytes.Buffer
+	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+	if !strings.Contains(buf.String(), "apt-get is not on PATH") || strings.Contains(buf.String(), "[ OK ]") {
+		t.Errorf("want a skip naming apt-get\n%s", buf.String())
+	}
+}

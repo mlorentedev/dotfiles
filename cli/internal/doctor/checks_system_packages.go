@@ -25,6 +25,12 @@ func checkSystemPackages(sys *System, cfg *Config, rep *Report) {
 		rep.Skip("only apt asks for sudo, and " + sys.GOOS + " installs through another manager")
 		return
 	}
+	if !sys.has("apt-get") {
+		// Every entry would plan as waiting on a manager, and "none waits on
+		// sudo" would read as a verified answer on a box nothing could ask.
+		rep.Skip("apt-get is not on PATH, so no system package could be planned")
+		return
+	}
 	in := &tools.Installer{
 		GOOS:       sys.GOOS,
 		HasCommand: sys.has,

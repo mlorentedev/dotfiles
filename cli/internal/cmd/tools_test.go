@@ -336,19 +336,30 @@ func TestInstallAll_NeedsSudoDoesNotFailTheRun(t *testing.T) {
 	}
 }
 
-// A run where sudo was never in the way prints no combined command.
+// A run where sudo was never in the way prints no combined command: as root
+// the absent package installs through apt directly, so installSystem runs to
+// its success path and defers nothing.
 func TestInstallAll_NoSudoNoCombinedCommand(t *testing.T) {
 	var out strings.Builder
+	installed := false
 	in := &tools.Installer{
 		GOOS: "linux", GOARCH: "amd64", Dest: t.TempDir(), Out: &out,
 		HasCommand: func(string) bool { return true },
 		IsRoot:     func() bool { return true },
-		Query:      func(string, ...string) ([]byte, error) { return []byte("install ok installed"), nil },
-		Run:        func(string, ...string) error { return nil },
+		Query: func(string, ...string) ([]byte, error) {
+			if installed {
+				return []byte("install ok installed"), nil
+			}
+			return nil, fmt.Errorf("exit 1")
+		},
+		Run: func(string, ...string) error { installed = true; return nil },
 	}
 	selected := []tools.Tool{{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh"}}}
 	if err := installAll(in, selected, io.Discard); err != nil {
 		t.Fatalf("installAll: %v", err)
+	}
+	if !strings.Contains(out.String(), "gh installed via apt") {
+		t.Fatalf("the install path did not run:\n%s", out.String())
 	}
 	if strings.Contains(out.String(), "one command") {
 		t.Errorf("no package needed sudo, yet:\n%s", out.String())
