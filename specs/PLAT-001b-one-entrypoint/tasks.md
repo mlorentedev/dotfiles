@@ -159,6 +159,15 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] The `git-hooks` reconciler, after `git-config`, every OS
 - [x] Replace the hooks blocks of `setup-linux.sh` and `setup-windows.ps1` (one twin pair) with `dotf converge --only git-hooks`, as git-config already is: a setup script run on its own (test-windows) still gets the dispatcher; `tests/guard-setup-no-hooks-install.bats` keeps the blocks out and the delegation in
 
+### PR 6c — converge guides the identity restore (#2013 D12)
+
+- [x] Failing test: from zero on a terminal, Enter at each prompt walks the chain in the runbook's order; the age key is waited for, never run; the chain ends restored (`TestGuide_FromZeroRunsTheChainInOrder`)
+- [x] Failing test: a skipped, failed or ineffective step, or the end of input, stops the chain; no later step is offered (`TestGuide_AStepNotDoneStopsTheChain`); a failed `secrets verify` does not (`TestGuide_AFailedVerifyDoesNotStopTheChain`), and the vault step wires git-config before it clones (`TestGuide_TheVaultStepWiresTheHelperBeforeItClones`)
+- [x] Failing test: without a terminal a converge ends with the identity plan and runs nothing; on a terminal it walks; `--plan` and `--only` never walk; the exit status is the converge's (`cli/internal/cmd/identity_test.go`)
+- [x] `internal/identity`, a leaf package: the chain, the plan, the guide, and the Restore texts doctor's SKIP lines cite (moved from doctor); `dotf identity restore [--plan]`; converge's epilogue
+- [x] Runbook, ADR-045 D12 and `cli/README.md` say what the walk runs, and why `gh auth login` is in the chain
+- [x] Lesson 398: under `curl | bash` stdin is the script, so the walk reads the person from `/dev/tty` and hands that terminal to `bw` and `gh`
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
