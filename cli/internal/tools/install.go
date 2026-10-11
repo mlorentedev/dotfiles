@@ -69,8 +69,8 @@ func HTTPFetch(url, destPath string) error {
 
 // Installer fetches, verifies (sha256 vs the release checksums), and places a
 // catalog tool's release binary in Dest. It is the Go consolidation of the
-// install-dotf.{sh,ps1} bootstrap pattern, generalised from a single CLI to any
-// github-release tool in packages.json (CLI-029 PR-B). Unlike install-dotf, sops
+// install.{sh,ps1} bootstrap pattern, generalised from a single CLI to any
+// github-release tool in packages.json (CLI-029 PR-B). Unlike install.sh, sops
 // ships raw (un-archived) binaries, so there is no extraction step.
 type Installer struct {
 	GOOS, GOARCH string    // target platform; default runtime.GOOS/GOARCH

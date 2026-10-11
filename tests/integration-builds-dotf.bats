@@ -41,8 +41,8 @@ setup() {
     # clobbered back to the pin before install_dotf runs (measured on #1305's
     # third run: "dotf dev drifted from pinned 0.51.0; converging"). The rule
     # has to live in the installers themselves.
-    grep -qF "grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+|dev'" "$REPO/scripts/install-dotf.sh"
-    grep -qF 'if [ "$_dotf_current" = "dev" ]; then' "$REPO/scripts/install-dotf.sh"
-    grep -qF "(\\d+\\.\\d+\\.\\d+|dev)" "$REPO/scripts/install-dotf.ps1"
-    grep -qF "if (\$current -eq 'dev') {" "$REPO/scripts/install-dotf.ps1"
+    grep -qF "grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+|dev'" "$REPO/install.sh"
+    grep -qF 'if [ "$_dotf_current" = "dev" ]; then' "$REPO/install.sh"
+    grep -qF "(\\d+\\.\\d+\\.\\d+|dev)" "$REPO/install.ps1"
+    grep -qF "if (\$current -eq 'dev') {" "$REPO/install.ps1"
 }

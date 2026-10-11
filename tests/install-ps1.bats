@@ -1,20 +1,19 @@
 #!/usr/bin/env bats
-# Tests for scripts/install-dotf.ps1 — the Windows dotf release fetch/verify/install
-# (WIN-006). PowerShell twin of install-dotf.sh. Structural + convention checks (the
+# Tests for install.ps1 — the Windows entrypoint: dotf release fetch/verify/install
+# (WIN-006), then the hand-off to `dotf converge`. PowerShell twin of install.sh. Structural + convention checks (the
 # repo's .ps1 test style — see healthcheck-ps1.bats; PowerShell's Invoke-WebRequest
 # has no file:// support, so the .sh's fixture-driven behavioral path can't be
-# mirrored here). Behavioral correctness is the direct mirror of install-dotf.sh
+# mirrored here). Behavioral correctness is the direct mirror of install.sh
 # (bats-tested on Linux) plus a real-release smoke during the WIN-006 verification.
 
 load 'lib/refute'
 
 setup() {
-    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
-    PS1="$SCRIPTS_DIR/install-dotf.ps1"
+    PS1="$BATS_TEST_DIRNAME/../install.ps1"
     SETUP_WIN="$BATS_TEST_DIRNAME/../setup-windows.ps1"
 }
 
-@test "install-dotf.ps1 exists" {
+@test "install.ps1 exists" {
     [ -f "$PS1" ]
 }
 
@@ -38,7 +37,7 @@ setup() {
     grep -qF '.local\bin' "$PS1"
 }
 
-@test "fetches the windows zip and verifies sha256 (parity with install-dotf.sh)" {
+@test "fetches the windows zip and verifies sha256 (parity with install.sh)" {
     grep -qF 'dotf_${Version}_windows_${arch}.zip' "$PS1"
     grep -qF 'checksums.txt' "$PS1"
     grep -qF 'Get-FileHash' "$PS1"
@@ -66,15 +65,20 @@ setup() {
 @test "replaces a locked dotf.exe by moving it aside, not by overwriting it" {
     # BUG-037 parity. Windows refuses to overwrite or delete a *running* image,
     # but it does allow renaming one, so the swap has to park the live exe and
-    # move the staged one into place — the analogue of install-dotf.sh's mv.
-    # Behavioral coverage lives in install-dotf-ps1.Tests.ps1 (Pester).
+    # move the staged one into place — the analogue of install.sh's mv.
+    # Behavioral coverage lives in install-ps1.Tests.ps1 (Pester).
     grep -qE 'function +Set-DotfBinary' "$PS1"
     grep -qF 'Move-Item' "$PS1"
     # The naive one-shot copy straight onto the live target must be gone.
     refute_grep_fixed "Copy-Item -Path \$exe" "$PS1"
 }
 
-@test "setup-windows.ps1 dot-sources install-dotf.ps1 and calls Install-Dotf" {
-    grep -qF 'install-dotf.ps1' "$SETUP_WIN"
+@test "setup-windows.ps1 dot-sources install.ps1 and calls Install-Dotf" {
+    grep -qF "'install.ps1'" "$SETUP_WIN"
     grep -qF 'Install-Dotf' "$SETUP_WIN"
+}
+
+@test "executed, it hands its arguments to dotf converge" {
+    # The ps1 half of the one-entrypoint contract; Pester drives it on Windows.
+    grep -qF '& $script:DotfBin converge @args' "$PS1"
 }
