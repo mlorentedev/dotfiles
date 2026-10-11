@@ -82,9 +82,11 @@ The owner asked for a homogeneous minimum that lets every agent work. Agy's gran
 - **Claude has two merge implementations** (the Go deploy, and `merge_claude_settings` in the setup scripts,
   "Divergence 18"). The renderer targets the Go path; the shell twin is a strangler-fig deletion.
 - **agy strips `search_web(*)` when it rewrites its settings,** so doctor reported permanent drift on the Mac.
-  Measured on 2026-10-10 (#2312): agy ran a web search without asking, and its grant list did not change. Web
-  search needs no grant, and agy keeps only the kinds `command`, `read_file`, `write_file`, `read_url` and
-  `mcp`. The template no longer ships `search_web(*)`, and a test fails on any other kind.
+  Measured on 2026-10-10 on macOS with agy 1.3.3 (#2312): agy ran a web search without asking, and its grant
+  list did not change. On that build web search needs no grant, and the kinds agy writes and keeps are
+  `command`, `read_file`, `write_file`, `read_url` and `mcp` (it had saved `mcp(hive-vault/vault_list)` itself).
+  The template no longer ships `search_web(*)`, and a test fails on any other kind. Linux and Windows were not
+  measured; if agy prompts for web search there, the grant it writes names the kind to add.
 - ADR-010's parity matrix gains a *Permissions* row.
 
 ## Alternatives rejected

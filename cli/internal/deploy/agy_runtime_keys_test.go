@@ -144,7 +144,8 @@ func TestAgyTemplateShipsTheBaselineGrants(t *testing.T) {
 }
 
 // agyKeptGrantKinds are the grant kinds agy keeps when it rewrites its
-// settings, measured on the Mac on 2026-10-10. It drops any other kind on its
+// settings, measured on macOS with agy 1.3.3 on 2026-10-10: each appeared in a
+// file agy itself had saved, mcp(...) included. It drops any other kind on its
 // next save: search_web(*) was dropped, and web search needs no grant (#2312).
 var agyKeptGrantKinds = []string{"command(", "read_file(", "write_file(", "read_url(", "mcp("}
 
