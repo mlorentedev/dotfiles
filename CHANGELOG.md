@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.68.0](https://github.com/mlorentedev/dotfiles/compare/v0.67.0...v0.68.0) (2026-10-11)
+
+
+### Features
+
+* **converge:** deploy and wire the git-hooks dispatcher on every OS ([#2340](https://github.com/mlorentedev/dotfiles/issues/2340)) ([2c7d709](https://github.com/mlorentedev/dotfiles/commit/2c7d709f341de4a7d7cb90446622dfe0935bb9d2))
+* **converge:** guide the identity restore on a terminal ([#2342](https://github.com/mlorentedev/dotfiles/issues/2342)) ([dfbf80a](https://github.com/mlorentedev/dotfiles/commit/dfbf80a67e1c7f5a2cadf4a6b696777e36c2ab25))
+* **converge:** render the contract's path file before any install ([#2316](https://github.com/mlorentedev/dotfiles/issues/2316)) ([b569b45](https://github.com/mlorentedev/dotfiles/commit/b569b45a8584f9b54f67e0b43b70864ca256d74f))
+* **doctor:** scope the sweep to machine checks with --scope machine ([#2337](https://github.com/mlorentedev/dotfiles/issues/2337)) ([3f02e99](https://github.com/mlorentedev/dotfiles/commit/3f02e99daa9b3e8f8505ea68892d2a22e6fc1b89))
+* **install:** make install.{sh,ps1} the one entrypoint that hands off to converge ([#2275](https://github.com/mlorentedev/dotfiles/issues/2275)) ([c6e82b3](https://github.com/mlorentedev/dotfiles/commit/c6e82b347e1aa3d3f3c3f177526fd18da14b5882))
+* **pr-agent:** publish the automatic review's findings inline ([#2325](https://github.com/mlorentedev/dotfiles/issues/2325)) ([7186bc0](https://github.com/mlorentedev/dotfiles/commit/7186bc0ac0663902c36a4609051a8bc3b936a7ba))
+* **tools:** track a tool's newest release under a latest marker ([#2329](https://github.com/mlorentedev/dotfiles/issues/2329)) ([27020ee](https://github.com/mlorentedev/dotfiles/commit/27020ee47ef2030288d8590b9836de15214e3ebe))
+
+
+### Bug Fixes
+
+* **agy:** stop granting search_web, a kind agy drops on every save ([#2326](https://github.com/mlorentedev/dotfiles/issues/2326)) ([6ee93d0](https://github.com/mlorentedev/dotfiles/commit/6ee93d05412324d47582c83f90951c727c0afb2f))
+* **converge:** re-run records-harness after tools installs an agent ([#2333](https://github.com/mlorentedev/dotfiles/issues/2333)) ([e389021](https://github.com/mlorentedev/dotfiles/commit/e389021b9adc479cea505736626b538ec576fa4c))
+* **deploy:** gate pi-compaction on pi like the other ~/.pi/agent entries ([#2334](https://github.com/mlorentedev/dotfiles/issues/2334)) ([1992c86](https://github.com/mlorentedev/dotfiles/commit/1992c862fd6c495c30a28af5d924816d088dca96))
+* **gitconfig:** ask gh about its stored login, not the token in the environment ([#2321](https://github.com/mlorentedev/dotfiles/issues/2321)) ([824eda5](https://github.com/mlorentedev/dotfiles/commit/824eda5208ef5a52e3a1a353ba36fac46717a2ad))
+* **pr-agent:** name the secret in every sync ci remedy ([#2327](https://github.com/mlorentedev/dotfiles/issues/2327)) ([e6b0af6](https://github.com/mlorentedev/dotfiles/commit/e6b0af6febcfcad0c1c8bd72319096d9de04b4a1))
+* **pr-agent:** report harness compliance failures inside the review schema ([#2315](https://github.com/mlorentedev/dotfiles/issues/2315)) ([201f301](https://github.com/mlorentedev/dotfiles/commit/201f30193c085488611abad3dee8b339cda15d0e))
+* **tools:** install zsh on Linux from the catalog ([#2338](https://github.com/mlorentedev/dotfiles/issues/2338)) ([5318aec](https://github.com/mlorentedev/dotfiles/commit/5318aec847554b68fc28fc439ce49eab4d030405))
+* **tools:** print one sudo command for every apt package and report it in doctor ([#2309](https://github.com/mlorentedev/dotfiles/issues/2309)) ([fa864d9](https://github.com/mlorentedev/dotfiles/commit/fa864d9d8542afcb0bc85ffe090542cfca5c3c21))
+* **tools:** refresh the apt index once before the first apt install ([#2332](https://github.com/mlorentedev/dotfiles/issues/2332)) ([f244079](https://github.com/mlorentedev/dotfiles/commit/f244079141b70f01c1ec74081f0b9b5925680194))
+
 ## [0.67.0](https://github.com/mlorentedev/dotfiles/compare/v0.66.0...v0.67.0) (2026-10-10)
 
 
