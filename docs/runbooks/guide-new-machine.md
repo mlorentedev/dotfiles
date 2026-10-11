@@ -34,7 +34,7 @@ Then check what converge produced, leaving identity aside:
 dotf doctor --scope machine
 ```
 
-Every identity check prints a SKIP naming the step below that restores it. A FAIL here is a defect of the bootstrap, not of your restore, and belongs in a ticket. The from-zero CI job runs this same command on fresh macOS and Ubuntu runners.
+Every identity check prints a SKIP naming the step below that restores it. A FAIL here is a defect of the bootstrap, not of your restore, and belongs in a ticket. The from-zero CI job (#2331) switches to this command once it lands; until then it runs the full `dotf doctor` on fresh macOS and Ubuntu runners.
 
 ## 2. Restore the identity
 

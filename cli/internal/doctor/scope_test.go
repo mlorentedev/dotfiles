@@ -113,8 +113,15 @@ func TestRun_MachineScopeSkipsEveryIdentityCheck(t *testing.T) {
 	}
 	identity := 0
 	for _, c := range sweep(nil, nil, nil, nil, Options{}, "") {
-		if c.kind == kindIdentity {
-			identity++
+		if c.kind != kindIdentity {
+			continue
+		}
+		identity++
+		// The section holds the SKIP and nothing else: no FAIL or WARN from
+		// the check, and the skip is not reported as anything worse.
+		want := "\n[" + c.section + "]\n  [SKIP] an identity check, not run under --scope machine: " + c.restore + "\n\n["
+		if !strings.Contains(machine, want) {
+			t.Errorf("section %q: want only its SKIP naming %q\n%s", c.section, c.restore, machine)
 		}
 	}
 	if got := strings.Count(machine, "an identity check, not run under --scope machine"); got != identity {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -215,64 +216,99 @@ type check struct {
 	run     func()
 }
 
+// sweepEnv carries what the checks of the full sweep read.
+type sweepEnv struct {
+	sys      *System
+	cfg      *Config
+	contract *Contract
+	rep      *Report
+	opts     Options
+	start    string
+}
+
 // sweep is the full diagnostic sweep (the healthcheck.sh sections and what
 // followed them), in report order, each check classified machine or identity.
+// The groups only keep each table short; the order across them is the report's.
 func sweep(sys *System, cfg *Config, contract *Contract, rep *Report, opts Options, start string) []check {
+	e := sweepEnv{sys: sys, cfg: cfg, contract: contract, rep: rep, opts: opts, start: start}
+	return slices.Concat(e.toolchain(), e.knowledgeAndSecrets(), e.agents(), e.deployAndHooks())
+}
+
+// toolchain: the machine's tools, versions, links and profile files.
+func (e sweepEnv) toolchain() []check {
 	return []check{
-		{kind: kindMachine, run: func() { checkCoreTools(sys, contract, rep) }},
-		{kind: kindMachine, run: func() { checkVersionedPaths(sys, rep) }},
-		{kind: kindMachine, run: func() { checkVersionMatch(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkSymlinks(sys, rep) }},
-		{kind: kindMachine, run: func() { checkProfileFiles(sys, contract, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkToolHomeEnvVars(sys, rep) }},
-		{kind: kindMachine, run: func() { checkOptionalTools(sys, cfg, contract, rep) }},
-		{kind: kindMachine, run: func() { checkMiseTools(sys, cfg, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkSystemPackages(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkPython(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "Knowledge vault (presence)", restore: restoreVault, run: func() { checkVault(sys, rep) }},
-		{kind: kindIdentity, section: "Knowledge vault hooks (secret gate)", restore: restoreVault, run: func() { checkVaultHooks(sys, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkGitConfig(sys, rep, opts.Fix) }},
-		{kind: kindIdentity, section: "Auto-memory vault link", restore: restoreVault, run: func() { checkAutoMemoryLink(sys, start, rep, opts.Fix) }},
-		{kind: kindIdentity, section: "Auto-memory file shape", restore: restoreVault, run: func() { checkMemoryShape(sys, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkPathFiles(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "Secrets integrity", restore: restoreAge, run: func() { checkSecrets(sys, cfg, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkSecretsTooling(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "Age identity key", restore: restoreAge, run: func() { checkAgeIdentity(sys, rep) }},
-		{kind: kindIdentity, section: "Bitwarden reach (live secrets SSOT)", restore: restoreBW, run: func() { checkBitwardenReach(sys, rep) }},
-		{kind: kindIdentity, section: "bw serve daemon (optional local unlock cache)", restore: restoreBW, run: func() { checkBWServeDaemon(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "Bitwarden mapping (registry -> vault)", restore: restoreBW, run: func() { checkBWMapping(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkAgentConfigSecrets(sys, rep) }},
-		{kind: kindMachine, run: func() { checkHiveBackendCanServe(sys, rep) }},
-		{kind: kindMachine, run: func() { checkHiveDaemonAnswers(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "Disaster recovery", restore: restoreAge, run: func() { checkDisasterRecovery(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "PAT expiry", restore: restoreBW, run: func() { checkPATExpiry(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkGuardHooks(sys, cfg, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkTmux(sys, rep) }},
-		{kind: kindMachine, run: func() { checkOpenCode(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "Agent configs from secrets", restore: restoreBW, run: func() { checkAgentSecretConfigs(sys, rep) }},
-		{kind: kindMachine, run: func() { checkCopilot(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkGolangciLint(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkModelMap(cfg, rep) }},
-		{kind: kindMachine, run: func() { checkModelPins(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkModelLimits(sys, cfg, rep) }},
-		{kind: kindIdentity, section: "NaN quota", restore: restoreBW, run: func() { checkNaNQuota(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkPiExtensions(sys, cfg, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkPiPackageRequirements(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkHarnessDrift(sys, cfg, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkDeployDrift(sys, cfg, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkHomeDeployDrift(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkDockerEngine(sys, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkColimaSize(sys, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkDockerCompose(sys, rep) }},
-		{kind: kindMachine, run: func() { checkDeployManifest(sys, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkAgentPresence(sys, rep) }},
-		{kind: kindMachine, run: func() { checkAgentSkillsMigrated(cfg, rep) }},
-		{kind: kindMachine, run: func() { checkDotfProvenance(sys, cfg, rep) }},
-		{kind: kindMachine, run: func() { checkRepoDirResolves(sys, rep) }},
-		{kind: kindIdentity, section: "spec-issue-state", restore: restoreGH, run: func() { checkSpecIssueState(sys, rep) }},
-		{kind: kindIdentity, section: "branch-protection", restore: restoreGH, run: func() { checkBranchProtection(sys, rep) }},
-		{kind: kindMachine, run: func() { checkAntigravity(sys, rep) }},
-		{kind: kindMachine, run: func() { checkOrcaHook(sys, rep, opts.Fix) }},
-		{kind: kindMachine, run: func() { checkHookBinding(sys, rep, opts.Fix) }},
+		{kind: kindMachine, run: func() { checkCoreTools(e.sys, e.contract, e.rep) }},
+		{kind: kindMachine, run: func() { checkVersionedPaths(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkVersionMatch(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkSymlinks(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkProfileFiles(e.sys, e.contract, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkToolHomeEnvVars(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkOptionalTools(e.sys, e.cfg, e.contract, e.rep) }},
+		{kind: kindMachine, run: func() { checkMiseTools(e.sys, e.cfg, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkSystemPackages(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkPython(e.sys, e.cfg, e.rep) }},
+	}
+}
+
+// knowledgeAndSecrets: the vault, the memory link, secrets, Bitwarden and the hive daemon.
+func (e sweepEnv) knowledgeAndSecrets() []check {
+	return []check{
+		{kind: kindIdentity, section: "Knowledge vault (presence)", restore: restoreVault, run: func() { checkVault(e.sys, e.rep) }},
+		{kind: kindIdentity, section: "Knowledge vault hooks (secret gate)", restore: restoreVault, run: func() { checkVaultHooks(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkGitConfig(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindIdentity, section: "Auto-memory vault link", restore: restoreVault, run: func() { checkAutoMemoryLink(e.sys, e.start, e.rep, e.opts.Fix) }},
+		{kind: kindIdentity, section: "Auto-memory file shape", restore: restoreVault, run: func() { checkMemoryShape(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkPathFiles(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "Secrets integrity", restore: restoreAge, run: func() { checkSecrets(e.sys, e.cfg, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkSecretsTooling(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "Age identity key", restore: restoreAge, run: func() { checkAgeIdentity(e.sys, e.rep) }},
+		{kind: kindIdentity, section: "Bitwarden reach (live secrets SSOT)", restore: restoreBW, run: func() { checkBitwardenReach(e.sys, e.rep) }},
+		{kind: kindIdentity, section: "bw serve daemon (optional local unlock cache)", restore: restoreBW, run: func() { checkBWServeDaemon(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "Bitwarden mapping (registry -> vault)", restore: restoreBW, run: func() { checkBWMapping(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkAgentConfigSecrets(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkHiveBackendCanServe(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkHiveDaemonAnswers(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "Disaster recovery", restore: restoreAge, run: func() { checkDisasterRecovery(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "PAT expiry", restore: restoreBW, run: func() { checkPATExpiry(e.sys, e.cfg, e.rep) }},
+	}
+}
+
+// agents: the guard hooks, tmux and the agents with their configs and model pins.
+func (e sweepEnv) agents() []check {
+	return []check{
+		{kind: kindMachine, run: func() { checkGuardHooks(e.sys, e.cfg, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkTmux(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkOpenCode(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "Agent configs from secrets", restore: restoreBW, run: func() { checkAgentSecretConfigs(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkCopilot(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkGolangciLint(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkModelMap(e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkModelPins(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkModelLimits(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "NaN quota", restore: restoreBW, run: func() { checkNaNQuota(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkPiExtensions(e.sys, e.cfg, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkPiPackageRequirements(e.sys, e.cfg, e.rep) }},
+	}
+}
+
+// deployAndHooks: drift between repo and deploy, containers, provenance, the repo's GitHub state and the hook bindings.
+func (e sweepEnv) deployAndHooks() []check {
+	return []check{
+		{kind: kindMachine, run: func() { checkHarnessDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkDeployDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkHomeDeployDrift(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkDockerEngine(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkColimaSize(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkDockerCompose(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkDeployManifest(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkAgentPresence(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkAgentSkillsMigrated(e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkDotfProvenance(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkRepoDirResolves(e.sys, e.rep) }},
+		{kind: kindIdentity, section: "spec-issue-state", restore: restoreGH, run: func() { checkSpecIssueState(e.sys, e.rep) }},
+		{kind: kindIdentity, section: "branch-protection", restore: restoreGH, run: func() { checkBranchProtection(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkAntigravity(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkOrcaHook(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkHookBinding(e.sys, e.rep, e.opts.Fix) }},
 	}
 }
