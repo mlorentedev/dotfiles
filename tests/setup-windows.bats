@@ -9,6 +9,10 @@ setup() {
     export PS1_SCRIPT="$DOTFILES_DIR/setup-windows.ps1"
 }
 
+refute_legacy_mise_sync() {
+    refute_grep '^[[:space:]]*(&[[:space:]]*)?(dotf(\.exe)?|\$([[:alnum:]_]+:)?DotfBin)[[:space:]]+tools[[:space:]]+sync([[:space:];#]|$)' "$1"
+}
+
 @test "setup-windows.ps1 exists" {
     [[ -f "$PS1_SCRIPT" ]] || false
 }
@@ -607,7 +611,16 @@ FIXTURE
 
 @test "Windows entrypoint owns tool convergence; legacy setup does not duplicate mise sync" {
     grep -qF '& $script:DotfBin converge @args' "$DOTFILES_DIR/install.ps1"
-    refute_grep '^[[:space:]]*(&[[:space:]]*)?dotf tools sync' "$PS1_SCRIPT"
+    refute_legacy_mise_sync "$PS1_SCRIPT"
+}
+
+@test "Windows legacy sync guard rejects every supported dotf invocation" {
+    local fixture="$BATS_TEST_TMPDIR/legacy-sync.ps1" line
+    for line in 'dotf tools sync' 'dotf.exe tools sync' '& $script:DotfBin tools sync' '& dotf tools sync'; do
+        printf '%s\n' "$line" > "$fixture"
+        run refute_legacy_mise_sync "$fixture"
+        [ "$status" -eq 1 ] || { echo "guard missed: $line"; false; }
+    done
 }
 
 # --- Cross-platform parity: developer tools ---

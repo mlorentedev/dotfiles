@@ -9,11 +9,9 @@ setup() {
     export CATALOG="$BATS_TEST_DIRNAME/../packages.json"
 }
 
-windows_reader_release_possible() {
-    awk -v release="$1" 'BEGIN {
-        split(release, parts, ".")
-        exit !(parts[1] > 0 || parts[2] >= 69)
-    }'
+mise_catalog_excludes_windows() {
+    jq -e 'any(.tools[]; .name == "mise" and
+        ((.source.platforms // ["windows"]) | index("windows") == null))' "$1" >/dev/null
 }
 
 @test "packages.json is valid JSON with a tools array" {
@@ -54,27 +52,13 @@ windows_reader_release_possible() {
     [ -z "$both" ] || { echo "owned by both mise and packages.json: $both"; false; }
 }
 
-@test "mise stays disabled on Windows while the pinned dotf lacks its bats and direnv reader" {
-    local release
-    release="$(sed -n 's/^DOTF_VERSION=//p' "$BATS_TEST_DIRNAME/../versions.conf")"
-    [ -n "$release" ]
-    # 0.68.0 is already in the release queue without the Windows reader.
-    # Raise this floor if the next release does not contain the reader either.
-    if ! windows_reader_release_possible "$release"; then
-        jq -e 'any(.tools[]; .name == "mise" and
-            ((.source.platforms // ["windows"]) | index("windows") == null))' "$CATALOG" >/dev/null
-    fi
+@test "mise stays disabled on Windows until the reader and full catalog are verified" {
+    mise_catalog_excludes_windows "$CATALOG"
 }
 
-@test "the Windows reader release floor keeps 0.68.0 gated" {
-    local release
-    for release in 0.67.0 0.68.0; do
-        if windows_reader_release_possible "$release"; then
-            echo "$release cannot contain the Windows reader"
-            false
-        fi
-    done
-    for release in 0.69.0 0.100.0 1.0.0; do
-        windows_reader_release_possible "$release"
-    done
+@test "a release bump alone cannot enable Windows mise without the reader" {
+    local fixture="$BATS_TEST_TMPDIR/packages.json"
+    printf '%s\n' '{"tools":[{"name":"mise","source":{"platforms":["windows"]}}]}' > "$fixture"
+    DOTF_VERSION=0.69.0 run mise_catalog_excludes_windows "$fixture"
+    [ "$status" -eq 1 ] || { echo "release pin bypassed the Windows catalog guard"; false; }
 }
