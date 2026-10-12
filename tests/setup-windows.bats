@@ -605,6 +605,11 @@ FIXTURE
     [ "$uv_line" -lt "$catalog_line" ]
 }
 
+@test "Windows entrypoint owns tool convergence; legacy setup does not duplicate mise sync" {
+    grep -qF '& $script:DotfBin converge @args' "$DOTFILES_DIR/install.ps1"
+    refute_grep '^[[:space:]]*(&[[:space:]]*)?dotf tools sync' "$PS1_SCRIPT"
+}
+
 # --- Cross-platform parity: developer tools ---
 
 @test "parity: both scripts provide uv (Linux through mise, Windows through its installer)" {

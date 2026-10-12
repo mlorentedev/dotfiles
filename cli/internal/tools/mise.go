@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -160,7 +161,15 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 		if contains(latest, t.Name) {
 			v = "latest"
 		}
-		fmt.Fprintf(&b, "%s = %q\n", t.Name, v)
+		name := t.Name
+		if runtime.GOOS == "windows" && name == "direnv" {
+			fmt.Fprintf(&b, "\"github:direnv/direnv\" = { version = %q, bin = \"direnv.exe\" }\n", v)
+			continue
+		}
+		if runtime.GOOS == "windows" && name == "bats" {
+			name = `"npm:bats"`
+		}
+		fmt.Fprintf(&b, "%s = %q\n", name, v)
 	}
 	// mise is pinned in packages.json; its update notice says `mise self-update`,
 	// which would move it past that pin.
@@ -340,6 +349,9 @@ func (s MiseSync) outdated(missing []string) ([]string, error) {
 // `mise which`, not PATH (the shims reach PATH in a later row). It returns the
 // plan it acted on; a tool that still does not run is an error naming it.
 func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
+	if runtime.GOOS == "windows" && hasTool(tools, "bats") && !hasTool(tools, "node") {
+		return SyncPlan{}, errors.New("windows bats requires node: mark NODE_VERSION for mise before using the npm installer")
+	}
 	p, err := s.Plan(tools)
 	if err != nil {
 		return p, err
@@ -360,6 +372,14 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 		return p, nil
 	}
 	if p.ConfigChanged || len(p.Missing) > 0 {
+		if runtime.GOOS == "windows" && contains(p.Missing, "bats") {
+			if out, err := s.Run("mise", "install", "node"); err != nil {
+				return p, fmt.Errorf("mise install node (required by bats): %w\n%s", err, strings.TrimSpace(string(out)))
+			}
+			if out, err := s.Run("mise", "install", "--force", "npm:bats"); err != nil {
+				return p, fmt.Errorf("mise install npm:bats: %w\n%s", err, strings.TrimSpace(string(out)))
+			}
+		}
 		if out, err := s.Run("mise", "install"); err != nil {
 			return p, fmt.Errorf("mise install: %w\n%s", err, strings.TrimSpace(string(out)))
 		}
@@ -484,7 +504,11 @@ var versionArgs = map[string][]string{
 // runsAtPin resolves the tool through mise and runs it: an install is real
 // only when the binary executes and reports at least the pin (lesson 337).
 func (s MiseSync) runsAtPin(t MiseTool) bool {
-	path := s.which(t.Name)
+	name := t.Name
+	if runtime.GOOS == "windows" && name == "bats" {
+		name = "bats.cmd"
+	}
+	path := s.which(name)
 	if path == "" {
 		return false
 	}
@@ -526,12 +550,41 @@ func writeFileAtomic(path string, data []byte) error {
 // --version`), stdout returns stdout alone (`mise which`, whose output is a
 // path a stderr warning must not corrupt).
 func HomeRunners(home string) (run, stdout Runner) {
+	bashBin := ""
+	if runtime.GOOS == "windows" {
+		out, err := exec.Command("git", "--exec-path").Output()
+		if err == nil {
+			gitRoot := filepath.Dir(filepath.Dir(filepath.Dir(strings.TrimSpace(string(out)))))
+			candidate := filepath.Join(gitRoot, "bin", "bash.exe")
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				bashBin = filepath.Dir(candidate)
+			}
+		}
+	}
 	command := func(name string, args ...string) *exec.Cmd {
 		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
 		c.Dir = home
+		installerEnv := miseInstallEnv(name, args...)
+		if bashBin != "" || installerEnv != "" {
+			c.Env = os.Environ()
+		}
+		if bashBin != "" {
+			c.Env = append(c.Env, "PATH="+bashBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		}
+		if installerEnv != "" {
+			c.Env = append(c.Env, installerEnv)
+		}
 		return c
 	}
 	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
 	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
 	return run, stdout
+}
+
+func miseInstallEnv(name string, args ...string) string {
+	if runtime.GOOS == "windows" && name == "mise" && len(args) == 3 &&
+		args[0] == "install" && args[1] == "--force" && args[2] == "npm:bats" {
+		return "MISE_NPM_PACKAGE_MANAGER=npm"
+	}
+	return ""
 }

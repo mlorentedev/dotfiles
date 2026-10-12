@@ -178,6 +178,16 @@ setup() {
     [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
 }
 
+@test "versions.conf declares Node through mise before npm-backed Windows bats (#2013)" {
+    run awk '
+        marked && /^NODE_VERSION=/ { node = 1 }
+        marked && /^BATS_VERSION=/ { bats = 1 }
+        { marked = ($0 == "# mise: cli") }
+        END { exit !(node && bats) }
+    ' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || false
+}
+
 # The released dotf probes a marked CLI with `<tool> --version`, and these
 # seven reject that flag. Up to v0.66.0 no release knows another way to ask
 # them, so marking one turns every machine's `dotf tools sync` into "not
