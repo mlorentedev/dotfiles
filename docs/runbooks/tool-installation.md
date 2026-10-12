@@ -4,7 +4,7 @@ type: runbook
 status: active
 tags: [runbook, dotfiles, tools, installation, catalog, mise]
 created: "2026-02-22"
-updated: "2026-10-06"
+updated: "2026-10-12"
 owner: manu
 ---
 
@@ -16,7 +16,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 
 | Tool class | Channel | Declared in | Converged by |
 |---|---|---|---|
-| Pinned single-binary CLIs (actionlint, age, bat, bats, cloudflared, delta, direnv, fd, fzf, golangci-lint, hadolint, herdr, jq, kubectx, kubens, lazygit, mkcert, shellcheck, shfmt, stern, terraform, tflint, trivy, uv, yq, zoxide) and toolchains (Go, Java, Python, Maven, Node) | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: the CLIs listed today on Linux and macOS (Windows after its session, #2013 H2), the toolchains from Wave 3 |
+| Pinned single-binary CLIs (actionlint, age, bat, bats, cloudflared, delta, direnv, fd, fzf, golangci-lint, hadolint, herdr, jq, kubectx, kubens, lazygit, mkcert, shellcheck, shfmt, stern, terraform, tflint, trivy, uv, yq, zoxide) and Python and Node; Go, Java and Maven in Wave 3 | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: Windows CLI activation follows a release carrying its bats/direnv reader (#2013) |
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
 | PyPI tools (hive, ansible, ansible-lint) | `uv tool` | `packages.json` | `dotf tools install` |
@@ -54,9 +54,10 @@ Put the pin in `versions.conf` with the marker on the line before it:
 LAZYGIT_VERSION=0.66.0
 ```
 
-- **Name.** `NAME_VERSION` becomes mise's `name`, with underscores turned into hyphens (`GOLANGCI_LINT_VERSION` becomes `golangci-lint`). The short name must resolve to an aqua backend; check it with `mise registry | grep '^name '`.
+- **Name.** `NAME_VERSION` becomes mise's `name`, with underscores turned into hyphens (`GOLANGCI_LINT_VERSION` becomes `golangci-lint`). Check its backend with `mise registry | grep '^name '`; Node uses mise's built-in backend. On Windows, `dotf` renders bats through npm and direnv through the GitHub backend with `bin = "direnv.exe"` because their aqua recipes do not provide discoverable Windows executables.
 - **Marker placement.** The marker goes on its own line, never after the value. Every reader of this file (the shell, doctor, `setup-windows.ps1`) skips comment lines, but a trailing comment would be read as part of the version. A marker that is not followed by a `NAME_VERSION=<pin>` line makes `sync` fail.
 - **What sync writes.** `dotf tools sync` renders the marked pins into `~/.config/mise/conf.d/dotfiles.toml`; it honours `MISE_CONFIG_DIR` and `XDG_CONFIG_HOME`. That file is generated, so do not edit it. It also sets `disable_update_warning`: mise is pinned in `packages.json`, and its own notice says to run `mise self-update`, which would move it past that pin. Bump `mise` in `packages.json` instead. Sync never touches a hand-written `~/.config/mise/config.toml`; one that pins the same tools is a leftover for the doctor check of #2013 row T3.
+- **Windows bats dependency.** Mark `NODE_VERSION` alongside `BATS_VERSION`: the Windows sync refuses bats without a Node pin, installs Node before bats, and sets `MISE_NPM_PACKAGE_MANAGER=npm` only on the bats installation child so mise generates `bats.cmd`. The global mise config retains its normal npm installer for every other package. `dotf converge` retries catalog entries that waited on npm after the sync. Do not enable mise in the Windows catalog before the installed `DOTF_VERSION` carries this behavior; 0.67.0 does not.
 - **Tools that track their newest release.** A `# mise: latest` line marks a tool mise keeps at its newest release instead of an exact pin; the coding agents are meant for it (ADR-044, amendment 2026-10-10). The pin is a floor: the sync renders the tool as `latest`, asks `mise outdated` and runs `mise upgrade` when the tool is behind, and fails if it ends below the floor. `dotf doctor` does not ask `mise outdated`, so a new upstream release is never a doctor fault. Only `dotf` 0.68.0 and later reads this marker, so `DOTF_VERSION` must not drop below that while a tool is marked; `tests/versions-conf.bats` enforces it.
 - **Python packages.** A `# mise: python-package` line marks a library that the suite imports from the bare interpreter (PyYAML), not a CLI: `PYYAML_VERSION` is the PyPI distribution `pyyaml`. A python package needs `PYTHON_VERSION` under `# mise: cli`. The sync lists the packages in `conf.d/dotfiles-python-packages.txt`, and mise's `python.default_packages_file` setting names that file, so mise installs them into every Python it installs. A Python installed before the package was declared gets it through pip. Tools are a different case: anything you run as a command is a `uv tool` entry in `packages.json`. Only `dotf` 0.66.0 and later reads this marker, so `DOTF_VERSION` must not drop below that while a package is marked; `tests/versions-conf.bats` enforces it (#2062, lesson 373).
 - **What doctor checks and fixes.** `dotf doctor` fails when a marked pin does not run at its pin through mise, or when a marked python package is missing from mise's Python. Its `[Python]` section fails when the shell's `python3` (`python` on Windows) is below 3.11 or cannot import a marked package. On a machine without mise (Windows, until its ADR-044 wave) a missing package only warns: nothing there manages it. `dotf doctor --fix` runs the sync whenever anything is pending, so it may run `mise install` for every pin, not only the one that failed. A `[Python]` failure that survives the fix names the PATH: mise has a Python that clears the floor, and the shell does not resolve it.

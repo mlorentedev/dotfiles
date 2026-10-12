@@ -9,6 +9,11 @@ setup() {
     export CATALOG="$BATS_TEST_DIRNAME/../packages.json"
 }
 
+mise_catalog_excludes_windows() {
+    jq -e 'any(.tools[]; .name == "mise" and
+        ((.source.platforms // ["windows"]) | index("windows") == null))' "$1" >/dev/null
+}
+
 @test "packages.json is valid JSON with a tools array" {
     jq -e '.tools | type == "array"' "$CATALOG" >/dev/null
 }
@@ -40,8 +45,20 @@ setup() {
         m && /^[A-Z0-9_]+_VERSION=/ {
             n = $0; sub(/_VERSION=.*/, "", n); n = tolower(n); gsub(/_/, "-", n); print n
         }
+
         { m = ($0 == "# mise: cli") }' "$BATS_TEST_DIRNAME/../versions.conf" | sort)"
     [ -n "$marked" ]
     both="$(jq -r '.tools[].name' "$CATALOG" | sort | comm -12 - <(printf '%s\n' "$marked"))"
     [ -z "$both" ] || { echo "owned by both mise and packages.json: $both"; false; }
+}
+
+@test "mise stays disabled on Windows until the reader and full catalog are verified" {
+    mise_catalog_excludes_windows "$CATALOG"
+}
+
+@test "a release bump alone cannot enable Windows mise without the reader" {
+    local fixture="$BATS_TEST_TMPDIR/packages.json"
+    printf '%s\n' '{"tools":[{"name":"mise","source":{"platforms":["windows"]}}]}' > "$fixture"
+    DOTF_VERSION=0.69.0 run mise_catalog_excludes_windows "$fixture"
+    [ "$status" -eq 1 ] || { echo "release pin bypassed the Windows catalog guard"; false; }
 }
