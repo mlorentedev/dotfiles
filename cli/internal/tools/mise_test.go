@@ -634,7 +634,16 @@ func TestHomeRunners_WindowsFindsGitBashForBatsWithoutShellPathWiring(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]; !strings.EqualFold(got, bash) {
+	got := strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]
+	found, err := os.Stat(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.Stat(bash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(found, want) {
 		t.Errorf("first bash on the sync runner's PATH = %q, want %q", got, bash)
 	}
 }
