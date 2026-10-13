@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 )
 
 // fakeClaude answers `claude plugin list` with listed and fails the installs
@@ -211,6 +213,18 @@ func TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun(t *testing.T) {
 	}
 	if !strings.Contains(out, row("failed", "claude-plugins")+"b@m did not install: ") {
 		t.Errorf("the failed plugin must be named with its cause:\n%s", out)
+	}
+}
+
+// A report that loses a declared plugin is an error, never a summary: the
+// counts must add up to the list (PR-Agent on #2343).
+func TestAccountedFor_RefusesAReportThatLosesAPlugin(t *testing.T) {
+	rep := claude.PluginReport{Present: []string{"a@m"}, Failed: []string{"b@m"}}
+	if err := accountedFor(rep, 2); err != nil {
+		t.Errorf("a full report was refused: %v", err)
+	}
+	if err := accountedFor(rep, 3); err == nil || !strings.Contains(err.Error(), "2 of 3") {
+		t.Errorf("a report missing one of 3 plugins = %v; want it refused", err)
 	}
 }
 

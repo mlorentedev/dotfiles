@@ -22,10 +22,12 @@ setup() {
     done
 }
 
+# Quoted or not: a list written as a bare array still carries the ids
+# (PR-Agent on #2343). Comments are dropped, as above.
 @test "neither setup script carries a plugin id from plugins.json" {
     while IFS= read -r id; do
         for f in setup-linux.sh setup-windows.ps1; do
-            run grep -nF "\"$id\"" "$DOTFILES_DIR/$f"
+            run bash -c "tr -d '\r' < '$DOTFILES_DIR/$f' | grep -v '^[[:space:]]*#' | grep -nF -- '$id'"
             [ "$status" -eq 1 ] || { echo "$f carries $id: $output"; false; }
         done
     done < <(jq -r '.plugins[]' "$PLUGINS_JSON")
