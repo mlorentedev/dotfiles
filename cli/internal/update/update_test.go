@@ -68,8 +68,9 @@ func TestUpdate(t *testing.T) {
 		{name: "already current", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, wantStatus: "current"},
 		{name: "diverged", mutate: func(g fakeGit) { g.out["merge-base HEAD @{u}"] = "cccc" }, wantStatus: "diverged"},
 		// Ahead is safe for Sync's other caller, not for a deploy: update only
-		// ever runs what the upstream holds, so it stays a "diverged" skip.
-		{name: "ahead is a diverged skip", mutate: func(g fakeGit) { g.out["merge-base HEAD @{u}"] = "bbbb" }, wantStatus: "diverged", wantMsgSubstr: "diverged from origin/main (non fast-forward)"},
+		// ever runs what the upstream holds, so it skips, but under its own tag:
+		// nothing has diverged and nothing needs reconciling (#2205).
+		{name: "ahead skips without claiming a divergence", mutate: func(g fakeGit) { g.out["merge-base HEAD @{u}"] = "bbbb" }, wantStatus: StatusAhead, wantMsgSubstr: "ahead of origin/main", wantMsgSuffix: "nothing to deploy"},
 		{name: "ff failed", mutate: func(g fakeGit) { g.fail["merge --ff-only @{u}"] = true }, wantStatus: "ff-failed"},
 		{name: "clean ff converges", mutate: func(g fakeGit) {}, wantStatus: "updated", setupRuns: true},
 		{name: "converge failure is the only error", mutate: func(g fakeGit) {}, setupErr: errors.New("boom"), wantStatus: "converge-failed", wantErr: true, setupRuns: true},
