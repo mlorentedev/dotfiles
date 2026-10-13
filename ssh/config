@@ -54,6 +54,29 @@ Host hermes-nan
   User root
   IdentityFile ~/.ssh/id_ed25519
 
+# --- Workstations (remote development targets) ---
+# Tailnet only, by decision: no *-lan and no *-ext alias. Their sshd accepts
+# 100.64.0.0/10 and nothing else, so an alias through the LAN or the public
+# bastion would only fail. Names, not mesh IPs: MagicDNS follows a node that
+# re-registers. Onboarding: docs/runbooks/guide-workstation-ssh-target.md
+Host msi
+  Hostname msi.kubelab.internal
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 3
+  ForwardAgent no
+
+Host macmini
+  Hostname macmini.kubelab.internal
+  User manu
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 3
+  ForwardAgent no
+
 # --- LAN fallback (no VPN needed, local network only) ---
 Host rpi4-lan
   Hostname 10.0.0.131
@@ -158,14 +181,6 @@ Host jetson-office
 # --- ACEMAGIC-OFFICE-START ---
 Host acemagic-office
     HostName acemagic-office
-    User manu
-    IdentityFile ~/.ssh/id_ed25519_ts_bridge_acemagic
-    IdentitiesOnly yes
-    ServerAliveInterval 15
-    ServerAliveCountMax 3
-
-Host acemagic-office-lan
-    HostName 192.168.137.245
     User manu
     IdentityFile ~/.ssh/id_ed25519_ts_bridge_acemagic
     IdentitiesOnly yes

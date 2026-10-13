@@ -189,8 +189,9 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             $aclIndex | Should -BeLessThan $writeIndex
         }
 
-        It 'installs the OpenSSH service and firewall when they are absent' {
+        It 'installs the OpenSSH service and a mesh-only firewall rule when they are absent' {
             . $script:HostScript
+            Mock Get-NetAdapter { [pscustomobject]@{ Name = 'Tailscale' } }
             Mock Get-WindowsCapability {
                 [pscustomobject]@{
                     State = 'NotPresent'
@@ -214,8 +215,65 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
                 $Name -eq 'sshd'
             }
             Should -Invoke -CommandName New-NetFirewallRule -Times 1 -Exactly -Scope It -ParameterFilter {
-                $Name -eq 'OpenSSH-Server-In-TCP' -and $LocalPort -eq 22
+                $Name -eq 'OpenSSH-Server-In-TCP' -and $LocalPort -eq 22 -and
+                    (@($InterfaceAlias | ForEach-Object { if ($_ -is [System.Management.Automation.WildcardPattern]) { $_.ToWql() } else { [string]$_ } }) -join ',') -eq 'Tailscale' -and
+                    (@($RemoteAddress) -join ',') -eq '100.64.0.0/10'
             }
+        }
+
+        It 'narrows the firewall rule the OpenSSH capability created open to any address' {
+            . $script:HostScript
+            Mock Get-NetAdapter { [pscustomobject]@{ Name = 'Tailscale' } }
+            Mock Get-WindowsCapability {
+                [pscustomobject]@{
+                    State = 'Installed'
+                    Name = 'OpenSSH.Server~~~~0.0.1.0'
+                }
+            }
+            Mock Set-Service {}
+            Mock Get-Service { [pscustomobject]@{ Status = 'Running' } }
+            Mock Get-NetFirewallRule { [pscustomobject]@{ Enabled = 'True' } }
+            Mock New-NetFirewallRule {}
+            Mock Set-NetFirewallRule {}
+
+            Enable-WindowsOpenSshServer
+
+            Should -Invoke -CommandName New-NetFirewallRule -Times 0 -Exactly -Scope It
+            Should -Invoke -CommandName Set-NetFirewallRule -Times 1 -Exactly -Scope It -ParameterFilter {
+                $Name -eq 'OpenSSH-Server-In-TCP' -and $Enabled -eq 'True' -and
+                    (@($InterfaceAlias | ForEach-Object { if ($_ -is [System.Management.Automation.WildcardPattern]) { $_.ToWql() } else { [string]$_ } }) -join ',') -eq 'Tailscale' -and
+                    (@($RemoteAddress) -join ',') -eq '100.64.0.0/10'
+            }
+        }
+
+        It 'refuses to enable sshd on a machine that has not joined the mesh' {
+            . $script:HostScript
+            Mock Get-NetAdapter { $null }
+            Mock Get-WindowsCapability {}
+            Mock Add-WindowsCapability {}
+            Mock Set-Service {}
+            Mock Start-Service {}
+            Mock New-NetFirewallRule {}
+            Mock Set-NetFirewallRule {}
+
+            { Enable-WindowsOpenSshServer } | Should -Throw '*join the mesh*'
+
+            Should -Invoke -CommandName Add-WindowsCapability -Times 0 -Exactly -Scope It
+            Should -Invoke -CommandName Start-Service -Times 0 -Exactly -Scope It
+            Should -Invoke -CommandName New-NetFirewallRule -Times 0 -Exactly -Scope It
+            Should -Invoke -CommandName Set-NetFirewallRule -Times 0 -Exactly -Scope It
+        }
+
+        It 'settles the firewall rule before sshd starts' {
+            $source = Get-Content -LiteralPath $script:HostScript -Raw
+            $startIndex = $source.IndexOf('Start-Service -Name sshd')
+            $newIndex = $source.IndexOf('New-NetFirewallRule -Name')
+            $setIndex = $source.IndexOf('Set-NetFirewallRule -Name')
+
+            $newIndex | Should -BeGreaterThan -1
+            $setIndex | Should -BeGreaterThan -1
+            $newIndex | Should -BeLessThan $startIndex
+            $setIndex | Should -BeLessThan $startIndex
         }
 
         It 'does not restart sshd after authorizing a key' {
@@ -244,13 +302,15 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             $registry | Should -Not -Match 'BEGIN OPENSSH PRIVATE KEY'
         }
 
-        It 'defines stable mesh and LAN aliases with the dedicated identity' {
+        It 'defines one mesh alias with the dedicated identity and no LAN alias' {
             $config = Get-Content -LiteralPath $script:SshConfig -Raw
-            $config | Should -Match '(?ms)^Host acemagic-office\s+.*?HostName acemagic-office\b'
-            $config | Should -Match '(?ms)^Host acemagic-office-lan\s+.*?HostName 192\.168\.137\.245\b'
+            $block = [regex]::Match($config, '(?ms)^# --- ACEMAGIC-OFFICE-START ---.*?^# --- ACEMAGIC-OFFICE-END ---').Value
+            $block | Should -Not -BeNullOrEmpty
+            $block | Should -Match '(?ms)^Host acemagic-office\s+.*?HostName acemagic-office\b'
+            $config | Should -Not -Match '(?m)^Host acemagic-office-lan\b'
             @([regex]::Matches($config, 'IdentityFile ~/.ssh/id_ed25519_ts_bridge_acemagic')).Count |
-                Should -Be 2
-            @([regex]::Matches($config, '(?m)^\s+IdentitiesOnly yes$')).Count | Should -Be 2
+                Should -Be 1
+            @([regex]::Matches($block, '(?m)^\s+IdentitiesOnly yes\s*$')).Count | Should -Be 1
         }
 
         It 'documents the complete lifecycle and the trust boundary' {
