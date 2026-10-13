@@ -1,7 +1,7 @@
 ---
 id: spec-CLI-098-pr-land
 type: spec
-status: implementing
+status: archived
 created: "2026-10-06"
 owner: manu
 issue: "mlorentedev/dotfiles#2034"
@@ -25,6 +25,7 @@ During the PLAT-001 macOS session, this check was done with a throwaway script i
    - every check is `pass` or `skipping`;
    - `mergeStateStatus` is `CLEAN` (up to date with the base, no conflicts);
    - `dotf pr triage-queue` does not list it.
+   - the base branch carries `.github/merge-grant.yml`, the repository's opt-in to the standing merge grant (#2229). Without it, `pr land` refuses every PR and names the missing grant.
 3. It re-reads the head SHA. If it moved, it refuses.
 4. It retargets every PR whose base is this head branch to this PR's base.
 5. It squash-merges with `--match-head-commit <sha> --delete-branch`.
@@ -55,7 +56,7 @@ Failing tests first (written before the code, run red, then green):
 
 ## Checklist
 
-- [x] Failing tests with a fake `gh` runner: lands when every condition holds; refuses and names each failed condition (a failing or pending check, BEHIND, DIRTY, untriaged review, draft, closed, release-please branch); refuses when the head moves between reads; retargets dependents before the merge; passes `--match-head-commit` with the SHA it checked
+- [x] Failing tests with a fake `gh` runner: lands when every condition holds; refuses and names each failed condition (a failing or pending check, BEHIND, DIRTY, untriaged review, draft, closed, release-please branch, and, since #2229, a base branch without the merge grant); refuses when the head moves between reads; retargets dependents before the merge; passes `--match-head-commit` with the SHA it checked
 - [x] `internal/prland`: the decision as a pure function over the facts read, and the gh calls behind an injected runner
 - [x] `cmd/pr.go`: `land` subcommand; `cli/README.md` row for `pr`
 - [x] Verified on a real PR of this repository
@@ -78,5 +79,5 @@ Land the first PR with it once a PR meets every condition.
 ## Promotion candidates
 
 - [ ] Lesson? `no: the stacked-PR close is recorded on #2034 and handled by the command`
-- [ ] ADR? `no`
-- [ ] Pattern? `no`
+- [ ] ADR? `no: the decisions it implements are ADR-047 (standing merge grant) and ADR-049 (merge queue behind dotf)`
+- [ ] Pattern? `no: the cross-project rule is the standing merge grant in AGENTS.md; the command is this repo's implementation of it`
