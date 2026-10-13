@@ -69,6 +69,13 @@ created: "2026-10-06"
 - [x] On the Mac: `dotf tools sync` installed herdr and uv, `herdr --version` is 0.9.3, a second run reported nothing to do
 - [ ] Windows: H2 (does `mise install herdr` keep `conpty/` next to `herdr.exe`), at the Windows box
 
+### H3 — herdr's attestations and pin drift (#2013 H3)
+
+- [x] Failing test first (`TestRenderMiseConfig_RoutesHerdrToTheBackendThatVerifiesAttestations`), then `attestedBackend`: the rendered `conf.d/dotfiles.toml` carries `[tool_alias] herdr = "github:herdrdev/herdr"` on linux and darwin. mise's github backend verifies the release digest and the GitHub artifact attestations; aqua's registry entry verified the digest only. An alias keeps the short name, so `mise which`, `where`, `bin-paths`, doctor and `verify-setup.bats` are unchanged
+- [x] Not on Windows: the herdr zip there carries no attestation, and mise refuses an asset without one (as it refused `python@3.12.6`); Windows herdr is H2's
+- [x] Pin drift needs no new check: herdr is a `# mise: cli` pin, so `checkMiseTools` already FAILs when it does not run at its pin, on every OS mise manages; `update.version_check = false` landed with H4 (#2417)
+- [ ] An existing aqua install of herdr 0.9.3 is kept: mise treats the version as installed. The next pin bump installs through the github backend, attestations included
+
 ### H4a — `dotf deploy` merges TOML (#2013 H4, owner decision 2026-10-08)
 
 herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the Settings screen saves into it), so a `replace` entry would overwrite the owner's in-app choices on every deploy and show drift until then: the `.gitconfig` class (lesson 366). The owner chose a TOML merge over `replace` and seed-if-missing.
