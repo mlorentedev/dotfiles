@@ -90,8 +90,9 @@ created: "2026-09-29"
       (commit 77c89fd5)
 - [x] [AC9] Live run, Sonnet risk route: #2188 itself (3,682 changed lines) at `ready_for_review` reviewed first on
       Sonnet with adaptive thinking, published, and the review's run details name the model (run 37907390670)
-- [ ] [AC9] Live run, second attempt: the first real failure of a first attempt after merge that runs the other
-      provider; run id on #1923 (a failure cannot be forced from CI without spending the shared NaN pool)
+- [x] [AC9] Live run, second attempt: the first real failure of a first attempt after merge that runs the other
+      provider; run id on #1923 (a failure cannot be forced from CI without spending the shared NaN pool). Run
+      38429799619 (#2409, 2026-10-13): NaN timed out, Haiku published (#1923 comment 6154701941)
 - [x] [AC10] #1923: failing test for the repository-wide job queue, then the job-level `concurrency` block
 - [x] [AC10] Live run of the PR that adds the queue shows GitHub accepts it: run 36835280780 started its `review` job and published a review (an unknown key fails the workflow before any job starts)
 - [x] [AC10] On `main`, two reviews that overlap in time both complete and neither is cancelled; record the run ids on #1923. A cancelled review run there means the job-level queue is ignored: revert the block (runs 36881054024, 36881389377, 36881441749 queued together, ran in turn, none cancelled; #1923 comment 5934615584)
@@ -102,7 +103,7 @@ created: "2026-09-29"
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
 - [x] Lint passes (shellcheck, actionlint)
 - [x] No unrelated changes in the diff
-- [ ] `verification.md` filled in (PR 1 and PR 2 done; prevention PRs pending)
+- [x] `verification.md` filled in: PR 1, PR 2 and the prevention PRs (AC6-AC10), with the live second attempt of AC9 (2026-10-13)
 - [x] PRs opened referencing this spec folder: PR 1 #1856, PR 2 #1916
 
 ## Machine-readable features
