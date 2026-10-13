@@ -359,3 +359,32 @@ func TestAFailedProbeReloadsARunningSSHDBackToThePreviousDropIn(t *testing.T) {
 		t.Errorf("sshd reloaded %d times, want 2: once for the new drop-in, once for its undo", reloads)
 	}
 }
+
+// refusingFirewall differs and refuses, as UFW does over a rule of the
+// owner's that opens port 22 off the mesh.
+type refusingFirewall struct{}
+
+func (refusingFirewall) Differs() (bool, error) { return true, nil }
+func (refusingFirewall) Apply(Root) (func() error, error) {
+	return func() error { return nil }, errors.New("ufw has rules that open port 22 off tailscale0")
+}
+func (refusingFirewall) Prove() error { return nil }
+
+func TestAFirewallThatRefusesDoesSoBeforeAnythingChanges(t *testing.T) {
+	m := newMachine(t)
+	tg := m.target()
+	tg.Firewall = refusingFirewall{}
+	p, err := tg.Inspect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Pending[0] != resFirewall {
+		t.Fatalf("pending = %q, want the firewall first", p.Pending)
+	}
+	if err := tg.Apply(p); err == nil || !strings.Contains(err.Error(), "off tailscale0") {
+		t.Fatalf("Apply = %v, want the firewall's refusal", err)
+	}
+	if len(m.rootCalls) != 0 {
+		t.Errorf("root ran before the refusal: %q", m.rootCalls)
+	}
+}

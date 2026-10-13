@@ -97,6 +97,9 @@ func workstationDetail(p sshtarget.Plan, dryRun bool) string {
 		lan = "refused from " + p.LAN.String()
 	}
 	proof := fmt.Sprintf("sshd accepts the key from %s, %s", p.Mesh, lan)
+	for _, n := range p.Notes {
+		proof += "; " + n
+	}
 	switch {
 	case p.Converged() && dryRun:
 		return "converged; a run proves: " + proof
