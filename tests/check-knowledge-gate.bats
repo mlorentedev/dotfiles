@@ -350,6 +350,20 @@ Example:
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
 }
 
+@test "a tab before a fence marker opens no fence: CommonMark reads it as indented code" {
+    SDD_PR_BODY="## Summary
+
+	\`\`\`
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned

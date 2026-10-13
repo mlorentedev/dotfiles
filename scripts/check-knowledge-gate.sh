@@ -136,9 +136,11 @@ _strip_markup() {
         {
             line = $0
             # A fence marker counts only at the start of a line outside a
-            # comment: up to three spaces, then three or more ` or ~.
-            if (!inside && match(line, /^[[:space:]]?[[:space:]]?[[:space:]]?(```+|~~~+)/)) {
-                marker = substr(line, RSTART, RLENGTH); sub(/^[[:space:]]+/, "", marker)
+            # comment: up to three spaces, then three or more ` or ~. Spaces,
+            # not tabs: CommonMark reads a tab as four columns, an indented
+            # code line rather than a fence.
+            if (!inside && match(line, /^ ? ? ?(```+|~~~+)/)) {
+                marker = substr(line, RSTART, RLENGTH); sub(/^ +/, "", marker)
                 if (fence == "") { fence = marker; opened = NR }
                 else if (substr(marker, 1, 1) == substr(fence, 1, 1) && length(marker) >= length(fence)) { fence = "" }
                 next
