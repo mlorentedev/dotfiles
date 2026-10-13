@@ -119,17 +119,40 @@ fi
 # absent, and the author needs to be told why.
 _strip_markup() {
     printf '%s\n' "$1" | awk -v mode="${2:-}" '
-        function strip_comments(line,    out, i) {
+        # span_end(s, n): the position in s of the last backtick of the first
+        # run of exactly n backticks, or 0 when there is none.
+        function span_end(s, n,    p, start) {
+            p = 0
+            while (match(substr(s, p + 1), /`+/)) {
+                start = p + RSTART
+                if (RLENGTH == n) return start + n - 1
+                p = start + RLENGTH - 1
+            }
+            return 0
+        }
+        function strip_comments(line,    out, i, j, run, rest, k) {
             out = ""
             while (line != "") {
                 if (inside) {
                     i = index(line, "-->")
                     if (i == 0) { line = "" } else { line = substr(line, i + 3); inside = 0 }
-                } else {
-                    i = index(line, "<!--")
-                    if (i == 0) { out = out line; line = "" }
-                    else { out = out substr(line, 1, i - 1); line = substr(line, i + 4); inside = 1 }
+                    continue
                 }
+                i = index(line, "<!--")
+                j = index(line, "`")
+                if (j > 0 && (i == 0 || j < i)) {
+                    # A code span, a backtick run closed by a run of the same
+                    # length, is kept as text: a <!-- inside it opens nothing.
+                    # A run with no closer on the line is a literal backtick.
+                    match(substr(line, j), /^`+/); run = RLENGTH
+                    rest = substr(line, j + run)
+                    k = span_end(rest, run)
+                    out = out substr(line, 1, j + run - 1) substr(rest, 1, k)
+                    line = substr(rest, k + 1)
+                    continue
+                }
+                if (i == 0) { out = out line; line = "" }
+                else { out = out substr(line, 1, i - 1); line = substr(line, i + 4); inside = 1 }
             }
             return out
         }

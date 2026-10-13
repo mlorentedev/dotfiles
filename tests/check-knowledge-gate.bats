@@ -397,6 +397,32 @@ more
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
 }
 
+@test "a comment opener inside an inline code span hides nothing" {
+    SDD_PR_BODY="## Summary
+
+A \`<!--\` in a code span is text, and so is \`\`a \` <!-- b\`\`.
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "an unmatched backtick does not shield a real comment" {
+    SDD_PR_BODY="## Summary
+
+A lone \` backtick, then <!--
+## Knowledge
+- Lesson: none: hidden in the comment
+-->"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned
