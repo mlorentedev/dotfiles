@@ -437,17 +437,20 @@ setup() {
 @test "every CLI versions.conf marks for mise is installed through mise at its pin (#2013 T2)" {
     # The Windows CI leg gates on doctor's "Pinned CLIs (mise)" check; Linux has
     # no doctor gate, so this is that check's Linux half. It reads the marks the
-    # way dotf does: "# mise: cli" on its own line, the pin on the next one, and
-    # NAME_VERSION as mise's name with underscores as hyphens.
+    # way dotf does: "# mise: cli" or "# mise: latest" on its own line, the pin
+    # on the next one, and NAME_VERSION as mise's name with underscores as
+    # hyphens. A "latest" tool renders as NAME@latest: mise keeps it current,
+    # and the pin is only its floor.
     local mise pins pin missing=""
     mise="$(command -v mise || printf '%s' "$HOME/.local/bin/mise")"
     pins="$(awk '
         m && /^[A-Z0-9_]+_VERSION=/ {
             n = $0; sub(/_VERSION=.*/, "", n); n = tolower(n); gsub(/_/, "-", n)
             v = $0; sub(/^[^=]*=/, "", v)
+            if (m == "latest") v = "latest"
             print n "@" v
         }
-        { m = ($0 == "# mise: cli") }' "$DOTFILES_DIR/versions.conf")"
+        { m = ($0 == "# mise: cli") ? "cli" : ($0 == "# mise: latest") ? "latest" : "" }' "$DOTFILES_DIR/versions.conf")"
     [ -n "$pins" ]
     # The awk above is a second reading of versions.conf; dotf's own reading
     # (tools.ParseMiseTools) is what the sync rendered. They must agree, or this
@@ -463,6 +466,8 @@ setup() {
     }
     while IFS= read -r pin; do
         # From $HOME, so the checkout's own mise.toml cannot answer for the machine.
+        # NAME@latest resolves to the newest version installed, not to the newest
+        # published, so a "latest" tool passes once mise has installed it.
         bash -c 'cd "$HOME" && "$1" where "$2"' _ "$mise" "$pin" >/dev/null 2>&1 ||
             missing="$missing $pin"
     done <<< "$pins"
