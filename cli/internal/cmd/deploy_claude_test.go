@@ -26,6 +26,12 @@ type fakeClaude struct {
 	markets    []string // registered marketplaces; a removal drops one
 	sticky     map[string]bool
 	unmarketed []string // removals asked for
+	refreshed  []string // marketplace refreshes asked for
+}
+
+func (f *fakeClaude) UpdateMarketplace(name string) error {
+	f.refreshed = append(f.refreshed, name)
+	return nil
 }
 
 func (f *fakeClaude) Marketplaces() (string, error) {

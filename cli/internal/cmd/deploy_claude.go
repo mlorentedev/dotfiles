@@ -46,6 +46,10 @@ func (c claudeCLI) RemoveMarketplace(name string) error {
 	return c.combined("plugin", "marketplace", "remove", name)
 }
 
+func (c claudeCLI) UpdateMarketplace(name string) error {
+	return c.combined("plugin", "marketplace", "update", name)
+}
+
 func (c claudeCLI) McpGet(name string) (string, error) {
 	out, err := c.command("mcp", "get", name).Output()
 	return string(out), err

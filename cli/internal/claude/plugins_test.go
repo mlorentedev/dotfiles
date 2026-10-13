@@ -24,12 +24,25 @@ type fakeRunner struct {
 	sticky   map[string]bool
 	rmFails  map[string]bool // RemoveMarketplace exits non-zero, registry untouched
 	removed  []string
+	// updFails names marketplaces whose refresh exits non-zero; log holds every
+	// refresh and install in call order ("update m", "install a@m").
+	updFails map[string]bool
+	log      []string
 }
 
 func (f *fakeRunner) List() (string, error) { return f.listed, f.listErr }
 
+func (f *fakeRunner) UpdateMarketplace(name string) error {
+	f.log = append(f.log, "update "+name)
+	if f.updFails[name] {
+		return errors.New("network unreachable")
+	}
+	return nil
+}
+
 func (f *fakeRunner) Install(id string) error {
 	f.installed = append(f.installed, id)
+	f.log = append(f.log, "install "+id)
 	if f.failing[id] {
 		return errors.New("install failed")
 	}
@@ -266,5 +279,58 @@ func TestRetireReadsTheCapturedListShape(t *testing.T) {
 	}
 	if !reflect.DeepEqual(rep.Removed, []string{"old"}) {
 		t.Fatalf("report %+v, want old to be removed", rep)
+	}
+}
+
+// A fresh Claude Code knows the official marketplace but its local copy does
+// not list the plugins yet, and `claude plugin install` does not refresh it, so
+// every declared plugin failed on a new machine (#2378). Each marketplace that
+// holds a plugin to install is refreshed once, before its first install.
+func TestSyncRefreshesEachMarketplaceOnceBeforeItsFirstInstall(t *testing.T) {
+	r := &fakeRunner{listed: "  ❯ c@p\n"}
+	if _, err := newSyncer(r).Sync([]string{"a@m", "b@m", "x@n", "c@p"}, false); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"update m", "install a@m", "install b@m", "update n", "install x@n"}
+	if !reflect.DeepEqual(r.log, want) {
+		t.Fatalf("calls %v, want %v", r.log, want)
+	}
+}
+
+// A converged box installs nothing, so it refreshes nothing: the refresh is a
+// network call, paid only when there is something to install. A dry run
+// changes nothing, the marketplace copy included.
+func TestSyncRefreshesNothingWithoutAnInstall(t *testing.T) {
+	r := &fakeRunner{listed: "  ❯ a@m\n"}
+	if _, err := newSyncer(r).Sync([]string{"a@m"}, false); err != nil {
+		t.Fatal(err)
+	}
+	r2 := &fakeRunner{}
+	if _, err := newSyncer(r2).Sync([]string{"a@m"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.log)+len(r2.log) != 0 {
+		t.Fatalf("calls %v and %v, want none", r.log, r2.log)
+	}
+}
+
+// A refresh that fails does not stop the install: an offline box whose copy
+// already lists the plugin still installs it. When the install fails as well,
+// its cause names both, since the refresh is the likelier reason.
+func TestAFailedRefreshStillAttemptsTheInstallAndIsNamedWhenItFails(t *testing.T) {
+	r := &fakeRunner{updFails: map[string]bool{"m": true}, failing: map[string]bool{"b@m": true}}
+	rep, err := newSyncer(r).Sync([]string{"a@m", "b@m"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(rep.Added, []string{"a@m"}) || !reflect.DeepEqual(rep.Failed, []string{"b@m"}) {
+		t.Fatalf("report %+v", rep)
+	}
+	cause := rep.Causes["b@m"].Error()
+	if !strings.Contains(cause, "install failed") || !strings.Contains(cause, "network unreachable") {
+		t.Fatalf("cause %q, want the install's error and the refresh's", cause)
+	}
+	if !reflect.DeepEqual(r.log, []string{"update m", "install a@m", "install b@m"}) {
+		t.Fatalf("calls %v: the failed refresh is not retried per install", r.log)
 	}
 }
