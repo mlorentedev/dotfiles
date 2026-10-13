@@ -49,17 +49,19 @@ func checkCoreTools(sys *System, c *Contract, rep *Report) {
 // coreToolRemedy names the command that provisions a missing core tool, only
 // where the repo provisions it: docker through its packages.json entry, which
 // is Colima's CLI on the Mac, docker.io on Linux and Docker Desktop on Windows
-// (#2013 P5b). Elsewhere the FAIL stays bare rather than guess; kubectl gets a
-// remedy with its mise pin, which waits on a release whose version probe can
-// read it (`kubectl --version` is an unknown flag).
+// (#2013 P5b), and kubectl through its mise pin on Linux and macOS: mise is not
+// in the Windows catalog yet (#2013), so a sync there installs nothing.
+// Elsewhere the FAIL stays bare rather than guess.
 func coreToolRemedy(tool, goos string) string {
-	if tool != "docker" {
-		return ""
-	}
-	if goos == "darwin" {
+	switch {
+	case tool == "docker" && goos == "darwin":
 		return " (run: dotf tools install, then dotf doctor --fix to start Colima)"
+	case tool == "docker":
+		return " (run: dotf tools install)"
+	case tool == "kubectl" && goos != "windows":
+		return " (run: dotf tools sync)"
 	}
-	return " (run: dotf tools install)"
+	return ""
 }
 
 // toolHome pairs a *_HOME env var with the binary expected under its bin/.

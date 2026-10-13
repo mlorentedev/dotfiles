@@ -20,8 +20,10 @@ func TestCheckCoreTools_MissingFails(t *testing.T) {
 }
 
 // The repo provisions docker on every OS (packages.json, #2013 P5b), so its FAIL
-// names the command that clears it, plus starting Colima on the Mac. Where
-// nothing provisions a tool the FAIL stays bare.
+// names the command that clears it, plus starting Colima on the Mac. kubectl is
+// a mise pin, and mise is not yet in the Windows catalog (#2013), so its remedy
+// is the sync on Linux and macOS only. Where nothing provisions a tool the FAIL
+// stays bare.
 func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
 	cases := []struct {
 		goos, want, absent string
@@ -29,8 +31,9 @@ func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
 		{"darwin", "docker not in PATH (run: dotf tools install", ""},
 		{"linux", "docker not in PATH (run: dotf tools install)\n", "Colima"},
 		{"windows", "docker not in PATH (run: dotf tools install)\n", "Colima"},
-		{"darwin", "kubectl not in PATH\n", ""},
-		{"linux", "kubectl not in PATH\n", ""},
+		{"darwin", "kubectl not in PATH (run: dotf tools sync)\n", ""},
+		{"linux", "kubectl not in PATH (run: dotf tools sync)\n", ""},
+		{"windows", "kubectl not in PATH\n", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.goos+"/"+tc.want, func(t *testing.T) {
