@@ -131,5 +131,12 @@
     "verification": "cd cli && out=$(go test ./internal/env/ ./internal/cmd/ -run '^(TestLoadMachineRoles|TestSetMachineRole|TestSetMachinePathKeepsSectionsItDoesNotOwn|TestEnvRole)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSetMachinePathKeepsSectionsItDoesNotOwn' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLoadMachineRolesRejectsAnUnknownRole' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestEnvRoleAddListRemove'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f20",
+    "behavior": "#2013 A1 PR 7c: on darwin, workstation-target plans without root, skips the apply with its plan when there is no terminal, and an apply whose proof fails (mesh refused, LAN accepted, drop-in rejected) is undone in reverse order",
+    "verification": "cd cli && out=$(go test ./internal/sshtarget/ ./internal/converge/ -run '^(TestInspect|TestApply|TestAFailedProbe|TestAnSSHD|TestARejectedDropIn|TestWorkstationTarget_)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAFailedProbeUndoesTheRunInReverse' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAnSSHDThatAcceptsTheLANFails' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestWorkstationTarget_PlanNeedsNoRoot' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestWorkstationTarget_ApplyWithoutATerminalIsSkippedWithThePlan'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

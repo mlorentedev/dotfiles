@@ -101,7 +101,23 @@ The from-zero job (X1) ran this ADR's consequence, "then `dotf doctor` reports i
 
 The alternative was to fake an identity on the CI runners: a generated age key, an empty vault skeleton and a stub `obsidian`, as `test-windows` does. It makes the doctor green by testing directories, not the restore. Moving `test-windows` to `--scope machine` is a follow-up row on #2013.
 
+## Amendment 2026-10-12 (#2013 A1, #2356, owner): how converge gets root
+
+The workstation-target step is the first reconciler that writes outside the user's home: the sshd drop-in, the host keys and the sshd service. The owner chose how it gets root, between a sudo prompt per run on the terminal and a plan that stops.
+
+- **The plan never asks for root.** Every read that decides the plan is one a user may make: the drop-in and the main sshd config are world-readable, and `launchctl print` answers without root. The effective state that only root can read (`sshd -T`, the packet filter's rules) is proven by consequence instead, never read.
+- **The apply asks once, on the terminal.** It reuses a cached sudo credential when there is one; otherwise it runs `sudo -v` on the controlling terminal, as `identity restore` does (D12). Each command then runs with `sudo -n`, which fails rather than prompt a second time.
+- **Without a terminal, the step is skipped and its reason is the plan.** A scheduled `dotf update` or a CI run therefore never changes the machine's network posture, and never fails for lack of a password. The report says what an attended run would apply.
+- **An apply proves itself, or it is undone.** After the changes, sshd must accept the owner's key from the node's mesh address and refuse it from a LAN address. The client's debug output says whether the server accepted the key, so the proof needs neither the key's passphrase nor an agent. If either answer is wrong, every change of the run is undone in reverse order and the run fails.
+- **A node off the mesh is skipped, not failed.** It cannot be proven, and with sshd open to the mesh only it is closed rather than open. A scheduled run while the tailnet is down therefore reports the step skipped instead of failing every tick.
+- **A role opts in.** Only a machine whose `machine.json` declares `ssh-target` (`dotf env role add ssh-target`) runs the step. Every other machine reports it skipped.
+
+Rejected:
+
+- Running `dotf converge` itself under sudo. Every other step would then write the user's files as root.
+- A one-off script or runbook commands for the owner to paste. Neither has a plan or proves its result, and neither is reproducible on the next machine.
+
 ## References
 
-- Epic #2013 (rows P0, P4, P9, X1; decisions D1, D2, D4, D10, D11, D12), epic #1843 (rows B1, B6, B7, B11), #2016 (P9), CLI-090 (#1803).
+- Epic #2013 (rows P0, P4, P9, X1, A1; decisions D1, D2, D4, D10, D11, D12), #2356 (SEC-011), epic #1843 (rows B1, B6, B7, B11), #2016 (P9), CLI-090 (#1803).
 - ADR-003, ADR-019, ADR-020 (C7, §5), ADR-036, ADR-041 (decisions 4 and 7), ADR-044; lesson 337.

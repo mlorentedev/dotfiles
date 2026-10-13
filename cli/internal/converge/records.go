@@ -3,12 +3,14 @@ package converge
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -54,6 +56,13 @@ type Options struct {
 	// harness.ResolveDotfPath in production. Unset, the records-bind step
 	// is skipped with the reason rather than guess.
 	DotfPath func(home string) string
+	// SSHRoot runs the workstation-target step's commands as root, asking on
+	// the terminal; UserRun runs its commands as the user (launchctl print,
+	// the ssh probe). Unset, the step is skipped. MeshAddrs lists the node's
+	// addresses; unset means sshtarget.InterfaceAddrs.
+	SSHRoot   sshtarget.Root
+	UserRun   sshtarget.Runner
+	MeshAddrs func() ([]net.IP, error)
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -70,6 +79,10 @@ func Registry(o Options) []Reconciler {
 	if url == "" {
 		url = DefaultCloneURL
 	}
+	addrs := o.MeshAddrs
+	if addrs == nil {
+		addrs = sshtarget.InterfaceAddrs
+	}
 	return []Reconciler{
 		checkout{run: o.GitRun, url: url, has: onPath},
 		recordsMirror{},
@@ -81,6 +94,7 @@ func Registry(o Options) []Reconciler {
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
+		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: currentUser},
 		legacySetup{run: o.RunSetup},
 	}
 }

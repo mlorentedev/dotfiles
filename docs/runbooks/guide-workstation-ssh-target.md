@@ -126,21 +126,11 @@ drop-in must sort before every other drop-in: Ubuntu's `50-cloud-init.conf` can
 set `PasswordAuthentication yes`, and macOS ships `100-macos.conf`. Name it
 `01-workstation.conf`.
 
-The drop-in, identical on Linux and macOS:
-
-```text
-# Managed by docs/runbooks/guide-workstation-ssh-target.md (SEC-011 automates it)
-AuthenticationMethods publickey
-PubkeyAuthentication yes
-PasswordAuthentication no
-KbdInteractiveAuthentication no
-PermitRootLogin no
-AllowUsers manu@100.64.0.0/10
-AllowAgentForwarding no
-X11Forwarding no
-ClientAliveInterval 60
-ClientAliveCountMax 3
-```
+The drop-in is `ssh/sshd-workstation.conf` in the checkout, identical on Linux
+and macOS. It sets key-only authentication, no root login, no agent or X11
+forwarding, client keepalives, and `AllowUsers {user}@{mesh}`. converge renders
+`{user}` as the account it runs as and `{mesh}` as `100.64.0.0/10`; the steps
+below install the rendered file.
 
 `AllowUsers manu@100.64.0.0/10` is the sshd half of the mesh-only rule. A
 connection from any other source address is refused after the key exchange,
@@ -155,15 +145,24 @@ grep -n '^Include' /etc/ssh/sshd_config   # the Include must come before any oth
 sudo sshd -t && sudo systemctl reload "$SSHD_UNIT"
 ```
 
-**macOS:** Remote Login is socket-activated. launchd starts a fresh `sshd` for
-each connection, so the next connection reads the new file with no reload.
-That is also why `ListenAddress` has no effect here: launchd owns the socket.
+**macOS:** one converge step does this section, idempotently: the authorized
+key, the host keys, the drop-in (validated with `sshd -t` before sshd listens)
+and Remote Login. It then proves the result from the node itself: sshd must
+accept the owner's key from the mesh address and refuse it from the LAN
+address, or the run's changes are undone and the run fails (ADR-045 amendment
+2026-10-12).
 
 ```bash
-sudo install -m 0644 01-workstation.conf /etc/ssh/sshd_config.d/01-workstation.conf
-sudo sshd -t
-sudo systemsetup -setremotelogin on        # needs Full Disk Access for the terminal
+dotf env role add ssh-target                       # once per machine: the opt-in
+dotf converge --plan --only workstation-target     # what would change; never asks for root
+dotf converge --only workstation-target            # asks for the sudo password once, on the terminal
+dotf converge --only workstation-target            # second run: 0 changes, and the proof again
 ```
+
+Without a terminal (a scheduled `dotf update`), the step is skipped and its
+reason is the plan. Remote Login is socket-activated: launchd starts a fresh
+`sshd` for each connection, so no reload is needed, and `ListenAddress` has no
+effect because launchd owns the socket.
 
 **Windows:** `C:\ProgramData\ssh\sshd_config` has no `Include` by default, so
 the same keywords go into the file itself, above its `Match Group administrators`

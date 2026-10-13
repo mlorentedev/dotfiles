@@ -189,12 +189,12 @@ Owner (2026-10-12): a machine that accepts SSH is a converge step here, not a sp
 - [x] PR 7a, interim: `msi` and `macmini` client profiles in `ssh/config` (MagicDNS names, `ForwardAgent no`, keepalives, `IdentitiesOnly`), and `docs/runbooks/guide-workstation-ssh-target.md` pairing every server step with its check
 - [x] PR 7a: `scripts/windows-openssh-authorize.ps1` narrows the OpenSSH firewall rule to the `Tailscale` adapter and `100.64.0.0/10` on every run, before sshd starts, and refuses a host without the adapter; the office LAN alias goes (lesson 401)
 - [x] PR 7b: the opt-in. `machine.json` gains a `roles` section, written by `dotf env role add|rm <ROLE>` and read by `env.LoadMachineRoles`; an unknown role is an error in both directions. The writers now edit the file per top-level section: `dotf env set` used to drop `machine`, `pools` and any role on every write (lesson 402)
-- [ ] Failing tests, then `workstation-target` (opt-in in `machine.json`): `Inspect` is the plan; `Apply` writes the sshd drop-in `01-workstation.conf`, the firewall rule, the power policy and the unattended tailscale service
-- [ ] Preflight before `Apply`: a live tailnet session, and `sshd -t -f <candidate>` passes. After the apply, a key-only self-connect over the node's tailnet address must succeed. Otherwise every resource the run changed (sshd drop-in, firewall rule, power policy, tailscale service) is restored from its backup and re-checked, and the run fails
-- [ ] A second run reports 0 changes; X1 renders the plan on linux, macos and windows without applying it
-- [ ] Doctor reuses `Inspect`, and `--fix` calls `Apply`
-- [ ] ADR-045 amendment: how converge gets privilege (a sudo prompt per step, or the plan and a stop, as `identity restore` does)
-- [ ] The runbook's sections 2 to 4 become one `dotf converge --only workstation-target` per machine
+- [x] PR 7c: `workstation-target` on darwin (`cli/internal/sshtarget`, after `env-persist`). `Inspect` is the plan and needs no root: the authorized key, the host keys, the sshd drop-in `01-workstation.conf` rendered from `ssh/sshd-workstation.conf`, and Remote Login. The preflight refuses a node with no mesh address and a main config that does not include the drop-in dir. `Apply` asks for root once, writes the host keys before `sshd -t` and the drop-in before sshd listens, then proves the result: sshd accepts the owner's key from the mesh address and refuses it from the LAN address. A failed proof or a rejected drop-in undoes the run's changes in reverse order. Without a terminal the apply is skipped with the plan as its reason
+- [x] ADR-045 amendment 2026-10-12: how converge gets root (the plan never asks; the apply asks once on the terminal; no terminal means skipped with the plan)
+- [x] PR 7c acceptance on the macmini, with the owner at the sudo prompt: plan, apply, and a second run reporting 0 changes; the outputs go on #2356 and below in `verification.md`
+- [ ] PR 7d: the firewall (a pf anchor and the LaunchDaemon that reloads it at boot), the power policy (`pmset`) and the unattended tailscale service, each with its undo. Doctor reuses `Inspect`; its remedy names `dotf converge --only workstation-target`, and `--fix` does not call `Apply`, because doctor never prompts for root (the `env-persist` precedent)
+- [ ] PR 7e: Linux (`ssh.service` or `ssh.socket` under systemd), accepted on a Linux host; Windows, porting `scripts/windows-openssh-authorize.ps1` into the step. X1 renders the plan on all three OSes
+- [ ] The runbook's sections 2 to 4 become one `dotf converge --only workstation-target` per machine, once PR 7d lands
 
 ## Closing
 

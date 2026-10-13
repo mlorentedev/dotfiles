@@ -14,6 +14,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -113,6 +114,8 @@ var convergeOptions = func() converge.Options {
 		ResolvePath:   env.ResolvePath,
 		Launchctl:     env.ExecLaunchctl,
 		UID:           os.Getuid(),
+		SSHRoot:       sshtarget.Sudo{Terminal: identityTerminal},
+		UserRun:       sshtarget.Exec,
 		RunSetup:      converge.ExecSetup,
 		DotfPath:      harness.ResolveDotfPath,
 	}
