@@ -38,12 +38,13 @@
     "            Declare the observed form, never guess (AI-042, #1334).",
     "  platforms the GOOS values (linux, darwin, windows) the entry applies on;",
     "            absent means every OS, and an OS not listed is skipped, not",
-    "            failed - the meaning packages.json gives it. Needs version 4: the",
-    "            dotf that reads 4 also reads 3, so this file moves to 4 with its",
-    "            first OS-only entry, once the release carrying that reader is the",
-    "            DOTF_VERSION pin (#1843 B1).",
+    "            failed - the meaning packages.json gives it. Needs version 4,",
+    "            which every dotf since 0.65 reads (#1843 B1). The bash and",
+    "            readline rc files are its first entries: the Windows shell is",
+    "            pwsh, whose profile setup-windows.ps1 deploys (#2013 P7).",
     "",
-    "version 3 (AI-042): paths changes what an entry's CONTENT means. Version 2",
+    "version 4 (#1843 B1): platforms. Version 3 (AI-042): paths changes what an",
+    "entry's CONTENT means. Version 2",
     "(AI-039): strategy and requires change what an entry MEANS, so a",
     "dotf that predates them refuses this file instead of deploying every entry",
     "as replace - which would overwrite ~/.copilot/settings.json and wipe the box's",
@@ -85,7 +86,7 @@
     "`platforms`. Merge keeps what docker and colima write there (auths,",
     "currentContext); mode 0600 because auths can hold registry credentials."
   ],
-  "version": 3,
+  "version": 4,
   "configs": [
     {
       "name": "opencode-tui",
@@ -224,6 +225,30 @@
       "render": false,
       "mode": "0644",
       "requires": "zsh"
+    },
+    {
+      "name": "bashrc",
+      "src": ".bashrc",
+      "dst": "{HOME}/.bashrc",
+      "render": false,
+      "mode": "0644",
+      "platforms": ["linux", "darwin"]
+    },
+    {
+      "name": "profile",
+      "src": ".profile",
+      "dst": "{HOME}/.profile",
+      "render": false,
+      "mode": "0644",
+      "platforms": ["linux", "darwin"]
+    },
+    {
+      "name": "inputrc",
+      "src": ".inputrc",
+      "dst": "{HOME}/.inputrc",
+      "render": false,
+      "mode": "0644",
+      "platforms": ["linux", "darwin"]
     },
     {
       "name": "tmux",

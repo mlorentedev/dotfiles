@@ -118,13 +118,11 @@ setup() {
 
 # --- Cross-OS asymmetry documented (Linux uses clean-copy, no heal needed) ---
 
-@test "parity (documented asymmetry): Linux deploys profile via deploy_file (no heal needed)" {
-    # setup-linux.sh uses deploy_file (utils.sh:454) which is a clean-copy
-    # under set -euo pipefail -- the file is byte-equivalent to the SSOT each
-    # run, so accumulation cannot occur. Asserting the deploy_file usage is
-    # in place is the Linux side of this contract.
-    grep -qE 'deploy_file\s+"\$DOTFILES_DIR/\.bashrc"\s+"\$HOME/\.bashrc"' "$DOTFILES_DIR/setup-linux.sh"
-    # .zshrc moved to `dotf deploy`, which writes the same clean copy.
+@test "parity (documented asymmetry): Linux deploys the rc files as clean copies (no heal needed)" {
+    # `dotf deploy` writes each rc file as a clean copy of the SSOT on every
+    # run, so accumulation cannot occur. Asserting the entries is the Linux
+    # side of this contract (.zshrc: #1843 B2; .bashrc: #2013 P7).
+    jq -e '.configs[] | select(.src == ".bashrc" and .dst == "{HOME}/.bashrc")' "$DOTFILES_DIR/ai/deploy.json" >/dev/null
     jq -e '.configs[] | select(.src == ".zshrc" and .dst == "{HOME}/.zshrc")' "$DOTFILES_DIR/ai/deploy.json" >/dev/null
 }
 

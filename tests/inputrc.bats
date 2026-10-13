@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # POLISH-004 (#133): .inputrc + .editorconfig cross-OS polish.
-# Asserts repo files exist, carry the intended defaults, and that setup-linux.sh
-# deploys .inputrc to $HOME (structural grep — no full setup run).
+# Asserts repo files exist, carry the intended defaults, and that .inputrc is an
+# ai/deploy.json entry (structural grep — no full setup run; #2013 P7).
 
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -20,8 +20,8 @@ setup() {
     grep -q 'history-search-forward'            "$DOTFILES_DIR/.inputrc"
 }
 
-@test "POLISH-004: setup-linux.sh deploys .inputrc to \$HOME/.inputrc" {
-    grep -qF 'deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"' "$DOTFILES_DIR/setup-linux.sh"
+@test "POLISH-004: .inputrc deploys to \$HOME/.inputrc through ai/deploy.json" {
+    grep -qF '"dst": "{HOME}/.inputrc"' "$DOTFILES_DIR/ai/deploy.json"
 }
 
 @test "POLISH-004: .editorconfig exists with root=true and CRLF for PowerShell" {
