@@ -59,15 +59,38 @@ test_windows_job() {
     grep -qF 'DOTFILES_CI_EXPECT_COPILOT' "$BATS_TEST_DIRNAME/copilot-native-skills.Tests.ps1"
 }
 
-# #2152, the Windows half: a native command's failure does not stop a pwsh step,
-# so `age-keygen -o` with nothing after it left no key and a green step. The
-# sandbox step must check the exit code and the key file before going on.
-@test "test-windows: the sandbox step fails on a failed age-keygen or an empty key (#2152)" {
+# #2013 X4: the runner has no identity, and doctor's machine scope declares
+# that. The gate used to be fed a fabricated age key, vault skeleton and
+# obsidian stub instead, plus a flag that covered Bitwarden alone; fabrication
+# is a second source of truth for what a runner is, and it hid the vault
+# checks' real behaviour on a machine without one.
+@test "test-windows: the doctor gate runs the machine scope and the job fabricates no identity (#2013 X4)" {
+    grep -qF '& dotf doctor --scope machine' "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
+    run grep -F '$env:DOTFILES_DOCTOR_NO_IDENTITY' "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
+    [ "$status" -eq 1 ] || false
     job="$(test_windows_job)"
-    step="$(printf '%s\n' "$job" | awk '/- name: Sandbox secrets \+ minimal vault/{f=1} f && /^      - /&& !/Sandbox secrets/{exit} f')"
-    [ -n "$step" ]
-    printf '%s\n' "$step" | grep -qF 'age-keygen -o $key'
-    # Each check must end the step: a Write-Output alone leaves pwsh exiting 0.
-    printf '%s\n' "$step" | grep -qF 'if ($LASTEXITCODE -ne 0) { Write-Output "::error::age-keygen exited $LASTEXITCODE"; exit 1 }'
-    printf '%s\n' "$step" | grep -qF 'if (-not ((Test-Path $key) -and (Get-Item $key).Length -gt 0)) { Write-Output "::error::age-keygen left no key at $key"; exit 1 }'
+    for fabricated in 'age-keygen -o' 'Projects\knowledge' 'obsidian.cmd'; do
+        run grep -F "$fabricated" <<<"$job"
+        [ "$status" -eq 1 ] || { echo "test-windows still fabricates: $fabricated"; false; }
+    done
+    # Least privilege: the doctor step needs no token under the machine scope.
+    gate="$(printf '%s\n' "$job" | awk '/- name: Post-setup doctor gate/{f=1} f && /^      - / && !/Post-setup doctor gate/{exit} f')"
+    [ -n "$gate" ] || false
+    run grep -E '^[^#]*GH_TOKEN' <<<"$gate"
+    [ "$status" -eq 1 ] || { echo "the doctor gate step carries GH_TOKEN again"; false; }
+}
+
+# The machine scope skips doctor's gh checks too, and spec-issue-state was the
+# one that verified something on the runner (CI-004 AC8): a spec whose issue
+# closed must still turn the job red. The audit is its own step with the token.
+@test "test-windows: the spec issue-state audit runs with GH_TOKEN after the doctor gate (CI-004 AC8)" {
+    job="$(test_windows_job)"
+    step="$(printf '%s\n' "$job" | awk '/- name: Spec issue-state audit/{f=1} f && /^      - / && !/Spec issue-state audit/{exit} f')"
+    [ -n "$step" ] || false
+    printf '%s\n' "$step" | grep -qF 'GH_TOKEN: ${{ github.token }}'
+    printf '%s\n' "$step" | grep -qF 'dotf spec audit'
+    printf '%s\n' "$step" | grep -qF 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+    gate_line=$(printf '%s\n' "$job" | grep -n 'Post-setup doctor gate' | head -1 | cut -d: -f1)
+    audit_line=$(printf '%s\n' "$job" | grep -n 'Spec issue-state audit' | head -1 | cut -d: -f1)
+    [ "$gate_line" -lt "$audit_line" ] || false
 }

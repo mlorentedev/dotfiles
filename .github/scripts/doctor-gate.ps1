@@ -74,17 +74,12 @@ if ($MyInvocation.InvocationName -ne '.') {
         Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
     }
 
-    # The runner has no Bitwarden identity and must never hold one that resolves
-    # real secrets, so [Bitwarden reach] reports "unauthenticated" by design.
-    # Declare that to doctor (TEST-005, #1313) rather than allow-listing the FAIL:
-    # a runner that will never log in is a declared property of the runner, not
-    # a [FAIL] to match (the list's Permanent entries are the owner's exception,
-    # #2212). doctor reads the
-    # flag in that one branch only; every other reach tier still runs.
-    $env:DOTFILES_DOCTOR_NO_IDENTITY = '1'
-    Write-Host "doctor gate: DOTFILES_DOCTOR_NO_IDENTITY=1 (no Bitwarden identity on this runner, declared)"
-
-    $output = & dotf doctor 2>&1 | Out-String
+    # The runner has no identity and must never hold one that resolves real
+    # secrets, so the gate asks for the machine scope: every identity check
+    # (age key, vault, Bitwarden, gh) prints a SKIP and none can fail
+    # (#2013 X4). That replaced a fabricated key and vault, and the
+    # DOTFILES_DOCTOR_NO_IDENTITY flag, which covered Bitwarden alone.
+    $output = & dotf doctor --scope machine 2>&1 | Out-String
     Write-Host $output
 
     $result = Test-DoctorGate -Lines ($output -split "`r?`n") -Patterns (Read-KnownFailures -Path $known)

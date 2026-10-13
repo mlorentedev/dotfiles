@@ -577,8 +577,8 @@ jobs:
     # only with a run that crossed it and a ticket that names the cause.
     timeout-minutes: 20
     needs: [changes]
-    # issues: read is for the doctor gate's spec-issue-state audit, the one step
-    # handed GH_TOKEN below. The workflow default grants contents only.
+    # issues: read is for the spec issue-state audit, the one step handed
+    # GH_TOKEN below. The workflow default grants contents only.
     permissions:
       contents: read
       issues: read
@@ -604,30 +604,6 @@ jobs:
           }
           & (Join-Path $ageDir 'age.exe') --version
           & (Join-Path $ageDir 'age-keygen.exe') --version
-
-      - name: Sandbox secrets + minimal vault
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\age" | Out-Null
-          # A native command's failure does not stop a pwsh step, so a broken
-          # age-keygen used to leave no key and the suite skipped on it (#2152,
-          # the Windows half). Assert what the step promises.
-          $key = "$env:USERPROFILE\.config\age\key.txt"
-          age-keygen -o $key
-          if ($LASTEXITCODE -ne 0) { Write-Output "::error::age-keygen exited $LASTEXITCODE"; exit 1 }
-          if (-not ((Test-Path $key) -and (Get-Item $key).Length -gt 0)) { Write-Output "::error::age-keygen left no key at $key"; exit 1 }
-          # No per-secret blob is planted: NAN_API_KEY is bw-backed, and doctor
-          # FAILs any blob the registry does not claim (CLI-036).
-          $vault = "$env:USERPROFILE\Projects\knowledge"
-          foreach ($d in '00_meta', '10_projects', '40_resources', '.obsidian') {
-            New-Item -ItemType Directory -Force (Join-Path $vault $d) | Out-Null
-          }
-          '{}' | Set-Content (Join-Path $vault '.obsidian\types.json') -Encoding UTF8
-          $stub = "$env:USERPROFILE\ci-stub-bin"
-          New-Item -ItemType Directory -Force $stub | Out-Null
-          Set-Content (Join-Path $stub 'obsidian.cmd') '@echo off'
-          Add-Content $env:GITHUB_PATH $stub
 
       # TEST-003 (#1298): setup installed dotf into ~/.local/bin and never put
       # it on PATH, so every dotf-gated block (deploy, render, tools install,
@@ -774,26 +750,41 @@ jobs:
       # owning ticket -- in doctor-gate-known-failures.txt, or on a listed
       # entry that no longer fires (a stale list is a failure too).
       #
-      # GH_TOKEN on this step only (CI-004 AC8): without it every gh call in
-      # doctor printed "set the GH_TOKEN environment variable" (43 lines in this
-      # step: one `not verified` WARN per active spec from spec-issue-state,
-      # plus branch-protection), so a spec whose issue had closed could never
-      # fail the gate. The setup step keeps no token.
-      #
-      # With it, an active spec whose issue is closed FAILs here, on main's push
-      # run and on every code PR, until the spec is archived. A closing keyword
-      # causes that only under a `skip-archive` label: otherwise spec-gate makes
-      # that PR archive the spec. A manual close can (SDD-041, #1087). The
-      # remedy is `dotf spec archive`, or `--abandoned`, in its own PR. The gate
-      # cannot block that PR: its merge ref no longer holds the active spec, and
-      # a specs-only diff skips this step.
+      # The gate runs `dotf doctor --scope machine` (#2013 X4): a runner has
+      # no identity, so the age key, vault and Bitwarden checks are skipped by
+      # declaration instead of being fed a fabricated key, vault skeleton and
+      # obsidian stub. That scope also skips doctor's gh checks, so the spec
+      # issue-state audit they carried is the next step, on its own.
       - name: Post-setup doctor gate (TEST-003)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
-          GH_TOKEN: ${{ github.token }}
         run: pwsh -NoProfile -File .github/scripts/doctor-gate.ps1
+
+      # GH_TOKEN on this step only (CI-004 AC8): without it the audit cannot
+      # ask whether an issue is open, so a spec whose issue had closed could
+      # never fail. The setup and doctor steps keep no token. Doctor's
+      # branch-protection check left with it: under this token it only ever
+      # answered `not verified` (HTTP 403), so it verified nothing here.
+      #
+      # An active spec whose issue is closed FAILs here, on main's push run
+      # and on every code PR, until the spec is archived. A closing keyword
+      # causes that only under a `skip-archive` label: otherwise spec-gate makes
+      # that PR archive the spec. A manual close can (SDD-041, #1087). The
+      # remedy is `dotf spec archive`, or `--abandoned`, in its own PR. The
+      # audit cannot block that PR: its merge ref no longer holds the active
+      # spec, and a specs-only diff skips this step.
+      - name: Spec issue-state audit (CI-004 AC8)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A native command's failure does not stop a pwsh step on its own
+        # (#2152), so the audit's exit is the step's, stated.
+        run: |
+          dotf spec audit --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # The evidence of why the hive daemon is down lives only on the runner: the
       # Scheduled Task's last result and the daemon's own output. Print both on a
