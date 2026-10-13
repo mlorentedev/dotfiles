@@ -6,6 +6,7 @@ import (
 )
 
 func TestEnvRoleAddListRemove(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	steps := []struct {
@@ -31,6 +32,7 @@ func TestEnvRoleAddListRemove(t *testing.T) {
 }
 
 func TestEnvRoleRejectsAnUnknownRole(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	if _, _, err := execute(t, "env", "role", "add", "ssh-targt"); err == nil {
 		t.Fatal("env role add ssh-targt = nil error, want one")

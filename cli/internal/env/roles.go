@@ -47,17 +47,21 @@ func LoadMachineRoles(path string) ([]string, error) {
 	}
 	for _, r := range f.Roles {
 		if err := checkRole(r); err != nil {
-			return nil, fmt.Errorf("machine.json (%s): %w", path, err)
+			return nil, fmt.Errorf("machine.json (%s): %w; remove it with `dotf env role rm %s`", path, err, r)
 		}
 	}
 	return f.Roles, nil
 }
 
 // SetMachineRole adds role to machine.json when on is true, or removes it, and
-// reports whether the file changed. Every other section is kept.
+// reports whether the file changed. Every other section is kept. Only an add
+// is checked against the known roles: removing a name cannot weaken anything,
+// and it is how an unknown name left by a hand edit or a newer dotf goes.
 func SetMachineRole(path, role string, on bool) (bool, error) {
-	if err := checkRole(role); err != nil {
-		return false, err
+	if on {
+		if err := checkRole(role); err != nil {
+			return false, err
+		}
 	}
 	return editMachine(path, func(doc map[string]json.RawMessage) (bool, error) {
 		var roles []string
