@@ -177,6 +177,15 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 	if pythonPackages != "" {
 		fmt.Fprintf(&b, "python.default_packages_file = %q\n", filepath.ToSlash(pythonPackages))
 	}
+	var alias []string
+	for _, t := range tools {
+		if backend, ok := attestedBackend[t.Name]; ok && runtime.GOOS != "windows" {
+			alias = append(alias, fmt.Sprintf("%s = %q", t.Name, backend))
+		}
+	}
+	if len(alias) > 0 {
+		b.WriteString("\n[tool_alias]\n" + strings.Join(alias, "\n") + "\n")
+	}
 	var env []string
 	for _, t := range tools {
 		if kv, ok := ownUpdaterOff[t.Name]; ok {
@@ -187,6 +196,18 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 		b.WriteString("\n[env]\n" + strings.Join(env, "\n") + "\n")
 	}
 	return b.Bytes()
+}
+
+// attestedBackend routes a tool's short name to a backend that verifies more
+// than aqua's registry entry for it does (#2013 H3). aqua:herdrdev/herdr
+// checks the release digest only; mise's github backend checks the digest and
+// the GitHub artifact attestations upstream publishes (measured with mise
+// 2026.10.3: "GitHub artifact attestations verified"). An alias, not a
+// renamed tool, so `mise which`, `where` and `bin-paths` keep the short name.
+// Not on Windows: the herdr zip there carries no attestation, and mise
+// refuses an asset whose attestation it cannot find.
+var attestedBackend = map[string]string{
+	"herdr": "github:herdrdev/herdr",
 }
 
 // ownUpdaterOff turns off the self-updater of a tool mise installs: mise keeps
