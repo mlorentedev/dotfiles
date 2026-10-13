@@ -302,8 +302,8 @@ func TestRetireReadsTheCapturedListShape(t *testing.T) {
 // declared plugin failed on a new machine (#2378). Before the first install
 // from a marketplace, Sync registers it from its declared source when it is
 // missing, or refreshes it when it is there (its copy may predate a plugin
-// declared since). Each marketplace is prepared once, and the registry is
-// listed once.
+// declared since). Each marketplace is prepared once; the registry is listed
+// once, and again after each add to prove the registration.
 func TestSyncPreparesEachMarketplaceOnceBeforeItsFirstInstall(t *testing.T) {
 	r := &fakeRunner{listed: "  ❯ c@p\n", markets: []string{"n"}}
 	s := newSyncer(r)

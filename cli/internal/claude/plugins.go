@@ -198,8 +198,9 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 	return rep, nil
 }
 
-// marketPrep is one Sync's preparation state: the registry, listed at most
-// once and only when there is something to install, and each marketplace's
+// marketPrep is one Sync's preparation state: the registry, listed once and
+// only when there is something to install (register reads it again after each
+// add), and each marketplace's
 // outcome, so a failure is reported per install and never retried.
 type marketPrep struct {
 	listed     bool
