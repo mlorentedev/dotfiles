@@ -23,6 +23,13 @@
 
 set -euo pipefail
 
+# The repo's scripts run under bash and zsh (.claude/CLAUDE.md). zsh matches
+# bash here with 0-based arrays and BASH_REMATCH filled by =~, which the
+# code-span stripping reads.
+if [ -n "${ZSH_VERSION:-}" ]; then
+    setopt KSH_ARRAYS BASH_REMATCH
+fi
+
 THRESHOLD=50
 # Minimum added+removed LOC WITHIN active specs/<id>/ folders for the change to
 # count as a genuine spec touch. Defeats the "edit one line of an unrelated stale

@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for scripts/check-spec-gate.sh — SDD Tier 4 enforcement gate
 
+load 'lib/both-shells'
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     REPO_FIXTURE="/tmp/bats_specgate_$$_${BATS_TEST_NUMBER:-0}"
@@ -26,27 +28,30 @@ _commit() {
     git commit -q -m "${1:-change}"
 }
 
+# Every case runs the gate under zsh and bash, which must agree.
+_both() { run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" "$@"; }
+
 @test "check-spec-gate.sh --help shows usage and exits 0" {
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --help
+    _both --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"Usage"* ]] || false
     [[ "$output" == *"--base-ref"* ]] || false
 }
 
 @test "exits 2 when --base-ref missing" {
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --head-ref HEAD
+    _both --head-ref HEAD
     [ "$status" -eq 2 ]
     [[ "$output" == *"required"* ]] || false
 }
 
 @test "exits 2 when --head-ref missing" {
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main
+    _both --base-ref main
     [ "$status" -eq 2 ]
     [[ "$output" == *"required"* ]] || false
 }
 
 @test "exits 2 on unknown argument" {
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --bogus
+    _both --bogus
     [ "$status" -eq 2 ]
     [[ "$output" == *"Unknown"* ]] || false
 }
@@ -54,7 +59,7 @@ _commit() {
 @test "exits 0 when diff is below threshold (no spec needed)" {
     printf 'line %d\n' {1..10} > small.txt
     _commit "small change"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
     [[ "$output" == *"below threshold"* ]] || [[ "$output" == *"OK"* ]] || false
 }
@@ -64,7 +69,7 @@ _commit() {
     printf 'proposal line %d\n' {1..12} > specs/SDD-999-test/proposal.md
     printf 'line %d\n' {1..60} > big.txt
     _commit "big change with spec"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
     [[ "$output" == *"spec folder touched"* ]] || [[ "$output" == *"OK"* ]] || false
 }
@@ -74,7 +79,7 @@ _commit() {
     printf 'x\n' > specs/SDD-777-stale/proposal.md   # 1 line, below SPEC_FLOOR
     printf 'line %d\n' {1..60} > big.txt
     _commit "large PR with a trivial stale-spec alibi"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -82,7 +87,7 @@ _commit() {
 @test "exits 1 when diff >= threshold AND no specs folder" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "big change without spec"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
     [[ "$output" == *"AGENTS.md"* ]] || false
@@ -91,9 +96,9 @@ _commit() {
 @test "exits 0 with skip-sdd label AND non-empty rationale" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "big change skipped"
-    run env SDD_LABELS="skip-sdd" \
+    SDD_LABELS="skip-sdd" \
         SDD_PR_BODY=$'## Summary\nfoo\n\n## SDD skip rationale\nmechanical rename, no logic change.\n' \
-        "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+        _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
     [[ "$output" == *"skip-sdd"* ]] || false
 }
@@ -101,9 +106,9 @@ _commit() {
 @test "exits 1 when skip-sdd label present but rationale empty" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "skip without rationale"
-    run env SDD_LABELS="skip-sdd" \
+    SDD_LABELS="skip-sdd" \
         SDD_PR_BODY=$'## Summary\nfoo\n\n## SDD skip rationale\n\n' \
-        "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+        _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"rationale"* ]] || false
 }
@@ -111,8 +116,8 @@ _commit() {
 @test "exits 0 when dependencies label present AND author is a bot (#686/C25)" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "dep bump"
-    run env SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="dependabot[bot]" \
-        "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="dependabot[bot]" \
+        _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
     [[ "$output" == *"bot-authored"* ]] || false
 }
@@ -120,8 +125,8 @@ _commit() {
 @test "dependencies label from a NON-bot author does not bypass the gate (#686/C25)" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "dep bump masquerade"
-    run env SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="some-human" \
-        "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    SDD_LABELS="dependencies" SDD_PR_BODY="" SDD_PR_AUTHOR="some-human" \
+        _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -129,7 +134,7 @@ _commit() {
 @test "fails closed (exit 2) when the base ref does not resolve (#686/C3)" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "change against a bogus base"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref origin/does-not-exist --head-ref feature
+    _both --base-ref origin/does-not-exist --head-ref feature
     [ "$status" -eq 2 ]
     [[ "$output" == *"could not be resolved"* ]] || [[ "$output" == *"fails closed"* ]] || false
 }
@@ -138,7 +143,7 @@ _commit() {
     # Previously any path merely containing "generated" was silently excluded.
     printf 'line %d\n' {1..60} > internal_generated_names.go
     _commit "large generated-named file, no spec"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -148,7 +153,7 @@ _commit() {
     printf 'line %d\n' {1..200} > tests/big-test.bats
     printf 'line %d\n' {1..10} > small.txt
     _commit "tests do not count"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
 }
 
@@ -157,7 +162,7 @@ _commit() {
     printf 'line %d\n' {1..200} > cli/internal/foo/foo_test.go
     printf 'line %d\n' {1..10} > small.txt
     _commit "go test file does not count as production"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
 }
 
@@ -165,7 +170,7 @@ _commit() {
     mkdir -p specs/archive/OLD-001-archived
     printf 'line %d\n' {1..200} > specs/archive/OLD-001-archived/proposal.md
     _commit "archive moves"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
 }
 
@@ -173,7 +178,7 @@ _commit() {
     mkdir -p docs/adr
     printf 'line %d\n' {1..200} > docs/adr/adr-999-example.md
     _commit "doc-only ADR"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
 }
 
@@ -181,7 +186,7 @@ _commit() {
     mkdir -p docs
     printf 'line %d\n' {1..60} > docs/example.sh
     _commit "script under docs counts as production"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -189,7 +194,7 @@ _commit() {
 @test "excludes lockfiles from LOC count" {
     printf 'line %d\n' {1..200} > package-lock.json
     _commit "lockfile bump"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
 }
 
@@ -207,7 +212,7 @@ _commit() {
     printf 'orig %d\n' {1..200} > leftover.go.orig
     printf 'rej %d\n' {1..200} > leftover.go.rej
     _commit "delete the patches, leave a failed apply's output"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 0 ]
 }
 
@@ -218,7 +223,7 @@ _commit() {
     git branch -f main HEAD
     git rm -q tool.sh
     _commit "delete the script"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -226,7 +231,7 @@ _commit() {
 @test "--explain prints LOC breakdown" {
     printf 'line %d\n' {1..10} > small.txt
     _commit "small"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
+    _both --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
     [[ "$output" == *"Threshold"* ]] || false
     [[ "$output" == *"Production LOC"* ]] || false
@@ -235,7 +240,7 @@ _commit() {
 @test "--threshold flag overrides default" {
     printf 'line %d\n' {1..10} > small.txt
     _commit "small"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --threshold 5
+    _both --base-ref main --head-ref feature --threshold 5
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -245,7 +250,7 @@ _commit() {
     printf 'archived\n' > specs/archive/OLD-001-archived/proposal.md
     printf 'line %d\n' {1..60} > big.txt
     _commit "archive does not satisfy gate"
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -269,7 +274,7 @@ _commit() {
     printf 'code line %d\n' {1..60} > feature.go
     _commit "archive move bundled with unrelated production code"
 
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+    _both --base-ref main --head-ref feature
     [ "$status" -eq 1 ]
     [[ "$output" == *"Discipline Gate"* ]] || false
 }
@@ -289,7 +294,7 @@ _commit() {
     git mv specs/HARNESS-026-bar/proposal.md specs/archive/HARNESS-026-bar/proposal.md
     _commit "pure archive move"
 
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
+    _both --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
     [[ "$output" == *"Spec folder touched: no"* ]] || false
     [[ "$output" == *"Production LOC (added+removed): 0"* ]] || false

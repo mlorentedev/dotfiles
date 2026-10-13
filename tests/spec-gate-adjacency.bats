@@ -4,6 +4,8 @@
 # PR changes — the signal that was missing when #851 merged while #849, which
 # described the shape the fix did not cover, sat open on the board.
 
+load 'lib/both-shells'
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     REPO_FIXTURE="/tmp/bats_adjacency_$$_${BATS_TEST_NUMBER:-0}"
@@ -51,7 +53,7 @@ _write_849_feed() {
     _replay_851_diff
     _write_849_feed
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
     [[ "$output" == *"849"* ]] || false
@@ -67,7 +69,7 @@ _write_849_feed() {
         'An unrelated-looking title with no filename at all, but the body cites `scripts/knowledge-crystallize.ps1` in a code span.' \
         > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"777"* ]] || false
 }
@@ -76,7 +78,7 @@ _write_849_feed() {
     _replay_851_diff
     printf '%s\t%s\n' 900 'OPS-001: rotate the age key on the Windows box, see sensitive/env-mapping.conf' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"900"* ]] || false
 }
@@ -85,7 +87,7 @@ _write_849_feed() {
     _replay_851_diff
     printf '%s\t%s\n' 850 'BUG-060: crystallize appends past the handoff block in scripts/knowledge-crystallize.sh' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"#850"* ]] || false
 }
@@ -106,7 +108,7 @@ _write_849_feed() {
         printf '%s\t%s\n' 333 'BUG-999: scripts/real-change.sh mishandles the second input shape'
     } > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"111"* ]] || false
     [[ "$output" != *"222"* ]] || false
@@ -117,10 +119,10 @@ _write_849_feed() {
     _replay_851_diff
     _write_849_feed
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
     local without_status="$status"
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
     [ "$status" -eq "$without_status" ]
@@ -131,7 +133,7 @@ _write_849_feed() {
     # no file, and the gate must behave exactly as it did before this change.
     _replay_851_diff
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
             --base-ref main --head-ref feature --adjacency-issues /nonexistent/feed.tsv
     [ "$status" -ne 2 ]
     [[ "$output" != *"Adjacent open issues"* ]] || false
@@ -157,7 +159,7 @@ _write_849_feed() {
     local baseline_output="$output" baseline_status="$status"
 
     SDD_PR_BODY="Closes #850" \
-        run "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
     [ "$status" -eq "$baseline_status" ]
 
     _strip_escape_hatch() {
@@ -170,7 +172,7 @@ _write_849_feed() {
 }
 
 @test "adjacency: --help documents the flag" {
-    run "$SCRIPTS_DIR/check-spec-gate.sh" --help
+    run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"--adjacency-issues"* ]] || false
 }
