@@ -40,8 +40,10 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		return
 	}
 	home := sys.home()
-	// Whatever the pins below say: the PATH a fresh shell starts with is a fact
-	// about the deployed files, and a missing pin must not hide it.
+	// Once mise is on PATH, whatever the pins below say: the PATH a fresh shell
+	// starts with is a fact about the deployed files, and a missing pin must
+	// not hide it. Without mise there are no shims to put on PATH, and the
+	// WARN above already names the remedy.
 	defer checkNonInteractivePath(sys, home, rep)
 	s := miseSync(sys, all.PythonPackages, all.Latest)
 	p, err := s.Plan(pins)
@@ -95,6 +97,9 @@ func checkNonInteractivePath(sys *System, home string, rep *Report) {
 	}
 	shims := tools.MiseShimsDir(home, sys.GOOS, sys.Getenv)
 	localBin := filepath.Join(home, ".local", "bin")
+	// Forwarded because a real caller inherits them too: mise's data dir moves
+	// the shims, and a zsh that inherits ZDOTDIR reads $ZDOTDIR/.zshenv, not
+	// the ~/.zshenv deploy installs. A WARN under ZDOTDIR is then true.
 	env := []string{"HOME=" + home, "PATH=/usr/bin:/bin"}
 	for _, k := range []string{"MISE_DATA_DIR", "XDG_DATA_HOME", "ZDOTDIR"} {
 		if v := sys.Getenv(k); v != "" {
