@@ -14,7 +14,7 @@ import (
 const workstationTemplate = "AllowUsers {user}@{mesh}\nPasswordAuthentication no\n"
 
 // The doctor check (#2356, PLAT-001b PR 7d) runs the converge step's plan with
-// the step's own gates, one row per branch: not darwin → no section; not opted
+// the step's own gates, one row per branch: neither darwin nor linux → no section; not opted
 // in → SKIP; off the mesh → SKIP; a config that shadows the drop-in → WARN with
 // Inspect's own message; anything pending → WARN naming the converge command;
 // converged → PASS.
@@ -30,7 +30,14 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 		needle  string
 		section bool
 	}{
-		{name: "linux → no section", goos: "linux", optIn: true, addrs: mesh, section: false},
+		{name: "windows → no section", goos: "windows", optIn: true, addrs: mesh, section: false},
+		{name: "linux, nothing applied → WARN naming the converge command", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "dotf converge --only workstation-target", section: true},
+		{name: "linux, converged → PASS", goos: "linux", optIn: true, addrs: mesh, want: StatusPass, needle: "as declared for the mesh address 100.64.0.15", section: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeFile(t, p.AuthorizedKeys, "ssh-ed25519 AAAAOwner manu@msi\n")
+				writeFile(t, p.HostKey, "ssh-ed25519 AAAAHost root@msi\n")
+				writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
+			}},
 		{name: "not opted in → SKIP", goos: "darwin", addrs: mesh, want: StatusSkip, needle: "dotf env role add ssh-target", section: true},
 		{name: "off the mesh → SKIP", goos: "darwin", optIn: true, addrs: []net.IP{net.ParseIP("10.0.0.130")}, want: StatusSkip, needle: "join the mesh", section: true},
 		{name: "nothing applied → WARN naming the converge command", goos: "darwin", optIn: true, addrs: mesh, want: StatusWarn, needle: "dotf converge --only workstation-target", section: true},
@@ -78,7 +85,12 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			s.SSHTargetPaths = func(string) sshtarget.Paths { return paths }
 			s.MeshAddrs = func() ([]net.IP, error) { return tc.addrs, nil }
 			s.CommandOutput = func(name string, args ...string) (string, error) {
-				if name != "launchctl" {
+				switch {
+				case name == "launchctl" && args[0] == "print":
+				case name == "systemctl" && args[0] == "list-unit-files":
+					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
+				case name == "systemctl" && (args[0] == "is-enabled" || args[0] == "is-active"):
+				default:
 					t.Fatalf("doctor ran %s %v; it must only read", name, args)
 				}
 				if loaded {

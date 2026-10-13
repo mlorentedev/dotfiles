@@ -27,15 +27,16 @@ type workstationTarget struct {
 
 func (workstationTarget) Name() string { return "workstation-target" }
 
-// Platforms is darwin until a Linux host accepts the systemd service (#2356).
-func (workstationTarget) Platforms() []string { return []string{"darwin"} }
+// Platforms is where sshd has a service manager the target drives: launchd
+// and systemd. Windows follows (#2356, PLAT-001b PR 7e).
+func (workstationTarget) Platforms() []string { return []string{"darwin", "linux"} }
 
 func (r workstationTarget) target(e Env) (sshtarget.Target, error) {
 	u, err := r.user()
 	if err != nil {
 		return sshtarget.Target{}, err
 	}
-	t, err := sshtarget.New(e.RepoRoot, u, r.paths(e.Home), r.run, r.addrs)
+	t, err := sshtarget.New(e.RepoRoot, u, e.GOOS, r.paths(e.Home), r.run, r.addrs)
 	t.Root = r.root
 	return t, err
 }

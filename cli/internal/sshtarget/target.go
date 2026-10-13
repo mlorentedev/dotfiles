@@ -69,12 +69,15 @@ const (
 	TemplateFile = "ssh/sshd-workstation.conf"
 )
 
-// New builds the target for user from the checkout at repoRoot: the owner's
-// key and the drop-in template, with launchd as the service. Root is left for
-// the caller, because only an apply needs it and doctor never applies.
-func New(repoRoot, user string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
-	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs, Service: Launchd{Run: run}}
+// New builds the target for user on goos from the checkout at repoRoot: the
+// owner's key and the drop-in template, with goos's service manager. Root is
+// left for the caller, because only an apply needs it and doctor never applies.
+func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
+	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs}
 	var err error
+	if t.Service, err = ServiceFor(goos, run); err != nil {
+		return t, err
+	}
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
 	}
