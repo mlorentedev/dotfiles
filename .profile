@@ -34,3 +34,7 @@ fi
 # set PATH and EDITOR
 export PATH="$HOME/bin:$PATH"
 export EDITOR="vim"
+
+# Last, so mise's shims end up ahead of every ~/.local/bin added above (#2013 W2b).
+# shellcheck source=/dev/null
+if [ -f "$HOME/.zsh/path.sh" ]; then . "$HOME/.zsh/path.sh"; fi

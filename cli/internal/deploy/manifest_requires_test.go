@@ -134,7 +134,8 @@ func TestMissingSiblingRequires(t *testing.T) {
 // "<command>" for every OS or "<command>/<goos>" for one.
 var requiredButNotCataloged = map[string]string{
 	"git":            "install.sh's prerequisite: the checkout step needs it before the catalog runs",
-	"claude":         "the setup twins install it until #2013 PR-B moves it to the catalog",
+	"claude/windows": "mise installs it on linux and darwin; on Windows setup-windows.ps1 does until mise joins the Windows catalog (#2013)",
+	"herdr/windows":  "mise installs it on linux and darwin; Windows waits for mise in the Windows catalog and H2 (conpty/, #2013)",
 	"pi":             "the setup twins install it until #2278 moves it to the catalog",
 	"zsh/darwin":     "macOS ships zsh as its login shell",
 	"zsh/windows":    "the zsh configs are for POSIX shells; Windows runs pwsh",
@@ -162,7 +163,19 @@ func TestManifest_EveryRequiredCommandIsInstalledWhereTheEntryDeploys(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	missing := uncatalogedRequires(m.Configs, cat)
+	versions, err := os.ReadFile(filepath.Join("../../..", "versions.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pins, err := tools.ParseMisePins(versions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var viaMise []string
+	for _, p := range pins.Tools {
+		viaMise = append(viaMise, p.Name)
+	}
+	missing := uncatalogedRequires(m.Configs, cat, viaMise)
 	// The positive half: zsh is the case this guard was written for.
 	if slices.Contains(missing, "zsh/linux") {
 		t.Error("nothing installs zsh on linux, so the zsh configs never deploy there")
@@ -188,15 +201,18 @@ func TestManifest_EveryRequiredCommandIsInstalledWhereTheEntryDeploys(t *testing
 
 // uncatalogedRequires names, as "<command>/<goos>", each command an entry
 // requires on an OS it deploys to where no catalog tool installs that command.
+// A tool versions.conf marks for mise (viaMise) counts wherever the catalog
+// installs mise: `dotf tools sync` installs it there (herdr, claude, #2013).
 // Sorted and without duplicates.
-func uncatalogedRequires(configs []Config, cat tools.Catalog) []string {
+func uncatalogedRequires(configs []Config, cat tools.Catalog, viaMise []string) []string {
 	var out []string
 	for _, c := range configs {
 		if c.Requires == "" {
 			continue
 		}
 		for _, goos := range []string{"linux", "darwin", "windows"} {
-			if c.AppliesOn(goos) && !catalogInstalls(cat, c.Requires, goos) {
+			byMise := slices.Contains(viaMise, c.Requires) && catalogInstalls(cat, "mise", goos)
+			if c.AppliesOn(goos) && !byMise && !catalogInstalls(cat, c.Requires, goos) {
 				out = append(out, c.Requires+"/"+goos)
 			}
 		}

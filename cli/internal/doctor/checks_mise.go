@@ -40,6 +40,11 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		return
 	}
 	home := sys.home()
+	// Once mise is on PATH, whatever the pins below say: the PATH a fresh shell
+	// starts with is a fact about the deployed files, and a missing pin must
+	// not hide it. Without mise there are no shims to put on PATH, and the
+	// WARN above already names the remedy.
+	defer checkNonInteractivePath(sys, home, rep)
 	s := miseSync(sys, all.PythonPackages, all.Latest)
 	p, err := s.Plan(pins)
 	if err != nil {
@@ -72,6 +77,103 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 	}
 	rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
 	checkShadowingCopies(sys, home, pins, rep, fix)
+}
+
+// shellProbes are the non-interactive shells whose startup PATH decides what
+// an agent, a script or a command over ssh runs. `bash -c` is not one: it
+// reads no file and inherits its parent's PATH, so what it runs is the
+// parent's question, not the dotfiles' (#2013 W2b).
+var shellProbes = [][2]string{{"zsh", "-c"}, {"bash", "-lc"}}
+
+// checkNonInteractivePath asks each shell above, started from an environment
+// that holds only HOME and a bare system PATH, what PATH it builds: none of
+// them reads the rc that runs `mise activate`, so mise's shims on that PATH,
+// ahead of ~/.local/bin, are the only way they run the pins. Starting from an
+// empty environment is the point: doctor's own PATH says what the shell that
+// launched doctor has, not what the deployed files give a fresh one.
+func checkNonInteractivePath(sys *System, home string, rep *Report) {
+	if sys.GOOS == "windows" {
+		return
+	}
+	shims := tools.MiseShimsDir(home, sys.GOOS, sys.Getenv)
+	localBin := filepath.Join(home, ".local", "bin")
+	// Forwarded because a real caller inherits them too: mise's data dir moves
+	// the shims, and a zsh that inherits ZDOTDIR reads $ZDOTDIR/.zshenv, not
+	// the ~/.zshenv deploy installs. A WARN under ZDOTDIR is then true.
+	env := []string{"HOME=" + home, "PATH=/usr/bin:/bin"}
+	for _, k := range []string{"MISE_DATA_DIR", "XDG_DATA_HOME", "ZDOTDIR"} {
+		if v := sys.Getenv(k); v != "" {
+			env = append(env, k+"="+v)
+		}
+	}
+	var ok, bad []string
+	for _, p := range shellProbes {
+		if !sys.has(p[0]) {
+			continue
+		}
+		form := p[0] + " " + p[1]
+		out, err := sys.CommandOutputEnv(env, p[0], p[1], `printf %s "$PATH"`)
+		if err != nil {
+			bad = append(bad, fmt.Sprintf("`%s` failed: %v", form, err))
+			continue
+		}
+		// The last line: an rc that prints something prints it first.
+		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+		if problem := shimsAhead(lines[len(lines)-1], shims, localBin); problem != "" {
+			bad = append(bad, fmt.Sprintf("`%s` %s", form, problem)+loginFileHidingProfile(sys, home, p[0]))
+			continue
+		}
+		ok = append(ok, form)
+	}
+	if len(bad) > 0 {
+		rep.Warn(strings.Join(bad, "; ") + " (run: dotf deploy, which installs ~/.zshenv, ~/.profile and ~/.zsh/path.sh)")
+		return
+	}
+	if len(ok) > 0 {
+		rep.Pass("non-interactive shells start with mise's shims first: " + strings.Join(ok, ", "))
+	}
+}
+
+// loginFileHidingProfile names the file a login bash reads instead of the
+// deployed ~/.profile: bash -l reads only the first of ~/.bash_profile,
+// ~/.bash_login and ~/.profile, so `dotf deploy` alone cannot fix a home that
+// holds one of the first two.
+func loginFileHidingProfile(sys *System, home, shell string) string {
+	if shell != "bash" {
+		return ""
+	}
+	for _, name := range []string{".bash_profile", ".bash_login"} {
+		f := filepath.Join(home, name)
+		if _, err := os.Stat(f); err == nil {
+			return " (" + f + " exists, so bash -l never reads ~/.profile: source ~/.zsh/path.sh from it)"
+		}
+	}
+	return ""
+}
+
+// shimsAhead says what is wrong with a PATH that must list shims before
+// localBin, or "" when nothing is.
+func shimsAhead(pathList, shims, localBin string) string {
+	shimsAt, localAt := -1, -1
+	for i, d := range filepath.SplitList(pathList) {
+		switch filepath.Clean(d) {
+		case filepath.Clean(shims):
+			if shimsAt < 0 {
+				shimsAt = i
+			}
+		case filepath.Clean(localBin):
+			if localAt < 0 {
+				localAt = i
+			}
+		}
+	}
+	switch {
+	case shimsAt < 0:
+		return "starts without mise's shims (" + shims + ") on PATH"
+	case localAt >= 0 && localAt < shimsAt:
+		return "puts " + localBin + " ahead of mise's shims, so a copy there shadows the pin"
+	}
+	return ""
 }
 
 // miseSync is the sync `dotf tools sync` runs, with mise run from HOME so a

@@ -428,4 +428,6 @@ tags: [lessons, index, dotfiles]
 | [407 - A markdown gate must read the body in CommonMark order](lesson-407-a-markdown-gate-must-read-the-body-in-commonmark-order.md) | 2026-10-13 |
 | [408 - A suite that runs a script by path tests only its shebang](lesson-408-a-suite-that-runs-a-script-by-path-tests-only-its-shebang.md) | 2026-10-13 |
 | [409 - A test that stages in the real index races every other git](lesson-409-a-test-that-stages-in-the-real-index-races-every-other-git.md) | 2026-10-13 |
+| [410 - bash -c reads no startup file, so no file of ours can set its PATH](lesson-410-bash-c-reads-no-startup-file.md) | 2026-10-13 |
+| [411 - A merge entry's dst needs a literal extension, or every dotf refuses the manifest](lesson-411-a-merge-dst-needs-a-literal-extension.md) | 2026-10-13 |
 <!-- END GENERATED -->

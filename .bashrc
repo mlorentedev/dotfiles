@@ -8,6 +8,11 @@ if [[ -n "${DOTFILES_PROFILE:-}" ]]; then
     set -x
 fi
 
+# PATH's head before the interactive check: bash run by sshd for a command
+# sources this file non-interactively and stops at the return below (#2013 W2b).
+# shellcheck source=/dev/null
+if [ -f "$HOME/.zsh/path.sh" ]; then . "$HOME/.zsh/path.sh"; fi
+
 # ==========================
 #    INTERACTIVE CHECK
 # ==========================
