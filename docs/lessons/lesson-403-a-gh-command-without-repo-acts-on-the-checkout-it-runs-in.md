@@ -20,19 +20,22 @@ the one the working directory's git remote points at. So the command renamed
 `mlorentedev/dotfiles` to `mlorentedev/pdf-modifier`. It then rewrote `origin` in the shared
 `.git/config` to the new URL, so every worktree of the checkout followed the rename.
 
-Nothing failed. GitHub redirects the old name, so pushes and fetches kept working. The first
-visible symptom came later, in a different session: `gh issue comment 2356` posted to
-`pdf-modifier#2356`, and the acceptance evidence of #2356 landed on the wrong issue. Every
-unqualified `gh` command in every session on that checkout now resolved to a repository with
-the wrong name. Those commands succeeded, so nothing reported the error.
+Nothing failed. The repository kept its id, its issues and its history, and GitHub redirects
+the old name, so pushes, fetches and comments kept reaching it. The rename was visible only as
+a name. In a different session, `gh issue comment 2356` printed a
+`github.com/mlorentedev/pdf-modifier/issues/2356` URL. That looked like the wrong repository,
+so the session posted the evidence a second time. Both comments were on dotfiles #2356, under
+the repository's new name. Meanwhile the repository the owner meant was still
+`pdf-modifier-mcp`. The name it was meant to take now belonged to dotfiles, and the old name
+`dotfiles` was free for anything to claim.
 
 ## The Solution
-Both renames were reversed with explicit targets: `gh repo rename dotfiles --repo
-mlorentedev/pdf-modifier`, then `gh repo rename pdf-modifier --repo
-mlorentedev/pdf-modifier-mcp`. The shared remote was restored with `git remote set-url origin
-https://github.com/mlorentedev/dotfiles.git`, and the duplicate comment was deleted. The
-repository ids confirm which repository holds which name: dotfiles is 882120129 and
-pdf-modifier is 1133951816.
+The wrong rename was reversed with an explicit target: `gh repo rename dotfiles --repo
+mlorentedev/pdf-modifier`. The requested rename then ran against the right repository:
+`gh repo rename pdf-modifier --repo mlorentedev/pdf-modifier-mcp`. The shared remote was
+restored with `git remote set-url origin https://github.com/mlorentedev/dotfiles.git`, and the
+duplicate comment was deleted. The repository ids confirm which repository holds which name:
+dotfiles is 882120129 and pdf-modifier (formerly pdf-modifier-mcp) is 1133951816.
 
 ## Takeaways
 - An agent passes `--repo OWNER/REPO` to every `gh` command that writes: rename, comment,
