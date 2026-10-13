@@ -1,7 +1,7 @@
 ---
 id: spec-CLI-098-pr-land
 type: spec
-status: implementing
+status: archived
 created: "2026-10-06"
 owner: manu
 issue: "mlorentedev/dotfiles#2034"
