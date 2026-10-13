@@ -2,6 +2,7 @@
 # Tests for scripts/obs-cli.ps1 (structural; PSScriptAnalyzer runs in lint-powershell, #2052)
 
 load 'winpath'
+load 'lib/pwsh'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -46,9 +47,7 @@ setup() {
 }
 
 @test "obs-cli.ps1 valid PowerShell syntax (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
     run pwsh -NonInteractive -Command "
         \$errors = \$null
         [System.Management.Automation.Language.Parser]::ParseFile(

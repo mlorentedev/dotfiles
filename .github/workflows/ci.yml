@@ -350,6 +350,9 @@ jobs:
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         env:
           DOTF_TEST_GH_TOKEN: ${{ github.token }}
+          # The runner image ships pwsh: a missing or broken one fails the
+          # PowerShell tests instead of skipping them (tests/lib/pwsh.bash).
+          DOTFILES_CI_EXPECT_PWSH: '1'
           # The network leg of pr-agent-config.bats (#2021).
           DOTF_TEST_NETWORK: >-
             ${{ (github.event_name == 'push' || needs.changes.outputs.pr_agent_contract == 'true') && '1' || '' }}
@@ -861,6 +864,8 @@ jobs:
       - name: Run PowerShell bats subset (Git Bash, pinned bats)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: bash
+        env:
+          DOTFILES_CI_EXPECT_PWSH: '1' # pwsh is this job's shell; see tests/lib/pwsh.bash
         run: |
           source versions.conf
           curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
