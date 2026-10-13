@@ -141,9 +141,17 @@ _strip_markup() {
             # code line rather than a fence.
             if (!inside && match(line, /^ ? ? ?(```+|~~~+)/)) {
                 marker = substr(line, RSTART, RLENGTH); sub(/^ +/, "", marker)
-                if (fence == "") { fence = marker; opened = NR }
-                else if (substr(marker, 1, 1) == substr(fence, 1, 1) && length(marker) >= length(fence)) { fence = "" }
-                next
+                rest = substr(line, RSTART + RLENGTH)
+                if (fence != "") {
+                    # Only a bare marker closes: the opener character, at
+                    # least as long, and nothing after it but spaces. A
+                    # line like ```js inside the fence is code.
+                    if (substr(marker, 1, 1) == substr(fence, 1, 1) && length(marker) >= length(fence) && rest ~ /^[ \t]*$/) fence = ""
+                    next
+                }
+                # A backtick fence cannot carry a backtick in its info string:
+                # such a line is inline code in a paragraph, not an opener.
+                if (!(substr(marker, 1, 1) == "`" && index(rest, "`"))) { fence = marker; opened = NR; next }
             }
             if (fence != "") next
             out = strip_comments(line)

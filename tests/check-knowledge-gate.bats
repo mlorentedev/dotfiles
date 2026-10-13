@@ -364,6 +364,38 @@ Example:
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
 }
 
+@test "a fence line with text after it closes nothing: only a bare marker closes" {
+    SDD_PR_BODY="## Summary
+
+\`\`\`
+code
+\`\`\`js
+more
+\`\`\`
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a backtick line whose info string holds a backtick is inline code, not a fence" {
+    SDD_PR_BODY="## Summary
+
+\`\`\`code\`\`\` rest
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned
