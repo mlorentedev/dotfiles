@@ -423,4 +423,5 @@ tags: [lessons, index, dotfiles]
 | [402 - A writer that round-trips a shared file through its own struct deletes what it does not know](lesson-402-a-writer-that-round-trips-a-shared-file-through-its-own-struct.md) | 2026-10-12 |
 | [403 - A gh command without --repo acts on the checkout it runs in, and a rename rewrites that checkout's remote](lesson-403-a-gh-command-without-repo-acts-on-the-checkout-it-runs-in.md) | 2026-10-12 |
 | [404 - A CLI hint that names the wrong fix: claude-plugins-official was not stale, it was not registered](lesson-404-a-cli-hint-that-names-the-wrong-fix.md) | 2026-10-13 |
+| [405 - A config written only by a setup script freezes on every machine that does not run it](lesson-405-a-config-written-only-by-a-setup-script-freezes-where-it-does-not-run.md) | 2026-10-13 |
 <!-- END GENERATED -->

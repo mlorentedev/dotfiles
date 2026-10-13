@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,8 +38,17 @@ func TestDeployCmd_BareDeployWritesAgyMCPConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("master not written: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(raw), filepath.Join(home, "Projects", "knowledge")) {
-		t.Errorf("VAULT_PATH placeholder not resolved:\n%s", raw)
+	// Decoded, not grepped: JSON escapes a Windows path's backslashes.
+	var doc struct {
+		MCPServers map[string]struct {
+			Env map[string]string `json:"env"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := doc.MCPServers["hive-vault"].Env["VAULT_PATH"], filepath.Join(home, "Projects", "knowledge"); got != want {
+		t.Errorf("hive-vault VAULT_PATH = %q, want %q", got, want)
 	}
 	if !strings.Contains(out, "no vault at") {
 		t.Errorf("a missing vault must be reported:\n%s", out)
