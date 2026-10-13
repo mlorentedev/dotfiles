@@ -62,7 +62,11 @@ func checkWorkstationTarget(sys *System, cfg *Config, rep *Report) {
 	case !p.Converged():
 		rep.Warn(fmt.Sprintf("differs from the declared state: %s; run %s (it asks for root once)", strings.Join(p.Pending, ", "), workstationRemedy))
 	default:
-		msg := fmt.Sprintf("key, host keys, sshd drop-in and service as declared for the mesh address %s", p.Mesh)
+		what := "key, host keys, sshd drop-in and service"
+		if t.Firewall != nil {
+			what = "firewall, " + what
+		}
+		msg := fmt.Sprintf("%s as declared for the mesh address %s", what, p.Mesh)
 		for _, n := range p.Notes {
 			msg += "; " + n
 		}

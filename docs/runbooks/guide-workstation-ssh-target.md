@@ -28,7 +28,7 @@ section 4.
 
 | Layer | Linux | macOS | Windows |
 |---|---|---|---|
-| Network (by hand) | UFW: port 22 only `in on tailscale0` | pf anchor: port 22 only from the mesh range | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` |
+| Network | UFW: port 22 only `in on tailscale0` (converged) | pf anchor: port 22 only from the mesh range (by hand) | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` (by hand) |
 | sshd | drop-in: key only, `AllowUsers manu@100.64.0.0/10` (converge) | same drop-in (converge) | `sshd_config`: key only, `AllowUsers` mesh range (by hand) |
 | Client | `ForwardAgent no`, keepalives, `IdentitiesOnly yes`, host key pinned with `StrictHostKeyChecking yes` (`ssh/config`, `ssh/known_hosts`) | same | same |
 

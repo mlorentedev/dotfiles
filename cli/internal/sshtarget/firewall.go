@@ -145,6 +145,9 @@ func (u UFW) Apply(root Root) (func() error, error) {
 		undos = append(undos, func() error { return asRoot(root, "ufw", "disable") })
 	}
 
+	if err := ufwActive(root); err != nil {
+		return undo, err
+	}
 	want, err := u.witness()
 	if err != nil {
 		return undo, err
@@ -170,6 +173,25 @@ func (u UFW) Prove() error {
 	}
 	if differs {
 		return fmt.Errorf("ufw does not read as converged after the apply (%s, %s, %s)", u.Conf, u.Defaults, u.Witness)
+	}
+	return nil
+}
+
+// ufwActive asks ufw, as root, what the kernel now holds: the files say what
+// ufw will load, its status says what it loaded.
+func ufwActive(root Root) error {
+	out, err := root.Run("ufw", "status", "verbose")
+	if err != nil {
+		return fmt.Errorf("ufw status verbose: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	s := string(out)
+	switch {
+	case !strings.Contains(s, "Status: active"):
+		return fmt.Errorf("ufw is not active after the apply:\n%s", s)
+	case !strings.Contains(s, "deny (incoming)") && !strings.Contains(s, "reject (incoming)"):
+		return fmt.Errorf("ufw does not refuse incoming by default after the apply:\n%s", s)
+	case !strings.Contains(s, "22/tcp on "+MeshInterface):
+		return fmt.Errorf("ufw lists no port 22 rule on %s after the apply:\n%s", MeshInterface, s)
 	}
 	return nil
 }

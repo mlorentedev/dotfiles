@@ -60,6 +60,8 @@ type host struct {
 	u         UFW
 	rootCalls []string
 	failOn    string // a root command prefix that fails
+	// statusOverride, when set, is what `ufw status verbose` prints.
+	statusOverride string
 }
 
 func newHost(t *testing.T, enabled bool, policy, rules, rules6 string) *host {
@@ -136,6 +138,8 @@ func (h *host) Run(argv ...string) ([]byte, error) {
 	case len(argv) == 4 && argv[0] == "ufw" && argv[1] == "default" && argv[3] == "incoming":
 		v := map[string]string{"deny": "DROP", "allow": "ACCEPT", "reject": "REJECT"}[argv[2]]
 		h.write(h.u.Defaults, "IPV6=yes\nDEFAULT_INPUT_POLICY=\""+v+"\"\nDEFAULT_OUTPUT_POLICY=\"ACCEPT\"\n")
+	case call == "ufw status verbose":
+		return []byte(h.status()), nil
 	case call == "ufw --force enable":
 		h.write(h.u.Conf, strings.Replace(h.read(h.u.Conf), "ENABLED=no", "ENABLED=yes", 1))
 	case call == "ufw disable":
@@ -144,6 +148,23 @@ func (h *host) Run(argv ...string) ([]byte, error) {
 		h.t.Fatalf("unexpected root command %q", call)
 	}
 	return nil, nil
+}
+
+// status renders `ufw status verbose` from the files, in ufw 0.36.2's format.
+func (h *host) status() string {
+	if h.statusOverride != "" {
+		return h.statusOverride
+	}
+	if !strings.Contains(h.read(h.u.Conf), "ENABLED=yes") {
+		return "Status: inactive\n"
+	}
+	policy := map[string]string{"DROP": "deny", "ACCEPT": "allow", "REJECT": "reject"}[shellValue([]byte(h.read(h.u.Defaults)), "DEFAULT_INPUT_POLICY")]
+	s := "Status: active\nLogging: on (low)\nDefault: " + policy + " (incoming), allow (outgoing), deny (routed)\nNew profiles: skip\n\n" +
+		"To                         Action      From\n--                         ------      ----\n"
+	if strings.Contains(h.read(h.u.Rules), "in_tailscale0") {
+		s += "22/tcp on tailscale0       ALLOW IN    Anywhere                   # ssh: mesh only\n"
+	}
+	return s
 }
 
 // A fresh install: UFW off, input policy DROP, no rules. Apply adds the mesh
@@ -273,5 +294,23 @@ func TestFirewallForManagesUFWOnlyWhereItIsInstalled(t *testing.T) {
 	}
 	if f, note := FirewallFor("darwin", paths); f != nil || note == "" {
 		t.Errorf("darwin: FirewallFor = %v, %q; want nil and a note", f, note)
+	}
+}
+
+// The files can say one thing and the kernel another (an iptables backend
+// that refused the load). The apply asks ufw what it loaded, and undoes the
+// run when the answer is not the declared state.
+func TestUFWUndoesTheRunWhenUFWDoesNotReportTheDeclaredState(t *testing.T) {
+	h := newHost(t, false, "ACCEPT", fixture(t, "empty.rules"), fixture(t, "empty.rules"))
+	h.statusOverride = "Status: inactive\n"
+	undo, err := h.u.Apply(h)
+	if err == nil || !strings.Contains(err.Error(), "not active") {
+		t.Fatalf("Apply = %v, want the status check to fail it", err)
+	}
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(h.read(h.u.Conf), "ENABLED=yes") || !strings.Contains(h.read(h.u.Defaults), `"ACCEPT"`) {
+		t.Errorf("undo left changes:\n%s\n%s", h.read(h.u.Conf), h.read(h.u.Defaults))
 	}
 }

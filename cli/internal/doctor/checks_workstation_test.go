@@ -43,7 +43,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			state: func(t *testing.T, p sshtarget.Paths, user string) {
 				writeConverged(t, p, user)
 			}},
-		{name: "linux, ufw installed and off → WARN naming the firewall", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "firewall; run `dotf converge", section: true,
+		{name: "linux, ufw installed and off → WARN naming the firewall", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "differs from the declared state: firewall", section: true,
 			state: func(t *testing.T, p sshtarget.Paths, user string) {
 				writeConverged(t, p, user)
 				writeFile(t, p.UFWConf, "ENABLED=no\n")

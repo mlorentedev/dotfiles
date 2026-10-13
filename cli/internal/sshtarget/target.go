@@ -188,6 +188,20 @@ func (t Target) Inspect() (Plan, error) {
 	if p.prevKeys, err = readOptional(t.Paths.AuthorizedKeys); err != nil {
 		return p, err
 	}
+	// The firewall goes first: it closes the door before sshd's listener
+	// opens, and a firewall that refuses (a rule of the owner's opens port 22
+	// off the mesh) refuses before any other resource has changed.
+	if t.Firewall != nil {
+		differs, err := t.Firewall.Differs()
+		if err != nil {
+			return p, err
+		}
+		if differs {
+			p.Pending = append(p.Pending, resFirewall)
+		}
+	} else if t.FirewallNote != "" {
+		p.Notes = append(p.Notes, t.FirewallNote)
+	}
 	if !hasKey(p.prevKeys, p.key) {
 		p.Pending = append(p.Pending, resKey)
 	}
@@ -209,17 +223,6 @@ func (t Target) Inspect() (Plan, error) {
 	}
 	if !p.enabled {
 		p.Pending = append(p.Pending, resService)
-	}
-	if t.Firewall != nil {
-		differs, err := t.Firewall.Differs()
-		if err != nil {
-			return p, err
-		}
-		if differs {
-			p.Pending = append(p.Pending, resFirewall)
-		}
-	} else if t.FirewallNote != "" {
-		p.Notes = append(p.Notes, t.FirewallNote)
 	}
 	if t.Power != nil {
 		differs, err := t.Power.Differs()
