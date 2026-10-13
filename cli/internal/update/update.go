@@ -6,7 +6,7 @@
 // tested path.
 //
 // The load-bearing contract: every non-actionable condition (not a repo, dirty
-// worktree, offline, no upstream, already current, diverged) is a benign SKIP
+// worktree, offline, no upstream, already current, ahead, diverged) is a benign SKIP
 // (nil error). The ONLY error is a real converge failure after a successful
 // fast-forward — so a systemd timer / Scheduled Task run reports failure only
 // when the deploy genuinely broke, never for the routine "nothing to do".
@@ -35,7 +35,7 @@ type Config struct {
 // Outcome classifies a run for the caller to log. Every Outcome except the
 // setup-failure path is returned with a nil error.
 type Outcome struct {
-	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|diverged|ff-failed|updated|converge-failed
+	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|converge-failed
 	Message  string // human-readable line
 	Upstream string // the upstream branch, once resolved (e.g. origin/main)
 	Detail   string // multi-line evidence for the status (the dirtying paths), printed after Message
@@ -53,8 +53,10 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 		return skip(out.Status, out.Message+" — no deploy needed")
 	case StatusAhead:
 		// Local commits are not on the upstream, so they are not a deploy: the
-		// self-update only ever runs what the upstream holds.
-		return skip("diverged", "local branch has diverged from "+out.Upstream+" (non fast-forward) — skipping")
+		// self-update only ever runs what the upstream holds. The skip is right,
+		// but it is not a divergence: the merge base is the upstream and nothing
+		// needs reconciling, so it gets its own tag (#2205).
+		return skip(out.Status, out.Message+" — nothing to deploy")
 	case "not-a-repo":
 		return skip(out.Status, out.Message+" — nothing to self-update")
 	case "dirty":
