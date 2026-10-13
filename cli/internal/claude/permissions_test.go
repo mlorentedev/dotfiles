@@ -1,6 +1,9 @@
 package claude
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -37,7 +40,7 @@ func TestDropMalformedRules_KeepsEveryOtherRuleInOrder(t *testing.T) {
 		"allow: Bash(ls *:*)",
 		"deny: Bash(rm -rf ~/*:*)",
 		"deny: Bash(git reset --hard*:*)",
-	}; !sameSet(got, want) {
+	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("MalformedRules = %q, want %q", got, want)
 	}
 	if !DropMalformedRules(doc) {
@@ -61,21 +64,22 @@ func TestDropMalformedRules_KeepsEveryOtherRuleInOrder(t *testing.T) {
 	}
 }
 
-func sameSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+// The template doctor's --fix compares against carries no rule it would
+// remove: the predicate and tests/claude-settings-template.bats, which guards
+// the template with a regex, have to agree on it.
+func TestMalformedRules_TheTemplateCarriesNone(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "ai", "claude", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	seen := map[string]int{}
-	for _, s := range a {
-		seen[s]++
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
 	}
-	for _, s := range b {
-		seen[s]--
+	if _, ok := doc["permissions"].(map[string]any); !ok {
+		t.Fatal("the template has no permissions block: this test checks nothing")
 	}
-	for _, n := range seen {
-		if n != 0 {
-			return false
-		}
+	if bad := MalformedRules(doc); len(bad) > 0 {
+		t.Errorf("ai/claude/settings.json carries rules Claude Code rejects: %q", bad)
 	}
-	return true
 }

@@ -21,7 +21,7 @@ func MalformedRule(rule string) bool {
 }
 
 // MalformedRules lists the malformed rules in a decoded settings document, as
-// "<list>: <rule>", in list order.
+// "<list>: <rule>": allow, then deny, then ask, each in its own order.
 func MalformedRules(doc map[string]any) []string {
 	var found []string
 	walkRules(doc, func(list string, rules []any) []any {
