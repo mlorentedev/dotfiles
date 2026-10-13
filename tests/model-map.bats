@@ -90,6 +90,17 @@ sys.exit(0 if len(top)==1 else 1)
     [ "$status" -eq 0 ]
 }
 
+@test "the NaN pool declares the base plan's published concurrency, per model and per key" {
+    # AI-045 AC4. NaN publishes 7 concurrent requests for deepseek-v4-flash,
+    # glm5.3-flash and qwen3.8-flash, 5 for mimo-v2.6-flash, qwen3.6 and gemma4,
+    # and a cap of 7 across the whole key. The Go schema test validates the
+    # shape against its own fixture, so without this one a catalog edit could
+    # change the shipped figures and fail nothing.
+    run jq -c '.pools.nan | {concurrency, model_concurrency}' "$MAP"
+    [ "$status" -eq 0 ]
+    [ "$output" = '{"concurrency":7,"model_concurrency":{"deepseek-v4-flash":7,"glm5.3-flash":7,"qwen3.8-flash":7,"mimo-v2.6-flash":5,"qwen3.6":5,"gemma4":5}}' ]
+}
+
 @test "model-map.json is not embedded into the Go tree, unlike triggers.json" {
     # An embedded copy would give an absent map a build-time default to fall back
     # to, and the doctor check would then certify that default as healthy — which
