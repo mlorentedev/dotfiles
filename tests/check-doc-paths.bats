@@ -14,19 +14,23 @@ setup() {
     GUARD="$DOTFILES_DIR/scripts/check-doc-paths.sh"
     SCRATCH="$BATS_TEST_TMPDIR/check-doc-paths"
     mkdir -p "$SCRATCH"
+    # Discovery reads the git index, so the probe cases stage a file. They stage
+    # it in a private copy: the real index is shared with every other test and
+    # git process, and under `bats --jobs` two writers race for index.lock.
+    # Every git below, the guard's included, inherits GIT_INDEX_FILE.
+    cp "$(git -C "$DOTFILES_DIR" rev-parse --absolute-git-dir)/index" "$BATS_TEST_TMPDIR/index"
+    export GIT_INDEX_FILE="$BATS_TEST_TMPDIR/index"
 }
 
 teardown() {
     rm -rf "$SCRATCH"
-    # The probe case (below) stages a fabricated instruction file in the REAL
-    # working tree — it has to, because discovery reads the git index. Cleanup
-    # lives here rather than at the end of that test because bats aborts a test
-    # body at the first failing command: an unguarded `git add -N` that failed
-    # (an index.lock from a concurrent session is enough) would skip the
-    # cleanup and strand a file claiming a dead path in a tree the whole suite
-    # shares. teardown always runs; test-body ordering does not.
+    # The probe cases write a fabricated instruction file into the REAL working
+    # tree, because the guard reads it there; only its staging is private.
+    # Cleanup lives here rather than at the end of the test because bats aborts
+    # a test body at the first failing command, and a stranded file claiming a
+    # dead path would sit in a tree the whole suite shares. teardown always
+    # runs; test-body ordering does not.
     if [ -n "${PROBE_REL:-}" ]; then
-        git -C "$DOTFILES_DIR" rm -q --cached "$PROBE_REL" 2>/dev/null || true
         rm -rf "$DOTFILES_DIR/$(dirname "$PROBE_REL")"
         PROBE_REL=""
     fi
@@ -182,6 +186,18 @@ governed_files() {
     printf '%s\n' "$found" | grep -qx ".claude/CLAUDE.md"
     printf '%s\n' "$found" | grep -qx "ai/copilot/copilot-instructions.md"
     printf '%s\n' "$found" | grep -qx "README.md"
+}
+
+@test "check-doc-paths: a probe is staged in the private index, never the real one" {
+    PROBE_REL="ai/index-probe/AGENTS.md"
+    mkdir -p "$DOTFILES_DIR/ai/index-probe"
+    printf 'probe\n' > "$DOTFILES_DIR/$PROBE_REL"
+    git -C "$DOTFILES_DIR" add -N "$PROBE_REL"
+
+    instruction_files | grep -qx "$PROBE_REL"
+    run env -u GIT_INDEX_FILE git -C "$DOTFILES_DIR" ls-files -- "$PROBE_REL"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "check-doc-paths: a file under an excluded prefix is not discovered [#916]" {
