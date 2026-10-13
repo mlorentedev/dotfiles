@@ -84,6 +84,7 @@ test_windows_job() {
     [ -n "$step" ] || false
     printf '%s\n' "$step" | grep -qF 'GH_TOKEN: ${{ github.token }}'
     printf '%s\n' "$step" | grep -qF 'dotf spec audit'
+    printf '%s\n' "$step" | grep -qF 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
     gate_line=$(printf '%s\n' "$job" | grep -n 'Post-setup doctor gate' | head -1 | cut -d: -f1)
     audit_line=$(printf '%s\n' "$job" | grep -n 'Spec issue-state audit' | head -1 | cut -d: -f1)
     [ "$gate_line" -lt "$audit_line" ] || false

@@ -780,7 +780,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: dotf spec audit --repo "${{ github.repository }}"
+        # A native command's failure does not stop a pwsh step on its own
+        # (#2152), so the audit's exit is the step's, stated.
+        run: |
+          dotf spec audit --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # The evidence of why the hive daemon is down lives only on the runner: the
       # Scheduled Task's last result and the daemon's own output. Print both on a
