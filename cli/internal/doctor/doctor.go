@@ -308,6 +308,7 @@ func (e sweepEnv) deployAndHooks() []check {
 		{kind: kindMachine, run: func() { checkColimaSize(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkDockerCompose(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkDeployManifest(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkClaudePermissionRules(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkAgentPresence(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkAgentSkillsMigrated(e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkDotfProvenance(e.sys, e.cfg, e.rep) }},
