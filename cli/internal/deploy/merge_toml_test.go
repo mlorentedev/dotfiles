@@ -273,3 +273,75 @@ func TestDeploy_TOMLMergeUnionsAListTheToolAppendedTo(t *testing.T) {
 		t.Errorf("the element the tool appended was lost: keys.extra = %#v", keys["extra"])
 	}
 }
+
+// #2013 H4: the SHIPPED herdr entry and the SHIPPED ai/herdr/config.toml, as
+// the agy test above does for its config. The tests before this one prove the
+// engine with a fixture; this one fails if the entry stops being a merge or
+// its dst stops resolving through HERDR_CONFIG_DIR, and if the file starts
+// naming one of the keys the fixture below has herdr write (onboarding,
+// ui.accent, keys.zoom). It cannot see every key herdr may write; the file's
+// header states the rule for the rest.
+func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
+	const root = "../../.."
+	raw, err := os.ReadFile(filepath.Join(root, ManifestRel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := ParseManifest(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg Config
+	for _, c := range m.Configs {
+		if c.Name == "herdr" {
+			cfg = c
+		}
+	}
+	if cfg.Name == "" || cfg.Strategy != StrategyMerge || cfg.Requires != "herdr" {
+		t.Fatalf("want a merge entry named herdr that requires herdr, got %+v", cfg)
+	}
+	home := t.TempDir()
+	dst := filepath.Join(home, "herdr-config", "config.toml")
+	resolve := func(name string) string {
+		if name == "HERDR_CONFIG_DIR" {
+			return filepath.Dir(dst)
+		}
+		return ""
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// What herdr itself writes: onboarding's answer and a Settings choice.
+	if err := os.WriteFile(dst, []byte("onboarding = false\n\n[keys]\nprefix = \"ctrl+b\"\nzoom = \"prefix+z\"\n\n[ui]\naccent = \"magenta\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Deploy(cfg, root, home, resolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Changed {
+		t.Fatal("the prefix differed, so the first deploy must change the file")
+	}
+	got := readTOML(t, dst)
+	keys, _ := got["keys"].(map[string]any)
+	ui, _ := got["ui"].(map[string]any)
+	worktrees, _ := got["worktrees"].(map[string]any)
+	if keys["prefix"] == "ctrl+b" || keys["prefix"] == nil {
+		t.Errorf("keys.prefix = %v: D6 wants a prefix that is not tmux's ctrl+b", keys["prefix"])
+	}
+	if worktrees["directory"] == nil {
+		t.Errorf("worktrees.directory not written: %v", got)
+	}
+	if got["onboarding"] != false || keys["zoom"] != "prefix+z" || ui["accent"] != "magenta" {
+		t.Errorf("a key herdr wrote was lost: %v", got)
+	}
+
+	plan, err := PlanConfig(cfg, root, home, resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Changed {
+		t.Errorf("a second deploy must be in sync:\n%s", plan.Content)
+	}
+}

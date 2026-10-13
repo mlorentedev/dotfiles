@@ -84,7 +84,16 @@
     "path (#2013 P5b). It requires colima, which only the brew catalog entry",
     "provisions, so it applies on the Mac and skips elsewhere without needing",
     "`platforms`. Merge keeps what docker and colima write there (auths,",
-    "currentContext); mode 0600 because auths can hold registry credentials."
+    "currentContext); mode 0600 because auths can hold registry credentials.",
+    "",
+    "herdr merges ai/herdr/config.toml, the first TOML merge entry (#2013 H4):",
+    "herdr writes the same file (onboarding, its Settings screen), so replace",
+    "would undo the owner's in-app choices on every deploy. The dst's directory",
+    "is the contract variable HERDR_CONFIG_DIR because herdr's default differs",
+    "per OS (%APPDATA% on Windows); the file name stays literal because a merge",
+    "reads its format from the dst's extension, at parse time. A dotf before",
+    "0.68.0 refuses a TOML merge with 'source is not a JSON object' instead of",
+    "replacing the file."
   ],
   "version": 4,
   "configs": [
@@ -321,6 +330,15 @@
       "mode": "0644",
       "strategy": "merge",
       "requires": "claude"
+    },
+    {
+      "name": "herdr",
+      "src": "ai/herdr/config.toml",
+      "dst": "{HERDR_CONFIG_DIR}/config.toml",
+      "render": false,
+      "mode": "0644",
+      "strategy": "merge",
+      "requires": "herdr"
     },
     {
       "name": "docker-config",

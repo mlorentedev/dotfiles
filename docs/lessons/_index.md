@@ -429,4 +429,5 @@ tags: [lessons, index, dotfiles]
 | [408 - A suite that runs a script by path tests only its shebang](lesson-408-a-suite-that-runs-a-script-by-path-tests-only-its-shebang.md) | 2026-10-13 |
 | [409 - A test that stages in the real index races every other git](lesson-409-a-test-that-stages-in-the-real-index-races-every-other-git.md) | 2026-10-13 |
 | [410 - bash -c reads no startup file, so no file of ours can set its PATH](lesson-410-bash-c-reads-no-startup-file.md) | 2026-10-13 |
+| [411 - A merge entry's dst needs a literal extension, or every dotf refuses the manifest](lesson-411-a-merge-dst-needs-a-literal-extension.md) | 2026-10-13 |
 <!-- END GENERATED -->

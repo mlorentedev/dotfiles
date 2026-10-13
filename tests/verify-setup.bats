@@ -434,6 +434,21 @@ setup() {
     [ ! -e "$HOME/.local/bin/shellcheck" ]
 }
 
+@test "the herdr config is deployed and herdr's own validator accepts it (#2013 H4)" {
+    # tests/herdr-config.bats skips where herdr is absent, which is every unit
+    # leg; here mise has installed herdr before `dotf deploy` ran, so the merge
+    # entry deployed and nothing may skip. herdr ignores a key it does not know
+    # and falls back to ctrl+b for a bad prefix, so its exit status is the check.
+    local cfg="$HOME/.config/herdr/config.toml"
+    [ -f "$cfg" ] || { echo "not deployed: $cfg"; false; }
+    run env HERDR_CONFIG_PATH="$cfg" herdr config check
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    # dotf writes the merged file with go-toml, which quotes 'ctrl+s' as a
+    # literal string, so match the value, not one spelling of it.
+    grep -Eq "^[[:space:]]*prefix[[:space:]]*=[[:space:]]*[\"']ctrl\+s[\"'][[:space:]]*$" "$cfg" ||
+        { echo "prefix is not ctrl+s in $cfg:"; grep -n prefix "$cfg"; false; }
+}
+
 @test "every CLI versions.conf marks for mise is installed through mise at its pin (#2013 T2)" {
     # The Windows CI leg gates on doctor's "Pinned CLIs (mise)" check; Linux has
     # no doctor gate, so this is that check's Linux half. It reads the marks the
