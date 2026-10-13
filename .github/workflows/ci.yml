@@ -46,6 +46,7 @@ jobs:
               - '.zsh/**'
               - '.bash/**'
               - '.zshrc'
+              - '.zshenv'
               - '.bashrc'
               - '.profile'
               - 'git/**'

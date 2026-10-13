@@ -148,9 +148,12 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 ### W2b — shims on PATH (after #2013 P6/P7)
 
 - [x] `mise activate` in `.zshrc`, `.bashrc` and the PowerShell profile, guarded on mise, before direnv and zoxide (#2013 P6, PR #2043)
-- [ ] The shims directory for non-interactive callers (setup, cron, an agent's shell), which read no rc file
+- [x] The shims directory for non-interactive callers that read a startup file: `.zsh/path.sh` puts mise's shims, then `~/.local/bin`, at the head of PATH, sourced from `.zshenv` (`zsh -c`), the end of `.profile` (`bash -lc`) and the top of `.bashrc`, before its interactive check (bash run by sshd for a command); `zshenv` and `shell-path` are deploy entries on linux and darwin (`tests/shell-path-head.bats`)
+  - `bash -c` and `sh -c` read no file and inherit their parent's PATH: covered when the parent is one of the shells above, by construction never by a file of ours (lesson 410)
+  - cron is S1's: its jobs run `/bin/sh -c` with cron's own PATH, so the PATH belongs in the job definition S1 renders, not in a startup file
+- [ ] PR 2: the PATH a process gets without any shell, persisted by `dotf env persist` with a managed record of the entries it adds: the user environment (HKCU) on Windows, `launchctl` for GUI apps on the Mac
 - [x] The doctor's pin half: the pinned CLIs resolve through `mise which`, T3 below. That answers from the mise config whatever the caller's PATH, so it does NOT show the shims directory reaches PATH
-- [ ] The doctor probe that the shims directory is on PATH for a non-interactive caller; lands with the shims directory above, and until it does a green "at their pin through mise" says nothing about cron or an agent's shell
+- [x] The doctor probe that the shims directory is on PATH for a non-interactive caller: `zsh -c` and `bash -lc`, each started from HOME and a bare system PATH, must list the shims ahead of `~/.local/bin`, else a WARN naming `dotf deploy` (`checkNonInteractivePath`, linux and darwin; Windows waits for PR 2)
 
 ### T3 — doctor reads a darwin machine as darwin, and checks the mise CLIs (stacked on #2043)
 
