@@ -315,6 +315,172 @@ Example:
     [[ "$output" == *"Lesson: the line is missing"* ]] || false
 }
 
+# #2310: GitHub reads fences and comments in one left-to-right pass, so each
+# hides the other's opener. Two separate passes read a fence quoted in a
+# comment as an open fence and refused a body that renders fine.
+@test "a fence marker inside an HTML comment opens no fence" {
+    SDD_PR_BODY='## Summary
+
+<!--
+```
+-->
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure'
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+# A regression guard for the one-pass rewrite: the two-pass code got this right too.
+@test "a comment opener inside a fence hides nothing after the fence" {
+    SDD_PR_BODY='## Summary
+
+```html
+<!-- an example comment, never closed in the example
+```
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure'
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a tab before a fence marker opens no fence: CommonMark reads it as indented code" {
+    SDD_PR_BODY="## Summary
+
+	\`\`\`
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a fence line with text after it closes nothing: only a bare marker closes" {
+    SDD_PR_BODY="## Summary
+
+\`\`\`
+code
+\`\`\`js
+more
+\`\`\`
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a backtick line whose info string holds a backtick is inline code, not a fence" {
+    SDD_PR_BODY="## Summary
+
+\`\`\`code\`\`\` rest
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a comment opener inside an inline code span hides nothing" {
+    SDD_PR_BODY="## Summary
+
+A \`<!--\` in a code span is text, and so is \`\`a \` <!-- b\`\`.
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "an unmatched backtick does not shield a real comment" {
+    SDD_PR_BODY="## Summary
+
+A lone \` backtick, then <!--
+## Knowledge
+- Lesson: none: hidden in the comment
+- ADR: none: hidden too
+- Runbook: none: hidden too
+-->"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+}
+
+@test "a backslash-escaped backtick opens no code span, so a real comment after it hides" {
+    SDD_PR_BODY="## Summary
+
+An escaped \\\`tick <!-- then a \` later
+## Knowledge
+- Lesson: none: hidden in the comment
+- ADR: none: hidden too
+- Runbook: none: hidden too
+--> and \`span\`"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+}
+
+@test "a code span whose closer follows other backtick runs is found" {
+    SDD_PR_BODY="## Summary
+
+A span \` <!-- b --> \`\` c \` ends here, and \`a <!-- b --> \`\` c\` too.
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "an escaped backslash escapes nothing: the backtick after it still opens a span" {
+    SDD_PR_BODY="## Summary
+
+A path a\\\\\`<!--\` in a span.
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a code span closes only on a run of its own length" {
+    SDD_PR_BODY="## Summary
+
+A \`\`span\` <!-- \`\`\` then
+## Knowledge
+- Lesson: none: hidden in the comment
+- ADR: none: hidden too
+- Runbook: none: hidden too
+-->"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned

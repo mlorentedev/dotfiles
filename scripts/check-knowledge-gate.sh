@@ -103,55 +103,105 @@ if _has_label "dependencies" && _is_dependency_bot "$SDD_PR_AUTHOR"; then
     exit 0
 fi
 
-# The body without fenced code blocks, so a section quoted as an example does
-# not count. Unlike spec-gate's _strip_markdown_code, inline code stays: paths
-# are usually written as `docs/lessons/...`, and stripping spans would erase
-# the very answer being checked. With --open-line it prints instead the line of
-# a fence that never closes: GitHub renders everything after one as code, so a
-# section below it is really absent, and the author needs to be told why.
-_strip_fences() {
-    local mode="${2:-}" line marker fence="" n=0 opened=0
-    local fence_re='^[[:space:]]{0,3}(`{3,}|~{3,})'
-    while IFS= read -r line; do
-        n=$((n + 1))
-        if [[ "$line" =~ $fence_re ]]; then
-            marker="${BASH_REMATCH[1]}"
-            if [[ -z "$fence" ]]; then
-                fence="$marker"
-                opened=$n
-            elif [[ "${marker:0:1}" == "${fence:0:1}" && ${#marker} -ge ${#fence} ]]; then
-                fence=""
-            fi
-            continue
-        fi
-        if [[ -z "$fence" && -z "$mode" ]]; then
-            printf '%s\n' "$line"
-        fi
-    done <<< "$1"
-    if [[ -n "$mode" && -n "$fence" ]]; then
-        printf '%s\n' "$opened"
-    fi
-    return 0
-}
-
-# The body without HTML comments, which GitHub does not render: a template's
-# guidance, or an example inside one, is not an answer the author gave.
-_strip_comments() {
-    awk '
-        {
-            line = $0; out = ""
+# The body as GitHub renders it, without fenced code blocks and HTML comments,
+# so neither a section quoted as an example nor a template's guidance counts as
+# the author's answer. Unlike spec-gate's _strip_markdown_code, inline code
+# stays: paths are usually written as `docs/lessons/...`, and stripping spans
+# would erase the very answer being checked.
+#
+# One left-to-right pass, as GitHub reads it, because each construct can hold
+# the other's opener: a fence marker inside a comment opens nothing, and a
+# `<!--` inside a fence hides nothing. Two passes (fences, then comments) read
+# a fence quoted in a comment as an open fence and refused a valid body (#2310).
+#
+# With --open-line it prints instead the line of a fence that never closes:
+# GitHub renders everything after one as code, so a section below it is really
+# absent, and the author needs to be told why.
+_strip_markup() {
+    printf '%s\n' "$1" | awk -v mode="${2:-}" '
+        # run_at(s, i): the length of the backtick run starting at position i.
+        # Counted by hand rather than with match(): one awk (onetrue-awk 2023)
+        # returns RSTART -1 on some inputs, and the arithmetic then loops.
+        function run_at(s, i,    r) {
+            r = 0
+            while (substr(s, i + r, 1) == "`") r++
+            return r
+        }
+        # escaped(s, i): whether the character at i follows an odd number of
+        # backslashes. An even number is literal backslashes, escaping nothing.
+        function escaped(s, i,    b) {
+            b = 0
+            while (i - b > 1 && substr(s, i - b - 1, 1) == "\\") b++
+            return b % 2
+        }
+        # span_end(s, n): the position in s of the last backtick of the first
+        # run of exactly n backticks, or 0 when there is none.
+        function span_end(s, n,    i, r) {
+            i = 1
+            while (i <= length(s)) {
+                if (substr(s, i, 1) != "`") { i++; continue }
+                r = run_at(s, i)
+                if (r == n) return i + n - 1
+                i += r
+            }
+            return 0
+        }
+        function strip_comments(line,    out, i, j, run, rest, k) {
+            out = ""
             while (line != "") {
                 if (inside) {
                     i = index(line, "-->")
                     if (i == 0) { line = "" } else { line = substr(line, i + 3); inside = 0 }
-                } else {
-                    i = index(line, "<!--")
-                    if (i == 0) { out = out line; line = "" }
-                    else { out = out substr(line, 1, i - 1); line = substr(line, i + 4); inside = 1 }
+                    continue
                 }
+                i = index(line, "<!--")
+                j = index(line, "`")
+                if (j > 0 && (i == 0 || j < i)) {
+                    # A code span, a backtick run closed by a run of the same
+                    # length, is kept as text: a <!-- inside it opens nothing.
+                    # A run with no closer on the line, or one escaped with a
+                    # backslash, is a literal backtick.
+                    if (escaped(line, j)) {
+                        out = out substr(line, 1, j); line = substr(line, j + 1)
+                        continue
+                    }
+                    run = run_at(line, j)
+                    rest = substr(line, j + run)
+                    k = span_end(rest, run)
+                    out = out substr(line, 1, j + run - 1) substr(rest, 1, k)
+                    line = substr(rest, k + 1)
+                    continue
+                }
+                if (i == 0) { out = out line; line = "" }
+                else { out = out substr(line, 1, i - 1); line = substr(line, i + 4); inside = 1 }
             }
-            print out
+            return out
         }
+        {
+            line = $0
+            # A fence marker counts only at the start of a line outside a
+            # comment: up to three spaces, then three or more ` or ~. Spaces,
+            # not tabs: CommonMark reads a tab as four columns, an indented
+            # code line rather than a fence.
+            if (!inside && match(line, /^ ? ? ?(```+|~~~+)/)) {
+                marker = substr(line, RSTART, RLENGTH); sub(/^ +/, "", marker)
+                rest = substr(line, RSTART + RLENGTH)
+                if (fence != "") {
+                    # Only a bare marker closes: the opener character, at
+                    # least as long, and nothing after it but spaces. A
+                    # line like ```js inside the fence is code.
+                    if (substr(marker, 1, 1) == substr(fence, 1, 1) && length(marker) >= length(fence) && rest ~ /^[ \t]*$/) fence = ""
+                    next
+                }
+                # A backtick fence cannot carry a backtick in its info string:
+                # such a line is inline code in a paragraph, not an opener.
+                if (!(substr(marker, 1, 1) == "`" && index(rest, "`"))) { fence = marker; opened = NR; next }
+            }
+            if (fence != "") next
+            out = strip_comments(line)
+            if (mode == "") print out
+        }
+        END { if (mode != "" && fence != "") print opened }
     '
 }
 
@@ -166,12 +216,12 @@ _section() {
 }
 
 # CR first: a body saved from GitHub's web editor has CRLF line endings.
-body=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" | _strip_comments)
+body=$(_strip_markup "${SDD_PR_BODY//$'\r'/}")
 
 problems=()
 
 if ! section=$(printf '%s\n' "$body" | _section); then
-    open_line=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" --open-line)
+    open_line=$(_strip_markup "${SDD_PR_BODY//$'\r'/}" --open-line)
     if [[ -n "$open_line" ]]; then
         problems+=("the PR body has no \"## Knowledge\" section outside code: the code fence opened at line $open_line is never closed, so everything after it is code")
     else

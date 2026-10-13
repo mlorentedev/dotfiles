@@ -425,4 +425,5 @@ tags: [lessons, index, dotfiles]
 | [404 - A CLI hint that names the wrong fix: claude-plugins-official was not stale, it was not registered](lesson-404-a-cli-hint-that-names-the-wrong-fix.md) | 2026-10-13 |
 | [405 - A config written only by a setup script freezes on every machine that does not run it](lesson-405-a-config-written-only-by-a-setup-script-freezes-where-it-does-not-run.md) | 2026-10-13 |
 | [406 - A migration named after one server is a drift check nobody generalised](lesson-406-a-migration-named-after-one-server-is-a-drift-check-nobody-generalised.md) | 2026-10-13 |
+| [407 - A markdown gate must read the body in CommonMark order](lesson-407-a-markdown-gate-must-read-the-body-in-commonmark-order.md) | 2026-10-13 |
 <!-- END GENERATED -->
