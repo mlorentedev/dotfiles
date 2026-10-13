@@ -799,11 +799,15 @@ func TestCopiesOnPath(t *testing.T) {
 	}
 	// a listed twice, once with a trailing separator: one directory, read once.
 	list := strings.Join([]string{d, a, b, "", a + string(filepath.Separator), c}, string(os.PathListSeparator))
-	got := copiesOnPath("poetry", "linux", list, "")
-	if want := []string{filepath.Join(a, "poetry")}; !reflect.DeepEqual(got, want) {
-		t.Errorf("linux: %v, want %v", got, want)
+	// The POSIX rule reads the execute bit, which a Windows filesystem does
+	// not record, so only a POSIX host can exercise it.
+	if runtime.GOOS != "windows" {
+		got := copiesOnPath("poetry", "linux", list, "")
+		if want := []string{filepath.Join(a, "poetry")}; !reflect.DeepEqual(got, want) {
+			t.Errorf("linux: %v, want %v", got, want)
+		}
 	}
-	got = copiesOnPath("poetry", "windows", list, ".EXE;.CMD")
+	got := copiesOnPath("poetry", "windows", list, ".EXE;.CMD")
 	want := []string{filepath.Join(b, "poetry.exe"), filepath.Join(c, "poetry.exe"), filepath.Join(c, "poetry.cmd")}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("windows: %v, want %v", got, want)
