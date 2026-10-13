@@ -113,6 +113,10 @@ type Installer struct {
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
 	AppExists func(bundle string) bool
+	// PathCopies lists every file on PATH that would run as name, in PATH order,
+	// so the first is the one that answers. Nil means a scan of $PATH; tests
+	// inject the machine's answer.
+	PathCopies func(name string) []string
 }
 
 func (in *Installer) defaults() {
@@ -133,6 +137,11 @@ func (in *Installer) defaults() {
 	}
 	if in.AppExists == nil {
 		in.AppExists = appInApplications
+	}
+	if in.PathCopies == nil {
+		in.PathCopies = func(name string) []string {
+			return copiesOnPath(name, in.GOOS, os.Getenv("PATH"), os.Getenv("PATHEXT"))
+		}
 	}
 	if in.HasCommand == nil {
 		in.HasCommand = func(name string) bool {
@@ -507,8 +516,23 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 // exiting 0 is not the tool being usable. Its global bin dir may be missing from
 // PATH, or an older copy earlier on PATH may shadow the new one; either way the
 // next command would not get the pinned tool, so neither is a success.
+// A version below the pin names the copies on PATH, so the error says which
+// file answered instead of leaving that to be found on the machine.
 func (in *Installer) verifyOnPath(t Tool, manager string) error {
-	return checkProbed(t, in.current(t), manager+" exited 0 but "+t.Name+" does not run on PATH (is "+manager+"'s global bin dir on PATH?)")
+	version := in.current(t)
+	err := checkProbed(t, version, manager+" exited 0 but "+t.Name+" does not run on PATH (is "+manager+"'s global bin dir on PATH?)")
+	if err == nil || version == "" {
+		return err
+	}
+	switch copies := in.PathCopies(t.Name); len(copies) {
+	case 0:
+		return err
+	case 1:
+		return fmt.Errorf("%w; the only copy on PATH is %s, so the one %s installed is not on PATH", err, copies[0], manager)
+	default:
+		return fmt.Errorf("%w; PATH holds %d copies and the first answers: %s (remove the older one, or put %s's bin dir ahead of it)",
+			err, len(copies), strings.Join(copies, ", "), manager)
+	}
 }
 
 // checkProbed turns a post-install probe into the install's verdict: no version

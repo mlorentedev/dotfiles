@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -276,6 +277,7 @@ func newNpmInstaller(current string, rec *[]string, runErr error) *Installer {
 			return runErr
 		},
 		HasCommand: func(string) bool { return true },
+		PathCopies: func(string) []string { return nil },
 	}
 }
 
@@ -746,5 +748,68 @@ func TestInstall_PackageManagerToolMustRunOnPathAfterward(t *testing.T) {
 				t.Errorf("error %q does not name %s and %q", err, tc.tool.Name, tc.reason)
 			}
 		})
+	}
+}
+
+// A shadowed install names the copies on PATH, so the failure says which file
+// answered and where to look, instead of only the version it reported.
+func TestInstall_ShadowedToolNamesTheCopiesOnPath(t *testing.T) {
+	cases := []struct {
+		name   string
+		copies []string
+		want   []string
+	}{
+		{"an older copy ahead of the new one", []string{`C:\old\poetry.exe`, `C:\uv\poetry.exe`},
+			[]string{"2 copies", `C:\old\poetry.exe, C:\uv\poetry.exe`, "uv's bin dir"}},
+		{"the new copy is not on PATH at all", []string{`C:\old\poetry.exe`},
+			[]string{`only copy on PATH is C:\old\poetry.exe`, "the one uv installed is not on PATH"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var rec []string
+			in := newNpmInstaller("2.4.1", &rec, nil)
+			in.CurrentVersion = func(string) string { return "2.4.1" }
+			in.PathCopies = func(string) []string { return tc.copies }
+			tool := Tool{Name: "poetry", Version: "2.5.1", Source: Source{Type: "uv-tool", Package: "poetry"}}
+			_, err := in.Install(tool)
+			if err == nil {
+				t.Fatal("Install succeeded with a shadowed copy")
+			}
+			for _, w := range append(tc.want, "below the pin") {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("error %q does not say %q", err, w)
+				}
+			}
+		})
+	}
+}
+
+func TestCopiesOnPath(t *testing.T) {
+	a, b, c, d := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
+	for _, f := range []string{filepath.Join(a, "poetry"), filepath.Join(b, "poetry.exe"), filepath.Join(c, "poetry.cmd"), filepath.Join(c, "poetry.exe")} {
+		if err := os.WriteFile(f, nil, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(b, "poetry"), 0o755); err != nil { // a directory never runs
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(d, "poetry"), nil, 0o644); err != nil { // no execute bit: LookPath skips it
+		t.Fatal(err)
+	}
+	// a listed twice, once with a trailing separator: one directory, read once.
+	list := strings.Join([]string{d, a, b, "", a + string(filepath.Separator), c}, string(os.PathListSeparator))
+	// The POSIX rule reads the execute bit, which a Windows filesystem does
+	// not record, so only a POSIX host can exercise it.
+	if runtime.GOOS != "windows" {
+		got := copiesOnPath("poetry", "linux", list, "")
+		if want := []string{filepath.Join(a, "poetry")}; !reflect.DeepEqual(got, want) {
+			t.Errorf("linux: %v, want %v", got, want)
+		}
+	}
+	got := copiesOnPath("poetry", "windows", list, ".EXE;.CMD")
+	want := []string{filepath.Join(b, "poetry.exe"), filepath.Join(c, "poetry.exe"), filepath.Join(c, "poetry.cmd")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("windows: %v, want %v", got, want)
 	}
 }
