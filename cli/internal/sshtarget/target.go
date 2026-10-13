@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -60,6 +61,35 @@ func DefaultPaths(home string) Paths {
 		AuthorizedKeys: filepath.Join(home, ".ssh", "authorized_keys"),
 		ClientKey:      filepath.Join(home, ".ssh", "id_ed25519"),
 	}
+}
+
+// The repo files a target is built from, relative to the checkout.
+const (
+	KeyFile      = "ssh/id_ed25519.pub"
+	TemplateFile = "ssh/sshd-workstation.conf"
+)
+
+// New builds the target for user from the checkout at repoRoot: the owner's
+// key and the drop-in template, with launchd as the service. Root is left for
+// the caller, because only an apply needs it and doctor never applies.
+func New(repoRoot, user string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
+	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs, Service: Launchd{Run: run}}
+	var err error
+	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
+		return t, err
+	}
+	t.Template, err = os.ReadFile(filepath.Join(repoRoot, TemplateFile))
+	return t, err
+}
+
+// CurrentUser is the account sshd is opened to: the one running dotf. Converge
+// and doctor both ask here, so they render the same AllowUsers line.
+func CurrentUser() (string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return u.Username, nil
 }
 
 // Service turns sshd on and off on one OS.

@@ -138,5 +138,12 @@
     "verification": "cd cli && out=$(go test ./internal/sshtarget/ ./internal/converge/ -run '^(TestInspect|TestApply|TestAFailedProbe|TestAnSSHD|TestARejectedDropIn|TestWorkstationTarget_)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAFailedProbeUndoesTheRunInReverse' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestAnSSHDThatAcceptsTheLANFails' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestWorkstationTarget_PlanNeedsNoRoot' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestWorkstationTarget_ApplyWithoutATerminalIsSkippedWithThePlan'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f21",
+    "behavior": "#2013 A1 PR 7d (doctor half): on darwin, doctor reports the workstation-target plan read-only, skipped until the machine opts in and off the mesh, and a pending resource is a WARN naming `dotf converge --only workstation-target`",
+    "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestCheckWorkstationTarget_ByStatus$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/not_opted_in' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/nothing_applied' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/converged'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

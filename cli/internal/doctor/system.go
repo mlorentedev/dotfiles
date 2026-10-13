@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 )
 
 // System abstracts the non-deterministic, process-global surfaces a check
@@ -134,6 +136,11 @@ type System struct {
 	// HKCU\Environment), the scope a profile-less process inherits; nil where
 	// the OS has no such scope, which skips checkPersistedEnv (CLI-058, #1324).
 	UserEnv func(name string) (string, bool, error)
+
+	// SSHTargetPaths and MeshAddrs point checkWorkstationTarget at a test tree
+	// and a test address list; nil means /etc/ssh and the real interfaces.
+	SSHTargetPaths func(home string) sshtarget.Paths
+	MeshAddrs      func() ([]net.IP, error)
 	// ProcessAlive reports whether pid names a live process (secrets.ProcessAlive
 	// in production: signal 0 on Unix, OpenProcess + GetExitCodeProcess on
 	// Windows). It is what lets the bw serve check tell "the daemon died" from
