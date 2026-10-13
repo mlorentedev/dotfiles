@@ -283,7 +283,7 @@
     },
     "pdf-modifier": {
       "type": "local",
-      "command": ["uvx", "pdf-modifier-mcp"],
+      "command": ["uvx", "pdf-modifier"],
       "enabled": true
     }
   }
