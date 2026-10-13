@@ -72,7 +72,12 @@ AC9, 2026-10-08:
   60,000-reasoning-character ceiling); `low` 285 s on 37,251 prompt tokens (45,651 reasoning characters, a review) and
   215 s on 96,707 (33,541, a review). Run 37885509177: the draw picked Haiku, which logged adaptive thinking at `high` and published, with all
   three NaN members answering the probe. Run 37886959259: the draw picked glm5.3-flash,
-  which received `low` and published a complete review in 74 s. Pending: a real second attempt.
+  which received `low` and published a complete review in 74 s.
+  Second attempt, run 38429799619 (#2409, 2026-10-13): the draw went to NaN; `deepseek-v4-flash` returned no content
+  twice (`finish_reason` `length`, then `stop`), PR-Agent fell back to `mimo-v2.6-flash`, and the action timed out at
+  12 minutes. The measure step found nothing published, `PR-Agent on Anthropic, after NaN published nothing` ran on
+  `anthropic/claude-haiku-5-5` (adaptive thinking `high`) and published, and the final guard passed (#1923 comment
+  6154701941).
 
 AC9 amendment B, 2026-10-09:
 
