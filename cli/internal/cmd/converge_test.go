@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
@@ -204,5 +205,30 @@ func TestConvergeOptions_ToolsBinDirsAreWhereTheToolLayerPlaces(t *testing.T) {
 	want := []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), in.Dest}
 	if strings.Join(o.ToolsBinDirs, "|") != strings.Join(want, "|") {
 		t.Errorf("ToolsBinDirs = %v, want %v", o.ToolsBinDirs, want)
+	}
+}
+
+// converge reaches claude through the deploy command's seam, so the
+// agent-extensions step drives the same guarded claude a bare `dotf deploy`
+// does, and skips where that one would (#2387).
+func TestConvergeOptions_ClaudeIsTheDeploySeam(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	orig := deployClaudeRunner
+	t.Cleanup(func() { deployClaudeRunner = orig })
+	fake := &fakeClaude{}
+	deployClaudeRunner = func(string) claude.Runner { return fake }
+	o := convergeOptions()
+	if o.Claude == nil {
+		t.Fatal("convergeOptions wires no claude seam: agent-extensions would always skip")
+	}
+	s, ok := o.Claude(home)
+	if !ok || s.Run != fake || s.HasCommand == nil {
+		t.Errorf("Claude(home) = %+v, %v; want the deploy runner with a PATH lookup", s, ok)
+	}
+	deployClaudeRunner = func(string) claude.Runner { return nil }
+	if _, ok := o.Claude(home); ok {
+		t.Error("no claude installed must read as not installed")
 	}
 }

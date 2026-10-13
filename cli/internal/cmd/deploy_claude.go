@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -103,100 +102,59 @@ var deployClaudeRunner = func(configDir string) claude.Runner {
 	return claudeCLI{configDir: configDir}
 }
 
-// deployClaudePlugins is the converge step a bare `dotf deploy` runs for the
-// Claude Code plugins in ai/claude/plugins.json (CLI-063, #1339), each claude
-// call inside the .claude.json snapshot guard. A failed install is reported by
-// name and fails the run: the setups print a warning on a non-zero deploy, and
-// a plugin that silently did not install is the #1491 miscount in another form.
+// deployClaudePlugins is the step a bare `dotf deploy` runs for the Claude Code
+// plugins in ai/claude/plugins.json (CLI-063, #1339), each claude call inside
+// the .claude.json snapshot guard. A failed install is reported by name and
+// fails the run: a plugin that silently did not install is the #1491 miscount
+// in another form. converge runs the same claude.ApplyPlugins (#2387).
 func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error {
 	const step = "claude-plugins"
-	s, ok := claudeSyncer(w, step, home)
+	s, ok := claudeSyncer(home)
 	if !ok {
+		deployRow(w, "skipped", step, "(claude not installed)")
 		return nil
 	}
-	list, err := claude.LoadPlugins(filepath.Join(repoRoot, filepath.FromSlash(claude.PluginsRel)))
-	if err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
-	s.Sources, err = claude.LoadMarketplaceSources(filepath.Join(repoRoot, filepath.FromSlash(claude.MarketplacesRel)))
-	if err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
-	retireErr := retireMarketplaces(w, step, s, list.RetiredMarketplaces, dryRun)
-	rep, err := s.Sync(list.Plugins, dryRun)
-	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
-	if err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
-	if err := accountedFor(rep, len(list.Plugins)); err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
-	reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
-	for _, id := range rep.Failed {
-		deployRow(w, "failed", step, "%s did not install: %v", id, rep.Causes[id])
-	}
-	if len(rep.Failed) > 0 {
-		return errors.Join(retireErr, fmt.Errorf("%s: %d plugin(s) failed to install: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", ")))
-	}
-	return retireErr
-}
-
-// accountedFor fails a report that does not place every declared plugin in
-// exactly one of Present, Added and Failed: a summary that counts fewer than
-// were declared would read as success while some were never tried (#2336).
-func accountedFor(rep claude.PluginReport, declared int) error {
-	if n := len(rep.Present) + len(rep.Added) + len(rep.Failed); n != declared {
-		return fmt.Errorf("the report accounts for %d of %d declared plugins", n, declared)
-	}
-	return nil
-}
-
-// retireMarketplaces removes the retired marketplaces a box still registers,
-// before the installs: a failure is reported by name and returned, and the
-// installs still run. It replaces the MEM-002 blocks the setups carried, which
-// never removed the registration (#1431).
-func retireMarketplaces(w io.Writer, step string, s claude.Syncer, names []string, dryRun bool) error {
-	rep, err := s.Retire(names, dryRun)
-	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
-	if err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
+	res, err := claude.ApplyPlugins(s, repoRoot, dryRun)
+	reportRestored(w, step, s.ClaudeJSON, res.Retired.Restored+res.Plugins.Restored)
 	verb := "removed"
 	if dryRun {
 		verb = "would remove"
 	}
-	for _, name := range rep.Removed {
+	for _, name := range res.Retired.Removed {
 		deployRow(w, verb, step, "retired marketplace %s", name)
 	}
-	for _, name := range rep.Failed {
-		if cause := rep.Causes[name]; cause != nil {
+	for _, name := range res.Retired.Failed {
+		if cause := res.Retired.Causes[name]; cause != nil {
 			deployRow(w, "failed", step, "retired marketplace %s is still registered: %v", name, cause)
 			continue
 		}
 		deployRow(w, "failed", step, "retired marketplace %s is still registered", name)
 	}
-	if len(rep.Failed) > 0 {
-		return fmt.Errorf("%s: retired marketplace(s) still registered: %s", step, strings.Join(rep.Failed, ", "))
+	rep := res.Plugins
+	if n := len(rep.Present) + len(rep.Added) + len(rep.Failed); n == res.Declared && (err == nil || n > 0) {
+		reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
+	}
+	for _, id := range rep.Failed {
+		deployRow(w, "failed", step, "%s did not install: %v", id, rep.Causes[id])
+	}
+	if err != nil {
+		return fmt.Errorf("%s: %w", step, err)
 	}
 	return nil
 }
 
-// deployClaudeMCP is the converge step that registers the servers in
-// mcp-servers.json with Claude Code at user scope (CLI-063, #1339). It runs
+// deployClaudeMCP is the step a bare `dotf deploy` runs to register the servers
+// in mcp-servers.json with Claude Code at user scope (CLI-063, #1339). It runs
 // before the plugins, as both twins do. A server whose prerequisite binary is
 // absent is skipped by name; its prerequisite command is not run (#1993).
 func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	const step = "claude-mcp"
-	s, ok := claudeSyncer(w, step, home)
+	s, ok := claudeSyncer(home)
 	if !ok {
+		deployRow(w, "skipped", step, "(claude not installed)")
 		return nil
 	}
-	servers, err := claude.LoadServers(filepath.Join(repoRoot, claude.ServersRel))
-	if err != nil {
-		return fmt.Errorf("%s: %w", step, err)
-	}
-	s.HasCommand = deployCommandAvailable
-	rep := s.Register(servers, dryRun)
+	rep, err := claude.ApplyMCP(s, repoRoot, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
 	verb, why := "migrated", "(stale uvx hive-vault entry replaced by the SSOT one)"
 	if dryRun {
@@ -208,29 +166,31 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	for _, sk := range rep.Skipped {
 		deployRow(w, "skipped", step, "%s (%s not on PATH)", sk.Name, sk.Missing)
 	}
-	reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
+	if n := len(rep.Present) + len(rep.Added) + len(rep.Failed) + len(rep.Skipped); err == nil || n > 0 {
+		reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
+	}
 	for _, name := range rep.Failed {
 		deployRow(w, "failed", step, "%s did not register", name)
 	}
-	if len(rep.Failed) > 0 {
-		return fmt.Errorf("%s: %d server(s) failed to register: %s", step, len(rep.Failed), strings.Join(rep.Failed, ", "))
+	if err != nil {
+		return fmt.Errorf("%s: %w", step, err)
 	}
 	return nil
 }
 
-// claudeSyncer builds the guarded claude seam both steps share, or reports the
-// step skipped when claude is not installed.
-func claudeSyncer(w io.Writer, step, home string) (claude.Syncer, bool) {
+// claudeSyncer builds the guarded claude seam the deploy steps and converge's
+// agent-extensions step share, or reports false when claude is not installed.
+func claudeSyncer(home string) (claude.Syncer, bool) {
 	configDir := claudeConfigDir(home)
 	run := deployClaudeRunner(configDir)
 	if run == nil {
-		deployRow(w, "skipped", step, "(claude not installed)")
 		return claude.Syncer{}, false
 	}
 	return claude.Syncer{
 		Run:        run,
 		ClaudeJSON: filepath.Join(configDir, ".claude.json"),
 		Floor:      mem.ClaudeJSONFloor(memConfigPath()),
+		HasCommand: deployCommandAvailable,
 	}, true
 }
 

@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
@@ -63,6 +64,10 @@ type Options struct {
 	SSHRoot   sshtarget.Root
 	UserRun   sshtarget.Runner
 	MeshAddrs func() ([]net.IP, error)
+	// Claude builds the guarded seam to the claude CLI for a home, or reports
+	// false when claude is not installed; the deploy command's in production.
+	// Unset, the agent-extensions step is skipped.
+	Claude func(home string) (claude.Syncer, bool)
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -95,6 +100,7 @@ func Registry(o Options) []Reconciler {
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: sshtarget.CurrentUser},
+		agentExtensions{claude: o.Claude},
 		legacySetup{run: o.RunSetup},
 	}
 }

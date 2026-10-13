@@ -213,6 +213,16 @@ Owner (2026-10-12): a machine that accepts SSH is a converge step here, not a sp
 - [ ] Host keys pinned (#2356): `ssh/known_hosts` deployed to `~/.ssh/known_hosts_pinned`, and the workstation profiles and github.com refuse any other key with `StrictHostKeyChecking yes`. Each line carries the fingerprint it was verified against out of band; `tests/ssh-known-hosts.bats` guards parse, fingerprint and coverage. The SSH CA (#2373, EPIC D11 / S11) replaces the list
 - [ ] The runbook's sections 2 to 4 become one `dotf converge --only workstation-target` per machine, once PR 7d lands. Linux and macOS sshd and Linux power collapsed 2026-10-13; the firewall on every OS, macOS power and Windows remain hand steps
 
+### PR 8 — agent extensions: MCP servers and plugins (#1843 B10, BUG-127 #2387)
+
+Converge never registered Claude Code's MCP servers or installed its plugins. Only a bare `dotf deploy` did, and only the setup scripts called it, so a Mac from zero had a Claude Code without hive or plugins. Measured on from-zero 38376819599: ubuntu prints `claude-plugins 3 added`, macOS has no row.
+
+- [ ] `claude.ApplyMCP` and `claude.ApplyPlugins`: the orchestration moves from `cmd` to `internal/claude`, and the bare deploy and converge call the same code. A failed install's error carries the CLI's cause, because converge prints one line per step (BUG-121)
+- [ ] `agent-extensions`, every OS, after `workstation-target` and before `legacy-setup`: after `tools`, whose PATH reaches the claude that mise installs, and last among the native steps, because the first failure stops a run and a plugin that cannot reach its marketplace must not stop git or the SSH target. Skipped while claude is absent. `Probe` re-plans as a dry run, which asks claude and changes nothing
+- [ ] Tests: a fresh claude gets the server and plugins, the probe passes and the second run changes nothing; a plan makes no mutating call; a failed install fails with its cause; an install that exits 0 and installs nothing fails the probe by name; `convergeOptions` wires the deploy seam; the registry order
+- [ ] Evidence: from-zero on macOS with claude installed (P5c, #2392) prints the step adding servers and plugins on the first converge and 0 changes on the second
+- [ ] Not here: agy's `mcp_config.json` (CLI-105 #2384, the next PR, into the same step); a doctor check for a missing plugin or server (CLI-106 #2393)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
