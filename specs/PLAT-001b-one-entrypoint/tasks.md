@@ -152,8 +152,11 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] Implement the sweep table (`check{kind, section, restore, run}`), `Options.Scope`, `ParseScope` and `dotf doctor --scope all|machine`; a plain `dotf doctor` is unchanged
 - [x] Split the two checks that mixed both kinds: `checkAgeIdentity` (the key) from `checkSecretsTooling` (the binaries), and `checkAgentSecretConfigs` (configs rendered from secrets) from `checkOpenCode` (the binaries)
 - [x] ADR-045 amendment for D10, D11 and D12; the runbook orders the restore the SKIP lines cite
-- [ ] Follow-up: X1 (#2331) runs `dotf doctor --scope machine`
-- [ ] Follow-up: test-windows runs `--scope machine` and drops the identity it fabricates (age key, vault skeleton, `obsidian.cmd` stub)
+- [x] Follow-up: X1 (#2331) runs `dotf doctor --scope machine` (`from-zero.yml`, step `dotf doctor --scope machine`)
+- [x] Follow-up: test-windows runs `--scope machine` and drops the identity it fabricates (age key, vault skeleton, `obsidian.cmd` stub)
+  - The machine scope also skips doctor's gh checks. spec-issue-state was the one verifying something on the runner (CI-004 AC8), so `dotf spec audit` became its own step with `GH_TOKEN`; branch-protection only ever printed `not verified` (HTTP 403) under the job token, so nothing is lost there
+  - `DOTFILES_DOCTOR_NO_IDENTITY` (TEST-005) had no other caller and was deleted: under the machine scope Bitwarden reach is skipped by declaration
+  - Guard: `tests/ci-windows-doctor-gate.bats`, two tests, each mutation-checked (a re-added `age-keygen -o`, an audit step without the token)
 
 ### PR 6b — the git-hooks step (#2013 X1 finding)
 
