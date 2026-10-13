@@ -417,4 +417,5 @@ tags: [lessons, index, dotfiles]
 | [396 - bash 3.2 prints a completion spec unquoted, and an untagged test only meets it on main](lesson-396-bash-32-prints-a-completion-spec-unquoted.md) | 2026-10-10 |
 | [397 - A config guard must assert the path that runs](lesson-397-a-config-guard-must-assert-the-path-that-runs.md) | 2026-10-11 |
 | [398 - curl \| bash leaves stdin to the script, not to the person](lesson-398-curl-pipe-bash-leaves-stdin-to-the-script.md) | 2026-10-11 |
+| [399 - A Claude Code deny rule that mixes * with :* denies nothing](lesson-399-a-deny-rule-that-mixes-wildcards-denies-nothing.md) | 2026-10-12 |
 <!-- END GENERATED -->

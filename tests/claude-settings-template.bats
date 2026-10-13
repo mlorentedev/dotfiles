@@ -300,3 +300,26 @@ setup() {
     done
 }
 
+# Claude Code reads a trailing `:*` as a literal prefix match: a rule that also
+# holds a `*` before it matches only commands with a literal `*` there, so a
+# deny rule written that way denies nothing (the startup warning on 2.x named
+# six of them, among them `git push *--force*:*` and `rm -rf ~/*:*`). A rule is
+# either `Tool(prefix:*)` with no other `*`, or a wildcard rule with no `:*`.
+@test "no permission rule mixes a wildcard with the trailing :* prefix form" {
+    run jq -r '.permissions | (.deny // []) + (.allow // []) + (.ask // []) | .[]
+        | select(test("\\(.*\\*.*:\\*\\)$"))' "$SETTINGS_TEMPLATE"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ] || { echo "rules that match nothing they were meant to: $output"; false; }
+}
+
+# The destructive commands the deny list exists for stay in it, in the form
+# that matches them. A best-effort guard, not a sandbox: a deny rule matches spellings, so each
+# destructive command is listed in its common forms (long flag, short flag,
+# reordered flags). A spelling not listed here is not denied.
+@test "the deny list keeps the destructive git and rm rules as wildcards" {
+    for rule in 'Bash(rm -rf ~/*)' 'Bash(rm -fr ~/*)' 'Bash(git push *--force*)' \
+        'Bash(git push -f*)' 'Bash(git push * -f*)' 'Bash(git reset --hard*)' \
+        'Bash(git clean -f*)' 'Bash(git clean -*f*)' 'Bash(*dotf secrets show*)'; do
+        jq -e --arg r "$rule" '.permissions.deny | index($r)' "$SETTINGS_TEMPLATE" >/dev/null || { echo "missing: $rule"; false; }
+    done
+}
