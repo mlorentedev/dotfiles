@@ -182,14 +182,14 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] Guard: `tests/claude-plugins.bats` fails when either script runs `claude plugin install|list` outside a comment or quotes a declared id; the BUG-004/011 structure tests that read the deleted loops are retired, and the zero-usage list guard reads `plugins.json`
 - [ ] After merge: the next X1 run names why the installs fail on a fresh runner; record the cause on #2013
 
-### PR 7 — the workstation SSH target (#2013 W1, SEC-011 #2356)
+### PR 7 — the workstation SSH target (#2013 A1, SEC-011 #2356)
 
 Owner (2026-10-12): a machine that accepts SSH is a converge step here, not a spec of its own. SSH is reachable through the mesh only: no LAN alias, no public bastion.
 
 - [x] PR 7a, interim: `msi` and `macmini` client profiles in `ssh/config` (MagicDNS names, `ForwardAgent no`, keepalives, `IdentitiesOnly`), and `docs/runbooks/guide-workstation-ssh-target.md` pairing every server step with its check
 - [x] PR 7a: `scripts/windows-openssh-authorize.ps1` narrows the OpenSSH firewall rule to the `Tailscale` adapter and `100.64.0.0/10` on every run, before sshd starts, and refuses a host without the adapter; the office LAN alias goes (lesson 401)
 - [ ] Failing tests, then `workstation-target` (opt-in in `machine.json`): `Inspect` is the plan; `Apply` writes the sshd drop-in `01-workstation.conf`, the firewall rule, the power policy and the unattended tailscale service
-- [ ] Preflight before `Apply`: a live tailnet session; `sshd -t -f <candidate>` passes; after reload a key-only self-connect over the node's tailnet address succeeds, otherwise the previous file is restored
+- [ ] Preflight before `Apply`: a live tailnet session, and `sshd -t -f <candidate>` passes. After the apply, a key-only self-connect over the node's tailnet address must succeed. Otherwise every resource the run changed (sshd drop-in, firewall rule, power policy, tailscale service) is restored from its backup and re-checked, and the run fails
 - [ ] A second run reports 0 changes; X1 renders the plan on linux, macos and windows without applying it
 - [ ] Doctor reuses `Inspect`, and `--fix` calls `Apply`
 - [ ] ADR-045 amendment: how converge gets privilege (a sudo prompt per step, or the plan and a stop, as `identity restore` does)

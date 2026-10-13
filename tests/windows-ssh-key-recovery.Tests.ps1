@@ -216,7 +216,7 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             }
             Should -Invoke -CommandName New-NetFirewallRule -Times 1 -Exactly -Scope It -ParameterFilter {
                 $Name -eq 'OpenSSH-Server-In-TCP' -and $LocalPort -eq 22 -and
-                    (@($InterfaceAlias) -join ',') -eq 'Tailscale' -and
+                    (@($InterfaceAlias | ForEach-Object { if ($_ -is [System.Management.Automation.WildcardPattern]) { $_.ToWql() } else { [string]$_ } }) -join ',') -eq 'Tailscale' -and
                     (@($RemoteAddress) -join ',') -eq '100.64.0.0/10'
             }
         }
@@ -241,7 +241,7 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
             Should -Invoke -CommandName New-NetFirewallRule -Times 0 -Exactly -Scope It
             Should -Invoke -CommandName Set-NetFirewallRule -Times 1 -Exactly -Scope It -ParameterFilter {
                 $Name -eq 'OpenSSH-Server-In-TCP' -and $Enabled -eq 'True' -and
-                    (@($InterfaceAlias) -join ',') -eq 'Tailscale' -and
+                    (@($InterfaceAlias | ForEach-Object { if ($_ -is [System.Management.Automation.WildcardPattern]) { $_.ToWql() } else { [string]$_ } }) -join ',') -eq 'Tailscale' -and
                     (@($RemoteAddress) -join ',') -eq '100.64.0.0/10'
             }
         }
@@ -304,11 +304,13 @@ Describe 'Windows SSH key recovery' -Skip:(-not $script:onWindows) {
 
         It 'defines one mesh alias with the dedicated identity and no LAN alias' {
             $config = Get-Content -LiteralPath $script:SshConfig -Raw
-            $config | Should -Match '(?ms)^Host acemagic-office\s+.*?HostName acemagic-office\b'
+            $block = [regex]::Match($config, '(?ms)^# --- ACEMAGIC-OFFICE-START ---.*?^# --- ACEMAGIC-OFFICE-END ---').Value
+            $block | Should -Not -BeNullOrEmpty
+            $block | Should -Match '(?ms)^Host acemagic-office\s+.*?HostName acemagic-office\b'
             $config | Should -Not -Match '(?m)^Host acemagic-office-lan\b'
             @([regex]::Matches($config, 'IdentityFile ~/.ssh/id_ed25519_ts_bridge_acemagic')).Count |
                 Should -Be 1
-            @([regex]::Matches($config, '(?m)^\s+IdentitiesOnly yes$')).Count | Should -Be 1
+            @([regex]::Matches($block, '(?m)^\s+IdentitiesOnly yes\s*$')).Count | Should -Be 1
         }
 
         It 'documents the complete lifecycle and the trust boundary' {

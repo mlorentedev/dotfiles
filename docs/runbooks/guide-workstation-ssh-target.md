@@ -83,9 +83,13 @@ Store and Standalone apps (`io.tailscale.ipn.macsys`, the one installed on
 `macmini` today) cannot. With FileVault on, a reboot also stops at the unlock
 screen until someone types the password. Pick one for each Mac and record it:
 
-- **Unattended (target):** remove the app and install `tailscaled` as a
-  LaunchDaemon: `brew install tailscale && sudo tailscaled install-system-daemon`,
-  then `sudo tailscale up --login-server https://vpn.kubelab.live`. FileVault
+- **Unattended (target):** switch variants in the order Tailscale requires.
+  Quit the app, delete it, empty the Trash and **reboot**, so its system
+  extension is unloaded. Only then install `tailscaled` as a LaunchDaemon:
+  `brew install tailscale && sudo tailscaled install-system-daemon`, then
+  `sudo tailscale up --login-server https://vpn.kubelab.live`. Check with
+  `systemextensionsctl list | grep -i tailscale`, which must list no extension
+  `[activated enabled]`. FileVault
   still blocks the boot until it is unlocked. Use `sudo fdesetup authrestart`
   for planned restarts. An unplanned restart, such as a power cut, still needs
   a person at the unlock screen.
@@ -142,12 +146,13 @@ ClientAliveCountMax 3
 connection from any other source address is refused after the key exchange,
 even with the right key.
 
-**Linux** (Debian/Ubuntu name the unit `ssh`; Fedora and Arch name it `sshd`):
+**Linux:**
 
 ```bash
+SSHD_UNIT=ssh        # Debian and Ubuntu; Fedora and Arch name the unit sshd
 sudo install -m 0644 01-workstation.conf /etc/ssh/sshd_config.d/01-workstation.conf
 grep -n '^Include' /etc/ssh/sshd_config   # the Include must come before any other directive
-sudo sshd -t && sudo systemctl reload ssh
+sudo sshd -t && sudo systemctl reload "$SSHD_UNIT"
 ```
 
 **macOS:** Remote Login is socket-activated. launchd starts a fresh `sshd` for
@@ -315,6 +320,6 @@ that fixes it.
 
 Restore the dated backups taken in the preflight, then:
 
-- **Linux:** `sudo sshd -t && sudo systemctl reload ssh`; `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp` if you remove the target role; `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target`.
+- **Linux:** `sudo sshd -t && sudo systemctl reload "$SSHD_UNIT"` (section 2); `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp` if you remove the target role; `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target`.
 - **macOS:** `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf`; `sudo pfctl -a com.apple/250.KubelabSSH -F all`; `sudo systemsetup -setremotelogin off` if the Mac stops being a target.
 - **Windows:** restore `sshd_config`, `sshd -t`, `Restart-Service sshd`. To retire the target, run `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP` and `Stop-Service sshd`.
