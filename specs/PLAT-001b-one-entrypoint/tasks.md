@@ -188,7 +188,7 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] Failing tests first: each marketplace is prepared once before its first install, added from its source when missing and refreshed when registered, with the registry listed once (`TestSyncPreparesEachMarketplaceOnceBeforeItsFirstInstall`); nothing is called on a converged box or a dry run (`TestSyncPreparesNothingWithoutAnInstall`); a failed preparation, or a marketplace with no source, is named in the cause of an install that then fails (`TestAFailedPreparationIsNamedInTheCauseOfAFailedInstall`)
 - [x] `ai/claude/marketplaces.json`, read by `LoadMarketplaceSources`: its own file, since every released dotf reads `plugins.json` with `DisallowUnknownFields` and a new field would fail the plugin step on a box whose binary predates it. Absent means no sources; present, it is read strictly (`TestLoadMarketplaceSources`)
 - [x] Guard: `TestEveryDeclaredPluginsMarketplaceHasASource` fails when a plugin is declared from a marketplace with no source
-- [ ] Evidence: a from-zero run on the branch shows `3 added` on the first converge and `0 added, 0 failed, 3 already present` on the second, on both runners
+- [x] Evidence: from-zero run 38368564873 on `66201aba`, ubuntu: `installed claude-plugins 3 added, 0 already present` on the first converge, `in sync claude-plugins 0 added, 3 already present` on the second (the report omits a zero failure count). The macOS runner prints `[SKIP] claude ... not installed` on both converges, before and after the fix: converge installs no Claude Code on macOS, which is #2317 (PLAT-002), so the defect never reached that runner and this PR cannot prove anything there
 
 ### PR 7 — the workstation SSH target (#2013 A1, SEC-011 #2356)
 
