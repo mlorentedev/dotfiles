@@ -9,6 +9,8 @@
 # The check is keyed on GitHub's closing keywords, never on "a spec was touched".
 # `Refs #N` legitimately leaves a spec active when the issue's work continues.
 
+load 'lib/both-shells'
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     GATE="$SCRIPTS_DIR/check-spec-gate.sh"
@@ -72,7 +74,7 @@ tiny_change() {
     git commit -q -m "tiny change"
 }
 
-run_gate() { run "$GATE" --base-ref main --head-ref feature; }
+run_gate() { run_both_shells "$GATE" --base-ref main --head-ref feature; }
 
 @test "AC1: closing an issue whose active spec is not archived fails the gate" {
     seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
@@ -341,7 +343,7 @@ big_change() {
     archive_spec FOO-001-demo
     export SDD_PR_BODY="Closes #123"
 
-    run "$GATE" --base-ref main --head-ref feature --explain
+    run_both_shells "$GATE" --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
     [[ "$output" == *"Active-spec LOC (added+removed): 0"* ]] || false
     [[ "$output" == *"Specs archived for archive-on-merge"* ]] || false

@@ -5,6 +5,7 @@
 # returns them, so the fixtures below are real jq over real JSON, no stubs.
 
 load 'lib/refute'
+load 'lib/both-shells'
 
 setup() {
     GATE="$BATS_TEST_DIRNAME/../scripts/pr-agent-push-gate.sh"
@@ -50,18 +51,8 @@ full_review_with_sha() {
         "$FULL" "$1"
 }
 
-# Every case runs under zsh and bash, which must agree: the repo's scripts run
-# under both (.claude/CLAUDE.md).
-_gate() {
-    run zsh "$GATE" --comments "$COMMENTS" --commits "$COMMITS" "$@"
-    local zsh_status="$status" zsh_output="$output"
-    run bash "$GATE" --comments "$COMMENTS" --commits "$COMMITS" "$@"
-    if [ "$status" != "$zsh_status" ] || [ "$output" != "$zsh_output" ]; then
-        printf 'bash (%s) and zsh (%s) disagree\n--- bash\n%s\n--- zsh\n%s\n' \
-            "$status" "$zsh_status" "$output" "$zsh_output"
-        return 1
-    fi
-}
+# Every case runs under zsh and bash, which must agree.
+_gate() { run_both_shells "$GATE" --comments "$COMMENTS" --commits "$COMMITS" "$@"; }
 
 @test "--help exits 0 and names the threshold" {
     run "$GATE" --help

@@ -7,6 +7,8 @@
 # check-md-escapes.sh checks corruption, compile-harness --check checks harness
 # drift. None of them ask whether a path in prose still resolves.
 
+load 'lib/both-shells'
+
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     GUARD="$DOTFILES_DIR/scripts/check-doc-paths.sh"
@@ -77,7 +79,7 @@ governed_files() {
     local failed=0 f
     while IFS= read -r f; do
         [ -f "$DOTFILES_DIR/$f" ] || continue
-        if ! (cd "$DOTFILES_DIR" && "$GUARD" "$f"); then
+        if ! (cd "$DOTFILES_DIR" && bash "$GUARD" "$f" && zsh "$GUARD" "$f"); then
             failed=$((failed + 1))
         fi
     done < <(instruction_files)
@@ -86,21 +88,21 @@ governed_files() {
 
 @test "check-doc-paths: catches a path that does not exist [#916]" {
     printf 'See `scripts/definitely-not-here.sh` for details.\n' > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
     [[ "$output" == *"definitely-not-here.sh"* ]] || false
 }
 
 @test "check-doc-paths: catches a glob that matches nothing [#916]" {
     printf 'Skills live in `ai/skills/*/SKILL.md` today.\n' > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
     [[ "$output" == *"matches nothing"* ]] || false
 }
 
 @test "check-doc-paths: accepts a path that exists [#916]" {
     printf 'The library is `scripts/utils.sh` and the manifest `versions.conf`.\n' > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 0 ]
 }
 
@@ -124,7 +126,7 @@ governed_files() {
         printf 'The store index is `_index.md` over there.\n'
         printf 'See `https://example.com/a/b.md` for context.\n'
     } > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 0 ]
 }
 
@@ -133,7 +135,7 @@ governed_files() {
     # earlier revision skipped every ALL-CAPS segment and so silently ignored
     # the dead `ai/skills/*/SKILL.md` reference it was written to catch.
     printf 'Records live at `harness/skills/nope-not-real/SKILL.md`.\n' > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
 }
 
@@ -202,7 +204,7 @@ governed_files() {
     mkdir -p "$DOTFILES_DIR/ai/untracked-probe"
     printf 'Run `scripts/definitely-not-here.sh` first.\n' > "$DOTFILES_DIR/$PROBE_REL"
 
-    run "$GUARD"
+    run_both_shells "$GUARD"
     [ "$status" -eq 0 ]
     [[ "$output" != *"$PROBE_REL"* ]] || false
 }
@@ -265,7 +267,7 @@ EOF
     # `scripts`) and used to resolve — and be reported OK — outside the repo.
     # A false negative, which is the failure mode this guard exists to avoid.
     printf 'Escaping: `scripts/../../dotfiles/README.md` is outside.\n' > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
     [[ "$output" == *"escapes the repo root"* ]] || false
 }
@@ -275,7 +277,7 @@ EOF
     # Ordering it before the rooted gate turned a false-negative fix into a
     # false positive on `not-a-real-dir/../x.md`.
     printf 'Unrelated: `not-a-real-toplevel/../other/thing.md` here.\n' > "$SCRATCH/doc.md"
-    run "$GUARD" "$SCRATCH/doc.md"
+    run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 0 ]
 }
 
@@ -330,7 +332,7 @@ EOF
 Read `$VAULT_PATH/00_meta/skills/missing.md` for details.
 EOF
 
-    run env VAULT_PATH="$fake_vault" "$GUARD" "$SCRATCH/doc.md"
+    VAULT_PATH="$fake_vault" run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "referenced vault path does not exist" ]] || false
 }
@@ -344,7 +346,7 @@ EOF
 Read `$VAULT_PATH/00_meta/skills/real.md` for details.
 EOF
 
-    run env VAULT_PATH="$fake_vault" "$GUARD" "$SCRATCH/doc.md"
+    VAULT_PATH="$fake_vault" run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 0 ]
 }
 
@@ -353,6 +355,7 @@ EOF
 Read `$VAULT_PATH/00_meta/skills/missing.md` for details.
 EOF
 
-    run env -u VAULT_PATH PATH="/usr/bin:/bin" "$GUARD" "$SCRATCH/doc.md"
+    unset VAULT_PATH
+    PATH="/usr/bin:/bin" run_both_shells "$GUARD" "$SCRATCH/doc.md"
     [ "$status" -eq 0 ]
 }
