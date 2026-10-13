@@ -75,6 +75,7 @@ func (l Logind) Apply(root Root) (func() error, error) {
 		return nil, err
 	}
 	todo := l.unmasked()
+	reload := l.canReload()
 	var undo []func() error
 	undoAll := func() error {
 		var errs []error
@@ -91,13 +92,15 @@ func (l Logind) Apply(root Root) (func() error, error) {
 			return undoAll, err
 		}
 		undo = append(undo, func() error {
-			if err := restoreRoot(root, l.DropIn, prev); err != nil {
+			if err := restoreRoot(root, l.DropIn, prev); err != nil || !reload {
 				return err
 			}
 			return reloadLogind(root)
 		})
-		if err := reloadLogind(root); err != nil {
-			return undoAll, err
+		if reload {
+			if err := reloadLogind(root); err != nil {
+				return undoAll, err
+			}
 		}
 	}
 	if len(todo) > 0 {
@@ -111,15 +114,31 @@ func (l Logind) Apply(root Root) (func() error, error) {
 	return undoAll, nil
 }
 
+// canReload reports whether this logind reads its config again on SIGHUP.
+// One that does not would die of the signal, so it is never sent one; the
+// drop-in then applies at its next start, the next boot at the latest.
+func (l Logind) canReload() bool {
+	out, _ := l.Run("systemctl", "show", "-p", "CanReload", "--value", "systemd-logind.service")
+	return strings.TrimSpace(string(out)) == "yes"
+}
+
 // reloadLogind makes logind read its config again. SIGHUP reloads it without
 // ending sessions; a restart would end them, so it is never done here.
 func reloadLogind(root Root) error {
 	return asRoot(root, "systemctl", "kill", "-s", "HUP", "systemd-logind")
 }
 
-// Prove asks logind what it now does with the lid on external power, and
-// systemd whether every sleep target is masked.
+// Prove asks systemd whether every sleep target is masked: that alone stops
+// every suspend, logind's or a desktop session's, since a masked target
+// refuses to start. Where logind can reload, it also asks logind what it now
+// does with the lid on external power.
 func (l Logind) Prove() error {
+	if todo := l.unmasked(); len(todo) > 0 {
+		return fmt.Errorf("%s not masked: the machine can still suspend", strings.Join(todo, ", "))
+	}
+	if !l.canReload() {
+		return nil
+	}
 	out, err := l.Run("busctl", "get-property", "org.freedesktop.login1", "/org/freedesktop/login1",
 		"org.freedesktop.login1.Manager", "HandleLidSwitchExternalPower")
 	if err != nil {
@@ -127,9 +146,6 @@ func (l Logind) Prove() error {
 	}
 	if got := strings.TrimSpace(string(out)); got != `s "ignore"` {
 		return fmt.Errorf("logind still answers HandleLidSwitchExternalPower=%s after the reload; it reads the drop-in at its next restart (`sudo systemctl restart systemd-logind` from a local session ends the graphical one)", got)
-	}
-	if todo := l.unmasked(); len(todo) > 0 {
-		return fmt.Errorf("%s not masked: the machine can still suspend", strings.Join(todo, ", "))
 	}
 	return nil
 }

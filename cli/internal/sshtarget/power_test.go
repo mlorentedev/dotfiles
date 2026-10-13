@@ -17,12 +17,13 @@ type laptop struct {
 	masked    map[string]bool
 	lid       string // logind's live HandleLidSwitchExternalPower
 	hupReads  bool   // whether SIGHUP makes logind read the drop-in
+	canReload bool   // what systemd says of systemd-logind's CanReload
 	rootCalls []string
 }
 
 func newLaptop(t *testing.T) *laptop {
 	return &laptop{t: t, dropIn: filepath.Join(t.TempDir(), "logind.conf.d", "50-workstation.conf"),
-		masked: map[string]bool{}, lid: "suspend", hupReads: true}
+		masked: map[string]bool{}, lid: "suspend", hupReads: true, canReload: true}
 }
 
 func (l *laptop) user(argv ...string) ([]byte, error) {
@@ -32,6 +33,11 @@ func (l *laptop) user(argv ...string) ([]byte, error) {
 			return []byte("masked\n"), nil
 		}
 		return []byte("static\n"), nil
+	case argv[0] == "systemctl" && argv[1] == "show":
+		if l.canReload {
+			return []byte("yes\n"), nil
+		}
+		return []byte("no\n"), nil
 	case argv[0] == "busctl":
 		return []byte(`s "` + l.lid + `"` + "\n"), nil
 	}
@@ -166,4 +172,28 @@ func mapsEqual(a, b map[string]bool) bool {
 		}
 	}
 	return true
+}
+
+// A logind that cannot reload is never sent SIGHUP, which would kill it. The
+// masks still stop every suspend, so the proof passes on them alone and the
+// lid policy waits for logind's next start.
+func TestLogindThatCannotReloadIsNeverSignalled(t *testing.T) {
+	l := newLaptop(t)
+	l.canReload = false
+	p := l.logind()
+	undo, err := p.Apply(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Prove(); err != nil {
+		t.Fatalf("Prove = %v; the masks alone stop every suspend", err)
+	}
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range l.rootCalls {
+		if strings.Contains(c, "kill") {
+			t.Errorf("ran %q on a logind that cannot reload; SIGHUP would kill it", c)
+		}
+	}
 }
