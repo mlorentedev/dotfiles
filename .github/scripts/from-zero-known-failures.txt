@@ -12,10 +12,13 @@
 darwin kubectl not in PATH
 
 # owner: #2013 S2 (hive supervision: launchd on macOS, `hive service install` on Linux)
+# A runner has no daemon, so hive's verdict is "down", or "unverified listener"
+# when another program holds the derived port (run 38372164624; hive#492). One
+# entry covers both: two would leave one stale on every run.
 # example: [FAIL] the hive daemon is down, so the hive MCP server fails in every agent (`hive client` never starts a server of its own). macOS has no hive supervisor yet: start `hive serve` by hand, then confirm with `hive service status`.
-darwin the hive daemon is down
+darwin the hive daemon is
 # example: [FAIL] the hive daemon is down, so the hive MCP server fails in every agent (`hive client` never starts a server of its own). Fix: `hive service install`, or `systemctl --user restart hive.service`, then confirm with `hive service status`.
-linux the hive daemon is down
+linux the hive daemon is
 
 
 # owner: #2013 T3 (versions via `mise ls --json`; the ~/Applications and *_HOME checks replaced)
