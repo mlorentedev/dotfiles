@@ -21,7 +21,8 @@ func newUpdateCmd() *cobra.Command {
 Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
 
 Anything non-actionable (not a git repo, dirty worktree, unreachable remote, no
-upstream, already current, diverged history) is logged and skipped with exit 0.
+upstream, already current, ahead of the upstream, diverged history) is logged
+and skipped with exit 0.
 A real converge failure is the ONLY non-zero exit, so 'systemctl --user status
 dotfiles-selfupdate' (and the journal) surface it.
 
