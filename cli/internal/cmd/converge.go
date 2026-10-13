@@ -116,6 +116,7 @@ var convergeOptions = func() converge.Options {
 		UID:           os.Getuid(),
 		SSHRoot:       sshtarget.Sudo{Terminal: identityTerminal},
 		UserRun:       sshtarget.Exec,
+		Claude:        claudeSyncer,
 		RunSetup:      converge.ExecSetup,
 		DotfPath:      harness.ResolveDotfPath,
 	}
