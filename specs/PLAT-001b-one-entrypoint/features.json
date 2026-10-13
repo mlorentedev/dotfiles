@@ -124,5 +124,12 @@
     "verification": "cd cli && out=$(go test ./internal/converge/ -run '^(TestEnvGenerate_|TestRegistry_ToolsRunAfterRecords$)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestEnvGenerate_RepairsAStaleFile' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRegistry_ToolsRunAfterRecords'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f19",
+    "behavior": "#2013 A1 PR 7b: a machine opts into ssh-target through a roles section in machine.json; an unknown role is rejected, and no writer of machine.json drops a section it does not own",
+    "verification": "cd cli && out=$(go test ./internal/env/ ./internal/cmd/ -run '^(TestLoadMachineRoles|TestSetMachineRole|TestSetMachinePathKeepsSectionsItDoesNotOwn|TestEnvRole)' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSetMachinePathKeepsSectionsItDoesNotOwn' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestLoadMachineRolesRejectsAnUnknownRole' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestEnvRoleAddListRemove'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

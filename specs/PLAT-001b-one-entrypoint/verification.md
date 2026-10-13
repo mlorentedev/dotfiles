@@ -85,6 +85,14 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - #2013 X1 doctor gate (owner, 2026-10-11): the job was red by design until S2, P7, T3 and the kubectl pin land, and a red non-required check cannot pass the merge conditions, nor tell a new failure from the known ones. Its doctor step now runs through a ratchet, the contract test-windows' `doctor-gate.ps1` already keeps (TEST-003): listed FAILs pass, an unlisted FAIL or a stale entry fails. Fixed substrings, not regexes, so GNU and BSD tools read them alike. Declined: leaving it red for the owner to merge, and holding X1 until every owner's fix lands.
 
+- #2013 A1, PR 7b (2026-10-12): the opt-in for the workstation SSH target is a `roles` section in `machine.json`, not a flag on `converge`. A flag would have to be repeated on every run, and the scheduled `dotf update` would converge the machine back without it.
+  - Written by `dotf env role add|rm <ROLE>` and read by `env.LoadMachineRoles`. No machine has a role until its owner adds one.
+  - An unknown role is an error on read and on write. A typo such as `ssh-targt` would otherwise leave the machine without the hardening its owner asked for, and nothing would say so.
+  - Removing the last role deletes the section; roles are stored sorted, so two machines with the same roles hold the same bytes.
+  - Found while adding it: `dotf env set` decoded the file into a struct holding only `paths` and wrote that back. Every write deleted `machine.id`, `pools.deny` and any role. An unidentified machine denies every pool, so the loss changed the dispatch policy without an error (lesson 402).
+  - Fix: every writer goes through `editMachine`, which replaces one top-level section and keeps the others. `TestSetMachinePathKeepsSectionsItDoesNotOwn` writes a path into a file with all three sections and reads the identity and the roles back through their own readers.
+  - Evidence: `go test ./...`, `go vet ./...`, `GOOS=windows go vet ./...` and golangci-lint 2.12.2 (the pin) all clean on 2026-10-12.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
