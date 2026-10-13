@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os/user"
 	"slices"
 	"strings"
 
@@ -106,13 +105,4 @@ func workstationDetail(p sshtarget.Plan, dryRun bool) string {
 		return "to apply as root: " + strings.Join(p.Pending, ", ") + "; then proves: " + proof
 	}
 	return "applied: " + strings.Join(p.Pending, ", ") + "; " + proof
-}
-
-// currentUser is the account sshd is opened to.
-func currentUser() (string, error) {
-	u, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-	return u.Username, nil
 }

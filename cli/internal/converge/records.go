@@ -94,7 +94,7 @@ func Registry(o Options) []Reconciler {
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
-		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: currentUser},
+		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: sshtarget.CurrentUser},
 		legacySetup{run: o.RunSetup},
 	}
 }

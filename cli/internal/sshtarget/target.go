@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -79,6 +80,16 @@ func New(repoRoot, user string, paths Paths, run Runner, addrs func() ([]net.IP,
 	}
 	t.Template, err = os.ReadFile(filepath.Join(repoRoot, TemplateFile))
 	return t, err
+}
+
+// CurrentUser is the account sshd is opened to: the one running dotf. Converge
+// and doctor both ask here, so they render the same AllowUsers line.
+func CurrentUser() (string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return u.Username, nil
 }
 
 // Service turns sshd on and off on one OS.

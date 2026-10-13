@@ -43,9 +43,9 @@ func checkWorkstationTarget(sys *System, cfg *Config, rep *Report) {
 		rep.Warn(sshtarget.TemplateFile + " not found in the checkout or the deploy mirror: set DOTFILES_REPO_DIR to the checkout to check the SSH target")
 		return
 	}
-	user := sys.Getenv("USER")
-	if user == "" {
-		rep.Warn("USER is unset: cannot tell which account sshd is opened to")
+	user, err := sshtarget.CurrentUser()
+	if err != nil {
+		rep.Warn("cannot tell which account sshd is opened to: " + err.Error())
 		return
 	}
 	t, err := sshtarget.New(filepath.Dir(filepath.Dir(tmpl)), user, workstationPaths(sys, home), workstationRun(sys), workstationAddrs(sys))

@@ -61,7 +61,11 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			writeFile(t, paths.SSHDConfig, "Include "+filepath.Dir(paths.DropIn)+"/*\n")
 			loaded := false
 			if tc.state != nil {
-				tc.state(t, paths, "manu")
+				u, err := sshtarget.CurrentUser()
+				if err != nil {
+					t.Fatal(err)
+				}
+				tc.state(t, paths, u)
 				loaded = tc.want == StatusPass
 			}
 			if tc.optIn {
@@ -69,7 +73,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			s := newSys(map[string]string{"HOME": home, "USER": "manu", "DOTFILES_REPO_DIR": repo}, nil, nil)
+			s := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
 			s.GOOS = tc.goos
 			s.SSHTargetPaths = func(string) sshtarget.Paths { return paths }
 			s.MeshAddrs = func() ([]net.IP, error) { return tc.addrs, nil }
