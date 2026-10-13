@@ -165,8 +165,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - First run, owner at the sudo prompt: `./install.sh --only workstation-target` -> `applied: firewall; sshd accepts the key from 100.64.0.1, refused from 10.0.0.9`, 1 changed.
   - Second run, over ssh from the macmini: `dotf converge --only workstation-target` -> `[ OK ] workstation-target converged`, `0 changed, 1 ok`, exit 0, with no sudo prompt (the witness answered the plan without root).
   - `sudo ufw status verbose`, owner: `Status: active`, `Default: deny (incoming), allow (outgoing), deny (routed)`, and only `22/tcp on tailscale0 ALLOW IN Anywhere # ssh: mesh only` plus its v6 twin.
-  - From the macmini: `ssh -o BatchMode=yes msi true` over the mesh exits 0; `nc -z -w 5 10.0.0.9 22` over the LAN exits 1 after 75 s, the kernel's connect timeout, so the packet is dropped rather than refused.
-  - `dotf doctor` on msi in a login shell: 190 passed, 0 failed, 2 warned (DR escrow age and persona `enforce:`, both tracked in the #2013 debt ledger). Run from a non-login ssh command it reports five tool-home variables as FAIL; those are unset because no profile was read, not drift.
+  - From the macmini: `ssh -o BatchMode=yes msi true` over the mesh exits 0; `nc -z -w 5 10.0.0.9 22` over the LAN exits 1 after 75 s: macOS's `nc -w` bounds idle time, not the connect, so 75 s is the kernel's connect timeout. Re-run with the connect bounded, `nc -v -z -G 5 10.0.0.9 22` exits 1 after 5 s with `connectx to 10.0.0.9 port 22 (tcp) failed: Operation timed out`, not `Connection refused`: the packet is dropped. Port 9, which nothing listens on, answers the same way, as default deny incoming says it should.
+  - `dotf doctor` on msi in a login shell: 190 passed, 0 failed, 2 warned (DR escrow age and persona `enforce:`, both tracked in the #2013 debt ledger). Run from a non-login ssh command it reports five tool-home variables as FAIL; those are unset because no profile was read. Doctor cannot tell that case from real drift, which is a reporting defect, recorded as D12 in the #2013 debt ledger.
 
 ## Promotion candidates
 
