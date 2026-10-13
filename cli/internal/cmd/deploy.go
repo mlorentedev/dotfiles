@@ -146,8 +146,9 @@ func newDeployCmd() *cobra.Command {
 			}
 			// A bare deploy converges everything the setups own, including the
 			// Orca hooks Orca rewrites on every install (CLI-093, #1953) and the
-			// Claude Code MCP servers and plugins (CLI-063, #1339). The two
-			// Claude steps are independent, so one failing still runs the other.
+			// Claude Code MCP servers and plugins (CLI-063, #1339) and agy's
+			// MCP configs (CLI-105, #2384). The three are independent, so one
+			// failing still runs the others.
 			if len(args) == 0 {
 				if err := deployOrcaHooks(w, env.Home(), dryRun); err != nil {
 					return err
@@ -155,6 +156,7 @@ func newDeployCmd() *cobra.Command {
 				return errors.Join(
 					deployClaudeMCP(w, repoRoot, env.Home(), dryRun),
 					deployClaudePlugins(w, repoRoot, env.Home(), dryRun),
+					deployAgyMCP(w, repoRoot, env.Home(), dryRun),
 				)
 			}
 			return nil

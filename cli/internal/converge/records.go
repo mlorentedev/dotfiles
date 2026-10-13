@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/agy"
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -68,6 +69,9 @@ type Options struct {
 	// false when claude is not installed; the deploy command's in production.
 	// Unset, the agent-extensions step is skipped.
 	Claude func(home string) (claude.Syncer, bool)
+	// AgyPaths says where agy's MCP configs go for a home; the deploy
+	// command's in production. Unset, agent-extensions skips agy.
+	AgyPaths func(home string) agy.Paths
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -100,7 +104,7 @@ func Registry(o Options) []Reconciler {
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: sshtarget.CurrentUser},
-		agentExtensions{claude: o.Claude},
+		agentExtensions{claude: o.Claude, agyPaths: o.AgyPaths},
 		legacySetup{run: o.RunSetup},
 	}
 }

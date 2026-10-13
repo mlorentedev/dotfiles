@@ -20,11 +20,11 @@ tags: [runbook, dotfiles, ai, harness]
 | `tools` | installs the agent CLIs the catalog holds | `packages.json` |
 | `configs-deploy` | agent settings, models and MCP config files | `ai/deploy.json` |
 | `records-bind` | session and gate hooks | `harness/manifest.json` (`agents.bind`, `agents.bind_named`) |
-| `agent-extensions` | Claude Code's MCP servers (hive among them) and plugins, through the `claude` CLI; skipped while claude is not installed | `mcp-servers.json`, `ai/claude/plugins.json`, `ai/claude/marketplaces.json` |
+| `agent-extensions` | Claude Code's MCP servers (hive among them) and plugins, through the `claude` CLI, skipped while claude is not installed; agy's MCP configs (`~/.gemini/config/mcp_config.json` and the hive-vault plugin), written whether or not agy is installed | `mcp-servers.json`, `ai/claude/plugins.json`, `ai/claude/marketplaces.json`, `ai/agy/mcp_servers.json` |
 
 On Linux and Windows, converge runs the setup script as its last step, and that script still installs the agents the catalog lacks. On macOS no setup script runs (ADR-045).
 
-A bare `dotf deploy` registers the same MCP servers and plugins, through the same code as `agent-extensions` (#2387). agy's `mcp_config.json` is still written only by the setup scripts (#2384), and doctor does not yet report a missing plugin or server (#2393).
+A bare `dotf deploy` registers the same MCP servers and plugins and writes the same agy configs, through the same code as `agent-extensions` (#2387, #2384). agy's hive-vault gets `VAULT_PATH` as the env contract resolves it (default `~/Projects/knowledge`); a missing vault is reported, not failed, so creating it later needs no rerun. doctor does not yet report a missing Claude plugin or server (#2393).
 
 ## Per agent
 

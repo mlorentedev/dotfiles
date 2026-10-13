@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/agy"
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 )
 
@@ -155,5 +156,52 @@ func TestAgentExtensions_TheProbeNamesWhatIsStillMissing(t *testing.T) {
 	}
 	if err := step.Probe(env); err == nil || !strings.Contains(err.Error(), "b@m") {
 		t.Errorf("probe = %v; want it to name b@m", err)
+	}
+}
+
+// withAgy writes agy's source into repo and wires paths under home.
+func withAgy(t *testing.T, step agentExtensions, repo, home string) agentExtensions {
+	t.Helper()
+	writeFile(t, filepath.Join(repo, filepath.FromSlash(agy.MCPRel)),
+		`{"mcpServers":{"hive-vault":{"command":"uvx","args":["hive-vault"],"env":{"VAULT_PATH":"${VAULT_PATH}"}}}}`)
+	step.agyPaths = func(h string) agy.Paths {
+		return agy.ResolvePaths(h, func(string) string { return "" }, func(string) string { return "" })
+	}
+	return step
+}
+
+// agy's configs are written whether or not claude is installed, and a machine
+// without claude no longer skips the whole step (CLI-105, #2384).
+func TestAgentExtensions_AgyIsWrittenWithoutClaude(t *testing.T) {
+	repo, home := extensionsRepo(t), t.TempDir()
+	step, env := withAgy(t, withClaude(nil), repo, home), Env{RepoRoot: repo, Home: home}
+	res, err := step.Reconcile(env, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Skip != "" || res.Changes != 3 || !strings.Contains(res.Detail, "agy: 3 MCP config(s) written") ||
+		!strings.Contains(res.Detail, "claude is not installed") {
+		t.Errorf("first run: %+v", res)
+	}
+	if err := step.Probe(env); err != nil {
+		t.Errorf("probe after the apply: %v", err)
+	}
+	again, err := step.Reconcile(env, false)
+	if err != nil || again.Changes != 0 || !strings.Contains(again.Detail, "3 in sync") {
+		t.Errorf("second run: %+v, %v; want no change", again, err)
+	}
+}
+
+// A master agy rewrote by hand is caught by the probe, by path.
+func TestAgentExtensions_TheProbeNamesADriftedAgyConfig(t *testing.T) {
+	repo, home := extensionsRepo(t), t.TempDir()
+	step, env := withAgy(t, withClaude(&claudeBox{}), repo, home), Env{RepoRoot: repo, Home: home}
+	if _, err := step.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	master := filepath.Join(home, ".gemini", "config", "mcp_config.json")
+	writeFile(t, master, "{}")
+	if err := step.Probe(env); err == nil || !strings.Contains(err.Error(), master) {
+		t.Errorf("probe = %v; want it to name %s", err, master)
 	}
 }

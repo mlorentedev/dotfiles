@@ -3,7 +3,10 @@
 # Regression suite for BUG-100 (issue #100): asserts no symlinks under ~/.gemini/config/
 # and that the master MCP config lives at agy's canonical read path.
 #
-# These tests assume agy is installed AND setup-linux.sh has been run.
+# These tests assume agy is installed AND `dotf deploy` (or converge) has run;
+# the VAULT_PATH substitution and the vault preflight are unit-tested in
+# cli/internal/agy, and tests/guard-agy-mcp-in-dotf.bats keeps them out of the
+# setup twins (CLI-105).
 # CI containers without agy binary or post-setup state will skip these tests.
 
 load 'lib/refute'
@@ -46,16 +49,6 @@ setup() {
     vault=$(jq -r '.mcpServers["hive-vault"].env.VAULT_PATH' "$DOTFILES_DIR/ai/agy/mcp_servers.json")
     [ "$vault" = '${VAULT_PATH}' ]
     refute_grep '/home/[a-z]+/|C:\\\\Users\\\\' "$DOTFILES_DIR/ai/agy/mcp_servers.json"
-}
-
-@test "setup-linux.sh substitutes \${VAULT_PATH} and preflights vault dir" {
-    grep -qF 'VAULT_PATH_DEFAULT' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'Obsidian vault not found at' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-windows.ps1 substitutes \${VAULT_PATH} and preflights vault dir (cross-OS parity)" {
-    grep -qF 'Projects\knowledge' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'Obsidian vault not found at' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "setup-windows.ps1 deploys agy skills via the SDD-008 engine (closes 0-skills-on-Windows bug, cross-OS parity)" {
