@@ -127,6 +127,22 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
     8. ace2's host key, `SHA256:qX3pe2spTBQu4Wl5mNlUBRyOna1Kg6TZsrxOemwm+8A` as seen from the macmini over the mesh, compared against a record that does not come over that network (ace2's console) before it is pinned.
   - Mutations, each failing exactly its own row of `TestCheckWorkstationTarget_ByStatus`: the role gate dropped, `ErrNoMesh` not mapped to a skip, a pending plan reported as converged, the darwin gate dropped.
   - On the macmini, `dotf doctor --verbose` from the worktree: `[Workstation SSH target]` `[ OK ] key, host keys, sshd drop-in and service as declared for the mesh address 100.64.0.15`.
+- #2356, host keys pinned (2026-10-13). `ssh/known_hosts` is deployed to `~/.ssh/known_hosts_pinned` by the `ssh-known-hosts` entry. Each pinned host's `Host` block reads only that file and refuses any other key with `StrictHostKeyChecking yes`.
+  - Pinned, each against a record that did not come over the network being trusted:
+    - msi: the owner compared the fingerprint on msi's console.
+    - macmini: read from its own `/etc/ssh/ssh_host_ed25519_key.pub`.
+    - github.com: the line and fingerprint GitHub documents, matching the key its server presented.
+  - Not pinned yet, and why:
+    - ace2: the owner could not compare its fingerprint, `SHA256:qX3pe2spTBQu4Wl5mNlUBRyOna1Kg6TZsrxOemwm+8A` as seen over the mesh. It is pinned once compared on its console, or from a long-standing `known_hosts` entry on msi as a weaker second observation.
+    - The other homelab and cloud hosts wait for the same out-of-band comparison. The SSH CA (#2373, EPIC D11 / S11) replaces the list rather than growing it.
+  - `hermes-nan` leaves `ssh/config`: the node is retired.
+  - Proof on the macmini, with the worktree's `ssh/config` and pin file: macmini, msi and github.com all pass host-key verification and reach authentication. A wrong pin (msi's key under macmini's names) is refused with `REMOTE HOST IDENTIFICATION HAS CHANGED` / `Host key verification failed.`
+  - Authentication itself failed in that run because the key has a passphrase and the agent was empty under `BatchMode`. That is the client's agent, not the pin; the msi acceptance (steps 1 and 6 above) logs in for real.
+  - Mutations, each caught:
+    - msi's line dropped: test 2 names the host.
+    - A key with one character changed: test 4, because the fingerprint differs from the one recorded above it. It still parses, so test 1 alone missed it; test 4 exists for that reason.
+    - A key truncated: tests 1 and 4.
+    - macmini's `UserKnownHostsFile` removed: test 3.
 
 ## Promotion candidates
 

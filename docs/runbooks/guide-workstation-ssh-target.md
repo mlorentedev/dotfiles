@@ -27,7 +27,7 @@ mesh and nowhere else**. The client side (`ssh/config`) is already converged by
 |---|---|---|---|
 | Network | UFW: port 22 only `in on tailscale0` | pf anchor: port 22 only from the mesh range | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` |
 | sshd | drop-in: key only, `AllowUsers manu@100.64.0.0/10` | same drop-in | `sshd_config`: key only, `AllowUsers` mesh range |
-| Client | `ForwardAgent no`, keepalives, `IdentitiesOnly yes` (`ssh/config`) | same | same |
+| Client | `ForwardAgent no`, keepalives, `IdentitiesOnly yes`, host key pinned with `StrictHostKeyChecking yes` (`ssh/config`, `ssh/known_hosts`) | same | same |
 
 The two server layers are independent. If the firewall is down, sshd still
 refuses every connection from outside the mesh, whatever key it carries. If
@@ -51,6 +51,13 @@ intended behaviour, not an outage.
   [kubelab#2222](https://github.com/mlorentedev/kubelab/issues/2222) (OBS-036).
 - One SSH key for every host:
   [#2357](https://github.com/mlorentedev/dotfiles/issues/2357) (SEC-012).
+- Host keys are pinned one line per host, by hand. The SSH CA replaces the
+  list with one signature:
+  [#2373](https://github.com/mlorentedev/dotfiles/issues/2373) (SEC-013).
+- SSH open to the internet on the VPS and gcp1:
+  [kubelab#2224](https://github.com/mlorentedev/kubelab/issues/2224) (SEC-029).
+  Ansible accepts host keys on first use:
+  [kubelab#2223](https://github.com/mlorentedev/kubelab/issues/2223) (ANSIBLE-066).
 
 ## Preflight
 
@@ -300,12 +307,32 @@ The client side is code. Each workstation profile in `ssh/config` (inside the
 - `ServerAliveInterval 30` and `ServerAliveCountMax 3`.
 - `ForwardAgent no`. A workstation runs its own `dotf identity restore`; it
   never borrows the client's agent.
+- `UserKnownHostsFile ~/.ssh/known_hosts_pinned` and `StrictHostKeyChecking
+  yes`. The client accepts only the key pinned in `ssh/known_hosts`, deployed
+  by the `ssh-known-hosts` entry, and refuses any other, including on the
+  first connection.
+
+### Pinning a new host
+
+A key is never accepted on first use. To add a host:
+
+1. Read the fingerprint the host presents over the mesh, without trusting it:
+   `ssh-keyscan -t ed25519 <name>.kubelab.internal | ssh-keygen -lf -`.
+2. Compare it against a record that does not come over that network: on the
+   host's own console, `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
+3. Only if they match, add the line to `ssh/known_hosts` with every name and
+   address of the host, and the fingerprint on a `# SHA256:` comment above it.
+   Add `UserKnownHostsFile` and `StrictHostKeyChecking yes` to its `Host`
+   block in `ssh/config`.
+4. `bats tests/ssh-known-hosts.bats` fails on a line that does not parse, on
+   a key that differs from the fingerprint recorded above it, and on a host
+   that pins without a line.
 
 Converge it and check it:
 
 ```bash
 dotf deploy --dry-run ssh-config      # what would change, touching nothing
-dotf deploy ssh-config                # then the same for ssh-pubkey, or run the full converge
+dotf deploy ssh-config                # then ssh-known-hosts and ssh-pubkey, or run the full converge
 dotf doctor                           # deploy drift, and mode 0600 on ~/.ssh/config
 ssh -G macmini | grep -E '^(hostname|identitiesonly|forwardagent|serveraliveinterval) '   # dry run, no connection
 ssh -o BatchMode=yes macmini true

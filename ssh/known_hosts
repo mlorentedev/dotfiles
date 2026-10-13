@@ -1,0 +1,22 @@
+# Pinned host keys, deployed to ~/.ssh/known_hosts_pinned (ai/deploy.json).
+# ssh/config points a host here with UserKnownHostsFile and refuses any other
+# key with StrictHostKeyChecking yes, so a key is never accepted on first use.
+#
+# A line lands only after its key is verified out of band, against a record
+# that does not come over the network being trusted. The source of each is
+# noted above it. A host key is per host, not per address: one line carries
+# every name and address of the host. This file is transitional; the SSH CA
+# (#2373) replaces it with one @cert-authority line.
+
+# msi: the owner compared the fingerprint on msi's console, 2026-10-13 (#2356).
+# SHA256:npy3TXN7J0X9q6yO5+Z3k868tWxbfDpsHlx/ZHtdkec
+msi.kubelab.internal,msi,100.64.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMWYFgzav71kYtus4RG7VV3vaPbacZismPGN/X78OvA7
+
+# macmini: read from its own /etc/ssh/ssh_host_ed25519_key.pub, 2026-10-13.
+# SHA256:C3oXrETgsfA3ZpH3cYbWSmzYJTbWMb6Yg1ds5Y+6zRY
+macmini.kubelab.internal,macmini,100.64.0.15 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO3jvKZEz70YZKMN+uKd8bc0xgZ1UI3sptRJZGWxBBSU
+
+# github.com: the line and fingerprint GitHub documents in "GitHub's SSH key
+# fingerprints", matching the key the server presented, 2026-10-13.
+# SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
