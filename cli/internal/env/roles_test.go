@@ -89,3 +89,17 @@ func TestSetMachineRoleRemovesAnUnknownRole(t *testing.T) {
 		t.Fatalf("roles after the remove = %v, %v; want none", roles, err)
 	}
 }
+
+func TestSetMachineRoleRefusesAnAddOverAnUnknownRole(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machine.json")
+	before := `{"roles":["ssh-targt"]}`
+	if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SetMachineRole(path, RoleSSHTarget, true); err == nil || !strings.Contains(err.Error(), "dotf env role rm ssh-targt") {
+		t.Fatalf("add over an unknown role = %v, want the unknown role named with its way out", err)
+	}
+	if after, _ := os.ReadFile(path); string(after) != before {
+		t.Errorf("machine.json changed by a refused add: %s", after)
+	}
+}

@@ -70,6 +70,15 @@ func SetMachineRole(path, role string, on bool) (bool, error) {
 				return false, fmt.Errorf("parse machine.json roles (%s): %w", path, err)
 			}
 		}
+		if on {
+			// An add over an unknown name would report success and leave a
+			// file LoadMachineRoles still refuses.
+			for _, r := range roles {
+				if err := checkRole(r); err != nil {
+					return false, fmt.Errorf("machine.json (%s): %w; remove it with `dotf env role rm %s`", path, err, r)
+				}
+			}
+		}
 		has := slices.Contains(roles, role)
 		switch {
 		case on == has:
