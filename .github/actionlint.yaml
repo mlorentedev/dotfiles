@@ -1,0 +1,7 @@
+# actionlint reads this file from .github/ on every run.
+paths:
+  .github/workflows/pr-agent.yml:
+    ignore:
+      # AC10 of AI-045: a job-level concurrency `queue`, which GitHub accepts
+      # (run 36835280780) and actionlint 1.7.12 does not know yet.
+      - 'unexpected key "queue" for "concurrency" section'
