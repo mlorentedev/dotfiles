@@ -61,13 +61,20 @@ func Dirs(home string, getenv func(string) string) (geminiHome, appData string) 
 	if geminiHome = getenv("GEMINI_HOME"); geminiHome == "" {
 		geminiHome = filepath.Join(home, ".gemini")
 	}
-	if appData = getenv("AGY_HOME"); appData == "" {
-		appData = getenv(LegacyAppDataVar)
-	}
-	if appData == "" {
+	if appData = getenv(AppDataSource(getenv)); appData == "" {
 		appData = filepath.Join(geminiHome, "antigravity-cli")
 	}
 	return geminiHome, appData
+}
+
+// AppDataSource is the variable Dirs takes the app-data dir from: AGY_HOME,
+// or the old name while only that one is set. doctor names it in its findings,
+// so the precedence lives here once.
+func AppDataSource(getenv func(string) string) string {
+	if getenv("AGY_HOME") == "" && getenv(LegacyAppDataVar) != "" {
+		return LegacyAppDataVar
+	}
+	return "AGY_HOME"
 }
 
 // MCPReport is what one ApplyMCP wrote and removed, or under a plan would.
