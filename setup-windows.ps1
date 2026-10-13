@@ -305,10 +305,11 @@ if ($wingetCmd) {
 # ============================================================================
 # 1d. AGENT BINARIES WITH AN OFFICIAL INSTALLER (AI-041, #1325)
 # ============================================================================
-# setup-linux.sh has installed Claude Code (claude.ai/install.sh) and the
-# Antigravity CLI (antigravity.google/cli/install.sh) since ADR-009; Windows
-# never did, so on a clean box every block below that gates on `claude` (MCP
-# registration, plugins, both session hooks) and the agy config deploy were
+# On Linux and macOS mise installs Claude Code and the Antigravity CLI
+# (versions.conf `# mise: latest`, #2013 P5c), as setup-linux.sh did through
+# the vendor installers since ADR-009. Windows never did, so on a clean box
+# every block below that gates on `claude` (MCP registration, plugins, both
+# session hooks) and the agy config deploy were
 # dead until a human installed the binaries by hand. Both vendors ship a
 # Windows installer (install.ps1); ADR-036 class 3 (official installer on every
 # OS, like uv), run in a child pwsh exactly as the uv/Bun installers are, and

@@ -108,6 +108,24 @@ func TestRenderMiseConfig_TurnsOffMiseOwnUpdateNotice(t *testing.T) {
 	}
 }
 
+// A tool mise keeps current must not also update itself: Claude Code's own
+// updater would replace the binary mise installed, outside the pin's floor and
+// outside converge's report (#2013 D9). The env lives in the config mise owns,
+// so it reaches every claude mise runs (activate and shims alike) and no other.
+func TestRenderMiseConfig_TurnsOffTheOwnUpdaterOfAToolMiseManages(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}, "", "claude"))
+	if !strings.Contains(out, "\n[env]\nDISABLE_AUTOUPDATER = \"1\"\n") {
+		t.Errorf("want DISABLE_AUTOUPDATER = \"1\" under [env] when mise manages claude:\n%s", out)
+	}
+	if strings.Index(out, "claude = ") > strings.Index(out, "[env]") {
+		t.Errorf("the pins must come before [env]:\n%s", out)
+	}
+	without := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, ""))
+	if strings.Contains(without, "[env]") || strings.Contains(without, "DISABLE_AUTOUPDATER") {
+		t.Errorf("a config that does not manage claude must leave its updater alone:\n%s", without)
+	}
+}
+
 // fakeMise answers `mise which <tool>` for the tools in installed, and
 // `<path> --version` with the version installed records; `mise install` marks
 // every pending tool installed at its pin.

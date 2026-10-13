@@ -177,7 +177,25 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 	if pythonPackages != "" {
 		fmt.Fprintf(&b, "python.default_packages_file = %q\n", filepath.ToSlash(pythonPackages))
 	}
+	var env []string
+	for _, t := range tools {
+		if kv, ok := ownUpdaterOff[t.Name]; ok {
+			env = append(env, kv)
+		}
+	}
+	if len(env) > 0 {
+		b.WriteString("\n[env]\n" + strings.Join(env, "\n") + "\n")
+	}
 	return b.Bytes()
+}
+
+// ownUpdaterOff turns off the self-updater of a tool mise installs: mise keeps
+// it current (MiseLatestMarker), and a second updater would replace the binary
+// mise installed outside the pin's floor and outside converge's report (#2013
+// D9). mise sets [env] under `mise activate` and in its shims, so the setting
+// reaches every copy mise runs and no other.
+var ownUpdaterOff = map[string]string{
+	"claude": `DISABLE_AUTOUPDATER = "1"`,
 }
 
 // RenderPythonPackages is the requirements file mise installs into every

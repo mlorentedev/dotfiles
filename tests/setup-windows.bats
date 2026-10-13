@@ -266,9 +266,24 @@ refute_legacy_mise_sync() {
     install_line=$(grep -n 'Install-AgentBinary -Name "Claude Code"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     mcp_line=$(grep -n 'claude mcp get' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     [ "$install_line" -lt "$mcp_line" ]
-    # parity: the Linux script installs the same two through the same vendors
-    grep -qF 'https://claude.ai/install.sh' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'https://antigravity.google/cli/install.sh' "$DOTFILES_DIR/setup-linux.sh"
+    # parity: Linux and macOS get the same two from mise, at their newest
+    # release (#2013 D9); setup-linux.sh no longer runs a vendor installer
+    grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^CLAUDE_VERSION='
+    grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^AGY_VERSION='
+}
+
+# #2013 P5c: mise installs Claude Code and agy on Linux and macOS (versions.conf,
+# `# mise: latest`). A vendor installer back in setup-linux.sh would be a second
+# channel that wins on a box where mise has not run yet, and setup would report
+# success on an agent no pin governs.
+@test "setup-linux.sh runs no vendor installer for Claude Code or agy (#2013 P5c)" {
+    for pattern in 'claude.ai/install.sh' 'antigravity.google/cli/install.sh' '@anthropic-ai/claude-code'; do
+        run grep -nF "$pattern" "$DOTFILES_DIR/setup-linux.sh"
+        printf '%s\n' "$output" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -q . && {
+            echo "setup-linux.sh installs an agent outside mise: $output"; false
+        }
+    done
+    true
 }
 
 @test "setup-windows.ps1 persists the contract variables at User scope after generating paths.ps1 (CLI-058, #1324)" {

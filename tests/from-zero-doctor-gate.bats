@@ -105,3 +105,16 @@ teardown() {
 @test "the from-zero job runs doctor through the gate" {
     grep -qF '.github/scripts/from-zero-doctor-gate.sh' "$REPO_DIR/.github/workflows/from-zero.yml"
 }
+
+# #2317 / #2013 P5c: a fresh machine must come out of the first converge with
+# its agents on PATH, before doctor or the second converge are read.
+@test "the from-zero job asserts claude and agy on PATH after the first converge" {
+    wf="$REPO_DIR/.github/workflows/from-zero.yml"
+    grep -qF 'for agent in claude agy; do' "$wf"
+    first=$(grep -n 'name: The first converge succeeded' "$wf" | cut -d: -f1)
+    agents=$(grep -n 'name: The agents resolve on PATH' "$wf" | cut -d: -f1)
+    second=$(grep -n 'name: Second converge changes nothing' "$wf" | cut -d: -f1)
+    [ -n "$agents" ] || false
+    [ "$first" -lt "$agents" ] || false
+    [ "$agents" -lt "$second" ] || false
+}
