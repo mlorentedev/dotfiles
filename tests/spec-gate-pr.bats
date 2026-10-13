@@ -108,10 +108,11 @@ teardown() {
 }
 
 @test "spec-gate-pr: a human login is never rewritten into a bot login" {
-    export STUB_PR_JSON='{"labels":[],"body":"","author":{"is_bot":false,"login":"app"}}'
+    # The prefix matches, so only the is_bot guard keeps it verbatim.
+    export STUB_PR_JSON='{"labels":[],"body":"","author":{"is_bot":false,"login":"app/dependabot"}}'
     run "$ADAPTER" --pr 1 --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 0 ]
-    grep -qF 'SDD_PR_AUTHOR=[app]' "$GATE_LOG"
+    grep -qF 'SDD_PR_AUTHOR=[app/dependabot]' "$GATE_LOG"
 }
 
 @test "spec-gate-pr: propagates the gate verdict instead of masking it" {
