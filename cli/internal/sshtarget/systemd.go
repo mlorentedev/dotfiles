@@ -91,12 +91,21 @@ func (s Systemd) Enable(root Root) error {
 	return asRoot(root, "systemctl", "enable", "--now", u)
 }
 
+// Disable undoes Enable. Stopping the socket does not stop the service a
+// connection already started through it (the proof's, for one), so that is
+// stopped too.
 func (s Systemd) Disable(root Root) error {
-	u, err := s.starter()
+	service, socket, err := s.units()
 	if err != nil {
 		return err
 	}
-	return asRoot(root, "systemctl", "disable", "--now", u)
+	if socket == "" {
+		return asRoot(root, "systemctl", "disable", "--now", service)
+	}
+	if err := asRoot(root, "systemctl", "disable", "--now", socket); err != nil {
+		return err
+	}
+	return asRoot(root, "systemctl", "stop", service)
 }
 
 // Reload makes a running sshd read the changed drop-in and does nothing when

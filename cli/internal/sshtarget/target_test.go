@@ -328,3 +328,34 @@ func TestHasKeyIgnoresOptionsAndComments(t *testing.T) {
 		t.Error("another key was taken for the owner's")
 	}
 }
+
+// reloadCounter is launchd with its reloads counted, standing for a service
+// manager whose running sshd keeps the config it last read (systemd).
+type reloadCounter struct {
+	Launchd
+	reloads *int
+}
+
+func (r reloadCounter) Reload(Root) error { *r.reloads++; return nil }
+
+// When sshd already runs, a failed proof must leave it running the previous
+// drop-in, not only with the previous file on disk: the undo reloads too.
+func TestAFailedProbeReloadsARunningSSHDBackToThePreviousDropIn(t *testing.T) {
+	m := newMachine(t)
+	m.loaded = true
+	m.write(m.paths.HostKey, hostKey+"\n")
+	m.accepts = func(string) bool { return false }
+	reloads := 0
+	tg := m.target()
+	tg.Service = reloadCounter{Launchd: Launchd{Run: m.user}, reloads: &reloads}
+	p, err := tg.Inspect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tg.Apply(p); err == nil {
+		t.Fatal("Apply succeeded though sshd refused the mesh")
+	}
+	if reloads != 2 {
+		t.Errorf("sshd reloaded %d times, want 2: once for the new drop-in, once for its undo", reloads)
+	}
+}

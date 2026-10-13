@@ -231,7 +231,14 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 			if err := t.installRoot(t.Paths.DropIn, p.dropIn); err != nil {
 				return err
 			}
-			*undo = append(*undo, func() error { return t.restoreRoot(t.Paths.DropIn, p.prevDrop) })
+			*undo = append(*undo, func() error {
+				if err := t.restoreRoot(t.Paths.DropIn, p.prevDrop); err != nil || !p.enabled {
+					return err
+				}
+				// A running daemon has read the new drop-in; restoring the
+				// file is not enough until it reads the old one back.
+				return t.Service.Reload(t.Root)
+			})
 			if err := t.Service.Validate(t.Root); err != nil {
 				return fmt.Errorf("sshd rejects the new drop-in: %w", err)
 			}

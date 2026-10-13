@@ -104,14 +104,14 @@ func TestSystemdEnabledNeedsBootAndNow(t *testing.T) {
 }
 
 // Enable turns on what the distribution starts sshd with, and Disable, the
-// undo, turns off the same unit.
+// undo, turns off the same unit, and the service the socket started.
 func TestSystemdEnableAndItsUndoUseTheSameUnit(t *testing.T) {
 	for _, tc := range []struct {
 		units []string
-		want  string
+		want  []string
 	}{
-		{units: []string{"ssh.service", "ssh.socket"}, want: "ssh.socket"},
-		{units: []string{"sshd.service"}, want: "sshd.service"},
+		{units: []string{"ssh.service", "ssh.socket"}, want: []string{"systemctl enable --now ssh.socket", "systemctl disable --now ssh.socket", "systemctl stop ssh.service"}},
+		{units: []string{"sshd.service"}, want: []string{"systemctl enable --now sshd.service", "systemctl disable --now sshd.service"}},
 	} {
 		l := &linux{units: tc.units}
 		s := Systemd{Run: l.user}
@@ -121,9 +121,8 @@ func TestSystemdEnableAndItsUndoUseTheSameUnit(t *testing.T) {
 		if err := s.Disable(l); err != nil {
 			t.Fatal(err)
 		}
-		want := []string{"systemctl enable --now " + tc.want, "systemctl disable --now " + tc.want}
-		if !slices.Equal(l.rootCalls, want) {
-			t.Errorf("root ran %q, want %q", l.rootCalls, want)
+		if !slices.Equal(l.rootCalls, tc.want) {
+			t.Errorf("root ran %q, want %q", l.rootCalls, tc.want)
 		}
 	}
 }
