@@ -2,6 +2,7 @@
 # Tests for powershell/profile.ps1 (structural)
 
 load 'winpath'
+load 'lib/pwsh'
 load 'lib/refute'
 
 setup() {
@@ -118,8 +119,6 @@ setup() {
 }
 
 @test "profile.ps1 valid PowerShell syntax (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
     pwsh -NoProfile -Command "Get-Content '$(_winpath "$PROFILE_SCRIPT")' | Out-Null; \$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content '$(_winpath "$PROFILE_SCRIPT")' -Raw), [ref]\$null)"
 }
