@@ -869,9 +869,12 @@ func checkAntigravity(sys *System, rep *Report) {
 	// (C:\Users\...\.gemini\antigravity-cli) is not '/'-rooted, so the POSIX-only
 	// check false-FAILed it whenever agy was on PATH on Windows (#691 / C20).
 	if filepath.IsAbs(agyData) {
-		rep.Pass("AGY_APP_DATA is absolute")
+		rep.Pass("AGY_HOME is absolute")
 	} else {
-		rep.Fail("AGY_APP_DATA is relative or unset: " + agyData)
+		rep.Fail("AGY_HOME is relative or unset: " + agyData)
+	}
+	if legacy := sys.env(agy.LegacyAppDataVar, ""); legacy != "" && legacy != agyData {
+		rep.Warn(agy.LegacyAppDataVar + " is set to " + legacy + " but " + agyData + " is used: AGY_HOME is the name dotf reads; drop the old export")
 	}
 
 	configDir := filepath.Join(geminiHome, "config")

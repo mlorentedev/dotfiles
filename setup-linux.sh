@@ -211,7 +211,7 @@ fi
 # use deploy_file (atomic + idempotent), no symlinks. Closes #100.
 log_info "Setting up Antigravity CLI configuration..."
 export GEMINI_HOME="$HOME/.gemini"
-export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
+export AGY_HOME="${AGY_HOME:-$GEMINI_HOME/antigravity-cli}"
 # ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL were exported here until OPS-040, kept
 # "for backward compat" against an empirical finding that already said they did
 # nothing (cli log 2026-05-25): agy 1.0.2 issues `loadCodeAssist` and
@@ -223,7 +223,7 @@ export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
 ensure_directory "$GEMINI_HOME"
 ensure_directory "$GEMINI_HOME/config"
 ensure_directory "$GEMINI_HOME/prompts"
-ensure_directory "$AGY_APP_DATA"
+ensure_directory "$AGY_HOME"
 
 # 1. agy settings.json, AGY.md and .geminiignore are `dotf deploy` entries
 #    (ai/deploy.json `agy-settings`, `agy-instructions`, `agy-geminiignore`;
@@ -233,7 +233,7 @@ ensure_directory "$AGY_APP_DATA"
 # 2. agy's MCP server configs (the master under ~/.gemini/config and the
 #    hive-vault plugin) are written by the bare `dotf deploy` this script makes
 #    and by `dotf converge` (CLI-105, #2384), which also drops the stale copy
-#    an older layout left in $AGY_APP_DATA.
+#    an older layout left in $AGY_HOME.
 
 # Drop project-local agy state cache from the workspace if agy leaked one
 [ -d "$CURRENT_DIR/.antigravitycli" ] && rm -rf "$CURRENT_DIR/.antigravitycli"

@@ -195,3 +195,14 @@ setup() {
         [ "$status" -ne 0 ]
     done
 }
+
+# CLI-107 (#2395): AGY_HOME is the one name for agy's app-data dir. A second
+# exported name moved nothing dotf writes or checks once agy.Dirs read the
+# contract's, so no rc file or setup twin may bring it back. grep exits 1 on
+# no match; 2 (a file gone) fails loudly instead of passing.
+@test "no rc file or setup twin exports the retired AGY_APP_DATA" {
+    run grep -nE '(export[[:space:]]+AGY_APP_DATA=|\$env:AGY_APP_DATA[[:space:]]*=)' \
+        "$ZSHRC" "$BASHRC" "$PS_PROFILE" "$DOTFILES_DIR/.profile" \
+        "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1"
+    [ "$status" -eq 1 ]
+}

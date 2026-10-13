@@ -14,7 +14,7 @@ load 'lib/refute'
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
     export GEMINI_HOME="$HOME/.gemini"
-    export AGY_APP_DATA="$GEMINI_HOME/antigravity-cli"
+    export AGY_HOME="$GEMINI_HOME/antigravity-cli"
     export MASTER_CONFIG="$GEMINI_HOME/config/mcp_config.json"
 
     # Skip the entire suite when agy is not installed (CI / fresh machine).
@@ -78,13 +78,13 @@ setup() {
     grep -q 'export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"' "$DOTFILES_DIR/.zshrc"
 }
 
-@test "AGY_APP_DATA uses absolute path" {
-    [[ "$AGY_APP_DATA" == /* ]] || false
+@test "AGY_HOME uses absolute path" {
+    [[ "$AGY_HOME" == /* ]] || false
 }
 
-@test "agy settings.json deployed to AGY_APP_DATA" {
-    [ -f "$AGY_APP_DATA/settings.json" ]
-    [ ! -L "$AGY_APP_DATA/settings.json" ]
+@test "agy settings.json deployed to AGY_HOME" {
+    [ -f "$AGY_HOME/settings.json" ]
+    [ ! -L "$AGY_HOME/settings.json" ]
 }
 
 @test "master MCP config exists at agy canonical path (~/.gemini/config/)" {

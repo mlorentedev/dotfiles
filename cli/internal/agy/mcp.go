@@ -33,7 +33,7 @@ var errNoSource = errors.New(MCPRel + " not found")
 // Paths is where ApplyMCP writes, and the vault hive-vault is pointed at.
 type Paths struct {
 	GeminiHome string // $GEMINI_HOME, default ~/.gemini
-	AppData    string // $AGY_APP_DATA, default <GeminiHome>/antigravity-cli
+	AppData    string // $AGY_HOME, default <GeminiHome>/antigravity-cli
 	Vault      string // VAULT_PATH as the env contract resolves it, default ~/Projects/knowledge
 }
 
@@ -48,14 +48,23 @@ func ResolvePaths(home string, getenv, resolve func(string) string) Paths {
 	return p
 }
 
-// Dirs is $GEMINI_HOME and $AGY_APP_DATA with their defaults. doctor reads
-// them through it too, so the writer and the checker agree on the paths by
-// construction.
+// LegacyAppDataVar is the name the setups exported before env-contract.json's
+// AGY_HOME was read here. Neither name is read by agy itself; both are ours.
+// It is still honoured when AGY_HOME is unset, so a shell that has not
+// re-sourced its rc file keeps the directory it had.
+const LegacyAppDataVar = "AGY_APP_DATA"
+
+// Dirs is $GEMINI_HOME and $AGY_HOME with their defaults, the contract's
+// names. doctor reads them through it too, so the writer and the checker agree
+// on the paths by construction.
 func Dirs(home string, getenv func(string) string) (geminiHome, appData string) {
 	if geminiHome = getenv("GEMINI_HOME"); geminiHome == "" {
 		geminiHome = filepath.Join(home, ".gemini")
 	}
-	if appData = getenv("AGY_APP_DATA"); appData == "" {
+	if appData = getenv("AGY_HOME"); appData == "" {
+		appData = getenv(LegacyAppDataVar)
+	}
+	if appData == "" {
 		appData = filepath.Join(geminiHome, "antigravity-cli")
 	}
 	return geminiHome, appData
