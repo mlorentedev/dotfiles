@@ -10,7 +10,7 @@ import (
 )
 
 // TestCheckAntigravity_AbsolutePathAccepted guards the C20 fix (#691): the
-// AGY_APP_DATA absolute-path check used strings.HasPrefix(_, "/"), which
+// AGY_HOME absolute-path check used strings.HasPrefix(_, "/"), which
 // false-FAILed an absolute Windows path (C:\Users\...\antigravity-cli) whenever
 // agy was on PATH on Windows. filepath.IsAbs recognizes each OS's absolute form,
 // so an OS-native absolute path must PASS. On the windows-latest runner this
@@ -22,17 +22,54 @@ func TestCheckAntigravity_AbsolutePathAccepted(t *testing.T) {
 		abs = `C:\Users\me\.gemini\antigravity-cli`
 	}
 
-	sys := newSys(map[string]string{"AGY_APP_DATA": abs}, []string{"agy"}, nil)
+	sys := newSys(map[string]string{"AGY_HOME": abs}, []string{"agy"}, nil)
 	var buf bytes.Buffer
 	rep := capture(&buf)
 	checkAntigravity(sys, rep)
 
 	out := buf.String()
-	if strings.Contains(out, "AGY_APP_DATA is relative or unset") {
+	if strings.Contains(out, "AGY_HOME is relative or unset") {
 		t.Errorf("absolute path %q was false-FAILed:\n%s", abs, out)
 	}
-	if !strings.Contains(out, "AGY_APP_DATA is absolute") {
+	if !strings.Contains(out, "AGY_HOME is absolute") {
 		t.Errorf("absolute path %q should report absolute:\n%s", abs, out)
+	}
+}
+
+// A relative value is reported under the name that supplied it: with only the
+// old name set, sending the user to AGY_HOME would fix nothing.
+func TestCheckAntigravity_ARelativeValueNamesItsSource(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env  map[string]string
+		want string
+	}{
+		"contract": {map[string]string{"AGY_HOME": "rel"}, "AGY_HOME is relative or unset: rel"},
+		"legacy":   {map[string]string{"AGY_APP_DATA": "rel"}, "AGY_APP_DATA is relative or unset: rel"},
+	} {
+		var buf bytes.Buffer
+		checkAntigravity(newSys(tc.env, []string{"agy"}, nil), capture(&buf))
+		if !strings.Contains(buf.String(), tc.want) {
+			t.Errorf("%s: want %q in:\n%s", name, tc.want, buf.String())
+		}
+	}
+}
+
+// A machine still exporting the old name to another directory is told which
+// one dotf uses (#2395); the same value, or the old name alone, says nothing.
+func TestCheckAntigravity_ALegacyAppDataThatDisagreesIsWarned(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env  map[string]string
+		warn bool
+	}{
+		"differs":     {map[string]string{"AGY_HOME": "/a", "AGY_APP_DATA": "/l"}, true},
+		"agrees":      {map[string]string{"AGY_HOME": "/a", "AGY_APP_DATA": "/a"}, false},
+		"legacy only": {map[string]string{"AGY_APP_DATA": "/l"}, false},
+	} {
+		var buf bytes.Buffer
+		checkAntigravity(newSys(tc.env, []string{"agy"}, nil), capture(&buf))
+		if got := strings.Contains(buf.String(), "AGY_APP_DATA is set to /l but /a is used"); got != tc.warn {
+			t.Errorf("%s: warned = %v, want %v:\n%s", name, got, tc.warn, buf.String())
+		}
 	}
 }
 
@@ -67,7 +104,7 @@ func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			sys := newSys(map[string]string{"GEMINI_HOME": gemini, "AGY_APP_DATA": gemini}, []string{"agy"}, nil)
+			sys := newSys(map[string]string{"GEMINI_HOME": gemini, "AGY_HOME": gemini}, []string{"agy"}, nil)
 			var buf bytes.Buffer
 			checkAntigravity(sys, capture(&buf))
 

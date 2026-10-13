@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -71,7 +72,60 @@ func TestResolvePaths_DefaultsFollowTheSetups(t *testing.T) {
 	set := map[string]string{"GEMINI_HOME": "/g"}
 	p = ResolvePaths(home, func(k string) string { return set[k] }, func(string) string { return "/v" })
 	if p.AppData != filepath.Join("/g", "antigravity-cli") || p.Vault != "/v" {
-		t.Fatalf("AGY_APP_DATA must default under GEMINI_HOME and the contract must win: %+v", p)
+		t.Fatalf("AGY_HOME must default under GEMINI_HOME and the contract must win: %+v", p)
+	}
+}
+
+// AGY_HOME is the contract's name and wins; the old AGY_APP_DATA is read only
+// when AGY_HOME is unset (#2395).
+func TestDirs_ReadsTheContractNameBeforeTheLegacyOne(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env  map[string]string
+		want string
+	}{
+		"contract only": {map[string]string{"AGY_HOME": "/a"}, "/a"},
+		"legacy only":   {map[string]string{"AGY_APP_DATA": "/l"}, "/l"},
+		"both":          {map[string]string{"AGY_HOME": "/a", "AGY_APP_DATA": "/l"}, "/a"},
+		"neither":       {nil, filepath.Join("/h", ".gemini", "antigravity-cli")},
+	} {
+		if _, got := Dirs("/h", func(k string) string { return tc.env[k] }); got != tc.want {
+			t.Errorf("%s: Dirs = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+// The default Dirs computes is the one env-contract.json declares for
+// AGY_HOME, on every OS key it carries: two places answering one question.
+func TestDirs_DefaultIsTheContractDefault(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "env-contract.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c struct {
+		EnvVars []struct {
+			Name    string            `json:"name"`
+			Default map[string]string `json:"default"`
+		} `json:"env_vars"`
+	}
+	if err := json.Unmarshal(raw, &c); err != nil {
+		t.Fatal(err)
+	}
+	var defaults map[string]string
+	for _, v := range c.EnvVars {
+		if v.Name == "AGY_HOME" {
+			defaults = v.Default
+		}
+	}
+	if len(defaults) == 0 {
+		t.Fatal("env-contract.json declares no default for AGY_HOME")
+	}
+	_, got := Dirs("HOME", func(string) string { return "" })
+	got = filepath.ToSlash(got)
+	for goos, d := range defaults {
+		d = strings.NewReplacer(`$env:USERPROFILE`, "HOME", "$HOME", "HOME", `\`, "/").Replace(d)
+		if d != got {
+			t.Errorf("contract default for %s is %q, Dirs computes %q", goos, d, got)
+		}
 	}
 }
 

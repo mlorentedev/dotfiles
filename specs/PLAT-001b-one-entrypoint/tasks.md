@@ -258,6 +258,18 @@ Converge registered Claude's MCP servers and plugins (PR 8) and replaced drifted
 - [x] Cost: about a second per server (`claude mcp get` starts each); the snapshot guard around each call may write `.claude.json` back if a call shrank it, the only write the section can cause. The full `dotf doctor` took 19 s on the Mac
 - [x] Evidence on the Mac, from a dev build in `$TMPDIR`: `` [WARN] MCP server pdf-modifier is registered as stdio uvx pdf-modifier-mcp, declared as stdio uvx pdf-modifier (run `dotf converge --only agent-extensions`) ``; no other server or plugin reported
 
+### PR 12 — one name for agy's app-data dir (CLI-107 #2395)
+
+env-contract.json names the directory `AGY_HOME`; `agy.Dirs`, doctor, `setup-linux.sh` and `.zshrc` used `AGY_APP_DATA`. A machine setting only the contract's name moved nothing dotf writes or checks. The agy binary reads neither name (no match for either in its strings on the Mac), so both are ours and the rename changes no agy behaviour.
+
+- [x] `agy.Dirs` reads `AGY_HOME`, then the old `AGY_APP_DATA` while it is set (`agy.LegacyAppDataVar`), then the default under `GEMINI_HOME`
+- [x] A test asserts the default `Dirs` computes is the one env-contract.json declares for `AGY_HOME`, on every OS key the contract carries
+- [x] doctor reports `AGY_HOME is absolute`, and WARNs when `AGY_APP_DATA` is set to another directory, naming the one in use. Evidence on the Mac (dev build in `$TMPDIR`, `AGY_APP_DATA=/tmp/elsewhere`): `` [WARN] AGY_APP_DATA is set to /tmp/elsewhere but /Users/manu/.gemini/antigravity-cli is used: AGY_HOME is the name dotf reads; drop the old export ``
+- [x] `.zshrc` and `setup-linux.sh` stop exporting `AGY_APP_DATA`; `setup-windows.ps1` only had a local `$AgyAppData`, now `$AgyHome`, and never persisted the old name
+- [x] `tests/env-contract.bats` fails if any shell, PowerShell or rc file outside `cli/`, `docs/`, `specs/` and `tests/` names `AGY_APP_DATA` again, whatever the export form; mutations caught: the `.zshrc` export restored, a `typeset -x` in `.zsh/aliases.zsh`
+- [x] A relative value is reported under the variable that supplied it (`AGY_APP_DATA` when `AGY_HOME` is unset); the vacuous `antigravity.bats` absolute-path test, which asserted a value it set itself, is gone: the doctor unit test covers the property
+- [ ] Drop the `AGY_APP_DATA` fallback from `agy.Dirs` and the doctor WARN one release after this ships
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

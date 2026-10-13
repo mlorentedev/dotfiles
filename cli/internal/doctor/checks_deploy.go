@@ -864,14 +864,21 @@ func checkAntigravity(sys *System, rep *Report) {
 		rep.Fail("ANTIGRAVITY_ENDPOINT is not production: " + endpoint)
 	}
 
-	geminiHome, agyData := agy.Dirs(sys.home(), func(k string) string { return sys.env(k, "") })
+	getenv := func(k string) string { return sys.env(k, "") }
+	geminiHome, agyData := agy.Dirs(sys.home(), getenv)
 	// filepath.IsAbs, not HasPrefix(_, "/"): an absolute Windows path
 	// (C:\Users\...\.gemini\antigravity-cli) is not '/'-rooted, so the POSIX-only
 	// check false-FAILed it whenever agy was on PATH on Windows (#691 / C20).
+	// Name the variable the value came from: with AGY_HOME unset, a relative
+	// path is AGY_APP_DATA's, and pointing the user at AGY_HOME fixes nothing.
+	source := agy.AppDataSource(getenv)
 	if filepath.IsAbs(agyData) {
-		rep.Pass("AGY_APP_DATA is absolute")
+		rep.Pass(source + " is absolute")
 	} else {
-		rep.Fail("AGY_APP_DATA is relative or unset: " + agyData)
+		rep.Fail(source + " is relative or unset: " + agyData)
+	}
+	if legacy := sys.env(agy.LegacyAppDataVar, ""); legacy != "" && legacy != agyData {
+		rep.Warn(agy.LegacyAppDataVar + " is set to " + legacy + " but " + agyData + " is used: AGY_HOME is the name dotf reads; drop the old export")
 	}
 
 	configDir := filepath.Join(geminiHome, "config")

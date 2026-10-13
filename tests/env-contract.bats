@@ -195,3 +195,16 @@ setup() {
         [ "$status" -ne 0 ]
     done
 }
+
+# CLI-107 (#2395): AGY_HOME is the one name for agy's app-data dir. Only Go
+# still reads AGY_APP_DATA, as a fallback, so no shell, PowerShell or rc file
+# may name it again, whatever the form of the export (export, typeset -x,
+# setx, SetEnvironmentVariable, $env:). Go, docs, specs and the tests are left
+# out: they describe the fallback. grep -r exits 1 on no match; 2 (an
+# unreadable path) fails loudly instead of passing.
+@test "no shell, PowerShell or rc file names the retired AGY_APP_DATA" {
+    run grep -rnI --exclude-dir=.git --exclude-dir=cli --exclude-dir=docs \
+        --exclude-dir=specs --exclude-dir=tests --exclude-dir=node_modules \
+        -e AGY_APP_DATA "$DOTFILES_DIR"
+    [ "$status" -eq 1 ] || { printf '%s\n' "$output" >&2; return 1; }
+}

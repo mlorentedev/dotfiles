@@ -950,8 +950,8 @@ Write-Info "Deploying Antigravity (agy) configuration..."
 Ensure-Directory $GeminiHome
 Ensure-Directory "$GeminiHome\config"
 Ensure-Directory "$GeminiHome\prompts"
-$AgyAppData = Join-Path $GeminiHome "antigravity-cli"
-Ensure-Directory $AgyAppData
+$AgyHome = Join-Path $GeminiHome "antigravity-cli"
+Ensure-Directory $AgyHome
 
 # agy reads GEMINI_DIR; set it for this session and persist it for later ones.
 # ANTIGRAVITY_ENDPOINT / CLOUDCODE_URL were set here too until OPS-040. They had
@@ -1734,7 +1734,7 @@ Write-Host ""
 Write-Host "Deployed:" -ForegroundColor Cyan
 Write-Host "  - Claude config:  $ClaudeHome\CLAUDE.md"
 Write-Host "  - Claude skills:  $ClaudeHome\skills\"
-Write-Host "  - Antigravity:    $GeminiHome\AGY.md  ($AgyAppData\)"
+Write-Host "  - Antigravity:    $GeminiHome\AGY.md  ($AgyHome\)"
 Write-Host "  - Agy prompts:    $GeminiHome\prompts\"
 Write-Host "  - Scripts:        $ScriptsDir\"
 Write-Host "  - Secrets:        $DotfilesDest\sensitive\"

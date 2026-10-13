@@ -46,7 +46,6 @@ else
     export COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
     export OPENCODE_HOME="${OPENCODE_HOME:-$HOME/.config/opencode}"
 fi
-export AGY_APP_DATA="$AGY_HOME"
 export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"
 export CLOUDCODE_URL="https://cloudcode-pa.googleapis.com"
 export GEMINI_DIR="$HOME/.gemini"
