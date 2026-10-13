@@ -7,10 +7,11 @@ setup() {
     REPO="$BATS_TEST_DIRNAME/.."
 }
 
-# The machine's own answer, asked without the gate: does pwsh start?
+# The machine's own answer, asked without the gate: does pwsh start? An absent
+# pwsh exits 127 here, so no PATH probe is needed (or allowed: see the guard
+# against `command -v pwsh` in bats-pwsh-gate.bats).
 pwsh_runs() {
-    command -v pwsh >/dev/null 2>&1 &&
-        pwsh -NoProfile -NonInteractive -Command 'exit 0' >/dev/null 2>&1 </dev/null
+    pwsh -NoProfile -NonInteractive -Command 'exit 0' >/dev/null 2>&1 </dev/null
 }
 
 gate() {
