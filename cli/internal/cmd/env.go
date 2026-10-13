@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ func newEnvCmd() *cobra.Command {
 	cmd.AddCommand(newEnvGenerateCmd())
 	cmd.AddCommand(newEnvPathCmd())
 	cmd.AddCommand(newEnvSetCmd())
+	cmd.AddCommand(newEnvRoleCmd())
 	cmd.AddCommand(newEnvPersistCmd())
 	return cmd
 }
@@ -61,6 +63,58 @@ func newEnvSetCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newEnvRoleCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "role [add|rm <ROLE>]",
+		Short: "List, add or remove the roles this machine opts into (machine.json)",
+		Long: "role records in ~/.config/dotfiles/machine.json the roles this machine\n" +
+			"takes beyond the common converge. A role changes how the machine faces the\n" +
+			"network, so none is on by default and an unknown name is rejected. With no\n" +
+			"argument it lists the declared roles. Known roles: " + strings.Join(env.KnownRoles(), ", ") + ".",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			roles, err := env.LoadMachineRoles(env.MachinePath(env.Home()))
+			if err != nil {
+				return err
+			}
+			for _, r := range roles {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), r)
+			}
+			return nil
+		},
+	}
+	for _, sub := range []struct {
+		use, short, verb string
+		on               bool
+	}{
+		{"add <ROLE>", "Add a machine role", "added", true},
+		{"rm <ROLE>", "Remove a machine role", "removed", false},
+	} {
+		verb, on := sub.verb, sub.on
+		cmd.AddCommand(&cobra.Command{
+			Use:          sub.use,
+			Short:        sub.short,
+			Args:         cobra.ExactArgs(1),
+			SilenceUsage: true,
+			RunE: func(cmd *cobra.Command, args []string) error {
+				path := env.MachinePath(env.Home())
+				changed, err := env.SetMachineRole(path, args[0], on)
+				if err != nil {
+					return err
+				}
+				if changed {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s role %s in %s\n", verb, args[0], path)
+				} else {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged role %s\n", args[0])
+				}
+				return nil
+			},
+		})
+	}
+	return cmd
 }
 
 func newEnvPathCmd() *cobra.Command {

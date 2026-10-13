@@ -107,3 +107,36 @@ func TestSetMachinePathUnknownKeyFails(t *testing.T) {
 		t.Error("machine.json was written despite the key being rejected")
 	}
 }
+
+// machine.json carries sections other readers own: the identity and pool policy
+// (LoadMachinePolicy) and the roles (LoadMachineRoles). A path write that drops
+// them leaves a machine unidentified, which denies every pool, and takes away
+// the roles it opted into, with nothing reporting either.
+func TestSetMachinePathKeepsSectionsItDoesNotOwn(t *testing.T) {
+	dir := t.TempDir()
+	contract := writeTestContract(t, dir)
+	machinePath := filepath.Join(dir, "machine.json")
+	before := `{"machine":{"id":"macmini"},"pools":{"deny":["claude"]},"roles":["ssh-target"],"paths":{}}`
+	if err := os.WriteFile(machinePath, []byte(before), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := SetMachinePath(contract, machinePath, "VAULT_PATH", "/data/vault"); err != nil {
+		t.Fatalf("SetMachinePath: %v", err)
+	}
+
+	policy, err := LoadMachinePolicy(machinePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if policy.ID != "macmini" || !policy.Denies("claude") {
+		t.Errorf("policy after a path write = %+v, want id macmini denying claude", policy)
+	}
+	roles, err := LoadMachineRoles(machinePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 || roles[0] != RoleSSHTarget {
+		t.Errorf("roles after a path write = %v, want [%s]", roles, RoleSSHTarget)
+	}
+}
