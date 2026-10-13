@@ -101,6 +101,19 @@ Two constraints decide the version and the order:
 - **The pin must be an attested build.** mise verifies GitHub artifact attestations for python-build-standalone by default, and `python@3.12.6` predates them (`No GitHub artifact attestations found`). The pin moves to 3.13.16. Turning the verification off is rejected.
 - **The markers wait for the release.** The released `dotf` up to v0.65.0 rejects every `# mise:` comment except `# mise: cli`. So the pins are marked only once `DOTF_VERSION` carries the parser; `tests/versions-conf.bats` enforces it.
 
+## Clarification 2026-10-12 (#2013, Node before Windows bats)
+
+Node is a narrow exception to decision 6's Mac-first toolchain order: the Windows
+mise reader needs npm to install the marked bats CLI, and a fresh tools step runs
+before the legacy Windows setup installs Node. `NODE_VERSION` is therefore marked
+for mise on every OS alongside the CLIs. On Windows, the reader installs Node
+before bats and selects npm only for that bats install; it does not change the
+installer for unrelated npm tools. The Windows mise catalog entry stays disabled
+until a released `DOTF_VERSION` carries this reader. Only then can a full
+from-zero catalog converge and a zero-change second pass justify removing the
+legacy Windows Node, winget and uv installs. Other toolchains keep their
+Mac-first rollout.
+
 ## Amendment 2026-10-10 (#2013 D9, the coding agents track latest)
 
 The owner decided that the coding agents (Claude Code, pi and agy) install through mise like every pinned CLI, but stay at their newest release instead of an exact pin. Their upstreams ship almost daily, and the owner wants the newest one on every machine without a bump PR per release.

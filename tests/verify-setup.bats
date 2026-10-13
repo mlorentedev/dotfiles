@@ -332,12 +332,11 @@ setup() {
 # =============================================================================
 
 @test "the npm catalog installs into ~/.local as the user, never into npm's root-owned prefix [#2251]" {
-    # Precondition, asserted so the guard cannot pass vacuously: npm is present
-    # and its default global prefix is not writable by this user. If the
-    # container ever gains a user-owned Node (nvm), this fails here instead of
-    # the test below silently proving nothing.
+    # The apt npm's default prefix is root-owned; mise's Node now comes first
+    # on PATH and has a different, user-owned prefix.
     command -v npm >/dev/null 2>&1
-    prefix=$(npm config get prefix)
+    [ -x /usr/bin/npm ]
+    prefix=$(PATH=/usr/bin:/bin /usr/bin/npm config get prefix)
     [ ! -w "$prefix/lib" ]
     for tool in bw yarn opencode copilot; do
         [ -x "$HOME/.local/bin/$tool" ] || { echo "missing: ~/.local/bin/$tool"; return 1; }
