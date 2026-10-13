@@ -62,6 +62,25 @@ func DefaultPaths(home string) Paths {
 	}
 }
 
+// The repo files a target is built from, relative to the checkout.
+const (
+	KeyFile      = "ssh/id_ed25519.pub"
+	TemplateFile = "ssh/sshd-workstation.conf"
+)
+
+// New builds the target for user from the checkout at repoRoot: the owner's
+// key and the drop-in template, with launchd as the service. Root is left for
+// the caller, because only an apply needs it and doctor never applies.
+func New(repoRoot, user string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
+	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs, Service: Launchd{Run: run}}
+	var err error
+	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
+		return t, err
+	}
+	t.Template, err = os.ReadFile(filepath.Join(repoRoot, TemplateFile))
+	return t, err
+}
+
 // Service turns sshd on and off on one OS.
 type Service interface {
 	Enabled() (bool, error)   // read without root

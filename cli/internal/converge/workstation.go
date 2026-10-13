@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"os/user"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -34,16 +32,12 @@ func (workstationTarget) Name() string { return "workstation-target" }
 func (workstationTarget) Platforms() []string { return []string{"darwin"} }
 
 func (r workstationTarget) target(e Env) (sshtarget.Target, error) {
-	t := sshtarget.Target{Root: r.root, Run: r.run, Addrs: r.addrs, Service: sshtarget.Launchd{Run: r.run}}
-	t.Paths = r.paths(e.Home)
-	var err error
-	if t.User, err = r.user(); err != nil {
-		return t, err
+	u, err := r.user()
+	if err != nil {
+		return sshtarget.Target{}, err
 	}
-	if t.Key, err = os.ReadFile(filepath.Join(e.RepoRoot, "ssh", "id_ed25519.pub")); err != nil {
-		return t, err
-	}
-	t.Template, err = os.ReadFile(filepath.Join(e.RepoRoot, "ssh", "sshd-workstation.conf"))
+	t, err := sshtarget.New(e.RepoRoot, u, r.paths(e.Home), r.run, r.addrs)
+	t.Root = r.root
 	return t, err
 }
 
