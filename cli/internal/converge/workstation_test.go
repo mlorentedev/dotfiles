@@ -106,3 +106,15 @@ func TestWorkstationTarget_IsSkippedWithoutRunners(t *testing.T) {
 		t.Fatalf("Reconcile = %+v, %v; want skipped", res, err)
 	}
 }
+
+func TestWorkstationTarget_ANodeOffTheMeshIsSkipped(t *testing.T) {
+	r, e := workstationFixture(t, noRoot{t: t})
+	if _, err := env.SetMachineRole(env.MachinePath(e.Home), env.RoleSSHTarget, true); err != nil {
+		t.Fatal(err)
+	}
+	r.addrs = func() ([]net.IP, error) { return []net.IP{net.ParseIP("10.0.0.130")}, nil }
+	res, err := r.Reconcile(e, false)
+	if err != nil || !strings.Contains(res.Skip, "join the mesh") {
+		t.Fatalf("Reconcile = %+v, %v; want a skip naming the mesh", res, err)
+	}
+}

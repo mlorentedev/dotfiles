@@ -63,6 +63,9 @@ func (r workstationTarget) Reconcile(e Env, dryRun bool) (Result, error) {
 		return Result{}, err
 	}
 	p, err := t.Inspect()
+	if errors.Is(err, sshtarget.ErrNoMesh) {
+		return Result{Skip: err.Error()}, nil
+	}
 	if err != nil {
 		return Result{}, err
 	}

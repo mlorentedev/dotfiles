@@ -109,6 +109,7 @@ The workstation-target step is the first reconciler that writes outside the user
 - **The apply asks once, on the terminal.** It reuses a cached sudo credential when there is one; otherwise it runs `sudo -v` on the controlling terminal, as `identity restore` does (D12). Each command then runs with `sudo -n`, which fails rather than prompt a second time.
 - **Without a terminal, the step is skipped and its reason is the plan.** A scheduled `dotf update` or a CI run therefore never changes the machine's network posture, and never fails for lack of a password. The report says what an attended run would apply.
 - **An apply proves itself, or it is undone.** After the changes, sshd must accept the owner's key from the node's mesh address and refuse it from a LAN address. The client's debug output says whether the server accepted the key, so the proof needs neither the key's passphrase nor an agent. If either answer is wrong, every change of the run is undone in reverse order and the run fails.
+- **A node off the mesh is skipped, not failed.** It cannot be proven, and with sshd open to the mesh only it is closed rather than open. A scheduled run while the tailnet is down therefore reports the step skipped instead of failing every tick.
 - **A role opts in.** Only a machine whose `machine.json` declares `ssh-target` (`dotf env role add ssh-target`) runs the step. Every other machine reports it skipped.
 
 Rejected:

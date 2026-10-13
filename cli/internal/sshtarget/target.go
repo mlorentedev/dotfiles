@@ -26,6 +26,11 @@ const MeshCIDR = "100.64.0.0/10"
 // there is no terminal to ask on. The apply stops before changing anything.
 var ErrNoTerminal = errors.New("root is needed and there is no terminal to ask on")
 
+// ErrNoMesh is what Inspect returns on a node with no mesh address. Such a
+// node cannot be proven, and with sshd open to the mesh only it is closed, not
+// open, so converge reports the step skipped rather than failed.
+var ErrNoMesh = errors.New("no address in " + MeshCIDR + ": join the mesh first (tailscale up)")
+
 // Runner runs a command as the current user and returns its combined output.
 type Runner func(argv ...string) ([]byte, error)
 
@@ -295,7 +300,7 @@ func (t Target) addresses() (mesh, lan net.IP, err error) {
 		}
 	}
 	if mesh == nil {
-		return nil, nil, fmt.Errorf("no address in %s: join the mesh first (tailscale up)", MeshCIDR)
+		return nil, nil, ErrNoMesh
 	}
 	return mesh, lan, nil
 }
