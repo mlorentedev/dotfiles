@@ -78,14 +78,16 @@ type MCPReport struct {
 	// would be). Each is in Added too, once its re-add landed.
 	Migrated []Drift
 	// RolledBack are the drifted servers whose re-add failed after the old
-	// registration was removed, and which got the old one back. Each is in
+	// registration was removed, and which got the old one back. Lost are the
+	// ones whose restore failed too, and are now unregistered. Each is in
 	// Failed too.
-	RolledBack []string
+	RolledBack, Lost []string
 	// Untouched are registered servers Register cannot judge or does not own:
 	// a `claude mcp get` answer that does not parse (treating it as drift
 	// would re-register every server the day Claude Code changes its output),
-	// or a drifted registration in a local or project scope, which shadows
-	// the user scope dotf registers in.
+	// a drifted registration in a local or project scope, which shadows the
+	// user scope dotf registers in, or one carrying settings McpAdd cannot
+	// put back if the replacement fails.
 	Untouched []Untouched
 	Skipped   []Skip
 	Restored  int
@@ -93,10 +95,13 @@ type MCPReport struct {
 
 // registration is what `claude mcp get` says a server runs: its transport,
 // the scope that answered, and argv, the command and its args for stdio or
-// the URL alone otherwise, so it can be handed back to McpAdd.
+// the URL alone otherwise, so it can be handed back to McpAdd. That is all a
+// restore preserves: nested is true when the answer has anything indented
+// under a field (an Environment or header entry), which McpAdd cannot pass.
 type registration struct {
 	transport, scope string
 	argv             []string
+	nested           bool
 }
 
 func (r registration) String() string { return r.transport + " " + strings.Join(r.argv, " ") }
@@ -110,14 +115,18 @@ func (r registration) userScope() bool { return strings.HasPrefix(r.scope, "User
 // `Command:` and `Args:` (joined on single spaces, the way registration split
 // them) for stdio or `URL:` otherwise. false when any of them is missing.
 func registered(out string) (registration, bool) {
-	fields := map[string]string{}
+	fields, nested := map[string]string{}, false
 	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) != "" && (strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t")) {
+			nested = true
+			continue
+		}
 		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
 		if ok {
 			fields[key] = strings.TrimSpace(value)
 		}
 	}
-	r := registration{transport: fields["Type"], scope: fields["Scope"], argv: strings.Fields(fields["URL"])}
+	r := registration{transport: fields["Type"], scope: fields["Scope"], argv: strings.Fields(fields["URL"]), nested: nested}
 	if r.transport == "stdio" {
 		r.argv = strings.Fields(fields["Command"] + " " + fields["Args"])
 	}
@@ -165,6 +174,9 @@ func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 			case !was.userScope():
 				rep.Untouched = append(rep.Untouched, Untouched{srv.Name, fmt.Sprintf("registered as %s in %q, not the user scope dotf owns", was, was.scope)})
 				continue
+			case was.nested:
+				rep.Untouched = append(rep.Untouched, Untouched{srv.Name, fmt.Sprintf("registered as %s with environment or header settings a replacement would drop", was)})
+				continue
 			}
 			drift = &Drift{Name: srv.Name, Was: was.String(), Now: declared(srv)}
 			if !dryRun {
@@ -180,8 +192,12 @@ func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 		if !dryRun {
 			if err := guard(func() error { return s.Run.McpAdd(srv.Name, srv.Transport, strings.Fields(srv.Args)) }); err != nil {
 				rep.Failed = append(rep.Failed, srv.Name)
-				if drift != nil && guard(func() error { return s.Run.McpAdd(srv.Name, was.transport, was.argv) }) == nil {
-					rep.RolledBack = append(rep.RolledBack, srv.Name)
+				if drift != nil {
+					if guard(func() error { return s.Run.McpAdd(srv.Name, was.transport, was.argv) }) == nil {
+						rep.RolledBack = append(rep.RolledBack, srv.Name)
+					} else {
+						rep.Lost = append(rep.Lost, srv.Name)
+					}
 				}
 				continue
 			}

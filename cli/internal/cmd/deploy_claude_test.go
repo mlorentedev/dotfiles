@@ -15,6 +15,7 @@ import (
 type fakeClaude struct {
 	listed         string
 	failing        map[string]bool
+	failOnce       map[string]bool // the first add fails, later ones succeed
 	installed      []string
 	onInstall      func() // runs inside the guard, where the real CLI would write
 	registered     map[string]string
@@ -69,6 +70,10 @@ func (f *fakeClaude) McpGet(name string) (string, error) {
 func (f *fakeClaude) McpAdd(name, transport string, args []string) error {
 	f.added = append(f.added, name)
 	if f.failing[name] {
+		return errors.New("add failed")
+	}
+	if f.failOnce[name] {
+		delete(f.failOnce, name)
 		return errors.New("add failed")
 	}
 	return nil
@@ -187,6 +192,27 @@ func TestDeployCmd_DriftedRegistrationIsMigrated(t *testing.T) {
 	}
 	if !strings.Contains(out, row("migrated", "claude-mcp")+"hive: stdio uvx hive-vault -> stdio hive client") {
 		t.Errorf("the migration must be reported:\n%s", out)
+	}
+}
+
+// A replacement that fails says whether the old registration came back.
+func TestDeployCmd_AFailedReplacementSaysWhetherTheOldOneCameBack(t *testing.T) {
+	stale := "hive:\n  Scope: User config (available in all your projects)\n  Type: stdio\n  Command: uvx\n  Args: hive-vault\n"
+	for name, c := range map[string]struct {
+		fake *fakeClaude
+		want string
+	}{
+		"restored": {&fakeClaude{failOnce: map[string]bool{"hive": true}}, "hive did not re-register; its previous registration was restored"},
+		"lost":     {&fakeClaude{failing: map[string]bool{"hive": true}}, "hive did not re-register, and its previous registration could not be restored: it is unregistered"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			withPath(t, "uv")
+			c.fake.registered, c.fake.listed = map[string]string{"web": webRegistered, "hive": stale}, "a@m b@m"
+			out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, c.fake)
+			if err == nil || !strings.Contains(out, row("failed", "claude-mcp")+c.want) {
+				t.Errorf("err %v; want the row %q:\n%s", err, c.want, out)
+			}
+		})
 	}
 }
 

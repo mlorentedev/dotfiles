@@ -262,8 +262,9 @@ func TestTheRepoListsLoad(t *testing.T) {
 }
 
 // A migration is claimed only when the replacement landed. A failed remove
-// leaves the stale entry; a failed re-add puts it back. Either way hive is in
-// Failed and not in Migrated.
+// leaves the stale entry; a re-add whose restore fails too leaves hive
+// unregistered, and says so in Lost. Either way hive is in Failed and not in
+// Migrated.
 func TestRegisterReportsAMigrationOnlyWhenItCompleted(t *testing.T) {
 	current := getOutput("context7", "http", "https://mcp.context7.com/mcp")
 	stale := map[string]string{"context7": current, "hive": getOutput("hive", "stdio", "uvx hive-vault")}
@@ -272,8 +273,11 @@ func TestRegisterReportsAMigrationOnlyWhenItCompleted(t *testing.T) {
 		"re-add fails": {registered: map[string]string{"context7": current, "hive": getOutput("hive", "stdio", "uvx hive-vault")}, failing: map[string]bool{"hive": true}},
 	} {
 		rep := mcpSyncer(f, "uv").Register(servers, false)
-		if len(rep.Migrated) != 0 || !reflect.DeepEqual(rep.Failed, []string{"hive"}) {
+		if len(rep.Migrated) != 0 || !reflect.DeepEqual(rep.Failed, []string{"hive"}) || len(rep.RolledBack) != 0 {
 			t.Errorf("%s: report %+v, want hive Failed and not Migrated", name, rep)
+		}
+		if lost := len(rep.Lost) == 1; lost != (name == "re-add fails") {
+			t.Errorf("%s: Lost %v; a removed server whose restore failed must be named", name, rep.Lost)
 		}
 	}
 }
@@ -286,5 +290,23 @@ func TestRegisterRestoresTheOldRegistrationWhenTheReAddFails(t *testing.T) {
 	want := []string{"hive stdio hive client", "hive stdio uvx hive-vault"}
 	if !reflect.DeepEqual(f.added, want) || !reflect.DeepEqual(rep.RolledBack, []string{"hive"}) || !reflect.DeepEqual(rep.Failed, []string{"hive"}) {
 		t.Errorf("added %v report %+v; want the declared add, then the old one back", f.added, rep)
+	}
+}
+
+// A restore can only pass back transport and argv. A drifted registration with
+// anything nested under a field (environment, headers) is left alone, since a
+// failed replacement would restore it without them; one that matches is present.
+func TestRegisterLeavesARegistrationWithSettingsItCannotRestoreAlone(t *testing.T) {
+	withEnv := func(argv string) string {
+		return strings.Replace(getOutput("hive", "stdio", argv), "  Environment:\n", "  Environment:\n    HIVE_TOKEN=x\n", 1)
+	}
+	f := &mcpFake{registered: map[string]string{"hive": withEnv("uvx hive-vault")}}
+	rep := mcpSyncer(f, "uv").Register(servers[1:], false)
+	if len(f.removed)+len(f.added) != 0 || len(rep.Untouched) != 1 || !strings.Contains(rep.Untouched[0].Why, "environment or header") {
+		t.Errorf("removed %v added %v report %+v; want hive untouched", f.removed, f.added, rep)
+	}
+	f = &mcpFake{registered: map[string]string{"hive": withEnv("hive client")}}
+	if rep := mcpSyncer(f, "uv").Register(servers[1:], false); !reflect.DeepEqual(rep.Present, []string{"hive"}) {
+		t.Errorf("report %+v; a matching registration with settings is present", rep)
 	}
 }

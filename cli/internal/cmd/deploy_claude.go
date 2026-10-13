@@ -174,11 +174,14 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 		reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
 	}
 	for _, name := range rep.Failed {
-		if slices.Contains(rep.RolledBack, name) {
+		switch {
+		case slices.Contains(rep.RolledBack, name):
 			deployRow(w, "failed", step, "%s did not re-register; its previous registration was restored", name)
-			continue
+		case slices.Contains(rep.Lost, name):
+			deployRow(w, "failed", step, "%s did not re-register, and its previous registration could not be restored: it is unregistered", name)
+		default:
+			deployRow(w, "failed", step, "%s did not register", name)
 		}
-		deployRow(w, "failed", step, "%s did not register", name)
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", step, err)

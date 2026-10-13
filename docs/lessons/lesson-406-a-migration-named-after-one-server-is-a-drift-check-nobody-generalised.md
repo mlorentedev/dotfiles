@@ -39,4 +39,6 @@ as "everything drifted" and remove every server.
 - Read what the answer is about before acting on it. `claude mcp get` reports the winning scope
   (local, then project, then user), while dotf only adds and removes at user scope; acting on a
   local registration's drift would remove nothing and add a user entry it still shadows. A
-  replace that removes first also owes a restore when the add fails.
+  replace that removes first also owes a restore when the add fails, a report that says so when
+  the restore fails too, and a refusal to start when the restore could not carry everything the
+  old entry had (here: environment and headers, which `claude mcp add` was never given).
