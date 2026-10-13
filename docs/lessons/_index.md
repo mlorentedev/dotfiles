@@ -426,4 +426,5 @@ tags: [lessons, index, dotfiles]
 | [405 - A config written only by a setup script freezes on every machine that does not run it](lesson-405-a-config-written-only-by-a-setup-script-freezes-where-it-does-not-run.md) | 2026-10-13 |
 | [406 - A migration named after one server is a drift check nobody generalised](lesson-406-a-migration-named-after-one-server-is-a-drift-check-nobody-generalised.md) | 2026-10-13 |
 | [407 - A markdown gate must read the body in CommonMark order](lesson-407-a-markdown-gate-must-read-the-body-in-commonmark-order.md) | 2026-10-13 |
+| [408 - A suite that runs a script by path tests only its shebang](lesson-408-a-suite-that-runs-a-script-by-path-tests-only-its-shebang.md) | 2026-10-13 |
 <!-- END GENERATED -->

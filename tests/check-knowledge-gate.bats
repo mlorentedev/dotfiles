@@ -2,6 +2,8 @@
 # Tests for scripts/check-knowledge-gate.sh (HARNESS-160): every PR names, in a
 # "## Knowledge" section, the lesson, ADR and runbook it wrote, or why none.
 
+load 'lib/both-shells'
+
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     REPO_FIXTURE="$BATS_TEST_TMPDIR/repo"
@@ -28,16 +30,7 @@ _commit() {
 
 # Every case runs under zsh and bash, which must agree: the repo's scripts run
 # under both (.claude/CLAUDE.md), and bash-only constructs fail silently in zsh.
-_both() {
-    run zsh "$SCRIPTS_DIR/check-knowledge-gate.sh" "$@"
-    local zsh_status="$status" zsh_output="$output"
-    run bash "$SCRIPTS_DIR/check-knowledge-gate.sh" "$@"
-    if [ "$status" != "$zsh_status" ] || [ "$output" != "$zsh_output" ]; then
-        printf 'bash (%s) and zsh (%s) disagree\n--- bash\n%s\n--- zsh\n%s\n' \
-            "$status" "$zsh_status" "$output" "$zsh_output"
-        return 1
-    fi
-}
+_both() { run_both_shells "$SCRIPTS_DIR/check-knowledge-gate.sh" "$@"; }
 
 _gate() {
     _both --base-ref main --head-ref feature "$@"
