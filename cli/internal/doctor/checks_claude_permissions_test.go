@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -100,5 +101,29 @@ func TestCheckClaudePermissionRules_SkipsWithoutClaudeOrADeployedFile(t *testing
 	checkClaudePermissionRules(sys, capture(&buf), true)
 	if out := buf.String(); !strings.Contains(out, "claude not in PATH") {
 		t.Errorf("no claude should be a SKIP:\n%s", out)
+	}
+}
+
+// A --fix that cannot write does not send the operator back to --fix: each
+// FAIL names why the rewrite failed instead.
+func TestCheckClaudePermissionRules_AFixThatCannotWriteSaysWhy(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX directory modes, which root ignores")
+	}
+	sys, dst := claudePermissionsBox(t, settingsWithMalformedRules)
+	dir := filepath.Dir(dst)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	var buf bytes.Buffer
+	checkClaudePermissionRules(sys, capture(&buf), true)
+	out := buf.String()
+	if strings.Count(out, "[FAIL]") != 2 || !strings.Contains(out, "--fix could not rewrite the file") {
+		t.Errorf("want two FAILs naming the failed rewrite:\n%s", out)
+	}
+	if strings.Contains(out, "run: dotf doctor --fix") || strings.Contains(out, "removed") {
+		t.Errorf("a failed --fix pointed back at --fix or claimed a removal:\n%s", out)
 	}
 }

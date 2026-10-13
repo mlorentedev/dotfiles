@@ -38,10 +38,17 @@ func TestEditJSON_WritesOnlyWhenTheEditChangesSomething(t *testing.T) {
 		t.Errorf("the first rewrite keeps a backup, as deploy does: %v", err)
 	}
 	// installMode keeps an operator's tighter mode, as deploy does.
-	if info, err := os.Stat(dst); err == nil && runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("mode = %04o, want the existing 0600 kept", info.Mode().Perm())
 	}
-	entries, _ := os.ReadDir(filepath.Dir(dst))
+	entries, err := os.ReadDir(filepath.Dir(dst))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), ".deploy-") {
 			t.Errorf("a staged file was left behind: %s", e.Name())
