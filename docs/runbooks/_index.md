@@ -5,6 +5,7 @@ Operational guides and procedures for managing the dotfiles environment.
 | Runbook | Description | Status |
 |---|---|---|
 | [guide-new-machine.md](guide-new-machine.md) | A machine from zero: converge, `dotf doctor --scope machine`, then restoring the identity (age key, Bitwarden, GitHub, vault) | Active |
+| [guide-workstation-ssh-target.md](guide-workstation-ssh-target.md) | A workstation as a mesh-only SSH target: Tailscale as a system service, sshd hardening, firewall, power policy, client profiles (interim, until SEC-011) | Active |
 | [guide-secrets-governance.md](guide-secrets-governance.md) | Secrets lifecycle: first machine, add, converge, curate, rotate, retire, backup, offline copy, recover, quarterly check | Active |
 | [guide-opencode-go-setup.md](guide-opencode-go-setup.md) | OpenCode setup, NaN provider, models & coexistence rules | Active |
 | [guide-agent-provisioning.md](guide-agent-provisioning.md) | What each AI agent gets (instructions, skills, configs, hooks, MCP, plugins) and which file declares it | Active |

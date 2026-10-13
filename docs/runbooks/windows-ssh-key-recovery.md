@@ -33,12 +33,19 @@ run:
 pwsh -NoProfile -File .\scripts\windows-openssh-authorize.ps1
 ```
 
-The script installs and enables OpenSSH Server, creates or enables the port 22
-firewall rule, adds the committed public key exactly once, preserves unrelated
-keys, and protects the administrator key store ACL without interrupting active
-SSH sessions.
+The host must already be on the Headscale mesh: the script stops before it
+installs anything when there is no `Tailscale` network adapter. It installs
+OpenSSH Server, then creates the port 22 firewall rule, or narrows the one the
+OpenSSH capability created open to any address, so that it matches only the
+`Tailscale` adapter and the mesh range `100.64.0.0/10`. Only then does it start
+sshd. It adds the committed public key exactly once, preserves unrelated keys,
+and protects the administrator key store ACL without interrupting active SSH
+sessions.
 
-Before accepting either SSH alias's host key, obtain the authoritative server
+SSH is reachable through the mesh only. There is no LAN alias: the dock LAN
+answers nothing on port 22.
+
+Before accepting the SSH alias's host key, obtain the authoritative server
 host-key fingerprint through this authenticated console or RDP channel:
 
 ```powershell
@@ -50,10 +57,9 @@ before accepting it:
 
 ```powershell
 ssh-keyscan -T 5 -t ed25519 acemagic-office | ssh-keygen -lf -
-ssh-keyscan -T 5 -t ed25519 acemagic-office-lan | ssh-keygen -lf -
 ```
 
-Only proceed when both results match the console/RDP fingerprint. The dedicated
+Only proceed when the result matches the console/RDP fingerprint. The dedicated
 client-key fingerprint is unrelated and must not be used for server trust.
 
 ## Normal reconciliation
@@ -74,9 +80,6 @@ protection comes from Bitwarden at rest plus the protected current-owner and
 SYSTEM Windows ACL after materialization. The client guard rejects an encrypted
 key rather than allowing SSH to fail later during signing.
 
-Use `ssh -o PreferredAuthentications=publickey -o BatchMode=yes
-acemagic-office-lan hostname` when directly connected to the dock LAN.
-
 ## Clean-machine recovery
 
 1. Clone dotfiles and authenticate/unlock the Bitwarden CLI.
@@ -85,8 +88,8 @@ acemagic-office-lan hostname` when directly connected to the dock LAN.
 3. The client guard compares private and committed-public fingerprints and
    verifies non-interactive signing, then replaces inherited ACLs with
    current-owner and SYSTEM access.
-4. Verify both aliases with `ssh -o PreferredAuthentications=publickey -o
-   BatchMode=yes <alias> hostname`; never verify by printing key material.
+4. Verify the alias with `ssh -o PreferredAuthentications=publickey -o
+   BatchMode=yes acemagic-office hostname`; never verify by printing key material.
 
 ## Rotation and revocation
 
@@ -117,7 +120,6 @@ not independently duplicated in git or another ad-hoc file.
 ```powershell
 ssh-keygen -lf .\ssh\id_ed25519_ts_bridge_acemagic.pub
 ssh -o PreferredAuthentications=publickey -o BatchMode=yes acemagic-office hostname
-ssh -o PreferredAuthentications=publickey -o BatchMode=yes acemagic-office-lan hostname
 ```
 
 Expected public fingerprint:

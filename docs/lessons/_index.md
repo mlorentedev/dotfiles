@@ -419,4 +419,5 @@ tags: [lessons, index, dotfiles]
 | [398 - curl \| bash leaves stdin to the script, not to the person](lesson-398-curl-pipe-bash-leaves-stdin-to-the-script.md) | 2026-10-11 |
 | [399 - A Claude Code deny rule that mixes * with :* denies nothing](lesson-399-a-deny-rule-that-mixes-wildcards-denies-nothing.md) | 2026-10-12 |
 | [400 - A fixture in a shape the tool never returns tests nothing](lesson-400-a-fixture-in-a-shape-the-tool-never-returns.md) | 2026-10-13 |
+| [401 - A firewall rule the installer already created is never the one you wrote](lesson-401-a-firewall-rule-the-installer-already-created.md) | 2026-10-12 |
 <!-- END GENERATED -->

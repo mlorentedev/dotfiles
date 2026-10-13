@@ -146,22 +146,38 @@ function Invoke-AclCommand {
 }
 
 function Enable-WindowsOpenSshServer {
+    # sshd answers the Headscale mesh only, never the LAN or the internet: the
+    # rule matches the Tailscale adapter AND the mesh range (100.64.0.0/10 is
+    # also carrier-grade NAT space, so the address alone is not the mesh).
+    # Without the adapter there is no mesh to open sshd to, so stop before
+    # anything is installed or started.
+    $meshInterface = 'Tailscale'
+    $meshAddressRange = '100.64.0.0/10'
+    if ($null -eq (Get-NetAdapter -Name $meshInterface -ErrorAction SilentlyContinue)) {
+        throw "No '$meshInterface' network adapter: join the mesh before enabling sshd (docs/runbooks/guide-workstation-ssh-target.md)."
+    }
+
     $capability = Get-WindowsCapability -Online -Name 'OpenSSH.Server~~~~0.0.1.0'
     if ($capability.State -ne 'Installed') {
         Add-WindowsCapability -Online -Name $capability.Name | Out-Null
     }
 
-    Set-Service -Name sshd -StartupType Automatic
-    if ((Get-Service -Name sshd).Status -ne 'Running') {
-        Start-Service -Name sshd
-    }
-
+    # The capability creates this rule itself, open to any address, so an
+    # existing rule is narrowed too: creating a closed one is not enough. The
+    # rule is settled before sshd starts, so it never listens behind the open one.
     $rule = Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue
     if ($null -eq $rule) {
         New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd)' `
-            -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
-    } elseif ($rule.Enabled -ne 'True') {
-        Enable-NetFirewallRule -Name 'OpenSSH-Server-In-TCP'
+            -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 `
+            -InterfaceAlias $meshInterface -RemoteAddress $meshAddressRange | Out-Null
+    } else {
+        Set-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -Enabled True `
+            -InterfaceAlias $meshInterface -RemoteAddress $meshAddressRange
+    }
+
+    Set-Service -Name sshd -StartupType Automatic
+    if ((Get-Service -Name sshd).Status -ne 'Running') {
+        Start-Service -Name sshd
     }
 }
 
