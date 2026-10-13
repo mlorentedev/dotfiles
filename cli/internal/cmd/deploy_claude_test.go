@@ -122,9 +122,12 @@ func withPath(t *testing.T, have ...string) {
 	}
 }
 
+// webRegistered is `claude mcp get web` for pluginRepo's declaration.
+const webRegistered = "web:\n  Scope: User config (available in all your projects)\n  Type: http\n  URL: https://example.test/mcp\n"
+
 func TestDeployCmd_BareDeployRegistersMissingMCPServers(t *testing.T) {
 	withPath(t, "uv")
-	fake := &fakeClaude{registered: map[string]string{"web": "web:\n  Type: http\n"}, listed: "a@m b@m"}
+	fake := &fakeClaude{registered: map[string]string{"web": webRegistered}, listed: "a@m b@m"}
 	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -172,9 +175,9 @@ func TestDeployCmd_AFailedMCPAddFailsTheRunButPluginsStillRun(t *testing.T) {
 	}
 }
 
-func TestDeployCmd_StaleHiveRegistrationIsMigrated(t *testing.T) {
+func TestDeployCmd_DriftedRegistrationIsMigrated(t *testing.T) {
 	withPath(t, "uv")
-	fake := &fakeClaude{registered: map[string]string{"web": "ok", "hive": "Command: uvx hive-vault"}, listed: "a@m b@m"}
+	fake := &fakeClaude{registered: map[string]string{"web": webRegistered, "hive": "hive:\n  Type: stdio\n  Command: uvx\n  Args: hive-vault\n"}, listed: "a@m b@m"}
 	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -182,8 +185,24 @@ func TestDeployCmd_StaleHiveRegistrationIsMigrated(t *testing.T) {
 	if strings.Join(fake.removed, ",") != "hive" || strings.Join(fake.added, ",") != "hive" {
 		t.Errorf("removed %v added %v, want hive removed then re-added", fake.removed, fake.added)
 	}
-	if !strings.Contains(out, row("migrated", "claude-mcp")+"hive") {
+	if !strings.Contains(out, row("migrated", "claude-mcp")+"hive: stdio uvx hive-vault -> stdio hive client") {
 		t.Errorf("the migration must be reported:\n%s", out)
+	}
+}
+
+// An answer that does not parse is reported and left alone, never re-added.
+func TestDeployCmd_AnUnreadableRegistrationIsReportedNotReplaced(t *testing.T) {
+	withPath(t, "uv")
+	fake := &fakeClaude{registered: map[string]string{"web": "web:\n", "hive": "hive:\n  Type: stdio\n  Command: hive\n  Args: client\n"}, listed: "a@m b@m"}
+	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if len(fake.added)+len(fake.removed) != 0 {
+		t.Errorf("removed %v added %v; an unreadable registration must be left alone", fake.removed, fake.added)
+	}
+	if !strings.Contains(out, row("unverified", "claude-mcp")+"web") {
+		t.Errorf("the unverified server must be named:\n%s", out)
 	}
 }
 

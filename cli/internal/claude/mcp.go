@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 )
 
@@ -64,23 +63,60 @@ func LoadServers(path string) ([]Server, error) {
 // on PATH.
 type Skip struct{ Name, Missing string }
 
+// Drift is a server registered with something other than what
+// mcp-servers.json declares: Was is what `claude mcp get` reported, Now the
+// declaration, both as "<transport> <argv or URL>".
+type Drift struct{ Name, Was, Now string }
+
 // MCPReport is what one Register found and did.
 type MCPReport struct {
 	Present, Added, Failed []string
-	Migrated               []string // stale entries replaced (or, in a dry run, that would be)
-	Skipped                []Skip
-	Restored               int
+	// Migrated are the drifted registrations replaced (or, in a dry run, that
+	// would be). Each is in Added too, once its re-add landed.
+	Migrated []Drift
+	// Unverified are registered servers whose `claude mcp get` output did not
+	// parse, so whether they drifted is unknown. They are left alone: treating
+	// an unreadable answer as drift would re-register every server on every
+	// run the day Claude Code changes its output.
+	Unverified []string
+	Skipped    []Skip
+	Restored   int
 }
 
-// staleHive matches a `claude mcp get hive` that still runs the per-session
-// `uvx hive-vault` server HIVE-118 replaced with the `hive client` proxy.
-var staleHive = regexp.MustCompile(`uvx|hive-vault`)
+// registered reads what `claude mcp get` says a server runs, as
+// "<transport> <argv>" for stdio (Command and Args joined on single spaces,
+// the way registration split them) and "<transport> <URL>" otherwise. false
+// when the output names no transport, or no command or URL to go with it.
+func registered(out string) (string, bool) {
+	fields := map[string]string{}
+	for _, line := range strings.Split(out, "\n") {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if ok {
+			fields[key] = strings.TrimSpace(value)
+		}
+	}
+	transport, target := fields["Type"], fields["URL"]
+	if transport == "stdio" {
+		target = strings.Join(strings.Fields(fields["Command"]+" "+fields["Args"]), " ")
+	}
+	if transport == "" || target == "" {
+		return "", false
+	}
+	return transport + " " + target, true
+}
 
-// Register adds every server `claude mcp get` does not know, each claude call
-// inside the snapshot guard. A get that exits non-zero means "not registered",
-// as in both twins; a CLI that is broken outright then fails on the add, where
-// it is reported. An add or remove that fails is named in Failed and never
-// counted, so unlike Sync there is no error a caller could act on.
+// declared is a Server in the shape registered reads.
+func declared(srv Server) string {
+	return srv.Transport + " " + strings.Join(strings.Fields(srv.Args), " ")
+}
+
+// Register adds every server `claude mcp get` does not know, and replaces one
+// registered with another command, arguments or URL (BUG-128, #2397; it was a
+// hive-only regex for HIVE-118's `uvx hive-vault`), each claude call inside the
+// snapshot guard. A get that exits non-zero means "not registered", as in both
+// twins; a CLI that is broken outright then fails on the add, where it is
+// reported. An add or remove that fails is named in Failed and never counted,
+// so unlike Sync there is no error a caller could act on.
 func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 	var rep MCPReport
 	guard := func(fn func() error) error {
@@ -95,28 +131,36 @@ func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 		}
 		var out string
 		getErr := guard(func() error { var err error; out, err = s.Run.McpGet(srv.Name); return err })
-		registered := getErr == nil
-		stale := registered && srv.Name == "hive" && staleHive.MatchString(out)
-		if stale && !dryRun {
-			if err := guard(func() error { return s.Run.McpRemove(srv.Name) }); err != nil {
+		var drift *Drift
+		if getErr == nil {
+			was, ok := registered(out)
+			switch {
+			case !ok:
+				rep.Unverified = append(rep.Unverified, srv.Name)
+				continue
+			case was == declared(srv):
+				rep.Present = append(rep.Present, srv.Name)
+				continue
+			}
+			drift = &Drift{Name: srv.Name, Was: was, Now: declared(srv)}
+			if !dryRun {
+				if err := guard(func() error { return s.Run.McpRemove(srv.Name) }); err != nil {
+					rep.Failed = append(rep.Failed, srv.Name)
+					continue
+				}
+			}
+		}
+		// A migration is reported only once the replacement is in: a remove
+		// whose re-add failed left the server unregistered, and says so in Failed.
+		if !dryRun {
+			if err := guard(func() error { return s.Run.McpAdd(srv.Name, srv.Transport, strings.Fields(srv.Args)) }); err != nil {
 				rep.Failed = append(rep.Failed, srv.Name)
 				continue
 			}
 		}
-		// A migration is reported only once the replacement is in: a remove
-		// whose re-add failed left hive unregistered, and says so in Failed.
-		switch {
-		case registered && !stale:
-			rep.Present = append(rep.Present, srv.Name)
-			continue
-		case dryRun:
-		case guard(func() error { return s.Run.McpAdd(srv.Name, srv.Transport, strings.Fields(srv.Args)) }) != nil:
-			rep.Failed = append(rep.Failed, srv.Name)
-			continue
-		}
 		rep.Added = append(rep.Added, srv.Name)
-		if stale {
-			rep.Migrated = append(rep.Migrated, srv.Name)
+		if drift != nil {
+			rep.Migrated = append(rep.Migrated, *drift)
 		}
 	}
 	return rep

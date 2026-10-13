@@ -59,13 +59,25 @@ func mcpSyncer(f *mcpFake, have ...string) Syncer {
 	return s
 }
 
+// getOutput is `claude mcp get` as Claude Code prints it (measured
+// 2026-10-13): a stdio server's Command and Args lines, an http server's URL.
+func getOutput(name, transport, argv string) string {
+	head := name + ":\n  Scope: User config (available in all your projects)\n  Status: ✔ Connected\n  Type: " + transport + "\n"
+	tail := "\nTo remove this server, run: claude mcp remove " + name + " -s user\n"
+	if transport != "stdio" {
+		return head + "  URL: " + argv + "\n" + tail
+	}
+	cmd, args, _ := strings.Cut(argv, " ")
+	return head + "  Command: " + cmd + "\n  Args: " + args + "\n  Environment:\n" + tail
+}
+
 var servers = []Server{
 	{Name: "context7", Transport: "http", Args: "https://mcp.context7.com/mcp"},
 	{Name: "hive", Transport: "stdio", Args: "hive client", PrerequisiteBinary: "uv", PrerequisiteCommand: "uv tool install --upgrade hive-vault"},
 }
 
 func TestRegisterAddsOnlyWhatIsMissing(t *testing.T) {
-	f := &mcpFake{registered: map[string]string{"context7": "context7:\n  Type: http\n"}}
+	f := &mcpFake{registered: map[string]string{"context7": getOutput("context7", "http", "https://mcp.context7.com/mcp")}}
 	rep := mcpSyncer(f, "uv").Register(servers, false)
 	if !reflect.DeepEqual(f.added, []string{"hive stdio hive client"}) {
 		t.Fatalf("added %v, want only hive, split on whitespace", f.added)
@@ -85,25 +97,75 @@ func TestRegisterSurfacesAFailedAdd(t *testing.T) {
 	}
 }
 
-// HIVE-118: a registration still pointing at `uvx hive-vault` is removed, then
-// re-added from the SSOT. A current `hive client` entry is left alone.
-func TestRegisterMigratesAStaleHiveEntry(t *testing.T) {
-	f := &mcpFake{registered: map[string]string{
-		"context7": "ok",
-		"hive":     "hive:\n  Command: uvx\n  Args: hive-vault\n",
-	}}
-	rep := mcpSyncer(f, "uv").Register(servers, false)
-	if !reflect.DeepEqual(f.removed, []string{"hive"}) || !reflect.DeepEqual(rep.Added, []string{"hive"}) {
-		t.Fatalf("removed %v, report %+v; want hive removed then re-added", f.removed, rep)
-	}
-	if !reflect.DeepEqual(rep.Migrated, []string{"hive"}) {
-		t.Fatalf("migration not reported: %+v", rep)
+// A registration that runs something other than the declaration is removed,
+// then re-added from the SSOT, and reported with both (BUG-128): the Mac's
+// pdf-modifier still ran the package name mcp-servers.json had dropped. A
+// current entry is left alone. HIVE-118's `uvx hive-vault` is one such drift.
+func TestRegisterReplacesADriftedRegistration(t *testing.T) {
+	pdf := Server{Name: "pdf-modifier", Transport: "stdio", Args: "uvx pdf-modifier", PrerequisiteBinary: "uv"}
+	for name, c := range map[string]struct {
+		srv Server
+		out string
+		was string
+	}{
+		"renamed package": {pdf, getOutput("pdf-modifier", "stdio", "uvx pdf-modifier-mcp"), "stdio uvx pdf-modifier-mcp"},
+		"HIVE-118 hive":   {servers[1], getOutput("hive", "stdio", "uvx hive-vault"), "stdio uvx hive-vault"},
+		"moved URL":       {servers[0], getOutput("context7", "http", "https://old.example/mcp"), "http https://old.example/mcp"},
+		"transport":       {servers[0], getOutput("context7", "sse", "https://mcp.context7.com/mcp"), "sse https://mcp.context7.com/mcp"},
+	} {
+		f := &mcpFake{registered: map[string]string{c.srv.Name: c.out}}
+		rep := mcpSyncer(f, "uv").Register([]Server{c.srv}, false)
+		want := []Drift{{Name: c.srv.Name, Was: c.was, Now: declared(c.srv)}}
+		if !reflect.DeepEqual(f.removed, []string{c.srv.Name}) || !reflect.DeepEqual(rep.Added, []string{c.srv.Name}) || !reflect.DeepEqual(rep.Migrated, want) {
+			t.Errorf("%s: removed %v, report %+v; want it replaced and reported as %+v", name, f.removed, rep, want)
+		}
 	}
 
-	f = &mcpFake{registered: map[string]string{"context7": "ok", "hive": "hive:\n  Command: hive\n  Args: client\n"}}
-	mcpSyncer(f, "uv").Register(servers, false)
-	if len(f.removed) != 0 || len(f.added) != 0 {
-		t.Fatalf("a current hive entry was touched: removed %v added %v", f.removed, f.added)
+	f := &mcpFake{registered: map[string]string{
+		"context7": getOutput("context7", "http", "https://mcp.context7.com/mcp"),
+		"hive":     getOutput("hive", "stdio", "hive client"),
+	}}
+	rep := mcpSyncer(f, "uv").Register(servers, false)
+	if len(f.removed) != 0 || len(f.added) != 0 || !reflect.DeepEqual(rep.Present, []string{"context7", "hive"}) {
+		t.Fatalf("current entries were touched: removed %v added %v report %+v", f.removed, f.added, rep)
+	}
+}
+
+// Output that does not parse is never drift: the day Claude Code changes its
+// format, treating it as drift would re-register every server on every run and
+// converge would never report zero changes. It is reported as unverified.
+func TestRegisterLeavesAnUnreadableRegistrationAlone(t *testing.T) {
+	for name, out := range map[string]string{
+		"empty":      "",
+		"no type":    "hive:\n  Command: hive\n  Args: client\n",
+		"no command": "hive:\n  Type: stdio\n",
+		"no URL":     "context7:\n  Type: http\n",
+		"new format": `{"name":"hive","command":"hive"}`,
+	} {
+		srv := servers[1]
+		if strings.Contains(name, "URL") {
+			srv = servers[0]
+		}
+		f := &mcpFake{registered: map[string]string{srv.Name: out}}
+		rep := mcpSyncer(f, "uv").Register([]Server{srv}, false)
+		if len(f.removed) != 0 || len(f.added) != 0 || !reflect.DeepEqual(rep.Unverified, []string{srv.Name}) || len(rep.Present) != 0 {
+			t.Errorf("%s: removed %v added %v report %+v; want it left alone and unverified", name, f.removed, f.added, rep)
+		}
+	}
+}
+
+// A stdio server with no arguments: Claude Code may print an empty Args line
+// or none at all; both read as the bare command.
+func TestRegisterReadsACommandWithoutArgs(t *testing.T) {
+	solo := Server{Name: "solo", Transport: "stdio", Args: "solo"}
+	for name, out := range map[string]string{
+		"empty Args": "solo:\n  Type: stdio\n  Command: solo\n  Args: \n",
+		"no Args":    "solo:\n  Type: stdio\n  Command: solo\n",
+	} {
+		f := &mcpFake{registered: map[string]string{"solo": out}}
+		if rep := mcpSyncer(f).Register([]Server{solo}, false); !reflect.DeepEqual(rep.Present, []string{"solo"}) {
+			t.Errorf("%s: report %+v, want solo present", name, rep)
+		}
 	}
 }
 
@@ -121,12 +183,13 @@ func TestRegisterSkipsAServerWhosePrerequisiteIsMissing(t *testing.T) {
 }
 
 func TestRegisterDryRunChangesNothing(t *testing.T) {
-	f := &mcpFake{registered: map[string]string{"hive": "Command: uvx hive-vault"}}
+	f := &mcpFake{registered: map[string]string{"hive": getOutput("hive", "stdio", "uvx hive-vault")}}
 	rep := mcpSyncer(f, "uv").Register(servers, true)
 	if len(f.added) != 0 || len(f.removed) != 0 {
 		t.Fatalf("dry run added %v removed %v", f.added, f.removed)
 	}
-	if !reflect.DeepEqual(rep.Added, []string{"context7", "hive"}) || !reflect.DeepEqual(rep.Migrated, []string{"hive"}) {
+	want := []Drift{{Name: "hive", Was: "stdio uvx hive-vault", Now: "stdio hive client"}}
+	if !reflect.DeepEqual(rep.Added, []string{"context7", "hive"}) || !reflect.DeepEqual(rep.Migrated, want) {
 		t.Fatalf("dry-run report %+v", rep)
 	}
 }
@@ -153,17 +216,6 @@ func TestLoadServers(t *testing.T) {
 	}
 }
 
-// The migration is scoped to hive: pdf-modifier legitimately runs under uvx,
-// and an unscoped match would remove and re-add it on every deploy.
-func TestRegisterLeavesOtherUvxServersAlone(t *testing.T) {
-	pdf := []Server{{Name: "pdf-modifier", Transport: "stdio", Args: "uvx pdf-modifier", PrerequisiteBinary: "uv"}}
-	f := &mcpFake{registered: map[string]string{"pdf-modifier": "Command: uvx\n  Args: pdf-modifier\n"}}
-	rep := mcpSyncer(f, "uv").Register(pdf, false)
-	if len(f.removed) != 0 || len(f.added) != 0 || !reflect.DeepEqual(rep.Present, []string{"pdf-modifier"}) {
-		t.Fatalf("removed %v added %v report %+v; a current uvx server was churned", f.removed, f.added, rep)
-	}
-}
-
 // The repo's own lists decode under the strict readers: a field added to either
 // file without the Go struct would otherwise fail every bare `dotf deploy`.
 func TestTheRepoListsLoad(t *testing.T) {
@@ -180,10 +232,11 @@ func TestTheRepoListsLoad(t *testing.T) {
 // leaves the stale entry; a failed re-add leaves hive unregistered. Either way
 // hive is in Failed and not in Migrated.
 func TestRegisterReportsAMigrationOnlyWhenItCompleted(t *testing.T) {
-	stale := map[string]string{"context7": "ok", "hive": "Command: uvx hive-vault"}
+	current := getOutput("context7", "http", "https://mcp.context7.com/mcp")
+	stale := map[string]string{"context7": current, "hive": getOutput("hive", "stdio", "uvx hive-vault")}
 	for name, f := range map[string]*mcpFake{
 		"remove fails": {registered: stale, failRemove: true},
-		"re-add fails": {registered: map[string]string{"context7": "ok", "hive": "uvx"}, failing: map[string]bool{"hive": true}},
+		"re-add fails": {registered: map[string]string{"context7": current, "hive": getOutput("hive", "stdio", "uvx hive-vault")}, failing: map[string]bool{"hive": true}},
 	} {
 		rep := mcpSyncer(f, "uv").Register(servers, false)
 		if len(rep.Migrated) != 0 || !reflect.DeepEqual(rep.Failed, []string{"hive"}) {

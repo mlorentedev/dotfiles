@@ -234,6 +234,17 @@ Only the setup twins wrote `~/.gemini/config/mcp_config.json` and the hive-vault
 - [x] Tests: substitution, merge, idempotence, plan writes nothing, symlink, stale copy, missing vault, missing sources; the bare deploy plans, applies and is in sync on the second run; `convergeOptions` wires the paths; converge writes agy without claude and the probe names a drifted master. Seven mutations of `ApplyMCP`, all caught
 - [x] Evidence: from-zero 38396154386, a throwaway branch merging this change with P5c (#2392) and dropping the darwin `master mcp_config.json missing` known failure. macOS and ubuntu alike: the first converge prints `agy: 3 MCP config(s) written, 0 in sync`, the second `agy: 0 MCP config(s) written, 3 in sync` with `"changed": 0`; the darwin doctor gate reads `2 known FAIL line(s), 0 new, 0 stale`
 
+### PR 10 — agent extensions: Claude MCP registrations with stale arguments (BUG-128 #2397)
+
+`claude.Syncer.Register` skipped any name `claude mcp get` knew, so a server registered with arguments the SSOT no longer declares stayed stale forever. The only exception was a hand-written HIVE-118 regexp for `uvx hive-vault`. On the Mac, Claude still launched `uvx pdf-modifier-mcp` after `mcp-servers.json` moved to `uvx pdf-modifier`; no step and no check could see it.
+
+- [x] `registered` reads `claude mcp get`'s measured output (`Type:`, `Command:`, `Args:`, `URL:`) into `transport target`; `declared` renders the SSOT entry the same way. A registration that differs is removed and re-added, and reported as `Drift{Name, Was, Now}` only when the re-add went in
+- [x] An answer that does not parse is `Unverified` and left as registered: a format change in Claude Code must never turn into a remove of every server. `staleHive` and its regexp are gone; hive's old entry is one case of the general drift
+- [x] The bare `dotf deploy` prints `migrated`/`would migrate` rows with `was -> now` and an `unverified` row; converge's detail names each re-registration in the tense of the run (`to re-register` in a plan)
+- [x] Tests: renamed package, hive HIVE-118, moved URL, changed transport, a command without args, an unreadable answer, dry run, a re-add that fails; converge plans, applies and is in sync on the second run. Mutation: replacing the drift comparison with `true` fails three claude tests
+- [x] Evidence on the Mac, plan only: `go run ./cmd/dotf converge --plan --only agent-extensions` prints `pdf-modifier to re-register (stdio uvx pdf-modifier-mcp -> stdio uvx pdf-modifier)`
+- [ ] Follow-up: the Claude MCP registration loop still lives in both setup twins (with their own HIVE-118 remove); the pinned 0.68.0 already registers from `dotf deploy`, so the twin is deletable in its own PR
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

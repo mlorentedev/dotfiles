@@ -156,12 +156,15 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	}
 	rep, err := claude.ApplyMCP(s, repoRoot, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
-	verb, why := "migrated", "(stale uvx hive-vault entry replaced by the SSOT one)"
+	verb := "migrated"
 	if dryRun {
-		verb, why = "would migrate", "(stale uvx hive-vault entry)"
+		verb = "would migrate"
 	}
-	for _, name := range rep.Migrated {
-		deployRow(w, verb, step, "%s %s", name, why)
+	for _, d := range rep.Migrated {
+		deployRow(w, verb, step, "%s: %s -> %s", d.Name, d.Was, d.Now)
+	}
+	for _, name := range rep.Unverified {
+		deployRow(w, "unverified", step, "%s (`claude mcp get` output did not parse; left as registered)", name)
 	}
 	for _, sk := range rep.Skipped {
 		deployRow(w, "skipped", step, "%s (%s not on PATH)", sk.Name, sk.Missing)

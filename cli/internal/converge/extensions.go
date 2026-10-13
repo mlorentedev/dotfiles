@@ -74,12 +74,18 @@ func (a agentExtensions) applyClaude(e Env, dryRun bool, p *extensionsPlan, part
 	if err := errors.Join(prefixed("claude mcp", mErr), prefixed("claude plugins", pErr)); err != nil {
 		return err
 	}
-	added, removed := "added", "removed"
+	added, removed, migrated := "added", "removed", "re-registered"
 	if dryRun {
-		added, removed = "to add", "to remove"
+		added, removed, migrated = "to add", "to remove", "to re-register"
 	}
 	p.changes += len(mcp.Added) + len(plugins.Plugins.Added) + len(plugins.Retired.Removed)
 	c := []string{fmt.Sprintf("claude: %d MCP server(s) %s, %d present", len(mcp.Added), added, len(mcp.Present))}
+	for _, d := range mcp.Migrated {
+		c = append(c, fmt.Sprintf("%s %s (%s -> %s)", d.Name, migrated, d.Was, d.Now))
+	}
+	if len(mcp.Unverified) > 0 {
+		c = append(c, "unverified (mcp get did not parse): "+strings.Join(mcp.Unverified, ", "))
+	}
 	for _, sk := range mcp.Skipped {
 		c = append(c, fmt.Sprintf("%s skipped (%s not on PATH)", sk.Name, sk.Missing))
 	}

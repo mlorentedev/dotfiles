@@ -2,6 +2,7 @@ package converge
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,10 +15,12 @@ import (
 
 // claudeBox is a Claude Code install: the servers and plugins it has, and the
 // marketplaces it registers. An install in broken fails; one in deaf exits 0
-// and leaves nothing installed. mutated counts every call that changes it.
+// and leaves nothing installed. A server in stale is registered at an old URL
+// until it is removed. mutated counts every call that changes it.
 type claudeBox struct {
 	servers, plugins, markets []string
 	broken, deaf              map[string]bool
+	stale                     map[string]string
 	mutated                   int
 }
 
@@ -38,7 +41,11 @@ func (b *claudeBox) McpGet(name string) (string, error) {
 	if !slices.Contains(b.servers, name) {
 		return "", errors.New("No MCP server found")
 	}
-	return name + ": https://example.test/mcp", nil
+	url := "https://example.test/mcp"
+	if old, ok := b.stale[name]; ok {
+		url = old
+	}
+	return name + ":\n  Type: http\n  URL: " + url + "\n", nil
 }
 
 func (b *claudeBox) McpAdd(name, _ string, _ []string) error {
@@ -47,7 +54,12 @@ func (b *claudeBox) McpAdd(name, _ string, _ []string) error {
 	return nil
 }
 
-func (b *claudeBox) McpRemove(string) error { b.mutated++; return nil }
+func (b *claudeBox) McpRemove(name string) error {
+	b.mutated++
+	delete(b.stale, name)
+	b.servers = slices.DeleteFunc(b.servers, func(s string) bool { return s == name })
+	return nil
+}
 
 func (b *claudeBox) Marketplaces() (string, error) {
 	parts := make([]string, 0, len(b.markets))
@@ -134,6 +146,27 @@ func TestAgentExtensions_APlanChangesNothing(t *testing.T) {
 	}
 	if res.Changes != 3 || !strings.Contains(res.Detail, "to add") || box.mutated != 0 {
 		t.Errorf("plan: %+v, %d mutating call(s)", res, box.mutated)
+	}
+}
+
+// A server registered with arguments the SSOT no longer declares is planned as
+// a re-registration, replaced on apply, and in sync on the next run (#2397).
+func TestAgentExtensions_ADriftedServerIsReRegistered(t *testing.T) {
+	box := &claudeBox{servers: []string{"web"}, plugins: []string{"a@m", "b@m"}, markets: []string{"m"},
+		stale: map[string]string{"web": "https://old.test/mcp"}}
+	step, env := withClaude(box), Env{RepoRoot: extensionsRepo(t)}
+	const move = "web %s (http https://old.test/mcp -> http https://example.test/mcp)"
+	plan, err := step.Reconcile(env, true)
+	if err != nil || plan.Changes != 1 || !strings.Contains(plan.Detail, fmt.Sprintf(move, "to re-register")) || box.mutated != 0 {
+		t.Fatalf("plan: %+v, %v, %d mutating call(s)", plan, err, box.mutated)
+	}
+	res, err := step.Reconcile(env, false)
+	if err != nil || res.Changes != 1 || !strings.Contains(res.Detail, fmt.Sprintf(move, "re-registered")) {
+		t.Fatalf("apply: %+v, %v", res, err)
+	}
+	again, err := step.Reconcile(env, false)
+	if err != nil || again.Changes != 0 {
+		t.Errorf("second run: %+v, %v; want no change", again, err)
 	}
 }
 

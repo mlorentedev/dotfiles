@@ -17,7 +17,7 @@ func TestDeployCmd_BareDeployWritesAgyMCPConfigs(t *testing.T) {
 	repo, home := pluginRepo(t), t.TempDir()
 	writeMirrorFixture(t, filepath.Join(repo, agy.MCPRel),
 		`{"mcpServers":{"hive-vault":{"command":"uvx","args":["hive-vault"],"env":{"VAULT_PATH":"${VAULT_PATH}"}}}}`)
-	fake := &fakeClaude{registered: map[string]string{"web": "web:\n  Type: http\n"}, listed: "a@m b@m"}
+	fake := &fakeClaude{registered: map[string]string{"web": webRegistered}, listed: "a@m b@m"}
 
 	out, err := runDeployWithClaude(t, repo, home, []string{"--dry-run"}, fake)
 	if err != nil {
