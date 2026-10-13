@@ -11,11 +11,6 @@
 # example: [FAIL] kubectl not in PATH
 darwin kubectl not in PATH
 
-# owner: #2384 CLI-105 (agy's MCP master config is written only by the setup
-# twins; agy reaches the macOS runner through mise since #2013 P5c)
-# example: [FAIL] master mcp_config.json missing at /Users/runner/.gemini/config/mcp_config.json (run setup)
-darwin master mcp_config.json missing
-
 # owner: #2013 S2 (hive supervision: launchd on macOS, `hive service install` on Linux)
 # A runner has no daemon, so hive's verdict is "down", or "unverified listener"
 # when another program holds the derived port (run 38372164624; hive#492). One
