@@ -10,8 +10,9 @@ created: "2026-10-13"
 
 ## Context
 The from-zero job (#2331) converges a fresh ubuntu and macOS runner twice. On run 38365444507
-every declared Claude plugin failed to install on both converges, while the same step was green
-on every machine that had used Claude Code before (#2378).
+every declared Claude plugin failed to install on both ubuntu converges (the macOS runner installs
+no Claude Code, #2317), while the same step was green on every machine that had used Claude Code
+before (#2378).
 
 ## The Trap
 The CLI explained its own failure: `Plugin "gopls-lsp" not found in marketplace
