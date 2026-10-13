@@ -280,7 +280,9 @@ func shellPathFixtureAt(t *testing.T, ageVersion string, paths map[string]string
 		if !ok {
 			return "", errors.New("unexpected probe " + name + " " + strings.Join(args, " "))
 		}
-		return strings.NewReplacer("HOME", home).Replace(out), nil
+		// The fixtures write PATH with ':'; the check splits with the host's
+		// separator, so a Windows host (whose HOME holds a ':') reads it too.
+		return strings.NewReplacer("HOME", home, ":", string(filepath.ListSeparator)).Replace(out), nil
 	}
 	return s, cfg, home
 }
