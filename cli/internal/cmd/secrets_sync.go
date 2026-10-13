@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -87,7 +88,12 @@ func newSecretsSyncCiCmd() *cobra.Command {
 			if sel.Upload, err = scopeUpload(sel.Upload, names, repo); err != nil {
 				return err
 			}
-			return pushCI(cmd.OutOrStdout(), sel, repo, dryRun, skipVerify)
+			err = pushCI(cmd.OutOrStdout(), sel, repo, dryRun, skipVerify)
+			if errors.Is(err, errNoCISecrets) {
+				return fmt.Errorf("nothing was delivered to %s: no secret in %s lists ci:%s as a consumer, or each one was skipped above. "+
+					"The registry is read from the working tree, so a checkout behind its upstream selects what it last pulled", repo, registryPath(), repo)
+			}
+			return err
 		},
 	}
 	c.Flags().StringVar(&repo, "repo", "", "target repo owner/name (default: current repo's origin)")
@@ -95,6 +101,12 @@ func newSecretsSyncCiCmd() *cobra.Command {
 	c.Flags().BoolVar(&skipVerify, "skip-verify", false, "skip the github-token liveness check for entries marked validate: github-token")
 	return c
 }
+
+// errNoCISecrets is pushCI's answer when the selection holds nothing to upload:
+// nothing was delivered, which must not read as success (#2362). `rotate
+// --push-ci` cannot reach it, because rotate refuses up front a secret whose ci:
+// consumers can store none of its vars.
+var errNoCISecrets = errors.New("no ci secrets selected")
 
 // pushCI uploads a CI selection to one repo's GitHub Actions secrets: it reports
 // the skipped entries, resolves every value before uploading any, gates entries
@@ -107,7 +119,7 @@ func pushCI(out io.Writer, sel secrets.CISelection, repo string, dryRun, skipVer
 	}
 	if len(sel.Upload) == 0 {
 		_, _ = fmt.Fprintf(out, "no ci secrets selected for %s\n", repo)
-		return nil
+		return errNoCISecrets
 	}
 
 	// One Loader path resolves both age and bw entries — the backend-agnostic
