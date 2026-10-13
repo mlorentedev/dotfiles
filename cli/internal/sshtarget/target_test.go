@@ -29,6 +29,7 @@ type machine struct {
 	ready      error // what Root.Ready returns
 	sshdT      error // what `sshd -t` returns
 	accepts    func(addr string) bool
+	unreached  string // an address ssh times out on before reaching sshd
 	rootCalls  []string
 	forbidRoot bool
 }
@@ -113,10 +114,13 @@ func (m *machine) user(argv ...string) ([]byte, error) {
 	case "ssh":
 		target := argv[len(argv)-2]
 		addr := target[strings.Index(target, "@")+1:]
-		if m.accepts(addr) {
-			return []byte("debug1: Server accepts key: id_ed25519 ED25519\nEnter passphrase"), errors.New("exit status 255")
+		if addr == m.unreached {
+			return []byte("ssh: connect to host " + addr + " port 22: Operation timed out"), errors.New("exit status 255")
 		}
-		return []byte("Permission denied (publickey)."), errors.New("exit status 255")
+		if m.accepts(addr) {
+			return []byte("debug1: Connection established.\ndebug1: Server accepts key: id_ed25519 ED25519\nEnter passphrase"), errors.New("exit status 255")
+		}
+		return []byte("debug1: Connection established.\nPermission denied (publickey)."), errors.New("exit status 255")
 	}
 	m.t.Fatalf("unexpected user command %v", argv)
 	return nil, nil
@@ -238,6 +242,19 @@ func TestAnSSHDThatAcceptsTheLANFails(t *testing.T) {
 	}
 }
 
+func TestALANAddressSSHNeverReachesLeavesTheRefusalUnproven(t *testing.T) {
+	m := newMachine(t)
+	m.unreached = lanIP.String()
+	tg := m.target()
+	p, _ := tg.Inspect()
+	if err := tg.Apply(p); err == nil || !strings.Contains(err.Error(), "never reached sshd at the LAN address 192.168.1.20") {
+		t.Fatalf("Apply = %v, want the unreached LAN address named", err)
+	}
+	if m.loaded {
+		t.Error("sshd left running on an unproven refusal")
+	}
+}
+
 func TestARejectedDropInRestoresThePreviousOne(t *testing.T) {
 	m := newMachine(t)
 	m.write(m.paths.DropIn, "# previous\n")
@@ -269,6 +286,36 @@ func TestInspectRefusesAConfigThatSkipsTheDropInDir(t *testing.T) {
 	m.write(m.paths.SSHDConfig, "UsePAM yes\n")
 	if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "never be read") {
 		t.Fatalf("Inspect = %v, want the missing Include named", err)
+	}
+}
+
+func TestInspectRefusesADirectiveSSHDReadsBeforeTheDropIn(t *testing.T) {
+	for name, setup := range map[string]func(m *machine){
+		"main config above the Include": func(m *machine) {
+			m.write(m.paths.SSHDConfig, "PasswordAuthentication yes\nInclude "+filepath.Dir(m.paths.DropIn)+"/*\n")
+		},
+		"drop-in that sorts first": func(m *machine) {
+			m.write(filepath.Join(filepath.Dir(m.paths.DropIn), "00-local.conf"), "# local\nPasswordAuthentication yes\n")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newMachine(t)
+			setup(m)
+			if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "sets PasswordAuthentication before the drop-in") {
+				t.Fatalf("Inspect = %v, want the shadowing directive named", err)
+			}
+		})
+	}
+}
+
+func TestInspectAllowsWhatTheDropInDoesNotSet(t *testing.T) {
+	m := newMachine(t)
+	dir := filepath.Dir(m.paths.DropIn)
+	m.write(m.paths.SSHDConfig, "Port 22\nInclude "+dir+"/*\nPasswordAuthentication yes\n")
+	m.write(filepath.Join(dir, "00-local.conf"), "UsePAM yes\nMatch User other\n\tPasswordAuthentication yes\n")
+	m.write(filepath.Join(dir, "100-macos.conf"), "PasswordAuthentication yes\n")
+	if _, err := m.target().Inspect(); err != nil {
+		t.Fatalf("Inspect = %v; directives sshd reads after the drop-in, or that it does not set, are not ours to refuse", err)
 	}
 }
 

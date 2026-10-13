@@ -231,23 +231,33 @@ func (t Target) Prove(p Plan) error {
 		return err
 	}
 	defer func() { _ = os.Remove(hosts) }()
-	if !t.accepts(hosts, p.Mesh) {
+	if accepted, _ := t.ask(hosts, p.Mesh); !accepted {
 		return fmt.Errorf("sshd does not accept the key from the mesh address %s", p.Mesh)
 	}
-	if p.LAN != nil && t.accepts(hosts, p.LAN) {
+	if p.LAN == nil {
+		return nil
+	}
+	accepted, reached := t.ask(hosts, p.LAN)
+	if accepted {
 		return fmt.Errorf("sshd accepts the key from the LAN address %s; it must refuse everything outside %s", p.LAN, MeshCIDR)
+	}
+	if !reached {
+		return fmt.Errorf("ssh never reached sshd at the LAN address %s, so its refusal is unproven", p.LAN)
 	}
 	return nil
 }
 
-func (t Target) accepts(hosts string, addr net.IP) bool {
+// ask offers the owner's key to sshd at addr. reached says the connection got
+// to sshd at all, so a refusal can be told apart from a timeout or no route.
+func (t Target) ask(hosts string, addr net.IP) (accepted, reached bool) {
 	a := addr.String()
 	out, err := t.Run("ssh", "-v", "-F", "/dev/null",
 		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
 		"-o", "UserKnownHostsFile="+hosts, "-o", "IdentitiesOnly=yes",
 		"-o", "PreferredAuthentications=publickey", "-o", "ConnectTimeout=10",
 		"-i", t.Paths.ClientKey, "-b", a, t.User+"@"+a, "true")
-	return err == nil || bytes.Contains(out, []byte("Server accepts key"))
+	accepted = err == nil || bytes.Contains(out, []byte("Server accepts key"))
+	return accepted, accepted || bytes.Contains(out, []byte("Connection established"))
 }
 
 // knownHosts writes a known_hosts file naming the node's own host key for
@@ -305,21 +315,96 @@ func (t Target) addresses() (mesh, lan net.IP, err error) {
 	return mesh, lan, nil
 }
 
-// checkInclude refuses a main config that does not read the drop-in dir: the
-// drop-in would be written and never take effect.
+// checkInclude refuses a main config that does not read the drop-in dir, and
+// one where sshd reads a directive of the drop-in before the drop-in itself.
+// sshd keeps the first value it reads for a keyword, so `PasswordAuthentication
+// yes` above the Include, or in a drop-in that sorts before ours, silently wins
+// and the drop-in only looks applied. Reading these files needs no root, so the
+// plan and the probe both see a config that undoes the drop-in.
 func (t Target) checkInclude() error {
 	conf, err := os.ReadFile(t.Paths.SSHDConfig)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", t.Paths.SSHDConfig, err)
 	}
+	ours := map[string]bool{}
+	for _, k := range directives(t.DropIn()) {
+		ours[strings.ToLower(k)] = true
+	}
 	dir := filepath.Dir(t.Paths.DropIn)
+	var first []string
 	for _, line := range strings.Split(string(conf), "\n") {
 		f := strings.Fields(line)
-		if len(f) >= 2 && strings.EqualFold(f[0], "Include") && strings.HasPrefix(f[1], dir+"/") {
-			return nil
+		if len(f) == 0 || strings.HasPrefix(f[0], "#") {
+			continue
+		}
+		if strings.EqualFold(f[0], "Match") {
+			break
+		}
+		if !strings.EqualFold(f[0], "Include") {
+			if ours[strings.ToLower(f[0])] {
+				first = append(first, f[0])
+			}
+			continue
+		}
+		for _, pattern := range f[1:] {
+			if strings.HasPrefix(pattern, dir+"/") {
+				if len(first) > 0 {
+					return shadowed(t.Paths.SSHDConfig+" above its Include", first)
+				}
+				return t.checkEarlierDropIns(pattern, ours)
+			}
 		}
 	}
 	return fmt.Errorf("%s does not include %s/: the drop-in would never be read", t.Paths.SSHDConfig, dir)
+}
+
+// checkEarlierDropIns reads the drop-ins the Include reaches before ours:
+// glob order is lexical, the order sshd reads them in.
+func (t Target) checkEarlierDropIns(pattern string, ours map[string]bool) error {
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("the include pattern %s: %w", pattern, err)
+	}
+	for _, m := range matches {
+		if m >= t.Paths.DropIn {
+			break
+		}
+		data, err := os.ReadFile(m)
+		if err != nil {
+			return err
+		}
+		var first []string
+		for _, k := range directives(data) {
+			if ours[strings.ToLower(k)] {
+				first = append(first, k)
+			}
+		}
+		if len(first) > 0 {
+			return shadowed(m, first)
+		}
+	}
+	return nil
+}
+
+func shadowed(where string, keys []string) error {
+	return fmt.Errorf("%s sets %s before the drop-in, and sshd keeps the first value it reads; move it after the drop-in or remove it", where, strings.Join(keys, ", "))
+}
+
+// directives lists the keywords a config sets unconditionally: those above
+// its first Match block.
+func directives(data []byte) []string {
+	var keys []string
+	for _, line := range strings.Split(string(data), "\n") {
+		f := strings.Fields(line)
+		if len(f) == 0 || strings.HasPrefix(f[0], "#") {
+			continue
+		}
+		if strings.EqualFold(f[0], "Match") {
+			break
+		}
+		keys = append(keys, f[0])
+	}
+	return keys
 }
 
 func (t Target) writeKeys(data []byte) error {
