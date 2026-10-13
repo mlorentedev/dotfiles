@@ -431,4 +431,5 @@ tags: [lessons, index, dotfiles]
 | [410 - bash -c reads no startup file, so no file of ours can set its PATH](lesson-410-bash-c-reads-no-startup-file.md) | 2026-10-13 |
 | [411 - A merge entry's dst needs a literal extension, or every dotf refuses the manifest](lesson-411-a-merge-dst-needs-a-literal-extension.md) | 2026-10-13 |
 | [412 - A plan without root can still see a root-only file change, through a witness of its stat](lesson-412-converge-a-root-only-file-without-root-through-a-witness.md) | 2026-10-13 |
+| [413 - A check that needs the vault belongs in doctor, not in a test CI cannot run](lesson-413-a-check-that-needs-the-vault-belongs-where-the-vault-is.md) | 2026-10-13 |
 <!-- END GENERATED -->
