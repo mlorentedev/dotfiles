@@ -45,9 +45,9 @@ gate() {
 
 @test "no bats file gates on command -v pwsh" {
     # This file names the pattern it forbids, so it is the one exception.
-    # Comments may name it too; only a probe that runs counts.
-    run grep -lnE '^[^#]*command -v pwsh' "$REPO"/tests/*.bats
-    offenders=$(printf '%s\n' "$output" | grep -v '/bats-pwsh-gate\.bats$' || true)
+    # A comment line may name it too; any other line that does is a probe.
+    run grep -n 'command -v pwsh' "$REPO"/tests/*.bats
+    offenders=$(printf '%s\n' "$output" | grep -vE '^[^:]*/bats-pwsh-gate\.bats:|^[^:]*:[0-9]+:[[:space:]]*#' || true)
     [ -z "$offenders" ] || { echo "use require_pwsh (tests/lib/pwsh.bash): $offenders"; false; }
 }
 
