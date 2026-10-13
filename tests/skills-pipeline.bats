@@ -380,13 +380,27 @@ path_without_copilot() {
     [ "$missing" -eq 0 ]
 }
 
+# The mutation goes into a copy of the tree (#2180). Editing the committed
+# record raced the sibling test that reads every record under `bats --jobs`, and
+# a run killed before the restore left the record without its owner line. The
+# copy is checked clean first, so the failure is the dropped key and not a file
+# the copy lacks.
 @test "HERMES-018: --check rejects a record that drops a required key" {
-    local victim="harness/skills/test/SKILL.md" backup
-    backup="$(mktemp)"
-    cp "$victim" "$backup"
-    sed -i.bak '/^owner: /d' "$victim" && rm -f "$victim.bak"
-    run bash scripts/compile-harness.sh --check
-    cp "$backup" "$victim"; rm -f "$backup"
+    local copy="$BATS_TEST_TMPDIR/repo" target targets
+    mkdir -p "$copy"
+    cp -R harness "$copy/harness"
+    targets="$(jq -r '.targets[].file' harness/manifest.json)"
+    [ -n "$targets" ]
+    while IFS= read -r target; do
+        mkdir -p "$copy/$(dirname "$target")"
+        cp "$target" "$copy/$target"
+    done <<< "$targets"
+
+    run env HARNESS_REPO_ROOT="$copy" bash scripts/compile-harness.sh --check
+    [ "$status" -eq 0 ] || { printf 'the unmodified copy fails --check:\n%s\n' "$output" >&2; return 1; }
+
+    sed '/^owner: /d' harness/skills/test/SKILL.md > "$copy/harness/skills/test/SKILL.md"
+    run env HARNESS_REPO_ROOT="$copy" bash scripts/compile-harness.sh --check
     [ "$status" -ne 0 ]
     [[ "$output" == *"owner"* ]] || false
 }
