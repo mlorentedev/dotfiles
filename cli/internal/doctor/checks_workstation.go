@@ -20,11 +20,11 @@ const workstationRemedy = "`dotf converge --only workstation-target`"
 // checkWorkstationTarget (#2356, PLAT-001b PR 7d) reports whether a machine
 // that declared the ssh-target role still matches its declared SSH posture. It
 // runs the converge step's own read-only plan, with the step's gates: darwin
-// only, skipped until the machine opts in, and skipped off the mesh. It does
+// and linux only, skipped until the machine opts in, and skipped off the mesh. It does
 // not run the proof; that asks sshd over the network and stays converge's, so
 // doctor remains read-only and fast.
 func checkWorkstationTarget(sys *System, cfg *Config, rep *Report) {
-	if sys.GOOS != "darwin" {
+	if sys.GOOS != "darwin" && sys.GOOS != "linux" {
 		return
 	}
 	rep.Section("Workstation SSH target")
@@ -48,7 +48,7 @@ func checkWorkstationTarget(sys *System, cfg *Config, rep *Report) {
 		rep.Warn("cannot tell which account sshd is opened to: " + err.Error())
 		return
 	}
-	t, err := sshtarget.New(filepath.Dir(filepath.Dir(tmpl)), user, workstationPaths(sys, home), workstationRun(sys), workstationAddrs(sys))
+	t, err := sshtarget.New(filepath.Dir(filepath.Dir(tmpl)), user, sys.GOOS, workstationPaths(sys, home), workstationRun(sys), workstationAddrs(sys))
 	if err != nil {
 		rep.Warn("read the SSH target's repo files: " + err.Error())
 		return
