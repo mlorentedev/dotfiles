@@ -7,10 +7,6 @@
 # matches, so an entry leaves when its owner's fix lands: the list only shrinks.
 # A new defect never goes here without an owner on the #2013 ledger.
 
-# owner: PLAT-001c tasks.md, kubectl as a `# mise: cli` pin (waits on the release whose version probe reads it)
-# example: [FAIL] kubectl not in PATH
-darwin kubectl not in PATH
-
 # owner: #2013 S2 (hive supervision: launchd on macOS, `hive service install` on Linux)
 # A runner has no daemon, so hive's verdict is "down", or "unverified listener"
 # when another program holds the derived port (run 38372164624; hive#492). One
@@ -19,7 +15,6 @@ darwin kubectl not in PATH
 darwin the hive daemon is
 # example: [FAIL] the hive daemon is down, so the hive MCP server fails in every agent (`hive client` never starts a server of its own). Fix: `hive service install`, or `systemctl --user restart hive.service`, then confirm with `hive service status`.
 linux the hive daemon is
-
 
 # owner: #2013 T3 (versions via `mise ls --json`; the ~/Applications and *_HOME checks replaced)
 # example: [FAIL] Java expected version 21.0.4 but directory missing: /home/runner/Applications/jdk-21.0.4

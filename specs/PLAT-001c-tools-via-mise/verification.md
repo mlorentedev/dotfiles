@@ -34,6 +34,13 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC9 (Python packages through mise; doctor's Python floor) -> PR1 / tests `TestParseMisePins_*`, `TestSync_WritesThePackagesFileBeforeMiseInstallsPython`, `TestSync_PipInstallsIntoAPythonAlreadyAtItsPin`, `TestSync_ReportsAFailedPipInstall`, `TestSync_FailsWhenThePackageStillDoesNotImport`, `TestCheckPython_*`, `TestCheckMiseTools_FixRunsTheSync`, `TestCheckMiseTools_APythonPackageMissingFailsNamingTheSync`
 - [x] AC8 (malformed system entries rejected, unknown type skipped) -> P5a / tests `TestLoad_RejectsMalformedSystemEntries`, `TestInstall_UnknownSourceTypeIsSkippedNotFailed`, `TestInstallAll_UnknownTypeDoesNotFailTheRun`
 - [x] Toolset pins (P5b and Toolsets A/B): on the Mac, the worktree's `dotf tools sync --dry-run` lists `to install: agy, argocd, claude, hcloud, helm, k9s, kubeconform, kubectl, kustomize, node` (agy, claude and node were already pending). In an isolated mise (`MISE_DATA_DIR` in `$TMPDIR`), `argocd version --client` prints `argocd: v3.5.3+c9c369e`, `helm version` `v3.21.4`, `hcloud version` `hcloud 1.69.0`, `k9s version --short` `v0.51.0`, `kubeconform -v` `v0.8.0`, `kubectl version --client` `v1.35.8`, `kustomize version` `v5.8.1`. Mise's debug log shows `dl.k8s.io/.../kubectl.sha256` and `get.helm.sh/...tar.gz.sha256sum` fetched; the other five log `using GitHub API digest for checksum verification`
+- [x] From-zero on macOS (run on #2419 at `7248ade0`): the first converge installs the seven through mise, and doctor no
+  longer reports `[FAIL] kubectl not in PATH`. The job failed on purpose: `.github/scripts/from-zero-known-failures.txt`
+  still carried `darwin kubectl not in PATH`, and the stale-entry check rejects an entry no `[FAIL]` line matches.
+  The entry leaves in the same PR (`f66985b7`), so the list shrank by the defect this change closes, as its header
+  requires. Linux had no such entry: the integration container already ran the sync before doctor.
+- [x] Doctor's kubectl remedy: `TestCheckCoreTools_HintsTheProvisioningCommand` rows for darwin and linux expect
+  `(run: dotf tools sync)` and failed before `coreToolRemedy` named it; the windows row keeps the bare FAIL
 
 ## Test status
 
