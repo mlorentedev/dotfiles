@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 	"github.com/mlorentedev/dotfiles/cli/internal/identity"
 )
 
@@ -22,6 +23,9 @@ type Options struct {
 	Scope    Scope   // ScopeAll (zero) runs every check; ScopeMachine skips the identity ones
 	System   *System // nil → realSystem()
 	StartDir string  // "" → os.Getwd()
+	// Claude builds the guarded claude seam the Claude extensions check asks
+	// through (the one `dotf deploy` and converge use); nil skips that check.
+	Claude func(home string) (claude.Syncer, bool)
 }
 
 // Run executes the full consolidated diagnostic sweep and returns the process
@@ -282,6 +286,7 @@ func (e sweepEnv) agents() []check {
 		{kind: kindMachine, run: func() { checkTmux(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkOpenCode(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "Agent configs from secrets", restore: restoreBW, run: func() { checkAgentSecretConfigs(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkClaudeExtensions(e.sys, e.cfg, e.rep, e.opts.Claude) }},
 		{kind: kindMachine, run: func() { checkCopilot(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkGolangciLint(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkModelMap(e.cfg, e.rep) }},

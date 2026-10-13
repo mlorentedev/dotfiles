@@ -248,6 +248,16 @@ Only the setup twins wrote `~/.gemini/config/mcp_config.json` and the hive-vault
 - [x] Evidence on the Mac, plan only: `go run ./cmd/dotf converge --plan --only agent-extensions` prints `pdf-modifier to re-register (stdio uvx pdf-modifier-mcp -> stdio uvx pdf-modifier)`
 - [ ] Follow-up: the Claude MCP registration loop still lives in both setup twins (with their own HIVE-118 remove); the pinned 0.68.0 already registers from `dotf deploy`, so the twin is deletable in its own PR
 
+### PR 11 — doctor: Claude extensions (CLI-106 #2393)
+
+Converge registered Claude's MCP servers and plugins (PR 8) and replaced drifted ones (PR 10), but nothing reported a box where that had not happened: the Mac's stale pdf-modifier registration passed every doctor section.
+
+- [x] `checks_claude_extensions.go`: a `kindMachine` section that calls `claude.ApplyMCP` and `claude.ApplyPlugins` with `dryRun=true` through `doctor.Options.Claude`, wired from `cmd.claudeSyncer` (the seam `dotf deploy` and converge use). Skipped when unwired, outside a checkout (`cfg.RepoDir` empty, since the declarations live there) or without claude
+- [x] One WARN per server missing, server registered with other arguments (`was` and `declared` both shown), untouched registration (with its reason; converge leaves it), plugin missing, or retired marketplace still registered; every fixable one names `dotf converge --only agent-extensions`. A server whose prerequisite is not on PATH is an INFO, as converge skips it
+- [x] Read-only by test: the fake runner fails the test on any install, add, remove or marketplace change. Mutations caught: an apply instead of a dry run (MCP and plugins separately), dropping the untouched findings
+- [x] Cost: about a second per server (`claude mcp get` starts each); the snapshot guard around each call may write `.claude.json` back if a call shrank it, the only write the section can cause. The full `dotf doctor` took 19 s on the Mac
+- [x] Evidence on the Mac, from a dev build in `$TMPDIR`: `` [WARN] MCP server pdf-modifier is registered as stdio uvx pdf-modifier-mcp, declared as stdio uvx pdf-modifier (run `dotf converge --only agent-extensions`) ``; no other server or plugin reported
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

@@ -64,6 +64,7 @@ the scope for a fresh machine before its identity is restored, and for CI.`,
 				Verbose: verbose,
 				Quick:   quick,
 				Scope:   sc,
+				Claude:  claudeSyncer,
 			})
 			if err != nil {
 				cmd.PrintErrln("doctor:", err)
