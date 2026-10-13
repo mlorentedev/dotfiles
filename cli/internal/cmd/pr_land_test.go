@@ -287,3 +287,19 @@ func TestPrLand_UnknownWaitBoundsTheWaitOnAnUncomputedMergeState(t *testing.T) {
 		t.Errorf("slept %s, output:\n%s", slept, stdout)
 	}
 }
+
+// A merge that landed with an error from gh prints the error as a warning and
+// still reports [MERGED], exiting zero.
+func TestWriteLandResult_ALandedMergePrintsItsWarning(t *testing.T) {
+	var out bytes.Buffer
+	err := writeLandResult(&out, prland.Result{Number: 30, Merged: true, HeadSHA: "abc1234def",
+		Warnings: []string{"merged, but gh pr merge reported: branch deletion refused"}})
+	if err != nil {
+		t.Fatalf("a landed merge returned %v", err)
+	}
+	for _, want := range []string{"warning: #30 merged, but gh pr merge reported: branch deletion refused", "[MERGED] #30 at abc1234"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out.String())
+		}
+	}
+}

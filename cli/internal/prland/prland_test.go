@@ -595,3 +595,39 @@ func TestLand_AnyOtherChecksFailureWithNoOutputIsAnError(t *testing.T) {
 		t.Errorf("err = %v, want the gh failure without the version remedy", err)
 	}
 }
+
+// gh can fail after the merge landed: the head branch deletion is refused, or
+// the client times out. The PR then reads MERGED, so it is a landing with a
+// warning, and the dependents stay on the base, where they belong now.
+func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
+	run, calls := failingMergeGH(false)
+	attempted := false
+	landed := func(ctx context.Context, args ...string) ([]byte, error) {
+		line := strings.Join(args, " ")
+		if strings.HasPrefix(line, "pr merge") {
+			attempted = true
+		}
+		if attempted && strings.HasPrefix(line, "pr view") {
+			return []byte(strings.Replace(readyView, `"OPEN"`, `"MERGED"`, 1)), nil
+		}
+		return run(ctx, args...)
+	}
+
+	res, err := Land(context.Background(), Options{Run: landed, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatalf("a landed merge returned an error: %v", err)
+	}
+	if !res.Merged || len(res.Retargeted) != 1 || res.Retargeted[0] != 31 {
+		t.Errorf("result %+v, want merged with #31 retargeted", res)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "head branch was modified") {
+		t.Errorf("warnings %q, want gh's error", res.Warnings)
+	}
+	want := []string{
+		"pr edit 31 --base main",
+		"pr merge 30 --squash --delete-branch --match-head-commit abc123",
+	}
+	if strings.Join(*calls, "\n") != strings.Join(want, "\n") {
+		t.Errorf("calls:\n%s\nwant (no restore):\n%s", strings.Join(*calls, "\n"), strings.Join(want, "\n"))
+	}
+}

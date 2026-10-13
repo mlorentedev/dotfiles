@@ -143,3 +143,26 @@ func TestRepoName_UsesTheOneGivenElseAsksGH(t *testing.T) {
 		t.Error("an unresolvable repo was accepted: nothing to key the lock on")
 	}
 }
+
+// Right after a take-over the new holder has the lock but has not yet written
+// its PID, so the file still names the dead one. The refusal names that PID
+// rather than claiming none is recorded.
+func TestAcquireLock_ALockHeldOverADeadPIDNamesIt(t *testing.T) {
+	dir := t.TempDir()
+	release, err := AcquireLock(dir, "o/r", func(int) bool { return true }, new(bytes.Buffer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if err := os.WriteFile(filepath.Join(dir, lockName("o/r")+".pid"), []byte("4242\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = AcquireLock(dir, "o/r", func(int) bool { return false }, new(bytes.Buffer))
+	if !errors.Is(err, ErrLandRunning) {
+		t.Fatalf("error %v is not ErrLandRunning", err)
+	}
+	if !strings.Contains(err.Error(), "4242") || strings.Contains(err.Error(), "not recorded yet") {
+		t.Errorf("error %q does not name the stale PID 4242", err)
+	}
+}
