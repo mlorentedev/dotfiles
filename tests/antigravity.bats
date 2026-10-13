@@ -78,10 +78,6 @@ setup() {
     grep -q 'export ANTIGRAVITY_ENDPOINT="https://cloudcode-pa.googleapis.com"' "$DOTFILES_DIR/.zshrc"
 }
 
-@test "AGY_HOME uses absolute path" {
-    [[ "$AGY_HOME" == /* ]] || false
-}
-
 @test "agy settings.json deployed to AGY_HOME" {
     [ -f "$AGY_HOME/settings.json" ]
     [ ! -L "$AGY_HOME/settings.json" ]

@@ -266,7 +266,8 @@ env-contract.json names the directory `AGY_HOME`; `agy.Dirs`, doctor, `setup-lin
 - [x] A test asserts the default `Dirs` computes is the one env-contract.json declares for `AGY_HOME`, on every OS key the contract carries
 - [x] doctor reports `AGY_HOME is absolute`, and WARNs when `AGY_APP_DATA` is set to another directory, naming the one in use. Evidence on the Mac (dev build in `$TMPDIR`, `AGY_APP_DATA=/tmp/elsewhere`): `` [WARN] AGY_APP_DATA is set to /tmp/elsewhere but /Users/manu/.gemini/antigravity-cli is used: AGY_HOME is the name dotf reads; drop the old export ``
 - [x] `.zshrc` and `setup-linux.sh` stop exporting `AGY_APP_DATA`; `setup-windows.ps1` only had a local `$AgyAppData`, now `$AgyHome`, and never persisted the old name
-- [x] `tests/env-contract.bats` fails if an rc file or setup twin exports `AGY_APP_DATA` again; mutation (the `.zshrc` export restored) caught
+- [x] `tests/env-contract.bats` fails if any shell, PowerShell or rc file outside `cli/`, `docs/`, `specs/` and `tests/` names `AGY_APP_DATA` again, whatever the export form; mutations caught: the `.zshrc` export restored, a `typeset -x` in `.zsh/aliases.zsh`
+- [x] A relative value is reported under the variable that supplied it (`AGY_APP_DATA` when `AGY_HOME` is unset); the vacuous `antigravity.bats` absolute-path test, which asserted a value it set itself, is gone: the doctor unit test covers the property
 - [ ] Drop the `AGY_APP_DATA` fallback from `agy.Dirs` and the doctor WARN one release after this ships
 
 ## Closing

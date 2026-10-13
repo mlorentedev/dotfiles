@@ -36,6 +36,24 @@ func TestCheckAntigravity_AbsolutePathAccepted(t *testing.T) {
 	}
 }
 
+// A relative value is reported under the name that supplied it: with only the
+// old name set, sending the user to AGY_HOME would fix nothing.
+func TestCheckAntigravity_ARelativeValueNamesItsSource(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env  map[string]string
+		want string
+	}{
+		"contract": {map[string]string{"AGY_HOME": "rel"}, "AGY_HOME is relative or unset: rel"},
+		"legacy":   {map[string]string{"AGY_APP_DATA": "rel"}, "AGY_APP_DATA is relative or unset: rel"},
+	} {
+		var buf bytes.Buffer
+		checkAntigravity(newSys(tc.env, []string{"agy"}, nil), capture(&buf))
+		if !strings.Contains(buf.String(), tc.want) {
+			t.Errorf("%s: want %q in:\n%s", name, tc.want, buf.String())
+		}
+	}
+}
+
 // A machine still exporting the old name to another directory is told which
 // one dotf uses (#2395); the same value, or the old name alone, says nothing.
 func TestCheckAntigravity_ALegacyAppDataThatDisagreesIsWarned(t *testing.T) {
