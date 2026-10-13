@@ -1020,7 +1020,9 @@ _dotf=""
 if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
 if [ -n "$_dotf" ]; then
     for _rc in zshrc bashrc profile; do
-        "$_dotf" deploy "$_rc" || log_warning "dotf deploy $_rc failed -- see 'dotf doctor'"
+        # Fatal, like the single `dotf deploy zshrc` this loop replaces: setup
+        # must not report success with an rc file it could not write (#2013 W4).
+        "$_dotf" deploy "$_rc" || { log_error "dotf deploy $_rc failed -- see 'dotf doctor'"; exit 1; }
     done
 fi
 

@@ -10,7 +10,8 @@ setup() {
 }
 
 @test "setup-linux.sh deploys no file into \$HOME with deploy_file" {
-    run grep -nE 'deploy_file[[:space:]]+"\$DOTFILES_DIR/[^"]+"[[:space:]]+"\$HOME/' "$REPO/setup-linux.sh"
+    # Any source shape: a variable or unquoted source is still a second deployer.
+    run grep -nE 'deploy_file[[:space:]].*"?\$\{?HOME\}?/' "$REPO/setup-linux.sh"
     [ "$status" -eq 1 ] || false
 }
 
@@ -31,6 +32,9 @@ PY
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
-@test "setup re-deploys the rc files through dotf at its tail" {
-    grep -qE 'for _rc in zshrc bashrc profile; do' "$REPO/setup-linux.sh"
+@test "setup re-deploys the rc files through dotf at its tail, and a failure stops it" {
+    # The header alone survives an emptied body, so pin the call and its exit.
+    run grep -A4 -E 'for _rc in zshrc bashrc profile; do' "$REPO/setup-linux.sh"
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *'"$_dotf" deploy "$_rc" || {'*'exit 1; }'* ]] || { echo "$output"; false; }
 }
