@@ -9,6 +9,10 @@ setup() {
     export PS1_SCRIPT="$DOTFILES_DIR/setup-windows.ps1"
 }
 
+refute_legacy_mise_sync() {
+    refute_grep '^[[:space:]]*(&[[:space:]]*)?(dotf(\.exe)?|\$([[:alnum:]_]+:)?DotfBin)[[:space:]]+tools[[:space:]]+sync([[:space:];#]|$)' "$1"
+}
+
 @test "setup-windows.ps1 exists" {
     [[ -f "$PS1_SCRIPT" ]] || false
 }
@@ -291,6 +295,8 @@ setup() {
 # snapshot .claude.json before the call, restore if it shrinks >50% from a
 # baseline of >=10 KB. Complementary to SDD-021's session-start canary at
 # claude-session-start.ps1 (same 10240 threshold, same upstream issue).
+# The plugin installs left the script for `dotf deploy` (#2336), which keeps
+# the same guard in cli/internal/claude; the helper stays for the MCP calls.
 
 @test "setup-windows.ps1 defines Backup-AndRestoreClaudeJson helper (BUG-004)" {
     grep -q 'function Backup-AndRestoreClaudeJson' "$PS1_SCRIPT"
@@ -302,18 +308,6 @@ setup() {
 
 @test "setup-windows.ps1 uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
     grep -qF '10240' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 wraps claude plugin install with Backup-AndRestoreClaudeJson (BUG-004)" {
-    # Structural check: the helper invocation appears within 5 lines preceding
-    # the `claude plugin install` call in the foreach loop.
-    grep -B5 'claude plugin install' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
-}
-
-@test "setup-windows.ps1 still preserves the upstream idempotence guard (BUG-004)" {
-    # Defense in depth -- the wrapper does NOT replace the existing guard.
-    grep -qF 'installedPlugins -match' "$PS1_SCRIPT"
-    grep -qF 'claude plugin list' "$PS1_SCRIPT"
 }
 
 # --- BUG-011: extend the BUG-004 guard to every claude CLI call site ---
@@ -330,10 +324,6 @@ setup() {
 @test "setup-windows.ps1 wraps claude mcp get with Backup-AndRestoreClaudeJson (BUG-011)" {
     # Same scriptblock typically wraps both mcp get and mcp add inside one iteration.
     grep -B15 'claude mcp get' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
-}
-
-@test "setup-windows.ps1 wraps claude plugin list with Backup-AndRestoreClaudeJson (BUG-011)" {
-    grep -B5 'claude plugin list' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
 # --- MEM-002: retire claude-mem — plugin no longer installed on Windows ---
@@ -603,6 +593,20 @@ FIXTURE
     [ -n "$uv_line" ]
     [ -n "$catalog_line" ]
     [ "$uv_line" -lt "$catalog_line" ]
+}
+
+@test "Windows entrypoint owns tool convergence; legacy setup does not duplicate mise sync" {
+    grep -qF '& $script:DotfBin converge @args' "$DOTFILES_DIR/install.ps1"
+    refute_legacy_mise_sync "$PS1_SCRIPT"
+}
+
+@test "Windows legacy sync guard rejects every supported dotf invocation" {
+    local fixture="$BATS_TEST_TMPDIR/legacy-sync.ps1" line
+    for line in 'dotf tools sync' 'dotf.exe tools sync' '& $script:DotfBin tools sync' '& dotf tools sync'; do
+        printf '%s\n' "$line" > "$fixture"
+        run refute_legacy_mise_sync "$fixture"
+        [ "$status" -eq 1 ] || { echo "guard missed: $line"; false; }
+    done
 }
 
 # --- Cross-platform parity: developer tools ---

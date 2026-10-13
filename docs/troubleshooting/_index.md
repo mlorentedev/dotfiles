@@ -9,4 +9,5 @@ Diagnostic and recovery guides for common environment, tooling, and agent errors
 | [opencode.md](opencode.md) | OpenCode | Diagnosing OpenCode TUI, model switching, and provider timeouts |
 | [copilot-cli-v1-vs-v2-detection.md](copilot-cli-v1-vs-v2-detection.md) | Copilot | Copilot CLI v1 extension vs v2 standalone detection and config |
 | [ai-tools.md](ai-tools.md) | Multi-agent | General agent tooling, environment variables and PATH fixes |
+| [windows-mise-direnv.md](windows-mise-direnv.md) | Windows / mise | direnv release binary missing its executable suffix |
 | [secrets.md](secrets.md) | Secrets | Resolving missing age keys and secrets decryption errors |

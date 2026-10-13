@@ -1,0 +1,40 @@
+# The from-zero job's known doctor failures (#2013 X1): findings on a fresh
+# runner that the epic already owns. One entry per line, "<darwin|linux> <text>",
+# where <text> is a fixed substring of the [FAIL] line. Each entry is preceded by
+# a comment naming its owner and by an "# example:" line quoting the [FAIL] line
+# it was written for; tests/from-zero-doctor-gate.bats asserts the text is in its
+# example. The gate fails on a [FAIL] no entry matches AND on an entry no [FAIL]
+# matches, so an entry leaves when its owner's fix lands: the list only shrinks.
+# A new defect never goes here without an owner on the #2013 ledger.
+
+# owner: PLAT-001c tasks.md, kubectl as a `# mise: cli` pin (waits on the release whose version probe reads it)
+# example: [FAIL] kubectl not in PATH
+darwin kubectl not in PATH
+
+# owner: #2013 S2 (hive supervision: launchd on macOS, `hive service install` on Linux)
+# example: [FAIL] the hive daemon is down, so the hive MCP server fails in every agent (`hive client` never starts a server of its own). macOS has no hive supervisor yet: start `hive serve` by hand, then confirm with `hive service status`.
+darwin the hive daemon is down
+# example: [FAIL] the hive daemon is down, so the hive MCP server fails in every agent (`hive client` never starts a server of its own). Fix: `hive service install`, or `systemctl --user restart hive.service`, then confirm with `hive service status`.
+linux the hive daemon is down
+
+# owner: #2013 P7 (= #1843 B2, home dotfiles as deploy entries)
+# example: [FAIL] .profile missing at /Users/runner/.profile (run setup-linux.sh)
+darwin .profile missing at
+# example: [FAIL] .inputrc missing at /Users/runner/.inputrc (run setup-linux.sh)
+darwin .inputrc missing at
+
+# owner: #2013 T3 (versions via `mise ls --json`; the ~/Applications and *_HOME checks replaced)
+# example: [FAIL] Java expected version 21.0.4 but directory missing: /home/runner/Applications/jdk-21.0.4
+linux Java expected version
+# example: [FAIL] Maven expected version 3.9.4 but directory missing: /home/runner/Applications/apache-maven-3.9.4
+linux Maven expected version
+# example: [FAIL] Minikube expected version 1.34.0 but directory missing: /home/runner/Applications/minikube-1.34.0
+linux Minikube expected version
+# example: [FAIL] Go expected version 1.26.0 but directory missing: /home/runner/Applications/go-1.26.0
+linux Go expected version
+# example: [FAIL] MAVEN_HOME is not set
+linux MAVEN_HOME is not set
+# example: [FAIL] GO_HOME is not set
+linux GO_HOME is not set
+# example: [FAIL] MINIKUBE_HOME is not set
+linux MINIKUBE_HOME is not set

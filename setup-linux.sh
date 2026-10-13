@@ -898,42 +898,8 @@ if command -v systemctl >/dev/null 2>&1; then
     esac
 fi
 
-# Claude Code plugins (requires claude CLI).
-# Idempotent: cache the installed-plugins list ONCE before the loop and skip
-# entries already present. The wrapper above (BUG-004/011) catches the
-# false-negative case where the idempotence guard misses a plugin and the
-# resulting `claude plugin install` call truncates .claude.json. BUG-011: the
-# pre-loop `claude plugin list` is now also wrapped because it goes through the
-# same #59870 path.
-if command -v claude >/dev/null 2>&1; then
-    log_info "Installing Claude Code plugins..."
-    # BUG-011: wrap the read-only `claude plugin list` pre-fetch with the
-    # snapshot guard -- the CLI still rewrites .claude.json on any invocation.
-    _snap=$(snapshot_claude_json)
-    installed_plugins=$(claude plugin list 2>/dev/null || true)
-    restore_claude_json_if_truncated "$_snap"
-    plugins_added=0
-    plugins_skipped=0
-    for plugin in \
-        "gopls-lsp@claude-plugins-official" \
-        "security-guidance@claude-plugins-official" \
-        "frontend-design@claude-plugins-official"; do
-        if printf '%s' "$installed_plugins" | grep -qF "$plugin"; then
-            plugins_skipped=$((plugins_skipped + 1))
-        else
-            # BUG-004: wrap the install with snapshot/restore so the upstream
-            # truncation bug (#59870) cannot drop subscription state.
-            _snap=$(snapshot_claude_json)
-            if claude plugin install "$plugin" >/dev/null 2>&1; then
-                plugins_added=$((plugins_added + 1))
-            fi
-            restore_claude_json_if_truncated "$_snap"
-        fi
-    done
-    log_success "Claude Code plugins ready ($plugins_added added, $plugins_skipped already present)"
-else
-    log_warning "Claude Code CLI not found, skipping plugin installation"
-fi
+# Claude Code plugins are installed by the bare `dotf deploy` above, from
+# ai/claude/plugins.json: it counts each failure and names its cause (#2336).
 
 # ~/.claude/settings.json is the `claude-settings` entry of ai/deploy.json, merged
 # by the `dotf deploy` above (CLI-063, #2000). Its per-key policy and the no-trailer

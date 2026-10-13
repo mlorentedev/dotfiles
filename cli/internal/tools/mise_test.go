@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -56,6 +57,40 @@ func TestRenderMiseConfig_IsSortedPinnedAndNamesItsSource(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered config lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestRenderMiseConfig_WindowsBatsUsesRunnableNpmBackend(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the Windows backend is exercised on the Windows runner")
+	}
+	out := string(RenderMiseConfig([]MiseTool{{"bats", "1.13.0"}, {"jq", "1.8.2"}}, ""))
+	for _, want := range []string{`"npm:bats" = "1.13.0"`, `jq = "1.8.2"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Windows mise config lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "npm.package_manager") || strings.Contains(out, "[settings.npm]") {
+		t.Errorf("bats must not change the package manager of unrelated npm tools:\n%s", out)
+	}
+	if strings.Contains(out, "\nbats = ") {
+		t.Errorf("the aqua bats recipe excludes Windows:\n%s", out)
+	}
+}
+
+func TestRenderMiseConfig_WindowsDirenvNamesTheReleaseBinaryAsExe(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the Windows direnv release lacks an .exe suffix")
+	}
+	out := string(RenderMiseConfig([]MiseTool{{"direnv", "2.37.1"}, {"jq", "1.8.2"}}, ""))
+	if !strings.Contains(out, `"github:direnv/direnv" = { version = "2.37.1", bin = "direnv.exe" }`) {
+		t.Errorf("Windows mise config does not name the runnable direnv binary:\n%s", out)
+	}
+	if !strings.Contains(out, `jq = "1.8.2"`) {
+		t.Errorf("unrelated pins must use the registry:\n%s", out)
+	}
+	if strings.Contains(out, "\ndirenv = ") {
+		t.Errorf("the aqua recipe installs direnv without .exe on Windows:\n%s", out)
 	}
 }
 
@@ -154,6 +189,157 @@ func TestSync_RendersInstallsProbesAndIsIdempotent(t *testing.T) {
 	}
 	if again.ConfigChanged || len(again.Missing) != 0 || f.installs != 1 {
 		t.Errorf("second run: want nothing to do and no second install, got %+v after %d installs", again, f.installs)
+	}
+}
+
+func TestSync_WindowsBatsRequiresARunnableCmdShim(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows has a distinct launcher for Bash scripts")
+	}
+	for _, tc := range []struct {
+		name    string
+		cmdShim bool
+		missing bool
+	}{
+		{"npm generated launcher", true, false},
+		{"aube package without launcher", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := func(name string, args ...string) ([]byte, error) {
+				switch {
+				case name == "mise" && len(args) == 2 && args[0] == "which" && args[1] == "bats":
+					return []byte(`C:\mise\bats`), nil
+				case name == "mise" && len(args) == 2 && args[0] == "which" && args[1] == "bats.cmd" && tc.cmdShim:
+					return []byte(`C:\mise\bats.cmd`), nil
+				case name == `C:\mise\bats.cmd` && len(args) == 1 && args[0] == "--version":
+					return []byte("Bats 1.13.0"), nil
+				}
+				return nil, errors.New("unavailable on Windows")
+			}
+			plan, err := (MiseSync{ConfigDir: t.TempDir(), Run: run}).Plan([]MiseTool{{"bats", "1.13.0"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := len(plan.Missing) == 1; got != tc.missing {
+				t.Errorf("missing bats = %v, want %v; plan: %+v", got, tc.missing, plan)
+			}
+		})
+	}
+}
+
+func TestSync_WindowsInstallsBatsWithNodeBeforeTheRest(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows bats requires npm to create a .cmd launcher")
+	}
+	pins := []MiseTool{{"node", "24.11.1"}, {"bats", "1.13.0"}, {"jq", "1.8.2"}}
+	installed := map[string]bool{}
+	var calls []string
+	run := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" {
+			switch {
+			case len(args) == 2 && args[0] == "which":
+				key := strings.TrimSuffix(args[1], ".cmd")
+				if installed[key] {
+					return []byte(key), nil
+				}
+				return nil, errors.New("not installed")
+			case len(args) >= 1 && args[0] == "install":
+				calls = append(calls, strings.Join(args, " "))
+				if len(args) == 2 && args[1] == "node" {
+					installed["node"] = true
+				} else if len(args) == 3 && args[1] == "--force" && args[2] == "npm:bats" {
+					if !installed["node"] {
+						return nil, errors.New("bats installed before node")
+					}
+					installed["bats"] = true
+				} else if len(args) == 1 {
+					installed["jq"] = true
+				} else {
+					return nil, errors.New("unexpected install order")
+				}
+				return nil, nil
+			}
+		}
+		if installed[name] && len(args) == 1 && args[0] == "--version" {
+			for _, pin := range pins {
+				if pin.Name == name {
+					return []byte(pin.Version), nil
+				}
+			}
+		}
+		return nil, errors.New("unexpected command")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: run}
+	if _, err := s.Apply(pins); err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.Apply(pins)
+	if err != nil || second.Pending() {
+		t.Fatalf("second sync: %+v, %v", second, err)
+	}
+	if got := strings.Join(calls, ", "); got != "install node, install --force npm:bats, install" {
+		t.Errorf("install sequence = %q, want scoped bats before the other pins", got)
+	}
+}
+
+func TestSync_WindowsRepairsAnAubeBatsWithoutLauncher(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("mise's aube reports bats installed but creates no Windows launcher")
+	}
+	tools := []MiseTool{{"bats", "1.13.0"}, {"node", "24.11.1"}}
+	reinstalled := false
+	run := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && len(args) == 2 && args[0] == "which" && args[1] == "node":
+			return []byte("node.exe"), nil
+		case name == "mise" && len(args) == 2 && args[0] == "which" && args[1] == "bats.cmd" && reinstalled:
+			return []byte("bats.cmd"), nil
+		case name == "mise" && len(args) == 2 && args[0] == "install" && args[1] == "node":
+			return nil, nil
+		case name == "mise" && len(args) == 3 && args[0] == "install" && args[1] == "--force" && args[2] == "npm:bats":
+			reinstalled = true
+			return nil, nil
+		case name == "mise" && len(args) == 1 && args[0] == "install":
+			return nil, nil
+		case name == "node.exe" && len(args) == 1 && args[0] == "--version":
+			return []byte("v24.11.1"), nil
+		case name == "bats.cmd" && len(args) == 1 && args[0] == "--version":
+			return []byte("Bats 1.13.0"), nil
+		}
+		return nil, errors.New("not found")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: run}
+	if _, err := s.Apply(tools); err != nil || !reinstalled {
+		t.Errorf("broken bats should be replaced by npm: reinstalled=%v, err=%v", reinstalled, err)
+	}
+}
+
+func TestSync_WindowsRefusesBatsWithoutPinnedNode(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the Windows npm installer needs mise's Node from zero")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: func(string, ...string) ([]byte, error) {
+		return nil, errors.New("not installed")
+	}}
+	if _, err := s.Apply([]MiseTool{{"bats", "1.13.0"}}); err == nil || !strings.Contains(err.Error(), "node") {
+		t.Fatalf("want missing Node pin named, got %v", err)
+	}
+	if _, err := os.Stat(s.ConfigPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a refused sync must not write an unfulfillable config: %v", err)
+	}
+}
+
+func TestHomeRunners_WindowsScopesNpmToBatsInstall(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows bats needs npm, other mise npm tools keep their installer")
+	}
+	if got := miseInstallEnv("mise", "install", "--force", "npm:bats"); got != "MISE_NPM_PACKAGE_MANAGER=npm" {
+		t.Errorf("bats install env = %q", got)
+	}
+	for _, args := range [][]string{{"mise", "install"}, {"mise", "install", "node"}, {"mise", "which", "bats.cmd"}, {"mise", "install", "npm:prettier"}} {
+		if got := miseInstallEnv(args[0], args[1:]...); got != "" {
+			t.Errorf("%v unexpectedly changes the npm installer: %q", args, got)
+		}
 	}
 }
 
@@ -420,6 +606,45 @@ func TestSync_FailsWhenThePackageStillDoesNotImport(t *testing.T) {
 	f.pipNoop = true
 	if _, err := s.Apply(tools); err == nil || !strings.Contains(err.Error(), "not importable") || !strings.Contains(err.Error(), "pyyaml") {
 		t.Fatalf("want a post-condition error naming pyyaml, got %v", err)
+	}
+}
+
+func TestHomeRunners_WindowsFindsGitBashForBatsWithoutShellPathWiring(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Git Bash is the Windows bats runtime")
+	}
+	root := t.TempDir()
+	gitCmd := filepath.Join(root, "cmd", "git.cmd")
+	bash := filepath.Join(root, "bin", "bash.exe")
+	for _, dir := range []string{filepath.Dir(gitCmd), filepath.Dir(bash)} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	if err := os.WriteFile(gitCmd, []byte("@echo "+execPath+"\r\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bash, []byte("test fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", filepath.Dir(gitCmd)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	run, _ := HomeRunners(t.TempDir())
+	out, err := run("where", "bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]
+	found, err := os.Stat(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.Stat(bash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(found, want) {
+		t.Errorf("first bash on the sync runner's PATH = %q, want %q", got, bash)
 	}
 }
 

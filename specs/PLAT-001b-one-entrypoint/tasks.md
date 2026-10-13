@@ -136,7 +136,12 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 
 ### PR 6 — from-zero proof (#2013 X1)
 
-- [ ] [AC9] CI job on clean `macos-latest` and `ubuntu-latest`: `install.sh`, `dotf doctor`, then a second `dotf converge` that reports zero native changes. It asserts the first run converged before it checks idempotence (lesson 328). Runs on pull requests to `main` and on push to `main`, so the default branch carries a run the verification can read; non-required until green
+- [ ] [AC9] CI job on clean `macos-latest` and `ubuntu-latest`: `install.sh`, `dotf doctor --scope machine` (D10: a runner has no identity), then a second `dotf converge` that reports zero native changes. It asserts the first run converged before it checks idempotence (lesson 328). Runs on pull requests to `main` and on push to `main`, so the default branch carries a run the verification can read; non-required until green
+- [x] `.github/workflows/from-zero.yml`: the job above, the PR's source build on PATH (install.sh keeps a `dev` build), `DOTFILES_REPO_DIR` at the workspace, `GITHUB_TOKEN` for mise's downloads; the owner's trigger (install path on PRs, every push to main, 2026-10-10)
+- [ ] Gap, deliberate: the job never exercises install.sh's clone-when-absent path (the workspace is the checkout) nor its release download (covered by the file:// fixture in `tests/install.bats`)
+- [ ] After #2013 P5c PR2 (the agents under `# mise: latest`): X1 asserts `claude`, `pi` and `agy` resolve on PATH after the first converge, on both runners
+- [x] Each red cause of the first runs becomes a row on the #2013 ledger, or is fixed here when it is the job's own. Run 38115559203, classified on #2013: kubectl on darwin (PLAT-001c's `# mise: cli` pin), the hive daemon (S2), `.profile`/`.inputrc` on darwin (P7), `~/Applications` and `*_HOME` on linux (T3); the dispatcher became the git-hooks step (#2340), the plugin miscount BUG-121 (#2336), test-windows' fabricated identity the X4 row
+- [x] Doctor gate (owner, 2026-10-11: a ratchet of known failures): `.github/scripts/from-zero-doctor-gate.sh` fails on a [FAIL] that `from-zero-known-failures.txt` does not list for the OS, on a listed entry no [FAIL] matches (stale: the list only shrinks), and on a non-zero doctor with no [FAIL] line. Each entry names its #2013 owner above an `# example:` line; `tests/from-zero-doctor-gate.bats` covers the verdicts under bash and zsh and checks every entry against its example. Replayed on run 38115559203: 4 known on darwin, 8 on linux, 0 new, 0 stale; dropping an entry or a FAIL turns it red
 - [x] Runbook `docs/runbooks/guide-new-machine.md`: the one-liner per OS, what `--plan` shows, how to read the report, what `skipped` on darwin means; it also orders the identity restore (#2013 D10)
 
 ### PR 6a — doctor scopes its checks: machine or identity (#2013 D10)
@@ -167,6 +172,15 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] `internal/identity`, a leaf package: the chain, the plan, the guide, and the Restore texts doctor's SKIP lines cite (moved from doctor); `dotf identity restore [--plan]`; converge's epilogue
 - [x] Runbook, ADR-045 D12 and `cli/README.md` say what the walk runs, and why `gh auth login` is in the chain
 - [x] Lesson 398: under `curl | bash` stdin is the script, so the walk reads the person from `/dev/tty` and hands that terminal to `bw` and `gh`
+
+### PR 6d — plugin failures counted and named (#2013 X1 finding, BUG-121 #2336)
+
+- [x] Failing test: every declared id lands in exactly one of Present, Added and Failed, and a failed install keeps the CLI's error (`TestSyncAccountsForEveryIDAndKeepsTheCause`)
+- [x] Failing test: a failed install puts `1 added, 1 failed, 0 already present` under a `failed` state and names the plugin with its cause (`TestDeployCmd_AFailedPluginInstallIsNamedAndFailsTheRun`)
+- [x] `PluginReport.Causes`, filled by `Syncer.Sync`; `reportCounts` counts failures for both claude steps, so the MCP summary gains the count too
+- [x] Delete the plugin loops of `setup-linux.sh` and `setup-windows.ps1` (one twin pair): both already run the bare `dotf deploy`, which installs `ai/claude/plugins.json`
+- [x] Guard: `tests/claude-plugins.bats` fails when either script runs `claude plugin install|list` outside a comment or quotes a declared id; the BUG-004/011 structure tests that read the deleted loops are retired, and the zero-usage list guard reads `plugins.json`
+- [ ] After merge: the next X1 run names why the installs fail on a fresh runner; record the cause on #2013
 
 ## Closing
 
