@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.69.0](https://github.com/mlorentedev/dotfiles/compare/v0.68.0...v0.69.0) (2026-10-13)
+
+
+### Features
+
+* **converge:** register Claude Code's MCP servers and plugins on every OS ([#2394](https://github.com/mlorentedev/dotfiles/issues/2394)) ([68f4bc2](https://github.com/mlorentedev/dotfiles/commit/68f4bc27689ae51797162d9af58c9593bd44d6ee))
+* **converge:** write agy's MCP configs from dotf, not the setup twins ([#2396](https://github.com/mlorentedev/dotfiles/issues/2396)) ([3e83a63](https://github.com/mlorentedev/dotfiles/commit/3e83a635bd17c627ab17c0ebd6ce63f300e8cb76))
+* **deploy:** deploy .bashrc, .profile and .inputrc through dotf deploy on linux and darwin ([#2377](https://github.com/mlorentedev/dotfiles/issues/2377)) ([ff5b01a](https://github.com/mlorentedev/dotfiles/commit/ff5b01a2111b1e3e9742af8fb97056da81294f33))
+* **deploy:** merge herdr's config.toml on every OS ([#2417](https://github.com/mlorentedev/dotfiles/issues/2417)) ([1df4383](https://github.com/mlorentedev/dotfiles/commit/1df4383ca42dbed8e6ede78e4c43d5485e8749d9))
+* **doctor:** report Claude MCP servers and plugins that differ from the declarations ([#2400](https://github.com/mlorentedev/dotfiles/issues/2400)) ([127d71c](https://github.com/mlorentedev/dotfiles/commit/127d71cc4ad1d68d5ba5803a4c84c2e6f167c0e2)), closes [#2393](https://github.com/mlorentedev/dotfiles/issues/2393)
+* **shell:** put mise's shims first for shells that read no interactive rc ([#2416](https://github.com/mlorentedev/dotfiles/issues/2416)) ([11422d8](https://github.com/mlorentedev/dotfiles/commit/11422d85ce75fd5b3481fd25972a8c77d8e01088))
+* **ssh:** load the key into the agent and collapse the Linux target runbook ([#2386](https://github.com/mlorentedev/dotfiles/issues/2386)) ([6f4261f](https://github.com/mlorentedev/dotfiles/commit/6f4261f7bd464dea94e08463f63f7a9c6f8f4a98))
+* **sshtarget:** converge the Linux firewall to port 22 on the mesh only ([#2422](https://github.com/mlorentedev/dotfiles/issues/2422)) ([e6d9ca9](https://github.com/mlorentedev/dotfiles/commit/e6d9ca9a7972f8b4de5503d2f712aee78229aa55))
+* **tools:** install Claude Code and agy through mise at their latest release ([#2392](https://github.com/mlorentedev/dotfiles/issues/2392)) ([4fe9898](https://github.com/mlorentedev/dotfiles/commit/4fe9898f2c6328f45165d90ddf6720d2d15b4323))
+* **tools:** install herdr through the mise backend that verifies its attestations ([#2418](https://github.com/mlorentedev/dotfiles/issues/2418)) ([6bf414d](https://github.com/mlorentedev/dotfiles/commit/6bf414d86d7881440f8716fa5cb059db85034ff6))
+* **tools:** pin kubectl, helm and the kubelab CLIs through mise ([#2419](https://github.com/mlorentedev/dotfiles/issues/2419)) ([086be9e](https://github.com/mlorentedev/dotfiles/commit/086be9e70d9587148ad795a91cb30d2d9e63c242))
+
+
+### Bug Fixes
+
+* **agy:** read the contract's AGY_HOME for agy's app-data dir ([#2401](https://github.com/mlorentedev/dotfiles/issues/2401)) ([e22c868](https://github.com/mlorentedev/dotfiles/commit/e22c868ce07ab3e977595c9c5c58f22bd2dd9f56))
+* **claude:** re-register an MCP server whose registered arguments drifted from the SSOT ([#2398](https://github.com/mlorentedev/dotfiles/issues/2398)) ([021cd63](https://github.com/mlorentedev/dotfiles/commit/021cd632f1b21ee66f8afcc7fc3b75dc06a31c06))
+* **claude:** register a declared plugin marketplace a fresh Claude Code lacks ([#2383](https://github.com/mlorentedev/dotfiles/issues/2383)) ([954526a](https://github.com/mlorentedev/dotfiles/commit/954526a75c8d4ded9b2268955562c081ea166dbb))
+* **doctor:** remove the Claude permission rules a merge deploy keeps ([#2405](https://github.com/mlorentedev/dotfiles/issues/2405)) ([d35802c](https://github.com/mlorentedev/dotfiles/commit/d35802cf100fa6bc43bfaec517e39e477bb28aa1))
+* **knowledge-gate:** strip fences and comments in one pass, as GitHub does ([#2406](https://github.com/mlorentedev/dotfiles/issues/2406)) ([d59dcec](https://github.com/mlorentedev/dotfiles/commit/d59dcecfbe08504d55cec021e075b71493d2be4c))
+* **pr:** report a landed merge as merged, name a stale lock PID, find the registry from any directory ([#2413](https://github.com/mlorentedev/dotfiles/issues/2413)) ([26538f6](https://github.com/mlorentedev/dotfiles/commit/26538f68a0648000c64f40b4faa7b4b5eff3dfc9))
+* **setup:** stop when dotf cannot be installed, deploy fails or skills do not deploy ([#2391](https://github.com/mlorentedev/dotfiles/issues/2391)) ([33f2053](https://github.com/mlorentedev/dotfiles/commit/33f20535216fd9cda53176d5de724bc48ae6d318))
+* **tools:** name the copies on PATH when a package-manager install is shadowed ([#2415](https://github.com/mlorentedev/dotfiles/issues/2415)) ([9a9f66a](https://github.com/mlorentedev/dotfiles/commit/9a9f66aa98bbfe80632ec796f32d1770ff0acee2))
+
 ## [0.68.0](https://github.com/mlorentedev/dotfiles/compare/v0.67.0...v0.68.0) (2026-10-13)
 
 
