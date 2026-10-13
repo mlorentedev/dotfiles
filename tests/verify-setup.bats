@@ -443,7 +443,10 @@ setup() {
     [ -f "$cfg" ] || { echo "not deployed: $cfg"; false; }
     run env HERDR_CONFIG_PATH="$cfg" herdr config check
     [ "$status" -eq 0 ] || { echo "$output"; false; }
-    grep -qx 'prefix = "ctrl+s"' "$cfg"
+    # dotf writes the merged file with go-toml, which quotes 'ctrl+s' as a
+    # literal string, so match the value, not one spelling of it.
+    grep -Eq "^[[:space:]]*prefix[[:space:]]*=[[:space:]]*[\"']ctrl\+s[\"'][[:space:]]*$" "$cfg" ||
+        { echo "prefix is not ctrl+s in $cfg:"; grep -n prefix "$cfg"; false; }
 }
 
 @test "every CLI versions.conf marks for mise is installed through mise at its pin (#2013 T2)" {

@@ -23,13 +23,13 @@ setup() {
     { cat "$SRC"; printf '\n[ui]\nno_such_key = 1\n'; } > "$bad"
     run env HERDR_CONFIG_PATH="$bad" herdr config check
     [ "$status" -ne 0 ] || false
-    [[ "$output" == *"no_such_key"* ]]
+    [[ "$output" == *"no_such_key"* ]] || false
 }
 
 @test "the prefix is not tmux's ctrl+b (D6)" {
     run grep -E '^prefix[[:space:]]*=' "$SRC"
     [ "$status" -eq 0 ] || false
-    [[ "$output" != *'"ctrl+b"'* ]]
+    [[ "$output" != *'"ctrl+b"'* ]] || false
 }
 
 @test "HERDR_CONFIG_DIR defaults to the directory herdr reads on each OS" {
