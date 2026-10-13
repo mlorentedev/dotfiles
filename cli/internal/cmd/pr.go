@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +55,7 @@ computed must not read as an empty one. The message says which.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			reg, err := prtriage.LoadRegistry(registry)
+			reg, err := prtriage.LoadRegistry(reviewerRegistryPath(c, registry))
 			if err != nil {
 				c.PrintErrln("pr triage-queue:", err)
 				return err
@@ -82,8 +83,29 @@ computed must not read as an empty one. The message says which.`,
 		},
 	}
 	cmd.Flags().StringVar(&repo, "repo", "", "owner/name (default: the current repository)")
-	cmd.Flags().StringVar(&registry, "registry",
-		filepath.Join("harness", "review-attestation.json"),
-		"path to the reviewer registry")
+	addReviewerRegistryFlag(cmd, &registry)
 	return cmd
+}
+
+// addReviewerRegistryFlag declares --registry, shared by every pr command that
+// reads the reviewer registry. Read it through reviewerRegistryPath.
+func addReviewerRegistryFlag(cmd *cobra.Command, registry *string) {
+	cmd.Flags().StringVar(registry, "registry", filepath.Join("harness", "review-attestation.json"),
+		"path to the reviewer registry (default: under the root of the current checkout; "+
+			"for a --repo other than this checkout's, pass that repository's registry)")
+}
+
+// reviewerRegistryPath resolves --registry. A path given on the command line
+// is used as given; the default is the current checkout's, found from any
+// directory in it. Outside a checkout the default stays relative, and reading
+// it fails with the path named.
+func reviewerRegistryPath(c *cobra.Command, registry string) string {
+	if c.Flags().Changed("registry") {
+		return registry
+	}
+	root, err := worktree.ResolveWorktreeRoot(".")
+	if err != nil {
+		return registry
+	}
+	return filepath.Join(root, registry)
 }

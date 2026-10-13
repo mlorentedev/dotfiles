@@ -109,7 +109,7 @@ with a note.`,
 			if err != nil {
 				return err
 			}
-			o := prLandOptions(repo, registry)
+			o := prLandOptions(repo, reviewerRegistryPath(c, registry))
 			o.Wait, o.UpdateBranch, o.UnknownWait = wait, update, unknownWait
 			release, err := lockLand(c, o)
 			if err != nil {
@@ -129,7 +129,7 @@ with a note.`,
 		},
 	}
 	cmd.Flags().StringVar(&repo, "repo", "", "owner/name (default: the current repository)")
-	cmd.Flags().StringVar(&registry, "registry", filepath.Join("harness", "review-attestation.json"), "path to the reviewer registry")
+	addReviewerRegistryFlag(cmd, &registry)
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the checks before reading them")
 	cmd.Flags().DurationVar(&unknownWait, "unknown-wait", prland.DefaultUnknownWait, "with --wait, how long to wait for GitHub to compute the merge state of a PR whose checks are all green")
 	cmd.Flags().BoolVar(&update, "update-branch", false, "when BEHIND is the only failing condition, merge the base in, wait for CI and decide again")
@@ -234,6 +234,9 @@ func writeLandResult(w io.Writer, res prland.Result) error {
 	}
 	for _, d := range res.Retargeted {
 		_, _ = fmt.Fprintf(w, "retargeted #%d before the merge deleted its base branch\n", d)
+	}
+	for _, warning := range res.Warnings {
+		_, _ = fmt.Fprintf(w, "warning: #%d %s\n", number, warning)
 	}
 	_, _ = fmt.Fprintf(w, "[MERGED] #%d at %.7s\n", number, res.HeadSHA)
 	return nil

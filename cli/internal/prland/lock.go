@@ -56,10 +56,13 @@ func AcquireLock(dir, repo string, alive func(pid int) bool, note io.Writer) (fu
 	if errors.Is(err, filelock.ErrLocked) {
 		// A recorded PID that is gone is the previous holder's: the new holder
 		// has not written its own yet.
-		if pid := readPID(pidPath); pid > 0 && alive(pid) {
+		switch pid := readPID(pidPath); {
+		case pid > 0 && alive(pid):
 			return nil, fmt.Errorf("%w for %s: PID %d holds the lock; wait for it to finish", ErrLandRunning, repo, pid)
+		case pid > 0:
+			return nil, fmt.Errorf("%w for %s: the recorded PID %d is not running, so the holder that took it over has not recorded its own yet; wait for it to finish", ErrLandRunning, repo, pid)
 		}
-		return nil, fmt.Errorf("%w for %s: its PID is not recorded yet; wait for it to finish", ErrLandRunning, repo)
+		return nil, fmt.Errorf("%w for %s: its PID is not recorded yet or cannot be read; wait for it to finish", ErrLandRunning, repo)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("lock %s: %w", base+".lock", err)

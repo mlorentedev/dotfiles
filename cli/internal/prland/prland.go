@@ -114,6 +114,7 @@ type Result struct {
 	HeadSHA    string
 	Reasons    []string // why it did not merge
 	Retargeted []int    // dependents pointed at the base before the merge
+	Warnings   []string // what went wrong after the merge landed
 }
 
 // Land merges the PR when Decide finds no reason against it and the head did
@@ -248,7 +249,14 @@ func merge(gh ghFunc, n string, f Facts, res Result) (Result, error) {
 	// moved, the base moved, a permission) puts the dependents back on the
 	// head branch, so a refused landing leaves the stack as it found it.
 	if _, err := gh("pr", "merge", n, "--squash", "--delete-branch", "--match-head-commit", f.HeadSHA); err != nil {
-		return res, errors.Join(fmt.Errorf("gh pr merge: %w", err), restoreDependents(gh, moved, f.HeadRef))
+		// gh also fails after the merge landed: the head branch deletion is
+		// refused, or the client times out. A PR that reads MERGED landed, and
+		// its dependents belong on the base, so it is a warning, not a restore.
+		after, verr := readView(gh, n)
+		if verr != nil || after.State != "MERGED" {
+			return res, errors.Join(fmt.Errorf("gh pr merge: %w", err), restoreDependents(gh, moved, f.HeadRef))
+		}
+		res.Warnings = append(res.Warnings, fmt.Sprintf("merged, but gh pr merge reported: %v", err))
 	}
 	res.Retargeted, res.Merged = moved, true
 	return res, nil
