@@ -2,7 +2,7 @@
   {
     "id": "AI-045-nan-catalog-alignment-f1",
     "behavior": "AC1: no live binding names mimo-v2.5, and the pool, chain, pi and opencode name mimo-v2.6-flash",
-    "verification": "grep -n -E '(openai/|nan/|\"|: *)mimo-v2\\.5([^0-9.]|$)' .pr_agent.toml .github/workflows/pr-agent.yml harness/model-map.json harness/reviewer-pool.json harness/nan-quotas.json ai/pi/settings.json ai/opencode/opencode.jsonc; [ $? -eq 1 ] && bats tests/reviewer-pool.bats tests/opencode.bats",
+    "verification": "grep -n -E \"(openai/|nan/|[\\\"']|[:=] *)mimo-v2\\.5([^0-9.]|\\$)\" .pr_agent.toml .github/workflows/pr-agent.yml harness/model-map.json harness/reviewer-pool.json harness/nan-quotas.json ai/pi/settings.json ai/opencode/opencode.jsonc; [ $? -eq 1 ] && bats tests/reviewer-pool.bats tests/opencode.bats",
     "state": "pending",
     "evidence": ""
   },
