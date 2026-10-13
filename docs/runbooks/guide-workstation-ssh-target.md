@@ -4,7 +4,7 @@ type: runbook
 status: active
 tags: [runbook, ssh, tailscale, workstations, security, power-management]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-13"
 owner: manu
 ---
 
@@ -12,21 +12,23 @@ owner: manu
 
 This runbook turns a workstation (`macmini`, `msi`, or a Windows host) into a
 remote development target that is reachable over SSH **through the Headscale
-mesh and nowhere else**. The client side (`ssh/config`) is already converged by
-`dotf`. The server side in sections 2 to 4 is applied by hand **for now**.
+mesh and nowhere else**. The client side (`ssh/config`) is converged by `dotf`.
+On Linux and macOS, `dotf converge --only workstation-target` applies the sshd
+half of section 2, and on Linux the lid policy of section 4.
 
-> **Interim procedure.** Sections 2 to 4 are replaced by one
-> `dotf converge --only workstation-target` per machine, tracked in
-> [#2356](https://github.com/mlorentedev/dotfiles/issues/2356) (SEC-011, a row of
-> PLAT-001b). Until then, every step below pairs its change with a check. Do not
-> skip the checks.
+> **Still by hand:** the firewall (section 3) on every OS, power on macOS, and
+> everything on Windows. Each is a row of
+> [#2356](https://github.com/mlorentedev/dotfiles/issues/2356) (SEC-011, PLAT-001b
+> PR 7d, PR 7e): it moves into the same converge step and leaves this runbook.
+> Until then, every hand step below pairs its change with a check. Do not skip
+> the checks.
 
 ## Security model
 
 | Layer | Linux | macOS | Windows |
 |---|---|---|---|
-| Network | UFW: port 22 only `in on tailscale0` | pf anchor: port 22 only from the mesh range | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` |
-| sshd | drop-in: key only, `AllowUsers manu@100.64.0.0/10` | same drop-in | `sshd_config`: key only, `AllowUsers` mesh range |
+| Network (by hand) | UFW: port 22 only `in on tailscale0` | pf anchor: port 22 only from the mesh range | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` |
+| sshd | drop-in: key only, `AllowUsers manu@100.64.0.0/10` (converge) | same drop-in (converge) | `sshd_config`: key only, `AllowUsers` mesh range (by hand) |
 | Client | `ForwardAgent no`, keepalives, `IdentitiesOnly yes`, host key pinned with `StrictHostKeyChecking yes` (`ssh/config`, `ssh/known_hosts`) | same | same |
 
 The two server layers are independent. If the firewall is down, sshd still
@@ -136,40 +138,40 @@ set `PasswordAuthentication yes`, and macOS ships `100-macos.conf`. Name it
 The drop-in is `ssh/sshd-workstation.conf` in the checkout, identical on Linux
 and macOS. It sets key-only authentication, no root login, no agent or X11
 forwarding, client keepalives, and `AllowUsers {user}@{mesh}`. converge renders
-`{user}` as the account it runs as and `{mesh}` as `100.64.0.0/10`; the steps
-below install the rendered file.
+`{user}` as the account it runs as and `{mesh}` as `100.64.0.0/10`, and
+installs the rendered file.
 
 `AllowUsers manu@100.64.0.0/10` is the sshd half of the mesh-only rule. A
 connection from any other source address is refused after the key exchange,
 even with the right key.
 
-**Linux:**
-
-```bash
-SSHD_UNIT=ssh        # Debian and Ubuntu; Fedora and Arch name the unit sshd
-sudo install -m 0644 01-workstation.conf /etc/ssh/sshd_config.d/01-workstation.conf
-grep -n '^Include' /etc/ssh/sshd_config   # the Include must come before any other directive
-sudo sshd -t && sudo systemctl reload "$SSHD_UNIT"
-```
-
-**macOS:** one converge step does this section, idempotently: the authorized
-key, the host keys, the drop-in (validated with `sshd -t` before sshd listens)
-and Remote Login. It then proves the result from the node itself: sshd must
-accept the owner's key from the mesh address and refuse it from the LAN
-address, or the run's changes are undone and the run fails (ADR-045 amendment
-2026-10-12).
+**Linux and macOS:** one converge step does this section, idempotently: the
+authorized key, the host keys, the drop-in (validated with `sshd -t` before
+sshd listens) and the sshd service. It then proves the result from the node
+itself: sshd must accept the owner's key from the mesh address and refuse it
+from the LAN address, or the run's changes are undone and the run fails
+(ADR-045 amendment 2026-10-12).
 
 ```bash
 dotf env role add ssh-target                       # once per machine: the opt-in
 dotf converge --plan --only workstation-target     # what would change; never asks for root
 dotf converge --only workstation-target            # asks for the sudo password once, on the terminal
 dotf converge --only workstation-target            # second run: 0 changes, and the proof again
+dotf doctor                                        # section "Workstation SSH target": PASS
 ```
 
-Without a terminal (a scheduled `dotf update`), the step is skipped and its
-reason is the plan. Remote Login is socket-activated: launchd starts a fresh
-`sshd` for each connection, so no reload is needed, and `ListenAddress` has no
-effect because launchd owns the socket.
+The step refuses a node with no `100.64.0.0/10` address (join the mesh first)
+and an `sshd_config` that sets one of the drop-in's keywords before its
+`Include`. Without a terminal (a scheduled `dotf update`), the step is skipped
+and its reason is the plan.
+
+- **Linux:** it finds the `ssh` unit (Debian, Ubuntu) or `sshd` (Fedora, Arch),
+  enables the socket unit when the distribution ships one and the service
+  otherwise, and reloads sshd only when it was already running. A machine
+  without `openssh-server` fails the step: install the package first.
+- **macOS:** Remote Login is socket-activated: launchd starts a fresh `sshd`
+  for each connection, so no reload is needed, and `ListenAddress` has no
+  effect because launchd owns the socket.
 
 **Windows:** `C:\ProgramData\ssh\sshd_config` has no `Include` by default, so
 the same keywords go into the file itself, above its `Match Group administrators`
@@ -186,7 +188,8 @@ from `ssh/id_ed25519.pub`, mode `0600`, in a `0700` `~/.ssh`. On Windows,
 administrator accounts read `C:\ProgramData\ssh\administrators_authorized_keys`,
 which the script above reconciles together with its ACL.
 
-**Check** (keep the current session open while you run it):
+**Check** (keep the current session open while you run it). converge's own
+proof logs in from the node itself; these lines check the same from outside:
 
 ```bash
 sudo sshd -T | grep -E '^(authenticationmethods|passwordauthentication|kbdinteractiveauthentication|permitrootlogin|allowusers|allowagentforwarding|clientaliveinterval) '
@@ -256,25 +259,27 @@ nc -vz -w 3 <workstation LAN address> 22    # must fail: timed out or refused
 
 A remote target must not sleep while it is on AC power.
 
-**Linux:**
+**Linux:** the same converge step writes
+`/etc/systemd/logind.conf.d/50-workstation.conf`:
 
 ```ini
-# /etc/systemd/logind.conf.d/10-workstation.conf
 [Login]
-HandleLidSwitch=ignore
 HandleLidSwitchExternalPower=ignore
 HandleLidSwitchDocked=ignore
 ```
 
-```bash
-sudo systemctl kill -s HUP systemd-logind     # reload logind without ending sessions
-sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
-```
+It reloads logind with `SIGHUP` only where `systemctl show -p CanReload
+systemd-logind` says `yes`, and never restarts it, which would end the
+sessions. Where logind cannot reload, the policy applies from the next boot.
+Battery keeps the distribution's lid behaviour, and no sleep target is masked,
+so a laptop that travels still suspends. Check:
+`busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandleLidSwitchExternalPower`
+prints `s "ignore"`.
 
-Masking turns off sleep on battery as well. For a laptop that also travels,
-skip the mask and rely on the lid settings.
-Check: `systemd-analyze cat-config systemd/logind.conf | grep Lid` and
-`systemctl is-enabled suspend.target` (prints `masked`).
+A GNOME desktop has its own idle suspend, which logind does not govern:
+`gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type`
+must print `'nothing'` (it does on msi). Converging it is
+[#2374](https://github.com/mlorentedev/dotfiles/issues/2374).
 
 **macOS:**
 
@@ -307,6 +312,11 @@ The client side is code. Each workstation profile in `ssh/config` (inside the
 - `ServerAliveInterval 30` and `ServerAliveCountMax 3`.
 - `ForwardAgent no`. A workstation runs its own `dotf identity restore`; it
   never borrows the client's agent.
+- A last `Host *` block sets `AddKeysToAgent yes` and, for Apple's OpenSSH,
+  `UseKeychain yes` behind `IgnoreUnknown UseKeychain`, so the file still
+  parses on Linux and Windows. The first connection asks for the key's
+  passphrase once; on macOS the keychain keeps it, and after a reboot the key
+  loads on first use. `ssh-add` is never a step.
 - `UserKnownHostsFile ~/.ssh/known_hosts_pinned` and `StrictHostKeyChecking
   yes`. The client accepts only the key pinned in `ssh/known_hosts`, deployed
   by the `ssh-known-hosts` entry, and refuses any other, including on the
@@ -344,8 +354,12 @@ that fixes it.
 
 ## Rollback
 
-Restore the dated backups taken in the preflight, then:
+A converge run whose apply or proof fails undoes its own changes, in reverse
+order, and says so. The host keys it generated stay. To retire a machine as a
+target, `dotf env role rm ssh-target`, then remove what the step wrote (there
+is no converge undo for a role removal yet). For the hand steps, restore the
+dated backups taken in the preflight, then:
 
-- **Linux:** `sudo sshd -t && sudo systemctl reload "$SSHD_UNIT"` (section 2); `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp` if you remove the target role; `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target`.
-- **macOS:** `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf`; `sudo pfctl -a com.apple/250.KubelabSSH -F all`; `sudo systemsetup -setremotelogin off` if the Mac stops being a target.
+- **Linux:** `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf /etc/systemd/logind.conf.d/50-workstation.conf`, then `sudo sshd -t && sudo systemctl reload ssh` (`sshd` on Fedora and Arch); `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp`.
+- **macOS:** `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf`; `sudo pfctl -a com.apple/250.KubelabSSH -F all`; `sudo launchctl bootout system/com.openssh.sshd` if the Mac stops being a target.
 - **Windows:** restore `sshd_config`, `sshd -t`, `Restart-Service sshd`. To retire the target, run `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP` and `Stop-Service sshd`.
