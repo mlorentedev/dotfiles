@@ -83,8 +83,8 @@ func (a agentExtensions) applyClaude(e Env, dryRun bool, p *extensionsPlan, part
 	for _, d := range mcp.Migrated {
 		c = append(c, fmt.Sprintf("%s %s (%s -> %s)", d.Name, migrated, d.Was, d.Now))
 	}
-	if len(mcp.Unverified) > 0 {
-		c = append(c, "unverified (mcp get did not parse): "+strings.Join(mcp.Unverified, ", "))
+	for _, u := range mcp.Untouched {
+		c = append(c, fmt.Sprintf("%s untouched (%s)", u.Name, u.Why))
 	}
 	for _, sk := range mcp.Skipped {
 		c = append(c, fmt.Sprintf("%s skipped (%s not on PATH)", sk.Name, sk.Missing))

@@ -11,11 +11,13 @@ import (
 
 // mcpFake answers the claude mcp subcommands: registered maps a name to its
 // `mcp get` output (absent means get exits non-zero), and failing names adds
-// that fail. Every add and remove is recorded.
+// that fail; failOnce names whose first add fails and later ones succeed.
+// Every add and remove is recorded.
 type mcpFake struct {
 	fakeRunner
 	registered map[string]string
 	failing    map[string]bool
+	failOnce   map[string]bool
 	failRemove bool
 	added      []string
 	removed    []string
@@ -32,6 +34,10 @@ func (f *mcpFake) McpGet(name string) (string, error) {
 func (f *mcpFake) McpAdd(name, transport string, args []string) error {
 	f.added = append(f.added, name+" "+transport+" "+strings.Join(args, " "))
 	if f.failing[name] {
+		return errors.New("add failed")
+	}
+	if f.failOnce[name] {
+		delete(f.failOnce, name)
 		return errors.New("add failed")
 	}
 	return nil
@@ -59,10 +65,18 @@ func mcpSyncer(f *mcpFake, have ...string) Syncer {
 	return s
 }
 
+// userScope is how `claude mcp get` names the scope dotf registers in.
+const userScope = "User config (available in all your projects)"
+
 // getOutput is `claude mcp get` as Claude Code prints it (measured
 // 2026-10-13): a stdio server's Command and Args lines, an http server's URL.
 func getOutput(name, transport, argv string) string {
-	head := name + ":\n  Scope: User config (available in all your projects)\n  Status: ✔ Connected\n  Type: " + transport + "\n"
+	return scopedOutput(name, userScope, transport, argv)
+}
+
+// scopedOutput is getOutput answered by the registration in scope.
+func scopedOutput(name, scope, transport, argv string) string {
+	head := name + ":\n  Scope: " + scope + "\n  Status: ✔ Connected\n  Type: " + transport + "\n"
 	tail := "\nTo remove this server, run: claude mcp remove " + name + " -s user\n"
 	if transport != "stdio" {
 		return head + "  URL: " + argv + "\n" + tail
@@ -133,11 +147,12 @@ func TestRegisterReplacesADriftedRegistration(t *testing.T) {
 
 // Output that does not parse is never drift: the day Claude Code changes its
 // format, treating it as drift would re-register every server on every run and
-// converge would never report zero changes. It is reported as unverified.
+// converge would never report zero changes. It is reported as untouched.
 func TestRegisterLeavesAnUnreadableRegistrationAlone(t *testing.T) {
 	for name, out := range map[string]string{
 		"empty":      "",
 		"no type":    "hive:\n  Command: hive\n  Args: client\n",
+		"no scope":   "hive:\n  Type: stdio\n  Command: uvx\n  Args: hive-vault\n",
 		"no command": "hive:\n  Type: stdio\n",
 		"no URL":     "context7:\n  Type: http\n",
 		"new format": `{"name":"hive","command":"hive"}`,
@@ -148,9 +163,27 @@ func TestRegisterLeavesAnUnreadableRegistrationAlone(t *testing.T) {
 		}
 		f := &mcpFake{registered: map[string]string{srv.Name: out}}
 		rep := mcpSyncer(f, "uv").Register([]Server{srv}, false)
-		if len(f.removed) != 0 || len(f.added) != 0 || !reflect.DeepEqual(rep.Unverified, []string{srv.Name}) || len(rep.Present) != 0 {
-			t.Errorf("%s: removed %v added %v report %+v; want it left alone and unverified", name, f.removed, f.added, rep)
+		if len(f.removed) != 0 || len(f.added) != 0 || len(rep.Untouched) != 1 || rep.Untouched[0].Name != srv.Name || !strings.Contains(rep.Untouched[0].Why, "did not parse") || len(rep.Present) != 0 {
+			t.Errorf("%s: removed %v added %v report %+v; want it left alone and untouched", name, f.removed, f.added, rep)
 		}
+	}
+}
+
+// `claude mcp get` answers with the winning scope, local before project before
+// user. dotf adds and removes at user scope only, so a drifted local or project
+// registration is reported and left alone; one that matches is present.
+func TestRegisterLeavesAnotherScopesRegistrationAlone(t *testing.T) {
+	const local = "Local config (private to you in this project)"
+	f := &mcpFake{registered: map[string]string{
+		"context7": scopedOutput("context7", local, "http", "https://mcp.context7.com/mcp"),
+		"hive":     scopedOutput("hive", "Project config (shared via .mcp.json)", "stdio", "uvx hive-vault"),
+	}}
+	rep := mcpSyncer(f, "uv").Register(servers, false)
+	if len(f.removed)+len(f.added) != 0 {
+		t.Fatalf("removed %v added %v; another scope's registration must not be touched", f.removed, f.added)
+	}
+	if !reflect.DeepEqual(rep.Present, []string{"context7"}) || len(rep.Untouched) != 1 || rep.Untouched[0].Name != "hive" || !strings.Contains(rep.Untouched[0].Why, "Project config") {
+		t.Errorf("report %+v; want context7 present and hive untouched naming its scope", rep)
 	}
 }
 
@@ -159,8 +192,8 @@ func TestRegisterLeavesAnUnreadableRegistrationAlone(t *testing.T) {
 func TestRegisterReadsACommandWithoutArgs(t *testing.T) {
 	solo := Server{Name: "solo", Transport: "stdio", Args: "solo"}
 	for name, out := range map[string]string{
-		"empty Args": "solo:\n  Type: stdio\n  Command: solo\n  Args: \n",
-		"no Args":    "solo:\n  Type: stdio\n  Command: solo\n",
+		"empty Args": "solo:\n  Scope: " + userScope + "\n  Type: stdio\n  Command: solo\n  Args: \n",
+		"no Args":    "solo:\n  Scope: " + userScope + "\n  Type: stdio\n  Command: solo\n",
 	} {
 		f := &mcpFake{registered: map[string]string{"solo": out}}
 		if rep := mcpSyncer(f).Register([]Server{solo}, false); !reflect.DeepEqual(rep.Present, []string{"solo"}) {
@@ -229,8 +262,8 @@ func TestTheRepoListsLoad(t *testing.T) {
 }
 
 // A migration is claimed only when the replacement landed. A failed remove
-// leaves the stale entry; a failed re-add leaves hive unregistered. Either way
-// hive is in Failed and not in Migrated.
+// leaves the stale entry; a failed re-add puts it back. Either way hive is in
+// Failed and not in Migrated.
 func TestRegisterReportsAMigrationOnlyWhenItCompleted(t *testing.T) {
 	current := getOutput("context7", "http", "https://mcp.context7.com/mcp")
 	stale := map[string]string{"context7": current, "hive": getOutput("hive", "stdio", "uvx hive-vault")}
@@ -242,5 +275,16 @@ func TestRegisterReportsAMigrationOnlyWhenItCompleted(t *testing.T) {
 		if len(rep.Migrated) != 0 || !reflect.DeepEqual(rep.Failed, []string{"hive"}) {
 			t.Errorf("%s: report %+v, want hive Failed and not Migrated", name, rep)
 		}
+	}
+}
+
+// A re-add that fails after the remove restores the old registration, so the
+// server is still there, stale, rather than gone; the restore is reported.
+func TestRegisterRestoresTheOldRegistrationWhenTheReAddFails(t *testing.T) {
+	f := &mcpFake{registered: map[string]string{"hive": getOutput("hive", "stdio", "uvx hive-vault")}, failOnce: map[string]bool{"hive": true}}
+	rep := mcpSyncer(f, "uv").Register(servers[1:], false)
+	want := []string{"hive stdio hive client", "hive stdio uvx hive-vault"}
+	if !reflect.DeepEqual(f.added, want) || !reflect.DeepEqual(rep.RolledBack, []string{"hive"}) || !reflect.DeepEqual(rep.Failed, []string{"hive"}) {
+		t.Errorf("added %v report %+v; want the declared add, then the old one back", f.added, rep)
 	}
 }

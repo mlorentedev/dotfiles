@@ -36,3 +36,7 @@ as "everything drifted" and remove every server.
 - When the comparison depends on another tool's human output, the unparseable case must fail
   safe (leave it and say so), and the test fixtures must be the measured output, not a shape
   the parser happens to accept.
+- Read what the answer is about before acting on it. `claude mcp get` reports the winning scope
+  (local, then project, then user), while dotf only adds and removes at user scope; acting on a
+  local registration's drift would remove nothing and add a user entry it still shadows. A
+  replace that removes first also owes a restore when the add fails.

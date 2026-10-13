@@ -177,7 +177,7 @@ func TestDeployCmd_AFailedMCPAddFailsTheRunButPluginsStillRun(t *testing.T) {
 
 func TestDeployCmd_DriftedRegistrationIsMigrated(t *testing.T) {
 	withPath(t, "uv")
-	fake := &fakeClaude{registered: map[string]string{"web": webRegistered, "hive": "hive:\n  Type: stdio\n  Command: uvx\n  Args: hive-vault\n"}, listed: "a@m b@m"}
+	fake := &fakeClaude{registered: map[string]string{"web": webRegistered, "hive": "hive:\n  Scope: User config (available in all your projects)\n  Type: stdio\n  Command: uvx\n  Args: hive-vault\n"}, listed: "a@m b@m"}
 	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -193,7 +193,7 @@ func TestDeployCmd_DriftedRegistrationIsMigrated(t *testing.T) {
 // An answer that does not parse is reported and left alone, never re-added.
 func TestDeployCmd_AnUnreadableRegistrationIsReportedNotReplaced(t *testing.T) {
 	withPath(t, "uv")
-	fake := &fakeClaude{registered: map[string]string{"web": "web:\n", "hive": "hive:\n  Type: stdio\n  Command: hive\n  Args: client\n"}, listed: "a@m b@m"}
+	fake := &fakeClaude{registered: map[string]string{"web": "web:\n", "hive": "hive:\n  Scope: User config (available in all your projects)\n  Type: stdio\n  Command: hive\n  Args: client\n"}, listed: "a@m b@m"}
 	out, err := runDeployWithClaude(t, pluginRepo(t), t.TempDir(), nil, fake)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -201,7 +201,7 @@ func TestDeployCmd_AnUnreadableRegistrationIsReportedNotReplaced(t *testing.T) {
 	if len(fake.added)+len(fake.removed) != 0 {
 		t.Errorf("removed %v added %v; an unreadable registration must be left alone", fake.removed, fake.added)
 	}
-	if !strings.Contains(out, row("unverified", "claude-mcp")+"web") {
+	if !strings.Contains(out, row("untouched", "claude-mcp")+"web") {
 		t.Errorf("the unverified server must be named:\n%s", out)
 	}
 }

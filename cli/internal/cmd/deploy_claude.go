@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
@@ -163,8 +164,8 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	for _, d := range rep.Migrated {
 		deployRow(w, verb, step, "%s: %s -> %s", d.Name, d.Was, d.Now)
 	}
-	for _, name := range rep.Unverified {
-		deployRow(w, "unverified", step, "%s (`claude mcp get` output did not parse; left as registered)", name)
+	for _, u := range rep.Untouched {
+		deployRow(w, "untouched", step, "%s (%s; left as registered)", u.Name, u.Why)
 	}
 	for _, sk := range rep.Skipped {
 		deployRow(w, "skipped", step, "%s (%s not on PATH)", sk.Name, sk.Missing)
@@ -173,6 +174,10 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 		reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
 	}
 	for _, name := range rep.Failed {
+		if slices.Contains(rep.RolledBack, name) {
+			deployRow(w, "failed", step, "%s did not re-register; its previous registration was restored", name)
+			continue
+		}
 		deployRow(w, "failed", step, "%s did not register", name)
 	}
 	if err != nil {

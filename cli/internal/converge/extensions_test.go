@@ -45,7 +45,7 @@ func (b *claudeBox) McpGet(name string) (string, error) {
 	if old, ok := b.stale[name]; ok {
 		url = old
 	}
-	return name + ":\n  Type: http\n  URL: " + url + "\n", nil
+	return name + ":\n  Scope: User config (available in all your projects)\n  Type: http\n  URL: " + url + "\n", nil
 }
 
 func (b *claudeBox) McpAdd(name, _ string, _ []string) error {

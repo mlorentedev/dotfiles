@@ -68,26 +68,48 @@ type Skip struct{ Name, Missing string }
 // declaration, both as "<transport> <argv or URL>".
 type Drift struct{ Name, Was, Now string }
 
+// Untouched is a registered server Register left as it is, and why.
+type Untouched struct{ Name, Why string }
+
 // MCPReport is what one Register found and did.
 type MCPReport struct {
 	Present, Added, Failed []string
 	// Migrated are the drifted registrations replaced (or, in a dry run, that
 	// would be). Each is in Added too, once its re-add landed.
 	Migrated []Drift
-	// Unverified are registered servers whose `claude mcp get` output did not
-	// parse, so whether they drifted is unknown. They are left alone: treating
-	// an unreadable answer as drift would re-register every server on every
-	// run the day Claude Code changes its output.
-	Unverified []string
-	Skipped    []Skip
-	Restored   int
+	// RolledBack are the drifted servers whose re-add failed after the old
+	// registration was removed, and which got the old one back. Each is in
+	// Failed too.
+	RolledBack []string
+	// Untouched are registered servers Register cannot judge or does not own:
+	// a `claude mcp get` answer that does not parse (treating it as drift
+	// would re-register every server the day Claude Code changes its output),
+	// or a drifted registration in a local or project scope, which shadows
+	// the user scope dotf registers in.
+	Untouched []Untouched
+	Skipped   []Skip
+	Restored  int
 }
 
-// registered reads what `claude mcp get` says a server runs, as
-// "<transport> <argv>" for stdio (Command and Args joined on single spaces,
-// the way registration split them) and "<transport> <URL>" otherwise. false
-// when the output names no transport, or no command or URL to go with it.
-func registered(out string) (string, bool) {
+// registration is what `claude mcp get` says a server runs: its transport,
+// the scope that answered, and argv, the command and its args for stdio or
+// the URL alone otherwise, so it can be handed back to McpAdd.
+type registration struct {
+	transport, scope string
+	argv             []string
+}
+
+func (r registration) String() string { return r.transport + " " + strings.Join(r.argv, " ") }
+
+// userScope reports whether the answering registration is the user-scope one
+// dotf adds and removes. `claude mcp get` answers with the winning scope
+// (local, then project, then user), worded "User config (...)".
+func (r registration) userScope() bool { return strings.HasPrefix(r.scope, "User") }
+
+// registered reads `claude mcp get`'s output: `Scope:` and `Type:`, then
+// `Command:` and `Args:` (joined on single spaces, the way registration split
+// them) for stdio or `URL:` otherwise. false when any of them is missing.
+func registered(out string) (registration, bool) {
 	fields := map[string]string{}
 	for _, line := range strings.Split(out, "\n") {
 		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
@@ -95,14 +117,11 @@ func registered(out string) (string, bool) {
 			fields[key] = strings.TrimSpace(value)
 		}
 	}
-	transport, target := fields["Type"], fields["URL"]
-	if transport == "stdio" {
-		target = strings.Join(strings.Fields(fields["Command"]+" "+fields["Args"]), " ")
+	r := registration{transport: fields["Type"], scope: fields["Scope"], argv: strings.Fields(fields["URL"])}
+	if r.transport == "stdio" {
+		r.argv = strings.Fields(fields["Command"] + " " + fields["Args"])
 	}
-	if transport == "" || target == "" {
-		return "", false
-	}
-	return transport + " " + target, true
+	return r, r.transport != "" && r.scope != "" && len(r.argv) > 0
 }
 
 // declared is a Server in the shape registered reads.
@@ -132,17 +151,22 @@ func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 		var out string
 		getErr := guard(func() error { var err error; out, err = s.Run.McpGet(srv.Name); return err })
 		var drift *Drift
+		var was registration
 		if getErr == nil {
-			was, ok := registered(out)
+			var ok bool
+			was, ok = registered(out)
 			switch {
 			case !ok:
-				rep.Unverified = append(rep.Unverified, srv.Name)
+				rep.Untouched = append(rep.Untouched, Untouched{srv.Name, "`claude mcp get` output did not parse"})
 				continue
-			case was == declared(srv):
+			case was.String() == declared(srv):
 				rep.Present = append(rep.Present, srv.Name)
 				continue
+			case !was.userScope():
+				rep.Untouched = append(rep.Untouched, Untouched{srv.Name, fmt.Sprintf("registered as %s in %q, not the user scope dotf owns", was, was.scope)})
+				continue
 			}
-			drift = &Drift{Name: srv.Name, Was: was, Now: declared(srv)}
+			drift = &Drift{Name: srv.Name, Was: was.String(), Now: declared(srv)}
 			if !dryRun {
 				if err := guard(func() error { return s.Run.McpRemove(srv.Name) }); err != nil {
 					rep.Failed = append(rep.Failed, srv.Name)
@@ -150,11 +174,15 @@ func (s Syncer) Register(servers []Server, dryRun bool) MCPReport {
 				}
 			}
 		}
-		// A migration is reported only once the replacement is in: a remove
-		// whose re-add failed left the server unregistered, and says so in Failed.
+		// A migration is reported only once the replacement is in. A re-add
+		// that fails puts the old registration back rather than leave the
+		// server unregistered, and is still Failed: the drift remains.
 		if !dryRun {
 			if err := guard(func() error { return s.Run.McpAdd(srv.Name, srv.Transport, strings.Fields(srv.Args)) }); err != nil {
 				rep.Failed = append(rep.Failed, srv.Name)
+				if drift != nil && guard(func() error { return s.Run.McpAdd(srv.Name, was.transport, was.argv) }) == nil {
+					rep.RolledBack = append(rep.RolledBack, srv.Name)
+				}
 				continue
 			}
 		}
