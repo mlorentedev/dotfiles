@@ -84,6 +84,9 @@ func TestWorkstationTarget_PlanNeedsNoRoot(t *testing.T) {
 	if res.Changes != 4 || !strings.HasPrefix(res.Detail, "to apply as root: authorized key, host keys, sshd drop-in, sshd service") {
 		t.Fatalf("plan = %+v", res)
 	}
+	if !strings.Contains(res.Detail, "firewall not managed on darwin yet") {
+		t.Errorf("the plan does not name the firewall it leaves alone: %q", res.Detail)
+	}
 }
 
 func TestWorkstationTarget_ApplyWithoutATerminalIsSkippedWithThePlan(t *testing.T) {

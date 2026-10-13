@@ -39,6 +39,17 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				writeFile(t, p.LogindDropIn, sshtarget.LogindPolicy)
 				writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
 			}},
+		{name: "linux without ufw → PASS that names the gap", goos: "linux", optIn: true, addrs: mesh, want: StatusPass, needle: "no ufw on this machine", section: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeConverged(t, p, user)
+			}},
+		{name: "linux, ufw installed and off → WARN naming the firewall", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "firewall; run `dotf converge", section: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeConverged(t, p, user)
+				writeFile(t, p.UFWConf, "ENABLED=no\n")
+				writeFile(t, p.UFWDefaults, "DEFAULT_INPUT_POLICY=\"DROP\"\n")
+				writeFile(t, p.UFWRules, "")
+			}},
 		{name: "not opted in → SKIP", goos: "darwin", addrs: mesh, want: StatusSkip, needle: "dotf env role add ssh-target", section: true},
 		{name: "off the mesh → SKIP", goos: "darwin", optIn: true, addrs: []net.IP{net.ParseIP("10.0.0.130")}, want: StatusSkip, needle: "join the mesh", section: true},
 		{name: "nothing applied → WARN naming the converge command", goos: "darwin", optIn: true, addrs: mesh, want: StatusWarn, needle: "dotf converge --only workstation-target", section: true},
@@ -60,12 +71,17 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			writeFile(t, filepath.Join(repo, sshtarget.KeyFile), "ssh-ed25519 AAAAOwner manu@msi\n")
 			writeFile(t, filepath.Join(repo, sshtarget.TemplateFile), workstationTemplate)
 			paths := sshtarget.Paths{
-				SSHDConfig:     filepath.Join(sys, "sshd_config"),
-				DropIn:         filepath.Join(sys, "sshd_config.d", "01-workstation.conf"),
-				HostKey:        filepath.Join(sys, "ssh_host_ed25519_key.pub"),
-				AuthorizedKeys: filepath.Join(home, ".ssh", "authorized_keys"),
-				ClientKey:      filepath.Join(home, ".ssh", "id_ed25519"),
-				LogindDropIn:   filepath.Join(sys, "logind.conf.d", "50-workstation.conf"),
+				SSHDConfig:      filepath.Join(sys, "sshd_config"),
+				DropIn:          filepath.Join(sys, "sshd_config.d", "01-workstation.conf"),
+				HostKey:         filepath.Join(sys, "ssh_host_ed25519_key.pub"),
+				AuthorizedKeys:  filepath.Join(home, ".ssh", "authorized_keys"),
+				ClientKey:       filepath.Join(home, ".ssh", "id_ed25519"),
+				LogindDropIn:    filepath.Join(sys, "logind.conf.d", "50-workstation.conf"),
+				UFWConf:         filepath.Join(sys, "ufw", "ufw.conf"),
+				UFWDefaults:     filepath.Join(sys, "default", "ufw"),
+				UFWRules:        filepath.Join(sys, "ufw", "user.rules"),
+				UFWRules6:       filepath.Join(sys, "ufw", "user6.rules"),
+				FirewallWitness: filepath.Join(sys, "dotf", "workstation-firewall"),
 			}
 			writeFile(t, paths.SSHDConfig, "Include "+filepath.Dir(paths.DropIn)+"/*\n")
 			loaded := false
@@ -114,4 +130,14 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+// writeConverged leaves the Linux SSH target as a converge leaves it, the
+// firewall aside.
+func writeConverged(t *testing.T, p sshtarget.Paths, user string) {
+	t.Helper()
+	writeFile(t, p.AuthorizedKeys, "ssh-ed25519 AAAAOwner manu@msi\n")
+	writeFile(t, p.HostKey, "ssh-ed25519 AAAAHost root@msi\n")
+	writeFile(t, p.LogindDropIn, sshtarget.LogindPolicy)
+	writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
 }

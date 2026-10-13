@@ -51,17 +51,29 @@ type Paths struct {
 	AuthorizedKeys string
 	ClientKey      string // the private key the probe offers
 	LogindDropIn   string // Linux: the lid policy (Logind)
+	// Linux, UFW: its switch, its input policy, the rule files, and the
+	// witness of the rule files the last apply read as root.
+	UFWConf         string
+	UFWDefaults     string
+	UFWRules        string
+	UFWRules6       string
+	FirewallWitness string
 }
 
 // DefaultPaths are the locations on macOS and Linux.
 func DefaultPaths(home string) Paths {
 	return Paths{
-		SSHDConfig:     "/etc/ssh/sshd_config",
-		DropIn:         "/etc/ssh/sshd_config.d/01-workstation.conf",
-		HostKey:        "/etc/ssh/ssh_host_ed25519_key.pub",
-		AuthorizedKeys: filepath.Join(home, ".ssh", "authorized_keys"),
-		ClientKey:      filepath.Join(home, ".ssh", "id_ed25519"),
-		LogindDropIn:   "/etc/systemd/logind.conf.d/50-workstation.conf",
+		SSHDConfig:      "/etc/ssh/sshd_config",
+		DropIn:          "/etc/ssh/sshd_config.d/01-workstation.conf",
+		HostKey:         "/etc/ssh/ssh_host_ed25519_key.pub",
+		AuthorizedKeys:  filepath.Join(home, ".ssh", "authorized_keys"),
+		ClientKey:       filepath.Join(home, ".ssh", "id_ed25519"),
+		LogindDropIn:    "/etc/systemd/logind.conf.d/50-workstation.conf",
+		UFWConf:         "/etc/ufw/ufw.conf",
+		UFWDefaults:     "/etc/default/ufw",
+		UFWRules:        "/etc/ufw/user.rules",
+		UFWRules6:       "/etc/ufw/user6.rules",
+		FirewallWitness: "/var/lib/dotf/workstation-firewall",
 	}
 }
 
@@ -81,6 +93,7 @@ func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]n
 		return t, err
 	}
 	t.Power = PowerFor(goos, run, paths)
+	t.Firewall, t.FirewallNote = FirewallFor(goos, paths)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
 	}
@@ -116,15 +129,20 @@ type Target struct {
 	Paths    Paths
 	Service  Service
 	Power    Power // nil where the target declares no power policy yet
-	Root     Root
-	Run      Runner
-	Addrs    func() ([]net.IP, error)
+	// Firewall is nil where the target manages none, and FirewallNote then
+	// says why, so a plan never reads converged in silence.
+	Firewall     Firewall
+	FirewallNote string
+	Root         Root
+	Run          Runner
+	Addrs        func() ([]net.IP, error)
 }
 
 // Plan is what differs from the declared state, and whether an apply could
 // proceed.
 type Plan struct {
 	Pending  []string // resource names, in apply order
+	Notes    []string // what the target does not manage here, and why
 	Mesh     net.IP
 	LAN      net.IP // nil when the node has no LAN address to test from
 	dropIn   []byte
@@ -142,6 +160,7 @@ const (
 	resHostKeys = "host keys"
 	resDropIn   = "sshd drop-in"
 	resService  = "sshd service"
+	resFirewall = "firewall"
 	resPower    = "power policy"
 )
 
@@ -190,6 +209,17 @@ func (t Target) Inspect() (Plan, error) {
 	}
 	if !p.enabled {
 		p.Pending = append(p.Pending, resService)
+	}
+	if t.Firewall != nil {
+		differs, err := t.Firewall.Differs()
+		if err != nil {
+			return p, err
+		}
+		if differs {
+			p.Pending = append(p.Pending, resFirewall)
+		}
+	} else if t.FirewallNote != "" {
+		p.Notes = append(p.Notes, t.FirewallNote)
 	}
 	if t.Power != nil {
 		differs, err := t.Power.Differs()
@@ -266,6 +296,14 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 				return err
 			}
 			*undo = append(*undo, func() error { return t.Service.Disable(t.Root) })
+		case resFirewall:
+			u, err := t.Firewall.Apply(t.Root)
+			if u != nil {
+				*undo = append(*undo, u)
+			}
+			if err != nil {
+				return err
+			}
 		case resPower:
 			u, err := t.Power.Apply(t.Root)
 			if u != nil {
@@ -290,6 +328,11 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 func (t Target) Prove(p Plan) error {
 	if err := t.proveSSH(p); err != nil {
 		return err
+	}
+	if t.Firewall != nil {
+		if err := t.Firewall.Prove(); err != nil {
+			return err
+		}
 	}
 	if t.Power != nil {
 		return t.Power.Prove()
