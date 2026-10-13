@@ -103,43 +103,24 @@ if _has_label "dependencies" && _is_dependency_bot "$SDD_PR_AUTHOR"; then
     exit 0
 fi
 
-# The body without fenced code blocks, so a section quoted as an example does
-# not count. Unlike spec-gate's _strip_markdown_code, inline code stays: paths
-# are usually written as `docs/lessons/...`, and stripping spans would erase
-# the very answer being checked. With --open-line it prints instead the line of
-# a fence that never closes: GitHub renders everything after one as code, so a
-# section below it is really absent, and the author needs to be told why.
-_strip_fences() {
-    local mode="${2:-}" line marker fence="" n=0 opened=0
-    local fence_re='^[[:space:]]{0,3}(`{3,}|~{3,})'
-    while IFS= read -r line; do
-        n=$((n + 1))
-        if [[ "$line" =~ $fence_re ]]; then
-            marker="${BASH_REMATCH[1]}"
-            if [[ -z "$fence" ]]; then
-                fence="$marker"
-                opened=$n
-            elif [[ "${marker:0:1}" == "${fence:0:1}" && ${#marker} -ge ${#fence} ]]; then
-                fence=""
-            fi
-            continue
-        fi
-        if [[ -z "$fence" && -z "$mode" ]]; then
-            printf '%s\n' "$line"
-        fi
-    done <<< "$1"
-    if [[ -n "$mode" && -n "$fence" ]]; then
-        printf '%s\n' "$opened"
-    fi
-    return 0
-}
-
-# The body without HTML comments, which GitHub does not render: a template's
-# guidance, or an example inside one, is not an answer the author gave.
-_strip_comments() {
-    awk '
-        {
-            line = $0; out = ""
+# The body as GitHub renders it, without fenced code blocks and HTML comments,
+# so neither a section quoted as an example nor a template's guidance counts as
+# the author's answer. Unlike spec-gate's _strip_markdown_code, inline code
+# stays: paths are usually written as `docs/lessons/...`, and stripping spans
+# would erase the very answer being checked.
+#
+# One left-to-right pass, as GitHub reads it, because each construct can hold
+# the other's opener: a fence marker inside a comment opens nothing, and a
+# `<!--` inside a fence hides nothing. Two passes (fences, then comments) read
+# a fence quoted in a comment as an open fence and refused a valid body (#2310).
+#
+# With --open-line it prints instead the line of a fence that never closes:
+# GitHub renders everything after one as code, so a section below it is really
+# absent, and the author needs to be told why.
+_strip_markup() {
+    printf '%s\n' "$1" | awk -v mode="${2:-}" '
+        function strip_comments(line,    out, i) {
+            out = ""
             while (line != "") {
                 if (inside) {
                     i = index(line, "-->")
@@ -150,8 +131,23 @@ _strip_comments() {
                     else { out = out substr(line, 1, i - 1); line = substr(line, i + 4); inside = 1 }
                 }
             }
-            print out
+            return out
         }
+        {
+            line = $0
+            # A fence marker counts only at the start of a line outside a
+            # comment: up to three spaces, then three or more ` or ~.
+            if (!inside && match(line, /^[[:space:]]?[[:space:]]?[[:space:]]?(```+|~~~+)/)) {
+                marker = substr(line, RSTART, RLENGTH); sub(/^[[:space:]]+/, "", marker)
+                if (fence == "") { fence = marker; opened = NR }
+                else if (substr(marker, 1, 1) == substr(fence, 1, 1) && length(marker) >= length(fence)) { fence = "" }
+                next
+            }
+            if (fence != "") next
+            out = strip_comments(line)
+            if (mode == "") print out
+        }
+        END { if (mode != "" && fence != "") print opened }
     '
 }
 
@@ -166,12 +162,12 @@ _section() {
 }
 
 # CR first: a body saved from GitHub's web editor has CRLF line endings.
-body=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" | _strip_comments)
+body=$(_strip_markup "${SDD_PR_BODY//$'\r'/}")
 
 problems=()
 
 if ! section=$(printf '%s\n' "$body" | _section); then
-    open_line=$(_strip_fences "${SDD_PR_BODY//$'\r'/}" --open-line)
+    open_line=$(_strip_markup "${SDD_PR_BODY//$'\r'/}" --open-line)
     if [[ -n "$open_line" ]]; then
         problems+=("the PR body has no \"## Knowledge\" section outside code: the code fence opened at line $open_line is never closed, so everything after it is code")
     else

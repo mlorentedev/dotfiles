@@ -315,6 +315,41 @@ Example:
     [[ "$output" == *"Lesson: the line is missing"* ]] || false
 }
 
+# #2310: GitHub reads fences and comments in one left-to-right pass, so each
+# hides the other's opener. Two separate passes read a fence quoted in a
+# comment as an open fence and refused a body that renders fine.
+@test "a fence marker inside an HTML comment opens no fence" {
+    SDD_PR_BODY='## Summary
+
+<!--
+```
+-->
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure'
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a comment opener inside a fence hides nothing after the fence" {
+    SDD_PR_BODY='## Summary
+
+```html
+<!-- an example comment, never closed in the example
+```
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure'
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned
