@@ -229,14 +229,29 @@ func (s Syncer) prepare(name string, p *marketPrep, restored *int) error {
 	case p.registered[name]:
 		err = s.guarded(restored, func() error { return s.Run.UpdateMarketplace(name) })
 	case src != "":
-		if err = s.guarded(restored, func() error { return s.Run.AddMarketplace(src) }); err != nil {
-			err = fmt.Errorf("registering marketplace %q from %s: %w", name, src, err)
-		}
+		err = s.register(name, src, restored)
 	default:
 		err = fmt.Errorf("marketplace %q is not registered and %s declares no source", name, MarketplacesRel)
 	}
 	p.done[name] = err
 	return err
+}
+
+// register adds the marketplace name from src, then reads the registry again:
+// an add that exits 0 under another name would leave the install to fail with
+// "not found in marketplace", naming no cause (lesson 404).
+func (s Syncer) register(name, src string, restored *int) error {
+	if err := s.guarded(restored, func() error { return s.Run.AddMarketplace(src) }); err != nil {
+		return fmt.Errorf("registering marketplace %q from %s: %w", name, src, err)
+	}
+	registered, err := s.marketplaces(restored)
+	if err != nil {
+		return fmt.Errorf("registered %s, but cannot read the registry back: %w", src, err)
+	}
+	if !registered[name] {
+		return fmt.Errorf("registered %s, but the registry still has no marketplace %q: the source names itself differently", src, name)
+	}
+	return nil
 }
 
 // guarded runs fn inside the .claude.json snapshot guard and counts a restore.

@@ -311,7 +311,7 @@ func TestSyncPreparesEachMarketplaceOnceBeforeItsFirstInstall(t *testing.T) {
 	if _, err := s.Sync([]string{"a@m", "b@m", "x@n", "c@p"}, false); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"list", "add org/m", "install a@m", "install b@m", "update n", "install x@n"}
+	want := []string{"list", "add org/m", "list", "install a@m", "install b@m", "update n", "install x@n"}
 	if !reflect.DeepEqual(r.log, want) {
 		t.Fatalf("calls %v, want %v", r.log, want)
 	}
@@ -362,6 +362,27 @@ func TestAFailedPreparationIsNamedInTheCauseOfAFailedInstall(t *testing.T) {
 	want := []string{"list", "update m", "install a@m", "install b@m", "install z@q", "add org/k", "install y@k"}
 	if !reflect.DeepEqual(r.log, want) {
 		t.Fatalf("calls %v, want %v: a failed preparation is not retried per install", r.log, want)
+	}
+}
+
+// An add that exits 0 but registers the source under another name leaves the
+// install to fail with "not found in marketplace", which names no cause: the
+// misleading reading lesson 404 records. The registry is read again after an
+// add, and a missing name is the cause of the failed install.
+func TestARegistrationUnderAnotherNameIsNamedInTheCause(t *testing.T) {
+	r := &fakeRunner{failing: map[string]bool{"a@m": true}}
+	s := newSyncer(r)
+	s.Sources = map[string]string{"m": "org/renamed"}
+	rep, err := s.Sync([]string{"a@m"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := rep.Causes["a@m"]; c == nil || !strings.Contains(c.Error(), `the registry still has no marketplace "m"`) {
+		t.Fatalf("cause %v, want the missing registration named", c)
+	}
+	want := []string{"list", "add org/renamed", "list", "install a@m"}
+	if !reflect.DeepEqual(r.log, want) {
+		t.Fatalf("calls %v, want %v", r.log, want)
 	}
 }
 
