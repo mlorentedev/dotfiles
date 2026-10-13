@@ -408,10 +408,10 @@ render_skill() {
 #   2  the resolver is UNAVAILABLE — no dotf on PATH, or a dotf too old to carry
 #      this subcommand (#1158, measured: the deployed binary routinely predates
 #      the tree). NOT C15: C15 governs a map that cannot be READ, and an absent
-#      binary is a bootstrap state, not an unreadable map. setup-linux.sh installs
-#      dotf best-effort (`install_dotf || log_warning`), so treating this as fatal
-#      would make a warned-past dependency a hard prerequisite of the entire
-#      harness deploy. The caller warns loudly and renders without the model line,
+#      binary is a bootstrap state, not an unreadable map. setup-linux.sh now
+#      stops without dotf (#2013 W4), but this script also runs from a bare
+#      checkout, so treating this as fatal would make dotf a hard prerequisite of
+#      every harness deploy. The caller warns loudly and renders without the model line,
 #      which is what this script did unconditionally before — never worse than the
 #      status quo, and it still SAYS SO, which is the honest-degradation bar
 #      (ADR-032).

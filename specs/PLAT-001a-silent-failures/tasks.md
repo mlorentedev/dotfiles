@@ -64,7 +64,7 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 ### W4 — setup fails loudly (F-048)
 
 - [x] Measured first: after BUG-126 (#2383), `dotf deploy` reports no failed row on integration (`bash setup-linux.sh`) or test-windows (`.\setup-windows.ps1`), and compile-harness prints its success line, so making them fatal turns no green job red (CI run 38375975019)
-- [x] Failing guard first: `tests/setup-fails-loudly.bats`, five tests, all red before the change
+- [x] Failing guard first: `tests/setup-fails-loudly.bats`, five tests, all red before the change (the suite run against `1c70afeb^`'s two setup scripts: `not ok` 1-5)
 - [x] The preflight: a failed dotf install (`install_dotf`, `Install-Dotf`) or a missing installer stops setup; every later step needs dotf
 - [x] A failed `dotf deploy` stops setup on both OSes, and so does a `dotf` that cannot be found after the install
 - [x] A failed `compile-harness --deploy` stops `setup-linux.sh`. Windows' skill deploy is the in-script `Deploy-SkillRecord`, out of this row
