@@ -127,6 +127,13 @@ _strip_markup() {
             while (substr(s, i + r, 1) == "`") r++
             return r
         }
+        # escaped(s, i): whether the character at i follows an odd number of
+        # backslashes. An even number is literal backslashes, escaping nothing.
+        function escaped(s, i,    b) {
+            b = 0
+            while (i - b > 1 && substr(s, i - b - 1, 1) == "\\") b++
+            return b % 2
+        }
         # span_end(s, n): the position in s of the last backtick of the first
         # run of exactly n backticks, or 0 when there is none.
         function span_end(s, n,    i, r) {
@@ -154,7 +161,7 @@ _strip_markup() {
                     # length, is kept as text: a <!-- inside it opens nothing.
                     # A run with no closer on the line, or one escaped with a
                     # backslash, is a literal backtick.
-                    if (j > 1 && substr(line, j - 1, 1) == "\\") {
+                    if (escaped(line, j)) {
                         out = out substr(line, 1, j); line = substr(line, j + 1)
                         continue
                     }

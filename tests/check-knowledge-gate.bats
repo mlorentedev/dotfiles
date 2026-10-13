@@ -453,6 +453,34 @@ A span \` <!-- b --> \`\` c \` ends here, and \`a <!-- b --> \`\` c\` too.
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
 }
 
+@test "an escaped backslash escapes nothing: the backtick after it still opens a span" {
+    SDD_PR_BODY="## Summary
+
+A path a\\\\\`<!--\` in a span.
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
+}
+
+@test "a code span closes only on a run of its own length" {
+    SDD_PR_BODY="## Summary
+
+A \`\`span\` <!-- \`\`\` then
+## Knowledge
+- Lesson: none: hidden in the comment
+- ADR: none: hidden too
+- Runbook: none: hidden too
+-->"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+}
+
 @test "the section ends at the next heading" {
     SDD_PR_BODY="## Knowledge
 - Lesson: none: nothing learned
