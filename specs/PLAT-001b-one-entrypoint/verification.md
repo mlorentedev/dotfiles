@@ -151,6 +151,12 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - `DOTFILES_DOCTOR_NO_IDENTITY` (TEST-005) had no caller left and was deleted with its test: the machine scope skips Bitwarden reach by declaration.
   - Mutations against `tests/ci-windows-doctor-gate.bats`, each caught: a step running `age-keygen -o $key` re-added to the job; the audit step without `GH_TOKEN`.
   - Open until the PR's CI answers: `checkHiveDaemonAnswers` with no vault directory on the runner (hive 4.4.0 starts without one and reports not ready).
+- #2356, PR 7e Linux half accepted on msi (2026-10-13, dotf 0.68.0). The owner ran `dotf env role add ssh-target` and `dotf converge --only workstation-target` twice (1 changed, then 0 changed; no reboot needed), then `ssh-add --apple-use-keychain` and `ssh msi true` on the macmini. Read-only checks from the macmini afterwards:
+  - `ssh -o BatchMode=yes msi` connects; `dotf converge --only workstation-target --plan` on msi: `[ OK ] workstation-target converged`, `0 to change, 1 ok`.
+  - `/etc/ssh/sshd_config.d/01-workstation.conf`: publickey only, `PermitRootLogin no`, `AllowUsers manu@100.64.0.0/10`, no agent or X11 forwarding. `/etc/systemd/logind.conf.d/50-workstation.conf`: lid ignored on external power and docked.
+  - GNOME `sleep-inactive-ac-type` is `'nothing'`, so the desktop does not idle-suspend on AC (#2374's measurement).
+  - sshd listens on `0.0.0.0:22`; UFW is active, but its rules need root to read, and the step writes none. That gap is the new "PR 7e, Linux firewall" row.
+  - `ssh-add --apple-use-keychain` stops being a step: the client agent row in `tasks.md`.
 
 ## Promotion candidates
 
