@@ -103,7 +103,14 @@ fi
 # substrings that were never there.
 SDD_LABELS=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
 SDD_PR_BODY=$(printf '%s' "$meta" | jq -r '.body // ""')
-SDD_PR_AUTHOR=$(printf '%s' "$meta" | jq -r '.author.login // ""')
+# gh names a GitHub App author `app/<slug>` (`app/dependabot`), while the REST
+# API and the gates' bot lists use `<slug>[bot]`. Normalise to the REST form,
+# only when gh also says `is_bot`, so a human login is passed through verbatim.
+# Without it the gates' dependency-bot skip never matched a real PR (#2347).
+SDD_PR_AUTHOR=$(printf '%s' "$meta" | jq -r '
+    (.author.login // "") as $l
+    | if (.author.is_bot // false) and ($l | startswith("app/"))
+      then ($l | ltrimstr("app/")) + "[bot]" else $l end')
 export SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR
 
 exec "$SCRIPT_DIR/$GATE" "${FORWARD[@]}"
