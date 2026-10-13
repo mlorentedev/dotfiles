@@ -17,11 +17,6 @@ darwin the hive daemon is down
 # example: [FAIL] the hive daemon is down, so the hive MCP server fails in every agent (`hive client` never starts a server of its own). Fix: `hive service install`, or `systemctl --user restart hive.service`, then confirm with `hive service status`.
 linux the hive daemon is down
 
-# owner: #2013 P7 (= #1843 B2, home dotfiles as deploy entries)
-# example: [FAIL] .profile missing at /Users/runner/.profile (run setup-linux.sh)
-darwin .profile missing at
-# example: [FAIL] .inputrc missing at /Users/runner/.inputrc (run setup-linux.sh)
-darwin .inputrc missing at
 
 # owner: #2013 T3 (versions via `mise ls --json`; the ~/Applications and *_HOME checks replaced)
 # example: [FAIL] Java expected version 21.0.4 but directory missing: /home/runner/Applications/jdk-21.0.4

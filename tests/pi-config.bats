@@ -322,7 +322,8 @@ assert_absent() {
 # of two blocks in a script is incidental until something asserts it.
 @test "both setups seed pi settings.json BEFORE dotf deploy merges compaction into it" {
     seed="$(grep -n '^PI_SETTINGS_SRC=' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
-    deploy="$(grep -n '"$_dotf" deploy' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
+    # The bare deploy, which merges compaction; the tail re-deploys named rc files only.
+    deploy="$(grep -n '"$_dotf" deploy ||' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
     [ -n "$seed" ] && [ -n "$deploy" ] || { echo "linux anchors missing: seed=$seed deploy=$deploy"; return 1; }
     [ "$seed" -lt "$deploy" ] || { echo "setup-linux.sh: seed at $seed, dotf deploy at $deploy"; return 1; }
     seed="$(grep -n '^\$piSettingsSrc = ' "$DOTFILES_DIR/setup-windows.ps1" | cut -d: -f1)"

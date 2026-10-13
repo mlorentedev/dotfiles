@@ -50,7 +50,11 @@ created: "2026-10-05"
 - [x] A directory `dotf deploy` creates for a file that grants nothing to group or others is 0700: `~/.ssh` landed 0755 on the Mac. An existing directory keeps its mode
 - [x] W6 (`.gitconfig`): the github.com and gist credential helpers run `!gh auth git-credential` through PATH. `/usr/bin/gh` is Linux's path; macOS has `/opt/homebrew/bin/gh` and Windows `gh.exe`. On the Mac, `git credential fill` through the repo `.gitconfig` alone returns a password line
 - [x] On the Mac: `dotf deploy ssh-config` and `ssh-pubkey` created `~/.ssh` 0700 with the config 0600 and the key 0644, `ssh -G rpi4` resolves the host, and a second run is in sync
-- [ ] P7b, after B1 is released and pinned: `.bashrc`, `.profile` and `.inputrc` as entries with `platforms: [linux, darwin]`, the manifest at version 4
+- [x] P7b, after B1 is released and pinned (0.65.0 carries the reader; the pin is 0.67.0): `.bashrc`, `.profile` and `.inputrc` as entries with `platforms: [linux, darwin]`, the manifest at version 4
+  - `setup-linux.sh` loses its `deploy_file` calls into `$HOME` and the fallback that wrote a basic `.bashrc` when the repo had none; its tail re-deploys `zshrc`, `bashrc` and `profile` through `dotf deploy`, since installers append to them mid-setup
+  - doctor's deploy-dir drift section and `homeDeployMap` go: `checkDeployManifest` compares the entries, and `deploy.PlanConfig` counts a symlink at the destination as a change, the `check_deployed` rejection it carried. `TestSetupShellParity` reads the manifest alone
+  - `tests/guard-setup-rc-files-are-deploy-entries.bats` keeps `deploy_file` into `$HOME` out of setup and pins the three entries; re-adding the `.inputrc` call fails it
+  - The X1 ratchet drops `darwin .profile missing at` and `darwin .inputrc missing at` in the same PR: the gate fails on an entry no [FAIL] matches
 - [x] `.gitconfig` is co-owned: every `git config --global` writes it, which is why doctor exempts it from the content check (measured drifting on a converged box 2026-09-02), so a replace entry would fight those tools on every run. The design for its row: the repo file deploys whole to a file dotfiles owns (`~/.config/dotfiles/gitconfig`), and `~/.gitconfig` keeps one `[include] path` to it, added idempotently, so tools keep writing `~/.gitconfig` and neither side overwrites the other Done by #2207 (#2208) with the include target at `~/.config/git/dotfiles.gitconfig`, deployed by the `gitconfig` entry and included through `dotf converge --only git-config`
 
 ## W2, W4, W5, W8–W10
@@ -67,7 +71,7 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] Review triage: `dotf deploy <name>` for an entry of another OS prints a `skipped` line and exits 0, not 1.
   A skip is not a failure (#1843 contract), and no script deploys a single entry by name, so a
   non-zero exit would only break `dotf deploy bashrc` typed on Windows without telling anyone more
-- [ ] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc` and `ssh/config` (`.gitconfig` left this list with #2207) to entries with `platforms: [linux, darwin]` and the manifest to version 4
+- [x] After the release carrying this reader is the `DOTF_VERSION` pin: P7 moves `.bashrc`, `.profile`, `.inputrc` and `ssh/config` (`.gitconfig` left this list with #2207) to entries with `platforms: [linux, darwin]` and the manifest to version 4. `ssh/config` went in P7a without `platforms`, every OS; the other three in P7b
 
 ## #2162 — the harness refresh reads a vault clone of unknown age
 

@@ -76,13 +76,11 @@ else
     log_info "Already in dotfiles directory, skipping copy..."
 fi
 
-# Deploy dotfiles via deploy_file (SDD-007 IaC strategy: atomic copy + idempotent).
 # ~/.zshrc, ~/.zsh/* and ~/.tmux.conf are `dotf deploy` entries (ai/deploy.json:
-# zshrc, zsh-*, tmux; #1843 B2, PLAT-001 P6), deployed by the bare `dotf deploy`
-# below on every OS that has zsh or tmux, with a one-time .pre-dotf backup of a
+# zshrc, zsh-*, tmux; #1843 B2, PLAT-001 P6), and so are ~/.bashrc, ~/.profile
+# and ~/.inputrc on linux and darwin (bashrc, profile, inputrc; #2013 P7). The
+# bare `dotf deploy` below installs them, with a one-time .pre-dotf backup of a
 # file the machine already had. Edit in the repo, never in $HOME.
-log_info "Deploying main dotfiles..."
-[ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
 
 # ~/.ssh/config (0600) and the public key are `dotf deploy` entries on every
 # OS (ai/deploy.json ssh-config, ssh-pubkey; #2013 P7).
@@ -90,9 +88,6 @@ log_info "Deploying main dotfiles..."
 # ~/.gitconfig is co-owned by git, gh and the user, so nothing deploys over it
 # (#2207): `dotf deploy` below writes ~/.config/git/dotfiles.gitconfig and
 # `dotf converge --only git-config` after it adds the include and gh's helper.
-
-# readline config (POLISH-004): case-insensitive completion + smart history.
-deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"
 chmod +x "$DOTFILES_DIR/scripts/utils.sh"
 chmod +x "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 chmod +x "$DOTFILES_DIR/scripts/dotfiles-sync.sh"
@@ -139,8 +134,9 @@ fi
 # deployed file (REFACTOR-010 / "presence is not convergence").
 #
 # That assertion used to be check_deployed, right below; OPS-043 moved it into
-# `dotf doctor` (checkHomeDeployDrift). The reason this comment records still
-# holds -- only the thing that would catch a regression changed name and file.
+# `dotf doctor`, where checkDeployManifest compares the rc files now that they
+# are ai/deploy.json entries. The reason this comment records still holds --
+# only the thing that would catch a regression changed name and file.
 
 # Create a bash_aliases file for bash
 log_info "Creating bash_aliases file..."
@@ -149,29 +145,6 @@ cat > "$HOME/.bash/bash_aliases" << EOF
 # Bash Aliases
 $(grep -v '^\s*#' "$DOTFILES_DIR/.zsh/aliases.zsh" | grep "^alias ")
 EOF
-
-# Create a basic .bashrc if it doesn't exist
-if [ -f "$DOTFILES_DIR/.bashrc" ]; then
-    log_info "Using existing .bashrc from dotfiles..."
-else
-    log_info "Creating a basic .bashrc file (none found in source)..."
-    cat > "$DOTFILES_DIR/.bashrc" << EOF
-# ~/.bashrc: executed by bash(1) for non-login shells.
-
-# Source aliases
-if [ -f ~/.bash/bash_aliases ]; then
-    . ~/.bash/bash_aliases
-fi
-
-# Source utility functions
-if [ -f "$DOTFILES_DIR/scripts/utils.sh" ]; then
-    . "$DOTFILES_DIR/scripts/utils.sh"
-fi
-EOF
-fi
-
-# Deploy .bashrc
-deploy_file "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
 # ============================================================================
 # DEVELOPER TOOLS (user-level installs to ~/.local/bin)
@@ -988,14 +961,12 @@ log_success "Installation completed! Verifying file links..."
 # OPS-043: the per-file byte comparison that used to live here (check_deployed
 # x3) and the 14-tool check_dependencies sweep are now `dotf doctor`'s, which
 # runs at the tail of this same script. Both moved rather than being dropped:
-# doctor's `Deploy-dir<->$HOME drift` section carries the byte comparison AND
-# check_deployed's symlink rejection, over eleven files instead of three, and
-# every one of the fourteen tools has an equal-or-stronger verdict there --
-# asserted by TestSetupShellParity, not by this comment. setup-windows.ps1 has
-# had no such block since CLI-018; this brings Linux to the same shape.
-#
-# The exemptions the deleted NOTEs recorded now live beside the data they
-# describe, in doctor's homeDeployMap, each with its own reason.
+# every home file is an ai/deploy.json entry, which doctor's checkDeployManifest
+# byte-compares and which counts a symlink at the destination as drift (the
+# check_deployed rejection), and every one of the fourteen tools has an
+# equal-or-stronger verdict there -- asserted by TestSetupShellParity, not by
+# this comment. setup-windows.ps1 has had no such block since CLI-018; this
+# brings Linux to the same shape.
 file_exists "$HOME/.bash/bash_aliases" && log_success "bash_aliases created" || log_error "bash_aliases issue"
 
 # Deploy env-contract.json so `dotf doctor` can find it under $DOTFILES_DIR.
@@ -1044,10 +1015,16 @@ if command -v dotf >/dev/null 2>&1; then
     fi
 fi
 
-# Re-enforce main dotfiles at the end of setup to overwrite any third-party installer mutations.
-if command -v dotf >/dev/null 2>&1; then dotf deploy zshrc; elif [ -x "$HOME/.local/bin/dotf" ]; then "$HOME/.local/bin/dotf" deploy zshrc; fi
-[ -f "$DOTFILES_DIR/.bashrc" ] && deploy_file "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
-[ -f "$DOTFILES_DIR/.profile" ] && deploy_file "$DOTFILES_DIR/.profile" "$HOME/.profile"
+# Re-enforce the rc files at the end of setup to overwrite any third-party installer mutations.
+_dotf=""
+if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
+if [ -n "$_dotf" ]; then
+    for _rc in zshrc bashrc profile; do
+        # Fatal, like the single `dotf deploy zshrc` this loop replaces: setup
+        # must not report success with an rc file it could not write (#2013 W4).
+        "$_dotf" deploy "$_rc" || { log_error "dotf deploy $_rc failed -- see 'dotf doctor'"; exit 1; }
+    done
+fi
 
 # Final assertion against env-contract.json -- catches drift between what
 # setup just deployed and what's actually in place / on PATH / in env vars.
