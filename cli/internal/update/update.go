@@ -124,7 +124,7 @@ func Assess(repo string, git func(args ...string) (string, error)) Outcome {
 	// on a dirty worktree is otherwise a silent no-op forever (dotfiles#694): the
 	// timer stays green while the deploy never runs. Surfacing the exact paths
 	// makes that state diagnosable from the run log alone.
-	if dirt := strings.TrimSpace(out); dirt != "" {
+	if dirt := strings.TrimRight(out, "\r\n"); strings.TrimSpace(dirt) != "" {
 		return Outcome{Status: "dirty", Message: "dirty worktree in " + repo, Detail: dirt}
 	}
 	// A fetch failure is transient (network): the caller retries next run.
