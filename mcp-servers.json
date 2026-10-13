@@ -23,7 +23,7 @@
     {
       "name": "pdf-modifier",
       "transport": "stdio",
-      "args": "uvx pdf-modifier-mcp",
+      "args": "uvx pdf-modifier",
       "prerequisite_binary": "uv"
     }
   ]

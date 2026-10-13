@@ -156,8 +156,8 @@ func TestLoadServers(t *testing.T) {
 // The migration is scoped to hive: pdf-modifier legitimately runs under uvx,
 // and an unscoped match would remove and re-add it on every deploy.
 func TestRegisterLeavesOtherUvxServersAlone(t *testing.T) {
-	pdf := []Server{{Name: "pdf-modifier", Transport: "stdio", Args: "uvx pdf-modifier-mcp", PrerequisiteBinary: "uv"}}
-	f := &mcpFake{registered: map[string]string{"pdf-modifier": "Command: uvx\n  Args: pdf-modifier-mcp\n"}}
+	pdf := []Server{{Name: "pdf-modifier", Transport: "stdio", Args: "uvx pdf-modifier", PrerequisiteBinary: "uv"}}
+	f := &mcpFake{registered: map[string]string{"pdf-modifier": "Command: uvx\n  Args: pdf-modifier\n"}}
 	rep := mcpSyncer(f, "uv").Register(pdf, false)
 	if len(f.removed) != 0 || len(f.added) != 0 || !reflect.DeepEqual(rep.Present, []string{"pdf-modifier"}) {
 		t.Fatalf("removed %v added %v report %+v; a current uvx server was churned", f.removed, f.added, rep)
