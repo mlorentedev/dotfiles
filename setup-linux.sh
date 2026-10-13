@@ -165,12 +165,15 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # dotf (the dotfiles Go CLI — ADR-020). Fetch the pinned release binary,
 # checksum-verified, into ~/.local/bin. Idempotent; converges on drift.
+# The preflight of every dotf step below: without it setup cannot finish, so a
+# failure stops here rather than in a box that only looks set up (#2013 W4).
 if [ -f ./install.sh ]; then
     # shellcheck source=/dev/null
     . ./install.sh
-    install_dotf || log_warning "dotf installation failed (continuing; see healthcheck)"
+    install_dotf || { log_error "dotf installation failed -- see the error above; setup cannot continue without it"; exit 1; }
 else
-    log_warning "install.sh not found; skipping dotf install"
+    log_error "install.sh not found -- run setup from the root of a dotfiles checkout"
+    exit 1
 fi
 
 # Catalog tools (CLI-029, packages.json) and the mise-pinned CLIs (ADR-044,
@@ -494,14 +497,15 @@ fi
 _dotf=""
 if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
 if [ -n "$_dotf" ]; then
-    "$_dotf" deploy || log_warning "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
+    "$_dotf" deploy || { log_error "dotf deploy failed -- the failed rows above name each config; fix them and run setup again"; exit 1; }
     # After deploy, which writes the file the include names (#2207).
     "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
     # Its own call: a dotf older than the step refuses the name, and must not
     # take git-config down with it (#2013 X1).
     "$_dotf" converge --only git-hooks || log_warning "dotf converge --only git-hooks failed -- a dotf older than the step cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
 else
-    log_warning "dotf not found (PATH or ~/.local/bin) -- skipping agent config deploy (run ./install.sh: it installs dotf, then converges)"
+    log_error "dotf not found (PATH or ~/.local/bin) after installing it -- no agent config can be deployed"
+    exit 1
 fi
 unset _dotf
 
@@ -934,7 +938,8 @@ unset _dotf
 if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --deploy ) >/dev/null; then
     log_success "Skills deployed from records (claude / opencode / agy / copilot)"
 else
-    log_warning "compile-harness --deploy reported issues; check skill records"
+    log_error "compile-harness --deploy failed -- see its errors above; no skill reached the agents"
+    exit 1
 fi
 
 # Weekly vault maintenance cron (Sundays 10:00 AM)

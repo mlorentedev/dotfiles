@@ -498,15 +498,18 @@ if (-not ($claudeCmd -and $npxCmd)) {
 # (user-space, no admin) - the PowerShell twin of setup-linux.sh sourcing
 # install.sh. goreleaser already publishes the Windows zip, so nothing is
 # compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
-# automatically; non-fatal, like the Linux side (`install_dotf || log_warning`).
+# automatically. The preflight of every dotf step below, as on Linux: setup
+# cannot finish without it, so a failure stops here (#2013 W4).
 $installDotfScript = Join-Path $PSScriptRoot 'install.ps1'
 if (Test-Path $installDotfScript) {
     . $installDotfScript
     if (-not (Install-Dotf)) {
-        Write-Warn "dotf installation failed (continuing; the env steps below auto-skip)"
+        Write-Err "dotf installation failed -- see the error above; setup cannot continue without it"
+        exit 1
     }
 } else {
-    Write-Warn "install.ps1 not found; skipping dotf install"
+    Write-Err "install.ps1 not found -- run setup from the root of a dotfiles checkout"
+    exit 1
 }
 
 # ============================================================================
@@ -840,7 +843,8 @@ if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
     & dotf deploy
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "dotf deploy failed -- run it again after setup, or see 'dotf doctor'"
+        Write-Err "dotf deploy failed -- the failed rows above name each config; fix them and run setup again"
+        exit 1
     }
     # After deploy, which writes the file the include names (#2207).
     & dotf converge --only git-config
@@ -854,7 +858,8 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
         Write-Warn "dotf converge --only git-hooks failed -- a dotf older than the step cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
     }
 } else {
-    Write-Warn "dotf not on PATH -- skipping agent config deploy (run install.ps1, then 'dotf deploy')"
+    Write-Err "dotf not on PATH after installing it -- no agent config can be deployed"
+    exit 1
 }
 
 $piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'
