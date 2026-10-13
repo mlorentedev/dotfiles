@@ -2,6 +2,7 @@
 # Tests for setup-windows.ps1 (structural; PSScriptAnalyzer runs in lint-powershell, #2052)
 
 load 'winpath'
+load 'lib/pwsh'
 load 'lib/refute'
 
 setup() {
@@ -407,9 +408,7 @@ _render_skill_record() {  # <kind> <record> <srcpath> <outfile>
     # committed record carries its own generated_* provenance, every Windows
     # skill/command deploy produced duplicate YAML keys. A source-text grep
     # cannot catch this class -- it has to run the real function.
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
 
     local scratch="$BATS_TEST_TMPDIR/convert-skill-record"
     mkdir -p "$scratch"
@@ -439,9 +438,7 @@ _render_skill_record() {  # <kind> <record> <srcpath> <outfile>
     # session-start roster. compile-harness.sh was fixed for that in #1080;
     # this function is its Windows twin and was not, which took 34 of 43
     # skills off this box (measured 2026-08-29).
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
 
     local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
     mkdir -p "$scratch"
@@ -886,9 +883,7 @@ FIXTURE
 }
 
 @test "setup-windows.ps1 valid PowerShell syntax (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
     run pwsh -NonInteractive -Command "
         \$errors = \$null
         [System.Management.Automation.Language.Parser]::ParseFile(
@@ -943,18 +938,14 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 }
 
 @test "setup-windows.ps1 executes harness mirror with its checkout path (WIN-014)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
     run_windows_harness_mirror_block yes 'C:\checkout with spaces'
     [ "$status" -eq 0 ]
     [[ "$output" == *'CALL <harness> <mirror> <--repo> <C:\checkout with spaces>'* ]] || false
 }
 
 @test "setup-windows.ps1 warns when dotf cannot mirror the harness (WIN-014)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
     run_windows_harness_mirror_block no 'C:\checkout'
     [ "$status" -eq 0 ]
     [[ "$output" == *'WARN:dotf not found; harness inputs were not mirrored'* ]] || false
