@@ -2,7 +2,10 @@ package tools
 
 import (
 	"bytes"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 // Runner executes name with args and returns its output. The seam
@@ -52,4 +55,38 @@ func ProbeVersionArgs(name string, run Runner, args ...string) string {
 		return string(m)
 	}
 	return ""
+}
+
+// copiesOnPath lists every regular file in pathList that would run as name, in
+// PATH order: name itself, or on Windows name plus each PATHEXT extension, which
+// is how exec.LookPath resolves a command there. A directory listed twice is
+// read once.
+func copiesOnPath(name, goos, pathList, pathext string) []string {
+	names := []string{name}
+	if goos == "windows" {
+		if pathext == "" {
+			pathext = ".com;.exe;.bat;.cmd"
+		}
+		names = nil
+		for _, ext := range strings.Split(pathext, ";") {
+			if ext != "" {
+				names = append(names, name+strings.ToLower(ext))
+			}
+		}
+	}
+	var copies []string
+	seen := map[string]bool{}
+	for _, dir := range filepath.SplitList(pathList) {
+		if dir == "" || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		for _, n := range names {
+			p := filepath.Join(dir, n)
+			if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() {
+				copies = append(copies, p)
+			}
+		}
+	}
+	return copies
 }
