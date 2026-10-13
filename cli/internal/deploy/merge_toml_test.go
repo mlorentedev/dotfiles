@@ -276,10 +276,11 @@ func TestDeploy_TOMLMergeUnionsAListTheToolAppendedTo(t *testing.T) {
 
 // #2013 H4: the SHIPPED herdr entry and the SHIPPED ai/herdr/config.toml, as
 // the agy test above does for its config. The tests before this one prove the
-// engine with a fixture; this one fails if the entry stops being a merge, if
-// its dst stops resolving through HERDR_CONFIG_DIR, or if the file starts
-// naming a key herdr writes, any of which would undo the owner's in-app
-// choices on every deploy.
+// engine with a fixture; this one fails if the entry stops being a merge or
+// its dst stops resolving through HERDR_CONFIG_DIR, and if the file starts
+// naming one of the keys the fixture below has herdr write (onboarding,
+// ui.accent, keys.zoom). It cannot see every key herdr may write; the file's
+// header states the rule for the rest.
 func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
 	const root = "../../.."
 	raw, err := os.ReadFile(filepath.Join(root, ManifestRel))
