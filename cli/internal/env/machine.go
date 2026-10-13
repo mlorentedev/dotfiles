@@ -5,7 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
+
+// machineLockTimeout bounds the wait for another machine.json writer. A writer
+// holds the lock for one read and one rename, so ten seconds only runs out
+// when something is wrong, and then the error names the lock file.
+const machineLockTimeout = 10 * time.Second
 
 // SetMachinePath merges one path override into machine.json — the write-side
 // counterpart of the read-side ResolvePath / `dotf env path`. It loads the
@@ -48,7 +56,20 @@ func SetMachinePath(contractPath, machinePath, key, value string) (bool, error) 
 // readers own (machine, pools, roles), and a writer that round-trips the file
 // through its own struct deletes every section that struct lacks (lesson 402).
 // An absent file starts as an empty document; a malformed one is an error.
+//
+// The read, the edit and the rename run under a lock on machine.json.lock, so
+// two dotf processes editing at once both keep their edit; without it the later
+// rename drops the earlier one and both report success (#2363). The kernel
+// releases the lock when its holder exits, so a killed writer leaves none.
 func editMachine(path string, edit func(doc map[string]json.RawMessage) (bool, error)) (bool, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, fmt.Errorf("create machine.json dir: %w", err)
+	}
+	unlock, err := filelock.Lock(path+".lock", machineLockTimeout)
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
 	doc := map[string]json.RawMessage{}
 	raw, err := os.ReadFile(path)
 	switch {
