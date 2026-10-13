@@ -6,6 +6,10 @@
 # OpenSSH: any other build rejects the whole file over an unknown keyword
 # unless IgnoreUnknown names it first.
 
+# os-sensitive: the keychain half runs only on macOS, so test-macos must run
+# this file on every pull request, not only on pushes to main.
+# bats file_tags=os-sensitive
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CONF="$REPO/ssh/config"
@@ -28,9 +32,13 @@ setup() {
     printf '%s\n' "$block" | grep -q '^[[:space:]]*AddKeysToAgent[[:space:]]\{1,\}yes$'
 }
 
-@test "Apple's OpenSSH accepts UseKeychain, so the keychain half is real on macOS" {
+# The shipped line, without the IgnoreUnknown that would hide a keyword Apple's
+# ssh rejected: in the shipped file a typo would parse and do nothing.
+@test "Apple's OpenSSH accepts the shipped UseKeychain line, so the keychain half is real on macOS" {
     [ "$(uname -s)" = Darwin ] && [ -x /usr/bin/ssh ] || skip "not macOS"
-    printf 'Host *\n  UseKeychain yes\n' > "$BATS_TEST_TMPDIR/apple.conf"
+    line="$(awk '/^Host \*$/{f=1; next} f && /^(Host|Match) /{exit} f && /^[[:space:]]*UseKeychain[[:space:]]/' "$CONF")"
+    [ -n "$line" ] || false
+    printf 'Host *\n%s\n' "$line" > "$BATS_TEST_TMPDIR/apple.conf"
     run /usr/bin/ssh -F "$BATS_TEST_TMPDIR/apple.conf" -G msi </dev/null
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
