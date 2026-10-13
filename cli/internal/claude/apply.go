@@ -18,7 +18,11 @@ func ApplyMCP(s Syncer, repoRoot string, dryRun bool) (MCPReport, error) {
 	}
 	rep := s.Register(servers, dryRun)
 	if len(rep.Failed) > 0 {
-		return rep, fmt.Errorf("%d server(s) failed to register: %s", len(rep.Failed), strings.Join(rep.Failed, ", "))
+		err := fmt.Errorf("%d server(s) failed to register: %s", len(rep.Failed), strings.Join(rep.Failed, ", "))
+		if len(rep.Lost) > 0 {
+			err = fmt.Errorf("%w; removed and not restored: %s", err, strings.Join(rep.Lost, ", "))
+		}
+		return rep, err
 	}
 	return rep, nil
 }

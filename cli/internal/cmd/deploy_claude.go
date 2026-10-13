@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
@@ -156,12 +157,15 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 	}
 	rep, err := claude.ApplyMCP(s, repoRoot, dryRun)
 	reportRestored(w, step, s.ClaudeJSON, rep.Restored)
-	verb, why := "migrated", "(stale uvx hive-vault entry replaced by the SSOT one)"
+	verb := "migrated"
 	if dryRun {
-		verb, why = "would migrate", "(stale uvx hive-vault entry)"
+		verb = "would migrate"
 	}
-	for _, name := range rep.Migrated {
-		deployRow(w, verb, step, "%s %s", name, why)
+	for _, d := range rep.Migrated {
+		deployRow(w, verb, step, "%s: %s -> %s", d.Name, d.Was, d.Now)
+	}
+	for _, u := range rep.Untouched {
+		deployRow(w, "untouched", step, "%s (%s; left as registered)", u.Name, u.Why)
 	}
 	for _, sk := range rep.Skipped {
 		deployRow(w, "skipped", step, "%s (%s not on PATH)", sk.Name, sk.Missing)
@@ -170,7 +174,14 @@ func deployClaudeMCP(w io.Writer, repoRoot, home string, dryRun bool) error {
 		reportCounts(w, step, dryRun, len(rep.Added), len(rep.Failed), len(rep.Present))
 	}
 	for _, name := range rep.Failed {
-		deployRow(w, "failed", step, "%s did not register", name)
+		switch {
+		case slices.Contains(rep.RolledBack, name):
+			deployRow(w, "failed", step, "%s did not re-register; its previous registration was restored", name)
+		case slices.Contains(rep.Lost, name):
+			deployRow(w, "failed", step, "%s did not re-register, and its previous registration could not be restored: it is unregistered", name)
+		default:
+			deployRow(w, "failed", step, "%s did not register", name)
+		}
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", step, err)
