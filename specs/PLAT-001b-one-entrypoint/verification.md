@@ -143,6 +143,14 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
     - A key with one character changed: test 4, because the fingerprint differs from the one recorded above it. It still parses, so test 1 alone missed it; test 4 exists for that reason.
     - A key truncated: tests 1 and 4.
     - macmini's `UserKnownHostsFile` removed: test 3.
+- #2013 X4, test-windows runs the machine scope (2026-10-13). The job no longer fabricates an age key, a vault skeleton or an `obsidian.cmd` stub, and `doctor-gate.ps1` runs `dotf doctor --scope machine`.
+  - What else read the fabricated pieces, measured before the change: no Pester suite and no test in the bats subset reads them; the setup-windows.ps1 preflights for the key and the vault only warn; `checkTriggerTargets` and `checkGuardHooks` already skipped on the skeleton. Without the machine scope `checkVault` would FAIL seven times, so both changes land together.
+  - The machine scope also skips doctor's gh checks. On the last green main run (38365444626) they printed:
+    - spec-issue-state: `1 checks, all ok`. It verified something, so it became its own step, `dotf spec audit` with `GH_TOKEN` (CI-004 AC8 kept). `dotf spec audit` on main the same day: `[OK] 13 active spec(s), every one tracking an open issue`.
+    - branch-protection: one `not verified — Resource not accessible by integration (HTTP 403)` WARN per repo. It verified nothing under the job token, so nothing is lost.
+  - `DOTFILES_DOCTOR_NO_IDENTITY` (TEST-005) had no caller left and was deleted with its test: the machine scope skips Bitwarden reach by declaration.
+  - Mutations against `tests/ci-windows-doctor-gate.bats`, each caught: a step running `age-keygen -o $key` re-added to the job; the audit step without `GH_TOKEN`.
+  - Open until the PR's CI answers: `checkHiveDaemonAnswers` with no vault directory on the runner (hive 4.4.0 starts without one and reports not ready).
 - #2356, PR 7e Linux half accepted on msi (2026-10-13, dotf 0.68.0). The owner ran `dotf env role add ssh-target` and `dotf converge --only workstation-target` twice (1 changed, then 0 changed; no reboot needed), then `ssh-add --apple-use-keychain` and `ssh msi true` on the macmini. Read-only checks from the macmini afterwards:
   - `ssh -o BatchMode=yes msi` connects; `dotf converge --only workstation-target --plan` on msi: `[ OK ] workstation-target converged`, `0 to change, 1 ok`.
   - `/etc/ssh/sshd_config.d/01-workstation.conf`: publickey only, `PermitRootLogin no`, `AllowUsers manu@100.64.0.0/10`, no agent or X11 forwarding. `/etc/systemd/logind.conf.d/50-workstation.conf`: lid ignored on external power and docked.

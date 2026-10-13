@@ -152,8 +152,11 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] Implement the sweep table (`check{kind, section, restore, run}`), `Options.Scope`, `ParseScope` and `dotf doctor --scope all|machine`; a plain `dotf doctor` is unchanged
 - [x] Split the two checks that mixed both kinds: `checkAgeIdentity` (the key) from `checkSecretsTooling` (the binaries), and `checkAgentSecretConfigs` (configs rendered from secrets) from `checkOpenCode` (the binaries)
 - [x] ADR-045 amendment for D10, D11 and D12; the runbook orders the restore the SKIP lines cite
-- [ ] Follow-up: X1 (#2331) runs `dotf doctor --scope machine`
-- [ ] Follow-up: test-windows runs `--scope machine` and drops the identity it fabricates (age key, vault skeleton, `obsidian.cmd` stub)
+- [x] Follow-up: X1 (#2331) runs `dotf doctor --scope machine` (`from-zero.yml`, step `dotf doctor --scope machine`)
+- [x] Follow-up: test-windows runs `--scope machine` and drops the identity it fabricates (age key, vault skeleton, `obsidian.cmd` stub)
+  - The machine scope also skips doctor's gh checks. spec-issue-state was the one verifying something on the runner (CI-004 AC8), so `dotf spec audit` became its own step with `GH_TOKEN`; branch-protection only ever printed `not verified` (HTTP 403) under the job token, so nothing is lost there
+  - `DOTFILES_DOCTOR_NO_IDENTITY` (TEST-005) had no other caller and was deleted: under the machine scope Bitwarden reach is skipped by declaration
+  - Guard: `tests/ci-windows-doctor-gate.bats`, two tests, each mutation-checked (a re-added `age-keygen -o`, an audit step without the token)
 
 ### PR 6b — the git-hooks step (#2013 X1 finding)
 
@@ -180,7 +183,16 @@ Gated on a release that carries 4a and PR 5 (0.67.0): `tests/install.bats` fails
 - [x] `PluginReport.Causes`, filled by `Syncer.Sync`; `reportCounts` counts failures for both claude steps, so the MCP summary gains the count too
 - [x] Delete the plugin loops of `setup-linux.sh` and `setup-windows.ps1` (one twin pair): both already run the bare `dotf deploy`, which installs `ai/claude/plugins.json`
 - [x] Guard: `tests/claude-plugins.bats` fails when either script runs `claude plugin install|list` outside a comment or quotes a declared id; the BUG-004/011 structure tests that read the deleted loops are retired, and the zero-usage list guard reads `plugins.json`
-- [ ] After merge: the next X1 run names why the installs fail on a fresh runner; record the cause on #2013
+- [x] After merge: the next X1 run names why the installs fail on a fresh runner; record the cause on #2013. Run 38365444507: `Plugin "gopls-lsp" not found in marketplace "claude-plugins-official"` for all three, on both converges; filed as BUG-126 (#2378), fixed in PR 6e; the cause is recorded on #2013 (https://github.com/mlorentedev/dotfiles/issues/2013#issuecomment-6140797662, row 3)
+
+### PR 6e — a plugin's marketplace is registered from a declared source (BUG-126 #2378)
+
+- [x] First fix refuted before its PR: refreshing each marketplace (the CLI's hint) failed on dispatched run 38366816961 with `Marketplace 'claude-plugins-official' not found. Available marketplaces: anthropic-plugin-directory`. The `latest` Claude Code no longer registers it; upstream `anthropics/claude-plugins-official` still names itself so and carries the three plugins (lesson 404)
+- [x] Failing tests first: each marketplace is prepared once before its first install, added from its source when missing and refreshed when registered, with the registry listed once and read again after each add (`TestSyncPreparesEachMarketplaceOnceBeforeItsFirstInstall`); nothing is called on a converged box or a dry run (`TestSyncPreparesNothingWithoutAnInstall`); a failed preparation, or a marketplace with no source, is named in the cause of an install that then fails (`TestAFailedPreparationIsNamedInTheCauseOfAFailedInstall`)
+- [x] `ai/claude/marketplaces.json`, read by `LoadMarketplaceSources`: its own file, since every released dotf reads `plugins.json` with `DisallowUnknownFields` and a new field would fail the plugin step on a box whose binary predates it. Absent means no sources; present, it is read strictly (`TestLoadMarketplaceSources`)
+- [x] Guard: `TestEveryDeclaredPluginsMarketplaceHasASource` fails when a plugin is declared from a marketplace with no source
+- [x] Review fixes (PR-Agent on #2383): the deploy's read of `marketplaces.json` is tested (`TestDeployCmd_APluginsMarketplaceIsPreparedFromTheDeclaredSource`, mutation-checked), and an add is followed by a registry read, so a source that registers under another name is the named cause (`TestARegistrationUnderAnotherNameIsNamedInTheCause`)
+- [x] Evidence: from-zero run 38368564873 on `66201aba`, ubuntu: `installed claude-plugins 3 added, 0 already present` on the first converge, `in sync claude-plugins 0 added, 3 already present` on the second (the report omits a zero failure count). The macOS runner prints `[SKIP] claude ... not installed` on both converges, before and after the fix: converge installs no Claude Code on macOS, which is #2317 (PLAT-002), so the defect never reached that runner and this PR cannot prove anything there
 
 ### PR 7 — the workstation SSH target (#2013 A1, SEC-011 #2356)
 
