@@ -266,7 +266,12 @@ func TestCheckMiseTools_APythonPackageMissingFailsNamingTheSync(t *testing.T) {
 // from an empty environment; env records what each probe was given.
 func shellPathFixture(t *testing.T, paths map[string]string, env *[][]string) (*System, *Config, string) {
 	t.Helper()
-	s, cfg := miseFixture(t, "darwin", "1.2.1", true)
+	return shellPathFixtureAt(t, "1.2.1", paths, env)
+}
+
+func shellPathFixtureAt(t *testing.T, ageVersion string, paths map[string]string, env *[][]string) (*System, *Config, string) {
+	t.Helper()
+	s, cfg := miseFixture(t, "darwin", ageVersion, true)
 	home := s.Getenv("HOME")
 	s.LookPath = newSys(nil, []string{"mise", "zsh", "bash"}, nil).LookPath
 	s.CommandOutputEnv = func(e []string, name string, args ...string) (string, error) {
@@ -334,6 +339,42 @@ func TestCheckMiseTools_ANonInteractiveShellWithoutTheShimsWarns(t *testing.T) {
 				t.Errorf("want one WARN saying %q and naming dotf deploy\n%s", want, b.String())
 			}
 		})
+	}
+}
+
+// The startup PATH is a fact about the deployed files, not about the pins: a
+// pin that is not installed yet must not hide a shell that would never run it
+// through mise anyway.
+func TestCheckMiseTools_ShellProbeRunsWhenAPinIsMissing(t *testing.T) {
+	var env [][]string
+	s, cfg, _ := shellPathFixtureAt(t, "1.0.0", map[string]string{
+		"zsh -c":   "/usr/bin:/bin",
+		"bash -lc": "HOME/.local/share/mise/shims:/usr/bin",
+	}, &env)
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 1 || rep.Warnings() != 1 || !strings.Contains(b.String(), "`zsh -c` starts without") {
+		t.Errorf("want the pin FAIL and the shell WARN both\n%s", b.String())
+	}
+}
+
+// bash -lc reads the first of ~/.bash_profile, ~/.bash_login and ~/.profile,
+// so where one of the first two exists the deployed .profile is never read
+// and `dotf deploy` alone cannot fix it: the WARN says so.
+func TestCheckMiseTools_ABashProfileThatHidesProfileIsNamed(t *testing.T) {
+	var env [][]string
+	s, cfg, home := shellPathFixture(t, map[string]string{
+		"zsh -c":   "HOME/.local/share/mise/shims:/usr/bin",
+		"bash -lc": "/usr/bin:/bin",
+	}, &env)
+	writeFile(t, filepath.Join(home, ".bash_login"), "")
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	want := filepath.Join(home, ".bash_login") + " exists, so bash -l never reads ~/.profile"
+	if rep.Warnings() != 1 || !strings.Contains(b.String(), want) {
+		t.Errorf("want one WARN saying %q\n%s", want, b.String())
 	}
 }
 

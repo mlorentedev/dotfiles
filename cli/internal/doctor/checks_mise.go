@@ -40,6 +40,9 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		return
 	}
 	home := sys.home()
+	// Whatever the pins below say: the PATH a fresh shell starts with is a fact
+	// about the deployed files, and a missing pin must not hide it.
+	defer checkNonInteractivePath(sys, home, rep)
 	s := miseSync(sys, all.PythonPackages, all.Latest)
 	p, err := s.Plan(pins)
 	if err != nil {
@@ -72,7 +75,6 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 	}
 	rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
 	checkShadowingCopies(sys, home, pins, rep, fix)
-	checkNonInteractivePath(sys, home, rep)
 }
 
 // shellProbes are the non-interactive shells whose startup PATH decides what
@@ -113,7 +115,7 @@ func checkNonInteractivePath(sys *System, home string, rep *Report) {
 		// The last line: an rc that prints something prints it first.
 		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 		if problem := shimsAhead(lines[len(lines)-1], shims, localBin); problem != "" {
-			bad = append(bad, fmt.Sprintf("`%s` %s", form, problem))
+			bad = append(bad, fmt.Sprintf("`%s` %s", form, problem)+loginFileHidingProfile(sys, home, p[0]))
 			continue
 		}
 		ok = append(ok, form)
@@ -125,6 +127,23 @@ func checkNonInteractivePath(sys *System, home string, rep *Report) {
 	if len(ok) > 0 {
 		rep.Pass("non-interactive shells start with mise's shims first: " + strings.Join(ok, ", "))
 	}
+}
+
+// loginFileHidingProfile names the file a login bash reads instead of the
+// deployed ~/.profile: bash -l reads only the first of ~/.bash_profile,
+// ~/.bash_login and ~/.profile, so `dotf deploy` alone cannot fix a home that
+// holds one of the first two.
+func loginFileHidingProfile(sys *System, home, shell string) string {
+	if shell != "bash" {
+		return ""
+	}
+	for _, name := range []string{".bash_profile", ".bash_login"} {
+		f := filepath.Join(home, name)
+		if _, err := os.Stat(f); err == nil {
+			return " (" + f + " exists, so bash -l never reads ~/.profile: source ~/.zsh/path.sh from it)"
+		}
+	}
+	return ""
 }
 
 // shimsAhead says what is wrong with a PATH that must list shims before
