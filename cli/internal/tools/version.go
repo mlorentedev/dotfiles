@@ -57,36 +57,55 @@ func ProbeVersionArgs(name string, run Runner, args ...string) string {
 	return ""
 }
 
-// copiesOnPath lists every regular file in pathList that would run as name, in
-// PATH order: name itself, or on Windows name plus each PATHEXT extension, which
-// is how exec.LookPath resolves a command there. A directory listed twice is
-// read once.
+// copiesOnPath lists every file in pathList that would run as name, in PATH
+// order, the way exec.LookPath resolves a command: on Windows name plus each
+// PATHEXT extension, elsewhere name itself with an execute bit. A directory
+// listed twice, even spelled differently, is read once.
 func copiesOnPath(name, goos, pathList, pathext string) []string {
-	names := []string{name}
-	if goos == "windows" {
-		if pathext == "" {
-			pathext = ".com;.exe;.bat;.cmd"
-		}
-		names = nil
-		for _, ext := range strings.Split(pathext, ";") {
-			if ext != "" {
-				names = append(names, name+strings.ToLower(ext))
-			}
-		}
-	}
 	var copies []string
 	seen := map[string]bool{}
 	for _, dir := range filepath.SplitList(pathList) {
-		if dir == "" || seen[dir] {
+		key := filepath.Clean(dir)
+		if goos == "windows" {
+			key = strings.ToLower(key)
+		}
+		if dir == "" || seen[key] {
 			continue
 		}
-		seen[dir] = true
-		for _, n := range names {
-			p := filepath.Join(dir, n)
-			if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() {
+		seen[key] = true
+		for _, n := range commandNames(name, goos, pathext) {
+			if p := filepath.Join(dir, n); runsAs(p, goos) {
 				copies = append(copies, p)
 			}
 		}
 	}
 	return copies
+}
+
+// commandNames is the file names a command resolves to: on Windows one per
+// PATHEXT extension, in PATHEXT order; elsewhere the name alone.
+func commandNames(name, goos, pathext string) []string {
+	if goos != "windows" {
+		return []string{name}
+	}
+	if pathext == "" {
+		pathext = ".com;.exe;.bat;.cmd"
+	}
+	var names []string
+	for _, ext := range strings.Split(pathext, ";") {
+		if ext != "" {
+			names = append(names, name+strings.ToLower(ext))
+		}
+	}
+	return names
+}
+
+// runsAs reports whether p is a regular file the OS would run: on Windows its
+// extension already says so, elsewhere it needs an execute bit.
+func runsAs(p, goos string) bool {
+	fi, err := os.Stat(p)
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	return goos == "windows" || fi.Mode()&0o111 != 0
 }

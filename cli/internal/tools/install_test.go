@@ -785,7 +785,7 @@ func TestInstall_ShadowedToolNamesTheCopiesOnPath(t *testing.T) {
 }
 
 func TestCopiesOnPath(t *testing.T) {
-	a, b, c := t.TempDir(), t.TempDir(), t.TempDir()
+	a, b, c, d := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
 	for _, f := range []string{filepath.Join(a, "poetry"), filepath.Join(b, "poetry.exe"), filepath.Join(c, "poetry.cmd"), filepath.Join(c, "poetry.exe")} {
 		if err := os.WriteFile(f, nil, 0o755); err != nil {
 			t.Fatal(err)
@@ -794,7 +794,11 @@ func TestCopiesOnPath(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(b, "poetry"), 0o755); err != nil { // a directory never runs
 		t.Fatal(err)
 	}
-	list := strings.Join([]string{a, b, "", a, c}, string(os.PathListSeparator))
+	if err := os.WriteFile(filepath.Join(d, "poetry"), nil, 0o644); err != nil { // no execute bit: LookPath skips it
+		t.Fatal(err)
+	}
+	// a listed twice, once with a trailing separator: one directory, read once.
+	list := strings.Join([]string{d, a, b, "", a + string(filepath.Separator), c}, string(os.PathListSeparator))
 	got := copiesOnPath("poetry", "linux", list, "")
 	if want := []string{filepath.Join(a, "poetry")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("linux: %v, want %v", got, want)
