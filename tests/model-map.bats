@@ -96,9 +96,10 @@ sys.exit(0 if len(top)==1 else 1)
     # and a cap of 7 across the whole key. The Go schema test validates the
     # shape against its own fixture, so without this one a catalog edit could
     # change the shipped figures and fail nothing.
-    run jq -c '.pools.nan | {concurrency, model_concurrency}' "$MAP"
+    # Sorted keys, so reordering the map is not a change of figures.
+    run jq -S -c '.pools.nan | {concurrency, model_concurrency}' "$MAP"
     [ "$status" -eq 0 ]
-    [ "$output" = '{"concurrency":7,"model_concurrency":{"deepseek-v4-flash":7,"glm5.3-flash":7,"qwen3.8-flash":7,"mimo-v2.6-flash":5,"qwen3.6":5,"gemma4":5}}' ]
+    [ "$output" = '{"concurrency":7,"model_concurrency":{"deepseek-v4-flash":7,"gemma4":5,"glm5.3-flash":7,"mimo-v2.6-flash":5,"qwen3.6":5,"qwen3.8-flash":7}}' ]
 }
 
 @test "model-map.json is not embedded into the Go tree, unlike triggers.json" {
