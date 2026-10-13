@@ -1,0 +1,409 @@
+// Package sshtarget makes a machine accept SSH from the mesh and from nothing
+// else (#2356, #2013 A1). converge's workstation-target step drives it on a
+// machine that declares the ssh-target role.
+//
+// Inspect reads only what a user may read, so a plan never needs root. Apply
+// asks for root once, changes what differs, and then proves the result by
+// consequence: sshd must accept the owner's key from the node's mesh address
+// and refuse it from its LAN address. If either fails, every change of the run
+// is undone in reverse order, so a failed apply leaves the machine as it was.
+package sshtarget
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// MeshCIDR is the tailnet's address range (CGNAT, as headscale allocates it).
+const MeshCIDR = "100.64.0.0/10"
+
+// ErrNoTerminal is what Root.Ready returns when root needs a password and
+// there is no terminal to ask on. The apply stops before changing anything.
+var ErrNoTerminal = errors.New("root is needed and there is no terminal to ask on")
+
+// Runner runs a command as the current user and returns its combined output.
+type Runner func(argv ...string) ([]byte, error)
+
+// Root runs commands as root. Production asks for the password once, on the
+// terminal, and runs each command with `sudo -n` (ADR-045 amendment 2026-10-12).
+type Root interface {
+	Ready() error
+	Run(argv ...string) ([]byte, error)
+}
+
+// Paths are the files the target reads and writes. Tests point them at a
+// temporary tree.
+type Paths struct {
+	SSHDConfig     string // the main config, which must include DropIn's dir
+	DropIn         string
+	HostKey        string // the ed25519 host public key
+	AuthorizedKeys string
+	ClientKey      string // the private key the probe offers
+}
+
+// DefaultPaths are the locations on macOS and Linux.
+func DefaultPaths(home string) Paths {
+	return Paths{
+		SSHDConfig:     "/etc/ssh/sshd_config",
+		DropIn:         "/etc/ssh/sshd_config.d/01-workstation.conf",
+		HostKey:        "/etc/ssh/ssh_host_ed25519_key.pub",
+		AuthorizedKeys: filepath.Join(home, ".ssh", "authorized_keys"),
+		ClientKey:      filepath.Join(home, ".ssh", "id_ed25519"),
+	}
+}
+
+// Service turns sshd on and off on one OS.
+type Service interface {
+	Enabled() (bool, error)   // read without root
+	HostKeys(root Root) error // creates the missing host keys; inert, never undone
+	Enable(root Root) error   // starts it
+	Disable(root Root) error  // the undo of Enable
+	Reload(root Root) error   // makes a running sshd read a changed drop-in
+	Validate(root Root) error // `sshd -t` on the installed config
+}
+
+// Target is one machine's SSH posture.
+type Target struct {
+	User     string
+	Key      []byte // the authorized public key, one line
+	Template []byte // the drop-in with {user} and {mesh} placeholders
+	Paths    Paths
+	Service  Service
+	Root     Root
+	Run      Runner
+	Addrs    func() ([]net.IP, error)
+}
+
+// Plan is what differs from the declared state, and whether an apply could
+// proceed.
+type Plan struct {
+	Pending  []string // resource names, in apply order
+	Mesh     net.IP
+	LAN      net.IP // nil when the node has no LAN address to test from
+	dropIn   []byte
+	key      []byte
+	enabled  bool
+	prevDrop []byte // nil when absent
+	prevKeys []byte // nil when absent
+}
+
+// Converged reports whether nothing differs.
+func (p Plan) Converged() bool { return len(p.Pending) == 0 }
+
+const (
+	resKey      = "authorized key"
+	resHostKeys = "host keys"
+	resDropIn   = "sshd drop-in"
+	resService  = "sshd service"
+)
+
+// DropIn renders the drop-in for user.
+func (t Target) DropIn() []byte {
+	r := strings.NewReplacer("{user}", t.User, "{mesh}", MeshCIDR)
+	return []byte(r.Replace(string(t.Template)))
+}
+
+// Inspect compares the machine with the declared state. It runs no command
+// as root and changes nothing; the plan is its result.
+func (t Target) Inspect() (Plan, error) {
+	var p Plan
+	var err error
+	if p.Mesh, p.LAN, err = t.addresses(); err != nil {
+		return p, err
+	}
+	if err := t.checkInclude(); err != nil {
+		return p, err
+	}
+	p.key = bytes.TrimSpace(t.Key)
+	if len(p.key) == 0 {
+		return p, errors.New("no public key to authorize")
+	}
+	if p.prevKeys, err = readOptional(t.Paths.AuthorizedKeys); err != nil {
+		return p, err
+	}
+	if !hasKey(p.prevKeys, p.key) {
+		p.Pending = append(p.Pending, resKey)
+	}
+	if _, err := os.Stat(t.Paths.HostKey); errors.Is(err, os.ErrNotExist) {
+		// Before the drop-in: `sshd -t` refuses a config with no host key.
+		p.Pending = append(p.Pending, resHostKeys)
+	} else if err != nil {
+		return p, err
+	}
+	p.dropIn = t.DropIn()
+	if p.prevDrop, err = readOptional(t.Paths.DropIn); err != nil {
+		return p, err
+	}
+	if !bytes.Equal(p.prevDrop, p.dropIn) {
+		p.Pending = append(p.Pending, resDropIn)
+	}
+	if p.enabled, err = t.Service.Enabled(); err != nil {
+		return p, err
+	}
+	if !p.enabled {
+		p.Pending = append(p.Pending, resService)
+	}
+	return p, nil
+}
+
+// Apply converges what p says differs, then proves the result. On any
+// failure it undoes the run's changes in reverse order and returns the error,
+// joined with any undo that failed too.
+func (t Target) Apply(p Plan) error {
+	if p.Converged() {
+		return t.Prove(p)
+	}
+	if err := t.Root.Ready(); err != nil {
+		return err
+	}
+	var undo []func() error
+	err := t.apply(p, &undo)
+	if err == nil {
+		err = t.Prove(p)
+	}
+	if err == nil {
+		return nil
+	}
+	for i := len(undo) - 1; i >= 0; i-- {
+		if uerr := undo[i](); uerr != nil {
+			err = errors.Join(err, fmt.Errorf("undo: %w", uerr))
+		}
+	}
+	return fmt.Errorf("%w (the run's changes were undone)", err)
+}
+
+func (t Target) apply(p Plan, undo *[]func() error) error {
+	for _, res := range p.Pending {
+		switch res {
+		case resKey:
+			if err := t.writeKeys(append(appendLine(p.prevKeys), append(p.key, '\n')...)); err != nil {
+				return err
+			}
+			*undo = append(*undo, func() error { return t.restoreKeys(p.prevKeys) })
+		case resHostKeys:
+			if err := t.Service.HostKeys(t.Root); err != nil {
+				return err
+			}
+		case resDropIn:
+			if err := t.installRoot(t.Paths.DropIn, p.dropIn); err != nil {
+				return err
+			}
+			*undo = append(*undo, func() error { return t.restoreRoot(t.Paths.DropIn, p.prevDrop) })
+			if err := t.Service.Validate(t.Root); err != nil {
+				return fmt.Errorf("sshd rejects the new drop-in: %w", err)
+			}
+			if p.enabled {
+				if err := t.Service.Reload(t.Root); err != nil {
+					return err
+				}
+			}
+		case resService:
+			if err := t.Service.Enable(t.Root); err != nil {
+				return err
+			}
+			*undo = append(*undo, func() error { return t.Service.Disable(t.Root) })
+		}
+	}
+	return nil
+}
+
+// Prove asks sshd, through the mesh address, whether it accepts the owner's
+// key, and asks again through the LAN address, where it must not. It reads
+// `Server accepts key` from the client's debug output, so it needs neither
+// the key's passphrase nor an agent, and never opens a session.
+//
+// What this proves is the sshd layer: the listener, AllowUsers and the
+// authorized key. A connection to the node's own address does not cross its
+// firewall, so the firewall is proven from another node (OBS-036).
+func (t Target) Prove(p Plan) error {
+	hosts, err := t.knownHosts(p)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(hosts) }()
+	if !t.accepts(hosts, p.Mesh) {
+		return fmt.Errorf("sshd does not accept the key from the mesh address %s", p.Mesh)
+	}
+	if p.LAN != nil && t.accepts(hosts, p.LAN) {
+		return fmt.Errorf("sshd accepts the key from the LAN address %s; it must refuse everything outside %s", p.LAN, MeshCIDR)
+	}
+	return nil
+}
+
+func (t Target) accepts(hosts string, addr net.IP) bool {
+	a := addr.String()
+	out, err := t.Run("ssh", "-v", "-F", "/dev/null",
+		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+		"-o", "UserKnownHostsFile="+hosts, "-o", "IdentitiesOnly=yes",
+		"-o", "PreferredAuthentications=publickey", "-o", "ConnectTimeout=10",
+		"-i", t.Paths.ClientKey, "-b", a, t.User+"@"+a, "true")
+	return err == nil || bytes.Contains(out, []byte("Server accepts key"))
+}
+
+// knownHosts writes a known_hosts file naming the node's own host key for
+// both addresses, so the probe checks the host key instead of trusting it.
+func (t Target) knownHosts(p Plan) (string, error) {
+	key, err := os.ReadFile(t.Paths.HostKey)
+	if err != nil {
+		return "", fmt.Errorf("read the host key: %w", err)
+	}
+	fields := strings.Fields(string(key))
+	if len(fields) < 2 {
+		return "", fmt.Errorf("%s is not a public key", t.Paths.HostKey)
+	}
+	names := p.Mesh.String()
+	if p.LAN != nil {
+		names += "," + p.LAN.String()
+	}
+	f, err := os.CreateTemp("", "workstation-known-hosts-*")
+	if err != nil {
+		return "", err
+	}
+	_, werr := fmt.Fprintf(f, "%s %s %s\n", names, fields[0], fields[1])
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		_ = os.Remove(f.Name())
+		return "", werr
+	}
+	return f.Name(), nil
+}
+
+// addresses finds the node's mesh address, and an address outside the mesh
+// to test the refusal from.
+func (t Target) addresses() (mesh, lan net.IP, err error) {
+	ips, err := t.Addrs()
+	if err != nil {
+		return nil, nil, err
+	}
+	_, cidr, _ := net.ParseCIDR(MeshCIDR)
+	for _, ip := range ips {
+		switch {
+		case ip.To4() == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast():
+		case cidr.Contains(ip):
+			if mesh == nil {
+				mesh = ip
+			}
+		case ip.IsPrivate() && lan == nil:
+			lan = ip
+		}
+	}
+	if mesh == nil {
+		return nil, nil, fmt.Errorf("no address in %s: join the mesh first (tailscale up)", MeshCIDR)
+	}
+	return mesh, lan, nil
+}
+
+// checkInclude refuses a main config that does not read the drop-in dir: the
+// drop-in would be written and never take effect.
+func (t Target) checkInclude() error {
+	conf, err := os.ReadFile(t.Paths.SSHDConfig)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", t.Paths.SSHDConfig, err)
+	}
+	dir := filepath.Dir(t.Paths.DropIn)
+	for _, line := range strings.Split(string(conf), "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 2 && strings.EqualFold(f[0], "Include") && strings.HasPrefix(f[1], dir+"/") {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s does not include %s/: the drop-in would never be read", t.Paths.SSHDConfig, dir)
+}
+
+func (t Target) writeKeys(data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(t.Paths.AuthorizedKeys), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(t.Paths.AuthorizedKeys, data, 0o600)
+}
+
+func (t Target) restoreKeys(prev []byte) error {
+	if prev == nil {
+		return os.Remove(t.Paths.AuthorizedKeys)
+	}
+	return t.writeKeys(prev)
+}
+
+// installRoot writes data to a root-owned path through a file of the user's.
+func (t Target) installRoot(path string, data []byte) error {
+	f, err := os.CreateTemp("", "workstation-dropin-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(f.Name()) }()
+	_, werr := f.Write(data)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		return werr
+	}
+	if out, err := t.Root.Run("install", "-m", "0644", "-o", "0", "-g", "0", f.Name(), path); err != nil {
+		return fmt.Errorf("install %s: %w: %s", path, err, bytes.TrimSpace(out))
+	}
+	return nil
+}
+
+func (t Target) restoreRoot(path string, prev []byte) error {
+	if prev != nil {
+		return t.installRoot(path, prev)
+	}
+	if out, err := t.Root.Run("rm", "-f", path); err != nil {
+		return fmt.Errorf("remove %s: %w: %s", path, err, bytes.TrimSpace(out))
+	}
+	return nil
+}
+
+func readOptional(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	return b, err
+}
+
+// hasKey reports whether keys authorizes key: some line holds its type and
+// blob, whatever options precede them.
+func hasKey(keys, key []byte) bool {
+	f := strings.Fields(string(key))
+	if len(f) < 2 {
+		return false
+	}
+	want := f[0] + " " + f[1]
+	for _, line := range strings.Split(string(keys), "\n") {
+		if strings.Contains(strings.Join(strings.Fields(line), " "), want) {
+			return true
+		}
+	}
+	return false
+}
+
+// appendLine returns b ending in a newline, unless it is empty.
+func appendLine(b []byte) []byte {
+	if len(b) == 0 || b[len(b)-1] == '\n' {
+		return bytes.Clone(b)
+	}
+	return append(bytes.Clone(b), '\n')
+}
+
+// InterfaceAddrs lists the IP addresses of the node's interfaces.
+func InterfaceAddrs() ([]net.IP, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, a := range addrs {
+		if n, ok := a.(*net.IPNet); ok {
+			ips = append(ips, n.IP)
+		}
+	}
+	return ips, nil
+}

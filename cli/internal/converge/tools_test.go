@@ -115,14 +115,16 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // whose probe needs the dotfiles.gitconfig include target that a config entry
 // deploys. records-bind follows configs-deploy, which seeds the settings files
 // the hooks merge into. env-persist closes the configs step: the env files are configs too
-// (ADR-045 decision 4, step 5). The setup script runs last, after every native
-// step (PLAT-001b PR 5).
+// (ADR-045 decision 4, step 5). workstation-target follows: it reads the
+// deployed public key's source in the checkout and changes how the machine
+// faces the network, so it comes after everything a user session needs. The
+// setup script runs last, after every native step (PLAT-001b PR 5).
 func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	var names []string
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,configs-deploy,records-bind,git-config,git-hooks,env-persist,legacy-setup" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,configs-deploy,records-bind,git-config,git-hooks,env-persist,workstation-target,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }

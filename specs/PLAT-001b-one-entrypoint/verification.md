@@ -93,6 +93,14 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - Fix: every writer goes through `editMachine`, which replaces one top-level section and keeps the others. `TestSetMachinePathKeepsSectionsItDoesNotOwn` writes a path into a file with all three sections and reads the identity and the roles back through their own readers.
   - Evidence: `go test ./...`, `go vet ./...`, `GOOS=windows go vet ./...` and golangci-lint 2.12.2 (the pin) all clean on 2026-10-12.
 
+- #2013 A1, PR 7c (2026-10-12): `workstation-target` on darwin. Owner decisions: no runbook commands and no one-off scripts ("todo idempotente y reproducible en otro equipo"), and root comes from a sudo prompt on the terminal (ADR-045 amendment 2026-10-12).
+  - The proof reads `Server accepts key` from `ssh -v` in `BatchMode`. On the macmini the owner's key has a passphrase and the agent holds no identity, so a full login cannot be non-interactive. Acceptance of the key is what the hardening decides; opening a session adds nothing to that.
+  - A self-connection does not cross the node's own firewall, so the proof covers the sshd layer only. The firewall is PR 7d's, and its runtime proof is the external probe (OBS-036).
+  - Host keys are created (`ssh-keygen -A`) before `sshd -t`, which refuses a config with no host key. On a Mac where Remote Login was never on, none exist, because macOS creates them at the first connection. The drop-in is installed and validated before Remote Login starts, so sshd never listens with the stock config (lesson 401's window).
+  - Linux is not in this PR. Ubuntu 24.04 starts sshd through `ssh.socket`, and the reload semantics need a Linux host to accept them. That host is PR 7e's.
+  - Mutations, each caught: the undo loop skipped (3 tests fail), the LAN refusal not checked (1), `sshd -t` skipped (2), the proof reading the wrong line (3), the host keys never created (4).
+  - Plan on the macmini, before and after `dotf env role add ssh-target`, with no sudo call: `[SKIP] workstation-target this machine has not opted in (dotf env role add ssh-target)`, then `[CHANGE] workstation-target to apply as root: authorized key, host keys, sshd drop-in, sshd service; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130`. `machine.json` kept its `paths` section.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
