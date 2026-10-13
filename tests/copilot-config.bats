@@ -135,7 +135,8 @@ load 'lib/refute'
     # Copilot's half is untouched: `trustedFolders` is still ours to ship.
     [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*"]' ]
     [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json slash" ]
-    [ "$(jq -r '.version' "$MANIFEST")" = "3" ]
+    # paths needs version 3; later versions keep it (4 added platforms, #1843 B1).
+    [ "$(jq -r '.version' "$MANIFEST")" -ge 3 ]
 }
 
 @test "neither setup copies ai/agy/settings.json any more: the manifest entry renders it (AI-042)" {

@@ -43,6 +43,16 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
 - [x] CI review round: a `#!/nonexistent` interpreter is not a portable stand-in for an unrunnable binary. macOS bash reports 126 and Linux bash reports 127. A file of no executable format (NUL bytes) fails exec with ENOEXEC on both kernels, and bash reports it as 126 on both. `setup-linux-only-downloads-real.bats` pairs the suite with the host's real `uname` and a copy of its `ls`. macOS kills a copied system binary on launch (137) and Linux runs it; neither is 126, so it stays.
 - W2 still owns the real fix. When it deletes the blocks, it deletes `host_is_linux_amd64`, the gate and this guard test with them.
 
+### P7b: the bash and readline rc files as deploy entries (#2013 P7)
+
+- [x] `ai/deploy.json` at version 4 with `bashrc`, `profile` and `inputrc` (`platforms: [linux, darwin]`, 0644). Every dotf since 0.65.0 reads version 4, and the pin is 0.67.0.
+- [x] On the Mac, a dotf built from the branch into `$TMPDIR`: `deploy --dry-run` reports `profile` and `inputrc` in sync, and `bashrc` as `would deploy`. The deployed `.bashrc` predates W6 (it still says the line before the PATH prepend "REPLACES PATH outright"), so the first apply keeps it once as `.bashrc.pre-dotf`.
+- [x] `tests/guard-setup-rc-files-are-deploy-entries.bats`: 3/3 ok. Appending `deploy_file "$DOTFILES_DIR/.inputrc" "$HOME/.inputrc"` to `setup-linux.sh` turns its first test red.
+- [x] Doctor's deploy-dir drift section is deleted, not emptied: with no `deploy_file` into `$HOME` left in setup, the map it compared would hold nothing. A symlink at a destination stays a finding, because `deploy.PlanConfig` counts it as a change (`TestPlanConfig_ASymlinkWithTheSourceContentIsChanged`).
+- [x] Three suites pinned the old shape and were moved to the new one: the manifest version in `copilot-config.bats` (now `>= 3`, the version `paths` needs), the bare-deploy anchor in `pi-config.bats` (the tail's named re-deploys matched it too), and the Linux half of the profile-heal parity test.
+- [x] Full bats on darwin: 1899 ok, 13 not ok before the three fixes above. Of the ten left, nine are the dangling mise `pwsh` shim (#2375) and one is `harness-doctrine-records.bats` comparing the records against the live vault, whose `teardown` skill changed upstream; both fail on `main` as well.
+- [x] `go build`, `go vet` (darwin and windows), `go test ./...` and `golangci-lint run` 2.12.2 (cache cleaned): all clean. `shellcheck setup-linux.sh` reports the same three infos as `main`; `bash -n` and `zsh -n` pass.
+
 ## Test status
 
 - `cd cli && go build ./... && go vet ./... && go test ./...`: all packages ok (darwin/arm64).

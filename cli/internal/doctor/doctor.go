@@ -299,7 +299,6 @@ func (e sweepEnv) deployAndHooks() []check {
 		{kind: kindMachine, run: func() { checkHarnessDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkDeployDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkWorkstationTarget(e.sys, e.cfg, e.rep) }},
-		{kind: kindMachine, run: func() { checkHomeDeployDrift(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkDockerEngine(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkColimaSize(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkDockerCompose(e.sys, e.rep) }},

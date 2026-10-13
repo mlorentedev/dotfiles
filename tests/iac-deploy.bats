@@ -82,14 +82,11 @@ teardown() {
 
 # --- check_deployed: removed by OPS-043 (#1337) ---
 #
-# The four cases that lived here were ported one-for-one into
-# TestCheckHomeDeployDrift in cli/internal/doctor/checks_home_deploy_test.go,
-# which is where the behaviour now lives:
-#
-#   matching content returns 0        -> "checked entries agree -> pass"
-#   missing target returns 1          -> "deployed source present but $HOME copy missing -> fail"
-#   symlinked target returns 1        -> "symlink at $HOME -> fail even when content resolves equal"
-#   drift repo vs home returns 1      -> "functions.sh drift -> fail naming both paths"
+# The four cases that lived here went to doctor's deploy-dir drift check, and
+# then, once every home file became an ai/deploy.json entry (#2013 P7), to
+# deploy.PlanConfig, which checkDeployManifest runs: matching content is in
+# sync, a missing destination, a symlink at the destination and drifted content
+# are each a change to deploy.
 #
 # deploy_file's own tests stay above: the deployer was not migrated, only its
 # assertion pair.
