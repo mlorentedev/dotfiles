@@ -5,6 +5,7 @@
 # tests/windows-defaults.Tests.ps1 (Pester, Windows-only).
 
 load 'winpath'
+load 'lib/pwsh'
 load 'lib/refute'
 
 setup() {
@@ -109,9 +110,7 @@ setup() {
 # --- syntax (strict variant: catch exits 1, never 0) ---
 
 @test "windows-defaults.ps1 valid PowerShell syntax (if pwsh available)" {
-    if ! command -v pwsh >/dev/null 2>&1; then
-        skip "pwsh not available"
-    fi
+    require_pwsh
     run pwsh -NonInteractive -Command "
         \$errors = \$null
         [System.Management.Automation.Language.Parser]::ParseFile(

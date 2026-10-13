@@ -193,3 +193,16 @@ Host acemagic-office
     ServerAliveInterval 15
     ServerAliveCountMax 3
 # --- ACEMAGIC-OFFICE-END ---
+
+# --- AGENT-START ---
+# Last, so every Host above keeps its own values: ssh takes the first one it
+# reads for each keyword. The key goes into the agent on first use, and on
+# macOS its passphrase comes from the login keychain, so a reboot never needs
+# `ssh-add` again (#2013 PLAT-001b). UseKeychain exists only in Apple's
+# OpenSSH; IgnoreUnknown keeps every other build, Linux and Windows included,
+# from rejecting this whole file over it (tests/ssh-client-agent.bats).
+Host *
+    IgnoreUnknown UseKeychain
+    AddKeysToAgent yes
+    UseKeychain yes
+# --- AGENT-END ---
