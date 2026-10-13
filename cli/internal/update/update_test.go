@@ -62,7 +62,7 @@ func TestUpdate(t *testing.T) {
 		// skipping scheduled run stays diagnosable (dotfiles#694).
 		// The path list ends the message: a suffix appended after it would land
 		// on the last path and garble it.
-		{name: "dirty worktree", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M setup.sh" }, wantStatus: "dirty", wantMsgSubstr: "Dirtying paths:\nM setup.sh", wantMsgSuffix: "setup.sh"},
+		{name: "dirty worktree", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M setup.sh" }, wantStatus: "dirty", wantMsgSubstr: "Dirtying paths:\n M setup.sh", wantMsgSuffix: "setup.sh"},
 		{name: "fetch offline", mutate: func(g fakeGit) { g.fail["fetch --quiet"] = true }, wantStatus: "offline"},
 		{name: "no upstream", mutate: func(g fakeGit) { g.fail["rev-parse --abbrev-ref --symbolic-full-name @{u}"] = true }, wantStatus: "no-upstream"},
 		{name: "already current", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, wantStatus: "current"},

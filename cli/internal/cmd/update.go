@@ -79,12 +79,15 @@ func dirExists(p string) bool {
 }
 
 // gitRunner returns a Git seam that runs `git -C <repo> <args...>` and returns
-// trimmed stdout. On failure the error is returned (stdout ignored) — callers
+// stdout without its trailing newline. On failure the error is returned (stdout ignored) — callers
 // treat a failed git query as a skip condition, so surfacing stderr is not
 // needed here.
 func gitRunner(repo string) func(args ...string) (string, error) {
 	return func(args ...string) (string, error) {
 		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).Output() //nolint:gosec // fixed git subcommands, repo is the resolved checkout
-		return strings.TrimSpace(string(out)), err
+		// Only the trailing newline goes: porcelain output starts with a status
+		// column that is a space for an unstaged change, and trimming both ends
+		// stripped it from the first line only (#2177).
+		return strings.TrimRight(string(out), "\r\n"), err
 	}
 }
