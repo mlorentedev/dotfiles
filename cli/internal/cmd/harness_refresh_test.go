@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -223,7 +224,9 @@ func TestHarnessRefresh_UncommittedWorkInTheRecordsIsNeitherOverwrittenNorAnnoun
 	if strings.Contains(stderr, "chore(harness): refresh records from vault") {
 		t.Errorf("uncommitted work was announced as the vault's change:\n%s", stderr)
 	}
-	if !strings.Contains(stderr, "      M harness/record.md\n") {
-		t.Errorf("the warning does not name the uncommitted path:\n%s", stderr)
+	// The six-space indent, then the porcelain line with its index column
+	// intact: a line, not a substring, so a trimmed column fails it (#2177).
+	if !slices.Contains(strings.Split(stderr, "\n"), "       M harness/record.md") {
+		t.Errorf("the warning does not name the uncommitted path in porcelain form:\n%s", stderr)
 	}
 }
