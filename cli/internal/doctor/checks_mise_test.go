@@ -260,3 +260,101 @@ func TestCheckMiseTools_APythonPackageMissingFailsNamingTheSync(t *testing.T) {
 		t.Errorf("want one FAIL naming pyyaml\n%s", b.String())
 	}
 }
+
+// shellPathFixture is miseFixture at the pin, on darwin, with zsh and bash on
+// PATH. paths maps "zsh -c" and "bash -lc" to the PATH that shell starts with
+// from an empty environment; env records what each probe was given.
+func shellPathFixture(t *testing.T, paths map[string]string, env *[][]string) (*System, *Config, string) {
+	t.Helper()
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true)
+	home := s.Getenv("HOME")
+	s.LookPath = newSys(nil, []string{"mise", "zsh", "bash"}, nil).LookPath
+	s.CommandOutputEnv = func(e []string, name string, args ...string) (string, error) {
+		*env = append(*env, e)
+		out, ok := paths[name+" "+args[0]]
+		if !ok {
+			return "", errors.New("unexpected probe " + name + " " + strings.Join(args, " "))
+		}
+		return strings.NewReplacer("HOME", home).Replace(out), nil
+	}
+	return s, cfg, home
+}
+
+// A shell an agent or sshd runs reads no interactive rc, so `mise activate`
+// never reaches it: only the shims dir on its startup PATH runs the pins
+// (#2013 W2b). The probe starts each shell from an empty environment, so the
+// answer is what the deployed files give, not what doctor's own shell has.
+func TestCheckMiseTools_NonInteractiveShellsStartWithTheShimsFirst(t *testing.T) {
+	var env [][]string
+	s, cfg, home := shellPathFixture(t, map[string]string{
+		"zsh -c":   "HOME/.local/share/mise/shims:HOME/.local/bin:/usr/bin:/bin",
+		"bash -lc": "HOME/.local/share/mise/shims:HOME/.local/bin:/usr/bin:/bin\n",
+	}, &env)
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 0 || rep.Warnings() != 0 || !strings.Contains(b.String(), "zsh -c, bash -lc") {
+		t.Errorf("want a clean pass naming both shells\n%s", b.String())
+	}
+	if len(env) != 2 {
+		t.Fatalf("probes = %d, want 2", len(env))
+	}
+	for _, e := range env {
+		var paths []string
+		for _, kv := range e {
+			if strings.HasPrefix(kv, "PATH=") {
+				paths = append(paths, kv)
+			}
+		}
+		if !contains(e, "HOME="+home) || len(paths) != 1 || paths[0] != "PATH=/usr/bin:/bin" {
+			t.Errorf("probe env %v: want HOME and only the bare system PATH, never doctor's own", e)
+		}
+	}
+}
+
+func TestCheckMiseTools_ANonInteractiveShellWithoutTheShimsWarns(t *testing.T) {
+	cases := []struct {
+		name, zsh, want string
+	}{
+		{"no shims", "HOME/.local/bin:/usr/bin:/bin", "`zsh -c` starts without mise's shims"},
+		{"local bin first", "HOME/.local/bin:HOME/.local/share/mise/shims:/usr/bin", "`zsh -c` puts " + filepath.Join("HOME", ".local", "bin")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var env [][]string
+			s, cfg, home := shellPathFixture(t, map[string]string{
+				"zsh -c":   tc.zsh,
+				"bash -lc": "HOME/.local/share/mise/shims:/usr/bin",
+			}, &env)
+			var b bytes.Buffer
+			rep := capture(&b)
+			checkMiseTools(s, cfg, rep, false)
+			want := strings.ReplaceAll(tc.want, "HOME", home)
+			if rep.Warnings() != 1 || !strings.Contains(b.String(), want) || !strings.Contains(b.String(), "dotf deploy") {
+				t.Errorf("want one WARN saying %q and naming dotf deploy\n%s", want, b.String())
+			}
+		})
+	}
+}
+
+// Windows has no zsh -c or bash -lc to probe: what `pwsh -NoProfile` inherits
+// is the user environment, a later row (env persist).
+func TestCheckMiseTools_NoShellProbeOnWindows(t *testing.T) {
+	var env [][]string
+	s, cfg, _ := shellPathFixture(t, nil, &env)
+	s.GOOS = "windows"
+	var b bytes.Buffer
+	checkMiseTools(s, cfg, capture(&b), false)
+	if len(env) != 0 {
+		t.Errorf("probed %d shells on windows\n%s", len(env), b.String())
+	}
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}

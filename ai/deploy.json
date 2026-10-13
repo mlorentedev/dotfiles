@@ -212,6 +212,23 @@
       "requires": "zsh"
     },
     {
+      "name": "zshenv",
+      "src": ".zshenv",
+      "dst": "{HOME}/.zshenv",
+      "render": false,
+      "mode": "0644",
+      "requires": "zsh",
+      "platforms": ["linux", "darwin"]
+    },
+    {
+      "name": "shell-path",
+      "src": ".zsh/path.sh",
+      "dst": "{HOME}/.zsh/path.sh",
+      "render": false,
+      "mode": "0644",
+      "platforms": ["linux", "darwin"]
+    },
+    {
       "name": "zsh-functions-sh",
       "src": ".zsh/functions.sh",
       "dst": "{HOME}/.zsh/functions.sh",
