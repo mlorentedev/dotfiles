@@ -91,7 +91,8 @@ computed must not read as an empty one. The message says which.`,
 // reads the reviewer registry. Read it through reviewerRegistryPath.
 func addReviewerRegistryFlag(cmd *cobra.Command, registry *string) {
 	cmd.Flags().StringVar(registry, "registry", filepath.Join("harness", "review-attestation.json"),
-		"path to the reviewer registry (default: under the root of the current checkout)")
+		"path to the reviewer registry (default: under the root of the current checkout; "+
+			"for a --repo other than this checkout's, pass that repository's registry)")
 }
 
 // reviewerRegistryPath resolves --registry. A path given on the command line
