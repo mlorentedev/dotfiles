@@ -73,6 +73,11 @@ test_windows_job() {
         run grep -F "$fabricated" <<<"$job"
         [ "$status" -eq 1 ] || { echo "test-windows still fabricates: $fabricated"; false; }
     done
+    # Least privilege: the doctor step needs no token under the machine scope.
+    gate="$(printf '%s\n' "$job" | awk '/- name: Post-setup doctor gate/{f=1} f && /^      - / && !/Post-setup doctor gate/{exit} f')"
+    [ -n "$gate" ] || false
+    run grep -E '^[^#]*GH_TOKEN' <<<"$gate"
+    [ "$status" -eq 1 ] || { echo "the doctor gate step carries GH_TOKEN again"; false; }
 }
 
 # The machine scope skips doctor's gh checks too, and spec-issue-state was the
