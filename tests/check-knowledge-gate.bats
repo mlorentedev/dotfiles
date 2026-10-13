@@ -334,6 +334,7 @@ Example:
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
 }
 
+# A regression guard for the one-pass rewrite: the two-pass code got this right too.
 @test "a comment opener inside a fence hides nothing after the fence" {
     SDD_PR_BODY='## Summary
 
