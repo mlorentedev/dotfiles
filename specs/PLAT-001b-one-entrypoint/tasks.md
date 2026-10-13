@@ -232,7 +232,7 @@ Only the setup twins wrote `~/.gemini/config/mcp_config.json` and the hive-vault
 - [x] Both twins lose their block; `tests/guard-agy-mcp-in-dotf.bats` keeps it from growing back (mutation: one line naming the file in either twin turns it red). The two `antigravity.bats` tests that grepped the twins' substitution are gone with it; `cli/internal/agy` tests the substitution and the preflight
 - [x] doctor reads `GEMINI_HOME` and `AGY_APP_DATA` through `agy.Dirs`, so writer and checker agree, and its four remedies name `dotf converge --only agent-extensions`
 - [x] Tests: substitution, merge, idempotence, plan writes nothing, symlink, stale copy, missing vault, missing sources; the bare deploy plans, applies and is in sync on the second run; `convergeOptions` wires the paths; converge writes agy without claude and the probe names a drifted master. Seven mutations of `ApplyMCP`, all caught
-- [ ] Evidence: from-zero on a throwaway branch merging this change with P5c (#2392), with the darwin `master mcp_config.json missing` known-failure removed
+- [x] Evidence: from-zero 38396154386, a throwaway branch merging this change with P5c (#2392) and dropping the darwin `master mcp_config.json missing` known failure. macOS and ubuntu alike: the first converge prints `agy: 3 MCP config(s) written, 0 in sync`, the second `agy: 0 MCP config(s) written, 3 in sync` with `"changed": 0`; the darwin doctor gate reads `2 known FAIL line(s), 0 new, 0 stale`
 
 ## Closing
 
