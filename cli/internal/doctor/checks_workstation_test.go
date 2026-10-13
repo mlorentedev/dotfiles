@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -36,6 +37,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			state: func(t *testing.T, p sshtarget.Paths, user string) {
 				writeFile(t, p.AuthorizedKeys, "ssh-ed25519 AAAAOwner manu@msi\n")
 				writeFile(t, p.HostKey, "ssh-ed25519 AAAAHost root@msi\n")
+				writeFile(t, p.LogindDropIn, sshtarget.LogindPolicy)
 				writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
 			}},
 		{name: "not opted in → SKIP", goos: "darwin", addrs: mesh, want: StatusSkip, needle: "dotf env role add ssh-target", section: true},
@@ -64,6 +66,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				HostKey:        filepath.Join(sys, "ssh_host_ed25519_key.pub"),
 				AuthorizedKeys: filepath.Join(home, ".ssh", "authorized_keys"),
 				ClientKey:      filepath.Join(home, ".ssh", "id_ed25519"),
+				LogindDropIn:   filepath.Join(sys, "logind.conf.d", "50-workstation.conf"),
 			}
 			writeFile(t, paths.SSHDConfig, "Include "+filepath.Dir(paths.DropIn)+"/*\n")
 			loaded := false
@@ -89,6 +92,12 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				case name == "launchctl" && args[0] == "print":
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
+				case name == "systemctl" && args[0] == "is-enabled" && strings.HasSuffix(args[len(args)-1], ".target"):
+					// The sleep targets: masked once the power policy is applied.
+					if loaded {
+						return "masked\n", nil
+					}
+					return "static\n", nil
 				case name == "systemctl" && (args[0] == "is-enabled" || args[0] == "is-active"):
 				default:
 					t.Fatalf("doctor ran %s %v; it must only read", name, args)

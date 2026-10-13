@@ -50,6 +50,7 @@ type Paths struct {
 	HostKey        string // the ed25519 host public key
 	AuthorizedKeys string
 	ClientKey      string // the private key the probe offers
+	LogindDropIn   string // Linux: the lid policy (Logind)
 }
 
 // DefaultPaths are the locations on macOS and Linux.
@@ -60,6 +61,7 @@ func DefaultPaths(home string) Paths {
 		HostKey:        "/etc/ssh/ssh_host_ed25519_key.pub",
 		AuthorizedKeys: filepath.Join(home, ".ssh", "authorized_keys"),
 		ClientKey:      filepath.Join(home, ".ssh", "id_ed25519"),
+		LogindDropIn:   "/etc/systemd/logind.conf.d/50-workstation.conf",
 	}
 }
 
@@ -78,6 +80,7 @@ func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]n
 	if t.Service, err = ServiceFor(goos, run); err != nil {
 		return t, err
 	}
+	t.Power = PowerFor(goos, run, paths)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
 	}
@@ -112,6 +115,7 @@ type Target struct {
 	Template []byte // the drop-in with {user} and {mesh} placeholders
 	Paths    Paths
 	Service  Service
+	Power    Power // nil where the target declares no power policy yet
 	Root     Root
 	Run      Runner
 	Addrs    func() ([]net.IP, error)
@@ -138,6 +142,7 @@ const (
 	resHostKeys = "host keys"
 	resDropIn   = "sshd drop-in"
 	resService  = "sshd service"
+	resPower    = "power policy"
 )
 
 // DropIn renders the drop-in for user.
@@ -185,6 +190,15 @@ func (t Target) Inspect() (Plan, error) {
 	}
 	if !p.enabled {
 		p.Pending = append(p.Pending, resService)
+	}
+	if t.Power != nil {
+		differs, err := t.Power.Differs()
+		if err != nil {
+			return p, err
+		}
+		if differs {
+			p.Pending = append(p.Pending, resPower)
+		}
 	}
 	return p, nil
 }
@@ -252,6 +266,14 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 				return err
 			}
 			*undo = append(*undo, func() error { return t.Service.Disable(t.Root) })
+		case resPower:
+			u, err := t.Power.Apply(t.Root)
+			if u != nil {
+				*undo = append(*undo, u)
+			}
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -266,6 +288,16 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 // authorized key. A connection to the node's own address does not cross its
 // firewall, so the firewall is proven from another node (OBS-036).
 func (t Target) Prove(p Plan) error {
+	if err := t.proveSSH(p); err != nil {
+		return err
+	}
+	if t.Power != nil {
+		return t.Power.Prove()
+	}
+	return nil
+}
+
+func (t Target) proveSSH(p Plan) error {
 	hosts, err := t.knownHosts(p)
 	if err != nil {
 		return err
@@ -461,8 +493,12 @@ func (t Target) restoreKeys(prev []byte) error {
 	return t.writeKeys(prev)
 }
 
+func (t Target) installRoot(path string, data []byte) error { return installRoot(t.Root, path, data) }
+
+func (t Target) restoreRoot(path string, prev []byte) error { return restoreRoot(t.Root, path, prev) }
+
 // installRoot writes data to a root-owned path through a file of the user's.
-func (t Target) installRoot(path string, data []byte) error {
+func installRoot(root Root, path string, data []byte) error {
 	f, err := os.CreateTemp("", "workstation-dropin-*")
 	if err != nil {
 		return err
@@ -475,17 +511,17 @@ func (t Target) installRoot(path string, data []byte) error {
 	if werr != nil {
 		return werr
 	}
-	if out, err := t.Root.Run("install", "-m", "0644", "-o", "0", "-g", "0", f.Name(), path); err != nil {
+	if out, err := root.Run("install", "-m", "0644", "-o", "0", "-g", "0", f.Name(), path); err != nil {
 		return fmt.Errorf("install %s: %w: %s", path, err, bytes.TrimSpace(out))
 	}
 	return nil
 }
 
-func (t Target) restoreRoot(path string, prev []byte) error {
+func restoreRoot(root Root, path string, prev []byte) error {
 	if prev != nil {
-		return t.installRoot(path, prev)
+		return installRoot(root, path, prev)
 	}
-	if out, err := t.Root.Run("rm", "-f", path); err != nil {
+	if out, err := root.Run("rm", "-f", path); err != nil {
 		return fmt.Errorf("remove %s: %w: %s", path, err, bytes.TrimSpace(out))
 	}
 	return nil
