@@ -98,9 +98,10 @@ RUN mkdir -p /home/testuser/.local/bin \
     && go build -o /home/testuser/.local/bin/dotf ./cmd/dotf \
     && /home/testuser/.local/bin/dotf version
 
-# agy, installed before setup the way bats is above, so setup-linux.sh finds it
-# and reports "already installed". Its own install is a vendor `curl | bash` that
-# warns and continues on failure; when it failed fast on the first run, the
+# agy, installed before setup the way bats is above, so it is present on the
+# first run whatever happens to setup's own install. That install is mise's
+# (`# mise: latest`, #2013 P5c), best-effort like every tools step: when the
+# vendor installer setup used to run failed fast on the first run, the
 # second run installed agy, `dotf harness bind` then wrote
 # ~/.gemini/config/hooks.json, and the idempotence test read that repair as
 # drift (#1704). Here a vendor outage fails the build at this step, by name.

@@ -192,20 +192,6 @@ if command -v dotf >/dev/null 2>&1; then
     dotf tools install || log_warning "dotf tools install failed (continuing; re-run 'dotf tools install')"
 fi
 
-# Antigravity CLI (agy) install — idempotent per pattern-setup-script-idempotence.
-# Official install URL: https://antigravity.google/cli/install.sh
-# If agy is not in PATH, install it automatically; otherwise skip.
-if ! command -v agy >/dev/null 2>&1; then
-    log_info "Installing Antigravity CLI (agy)..."
-    if curl -fsSL https://antigravity.google/cli/install.sh | bash 2>/dev/null; then
-        log_success "agy installed"
-    else
-        log_warning "agy install failed — re-run setup or install manually (https://antigravity.google)"
-    fi
-else
-    log_info "agy already installed"
-fi
-
 # Setup Antigravity CLI configuration (fresh-install model, SDD-007).
 # Strategy: write canonical config to where agy reads from (~/.gemini/config/),
 # use deploy_file (atomic + idempotent), no symlinks. Closes #100.
@@ -314,22 +300,6 @@ ensure_directory "$HOME/.claude/skills"
 
 # uv and poetry: uv is a mise-pinned CLI and poetry a packages.json uv-tool
 # entry, both converged by the tools steps above (#2013 W2).
-
-# Claude Code (primary AI coding agent — see ADR-009)
-log_info "Setting up Claude Code CLI..."
-if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then
-    log_info "Installing Claude Code CLI via official install script..."
-    if curl -fsSL https://claude.ai/install.sh | bash; then
-        log_success "Claude Code installed"
-    elif command -v npm >/dev/null 2>&1; then
-        log_info "Falling back to npm install for Claude Code..."
-        npm install -g --prefix "$HOME/.local" @anthropic-ai/claude-code || log_warning "Claude Code install failed"
-    else
-        log_warning "Claude Code install failed — re-run setup or install manually"
-    fi
-else
-    log_info "Claude Code already installed"
-fi
 
 # OpenCode (secondary AI coding agent — see ADR-009 and specs/AI-011-opencode-bootstrap)
 
