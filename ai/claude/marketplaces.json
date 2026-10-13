@@ -1,0 +1,18 @@
+{
+  "$comment": [
+    "Where each marketplace of a plugin in plugins.json comes from (#2378).",
+    "",
+    "Name to source, the source in the form `claude plugin marketplace add`",
+    "takes. Before the first install from a marketplace, `dotf deploy` adds it",
+    "from here when the box does not register it, and refreshes it when it does.",
+    "A fresh Claude Code no longer registers claude-plugins-official on its own.",
+    "",
+    "Its own file, not a plugins.json field: every released dotf reads",
+    "plugins.json strictly, so a new field there fails the plugin step on a box",
+    "whose binary predates it. Every plugin's marketplace must be listed here",
+    "(TestEveryDeclaredPluginsMarketplaceHasASource)."
+  ],
+  "marketplaces": {
+    "claude-plugins-official": "anthropics/claude-plugins-official"
+  }
+}
