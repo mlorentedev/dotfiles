@@ -10,11 +10,10 @@ import (
 )
 
 // laptop is a fake systemd host for the power policy: the drop-in on disk,
-// which sleep targets are masked, and what logind answers for the lid.
+// and what logind answers for the lid.
 type laptop struct {
 	t         *testing.T
 	dropIn    string
-	masked    map[string]bool
 	lid       string // logind's live HandleLidSwitchExternalPower
 	hupReads  bool   // whether SIGHUP makes logind read the drop-in
 	canReload bool   // what systemd says of systemd-logind's CanReload
@@ -23,16 +22,11 @@ type laptop struct {
 
 func newLaptop(t *testing.T) *laptop {
 	return &laptop{t: t, dropIn: filepath.Join(t.TempDir(), "logind.conf.d", "50-workstation.conf"),
-		masked: map[string]bool{}, lid: "suspend", hupReads: true, canReload: true}
+		lid: "suspend", hupReads: true, canReload: true}
 }
 
 func (l *laptop) user(argv ...string) ([]byte, error) {
 	switch {
-	case argv[0] == "systemctl" && argv[1] == "is-enabled":
-		if l.masked[argv[2]] {
-			return []byte("masked\n"), nil
-		}
-		return []byte("static\n"), nil
 	case argv[0] == "systemctl" && argv[1] == "show":
 		if l.canReload {
 			return []byte("yes\n"), nil
@@ -60,14 +54,6 @@ func (l *laptop) Run(argv ...string) ([]byte, error) {
 		return nil, os.WriteFile(argv[len(argv)-1], data, 0o644)
 	case argv[0] == "rm":
 		return nil, os.Remove(argv[len(argv)-1])
-	case slices.Equal(argv[:2], []string{"systemctl", "mask"}):
-		for _, u := range argv[2:] {
-			l.masked[u] = true
-		}
-	case slices.Equal(argv[:2], []string{"systemctl", "unmask"}):
-		for _, u := range argv[2:] {
-			delete(l.masked, u)
-		}
 	case slices.Equal(argv[:2], []string{"systemctl", "kill"}):
 		if l.hupReads {
 			l.lid = "suspend"
@@ -98,11 +84,9 @@ func TestLogindAppliesAndProvesTheLidPolicy(t *testing.T) {
 	}
 }
 
-// The undo puts back exactly what the run changed: the previous drop-in, read
-// again by logind, and only the targets this run masked.
-func TestLogindUndoRestoresOnlyWhatTheRunChanged(t *testing.T) {
+// The undo puts back the previous drop-in, read again by logind.
+func TestLogindUndoRestoresThePreviousPolicy(t *testing.T) {
 	l := newLaptop(t)
-	l.masked["hibernate.target"] = true // the owner had masked it already
 	undo, err := l.logind().Apply(l)
 	if err != nil {
 		t.Fatal(err)
@@ -116,8 +100,22 @@ func TestLogindUndoRestoresOnlyWhatTheRunChanged(t *testing.T) {
 	if l.lid != "suspend" {
 		t.Errorf("logind answers %q after the undo, want its previous policy", l.lid)
 	}
-	if want := map[string]bool{"hibernate.target": true}; !mapsEqual(l.masked, want) {
-		t.Errorf("masked after undo = %v, want only what was masked before: %v", l.masked, want)
+}
+
+// A mask holds on battery too, so the policy never masks a sleep target: a
+// closed lid on battery keeps the distribution's default, suspend.
+func TestLogindLeavesBatteryAlone(t *testing.T) {
+	l := newLaptop(t)
+	if _, err := l.logind().Apply(l); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range l.rootCalls {
+		if strings.Contains(c, "mask") {
+			t.Errorf("the apply ran %q; a mask stops suspend on battery as well", c)
+		}
+	}
+	if strings.Contains(LogindPolicy, "HandleLidSwitch=") {
+		t.Error("the drop-in sets HandleLidSwitch, the battery case")
 	}
 }
 
@@ -141,18 +139,6 @@ func TestLogindProofFailsWhenLogindKeepsTheOldPolicy(t *testing.T) {
 	}
 }
 
-func TestLogindProofFailsWhileASleepTargetIsUnmasked(t *testing.T) {
-	l := newLaptop(t)
-	p := l.logind()
-	if _, err := p.Apply(l); err != nil {
-		t.Fatal(err)
-	}
-	delete(l.masked, "suspend.target")
-	if err := p.Prove(); err == nil || !strings.Contains(err.Error(), "suspend.target") {
-		t.Fatalf("Prove = %v, want it to name suspend.target", err)
-	}
-}
-
 func TestPowerForDeclaresAPolicyOnLinuxOnly(t *testing.T) {
 	if _, ok := PowerFor("linux", nil, Paths{}).(Logind); !ok {
 		t.Error("linux declares the logind policy")
@@ -162,21 +148,9 @@ func TestPowerForDeclaresAPolicyOnLinuxOnly(t *testing.T) {
 	}
 }
 
-func mapsEqual(a, b map[string]bool) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
-}
-
 // A logind that cannot reload is never sent SIGHUP, which would kill it. The
-// masks still stop every suspend, so the proof passes on them alone and the
-// lid policy waits for logind's next start.
+// drop-in waits for logind's next start, and the proof does not fail a run
+// for what only a restart, which ends the graphical session, could show.
 func TestLogindThatCannotReloadIsNeverSignalled(t *testing.T) {
 	l := newLaptop(t)
 	l.canReload = false
@@ -186,7 +160,7 @@ func TestLogindThatCannotReloadIsNeverSignalled(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := p.Prove(); err != nil {
-		t.Fatalf("Prove = %v; the masks alone stop every suspend", err)
+		t.Fatalf("Prove = %v; nothing is provable before logind's next start", err)
 	}
 	if err := undo(); err != nil {
 		t.Fatal(err)

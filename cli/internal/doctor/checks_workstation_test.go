@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -92,12 +91,6 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				case name == "launchctl" && args[0] == "print":
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
-				case name == "systemctl" && args[0] == "is-enabled" && strings.HasSuffix(args[len(args)-1], ".target"):
-					// The sleep targets: masked once the power policy is applied.
-					if loaded {
-						return "masked\n", nil
-					}
-					return "static\n", nil
 				case name == "systemctl" && (args[0] == "is-enabled" || args[0] == "is-active"):
 				default:
 					t.Fatalf("doctor ran %s %v; it must only read", name, args)
