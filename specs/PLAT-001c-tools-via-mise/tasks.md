@@ -234,7 +234,9 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
   - [x] `setup-linux.sh` loses the agy and Claude vendor-installer blocks; the agy config block and the pi package reconcile stay. Guard: `tests/setup-windows.bats` fails when `setup-linux.sh` runs `claude.ai/install.sh`, `antigravity.google/cli/install.sh` or `@anthropic-ai/claude-code` outside a comment (mutation-checked); the old parity assertion now reads the markers
   - [x] X1 (`from-zero.yml`): `The agents resolve on PATH` runs `command -v` and `--version` for claude and agy in the interactive shell, between the first converge and doctor (`tests/from-zero-doctor-gate.bats`)
   - [ ] Lands after the macmini runs 0.68.0: 0.67.0 rejects `# mise: latest` as a near-miss, so the tools step and doctor would fail there, and converge never upgrades dotf itself (#2381, CLI-104)
-  - [ ] Evidence: a from-zero run on the branch passes `The agents resolve on PATH` on both runners, and the macOS runner's plugin step runs for the first time (BUG-126's missing macOS proof)
+  - [x] Evidence: from-zero run 38376819599 on the branch (merged with main after BUG-126) is green on both runners. `The agents resolve on PATH` prints claude and agy from `~/.local/share/mise/installs/<tool>/latest/` on each; the gates read `linux: 8 known, 0 new, 0 stale` and `darwin: 3 known, 0 new, 0 stale`; the second converge is `changed: 0` on both
+  - [x] The macOS plugin step this row expected does not exist: converge runs the Claude MCP and plugin steps only through the bare `dotf deploy` that `setup-linux.sh` calls, so macOS never runs them. Filed as BUG-127 (#2387), out of this PR
+  - [x] agy on macOS un-skips doctor's Antigravity section, whose master `mcp_config.json` only the setup twins write: filed as CLI-105 (#2384) and listed in `from-zero-known-failures.txt` with that owner
 - Windows: the agents stay on `Install-AgentBinary` until Windows mise is measured (#2013)
 
 ### apt index refresh (#2013 X1 finding, #2332)
