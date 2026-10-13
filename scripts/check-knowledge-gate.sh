@@ -119,14 +119,23 @@ fi
 # absent, and the author needs to be told why.
 _strip_markup() {
     printf '%s\n' "$1" | awk -v mode="${2:-}" '
+        # run_at(s, i): the length of the backtick run starting at position i.
+        # Counted by hand rather than with match(): one awk (onetrue-awk 2023)
+        # returns RSTART -1 on some inputs, and the arithmetic then loops.
+        function run_at(s, i,    r) {
+            r = 0
+            while (substr(s, i + r, 1) == "`") r++
+            return r
+        }
         # span_end(s, n): the position in s of the last backtick of the first
         # run of exactly n backticks, or 0 when there is none.
-        function span_end(s, n,    p, start) {
-            p = 0
-            while (match(substr(s, p + 1), /`+/)) {
-                start = p + RSTART
-                if (RLENGTH == n) return start + n - 1
-                p = start + RLENGTH - 1
+        function span_end(s, n,    i, r) {
+            i = 1
+            while (i <= length(s)) {
+                if (substr(s, i, 1) != "`") { i++; continue }
+                r = run_at(s, i)
+                if (r == n) return i + n - 1
+                i += r
             }
             return 0
         }
@@ -143,8 +152,13 @@ _strip_markup() {
                 if (j > 0 && (i == 0 || j < i)) {
                     # A code span, a backtick run closed by a run of the same
                     # length, is kept as text: a <!-- inside it opens nothing.
-                    # A run with no closer on the line is a literal backtick.
-                    match(substr(line, j), /^`+/); run = RLENGTH
+                    # A run with no closer on the line, or one escaped with a
+                    # backslash, is a literal backtick.
+                    if (j > 1 && substr(line, j - 1, 1) == "\\") {
+                        out = out substr(line, 1, j); line = substr(line, j + 1)
+                        continue
+                    }
+                    run = run_at(line, j)
                     rest = substr(line, j + run)
                     k = span_end(rest, run)
                     out = out substr(line, 1, j + run - 1) substr(rest, 1, k)

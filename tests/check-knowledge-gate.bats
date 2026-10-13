@@ -417,10 +417,40 @@ A \`<!--\` in a code span is text, and so is \`\`a \` <!-- b\`\`.
 A lone \` backtick, then <!--
 ## Knowledge
 - Lesson: none: hidden in the comment
+- ADR: none: hidden too
+- Runbook: none: hidden too
 -->"
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 1 ]
+}
+
+@test "a backslash-escaped backtick opens no code span, so a real comment after it hides" {
+    SDD_PR_BODY="## Summary
+
+An escaped \\\`tick <!-- then a \` later
+## Knowledge
+- Lesson: none: hidden in the comment
+- ADR: none: hidden too
+- Runbook: none: hidden too
+--> and \`span\`"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 1 ]
+}
+
+@test "a code span whose closer follows other backtick runs is found" {
+    SDD_PR_BODY="## Summary
+
+A span \` <!-- b --> \`\` c \` ends here, and \`a <!-- b --> \`\` c\` too.
+
+## Knowledge
+- Lesson: none: nothing learned
+- ADR: none: no decision
+- Runbook: none: no procedure"
+    export SDD_PR_BODY
+    _gate
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
 }
 
 @test "the section ends at the next heading" {
