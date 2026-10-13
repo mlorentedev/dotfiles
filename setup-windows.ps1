@@ -969,72 +969,9 @@ $env:GEMINI_DIR = "$GeminiHome"
 # `agy-geminiignore`, `agy-instructions`; #1843 B11), deployed by the bare
 # `dotf deploy` this script makes: one implementation for every OS.
 
-# 2. Consolidate MCP servers - master at ~/.gemini/config/mcp_config.json (agy's canonical read path)
-$mcpServersSrc = "$DotfilesDir\ai\agy\mcp_servers.json"
-$rootMcpSrc = "$DotfilesDir\mcp-servers.json"
-if ((Test-Path $mcpServersSrc) -and (Test-Path $rootMcpSrc) -and (Get-Command jq -ErrorAction SilentlyContinue)) {
-    Write-Info "Consolidating Antigravity MCP servers..."
-
-    # NOTE: canonical agy schema uses `mcpServers` (not `servers`).
-    #
-    # CLI-042 AC8: the OpenRouter key recovery that stood here is gone with the
-    # provider. hive's worker is NaN-only since mlorentedev/hive#384, so an
-    # OPENROUTER_API_KEY handed to hive-vault buys nothing, and recovering it
-    # from the existing master config kept a live credential in mcp_config.json
-    # in plaintext across every redeploy. Parity with setup-linux.sh.
-    # opencode's own OpenRouter provider is a different consumer and untouched.
-    $mcpConfigJson = Get-Content $mcpServersSrc -Raw | ConvertFrom-Json
-
-    # Substitute ${VAULT_PATH} placeholder with the canonical Windows vault dir.
-    # The committed JSON uses ${VAULT_PATH} so it's OS-portable; agy does NOT
-    # expand env vars inside JSON values, so substitution must happen here
-    # before write. The path itself is by convention: $USERPROFILE\Projects\knowledge.
-    # ADR-025: honor $env:VAULT_PATH (the cross-machine seam) before the legacy
-    # default - parity with setup-linux.sh:402 ${VAULT_PATH:-...}.
-    $vaultPath = if ($env:VAULT_PATH) { $env:VAULT_PATH } else { Join-Path $env:USERPROFILE 'Projects\knowledge' }
-    $hiveEntry = $mcpConfigJson.mcpServers."hive-vault"
-    if ($hiveEntry -and $hiveEntry.env.PSObject.Properties['VAULT_PATH']) {
-        $hiveEntry.env.VAULT_PATH = $vaultPath
-    }
-
-    # Preflight: WARN (non-fatal) if the vault dir doesn't exist on disk.
-    # hive-vault MCP server will fail at first tool call without it, but
-    # encrypted secrets + AGY.md + everything else still deploys cleanly so
-    # creating the vault later doesn't require a setup re-run.
-    if (-not (Test-Path -LiteralPath $vaultPath -PathType Container)) {
-        Write-Warn "Obsidian vault not found at $vaultPath"
-        Write-Warn "  hive-vault MCP will error at runtime until this dir exists."
-        Write-Warn "  Either clone/sync your vault to $vaultPath, or override via"
-        Write-Warn "  the VAULT_PATH env var in your profile."
-    }
-
-    # Merge stdio servers from root mcp-servers.json into mcpServers map
-    $rootServers = (Get-Content $rootMcpSrc -Raw | ConvertFrom-Json).servers
-    foreach ($srv in $rootServers) {
-        if ($srv.name -eq "hive") { continue }
-        if ($srv.transport -ne "stdio") { continue }
-
-        $parts = $srv.args -split '\s+'
-        $cmd = $parts[0]
-        # NOTE: $args is an automatic PowerShell variable; use serverArgs to avoid PSAvoidAssignmentToAutomaticVariable
-        $serverArgs = $parts[1..($parts.Length-1)]
-        $mcpConfigJson.mcpServers | Add-Member -MemberType NoteProperty -Name $srv.name -Value @{ command = $cmd; args = $serverArgs } -Force
-    }
-
-    # Write master to canonical path. No symlinks, no copies elsewhere.
-    $masterConfig = Join-Path $GeminiHome "config\mcp_config.json"
-    $mcpConfigJson | ConvertTo-Json -Depth 10 | Set-Content $masterConfig -Encoding UTF8
-    Write-Success "Deployed master MCP config to $masterConfig"
-
-    # Hive plugin discovery file
-    $hivePluginDir = Join-Path $AgyAppData "plugins\hive-vault"
-    Ensure-Directory $hivePluginDir
-    '{"name": "hive-vault"}' | Set-Content (Join-Path $hivePluginDir "plugin.json") -Encoding UTF8
-    $hiveMcp = @{ mcpServers = @{ "hive-vault" = $mcpConfigJson.mcpServers."hive-vault" } }
-    $hiveMcp | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $hivePluginDir "mcp_config.json") -Encoding UTF8
-
-    Write-Success "Registered Hive plugin"
-}
+# 2. agy's MCP server configs (the master under ~/.gemini/config and the
+#    hive-vault plugin) are written by the bare `dotf deploy` this script makes
+#    and by `dotf converge` (CLI-105, #2384): one implementation for every OS.
 
 # Drop project-local agy state cache from the workspace if agy leaked one
 $projAgyCli = Join-Path $DotfilesDir ".antigravitycli"

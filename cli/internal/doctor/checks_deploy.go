@@ -2,13 +2,14 @@ package doctor
 
 import (
 	"fmt"
-	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/agy"
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
@@ -863,7 +864,7 @@ func checkAntigravity(sys *System, rep *Report) {
 		rep.Fail("ANTIGRAVITY_ENDPOINT is not production: " + endpoint)
 	}
 
-	agyData := sys.env("AGY_APP_DATA", filepath.Join(sys.home(), ".gemini", "antigravity-cli"))
+	geminiHome, agyData := agy.Dirs(sys.home(), func(k string) string { return sys.env(k, "") })
 	// filepath.IsAbs, not HasPrefix(_, "/"): an absolute Windows path
 	// (C:\Users\...\.gemini\antigravity-cli) is not '/'-rooted, so the POSIX-only
 	// check false-FAILed it whenever agy was on PATH on Windows (#691 / C20).
@@ -873,22 +874,21 @@ func checkAntigravity(sys *System, rep *Report) {
 		rep.Fail("AGY_APP_DATA is relative or unset: " + agyData)
 	}
 
-	geminiHome := sys.env("GEMINI_HOME", filepath.Join(sys.home(), ".gemini"))
 	configDir := filepath.Join(geminiHome, "config")
 	master := filepath.Join(configDir, "mcp_config.json")
 	switch {
 	case !pathExists(master):
-		rep.Fail("master mcp_config.json missing at " + master + " (run setup)")
+		rep.Fail("master mcp_config.json missing at " + master + " (run `dotf converge --only agent-extensions`)")
 	case isSymlink(master):
 		// BUG-100 regression
-		rep.Fail("master mcp_config.json is a symlink (recursion risk) (run setup)")
+		rep.Fail("master mcp_config.json is a symlink (recursion risk) (run `dotf converge --only agent-extensions`)")
 	case isEmptyFile(master):
-		// agy writes an empty file on its first run, before setup has written
-		// the master (measured on the Mac bring-up, #2013). Setup overwrites
-		// it, so the remedy is the same as for a missing one.
-		rep.Fail("master mcp_config.json at " + master + " is empty — agy creates it on first run (run setup)")
+		// agy writes an empty file on its first run, before converge has
+		// written the master (measured on the Mac bring-up, #2013). converge
+		// overwrites it, so the remedy is the same as for a missing one.
+		rep.Fail("master mcp_config.json at " + master + " is empty — agy creates it on first run (run `dotf converge --only agent-extensions`)")
 	case !isValidJSON(master):
-		rep.Fail("master mcp_config.json at " + master + " is invalid JSON (run setup)")
+		rep.Fail("master mcp_config.json at " + master + " is invalid JSON (run `dotf converge --only agent-extensions`)")
 	default:
 		rep.Pass("master mcp_config.json is a real file with valid JSON")
 	}

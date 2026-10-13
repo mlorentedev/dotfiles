@@ -37,13 +37,14 @@ func TestCheckAntigravity_AbsolutePathAccepted(t *testing.T) {
 }
 
 // Every FAIL on the master config names its remedy. An empty master is what
-// agy leaves on its first run before setup, and reporting it as "invalid
+// agy leaves on its first run before converge, and reporting it as "invalid
 // JSON" with no remedy sent the Mac bring-up looking for a corrupt write.
 func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
 	for name, content := range map[string]string{
 		"empty":   "",
 		"invalid": "{not json",
 		"symlink": "{}",
+		"missing": "",
 	} {
 		t.Run(name, func(t *testing.T) {
 			gemini := t.TempDir()
@@ -51,7 +52,9 @@ func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
 				t.Fatal(err)
 			}
 			master := filepath.Join(gemini, "config", "mcp_config.json")
-			if name == "symlink" {
+			switch name {
+			case "missing":
+			case "symlink":
 				target := filepath.Join(gemini, "target.json")
 				if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
 					t.Fatal(err)
@@ -59,8 +62,10 @@ func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
 				if err := os.Symlink(target, master); err != nil {
 					t.Skipf("cannot create a symlink here: %v", err)
 				}
-			} else if err := os.WriteFile(master, []byte(content), 0o600); err != nil {
-				t.Fatal(err)
+			default:
+				if err := os.WriteFile(master, []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
 			}
 			sys := newSys(map[string]string{"GEMINI_HOME": gemini, "AGY_APP_DATA": gemini}, []string{"agy"}, nil)
 			var buf bytes.Buffer
@@ -73,7 +78,7 @@ func TestCheckAntigravity_TheMasterConfigFailuresNameTheRemedy(t *testing.T) {
 					line = l
 				}
 			}
-			if !strings.Contains(line, "FAIL") || !strings.HasSuffix(strings.TrimSpace(line), "(run setup)") {
+			if !strings.Contains(line, "FAIL") || !strings.HasSuffix(strings.TrimSpace(line), "(run `dotf converge --only agent-extensions`)") {
 				t.Errorf("want a FAIL naming the remedy, got %q in:\n%s", line, out)
 			}
 			if name == "empty" && !strings.Contains(line, "is empty") {

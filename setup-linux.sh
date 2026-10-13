@@ -230,79 +230,15 @@ ensure_directory "$AGY_APP_DATA"
 #    #1843 B11): one implementation for every OS, run by the bare `dotf deploy`
 #    this script makes. settings.json renders {HOME} per machine (AI-042/#1334).
 
-# 2. Consolidate MCP servers — master at ~/.gemini/config/mcp_config.json (agy's canonical read path)
-if [ -f "$CURRENT_DIR/mcp-servers.json" ] && command -v jq >/dev/null 2>&1; then
-    log_info "Consolidating Antigravity MCP servers..."
-
-    # NOTE: canonical agy schema uses `mcpServers` (not `servers`) per Antigravity docs.
-    #
-    # CLI-042 AC8: the OpenRouter key recovery cascade that stood here is gone
-    # with the provider. hive's worker is NaN-only since mlorentedev/hive#384, so
-    # an OPENROUTER_API_KEY handed to hive-vault buys nothing — and the cascade
-    # ended in `dotf secrets show`, baking a live credential into
-    # mcp_config.json in plaintext. Removing the provider removes that file as a
-    # place a secret lives, which is AC7's rule applied to the same daemon from
-    # the other side. opencode's own OpenRouter provider is untouched: that is a
-    # different consumer, and the spec scopes this criterion to hive's worker.
-
-    # Substitute ${VAULT_PATH} placeholder with the canonical Linux vault dir.
-    # Committed JSON uses a placeholder so the same source works cross-OS;
-    # agy does NOT expand env vars inside JSON values, so the substitution
-    # must happen here at write time. Path is by convention: $HOME/Projects/knowledge.
-    VAULT_PATH_DEFAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
-
-    # Preflight: WARN (non-fatal) if the vault dir is missing. hive-vault MCP
-    # will fail at first tool call without it, but encrypted secrets + AGY.md +
-    # everything else still deploys cleanly so creating the vault later doesn't
-    # require a setup re-run. Mirrors the age-key preflight in #106.
-    if [ ! -d "$VAULT_PATH_DEFAULT" ]; then
-        log_warning "Obsidian vault not found at $VAULT_PATH_DEFAULT"
-        log_warning "  hive-vault MCP will error at runtime until this dir exists."
-        log_warning "  Either clone/sync your vault to $VAULT_PATH_DEFAULT, or override via"
-        log_warning "  the VAULT_PATH env var in your shell."
-    fi
-
-    NEW_MCP_CONFIG=$(jq --arg vault "$VAULT_PATH_DEFAULT" '
-        .mcpServers["hive-vault"].env.VAULT_PATH = $vault
-    ' "$CURRENT_DIR/ai/agy/mcp_servers.json")
-
-    # Merge stdio servers from root mcp-servers.json into mcpServers map
-    while IFS=$'\t' read -r name transport args; do
-        [ "$name" = "hive" ] && continue
-        [ "$transport" != "stdio" ] && continue
-
-        cmd=$(echo "$args" | awk '{print $1}')
-        cmd_args=$(echo "$args" | cut -d' ' -f2-)
-
-        NEW_MCP_CONFIG=$(echo "$NEW_MCP_CONFIG" | jq --arg name "$name" --arg cmd "$cmd" --argjson args "$(echo "$cmd_args" | jq -R 'split(" ")')" \
-            '.mcpServers[$name] = { "command": $cmd, "args": $args }')
-    done < <(jq -r '.servers[] | [.name, .transport, .args] | @tsv' "$CURRENT_DIR/mcp-servers.json")
-
-    # Write master config to agy's canonical read path. No symlinks (BUG-100).
-    # Idempotent: write to tempfile then deploy_file (skips when content matches).
-    MASTER_CONFIG="$GEMINI_HOME/config/mcp_config.json"
-    [ -L "$MASTER_CONFIG" ] && rm -f "$MASTER_CONFIG"
-    _mcp_tmp="$(mktemp)"
-    echo "$NEW_MCP_CONFIG" > "$_mcp_tmp"
-    deploy_file "$_mcp_tmp" "$MASTER_CONFIG"
-    rm -f "$_mcp_tmp"
-
-    # Hive plugin: discovery file at canonical plugin path
-    HIVE_PLUGIN_DIR="$AGY_APP_DATA/plugins/hive-vault"
-    ensure_directory "$HIVE_PLUGIN_DIR"
-    echo '{"name": "hive-vault"}' > "$HIVE_PLUGIN_DIR/plugin.json"
-    echo "$NEW_MCP_CONFIG" | jq '{ "mcpServers": { "hive-vault": .mcpServers["hive-vault"] } }' > "$HIVE_PLUGIN_DIR/mcp_config.json"
-
-    log_success "Consolidated Antigravity MCP configuration and registered Hive plugin"
-fi
+# 2. agy's MCP server configs (the master under ~/.gemini/config and the
+#    hive-vault plugin) are written by the bare `dotf deploy` this script makes
+#    and by `dotf converge` (CLI-105, #2384), which also drops the stale copy
+#    an older layout left in $AGY_APP_DATA.
 
 # Drop project-local agy state cache from the workspace if agy leaked one
 [ -d "$CURRENT_DIR/.antigravitycli" ] && rm -rf "$CURRENT_DIR/.antigravitycli"
 [ -d "$CURRENT_DIR/.antigravitycli.bak" ] && rm -rf "$CURRENT_DIR/.antigravitycli.bak"
 rm -f "$GEMINI_HOME/config/.migrated" 2>/dev/null
-
-# Drop the old AGY_APP_DATA symlink/copy of mcp_config.json (replaced by canonical path)
-[ -e "$AGY_APP_DATA/mcp_config.json" ] && rm -f "$AGY_APP_DATA/mcp_config.json"
 
 # Agy skills (native Shared skills + flat prompts) are deployed from the vault
 # skill records by `compile-harness.sh --deploy` (SDD-008), which renders each

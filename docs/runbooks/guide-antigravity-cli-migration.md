@@ -57,7 +57,8 @@ The install/config migration is **done** cross-OS — no porting work remains:
 - A one-time `gemini-cli → agy` migration removes the legacy `GEMINI.md`.
 - Config lives under `~/.gemini/` (agy inherits the path for back-compat):
   `~/.gemini/antigravity-cli/settings.json`, MCP consolidated at
-  `~/.gemini/config/mcp_config.json`.
+  `~/.gemini/config/mcp_config.json` by `dotf deploy` and `dotf converge`
+  (CLI-105, #2384; the setup scripts no longer write it).
 - `ANTIGRAVITY_ENDPOINT=https://cloudcode-pa.googleapis.com` (production Code
   Assist endpoint = the subscription path).
 - `dotf doctor` ("Antigravity CLI health" section) already guards endpoint,

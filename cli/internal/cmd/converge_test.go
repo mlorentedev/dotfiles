@@ -231,4 +231,12 @@ func TestConvergeOptions_ClaudeIsTheDeploySeam(t *testing.T) {
 	if _, ok := o.Claude(home); ok {
 		t.Error("no claude installed must read as not installed")
 	}
+	if o.AgyPaths == nil {
+		t.Fatal("convergeOptions wires no agy paths: agent-extensions would never write agy's MCP configs")
+	}
+	t.Setenv("GEMINI_HOME", "")
+	t.Setenv("AGY_APP_DATA", "")
+	if got, want := o.AgyPaths(home), agyPaths(home); got != want || got.GeminiHome != filepath.Join(home, ".gemini") {
+		t.Errorf("AgyPaths(home) = %+v; want the deploy command's %+v", got, want)
+	}
 }

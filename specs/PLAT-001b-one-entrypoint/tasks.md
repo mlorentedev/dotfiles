@@ -221,7 +221,18 @@ Converge never registered Claude Code's MCP servers or installed its plugins. On
 - [x] `agent-extensions`, every OS, after `workstation-target` and before `legacy-setup`: after `tools`, whose PATH reaches the claude that mise installs, and last among the native steps, because the first failure stops a run and a plugin that cannot reach its marketplace must not stop git or the SSH target. Skipped while claude is absent. `Probe` re-plans as a dry run, which asks claude and changes nothing
 - [x] Tests: a fresh claude gets the server and plugins, the probe passes and the second run changes nothing; a plan makes no mutating call; a failed install fails with its cause; an install that exits 0 and installs nothing fails the probe by name; `convergeOptions` wires the deploy seam; the registry order
 - [x] Evidence: from-zero 38391592787, a throwaway branch merging this change with P5c (#2392, the only change that installs claude on both runners). macOS and ubuntu alike: the first converge prints `[CHANGE] agent-extensions claude: 4 MCP server(s) added, 0 present; 3 plugin(s) added, 0 present`, the second `[ OK ] agent-extensions claude: 0 MCP server(s) added, 4 present; 0 plugin(s) added, 3 present` with `"changed": 0`
-- [ ] Not here: agy's `mcp_config.json` (CLI-105 #2384, the next PR, into the same step); a doctor check for a missing plugin or server (CLI-106 #2393)
+- [x] agy's `mcp_config.json`: PR 9 below. Still open: a doctor check for a missing plugin or server (CLI-106 #2393)
+
+### PR 9 — agent extensions: agy's MCP configs (#1843 B10, CLI-105 #2384)
+
+Only the setup twins wrote `~/.gemini/config/mcp_config.json` and the hive-vault plugin pair, each with its own jq or ConvertTo-Json, so a Mac converged by dotf had an agy with no MCP config, and doctor FAILed it with a remedy (`run setup`) that macOS never runs.
+
+- [x] `internal/agy`: `ApplyMCP` renders agy's own list with `VAULT_PATH` resolved through the env contract, merges every stdio server of `mcp-servers.json` but hive as `{command, args}`, writes the master and the plugin pair only when the bytes differ, replaces a symlink without following it (BUG-100), and removes the stale `$AGY_APP_DATA/mcp_config.json`. A missing vault is a note, not a failure, as the twins' preflight was. A one-word command now gets no args; the twins' `cut -d' ' -f2-` handed it itself
+- [x] The bare `dotf deploy` and `agent-extensions` call it; the step is no longer skipped whole when claude is absent, only its Claude half. agy's files are written whether or not agy is installed, as every `ai/deploy.json` agy entry is
+- [x] Both twins lose their block; `tests/guard-agy-mcp-in-dotf.bats` keeps it from growing back (mutation: one line naming the file in either twin turns it red). The two `antigravity.bats` tests that grepped the twins' substitution are gone with it; `cli/internal/agy` tests the substitution and the preflight
+- [x] doctor reads `GEMINI_HOME` and `AGY_APP_DATA` through `agy.Dirs`, so writer and checker agree, and its four remedies name `dotf converge --only agent-extensions`
+- [x] Tests: substitution, merge, idempotence, plan writes nothing, symlink, stale copy, missing vault, missing sources; the bare deploy plans, applies and is in sync on the second run; `convergeOptions` wires the paths; converge writes agy without claude and the probe names a drifted master. Seven mutations of `ApplyMCP`, all caught
+- [x] Evidence: from-zero 38396154386, a throwaway branch merging this change with P5c (#2392) and dropping the darwin `master mcp_config.json missing` known failure. macOS and ubuntu alike: the first converge prints `agy: 3 MCP config(s) written, 0 in sync`, the second `agy: 0 MCP config(s) written, 3 in sync` with `"changed": 0`; the darwin doctor gate reads `2 known FAIL line(s), 0 new, 0 stale`
 
 ## Closing
 
