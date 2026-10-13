@@ -46,6 +46,14 @@ func (c claudeCLI) RemoveMarketplace(name string) error {
 	return c.combined("plugin", "marketplace", "remove", name)
 }
 
+func (c claudeCLI) AddMarketplace(source string) error {
+	return c.combined("plugin", "marketplace", "add", source)
+}
+
+func (c claudeCLI) UpdateMarketplace(name string) error {
+	return c.combined("plugin", "marketplace", "update", name)
+}
+
 func (c claudeCLI) McpGet(name string) (string, error) {
 	out, err := c.command("mcp", "get", name).Output()
 	return string(out), err
@@ -107,6 +115,10 @@ func deployClaudePlugins(w io.Writer, repoRoot, home string, dryRun bool) error 
 		return nil
 	}
 	list, err := claude.LoadPlugins(filepath.Join(repoRoot, filepath.FromSlash(claude.PluginsRel)))
+	if err != nil {
+		return fmt.Errorf("%s: %w", step, err)
+	}
+	s.Sources, err = claude.LoadMarketplaceSources(filepath.Join(repoRoot, filepath.FromSlash(claude.MarketplacesRel)))
 	if err != nil {
 		return fmt.Errorf("%s: %w", step, err)
 	}

@@ -15,17 +15,31 @@ import (
 // named in failing. For MCP, registered maps a server to its `mcp get` output
 // (absent means get exits non-zero), and failing also names adds that fail.
 type fakeClaude struct {
-	listed     string
-	failing    map[string]bool
-	installed  []string
-	onInstall  func() // runs inside the guard, where the real CLI would write
-	registered map[string]string
-	added      []string
-	removed    []string
-	calls      []string // step order: "mcp", "market" or "plugin", per call
-	markets    []string // registered marketplaces; a removal drops one
-	sticky     map[string]bool
-	unmarketed []string // removals asked for
+	listed         string
+	failing        map[string]bool
+	installed      []string
+	onInstall      func() // runs inside the guard, where the real CLI would write
+	registered     map[string]string
+	added          []string
+	removed        []string
+	calls          []string // step order: "mcp", "market" or "plugin", per call
+	markets        []string // registered marketplaces; a removal drops one
+	sticky         map[string]bool
+	unmarketed     []string // removals asked for
+	refreshed      []string // marketplace refreshes asked for
+	registeredFrom []string // marketplace sources registered
+}
+
+// AddMarketplace registers the source under the name after its last "/".
+func (f *fakeClaude) AddMarketplace(source string) error {
+	f.registeredFrom = append(f.registeredFrom, source)
+	f.markets = append(f.markets, source[strings.LastIndex(source, "/")+1:])
+	return nil
+}
+
+func (f *fakeClaude) UpdateMarketplace(name string) error {
+	f.refreshed = append(f.refreshed, name)
+	return nil
 }
 
 func (f *fakeClaude) Marketplaces() (string, error) {
@@ -186,6 +200,28 @@ func TestDeployCmd_BareDeployInstallsMissingClaudePlugins(t *testing.T) {
 	}
 	if !strings.Contains(out, row("installed", "claude-plugins")+"1 added, 1 already present") {
 		t.Errorf("the step must report what it did:\n%s", out)
+	}
+}
+
+// The deploy reads ai/claude/marketplaces.json into the syncer: a box without
+// the marketplace registers it from the declared source, and a box with it
+// refreshes it (#2378). Without that wiring every plugin fails on a new box.
+func TestDeployCmd_APluginsMarketplaceIsPreparedFromTheDeclaredSource(t *testing.T) {
+	repo := pluginRepo(t)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "claude", "marketplaces.json"), `{"marketplaces":{"m":"org/m"}}`)
+	fresh := &fakeClaude{}
+	if out, err := runDeployWithClaude(t, repo, t.TempDir(), nil, fresh); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if strings.Join(fresh.registeredFrom, ",") != "org/m" || len(fresh.refreshed) != 0 {
+		t.Errorf("fresh box: registered %v refreshed %v, want org/m registered once", fresh.registeredFrom, fresh.refreshed)
+	}
+	known := &fakeClaude{markets: []string{"m"}}
+	if out, err := runDeployWithClaude(t, repo, t.TempDir(), nil, known); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if strings.Join(known.refreshed, ",") != "m" || len(known.registeredFrom) != 0 {
+		t.Errorf("registered box: registered %v refreshed %v, want m refreshed once", known.registeredFrom, known.refreshed)
 	}
 }
 
