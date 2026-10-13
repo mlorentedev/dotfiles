@@ -61,6 +61,14 @@ created: "2026-10-05"
 
 Tracked in #2013 track W. Each PR adds its block here when it starts.
 
+### W4 — setup fails loudly (F-048)
+
+- [x] Measured first: after BUG-126 (#2383), `dotf deploy` reports no failed row on integration (`bash setup-linux.sh`) or test-windows (`.\setup-windows.ps1`), and compile-harness prints its success line, so making them fatal turns no green job red (CI run 38375975019)
+- [x] Failing guard first: `tests/setup-fails-loudly.bats`, five tests, all red before the change
+- [x] The preflight: a failed dotf install (`install_dotf`, `Install-Dotf`) or a missing installer stops setup; every later step needs dotf
+- [x] A failed `dotf deploy` stops setup on both OSes, and so does a `dotf` that cannot be found after the install
+- [x] A failed `compile-harness --deploy` stops `setup-linux.sh`. Windows' skill deploy is the in-script `Deploy-SkillRecord`, out of this row
+
 ## B1 — an OS selector on `ai/deploy.json` entries (#1843 B1, unblocks #2013 P7)
 
 - [x] Failing tests first: `TestParseManifest_ReadsThePreviousVersionToo`, `TestParseManifest_ValidatesPlatforms`, `TestConfig_AppliesOn`, `TestDeployCmd_SkipsAnEntryForAnotherOS`, `TestCheckDeployManifest_AnEntryForAnotherOSIsNotCompared`; the version test moves its bounds to 2 and 5, and the field-set freeze gains version 4
