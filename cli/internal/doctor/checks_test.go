@@ -34,6 +34,7 @@ func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
 		{"darwin", "kubectl not in PATH (run: dotf tools sync)\n", ""},
 		{"linux", "kubectl not in PATH (run: dotf tools sync)\n", ""},
 		{"windows", "kubectl not in PATH\n", ""},
+		{"freebsd", "kubectl not in PATH\n", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.goos+"/"+tc.want, func(t *testing.T) {

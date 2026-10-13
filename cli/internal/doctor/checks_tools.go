@@ -58,7 +58,7 @@ func coreToolRemedy(tool, goos string) string {
 		return " (run: dotf tools install, then dotf doctor --fix to start Colima)"
 	case tool == "docker":
 		return " (run: dotf tools install)"
-	case tool == "kubectl" && goos != "windows":
+	case tool == "kubectl" && (goos == "linux" || goos == "darwin"):
 		return " (run: dotf tools sync)"
 	}
 	return ""
