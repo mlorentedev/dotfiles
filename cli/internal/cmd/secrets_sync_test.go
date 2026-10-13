@@ -118,8 +118,9 @@ secrets:
 `
 	setter := fakeSetter{}
 	out, err := syncCiExec(t, reg, setter, fakeBW{}, nil, "--repo", "mlorentedev/dotfiles")
-	if err != nil {
-		t.Fatal(err)
+	// Every entry skipped delivers nothing, and that is a failure (#2362).
+	if err == nil || !strings.Contains(err.Error(), "nothing was delivered") {
+		t.Fatalf("err = %v, want nothing-delivered", err)
 	}
 	if len(setter) != 0 {
 		t.Errorf("exclusions must upload nothing, got %v", setter)
@@ -128,6 +129,21 @@ secrets:
 		if !strings.Contains(out, want) {
 			t.Errorf("missing skip report %q in:\n%s", want, out)
 		}
+	}
+}
+
+// #2362: a sync whose registry lists no secret for the repo exits non-zero and
+// says where the selection came from. Exit 0 here read as a delivery that never
+// happened, on a checkout one commit behind the merged consumer ids.
+func TestSecretsSyncCi_NothingSelectedFails(t *testing.T) {
+	setter := fakeSetter{}
+	out, err := syncCiExec(t, ciRegistry, setter, fakeBW{}, nil, "--repo", "mlorentedev/renamed")
+	if err == nil || !strings.Contains(err.Error(), "nothing was delivered to mlorentedev/renamed") ||
+		!strings.Contains(err.Error(), "ci:mlorentedev/renamed") {
+		t.Fatalf("err = %v, want a failure naming the repo and the consumer it looked for", err)
+	}
+	if len(setter) != 0 || !strings.Contains(out, "no ci secrets selected for mlorentedev/renamed") {
+		t.Errorf("uploads = %v, out = %q", setter, out)
 	}
 }
 
