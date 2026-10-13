@@ -15,18 +15,24 @@ import (
 // named in failing. For MCP, registered maps a server to its `mcp get` output
 // (absent means get exits non-zero), and failing also names adds that fail.
 type fakeClaude struct {
-	listed     string
-	failing    map[string]bool
-	installed  []string
-	onInstall  func() // runs inside the guard, where the real CLI would write
-	registered map[string]string
-	added      []string
-	removed    []string
-	calls      []string // step order: "mcp", "market" or "plugin", per call
-	markets    []string // registered marketplaces; a removal drops one
-	sticky     map[string]bool
-	unmarketed []string // removals asked for
-	refreshed  []string // marketplace refreshes asked for
+	listed         string
+	failing        map[string]bool
+	installed      []string
+	onInstall      func() // runs inside the guard, where the real CLI would write
+	registered     map[string]string
+	added          []string
+	removed        []string
+	calls          []string // step order: "mcp", "market" or "plugin", per call
+	markets        []string // registered marketplaces; a removal drops one
+	sticky         map[string]bool
+	unmarketed     []string // removals asked for
+	refreshed      []string // marketplace refreshes asked for
+	registeredFrom []string // marketplace sources registered
+}
+
+func (f *fakeClaude) AddMarketplace(source string) error {
+	f.registeredFrom = append(f.registeredFrom, source)
+	return nil
 }
 
 func (f *fakeClaude) UpdateMarketplace(name string) error {

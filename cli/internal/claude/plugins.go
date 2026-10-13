@@ -3,13 +3,21 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 )
 
 // PluginsRel is the plugin list, relative to the repo root.
 const PluginsRel = "ai/claude/plugins.json"
+
+// MarketplacesRel declares where each marketplace of a plugin comes from,
+// relative to the repo root. It is not a field of plugins.json because every
+// released dotf reads that file strictly: a new field there would fail the
+// plugin step on any box whose binary predates it.
+const MarketplacesRel = "ai/claude/marketplaces.json"
 
 // PluginList is ai/claude/plugins.json: the plugins a box must carry, and the
 // marketplaces it must not (retired ones whose registration outlives the
@@ -61,6 +69,41 @@ func LoadPlugins(path string) (PluginList, error) {
 	return PluginList{Plugins: doc.Plugins, RetiredMarketplaces: doc.RetiredMarketplaces}, nil
 }
 
+// LoadMarketplaceSources reads the marketplace sources as a name-to-source
+// map, each source in the form `claude plugin marketplace add` takes. A
+// checkout that predates the file has no sources, which is not an error: Sync
+// then only refreshes marketplaces the box already registers.
+func LoadMarketplaceSources(path string) (map[string]string, error) {
+	raw, err := os.ReadFile(path) //nolint:gosec // repo-relative, fixed name
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Comment      []string          `json:"$comment"`
+		Marketplaces map[string]string `json:"marketplaces"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&doc); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", MarketplacesRel, err)
+	}
+	for name, src := range doc.Marketplaces {
+		if name == "" || strings.Contains(name, "@") {
+			return nil, fmt.Errorf("%s: %q is not a marketplace name", MarketplacesRel, name)
+		}
+		if strings.TrimSpace(src) == "" {
+			return nil, fmt.Errorf("%s: marketplace %q has an empty source", MarketplacesRel, name)
+		}
+	}
+	if doc.Marketplaces == nil {
+		doc.Marketplaces = map[string]string{}
+	}
+	return doc.Marketplaces, nil
+}
+
 // Runner is the claude CLI as the deploy uses it: the seam a test fills with a
 // fake instead of a real install.
 type Runner interface {
@@ -71,6 +114,7 @@ type Runner interface {
 	McpRemove(name string) error                        // `claude mcp remove <name> --scope user`
 	Marketplaces() (string, error)                      // `claude plugin marketplace list --json` output
 	RemoveMarketplace(name string) error                // `claude plugin marketplace remove <name>`
+	AddMarketplace(source string) error                 // `claude plugin marketplace add <source>`
 	UpdateMarketplace(name string) error                // `claude plugin marketplace update <name>`
 }
 
@@ -81,6 +125,7 @@ type Syncer struct {
 	ClaudeJSON string
 	Floor      int
 	HasCommand func(string) bool // PATH lookup for an MCP server's prerequisite binary
+	Sources    map[string]string // marketplace name to its `marketplace add` source
 }
 
 // PluginReport is what one Sync found and did. Added holds only installs that
@@ -101,12 +146,14 @@ type PluginReport struct {
 // on a box that only has `gopls-lsp@m`. A list that fails is returned, not read
 // as empty: treating a broken CLI as "nothing installed" reinstalls everything.
 //
-// Before the first install from a marketplace, Sync refreshes that
-// marketplace once. A fresh Claude Code ships a stale copy of its official
-// marketplace and `plugin install` does not refresh it, so without this every
-// declared plugin fails on a new machine (#2378). A failed refresh is not
-// fatal, since the copy may already list the plugin; it is named in the cause
-// of any install from that marketplace that then fails.
+// Before the first install from a marketplace, Sync prepares it once: a
+// marketplace the box does not register is added from its declared source,
+// and one it registers is refreshed, since its copy may predate a plugin
+// declared since. A fresh Claude Code no longer registers
+// claude-plugins-official, so without this every declared plugin failed on a
+// new machine (#2378). A failed preparation is not fatal, since the install
+// may still succeed; it is named in the cause of any install from that
+// marketplace that then fails.
 func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 	var rep PluginReport
 	var listed string
@@ -123,7 +170,7 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 	for _, tok := range strings.Fields(listed) {
 		installed[tok] = true
 	}
-	refreshed := map[string]error{}
+	prep := &marketPrep{done: map[string]error{}}
 	for _, id := range ids {
 		switch {
 		case installed[id]:
@@ -131,12 +178,12 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 		case dryRun:
 			rep.Added = append(rep.Added, id)
 		default:
-			updErr := s.refresh(marketplaceOf(id), refreshed, &rep)
+			prepErr := s.prepare(marketplaceOf(id), prep, &rep.Restored)
 			restored, err := Guard(s.ClaudeJSON, s.Floor, func() error { return s.Run.Install(id) })
 			rep.Restored += b2i(restored)
 			if err != nil {
-				if updErr != nil {
-					err = fmt.Errorf("%w (refreshing its marketplace failed first: %v)", err, updErr)
+				if prepErr != nil {
+					err = fmt.Errorf("%w (preparing its marketplace failed first: %v)", err, prepErr)
 				}
 				rep.Failed = append(rep.Failed, id)
 				if rep.Causes == nil {
@@ -151,19 +198,51 @@ func (s Syncer) Sync(ids []string, dryRun bool) (PluginReport, error) {
 	return rep, nil
 }
 
-// refresh runs `claude plugin marketplace update` for name the first time it is
-// asked, and returns that call's error on every later ask without calling
-// again. An id with no marketplace part has nothing to refresh.
-func (s Syncer) refresh(name string, done map[string]error, rep *PluginReport) error {
+// marketPrep is one Sync's preparation state: the registry, listed at most
+// once and only when there is something to install, and each marketplace's
+// outcome, so a failure is reported per install and never retried.
+type marketPrep struct {
+	listed     bool
+	registered map[string]bool
+	listErr    error
+	done       map[string]error
+}
+
+// prepare readies the marketplace name for an install the first time it is
+// asked, and returns that outcome on every later ask without calling again.
+// An id with no marketplace part has nothing to prepare.
+func (s Syncer) prepare(name string, p *marketPrep, restored *int) error {
 	if name == "" {
 		return nil
 	}
-	if err, ok := done[name]; ok {
+	if err, ok := p.done[name]; ok {
 		return err
 	}
-	restored, err := Guard(s.ClaudeJSON, s.Floor, func() error { return s.Run.UpdateMarketplace(name) })
-	rep.Restored += b2i(restored)
-	done[name] = err
+	if !p.listed {
+		p.listed = true
+		p.registered, p.listErr = s.marketplaces(restored)
+	}
+	var err error
+	switch src := s.Sources[name]; {
+	case p.listErr != nil:
+		err = fmt.Errorf("cannot tell whether marketplace %q is registered: %w", name, p.listErr)
+	case p.registered[name]:
+		err = s.guarded(restored, func() error { return s.Run.UpdateMarketplace(name) })
+	case src != "":
+		if err = s.guarded(restored, func() error { return s.Run.AddMarketplace(src) }); err != nil {
+			err = fmt.Errorf("registering marketplace %q from %s: %w", name, src, err)
+		}
+	default:
+		err = fmt.Errorf("marketplace %q is not registered and %s declares no source", name, MarketplacesRel)
+	}
+	p.done[name] = err
+	return err
+}
+
+// guarded runs fn inside the .claude.json snapshot guard and counts a restore.
+func (s Syncer) guarded(restored *int, fn func() error) error {
+	r, err := Guard(s.ClaudeJSON, s.Floor, fn)
+	*restored += b2i(r)
 	return err
 }
 
@@ -197,7 +276,7 @@ func (s Syncer) Retire(names []string, dryRun bool) (RetireReport, error) {
 	if len(names) == 0 {
 		return rep, nil
 	}
-	registered, err := s.marketplaces(&rep)
+	registered, err := s.marketplaces(&rep.Restored)
 	if err != nil {
 		return rep, err
 	}
@@ -220,7 +299,7 @@ func (s Syncer) Retire(names []string, dryRun bool) (RetireReport, error) {
 	}
 	// The second list judges every name, a failed removal included: the end
 	// state decides, and the CLI's error only explains a survivor.
-	after, err := s.marketplaces(&rep)
+	after, err := s.marketplaces(&rep.Restored)
 	if err != nil {
 		return rep, err
 	}
@@ -246,14 +325,13 @@ func (s Syncer) Retire(names []string, dryRun bool) (RetireReport, error) {
 // marketplaces is the set of marketplace names Claude Code has registered. A
 // list that fails or does not parse is an error, never an empty set: reading
 // a broken CLI as "nothing registered" would report a retired one as gone.
-func (s Syncer) marketplaces(rep *RetireReport) (map[string]bool, error) {
+func (s Syncer) marketplaces(restored *int) (map[string]bool, error) {
 	var out string
-	restored, err := Guard(s.ClaudeJSON, s.Floor, func() error {
+	err := s.guarded(restored, func() error {
 		var err error
 		out, err = s.Run.Marketplaces()
 		return err
 	})
-	rep.Restored += b2i(restored)
 	if err != nil {
 		return nil, fmt.Errorf("claude plugin marketplace list: %w", err)
 	}

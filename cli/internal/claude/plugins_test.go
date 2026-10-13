@@ -24,13 +24,27 @@ type fakeRunner struct {
 	sticky   map[string]bool
 	rmFails  map[string]bool // RemoveMarketplace exits non-zero, registry untouched
 	removed  []string
-	// updFails names marketplaces whose refresh exits non-zero; log holds every
-	// refresh and install in call order ("update m", "install a@m").
+	// updFails names marketplaces whose refresh exits non-zero, addFails the
+	// sources whose registration does. log holds every listing, registration,
+	// refresh and install in call order ("list", "add o/m", "update m",
+	// "install a@m").
 	updFails map[string]bool
+	addFails map[string]bool
 	log      []string
 }
 
 func (f *fakeRunner) List() (string, error) { return f.listed, f.listErr }
+
+// AddMarketplace registers the source under the name after its last "/", the
+// way a GitHub source's marketplace.json names it in the declared case.
+func (f *fakeRunner) AddMarketplace(source string) error {
+	f.log = append(f.log, "add "+source)
+	if f.addFails[source] {
+		return errors.New("repository not found")
+	}
+	f.markets = append(f.markets, source[strings.LastIndex(source, "/")+1:])
+	return nil
+}
 
 func (f *fakeRunner) UpdateMarketplace(name string) error {
 	f.log = append(f.log, "update "+name)
@@ -54,6 +68,7 @@ func (f *fakeRunner) McpAdd(string, string, []string) error { return nil }
 func (f *fakeRunner) McpRemove(string) error                { return nil }
 
 func (f *fakeRunner) Marketplaces() (string, error) {
+	f.log = append(f.log, "list")
 	if f.marketsJ != "" {
 		return f.marketsJ, nil
 	}
@@ -282,25 +297,30 @@ func TestRetireReadsTheCapturedListShape(t *testing.T) {
 	}
 }
 
-// A fresh Claude Code knows the official marketplace but its local copy does
-// not list the plugins yet, and `claude plugin install` does not refresh it, so
-// every declared plugin failed on a new machine (#2378). Each marketplace that
-// holds a plugin to install is refreshed once, before its first install.
-func TestSyncRefreshesEachMarketplaceOnceBeforeItsFirstInstall(t *testing.T) {
-	r := &fakeRunner{listed: "  ❯ c@p\n"}
-	if _, err := newSyncer(r).Sync([]string{"a@m", "b@m", "x@n", "c@p"}, false); err != nil {
+// A fresh Claude Code no longer registers claude-plugins-official, and a
+// plugin from a marketplace the box does not register cannot install, so every
+// declared plugin failed on a new machine (#2378). Before the first install
+// from a marketplace, Sync registers it from its declared source when it is
+// missing, or refreshes it when it is there (its copy may predate a plugin
+// declared since). Each marketplace is prepared once, and the registry is
+// listed once.
+func TestSyncPreparesEachMarketplaceOnceBeforeItsFirstInstall(t *testing.T) {
+	r := &fakeRunner{listed: "  ❯ c@p\n", markets: []string{"n"}}
+	s := newSyncer(r)
+	s.Sources = map[string]string{"m": "org/m"}
+	if _, err := s.Sync([]string{"a@m", "b@m", "x@n", "c@p"}, false); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"update m", "install a@m", "install b@m", "update n", "install x@n"}
+	want := []string{"list", "add org/m", "install a@m", "install b@m", "update n", "install x@n"}
 	if !reflect.DeepEqual(r.log, want) {
 		t.Fatalf("calls %v, want %v", r.log, want)
 	}
 }
 
-// A converged box installs nothing, so it refreshes nothing: the refresh is a
-// network call, paid only when there is something to install. A dry run
-// changes nothing, the marketplace copy included.
-func TestSyncRefreshesNothingWithoutAnInstall(t *testing.T) {
+// A converged box installs nothing, so it lists, registers and refreshes
+// nothing: each is a network or disk call paid only when there is something to
+// install. A dry run changes nothing, the registry included.
+func TestSyncPreparesNothingWithoutAnInstall(t *testing.T) {
 	r := &fakeRunner{listed: "  ❯ a@m\n"}
 	if _, err := newSyncer(r).Sync([]string{"a@m"}, false); err != nil {
 		t.Fatal(err)
@@ -314,23 +334,77 @@ func TestSyncRefreshesNothingWithoutAnInstall(t *testing.T) {
 	}
 }
 
-// A refresh that fails does not stop the install: an offline box whose copy
-// already lists the plugin still installs it. When the install fails as well,
-// its cause names both, since the refresh is the likelier reason.
-func TestAFailedRefreshStillAttemptsTheInstallAndIsNamedWhenItFails(t *testing.T) {
-	r := &fakeRunner{updFails: map[string]bool{"m": true}, failing: map[string]bool{"b@m": true}}
-	rep, err := newSyncer(r).Sync([]string{"a@m", "b@m"}, false)
+// A preparation that fails does not stop the install: an offline box whose
+// copy already lists the plugin still installs it. When the install fails as
+// well, its cause names both, since the preparation is the likelier reason.
+// A marketplace the box lacks and no source declares is named as such.
+func TestAFailedPreparationIsNamedInTheCauseOfAFailedInstall(t *testing.T) {
+	r := &fakeRunner{markets: []string{"m"}, updFails: map[string]bool{"m": true}, failing: map[string]bool{"b@m": true, "z@q": true, "y@k": true}}
+	s := newSyncer(r)
+	s.Sources = map[string]string{"k": "org/k"}
+	r.addFails = map[string]bool{"org/k": true}
+	rep, err := s.Sync([]string{"a@m", "b@m", "z@q", "y@k"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(rep.Added, []string{"a@m"}) || !reflect.DeepEqual(rep.Failed, []string{"b@m"}) {
+	if !reflect.DeepEqual(rep.Added, []string{"a@m"}) || !reflect.DeepEqual(rep.Failed, []string{"b@m", "z@q", "y@k"}) {
 		t.Fatalf("report %+v", rep)
 	}
-	cause := rep.Causes["b@m"].Error()
-	if !strings.Contains(cause, "install failed") || !strings.Contains(cause, "network unreachable") {
-		t.Fatalf("cause %q, want the install's error and the refresh's", cause)
+	for id, want := range map[string]string{
+		"b@m": "network unreachable",
+		"z@q": "ai/claude/marketplaces.json declares no source",
+		"y@k": "repository not found",
+	} {
+		if c := rep.Causes[id].Error(); !strings.Contains(c, "install failed") || !strings.Contains(c, want) {
+			t.Errorf("%s cause %q, want the install's error and %q", id, c, want)
+		}
 	}
-	if !reflect.DeepEqual(r.log, []string{"update m", "install a@m", "install b@m"}) {
-		t.Fatalf("calls %v: the failed refresh is not retried per install", r.log)
+	want := []string{"list", "update m", "install a@m", "install b@m", "install z@q", "add org/k", "install y@k"}
+	if !reflect.DeepEqual(r.log, want) {
+		t.Fatalf("calls %v, want %v: a failed preparation is not retried per install", r.log, want)
+	}
+}
+
+// The marketplace sources are their own file, so a dotf that predates them
+// still reads plugins.json (strict) unchanged. Absent, there are no sources;
+// present, it is read as strictly as the plugin list.
+func TestLoadMarketplaceSources(t *testing.T) {
+	dir := t.TempDir()
+	got, err := LoadMarketplaceSources(filepath.Join(dir, "absent.json"))
+	if err != nil || len(got) != 0 {
+		t.Fatalf("absent file: %v %v, want empty and no error", got, err)
+	}
+	for name, body := range map[string]string{
+		"unknown field": `{"marketplaces":{"m":"o/m"},"extra":1}`,
+		"empty source":  `{"marketplaces":{"m":""}}`,
+		"id as name":    `{"marketplaces":{"a@m":"o/m"}}`,
+	} {
+		p := filepath.Join(dir, "bad.json")
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadMarketplaceSources(p); err == nil {
+			t.Errorf("%s: want an error", name)
+		}
+	}
+}
+
+// Every plugin the repo declares comes from a marketplace whose source the
+// repo declares, so a fresh box can register it. A plugin added from a new
+// marketplace without its source fails here, not on the next new machine.
+func TestEveryDeclaredPluginsMarketplaceHasASource(t *testing.T) {
+	root := filepath.Join("..", "..", "..")
+	list, err := LoadPlugins(filepath.Join(root, filepath.FromSlash(PluginsRel)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := LoadMarketplaceSources(filepath.Join(root, filepath.FromSlash(MarketplacesRel)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range list.Plugins {
+		if m := marketplaceOf(id); sources[m] == "" {
+			t.Errorf("%s: marketplace %q has no source in %s", id, m, MarketplacesRel)
+		}
 	}
 }
