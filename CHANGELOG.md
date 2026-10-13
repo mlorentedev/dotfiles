@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.68.0](https://github.com/mlorentedev/dotfiles/compare/v0.67.0...v0.68.0) (2026-10-13)
+
+
+### Features
+
+* **converge:** add the workstation-target step for macOS ([#2361](https://github.com/mlorentedev/dotfiles/issues/2361)) ([3bf4afe](https://github.com/mlorentedev/dotfiles/commit/3bf4afeaafdfab8643599255894a7c2f2886442d))
+* **converge:** deploy and wire the git-hooks dispatcher on every OS ([#2340](https://github.com/mlorentedev/dotfiles/issues/2340)) ([2c7d709](https://github.com/mlorentedev/dotfiles/commit/2c7d709f341de4a7d7cb90446622dfe0935bb9d2))
+* **converge:** drive the workstation SSH target under systemd on Linux ([#2372](https://github.com/mlorentedev/dotfiles/issues/2372)) ([af34bb9](https://github.com/mlorentedev/dotfiles/commit/af34bb9b2678bf9d10b564b2255010157753e23f))
+* **converge:** guide the identity restore on a terminal ([#2342](https://github.com/mlorentedev/dotfiles/issues/2342)) ([dfbf80a](https://github.com/mlorentedev/dotfiles/commit/dfbf80a67e1c7f5a2cadf4a6b696777e36c2ab25))
+* **converge:** render the contract's path file before any install ([#2316](https://github.com/mlorentedev/dotfiles/issues/2316)) ([b569b45](https://github.com/mlorentedev/dotfiles/commit/b569b45a8584f9b54f67e0b43b70864ca256d74f))
+* **doctor:** report the workstation-target plan read-only ([#2366](https://github.com/mlorentedev/dotfiles/issues/2366)) ([39cc7a9](https://github.com/mlorentedev/dotfiles/commit/39cc7a961568fb68707852bc95c6c31b787381a4))
+* **doctor:** scope the sweep to machine checks with --scope machine ([#2337](https://github.com/mlorentedev/dotfiles/issues/2337)) ([3f02e99](https://github.com/mlorentedev/dotfiles/commit/3f02e99daa9b3e8f8505ea68892d2a22e6fc1b89))
+* **env:** declare machine roles and keep the sections a write does not own ([#2359](https://github.com/mlorentedev/dotfiles/issues/2359)) ([dc81d19](https://github.com/mlorentedev/dotfiles/commit/dc81d19ee778bb9f8f3e1d10b1a2a45dd5876c1a)), closes [#2356](https://github.com/mlorentedev/dotfiles/issues/2356)
+* **install:** make install.{sh,ps1} the one entrypoint that hands off to converge ([#2275](https://github.com/mlorentedev/dotfiles/issues/2275)) ([c6e82b3](https://github.com/mlorentedev/dotfiles/commit/c6e82b347e1aa3d3f3c3f177526fd18da14b5882))
+* **pr-agent:** publish the automatic review's findings inline ([#2325](https://github.com/mlorentedev/dotfiles/issues/2325)) ([7186bc0](https://github.com/mlorentedev/dotfiles/commit/7186bc0ac0663902c36a4609051a8bc3b936a7ba))
+* **ssh:** add workstation profiles and target onboarding runbook ([#2358](https://github.com/mlorentedev/dotfiles/issues/2358)) ([440085c](https://github.com/mlorentedev/dotfiles/commit/440085c6acfff91c26b0f351f4156d6c76471224))
+* **ssh:** pin workstation and GitHub host keys ([#2376](https://github.com/mlorentedev/dotfiles/issues/2376)) ([e05c5e0](https://github.com/mlorentedev/dotfiles/commit/e05c5e032a3c4d598d60c29647327024917eee6b))
+* **tools:** track a tool's newest release under a latest marker ([#2329](https://github.com/mlorentedev/dotfiles/issues/2329)) ([27020ee](https://github.com/mlorentedev/dotfiles/commit/27020ee47ef2030288d8590b9836de15214e3ebe))
+
+
+### Bug Fixes
+
+* **agy:** stop granting search_web, a kind agy drops on every save ([#2326](https://github.com/mlorentedev/dotfiles/issues/2326)) ([6ee93d0](https://github.com/mlorentedev/dotfiles/commit/6ee93d05412324d47582c83f90951c727c0afb2f))
+* **ci:** read a GitHub App PR author in the form the gates compare ([#2353](https://github.com/mlorentedev/dotfiles/issues/2353)) ([9b9fd59](https://github.com/mlorentedev/dotfiles/commit/9b9fd595888518497ce70fba799d3df0a5bf31fd))
+* **claude:** write the deny rules in a form that matches ([#2349](https://github.com/mlorentedev/dotfiles/issues/2349)) ([9d23213](https://github.com/mlorentedev/dotfiles/commit/9d23213a7f61facb41978d404aa06d1c34e2f968))
+* **cli:** keep the porcelain status column on the first dirty line ([#2369](https://github.com/mlorentedev/dotfiles/issues/2369)) ([a396c86](https://github.com/mlorentedev/dotfiles/commit/a396c86aa9c24e7d4431acdaba75e574906a83fc)), closes [#2177](https://github.com/mlorentedev/dotfiles/issues/2177)
+* **converge:** re-run records-harness after tools installs an agent ([#2333](https://github.com/mlorentedev/dotfiles/issues/2333)) ([e389021](https://github.com/mlorentedev/dotfiles/commit/e389021b9adc479cea505736626b538ec576fa4c))
+* **deploy:** count a failed plugin install and name its cause ([#2343](https://github.com/mlorentedev/dotfiles/issues/2343)) ([da594be](https://github.com/mlorentedev/dotfiles/commit/da594be41a49fc993972c6b6fd6140515b720763))
+* **deploy:** gate pi-compaction on pi like the other ~/.pi/agent entries ([#2334](https://github.com/mlorentedev/dotfiles/issues/2334)) ([1992c86](https://github.com/mlorentedev/dotfiles/commit/1992c862fd6c495c30a28af5d924816d088dca96))
+* **env:** lock machine.json across a read, an edit and a rename ([#2365](https://github.com/mlorentedev/dotfiles/issues/2365)) ([4b89f19](https://github.com/mlorentedev/dotfiles/commit/4b89f19da0e5a7a2c2136036b807d360dddfa557))
+* **gitconfig:** ask gh about its stored login, not the token in the environment ([#2321](https://github.com/mlorentedev/dotfiles/issues/2321)) ([824eda5](https://github.com/mlorentedev/dotfiles/commit/824eda5208ef5a52e3a1a353ba36fac46717a2ad))
+* **pr-agent:** name the secret in every sync ci remedy ([#2327](https://github.com/mlorentedev/dotfiles/issues/2327)) ([e6b0af6](https://github.com/mlorentedev/dotfiles/commit/e6b0af6febcfcad0c1c8bd72319096d9de04b4a1))
+* **pr-agent:** report harness compliance failures inside the review schema ([#2315](https://github.com/mlorentedev/dotfiles/issues/2315)) ([201f301](https://github.com/mlorentedev/dotfiles/commit/201f30193c085488611abad3dee8b339cda15d0e))
+* **secrets:** fail a ci sync that delivers nothing ([#2368](https://github.com/mlorentedev/dotfiles/issues/2368)) ([80289c3](https://github.com/mlorentedev/dotfiles/commit/80289c36b0711f77eabbfb05d3d8597bea775d92))
+* **tools:** install zsh on Linux from the catalog ([#2338](https://github.com/mlorentedev/dotfiles/issues/2338)) ([5318aec](https://github.com/mlorentedev/dotfiles/commit/5318aec847554b68fc28fc439ce49eab4d030405))
+* **tools:** prepare Windows mise for pinned CLI sync ([#2345](https://github.com/mlorentedev/dotfiles/issues/2345)) ([007c92f](https://github.com/mlorentedev/dotfiles/commit/007c92fc88e9de48d05638f370c3c737cbd1086f))
+* **tools:** print one sudo command for every apt package and report it in doctor ([#2309](https://github.com/mlorentedev/dotfiles/issues/2309)) ([fa864d9](https://github.com/mlorentedev/dotfiles/commit/fa864d9d8542afcb0bc85ffe090542cfca5c3c21))
+* **tools:** refresh the apt index once before the first apt install ([#2332](https://github.com/mlorentedev/dotfiles/issues/2332)) ([f244079](https://github.com/mlorentedev/dotfiles/commit/f244079141b70f01c1ec74081f0b9b5925680194))
+* **update:** report a checkout ahead of its upstream as ahead, not diverged ([#2370](https://github.com/mlorentedev/dotfiles/issues/2370)) ([cd4ac63](https://github.com/mlorentedev/dotfiles/commit/cd4ac63c4ca8050139a0a88a5e39aa24ab2b13e2)), closes [#2205](https://github.com/mlorentedev/dotfiles/issues/2205)
+
 ## [0.67.0](https://github.com/mlorentedev/dotfiles/compare/v0.66.0...v0.67.0) (2026-10-10)
 
 
