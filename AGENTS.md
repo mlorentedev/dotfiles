@@ -267,6 +267,7 @@ Wire `dotf pr triage-queue` into any session-start hook the harness offers.
 ### Interaction Discipline
 
 - **Wait before acting** — don't explore/implement/launch until the prompt is finished. Ask before exploring; hands off unless asked; never delete content without explicit confirmation.
+- **Second opinion before recommending.** Before handing the owner a recommendation or an option table they will act on, have a stronger model review it where the harness offers one, and say where it differed; where the harness offers none, say so. Asked three times (2026-08-09 twice, 2026-10-13); on 2026-10-13 it caught two firewall commands that would have replaced macOS's main pf ruleset and a lockout risk with no mechanism behind it.
 - **Hand the PR over; don't watch CI.** After opening a PR, report it and move to the next piece of work. Query status once only when follow-up work depends on it.
 
 ### Autonomy Boundaries

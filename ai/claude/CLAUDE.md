@@ -75,6 +75,7 @@ Wire `dotf pr triage-queue` into any session-start hook the harness offers.
 <!-- END HARNESS GENERATED -->
 * **Skills:** Auto-loaded via slash commands from `~/.claude/skills/<skill>/SKILL.md` (deployed by `compile-harness.sh --deploy`).
 * **TaskCreate / TaskUpdate / TaskList:** Use for non-trivial work (≥3 steps). Mark `in_progress` before start, `completed` on finish.
+* **Advisor:** AGENTS.md's *second opinion before recommending* is `advisor()` here (model: `advisorModel` in `ai/claude/settings.json`). Call it before any recommendation handed to the owner, and before declaring non-trivial work done.
 * **AskUserQuestion:** Use for branching decisions (2-4 options), marking "(Recommended)" on preferred.
 * **MEMORY.md:** Auto-loads at session start (capped at 200 lines). Index-only; link to topic files.
 
