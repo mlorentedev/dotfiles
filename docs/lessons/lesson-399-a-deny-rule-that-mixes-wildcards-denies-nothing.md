@@ -32,5 +32,10 @@ destructive git and rm rules are present in the wildcard form.
 ## Takeaways
 - A permission rule fails open. A rule that matches nothing reads exactly like a rule whose
   command never ran, so its syntax needs a test, not a review.
+- A deny list matches spellings, not intent: `git push -f` slips past `*--force*`. List the
+  common forms of each destructive command and treat the list as best-effort, never as a
+  sandbox.
+- A merge deploy that unions lists adds the corrected rules but never removes the malformed
+  ones: an existing box keeps them, warning included, until something retires them (#2350).
 - When a tool offers two pattern syntaxes, a guard that rejects their mixture is cheaper than
   remembering which one wins.
