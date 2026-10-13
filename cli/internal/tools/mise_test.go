@@ -94,6 +94,33 @@ func TestRenderMiseConfig_WindowsDirenvNamesTheReleaseBinaryAsExe(t *testing.T) 
 	}
 }
 
+// #2013 H3: aqua's registry entry for herdr checks the release digest only,
+// while mise's github backend checks it and the GitHub artifact attestations
+// upstream publishes for the linux and macOS assets. A [tool_alias] routes
+// the short name there, so every other reader (mise which, where, bin-paths,
+// the doctor and verify-setup.bats) keeps asking for herdr. The Windows zip
+// carries no attestation, and mise refuses an asset without one, so Windows
+// renders no alias.
+func TestRenderMiseConfig_RoutesHerdrToTheBackendThatVerifiesAttestations(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"herdr", "0.9.3"}, {"jq", "1.8.2"}}, ""))
+	alias := "\n[tool_alias]\nherdr = \"github:herdrdev/herdr\"\n"
+	if runtime.GOOS == "windows" {
+		if strings.Contains(out, "[tool_alias]") {
+			t.Errorf("the Windows herdr zip has no attestation; no alias there:\n%s", out)
+		}
+		return
+	}
+	if !strings.Contains(out, alias) || !strings.Contains(out, "herdr = \"0.9.3\"\n") {
+		t.Errorf("want herdr pinned by its short name and aliased to the github backend:\n%s", out)
+	}
+	if strings.Count(out, "[tool_alias]") != 1 || strings.Contains(out, "jq = \"github:") {
+		t.Errorf("only herdr is aliased:\n%s", out)
+	}
+	if out := string(RenderMiseConfig([]MiseTool{{"jq", "1.8.2"}}, "")); strings.Contains(out, "[tool_alias]") {
+		t.Errorf("no alias section without herdr:\n%s", out)
+	}
+}
+
 // mise itself is pinned in packages.json and installed by `dotf tools install`.
 // Its own update notice tells the user to run `mise self-update`, which would
 // move it past that pin, so the rendered config turns the notice off.
