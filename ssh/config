@@ -48,20 +48,17 @@ Host vps
   User deployer
   IdentityFile ~/.ssh/id_ed25519
 
-# --- Fleet agents (Headscale tag:hermes, ADR-041; userspace pod, root) ---
-Host hermes-nan
-  Hostname 100.64.0.9
-  User root
-  IdentityFile ~/.ssh/id_ed25519
-
 # --- Workstations (remote development targets) ---
 # Tailnet only, by decision: no *-lan and no *-ext alias. Their sshd accepts
 # 100.64.0.0/10 and nothing else, so an alias through the LAN or the public
 # bastion would only fail. Names, not mesh IPs: MagicDNS follows a node that
 # re-registers. Onboarding: docs/runbooks/guide-workstation-ssh-target.md
+# Their host keys are pinned (ssh/known_hosts): any other key is refused.
 Host msi
   Hostname msi.kubelab.internal
   User manu
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
   ServerAliveInterval 30
@@ -71,6 +68,8 @@ Host msi
 Host macmini
   Hostname macmini.kubelab.internal
   User manu
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
   ServerAliveInterval 30
@@ -167,6 +166,13 @@ Host gcp1-ext
   IdentityFile ~/.ssh/id_ed25519
   ProxyJump vps-pub
 # --- KUBELAB-SSH-END ---
+
+# --- GITHUB-START ---
+# Pinned to the key GitHub documents (ssh/known_hosts).
+Host github.com
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
+# --- GITHUB-END ---
 
 # --- OFFICE-JETSON-START ---
 Host jetson-office

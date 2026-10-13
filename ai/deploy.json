@@ -249,6 +249,13 @@
       "mode": "0600"
     },
     {
+      "name": "ssh-known-hosts",
+      "src": "ssh/known_hosts",
+      "dst": "{HOME}/.ssh/known_hosts_pinned",
+      "render": false,
+      "mode": "0644"
+    },
+    {
       "name": "ssh-pubkey",
       "src": "ssh/id_ed25519.pub",
       "dst": "{HOME}/.ssh/id_ed25519.pub",

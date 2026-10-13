@@ -30,6 +30,7 @@ git-hooks/** text eol=lf
 cli/internal/initrepo/templates/** text eol=lf
 tests/golden/**                   text eol=lf
 ssh/config                        text eol=lf
+ssh/known_hosts                   text eol=lf
 LICENSE                           text eol=lf
 
 # Windows shells: native tooling expects CRLF.
