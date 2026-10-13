@@ -268,7 +268,18 @@ env-contract.json names the directory `AGY_HOME`; `agy.Dirs`, doctor, `setup-lin
 - [x] `.zshrc` and `setup-linux.sh` stop exporting `AGY_APP_DATA`; `setup-windows.ps1` only had a local `$AgyAppData`, now `$AgyHome`, and never persisted the old name
 - [x] `tests/env-contract.bats` fails if any shell, PowerShell or rc file outside `cli/`, `docs/`, `specs/` and `tests/` names `AGY_APP_DATA` again, whatever the export form; mutations caught: the `.zshrc` export restored, a `typeset -x` in `.zsh/aliases.zsh`
 - [x] A relative value is reported under the variable that supplied it (`AGY_APP_DATA` when `AGY_HOME` is unset); the vacuous `antigravity.bats` absolute-path test, which asserted a value it set itself, is gone: the doctor unit test covers the property
-- [ ] Drop the `AGY_APP_DATA` fallback from `agy.Dirs` and the doctor WARN one release after this ships
+- [ ] Drop the `AGY_APP_DATA` fallback from `agy.Dirs` and the doctor WARN one release after this ships (#2404, CLI-110)
+
+### PR 13 — doctor: Claude permission rules that match nothing (BUG-123 #2350)
+
+#2349 corrected six deny rules in `ai/claude/settings.json` that mixed `*` with the trailing `:*` prefix form (lesson 399). `claude-settings` deploys by merge, and the merge unions lists, so every box that had them kept them, and Claude Code warned at each start. The Mac had all six.
+
+- [x] `claude.MalformedRule`: Claude Code's startup validation, a `Tool(...)` rule whose pattern ends in `:*` and holds another `*`. `MalformedRules` lists them across `allow`, `deny` and `ask`; `DropMalformedRules` removes them and keeps every other rule in its order
+- [x] `deploy.EditJSON`: an edit applied through deploy's own staged write (temp file beside the destination, one-time backup, atomic rename, `installMode`). An absent or non-object destination is an error, so a repair never creates a file deploy has not
+- [x] doctor section *Claude permission rules*: one FAIL per malformed rule in the deployed `settings.json` (resolved from the `claude-settings` entry, so `CLAUDE_CONFIG_DIR` is honoured); `--fix` removes them; a second run passes. Skipped without claude or without the file
+- [x] Rejected, as the issue records: a manifest `retire` field (a `ManifestVersion` bump and two releases for one consumer) and switching `deny` to replace (a new merge policy that would drop a box's own rules)
+- [x] Evidence on the Mac, dev build in `$TMPDIR`, read-only (no `--fix` on the owner's real settings): six FAILs, `Bash(rm -rf ~/*:*)`, `Bash(git push *--force*:*)`, `Bash(git reset --hard*:*)`, `Bash(git clean -fdx*:*)`, `Bash(git clean -f*:*)`, `Bash(*dotf secrets show*:*)`
+- [ ] The owner runs `dotf doctor --fix` with a release carrying this, and the Claude startup warning is gone
 
 ## Closing
 

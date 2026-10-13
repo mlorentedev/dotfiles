@@ -36,6 +36,7 @@ destructive git and rm rules are present in the wildcard form.
   common forms of each destructive command and treat the list as best-effort, never as a
   sandbox.
 - A merge deploy that unions lists adds the corrected rules but never removes the malformed
-  ones: an existing box keeps them, warning included, until something retires them (#2350).
+  ones: an existing box keeps them, warning included. `dotf doctor` reports them and `--fix`
+  removes them, applying the same validation Claude Code runs at startup (#2350).
 - When a tool offers two pattern syntaxes, a guard that rejects their mixture is cheaper than
   remembering which one wins.
