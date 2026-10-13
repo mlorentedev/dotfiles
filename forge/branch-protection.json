@@ -173,7 +173,7 @@
         "allow_fork_syncing": false
       }
     },
-    "mlorentedev/pdf-modifier-mcp": {
+    "mlorentedev/pdf-modifier": {
       "branch": "master",
       "protection": {
         "required_status_checks": {

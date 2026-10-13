@@ -23,7 +23,7 @@
     "pdf-modifier": {
       "command": "uvx",
       "args": [
-        "pdf-modifier-mcp"
+        "pdf-modifier"
       ]
     }
   }
