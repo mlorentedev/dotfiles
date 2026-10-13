@@ -272,7 +272,8 @@ It reloads logind with `SIGHUP` only where `systemctl show -p CanReload
 systemd-logind` says `yes`, and never restarts it, which would end the
 sessions. Where logind cannot reload, the policy applies from the next boot.
 Battery keeps the distribution's lid behaviour, and no sleep target is masked,
-so a laptop that travels still suspends. Check:
+so a laptop that travels still suspends. Check, after the next boot where
+logind could not reload (until then it still reports the old value):
 `busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandleLidSwitchExternalPower`
 prints `s "ignore"`.
 
@@ -360,7 +361,7 @@ target, `dotf env role rm ssh-target`, then remove what the step wrote (there
 is no converge undo for a role removal yet). For the hand steps, restore the
 dated backups taken in the preflight, then:
 
-- **Linux:** `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf /etc/systemd/logind.conf.d/50-workstation.conf`, then `sudo sshd -t && sudo systemctl reload ssh` (`sshd` on Fedora and Arch); `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp`.
+- **Linux:** if the machine served no ssh before it became a target, stop the listener first, so sshd never runs on the stock config (which allows passwords) once the drop-in is gone. This mirrors the step's own rollback (`sshtarget.Systemd.Disable`): `sudo systemctl disable --now ssh.socket && sudo systemctl stop ssh.service` where sshd is socket-activated (Ubuntu 22.10 and later), else `sudo systemctl disable --now ssh` (`sshd` on Fedora and Arch). Then `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf /etc/systemd/logind.conf.d/50-workstation.conf`; if sshd stays enabled, `sudo sshd -t && sudo systemctl reload ssh`; and `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp`.
 - **Linux, a node set up by hand before the converge step:** the earlier version of this runbook masked the sleep targets, which the step neither writes nor removes. `systemctl is-enabled suspend.target` prints `masked` on such a node, and it then never suspends, on battery included. `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target` restores the distribution's behaviour; the logind drop-in keeps the lid policy.
-- **macOS:** `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf`; `sudo pfctl -a com.apple/250.KubelabSSH -F all`; if the Mac stops being a target, `sudo launchctl bootout system/com.openssh.sshd && sudo launchctl disable system/com.openssh.sshd`. `bootout` alone only stops the running job, so Remote Login returns at the next boot; `disable` persists the off state, as the step's own rollback does (`sshtarget.Launchd.Disable`).
-- **Windows:** restore `sshd_config`, `sshd -t`, `Restart-Service sshd`. To retire the target, run `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP` and `Stop-Service sshd`.
+- **macOS:** if the Mac stops being a target, stop Remote Login first, for the same reason: `sudo launchctl bootout system/com.openssh.sshd && sudo launchctl disable system/com.openssh.sshd`. `bootout` alone only stops the running job, so Remote Login returns at the next boot; `disable` persists the off state, as the step's own rollback does (`sshtarget.Launchd.Disable`). Then `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf` and `sudo pfctl -a com.apple/250.KubelabSSH -F all`.
+- **Windows:** restore `sshd_config`, `sshd -t`, `Restart-Service sshd`. To retire the target, run `Stop-Service sshd; Set-Service sshd -StartupType Disabled` (a stop alone returns at the next boot) and `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP`.
