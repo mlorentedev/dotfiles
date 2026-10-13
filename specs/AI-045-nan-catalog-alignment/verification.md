@@ -19,7 +19,7 @@ PR 1 (AC1-AC3). AC4 and AC5 land in PR 2.
 
 - `bats tests/*.bats` -> 1714/1716 locally before the real sibling existed: `stub-real-pairing` (fixed by adding the sibling) and `shell-alias-collision`'s oh-my-zsh snapshot freshness, which reads this machine's oh-my-zsh install (new `glolm` alias upstream) and is unrelated to this change.
 - `cd cli && go build ./... && go vet ./... && go test ./... && GOOS=windows go vet ./...` -> all green. `golangci-lint run` -> 0 issues.
-- `shellcheck scripts/pr-agent-model-preflight.sh` and `actionlint .github/workflows/pr-agent.yml` -> clean.
+- `shellcheck scripts/pr-agent-model-preflight.sh` -> clean. `actionlint .github/workflows/pr-agent.yml` was clean before AC10; since then it reports one error, `unexpected key "queue" for "concurrency" section` (actionlint 1.7.12, re-run 2026-10-13). That key is AC10's declared deviation (proposal, Risks): GitHub accepts it on the job-level group, and run 36835280780 plus the three-run queue on #1923 are the measurement. `.github/actionlint.yaml` ignores that one message for that one file, so `actionlint .github/workflows/pr-agent.yml` exits 0 again and any other error in it still fails. Nothing in CI or the hooks runs actionlint, so the claim stays a local check.
 - Live smoke, 2026-09-30, `dotf secrets run --only NAN_API_KEY -- ./scripts/pr-agent-model-preflight.sh` over the whole catalog, with the retired model as primary:
 
   | Model | Result |
@@ -128,6 +128,13 @@ pool's `$comment`.
 - PR 2 keeps `pools.nan.concurrency` as the key-wide cap so the existing pool semaphore remains conservative; `model_concurrency` is a separate declared map because AC4 does not add per-model enforcement.
 - pi keeps package ownership of NaN model registrations. `ai/pi/models.json` uses supported `modelOverrides` for the published limits, including NaN's served 1,048,576-token qwen3.8-flash window, rather than restoring duplicate model definitions.
 - OpenCode exposes `reasoning_effort` variants only for glm5.3-flash, qwen3.6 and gemma4. deepseek-v4-flash, qwen3.8-flash and mimo-v2.6-flash manage their own depth, so presenting fast/thinking variants for them would be a no-op.
+
+## Archive review dispositions
+
+First archive review, 2026-10-13 (`nan/glm5.3-flash`, FAIL, `review.md`):
+
+- Major, features.json f3/f6/f7/f9 named tests that had since been renamed, so two passed vacuously and two failed. Fixed: each filter now names the current test, and each `bats -f` command fails on bats' own exit status (any selected test failing) and on a filter that selects no test (no `ok` line). f9's route suites fail on bats' exit too, so a missing suite fails rather than printing no `not ok`. All ten verification commands exit 0 from this tree; a filter naming no test exits 1, and so does a suite path that does not exist.
+- Minor, actionlint: fixed by the scoped ignore under Test status above, so tasks.md's "Lint passes (shellcheck, actionlint)" holds again for `pr-agent.yml`.
 
 ## Promotion candidates
 

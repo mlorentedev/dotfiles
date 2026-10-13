@@ -16,7 +16,7 @@
   {
     "id": "AI-045-nan-catalog-alignment-f3",
     "behavior": "AC3: the preflight skips a non-2xx or hanging model, fails when none answers, and never leaves the declared chain",
-    "verification": "bats tests/pr-agent-model-preflight.bats && bats -f 'preflight runs wherever PR-Agent runs' tests/pr-agent-config.bats",
+    "verification": "bats tests/pr-agent-model-preflight.bats && o=$(bats -f 'preflight and the draw run wherever PR-Agent runs' tests/pr-agent-config.bats) && printf '%s\n' \"$o\" | grep -q '^ok '",
     "state": "pending",
     "evidence": ""
   },
@@ -37,14 +37,14 @@
   {
     "id": "AI-045-nan-catalog-alignment-f6",
     "behavior": "AC6: PR-Agent streams its NaN calls, pinned by a test",
-    "verification": "bats tests/pr-agent-config.bats -f 'every attempt streams its NaN calls' | grep -q '^ok 1 '",
+    "verification": "o=$(bats tests/pr-agent-config.bats -f 'the NaN attempt streams its calls') && printf '%s\n' \"$o\" | grep -q '^ok '",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f7",
     "behavior": "AC7: PR-Agent's total wait is below the job timeout, asserted by a test",
-    "verification": "bats tests/pr-agent-config.bats -f 'the job outlives both attempts' | grep -q '^ok 1 '",
+    "verification": "o=$(bats tests/pr-agent-config.bats -f 'the job outlives both bounded Actions') && printf '%s\n' \"$o\" | grep -q '^ok '",
     "state": "pending",
     "evidence": ""
   },
@@ -58,7 +58,7 @@
   {
     "id": "AI-045-nan-catalog-alignment-f9",
     "behavior": "AC9: PR-Agent draws its first reviewer with equal weight from a pool of NaN models and Claude Haiku 5.5, and the other provider reviews when nothing was published",
-    "verification": "bats tests/pr-agent-route.bats tests/pr-agent-route-real.bats | grep -q '^not ok' && exit 1; bats tests/pr-agent-config.bats -f 'second needs a measured absence|fail closed without invoking|one pinned model with bounded' | grep -c '^ok ' | grep -qx 3",
+    "verification": "bats tests/pr-agent-route.bats tests/pr-agent-route-real.bats >/dev/null || exit 1; o=$(bats tests/pr-agent-config.bats -f 'second needs a measured absence|fail closed without invoking|routed model, allowlisted, with bounded input and output') && printf '%s\n' \"$o\" | grep -c '^ok ' | grep -qx 3",
     "state": "pending",
     "evidence": ""
   },

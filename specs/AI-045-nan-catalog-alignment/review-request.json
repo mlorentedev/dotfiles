@@ -1,0 +1,12 @@
+{
+  "reviewed_sha": "081374d32c532bf568c164bde7843b586f2a4cae",
+  "reviewer": "nan/glm5.3-flash",
+  "requested_at": "2026-10-13T20:42:13Z",
+  "review_digest_before": "",
+  "base_sha": "a94ae3465a245b4a29af25e4b8a056d0f4cd62d0",
+  "contract_digests": {
+    "features.json": "6ebf7ddf7493cbe79fd2879c42847a35e9b97c88ba93bd5756648b69b81b843a",
+    "proposal.md": "29895ca334bb5973781681d9a9cf48ed868b2b3f0ff633ebb8c6ef1e4057cf89",
+    "tasks.md": "bb67e7e3e8002b3e180eb45c37d2a8d8630c6dcefbd30a5f15e562784402b6ea"
+  }
+}
