@@ -14,17 +14,22 @@
 # A line that names BASH_REMATCH outside a whole-line comment.
 READS='^[[:space:]]*[^#[:space:]].*BASH_REMATCH'
 
-# missing_shim FILE: succeed when FILE reads BASH_REMATCH and nothing in it
-# sets the zsh option. A grep error returns 2, so it is never read as "fine".
+# missing_shim FILE: succeed when FILE reads BASH_REMATCH and does not set
+# both zsh options. BASH_REMATCH alone fills the array but indexes it from 1,
+# so ${BASH_REMATCH[2]} reads group 1. A grep error returns 2, so it is never
+# read as "fine".
 missing_shim() {
-    local file="$1" rc=0
+    local file="$1" rc=0 opt
     grep -qE "$READS" "$file" || rc=$?
     [ "$rc" -le 1 ] || return 2
     [ "$rc" -eq 0 ] || return 1
-    rc=0
-    grep -qE '^[[:space:]]*setopt[[:space:]].*BASH_REMATCH' "$file" || rc=$?
-    [ "$rc" -le 1 ] || return 2
-    [ "$rc" -eq 1 ]
+    for opt in BASH_REMATCH KSH_ARRAYS; do
+        rc=0
+        grep -qE "^[[:space:]]*setopt[[:space:]].*$opt" "$file" || rc=$?
+        [ "$rc" -le 1 ] || return 2
+        [ "$rc" -eq 0 ] || return 0
+    done
+    return 1
 }
 
 @test "guard: every dual-shell script that reads BASH_REMATCH sets it under zsh" {
@@ -49,13 +54,16 @@ missing_shim() {
     fi
 }
 
-@test "guard: the predicate flags a reader without the shim and passes one with it" {
+@test "guard: the predicate flags a reader without the full shim and passes one with it" {
     printf '%s\n' '[[ x =~ (x) ]] && echo "${BASH_REMATCH[1]}"' > "$BATS_TEST_TMPDIR/bare.sh"
     printf '%s\n' 'if [ -n "${ZSH_VERSION:-}" ]; then' '    setopt KSH_ARRAYS BASH_REMATCH' 'fi' \
         '[[ x =~ (x) ]] && echo "${BASH_REMATCH[1]}"' > "$BATS_TEST_TMPDIR/shimmed.sh"
+    printf '%s\n' 'if [ -n "${ZSH_VERSION:-}" ]; then' '    setopt BASH_REMATCH' 'fi' \
+        '[[ xy =~ (x)(y) ]] && echo "${BASH_REMATCH[2]}"' > "$BATS_TEST_TMPDIR/half.sh"
     printf '%s\n' '# BASH_REMATCH is only named here' 'echo plain' > "$BATS_TEST_TMPDIR/plain.sh"
 
     missing_shim "$BATS_TEST_TMPDIR/bare.sh"
+    missing_shim "$BATS_TEST_TMPDIR/half.sh"
     run missing_shim "$BATS_TEST_TMPDIR/shimmed.sh"
     [ "$status" -eq 1 ]
     run missing_shim "$BATS_TEST_TMPDIR/plain.sh"
