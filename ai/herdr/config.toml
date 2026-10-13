@@ -1,0 +1,30 @@
+# herdr's config (#2013 H4, D6). `dotf deploy herdr` MERGES these keys into
+# the config.toml herdr also writes: onboarding saves `onboarding = false` and
+# the Settings screen saves there too, and every key this file does not name
+# stays the machine's. Validate a change with:
+#   HERDR_CONFIG_PATH=ai/herdr/config.toml herdr config check
+
+[keys]
+# Not tmux's ctrl+b, so tmux keeps working inside a pane (owner, 2026-10-13).
+# herdr puts the terminal in raw mode, so the tty's XOFF never sees ctrl+s.
+prefix = "ctrl+s"
+# Orca's tab keys (ai/orca/keybindings.json: Mod+Alt+[ and ]), as direct
+# chords beside herdr's own prefix ones.
+previous_tab = ["prefix+p", "ctrl+alt+["]
+next_tab = ["prefix+n", "ctrl+alt+]"]
+
+[worktrees]
+# herdr creates <directory>/<repo>/<branch-slug>; beside the repos, not in a
+# hidden dir (owner, 2026-10-13).
+directory = "~/Projects/.worktrees"
+
+[update]
+# mise installs herdr at the versions.conf pin, so herdr's own "new version"
+# notice only invites a self-update that drifts from it (H3).
+version_check = false
+
+[experimental]
+# Screen history persisted to session-history.json holds whatever the panes
+# printed, secrets included. Off, as herdr's default is, and pinned so a
+# Settings toggle shows as drift.
+pane_history = false

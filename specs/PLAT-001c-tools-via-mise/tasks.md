@@ -87,7 +87,12 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
 - [x] Review triage: a merge entry whose source and destination differ in format is refused when the manifest is parsed. The merge reads the source in the destination's format, so the slip failed on every machine at deploy time with a misleading `source is not a TOML table`; `replace` never parses and may still cross formats (`TestParseManifest_RefusesAMergeWhoseSourceAndDestinationFormatsDiffer`)
 - [x] Review triage: the `paths` refusal reads the source's extension, not the destination's. `paths` rewrites the source as JSON before it is installed, so `replace` from `a.toml` to `b.json` passed the parse and failed at deploy on every machine, while `a.json` to `b.toml` was refused although it works (`TestParseManifest_RefusesPathsOnATOMLSource`, mutation-checked)
 - [x] Review triage: "manages no key" looks below the top level. A source of empty tables (`[keys]` with no assignment, `{"a": {}}`) named no value and passed; it is refused now, and an empty list still counts as a value
-- [ ] H4 (the `herdr` entry) lands after the release carrying this is the `DOTF_VERSION` pin, so no machine runs a `dotf` that refuses it (#1814 class)
+- [x] H4 (the `herdr` entry) lands after the release carrying this is the `DOTF_VERSION` pin, so no machine runs a `dotf` that refuses it (#1814 class): 0.68.0 is the pin
+  - `ai/herdr/config.toml`: prefix `ctrl+s` and worktrees in `~/Projects/.worktrees` (owner, 2026-10-13), Orca's tab keys as `ctrl+alt+[`/`]` beside herdr's prefix ones, `update.version_check = false`, `experimental.pane_history = false`. `herdr config check` (0.9.3) accepts it; `tests/herdr-config.bats` runs it and proves it rejects an unknown key
+  - The dst is `{HERDR_CONFIG_DIR}/config.toml`, not the planned `{HERDR_CONFIG_PATH}`: a merge's format comes from the dst's extension when the manifest is parsed, so an extensionless token made every shipped dotf refuse the whole manifest (lesson 411). `HERDR_CONFIG_DIR` in `env-contract.json` holds herdr's default directory per OS; herdr's own `HERDR_CONFIG_PATH` stays unset
+  - `TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys`: the shipped entry and file, deployed over a config herdr wrote, keep `onboarding`, a Settings key and a non-managed binding, and a second plan is in sync
+  - `TestManifest_EveryRequiredCommandIsInstalledWhereTheEntryDeploys` counts a `# mise:` pin as installed wherever the catalog installs mise, so herdr needs no exemption on linux and darwin; `claude`'s exemption narrows to Windows, where `setup-windows.ps1` runs the official installer
+  - Windows: H2 and mise in the Windows catalog (`herdr/windows` exemption)
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
