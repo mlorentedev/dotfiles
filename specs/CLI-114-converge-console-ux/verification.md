@@ -22,7 +22,7 @@ PR 1 (macOS arm64, 2026-10-14):
 ## Test status
 
 - PR 1: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` -> exit 0, every package ok; `golangci-lint run` 2.12.2 after `cache clean` -> 0 issues; bats over the 7 files that reference converge's output (`git grep -l -E 'dotf converge|converge on |converge plan' -- 'tests/*.bats'`) -> 1..252, 252 ok
-- Manual smoke test: pending, a real `dotf converge --plan` on the Mac's terminal and piped to `cat`, once the branch is built into `$TMPDIR`
+- Manual smoke test (the branch built into `$TMPDIR`, run from the Mac's checkout, `converge --plan`, a dry run): piped -> the tags bare, the same text as before; under `script -q /dev/null` (a pty) -> `\x1b[36m[SKIP]`, `\x1b[35m[CHANGE]`, `\x1b[32m[ OK ]` with the columns aligned; `NO_COLOR=1` under the pty -> bare again
 
 ## Decisions made during implementation
 
