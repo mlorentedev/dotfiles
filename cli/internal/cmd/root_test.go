@@ -62,3 +62,29 @@ func TestRootCmd(t *testing.T) {
 		})
 	}
 }
+
+// `dotf --version` and `-v` print the very line `dotf version` does, to stdout:
+// install.{sh,ps1} regex that line for the installed semver.
+func TestRootVersionFlag(t *testing.T) {
+	run := func(args ...string) (string, string) {
+		t.Helper()
+		c := New("1.2.3", "abc")
+		var out, errBuf bytes.Buffer
+		c.SetOut(&out)
+		c.SetErr(&errBuf)
+		c.SetArgs(args)
+		if err := c.Execute(); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		return out.String(), errBuf.String()
+	}
+	want, _ := run("version")
+	if want != "dotf version 1.2.3\n" {
+		t.Fatalf("dotf version = %q", want)
+	}
+	for _, flag := range []string{"--version", "-v"} {
+		if out, errOut := run(flag); out != want || errOut != "" {
+			t.Errorf("dotf %s: stdout %q, stderr %q; want stdout %q", flag, out, errOut, want)
+		}
+	}
+}
