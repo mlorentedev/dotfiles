@@ -52,6 +52,7 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
 - [x] Three suites pinned the old shape and were moved to the new one: the manifest version in `copilot-config.bats` (now `>= 3`, the version `paths` needs), the bare-deploy anchor in `pi-config.bats` (the tail's named re-deploys matched it too), and the Linux half of the profile-heal parity test.
 - [x] Full bats on darwin: 1899 ok, 13 not ok before the three fixes above. Of the ten left, nine are the dangling mise `pwsh` shim (#2375) and one is `harness-doctrine-records.bats` comparing the records against the live vault, whose `teardown` skill changed upstream; both fail on `main` as well.
 - [x] `go build`, `go vet` (darwin and windows), `go test ./...` and `golangci-lint run` 2.12.2 (cache cleaned): all clean. `shellcheck setup-linux.sh` reports the same three infos as `main`; `bash -n` and `zsh -n` pass.
+- [x] #2013 D2/D9 (2026-10-13, macmini, dev build from this tree): with `main`'s `teardown` record in place `dotf doctor` prints `[WARN] 1 committed harness record(s) differ from their vault source: skills/teardown`; with the refreshed record, `[ OK ] 39 committed records match their vault source`. `tests/harness-doctrine-records.bats` 2/2 ok against the live vault (its second case had failed on `main` since 2026-10-12). `go vet` (darwin and windows), `go test ./internal/doctor/...` and `golangci-lint run` 2.12.2: clean.
 
 ## Test status
 
