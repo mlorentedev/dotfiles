@@ -76,6 +76,14 @@ created: "2026-10-06"
 - [x] Pin drift needs no new check: herdr is a `# mise: cli` pin, so `checkMiseTools` already FAILs when it does not run at its pin, on every OS mise manages; `update.version_check = false` landed with H4 (#2417)
 - [ ] An existing aqua install of herdr 0.9.3 is kept: mise treats the version as installed. The next pin bump installs through the github backend, attestations included
 
+### H6 — herdr's agent integrations (#2013 H6)
+
+- [x] Failing tests first (`cli/internal/herdr`): `ParseStatus` reads `herdr integration status`, `Current` is read on the positive (an outdated or re-worded state reinstalls), `Apply` installs only for installed harnesses whose integration is not current, a plan installs nothing, a harness herdr has no integration for is reported, one failed install is named and the rest proceed. Mutation-checked (five mutants killed)
+- [x] A third half of `agent-extensions`: the harnesses are the ones `harness/model-map.json` routes to (`harness.Harnesses`), agy is herdr's `antigravity-cli`, herdr absent is a named skip. A harness that is not installed is never touched: herdr would create its config directory (claude and copilot "ensure settings"), the #1312 class. codex is not in the routing map, so it gets none
+- [x] Coexistence: `harness bind` keeps herdr's SessionStart group, verbatim from 0.9.3, and a second bind changes nothing (`TestMergeHooksKeepsHerdrsSessionStartGroup`). herdr writes `tui.jsonc` beside the deployed `tui.json` and leaves it byte-identical; opencode merges both (`config/tui.ts`). Measured on the Mac: herdr's own merge added one SessionStart group to `settings.json` and its uninstall removed only that group
+- [x] Cost when herdr is not the parent: the claude hook exits after `mktemp` and `cat` (7 ms), and 20 ms with a dead socket
+- [x] On the Mac, with this branch's build (2026-10-14): `dotf converge --only agent-extensions` reported `herdr: 5 integration(s) installed`, and a second run `0 installed, 5 current`. `herdr integration status` shows all five current. `records-bind` stays in sync, and the only change to `settings.json` is herdr's one SessionStart group
+
 ### H4a — `dotf deploy` merges TOML (#2013 H4, owner decision 2026-10-08)
 
 herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the Settings screen saves into it), so a `replace` entry would overwrite the owner's in-app choices on every deploy and show drift until then: the `.gitconfig` class (lesson 366). The owner chose a TOML merge over `replace` and seed-if-missing.
@@ -275,7 +283,7 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
   - [x] pi's update notice off under mise: `PI_SKIP_VERSION_CHECK = "1"` in the rendered `[env]` (pi has no updater, but the notice says `pi update`, a second channel outside mise)
   - [x] `dotf pi packages apply` resolves pi on PATH before `~/.local/bin/pi`, so a pre-mise npm copy left there is a fallback, never the one reconciled; doctor's pi hints name `dotf converge --only tools` (Windows: `setup-windows.ps1`) instead of an npm command
   - [x] Guards: the `setup-linux.sh` installer guard in `tests/setup-windows.bats` now also rejects `@earendil-works/pi-coding-agent`; the parity assertion reads `PI_VERSION` under the marker; X1 asserts pi on PATH (`tests/from-zero-doctor-gate.bats`); the integration test asks mise for pi instead of `~/.local/bin/pi`
-  - [ ] Evidence: from-zero on both runners with pi on PATH after the first converge and `changed: 0` on the second; then #2449 rebased, with herdr reporting 5 integrations current on the second pass
+  - [x] Evidence: from-zero run 38532622634 on #2449, rebased after #2452 merged (`adca557c`), is green on both runners. `The agents resolve on PATH` passes for claude, agy and pi after the first converge; the second converge is `changed: 0` on both; `agent-extensions` reads `herdr: 5 integration(s) installed, 0 current` on the first pass and `herdr: 0 integration(s) installed, 5 current` on the second, on macos-latest and ubuntu-latest alike
 - Windows: the agents stay on `Install-AgentBinary` until Windows mise is measured (#2013)
 
 ### apt index refresh (#2013 X1 finding, #2332)
