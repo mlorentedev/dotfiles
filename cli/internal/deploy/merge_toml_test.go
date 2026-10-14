@@ -337,16 +337,18 @@ func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
 		t.Errorf("a key herdr wrote was lost: %v", got)
 	}
 	// H9: lazygit replaces Orca's diff viewer, as a popup over the focused
-	// pane, which herdr opens in that pane's directory.
+	// pane, which herdr opens in that pane's directory. The key is pinned: it
+	// was chosen against herdr's default keymap, which `herdr config check`
+	// does not compare it with.
 	lazygit := false
 	cmds, _ := keys["command"].([]any)
 	for _, c := range cmds {
-		if b, _ := c.(map[string]any); b["command"] == "lazygit" && b["type"] == "popup" && b["key"] != nil {
+		if b, _ := c.(map[string]any); b["command"] == "lazygit" && b["type"] == "popup" && b["key"] == "prefix+d" {
 			lazygit = true
 		}
 	}
 	if !lazygit {
-		t.Errorf("no lazygit popup in keys.command: %v", keys["command"])
+		t.Errorf("no lazygit popup on prefix+d in keys.command: %v", keys["command"])
 	}
 
 	plan, err := PlanConfig(cfg, root, home, resolve)

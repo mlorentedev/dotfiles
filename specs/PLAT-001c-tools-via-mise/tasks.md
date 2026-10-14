@@ -106,6 +106,8 @@ lazygit replaces Orca's diff viewer. Its install was done with the mise pins abo
 - [x] An array of tables through the TOML merge: `TestDeploy_TOMLMergeUnionsAnArrayOfTables` keeps a binding the user added beside the repo's, the merged file still holds tables, and a second merge is in sync
 - [x] On the Mac, into a scratch `HERDR_CONFIG_DIR` holding a user binding: `dotf deploy herdr` wrote both, a second deploy said `in sync`, and `herdr config check` on the merged file said `config: ok`
 - [x] `herdr config check` does not report a binding that collides with a default (a `prefix+g` command passed it), so the key was chosen against 0.9.3's default keymap (`config-reference.json` at the `v0.9.3` tag). A later herdr that binds `prefix+d` itself would show up as a changed keymap in that file's diff, which a pin bump reads anyway
+- [x] The popup runs the bare `lazygit` with herdr's own environment, so it finds lazygit where herdr was started from a shell: W2b puts mise's shims on PATH for every shell we configure. A herdr started with no shell at all is W2b's open PR 2 (`dotf env persist`)
+- [x] The test pins the key itself, not only a lazygit popup: `prefix+x` in the stanza fails it
 - [ ] The merge keeps a stale binding when one is edited, because lists union by equality: #2455 (CLI-113)
 - [ ] In daily use on the Mac, recorded at gate V
 
