@@ -324,15 +324,25 @@ func (s MiseSync) ConfigPath() string {
 
 // Plan reports what Apply would do and writes nothing.
 func (s MiseSync) Plan(tools []MiseTool) (SyncPlan, error) {
+	p, unlisted, err := s.plan(tools)
+	if err == nil {
+		err = unlisted
+	}
+	return p, err
+}
+
+// plan is Plan with a failed orphan listing returned on its own, so that Apply
+// still installs and upgrades when only the prune cannot run.
+func (s MiseSync) plan(tools []MiseTool) (p SyncPlan, unlisted, err error) {
 	have, err := os.ReadFile(s.ConfigPath())
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return SyncPlan{}, err
+		return SyncPlan{}, nil, err
 	}
-	p := SyncPlan{ConfigChanged: !bytes.Equal(have, s.render(tools))}
+	p = SyncPlan{ConfigChanged: !bytes.Equal(have, s.render(tools))}
 	if len(s.PythonPackages) > 0 {
 		pkgs, err := os.ReadFile(s.PythonPackagesPath())
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return SyncPlan{}, err
+			return SyncPlan{}, nil, err
 		}
 		p.ConfigChanged = p.ConfigChanged || !bytes.Equal(pkgs, RenderPythonPackages(s.PythonPackages))
 	}
@@ -343,14 +353,12 @@ func (s MiseSync) Plan(tools []MiseTool) (SyncPlan, error) {
 	}
 	p.MissingPackages = s.missingPythonPackages()
 	if p.Outdated, err = s.outdated(p.Missing); err != nil {
-		return p, err
+		return p, nil, err
 	}
 	if s.Prune {
-		if p.Orphans, err = s.Orphans(tools); err != nil {
-			return p, err
-		}
+		p.Orphans, unlisted = s.Orphans(tools)
 	}
-	return p, nil
+	return p, unlisted, nil
 }
 
 // Orphans names, as tool@version, each install `mise ls --prunable` reports
@@ -445,15 +453,22 @@ func (s MiseSync) outdated(missing []string) ([]string, error) {
 // Apply writes the config when it differs, runs `mise install` when anything is
 // pending, and then requires every tool to run at or above its pin, through
 // `mise which`, not PATH (the shims reach PATH in a later row). It returns the
-// plan it acted on; a tool that still does not run is an error naming it.
-func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
+// plan it acted on; a tool that still does not run is an error naming it. When
+// mise cannot list the orphans, the rest still runs, nothing is pruned, and the
+// listing's failure is the error.
+func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 	if runtime.GOOS == "windows" && hasTool(tools, "bats") && !hasTool(tools, "node") {
 		return SyncPlan{}, errors.New("windows bats requires node: mark NODE_VERSION for mise before using the npm installer")
 	}
-	p, err := s.Plan(tools)
+	p, unlisted, err := s.plan(tools)
 	if err != nil {
 		return p, err
 	}
+	defer func() {
+		if err == nil && unlisted != nil {
+			err = fmt.Errorf("nothing pruned: %w", unlisted)
+		}
+	}()
 	if p.ConfigChanged {
 		// The packages file first: the config names it, and mise reads it
 		// when it installs a Python.
@@ -503,9 +518,12 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 			return p, fmt.Errorf("mise prune: %w\n%s", err, strings.TrimSpace(string(out)))
 		}
 	}
-	after, err := s.Plan(tools)
+	after, afterUnlisted, err := s.plan(tools)
 	if err != nil {
 		return p, err
+	}
+	if unlisted == nil {
+		unlisted = afterUnlisted
 	}
 	if len(after.Orphans) > 0 {
 		return p, fmt.Errorf("after mise prune, still installed: %s", strings.Join(after.Orphans, ", "))
@@ -524,7 +542,7 @@ func (s MiseSync) Apply(tools []MiseTool) (SyncPlan, error) {
 	if err := s.pipInstall(after.MissingPackages); err != nil {
 		return p, err
 	}
-	if after, err = s.Plan(tools); err != nil {
+	if after, _, err = s.plan(tools); err != nil {
 		return p, err
 	}
 	if len(after.MissingPackages) > 0 {

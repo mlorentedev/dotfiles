@@ -184,6 +184,7 @@ type fakeMise struct {
 	prunable  map[string][]string
 	listPrune int
 	prunes    [][]string
+	listFails bool // `mise ls --prunable` exits non-zero
 }
 
 func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
@@ -206,6 +207,9 @@ func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
 		return nil, nil
 	case name == "mise" && len(args) == 3 && args[0] == "ls" && args[1] == "--prunable" && args[2] == "--json":
 		f.listPrune++
+		if f.listFails {
+			return []byte("mise ERROR failed to read a tracked config"), errors.New("exit status 1")
+		}
 		report := map[string][]map[string]any{}
 		for tool, versions := range f.prunable {
 			for _, v := range versions {
@@ -903,6 +907,29 @@ func TestSync_PrunesAnInstallNoPinAsksForAndIsIdempotent(t *testing.T) {
 	}
 	if again.Pending() || len(f.prunes) != 1 {
 		t.Errorf("second run: want nothing to do and no second prune, got %+v after %v", again, f.prunes)
+	}
+}
+
+// A mise that cannot list what to prune must not cost the tools a run: the
+// install goes ahead, nothing is pruned, and the error names the listing.
+// The plan still fails, so a dry run reports the same cause.
+func TestSync_InstallsWhenTheOrphanListingFails(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	f := &fakeMise{installed: map[string]string{}, pending: tools, listFails: true}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run, Prune: true}
+
+	if _, err := s.Plan(tools); err == nil || !strings.Contains(err.Error(), "mise ls --prunable") {
+		t.Fatalf("plan: want the listing's failure, got %v", err)
+	}
+	_, err := s.Apply(tools)
+	if err == nil || !strings.Contains(err.Error(), "nothing pruned: mise ls --prunable") || !strings.Contains(err.Error(), "failed to read a tracked config") {
+		t.Errorf("apply: want an error naming the listing and its output, got %v", err)
+	}
+	if f.installs != 1 || f.installed["age"] != "1.3.1" {
+		t.Errorf("want the install to run despite the listing, got %d installs, %v", f.installs, f.installed)
+	}
+	if len(f.prunes) != 0 {
+		t.Errorf("pruned without a listing: %v", f.prunes)
 	}
 }
 
