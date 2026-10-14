@@ -1,8 +1,6 @@
 package doctor
 
 import (
-	"path/filepath"
-
 	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 )
 
@@ -22,9 +20,12 @@ import (
 func checkAutoMemoryLink(sys *System, start string, rep *Report, fix bool) {
 	rep.Section("Auto-memory vault link")
 
-	// Same ADR-025 seam + legacy default as checkVault / checkVaultHooks, so a
-	// path-default fix is inherited here too.
-	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
+	// Same ADR-025 resolution as checkVault / checkVaultHooks.
+	vault := sys.vaultPath()
+	if vault == "" {
+		rep.Skip("no vault resolves on this machine (VAULT_PATH, machine.json) — nothing to link")
+		return
+	}
 	target := memlink.ClaudeMemoryTarget(sys.home(), start)
 
 	switch memlink.Status(start, target, "", vault) {

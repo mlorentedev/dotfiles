@@ -39,7 +39,11 @@ func checkTriggerTargets(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 
-	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
+	vault := sys.vaultPath()
+	if vault == "" {
+		rep.Skip("no vault resolves on this machine - trigger targets unchecked")
+		return
+	}
 	patterns := filepath.Join(vault, filepath.FromSlash(triggerPatternsSubdir))
 	if !isDir(patterns) {
 		rep.Skip("no vault patterns at " + patterns + " - trigger targets unchecked")
