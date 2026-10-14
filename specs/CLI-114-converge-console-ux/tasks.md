@@ -15,13 +15,13 @@ created: "2026-10-14"
 
 ## PR 1: one console package, doctor on it, converge in colour
 
-- [ ] [AC1] Failing table test: `console.ColorEnabled(getenv, isTerminal)` off for a non-terminal, a non-empty `NO_COLOR` (per no-color.org), and `TERM=dumb`; on otherwise
-- [ ] [AC1] Implement `cli/internal/console`: the colour decision, the palette (doctor's ANSI constants move here) and a `Style(kind, text)` styler
-- [ ] [AC2] Capture doctor's output with colour on and off on a fixed set of checks as golden files, **before** the move
-- [ ] [AC2] Move `doctor/report.go` onto `console`; the golden files stay byte-identical
-- [ ] [AC3] Failing golden tests: converge's report to a terminal (colour) and to a pipe (no escape bytes, same text)
-- [ ] [AC3] Decide colour on the raw writer in `runConverge`, before `beginRunLog` builds the tee, and style the tags in `printConvergeReport`
-- [ ] Fix the stale comment at `cmd/converge.go` `saveConvergeReport`: "last.json, which doctor reads". Nothing in Go reads it; `from-zero.yml` does
+- [x] [AC1] Failing table test: `console.ColorEnabled(getenv, isTerminal)` off for a non-terminal, a non-empty `NO_COLOR` (per no-color.org), and `TERM=dumb`; on otherwise
+- [x] [AC1] Implement `cli/internal/console`: the colour decision, the palette (doctor's ANSI constants move here) and a `Style(kind, text)` styler
+- [x] [AC2] Capture doctor's output with colour on and off on a fixed set of checks as golden files, **before** the move
+- [x] [AC2] Move `doctor/report.go` onto `console`; the golden files stay byte-identical
+- [x] [AC3] Failing golden tests: converge's report to a terminal (colour) and to a pipe (no escape bytes, same text)
+- [x] [AC3] Decide colour on the raw writer in `runConverge`, before `beginRunLog` builds the tee, and style the tags in `printConvergeReport`
+- [x] Fix the stale comment at `cmd/converge.go` `saveConvergeReport`: "last.json, which doctor reads". Nothing in Go reads it; `from-zero.yml` does
 
 ## PR 2: durations and the failure summary
 
