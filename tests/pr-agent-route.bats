@@ -170,8 +170,9 @@ every_point() {
         awk 'NF == 2 { print tolower($1) "=" $2 }' | sort | tr '\n' ' ')
     shipped=$(jq -r '.pool[] | select(.pr_agent.weight) | "\(.pr_agent.model)=\(.pr_agent.weight)"' "$pool" |
         while IFS='=' read -r model weight; do
+            # No `case` here: bash 3.2 misparses a case pattern's `)` inside $(...).
             for short in mimo glm deepseek haiku; do
-                case "$model" in *"$short"*) echo "$short=$weight" ;; esac
+                [ "${model#*"$short"}" = "$model" ] || echo "$short=$weight"
             done
         done | sort | tr '\n' ' ')
     [ "$(printf '%s' "$adopted" | wc -w | tr -d ' ')" -eq 4 ] || { echo "adopted: $adopted" >&2; false; }
