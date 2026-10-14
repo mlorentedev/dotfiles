@@ -62,6 +62,7 @@ One PR per row of #2013 track W. Each fix lands with the guard that would have c
 - [ ] AC4: the existing happy paths (install, upgrade, skip, missing-manager) keep their results and messages.
 - [ ] AC5: no shell file bash runs uses a bash-4-only construct, enforced by a static guard on every OS; `compile-harness.sh --check/--refresh/--deploy` run under macOS `/bin/bash` 3.2.
 - [ ] AC6: the harness bats suites pass on macOS for every failure caused by bash 3.2 or BSD sed.
+- [ ] AC7: every applied `dotf converge` run keeps an owner-only transcript of everything it printed, subprocess output included, beside its report under `<StateDir>/converge/runs/`. The transcript masks registry-exposed and credential-named values and token shapes before writing, and the newest 20 runs are kept (#1098, added with the owner 2026-10-14).
 
 ## References
 

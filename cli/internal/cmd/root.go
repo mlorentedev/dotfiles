@@ -12,6 +12,7 @@ import (
 // cmd/dotf/main.go, where goreleaser's -X main.version / -X main.commit ldflags
 // land. commit is "" for a source build.
 func New(version, commit string) *cobra.Command {
+	dotfVersion = version
 	root := &cobra.Command{
 		Use:   "dotf",
 		Short: "Single entry point for the dotfiles tooling",
