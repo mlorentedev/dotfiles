@@ -25,7 +25,10 @@ const MeshInterface = "tailscale0"
 
 // FirewallFor is the firewall the target manages on goos, with a note naming
 // why there is none: a plan says so rather than reading converged.
-func FirewallFor(goos string, paths Paths) (Firewall, string) {
+func FirewallFor(goos string, run Runner, paths Paths) (Firewall, string) {
+	if goos == "windows" {
+		return WindowsFirewall{Run: run}, ""
+	}
 	if goos != "linux" {
 		return nil, "firewall not managed on " + goos + " yet: sshd's AllowUsers is the only fence"
 	}

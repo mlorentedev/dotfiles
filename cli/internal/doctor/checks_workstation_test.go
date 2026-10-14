@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -14,7 +15,7 @@ import (
 const workstationTemplate = "AllowUsers {user}@{mesh}\nPasswordAuthentication no\n"
 
 // The doctor check (#2356, PLAT-001b PR 7d) runs the converge step's plan with
-// the step's own gates, one row per branch: neither darwin nor linux → no section; not opted
+// the step's own gates, one row per branch: an OS the step skips → no section; not opted
 // in → SKIP; off the mesh → SKIP; a config that shadows the drop-in → WARN with
 // Inspect's own message; anything pending → WARN naming the converge command;
 // converged → PASS.
@@ -30,7 +31,12 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 		needle  string
 		section bool
 	}{
-		{name: "windows → no section", goos: "windows", optIn: true, addrs: mesh, section: false},
+		{name: "an OS the step does not run on → no section", goos: "plan9", optIn: true, addrs: mesh, section: false},
+		{name: "windows, the capability's defaults → WARN naming the firewall", goos: "windows", optIn: true, addrs: mesh, want: StatusWarn, needle: "differs from the declared state: firewall", section: true},
+		{name: "windows, converged → PASS", goos: "windows", optIn: true, addrs: mesh, want: StatusPass, needle: "firewall, key, host keys", section: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeConverged(t, p, user)
+			}},
 		{name: "linux, nothing applied → WARN naming the converge command", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "dotf converge --only workstation-target", section: true},
 		{name: "linux, converged → PASS", goos: "linux", optIn: true, addrs: mesh, want: StatusPass, needle: "as declared for the mesh address 100.64.0.15", section: true,
 			state: func(t *testing.T, p sshtarget.Paths, user string) {
@@ -104,6 +110,14 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			s.MeshAddrs = func() ([]net.IP, error) { return tc.addrs, nil }
 			s.CommandOutput = func(name string, args ...string) (string, error) {
 				switch {
+				case name == "sc.exe" && loaded:
+					return "        START_TYPE         : 2   AUTO_START\n        STATE              : 4  RUNNING\n", nil
+				case name == "sc.exe":
+					return "        START_TYPE         : 3   DEMAND_START\n        STATE              : 1  STOPPED\n", nil
+				case name == "powershell.exe" && strings.Contains(strings.Join(args, " "), "ConvertTo-Json") && loaded:
+					return `{"adapter":true,"exists":true,"enabled":"True","action":"Allow","remote":["100.64.0.0/255.192.0.0"],"iface":["Tailscale"],"disabled":[],"others":[]}`, nil
+				case name == "powershell.exe" && strings.Contains(strings.Join(args, " "), "ConvertTo-Json"):
+					return `{"adapter":true,"exists":true,"enabled":"True","action":"Allow","remote":["Any"],"iface":["Any"],"disabled":[],"others":[]}`, nil
 				case name == "launchctl" && args[0] == "print":
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
