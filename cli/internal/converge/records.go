@@ -72,6 +72,9 @@ type Options struct {
 	// AgyPaths says where agy's MCP configs go for a home; the deploy
 	// command's in production. Unset, agent-extensions skips agy.
 	AgyPaths func(home string) agy.Paths
+	// HerdrRun runs herdr for its agent integrations; unset, that half of
+	// agent-extensions is skipped.
+	HerdrRun tools.Runner
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -105,7 +108,7 @@ func Registry(o Options) []Reconciler {
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: sshtarget.CurrentUser},
-		agentExtensions{claude: o.Claude, agyPaths: o.AgyPaths},
+		agentExtensions{claude: o.Claude, agyPaths: o.AgyPaths, herdr: o.HerdrRun, has: onPath},
 		legacySetup{run: o.RunSetup},
 	}
 }

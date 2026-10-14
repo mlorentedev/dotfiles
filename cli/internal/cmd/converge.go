@@ -74,7 +74,11 @@ func newConvergeCmd() *cobra.Command {
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	home := env.Home()
 	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
-	paint := convergePainter(w)
+	// Decided once, on the writer converge was handed: beginRunLog wraps it in
+	// the transcript tee, which is never a terminal, and the transcript strips
+	// colour, so one stream serves both (CLI-114).
+	terminal := console.IsTerminalBy(w, isTerminal)
+	paint := convergePainter(terminal)
 	out := w
 	var rl *converge.RunLog
 	if !plan {
@@ -93,8 +97,10 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 			return serr
 		}
 	}
-	rep, err := converge.Run(reg, e, plan)
-	printConvergeReport(out, rep, paint)
+	pr := newConvergePrinter(out, reg, paint, terminal)
+	pr.header(plan, e.GOOS)
+	rep, err := converge.RunObserved(reg, e, plan, pr)
+	pr.finish(rep)
 	if plan {
 		return err
 	}
@@ -172,7 +178,7 @@ var convergeOptions = func() converge.Options {
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		// Install progress goes to stderr, apart from the report on stdout.
-		ToolsCatalog:  &tools.Installer{Dest: dest, Out: os.Stderr},
+		ToolsCatalog:  toolsInstaller(dest, os.Stderr),
 		ToolsBinDirs:  []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest},
 		GitRun:        gitconfig.ExecRunner,
 		GitStoredAuth: gitconfig.StoredLoginRunner,
@@ -185,6 +191,7 @@ var convergeOptions = func() converge.Options {
 		UserRun:       sshtarget.Exec,
 		Claude:        claudeSyncer,
 		AgyPaths:      agyPaths,
+		HerdrRun:      tools.ExecRunner,
 		RunSetup:      converge.ExecSetup,
 		DotfPath:      harness.ResolveDotfPath,
 	}
@@ -225,30 +232,132 @@ var convergeColor = map[converge.Status][]string{
 	converge.StatusOpaque:  {console.Yellow},
 }
 
-// convergePainter decides colour on the writer converge was handed, before
-// beginRunLog wraps it in the transcript tee, which is never a terminal. The
-// transcript strips the codes, so one stream serves both (CLI-114).
-func convergePainter(w io.Writer) console.Painter {
-	f, ok := w.(*os.File)
-	return console.Painter{On: console.ColorEnabled(os.Getenv, ok && isTerminal(f.Fd()))}
+// convergePainter colours a terminal, unless NO_COLOR or TERM=dumb say not.
+func convergePainter(terminal bool) console.Painter {
+	return console.Painter{On: console.ColorEnabled(os.Getenv, terminal)}
 }
 
-func printConvergeReport(w io.Writer, rep converge.Report, p console.Painter) {
-	heading, changed := "converge", "changed"
-	if rep.DryRun {
-		heading, changed = "converge plan", "to change"
+// convergePrinter renders a run as it happens (CLI-114). Each step's line is
+// printed when the step is done; on a terminal a "→ name" line also says
+// which step is running, ahead of whatever the step itself prints. finish
+// prints the entries the run never ran, then the counts and the failures.
+type convergePrinter struct {
+	w        io.Writer
+	p        console.Painter
+	terminal bool
+	width    int // the name column, which fits the longest name
+	printed  int // how many of the report's entries Done has printed
+}
+
+func newConvergePrinter(w io.Writer, reg []converge.Reconciler, p console.Painter, terminal bool) *convergePrinter {
+	c := &convergePrinter{w: w, p: p, terminal: terminal, width: 16}
+	for _, r := range reg {
+		c.width = max(c.width, len(r.Name()))
 	}
-	_, _ = fmt.Fprintf(w, "%s on %s:\n", heading, rep.GOOS)
-	for _, e := range rep.Entries {
-		// Pad the bare tag: escape codes would count toward a %-8s width.
-		tag := convergeTag[e.Status]
-		_, _ = fmt.Fprintf(w, "  %s%s %-16s %s\n", p.Paint(tag, convergeColor[e.Status]...), strings.Repeat(" ", max(0, 8-len(tag))), e.Name, e.Detail)
+	return c
+}
+
+func (c *convergePrinter) header(dryRun bool, goos string) {
+	heading := "converge"
+	if dryRun {
+		heading = "converge plan"
+	}
+	_, _ = fmt.Fprintf(c.w, "%s on %s:\n", heading, goos)
+}
+
+// Start announces a step on a terminal; a pipe gets only result lines.
+func (c *convergePrinter) Start(name string) {
+	if c.terminal {
+		_, _ = fmt.Fprintf(c.w, "→ %s\n", name)
+	}
+}
+
+// Done prints a step's line. converge.RunObserved calls it in the report's
+// order, and the entries it never calls it for are the report's tail.
+func (c *convergePrinter) Done(e converge.Entry) {
+	c.line(e)
+	c.printed++
+}
+
+func (c *convergePrinter) line(e converge.Entry) {
+	// Pad the bare tag: escape codes would count toward a %-8s width.
+	tag := convergeTag[e.Status]
+	_, _ = fmt.Fprintf(c.w, "  %s%s %-*s %6s  %s\n", c.p.Paint(tag, convergeColor[e.Status]...), strings.Repeat(" ", max(0, 8-len(tag))), c.width, e.Name, stepDuration(e), e.Detail)
+}
+
+// finish prints the entries Done never saw, then the counts and the failures.
+func (c *convergePrinter) finish(rep converge.Report) {
+	for _, e := range rep.Entries[min(c.printed, len(rep.Entries)):] {
+		c.line(e)
+	}
+	changed := "changed"
+	if rep.DryRun {
+		changed = "to change"
 	}
 	n := rep.Summary()
-	failed := fmt.Sprintf("%d failed", n[converge.StatusFailed])
+	failed := fmt.Sprintf("%d failed", n[converge.StatusFailed]) + failedChangesNote(failedChanges(rep), rep.DryRun)
 	if n[converge.StatusFailed] > 0 {
-		failed = p.Paint(failed, console.Red, console.Bold)
+		failed = c.p.Paint(failed, console.Red, console.Bold)
 	}
-	_, _ = fmt.Fprintf(w, "%d %s, %d ok, %d opaque, %d skipped, %s\n",
+	_, _ = fmt.Fprintf(c.w, "%d %s, %d ok, %d opaque, %d skipped, %s\n",
 		n[converge.StatusChange], changed, n[converge.StatusOK], n[converge.StatusOpaque], n[converge.StatusSkipped], failed)
+	printFailureSummary(c.w, rep, c.p)
+}
+
+// failedChangesNote words the failed steps' changes for the summary. A dry
+// run changed nothing, so its note says the changes were planned.
+func failedChangesNote(k int, dryRun bool) string {
+	noun := "changes"
+	if k == 1 {
+		noun = "change"
+	}
+	switch {
+	case k == 0:
+		return ""
+	case dryRun:
+		return fmt.Sprintf(" (%d %s planned)", k, noun)
+	default:
+		return fmt.Sprintf(" (after %d %s)", k, noun)
+	}
+}
+
+// failedChanges is how many changes the failed steps made before failing:
+// the summary counts steps by status, and a failed step's changes would
+// otherwise vanish from it (BUG-136).
+func failedChanges(rep converge.Report) int {
+	k := 0
+	for _, e := range rep.Entries {
+		if e.Status == converge.StatusFailed {
+			k += e.Changes
+		}
+	}
+	return k
+}
+
+// stepDuration is a step's duration column: blank for a step the run never
+// ran, so "not reached" does not read as instant.
+func stepDuration(e converge.Entry) string {
+	if e.Duration <= 0 {
+		return ""
+	}
+	return console.Duration(e.Duration)
+}
+
+// printFailureSummary repeats each failed step after the counts (CLI-114 AC6):
+// in a long run the failure is one line among many, and the steps' own output
+// can scroll it away. A failed entry's detail is its error (runOne).
+func printFailureSummary(w io.Writer, rep converge.Report, p console.Painter) {
+	var failed []converge.Entry
+	for _, e := range rep.Entries {
+		if e.Status == converge.StatusFailed {
+			failed = append(failed, e)
+		}
+	}
+	if len(failed) == 0 {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "\n%s\n", p.Paint("failed:", console.Red, console.Bold))
+	for _, e := range failed {
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", e.Name, e.Detail)
+	}
 }

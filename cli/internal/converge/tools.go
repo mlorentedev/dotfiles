@@ -87,6 +87,9 @@ func (r toolsSync) Probe(env Env) error {
 		return err
 	}
 	if p.Pending() {
+		if len(p.Orphans) > 0 {
+			return fmt.Errorf("installed by mise but asked for by no pin: %s", strings.Join(p.Orphans, ", "))
+		}
 		return fmt.Errorf("after the sync, config current=%v, not at their pin: %s", !p.ConfigChanged, strings.Join(append(append(p.Missing, p.MissingPackages...), p.Outdated...), ", "))
 	}
 	return nil
@@ -122,7 +125,7 @@ func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
 		plan = s.Apply
 	}
 	p, err := plan(pins)
-	res := Result{Changes: len(p.Missing) + len(p.MissingPackages) + len(p.Outdated), Detail: syncDetail(p, len(pins), dryRun)}
+	res := Result{Changes: len(p.Missing) + len(p.MissingPackages) + len(p.Outdated) + len(p.Orphans), Detail: syncDetail(p, len(pins), dryRun)}
 	if p.ConfigChanged {
 		res.Changes++
 	}
@@ -187,7 +190,7 @@ func (r toolsSync) sync(env Env) (tools.MiseSync, []tools.MiseTool, error) {
 	if getenv == nil {
 		getenv = os.Getenv
 	}
-	s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home, getenv), Run: r.run, Stdout: r.stdout, PythonPackages: all.PythonPackages, Latest: all.Latest, CheckUpgrades: true}
+	s := tools.MiseSync{ConfigDir: tools.MiseConfigDir(env.Home, getenv), Run: r.run, Stdout: r.stdout, PythonPackages: all.PythonPackages, Latest: all.Latest, CheckUpgrades: true, Prune: true}
 	return s, all.Tools, nil
 }
 
@@ -211,6 +214,13 @@ func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
 	}
 	if len(p.Outdated) > 0 {
 		parts = append(parts, up+" to their newest release: "+strings.Join(p.Outdated, ", "))
+	}
+	if len(p.Orphans) > 0 {
+		gone := "pruned"
+		if dryRun {
+			gone = "to prune"
+		}
+		parts = append(parts, gone+", asked for by no pin: "+strings.Join(p.Orphans, ", "))
 	}
 	return strings.Join(parts, "; ")
 }

@@ -35,6 +35,9 @@ func fakeMise() (run, stdout tools.Runner, installs *int) {
 		if installed && name == "mise" && args[0] == "which" {
 			return []byte("/bin/jq\n"), nil
 		}
+		if name == "mise" && args[0] == "ls" {
+			return []byte("{}"), nil
+		}
 		return nil, errors.New("not installed")
 	}
 	return run, stdout, &n
@@ -163,6 +166,8 @@ func TestToolsSync_AnOutdatedLatestToolIsAnUpgrade(t *testing.T) {
 				return []byte("{}"), nil
 			}
 			return []byte(`{"jq": {"requested": "latest", "current": "1.8.2", "latest": "1.8.3"}}`), nil
+		case name == "mise" && args[0] == "ls":
+			return []byte("{}"), nil
 		}
 		return nil, errors.New("unexpected: " + name + " " + strings.Join(args, " "))
 	}
@@ -180,5 +185,49 @@ func TestToolsSync_AnOutdatedLatestToolIsAnUpgrade(t *testing.T) {
 	}
 	if err := r.Probe(env); err != nil {
 		t.Fatalf("probe after the upgrade: %v", err)
+	}
+}
+
+// #2375: an install no pin asks for is drift the plan names, the probe
+// reports and an apply removes, once: the second plan has nothing to prune.
+func TestToolsSync_PlansReportsAndPrunesAnOrphanedInstall(t *testing.T) {
+	env := toolsEnv(t)
+	run, stdout, _ := fakeMise()
+	orphan, prunes := true, 0
+	pruning := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" && args[0] == "prune" {
+			if strings.Join(args[1:], " ") != "--yes --tools powershell" {
+				return nil, errors.New("pruned the wrong set: " + strings.Join(args, " "))
+			}
+			orphan, prunes = false, prunes+1
+			return nil, nil
+		}
+		return run(name, args...)
+	}
+	listing := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" && args[0] == "ls" && orphan {
+			return []byte(`{"powershell": [{"version": "7.5.11", "installed": true, "active": false}]}`), nil
+		}
+		return stdout(name, args...)
+	}
+	r := toolsSync{run: pruning, stdout: listing, has: func(string) bool { return true }, getenv: func(string) string { return "" }}
+
+	plan, err := r.Reconcile(env, true)
+	if err != nil || !strings.Contains(plan.Detail, "to prune, asked for by no pin: powershell@7.5.11") || prunes != 0 {
+		t.Fatalf("plan: want the orphan named and nothing pruned, got %+v (%d prunes), %v", plan, prunes, err)
+	}
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Probe(env); err != nil || prunes != 1 {
+		t.Fatalf("probe after apply: %v (%d prunes)", err, prunes)
+	}
+	orphan = true // a tool installed by hand after the converge
+	if err := r.Probe(env); err == nil || !strings.Contains(err.Error(), "asked for by no pin: powershell@7.5.11") {
+		t.Errorf("probe with an orphan: want it named, got %v", err)
+	}
+	orphan = false
+	if again, err := r.Reconcile(env, true); err != nil || again.Changes != 0 {
+		t.Errorf("second plan: want 0 changes, got %+v, %v", again, err)
 	}
 }

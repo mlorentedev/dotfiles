@@ -76,6 +76,13 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		return
 	}
 	rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
+	// Reported, never removed here: removal is the converge's, which shows it
+	// in its plan first (#2375), and doctor --fix stays non-destructive.
+	if orphans, err := s.Orphans(pins); err != nil {
+		rep.Warn("cannot list the mise installs no pin asks for (mise ls --prunable --json): " + err.Error())
+	} else if len(orphans) > 0 {
+		rep.Warn(fmt.Sprintf("%d mise install(s) asked for by no pin, each behind a shim that cannot run: %s (run: dotf converge --only tools, which prunes them)", len(orphans), strings.Join(orphans, ", ")))
+	}
 	checkShadowingCopies(sys, home, pins, rep, fix)
 }
 

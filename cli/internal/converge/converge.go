@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
@@ -82,6 +83,9 @@ type Entry struct {
 	Status  Status
 	Changes int
 	Detail  string
+	// Duration is how long the step took; zero for one the run never
+	// reached or a plan gate skipped.
+	Duration time.Duration
 }
 
 // Report is the outcome of a run, one entry per registered reconciler.
@@ -118,12 +122,32 @@ func Select(reconcilers []Reconciler, names []string) ([]Reconciler, error) {
 	return out, nil
 }
 
+// Observer hears a run as it happens (CLI-114): Start when a step begins to
+// run, Done with its entry once that entry is final. A step the OS does not
+// support is done without a start. The entries the run appends without running
+// a step ("not reached", a plan's gate) are never done: they are in the
+// returned report, for the caller to print.
+type Observer interface {
+	Start(name string)
+	Done(e Entry)
+}
+
+type nopObserver struct{}
+
+func (nopObserver) Start(string) {}
+func (nopObserver) Done(Entry)   {}
+
 // Run drives the reconcilers in order. A reconciler that does not list
 // env.GOOS is skipped, never passed. The first failure stops the run: the
 // reconcilers after it are reported as not reached, because a later step may
 // depend on the one that failed (ADR-041 decision 4). The returned error names
 // the reconciler that failed.
 func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
+	return RunObserved(reconcilers, env, dryRun, nopObserver{})
+}
+
+// RunObserved is Run, telling obs about each step as it runs.
+func RunObserved(reconcilers []Reconciler, env Env, dryRun bool, obs Observer) (Report, error) {
 	rep := Report{DryRun: dryRun, GOOS: env.GOOS}
 	var failed error
 	var ran []Reconciler
@@ -137,7 +161,8 @@ func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: gate})
 			continue
 		}
-		entry, g, err := runOne(r, env, dryRun)
+		entry, g, err := runOne(r, env, dryRun, obs)
+		obs.Done(entry)
 		rep.Entries = append(rep.Entries, entry)
 		if err != nil {
 			failed = fmt.Errorf("converge: %s: %w", r.Name(), err)
@@ -146,7 +171,7 @@ func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 			gate = g
 		}
 		if err == nil && !dryRun && entry.Status == StatusChange {
-			failed = revisit(&rep, ran, r.Name(), env)
+			failed = revisit(&rep, ran, r.Name(), env, obs)
 		}
 		ran = append(ran, r)
 	}
@@ -156,13 +181,14 @@ func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 // revisit applies again each reconciler that already ran and revisits after
 // the one named, in registry order, and appends their entries. The first
 // failure stops it and is returned, as Run's own loop does.
-func revisit(rep *Report, ran []Reconciler, after string, env Env) error {
+func revisit(rep *Report, ran []Reconciler, after string, env Env, obs Observer) error {
 	for _, q := range ran {
 		if rv, ok := q.(Revisiter); !ok || rv.RevisitAfter() != after || !platform.Supports(q.Platforms(), env.GOOS) {
 			continue
 		}
-		entry, _, err := runOne(q, env, false)
+		entry, _, err := runOne(q, env, false, obs)
 		entry.Detail = "after " + after + ": " + entry.Detail
+		obs.Done(entry)
 		rep.Entries = append(rep.Entries, entry)
 		if err != nil {
 			return fmt.Errorf("converge: %s: %w", q.Name(), err)
@@ -171,12 +197,26 @@ func revisit(rep *Report, ran []Reconciler, after string, env Env) error {
 	return nil
 }
 
-func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
-	e := Entry{Name: r.Name()}
+// now is the clock runOne times a step by; tests replace it.
+var now = time.Now
+
+// runOne runs one reconciler and records how long it took (CLI-114 AC4).
+// A step this OS does not support never starts, so obs hears no Start for it.
+func runOne(r Reconciler, env Env, dryRun bool, obs Observer) (Entry, string, error) {
 	if !platform.Supports(r.Platforms(), env.GOOS) {
-		e.Status, e.Detail = StatusSkipped, "not supported on "+env.GOOS
-		return e, "", nil
+		return Entry{Name: r.Name(), Status: StatusSkipped, Detail: "not supported on " + env.GOOS}, "", nil
 	}
+	obs.Start(r.Name())
+	start := now()
+	e, gate, err := runStep(r, env, dryRun)
+	// Millisecond resolution, rounded once here so the console and the JSON
+	// agree, and never under 1ms: duration 0 means the step never ran.
+	e.Duration = max(now().Sub(start).Round(time.Millisecond), time.Millisecond)
+	return e, gate, err
+}
+
+func runStep(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
+	e := Entry{Name: r.Name()}
 	res, err := r.Reconcile(env, dryRun)
 	if err == nil && res.Skip != "" {
 		e.Status, e.Detail = StatusSkipped, res.Skip
@@ -189,6 +229,9 @@ func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 		}
 	}
 	switch {
+	case err != nil && res.Changes > 0 && res.Detail != "":
+		// What the step changed before failing stays on its line (BUG-136).
+		e.Status, e.Detail = StatusFailed, res.Detail+"; failed: "+err.Error()
 	case err != nil:
 		e.Status, e.Detail = StatusFailed, err.Error()
 	case res.Opaque:

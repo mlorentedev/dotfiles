@@ -239,8 +239,8 @@ func TestModelMapConsumerClasses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ResolveTier(top, gemini): %v", err)
 		}
-		if got != "gemini-3.1-pro-high" {
-			t.Errorf("top/gemini = %q, want gemini-3.1-pro-high", got)
+		if got != "gemini-3.8-flash-high" {
+			t.Errorf("top/gemini = %q, want gemini-3.8-flash-high", got)
 		}
 	})
 }
@@ -859,5 +859,18 @@ func TestRenderKindAgreesWithTierKeying(t *testing.T) {
 				"actually arrives as a launcher flag.\nIf the answer genuinely is not known yet, "+
 				"add it to tierlessRenderers with the reason.", name, render)
 		}
+	}
+}
+
+// The shipped map routes to the five harnesses dotfiles supports; herdr's
+// integrations, among others, are installed for exactly these.
+func TestHarnesses_NamesEveryRoutedHarness(t *testing.T) {
+	m, err := LoadModelMap(repoRootForTest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(Harnesses(m), ",")
+	if got != "agy,claude,copilot,opencode,pi" {
+		t.Errorf("Harnesses = %s", got)
 	}
 }

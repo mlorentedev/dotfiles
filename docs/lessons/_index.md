@@ -438,8 +438,14 @@ tags: [lessons, index, dotfiles]
 | [417 - bash 3.2 misparses a case pattern's ) inside $(...), and only main's macOS job could see it](lesson-417-bash-32-misparses-a-case-pattern-inside-command-substitution.md) | 2026-10-14 |
 | [418 - Capturing a process's stdout turns every terminal check inside it into a pipe check](lesson-418-capturing-stdout-turns-every-terminal-check-into-a-pipe-check.md) | 2026-10-14 |
 | [419 - A pin bumped right after its release meets a stale uv index cache](lesson-419-a-pin-bumped-right-after-its-release-meets-a-stale-uv-index-cache.md) | 2026-10-14 |
+| [420 - A scratch HOME does not isolate a tool that reads the env contract's per-tool dirs](lesson-420-a-scratch-home-does-not-isolate-a-tool-that-reads-per-tool-dirs.md) | 2026-10-14 |
 | [421 - A retry belongs to the caller that knows its bound](lesson-421-a-retry-belongs-to-the-caller-that-knows-its-bound.md) | 2026-10-14 |
 | [422 - A step keyed on what is installed inherits the install order](lesson-422-a-step-keyed-on-what-is-installed-inherits-the-install-order.md) | 2026-10-14 |
 | [423 - Every zsh reads ~/.zshenv, so a test's PATH is not the script's PATH](lesson-423-every-zsh-reads-zshenv-so-a-test-path-is-not-the-script-path.md) | 2026-10-14 |
 | [424 - A golden file with an extension escapes the extensionless eol guard](lesson-424-a-golden-file-with-an-extension-escapes-the-extensionless-eol-guard.md) | 2026-10-14 |
+| [425 - A probe whose output is the secret is the wrong probe](lesson-425-a-probe-whose-output-is-the-secret-is-the-wrong-probe.md) | 2026-10-14 |
+| [426 - mise prune removes more than orphans](lesson-426-mise-prune-removes-more-than-orphans.md) | 2026-10-14 |
+| [427 - apt-get update exits 0 on a mirror it cannot reach](lesson-427-apt-get-update-exits-0-on-a-mirror-it-cannot-reach.md) | 2026-10-14 |
+| [428 - A retry count is not a retry window](lesson-428-a-retry-count-is-not-a-retry-window.md) | 2026-10-14 |
+| [429 - An installer that picks the newest interpreter fails with the runner image](lesson-429-an-installer-that-picks-the-newest-interpreter-fails-with-the-runner-image.md) | 2026-10-14 |
 <!-- END GENERATED -->

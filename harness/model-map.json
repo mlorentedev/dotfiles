@@ -141,7 +141,8 @@
     "top": {
       "claude": "opus",
       "copilot": "claude-opus-5",
-      "gemini": "gemini-3.1-pro-high"
+      "gemini": "gemini-3.8-flash-high",
+      "$comment_gemini": "agy serves no Gemini Pro tier since 2026-10 (`agy models`, agy 1.3.5), so top and mid name the same id until Gemini ships a stronger one; the old gemini-3.1-pro-high was rejected at startup (#2385, #902)."
     },
     "mid": {
       "claude": "sonnet",

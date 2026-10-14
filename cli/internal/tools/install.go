@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Result classifies what Install did, for an honest human message and tests.
@@ -45,26 +46,76 @@ func (r Result) String() string {
 // release asset, the offline case — is an error.
 type Fetcher func(url, destPath string) error
 
+// fetchAttempts and fetchWait bound HTTPFetch's retries. GitHub's release
+// host answers a transient 5xx often enough to fail a from-zero run: twice on
+// 2026-10-14 alone, once on the mise binary, which left the integration
+// container without jq. The wait doubles after each failed attempt. Tests
+// shorten it.
+var (
+	fetchAttempts = 3
+	fetchWait     = 2 * time.Second
+)
+
 // HTTPFetch is the production Fetcher: GET url, stream the body to destPath, and
-// error on any non-200 so a missing asset or checksums file aborts cleanly.
+// error on any non-200 so a missing asset or checksums file aborts cleanly. A
+// failure the server may not repeat (a transport error, a 5xx, a 429, a body
+// cut short) is retried; any other status, and a local write error, is final
+// on the first answer. An offline host is a transport error, so each fetch
+// spends the full 6 s of waits before it fails.
 func HTTPFetch(url, destPath string) error {
+	var err error
+	wait := fetchWait
+	for attempt := 1; ; attempt++ {
+		var transient bool
+		if transient, err = fetchOnce(url, destPath); err == nil || !transient || attempt == fetchAttempts {
+			return err
+		}
+		time.Sleep(wait)
+		wait *= 2
+	}
+}
+
+// fetchOnce is one GET of url into destPath. transient reports whether the
+// same request might succeed if repeated.
+func fetchOnce(url, destPath string) (transient bool, err error) {
 	resp, err := http.Get(url) //nolint:gosec // url is built from the pinned catalog, not user input
 	if err != nil {
-		return fmt.Errorf("download %s: %w", url, err)
+		return true, fmt.Errorf("download %s: %w", url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
+		retry := resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests
+		return retry, fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
 	}
 	f, err := os.Create(destPath)
 	if err != nil {
-		return fmt.Errorf("create %s: %w", destPath, err)
+		return false, fmt.Errorf("create %s: %w", destPath, err)
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("write %s: %w", destPath, err)
+	body := &readSide{r: resp.Body}
+	if _, err := io.Copy(f, body); err != nil {
+		if body.err != nil {
+			return true, fmt.Errorf("download %s: body cut short: %w", url, err)
+		}
+		return false, fmt.Errorf("write %s: %w", destPath, err)
 	}
-	return nil
+	return false, nil
+}
+
+// readSide records an error from the response body, so fetchOnce can tell a
+// body cut short (worth repeating) from a local write that failed, such as a
+// full disk (not worth repeating).
+type readSide struct {
+	r   io.Reader
+	err error
+}
+
+func (b *readSide) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	if err != nil && err != io.EOF {
+		b.err = err
+	}
+	return n, err
 }
 
 // Installer fetches, verifies (sha256 vs the release checksums), and places a
@@ -113,6 +164,11 @@ type Installer struct {
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
 	AppExists func(bundle string) bool
+	// Python is the Python series uv-tool entries run on ("3.13"), from
+	// versions.conf's PYTHON_VERSION (PythonSeries). Empty lets uv pick, which
+	// is the newest interpreter it finds: on a runner image with 3.15 that was
+	// one ansible-core cannot import on (BUG-138).
+	Python string
 	// PathCopies lists every file on PATH that would run as name, in PATH order,
 	// so the first is the one that answers. Nil means a scan of $PATH; tests
 	// inject the machine's answer.
@@ -427,9 +483,13 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	// --refresh-package revalidates this package's index entry: a pin bumped
 	// minutes after its release otherwise fails with "no version of <pkg>==<v>"
 	// on a machine whose uv cache still holds the index from before it.
-	spec := pkg + "==" + t.Version
-	if err := in.Run("uv", "tool", "install", "--force", "--refresh-package", pkg, spec); err != nil {
-		return Skipped, fmt.Errorf("%s: uv tool install --force --refresh-package %s %s: %w", t.Name, pkg, spec, err)
+	args := []string{"tool", "install", "--force", "--refresh-package", pkg}
+	if in.Python != "" {
+		args = append(args, "--python", in.Python)
+	}
+	args = append(args, pkg+"=="+t.Version)
+	if err := in.Run("uv", args...); err != nil {
+		return Skipped, fmt.Errorf("%s: uv %s: %w", t.Name, strings.Join(args, " "), err)
 	}
 	if err := in.verifyOnPath(t, "uv"); err != nil {
 		return Skipped, err
@@ -523,7 +583,15 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 // file answered instead of leaving that to be found on the machine.
 func (in *Installer) verifyOnPath(t Tool, manager string) error {
 	version := in.current(t)
-	err := checkProbed(t, version, manager+" exited 0 but "+t.Name+" does not run on PATH (is "+manager+"'s global bin dir on PATH?)")
+	absent := manager + " exited 0 but " + t.Name + " does not run on PATH (is " + manager + "'s global bin dir on PATH?)"
+	if version == "" {
+		// On PATH and still no version: it is there and crashes, so PATH is
+		// the wrong place to look (BUG-138).
+		if copies := in.PathCopies(t.Name); len(copies) > 0 {
+			absent = manager + " exited 0, and " + t.Name + " is on PATH at " + copies[0] + " but does not run: run `" + t.Name + " --version`"
+		}
+	}
+	err := checkProbed(t, version, absent)
 	if err == nil || version == "" {
 		return err
 	}
