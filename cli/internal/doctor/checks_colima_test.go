@@ -42,6 +42,7 @@ func TestCheckColimaSize(t *testing.T) {
 		fix         bool
 		stuck       bool // the VM keeps reporting its old size after the restart
 		stopFails   bool // `colima stop` exits non-zero
+		svcFails    bool // `brew services start colima` exits non-zero
 		wantSubstr  string
 		wantWarn    int
 		wantRestart bool
@@ -70,6 +71,8 @@ func TestCheckColimaSize(t *testing.T) {
 			wantSubstr: "moved Colima into brew services at 4 CPU, 8 GiB", wantRestart: true, wantFile: colimaYAML("4", "8")},
 		{name: "running outside the service, stop fails → warn, nothing started", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22, fix: true, stopFails: true,
 			wantWarn: 1, wantSubstr: "colima stop failed"},
+		{name: "running outside the service, service start fails → direct start, warn", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22, fix: true, svcFails: true,
+			wantWarn: 1, wantSubstr: "was started directly at 4 CPU, 8 GiB", wantRestart: true},
 		{name: "file does not parse → warn", goos: "darwin", onPath: []string{"colima"}, file: "cpu: [\n", wantWarn: 1, wantSubstr: "does not parse"},
 	}
 
@@ -108,6 +111,12 @@ func TestCheckColimaSize(t *testing.T) {
 					}
 					return "", "", nil
 				case "brew services start colima":
+					if tc.svcFails {
+						return "", "Bootstrap failed: 5", errors.New("exit 1")
+					}
+					restarted = true
+					return "", "", nil
+				case "colima start":
 					restarted = true
 					return "", "", nil
 				case "docker info --format {{.ServerVersion}}":

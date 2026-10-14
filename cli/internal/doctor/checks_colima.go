@@ -167,7 +167,7 @@ func setYAMLLine(raw []byte, key string, v int) []byte {
 // relaunches it on a clean exit, so a direct `colima stop` or `start` races it.
 // A VM running outside the service has no such race: doctor stops it and hands
 // it to the service, which starts it at the size the file now declares and at
-// every login after (#2013 D5).
+// every login after (#2013 debt ledger, row D5).
 func restartColima(sys *System, rep *Report, want string) {
 	if !colimaServiceRunning(sys) {
 		adoptColima(sys, rep, want)
@@ -188,7 +188,17 @@ func adoptColima(sys *System, rep *Report, want string) {
 		return
 	}
 	if _, errOut, err := sys.CommandOutputBounded(2*time.Minute, "brew", "services", "start", "colima"); err != nil {
-		rep.Warn("stopped Colima, but brew services start colima failed: " + strings.TrimSpace(errOut+" "+err.Error()) + "; the engine is down until it starts")
+		// The VM is already stopped, so leaving it there takes the engine down.
+		// A service that failed to bootstrap is not loaded, so a direct start
+		// cannot race it; it reads the size the file now declares.
+		svcErr := strings.TrimSpace(errOut + " " + err.Error())
+		if _, errOut, err := sys.CommandOutputBounded(5*time.Minute, "colima", "start"); err != nil {
+			rep.Warn("stopped Colima, but neither brew services start colima (" + svcErr + ") nor colima start (" +
+				strings.TrimSpace(errOut+" "+err.Error()) + ") brought it back; the engine is down")
+			return
+		}
+		rep.Warn("brew services start colima failed (" + svcErr + "), so Colima was started directly at " + want +
+			" and will not start at login; a stale launchd job holding sh.brew.colima is the usual cause (launchctl print gui/$UID/sh.brew.colima)")
 		return
 	}
 	waitForColimaSize(sys, rep, "moved Colima into brew services at "+want+"; its containers stopped", want)
