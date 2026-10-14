@@ -21,7 +21,7 @@ The token was revoked and `gh auth login` re-run, so the exposure is closed. Tha
 
 **Solution:**
 
-- `Bash(*gh auth token*)` joins the Claude deny list (`ai/claude/settings.json`), beside `env`, `printenv` and `dotf secrets show`. A committed test (`tests/claude-settings-template.bats`, "the deny list keeps the commands that print a secret") fails if any of them is dropped.
+- `Bash(*gh auth token*)` joins the Claude deny list (`ai/claude/settings.json`), beside `env`, `printenv` and `dotf secrets show`. So does `gh auth status` with its token flag (long and short form), which prints the same credential. A committed test (`tests/claude-settings-template.bats`, "the deny list keeps the commands that print a secret") fails if any of them is dropped.
 - To check that a credential is usable, run something that *uses* it and read the exit status. For example, `gh auth status` exits 0 or not. To check that one is *present*, test the variable without expanding it: `[ -n "${GH_TOKEN:-}" ]`.
 
 **Why:** The probe asked "is there a token?" with a command whose answer *is* the token. A redirection or a filter downstream is no protection: the shell may route the value somewhere the author did not expect, as zsh did here, and the harness captures what reaches it. The safe question is one whose output cannot contain the secret: an exit code, a boolean or a length. A deny rule matches spellings, so it is a backstop and not a sandbox. The working rule is to choose a probe that cannot print the value.

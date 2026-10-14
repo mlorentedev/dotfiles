@@ -326,9 +326,12 @@ setup() {
 
 # The commands whose whole output is a secret stay denied. The transcript is durable and
 # nothing scans it, so a probe that prints a credential leaks it, and the only fix is a
-# rotation. `gh auth token` reads the OS keychain whatever GH_CONFIG_DIR says (lesson 425).
+# rotation. `gh auth token` reads the OS keychain whatever GH_CONFIG_DIR says (lesson 425),
+# and `gh auth status --show-token` (short form `-t`) prints the same token.
 @test "the deny list keeps the commands that print a secret" {
-    for rule in 'Bash(*dotf secrets show*)' 'Bash(*gh auth token*)' 'Bash(env:*)' 'Bash(printenv:*)'; do
+    for rule in 'Bash(*dotf secrets show*)' 'Bash(*gh auth token*)' 'Bash(*--show-token*)' \
+        'Bash(*gh auth status -t*)' 'Bash(*gh auth status * -t*)' \
+        'Bash(env:*)' 'Bash(printenv:*)' 'Bash(export -p:*)'; do
         jq -e --arg r "$rule" '.permissions.deny | index($r)' "$SETTINGS_TEMPLATE" >/dev/null || { echo "missing: $rule"; false; }
     done
 }
