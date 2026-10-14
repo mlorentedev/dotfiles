@@ -220,3 +220,30 @@ func TestConverge_FailedRunReportsAreRedacted(t *testing.T) {
 		t.Errorf("want the run's report and last.json, got %v", reports)
 	}
 }
+
+// On a terminal the hints are set for the run and removed after it; a hint
+// the person set is kept, and off a terminal nothing is touched.
+func TestForceColorFor_SetsColorHintsOnlyOnATerminal(t *testing.T) {
+	for _, k := range colorHints {
+		t.Setenv(k, "")
+		_ = os.Unsetenv(k)
+	}
+	t.Setenv("CLICOLOR_FORCE", "0")
+	undo := forceColorFor(true)
+	if os.Getenv("FORCE_COLOR") != "1" || os.Getenv("HOMEBREW_COLOR") != "1" {
+		t.Errorf("unset hints should be set on a terminal")
+	}
+	if os.Getenv("CLICOLOR_FORCE") != "0" {
+		t.Errorf("a hint the person set was overridden")
+	}
+	undo()
+	for _, k := range []string{"FORCE_COLOR", "HOMEBREW_COLOR"} {
+		if _, ok := os.LookupEnv(k); ok {
+			t.Errorf("%s survived the run", k)
+		}
+	}
+	forceColorFor(false)()
+	if _, ok := os.LookupEnv("FORCE_COLOR"); ok {
+		t.Errorf("off a terminal no hint should be set")
+	}
+}

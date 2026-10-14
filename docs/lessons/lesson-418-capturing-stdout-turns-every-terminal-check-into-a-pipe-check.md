@@ -21,7 +21,7 @@ Two other values bind the old file early and silently skip the capture. `converg
 - The capture starts before `convergeOptions()` is called, so writers bound at construction get the pipe. The report is written to `io.MultiWriter(w, log)` explicitly.
 - The capture is undone before the identity epilogue, which walks the restore on a terminal.
 - Draining is bounded (2 s). A daemon the run started can inherit the pipe's write end and keep it open, and the run must still exit.
-- Children see a pipe, so when the console is a terminal the run sets `FORCE_COLOR=1` and `CLICOLOR_FORCE=1`, unless the person already set them, so tools that honour them stay coloured. The log strips the escapes.
+- Children see a pipe, so when the console is a terminal the run sets `FORCE_COLOR=1`, `CLICOLOR_FORCE=1` and `HOMEBREW_COLOR=1` (brew honours neither of the first two), unless the person already set them, so tools that honour them stay coloured. The log strips the escapes.
 
 ## Why
 Swapping the process's stdio is the only capture that reaches children on every OS without per-call plumbing, and it changes what "stdout" means for the whole process. Every question asked of `os.Stdout` during the swap has to be audited (`git grep 'IsTerminal\|Stdout.Fd()'`), along with every value that copied `os.Stdout` or `os.Stderr` before it.

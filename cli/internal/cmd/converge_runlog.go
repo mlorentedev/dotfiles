@@ -138,15 +138,22 @@ func (c *runCapture) stop() {
 	}
 }
 
-// forceColorFor sets the colour hints npm, uv, brew and most CLIs honour when
-// the console is a terminal, so capturing their output does not strip it, and
-// returns what undoes that. A hint the person already set is left alone.
+// colorHints are the variables that make a child colour a pipe: FORCE_COLOR
+// for Node and uv, CLICOLOR_FORCE for most BSD-style and Rust CLIs, and
+// HOMEBREW_COLOR, because brew honours neither. None of them colours the
+// output dotf parses: measured on darwin-arm64, 38 mise tools' version probes
+// and brew's list, info and --prefix stay escape-free with all three set.
+var colorHints = []string{"FORCE_COLOR", "CLICOLOR_FORCE", "HOMEBREW_COLOR"}
+
+// forceColorFor sets colorHints when the console is a terminal, so capturing
+// the children's output does not strip their colour, and returns what undoes
+// that. A hint the person already set is left alone.
 func forceColorFor(tty bool) func() {
 	if !tty {
 		return func() {}
 	}
 	var set []string
-	for _, k := range []string{"FORCE_COLOR", "CLICOLOR_FORCE"} {
+	for _, k := range colorHints {
 		if _, ok := os.LookupEnv(k); !ok {
 			_ = os.Setenv(k, "1")
 			set = append(set, k)
