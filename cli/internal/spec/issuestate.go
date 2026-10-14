@@ -1,6 +1,8 @@
 package spec
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,7 +38,9 @@ type IssueStateLookup func(IssueRef) (IssueState, error)
 // run executes gh with args and returns stdout, stderr and the exit error.
 //
 // One attempt by default. Attempts(n) retries a failure GitHub did not answer
-// (a network or TLS timeout, a 5xx), never an HTTP 4xx, which is its answer.
+// (a network or TLS timeout, a 5xx), never an HTTP 4xx, which is its answer,
+// nor a run that returns context.DeadlineExceeded: that is the caller's own
+// bound, and retrying it would multiply the wait the caller chose.
 // The retry is the caller's policy because only the caller knows its bound: a
 // CI audit that fails its leg on one blip wants it (#2450); the doctor, which
 // reports an unanswerable spec as a WARN and kills gh at its own deadline,
@@ -52,7 +56,7 @@ func GHIssueStateLookup(run func(args ...string) (stdout, stderr string, err err
 		for attempt := 1; attempt <= cfg.attempts; attempt++ {
 			out, errOut, err = run("api", fmt.Sprintf("repos/%s/issues/%d", ref.Repo, ref.Number),
 				"--jq", `[.state, (.pull_request != null)] | @tsv`)
-			if err == nil || httpClientError.MatchString(errOut) || attempt == cfg.attempts {
+			if err == nil || httpClientError.MatchString(errOut) || errors.Is(err, context.DeadlineExceeded) || attempt == cfg.attempts {
 				break
 			}
 			cfg.wait(attempt)
@@ -89,9 +93,10 @@ func Attempts(n int) LookupOption {
 	return func(c *lookupConfig) { c.attempts = max(n, 1) }
 }
 
-// httpClientError is gh's report of a 4xx: an answer from GitHub, not a
-// failure to reach it.
-var httpClientError = regexp.MustCompile(`\(HTTP 4[0-9]{2}\)`)
+// httpClientError is gh's report of a 4xx, with or without parentheses
+// ("Not Found (HTTP 404)", "HTTP 403"): an answer from GitHub, not a failure to
+// reach it.
+var httpClientError = regexp.MustCompile(`\bHTTP 4[0-9]{2}\b`)
 
 // RetryWait replaces the back-off before retry number attempt; nil keeps the
 // default. Tests pass a no-op: a retrying test without one sleeps for real.

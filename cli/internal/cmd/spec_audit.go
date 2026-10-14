@@ -39,12 +39,23 @@ var specAuditWait func(attempt int)
 // specAuditRun runs gh with a deadline. A package var so tests never reach
 // the network.
 var specAuditRun = func(args ...string) (string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), specAuditTimeout)
+	return boundedRun(specAuditTimeout, "gh", args...)
+}
+
+// boundedRun runs name with args and kills it after timeout. A kill at the
+// deadline is reported as wrapping context.DeadlineExceeded, not as the bare
+// "signal: killed" exec returns, so the issue lookup can tell its caller's
+// bound from GitHub failing to answer, and does not retry it.
+func boundedRun(timeout time.Duration, name string, args ...string) (string, string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var out, errOut bytes.Buffer
-	c := exec.CommandContext(ctx, "gh", args...)
+	c := exec.CommandContext(ctx, name, args...)
 	c.Stdout, c.Stderr = &out, &errOut
 	err := c.Run()
+	if err != nil && ctx.Err() != nil {
+		err = fmt.Errorf("%s timed out after %s: %w", name, timeout, ctx.Err())
+	}
 	return out.String(), errOut.String(), err
 }
 

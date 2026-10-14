@@ -1,7 +1,9 @@
 package spec
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -237,9 +239,10 @@ func TestIssueStateGHLookup_StopsRetrying(t *testing.T) {
 		stderr string
 		calls  int
 	}{
-		"a persistent timeout gives up":    {"net/http: TLS handshake timeout\n", 3},
-		"a refusal is answered at once":    {"gh: Bad credentials (HTTP 401)\n", 1},
-		"a rate limit is answered at once": {"gh: API rate limit exceeded (HTTP 403)\n", 1},
+		"a persistent timeout gives up":          {"net/http: TLS handshake timeout\n", 3},
+		"a refusal is answered at once":          {"gh: Bad credentials (HTTP 401)\n", 1},
+		"a rate limit is answered at once":       {"gh: API rate limit exceeded (HTTP 403)\n", 1},
+		"a bare HTTP status is answered at once": {"gh: HTTP 403\n", 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			calls := 0
@@ -262,6 +265,19 @@ func TestIssueStateGHLookup_AsksOnceByDefault(t *testing.T) {
 		calls++
 		return "", "net/http: TLS handshake timeout\n", errors.New("exit status 1")
 	}, noWait)
+	if _, err := lookup(IssueRef{"o/r", 1}); err == nil || calls != 1 {
+		t.Errorf("got %v after %d call(s), want unanswerable after 1", err, calls)
+	}
+}
+
+// A run that hit the caller's own deadline is the caller giving up, not GitHub
+// failing to answer: retrying it would multiply the bound the caller chose.
+func TestIssueStateGHLookup_DoesNotRetryTheCallersDeadline(t *testing.T) {
+	calls := 0
+	lookup := GHIssueStateLookup(func(...string) (string, string, error) {
+		calls++
+		return "", "", fmt.Errorf("gh: %w", context.DeadlineExceeded)
+	}, Attempts(3), noWait)
 	if _, err := lookup(IssueRef{"o/r", 1}); err == nil || calls != 1 {
 		t.Errorf("got %v after %d call(s), want unanswerable after 1", err, calls)
 	}

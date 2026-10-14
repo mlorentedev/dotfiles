@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // stubSpecAuditGH replaces the gh runner for one test. states maps
@@ -99,5 +101,24 @@ func TestSpecAuditRetriesATransientFailure(t *testing.T) {
 	}
 	if stdout, _, err := execute(t, "spec", "audit", "--repo", "mlorentedev/dotfiles"); err != nil {
 		t.Fatalf("err = %v after %d call(s)\n%s", err, calls, stdout)
+	}
+}
+
+// TestBoundedRunHelper is the child process TestBoundedRun_ADeadlineIsReported
+// starts: it outlives the parent's deadline. It does nothing as a plain test.
+func TestBoundedRunHelper(t *testing.T) {
+	if os.Getenv("DOTF_TEST_BOUNDED_RUN_CHILD") != "1" {
+		return
+	}
+	time.Sleep(10 * time.Second)
+}
+
+// The audit's own deadline must read as context.DeadlineExceeded, which the
+// lookup never retries: a retried deadline would turn the 20s bound into 60s.
+func TestBoundedRun_ADeadlineIsReported(t *testing.T) {
+	t.Setenv("DOTF_TEST_BOUNDED_RUN_CHILD", "1")
+	_, _, err := boundedRun(200*time.Millisecond, os.Args[0], "-test.run=^TestBoundedRunHelper$")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want it to wrap context.DeadlineExceeded", err)
 	}
 }
