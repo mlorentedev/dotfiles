@@ -15,12 +15,39 @@ ARG AGE_VERSION=1.3.1
 # `go` directive; ci.yml passes the real value as a build-arg).
 ARG GO_VERSION=1.26.0
 
+# apt retries a transient mirror failure here as the `test` job's "Install zsh"
+# step does in ci.yml (#1498): a mirror mid-sync or a runner that cannot
+# resolve archive.ubuntu.com failed the whole job before a test ran. Error-Mode
+# "any" makes a failed index fetch an error: apt-get update otherwise warns,
+# exits 0, and the install that follows fails on a missing package instead.
+COPY <<'EOF' /etc/apt/apt.conf.d/80-ci-retries
+Acquire::Retries "3";
+Acquire::http::Timeout "15";
+Acquire::https::Timeout "15";
+APT::Update::Error-Mode "any";
+EOF
+
+# Every `apt-get update` in this file goes through apt-update-retry.
+COPY --chmod=0755 <<'EOF' /usr/local/sbin/apt-update-retry
+#!/bin/sh
+attempt=1
+until apt-get update; do
+    if [ "$attempt" -ge 3 ]; then
+        echo "apt-get update failed $attempt times; giving up" >&2
+        exit 1
+    fi
+    echo "apt-get update failed (attempt $attempt of 3); retrying in 10s" >&2
+    attempt=$((attempt + 1))
+    sleep 10
+done
+EOF
+
 # Minimal dependencies that setup-linux.sh actually needs. xz-utils extracts
 # .tar.xz archives: without it a `tar xJf` failed silently with "tar (child): xz:
 # Cannot exec". shellcheck, its first user, now comes from mise (#2013 W2). A
 # standard Ubuntu desktop ships xz-utils, so the container keeps it to stay
 # representative of a real machine.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-update-retry && apt-get install -y --no-install-recommends \
     bash \
     zsh \
     git \
@@ -60,7 +87,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 # npm catalog (bw, yarn, opencode, copilot) skipped here, so a `dotf tools
 # install` running a bare `npm install -g` passed every job and failed with
 # EACCES on the first machine that ran it (#2251).
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm \
+RUN apt-update-retry && apt-get install -y --no-install-recommends nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user (setup-linux.sh uses $HOME)
