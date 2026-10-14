@@ -29,6 +29,10 @@ git-hooks/** text eol=lf
 # silently depending on which OS someone happens to be checking out on.
 cli/internal/initrepo/templates/** text eol=lf
 tests/golden/**                   text eol=lf
+# Go golden files (CLI-114) are compared byte-for-byte too, and carry an
+# extension, so the extensionless guard never sees them: a Windows checkout
+# turned every line ending into CRLF and failed each golden test there.
+*.golden                          text eol=lf
 ssh/config                        text eol=lf
 ssh/known_hosts                   text eol=lf
 LICENSE                           text eol=lf
