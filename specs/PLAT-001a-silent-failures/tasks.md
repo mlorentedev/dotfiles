@@ -254,6 +254,24 @@ the same rule a second time. The rule now has one definition, and darwin is a ke
   key would be read by no OS) and on a darwin value that repeats the linux one. Mutation-checked, as is
   the fallback (eight tests fail without it)
 
+## #2013 D2/D9 — main's skill record went stale against the vault, and only a bats run could tell
+
+The vault edited `00_meta/skills/teardown/SKILL.md` on 2026-10-12 and nobody refreshed the
+committed record. msi's checkout, refreshed by setup, carried the vault's version as an
+"uncommitted change" that read as a stray edit, while `main` was the stale side.
+`tests/harness-doctrine-records.bats` does compare `--refresh` against the real vault, but only
+where bats runs with a vault (never in CI), and `compile-harness.sh --check`, the gate doctor
+calls, reads no vault by design.
+
+- [x] The `teardown` record refreshed from the vault (`compile-harness.sh --refresh`, 1 file
+  changed, +59/-31: the same bytes msi held)
+- [x] Failing test first: `TestCheckSkillRecordsAgainstVault` (refreshed records pass; a vault
+  edit warns and names the record; a gone source warns as such; no vault skips)
+- [x] Doctor's `Harness + skill drift` section compares every committed skill and agent record's
+  `generated_sha` with the 16-hex sha256 of its `generated_from` source, on every OS. WARN, not
+  FAIL: a vault edit waits for its refresh PR, and a machine whose vault is not pulled sees the
+  records ahead. The warning names both remedies
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

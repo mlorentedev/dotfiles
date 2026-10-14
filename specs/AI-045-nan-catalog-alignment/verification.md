@@ -133,8 +133,18 @@ pool's `$comment`.
 
 First archive review, 2026-10-13 (`nan/glm5.3-flash`, FAIL, `review.md`):
 
-- Major, features.json f3/f6/f7/f9 named tests that had since been renamed, so two passed vacuously and two failed. Fixed: each filter now names the current test, and each `bats -f` command fails on bats' own exit status (any selected test failing) and on a filter that selects no test (no `ok` line). f9's route suites fail on bats' exit too, so a missing suite fails rather than printing no `not ok`. All ten verification commands exit 0 from this tree; a filter naming no test exits 1, and so does a suite path that does not exist.
+- Major, features.json f3/f6/f7/f9 named tests that had since been renamed, so two passed vacuously and two failed. Fixed: each filter now names the current test, and the f3, f6, f7 and f9 commands fail on bats' own exit status (any selected test failing) and on a filter that selects no test (no `ok` line). f2, f5 and f8 kept the unguarded form until round 2 below. f9's route suites fail on bats' exit too, so a missing suite fails rather than printing no `not ok`. All ten verification commands exit 0 from this tree; a filter naming no test exits 1, and so does a suite path that does not exist.
 - Minor, actionlint: fixed by the scoped ignore under Test status above, so tasks.md's "Lint passes (shellcheck, actionlint)" holds again for `pr-agent.yml`.
+
+Second archive review, 2026-10-13 (`nan/qwen3.8-flash`, PASS-WITH-GAPS, reviewed `e312395e`). Every finding is fixed rather than carried past the archive, so the contract set changed and a third review judges it:
+
+- Major (THEORETICAL), f2, f5 and f8 passed on a filter that selects nothing. Fixed: every contract command that filters tests now counts what it selected and requires the exact number (f2 3, f4 3 Go tests plus 1, f5 3 plus 1, f8 2 Go tests); f4's `go test -run` had the same gap and is guarded too. With each filter replaced by one that matches nothing, f2, f4, f5 and f8 exit 1.
+- Minor, `verification.md` over-claimed the round-1 guard's reach. Corrected above.
+- Minor, f9's behavior said "equal weight". It now names the weighted draw and the 1,500-line route to Sonnet that Amendment B shipped.
+- Minor, the preflight header said the job fails with `::error::` when no model answers. It now states the shipped behavior: a warning, exit 1 on a `continue-on-error` step, and the hand-over to the pool's other provider.
+- Minor (THEORETICAL), f1 depended on a trailing quote and negated grep's error status. Fixed: the pattern matches the model as a value in the forms these seven files can bind it: after `openai/` or `nan/`, after a single or double quote, or after a YAML `:` or TOML `=` with optional spaces, and with no further version digit after it. A prose mention ("retired mimo-v2.5") is not a binding and is not matched. The PR review of #2424 added the single-quoted TOML literal, and the command requires grep's exit 1 instead of `!`. An unquoted `DECLARED_MODEL: openai/mimo-v2.5` in the workflow now fails f1, and so does a missing file in its list.
+- Minor, AC4's published figures were pinned by no test. Added `the NaN pool declares the base plan's published concurrency, per model and per key` to `tests/model-map.bats` and to f4; changing gemma4 from 5 to 6 fails it.
+- Question, AC6's evidence was 31,381 tokens rather than #1856's 42K. Kept as the stated substitution in `tasks.md`; the streaming setting is pinned by test.
 
 ## Promotion candidates
 
@@ -142,7 +152,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-320-a-retired-model-hangs-before-it-refuses.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the preflight applies ADR-032's "never degrade silently" to one more failure shape; it decides nothing new
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <decided at archive: six more repos bind PR-Agent to NaN (#1763), so it may recur>
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. yes: 00_meta/patterns/pattern-detection-vs-enforcement.md
 
 ## Archive checklist
 
