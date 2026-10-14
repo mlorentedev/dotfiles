@@ -9,7 +9,6 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
@@ -95,10 +94,10 @@ func identityPaths() identity.Paths {
 // person is still at the keyboard. Windows has no /dev/tty; there only a
 // terminal stdin counts.
 var identityTerminal = func() (*os.File, bool) {
-	if !term.IsTerminal(int(os.Stdout.Fd())) {
+	if !isTerminal(consoleOut().Fd()) {
 		return nil, false
 	}
-	if term.IsTerminal(int(os.Stdin.Fd())) {
+	if isTerminal(os.Stdin.Fd()) {
 		return os.Stdin, true
 	}
 	if runtime.GOOS == "windows" {
@@ -108,7 +107,7 @@ var identityTerminal = func() (*os.File, bool) {
 	if err != nil {
 		return nil, false
 	}
-	if !term.IsTerminal(int(tty.Fd())) {
+	if !isTerminal(tty.Fd()) {
 		_ = tty.Close()
 		return nil, false
 	}

@@ -105,6 +105,14 @@ The first `install.sh` run on the Mac (2026-10-07, `dotf` 0.65.0) reproduced the
     `50_work/20-products` (109), `50_work/30-clients` (103), `10_projects/kubelab` (75); orphans
     408/1042 (39%, WARN) -> 161/1042 (15%, PASS), with 307 unlinked attachments on their own line.
 
+- **Converge transcripts capture the process's stdio, not a writer per reconciler (#1098).** Swapping
+  `os.Stdout`/`os.Stderr` for teed pipes reaches every child on every OS with no plumbing, at the cost
+  that children see a pipe: colour hints keep tools that honour them coloured on a terminal, and
+  terminal checks read the original console (lesson 418). Redaction reimplements the literal-value
+  pass of `secrets run`'s `redactWriter` (same 6-byte floor, longest first) rather than sharing it:
+  the transcript is line-buffered per stream, so the streaming hold-back that writer needs for a TTY
+  does not apply, and the token-shape regexes need whole lines anyway.
+
 ## Promotion candidates
 
 - [ ] Lesson for the repo's `docs/lessons/`? <decided at archive>
