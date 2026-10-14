@@ -49,7 +49,7 @@ func TestToolHomes_UnloadedProfileWarnsOnce(t *testing.T) {
 	var b bytes.Buffer
 	rep := capture(&b)
 	checkToolHomeEnvVars(newSys(map[string]string{}, nil, nil), rep)
-	if rep.Failures() != 0 || rep.Warnings() != 1 || !strings.Contains(b.String(), "no shell profile was read") {
+	if rep.Failures() != 0 || rep.Warnings() != 1 || !strings.Contains(b.String(), "no shell profile reached this process") || !strings.Contains(b.String(), "'exec $SHELL -lic") {
 		t.Fatalf("want one WARN naming the unloaded profile, got %d FAIL, %d WARN\n%s", rep.Failures(), rep.Warnings(), b.String())
 	}
 

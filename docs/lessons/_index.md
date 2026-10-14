@@ -431,4 +431,5 @@ tags: [lessons, index, dotfiles]
 | [410 - bash -c reads no startup file, so no file of ours can set its PATH](lesson-410-bash-c-reads-no-startup-file.md) | 2026-10-13 |
 | [411 - A merge entry's dst needs a literal extension, or every dotf refuses the manifest](lesson-411-a-merge-dst-needs-a-literal-extension.md) | 2026-10-13 |
 | [412 - A plan without root can still see a root-only file change, through a witness of its stat](lesson-412-converge-a-root-only-file-without-root-through-a-witness.md) | 2026-10-13 |
+| [415 - An ssh command reads no profile: a health check run that way fails for the environment, not the machine](lesson-415-an-ssh-command-reads-no-profile.md) | 2026-10-14 |
 <!-- END GENERATED -->

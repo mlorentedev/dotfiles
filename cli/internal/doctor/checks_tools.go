@@ -269,13 +269,16 @@ var toolHomeVars = []string{
 // non-login, non-interactive shell) has DOTFILES_DIR unset too, which the
 // generated paths file always exports. Then every variable is missing for one
 // reason, and failing each one reads as five drifts (#2013 debt ledger, D12):
-// it is said once, as a WARN naming how to run doctor with the profile.
+// it is said once, as a WARN naming how to run doctor with the profile. From
+// inside the process doctor cannot tell that from a login shell whose rc does
+// not source the paths file, so the WARN names both causes and both remedies.
 func checkToolHomeEnvVars(sys *System, rep *Report) {
 	rep.Section("Tool-home environment variables")
 	why := appsLayoutSkip(sys.GOOS)
 	if why == "" && profileNotLoaded(sys) {
-		rep.Warn("no shell profile was read by this process (DOTFILES_DIR and every tool-home variable are unset), " +
-			"so these cannot be checked; run doctor from a login shell, e.g. ssh -t <host> \"$SHELL\" -lic 'dotf doctor'")
+		rep.Warn("no shell profile reached this process (DOTFILES_DIR and every tool-home variable are unset), so these cannot be checked. " +
+			"Over ssh, a command runs in a non-login shell: run ssh -t <host> 'exec $SHELL -lic \"dotf doctor\"' (single quotes, so the remote shell expands $SHELL). " +
+			"If this already is a login shell, its rc does not source the generated paths file: run dotf env generate, then check the rc")
 		return
 	}
 	for _, v := range toolHomeVars {
