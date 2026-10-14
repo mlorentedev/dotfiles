@@ -433,4 +433,5 @@ tags: [lessons, index, dotfiles]
 | [412 - A plan without root can still see a root-only file change, through a witness of its stat](lesson-412-converge-a-root-only-file-without-root-through-a-witness.md) | 2026-10-13 |
 | [413 - A check that needs the vault belongs in doctor, not in a test CI cannot run](lesson-413-a-check-that-needs-the-vault-belongs-where-the-vault-is.md) | 2026-10-13 |
 | [414 - A fake HOME does not isolate launchd: a test's brew services job outlives the test](lesson-414-a-fake-home-does-not-isolate-launchd.md) | 2026-10-13 |
+| [416 - A foreign user-scope HOME on Windows splits git, ssh and dotf across two homes without an error](lesson-416-a-foreign-home-on-windows-splits-every-tool.md) | 2026-10-13 |
 <!-- END GENERATED -->
