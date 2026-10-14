@@ -61,10 +61,7 @@ func newToolsInstallCmd() *cobra.Command {
 			if len(args) == 1 {
 				name = args[0]
 			}
-			in := &tools.Installer{
-				Dest: filepath.Join(env.Home(), ".local", "bin"),
-				Out:  cmd.OutOrStdout(),
-			}
+			in := toolsInstaller(filepath.Join(env.Home(), ".local", "bin"), cmd.OutOrStdout())
 			if dryRun {
 				return planToolsInstall(in, cat, name, cmd.OutOrStdout())
 			}
@@ -73,6 +70,23 @@ func newToolsInstallCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "print what install would do, and change nothing")
 	return c
+}
+
+// toolsInstaller is the catalog installer `dotf tools install` and converge
+// share, so a tool installed by hand runs on the same Python as one converge
+// installed.
+func toolsInstaller(dest string, out io.Writer) *tools.Installer {
+	return &tools.Installer{Dest: dest, Out: out, Python: pinnedPython()}
+}
+
+// pinnedPython is the Python series versions.conf pins, which uv-tool
+// installs run on; "" when versions.conf cannot be read, and uv picks.
+func pinnedPython() string {
+	raw, err := os.ReadFile(env.ResolveVersionsPath())
+	if err != nil {
+		return ""
+	}
+	return tools.PythonSeries(raw)
 }
 
 // loadToolsCatalog reads packages.json from the checkout, else the deploy mirror

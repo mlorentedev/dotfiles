@@ -815,3 +815,51 @@ func TestCopiesOnPath(t *testing.T) {
 		t.Errorf("windows: %v, want %v", got, want)
 	}
 }
+
+// A uv tool runs on the Python versions.conf pins, never the newest one uv
+// finds: on a runner image with 3.15, ansible-core 2.21 crashed on import and
+// from-zero failed whenever the image rolled (BUG-138).
+func TestInstallUvTool_RunsOnThePinnedPython(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.Python = "3.13"
+	if _, err := in.Install(hiveTool()); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if want := "uv tool install --force --refresh-package hive-vault --python 3.13 hive-vault==4.2.2"; len(rec) != 1 || rec[0] != want {
+		t.Errorf("Run = %v, want %q", rec, want)
+	}
+}
+
+// A tool that is on PATH but answers no version crashed; the error says so
+// instead of asking whether uv's bin dir is on PATH (BUG-138).
+func TestInstall_ACopyOnPathThatDoesNotRunIsNamed(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.CurrentVersion = func(string) string { return "" }
+	in.PathCopies = func(string) []string { return []string{"/home/u/.local/bin/ansible"} }
+	tool := Tool{Name: "ansible", Version: "2.21.5", Source: Source{Type: "uv-tool", Package: "ansible-core"}}
+	_, err := in.Install(tool)
+	if err == nil {
+		t.Fatal("Install succeeded with a tool that does not run")
+	}
+	if want := "ansible is on PATH at /home/u/.local/bin/ansible but does not run: run `ansible --version`"; !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not say %q", err, want)
+	}
+	if strings.Contains(err.Error(), "bin dir on PATH?") {
+		t.Errorf("error %q still blames PATH", err)
+	}
+}
+
+func TestPythonSeries(t *testing.T) {
+	for _, tc := range []struct{ conf, want string }{
+		{"# mise: cli\nPYTHON_VERSION=3.13.16\n", "3.13"},
+		{"# mise: cli\nGO_VERSION=1.26.0\n", ""},
+		{"PYTHON_VERSION=3.13.16\n", ""}, // not a mise pin: no marker, nothing installs it
+		{"", ""},
+	} {
+		if got := PythonSeries([]byte(tc.conf)); got != tc.want {
+			t.Errorf("PythonSeries(%q) = %q, want %q", tc.conf, got, tc.want)
+		}
+	}
+}
