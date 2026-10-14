@@ -61,7 +61,7 @@ Independent review (`review.md`, nan/qwen3.8-flash through pi, 2026-10-14): **PA
 | Minor, REAL: `printConvergeReport` has no production caller | **Ticketed**, REFACTOR-019 (#2487). Moving the five golden sites onto the production renderer can change golden bytes (the two derive the column width differently), so it is its own change. |
 | Minor, REAL: two terminal probes, doctor's `console.IsTerminal` and converge's `convergeTerminal`, and a double probe in `runConverge` | **Ticketed**, same REFACTOR-019 (#2487): the same code area, one change. |
 | Minor, THEORETICAL: a terminal run's transcript holds the `→ name` lines a piped run's does not | **Applied, policy decided:** the transcript records what the terminal showed, uncoloured. `TestConvergeConsole_AnAppliedRunColoursTheTerminalNotTheTranscript` now requires the whole line `→ checkout` in the transcript (a bare `→` matched records-mirror's own detail, so the first version of the assertion survived its mutation); removing the announcement fails it. `docs/runbooks/guide-new-machine.md` says the transcript keeps those lines. |
-| Minor, REAL: the `from-zero.yml` measurement omits `.changed` | **Applied as a correction here.** The sentence is in `proposal.md` §3, which this verdict closes. `from-zero.yml:168` also reads `.changed` (`jq -e '.result == "ok" and .changed == 0'`). The conclusion stands: `duration_ms` is a new field and no reader selects it. |
+| Minor, REAL: the `from-zero.yml` measurement omits `.changed` | **Corrected here, not in `proposal.md`.** The sentence is in `proposal.md` §3, which this verdict closes, so the correction lives in this row. `from-zero.yml:168` also reads `.changed` (`jq -e '.result == "ok" and .changed == 0'`). The conclusion stands: `duration_ms` is a new field and no reader selects it. |
 | Question: `features.json` rows stay `pending` | **Existing ticket**, GUARD-010 (#1470): nothing in the harness writes `state` or `evidence`. Every row's verification command exits 0 above (f1-f7). |
 
 ## Promotion candidates
@@ -76,5 +76,5 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/CLI-114-converge-console-ux/` -> `specs/archive/CLI-114-converge-console-ux/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #2460, closed by the archive PR's `Closes #2460`
 - [x] Promotions above executed (if any)
