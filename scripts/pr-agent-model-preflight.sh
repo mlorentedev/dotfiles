@@ -15,7 +15,10 @@
 # PR-Agent the first model that answers, followed by the remaining models that
 # answered, in declared order. Every model that did not answer becomes a
 # `::warning::` and a line in the job summary, naming the files to fix. If
-# none answers, the job fails with `::error::` before PR-Agent starts.
+# none answers, it warns and exits 1: the step is `continue-on-error`, NaN
+# leaves the review pool for this run, and the draw hands the review to the
+# pool's other provider. The publish guard fails the job if nothing is
+# published.
 #
 # It never CHOOSES a model. The chain is declared in the workflow and in
 # .pr_agent.toml (a test holds the two equal), and this only skips dead entries

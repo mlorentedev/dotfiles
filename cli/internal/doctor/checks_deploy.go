@@ -457,6 +457,7 @@ func reportAgentLaunchability(sys *System, rep *Report) {
 func checkHarnessDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Harness + skill drift")
 	checkCompileHarnessDrift(sys, cfg, rep)
+	checkSkillRecordsAgainstVault(sys, rep)
 	checkHarnessMirrorOrphans(sys, cfg, rep, fix)
 	checkDeployedSkillSymlinks(sys, cfg, rep)
 	checkInstructionDrift(sys, rep)

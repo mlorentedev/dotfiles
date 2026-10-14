@@ -2,14 +2,14 @@
   {
     "id": "AI-045-nan-catalog-alignment-f1",
     "behavior": "AC1: no live binding names mimo-v2.5, and the pool, chain, pi and opencode name mimo-v2.6-flash",
-    "verification": "! grep -n 'mimo-v2\\.5\"' .pr_agent.toml .github/workflows/pr-agent.yml harness/model-map.json harness/reviewer-pool.json harness/nan-quotas.json ai/pi/settings.json ai/opencode/opencode.jsonc && bats tests/reviewer-pool.bats tests/opencode.bats",
+    "verification": "grep -n -E \"(openai/|nan/|[\\\"']|[:=] *)mimo-v2\\.5([^0-9.]|\\$)\" .pr_agent.toml .github/workflows/pr-agent.yml harness/model-map.json harness/reviewer-pool.json harness/nan-quotas.json ai/pi/settings.json ai/opencode/opencode.jsonc; [ $? -eq 1 ] && bats tests/reviewer-pool.bats tests/opencode.bats",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f2",
     "behavior": "AC2: the workflow's declared model and fallbacks equal .pr_agent.toml's, and PR-Agent reads them from the preflight",
-    "verification": "bats -f 'chain the preflight probes|model travels in the workflow env' tests/pr-agent-config.bats",
+    "verification": "o=$(bats -f 'chain the preflight probes|model travels in the workflow env' tests/pr-agent-config.bats) && printf '%s\\n' \"$o\" | grep -c '^ok ' | grep -qx 3",
     "state": "pending",
     "evidence": ""
   },
@@ -22,15 +22,15 @@
   },
   {
     "id": "AI-045-nan-catalog-alignment-f4",
-    "behavior": "AC4: model-map declares per-model concurrency and the per-key cap, and the loader validates the shape",
-    "verification": "cd cli && go test ./internal/harness -run 'TestModelMap(BudgetIsDeclarationOnly|SchemaAcceptsPerModelConcurrency|SchemaRejectsMalformedPerModelConcurrency)$' -count=1",
+    "behavior": "AC4: model-map declares per-model concurrency and the per-key cap at NaN's published base-plan figures, and the loader validates the shape",
+    "verification": "o=$(cd cli && go test ./internal/harness -run 'TestModelMap(BudgetIsDeclarationOnly|SchemaAcceptsPerModelConcurrency|SchemaRejectsMalformedPerModelConcurrency)$' -count=1 -v) && printf '%s\\n' \"$o\" | grep -c '^--- PASS: TestModelMap' | grep -qx 3 && o=$(bats -f 'published concurrency, per model and per key' tests/model-map.bats) && printf '%s\\n' \"$o\" | grep -c '^ok ' | grep -qx 1",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f5",
     "behavior": "AC5: opencode and pi NaN windows and caps equal NaN's published figures, and enable_thinking appears nowhere",
-    "verification": "bats -f 'published windows|effective reasoning_effort|README records' tests/opencode.bats && bats -f 'model overrides carry' tests/pi-config.bats",
+    "verification": "o=$(bats -f 'published windows|effective reasoning_effort|README records' tests/opencode.bats) && printf '%s\\n' \"$o\" | grep -c '^ok ' | grep -qx 3 && o=$(bats -f 'model overrides carry' tests/pi-config.bats) && printf '%s\\n' \"$o\" | grep -c '^ok ' | grep -qx 1",
     "state": "pending",
     "evidence": ""
   },
@@ -51,13 +51,13 @@
   {
     "id": "AI-045-nan-catalog-alignment-f8",
     "behavior": "AC8: a daily canary probes every bound NaN model and reports the dead ones in one issue",
-    "verification": "(cd cli && go test ./internal/nanprobe/ && go test ./internal/cmd/ -run 'HarnessCanary') && bats tests/model-canary.bats",
+    "verification": "o=$(cd cli && go test ./internal/nanprobe/ -count=1 && go test ./internal/cmd/ -run 'HarnessCanary' -count=1 -v) && printf '%s\\n' \"$o\" | grep -c '^--- PASS: TestHarnessCanary' | grep -qx 2 && bats tests/model-canary.bats",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "AI-045-nan-catalog-alignment-f9",
-    "behavior": "AC9: PR-Agent draws its first reviewer with equal weight from a pool of NaN models and Claude Haiku 5.5, and the other provider reviews when nothing was published",
+    "behavior": "AC9: PR-Agent draws its first reviewer by declared weight from a pool of NaN models and Claude Haiku 5.5, routes a diff of 1,500 changed lines or more to Sonnet, and the other provider reviews when nothing was published",
     "verification": "bats tests/pr-agent-route.bats tests/pr-agent-route-real.bats >/dev/null || exit 1; o=$(bats tests/pr-agent-config.bats -f 'second needs a measured absence|fail closed without invoking|routed model, allowlisted, with bounded input and output') && printf '%s\n' \"$o\" | grep -c '^ok ' | grep -qx 3",
     "state": "pending",
     "evidence": ""
