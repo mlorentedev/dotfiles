@@ -1,7 +1,7 @@
 ---
 id: "CLI-114-converge-console-ux"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-14"
 issue: "mlorentedev/dotfiles#2460"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, converge, doctor, console]
@@ -60,3 +60,5 @@ wip_override: "the owner put the converge logs first (2026-10-14: 'los logs ante
 - #2460 (this spec), #1098 (half (a), "the log"), #2446 (the transcript and JSON report this view reads)
 - PLAT-001b (one entry point), TOOL-026 #2355 (the remedy catalog, out of scope here)
 - `cli/internal/doctor/report.go` (today's colour policy), `cli/internal/converge/runlog.go` (ANSI stripping in the transcript)
+
+<!-- archived 2026-10-14 — PR: https://github.com/mlorentedev/dotfiles/pull/2468 -->

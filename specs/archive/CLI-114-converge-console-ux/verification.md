@@ -40,25 +40,41 @@ PR 1 (macOS arm64, 2026-10-14):
 - PR 3 smoke test (`converge --plan` under `script -q /dev/null`, a pty): `→ checkout`, then its `[SKIP]` line, `→ records-mirror`, then its `[CHANGE]` line, and so on, each step announced before it runs
 - PR 2 smoke test (`converge --plan` from the Mac's checkout, piped): every step carries its duration (`tools 5.7s`, `agent-extensions 4.1s`, `configs-deploy 431ms`), and the columns stay aligned past `workstation-target`, an 18-character name that overflowed the old fixed 16-column width
 - Manual smoke test (the branch built into `$TMPDIR`, run from the Mac's checkout, `converge --plan`, a dry run): piped -> the tags bare, the same text as before; under `script -q /dev/null` (a pty) -> `\x1b[36m[SKIP]`, `\x1b[35m[CHANGE]`, `\x1b[32m[ OK ]` with the columns aligned; `NO_COLOR=1` under the pty -> bare again
+- After all three PRs merged (main at `3cf4bcd1`, macOS arm64, 2026-10-14): each `features.json` verification command -> exit 0 (f1-f7); `go build`, `go vet`, `GOOS=windows go vet` -> exit 0; `golangci-lint run` -> 0 issues; bats over the 6 `.bats` files that reference `dotf converge` (`git grep -l 'dotf converge' -- tests`) -> 1..179, 0 not ok
+- Smoke test on main (`converge --plan`, a dry run, from the Mac's checkout): piped to `cat` -> 0 escape bytes and no step announcement (the one `→` is inside records-mirror's own detail); under `script -q /dev/null` (a pty) -> 14 lines carry SGR codes, each of the 13 steps darwin supports announced with `→ name` before its result line. Both end `1 to change, 11 ok, 0 opaque, 2 skipped, 0 failed`
 
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
--
--
+- Colour is decided on the raw writer in `runConverge`, before the run log's tee, so the transcript on disk stays plain whatever the terminal gets.
+- The `→ name` announcement prints on a terminal only. A pipe keeps the finished-report shape, so scripts and `from-zero.yml`, which read the output, see what they saw before.
+- No `\r` ticker: it would garble the subprocesses' own output. The heartbeat alternative is the owner's question, CLI-115 (#2480).
+
+## Review dispositions
+
+Independent review (`review.md`, nan/qwen3.8-flash through pi, 2026-10-14): **PASS-WITH-GAPS**. One disposition per finding:
+
+| Finding | Disposition |
+|---|---|
+| Major, THEORETICAL: a step's child output can land after its result line (pump vs direct write) | **Ticketed**, CLI-116 (#2486), with the design notes: a pump-acknowledged barrier, not routing the printer through the pipe (that would put SGR codes in the transcript), and a `runConverge` test with a real child. Cross-referenced on CLI-115 (#2480). |
+| Minor, REAL: `printConvergeReport` has no production caller | **Ticketed**, REFACTOR-019 (#2487). Moving the five golden sites onto the production renderer can change golden bytes (the two derive the column width differently), so it is its own change. |
+| Minor, REAL: two terminal probes, doctor's `console.IsTerminal` and converge's `convergeTerminal`, and a double probe in `runConverge` | **Ticketed**, same REFACTOR-019 (#2487): the same code area, one change. |
+| Minor, THEORETICAL: a terminal run's transcript holds the `→ name` lines a piped run's does not | **Applied, policy decided:** the transcript records what the terminal showed, uncoloured. `TestConvergeConsole_AnAppliedRunColoursTheTerminalNotTheTranscript` now requires the whole line `→ checkout` in the transcript (a bare `→` matched records-mirror's own detail, so the first version of the assertion survived its mutation); removing the announcement fails it. `docs/runbooks/guide-new-machine.md` says the transcript keeps those lines. |
+| Minor, REAL: the `from-zero.yml` measurement omits `.changed` | **Corrected here, not in `proposal.md`.** The sentence is in `proposal.md` §3, which this verdict closes, so the correction lives in this row. `from-zero.yml:168` also reads `.changed` (`jq -e '.result == "ok" and .changed == 0'`). The conclusion stands: `duration_ms` is a new field and no reader selects it. |
+| Question: `features.json` rows stay `pending` | **Existing ticket**, GUARD-010 (#1470): nothing in the harness writes `state` or `evidence`. Every row's verification command exits 0 above (f1-f7). |
 
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-424-a-golden-file-with-an-extension-escapes-the-extensionless-eol-guard.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a console presentation change inside one command; no contract or dependency outlives it
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: converge's console is specific to dotf
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-114-converge-console-ux/` -> `specs/archive/CLI-114-converge-console-ux/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-114-converge-console-ux/` -> `specs/archive/CLI-114-converge-console-ux/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #2460, closed by the archive PR's `Closes #2460`
+- [x] Promotions above executed (if any)
