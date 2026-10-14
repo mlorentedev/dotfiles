@@ -27,9 +27,13 @@ import (
 func checkVaultHooks(sys *System, rep *Report, fix bool) {
 	rep.Section("Knowledge vault hooks (secret gate)")
 
-	// Same ADR-025 seam as checkVault — VAULT_PATH with the legacy default. No
-	// hardcode, so a path-default fix (e.g. #551) is inherited here for free.
-	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
+	// Same ADR-025 resolution as checkVault, so a path-default fix (e.g. #551)
+	// is inherited here for free.
+	vault := sys.vaultPath()
+	if vault == "" {
+		rep.Skip("no vault resolves on this machine — no secret gate to provision")
+		return
+	}
 
 	// Vault absent -> nothing to protect. SKIP, not FAIL: a machine that never
 	// syncs the vault is a valid state. Asks git rather than assuming

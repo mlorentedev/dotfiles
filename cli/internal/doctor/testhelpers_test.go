@@ -48,6 +48,14 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 	}
 	return &System{
 		Getenv: func(k string) string { return env[k] },
+		// The contract's Unix default, from the fake HOME: hermetic, where the
+		// production resolver would read this machine's machine.json.
+		ResolvePath: func(k string) string {
+			if k == "VAULT_PATH" && env["HOME"] != "" {
+				return filepath.Join(env["HOME"], "Projects", "knowledge")
+			}
+			return ""
+		},
 		LookPath: func(n string) (string, error) {
 			if pathset[n] {
 				return "/usr/bin/" + n, nil
