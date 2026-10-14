@@ -194,19 +194,19 @@ func TestConvergeConsole_TheSummaryCountsAFailedStepsChanges(t *testing.T) {
 		{Name: "tools", Status: converge.StatusFailed, Changes: 2, Detail: "pruned powershell@7.5.11; failed: catalog: veracrypt", Duration: time.Second},
 	}}
 	var out bytes.Buffer
-	printConvergeReport(&out, rep, console.Painter{})
+	renderConvergeReport(t, &out, rep, console.Painter{})
 	if !strings.Contains(out.String(), "1 failed (after 2 changes)\n") {
 		t.Errorf("the summary hides the failed step's changes:\n%s", out.String())
 	}
 	rep.Entries[0].Changes = 1
 	out.Reset()
-	printConvergeReport(&out, rep, console.Painter{})
+	renderConvergeReport(t, &out, rep, console.Painter{})
 	if !strings.Contains(out.String(), "1 failed (after 1 change)\n") {
 		t.Errorf("one change reads as plural:\n%s", out.String())
 	}
 	rep.DryRun, rep.Entries[0].Changes = true, 2
 	out.Reset()
-	printConvergeReport(&out, rep, console.Painter{})
+	renderConvergeReport(t, &out, rep, console.Painter{})
 	if !strings.Contains(out.String(), "1 failed (2 changes planned)\n") {
 		t.Errorf("a dry run's summary says the machine changed:\n%s", out.String())
 	}
