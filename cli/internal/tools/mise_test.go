@@ -185,6 +185,10 @@ type fakeMise struct {
 	listPrune int
 	prunes    [][]string
 	listFails bool // `mise ls --prunable` exits non-zero
+	// listFailsFrom, when > 0, makes the listing exit non-zero from that
+	// call on: the first plan sees the orphans, the check after the prune
+	// cannot.
+	listFailsFrom int
 }
 
 func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
@@ -207,7 +211,7 @@ func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
 		return nil, nil
 	case name == "mise" && len(args) == 3 && args[0] == "ls" && args[1] == "--prunable" && args[2] == "--json":
 		f.listPrune++
-		if f.listFails {
+		if f.listFails || (f.listFailsFrom > 0 && f.listPrune >= f.listFailsFrom) {
 			return []byte("mise ERROR failed to read a tracked config"), errors.New("exit status 1")
 		}
 		report := map[string][]map[string]any{}
@@ -930,6 +934,44 @@ func TestSync_InstallsWhenTheOrphanListingFails(t *testing.T) {
 	}
 	if len(f.prunes) != 0 {
 		t.Errorf("pruned without a listing: %v", f.prunes)
+	}
+}
+
+// A listing that fails only after the prune must not be reported as nothing
+// pruned: the prune ran, and what failed is its verification.
+func TestSync_ReportsAPruneItCouldNotVerify(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	f := &fakeMise{installed: map[string]string{"age": "1.3.1"}, pending: tools,
+		prunable: map[string][]string{"powershell": {"7.5.11"}}, listFailsFrom: 2}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run, Prune: true}
+
+	_, err := s.Apply(tools)
+	if len(f.prunes) != 1 {
+		t.Fatalf("want the listed orphan pruned once, got prunes %v", f.prunes)
+	}
+	if err == nil || strings.Contains(err.Error(), "nothing pruned") {
+		t.Fatalf("want an error that does not deny the prune, got %v", err)
+	}
+	for _, want := range []string{"pruned powershell@7.5.11; cannot verify: mise ls --prunable", "failed to read a tracked config"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("want %q in the error, got %v", want, err)
+		}
+	}
+}
+
+// With no orphan before the sync and a listing that fails after it, nothing
+// was pruned and the absence of orphans is what went unchecked.
+func TestSync_ReportsAnOrphanCheckItCouldNotRun(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	f := &fakeMise{installed: map[string]string{}, pending: tools, listFailsFrom: 2}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run, Prune: true}
+
+	_, err := s.Apply(tools)
+	if f.installs != 1 || len(f.prunes) != 0 {
+		t.Fatalf("want one install and no prune, got %d installs, prunes %v", f.installs, f.prunes)
+	}
+	if err == nil || !strings.Contains(err.Error(), "cannot verify that no orphan remains: mise ls --prunable") {
+		t.Errorf("want the unchecked orphan listing named, got %v", err)
 	}
 }
 

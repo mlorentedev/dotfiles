@@ -61,10 +61,7 @@ func newToolsInstallCmd() *cobra.Command {
 			if len(args) == 1 {
 				name = args[0]
 			}
-			in := &tools.Installer{
-				Dest: filepath.Join(env.Home(), ".local", "bin"),
-				Out:  cmd.OutOrStdout(),
-			}
+			in := toolsInstaller(filepath.Join(env.Home(), ".local", "bin"), cmd.OutOrStdout())
 			if dryRun {
 				return planToolsInstall(in, cat, name, cmd.OutOrStdout())
 			}
@@ -73,6 +70,29 @@ func newToolsInstallCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "print what install would do, and change nothing")
 	return c
+}
+
+// toolsInstaller is the catalog installer `dotf tools install` and converge
+// share, so a tool installed by hand runs on the same Python as one converge
+// installed.
+func toolsInstaller(dest string, out io.Writer) *tools.Installer {
+	return &tools.Installer{Dest: dest, Out: out, Python: pinnedPython(env.ResolveVersionsPath(), out)}
+}
+
+// pinnedPython is the Python series the versions.conf at path pins, which
+// uv-tool installs run on. Without one, uv picks the newest interpreter it
+// finds, which is how BUG-138 happened, so that is said on out, never silent.
+func pinnedPython(path string, out io.Writer) string {
+	raw, err := os.ReadFile(path)
+	if series := tools.PythonSeries(raw); err == nil && series != "" {
+		return series
+	}
+	reason := "it pins no Python"
+	if err != nil {
+		reason = err.Error()
+	}
+	_, _ = fmt.Fprintf(out, "[WARN] no Python series read from %s (%s): uv tools run on whichever interpreter uv picks\n", path, reason)
+	return ""
 }
 
 // loadToolsCatalog reads packages.json from the checkout, else the deploy mirror

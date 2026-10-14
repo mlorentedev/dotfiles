@@ -111,6 +111,25 @@ func ParseMisePins(versionsConf []byte) (MisePins, error) {
 	return p, nil
 }
 
+// PythonSeries is the major.minor of the Python versions.conf pins for mise
+// ("3.13"), which uv-tool installs run on; "" when there is none to read. A
+// series rather than the patch, so uv takes mise's interpreter and a patch
+// bump does not make it fetch another.
+func PythonSeries(versionsConf []byte) string {
+	p, err := ParseMisePins(versionsConf)
+	if err != nil {
+		return ""
+	}
+	for _, t := range p.Tools {
+		if t.Name == "python" {
+			if parts := strings.SplitN(t.Version, ".", 3); len(parts) >= 2 {
+				return parts[0] + "." + parts[1]
+			}
+		}
+	}
+	return ""
+}
+
 // ParseMiseTools returns the tools ParseMisePins reads, for a caller that
 // needs only those.
 func ParseMiseTools(versionsConf []byte) ([]MiseTool, error) {
@@ -464,9 +483,18 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 	if err != nil {
 		return p, err
 	}
+	// A listing that fails before the prune means nothing was pruned; one
+	// that fails only after it means the prune ran and could not be checked.
+	var unverified error
 	defer func() {
-		if err == nil && unlisted != nil {
+		switch {
+		case err != nil:
+		case unlisted != nil:
 			err = fmt.Errorf("nothing pruned: %w", unlisted)
+		case unverified != nil && len(p.Orphans) > 0:
+			err = fmt.Errorf("pruned %s; cannot verify: %w", strings.Join(p.Orphans, ", "), unverified)
+		case unverified != nil:
+			err = fmt.Errorf("cannot verify that no orphan remains: %w", unverified)
 		}
 	}()
 	if p.ConfigChanged {
@@ -518,12 +546,9 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 			return p, fmt.Errorf("mise prune: %w\n%s", err, strings.TrimSpace(string(out)))
 		}
 	}
-	after, afterUnlisted, err := s.plan(tools)
+	after, unverified, err := s.plan(tools)
 	if err != nil {
 		return p, err
-	}
-	if unlisted == nil {
-		unlisted = afterUnlisted
 	}
 	if len(after.Orphans) > 0 {
 		return p, fmt.Errorf("after mise prune, still installed: %s", strings.Join(after.Orphans, ", "))
