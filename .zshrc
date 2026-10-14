@@ -167,6 +167,8 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # AI Tool Aliases
 alias g='agy'
 alias c='claude'
+# hr: herdr, the terminal cockpit for agent panes and worktrees (h is helm).
+alias hr='herdr'
 # --no-sandbox is for the Linux AppImage's Electron sandbox; the macOS CLI
 # reads it as a command and fails every call (obsidian 1.14.4). Everywhere
 # but darwin, as `dotf vault health` does.

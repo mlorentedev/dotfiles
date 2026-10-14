@@ -185,6 +185,8 @@ fi
 # AI Tool Aliases
 alias g='agy'
 alias c='claude'
+# hr: herdr, the terminal cockpit for agent panes and worktrees (h is helm).
+alias hr='herdr'
 # GitHub Copilot CLI: cop -> interactive agent; cops -> single-shot prompt with
 # --allow-all-tools (required by the CLI for -p mode). Same pair as aliases.zsh
 # and profile.ps1 -- bash had neither (AI-036/#1296).
