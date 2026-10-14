@@ -21,7 +21,7 @@ PR 1 (macOS arm64, 2026-10-14):
   - `duration_ms` written as 0 -> `TestWriteReport_HoldsEachStepsDurationInMilliseconds` FAIL
   - a zero duration printed as `0ms` instead of blank -> golden FAIL
   - the name column fixed at 16 -> `TestConvergeConsole_ALongNameWidensTheColumn` FAIL
-- [x] AC6 -> `TestConvergeConsole_FailureSummary`: two failed steps (one a revisit, `after tools: …`) are listed again under `failed:` after the counts; the same run with no failures prints no summary. The `log:` line follows because `saveConvergeReport` prints it after the report. Mutation: the summary never printed -> golden FAIL
+- [x] AC6 -> `TestConvergeConsole_FailureSummary`: two failed steps (one a revisit, `after tools: …`) are listed again under `failed:` after the counts; the same run with no failures prints no summary. `TestConvergeConsole_AFailedRunSummarisesBeforeTheLog` runs a failing `dotf converge` and asserts `failed:` comes before `log:`. Mutation: the summary never printed -> both FAIL
 - [ ] AC5 -> PR 3
 - [ ] AC7 -> every PR (`go test ./...` unchanged elsewhere)
 
