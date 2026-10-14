@@ -1,0 +1,7 @@
+converge on linux:
+  [CHANGE] tools            installed herdr, lazygit
+  [ OK ]   pi-settings      settings.json present, enabledModels in sync
+  [OPAQUE] legacy-setup     setup-linux.sh exited 0
+  [FAIL]   identity         the age key is locked
+  [SKIP]   records-harness  not reached
+1 changed, 1 ok, 1 opaque, 1 skipped, 1 failed
