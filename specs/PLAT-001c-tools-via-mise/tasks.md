@@ -96,6 +96,19 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
   - `TestManifest_EveryRequiredCommandIsInstalledWhereTheEntryDeploys` counts a `# mise:` pin as installed wherever the catalog installs mise, so herdr needs no exemption on linux and darwin; `claude`'s exemption narrows to Windows, where `setup-windows.ps1` runs the official installer
   - Windows: H2 and mise in the Windows catalog (`herdr/windows` exemption)
 
+### H9 — lazygit in a herdr popup (#2013 H9)
+
+lazygit replaces Orca's diff viewer. Its install was done with the mise pins above (`LAZYGIT_VERSION`, tasks 104-105); this is the binding.
+
+- [x] Failing test first: `TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys` wants a lazygit popup in the shipped `keys.command`, and was red before the stanza
+- [x] `[[keys.command]]` in `ai/herdr/config.toml`: `prefix+d` (d for diff; herdr 0.9.3 leaves it unbound, `prefix+g` is goto, `prefix+shift+g` is new_worktree), `type = "popup"`, `command = "lazygit"`. No alt chord: macOS terminals send Option as Alt only when configured to
+- [x] No path argument: herdr 0.9.3's `spawn_popup_command` (`src/app/popup.rs`) falls back to the focused pane's cwd, so the popup shows that pane's worktree, and the bare command also runs under Windows' `cmd.exe /d /c`
+- [x] An array of tables through the TOML merge: `TestDeploy_TOMLMergeUnionsAnArrayOfTables` keeps a binding the user added beside the repo's, the merged file still holds tables, and a second merge is in sync
+- [x] On the Mac, into a scratch `HERDR_CONFIG_DIR` holding a user binding: `dotf deploy herdr` wrote both, a second deploy said `in sync`, and `herdr config check` on the merged file said `config: ok`
+- [x] `herdr config check` does not report a binding that collides with a default (a `prefix+g` command passed it), so the key was chosen against 0.9.3's default keymap (`config-reference.json` at the `v0.9.3` tag). A later herdr that binds `prefix+d` itself would show up as a changed keymap in that file's diff, which a pin bump reads anyway
+- [ ] The merge keeps a stale binding when one is edited, because lists union by equality: #2455 (CLI-113)
+- [ ] In daily use on the Mac, recorded at gate V
+
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
 - [x] [AC5] Failing tests, then `tools.ParseMiseTools`: pins marked `# mise: cli` on the line before them, name from `NAME_VERSION`; a marker that marks no pin is an error

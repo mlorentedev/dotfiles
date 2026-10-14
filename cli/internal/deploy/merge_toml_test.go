@@ -336,6 +336,18 @@ func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
 	if got["onboarding"] != false || keys["zoom"] != "prefix+z" || ui["accent"] != "magenta" {
 		t.Errorf("a key herdr wrote was lost: %v", got)
 	}
+	// H9: lazygit replaces Orca's diff viewer, as a popup over the focused
+	// pane, which herdr opens in that pane's directory.
+	lazygit := false
+	cmds, _ := keys["command"].([]any)
+	for _, c := range cmds {
+		if b, _ := c.(map[string]any); b["command"] == "lazygit" && b["type"] == "popup" && b["key"] != nil {
+			lazygit = true
+		}
+	}
+	if !lazygit {
+		t.Errorf("no lazygit popup in keys.command: %v", keys["command"])
+	}
 
 	plan, err := PlanConfig(cfg, root, home, resolve)
 	if err != nil {
@@ -343,5 +355,53 @@ func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
 	}
 	if plan.Changed {
 		t.Errorf("a second deploy must be in sync:\n%s", plan.Content)
+	}
+}
+
+// herdr's custom command keys are an array of tables (`[[keys.command]]`), the
+// first such value a TOML merge carries (#2013 H9). A binding the user added
+// in herdr survives beside the repo's, the merged file still holds tables,
+// and a second merge is in sync, which the union only gives if the decoded
+// tables compare equal after a round trip.
+func TestDeploy_TOMLMergeUnionsAnArrayOfTables(t *testing.T) {
+	root := repoWithHerdrConfig(t, `[keys]
+prefix = "ctrl+s"
+
+[[keys.command]]
+key = "prefix+d"
+type = "popup"
+command = "lazygit"
+`)
+	home := t.TempDir()
+	dst := writeHerdrDst(t, home, `[keys]
+prefix = "ctrl+s"
+
+[[keys.command]]
+key = "prefix+alt+t"
+type = "pane"
+command = "htop"
+`)
+	if _, err := Deploy(herdrConfig(), root, home, noResolve, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := readTOML(t, dst)["keys"].(map[string]any)
+	cmds, _ := keys["command"].([]any)
+	var got []string
+	for _, c := range cmds {
+		table, ok := c.(map[string]any)
+		if !ok {
+			t.Fatalf("keys.command element is %T, want a table", c)
+		}
+		got = append(got, table["command"].(string))
+	}
+	if strings.Join(got, ",") != "htop,lazygit" {
+		t.Errorf("keys.command = %v, want the user's htop then the repo's lazygit", got)
+	}
+	again, err := Deploy(herdrConfig(), root, home, noResolve, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Changed {
+		t.Error("a second merge of the same array of tables must report no change")
 	}
 }
