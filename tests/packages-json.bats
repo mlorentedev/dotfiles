@@ -30,7 +30,7 @@ mise_catalog_excludes_windows() {
 @test "every packages.json tool declares name, version, profile and a typed source" {
     jq -e 'all(.tools[]; (.name | type == "string") and (.profile | type == "string") and
         (if .source.type == "system"
-         then (has("version") | not) and ([.source.apt, .source.brew, .source.winget] | any(type == "string"))
+         then (has("version") | not) and ([.source.apt, .source.brew, .source.cask, .source.winget] | any(type == "string"))
          else (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.source.type | IN("npm", "github-release", "uv-tool"))
          end))' "$CATALOG" >/dev/null
 }
