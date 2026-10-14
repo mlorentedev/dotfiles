@@ -441,13 +441,17 @@ jobs:
       #   PR-Agent's tokenizer counts about 30% fewer tokens than Claude's, so a
       #   diff past roughly 75,000 of PR-Agent's crosses 100,000 and pays the
       #   higher prices for that request.
-      # - The OUTPUT is capped at 32,000 tokens. LiteLLM sends 4,096 for a Claude
+      # - The OUTPUT is capped at 40,000 tokens. LiteLLM sends 4,096 for a Claude
       #   model it does not know (DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS), and the
       #   model's thinking counts toward the cap, so a review could be cut short
-      #   and published as nothing. Worst case, a 260,000-token prompt with a
-      #   full answer, is about $0.21 a review on Haiku and $0.84 on Sonnet.
-      # - EFFORT is the member's `reasoning_effort` in the pool (Haiku `high`,
-      #   Sonnet `medium`), with adaptive thinking. PR-Agent sends `thinking`
+      #   and published as nothing. At 32,000 Haiku's p90 answer was 30,600
+      #   tokens and the cap cut 5 of 11 runs (#2458). 40,000 is the highest
+      #   round cap under both ceilings: worst case, a 260,000-token prompt
+      #   with a full answer, is about $0.23 a review on Haiku and $0.92 on
+      #   Sonnet. Both models answer up to 128,000.
+      # - EFFORT is the member's `reasoning_effort` in the pool (Haiku and
+      #   Sonnet both `medium`: at `high` Haiku's thinking used the whole output
+      #   cap and the answer came back empty, #2458), with adaptive thinking. PR-Agent sends `thinking`
       #   and `output_config` only for a model it recognises as adaptive, and
       #   its built-in pattern does not match these ids, hence the override
       #   list, which names every allowed model. Measured with LiteLLM 1.103.0,
@@ -486,7 +490,7 @@ jobs:
           CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"]'
           CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
           CONFIG__AI_TIMEOUT: "360"
-          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
+          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "40000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           CONFIG__OUTPUT_RUN_DETAILS: "true"
@@ -708,7 +712,7 @@ jobs:
           CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE: '["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"]'
           CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
           CONFIG__AI_TIMEOUT: "360"
-          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "32000"
+          DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "40000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           CONFIG__OUTPUT_RUN_DETAILS: "true"
