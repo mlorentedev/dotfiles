@@ -239,8 +239,8 @@ func TestModelMapConsumerClasses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ResolveTier(top, gemini): %v", err)
 		}
-		if got != "gemini-3.1-pro-high" {
-			t.Errorf("top/gemini = %q, want gemini-3.1-pro-high", got)
+		if got != "gemini-3.8-flash-high" {
+			t.Errorf("top/gemini = %q, want gemini-3.8-flash-high", got)
 		}
 	})
 }
