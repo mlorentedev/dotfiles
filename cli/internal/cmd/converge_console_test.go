@@ -204,6 +204,12 @@ func TestConvergeConsole_TheSummaryCountsAFailedStepsChanges(t *testing.T) {
 	if !strings.Contains(out.String(), "1 failed (after 1 change)\n") {
 		t.Errorf("one change reads as plural:\n%s", out.String())
 	}
+	rep.DryRun, rep.Entries[0].Changes = true, 2
+	out.Reset()
+	printConvergeReport(&out, rep, console.Painter{})
+	if !strings.Contains(out.String(), "1 failed (2 changes planned)\n") {
+		t.Errorf("a dry run's summary says the machine changed:\n%s", out.String())
+	}
 }
 
 // A name longer than the default column widens it for every line, so the
