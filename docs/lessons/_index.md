@@ -439,4 +439,5 @@ tags: [lessons, index, dotfiles]
 | [418 - Capturing a process's stdout turns every terminal check inside it into a pipe check](lesson-418-capturing-stdout-turns-every-terminal-check-into-a-pipe-check.md) | 2026-10-14 |
 | [419 - A pin bumped right after its release meets a stale uv index cache](lesson-419-a-pin-bumped-right-after-its-release-meets-a-stale-uv-index-cache.md) | 2026-10-14 |
 | [421 - A retry belongs to the caller that knows its bound](lesson-421-a-retry-belongs-to-the-caller-that-knows-its-bound.md) | 2026-10-14 |
+| [423 - Every zsh reads ~/.zshenv, so a test's PATH is not the script's PATH](lesson-423-every-zsh-reads-zshenv-so-a-test-path-is-not-the-script-path.md) | 2026-10-14 |
 <!-- END GENERATED -->
