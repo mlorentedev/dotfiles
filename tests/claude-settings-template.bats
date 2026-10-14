@@ -319,7 +319,16 @@ setup() {
 @test "the deny list keeps the destructive git and rm rules as wildcards" {
     for rule in 'Bash(rm -rf ~/*)' 'Bash(rm -fr ~/*)' 'Bash(git push *--force*)' \
         'Bash(git push -f*)' 'Bash(git push * -f*)' 'Bash(git reset --hard*)' \
-        'Bash(git clean -f*)' 'Bash(git clean -*f*)' 'Bash(*dotf secrets show*)'; do
+        'Bash(git clean -f*)' 'Bash(git clean -*f*)'; do
+        jq -e --arg r "$rule" '.permissions.deny | index($r)' "$SETTINGS_TEMPLATE" >/dev/null || { echo "missing: $rule"; false; }
+    done
+}
+
+# The commands whose whole output is a secret stay denied. The transcript is durable and
+# nothing scans it, so a probe that prints a credential leaks it, and the only fix is a
+# rotation. `gh auth token` reads the OS keychain whatever GH_CONFIG_DIR says (lesson 425).
+@test "the deny list keeps the commands that print a secret" {
+    for rule in 'Bash(*dotf secrets show*)' 'Bash(*gh auth token*)' 'Bash(env:*)' 'Bash(printenv:*)'; do
         jq -e --arg r "$rule" '.permissions.deny | index($r)' "$SETTINGS_TEMPLATE" >/dev/null || { echo "missing: $rule"; false; }
     done
 }

@@ -34,6 +34,7 @@
       "Bash(git clean -*f*)",
       "Bash(sudo:*)",
       "Bash(*dotf secrets show*)",
+      "Bash(*gh auth token*)",
       "Bash(env:*)",
       "Bash(printenv:*)",
       "Bash(export -p:*)",
