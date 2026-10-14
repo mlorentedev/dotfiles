@@ -169,6 +169,26 @@ func TestConvergeConsole_FailureSummary(t *testing.T) {
 	}
 }
 
+// The summary counts what a failed step changed before it failed, so a run
+// that pruned and then failed does not read as one that changed nothing
+// (BUG-136).
+func TestConvergeConsole_TheSummaryCountsAFailedStepsChanges(t *testing.T) {
+	rep := converge.Report{GOOS: "darwin", Entries: []converge.Entry{
+		{Name: "tools", Status: converge.StatusFailed, Changes: 2, Detail: "pruned powershell@7.5.11; failed: catalog: veracrypt", Duration: time.Second},
+	}}
+	var out bytes.Buffer
+	printConvergeReport(&out, rep, console.Painter{})
+	if !strings.Contains(out.String(), "1 failed (after 2 changes)\n") {
+		t.Errorf("the summary hides the failed step's changes:\n%s", out.String())
+	}
+	rep.Entries[0].Changes = 1
+	out.Reset()
+	printConvergeReport(&out, rep, console.Painter{})
+	if !strings.Contains(out.String(), "1 failed (after 1 change)\n") {
+		t.Errorf("one change reads as plural:\n%s", out.String())
+	}
+}
+
 // A name longer than the default column widens it for every line, so the
 // duration and detail columns stay aligned.
 func TestConvergeConsole_ALongNameWidensTheColumn(t *testing.T) {

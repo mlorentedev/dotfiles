@@ -292,3 +292,30 @@ func TestRegistry_RecordsHarnessRevisitsAfterTools(t *testing.T) {
 		t.Errorf("tools (%d) must run after records-harness (%d)", pos["tools"], pos["records-harness"])
 	}
 }
+
+// A step that changed the machine and then failed keeps both: the report
+// names what it changed beside the error, and counts the changes (BUG-136).
+func TestRun_AFailedStepKeepsWhatItChanged(t *testing.T) {
+	tools := &fake{name: "tools", changes: 2, err: errors.New("catalog: veracrypt: exit status 1")}
+
+	rep, err := Run([]Reconciler{tools}, Env{GOOS: "darwin"}, false)
+	if err == nil {
+		t.Fatal("want the step's error")
+	}
+	e := rep.Entries[0]
+	if e.Status != StatusFailed || e.Changes != 2 {
+		t.Fatalf("want a failed entry with 2 changes, got %+v", e)
+	}
+	if want := "tools detail; failed: catalog: veracrypt: exit status 1"; e.Detail != want {
+		t.Errorf("detail = %q, want %q", e.Detail, want)
+	}
+}
+
+// A step that failed before changing anything reads as its error alone.
+func TestRun_AFailedStepWithNoChangeIsItsError(t *testing.T) {
+	r := &fake{name: "identity", err: errors.New("the age key is locked")}
+	rep, _ := Run([]Reconciler{r}, Env{GOOS: "darwin"}, false)
+	if got := rep.Entries[0].Detail; got != "the age key is locked" {
+		t.Errorf("detail = %q, want the error alone", got)
+	}
+}

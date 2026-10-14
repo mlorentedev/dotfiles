@@ -311,12 +311,30 @@ func (c *convergePrinter) finish(rep converge.Report) {
 	}
 	n := rep.Summary()
 	failed := fmt.Sprintf("%d failed", n[converge.StatusFailed])
+	if k := failedChanges(rep); k == 1 {
+		failed += " (after 1 change)"
+	} else if k > 1 {
+		failed += fmt.Sprintf(" (after %d changes)", k)
+	}
 	if n[converge.StatusFailed] > 0 {
 		failed = c.p.Paint(failed, console.Red, console.Bold)
 	}
 	_, _ = fmt.Fprintf(c.w, "%d %s, %d ok, %d opaque, %d skipped, %s\n",
 		n[converge.StatusChange], changed, n[converge.StatusOK], n[converge.StatusOpaque], n[converge.StatusSkipped], failed)
 	printFailureSummary(c.w, rep, c.p)
+}
+
+// failedChanges is how many changes the failed steps made before failing:
+// the summary counts steps by status, and a failed step's changes would
+// otherwise vanish from it (BUG-136).
+func failedChanges(rep converge.Report) int {
+	k := 0
+	for _, e := range rep.Entries {
+		if e.Status == converge.StatusFailed {
+			k += e.Changes
+		}
+	}
+	return k
 }
 
 // stepDuration is a step's duration column: blank for a step the run never
