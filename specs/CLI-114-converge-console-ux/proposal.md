@@ -1,7 +1,7 @@
 ---
 id: "CLI-114-converge-console-ux"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-10-14"
 issue: "mlorentedev/dotfiles#2460"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, converge, doctor, console]
