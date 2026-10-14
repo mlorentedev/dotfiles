@@ -111,6 +111,25 @@ func ParseMisePins(versionsConf []byte) (MisePins, error) {
 	return p, nil
 }
 
+// PythonSeries is the major.minor of the Python versions.conf pins for mise
+// ("3.13"), which uv-tool installs run on; "" when there is none to read. A
+// series rather than the patch, so uv takes mise's interpreter and a patch
+// bump does not make it fetch another.
+func PythonSeries(versionsConf []byte) string {
+	p, err := ParseMisePins(versionsConf)
+	if err != nil {
+		return ""
+	}
+	for _, t := range p.Tools {
+		if t.Name == "python" {
+			if parts := strings.SplitN(t.Version, ".", 3); len(parts) >= 2 {
+				return parts[0] + "." + parts[1]
+			}
+		}
+	}
+	return ""
+}
+
 // ParseMiseTools returns the tools ParseMisePins reads, for a caller that
 // needs only those.
 func ParseMiseTools(versionsConf []byte) ([]MiseTool, error) {

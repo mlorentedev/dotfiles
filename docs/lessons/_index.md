@@ -447,4 +447,5 @@ tags: [lessons, index, dotfiles]
 | [426 - mise prune removes more than orphans](lesson-426-mise-prune-removes-more-than-orphans.md) | 2026-10-14 |
 | [427 - apt-get update exits 0 on a mirror it cannot reach](lesson-427-apt-get-update-exits-0-on-a-mirror-it-cannot-reach.md) | 2026-10-14 |
 | [428 - A retry count is not a retry window](lesson-428-a-retry-count-is-not-a-retry-window.md) | 2026-10-14 |
+| [429 - An installer that picks the newest interpreter fails with the runner image](lesson-429-an-installer-that-picks-the-newest-interpreter-fails-with-the-runner-image.md) | 2026-10-14 |
 <!-- END GENERATED -->

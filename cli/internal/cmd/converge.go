@@ -174,7 +174,7 @@ var convergeOptions = func() converge.Options {
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		// Install progress goes to stderr, apart from the report on stdout.
-		ToolsCatalog:  &tools.Installer{Dest: dest, Out: os.Stderr},
+		ToolsCatalog:  toolsInstaller(dest, os.Stderr),
 		ToolsBinDirs:  []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest},
 		GitRun:        gitconfig.ExecRunner,
 		GitStoredAuth: gitconfig.StoredLoginRunner,
