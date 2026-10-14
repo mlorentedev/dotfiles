@@ -17,7 +17,7 @@ import (
 func TestPrLand_ARefusalListsTheReasonsAndExitsNonZero(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	saved := prLandOptions
-	prLandOptions = func(repo, _ string) prland.Options {
+	prLandOptions = func(repo string, _ registryLoader) prland.Options {
 		return prland.Options{
 			Repo: repo,
 			Run: func(_ context.Context, args ...string) ([]byte, error) {
@@ -69,7 +69,7 @@ type queueFake struct {
 	calls  int
 }
 
-func (q *queueFake) options(repo, _ string) prland.Options {
+func (q *queueFake) options(repo string, _ registryLoader) prland.Options {
 	return prland.Options{
 		Repo: repo,
 		Run: func(_ context.Context, args ...string) ([]byte, error) {
@@ -264,7 +264,7 @@ func TestPrLand_UnknownWaitBoundsTheWaitOnAnUncomputedMergeState(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	saved := prLandOptions
 	var slept time.Duration
-	prLandOptions = func(repo, _ string) prland.Options {
+	prLandOptions = func(repo string, _ registryLoader) prland.Options {
 		return prland.Options{
 			Repo: repo,
 			Run: func(_ context.Context, args ...string) ([]byte, error) {
