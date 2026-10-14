@@ -196,7 +196,14 @@ func checkDrillRecord(sys *System, escrowDir string, rep *Report) {
 		rep.Warn(fmt.Sprintf("the offline copy was last verified %d days ago — %s; an untested backup is a supposition", days, remedy))
 		return
 	}
-	if stored, err := readEscrowManifest(escrowDir); err == nil && stored.Digest != rec.EscrowDigest {
+	// The record is only as good as the escrow it was compared with: when the
+	// manifest cannot be read, nothing says the copy would restore today's vault.
+	stored, err := readEscrowManifest(escrowDir)
+	if err != nil {
+		rep.Warn(fmt.Sprintf("cannot compare the drill record with the escrow manifest (%v) — %s", err, remedy))
+		return
+	}
+	if stored.Digest != rec.EscrowDigest {
 		rep.Warn("the offline copy was verified against an older escrow, so it would restore an older vault — " + remedy)
 		return
 	}

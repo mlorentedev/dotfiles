@@ -116,6 +116,29 @@ func TestBackupUSB_FillsAnEmptyStickAndRecordsTheDrill(t *testing.T) {
 	}
 }
 
+// The copy path is the declared payload, never a directory walk: a plaintext
+// `*.secret` beside the escrow must not reach the stick.
+func TestBackupUSB_NeverCopiesASecretFile(t *testing.T) {
+	f := newUSBFixture(t)
+	writeFile(t, filepath.Join(f.cfg.RepoDR, "github.secret"), "ghp_plaintext")
+	writeFile(t, filepath.Join(f.cfg.RepoDR, "secrets", "dr", "github.secret"), "ghp_plaintext")
+	if _, err := BackupUSB(f.cfg, newStick); err != nil {
+		t.Fatal(err)
+	}
+	err := filepath.WalkDir(f.cfg.Mount, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(d.Name(), ".secret") {
+			t.Errorf("a .secret file reached the stick: %s", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 // The record is committed and the report is printed: neither may carry key
 // material or plaintext.
 func TestUSB_RecordAndReportCarryNoSecret(t *testing.T) {

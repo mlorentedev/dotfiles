@@ -131,6 +131,7 @@ func TestDR_DrillRecord(t *testing.T) {
 		{"stale", drillRecordAt(now.Add(-400*24*time.Hour), "d1"), "d1", "last verified 400 days ago", "[WARN]"},
 		{"older escrow", drillRecordAt(now.Add(-1*24*time.Hour), "d0"), "d1", "verified against an older escrow", "[WARN]"},
 		{"unreadable time", secrets.DrillRecord{VerifiedAt: "yesterday"}, "d1", "is not a time", "[WARN]"},
+		{"no manifest to compare", drillRecordAt(now.Add(-1*24*time.Hour), "d1"), "", "cannot compare the drill record", "[WARN]"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{DotfilesDir: t.TempDir()}
