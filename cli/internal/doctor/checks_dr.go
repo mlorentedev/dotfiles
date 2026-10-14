@@ -33,13 +33,6 @@ const drillMaxAge = 180 * 24 * time.Hour
 // churn that restoring from it would silently lose credentials.
 const escrowMaxAge = 90 * 24 * time.Hour
 
-// drillMarkerPath is touched by whoever completes a recovery drill. Kept in the
-// deploy dir rather than the repo so it records what happened on THIS machine —
-// a drill is a property of a box and its USB, not of the source tree.
-func drillMarkerPath(cfg *Config) string {
-	return filepath.Join(cfg.DotfilesDir, ".dr-drill")
-}
-
 // reportAbsentEscrow renders the missing-escrow state at the severity its real
 // exposure earns: `live` is how many registry entries resolve through Bitwarden,
 // and regErr is non-nil when the registry could not be read to find out.
@@ -171,18 +164,52 @@ func checkDisasterRecovery(sys *System, cfg *Config, rep *Report) {
 	// The drill. This is the one that matters, and the one no other check can
 	// stand in for: an escrow that exists proves a file was written, never that
 	// anyone can restore from it.
-	marker := drillMarkerPath(cfg)
-	switch info, err := os.Stat(marker); {
+	checkDrillRecord(sys, filepath.Dir(escrow), rep)
+}
+
+// checkDrillRecord reads the record `dotf secrets usb verify` commits beside the
+// escrow (#1770). It replaced a hand-touched marker in the deploy dir, which
+// recorded that someone ran `touch`, on one machine only: the record is written
+// only by a verification that passed, and travels with the checkout, so every
+// machine reads the same answer. It is checked against the manifest as well as
+// the clock, because a stick verified yesterday against last month's escrow
+// restores last month's vault.
+func checkDrillRecord(sys *System, escrowDir string, rep *Report) {
+	const remedy = "mount the offline stick and run `dotf secrets usb backup --mount <dir>`, then commit " +
+		"sensitive/dr/" + secrets.DrillRecordFileName
+	rec, err := secrets.ReadDrillRecord(escrowDir)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		rep.Warn("no recovery drill recorded — " + remedy)
+		return
 	case err != nil:
-		rep.Warn("no recovery drill recorded — run the chain in docs/runbooks/guide-secrets-governance.md " +
-			"§ RECOVER against the real offline backup, then `touch " + marker + "`")
-	case sys.Now().Sub(info.ModTime()) > drillMaxAge:
-		rep.Warn(fmt.Sprintf("last recovery drill was %d days ago — re-run it; an untested backup is a supposition",
-			int(sys.Now().Sub(info.ModTime()).Hours()/24)))
-	default:
-		rep.Pass(fmt.Sprintf("recovery drill run %d days ago",
-			int(sys.Now().Sub(info.ModTime()).Hours()/24)))
+		rep.Warn(fmt.Sprintf("cannot read the drill record (%v) — %s", err, remedy))
+		return
 	}
+	at, err := time.Parse(time.RFC3339, rec.VerifiedAt)
+	if err != nil {
+		rep.Warn(fmt.Sprintf("the drill record's verified_at %q is not a time — %s", rec.VerifiedAt, remedy))
+		return
+	}
+	days := int(sys.Now().Sub(at).Hours() / 24)
+	if sys.Now().Sub(at) > drillMaxAge {
+		rep.Warn(fmt.Sprintf("the offline copy was last verified %d days ago — %s; an untested backup is a supposition", days, remedy))
+		return
+	}
+	if stored, err := readEscrowManifest(escrowDir); err == nil && stored.Digest != rec.EscrowDigest {
+		rep.Warn("the offline copy was verified against an older escrow, so it would restore an older vault — " + remedy)
+		return
+	}
+	rep.Pass(fmt.Sprintf("offline copy verified %d days ago on %s (%d items)", days, rec.Host, rec.Items))
+}
+
+func readEscrowManifest(dir string) (secrets.EscrowManifest, error) {
+	var m secrets.EscrowManifest
+	blob, err := os.ReadFile(filepath.Join(dir, secrets.ManifestFileName))
+	if err != nil {
+		return m, err
+	}
+	return m, json.Unmarshal(blob, &m)
 }
 
 // checkEscrowDescribesVault compares what the escrow contained with what the vault

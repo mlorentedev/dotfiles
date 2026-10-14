@@ -9,3 +9,6 @@
 # revision timestamps only — but `!*.json` would un-ignore a plaintext `bw export`
 # dropped here, which is the single thing this file exists to make impossible.
 !escrow-manifest.json
+# The drill record `dotf secrets usb verify` writes (#1770), by EXACT NAME for the
+# same reason: a date, a host, the public recipient, a count and a digest.
+!drill-record.json

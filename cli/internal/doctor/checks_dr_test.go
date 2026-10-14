@@ -73,6 +73,31 @@ func touchAt(t *testing.T, path string, mod time.Time) {
 	}
 }
 
+// writeDrillRecord commits a drill record (and, when digest is set, the
+// manifest it is compared with) into the mirror's escrow dir, where escrowPath
+// lands when the fixture's checkout is empty.
+func writeDrillRecord(t *testing.T, cfg *Config, rec secrets.DrillRecord, manifestDigest string) {
+	t.Helper()
+	dir := filepath.Join(cfg.DotfilesDir, "sensitive", "dr")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(rec)
+	if err := os.WriteFile(filepath.Join(dir, secrets.DrillRecordFileName), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if manifestDigest != "" {
+		m, _ := json.Marshal(secrets.EscrowManifest{Count: 3, Digest: manifestDigest})
+		if err := os.WriteFile(filepath.Join(dir, secrets.ManifestFileName), m, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func drillRecordAt(at time.Time, digest string) secrets.DrillRecord {
+	return secrets.DrillRecord{VerifiedAt: at.UTC().Format(time.RFC3339), Host: "macmini", Items: 3, EscrowDigest: digest}
+}
+
 // A drill that never happened is the state this check exists for. It must not be
 // silent, and it must not be a FAIL either -- nothing is broken, it is unproven.
 func TestDR_NoDrillRecorded_Warns(t *testing.T) {
@@ -85,43 +110,40 @@ func TestDR_NoDrillRecorded_Warns(t *testing.T) {
 	if rep.Failures() != 0 {
 		t.Fatalf("an unproven backup is not a broken one; want WARN not FAIL:\n%s", buf.String())
 	}
-	if !strings.Contains(buf.String(), "no recovery drill recorded") {
-		t.Errorf("want the never-drilled warning, got: %s", buf.String())
-	}
-	if !strings.Contains(buf.String(), "guide-secrets-governance.md") {
-		t.Errorf("the warning must name the runbook to run, got: %s", buf.String())
+	line := lineContaining(buf.String(), "no recovery drill recorded")
+	if !strings.Contains(line, "[WARN]") || !strings.Contains(line, "dotf secrets usb backup") {
+		t.Errorf("want the never-drilled warning naming the command that records one, got: %s", buf.String())
 	}
 }
 
-func TestDR_RecentDrillPasses(t *testing.T) {
-	dir := t.TempDir()
-	cfg := &Config{DotfilesDir: dir}
+// Every outcome of the committed record (#1770). The digest row is the one a
+// clock cannot see: a stick verified yesterday against last month's escrow.
+func TestDR_DrillRecord(t *testing.T) {
 	now := time.Now()
-	touchAt(t, drillMarkerPath(cfg), now.Add(-30*24*time.Hour))
-	var buf bytes.Buffer
-	rep := capture(&buf)
+	for _, tt := range []struct {
+		name     string
+		rec      secrets.DrillRecord
+		manifest string
+		want     string
+		tag      string
+	}{
+		{"recent, same escrow", drillRecordAt(now.Add(-30*24*time.Hour), "d1"), "d1", "offline copy verified 30 days ago on macmini (3 items)", "[ OK ]"},
+		{"stale", drillRecordAt(now.Add(-400*24*time.Hour), "d1"), "d1", "last verified 400 days ago", "[WARN]"},
+		{"older escrow", drillRecordAt(now.Add(-1*24*time.Hour), "d0"), "d1", "verified against an older escrow", "[WARN]"},
+		{"unreadable time", secrets.DrillRecord{VerifiedAt: "yesterday"}, "d1", "is not a time", "[WARN]"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{DotfilesDir: t.TempDir()}
+			writeDrillRecord(t, cfg, tt.rec, tt.manifest)
+			var buf bytes.Buffer
+			rep := capture(&buf)
 
-	checkDisasterRecovery(drSys(t, now), cfg, rep)
+			checkDisasterRecovery(drSys(t, now), cfg, rep)
 
-	if !strings.Contains(buf.String(), "recovery drill run 30 days ago") {
-		t.Errorf("want the drill PASS with its age, got: %s", buf.String())
-	}
-}
-
-// The decay direction. Without this, a drill done once in 2019 reads the same as
-// one done last week -- which is the failure this check exists to prevent.
-func TestDR_StaleDrillWarns(t *testing.T) {
-	dir := t.TempDir()
-	cfg := &Config{DotfilesDir: dir}
-	now := time.Now()
-	touchAt(t, drillMarkerPath(cfg), now.Add(-400*24*time.Hour))
-	var buf bytes.Buffer
-	rep := capture(&buf)
-
-	checkDisasterRecovery(drSys(t, now), cfg, rep)
-
-	if !strings.Contains(buf.String(), "last recovery drill was 400 days ago") {
-		t.Errorf("want the staleness warning with its age, got: %s", buf.String())
+			if line := lineContaining(buf.String(), tt.want); !strings.Contains(line, tt.tag) {
+				t.Errorf("want %s %q, got:\n%s", tt.tag, tt.want, buf.String())
+			}
+		})
 	}
 }
 
