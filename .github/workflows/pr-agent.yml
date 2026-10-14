@@ -446,8 +446,9 @@ jobs:
       #   model's thinking counts toward the cap, so a review could be cut short
       #   and published as nothing. Worst case, a 260,000-token prompt with a
       #   full answer, is about $0.21 a review on Haiku and $0.84 on Sonnet.
-      # - EFFORT is the member's `reasoning_effort` in the pool (Haiku `high`,
-      #   Sonnet `medium`), with adaptive thinking. PR-Agent sends `thinking`
+      # - EFFORT is the member's `reasoning_effort` in the pool (Haiku and
+      #   Sonnet both `medium`: at `high` Haiku's thinking used the whole output
+      #   cap and the answer came back empty, #2458), with adaptive thinking. PR-Agent sends `thinking`
       #   and `output_config` only for a model it recognises as adaptive, and
       #   its built-in pattern does not match these ids, hence the override
       #   list, which names every allowed model. Measured with LiteLLM 1.103.0,
