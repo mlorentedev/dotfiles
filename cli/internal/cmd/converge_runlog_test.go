@@ -11,9 +11,11 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 )
 
-// runLogFixture is convergeFixture whose harness deploy runs a real child
-// process, the way uv, npm, winget and the setup script do: the child inherits
-// dotf's stdout and prints what it was given.
+// runLogFixture is convergeFixture whose harness deploy and setup script run a
+// real child process, the way uv, npm, winget and the setup script do: the
+// child inherits dotf's stdout and prints what it was given. Both seams carry
+// it because no single step runs on every OS: the harness deploy is linux and
+// darwin, the setup script linux and windows.
 func runLogFixture(t *testing.T, childSays string) (repo, state string, console *[]*os.File) {
 	t.Helper()
 	repo, home := convergeFixture(t)
@@ -23,13 +25,14 @@ func runLogFixture(t *testing.T, childSays string) (repo, state string, console 
 	base := convergeOptions
 	convergeOptions = func() converge.Options {
 		o := base()
-		o.RunHarnessDeploy = func(converge.Env) error {
+		child := func(converge.Env) error {
 			seen = append(seen, consoleOut())
 			c := exec.Command(helperArgv()[0], helperArgv()[1:]...) //nolint:gosec // the test binary
 			c.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "FOO="+childSays, "EXIT_CODE=0")
 			c.Stdout, c.Stderr = os.Stdout, os.Stderr
 			return c.Run()
 		}
+		o.RunHarnessDeploy, o.RunSetup = child, child
 		return o
 	}
 	return repo, filepath.Join(state, "dotfiles"), &seen
@@ -196,9 +199,10 @@ func TestConverge_FailedRunReportsAreRedacted(t *testing.T) {
 	base := convergeOptions
 	convergeOptions = func() converge.Options {
 		o := base()
-		o.RunHarnessDeploy = func(converge.Env) error {
+		fail := func(converge.Env) error {
 			return errors.New("push to https://x:" + gh + "@github.com/o/r refused")
 		}
+		o.RunHarnessDeploy, o.RunSetup = fail, fail // one runs on every OS
 		return o
 	}
 	if _, _, err := execute(t, "converge", "--repo", repo); err == nil {
