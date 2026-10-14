@@ -975,3 +975,24 @@ func hookCommandsIn(doc map[string]any, event string) []string {
 	}
 	return out
 }
+
+// herdr's claude integration (#2013 H6) adds a SessionStart group of its own.
+// The bind appends beside it, and a second bind leaves it as it is: the two
+// writers of settings.json's hooks never undo each other. The group is the one
+// herdr 0.9.3 wrote, verbatim.
+func TestMergeHooksKeepsHerdrsSessionStartGroup(t *testing.T) {
+	const herdrGroup = `{"matcher":"^(startup|resume|clear|compact|fork)$","hooks":[{"type":"command","command":"bash '/h/.claude/hooks/herdr-agent-state.sh' session","timeout":10}]}`
+	doc := decode(t, `{"hooks":{"SessionStart":[`+herdrGroup+`]}}`)
+	out, _, err := MergeHooks(doc, []HookCommand{gateCmd("reviewer")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, changed, err := MergeHooks(out, []HookCommand{gateCmd("reviewer")})
+	if err != nil || changed {
+		t.Fatalf("second bind changed %v, err %v", changed, err)
+	}
+	raw, _ := json.Marshal(again)
+	if !strings.Contains(string(raw), "herdr-agent-state.sh' session") || ForeignHookCount(again) != 1 {
+		t.Errorf("herdr's hook did not survive the bind:\n%s", raw)
+	}
+}
