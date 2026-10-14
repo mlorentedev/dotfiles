@@ -286,6 +286,14 @@
       }
     },
     {
+      "name": "veracrypt",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "veracrypt"
+      }
+    },
+    {
       "name": "btop",
       "profile": "full",
       "source": {
