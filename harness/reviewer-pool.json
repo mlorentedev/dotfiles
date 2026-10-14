@@ -44,9 +44,12 @@
     "A pin that depends on a default is not a pin.",
     "",
     "Reasoning-class only. The latency-optimised daily models (nan/qwen3.6,",
-    "nan/gemma4, the gemini flash tier) are deliberately absent: a reviewer that",
-    "PASSes cheaply is worse than no gate, because it converts the gate into a",
-    "green checkmark. This file is read once per spec, so slow is fine.",
+    "nan/gemma4) are deliberately absent: a reviewer that PASSes cheaply is worse",
+    "than no gate, because it converts the gate into a green checkmark. This file",
+    "is read once per spec, so slow is fine. A member is admitted by the bar, not",
+    "by its tier name: gemini-3.8-flash-high is in because agy dropped its Pro tier",
+    "and Flash at High effort found the planted defect (owner decision 2026-10-14,",
+    "#2385). gpt-oss-120b-medium is out because it missed it twice; never admit it.",
     "",
     "This is the load-bearing slice of H-044, not a replacement for it. H-044's",
     "model-map.json maps a neutral tier (top|mid|low) to a provider per agent — a",
@@ -72,12 +75,12 @@
       "why": "1M context and a mandatory reasoning chain — roughly 4x slower than qwen3.6 on trivial prompts, which is the correct trade for a gate that runs once per spec. Exercised: BUG-074 round 3 re-ran the mutation battery itself rather than trusting the spec's table."
     },
     {
-      "id": "agy/gemini-3.1-pro-high",
+      "id": "agy/gemini-3.8-flash-high",
       "runner": "agy",
-      "model": "gemini-3.1-pro-high",
+      "model": "gemini-3.8-flash-high",
       "role": "fallback",
       "vendor": "google",
-      "why": "A second provider family, independent of both NaN and Anthropic — provider diversity rather than merely a different model. Pro tier at high effort; the flash tiers are excluded for the same reason qwen3.6 is. agy has no --provider flag; the model id selects the family. AUTH IS LOGIN, not a key (#1156): agy holds an OAuth token at ~/.gemini/antigravity-cli/google_credentials.json and answers with no API key in the environment at all (measured 2026-08-22). This entry previously named GEMINI_API_KEY, a secret the registry has never declared, so every attempt to use the provider-diverse arm died at `dotf secrets run --only` -- and nothing noticed, because the primary always answered. The arm this pool exists to provide had therefore never run once.",
+      "why": "A second provider family, independent of both NaN and Anthropic — provider diversity rather than merely a different model. Flash tier at high effort, admitted 2026-10-14 by owner decision (#2385) when agy stopped serving gemini-3.1-pro-high, the id this arm held until then, so roughly one random draw in five died at startup. Admitted on the bar every member clears: the planted `((count++))` defect under `set -e` with count=0 (agy 1.3.5, macOS). It found the defect in 54 s, named a failing input and gave the fix. gpt-oss-120b-medium, the only other non-Anthropic id agy serves, missed it twice and must not be admitted. PROVISIONAL: when Gemini ships new models, measure them on the same bar and replace this one if one passes. agy has no --provider flag; the model id selects the family. AUTH IS LOGIN, not a key (#1156): agy holds an OAuth token at ~/.gemini/antigravity-cli/google_credentials.json and answers with no API key in the environment at all (measured 2026-08-22). This entry previously named GEMINI_API_KEY, a secret the registry has never declared, so every attempt to use the provider-diverse arm died at `dotf secrets run --only` -- and nothing noticed, because the primary always answered. The arm this pool exists to provide had therefore never run once.",
       "auth": "login"
     },
     {
@@ -134,7 +137,7 @@
         "weight": 35,
         "reasoning_effort": "medium"
       },
-      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B). In the adversarial review it signs only as a FALLBACK, with a classified reason (rate limit, quota, provider error, timeout, content filter, empty answer) when the NaN first signers failed; it never signs first by draw. In PR-Agent it is drawn at weight 35, about a third of reviews, because there it is cheap: about $0.008 a review at 30K tokens, and NaN's shared per-model concurrency is the scarcer resource. Reasoning-class by profile (adaptive thinking). Effort is medium, not high: at high, thinking spent the 32,000-token output cap on large diffs and the answer came back empty in 5 of 11 runs (#2458). No calibration against a review of known outcome yet; #2215 and #2216 measure its addressed-comment rate."
+      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B). In the adversarial review it signs only as a FALLBACK, with a classified reason (rate limit, quota, provider error, timeout, content filter, empty answer) when the NaN first signers failed; it never signs first by draw. In PR-Agent it is drawn at weight 35, about a third of reviews, because NaN's shared per-model concurrency is the scarcer resource and the owner judged the spend acceptable (2026-10-14, #2215). Measured on four real reviews (25K-55K tokens in, 9K-32K out, all under the 100K price step): about $0.02-0.06 a review, 3 to 7 times the $0.008 this entry first estimated, because thinking tokens bill as output. Reasoning-class by profile (adaptive thinking). Effort is medium, not high: at high, thinking spent the 32,000-token output cap on large diffs and the answer came back empty in 5 of 11 runs (#2458). No calibration against a review of known outcome yet; #2215 and #2216 measure its addressed-comment rate."
     },
     {
       "id": "anthropic-review/claude-sonnet-5-5",

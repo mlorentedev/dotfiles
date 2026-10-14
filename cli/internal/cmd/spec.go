@@ -159,7 +159,7 @@ a pool member of another vendor that declares ` + "`signs: second`" + `: --secon
 after the first review, into review-second.md. A member that declares
 ` + "`signs: fallback`" + ` signs first only when the first signers failed, and
 --fallback-reason names how they failed.`,
-		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.1-pro-high\n" +
+		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.8-flash-high\n" +
 			"  dotf spec review FEAT-012-reviewer-pool --second\n  dotf spec review FEAT-012-reviewer-pool --fallback-reason rate-limit",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
