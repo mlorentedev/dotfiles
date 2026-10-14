@@ -17,3 +17,14 @@ func TestRealSystem_VersionOutputDropsAFailedRunsStderr(t *testing.T) {
 		t.Errorf("a crash read as output %q (err %v), want none", out, err)
 	}
 }
+
+// A System without the VersionOutput seam answers from its CommandOutput fake:
+// a nil runner would let ProbeVersion run the machine's real binary.
+func TestSemverOf_WithoutTheSeamUsesCommandOutput(t *testing.T) {
+	sys := &System{CommandOutput: func(name string, args ...string) (string, error) {
+		return "fake-tool 9.8.7\n", nil
+	}}
+	if got := semverOf(sys, "fake-tool-that-is-not-installed"); got != "9.8.7" {
+		t.Errorf("semverOf = %q, want the fake's 9.8.7", got)
+	}
+}

@@ -53,7 +53,8 @@ type System struct {
 	// VersionOutput runs a `<tool> --version` probe (tools.ProbeRunner in
 	// production): stdout then stderr, but a failed run's stdout alone, so a
 	// crashing tool is not read at the version some warning of its names
-	// (BUG-141).
+	// (BUG-141). Nil means CommandOutput, so a test System never reaches the
+	// real binary.
 	VersionOutput tools.Runner
 	// CommandOutputEnv is CommandOutput with an explicit environment. Checks use
 	// it when inherited process state could redirect a probe to another target.
