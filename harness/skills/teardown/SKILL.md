@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/teardown/SKILL.md
-generated_sha: 9789e43dfada974f
+generated_sha: b83fcf48f1099b1d
 id: teardown-skill
 type: skill
 status: active
@@ -10,7 +10,7 @@ owner: manu
 name: teardown
 description: Use when performing a full 360-degree teardown of an external product, repository, tool, framework, or business idea, combining deep technical architecture with product, UX, monetization, and master sales/business frameworks (Hormozi, Dunford, Cagan, Walling, Levels, Naval, Welsh, Kendall).
 keywords: [teardown, product teardown, tech teardown, evaluate product, business model, hormozi, dunford, cagan, walling, naval, welsh, kendall, analisis de producto, desglosar herramienta]
-paths: ['10_projects/**/research/**', '00_meta/research/**', 'research/**']
+paths: ['05_research/**', '10_projects/**/research/**', 'research/**']
 ---
 
 # Teardown — 360° Technical, Product & Business Evaluation
@@ -54,21 +54,18 @@ paths: ['10_projects/**/research/**', '00_meta/research/**', 'research/**']
 5. **The Vault as SSOT for Domain Auto-Discovery (NEVER Default Lazily to `dotfiles`)**:
    - **Doctrinal Invariant**: The Knowledge Vault is the canonical Single Source of Truth ([[00_meta/_ssot|_ssot.md]], [[00_meta/patterns/pattern-knowledge-placement|pattern-knowledge-placement]]). Project scopes and domain boundaries are **canonically defined inside the vault**, never inferred from ad-hoc filesystem folders, git clones, or hardcoded skill lists.
    - `dotfiles` is **NOT** the default sink for all research. It belongs ONLY to developer workstation OS, shell environments (zsh, tmux), Go CLI (`dotf`), git worktree workflows, and local harness orchestration.
-   - **Dynamic SSOT Discovery Protocol**:
-     1. **Query the Vault SSOT**: Agents must query the live vault registry before assigning any destination:
-        - *Hive-first access*: Call `vault_query` for documents with `type: project` (or `vault_list` on `10_projects/`).
-        - *Filesystem fallback*: Inspect `10_projects/*/context.md` (plus zone anchors in `30_career/`, `20_certifications/`, `50_work/`).
-        - Extract from each project's `context.md`: `id`, frontmatter `tags`, declared stack, and strategic scope.
+   - **Dynamic SSOT Discovery & Routing Protocol**:
+     1. **Target Slug Allocation (`05_research/_targets.yaml`)**:
+        - External technology, library, framework, or product evaluations route to `05_research/<target-slug>/epoch-N/`.
+        - The target slug is resolved deterministically from `05_research/_targets.yaml` (canonical URL normalization or explicit human entry). Free-form invention of slugs in filenames is forbidden.
      2. **Semantic Affinity Matching Against Vault SSOT**:
-        - If the candidate topic matches the scope and tags of an active project in the vault SSOT (e.g. ATS scrapers/CV builders -> discovered `resume`; Kubernetes/homelab -> discovered `kubelab`; autonomous agent broker -> discovered `iris`; camera sensors -> discovered `imagingsuite`; personal portfolio/blog -> discovered `web`; shell/workstation CLI -> discovered `dotfiles`):
-          - Route the teardown report to `10_projects/<discovered-project>/research/YYYY-MM-DD-<topic>-<model-token>.md` — one naming rule, stated once in full under Parallel Multi-Model Benchmarking below. A `-synthesis.md` is a later pass, never the first one and never this pass's filename.
-          - Route follow-up tickets, mechanisms, and tasks to that project's issue tracker or `roadmap.md`.
-        - If the topic aligns with personal career strategy, compensation, or job search: route to `30_career/`.
-        - If the topic represents a **completely new domain / product venture** not registered in the vault SSOT:
-          - Flag it explicitly as a **New Venture / Greenfield Opportunity**.
-          - Propose scaffolding a new project entry (`10_projects/<slug>/context.md`) following [[00_meta/patterns/pattern-project-structure|pattern-project-structure]] or place as a foundational prestudy in `00_meta/research/` pending user initiation. Never contaminate an unrelated project.
-        - If cross-cutting universal architecture or meta-system doctrine: route to `00_meta/research/`.
-   - **Language Discipline**: Conversation with the user is in **Spanish** (or user preference); all durable vault artifacts, filenames, and commit messages are in **English only**.
+        - Query the live vault registry (`10_projects/*/context.md`, `30_career/`) to identify which sovereign portfolio projects could benefit from this target (e.g. ATS scrapers/CV builders -> `resume`; Kubernetes/homelab -> `kubelab`; autonomous agent broker -> `iris`; camera sensors -> `imagingsuite`; shell/workstation CLI -> `dotfiles`).
+        - Record the matching projects in the frontmatter array: `projects: [<discovered-project>, ...]`.
+        - The project's auto-generated research lens (`10_projects/<project>/research/_index.md`) automatically links to the teardown, providing zero-token-bloat discoverability.
+        - Route follow-up tickets, mechanisms, and tasks directly to the discovered project's issue tracker or `roadmap.md`.
+     3. **Greenfield Opportunities**:
+        - If the topic represents a **completely new domain / product venture** not registered in the vault SSOT: flag it as a **New Venture / Greenfield Opportunity** and propose scaffolding a new project entry (`10_projects/<slug>/context.md`) following [[00_meta/patterns/pattern-project-structure|pattern-project-structure]].
+     4. **Language Discipline**: Conversation with the user is in **Spanish** (or user preference); all durable vault artifacts, filenames, and commit messages are in **English only**.
 
 ---
 
@@ -129,23 +126,43 @@ Map the findings against our sovereign portfolio dynamically discovered via `10_
 
 ---
 
-## Parallel Multi-Model Benchmarking
+## Parallel Multi-Model Benchmarking & Blinded Protocol
 
-**Pre-flight, before writing anything.** Two cheap checks, both mandatory:
+All external teardowns follow a two-phase lifecycle under `05_research/<target-slug>/epoch-N/`:
 
-1. **Is a pass already here?** Read the target's `research/` directory **and** its `_index.md` — in practice the directory and the index disagree, so reading one is not reading the other. If a pass on this target already exists, the default deliverable is an **independent evaluation of it or a verification of it**, not a near-duplicate.
-2. **Is the ticket already open?** See Board Pre-Flight under Core Principle 3.
+### Phase A — Blinded Analysis (Per Evaluator, Independent)
 
-**The naming rule, stated once — this is its SSOT.** Every evaluation pass is `10_projects/<project>/research/YYYY-MM-DD-<topic>-<model-token>.md`.
+You are ONE evaluator. You are strictly blind to every peer pass on this target and epoch to prevent conformity bias and artificial consensus:
 
-**`<model-token>` is provider-qualified and path-safe; `Evaluator:` carries the exact runtime.** They are two encodings of one fact, and collapsing them is a defect in either direction:
+- **Structural Isolation**: Phase A passes run in run-scoped scratch directories outside the vault (`$TMPDIR/research-<id>/`).
+- **FORBIDDEN before your own pass is written**:
+  - Reading any `*.md` under `05_research/<slug>/` (any epoch) — including `_index.md`.
+  - Reading peer passes reported in chat, git commits, or previous session memories.
+  - Writing, editing, or listing any path inside `05_research/<slug>/`.
+- **PERMITTED**: The raw target source, docs, issue tracker, git history, and — only when `prior_epoch_access != none` — prior epoch syntheses (never prior passes).
+- **Naming Rule (SSOT)**: `YYYY-MM-DD-<model-token>.md` inside `05_research/<target-slug>/epoch-N/`.
+  - `<model-token>` is provider-qualified and path-safe (e.g. `nan-deepseek-v4-flash`). Read from harness environment (`PI_PROVIDER`/`PI_MODEL`), never self-described.
+- **Harvest**: The harness/human harvests passes from scratch into `05_research/<target-slug>/epoch-N/`.
+- **Frontmatter Invariant**: Declare `type: analysis`, `kind: pass`, `epoch: N`, `blind: true`, `prior_epoch_access: none|summary|full`, `model:`, `model_token:`, `projects: [...]`, `target:`, `target_url:`, `verdict:`.
 
-- **`<model-token>`** — `<PI_PROVIDER>-<PI_MODEL>` with every `/` replaced by `-`. Provider `nan` + model `deepseek-v4-flash` → `nan-deepseek-v4-flash`. The provider is the segment before the first `-`, so the token is reversible and two providers serving one model name cannot collide. A `/` in a filename is a path separator: using the runtime verbatim writes the file into a subdirectory that does not exist.
-- **`Evaluator:`** — the exact runtime as the harness declares it, e.g. `nan/deepseek-v4-flash`. Never abbreviated, never a family name.
+### Phase B — Consensus Synthesis
 
-Both are **resolved from the harness, never self-described**: read `PI_PROVIDER` / `PI_MODEL` (under pi) or the local equivalent. A model cannot observe its own identity, so anything it writes about itself is a guess. This is not tidiness: `harness/reviewer-pool.json` is an allow-list of models permitted to sign a `review.md`, and `dotfiles#1907` binds reviewer identity to runtime provenance — a provenance field that can be invented is not a provenance field. When the runtime cannot be resolved, write `unresolved` plus the reason in `Evaluator:` and `unresolved` as the token; never guess a family or a vendor.
+Authored ONLY once Phase A is closed and every pass is read:
 
-**The synthesis is a different pass, and it has a precondition.** `YYYY-MM-DD-<topic>-synthesis.md` merges consensus and the union of adversarial and business findings across passes, and it may be authored **only once the set of passes is closed and every pass read**. A `-synthesis.md` carries no `<model>` token (it merges several) and is never the artifact of a single evaluation run. Declaring a synthesis early closes the set by implication and silently promotes one model's pass into the repository's voice.
+- **Preconditions**:
+  1. All passes in `epoch-N/` are completed and harvested.
+  2. The synthesis author has read every pass in the epoch (`synthesizes: [<pass-ids>]`).
+  3. `len(models) >= 2` (or explicit `single_model_reason:` stated).
+- **Naming Rule**: `YYYY-MM-DD-synthesis.md` physically located inside `05_research/<target-slug>/epoch-N/`.
+- **Deliverables**: Merge consensus, document adversarial and business disagreements, extract mechanisms into ready-to-file tickets, and record final `verdict:`.
+
+### Longitudinal Re-Evaluations & Epochs
+
+When an evaluated target releases a major version or requires a follow-up probe:
+- Open `epoch-N/` (where `N = max(existing) + 1`).
+- Historical epochs (`epoch-1/`) are preserved intact as durable historical facts.
+- The new synthesis includes a human narrative `## Delta (epoch N vs epoch N-1)` documenting what blockers or decisions changed.
+- **Rule**: `supersedes:` is strictly for factual corrections within the same epoch. Re-evaluations across time are tracked via `epoch`.
 
 ---
 
@@ -168,20 +185,31 @@ Both are **resolved from the harness, never self-described**: read `PI_PROVIDER`
 
 ```markdown
 ---
-id: <topic>-analysis-<model-token>
+id: <target-slug>-e<epoch>-pass-<model-token>
 type: analysis
+kind: pass  # 'pass' for independent teardown, 'verification' for peer re-audit
 status: active
 created: "YYYY-MM-DD"
 owner: manu
-tags: [research, <project>, <topic>, product, business, <keywords>]
+target: <domain-or-github-slug>
+target_url: <inspected-url>
+epoch: 1
+projects: [<affected-project-1>, <affected-project-2>]
+verdict: extract-mechanism
+classification: mechanism-donor
+model: <harness-read-runtime, e.g. nan/deepseek-v4-flash>
+model_token: <harness-read-token, e.g. nan-deepseek-v4-flash>
+blind: true  # true for blind passes; false for verification passes reading prior passes
+prior_epoch_access: none  # 'none' for blind passes; or cited passes/epochs for verifications
+tags: [research, <target-slug>, <keywords>]
 ---
 
-# <Topic / Product Name> — Technical, Product & Business Analysis (<exact runtime, e.g. nan/deepseek-v4-flash>)
+# <Target Name> — Technical, Product & Business Analysis (<exact runtime>)
 
 > **Source:** Web & codebase inspection of `<URL / Repo>` (inspected YYYY-MM-DD).
-> **Evaluator:** <the exact provider-qualified runtime, e.g. `nan/deepseek-v4-flash` — read from the harness environment, never self-described>
-> **Target Scope:** <10_projects/<project> or 00_meta>
+> **Evaluator:** `<exact runtime>`
 > **Classification:** **<Architecture Donor | Mechanism Donor | Incompatible | Reference>** — <Rationale>.
+> **Target Scope:** 05_research/<target-slug>/epoch-1/ | Affected Projects: `<projects>`
 
 ---
 
