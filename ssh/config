@@ -46,6 +46,8 @@ Host gcp1
 Host vps
   Hostname 100.64.0.2
   User deployer
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
   IdentityFile ~/.ssh/id_ed25519
 
 # --- Workstations (remote development targets) ---
@@ -117,6 +119,8 @@ Host jet1-lan
 Host vps-pub
   Hostname 162.55.57.175
   User deployer
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
   IdentityFile ~/.ssh/id_ed25519
 
 # --- Bastion access (*-ext): jump via VPS public IP. Use from outside the LAN on
