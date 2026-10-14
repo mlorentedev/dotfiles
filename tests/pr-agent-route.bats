@@ -156,6 +156,28 @@ every_point() {
     [ "$output" = "$want " ] || { printf 'drawn:   %s\nweights: %s\n' "$output" "$want" >&2; false; }
 }
 
+# The shares themselves are the budget (ADR-046 D3 names them), so the shipped
+# weights must be the ADR's: a share changed in the pool without an amendment
+# to the ADR fails here, and the test above only proves the draw honours
+# whatever the pool says.
+@test "route: the shipped weights are the ones ADR-046 adopted" {
+    local pool="$BATS_TEST_DIRNAME/../harness/reviewer-pool.json"
+    local adr="$BATS_TEST_DIRNAME/../docs/adr/adr-046-anthropic-reviewers-never-sign-alone.md"
+    local line adopted shipped
+    line=$(grep -E '^[[:space:]]*Weights at adoption: ' "$adr")
+    [ -n "$line" ] || { echo "ADR-046 states no 'Weights at adoption:' line" >&2; false; }
+    adopted=$(printf '%s\n' "${line#*: }" | tr -d '.' | tr ',' '\n' |
+        awk 'NF == 2 { print tolower($1) "=" $2 }' | sort | tr '\n' ' ')
+    shipped=$(jq -r '.pool[] | select(.pr_agent.weight) | "\(.pr_agent.model)=\(.pr_agent.weight)"' "$pool" |
+        while IFS='=' read -r model weight; do
+            for short in mimo glm deepseek haiku; do
+                case "$model" in *"$short"*) echo "$short=$weight" ;; esac
+            done
+        done | sort | tr '\n' ' ')
+    [ "$(printf '%s' "$adopted" | wc -w | tr -d ' ')" -eq 4 ] || { echo "adopted: $adopted" >&2; false; }
+    [ "$shipped" = "$adopted" ] || { printf 'shipped: %s\nADR-046: %s\n' "$shipped" "$adopted" >&2; false; }
+}
+
 # The shipped risk line is the budget lever (ADR-046): 1,500 changed lines put
 # about 3% of PRs on Sonnet. Moving it moves the month's spend, so the number is
 # pinned here and the route is driven against the shipped pool on both sides.

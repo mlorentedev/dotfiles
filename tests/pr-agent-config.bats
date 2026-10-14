@@ -1129,21 +1129,31 @@ print(all(any(c == x or c.endswith('/' + x) for c in chain) for x in listed))
 # A job timeout shorter than its Action step would hide the Action's own bound.
 @test "pr-agent: the job outlives both bounded Actions and the probes before them" {
     # At most two attempts run, one per provider. The worst pair, plus the
-    # preflight's probes (PREFLIGHT_TIMEOUT, 90 s per NaN model), the draw's
-    # (30 s), three minutes of setup (31 s measured, run 37879933613), and a
-    # minute for each step after the attempts that calls the GitHub API (two
-    # publication measurements and the final guard: up to three calls each, with
-    # 5 s and 10 s retry sleeps), must fit inside the job.
+    # preflight's probes (PREFLIGHT_TIMEOUT per NaN model) and the draw's
+    # (ROUTE_PROBE_TIMEOUT), three minutes of setup (31 s measured, run
+    # 37879933613), and a minute for each step after the attempts that calls the
+    # GitHub API (two publication measurements and the final guard: up to three
+    # calls each, with 5 s and 10 s retry sleeps), must stay under the job's
+    # bound: AC7 asks the job to exceed the sum, so equal fails. The probe
+    # seconds are read where they are set, a step's env over the script's
+    # default, never restated here.
     run python3 -c "
-import json, math, yaml
+import json, math, re, yaml
 job = yaml.safe_load(open('$WF'))['jobs']['review']
 by = {s.get('id'): s for s in job['steps']}
+def knob(name, script):
+    for s in job['steps']:
+        if name in (s.get('env') or {}):
+            return int(s['env'][name])
+    m = re.search(r'\\$\{' + name + r':-([0-9]+)\}', open('$REPO/scripts/' + script).read())
+    return int(m.group(1))
 pair = by['pr_agent']['timeout-minutes'] + max(by[i]['timeout-minutes'] for i in ('pr_agent_anthropic_first', 'pr_agent_anthropic_second'))
 chain = 1 + len(json.loads(by['models']['env']['DECLARED_FALLBACK_MODELS']))
-probes = math.ceil((90 * chain + 30) / 60)
+probes = math.ceil((knob('PREFLIGHT_TIMEOUT', 'pr-agent-model-preflight.sh') * chain
+                    + knob('ROUTE_PROBE_TIMEOUT', 'pr-agent-route.sh')) / 60)
 after = len([s for s in job['steps'] if s.get('id') in ('published_after_anthropic', 'published_after_nan')
              or s.get('name') == 'Fail if no review was published'])
-print(after == 3 and job['timeout-minutes'] >= pair + probes + 3 + after, job['timeout-minutes'], pair, probes, after)
+print(after == 3 and job['timeout-minutes'] > pair + probes + 3 + after, job['timeout-minutes'], pair, probes, after)
 "
     [ "$status" -eq 0 ]
     [[ "$output" == "True "* ]] || { echo "$output" >&2; false; }
