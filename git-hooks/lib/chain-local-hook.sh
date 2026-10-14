@@ -28,7 +28,9 @@
 #
 # Which hooks a stage actually has is pre-commit's decision, not ours: a config
 # declaring nothing for this stage exits 0 by itself, so there is no YAML to
-# parse here.
+# parse here. One exception: while the index holds unmerged paths, pre-commit
+# refuses every stage ("Unmerged files") before it looks at the config. A stage
+# that cannot block is not handed over then (BUG-135, below).
 #
 # Both paths are `exec` on purpose — that is what makes stdin reach the child and
 # its exit status become the hook's, and the exit status is the whole feature.
@@ -107,6 +109,20 @@ local_hook="$common_dir/hooks/$hook_type"
 
 pre_commit_config="$toplevel/.pre-commit-config.yaml"
 [ -f "$pre_commit_config" ] || exit 0
+
+# BUG-135: `git checkout --theirs -- f` during a conflicted merge fires
+# post-checkout, pre-commit refuses it for the unmerged paths, and git returns
+# that refusal as the checkout's own status: exit 1 for a checkout that worked,
+# which stops a `checkout --theirs && git add` chain halfway. A stage that runs
+# after the fact cannot block anything, so with paths unmerged it is not handed
+# to pre-commit. The blocking stages still are, and still fail closed.
+case "$hook_type" in
+    post-checkout|post-merge|post-commit|post-rewrite)
+        if [ -n "$(git -C "$toplevel" ls-files --unmerged 2>/dev/null)" ]; then
+            exit 0
+        fi
+        ;;
+esac
 
 # uv's documented order for its tool executables: UV_TOOL_BIN_DIR, then
 # XDG_BIN_HOME, then ~/.local/bin.
