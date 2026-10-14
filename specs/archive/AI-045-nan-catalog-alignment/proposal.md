@@ -1,7 +1,7 @@
 ---
 id: "AI-045-nan-catalog-alignment"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-30"
 issue: "mlorentedev/dotfiles#1763"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, nan, pr-agent, reviewer-pool, pi, opencode, model-map]
