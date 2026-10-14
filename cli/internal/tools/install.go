@@ -59,7 +59,9 @@ var (
 // HTTPFetch is the production Fetcher: GET url, stream the body to destPath, and
 // error on any non-200 so a missing asset or checksums file aborts cleanly. A
 // failure the server may not repeat (a transport error, a 5xx, a 429, a body
-// cut short) is retried; any other status is final on the first answer.
+// cut short) is retried; any other status, and a local write error, is final
+// on the first answer. An offline host is a transport error, so each fetch
+// spends the full 6 s of waits before it fails.
 func HTTPFetch(url, destPath string) error {
 	var err error
 	wait := fetchWait
@@ -90,10 +92,30 @@ func fetchOnce(url, destPath string) (transient bool, err error) {
 		return false, fmt.Errorf("create %s: %w", destPath, err)
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return true, fmt.Errorf("write %s: %w", destPath, err)
+	body := &readSide{r: resp.Body}
+	if _, err := io.Copy(f, body); err != nil {
+		if body.err != nil {
+			return true, fmt.Errorf("download %s: body cut short: %w", url, err)
+		}
+		return false, fmt.Errorf("write %s: %w", destPath, err)
 	}
 	return false, nil
+}
+
+// readSide records an error from the response body, so fetchOnce can tell a
+// body cut short (worth repeating) from a local write that failed, such as a
+// full disk (not worth repeating).
+type readSide struct {
+	r   io.Reader
+	err error
+}
+
+func (b *readSide) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	if err != nil && err != io.EOF {
+		b.err = err
+	}
+	return n, err
 }
 
 // Installer fetches, verifies (sha256 vs the release checksums), and places a
