@@ -154,8 +154,10 @@ jobs:
     # measurements and the final guard after them (each up to three API calls with
     # retry sleeps). The second attempt runs only when the first published nothing
     # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
-    # longer than before.
-    timeout-minutes: 31
+    # longer than before. The sum is 31 minutes, and the bound exceeds it rather
+    # than equals it (AC7), so a probe that runs to its last second still leaves
+    # the final guard time to report.
+    timeout-minutes: 32
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag

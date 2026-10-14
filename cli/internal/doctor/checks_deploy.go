@@ -56,9 +56,13 @@ func checkSymlinks(sys *System, rep *Report) {
 func checkVault(sys *System, rep *Report) {
 	rep.Section("Knowledge vault (presence)")
 	// VAULT_PATH is the canonical seam (ADR-025); the old VAULT_DIR name is gone.
-	// The generated paths file sets VAULT_PATH, so the hardcoded default below is
-	// only a last resort for a machine that never ran `dotf env generate`.
-	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
+	// A machine that never ran `dotf env generate` still resolves it through
+	// machine.json and the contract default, never through a path guessed here.
+	vault := sys.vaultPath()
+	if vault == "" {
+		rep.Fail("no vault path resolves (VAULT_PATH, machine.json, env-contract.json default)")
+		return
+	}
 
 	presence := func(ok bool, okMsg, failMsg string) {
 		if ok {

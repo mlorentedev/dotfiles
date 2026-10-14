@@ -433,4 +433,7 @@ tags: [lessons, index, dotfiles]
 | [412 - A plan without root can still see a root-only file change, through a witness of its stat](lesson-412-converge-a-root-only-file-without-root-through-a-witness.md) | 2026-10-13 |
 | [413 - A check that needs the vault belongs in doctor, not in a test CI cannot run](lesson-413-a-check-that-needs-the-vault-belongs-where-the-vault-is.md) | 2026-10-13 |
 | [414 - A fake HOME does not isolate launchd: a test's brew services job outlives the test](lesson-414-a-fake-home-does-not-isolate-launchd.md) | 2026-10-13 |
+| [415 - An ssh command reads no profile: a health check run that way fails for the environment, not the machine](lesson-415-an-ssh-command-reads-no-profile.md) | 2026-10-14 |
+| [416 - A foreign user-scope HOME on Windows splits git, ssh and dotf across two homes without an error](lesson-416-a-foreign-home-on-windows-splits-every-tool.md) | 2026-10-13 |
+| [417 - bash 3.2 misparses a case pattern's ) inside $(...), and only main's macOS job could see it](lesson-417-bash-32-misparses-a-case-pattern-inside-command-substitution.md) | 2026-10-14 |
 <!-- END GENERATED -->
