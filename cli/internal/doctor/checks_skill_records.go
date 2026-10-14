@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // checkSkillRecordsAgainstVault compares each committed harness record with the
@@ -29,23 +31,31 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 	if repo == "" {
 		return
 	}
-	vault := sys.env("VAULT_PATH", filepath.Join(sys.home(), "Projects", "knowledge"))
-	if !isDir(vault) {
-		rep.Skip("no vault at " + vault + ": committed harness records not compared with their source")
+	// The resolver, not a literal default: a vault guessed at ~/Projects/knowledge
+	// would compare against whatever happens to live there (ADR-025).
+	vault := sys.Getenv("VAULT_PATH")
+	if vault == "" {
+		vault = env.ResolvePath("VAULT_PATH")
+	}
+	if vault == "" || !isDir(vault) {
+		rep.Skip("no vault resolves on this machine (VAULT_PATH, machine.json): committed harness records not compared with their source")
 		return
 	}
 
-	var stale []string
+	var stale, unstamped []string
 	checked := 0
 	for _, kind := range []struct{ sub, file string }{{"skills", "SKILL.md"}, {"agents", "AGENT.md"}} {
 		records, _ := filepath.Glob(filepath.Join(repo, "harness", kind.sub, "*", kind.file))
 		for _, rec := range records {
+			name := kind.sub + "/" + filepath.Base(filepath.Dir(rec))
 			from, sha := recordProvenance(rec)
 			if from == "" || sha == "" {
+				// Every record --refresh writes carries both; one without them
+				// cannot be compared, and skipping it would hide its drift.
+				unstamped = append(unstamped, name)
 				continue
 			}
 			checked++
-			name := kind.sub + "/" + filepath.Base(filepath.Dir(rec))
 			got, err := fileSHA16(filepath.Join(vault, filepath.FromSlash(from)))
 			switch {
 			case err != nil:
@@ -56,6 +66,11 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 		}
 	}
 
+	if len(unstamped) > 0 {
+		sort.Strings(unstamped)
+		rep.Warn(fmt.Sprintf("%d committed harness record(s) carry no generated_from/generated_sha, so they cannot be compared with the vault: %s "+
+			"(run `compile-harness.sh --refresh` in a worktree and open a PR)", len(unstamped), strings.Join(unstamped, ", ")))
+	}
 	if len(stale) > 0 {
 		sort.Strings(stale)
 		rep.Warn(fmt.Sprintf("%d committed harness record(s) differ from their vault source: %s. "+
@@ -63,7 +78,7 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 			"if the records are, pull the vault", len(stale), strings.Join(stale, ", ")))
 		return
 	}
-	if checked > 0 {
+	if checked > 0 && len(unstamped) == 0 {
 		rep.Pass(fmt.Sprintf("%d committed records match their vault source", checked))
 	}
 }

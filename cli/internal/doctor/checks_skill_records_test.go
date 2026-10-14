@@ -84,6 +84,20 @@ func TestCheckSkillRecordsAgainstVault(t *testing.T) {
 		}
 	})
 
+	t.Run("a record without provenance warns instead of being skipped", func(t *testing.T) {
+		repo, vault := t.TempDir(), t.TempDir()
+		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, writeSource(t, vault, skillSrc, "v1\n"))
+		p := filepath.Join(repo, "harness", "skills", "bare", "SKILL.md")
+		mkdirAll(t, filepath.Dir(p))
+		if err := os.WriteFile(p, []byte("---\nid: bare\n---\n\nbody\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		out, rep := run(t, map[string]string{"DOTFILES_REPO_DIR": repo, "VAULT_PATH": vault})
+		if rep.Warnings() != 1 || !strings.Contains(out, "skills/bare") || strings.Contains(out, "[ OK ]") {
+			t.Fatalf("want one warning naming the unstamped record and no pass\n%s", out)
+		}
+	})
+
 	t.Run("no vault on this machine skips", func(t *testing.T) {
 		repo := t.TempDir()
 		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, "0123456789abcdef")
