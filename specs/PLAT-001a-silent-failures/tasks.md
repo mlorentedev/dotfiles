@@ -284,8 +284,12 @@ verification rather than seed a record.
   it opens the repo's escrow and its own copy to exactly what each manifest describes; its copy is
   the repo's byte for byte; nothing else is on the volume. In memory, every failure named in one
   run, no record on a failure
-- [x] `dotf secrets usb backup --mount <dir> [--prune]`: copies the declared payload, installs the
-  identity only on a stick that has none, refuses a stick with another identity before writing
+- [x] `dotf secrets usb backup --mount <dir> [--prune] [--init-identity]`: writes only to a mounted
+  volume (device differs from its parent on Unix, a non-system drive root on Windows), installs the
+  identity only when asked and only on an empty volume, refuses a stick with another identity, and
+  each refusal leaves no key material behind (advisor finding: a typo or an unmounted mount point
+  would have received the age key in the clear). No chmod on the stick: exFAT keeps no modes and
+  Linux refuses the call
 - [x] `sensitive/dr/drill-record.json`, un-ignored by exact name; `rehearsed_at` survives a rewrite
 - [x] Doctor reads the record checkout-first beside the escrow: WARN when absent, older than 180
   days, or made against an older escrow digest; the marker is gone

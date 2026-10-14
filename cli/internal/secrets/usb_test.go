@@ -77,10 +77,14 @@ func newUSBFixture(t *testing.T) usbFixture {
 	writeEscrow(t, repoDR, key, export)
 	now := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
 	return usbFixture{
-		cfg:    USBConfig{Mount: mount, KeyPath: key, RepoDR: repoDR, Host: "macmini", Now: func() time.Time { return now }},
+		cfg: USBConfig{Mount: mount, KeyPath: key, RepoDR: repoDR, Host: "macmini", Now: func() time.Time { return now },
+			IsMount: func(string) (bool, error) { return true, nil }},
 		export: export,
 	}
 }
+
+// newStick is the first run on an empty stick, which installs the identity.
+var newStick = USBBackupOptions{InitIdentity: true}
 
 func readRecord(t *testing.T, dir string) DrillRecord {
 	t.Helper()
@@ -93,7 +97,7 @@ func readRecord(t *testing.T, dir string) DrillRecord {
 
 func TestBackupUSB_FillsAnEmptyStickAndRecordsTheDrill(t *testing.T) {
 	f := newUSBFixture(t)
-	rep, err := BackupUSB(f.cfg, false)
+	rep, err := BackupUSB(f.cfg, newStick)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +120,7 @@ func TestBackupUSB_FillsAnEmptyStickAndRecordsTheDrill(t *testing.T) {
 // material or plaintext.
 func TestUSB_RecordAndReportCarryNoSecret(t *testing.T) {
 	f := newUSBFixture(t)
-	rep, err := BackupUSB(f.cfg, false)
+	rep, err := BackupUSB(f.cfg, newStick)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +141,7 @@ func TestUSB_RecordAndReportCarryNoSecret(t *testing.T) {
 // escrow. Off by one must fail, and must not record a pass.
 func TestVerifyUSB_ManifestOffByOneFails(t *testing.T) {
 	f := newUSBFixture(t)
-	if _, err := BackupUSB(f.cfg, false); err != nil {
+	if _, err := BackupUSB(f.cfg, newStick); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Remove(filepath.Join(f.cfg.RepoDR, DrillRecordFileName)); err != nil {
@@ -166,7 +170,7 @@ func TestVerifyUSB_ManifestOffByOneFails(t *testing.T) {
 
 func TestVerifyUSB_StaleCopyNamesTheRefresh(t *testing.T) {
 	f := newUSBFixture(t)
-	if _, err := BackupUSB(f.cfg, false); err != nil {
+	if _, err := BackupUSB(f.cfg, newStick); err != nil {
 		t.Fatal(err)
 	}
 	writeEscrow(t, f.cfg.RepoDR, f.cfg.KeyPath, exportOf("a", "b", "c", "d"))
@@ -191,7 +195,7 @@ func TestBackupUSB_RefusesAnotherIdentity(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(f.cfg.Mount, USBKeyFile), b, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err = BackupUSB(f.cfg, false)
+	_, err = BackupUSB(f.cfg, USBBackupOptions{})
 	if err == nil || !strings.Contains(err.Error(), "another identity") {
 		t.Fatalf("err = %v", err)
 	}
@@ -206,27 +210,25 @@ func TestBackupUSB_RefusesAnotherIdentity(t *testing.T) {
 
 func TestUSB_ExtraFilesFailUntilPruned(t *testing.T) {
 	f := newUSBFixture(t)
-	stray := filepath.Join(f.cfg.Mount, "secrets", "github.secret")
-	if err := os.MkdirAll(filepath.Dir(stray), 0o700); err != nil {
+	if _, err := BackupUSB(f.cfg, newStick); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Remove(filepath.Join(f.cfg.RepoDR, DrillRecordFileName)); err != nil {
+		t.Fatal(err)
+	}
+	stray := filepath.Join(f.cfg.Mount, "secrets", "github.secret")
 	for _, p := range []string{stray, filepath.Join(f.cfg.Mount, ".DS_Store"), filepath.Join(f.cfg.Mount, "._key.txt"),
 		filepath.Join(f.cfg.Mount, ".Spotlight-V100", "store.db")} {
-		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		writeFile(t, p, "x")
 	}
-	rep, err := BackupUSB(f.cfg, false)
+	rep, err := BackupUSB(f.cfg, USBBackupOptions{})
 	if err == nil || len(rep.Extra) != 1 || rep.Extra[0] != "secrets/github.secret" {
 		t.Fatalf("rep = %+v, err = %v", rep, err)
 	}
 	if _, err := ReadDrillRecord(f.cfg.RepoDR); !os.IsNotExist(err) {
 		t.Fatalf("a stick with extra files recorded a pass: %v", err)
 	}
-	if _, err := BackupUSB(f.cfg, true); err != nil {
+	if _, err := BackupUSB(f.cfg, USBBackupOptions{Prune: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(stray); !os.IsNotExist(err) {
@@ -237,9 +239,76 @@ func TestUSB_ExtraFilesFailUntilPruned(t *testing.T) {
 	}
 }
 
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// requireNoKeyUnder fails when any file under dir carries age key material.
+func requireNoKeyUnder(t *testing.T, dir string) {
+	t.Helper()
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if b, _ := os.ReadFile(path); strings.Contains(string(b), "AGE-SECRET-KEY") {
+			t.Errorf("age key material written to %s", path)
+		}
+		return nil
+	})
+}
+
+// BackupUSB writes the private identity, so where it writes is checked before
+// anything else: a directory that is not a mounted volume, a stick with no
+// identity unless asked, and asked only on an empty volume. Each refusal
+// leaves the target without key material (the advisor's case: a typo in
+// --mount, or a mount point that was never mounted).
+func TestBackupUSB_WritesTheIdentityOnlyToAnEmptyMountedStick(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		mounted bool
+		opts    USBBackupOptions
+		before  []string
+		want    string
+	}{
+		{"not a mounted volume", false, newStick, nil, "not a mounted volume"},
+		{"no identity, not asked to install one", true, USBBackupOptions{}, nil, "--init-identity"},
+		{"asked, but the volume holds files", true, newStick, []string{"notes.txt", "photos/a.jpg"}, "holds notes.txt, photos/a.jpg"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newUSBFixture(t)
+			f.cfg.IsMount = func(string) (bool, error) { return tt.mounted, nil }
+			for _, rel := range tt.before {
+				writeFile(t, filepath.Join(f.cfg.Mount, filepath.FromSlash(rel)), "x")
+			}
+			_, err := BackupUSB(f.cfg, tt.opts)
+			if err == nil || !strings.Contains(err.Error(), tt.want) || !strings.Contains(err.Error(), "nothing was written") {
+				t.Fatalf("err = %v, want %q", err, tt.want)
+			}
+			requireNoKeyUnder(t, f.cfg.Mount)
+			if _, err := os.Stat(filepath.Join(f.cfg.Mount, filepath.FromSlash(usbEscrowSubdir))); !os.IsNotExist(err) {
+				t.Fatalf("the escrow was copied after a refusal: %v", err)
+			}
+		})
+	}
+}
+
+// A plain directory is not a mount point: the real check, on every OS.
+func TestIsMountPoint_ADirectoryIsNot(t *testing.T) {
+	mounted, err := isMountPoint(t.TempDir())
+	if err != nil || mounted {
+		t.Fatalf("isMountPoint(tempdir) = %v, %v", mounted, err)
+	}
+}
+
 func TestVerifyUSB_KeepsTheRehearsalDate(t *testing.T) {
 	f := newUSBFixture(t)
-	if _, err := BackupUSB(f.cfg, false); err != nil {
+	if _, err := BackupUSB(f.cfg, newStick); err != nil {
 		t.Fatal(err)
 	}
 	rec := readRecord(t, f.cfg.RepoDR)

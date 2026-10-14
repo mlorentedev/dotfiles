@@ -54,15 +54,18 @@ func newSecretsUSBVerifyCmd() *cobra.Command {
 
 func newSecretsUSBBackupCmd() *cobra.Command {
 	var mount string
-	var prune bool
+	var opts secrets.USBBackupOptions
 	c := &cobra.Command{
 		Use:   "backup",
 		Short: "Copy the escrow and its manifest to the stick, then verify it",
-		Long: "backup copies sensitive/dr's escrow and manifest onto the mounted stick at\n" +
-			"0600 and installs this machine's age identity when the stick has none. A stick\n" +
-			"that holds a different identity is refused before anything is written. Then it\n" +
-			"runs `usb verify`. Files outside the declared payload fail the verification;\n" +
-			"--prune removes them first. Run it after every `dotf secrets backup`.",
+		Long: "backup copies sensitive/dr's escrow and manifest onto the mounted stick, then\n" +
+			"runs `usb verify`. Run it after every `dotf secrets backup`.\n\n" +
+			"--mount must be a mounted volume, never a directory of the disk it sits on: a\n" +
+			"mount point that was never mounted would otherwise receive the age identity in\n" +
+			"the clear. The stick must already hold this machine's identity; a new, empty\n" +
+			"stick gets it with --init-identity. A stick that holds a different identity is\n" +
+			"refused before anything is written. Files outside the declared payload fail\n" +
+			"the verification; --prune removes them first.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -70,7 +73,7 @@ func newSecretsUSBBackupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := secrets.BackupUSB(cfg, prune)
+			rep, err := secrets.BackupUSB(cfg, opts)
 			if err != nil {
 				return err
 			}
@@ -79,7 +82,8 @@ func newSecretsUSBBackupCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&mount, "mount", "", "where the VeraCrypt volume is mounted (required)")
-	c.Flags().BoolVar(&prune, "prune", false, "remove files outside the declared payload")
+	c.Flags().BoolVar(&opts.Prune, "prune", false, "remove files outside the declared payload")
+	c.Flags().BoolVar(&opts.InitIdentity, "init-identity", false, "install this machine's age identity on an empty stick")
 	_ = c.MarkFlagRequired("mount")
 	return c
 }

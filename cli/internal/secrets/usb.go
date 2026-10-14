@@ -44,6 +44,18 @@ type USBConfig struct {
 	Recipient RecipientFn // nil → AgeRecipient
 	Decrypt   Decryptor   // nil → AgeDecrypt
 	Now       func() time.Time
+	// IsMount reports whether Mount is a mounted volume rather than a directory
+	// of the disk it sits on. nil → isMountPoint.
+	IsMount func(dir string) (bool, error)
+}
+
+// USBBackupOptions are the two writes BackupUSB never does by default.
+type USBBackupOptions struct {
+	// InitIdentity installs this machine's identity on a stick that has none,
+	// and only on an empty volume: a new stick, set up once.
+	InitIdentity bool
+	// Prune removes the files outside the declared payload.
+	Prune bool
 }
 
 // USBReport is what a verification established. It carries the public
@@ -86,6 +98,9 @@ func (c USBConfig) withDefaults() USBConfig {
 	}
 	if c.Now == nil {
 		c.Now = time.Now
+	}
+	if c.IsMount == nil {
+		c.IsMount = isMountPoint
 	}
 	return c
 }
@@ -215,20 +230,33 @@ func sameFile(a, b string) (bool, error) {
 	return bytes.Equal(x, y), nil
 }
 
-// usbExtra lists the files on the volume outside the declared payload. The
+// usbExtra lists the files on the volume outside the declared payload.
+func usbExtra(mount string) ([]string, error) {
+	content, err := usbContent(mount)
+	if err != nil {
+		return nil, err
+	}
+	payload := USBPayload()
+	var extra []string
+	for _, rel := range content {
+		if !slices.Contains(payload, rel) {
+			extra = append(extra, rel)
+		}
+	}
+	return extra, nil
+}
+
+// usbContent lists every file on the volume, relative to its mount. The
 // metadata an OS writes on any volume it mounts is not the owner's content and
 // is skipped: AppleDouble and Finder files, Spotlight and fsevents indexes, the
 // trash, and Windows' recycle bin and volume information.
-func usbExtra(mount string) ([]string, error) {
-	payload := USBPayload()
-	var extra []string
+func usbContent(mount string) ([]string, error) {
+	var files []string
 	err := filepath.WalkDir(mount, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(mount, path)
-		rel = filepath.ToSlash(rel)
-		if rel == "." {
+		if path == mount {
 			return nil
 		}
 		if osMetadata(d.Name()) {
@@ -240,12 +268,14 @@ func usbExtra(mount string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if !slices.Contains(payload, rel) {
-			extra = append(extra, rel)
+		rel, err := filepath.Rel(mount, path)
+		if err != nil {
+			return err
 		}
+		files = append(files, filepath.ToSlash(rel))
 		return nil
 	})
-	return extra, err
+	return files, err
 }
 
 func osMetadata(name string) bool {
@@ -294,16 +324,26 @@ func ReadDrillRecord(dir string) (DrillRecord, error) {
 	return rec, nil
 }
 
-// BackupUSB refreshes the offline copy from the repo and then verifies it. It
-// copies the escrow and its manifest, and installs this machine's identity only
-// when the stick has none: a stick that holds a different identity is refused
-// before anything is written, because overwriting it could destroy the only
-// copy of a key some other escrow still needs. Files outside the payload are
-// reported by the verification, and removed first when prune is set.
-func BackupUSB(cfg USBConfig, prune bool) (USBReport, error) {
+// BackupUSB refreshes the offline copy from the repo and then verifies it.
+//
+// It writes the private identity, so where it writes is the first thing it
+// checks: the target must be a mounted volume, never a directory on the disk
+// it sits on. A mount point that was created and never mounted (Linux's
+// /media/secrets), or a typo one level up, would otherwise receive the age key
+// in the clear. The identity is installed only when asked (InitIdentity) and
+// only on a volume with nothing on it; a stick that holds a different identity
+// is refused before anything is written, because it may hold the only copy of
+// a key some other escrow still needs.
+func BackupUSB(cfg USBConfig, opts USBBackupOptions) (USBReport, error) {
 	cfg = cfg.withDefaults()
 	if info, err := os.Stat(cfg.Mount); err != nil || !info.IsDir() {
 		return USBReport{}, fmt.Errorf("usb: no mounted volume at %s", cfg.Mount)
+	}
+	switch mounted, err := cfg.IsMount(cfg.Mount); {
+	case err != nil:
+		return USBReport{}, fmt.Errorf("usb: is %s a mounted volume: %w", cfg.Mount, err)
+	case !mounted:
+		return USBReport{}, fmt.Errorf("usb: %s is not a mounted volume, it is a directory of the disk it sits on: mount the stick there first; nothing was written", cfg.Mount)
 	}
 	usbKey := cfg.usbPath(USBKeyFile)
 	switch _, err := os.Stat(usbKey); {
@@ -319,12 +359,21 @@ func BackupUSB(cfg USBConfig, prune bool) (USBReport, error) {
 		if usbRecipient == "" || usbRecipient != localRecipient {
 			return USBReport{}, fmt.Errorf("usb: the stick holds another identity (recipient %q, here %q); nothing was written", usbRecipient, localRecipient)
 		}
-	case errors.Is(err, fs.ErrNotExist):
+	case !errors.Is(err, fs.ErrNotExist):
+		return USBReport{}, fmt.Errorf("usb: %w", err)
+	case !opts.InitIdentity:
+		return USBReport{}, fmt.Errorf("usb: the stick at %s has no %s; to set up a new stick, re-run with --init-identity; nothing was written", cfg.Mount, USBKeyFile)
+	default:
+		content, err := usbContent(cfg.Mount)
+		if err != nil {
+			return USBReport{}, fmt.Errorf("usb: list the volume: %w", err)
+		}
+		if len(content) > 0 {
+			return USBReport{}, fmt.Errorf("usb: --init-identity sets up an empty stick, and %s holds %s; nothing was written", cfg.Mount, strings.Join(content, ", "))
+		}
 		if err := copyFile(cfg.KeyPath, usbKey); err != nil {
 			return USBReport{}, fmt.Errorf("usb: install the identity: %w", err)
 		}
-	default:
-		return USBReport{}, fmt.Errorf("usb: %w", err)
 	}
 
 	for i, name := range []string{EscrowFileName, ManifestFileName} {
@@ -333,7 +382,7 @@ func BackupUSB(cfg USBConfig, prune bool) (USBReport, error) {
 		}
 	}
 
-	if prune {
+	if opts.Prune {
 		extra, err := usbExtra(cfg.Mount)
 		if err != nil {
 			return USBReport{}, fmt.Errorf("usb: list the volume: %w", err)
@@ -347,8 +396,11 @@ func BackupUSB(cfg USBConfig, prune bool) (USBReport, error) {
 	return VerifyUSB(cfg)
 }
 
-// copyFile copies src over dst at mode 0600, creating dst's directory, through
-// an atomic rename so an interrupted copy never leaves half a file on the stick.
+// copyFile copies src over dst through a temp file and a rename, so an
+// interrupted copy never leaves half a file on the stick. It does not chmod:
+// os.CreateTemp already creates 0600 where the filesystem keeps modes, and on
+// the exFAT the runbook recommends, which keeps none, Linux refuses a chmod
+// with EPERM. The volume's access control is its VeraCrypt password.
 func copyFile(src, dst string) error {
 	b, err := os.ReadFile(src)
 	if err != nil {
@@ -358,5 +410,17 @@ func copyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return err
 	}
-	return AtomicWrite(dst, b)
+	tmp, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }() // no-op once the rename succeeds
+	if _, err := tmp.Write(b); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), dst)
 }

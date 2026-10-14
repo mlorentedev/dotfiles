@@ -245,7 +245,7 @@ dotf secrets usb backup --mount <mount>    # copy the escrow and manifest, then 
 git add sensitive/dr/drill-record.json && git commit -m "chore(secrets): record the DR drill"
 ```
 
-`backup` copies the escrow and its manifest at 0600 and installs this machine's age identity only when the stick has none. A stick that holds a different identity is refused before anything is written: it may hold the only copy of a key some other escrow needs. Then it runs `dotf secrets usb verify`, which checks by consequence, in memory, and prints only the public recipient and two counts:
+`backup` first checks that `<mount>` is a mounted volume and not a directory of the disk it sits on: a mount point created and never mounted would otherwise receive the age identity in the clear. The stick must already hold this machine's identity; a stick that holds a different one is refused before anything is written, because it may hold the only copy of a key some other escrow needs. Files are written through a rename and not chmodded: exFAT keeps no modes, and the volume's access control is its password. Then it runs `dotf secrets usb verify`, which checks by consequence, in memory, and prints only the public recipient and two counts:
 
 1. the stick's identity has this machine's recipient (two failed reads never compare equal);
 2. the stick's identity opens the **repo's** escrow to exactly what its manifest describes (RECOVER steps 1-3);
@@ -256,7 +256,7 @@ Every failed check is named in one run, and a failed verification writes no reco
 
 **To create a new stick** (one time):
 1. In the VeraCrypt Volume Creation Wizard, choose "Create a volume within a partition/drive", pick the whole device, select AES and SHA-512, and format it exFAT: the one filesystem macOS, Linux and Windows all read and write, so any machine can restore from it.
-2. Mount it, and run `dotf secrets usb backup --mount <mount>`: on an empty stick it installs the identity too.
+2. Mount it, and run `dotf secrets usb backup --mount <mount> --init-identity`. The flag installs this machine's identity, and only on a volume with nothing on it.
 
 ## Protocol — RECOVER (disaster)
 
