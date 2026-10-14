@@ -446,4 +446,5 @@ tags: [lessons, index, dotfiles]
 | [425 - A probe whose output is the secret is the wrong probe](lesson-425-a-probe-whose-output-is-the-secret-is-the-wrong-probe.md) | 2026-10-14 |
 | [426 - mise prune removes more than orphans](lesson-426-mise-prune-removes-more-than-orphans.md) | 2026-10-14 |
 | [427 - apt-get update exits 0 on a mirror it cannot reach](lesson-427-apt-get-update-exits-0-on-a-mirror-it-cannot-reach.md) | 2026-10-14 |
+| [428 - A retry count is not a retry window](lesson-428-a-retry-count-is-not-a-retry-window.md) | 2026-10-14 |
 <!-- END GENERATED -->

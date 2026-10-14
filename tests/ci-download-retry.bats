@@ -8,6 +8,13 @@
 # transfer would feed tar a second copy behind the first half. So every
 # `curl -fsSL` that fetches a file in CI writes it with `-o` and carries
 # `--retry`.
+#
+# How long it retries matters as much (BUG-139, #2484). `--retry 3` alone
+# backs off 1, 2 and 4 seconds, and on 2026-10-14 a GitHub release download
+# answered 500 for longer than those 7 seconds. `--retry-delay` is a fixed
+# wait (measured against a server that always answers 500: 3 retries at 2 s
+# took 6 s), so `--retry 5 --retry-delay 10` keeps asking for about 50 s.
+RETRY='--retry 5 --retry-delay 10 --retry-all-errors'
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -16,15 +23,17 @@ setup() {
 @test "every CI download retries and writes a file" {
     files=("$REPO"/.github/workflows/*.yml "$REPO/tests/Dockerfile.integration")
     [ "${#files[@]}" -gt 1 ] || false
-    no_retry=$(grep -nH 'curl -fsSL' "${files[@]}" | grep -v -e '--retry' || true)
-    [ -z "$no_retry" ] || { printf 'a download without --retry:\n%s\n' "$no_retry" >&2; false; }
+    no_retry=$(grep -nH 'curl -fsSL' "${files[@]}" | grep -vF -e "$RETRY" || true)
+    [ -z "$no_retry" ] || { printf 'a download without %s:\n%s\n' "$RETRY" "$no_retry" >&2; false; }
     piped=$(grep -nH 'curl -fsSL' "${files[@]}" | grep -v -e ' -o ' || true)
     [ -z "$piped" ] || { printf 'a download piped instead of written to a file:\n%s\n' "$piped" >&2; false; }
 }
 
 @test "the guard sees the downloads it is about" {
-    n=$(grep -c 'curl -fsSL --retry 3 --retry-all-errors' "$REPO/.github/workflows/ci.yml" | tr -d ' ')
+    n=$(grep -cF "curl -fsSL $RETRY" "$REPO/.github/workflows/ci.yml" | tr -d ' ')
     [ "$n" -ge 6 ] || { echo "found $n retried downloads in ci.yml, want at least 6" >&2; false; }
+    n=$(grep -cF "curl -fsSL $RETRY" "$REPO/tests/Dockerfile.integration" | tr -d ' ')
+    [ "$n" -ge 4 ] || { echo "found $n retried downloads in Dockerfile.integration, want at least 4" >&2; false; }
 }
 
 # The same failure through apt: on 2026-10-14 the integration container could
