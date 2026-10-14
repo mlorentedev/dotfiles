@@ -41,6 +41,7 @@ func TestCheckColimaSize(t *testing.T) {
 		service     bool   // brew services reports colima running
 		fix         bool
 		stuck       bool // the VM keeps reporting its old size after the restart
+		stopFails   bool // `colima stop` exits non-zero
 		wantSubstr  string
 		wantWarn    int
 		wantRestart bool
@@ -65,8 +66,10 @@ func TestCheckColimaSize(t *testing.T) {
 			wantWarn: 1, wantSubstr: "has not reported 4 CPU, 8 GiB yet", wantRestart: true},
 		{name: "VM at the old size, no --fix → warn naming the running size", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22,
 			wantWarn: 1, wantSubstr: "the VM runs with 2 CPU, 2 GiB"},
-		{name: "running outside the service → edit, no restart, the command named", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("2", "2"), list: vmRunning22, fix: true,
-			wantWarn: 1, wantSubstr: "colima stop && brew services start colima", wantFile: colimaYAML("4", "8")},
+		{name: "running outside the service, --fix → edit, stop, start under the service", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("2", "2"), list: vmRunning22, fix: true,
+			wantSubstr: "moved Colima into brew services at 4 CPU, 8 GiB", wantRestart: true, wantFile: colimaYAML("4", "8")},
+		{name: "running outside the service, stop fails → warn, nothing started", goos: "darwin", onPath: []string{"colima"}, file: colimaYAML("4", "8"), list: vmRunning22, fix: true, stopFails: true,
+			wantWarn: 1, wantSubstr: "colima stop failed"},
 		{name: "file does not parse → warn", goos: "darwin", onPath: []string{"colima"}, file: "cpu: [\n", wantWarn: 1, wantSubstr: "does not parse"},
 	}
 
@@ -97,6 +100,14 @@ func TestCheckColimaSize(t *testing.T) {
 				case "brew services info colima --json":
 					return `[{"name":"colima","running":` + map[bool]string{true: "true", false: "false"}[tc.service] + `}]`, "", nil
 				case "brew services restart colima":
+					restarted = true
+					return "", "", nil
+				case "colima stop":
+					if tc.stopFails {
+						return "", "boom", errors.New("exit 1")
+					}
+					return "", "", nil
+				case "brew services start colima":
 					restarted = true
 					return "", "", nil
 				case "docker info --format {{.ServerVersion}}":
