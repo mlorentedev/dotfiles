@@ -1,0 +1,11 @@
+converge on linux:
+→ checkout
+  [ OK ]   checkout             1.2s  up to date
+→ tools
+installing lazygit
+  [FAIL]   tools                1.2s  mise install: exit status 1
+  [SKIP]   workstation-target         not reached
+0 changed, 1 ok, 0 opaque, 1 skipped, 1 failed
+
+failed:
+  tools: mise install: exit status 1
