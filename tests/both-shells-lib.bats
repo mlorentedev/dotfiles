@@ -17,7 +17,9 @@ setup() {
 @test "run_both_shells: zsh does not read the user's startup files" {
     mkdir -p "$SCRATCH/home"
     printf '%s\n' 'export PATH="/from/zshenv:$PATH"' > "$SCRATCH/home/.zshenv"
-    HOME="$SCRATCH/home" PATH="/usr/bin:/bin" run_both_shells "$SCRATCH/probe.sh"
+    # ZDOTDIR too: zsh reads $ZDOTDIR/.zshenv when it is set, and a machine
+    # that exports it would otherwise skip the planted file and pass unfixed.
+    HOME="$SCRATCH/home" ZDOTDIR="$SCRATCH/home" PATH="/usr/bin:/bin" run_both_shells "$SCRATCH/probe.sh"
     [ "$status" -eq 0 ] || false
     [ "$output" = "path-head=/usr/bin" ] || false
 }
