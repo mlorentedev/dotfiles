@@ -16,12 +16,20 @@ PR 1 (macOS arm64, 2026-10-14):
   - `runConverge` printing with a zero `Painter` -> `ARunOnATerminalIsColoured` FAIL
   - colour decided on the transcript tee, `convergePainter(out)` -> `AnAppliedRunColoursTheTerminalNotTheTranscript` FAIL
   - the tag printed unpainted -> `TestConvergeConsole_Colour` FAIL
-- [ ] AC4, AC5, AC6 -> PR 2 and PR 3
+- [x] AC4 -> `TestRun_RecordsEachStepsDuration` (an injected clock, `now`, steps 1.5s; the step never reached holds 0), `TestWriteReport_HoldsEachStepsDurationInMilliseconds` (reads `duration_ms` back from the file), and the console goldens (`converge-{apply,plan}-{plain,color}.golden`: `2m05s`, `850ms`, `12.3s`, `40ms`, blank for "not reached"). Mutations, each caught:
+  - `runOne` not setting `Duration` -> `TestRun_RecordsEachStepsDuration` FAIL
+  - `duration_ms` written as 0 -> `TestWriteReport_HoldsEachStepsDurationInMilliseconds` FAIL
+  - a zero duration printed as `0ms` instead of blank -> golden FAIL
+  - the name column fixed at 16 -> `TestConvergeConsole_ALongNameWidensTheColumn` FAIL
+- [x] AC6 -> `TestConvergeConsole_FailureSummary`: two failed steps (one a revisit, `after tools: …`) are listed again under `failed:` after the counts; the same run with no failures prints no summary. The `log:` line follows because `saveConvergeReport` prints it after the report. Mutation: the summary never printed -> golden FAIL
+- [ ] AC5 -> PR 3
 - [ ] AC7 -> every PR (`go test ./...` unchanged elsewhere)
 
 ## Test status
 
 - PR 1: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` -> exit 0, every package ok; `golangci-lint run` 2.12.2 after `cache clean` -> 0 issues; bats over the 7 files that reference converge's output (`git grep -l -E 'dotf converge|converge on |converge plan' -- 'tests/*.bats'`) -> 1..252, 252 ok
+- PR 2: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` -> exit 0; `golangci-lint run` -> 0 issues; bats over the same 7 files -> 1..252, 252 ok
+- PR 2 smoke test (`converge --plan` from the Mac's checkout, piped): every step carries its duration (`tools 5.7s`, `agent-extensions 4.1s`, `configs-deploy 431ms`), and the columns stay aligned past `workstation-target`, an 18-character name that overflowed the old fixed 16-column width
 - Manual smoke test (the branch built into `$TMPDIR`, run from the Mac's checkout, `converge --plan`, a dry run): piped -> the tags bare, the same text as before; under `script -q /dev/null` (a pty) -> `\x1b[36m[SKIP]`, `\x1b[35m[CHANGE]`, `\x1b[32m[ OK ]` with the columns aligned; `NO_COLOR=1` under the pty -> bare again
 
 ## Decisions made during implementation

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
@@ -82,6 +83,9 @@ type Entry struct {
 	Status  Status
 	Changes int
 	Detail  string
+	// Duration is how long the step took; zero for one the run never
+	// reached or a plan gate skipped.
+	Duration time.Duration
 }
 
 // Report is the outcome of a run, one entry per registered reconciler.
@@ -171,7 +175,18 @@ func revisit(rep *Report, ran []Reconciler, after string, env Env) error {
 	return nil
 }
 
+// now is the clock runOne times a step by; tests replace it.
+var now = time.Now
+
+// runOne runs one reconciler and records how long it took (CLI-114 AC4).
 func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
+	start := now()
+	e, gate, err := runStep(r, env, dryRun)
+	e.Duration = now().Sub(start)
+	return e, gate, err
+}
+
+func runStep(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 	e := Entry{Name: r.Name()}
 	if !platform.Supports(r.Platforms(), env.GOOS) {
 		e.Status, e.Detail = StatusSkipped, "not supported on "+env.GOOS

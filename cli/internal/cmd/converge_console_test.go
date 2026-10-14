@@ -4,20 +4,23 @@ import (
 	"bytes"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/console"
 	"github.com/mlorentedev/dotfiles/cli/internal/console/consoletest"
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 )
 
-// consoleReport holds one entry of every status, the shape a real run prints.
+// consoleReport holds one entry of every status, the shape a real run prints:
+// each step that ran has a duration, the one never reached has none.
 func consoleReport(dryRun bool) converge.Report {
 	return converge.Report{DryRun: dryRun, GOOS: "linux", Entries: []converge.Entry{
-		{Name: "tools", Status: converge.StatusChange, Changes: 2, Detail: "installed herdr, lazygit"},
-		{Name: "pi-settings", Status: converge.StatusOK, Detail: "settings.json present, enabledModels in sync"},
-		{Name: "legacy-setup", Status: converge.StatusOpaque, Detail: "setup-linux.sh exited 0"},
-		{Name: "identity", Status: converge.StatusFailed, Detail: "the age key is locked"},
+		{Name: "tools", Status: converge.StatusChange, Changes: 2, Detail: "installed herdr, lazygit", Duration: 125 * time.Second},
+		{Name: "pi-settings", Status: converge.StatusOK, Detail: "settings.json present, enabledModels in sync", Duration: 850 * time.Millisecond},
+		{Name: "legacy-setup", Status: converge.StatusOpaque, Detail: "setup-linux.sh exited 0", Duration: 12340 * time.Millisecond},
+		{Name: "identity", Status: converge.StatusFailed, Detail: "the age key is locked", Duration: 40 * time.Millisecond},
 		{Name: "records-harness", Status: converge.StatusSkipped, Detail: "not reached"},
 	}}
 }
@@ -132,5 +135,42 @@ func TestConvergeConsole_AnAppliedRunColoursTheTerminalNotTheTranscript(t *testi
 	}
 	if bytes.IndexByte(raw, 0x1b) >= 0 || !bytes.Contains(raw, []byte("converge on ")) {
 		t.Errorf("the transcript holds escape codes or misses the report:\n%q", raw)
+	}
+}
+
+// CLI-114 AC6: a run with failures ends with each failed step again, by name
+// and error, so a failure is never only one line inside the table. A run
+// without failures prints no summary.
+func TestConvergeConsole_FailureSummary(t *testing.T) {
+	rep := converge.Report{GOOS: "darwin", Entries: []converge.Entry{
+		{Name: "checkout", Status: converge.StatusOK, Detail: "up to date", Duration: 300 * time.Millisecond},
+		{Name: "tools", Status: converge.StatusFailed, Detail: "mise install: exit status 1", Duration: 61 * time.Second},
+		{Name: "git-config", Status: converge.StatusFailed, Detail: "after tools: post-condition: user.email unset", Duration: 20 * time.Millisecond},
+		{Name: "identity", Status: converge.StatusSkipped, Detail: "not reached"},
+	}}
+	var out bytes.Buffer
+	printConvergeReport(&out, rep, console.Painter{})
+	consoletest.Golden(t, "converge-failures-plain", out.Bytes())
+
+	rep.Entries[1].Status, rep.Entries[2].Status = converge.StatusOK, converge.StatusOK
+	var none bytes.Buffer
+	printConvergeReport(&none, rep, console.Painter{})
+	if strings.Contains(none.String(), "failed:") {
+		t.Errorf("a run without failures printed a summary:\n%s", none.String())
+	}
+}
+
+// A name longer than the default column widens it for every line, so the
+// duration and detail columns stay aligned.
+func TestConvergeConsole_ALongNameWidensTheColumn(t *testing.T) {
+	rep := converge.Report{GOOS: "darwin", Entries: []converge.Entry{
+		{Name: "git-hooks", Status: converge.StatusOK, Detail: "wired", Duration: 7 * time.Millisecond},
+		{Name: "workstation-target", Status: converge.StatusOK, Detail: "converged", Duration: 3 * time.Millisecond},
+	}}
+	var out bytes.Buffer
+	printConvergeReport(&out, rep, console.Painter{})
+	lines := strings.Split(out.String(), "\n")
+	if a, b := strings.Index(lines[1], "wired"), strings.Index(lines[2], "converged"); a != b {
+		t.Errorf("detail columns at %d and %d, want one column:\n%s", a, b, out.String())
 	}
 }

@@ -23,7 +23,7 @@
   {
     "id": "CLI-114-converge-console-ux-f4",
     "behavior": "AC4: every entry carries a duration, printed on the console and persisted as duration_ms",
-    "verification": "cd cli && go test ./internal/converge -run TestRun_RecordsEachStepsDuration",
+    "verification": "cd cli && go test ./internal/converge -run 'TestRun_RecordsEachStepsDuration|TestWriteReport_HoldsEachStepsDurationInMilliseconds' && go test ./internal/cmd -run 'TestConvergeConsole_Colour|TestConvergeConsole_ALongNameWidensTheColumn'",
     "state": "pending",
     "evidence": ""
   },
