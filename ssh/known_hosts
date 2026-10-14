@@ -16,6 +16,13 @@ msi.kubelab.internal,msi,100.64.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMWYFgza
 # SHA256:C3oXrETgsfA3ZpH3cYbWSmzYJTbWMb6Yg1ds5Y+6zRY
 macmini.kubelab.internal,macmini,100.64.0.15 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO3jvKZEz70YZKMN+uKd8bc0xgZ1UI3sptRJZGWxBBSU
 
+# vps (kubelab prod, Hetzner): read from its own /etc/ssh/ssh_host_ed25519_key.pub on
+# 2026-10-13, over a session whose key equalled the one msi had recorded for 100.64.0.2
+# since before this file existed; a scan of both addresses from the Mac presented the
+# same key. Not compared on the Hetzner console.
+# SHA256:I3+TP6iqOeSc059125L7qVrKjPIqLjqrP+EGWlwhT80
+100.64.0.2,162.55.57.175 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJCrQpN7tBvHapEnjyKUWiRgMigO992qh3thUZZgCX4I
+
 # github.com: the line and fingerprint GitHub documents in "GitHub's SSH key
 # fingerprints", matching the key the server presented, 2026-10-13.
 # SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
