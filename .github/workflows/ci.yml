@@ -540,6 +540,19 @@ jobs:
           go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf
           echo "DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"
 
+      # A pull request runs only the os-sensitive tier here, so a file that bash
+      # 3.2 cannot even parse reached main green and broke the full suite there
+      # (a `case` pattern's `)` inside $(...), #2433). Parsing every file costs
+      # seconds and runs on both events. The sed turns each `@test` header into
+      # a function header, which is all bats' preprocessor changes for syntax.
+      - name: every bats file parses under bash 3.2
+        run: |
+          rc=0
+          for f in tests/*.bats; do
+            sed -E 's/^@test .*\{[[:space:]]*$/_t() {/' "$f" | /bin/bash -n || { echo "::error file=$f::does not parse under /bin/bash 3.2"; rc=1; }
+          done
+          exit "$rc"
+
       # `/bin` first so bats' `#!/usr/bin/env bash` finds 3.2; run-bats.sh fails
       # the step when it does not, and when no test carries the tag.
       - name: bats, os-sensitive tier (bash 3.2)

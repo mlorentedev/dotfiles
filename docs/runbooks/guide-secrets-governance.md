@@ -238,24 +238,25 @@ It never holds anything else:
 - no per-secret blobs (CLI-036 retired them);
 - no `ci-age-key.txt`, which is kubelab's CI identity (kubelab ADR-027).
 
-**Do not run `scripts/backup-secrets-to-usb.sh`.** It copies the plaintext `sensitive/*.secret` files and the retired blobs, and it verifies nothing. #1770 replaces it with a `dotf` command that copies a declared payload and verifies it by consequence. Until that ships, refresh the copy after every escrow:
+Refresh it after every `dotf secrets backup`, from the checkout, with the volume mounted (the VeraCrypt GUI on macOS and Windows, `veracrypt <device> <mount>` on Linux; it asks for the volume password, which is why mounting stays a human step):
 
 ```bash
-sudo mkdir -p /media/secrets               # veracrypt does not create the mount point
-veracrypt /dev/sdX /media/secrets          # lsblk names the device; it is not stable
-install -m 600 -D sensitive/dr/bitwarden-export.age /media/secrets/secrets/dr/bitwarden-export.age
-install -m 600 sensitive/dr/escrow-manifest.json /media/secrets/secrets/dr/escrow-manifest.json
-# Verify by consequence. Only a recipient comparison and two counts are printed.
-[ "$(age-keygen -y /media/secrets/key.txt)" = "$(age-keygen -y ~/.config/age/key.txt)" ] && echo "recipient: same"
-age -d -i /media/secrets/key.txt /media/secrets/secrets/dr/bitwarden-export.age | jq '.items | length'
-jq .count /media/secrets/secrets/dr/escrow-manifest.json      # must equal the line above
-veracrypt -d /media/secrets
+dotf secrets usb backup --mount <mount>    # copy the escrow and manifest, then verify
+git add sensitive/dr/drill-record.json && git commit -m "chore(secrets): record the DR drill"
 ```
 
+`backup` first checks that `<mount>` is a mounted volume and not a directory of the disk it sits on: a mount point created and never mounted would otherwise receive the age identity in the clear. The stick must already hold this machine's identity; a stick that holds a different one is refused before anything is written, because it may hold the only copy of a key some other escrow needs. Files are written through a rename and not chmodded: exFAT keeps no modes, and the volume's access control is its password. Then it runs `dotf secrets usb verify`, which checks by consequence, in memory, and prints only the public recipient and two counts:
+
+1. the stick's identity has this machine's recipient (two failed reads never compare equal);
+2. the stick's identity opens the **repo's** escrow to exactly what its manifest describes (RECOVER steps 1-3);
+3. the stick's **own** escrow copy does the same, and is the repo's byte for byte, so it can stand in for a repo clone;
+4. nothing else is on the volume, OS metadata aside (`--prune` removes the rest).
+
+Every failed check is named in one run, and a failed verification writes no record. On a pass, `verify` writes `sensitive/dr/drill-record.json` (date, host, recipient, item count, the manifest digest it saw). Commit it: `dotf doctor` reads it on every machine.
+
 **To create a new stick** (one time):
-1. In the VeraCrypt Volume Creation Wizard, choose "Create a volume within a partition/drive", pick the whole device, and select AES and SHA-512.
-2. Mount it, and run `install -m 600 ~/.config/age/key.txt <mount>/key.txt`.
-3. Refresh it as above.
+1. In the VeraCrypt Volume Creation Wizard, choose "Create a volume within a partition/drive", pick the whole device, select AES and SHA-512, and format it exFAT: the one filesystem macOS, Linux and Windows all read and write, so any machine can restore from it.
+2. Mount it, and run `dotf secrets usb backup --mount <mount> --init-identity`. The flag installs this machine's identity, and only on a volume with nothing on it.
 
 ## Protocol — RECOVER (disaster)
 
@@ -302,33 +303,11 @@ Lost Bitwarden access / new machine / account compromise (the OPS-001 #257 chain
 
 ### Drill it
 
-Run this chain against the real offline backup periodically — not as an incident,
-as a rehearsal — then record it. This form proves the offline key opens the
-repo's escrow, which is what RECOVER steps 1-3 rely on, without restoring anything or
-writing plaintext to disk. The stick's own copy of the escrow is checked by the
-OFFLINE COPY refresh, not here. The marker is touched only when every check passes,
-so a failed drill cannot record itself as a pass:
+`dotf secrets usb verify --mount <mount>` is the drill for steps 1-3: it proves the offline key opens the repo's escrow to what the manifest describes, without restoring anything or writing plaintext to disk, and records the pass in `sensitive/dr/drill-record.json`. A failed run cannot record itself as a pass.
 
-```sh
-sudo mkdir -p /media/secrets
-veracrypt /dev/sdX /media/secrets
-usb=$(age-keygen -y /media/secrets/key.txt); here=$(age-keygen -y ~/.config/age/key.txt)
-same=$([ -n "$usb" ] && [ "$usb" = "$here" ] && echo yes)   # two failed reads must not compare equal
-n=$(age -d -i /media/secrets/key.txt sensitive/dr/bitwarden-export.age | jq '.items | length')
-m=$(jq .count sensitive/dr/escrow-manifest.json)
-veracrypt -d /media/secrets
-if [ "$same" = yes ] && [ -n "$n" ] && [ "$n" = "$m" ]; then
-  touch ~/.dotfiles/.dr-drill && echo "drill passed: $n items"
-else
-  echo "drill FAILED: recipient same=${same:-no}, decrypted=${n:-none}, manifest=$m"
-fi
-```
+`dotf doctor` reads that record and warns when none is committed, when it is over 180 days old, or when it was made against an older escrow than the current manifest (a stick verified yesterday against last month's escrow restores last month's vault). It cannot check the chain works; only running it can. This runbook's step 1 had **no instructions at all** until someone ran it (#848): an escrow that exists proves a file was written, never that anyone can restore from it.
 
-`dotf doctor` reads that marker and warns when no drill is recorded, or when the
-last one is over 180 days old. It cannot check the chain works; only running it
-can. This runbook's step 1 had **no instructions at all** until someone ran it
-(#848) — an escrow that exists proves a file was written, never that anyone can
-restore from it.
+Steps 4-5 (import into a throwaway account, resync, verify) are the yearly rehearsal. When one is done, set `rehearsed_at` in the record by hand and commit it; `verify` keeps that field when it rewrites the record.
 
 ## Protocol — QUARTERLY CHECK
 
@@ -343,7 +322,7 @@ Once a quarter, and after any large change, check that the vault still matches t
    `dotf secrets curate --check` will assert this (#1792). Until it ships, take a value-free inventory (ids, folders, field names and types) and write a curate plan for every violation.
 3. **Bitwarden's Vault Health reports** (web vault → Reports) list exposed, reused and weak passwords, unsecured websites, and inactive two-step login. Each finding goes to ROTATE or RETIRE.
 4. **Rotation age:** compare each entry's `rotate:` with the date of the item's last change (#1670), and ROTATE any that is overdue.
-5. **The drill:** `dotf doctor` warns when the recorded DR drill (`~/.dotfiles/.dr-drill`) is more than 180 days old.
+5. **The drill:** `dotf doctor` warns when the committed drill record (`sensitive/dr/drill-record.json`) is missing, more than 180 days old, or older than the escrow. Re-run `dotf secrets usb backup --mount <mount>`.
 
 ## Maintainability (what keeps it from drifting)
 

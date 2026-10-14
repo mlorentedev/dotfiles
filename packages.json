@@ -95,7 +95,7 @@
     },
     {
       "name": "hive",
-      "version": "4.3.2",
+      "version": "4.4.1",
       "profile": "full",
       "source": {
         "type": "uv-tool",
@@ -129,6 +129,16 @@
       "source": {
         "type": "system",
         "brew": "bash"
+      }
+    },
+    {
+      "name": "coreutils",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "coreutils",
+        "command": "gtimeout",
+        "platforms": ["darwin"]
       }
     },
     {

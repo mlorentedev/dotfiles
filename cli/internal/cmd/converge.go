@@ -65,13 +65,25 @@ func newConvergeCmd() *cobra.Command {
 	return cmd
 }
 
-// runConverge drives the registry over repo and prints the report. A full
-// apply also persists it; a plan or an --only run leaves the last one alone.
-// `dotf converge` and `dotf update` both run through here.
+// runConverge drives the registry over repo and prints the report. An applied
+// run keeps a transcript (#1098); a full one also persists the report as
+// last.json, which a plan or an --only run leaves alone. `dotf converge` and
+// `dotf update` both run through here.
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	home := env.Home()
 	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
-	reg := converge.Registry(convergeOptions())
+	out := w
+	var rl *converge.RunLog
+	if !plan {
+		var done func()
+		rl, out, done = beginRunLog(w, repo)
+		defer done()
+	}
+	opts := convergeOptions()
+	if rl != nil {
+		opts.MiseRun = loggedRunner(opts.MiseRun, rl.Stream())
+	}
+	reg := converge.Registry(opts)
 	if len(only) > 0 {
 		var serr error
 		if reg, serr = converge.Select(reg, only); serr != nil {
@@ -79,8 +91,49 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 		}
 	}
 	rep, err := converge.Run(reg, e, plan)
-	printConvergeReport(w, rep)
-	if plan || len(only) > 0 {
+	printConvergeReport(out, rep)
+	if plan {
+		return err
+	}
+	return saveConvergeReport(w, out, rl, rep, err, len(only) == 0)
+}
+
+// beginRunLog opens the run's transcript and captures this process's output
+// into it. It returns the transcript (nil when it could not be opened), the
+// writer the report goes to, and what to run when the run ends. The capture
+// starts before the options are built: they bind os.Stderr (the installers'
+// progress) when they are made.
+func beginRunLog(w io.Writer, repo string) (*converge.RunLog, io.Writer, func()) {
+	rl := openConvergeRunLog(w, repo, os.Args)
+	if rl == nil {
+		return nil, w, func() {}
+	}
+	c, err := startRunCapture(rl)
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "warning: this run's transcript misses subprocess output: %v\n", err)
+	}
+	return rl, teeWriter{w, rl.Stream()}, func() {
+		if c != nil {
+			c.stop()
+		}
+		finishRunLog(w, rl)
+	}
+}
+
+// saveConvergeReport writes the run's report beside its transcript and, for a
+// full run, to last.json, which doctor reads. Both carry the transcript's
+// redaction: a step's detail or the run's error can echo a remote URL with a
+// token in it. A failure to write either is joined to the run's own error.
+func saveConvergeReport(w, out io.Writer, rl *converge.RunLog, rep converge.Report, err error, full bool) error {
+	saved, savedErr := rep, err
+	if rl != nil {
+		saved, savedErr = rl.Redacted(rep, err)
+		if werr := rl.WriteReport(saved, savedErr); werr != nil {
+			_, _ = fmt.Fprintf(w, "warning: writing this run's report: %v\n", werr)
+		}
+		_, _ = fmt.Fprintf(out, "log: %s\n", rl.Path())
+	}
+	if !full {
 		return err
 	}
 	state, serr := env.StateDir()
@@ -88,11 +141,22 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 		return errors.Join(err, fmt.Errorf("writing the converge report: %w", serr))
 	}
 	path := filepath.Join(state, "converge", "last.json")
-	if werr := converge.WriteReport(path, rep, err); werr != nil {
+	if werr := converge.WriteReport(path, saved, savedErr); werr != nil {
 		return errors.Join(err, fmt.Errorf("writing the converge report: %w", werr))
 	}
-	_, _ = fmt.Fprintf(w, "report: %s\n", path)
+	_, _ = fmt.Fprintf(out, "report: %s\n", path)
 	return err
+}
+
+// finishRunLog closes a run's transcript and prunes the oldest runs. Neither
+// failing changes the run's result; both say so.
+func finishRunLog(w io.Writer, rl *converge.RunLog) {
+	if err := rl.Close(); err != nil {
+		_, _ = fmt.Fprintf(w, "warning: closing this run's transcript: %v\n", err)
+	}
+	if err := converge.PruneRuns(rl.Dir(), converge.RunLogKeep); err != nil {
+		_, _ = fmt.Fprintf(w, "warning: pruning old converge transcripts: %v\n", err)
+	}
 }
 
 // convergeOptions wires the registry's side effects; tests replace it.

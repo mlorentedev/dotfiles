@@ -27,15 +27,35 @@ var errAuditAttention = errors.New("spec audit: at least one active spec needs a
 // unanswerable finding instead of a hung audit.
 const specAuditTimeout = 20 * time.Second
 
+// specAuditAttempts is how often the audit asks GitHub about one issue before
+// calling it unanswerable. The audit gates CI, where one TLS handshake timeout
+// otherwise failed a whole leg (#2450).
+const specAuditAttempts = 3
+
+// specAuditWait is the back-off between attempts; nil is spec's default. A
+// package var so tests do not sleep.
+var specAuditWait func(attempt int)
+
 // specAuditRun runs gh with a deadline. A package var so tests never reach
 // the network.
 var specAuditRun = func(args ...string) (string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), specAuditTimeout)
+	return boundedRun(specAuditTimeout, "gh", args...)
+}
+
+// boundedRun runs name with args and kills it after timeout. A kill at the
+// deadline is reported as wrapping context.DeadlineExceeded, not as the bare
+// "signal: killed" exec returns, so the issue lookup can tell its caller's
+// bound from GitHub failing to answer, and does not retry it.
+func boundedRun(timeout time.Duration, name string, args ...string) (string, string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var out, errOut bytes.Buffer
-	c := exec.CommandContext(ctx, "gh", args...)
+	c := exec.CommandContext(ctx, name, args...)
 	c.Stdout, c.Stderr = &out, &errOut
 	err := c.Run()
+	if err != nil && ctx.Err() != nil {
+		err = fmt.Errorf("%s timed out after %s: %w", name, timeout, ctx.Err())
+	}
 	return out.String(), errOut.String(), err
 }
 
@@ -80,7 +100,7 @@ could not be answered must not read as a clean audit.`,
 				c.PrintErrln(err)
 				return err
 			}
-			findings, err := spec.AuditIssueState(root, home, spec.GHIssueStateLookup(specAuditRun))
+			findings, err := spec.AuditIssueState(root, home, spec.GHIssueStateLookup(specAuditRun, spec.Attempts(specAuditAttempts), spec.RetryWait(specAuditWait)))
 			if err != nil {
 				c.PrintErrln("spec audit:", err)
 				return err

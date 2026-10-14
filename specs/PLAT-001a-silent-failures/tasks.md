@@ -272,6 +272,67 @@ calls, reads no vault by design.
   FAIL: a vault edit waits for its refresh PR, and a machine whose vault is not pulled sees the
   records ahead. The warning names both remedies
 
+## #1770 — the offline DR copy was refreshed by a script that verified nothing, and the drill by `touch`
+
+`scripts/backup-secrets-to-usb.sh` copied plaintext `sensitive/*.secret` files and retired blobs
+and checked nothing, and the drill was recorded by touching `~/.dotfiles/.dr-drill`, a marker on
+one machine that said someone ran `touch`. Owner decisions (2026-10-13): mount on the Mac with
+VeraCrypt (#2435 declares the cask), and accept doctor's "no drill" warning until the first real
+verification rather than seed a record.
+
+- [x] `dotf secrets usb verify --mount <dir>`: the stick's identity has this machine's recipient;
+  it opens the repo's escrow and its own copy to exactly what each manifest describes; its copy is
+  the repo's byte for byte; nothing else is on the volume. In memory, every failure named in one
+  run, no record on a failure
+- [x] `dotf secrets usb backup --mount <dir> [--prune] [--init-identity]`: writes only to a mounted
+  volume (device differs from its parent on Unix, a non-system drive root on Windows), installs the
+  identity only when asked and only on an empty volume, refuses a stick with another identity, and
+  each refusal leaves no key material behind (advisor finding: a typo or an unmounted mount point
+  would have received the age key in the clear). No chmod on the stick: exFAT keeps no modes and
+  Linux refuses the call
+- [x] `sensitive/dr/drill-record.json`, un-ignored by exact name; `rehearsed_at` survives a rewrite
+- [x] Doctor reads the record checkout-first beside the escrow: WARN when absent, older than 180
+  days, or made against an older escrow digest; the marker is gone
+- [x] Tests with real `age` (skipped without it): off-by-one manifest fails and records nothing,
+  stale copy names the refresh, another identity is refused untouched, extras fail until pruned,
+  record and report carry no `AGE-SECRET-KEY` and no plaintext
+- [x] The script, its bats, `age-standalone.sh` (its only consumer) and their tests retired;
+  runbook OFFLINE COPY and "Drill it", ADR-028 and ADR-033 updated
+- [ ] Live: the owner mounts the stick on the Mac and runs `dotf secrets usb backup --mount <dir>`
+  with a released `dotf`; the committed record turns doctor's drill line green
+
+## #1098 — a converge run left no transcript
+
+A failed install on a box nobody can reach (poetry on the Windows corporate box, 2026-10-13) could
+only be diagnosed from what the owner pasted: `last.json` holds the report, not what uv, npm or
+winget printed, and only the latest run. Owner decisions (2026-10-13/14): layout and requirements on
+#1098, built before the herdr integrations.
+
+- [x] `converge.RunLog`: `<StateDir>/converge/runs/<UTC>.log` with the run's report beside it as
+  `<UTC>.json`; `0700` directory (tightened if older), `0600` files from creation; a same-second
+  run gets its own file; `PruneRuns` keeps the newest 20 runs, counts an orphan transcript as a run
+  and never touches a file that is not one
+- [x] Redaction on write, by whole line per stream: registry-exposed and credential-named values
+  (>= 6 bytes, longest first, named `[REDACTED:<VAR>]`), token shapes (`gh*_`, `github_pat_`, `sk-`,
+  `AKIA`, `xox*-`, `AGE-SECRET-KEY-1`, Authorization and Bearer, URL userinfo passwords), terminal
+  escapes stripped
+- [x] `runConverge` tees `os.Stdout`/`os.Stderr` for every applied run (`--only` included, a plan
+  never), before the options bind them; mise's captured output is recorded too; the report and a
+  `log:` line go to the transcript; a transcript that cannot be written warns and never fails the run
+- [x] Terminal checks read the real console during the capture (`consoleOut`); the drain is bounded
+  so a daemon holding the pipe cannot hang the exit; colour hints set only on a terminal and only
+  when unset (lesson 418)
+- [x] Tests red first; each mutation below fails a test: registry ignored, header unredacted,
+  unanchored session name, reports unredacted (`rl.Redacted` dropped), `identityTerminal` reading
+  `os.Stdout` instead of the console, the over-long-line flush removed, the flush cutting without
+  `safeCut`, and a zero tail. A real child process's output reaches the transcript masked; the pty
+  run on the Mac and its measurements are in #2446's Verification section
+- [x] A stream that never ends a line stays bounded (`maxPartialLine`, 1 MiB): the head is written
+  and the cut moves back before any masked value, token shape or escape sequence that spans it
+- [x] Runbooks: `guide-new-machine.md` (reading the report), `guide-self-deploy-timer.md` (failed service)
+- [ ] Live: the first applied converge on the Windows box after the release carrying this keeps a
+  transcript that names the shadowing poetry (#2013 row 23)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

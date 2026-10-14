@@ -424,9 +424,12 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	// which uv otherwise refuses with exit 2, so the run could never converge.
 	// decideAction above only gets here below the pin or when absent, so a tool
 	// at or above it is never touched.
+	// --refresh-package revalidates this package's index entry: a pin bumped
+	// minutes after its release otherwise fails with "no version of <pkg>==<v>"
+	// on a machine whose uv cache still holds the index from before it.
 	spec := pkg + "==" + t.Version
-	if err := in.Run("uv", "tool", "install", "--force", spec); err != nil {
-		return Skipped, fmt.Errorf("%s: uv tool install --force %s: %w", t.Name, spec, err)
+	if err := in.Run("uv", "tool", "install", "--force", "--refresh-package", pkg, spec); err != nil {
+		return Skipped, fmt.Errorf("%s: uv tool install --force --refresh-package %s %s: %w", t.Name, pkg, spec, err)
 	}
 	if err := in.verifyOnPath(t, "uv"); err != nil {
 		return Skipped, err

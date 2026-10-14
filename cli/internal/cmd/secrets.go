@@ -56,6 +56,7 @@ func newSecretsCmd() *cobra.Command {
 	cmd.AddCommand(newSecretsCurateCmd())
 	cmd.AddCommand(newSecretsProbeCmd())
 	cmd.AddCommand(newSecretsBackupCmd())
+	cmd.AddCommand(newSecretsUSBCmd())
 	cmd.AddCommand(newSecretsUnlockCmd())
 	cmd.AddCommand(newSecretsLockCmd())
 	return cmd
