@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -234,5 +235,27 @@ func TestConvergeConsole_Streams(t *testing.T) {
 				t.Errorf("the unreached step printed %d times, want once:\n%s", n, out.String())
 			}
 		})
+	}
+}
+
+// CLI-114 AC6: a failed run's last lines are the failure summary, then the
+// transcript's path: what failed, and where to read why.
+func TestConvergeConsole_AFailedRunSummarisesBeforeTheLog(t *testing.T) {
+	repo, home := convergeFixture(t)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
+	base := convergeOptions
+	convergeOptions = func() converge.Options {
+		o := base()
+		fail := func(converge.Env) error { return errors.New("boom") }
+		o.RunHarnessDeploy, o.RunSetup = fail, fail // one runs on every OS
+		return o
+	}
+	out, _, err := execute(t, "converge", "--repo", repo)
+	if err == nil {
+		t.Fatal("the run should fail")
+	}
+	summary, log := strings.Index(out, "\nfailed:\n"), strings.Index(out, "\nlog: ")
+	if summary < 0 || log < 0 || summary > log {
+		t.Errorf("want the failure summary, then log:\n%s", out)
 	}
 }
