@@ -155,3 +155,19 @@ func TestApply_AFailedStatusIsAnError(t *testing.T) {
 		t.Error("a status that fails must not read as nothing to do")
 	}
 }
+
+// herdr lists every integration it ships, so a status that exits 0 and
+// parses to none is a format this reader does not know, not "herdr has no
+// integration for any harness": reading it that way would report success
+// and install nothing.
+func TestApply_AStatusWithNoReadableLineIsAnError(t *testing.T) {
+	for name, out := range map[string]string{
+		"empty":    "",
+		"reworded": "pi -> current (v9)\nclaude -> outdated\n",
+	} {
+		run := func(string, ...string) ([]byte, error) { return []byte(out), nil }
+		if _, err := Apply(run, []string{"claude"}, installed("claude"), true); err == nil || !strings.Contains(err.Error(), "no integration") {
+			t.Errorf("%s status: want an error naming the unreadable output, got %v", name, err)
+		}
+	}
+}

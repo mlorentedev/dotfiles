@@ -75,6 +75,11 @@ func Apply(run tools.Runner, harnesses []string, has func(string) bool, dryRun b
 		return rep, fmt.Errorf("herdr integration status: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	states := ParseStatus(out)
+	if len(states) == 0 {
+		// herdr lists every integration it ships; none read means a format
+		// this parser does not know, which must not pass for "nothing to do".
+		return rep, fmt.Errorf("herdr integration status listed no integration this reader understands: %q", strings.TrimSpace(string(out)))
+	}
 	var errs []error
 	for _, h := range slices.Sorted(slices.Values(harnesses)) {
 		state, known := states[Target(h)]
