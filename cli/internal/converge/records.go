@@ -98,6 +98,7 @@ func Registry(o Options) []Reconciler {
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
+		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
