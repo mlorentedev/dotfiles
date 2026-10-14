@@ -37,7 +37,7 @@ func checkHiveDaemonAnswers(sys *System, cfg *Config, rep *Report) {
 
 	if _, err := sys.LookPath("hive"); err != nil {
 		rep.Fail("mcp-servers.json registers hive as `hive client`, but `hive` is not on PATH, " +
-			"so the hive MCP server fails to start in every agent. Fix: `uv tool install --upgrade hive-vault`.")
+			"so the hive MCP server fails to start in every agent. Fix: `dotf tools install hive`, which installs the catalog pin.")
 		return
 	}
 

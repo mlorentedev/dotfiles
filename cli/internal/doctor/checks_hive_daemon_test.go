@@ -189,6 +189,11 @@ func TestHiveDaemon_RegisteredButNotInstalledFails(t *testing.T) {
 	if !strings.Contains(got, "`hive` is not on PATH") {
 		t.Fatalf("expected the not-installed failure, got: %s", got)
 	}
+	// The fix installs the catalog pin; an unpinned `uv tool install --upgrade`
+	// would leave the machine on whatever PyPI's latest is (#1993).
+	if !strings.Contains(got, "`dotf tools install hive`") {
+		t.Errorf("the fix should name the pinned install, got: %s", got)
+	}
 }
 
 // Nothing launches `hive client` here, so there is no claim to check and the
