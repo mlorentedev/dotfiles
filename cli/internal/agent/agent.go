@@ -86,8 +86,8 @@ type Response struct {
 }
 
 // Backend is the seam. One method, the five semantics of ADR-032 §2, and no
-// backend-specific type in either direction — that is what keeps subprocess,
-// hive and (later) orca interchangeable rather than merely coexisting.
+// backend-specific type in either direction — that is what keeps subprocess
+// and hive interchangeable rather than merely coexisting.
 //
 // It returns no error: a transport failure IS one of the statuses, and a
 // backend that could report a failure two different ways would let the
