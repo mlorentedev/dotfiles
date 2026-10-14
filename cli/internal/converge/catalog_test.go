@@ -93,6 +93,9 @@ func freshMachine(t *testing.T) (toolsSync, Env, *machine) {
 		if synced && name == "mise" && args[0] == "which" {
 			return []byte("/bin/" + args[len(args)-1] + "\n"), nil
 		}
+		if name == "mise" && args[0] == "ls" {
+			return []byte("{}"), nil
+		}
 		return nil, errors.New("not installed")
 	}
 	r := toolsSync{run: run, stdout: stdout, has: m.has, getenv: func(string) string { return "" }, catalog: fakeCatalog{m}}

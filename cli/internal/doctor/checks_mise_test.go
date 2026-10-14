@@ -34,7 +34,8 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		"/m/age --version": "v" + ageVersion,
 		// What mise provides for the pins: a pin can bring a companion.
 		"mise bin-paths --bin-names age@1.2.1 jq@1.7.1": "age\nage-keygen\njq\n",
-		"mise install": "",
+		"mise install":              "",
+		"mise ls --prunable --json": "{}",
 	})
 	s.GOOS = goos
 	return s, &Config{VersionsPath: versions}
@@ -400,4 +401,24 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// #2375: an install no pin asks for leaves a shim that cannot run. Doctor
+// names it and the converge that removes it; --fix removes nothing.
+func TestCheckMiseTools_AnInstallNoPinAsksForWarnsNamingTheConverge(t *testing.T) {
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true)
+	stdout := s.CommandStdoutDir
+	s.CommandStdoutDir = func(dir, name string, args ...string) (string, error) {
+		if name == "mise" && strings.Join(args, " ") == "ls --prunable --json" {
+			return `{"powershell": [{"version": "7.5.11"}], "jq": [{"version": "1.6"}]}`, nil
+		}
+		return stdout(dir, name, args...)
+	}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, true)
+	if rep.Warnings() != 1 || !strings.Contains(b.String(), "powershell@7.5.11") || strings.Contains(b.String(), "jq@1.6") ||
+		!strings.Contains(b.String(), "dotf converge --only tools") {
+		t.Errorf("want one WARN naming only the orphan and the converge\n%s", b.String())
+	}
 }

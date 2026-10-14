@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -177,6 +178,12 @@ type fakeMise struct {
 	cfg      string
 	outdates int
 	upgrades [][]string
+	// prunable is each tool's installed versions no tracked config requires,
+	// as `mise ls --prunable --json` reports them; `mise prune` removes the
+	// tools it names.
+	prunable  map[string][]string
+	listPrune int
+	prunes    [][]string
 }
 
 func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
@@ -195,6 +202,21 @@ func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
 		f.upgrades = append(f.upgrades, args[1:])
 		for _, tool := range args[1:] {
 			f.installed[tool] = f.newest[tool]
+		}
+		return nil, nil
+	case name == "mise" && len(args) == 3 && args[0] == "ls" && args[1] == "--prunable" && args[2] == "--json":
+		f.listPrune++
+		report := map[string][]map[string]any{}
+		for tool, versions := range f.prunable {
+			for _, v := range versions {
+				report[tool] = append(report[tool], map[string]any{"version": v, "installed": true, "active": false})
+			}
+		}
+		return json.Marshal(report)
+	case name == "mise" && len(args) >= 3 && args[0] == "prune" && args[1] == "--yes" && args[2] == "--tools":
+		f.prunes = append(f.prunes, args[3:])
+		for _, tool := range args[3:] {
+			delete(f.prunable, tool)
 		}
 		return nil, nil
 	case name == "mise" && len(args) == 2 && args[0] == "which":
@@ -844,5 +866,57 @@ func TestSync_PlansNoUpgradeWithoutCheckUpgrades(t *testing.T) {
 	}
 	if f.outdates != 0 || len(f.upgrades) != 0 {
 		t.Errorf("want no `mise outdated` and no upgrade, got %d and %v", f.outdates, f.upgrades)
+	}
+}
+
+// #2375: converge removes an install no pin asks for, such as a PowerShell
+// left by hand whose shim then dangles. A superseded version of a pinned tool
+// is not an orphan: mise schedules it for removal itself, and pruning it here
+// would race that schedule. The plan names each orphan and removes nothing.
+func TestSync_PrunesAnInstallNoPinAsksForAndIsIdempotent(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}, {"jq", "1.8.2"}}
+	f := &fakeMise{installed: map[string]string{"age": "1.3.1", "jq": "1.8.2"}, pending: tools,
+		prunable: map[string][]string{"powershell": {"7.5.11"}, "jq": {"1.7.1"}}}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run, Prune: true}
+
+	plan, err := s.Plan(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"powershell@7.5.11"}; !reflect.DeepEqual(plan.Orphans, want) {
+		t.Fatalf("plan orphans = %v, want %v", plan.Orphans, want)
+	}
+	if len(f.prunes) != 0 {
+		t.Fatalf("a plan pruned: %v", f.prunes)
+	}
+
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatal(err)
+	}
+	if want := [][]string{{"powershell"}}; !reflect.DeepEqual(f.prunes, want) {
+		t.Fatalf("prunes = %v, want only the orphan %v", f.prunes, want)
+	}
+
+	again, err := s.Apply(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Pending() || len(f.prunes) != 1 {
+		t.Errorf("second run: want nothing to do and no second prune, got %+v after %v", again, f.prunes)
+	}
+}
+
+// Pruning is converge's: doctor and `dotf tools sync` plan the same sync and
+// must never ask mise what to delete, let alone delete it.
+func TestSync_DoesNotPruneUnlessAsked(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	f := &fakeMise{installed: map[string]string{"age": "1.3.1"}, pending: tools, prunable: map[string][]string{"powershell": {"7.5.11"}}}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run}
+	p, err := s.Apply(tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Orphans) != 0 || f.listPrune != 0 || len(f.prunes) != 0 {
+		t.Errorf("want no prune query and no prune, got orphans %v, %d queries, prunes %v", p.Orphans, f.listPrune, f.prunes)
 	}
 }

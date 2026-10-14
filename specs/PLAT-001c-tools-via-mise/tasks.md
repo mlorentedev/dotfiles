@@ -298,6 +298,19 @@ A fix to the AC7 path, so it lives here and not in a spec of its own.
 - [x] The command handed to the person refreshes first: `SudoInstallCommand` prefixes `sudo apt-get update &&`, and the per-package line and the plan note reuse it (pr-agent finding on #2332: an install alone meets the same stale lists)
 - [ ] X1 on ubuntu-latest passes its first converge once #2332 is on main
 
+### mise installs no pin asks for (#2375 half b, owner decision 2026-10-14)
+
+A tool installed through mise by hand and since abandoned leaves a shim that
+cannot run (`No version is set for shim: pwsh` on the Mac). The owner placed
+the fix in the converge, visible in its plan, rather than in a hand cleanup.
+
+- [x] `MiseSync.Prune`: `Plan` lists each install `mise ls --prunable --json` reports whose tool is no pin, as `tool@version`; `Apply` runs `mise prune --yes --tools <names>` after the install and the upgrade, and fails if one is still there (`TestSync_PrunesAnInstallNoPinAsksForAndIsIdempotent`)
+- [x] Only the converge sets it: `dotf tools sync` and doctor never ask mise what to delete (`TestSync_DoesNotPruneUnlessAsked`)
+- [x] The `tools` step names each orphan in `--plan` (`to prune, asked for by no pin: …`), counts it as a change, and its probe reports one left behind (`TestToolsSync_PlansReportsAndPrunesAnOrphanedInstall`)
+- [x] Doctor WARNs on an orphan and names `dotf converge --only tools`; `--fix` removes nothing (`TestCheckMiseTools_AnInstallNoPinAsksForWarnsNamingTheConverge`)
+- [x] Non-goals, by construction: a tool another project's tracked `mise.toml` requires is not in mise's prunable list; a superseded version of a pinned tool is left to the removal `mise upgrade` already scheduled
+- [x] Evidence on the Mac: plan named `powershell@7.5.11`, the apply removed it, the next plan has nothing to prune and `pwsh` no longer resolves (verification.md)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
