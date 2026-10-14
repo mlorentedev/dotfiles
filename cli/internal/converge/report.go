@@ -19,10 +19,11 @@ type reportFile struct {
 }
 
 type reportEntry struct {
-	Name    string `json:"name"`
-	Status  string `json:"status"`
-	Changes int    `json:"changes"`
-	Detail  string `json:"detail"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Changes    int    `json:"changes"`
+	Detail     string `json:"detail"`
+	DurationMs int64  `json:"duration_ms"`
 }
 
 // WriteReport persists an applied run to path, atomically, so a reader never
@@ -34,7 +35,7 @@ func WriteReport(path string, rep Report, runErr error) error {
 	}
 	for _, e := range rep.Entries {
 		f.Changed += e.Changes
-		f.Entries = append(f.Entries, reportEntry{Name: e.Name, Status: e.Status.String(), Changes: e.Changes, Detail: e.Detail})
+		f.Entries = append(f.Entries, reportEntry{Name: e.Name, Status: e.Status.String(), Changes: e.Changes, Detail: e.Detail, DurationMs: e.Duration.Milliseconds()})
 	}
 	data, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {

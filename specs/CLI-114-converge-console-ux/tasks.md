@@ -25,10 +25,10 @@ created: "2026-10-14"
 
 ## PR 2: durations and the failure summary
 
-- [ ] [AC4] Failing test: `runOne` sets `Entry.Duration` from an injected clock; `WriteReport` emits `duration_ms`, read back from the file
-- [ ] [AC4] Implement; the console prints the duration beside each step (`console.Duration`: `850ms`, `12.3s`, `2m05s`)
-- [ ] [AC6] Failing golden test: a run with two failed steps ends with a summary (detail, error), then `log:`; a clean run prints none
-- [ ] [AC6] Implement the summary in the converge renderer
+- [x] [AC4] Failing test: `runOne` sets `Entry.Duration` from an injected clock; `WriteReport` emits `duration_ms`, read back from the file
+- [x] [AC4] Implement; the console prints the duration beside each step (`console.Duration`: `850ms`, `12.3s`, `2m05s`)
+- [x] [AC6] Failing golden test: a run with two failed steps ends with a summary (detail, error), then `log:`; a clean run prints none
+- [x] [AC6] Implement the summary in the converge renderer
 
 ## PR 3: streaming progress
 

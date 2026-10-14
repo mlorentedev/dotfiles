@@ -239,10 +239,16 @@ func printConvergeReport(w io.Writer, rep converge.Report, p console.Painter) {
 		heading, changed = "converge plan", "to change"
 	}
 	_, _ = fmt.Fprintf(w, "%s on %s:\n", heading, rep.GOOS)
+	// The name column fits the longest name, so the duration and detail
+	// columns stay aligned (workstation-target is 18 characters).
+	width := 16
+	for _, e := range rep.Entries {
+		width = max(width, len(e.Name))
+	}
 	for _, e := range rep.Entries {
 		// Pad the bare tag: escape codes would count toward a %-8s width.
 		tag := convergeTag[e.Status]
-		_, _ = fmt.Fprintf(w, "  %s%s %-16s %s\n", p.Paint(tag, convergeColor[e.Status]...), strings.Repeat(" ", max(0, 8-len(tag))), e.Name, e.Detail)
+		_, _ = fmt.Fprintf(w, "  %s%s %-*s %6s  %s\n", p.Paint(tag, convergeColor[e.Status]...), strings.Repeat(" ", max(0, 8-len(tag))), width, e.Name, stepDuration(e), e.Detail)
 	}
 	n := rep.Summary()
 	failed := fmt.Sprintf("%d failed", n[converge.StatusFailed])
@@ -251,4 +257,33 @@ func printConvergeReport(w io.Writer, rep converge.Report, p console.Painter) {
 	}
 	_, _ = fmt.Fprintf(w, "%d %s, %d ok, %d opaque, %d skipped, %s\n",
 		n[converge.StatusChange], changed, n[converge.StatusOK], n[converge.StatusOpaque], n[converge.StatusSkipped], failed)
+	printFailureSummary(w, rep, p)
+}
+
+// stepDuration is a step's duration column: blank for a step the run never
+// ran, so "not reached" does not read as instant.
+func stepDuration(e converge.Entry) string {
+	if e.Duration <= 0 {
+		return ""
+	}
+	return console.Duration(e.Duration)
+}
+
+// printFailureSummary repeats each failed step after the counts (CLI-114 AC6):
+// in a long run the failure is one line among many, and the steps' own output
+// can scroll it away. A failed entry's detail is its error (runOne).
+func printFailureSummary(w io.Writer, rep converge.Report, p console.Painter) {
+	var failed []converge.Entry
+	for _, e := range rep.Entries {
+		if e.Status == converge.StatusFailed {
+			failed = append(failed, e)
+		}
+	}
+	if len(failed) == 0 {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "\n%s\n", p.Paint("failed:", console.Red, console.Bold))
+	for _, e := range failed {
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", e.Name, e.Detail)
+	}
 }
