@@ -39,8 +39,14 @@ func ColorEnabled(getenv func(string) string, terminal bool) bool {
 // IsTerminal reports whether w is a file open on a terminal. Decide it on the
 // raw writer: a tee or a buffer around a terminal is never one.
 func IsTerminal(w io.Writer) bool {
+	return IsTerminalBy(w, func(fd uintptr) bool { return term.IsTerminal(int(fd)) })
+}
+
+// IsTerminalBy is IsTerminal with the descriptor check supplied, so a caller
+// can fake a terminal in its tests. Only an *os.File is ever asked.
+func IsTerminalBy(w io.Writer, isTerminal func(fd uintptr) bool) bool {
 	f, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd()))
+	return ok && isTerminal(f.Fd())
 }
 
 // Painter colours text when On, and returns it bare otherwise.
