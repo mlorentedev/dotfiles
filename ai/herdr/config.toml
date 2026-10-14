@@ -13,6 +13,22 @@ prefix = "ctrl+s"
 previous_tab = ["prefix+p", "ctrl+alt+["]
 next_tab = ["prefix+n", "ctrl+alt+]"]
 
+# lazygit replaces Orca's diff viewer (H9): d for diff, a key herdr leaves
+# unbound (prefix+g is goto). No alt chord, because macOS terminals send
+# Option as Alt only when configured to. A popup opens in the focused pane's
+# directory, so it shows that pane's worktree on every OS; mise installs
+# lazygit at its versions.conf pin.
+# Until #2455 the merge matches list elements whole, so editing this binding
+# in place leaves the old one beside it in the deployed file: change the key
+# only together with that fix.
+[[keys.command]]
+key = "prefix+d"
+type = "popup"
+command = "lazygit"
+description = "lazygit in this pane's repository"
+width = "90%"
+height = "90%"
+
 [worktrees]
 # herdr creates <directory>/<repo>/<branch-slug>; beside the repos, not in a
 # hidden dir (owner, 2026-10-13).

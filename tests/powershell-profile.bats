@@ -20,6 +20,12 @@ setup() {
     grep -q 'Set-Alias.*-Name c -Value claude' "$PROFILE_SCRIPT"
 }
 
+@test "hr launches herdr in zsh, bash and PowerShell" {
+    grep -qx "alias hr='herdr'" "$BATS_TEST_DIRNAME/../.zshrc" || false
+    grep -qx "alias hr='herdr'" "$BATS_TEST_DIRNAME/../.bashrc" || false
+    grep -q 'Set-Alias -Name hr -Value herdr' "$PROFILE_SCRIPT" || false
+}
+
 @test "profile.ps1 has agy alias (g -> agy, post-SDD-007 Antigravity migration)" {
     # gemini-cli replaced by Google Antigravity CLI ('agy'). The single-letter
     # alias 'g' carries forward — same finger pattern, new binary.
