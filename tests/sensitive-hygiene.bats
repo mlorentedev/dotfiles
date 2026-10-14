@@ -48,7 +48,3 @@ setup() {
     # C27: .dec are plaintext secrets; umask 077 forces 600, never world-readable.
     grep -q 'umask 077' "$DOTFILES_DIR/scripts/age-encrypt-decrypt.sh"
 }
-
-@test "age-standalone.sh sets umask 077 before writing .dec plaintext" {
-    grep -q 'umask 077' "$DOTFILES_DIR/scripts/age-standalone.sh"
-}

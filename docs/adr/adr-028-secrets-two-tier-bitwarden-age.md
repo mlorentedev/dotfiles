@@ -46,7 +46,7 @@ A single `dotf secrets` command reads a **registry** (`secrets/registry.yaml`) d
 
 ### 4. age key is offline-rooted (fixes the circular dependency)
 
-The authoritative copy of the age private key lives **OFFLINE** (encrypted USB via `backup-secrets-to-usb.sh` + paper + OS keychain), independent of Bitwarden. A copy *may* remain in Bitwarden for cross-device convenience, but it is **not** the root of trust. The age key is the single root from which all DR recovery flows.
+The authoritative copy of the age private key lives **OFFLINE** (encrypted USB refreshed and verified by `dotf secrets usb backup` + paper + OS keychain), independent of Bitwarden. A copy *may* remain in Bitwarden for cross-device convenience, but it is **not** the root of trust. The age key is the single root from which all DR recovery flows.
 
 ### 5. Disaster-recovery escrow
 

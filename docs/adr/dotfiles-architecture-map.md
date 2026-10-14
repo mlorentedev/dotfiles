@@ -145,7 +145,7 @@ Five distinct runtime triggers fan into specific hook scripts. Each writes to a 
 | **Hooks** | `claude-session-start.{sh,ps1}`, `claude-mem-heal.{sh,ps1}`, `check-spec-gate.sh`, `vault-maintenance-weekly.{sh,ps1}` | Fire on session start, push, PR, or schedule. Inject context, patch upstream bugs, enforce discipline. |
 | **Knowledge** | `knowledge-crystallize.{sh,ps1}`, `vault-health.sh`, `obs-cli.{sh,ps1}` | Vault maintenance: stale-memory detection, broken-link scan, Obsidian CLI wrapper. |
 | **Specs (SDD)** | `dotf spec init`, `dotf spec archive`, `check-spec-gate.sh` | Scaffold, archive, and enforce per-feature spec folders. |
-| **Secrets** | `load-secrets.{sh,ps1}`, `age-*.sh`, `github-secrets-manager.sh`, `backup-secrets-to-usb.sh` | age encryption/decryption, env-mapping, GitHub Actions secrets manager, USB backup. |
+| **Secrets** | `load-secrets.{sh,ps1}`, `age-encrypt-decrypt.sh`, `github-secrets-manager.sh` | age encryption/decryption, env-mapping, GitHub Actions secrets manager. The offline USB copy is `dotf secrets usb`. |
 | **Project init** | `init-project.{sh,ps1}`, `init-repo-*.{sh,ps1}` | Bootstrap new repos with AGENTS.md/CLAUDE.md, GitHub defaults, standards. |
 | **Skills pipeline** | `compile-harness.sh` | Compiles vault `00_meta/skills/*` → committed records in `harness/skills/`, then deploys per-agent (claude/opencode/agy/copilot). SDD-008. |
 | **Tests** | `tests/*.bats` (33 files, 4434 LOC), `tests/Dockerfile.integration` | bats unit + Docker-based integration. 645 cases as of SDD-003. |
