@@ -861,3 +861,16 @@ func TestRenderKindAgreesWithTierKeying(t *testing.T) {
 		}
 	}
 }
+
+// The shipped map routes to the five harnesses dotfiles supports; herdr's
+// integrations, among others, are installed for exactly these.
+func TestHarnesses_NamesEveryRoutedHarness(t *testing.T) {
+	m, err := LoadModelMap(repoRootForTest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(Harnesses(m), ",")
+	if got != "agy,claude,copilot,opencode,pi" {
+		t.Errorf("Harnesses = %s", got)
+	}
+}

@@ -185,6 +185,7 @@ var convergeOptions = func() converge.Options {
 		UserRun:       sshtarget.Exec,
 		Claude:        claudeSyncer,
 		AgyPaths:      agyPaths,
+		HerdrRun:      tools.ExecRunner,
 		RunSetup:      converge.ExecSetup,
 		DotfPath:      harness.ResolveDotfPath,
 	}
