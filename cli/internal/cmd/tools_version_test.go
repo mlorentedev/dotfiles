@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -47,5 +48,17 @@ func TestToolsVersionCmd(t *testing.T) {
 				t.Errorf("stdout = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// `dotf tools version` probes through tools.ProbeRunner, so a tool that crashes
+// is not read at a version its warnings name (BUG-141).
+func TestToolsVersion_DropsAFailedRunsStderr(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not on PATH")
+	}
+	out, err := toolsVersionRunner("sh", "-c", "echo 'ansible-core 2.21.5 supports Python up to 3.14' >&2; exit 3")
+	if err == nil || len(out) != 0 {
+		t.Errorf("a crash read as output %q (err %v), want none", out, err)
 	}
 }

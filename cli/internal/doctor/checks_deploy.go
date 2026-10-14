@@ -933,10 +933,7 @@ func checkAntigravity(sys *System, rep *Report) {
 // for opencode on the Windows work box (AI-034/#1294); "unknown" when the
 // tool prints no version at all, so the report line stays readable.
 func semverOf(sys *System, name string) string {
-	v := tools.ProbeVersion(name, func(n string, args ...string) ([]byte, error) {
-		out, err := sys.CommandOutput(n, args...)
-		return []byte(out), err
-	})
+	v := tools.ProbeVersion(name, sys.VersionOutput)
 	if v == "" {
 		return "unknown"
 	}

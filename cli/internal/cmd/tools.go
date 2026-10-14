@@ -238,7 +238,7 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 }
 
 // toolsVersionRunner is the exec seam for `dotf tools version`; tests inject a fake.
-var toolsVersionRunner tools.Runner = tools.ExecRunner
+var toolsVersionRunner tools.Runner = tools.ProbeRunner
 
 func newToolsVersionCmd() *cobra.Command {
 	return &cobra.Command{
