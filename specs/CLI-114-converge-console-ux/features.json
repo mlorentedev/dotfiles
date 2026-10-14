@@ -30,7 +30,7 @@
   {
     "id": "CLI-114-converge-console-ux-f5",
     "behavior": "AC5: a terminal run streams a start line and a result line per step, and prints unrun entries exactly once",
-    "verification": "cd cli && go test ./internal/cmd -run TestConvergeConsole_Streams",
+    "verification": "cd cli && go test ./internal/converge -run TestRunObserved && go test ./internal/cmd -run TestConvergeConsole_Streams",
     "state": "pending",
     "evidence": ""
   },

@@ -24,13 +24,20 @@ PR 1 (macOS arm64, 2026-10-14):
   - a step's duration recorded unrounded or under 1ms (a 300µs step as 0, which the JSON reads as "not reached"; a 1.6ms step as "2ms" beside `duration_ms` 1) -> `TestRun_RecordsADurationAtMillisecondResolution` FAIL
   - the long-name test passing with neither detail printed -> `TestConvergeConsole_ALongNameWidensTheColumn` FAIL (it asserts the index is found)
 - [x] AC6 -> `TestConvergeConsole_FailureSummary`: two failed steps (one a revisit, `after tools: …`) are listed again under `failed:` after the counts; the same run with no failures prints no summary. `TestConvergeConsole_AFailedRunSummarisesBeforeTheLog` runs a failing `dotf converge` and asserts `failed:` comes before `log:`. Mutation: the summary never printed -> both FAIL
-- [ ] AC5 -> PR 3
-- [ ] AC7 -> every PR (`go test ./...` unchanged elsewhere)
+- [x] AC5 -> `TestRunObserved_ReportsEachStepItRuns` (start then done per step, in run order, a revisit's final "after tools:" entry, a step the OS does not support done without a start, the unreached step never done), `TestRunObserved_AGateSkipsWithoutRunning`, and `TestConvergeConsole_Streams` (goldens `converge-stream-{terminal,pipe}.golden`: on a terminal `→ tools` precedes the step's own output and the result line follows it; a pipe gets no `→` lines; the unreached step printed exactly once). Mutations, each caught:
+  - `→` printed on a pipe too -> `converge-stream-pipe.golden` FAIL
+  - `finish` dropping the entries Done never saw -> the once-only count FAIL
+  - `finish` reprinting every entry -> the once-only count FAIL
+  - `revisit` not calling `Done` -> `TestRunObserved_ReportsEachStepItRuns` FAIL
+  - `Done` not counting what it printed -> golden FAIL
+- [x] AC7 -> `converge.Run` keeps its signature and delegates to `RunObserved` with a no-op observer; no existing test in `internal/converge` was edited, and `go test ./...` passes on every PR
 
 ## Test status
 
 - PR 1: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` -> exit 0, every package ok; `golangci-lint run` 2.12.2 after `cache clean` -> 0 issues; bats over the 7 files that reference converge's output (`git grep -l -E 'dotf converge|converge on |converge plan' -- 'tests/*.bats'`) -> 1..252, 252 ok
 - PR 2: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` -> exit 0; `golangci-lint run` -> 0 issues; bats over the same 7 files -> 1..252, 252 ok
+- PR 3: `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...` -> exit 0; `golangci-lint run` -> 0 issues. The PR 1 and PR 2 golden files did not change: a finished report prints exactly as before
+- PR 3 smoke test (`converge --plan` under `script -q /dev/null`, a pty): `→ checkout`, then its `[SKIP]` line, `→ records-mirror`, then its `[CHANGE]` line, and so on, each step announced before it runs
 - PR 2 smoke test (`converge --plan` from the Mac's checkout, piped): every step carries its duration (`tools 5.7s`, `agent-extensions 4.1s`, `configs-deploy 431ms`), and the columns stay aligned past `workstation-target`, an 18-character name that overflowed the old fixed 16-column width
 - Manual smoke test (the branch built into `$TMPDIR`, run from the Mac's checkout, `converge --plan`, a dry run): piped -> the tags bare, the same text as before; under `script -q /dev/null` (a pty) -> `\x1b[36m[SKIP]`, `\x1b[35m[CHANGE]`, `\x1b[32m[ OK ]` with the columns aligned; `NO_COLOR=1` under the pty -> bare again
 
