@@ -34,7 +34,8 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		"/m/age --version": "v" + ageVersion,
 		// What mise provides for the pins: a pin can bring a companion.
 		"mise bin-paths --bin-names age@1.2.1 jq@1.7.1": "age\nage-keygen\njq\n",
-		"mise install": "",
+		"mise install":              "",
+		"mise ls --prunable --json": "{}",
 	})
 	s.GOOS = goos
 	return s, &Config{VersionsPath: versions}
@@ -400,4 +401,39 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// #2375: an install no pin asks for leaves a shim that cannot run. Doctor
+// names it and the converge that removes it; --fix removes nothing, even on a
+// run where it does sync mise (the config here is stale, so it does).
+func TestCheckMiseTools_AnInstallNoPinAsksForWarnsNamingTheConverge(t *testing.T) {
+	s, cfg := miseFixture(t, "darwin", "1.2.1", false)
+	var calls []string
+	stdout, output := s.CommandStdoutDir, s.CommandOutputDir
+	s.CommandStdoutDir = func(dir, name string, args ...string) (string, error) {
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		if name == "mise" && strings.Join(args, " ") == "ls --prunable --json" {
+			return `{"powershell": [{"version": "7.5.11"}], "jq": [{"version": "1.6"}]}`, nil
+		}
+		return stdout(dir, name, args...)
+	}
+	s.CommandOutputDir = func(dir, name string, args ...string) (string, error) {
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		return output(dir, name, args...)
+	}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, true)
+	if rep.Warnings() != 1 || !strings.Contains(b.String(), "powershell@7.5.11") || strings.Contains(b.String(), "jq@1.6") ||
+		!strings.Contains(b.String(), "dotf converge --only tools") {
+		t.Errorf("want one WARN naming only the orphan and the converge\n%s", b.String())
+	}
+	if !contains(calls, "mise install") {
+		t.Fatalf("--fix did not run the sync, so it proves nothing about pruning: %q", calls)
+	}
+	for _, c := range calls {
+		if strings.HasPrefix(c, "mise prune") || strings.HasPrefix(c, "mise uninstall") {
+			t.Errorf("doctor --fix removed an install: %q", c)
+		}
+	}
 }

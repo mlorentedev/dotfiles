@@ -444,4 +444,5 @@ tags: [lessons, index, dotfiles]
 | [423 - Every zsh reads ~/.zshenv, so a test's PATH is not the script's PATH](lesson-423-every-zsh-reads-zshenv-so-a-test-path-is-not-the-script-path.md) | 2026-10-14 |
 | [424 - A golden file with an extension escapes the extensionless eol guard](lesson-424-a-golden-file-with-an-extension-escapes-the-extensionless-eol-guard.md) | 2026-10-14 |
 | [425 - A probe whose output is the secret is the wrong probe](lesson-425-a-probe-whose-output-is-the-secret-is-the-wrong-probe.md) | 2026-10-14 |
+| [426 - mise prune removes more than orphans](lesson-426-mise-prune-removes-more-than-orphans.md) | 2026-10-14 |
 <!-- END GENERATED -->

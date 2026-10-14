@@ -42,6 +42,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] Doctor's kubectl remedy: `TestCheckCoreTools_HintsTheProvisioningCommand` rows for darwin and linux expect
   `(run: dotf tools sync)` and failed before `coreToolRemedy` named it; the windows row keeps the bare FAIL
 
+- [x] #2375 half b, mise installs no pin asks for (2026-10-14, macmini, `dotf` built from the branch, `--repo` the worktree):
+  - `dotf converge --plan --only tools` -> `[CHANGE] tools ... to prune, asked for by no pin: powershell@7.5.11`. `mise prune --dry-run` on the same machine also listed `jq@1.7.1`, `python@3.12.15` and `agy@1.3.3`, superseded versions of pinned tools, and the filter left them alone.
+  - `dotf converge --only tools` exited 1 on `veracrypt` (BUG-134, #2469, a cask needing sudo), and the mise half still ran, because the step joins both halves' errors.
+  - After it, `dotf converge --plan --only tools` reads `catalog to install: veracrypt; 38 pinned CLI(s) at their pin`, with nothing to prune. `command -v pwsh` finds nothing, so the dangling shim is gone.
+  - `bats tests/setup-windows.bats tests/profile-heal-ps1.bats`: 138 ok, and the 6 PowerShell tests skip because pwsh is absent; they no longer fail.
+  - Mutations: dropping the pin filter fails `TestSync_PrunesAnInstallNoPinAsksForAndIsIdempotent` (`[jq@1.7.1 powershell@7.5.11]`). Never calling the prune fails it and `TestToolsSync_PlansReportsAndPrunesAnOrphanedInstall` (`still installed: powershell@7.5.11`). Dropping the doctor WARN fails its test.
+  - The contract the prune rests on, measured live (PR-Agent's untested-prune-scope finding on #2476; mise 2026.10.3, macOS arm64). `mise ls --prunable --json` listed `jq@1.7.1`. A scratch project outside this repo with `mise.toml` `jq = "1.7.1"`, trusted and loaded once from its own directory, removed `jq@1.7.1` from the list read from `~`. Deleting the project put it back. So a tool another project's tracked config requires is not prunable, wherever converge runs. A fake cannot falsify that, which is why it is measured here and not in a unit test.
+
 ## Test status
 
 - Test suite (T1a, macOS arm64): `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./... -count=1` -> ok; `golangci-lint run` (2.12.2) -> 0 issues; features f1 to f3 -> PASS
