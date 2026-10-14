@@ -473,3 +473,52 @@ YAML
     [ "$status" -eq 0 ]
     [[ "$(cat "$ARGS_LOG")" == *"--hook-type post-checkout"* ]] || false
 }
+
+# A merge stopped on a conflict in f, so the index holds unmerged paths.
+make_conflict() {
+    fixture_git config user.email t@t.io
+    fixture_git config user.name tester
+    echo base > "$FIXTURE/f"
+    fixture_git add f
+    fixture_git commit -q -m base
+    fixture_git checkout -q -b other
+    echo other > "$FIXTURE/f"
+    fixture_git commit -q -am other
+    fixture_git checkout -q -
+    echo mine > "$FIXTURE/f"
+    fixture_git commit -q -am mine
+    fixture_git merge -q other >/dev/null 2>&1 || true
+    [ -n "$(fixture_git ls-files --unmerged)" ]
+}
+
+@test "BUG-135: post-checkout during a conflicted merge exits 0 without asking pre-commit" {
+    stub_precommit 1
+    add_precommit_config
+    make_conflict
+    cd "$FIXTURE"
+
+    run "$CHAIN" post-checkout aaa bbb 0 < /dev/null
+    [ "$status" -eq 0 ]
+    [ ! -e "$ARGS_LOG" ]
+}
+
+@test "BUG-135: a blocking stage during a conflicted merge still reaches pre-commit" {
+    stub_precommit 1
+    add_precommit_config
+    make_conflict
+    cd "$FIXTURE"
+
+    run "$CHAIN" pre-commit < /dev/null
+    [ "$status" -eq 1 ]
+    grep -q -- '--hook-type pre-commit' "$ARGS_LOG"
+}
+
+@test "BUG-135: post-checkout with nothing unmerged still reaches pre-commit" {
+    stub_precommit 0
+    add_precommit_config
+    cd "$FIXTURE"
+
+    run "$CHAIN" post-checkout aaa bbb 1 < /dev/null
+    [ "$status" -eq 0 ]
+    grep -q -- '--hook-type post-checkout' "$ARGS_LOG"
+}
