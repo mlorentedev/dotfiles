@@ -251,3 +251,40 @@ func TestForceColorFor_SetsColorHintsOnlyOnATerminal(t *testing.T) {
 		t.Errorf("off a terminal no hint should be set")
 	}
 }
+
+// The identity walk asks whether a person is at a terminal while the run is
+// captured, when os.Stdout is a pipe into the transcript. It must ask the
+// console. The terminal test is a seam here, true only for the console and
+// stdin, so the test sees which file the walk asked about; with no terminal
+// at all every check would answer false and miss the regression.
+func TestConverge_TheIdentityWalkAsksTheConsole(t *testing.T) {
+	saved := isTerminal
+	t.Cleanup(func() { isTerminal = saved })
+	// The console is the stdout the run started with, which the capture keeps
+	// in consoleStdout; execute() has already swapped os.Stdout for its own
+	// buffer, so the test's own os.Stdout is not it.
+	isTerminal = func(fd uintptr) bool {
+		return (consoleStdout != nil && fd == consoleStdout.Fd()) || fd == os.Stdin.Fd()
+	}
+	walkTerminal := identityTerminal // the real one; the fixture stubs it out
+	repo, _, _ := runLogFixture(t, "hello\n")
+	var answers []bool
+	base := convergeOptions
+	convergeOptions = func() converge.Options {
+		o := base()
+		inner := o.RunSetup
+		ask := func(e converge.Env) error {
+			_, ok := walkTerminal()
+			answers = append(answers, ok)
+			return inner(e)
+		}
+		o.RunHarnessDeploy, o.RunSetup = ask, ask
+		return o
+	}
+	if _, _, err := execute(t, "converge", "--repo", repo); err != nil {
+		t.Fatal(err)
+	}
+	if len(answers) == 0 || !answers[0] {
+		t.Errorf("during a captured run identityTerminal() said no terminal (%v); it asked the transcript's pipe, not the console", answers)
+	}
+}

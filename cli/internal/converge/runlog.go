@@ -164,20 +164,76 @@ type runStream struct {
 	partial []byte
 }
 
+// maxPartialLine bounds the line a stream holds while it waits for a newline.
+// A child that never ends one (carriage-return progress bars, a binary on
+// stdout) would otherwise grow the buffer for the whole run.
+var maxPartialLine = 1 << 20
+
 func (s *runStream) Write(p []byte) (int, error) {
 	s.rl.mu.Lock()
 	defer s.rl.mu.Unlock()
+	scanned := len(s.partial)
 	data := append(s.partial, p...)
+	consumed := false
 	for {
-		i := bytes.IndexByte(data, '\n')
+		i := bytes.IndexByte(data[scanned:], '\n')
 		if i < 0 {
 			break
 		}
-		s.rl.writeLine(data[:i+1])
-		data = data[i+1:]
+		s.rl.writeLine(data[:scanned+i+1])
+		data, scanned, consumed = data[scanned+i+1:], 0, true
 	}
-	s.partial = append([]byte(nil), data...)
+	if keep := s.rl.tail(); len(data) > maxPartialLine+keep {
+		cut := s.rl.safeCut(data, len(data)-keep)
+		s.rl.writeLine(data[:cut])
+		data, consumed = data[cut:], true
+	}
+	if consumed {
+		// Move the remainder to the front of the same array: only what is
+		// left after a line is copied, never the line as it grows.
+		data = append(s.partial[:0], data...)
+	}
+	s.partial = data
 	return len(p), nil
+}
+
+// tail is how much of an over-long line stays buffered when its head is
+// written: enough to hold the start of any secret that has not fully arrived,
+// a masked value or a token shape.
+func (rl *RunLog) tail() int {
+	n := 256
+	if len(rl.masks) > 0 && len(rl.masks[0].value) > n { // masks are longest first
+		n = len(rl.masks[0].value)
+	}
+	return n
+}
+
+// safeCut moves cut back to before any masked value, token shape or escape
+// sequence that spans it, so the head and the rest are each redacted whole.
+// A match that starts at the very beginning is longer than maxPartialLine; no
+// credential is, so the cut stays where it was.
+func (rl *RunLog) safeCut(data []byte, cut int) int {
+	for moved := true; moved; {
+		moved = false
+		for _, m := range rl.masks {
+			v := []byte(m.value)
+			from := max(0, cut-len(v)+1)
+			if i := bytes.Index(data[from:min(len(data), cut+len(v)-1)], v); i >= 0 && from+i < cut {
+				cut, moved = from+i, true
+			}
+		}
+		for _, re := range append([]*regexp.Regexp{ansiEscape}, tokenShapes...) {
+			for _, loc := range re.FindAllIndex(data, -1) {
+				if loc[0] < cut && cut < loc[1] {
+					cut, moved = loc[0], true
+				}
+			}
+		}
+	}
+	if cut <= 0 {
+		return len(data) - rl.tail()
+	}
+	return cut
 }
 
 var (

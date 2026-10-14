@@ -298,3 +298,49 @@ func TestRunLog_HeaderIsRedacted(t *testing.T) {
 		t.Errorf("the header leaks a token:\n%s", got)
 	}
 }
+
+// A child that never ends a line (carriage-return progress, a binary on
+// stdout) must not grow the stream's buffer without bound: past
+// maxPartialLine the head is written out, and every byte still reaches the
+// file.
+func TestRunLog_AnUnterminatedStreamStaysBounded(t *testing.T) {
+	saved := maxPartialLine
+	t.Cleanup(func() { maxPartialLine = saved })
+	maxPartialLine = 64
+	rl, _ := openTestRunLog(t, nil)
+	w := rl.Stream()
+	s := rl.streams[0]
+	for i := 0; i < 200; i++ {
+		_, _ = io.WriteString(w, strings.Repeat("x", 50))
+		if limit := maxPartialLine + rl.tail(); len(s.partial) > limit {
+			t.Fatalf("after %d writes the partial line is %d bytes, over %d", i+1, len(s.partial), limit)
+		}
+	}
+	if got := strings.Count(readRunLog(t, rl), "x"); got != 200*50 {
+		t.Errorf("%d of %d bytes reached the file", got, 200*50)
+	}
+}
+
+// Writing the head of an over-long line never cuts through a secret, whether
+// it is a known value or a token shape: the cut moves back to before it.
+func TestRunLog_AFlushNeverCutsASecret(t *testing.T) {
+	saved := maxPartialLine
+	t.Cleanup(func() { maxPartialLine = saved })
+	maxPartialLine = 64
+	const known = "a-known-secret-value-of-some-length"
+	gh := "ghp_" + strings.Repeat("Z9y8", 9)
+	rl, _ := openTestRunLog(t, map[string]string{"RESTIC_PASSWORD": known})
+	w := rl.Stream()
+	for _, piece := range []string{strings.Repeat("a", 600), known, strings.Repeat("b", 600), " " + gh + " ", strings.Repeat("c", 600)} {
+		for i := 0; i < len(piece); i += 7 {
+			_, _ = io.WriteString(w, piece[i:min(i+7, len(piece))])
+		}
+	}
+	got := readRunLog(t, rl)
+	if strings.Contains(got, known) || strings.Contains(got, gh) || strings.Contains(got, gh[:20]) {
+		t.Errorf("a secret leaked across a flush:\n%s", got)
+	}
+	if !strings.Contains(got, "[REDACTED:RESTIC_PASSWORD]") || !strings.Contains(got, "[REDACTED]") {
+		t.Errorf("a secret was not redacted whole:\n%s", got)
+	}
+}

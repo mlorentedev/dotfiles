@@ -322,8 +322,13 @@ winget printed, and only the latest run. Owner decisions (2026-10-13/14): layout
 - [x] Terminal checks read the real console during the capture (`consoleOut`); the drain is bounded
   so a daemon holding the pipe cannot hang the exit; colour hints set only on a terminal and only
   when unset (lesson 418)
-- [x] Tests red first, 7 mutations killed; a real child process's output reaches the transcript
-  masked; a pty run on the Mac shows the console output unchanged
+- [x] Tests red first; each mutation below fails a test: registry ignored, header unredacted,
+  unanchored session name, reports unredacted (`rl.Redacted` dropped), `identityTerminal` reading
+  `os.Stdout` instead of the console, the over-long-line flush removed, the flush cutting without
+  `safeCut`, and a zero tail. A real child process's output reaches the transcript masked; the pty
+  run on the Mac and its measurements are in #2446's Verification section
+- [x] A stream that never ends a line stays bounded (`maxPartialLine`, 1 MiB): the head is written
+  and the cut moves back before any masked value, token shape or escape sequence that spans it
 - [x] Runbooks: `guide-new-machine.md` (reading the report), `guide-self-deploy-timer.md` (failed service)
 - [ ] Live: the first applied converge on the Windows box after the release carrying this keeps a
   transcript that names the shadowing poetry (#2013 row 23)

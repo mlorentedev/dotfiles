@@ -75,17 +75,9 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	out := w
 	var rl *converge.RunLog
 	if !plan {
-		if rl = openConvergeRunLog(w, repo, os.Args); rl != nil {
-			defer finishRunLog(w, rl)
-			// The capture starts before the options are built: they bind
-			// os.Stderr (the installers' progress) when they are made.
-			if c, cerr := startRunCapture(rl); cerr != nil {
-				_, _ = fmt.Fprintf(w, "warning: this run's transcript misses subprocess output: %v\n", cerr)
-			} else {
-				defer c.stop()
-			}
-			out = teeWriter{w, rl.Stream()}
-		}
+		var done func()
+		rl, out, done = beginRunLog(w, repo)
+		defer done()
 	}
 	opts := convergeOptions()
 	if rl != nil {
@@ -103,17 +95,45 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	if plan {
 		return err
 	}
+	return saveConvergeReport(w, out, rl, rep, err, len(only) == 0)
+}
+
+// beginRunLog opens the run's transcript and captures this process's output
+// into it. It returns the transcript (nil when it could not be opened), the
+// writer the report goes to, and what to run when the run ends. The capture
+// starts before the options are built: they bind os.Stderr (the installers'
+// progress) when they are made.
+func beginRunLog(w io.Writer, repo string) (*converge.RunLog, io.Writer, func()) {
+	rl := openConvergeRunLog(w, repo, os.Args)
+	if rl == nil {
+		return nil, w, func() {}
+	}
+	c, err := startRunCapture(rl)
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "warning: this run's transcript misses subprocess output: %v\n", err)
+	}
+	return rl, teeWriter{w, rl.Stream()}, func() {
+		if c != nil {
+			c.stop()
+		}
+		finishRunLog(w, rl)
+	}
+}
+
+// saveConvergeReport writes the run's report beside its transcript and, for a
+// full run, to last.json, which doctor reads. Both carry the transcript's
+// redaction: a step's detail or the run's error can echo a remote URL with a
+// token in it. A failure to write either is joined to the run's own error.
+func saveConvergeReport(w, out io.Writer, rl *converge.RunLog, rep converge.Report, err error, full bool) error {
 	saved, savedErr := rep, err
 	if rl != nil {
-		// Both reports carry the transcript's redaction: a step's detail or
-		// the run's error can echo a remote URL with a token in it.
 		saved, savedErr = rl.Redacted(rep, err)
 		if werr := rl.WriteReport(saved, savedErr); werr != nil {
 			_, _ = fmt.Fprintf(w, "warning: writing this run's report: %v\n", werr)
 		}
 		_, _ = fmt.Fprintf(out, "log: %s\n", rl.Path())
 	}
-	if len(only) > 0 {
+	if !full {
 		return err
 	}
 	state, serr := env.StateDir()
