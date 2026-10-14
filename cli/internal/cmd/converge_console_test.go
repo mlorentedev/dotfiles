@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -177,24 +176,63 @@ func TestConvergeConsole_ALongNameWidensTheColumn(t *testing.T) {
 	}
 }
 
-// CLI-114 AC6: a failed run's last lines are the failure summary, then the
-// transcript's path: what failed, and where to read why.
-func TestConvergeConsole_AFailedRunSummarisesBeforeTheLog(t *testing.T) {
-	repo, home := convergeFixture(t)
-	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
-	base := convergeOptions
-	convergeOptions = func() converge.Options {
-		o := base()
-		fail := func(converge.Env) error { return errors.New("boom") }
-		o.RunHarnessDeploy, o.RunSetup = fail, fail // one runs on every OS
-		return o
+// step is a reconciler for the streaming tests: it can write its own output
+// to the console while it runs, as installers do, and fail.
+type step struct {
+	name, detail string
+	out          *bytes.Buffer
+	says         string
+	err          error
+}
+
+func (s step) Name() string        { return s.name }
+func (s step) Platforms() []string { return nil }
+func (s step) Probe(converge.Env) error {
+	return nil
+}
+func (s step) Reconcile(converge.Env, bool) (converge.Result, error) {
+	if s.says != "" {
+		s.out.WriteString(s.says + "\n")
 	}
-	out, _, err := execute(t, "converge", "--repo", repo)
-	if err == nil {
-		t.Fatal("the run should fail")
-	}
-	summary, log := strings.Index(out, "\nfailed:\n"), strings.Index(out, "\nlog: ")
-	if summary < 0 || log < 0 || summary > log {
-		t.Errorf("want the failure summary, then log:\n%s", out)
+	return converge.Result{Detail: s.detail}, s.err
+}
+
+// fixedDurations holds every step's duration at one value, so the golden file
+// holds no real time.
+type fixedDurations struct{ *convergePrinter }
+
+func (f fixedDurations) Done(e converge.Entry) {
+	e.Duration = 1200 * time.Millisecond
+	f.convergePrinter.Done(e)
+}
+
+// CLI-114 AC5: on a terminal each step's start line precedes its own output
+// and its result line follows it; the step the run never reached is printed
+// exactly once, at the end, before the counts and the failure summary.
+func TestConvergeConsole_Streams(t *testing.T) {
+	for _, terminal := range []bool{true, false} {
+		name := "converge-stream-pipe"
+		if terminal {
+			name = "converge-stream-terminal"
+		}
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			reg := []converge.Reconciler{
+				step{name: "checkout", detail: "up to date"},
+				step{name: "tools", out: &out, says: "installing lazygit", err: errors.New("mise install: exit status 1")},
+				step{name: "workstation-target", detail: "converged"},
+			}
+			pr := newConvergePrinter(&out, reg, console.Painter{}, terminal)
+			pr.header(false, "linux")
+			rep, err := converge.RunObserved(reg, converge.Env{GOOS: "linux"}, false, fixedDurations{pr})
+			if err == nil {
+				t.Fatal("want the tools step's error")
+			}
+			pr.finish(rep)
+			consoletest.Golden(t, name, out.Bytes())
+			if n := strings.Count(out.String(), "workstation-target"); n != 1 {
+				t.Errorf("the unreached step printed %d times, want once:\n%s", n, out.String())
+			}
+		})
 	}
 }

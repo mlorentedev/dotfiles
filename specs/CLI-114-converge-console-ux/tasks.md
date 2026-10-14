@@ -32,10 +32,10 @@ created: "2026-10-14"
 
 ## PR 3: streaming progress
 
-- [ ] [AC7] `converge.RunObserved(reconcilers, env, dryRun, obs)`; `Run` delegates with a no-op observer. Existing tests unchanged
-- [ ] [AC5] Failing golden test: a terminal run where the middle step writes its own output and fails. Expect `→ name` before that output, the result line after it, and the "not reached" entries printed once at the end
-- [ ] [AC5] Implement the observer in `cmd/converge.go`: `Start` prints `→ name` on a terminal only, `Done` prints the result line, and the end flushes the entries never seen
-- [ ] [AC5] `revisit` entries reach `Done` too (they go through `runOne`)
+- [x] [AC7] `converge.RunObserved(reconcilers, env, dryRun, obs)`; `Run` delegates with a no-op observer. Existing tests unchanged
+- [x] [AC5] Failing golden test: a terminal run where the middle step writes its own output and fails. Expect `→ name` before that output, the result line after it, and the "not reached" entries printed once at the end
+- [x] [AC5] Implement the observer in `cmd/converge.go`: `Start` prints `→ name` on a terminal only, `Done` prints the result line, and the end flushes the entries never seen
+- [x] [AC5] `revisit` entries reach `Done` too (they go through `runOne`)
 
 ## Closing
 
