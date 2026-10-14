@@ -276,7 +276,7 @@ jobs:
           . ./versions.conf
           [ -n "${AGE_VERSION:-}" ] || { echo "AGE_VERSION missing from versions.conf" >&2; exit 1; }
           url="https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
-          curl -fsSL --retry 3 --retry-all-errors "$url" -o age.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "$url" -o age.tar.gz
           tar xzf age.tar.gz && rm age.tar.gz
           sudo install -m0755 age/age age/age-keygen /usr/local/bin/
           rm -rf age
@@ -342,7 +342,7 @@ jobs:
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           source versions.conf
-          curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
           tar -xzf bats.tar.gz
           sudo "bats-core-${BATS_VERSION}/install.sh" /usr/local
           rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
@@ -403,7 +403,7 @@ jobs:
       - name: Install bats-core
         run: |
           . ./versions.conf
-          curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
           tar -xzf bats.tar.gz
           sudo "bats-core-${BATS_VERSION}/install.sh" /usr/local
           rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
@@ -490,7 +490,7 @@ jobs:
             *) echo "::error::unsupported runner arch $(uname -m)"; exit 1 ;;
           esac
           url="https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-darwin-${arch}.tar.gz"
-          curl -fsSL --retry 3 --retry-all-errors "$url" -o age.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "$url" -o age.tar.gz
           tar xzf age.tar.gz && rm age.tar.gz
           mkdir -p "$HOME/.local/bin"
           install -m 0755 age/age age/age-keygen "$HOME/.local/bin/"
@@ -503,7 +503,7 @@ jobs:
         env:
           BATS_VERSION: ${{ steps.pins.outputs.BATS_VERSION }}
         run: |
-          curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
           tar -xzf bats.tar.gz
           "bats-core-${BATS_VERSION}/install.sh" "$HOME/.local"
           rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
@@ -889,7 +889,7 @@ jobs:
           DOTFILES_CI_EXPECT_PWSH: '1' # pwsh is this job's shell; see tests/lib/pwsh.bash
         run: |
           source versions.conf
-          curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
           tar -xzf bats.tar.gz
           bash "bats-core-${BATS_VERSION}/install.sh" "$HOME/.local"
           "$HOME/.local/bin/bats" \
