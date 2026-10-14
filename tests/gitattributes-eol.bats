@@ -154,3 +154,17 @@ _declared_eol_files() {
         [[ "$output" == *": eol: lf" ]] || false
     done
 }
+
+@test "every tracked golden file resolves eol=lf" {
+    # CLI-114: Go golden files are compared byte-for-byte and have an
+    # extension, so the extensionless guard above never reaches them. Under
+    # `* text=auto` a Windows checkout gave each one CRLF and failed every
+    # golden test on test (windows-latest) only.
+    cd "$REPO" || return 1
+    local files
+    files=$(git ls-files '*.golden')
+    [ -n "$files" ] || { printf 'No tracked *.golden files: update this test.\n' >&2; return 1; }
+    local bad
+    bad=$(printf '%s\n' "$files" | git check-attr --stdin eol | grep -v ': eol: lf$' || true)
+    [ -z "$bad" ] || { printf 'Golden files without eol=lf:\n%s\n' "$bad" >&2; return 1; }
+}

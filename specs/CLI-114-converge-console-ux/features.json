@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-114-converge-console-ux-f1",
+    "behavior": "AC1: the colour decision is off for a non-terminal, NO_COLOR and TERM=dumb, from injected getenv and isTerminal",
+    "verification": "cd cli && go test ./internal/console -run TestColorEnabled",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-114-converge-console-ux-f2",
+    "behavior": "AC2: doctor's output is byte-identical after moving onto the console package, colour on and off",
+    "verification": "cd cli && go test ./internal/doctor -run TestReport_Golden",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-114-converge-console-ux-f3",
+    "behavior": "AC3: converge colours tags on a terminal and prints the same text without escape bytes to a pipe",
+    "verification": "cd cli && go test ./internal/cmd -run TestConvergeConsole_Colour",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-114-converge-console-ux-f4",
+    "behavior": "AC4: every entry carries a duration, printed on the console and persisted as duration_ms",
+    "verification": "cd cli && go test ./internal/converge -run TestRun_RecordsEachStepsDuration",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-114-converge-console-ux-f5",
+    "behavior": "AC5: a terminal run streams a start line and a result line per step, and prints unrun entries exactly once",
+    "verification": "cd cli && go test ./internal/cmd -run TestConvergeConsole_Streams",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-114-converge-console-ux-f6",
+    "behavior": "AC6: a run with failures ends with a failure summary before the log path; a clean run prints none",
+    "verification": "cd cli && go test ./internal/cmd -run TestConvergeConsole_FailureSummary",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-114-converge-console-ux-f7",
+    "behavior": "AC7: converge.Run keeps its signature and the whole Go suite passes",
+    "verification": "cd cli && go test ./...",
+    "state": "pending",
+    "evidence": ""
+  }
+]

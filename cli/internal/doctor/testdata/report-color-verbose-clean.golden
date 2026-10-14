@@ -1,0 +1,16 @@
+
+[1m[Quiet][0m
+  [32m[ OK ][0m one
+  [32m[ OK ][0m two
+
+[1m[Mixed][0m
+  [32m[ OK ][0m passes
+  [33m[WARN][0m warns
+  [36m[SKIP][0m skips
+  [34m[INFO][0m informs
+  [35m[FIX ][0m fixes
+
+[1m[Empty][0m
+
+[32m[1mResults: 3 passed, 0 failed, 1 warned, 1 skipped[0m
+[35mApplied 1 fix action(s)[0m
