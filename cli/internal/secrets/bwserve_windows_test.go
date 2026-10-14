@@ -54,3 +54,24 @@ func TestBWServeDetachAttr_ChildHasNoConsole(t *testing.T) {
 		t.Fatalf("child spawned with bwServeDetachAttr() still owns a console (%q): it dies with the terminal that started it", got)
 	}
 }
+
+// The flags themselves, asserted where the effect test above cannot run: a
+// headless runner (windows-latest in CI) has no console of its own, so that
+// test skips there and only an operator's terminal ever ran it (PI-002 review).
+func TestBWServeDetachAttr_SetsTheDetachFlags(t *testing.T) {
+	a := bwServeDetachAttr()
+	if !a.HideWindow {
+		t.Error("HideWindow is false: bw serve started through a Scoop shim opens a visible console window")
+	}
+	for _, f := range []struct {
+		name string
+		bit  uint32
+	}{
+		{"DETACHED_PROCESS", detachedProcess},
+		{"CREATE_NEW_PROCESS_GROUP", syscall.CREATE_NEW_PROCESS_GROUP},
+	} {
+		if a.CreationFlags&f.bit == 0 {
+			t.Errorf("CreationFlags %#x lack %s", a.CreationFlags, f.name)
+		}
+	}
+}
