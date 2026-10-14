@@ -443,4 +443,5 @@ tags: [lessons, index, dotfiles]
 | [422 - A step keyed on what is installed inherits the install order](lesson-422-a-step-keyed-on-what-is-installed-inherits-the-install-order.md) | 2026-10-14 |
 | [423 - Every zsh reads ~/.zshenv, so a test's PATH is not the script's PATH](lesson-423-every-zsh-reads-zshenv-so-a-test-path-is-not-the-script-path.md) | 2026-10-14 |
 | [424 - A golden file with an extension escapes the extensionless eol guard](lesson-424-a-golden-file-with-an-extension-escapes-the-extensionless-eol-guard.md) | 2026-10-14 |
+| [425 - A probe whose output is the secret is the wrong probe](lesson-425-a-probe-whose-output-is-the-secret-is-the-wrong-probe.md) | 2026-10-14 |
 <!-- END GENERATED -->
