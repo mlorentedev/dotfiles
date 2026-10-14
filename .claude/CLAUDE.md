@@ -17,6 +17,7 @@ All shell scripts MUST work in **both bash and zsh**. Before modifying any `.sh`
 | `((count++))` with `set -e` | `count=$((count + 1))` | Exits with code 1 when count=0 |
 | `${!var}` (indirect) | See `utils.sh` zsh branch | bash/zsh have different indirect syntax |
 | `"${arr[@]}"` on an array that may be empty, under `set -u` | `${arr[@]+"${arr[@]}"}` | bash 3.2 (macOS `/bin/bash`) aborts with `unbound variable`; bash 4.4+ does not. Loud, but only on a Mac |
+| `case "$x" in *a*) …;; esac` inside `$(...)` | `[ "${x#*a}" = "$x" ] \|\| …`, or the `(pattern)` form | bash 3.2 closes the `$(...)` at the pattern's `)`: a syntax error on a Mac only. The macOS PR job parses every bats file under 3.2 for this (lesson 417) |
 | `for d in path/*/` where `path` may not exist | `bash -c 'shopt -s nullglob; …'`, or test the dir first | **Fails silently.** zsh's default `NOMATCH` makes an unmatched glob abort the *whole* compound command — the loop never runs and prints nothing |
 | `set -- $var` / unquoted `$var` to split into fields | read line by line, or `${=var}` in zsh | **Fails silently.** zsh does not word-split unquoted parameters: you get one field containing everything, not N |
 | `. file` (no slash) to source from the cwd | `. ./file` | **Fails silently.** A slashless argument to `.` is searched on `$PATH` only; bash also falls back to the cwd, zsh does not. In a `$(...)` the result is an empty string, not an error |
