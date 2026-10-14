@@ -35,9 +35,30 @@ func TestAppsLayout_DarwinSkipsNamingMise(t *testing.T) {
 func TestAppsLayout_LinuxStillRequiresIt(t *testing.T) {
 	var b bytes.Buffer
 	rep := capture(&b)
-	checkToolHomeEnvVars(newSys(map[string]string{}, nil, nil), rep)
+	// DOTFILES_DIR set: the profile ran, so each missing variable is drift.
+	checkToolHomeEnvVars(newSys(map[string]string{"DOTFILES_DIR": "/home/u/.dotfiles"}, nil, nil), rep)
 	if rep.Failures() != len(toolHomeVars) {
 		t.Errorf("failures = %d, want %d\n%s", rep.Failures(), len(toolHomeVars), b.String())
+	}
+}
+
+// `ssh host dotf doctor` reads no profile: one WARN that says so, not a FAIL
+// per variable (#2013 debt ledger, D12; measured on msi, 5 FAIL non-login and
+// 0 under zsh -lic).
+func TestToolHomes_UnloadedProfileWarnsOnce(t *testing.T) {
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkToolHomeEnvVars(newSys(map[string]string{}, nil, nil), rep)
+	if rep.Failures() != 0 || rep.Warnings() != 1 || !strings.Contains(b.String(), "no shell profile reached this process") || !strings.Contains(b.String(), "'exec $SHELL -lic") {
+		t.Fatalf("want one WARN naming the unloaded profile, got %d FAIL, %d WARN\n%s", rep.Failures(), rep.Warnings(), b.String())
+	}
+
+	// One tool home set means the profile ran: the others are real drift.
+	b.Reset()
+	rep = capture(&b)
+	checkToolHomeEnvVars(newSys(map[string]string{"JAVA_HOME": "/opt/jdk"}, nil, nil), rep)
+	if rep.Failures() != len(toolHomeVars)-1 || rep.Warnings() != 0 {
+		t.Fatalf("a half-loaded profile must still fail each missing variable\n%s", b.String())
 	}
 }
 
