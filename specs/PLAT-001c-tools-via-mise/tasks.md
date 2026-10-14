@@ -283,7 +283,7 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
   - [x] pi's update notice off under mise: `PI_SKIP_VERSION_CHECK = "1"` in the rendered `[env]` (pi has no updater, but the notice says `pi update`, a second channel outside mise)
   - [x] `dotf pi packages apply` resolves pi on PATH before `~/.local/bin/pi`, so a pre-mise npm copy left there is a fallback, never the one reconciled; doctor's pi hints name `dotf converge --only tools` (Windows: `setup-windows.ps1`) instead of an npm command
   - [x] Guards: the `setup-linux.sh` installer guard in `tests/setup-windows.bats` now also rejects `@earendil-works/pi-coding-agent`; the parity assertion reads `PI_VERSION` under the marker; X1 asserts pi on PATH (`tests/from-zero-doctor-gate.bats`); the integration test asks mise for pi instead of `~/.local/bin/pi`
-  - [ ] Evidence: from-zero on both runners with pi on PATH after the first converge and `changed: 0` on the second; then #2449 rebased, with herdr reporting 5 integrations current on the second pass
+  - [x] Evidence: from-zero run 38532622634 on #2449, rebased after #2452 merged (`adca557c`), is green on both runners. `The agents resolve on PATH` passes for claude, agy and pi after the first converge; the second converge is `changed: 0` on both; `agent-extensions` reads `herdr: 5 integration(s) installed, 0 current` on the first pass and `herdr: 0 integration(s) installed, 5 current` on the second, on macos-latest and ubuntu-latest alike
 - Windows: the agents stay on `Install-AgentBinary` until Windows mise is measured (#2013)
 
 ### apt index refresh (#2013 X1 finding, #2332)
