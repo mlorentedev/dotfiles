@@ -95,7 +95,7 @@ func identityPaths() identity.Paths {
 // person is still at the keyboard. Windows has no /dev/tty; there only a
 // terminal stdin counts.
 var identityTerminal = func() (*os.File, bool) {
-	if !term.IsTerminal(int(os.Stdout.Fd())) {
+	if !term.IsTerminal(int(consoleOut().Fd())) {
 		return nil, false
 	}
 	if term.IsTerminal(int(os.Stdin.Fd())) {

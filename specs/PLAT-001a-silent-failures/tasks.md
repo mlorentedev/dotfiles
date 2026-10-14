@@ -301,6 +301,33 @@ verification rather than seed a record.
 - [ ] Live: the owner mounts the stick on the Mac and runs `dotf secrets usb backup --mount <dir>`
   with a released `dotf`; the committed record turns doctor's drill line green
 
+## #1098 — a converge run left no transcript
+
+A failed install on a box nobody can reach (poetry on the Windows corporate box, 2026-10-13) could
+only be diagnosed from what the owner pasted: `last.json` holds the report, not what uv, npm or
+winget printed, and only the latest run. Owner decisions (2026-10-13/14): layout and requirements on
+#1098, built before the herdr integrations.
+
+- [x] `converge.RunLog`: `<StateDir>/converge/runs/<UTC>.log` with the run's report beside it as
+  `<UTC>.json`; `0700` directory (tightened if older), `0600` files from creation; a same-second
+  run gets its own file; `PruneRuns` keeps the newest 20 runs, counts an orphan transcript as a run
+  and never touches a file that is not one
+- [x] Redaction on write, by whole line per stream: registry-exposed and credential-named values
+  (>= 6 bytes, longest first, named `[REDACTED:<VAR>]`), token shapes (`gh*_`, `github_pat_`, `sk-`,
+  `AKIA`, `xox*-`, `AGE-SECRET-KEY-1`, Authorization and Bearer, URL userinfo passwords), terminal
+  escapes stripped
+- [x] `runConverge` tees `os.Stdout`/`os.Stderr` for every applied run (`--only` included, a plan
+  never), before the options bind them; mise's captured output is recorded too; the report and a
+  `log:` line go to the transcript; a transcript that cannot be written warns and never fails the run
+- [x] Terminal checks read the real console during the capture (`consoleOut`); the drain is bounded
+  so a daemon holding the pipe cannot hang the exit; colour hints set only on a terminal and only
+  when unset (lesson 418)
+- [x] Tests red first, 7 mutations killed; a real child process's output reaches the transcript
+  masked; a pty run on the Mac shows the console output unchanged
+- [x] Runbooks: `guide-new-machine.md` (reading the report), `guide-self-deploy-timer.md` (failed service)
+- [ ] Live: the first applied converge on the Windows box after the release carrying this keeps a
+  transcript that names the shadowing poetry (#2013 row 23)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

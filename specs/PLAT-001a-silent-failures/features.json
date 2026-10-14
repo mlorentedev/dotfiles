@@ -33,5 +33,12 @@
     "verification": "/bin/bash scripts/compile-harness.sh --check",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001a-silent-failures-f6",
+    "behavior": "AC7: an applied converge keeps an owner-only, redacted transcript with subprocess output beside its report, pruned to 20 runs",
+    "verification": "cd cli && go test ./internal/converge/ ./internal/cmd/ -run 'RunLog|PruneRuns|Transcript|RealConsole' -count=1 -v 2>&1 | grep -c '^--- PASS' | awk '$1 >= 15 {ok=1} END {exit !ok}'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
