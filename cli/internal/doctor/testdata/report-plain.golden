@@ -1,0 +1,15 @@
+
+[Quiet]
+  (2 checks, all ok)
+
+[Mixed]
+  [FAIL] fails
+  [WARN] warns
+  [SKIP] skips
+  [INFO] informs
+  [FIX ] fixes
+
+[Empty]
+
+Results: 3 passed, 1 failed, 1 warned, 1 skipped
+Applied 1 fix action(s)
