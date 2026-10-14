@@ -18,6 +18,10 @@ func New(version, commit string) *cobra.Command {
 		Long: "dotf is a cross-platform CLI for a dotfiles repository: machine setup checks,\n" +
 			"secrets injection, spec-driven development, and the pull-request review loop.",
 		SilenceUsage: true,
+		// `dotf --version` is what every other CLI answers. Cobra's default
+		// template prints "dotf version X", the same line as `dotf version`,
+		// so the installers' regex reads either.
+		Version: version,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
