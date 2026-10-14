@@ -51,6 +51,19 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The `→ name` announcement prints on a terminal only. A pipe keeps the finished-report shape, so scripts and `from-zero.yml`, which read the output, see what they saw before.
 - No `\r` ticker: it would garble the subprocesses' own output. The heartbeat alternative is the owner's question, CLI-115 (#2480).
 
+## Review dispositions
+
+Independent review (`review.md`, nan/qwen3.8-flash through pi, 2026-10-14): **PASS-WITH-GAPS**. One disposition per finding:
+
+| Finding | Disposition |
+|---|---|
+| Major, THEORETICAL: a step's child output can land after its result line (pump vs direct write) | **Ticketed**, CLI-116 (#2486), with the design notes: a pump-acknowledged barrier, not routing the printer through the pipe (that would put SGR codes in the transcript), and a `runConverge` test with a real child. Cross-referenced on CLI-115 (#2480). |
+| Minor, REAL: `printConvergeReport` has no production caller | **Ticketed**, REFACTOR-019 (#2487). Moving the five golden sites onto the production renderer can change golden bytes (the two derive the column width differently), so it is its own change. |
+| Minor, REAL: two terminal probes, doctor's `console.IsTerminal` and converge's `convergeTerminal`, and a double probe in `runConverge` | **Ticketed**, same REFACTOR-019 (#2487): the same code area, one change. |
+| Minor, THEORETICAL: a terminal run's transcript holds the `→ name` lines a piped run's does not | **Applied, policy decided:** the transcript records what the terminal showed, uncoloured. `TestConvergeConsole_AnAppliedRunColoursTheTerminalNotTheTranscript` now requires the whole line `→ checkout` in the transcript (a bare `→` matched records-mirror's own detail, so the first version of the assertion survived its mutation); removing the announcement fails it. `docs/runbooks/guide-new-machine.md` says the transcript keeps those lines. |
+| Minor, REAL: the `from-zero.yml` measurement omits `.changed` | **Applied as a correction here.** The sentence is in `proposal.md` §3, which this verdict closes. `from-zero.yml:168` also reads `.changed` (`jq -e '.result == "ok" and .changed == 0'`). The conclusion stands: `duration_ms` is a new field and no reader selects it. |
+| Question: `features.json` rows stay `pending` | **Existing ticket**, GUARD-010 (#1470): nothing in the harness writes `state` or `evidence`. Every row's verification command exits 0 above (f1-f7). |
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

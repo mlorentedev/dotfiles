@@ -45,4 +45,4 @@ created: "2026-10-14"
 - [x] bats over the files that reference `converge` output (`git grep -l 'dotf converge' -- tests`)
 - [x] A real `dotf converge --dry-run` on the Mac (terminal) and piped to `cat`, recorded in `verification.md`
 - [x] `verification.md` filled in
-- [ ] Independent adversarial review before archive (`dotf spec review CLI-114-converge-console-ux`)
+- [x] Independent adversarial review before archive (`dotf spec review CLI-114-converge-console-ux`)

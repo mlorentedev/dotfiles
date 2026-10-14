@@ -138,6 +138,13 @@ func TestConvergeConsole_AnAppliedRunColoursTheTerminalNotTheTranscript(t *testi
 	if bytes.IndexByte(raw, 0x1b) >= 0 || !bytes.Contains(raw, []byte("converge on ")) {
 		t.Errorf("the transcript holds escape codes or misses the report:\n%q", raw)
 	}
+	// The transcript records what the terminal showed, uncoloured: the step
+	// announcements too, so a terminal run's log differs from a piped run's
+	// by those lines (CLI-114 review).
+	// A whole line: records-mirror's own detail holds a "→" too.
+	if !bytes.Contains(raw, []byte("\n→ checkout\n")) {
+		t.Errorf("the transcript misses the step announcements the terminal got:\n%q", raw)
+	}
 }
 
 // CLI-114 AC6: a run with failures ends with each failed step again, by name
