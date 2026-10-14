@@ -111,6 +111,9 @@ teardown() {
 @test "the from-zero job asserts claude, agy and pi on PATH after the first converge" {
     wf="$REPO_DIR/.github/workflows/from-zero.yml"
     grep -qF 'for agent in claude agy pi; do' "$wf"
+    # The rc file wraps pi in `dotf secrets run`; only `command` asks for the
+    # binary itself, which is what "on PATH" means.
+    grep -qF '"$sh_" -ic "command $agent --version"' "$wf"
     first=$(grep -n 'name: The first converge succeeded' "$wf" | cut -d: -f1)
     agents=$(grep -n 'name: The agents resolve on PATH' "$wf" | cut -d: -f1)
     second=$(grep -n 'name: Second converge changes nothing' "$wf" | cut -d: -f1)

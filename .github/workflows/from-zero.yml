@@ -102,12 +102,15 @@ jobs:
       # The agents are what a workstation is for (#2317): mise installs Claude
       # Code, agy and pi on both runners (versions.conf `# mise: latest`, #2013
       # P5c). Asked in the interactive shell, like doctor below, because that
-      # is where `mise activate` puts them on PATH.
+      # is where `mise activate` puts them on PATH. `command` runs the binary
+      # and skips any shell function of the same name: the rc file wraps pi in
+      # `dotf secrets run`, which a runner without Bitwarden cannot satisfy,
+      # and `command -v` reports the wrapper rather than a path.
       - name: The agents resolve on PATH
         run: |
           sh_=bash; command -v zsh >/dev/null 2>&1 && sh_=zsh
           for agent in claude agy pi; do
-            "$sh_" -ic "command -v $agent && $agent --version" || {
+            "$sh_" -ic "command $agent --version" || {
               echo "::error::$agent is not on PATH after the first converge"
               exit 1
             }
