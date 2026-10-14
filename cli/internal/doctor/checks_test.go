@@ -638,6 +638,26 @@ func TestCheckOpenCode_piPathResilience(t *testing.T) {
 		}
 	})
 
+	// A process started outside a shell that ran `mise activate` (a GUI app)
+	// has no shims on PATH. pi is installed, so a reinstall hint is the wrong
+	// remedy: mise answers "already installed" and the FAIL stays (#2452).
+	t.Run("installed by mise but the shims are not on PATH", func(t *testing.T) {
+		home := t.TempDir()
+		writeFile(t, filepath.Join(home, ".pi", "agent", "models.json"), `{"models":{}}`)
+		writeExec(t, filepath.Join(home, ".local", "share", "mise", "shims", "pi"))
+		sys := newSys(map[string]string{"HOME": home}, nil, nil)
+		sys.GOOS = "linux"
+		var buf bytes.Buffer
+		checkOpenCode(sys, cfg, capture(&buf))
+		out := buf.String()
+		if !strings.Contains(out, "mise installed pi") || !strings.Contains(out, "shims") {
+			t.Errorf("want the missing-shims cause, not a reinstall hint\n%s", out)
+		}
+		if strings.Contains(out, "converge --only tools") || strings.Contains(out, "node version") {
+			t.Errorf("a reinstall hint or the npm-era cause for a pi mise already installed\n%s", out)
+		}
+	})
+
 	t.Run("on PATH passes", func(t *testing.T) {
 		home := t.TempDir()
 		var buf bytes.Buffer
