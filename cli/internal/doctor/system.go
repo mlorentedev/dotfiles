@@ -321,15 +321,17 @@ func (s *System) env(key, def string) string {
 // vaultPath is where the knowledge vault lives on this machine: VAULT_PATH from
 // doctor's environment, else the ADR-025 resolution (machine.json, then the
 // contract default). "" when nothing resolves; callers treat that as "no vault",
-// never as a path to guess.
+// never as a path to guess. An unwired resolver panics rather than read as
+// "no vault": a System literal that forgot the seam would otherwise pass every
+// no-vault assertion for the wrong reason.
 func (s *System) vaultPath() string {
 	if v := s.Getenv("VAULT_PATH"); v != "" {
 		return v
 	}
-	if s.ResolvePath != nil {
-		return s.ResolvePath("VAULT_PATH")
+	if s.ResolvePath == nil {
+		panic("doctor: System.ResolvePath is not wired; build the System with realSystem or newSys")
 	}
-	return ""
+	return s.ResolvePath("VAULT_PATH")
 }
 
 // has reports whether name resolves on PATH (the `command -v` test).

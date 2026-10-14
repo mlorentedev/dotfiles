@@ -25,15 +25,29 @@ func TestVaultChecksResolveThroughTheContract(t *testing.T) {
 		}
 		return &Config{DotfilesDir: dir}
 	}
+	// autoMemory runs the check from a project whose vault memory source
+	// exists in vault, when one resolves: the check then reports the link
+	// missing, which it can only do having read that vault.
+	autoMemory := func(t *testing.T, sys *System, rep *Report, vault string) {
+		start := filepath.Join(t.TempDir(), "proj")
+		mkdirAll(t, start)
+		if vault != "" {
+			mkdirAll(t, filepath.Join(vault, "10_projects", "proj", "memory"))
+		}
+		checkAutoMemoryLink(sys, start, rep, false)
+	}
 	checks := []struct {
 		name string
-		run  func(t *testing.T, sys *System, rep *Report)
+		run  func(t *testing.T, sys *System, rep *Report, vault string)
 		want string // what the check says when no vault resolves
+		// read is what the check says that it can only say having read the
+		// resolved vault.
+		read func(out, vault string) bool
 	}{
-		{"vault presence", func(_ *testing.T, sys *System, rep *Report) { checkVault(sys, rep) }, "no vault path resolves"},
-		{"vault hooks", func(_ *testing.T, sys *System, rep *Report) { checkVaultHooks(sys, rep, false) }, "no vault resolves"},
-		{"auto-memory link", func(t *testing.T, sys *System, rep *Report) { checkAutoMemoryLink(sys, t.TempDir(), rep, false) }, "no vault resolves"},
-		{"trigger targets", func(t *testing.T, sys *System, rep *Report) { checkTriggerTargets(sys, triggersCfg(t), rep) }, "no vault resolves"},
+		{"vault presence", func(_ *testing.T, sys *System, rep *Report, _ string) { checkVault(sys, rep) }, "no vault path resolves", namesVault},
+		{"vault hooks", func(_ *testing.T, sys *System, rep *Report, _ string) { checkVaultHooks(sys, rep, false) }, "no vault resolves", namesVault},
+		{"auto-memory link", autoMemory, "no vault resolves", func(out, _ string) bool { return strings.Contains(out, "not linked to the vault") }},
+		{"trigger targets", func(t *testing.T, sys *System, rep *Report, _ string) { checkTriggerTargets(sys, triggersCfg(t), rep) }, "no vault resolves", namesVault},
 	}
 
 	for _, c := range checks {
@@ -44,7 +58,7 @@ func TestVaultChecksResolveThroughTheContract(t *testing.T) {
 			sys := newSys(map[string]string{"HOME": home}, nil, nil)
 			sys.ResolvePath = func(string) string { return "" }
 			var buf bytes.Buffer
-			c.run(t, sys, capture(&buf))
+			c.run(t, sys, capture(&buf), "")
 			out := buf.String()
 			if !strings.Contains(out, c.want) || strings.Contains(out, filepath.Join("Projects", "knowledge")) {
 				t.Fatalf("want %q and no probe of the literal default\n%s", c.want, out)
@@ -60,9 +74,13 @@ func TestVaultChecksResolveThroughTheContract(t *testing.T) {
 				return ""
 			}
 			var buf bytes.Buffer
-			c.run(t, sys, capture(&buf))
-			if out := buf.String(); strings.Contains(out, c.want) {
+			c.run(t, sys, capture(&buf), resolved)
+			out := buf.String()
+			if strings.Contains(out, c.want) {
 				t.Fatalf("a resolved vault must not read as none\n%s", out)
+			}
+			if !c.read(out, resolved) {
+				t.Fatalf("the check did not read the resolved vault %s\n%s", resolved, out)
 			}
 			if got := sys.vaultPath(); got != resolved {
 				t.Fatalf("vaultPath() = %q, want %q", got, resolved)
@@ -78,3 +96,6 @@ func TestVaultChecksResolveThroughTheContract(t *testing.T) {
 		}
 	})
 }
+
+// namesVault is the proof for a check that reports the vault path it read.
+func namesVault(out, vault string) bool { return strings.Contains(out, vault) }
