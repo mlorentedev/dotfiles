@@ -38,7 +38,7 @@
     "",
     "NOT LISTED, and each absence is a decision:",
     "  harness/reviewer-pool.json  separate from the map BY DECISION (its own",
-    "                              $comment). Its `agy/gemini-3.1-pro-high` entry",
+    "                              $comment). Its `agy/gemini-3.8-flash-high` entry",
     "                              is unroutable today — a question about the",
     "                              map's completeness, filed as #1253.",
     "  cli/internal/agent/backends.go  Go rather than JSON on purpose.",

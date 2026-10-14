@@ -1,0 +1,10 @@
+converge on darwin:
+  [ OK ]   checkout          300ms  up to date
+  [FAIL]   tools             1m01s  mise install: exit status 1
+  [FAIL]   git-config         20ms  after tools: post-condition: user.email unset
+  [SKIP]   identity                 not reached
+0 changed, 1 ok, 0 opaque, 1 skipped, 2 failed
+
+failed:
+  tools: mise install: exit status 1
+  git-config: after tools: post-condition: user.email unset
