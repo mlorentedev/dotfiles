@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"golang.org/x/term"
+	"github.com/mlorentedev/dotfiles/cli/internal/console"
 )
 
 // Status is the outcome of a single check. Only StatusFail drives a non-zero
@@ -31,15 +31,17 @@ var statusTag = map[Status]string{
 	StatusFix:  "[FIX ]",
 }
 
+// The palette is the shared console's (CLI-114), so doctor and converge
+// colour alike.
 const (
-	ansiReset   = "\033[0m"
-	ansiBold    = "\033[1m"
-	ansiRed     = "\033[31m"
-	ansiGreen   = "\033[32m"
-	ansiYellow  = "\033[33m"
-	ansiBlue    = "\033[34m"
-	ansiMagenta = "\033[35m"
-	ansiCyan    = "\033[36m"
+	ansiReset   = console.Reset
+	ansiBold    = console.Bold
+	ansiRed     = console.Red
+	ansiGreen   = console.Green
+	ansiYellow  = console.Yellow
+	ansiBlue    = console.Blue
+	ansiMagenta = console.Magenta
+	ansiCyan    = console.Cyan
 )
 
 var coloredTag = map[Status]string{
@@ -71,16 +73,10 @@ type Report struct {
 	sectionOpen bool // a Section() header has been printed and not yet flushed
 }
 
-// isColorEnabled checks whether the output writer is an interactive terminal
-// and that color emission is not disabled via NO_COLOR or TERM=dumb.
+// isColorEnabled is the shared console's decision for w: a terminal, with
+// neither NO_COLOR nor TERM=dumb.
 func isColorEnabled(w io.Writer) bool {
-	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
-		return false
-	}
-	if f, ok := w.(*os.File); ok {
-		return term.IsTerminal(int(f.Fd()))
-	}
-	return false
+	return console.ColorEnabled(os.Getenv, console.IsTerminal(w))
 }
 
 // NewReport builds a Report writing to w. When verbose is false, passing
