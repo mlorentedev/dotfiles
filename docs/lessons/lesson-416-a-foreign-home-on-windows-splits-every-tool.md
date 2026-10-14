@@ -39,6 +39,13 @@ anything. Remove junctions with a link-only `rmdir`, so the deletion does not fo
 the vault. Move any state that exists only there, such as the gate ledgers, back to the real
 `StateDir`.
 
+Decide credential rotation from the files' own ACLs, not the parent's. On this box the
+materialised keys, kubeconfig and recovery codes each carried an explicit owner-only ACL
+(SYSTEM plus the owner, not inherited), so the `Authenticated Users: Modify` that `C:\` passes
+down never reached them. Nothing printed them and the same principal owned both homes. The copies were deleted after
+the owner approved, and the originals were re-hashed and found unchanged, so no rotation was
+needed (#2432). A copy that had inherited the parent ACL would have to be rotated.
+
 The converse holds for test isolation: on Windows, redirect `HOME` (and the XDG and `MISE_*`
 directories) but never `USERPROFILE`. The same evening, an isolated from-zero converge that also
 pointed `USERPROFILE` at the fixture made ten aqua installs fail Sigstore verification with
