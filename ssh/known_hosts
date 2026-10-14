@@ -27,3 +27,24 @@ macmini.kubelab.internal,macmini,100.64.0.15 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAA
 # fingerprints", matching the key the server presented, 2026-10-13.
 # SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
 github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+# Homelab nodes: the key msi had recorded for each mesh address before this file
+# existed equalled the key the node presented to the Mac on 2026-10-14. Not read
+# on the node's console or disk. The LAN address on each line is the same host.
+# rpi4
+# SHA256:KYrU7Dvr263Czt+TV4bT+s0M7/dw/POjEREX3ZtVmy0
+100.64.0.10,10.0.0.131 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXn9cB0VFpBw3LmhW8LX+KM3crQSENqjaFmZZGDw8B3
+# rpi3
+# SHA256:oMvZWbyJrxhyHFDWmw15b+jh1iWMoO9n183O/qC3/Eg
+100.64.0.6,10.0.0.157 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILed5H+u1a0zBLSgsV6azry4NJSShSoupaccjW5kARB7
+# ace1
+# SHA256:1K1vtwHbbYzIAmUyEVbC1pg+Wfxo6cRjHKmCk5jbeLU
+100.64.0.11,172.16.1.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKNttE77rkg8DzkMEwCarp4xLuvwuA/GZNBhIPnRA5Ej
+# ace2
+# SHA256:qX3pe2spTBQu4Wl5mNlUBRyOna1Kg6TZsrxOemwm+8A
+100.64.0.5,172.16.1.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEG4GT5ZJ8XD24dJoIxArDMwhnYyNVEJA33vUsPWG4O1
+# bee
+# SHA256:QOTf9z5WzIbvUtvPSrAGFkyg2zDlnJ6L76fCuYhq73c
+100.64.0.3,172.16.1.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMdALGydwL/6AfqwqvgL/UwnB4roA7H90QBEm2AZwzFH
+# jet1
+# SHA256:c08sy+P0HvDiGLoNrgTFG+w0NWx2XNH87kDVPurhcqs
+100.64.0.8,172.16.1.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpLWKWz/+UPEJ9utxttm5+iyeDWXd+Lbf5i2b8DTGw0

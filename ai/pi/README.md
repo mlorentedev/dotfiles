@@ -92,7 +92,15 @@ Tools are named `mcp__<server>__<tool>`. `/mcp` in a session lists each server's
 
 ## Install
 
-Pinned via `PI_VERSION` in `versions.conf`, installed by `setup-{linux,windows}` (guarded on `npm`):
+On Linux and macOS, mise installs pi at its newest release. `versions.conf` marks `PI_VERSION` with `# mise: latest`, so the value is a floor, and `dotf converge` (its `tools` step) installs and upgrades it. Install it on its own with:
+
+```sh
+dotf converge --only tools
+```
+
+mise's config sets `PI_SKIP_VERSION_CHECK=1`, because pi's own update notice points at `pi update`, which would install a second pi outside mise.
+
+Windows has no mise yet (#2013), so `setup-windows.ps1` still installs pi from npm at the `PI_VERSION` floor:
 
 ```sh
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
