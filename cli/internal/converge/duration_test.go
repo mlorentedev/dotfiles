@@ -31,6 +31,22 @@ func TestRun_RecordsEachStepsDuration(t *testing.T) {
 	}
 }
 
+// A step that ran is never 0ms, which is what a step never reached reads as
+// in the JSON; and the console and the JSON round the same measurement once,
+// so a 1.6ms step is 2 in both rather than "2ms" beside duration_ms 1.
+func TestRun_RecordsADurationAtMillisecondResolution(t *testing.T) {
+	for _, tc := range []struct{ step, want time.Duration }{
+		{300 * time.Microsecond, time.Millisecond},
+		{1600 * time.Microsecond, 2 * time.Millisecond},
+	} {
+		stepClock(t, tc.step)
+		rep, _ := Run([]Reconciler{&fake{name: "a"}}, Env{GOOS: "linux"}, false)
+		if got := rep.Entries[0].Duration; got != tc.want {
+			t.Errorf("a %v step: Duration = %v, want %v", tc.step, got, tc.want)
+		}
+	}
+}
+
 func TestWriteReport_HoldsEachStepsDurationInMilliseconds(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "last.json")
 	rep := Report{GOOS: "linux", Entries: []Entry{

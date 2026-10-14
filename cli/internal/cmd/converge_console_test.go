@@ -172,7 +172,7 @@ func TestConvergeConsole_ALongNameWidensTheColumn(t *testing.T) {
 	var out bytes.Buffer
 	printConvergeReport(&out, rep, console.Painter{})
 	lines := strings.Split(out.String(), "\n")
-	if a, b := strings.Index(lines[1], "wired"), strings.Index(lines[2], "converged"); a != b {
+	if a, b := strings.Index(lines[1], "wired"), strings.Index(lines[2], "converged"); a < 0 || a != b {
 		t.Errorf("detail columns at %d and %d, want one column:\n%s", a, b, out.String())
 	}
 }

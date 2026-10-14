@@ -21,6 +21,8 @@ PR 1 (macOS arm64, 2026-10-14):
   - `duration_ms` written as 0 -> `TestWriteReport_HoldsEachStepsDurationInMilliseconds` FAIL
   - a zero duration printed as `0ms` instead of blank -> golden FAIL
   - the name column fixed at 16 -> `TestConvergeConsole_ALongNameWidensTheColumn` FAIL
+  - a step's duration recorded unrounded or under 1ms (a 300µs step as 0, which the JSON reads as "not reached"; a 1.6ms step as "2ms" beside `duration_ms` 1) -> `TestRun_RecordsADurationAtMillisecondResolution` FAIL
+  - the long-name test passing with neither detail printed -> `TestConvergeConsole_ALongNameWidensTheColumn` FAIL (it asserts the index is found)
 - [x] AC6 -> `TestConvergeConsole_FailureSummary`: two failed steps (one a revisit, `after tools: …`) are listed again under `failed:` after the counts; the same run with no failures prints no summary. `TestConvergeConsole_AFailedRunSummarisesBeforeTheLog` runs a failing `dotf converge` and asserts `failed:` comes before `log:`. Mutation: the summary never printed -> both FAIL
 - [ ] AC5 -> PR 3
 - [ ] AC7 -> every PR (`go test ./...` unchanged elsewhere)

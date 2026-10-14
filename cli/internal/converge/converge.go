@@ -182,7 +182,9 @@ var now = time.Now
 func runOne(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 	start := now()
 	e, gate, err := runStep(r, env, dryRun)
-	e.Duration = now().Sub(start)
+	// Millisecond resolution, rounded once here so the console and the JSON
+	// agree, and never under 1ms: duration 0 means the step never ran.
+	e.Duration = max(now().Sub(start).Round(time.Millisecond), time.Millisecond)
 	return e, gate, err
 }
 
