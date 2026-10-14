@@ -84,7 +84,22 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: install.sh (first converge)
+        id: install
         run: ./install.sh
+
+      # BUG-138 (#2481): the ansible version probes fail now and then on macOS,
+      # and converge keeps a probe's output to itself. On a failed first
+      # converge, print what the probes read, and the locale they ran under:
+      # ansible refuses to start without a UTF-8 one.
+      - name: Show the version probes' raw output
+        if: ${{ failure() && steps.install.outcome == 'failure' }}
+        run: |
+          locale || true
+          for t in ansible ansible-lint; do
+              out=$("$HOME/.local/bin/$t" --version 2>&1) && rc=0 || rc=$?
+              echo "== $t --version: exit $rc"
+              printf '%s\n' "$out" | head -5 | cat -v
+          done
 
       # Idempotence is defined on a converged first run (lesson 328): assert
       # that before reading the second run, so a step that warned and went on
