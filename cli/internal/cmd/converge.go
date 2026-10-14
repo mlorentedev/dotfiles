@@ -74,7 +74,11 @@ func newConvergeCmd() *cobra.Command {
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	home := env.Home()
 	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
-	terminal, paint := convergeTerminal(w), convergePainter(w)
+	// Decided once, on the writer converge was handed: beginRunLog wraps it in
+	// the transcript tee, which is never a terminal, and the transcript strips
+	// colour, so one stream serves both (CLI-114).
+	terminal := console.IsTerminalBy(w, isTerminal)
+	paint := convergePainter(terminal)
 	out := w
 	var rl *converge.RunLog
 	if !plan {
@@ -174,7 +178,7 @@ var convergeOptions = func() converge.Options {
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		// Install progress goes to stderr, apart from the report on stdout.
-		ToolsCatalog:  &tools.Installer{Dest: dest, Out: os.Stderr},
+		ToolsCatalog:  toolsInstaller(dest, os.Stderr),
 		ToolsBinDirs:  []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest},
 		GitRun:        gitconfig.ExecRunner,
 		GitStoredAuth: gitconfig.StoredLoginRunner,
@@ -228,18 +232,9 @@ var convergeColor = map[converge.Status][]string{
 	converge.StatusOpaque:  {console.Yellow},
 }
 
-// convergeTerminal says whether converge was handed a terminal. It is decided
-// on that writer, before beginRunLog wraps it in the transcript tee, which is
-// never a terminal. The transcript strips colour, so one stream serves both
-// (CLI-114).
-func convergeTerminal(w io.Writer) bool {
-	f, ok := w.(*os.File)
-	return ok && isTerminal(f.Fd())
-}
-
 // convergePainter colours a terminal, unless NO_COLOR or TERM=dumb say not.
-func convergePainter(w io.Writer) console.Painter {
-	return console.Painter{On: console.ColorEnabled(os.Getenv, convergeTerminal(w))}
+func convergePainter(terminal bool) console.Painter {
+	return console.Painter{On: console.ColorEnabled(os.Getenv, terminal)}
 }
 
 // convergePrinter renders a run as it happens (CLI-114). Each step's line is
@@ -260,16 +255,6 @@ func newConvergePrinter(w io.Writer, reg []converge.Reconciler, p console.Painte
 		c.width = max(c.width, len(r.Name()))
 	}
 	return c
-}
-
-// printConvergeReport prints a finished run whole.
-func printConvergeReport(w io.Writer, rep converge.Report, p console.Painter) {
-	c := &convergePrinter{w: w, p: p, width: 16}
-	for _, e := range rep.Entries {
-		c.width = max(c.width, len(e.Name))
-	}
-	c.header(rep.DryRun, rep.GOOS)
-	c.finish(rep)
 }
 
 func (c *convergePrinter) header(dryRun bool, goos string) {

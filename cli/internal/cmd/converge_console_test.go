@@ -27,6 +27,23 @@ func consoleReport(dryRun bool) converge.Report {
 	}}
 }
 
+// renderConvergeReport prints a finished run through the printer runConverge
+// uses: the column width comes from the registry, and each entry is a step the
+// run reported done.
+func renderConvergeReport(t *testing.T, w *bytes.Buffer, rep converge.Report, p console.Painter) {
+	t.Helper()
+	reg := make([]converge.Reconciler, 0, len(rep.Entries))
+	for _, e := range rep.Entries {
+		reg = append(reg, step{name: e.Name})
+	}
+	pr := newConvergePrinter(w, reg, p, false)
+	pr.header(rep.DryRun, rep.GOOS)
+	for _, e := range rep.Entries {
+		pr.Done(e)
+	}
+	pr.finish(rep)
+}
+
 var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 // CLI-114 AC3: a terminal gets each tag coloured by status; a pipe reads the
@@ -40,8 +57,8 @@ func TestConvergeConsole_Colour(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			var plain, color bytes.Buffer
-			printConvergeReport(&plain, consoleReport(plan), console.Painter{})
-			printConvergeReport(&color, consoleReport(plan), console.Painter{On: true})
+			renderConvergeReport(t, &plain, consoleReport(plan), console.Painter{})
+			renderConvergeReport(t, &color, consoleReport(plan), console.Painter{On: true})
 			consoletest.Golden(t, name+"-plain", plain.Bytes())
 			consoletest.Golden(t, name+"-color", color.Bytes())
 			if bytes.IndexByte(plain.Bytes(), 0x1b) >= 0 {
@@ -60,22 +77,22 @@ func TestConvergeConsole_Colour(t *testing.T) {
 // The decision is made on the raw writer: a buffer, like the transcript tee,
 // is never a terminal.
 func TestConvergeConsole_ColourIsATerminals(t *testing.T) {
-	if convergePainter(&bytes.Buffer{}).On {
-		t.Error("a buffer got colour")
+	if console.IsTerminalBy(&bytes.Buffer{}, func(uintptr) bool { return true }) {
+		t.Error("a buffer passed for a terminal")
 	}
 }
 
 func TestConvergeConsole_ColourOnATerminal(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("TERM", "xterm-256color")
-	saved := isTerminal
-	t.Cleanup(func() { isTerminal = saved })
-	isTerminal = func(uintptr) bool { return true }
-	if !convergePainter(os.Stdout).On {
+	if !convergePainter(true).On {
 		t.Error("a terminal got no colour")
 	}
+	if convergePainter(false).On {
+		t.Error("a pipe got colour")
+	}
 	t.Setenv("NO_COLOR", "1")
-	if convergePainter(os.Stdout).On {
+	if convergePainter(true).On {
 		t.Error("NO_COLOR did not turn colour off")
 	}
 }
@@ -158,12 +175,12 @@ func TestConvergeConsole_FailureSummary(t *testing.T) {
 		{Name: "identity", Status: converge.StatusSkipped, Detail: "not reached"},
 	}}
 	var out bytes.Buffer
-	printConvergeReport(&out, rep, console.Painter{})
+	renderConvergeReport(t, &out, rep, console.Painter{})
 	consoletest.Golden(t, "converge-failures-plain", out.Bytes())
 
 	rep.Entries[1].Status, rep.Entries[2].Status = converge.StatusOK, converge.StatusOK
 	var none bytes.Buffer
-	printConvergeReport(&none, rep, console.Painter{})
+	renderConvergeReport(t, &none, rep, console.Painter{})
 	if strings.Contains(none.String(), "failed:") {
 		t.Errorf("a run without failures printed a summary:\n%s", none.String())
 	}
@@ -197,7 +214,7 @@ func TestConvergeConsole_ALongNameWidensTheColumn(t *testing.T) {
 		{Name: "workstation-target", Status: converge.StatusOK, Detail: "converged", Duration: 3 * time.Millisecond},
 	}}
 	var out bytes.Buffer
-	printConvergeReport(&out, rep, console.Painter{})
+	renderConvergeReport(t, &out, rep, console.Painter{})
 	lines := strings.Split(out.String(), "\n")
 	if a, b := strings.Index(lines[1], "wired"), strings.Index(lines[2], "converged"); a < 0 || a != b {
 		t.Errorf("detail columns at %d and %d, want one column:\n%s", a, b, out.String())

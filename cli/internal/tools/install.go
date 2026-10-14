@@ -164,6 +164,11 @@ type Installer struct {
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
 	AppExists func(bundle string) bool
+	// Python is the Python series uv-tool entries run on ("3.13"), from
+	// versions.conf's PYTHON_VERSION (PythonSeries). Empty lets uv pick, which
+	// is the newest interpreter it finds: on a runner image with 3.15 that was
+	// one ansible-core cannot import on (BUG-138).
+	Python string
 	// PathCopies lists every file on PATH that would run as name, in PATH order,
 	// so the first is the one that answers. Nil means a scan of $PATH; tests
 	// inject the machine's answer.
@@ -478,9 +483,13 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	// --refresh-package revalidates this package's index entry: a pin bumped
 	// minutes after its release otherwise fails with "no version of <pkg>==<v>"
 	// on a machine whose uv cache still holds the index from before it.
-	spec := pkg + "==" + t.Version
-	if err := in.Run("uv", "tool", "install", "--force", "--refresh-package", pkg, spec); err != nil {
-		return Skipped, fmt.Errorf("%s: uv tool install --force --refresh-package %s %s: %w", t.Name, pkg, spec, err)
+	args := []string{"tool", "install", "--force", "--refresh-package", pkg}
+	if in.Python != "" {
+		args = append(args, "--python", in.Python)
+	}
+	args = append(args, pkg+"=="+t.Version)
+	if err := in.Run("uv", args...); err != nil {
+		return Skipped, fmt.Errorf("%s: uv %s: %w", t.Name, strings.Join(args, " "), err)
 	}
 	if err := in.verifyOnPath(t, "uv"); err != nil {
 		return Skipped, err
@@ -574,7 +583,15 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 // file answered instead of leaving that to be found on the machine.
 func (in *Installer) verifyOnPath(t Tool, manager string) error {
 	version := in.current(t)
-	err := checkProbed(t, version, manager+" exited 0 but "+t.Name+" does not run on PATH (is "+manager+"'s global bin dir on PATH?)")
+	absent := manager + " exited 0 but " + t.Name + " does not run on PATH (is " + manager + "'s global bin dir on PATH?)"
+	if version == "" {
+		// On PATH and still no version: it is there and crashes, so PATH is
+		// the wrong place to look (BUG-138).
+		if copies := in.PathCopies(t.Name); len(copies) > 0 {
+			absent = manager + " exited 0, and " + t.Name + " is on PATH at " + copies[0] + " but does not run: run `" + t.Name + " --version`"
+		}
+	}
+	err := checkProbed(t, version, absent)
 	if err == nil || version == "" {
 		return err
 	}
