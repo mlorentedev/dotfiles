@@ -28,4 +28,5 @@ setup() {
     printf '%s\n' 'if [ -n "${ZSH_VERSION:-}" ]; then echo zsh; else echo bash; fi' > "$SCRATCH/differs.sh"
     run run_both_shells "$SCRATCH/differs.sh"
     [ "$status" -ne 0 ] || false
+    [[ "$output" == *"bash (0) and zsh (0) disagree"* ]] || false
 }
