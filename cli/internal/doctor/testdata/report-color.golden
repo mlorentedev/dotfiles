@@ -1,0 +1,15 @@
+
+[1m[Quiet][0m
+  [32m(2 checks, all ok)[0m
+
+[1m[Mixed][0m
+  [31m[FAIL][0m fails
+  [33m[WARN][0m warns
+  [36m[SKIP][0m skips
+  [34m[INFO][0m informs
+  [35m[FIX ][0m fixes
+
+[1m[Empty][0m
+
+Results: [32m3 passed[0m, [31m[1m1 failed[0m, [33m1 warned[0m, [36m1 skipped[0m
+[35mApplied 1 fix action(s)[0m
