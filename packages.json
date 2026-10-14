@@ -132,6 +132,16 @@
       }
     },
     {
+      "name": "coreutils",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "coreutils",
+        "command": "gtimeout",
+        "platforms": ["darwin"]
+      }
+    },
+    {
       "name": "git-lfs",
       "profile": "full",
       "source": {
