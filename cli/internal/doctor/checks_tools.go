@@ -264,9 +264,23 @@ var toolHomeVars = []string{
 // checkToolHomeEnvVars reproduces healthcheck section 5: the tool-home vars are
 // set. Unset is a FAIL where the APPS_HOME layout applies (the RC files export
 // them there) and a SKIP elsewhere.
+//
+// A process that read no shell profile (`ssh host dotf doctor` runs a
+// non-login, non-interactive shell) has DOTFILES_DIR unset too, which the
+// generated paths file always exports. Then every variable is missing for one
+// reason, and failing each one reads as five drifts (#2013 debt ledger, D12):
+// it is said once, as a WARN naming how to run doctor with the profile. From
+// inside the process doctor cannot tell that from a login shell whose rc does
+// not source the paths file, so the WARN names both causes and both remedies.
 func checkToolHomeEnvVars(sys *System, rep *Report) {
 	rep.Section("Tool-home environment variables")
 	why := appsLayoutSkip(sys.GOOS)
+	if why == "" && profileNotLoaded(sys) {
+		rep.Warn("no shell profile reached this process (DOTFILES_DIR and every tool-home variable are unset), so these cannot be checked. " +
+			"Over ssh, a command runs in a non-login shell: run ssh -t <host> 'exec $SHELL -lic \"dotf doctor\"' (single quotes, so the remote shell expands $SHELL). " +
+			"If this already is a login shell, its rc does not source the generated paths file: run dotf env generate, then check the rc")
+		return
+	}
 	for _, v := range toolHomeVars {
 		switch {
 		case sys.Getenv(v) != "":
@@ -277,6 +291,22 @@ func checkToolHomeEnvVars(sys *System, rep *Report) {
 			rep.Fail(v + " is not set")
 		}
 	}
+}
+
+// profileNotLoaded reports a process that inherited nothing from the shell
+// profile: DOTFILES_DIR, which the generated paths file always exports, and all
+// of the tool-home variables are unset. Any one of them set means the profile
+// ran, and a missing variable is then real drift.
+func profileNotLoaded(sys *System) bool {
+	if sys.Getenv("DOTFILES_DIR") != "" {
+		return false
+	}
+	for _, v := range toolHomeVars {
+		if sys.Getenv(v) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // optionalTools is healthcheck section 6's advisory set. terraform lives here
