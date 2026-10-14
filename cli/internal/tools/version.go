@@ -26,14 +26,31 @@ func ExecRunner(name string, args ...string) ([]byte, error) {
 	return append(stdout.Bytes(), stderr.Bytes()...), err
 }
 
+// ProbeRunner is the Runner version probes use: ExecRunner's stdout then
+// stderr, except that a failed run gives its stdout alone. A tool that crashes
+// leaves on stderr the warnings and tracebacks of whatever it loaded, and their
+// versions are not its own: ansible-lint under a Python its ansible-core does
+// not support exited 3 with only `ansible-core 2.21.5 supports Python up to
+// 3.14` to read, and was reported as installed at 2.21.5 (BUG-141). Read from
+// stdout alone, it does not run, which is what it did.
+func ProbeRunner(name string, args ...string) ([]byte, error) {
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command(name, args...) //nolint:gosec // name is an operator-chosen tool
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return stdout.Bytes(), err
+	}
+	return append(stdout.Bytes(), stderr.Bytes()...), nil
+}
+
 // ProbeVersion runs `<name> --version` through run and returns the first
-// semver in its output (stdout before stderr, see ExecRunner), or "" when the
+// semver in its output (stdout before stderr, see ProbeRunner), or "" when the
 // tool is absent or prints none.
 //
 // One extraction for every caller. The setup scripts each parsed the version
 // as "last whitespace token of the first line" — seven sites across both OSes —
 // and on the Windows work box that accepted `locked.` as opencode's version
-// from a banner line printed before the number (AI-034, #1294). Output is
+// from a banner line printed before the number (AI-034, #1294). stdout is
 // still used when the command exits non-zero: several tools print the version
 // and then complain about something unrelated.
 func ProbeVersion(name string, run Runner) string {
@@ -45,7 +62,7 @@ func ProbeVersion(name string, run Runner) string {
 // `-v`): the same extraction over `<name> <args>`.
 func ProbeVersionArgs(name string, run Runner, args ...string) string {
 	if run == nil {
-		run = ExecRunner
+		run = ProbeRunner
 	}
 	out, err := run(name, args...)
 	if err != nil && len(out) == 0 {

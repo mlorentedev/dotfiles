@@ -139,7 +139,7 @@ type Installer struct {
 	// network- and npm-free.
 	Run func(name string, args ...string) error
 	// Probe runs a tool's `--version` for the default version probes. Nil means
-	// ExecRunner; tests inject captured output.
+	// ProbeRunner; tests inject captured output.
 	Probe Runner
 	// HasCommand reports whether a package manager is on PATH. Nil means
 	// exec.LookPath; tests inject the answer.
