@@ -38,6 +38,12 @@ The first review (`review.md`, FAIL, agy/gemini-3.1-pro-high, committed in
    doctor check stays the guard. Owed with the Windows items below: a
    `dotf doctor` run on a machine that has opencode's catalog cached (this Mac
    SKIPs the section) showing `[ OK ]` for these values.
+   Recorded 2026-10-13 on msi (Linux, dotf 0.69.0), whose opencode catalog is
+   cached (`~/.cache/opencode/models.json`, written 2026-09-24, carrying
+   `openrouter/deepseek/deepseek-chat` limit `{'context': 163840, 'output': 16384}`):
+   `dotf doctor --verbose` prints `[Model limit drift] [ OK ] 1 models match the
+   provider catalog`. The macmini still SKIPs the section (no cached catalog).
+   The Windows run of AC3 below remains owed.
 
 2. **The proposal named `CREATE_NO_WINDOW`, the code does not use it (Major).**
    Fixed: `proposal.md` What #1 now describes `HideWindow` with
