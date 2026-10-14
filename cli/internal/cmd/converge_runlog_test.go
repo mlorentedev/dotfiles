@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -127,5 +128,95 @@ func TestConvergeOnly_KeepsATranscriptButNotLastJSON(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(state, "converge", "last.json")); !os.IsNotExist(err) {
 		t.Errorf("an --only run wrote last.json: %v", err)
+	}
+}
+
+// Only names that end like a credential are masked by name. A name that merely
+// contains SESSION or CREDENTIAL holds ordinary values ("wayland", a socket
+// path) that would otherwise be shredded throughout the transcript.
+func TestRunLogSecrets_MasksCredentialNamesOnly(t *testing.T) {
+	t.Setenv("XDG_SESSION_TYPE", "wayland")
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/home/u/.aws/credentials")
+	t.Setenv("BW_SESSION", "bw-session-value-123")
+	t.Setenv("OPENROUTER_API_KEY", "or-key-value-123")
+	t.Setenv("GH_TOKEN", "gh-token-value-123")
+	t.Setenv("BITACORA_PAT", "bitacora-pat-value-123")
+	got := runLogSecrets(t.TempDir())
+	for _, name := range []string{"XDG_SESSION_TYPE", "DBUS_SESSION_BUS_ADDRESS", "AWS_SHARED_CREDENTIALS_FILE"} {
+		if _, ok := got[name]; ok {
+			t.Errorf("%s is not a credential and must not be masked", name)
+		}
+	}
+	for _, name := range []string{"BW_SESSION", "OPENROUTER_API_KEY", "GH_TOKEN", "BITACORA_PAT"} {
+		if _, ok := got[name]; !ok {
+			t.Errorf("%s holds a credential and must be masked", name)
+		}
+	}
+}
+
+// A variable the secrets registry exposes is masked whatever its name.
+func TestRunLogSecrets_MasksRegistryExposedVars(t *testing.T) {
+	repo := t.TempDir()
+	reg := "version: 1\nsecrets:\n  - id: VAULT_DSN\n    plane: app\n    backend: bw\n    bw:\n      item: vault-dsn\n      field: VAULT_DSN\n      folder: Dotfiles/apps\n    expose: { env: VAULT_DSN }\n    consumers: [\"cli:test\"]\n"
+	if err := os.MkdirAll(filepath.Join(repo, "secrets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "secrets", "registry.yaml"), []byte(reg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("VAULT_DSN", "postgres://db/vault-value")
+	if _, ok := runLogSecrets(repo)["VAULT_DSN"]; !ok {
+		t.Errorf("a registry-exposed variable must be masked")
+	}
+}
+
+// The shipped registry parses, so the names it exposes reach the mask: a parse
+// failure there would leave every registry secret unmasked, silently.
+func TestRunLogSecrets_ReadsTheShippedRegistry(t *testing.T) {
+	// A name no credential-shaped rule matches: only the registry knows it.
+	const name = "KUBELAB_RESTIC_PASSWORD_BEELINK"
+	t.Setenv(name, "restic-password-value-123")
+	if secretNameShape.MatchString(name) {
+		t.Fatalf("%s matches the name rule; pick a name only the registry knows", name)
+	}
+	if _, ok := runLogSecrets(repoRootForTest(t))[name]; !ok {
+		t.Errorf("%s, which secrets/registry.yaml exposes, was not collected", name)
+	}
+}
+
+// A failed run's error reaches both reports, the run's own and last.json, and
+// both are redacted like the transcript: a step can fail with a token in its
+// message (a remote URL it echoes).
+func TestConverge_FailedRunReportsAreRedacted(t *testing.T) {
+	gh := "ghp_" + strings.Repeat("F4il", 9)
+	repo, home := convergeFixture(t)
+	state := filepath.Join(home, "state")
+	t.Setenv("XDG_STATE_HOME", state)
+	base := convergeOptions
+	convergeOptions = func() converge.Options {
+		o := base()
+		o.RunHarnessDeploy = func(converge.Env) error {
+			return errors.New("push to https://x:" + gh + "@github.com/o/r refused")
+		}
+		return o
+	}
+	if _, _, err := execute(t, "converge", "--repo", repo); err == nil {
+		t.Fatal("the run should fail")
+	}
+	dir := filepath.Join(state, "dotfiles", "converge")
+	reports, _ := filepath.Glob(filepath.Join(dir, "runs", "*.json"))
+	reports = append(reports, filepath.Join(dir, "last.json"))
+	for _, p := range reports {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), gh) || !strings.Contains(string(raw), "[REDACTED]") {
+			t.Errorf("%s leaks the token or was not masked:\n%s", filepath.Base(p), raw)
+		}
+	}
+	if len(reports) != 2 {
+		t.Errorf("want the run's report and last.json, got %v", reports)
 	}
 }

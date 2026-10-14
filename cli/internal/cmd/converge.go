@@ -84,7 +84,7 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 			} else {
 				defer c.stop()
 			}
-			out = io.MultiWriter(w, rl.Stream())
+			out = teeWriter{w, rl.Stream()}
 		}
 	}
 	opts := convergeOptions()
@@ -103,8 +103,12 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	if plan {
 		return err
 	}
+	saved, savedErr := rep, err
 	if rl != nil {
-		if werr := rl.WriteReport(rep, err); werr != nil {
+		// Both reports carry the transcript's redaction: a step's detail or
+		// the run's error can echo a remote URL with a token in it.
+		saved, savedErr = rl.Redacted(rep, err)
+		if werr := rl.WriteReport(saved, savedErr); werr != nil {
 			_, _ = fmt.Fprintf(w, "warning: writing this run's report: %v\n", werr)
 		}
 		_, _ = fmt.Fprintf(out, "log: %s\n", rl.Path())
@@ -117,7 +121,7 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 		return errors.Join(err, fmt.Errorf("writing the converge report: %w", serr))
 	}
 	path := filepath.Join(state, "converge", "last.json")
-	if werr := converge.WriteReport(path, rep, err); werr != nil {
+	if werr := converge.WriteReport(path, saved, savedErr); werr != nil {
 		return errors.Join(err, fmt.Errorf("writing the converge report: %w", werr))
 	}
 	_, _ = fmt.Fprintf(out, "report: %s\n", path)

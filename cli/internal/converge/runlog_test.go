@@ -250,3 +250,51 @@ func TestPruneRuns_KeepsTheNewestRuns(t *testing.T) {
 		t.Errorf("prune removed a file that is not a run: %v", err)
 	}
 }
+
+// The report beside the transcript is held to the same rule: a step's detail
+// or the run's error can echo a remote URL with a token in it.
+func TestRunLog_ReportIsRedactedToo(t *testing.T) {
+	gh := "ghp_" + strings.Repeat("R3p0", 9)
+	rl, state := openTestRunLog(t, nil)
+	rep := Report{GOOS: "linux", Entries: []Entry{{Name: "checkout", Status: StatusFailed, Detail: "fetch https://x:" + gh + "@github.com/o/r failed"}}}
+	runErr := errors.New("checkout: " + gh)
+	red, redErr := rl.Redacted(rep, runErr)
+	if err := rl.WriteReport(red, redErr); err != nil {
+		t.Fatal(err)
+	}
+	_ = rl.Close()
+	raw, _ := os.ReadFile(filepath.Join(state, "converge", "runs", "20261014T035512Z.json"))
+	if strings.Contains(string(raw), gh) || !strings.Contains(string(raw), "[REDACTED]") {
+		t.Errorf("the run's report leaks or was not masked:\n%s", raw)
+	}
+	if rep.Entries[0].Detail == red.Entries[0].Detail {
+		t.Errorf("Redacted must copy, not mask the caller's report in place")
+	}
+}
+
+// npm and uv are the children a converge captures most; their token shapes
+// are masked by form.
+func TestRunLog_RedactsPackageRegistryTokens(t *testing.T) {
+	npm := "npm_" + strings.Repeat("a1B2c3", 6)
+	pypi := "pypi-AgEIcHlwaS5vcmc" + strings.Repeat("Xy_9", 8)
+	rl, _ := openTestRunLog(t, nil)
+	_, _ = fmt.Fprintln(rl.Stream(), "//registry.npmjs.org/:_authToken="+npm+" uv publish --token "+pypi)
+	got := readRunLog(t, rl)
+	for _, leak := range []string{npm, pypi} {
+		if strings.Contains(got, leak) {
+			t.Errorf("the log holds %q:\n%s", leak, got)
+		}
+	}
+}
+
+// The header is a line like any other: argv can carry a token.
+func TestRunLog_HeaderIsRedacted(t *testing.T) {
+	gh := "ghp_" + strings.Repeat("H3ad", 9)
+	rl, err := OpenRunLog(t.TempDir(), runLogStart, nil, "dotf converge --repo https://x:"+gh+"@github.com/o/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readRunLog(t, rl); strings.Contains(got, gh) {
+		t.Errorf("the header leaks a token:\n%s", got)
+	}
+}

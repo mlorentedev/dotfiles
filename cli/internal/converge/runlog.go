@@ -86,7 +86,7 @@ func OpenRunLog(state string, start time.Time, secrets map[string]string, header
 	// Longest first, so a value that is a prefix of another cannot break the
 	// longer one's match and leak its suffix.
 	sort.SliceStable(rl.masks, func(i, j int) bool { return len(rl.masks[i].value) > len(rl.masks[j].value) })
-	if _, err := fmt.Fprintf(f, "# %s\n# started %s\n", header, start.UTC().Format(time.RFC3339)); err != nil {
+	if _, err := fmt.Fprintf(f, "# %s\n# started %s\n", rl.redact(header), start.UTC().Format(time.RFC3339)); err != nil {
 		_ = f.Close()
 		return nil, err
 	}
@@ -109,7 +109,24 @@ func (rl *RunLog) Stream() io.Writer {
 	return s
 }
 
-// WriteReport persists the run's report beside its transcript.
+// Redacted returns a copy of a run's report and error with the transcript's
+// redaction applied to every detail and to the error, for the files written
+// beside it. The caller's report is not changed.
+func (rl *RunLog) Redacted(rep Report, runErr error) (Report, error) {
+	out := rep
+	out.Entries = make([]Entry, len(rep.Entries))
+	for i, e := range rep.Entries {
+		e.Detail = rl.redact(e.Detail)
+		out.Entries[i] = e
+	}
+	if runErr != nil {
+		runErr = errors.New(rl.redact(runErr.Error()))
+	}
+	return out, runErr
+}
+
+// WriteReport persists the run's report beside its transcript. Pass it what
+// Redacted returns.
 func (rl *RunLog) WriteReport(rep Report, runErr error) error {
 	return WriteReport(filepath.Join(rl.dir, rl.stamp+".json"), rep, runErr)
 }
@@ -176,6 +193,8 @@ var (
 		regexp.MustCompile(`()\bAKIA[0-9A-Z]{16}\b()`),
 		regexp.MustCompile(`()\bxox[abprs]-[A-Za-z0-9-]{10,}()`),
 		regexp.MustCompile(`()\bAGE-SECRET-KEY-1[0-9A-Z]{20,}()`),
+		regexp.MustCompile(`()\bnpm_[A-Za-z0-9]{36}\b()`),
+		regexp.MustCompile(`()\bpypi-AgEI[A-Za-z0-9_-]{20,}()`),
 		regexp.MustCompile(`(?i)(\b(?:proxy-)?authorization:\s*(?:bearer|basic|token)\s+)[^\s'"]+()`),
 		regexp.MustCompile(`(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]{16,}()`),
 		// URL userinfo: scheme://user:password@host keeps the user, masks the password.

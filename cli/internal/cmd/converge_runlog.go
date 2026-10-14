@@ -40,8 +40,12 @@ func consoleOut() *os.File {
 // open; the run must still exit.
 const drainTimeout = 2 * time.Second
 
-// secretNameShape is a variable name that holds a credential by convention.
-var secretNameShape = regexp.MustCompile(`(?i)(TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|API_?KEY|PRIVATE_KEY|SESSION|CREDENTIAL)`)
+// secretNameShape is a variable name that holds a credential by convention:
+// one that ends like one, plus Bitwarden's session. Anchored on the suffix,
+// because a name that merely contains SESSION or CREDENTIAL holds ordinary
+// values (XDG_SESSION_TYPE=wayland, a credentials file's path) that masking
+// would shred throughout the transcript.
+var secretNameShape = regexp.MustCompile(`(?i)((^|_)(TOKEN|SECRET|SECRET_KEY|PASSWORD|PASSWD|PASSPHRASE|API_?KEY|PRIVATE_KEY|ACCESS_KEY|PAT)$|^BW_SESSION$)`)
 
 // runLogSecrets is what a transcript masks by value: every variable the
 // checkout's secrets registry exposes, and every variable whose name says it
@@ -187,4 +191,15 @@ func loggedRunner(run tools.Runner, log io.Writer) tools.Runner {
 		}
 		return out, err
 	}
+}
+
+// teeWriter writes to each writer and ignores their errors: a console that
+// went away must not cost the transcript the report, nor the other way round.
+type teeWriter []io.Writer
+
+func (t teeWriter) Write(p []byte) (int, error) {
+	for _, w := range t {
+		_, _ = w.Write(p)
+	}
+	return len(p), nil
 }
