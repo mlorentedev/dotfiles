@@ -10,6 +10,8 @@
 # AI Tools
 Set-Alias -Name c -Value claude
 Set-Alias -Name g -Value agy
+# hr: herdr, the terminal cockpit for agent panes and worktrees (h is helm in zsh).
+Set-Alias -Name hr -Value herdr
 
 # agyp: launch agy with a saved prompt, the PowerShell twin of .zsh/functions.sh's
 # agyp (PARITY-001, #764). Same contract on both sides: the prompt lives at

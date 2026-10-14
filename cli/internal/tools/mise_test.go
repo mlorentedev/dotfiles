@@ -153,6 +153,16 @@ func TestRenderMiseConfig_TurnsOffTheOwnUpdaterOfAToolMiseManages(t *testing.T) 
 	}
 }
 
+// pi has no updater of its own, but its startup check tells the user to run
+// `pi update`, which would install a second pi outside mise. The check is off
+// wherever mise manages pi, and both settings land in one [env] table.
+func TestRenderMiseConfig_SilencesPisUpdateCheck(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"claude", "2.1.296"}, {"pi", "1.2.0"}}, "", "claude", "pi"))
+	if !strings.Contains(out, "\n[env]\nDISABLE_AUTOUPDATER = \"1\"\nPI_SKIP_VERSION_CHECK = \"1\"\n") {
+		t.Errorf("want both settings under one [env]:\n%s", out)
+	}
+}
+
 // fakeMise answers `mise which <tool>` for the tools in installed, and
 // `<path> --version` with the version installed records; `mise install` marks
 // every pending tool installed at its pin.

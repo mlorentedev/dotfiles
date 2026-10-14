@@ -243,12 +243,16 @@ setup() {
     "$jq_bin" -e '.compaction.modelOverrides["nan/deepseek-v4-flash"].reserveTokens == 600000' "$settings"
 }
 
-# #1484: the image carries npm since #2254, so setup installs pi and runs the pi
-# package reconcile for real. Its exit status is a warning by design, so the
+# #1484: mise installs pi (#2013 D9) and the image carries npm since #2254, so
+# setup runs the pi package reconcile for real. Its exit status is a warning by design, so the
 # result is what is checked (lesson 379): pi's settings.json records every
 # package ai/pi/packages.json declares and nothing it does not.
 @test "pi packages converge on ai/pi/packages.json [#1484]" {
-    [ -x "$HOME/.local/bin/pi" ] || { echo "setup did not install pi into ~/.local/bin"; return 1; }
+    # Asked of mise from $HOME, like the pinned-CLI test below: a bats process
+    # has no `mise activate`, so PATH alone cannot answer.
+    local mise
+    mise="$(command -v mise || printf '%s' "$HOME/.local/bin/mise")"
+    bash -c 'cd "$HOME" && "$1" which pi' _ "$mise" >/dev/null 2>&1 || { echo "mise did not install pi"; return 1; }
     run dotf pi packages check --repo "$REPO_DIR"
     [ "$status" -eq 0 ] || { echo "$output"; return 1; }
 }
