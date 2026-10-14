@@ -42,7 +42,7 @@ wip_override: "the owner put the converge logs first (2026-10-14: 'los logs ante
 ## Risks / open questions
 
 - **Interleaving.** A step's subprocess output lands between its `→` line and its result line. That is wanted, because it shows which step printed what. The golden tests cover a step that writes to the console while it runs.
-- **Owner question:** a heartbeat line (`… tools still running, 2m10s`) every 30 s on a terminal. It would serve the "how long it has taken" half without `\r`. Recorded on #2460 and not decided here.
+- **Owner question:** a heartbeat line (`… tools still running, 2m10s`) every 30 s on a terminal. It would serve the "how long it has taken" half without `\r`. Not decided here; it is CLI-115 (#2480), so the close of #2460 does not drop it.
 - **Golden output.** Durations vary from run to run. The renderer takes a clock, so tests inject a fixed one and the golden files hold no real time.
 
 ## Acceptance criteria
