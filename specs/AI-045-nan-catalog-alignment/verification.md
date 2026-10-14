@@ -146,6 +146,15 @@ Second archive review, 2026-10-13 (`nan/qwen3.8-flash`, PASS-WITH-GAPS, reviewed
 - Minor, AC4's published figures were pinned by no test. Added `the NaN pool declares the base plan's published concurrency, per model and per key` to `tests/model-map.bats` and to f4; changing gemma4 from 5 to 6 fails it.
 - Question, AC6's evidence was 31,381 tokens rather than #1856's 42K. Kept as the stated substitution in `tasks.md`; the streaming setting is pinned by test.
 
+Third archive review, 2026-10-14 (`nan/qwen3.8-flash`, PASS-WITH-GAPS, reviewed `8e5ec524`). It found no REAL Major. The contract set is closed by this verdict, so the findings outside it are fixed and the ones inside it are dispositioned here:
+
+- Major (THEORETICAL), AC7's budget test restated the probe seconds (90 and 30) instead of reading them, and the job's bound equalled the sum (31 = 31) although AC7 asks the job to *exceed* it. Fixed: the test reads `PREFLIGHT_TIMEOUT` and `ROUTE_PROBE_TIMEOUT` from a step's env, else from the script's own `${NAME:-default}`, and requires the bound to be strictly greater. `timeout-minutes` goes from 31 to 32. Raising the preflight default to 120 s fails the test.
+- Minor (THEORETICAL), Amendment B's four weights were pinned by no test: the draw test compares against whatever the pool declares. Fixed: `route: the shipped weights are the ones ADR-046 adopted` parses ADR-046 D3's "Weights at adoption" line and requires the shipped pool to equal it, so a share changes only with an amendment to the ADR. Changing mimo from 27 to 20 fails it.
+- Minor (REAL) and Minor (THEORETICAL), f1's pattern fails on a prose mention with `:` before the name, and misses a YAML block-sequence binding. Declined: each fix is a contract-set edit, which would need a fourth review, and nothing runs f1 after the archive. No workflow and no `dotf` code executes `features.json` verification commands; they gate this archive and nothing later. The block-sequence shape binds no model in any of the seven files. The binding a revert would actually change is held by tests CI runs on every PR: `pr-agent: the chain the preflight probes equals the toml's, model and fallbacks`, plus the pin registry (`TestEveryRepoRoutingPinResolvesInTheMap`).
+- Minor (REAL), the exact-count vacuity guards on f2, f4, f5 and f8 go red when a matching test is added. Declined for the same reason: they are archive-time commands with no later consumer, so the brittleness has nothing left to break. f2's count including an AC9 title is noted as coincidental.
+- Question (AC6 size), carried unchanged from round 2: a stated substitution in `tasks.md`.
+- Question (`ai/pi/nan-package-windows.json`), resolved by the reviewer: a parity-tested package snapshot, not a binding.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
