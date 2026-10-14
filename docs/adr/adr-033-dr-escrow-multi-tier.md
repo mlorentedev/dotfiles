@@ -90,6 +90,11 @@ Multiplying the tiers of a backup that has never been restored multiplies zero. 
    full-vault escrow has never been on the USB. This is a three-line fix with a bats assertion, and
    it is the cheapest row-4 coverage available.
 
+   _Implemented by #1770, which replaced both mechanisms above rather than patching them:
+   `dotf secrets usb backup` copies the declared three-file payload, and `dotf secrets usb verify`
+   proves it by consequence and writes `sensitive/dr/drill-record.json`, the committed record
+   `dotf doctor` reads in place of the `~/.dotfiles/.dr-drill` marker. The script is deleted._
+
 ### D3 — Phase 2 (blocked on #1008): scheduled, unattended refresh
 
 Phase 2 does not exist until #1008 resolves, and that dependency is mechanical, not a preference:

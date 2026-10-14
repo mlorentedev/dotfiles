@@ -272,6 +272,35 @@ calls, reads no vault by design.
   FAIL: a vault edit waits for its refresh PR, and a machine whose vault is not pulled sees the
   records ahead. The warning names both remedies
 
+## #1770 — the offline DR copy was refreshed by a script that verified nothing, and the drill by `touch`
+
+`scripts/backup-secrets-to-usb.sh` copied plaintext `sensitive/*.secret` files and retired blobs
+and checked nothing, and the drill was recorded by touching `~/.dotfiles/.dr-drill`, a marker on
+one machine that said someone ran `touch`. Owner decisions (2026-10-13): mount on the Mac with
+VeraCrypt (#2435 declares the cask), and accept doctor's "no drill" warning until the first real
+verification rather than seed a record.
+
+- [x] `dotf secrets usb verify --mount <dir>`: the stick's identity has this machine's recipient;
+  it opens the repo's escrow and its own copy to exactly what each manifest describes; its copy is
+  the repo's byte for byte; nothing else is on the volume. In memory, every failure named in one
+  run, no record on a failure
+- [x] `dotf secrets usb backup --mount <dir> [--prune] [--init-identity]`: writes only to a mounted
+  volume (device differs from its parent on Unix, a non-system drive root on Windows), installs the
+  identity only when asked and only on an empty volume, refuses a stick with another identity, and
+  each refusal leaves no key material behind (advisor finding: a typo or an unmounted mount point
+  would have received the age key in the clear). No chmod on the stick: exFAT keeps no modes and
+  Linux refuses the call
+- [x] `sensitive/dr/drill-record.json`, un-ignored by exact name; `rehearsed_at` survives a rewrite
+- [x] Doctor reads the record checkout-first beside the escrow: WARN when absent, older than 180
+  days, or made against an older escrow digest; the marker is gone
+- [x] Tests with real `age` (skipped without it): off-by-one manifest fails and records nothing,
+  stale copy names the refresh, another identity is refused untouched, extras fail until pruned,
+  record and report carry no `AGE-SECRET-KEY` and no plaintext
+- [x] The script, its bats, `age-standalone.sh` (its only consumer) and their tests retired;
+  runbook OFFLINE COPY and "Drill it", ADR-028 and ADR-033 updated
+- [ ] Live: the owner mounts the stick on the Mac and runs `dotf secrets usb backup --mount <dir>`
+  with a released `dotf`; the committed record turns doctor's drill line green
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
