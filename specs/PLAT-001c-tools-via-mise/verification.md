@@ -48,6 +48,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - After it, `dotf converge --plan --only tools` reads `catalog to install: veracrypt; 38 pinned CLI(s) at their pin`, with nothing to prune. `command -v pwsh` finds nothing, so the dangling shim is gone.
   - `bats tests/setup-windows.bats tests/profile-heal-ps1.bats`: 138 ok, and the 6 PowerShell tests skip because pwsh is absent; they no longer fail.
   - Mutations: dropping the pin filter fails `TestSync_PrunesAnInstallNoPinAsksForAndIsIdempotent` (`[jq@1.7.1 powershell@7.5.11]`). Never calling the prune fails it and `TestToolsSync_PlansReportsAndPrunesAnOrphanedInstall` (`still installed: powershell@7.5.11`). Dropping the doctor WARN fails its test.
+  - The contract the prune rests on, measured live (PR-Agent's untested-prune-scope finding on #2476; mise 2026.10.3, macOS arm64). `mise ls --prunable --json` listed `jq@1.7.1`. A scratch project outside this repo with `mise.toml` `jq = "1.7.1"`, trusted and loaded once from its own directory, removed `jq@1.7.1` from the list read from `~`. Deleting the project put it back. So a tool another project's tracked config requires is not prunable, wherever converge runs. A fake cannot falsify that, which is why it is measured here and not in a unit test.
 
 ## Test status
 
