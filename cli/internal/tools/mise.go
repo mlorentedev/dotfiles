@@ -290,9 +290,10 @@ func MiseShimsDir(home, goos string, getenv func(string) string) string {
 // config: a hand-written config.toml keeps working beside it.
 type MiseSync struct {
 	ConfigDir string
-	Run       Runner // `mise install` and `<tool> --version`, stdout and stderr merged
-	// Stdout runs `mise which`, whose stdout alone is the path: a warning mise
-	// prints on stderr must not become part of it. Nil means Run.
+	Run       Runner // `mise install`, and a `<tool> --version` silent on stdout; stdout and stderr merged
+	// Stdout runs `mise which`, whose stdout alone is the path, and each
+	// tool's `--version` first (probeVersion): a warning on stderr must not
+	// become part of either. Nil means Run.
 	Stdout Runner
 	// PythonPackages must be importable from mise's Python at their pin
 	// (MisePythonPackageMarker). Nil means the sync owns no packages file.
@@ -671,21 +672,25 @@ func (s MiseSync) runsAtPin(t MiseTool) bool {
 	return v != "" && atLeast(v, t.Version)
 }
 
-// probeVersion is ProbeRunner's rule over the sync's two runners. Run merges
-// stdout and stderr, which a run that exits 0 may use; a failed run has a
-// version only on stdout, read again through Stdout, because its stderr can
-// name another package's (BUG-142, the BUG-141 class). Without a Stdout
-// runner, a failed run has no version.
+// probeVersion is ProbeRunner's rule over the sync's two runners: stdout
+// first, through Stdout, so a warning on stderr is never read before the
+// tool's own banner; a failed run has no other version, whatever its stderr
+// names (BUG-142, the BUG-141 class); the merged output counts only for a run
+// that exited 0 and printed no version on stdout, the one case that runs the
+// tool twice.
 func (s MiseSync) probeVersion(path string, args ...string) string {
-	out, err := s.Run(path, args...)
-	if err == nil {
-		return string(semverRE.Find(out))
+	run := s.Stdout
+	if run == nil {
+		run = s.Run
 	}
-	if s.Stdout == nil {
+	out, err := run(path, args...)
+	if m := semverRE.Find(out); m != nil {
+		return string(m)
+	}
+	if err != nil {
 		return ""
 	}
-	out, _ = s.Stdout(path, args...)
-	return string(semverRE.Find(out))
+	return ProbeVersionArgs(path, s.Run, args...)
 }
 
 // writeFileAtomic writes data to path through a temp file in the same
@@ -714,9 +719,9 @@ func writeFileAtomic(path string, data []byte) error {
 
 // HomeRunners returns the runners a machine-level sync uses, both run from
 // home so a project mise.toml in the caller's directory is not installed as a
-// side effect: run merges stdout and stderr (`mise install`, `<tool>
-// --version`), stdout returns stdout alone (`mise which`, whose output is a
-// path a stderr warning must not corrupt).
+// side effect: run merges stdout and stderr (`mise install`), stdout returns
+// stdout alone (`mise which`, whose output is a path a stderr warning must not
+// corrupt, and a tool's `--version`, read stdout first).
 func HomeRunners(home string) (run, stdout Runner) {
 	bashBin := ""
 	if runtime.GOOS == "windows" {
