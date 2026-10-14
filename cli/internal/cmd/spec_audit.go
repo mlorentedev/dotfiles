@@ -27,6 +27,15 @@ var errAuditAttention = errors.New("spec audit: at least one active spec needs a
 // unanswerable finding instead of a hung audit.
 const specAuditTimeout = 20 * time.Second
 
+// specAuditAttempts is how often the audit asks GitHub about one issue before
+// calling it unanswerable. The audit gates CI, where one TLS handshake timeout
+// otherwise failed a whole leg (#2450).
+const specAuditAttempts = 3
+
+// specAuditWait is the back-off between attempts; nil is spec's default. A
+// package var so tests do not sleep.
+var specAuditWait func(attempt int)
+
 // specAuditRun runs gh with a deadline. A package var so tests never reach
 // the network.
 var specAuditRun = func(args ...string) (string, string, error) {
@@ -80,7 +89,7 @@ could not be answered must not read as a clean audit.`,
 				c.PrintErrln(err)
 				return err
 			}
-			findings, err := spec.AuditIssueState(root, home, spec.GHIssueStateLookup(specAuditRun))
+			findings, err := spec.AuditIssueState(root, home, spec.GHIssueStateLookup(specAuditRun, spec.Attempts(specAuditAttempts), spec.RetryWait(specAuditWait)))
 			if err != nil {
 				c.PrintErrln("spec audit:", err)
 				return err

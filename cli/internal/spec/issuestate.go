@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // IssueState is what the forge says about one tracking issue.
@@ -32,10 +34,29 @@ type IssueStateLookup func(IssueRef) (IssueState, error)
 // endpoint: it has its own rate budget, separate from the GraphQL one that
 // board automation exhausts, and its 404 cleanly means "no such issue".
 // run executes gh with args and returns stdout, stderr and the exit error.
-func GHIssueStateLookup(run func(args ...string) (stdout, stderr string, err error)) IssueStateLookup {
+//
+// One attempt by default. Attempts(n) retries a failure GitHub did not answer
+// (a network or TLS timeout, a 5xx), never an HTTP 4xx, which is its answer.
+// The retry is the caller's policy because only the caller knows its bound: a
+// CI audit that fails its leg on one blip wants it (#2450); the doctor, which
+// reports an unanswerable spec as a WARN and kills gh at its own deadline,
+// would only triple its wait on a hung call.
+func GHIssueStateLookup(run func(args ...string) (stdout, stderr string, err error), opts ...LookupOption) IssueStateLookup {
+	cfg := lookupConfig{attempts: 1, wait: linearBackoff}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	return func(ref IssueRef) (IssueState, error) {
-		out, errOut, err := run("api", fmt.Sprintf("repos/%s/issues/%d", ref.Repo, ref.Number),
-			"--jq", `[.state, (.pull_request != null)] | @tsv`)
+		var out, errOut string
+		var err error
+		for attempt := 1; attempt <= cfg.attempts; attempt++ {
+			out, errOut, err = run("api", fmt.Sprintf("repos/%s/issues/%d", ref.Repo, ref.Number),
+				"--jq", `[.state, (.pull_request != null)] | @tsv`)
+			if err == nil || httpClientError.MatchString(errOut) || attempt == cfg.attempts {
+				break
+			}
+			cfg.wait(attempt)
+		}
 		if err != nil {
 			if strings.Contains(errOut, "HTTP 404") {
 				return StateNotFound, nil
@@ -53,6 +74,37 @@ func GHIssueStateLookup(run func(args ...string) (stdout, stderr string, err err
 		return StateUnknown, fmt.Errorf("gh api %s: unexpected output %q", ref, strings.TrimSpace(out))
 	}
 }
+
+// LookupOption tunes GHIssueStateLookup.
+type LookupOption func(*lookupConfig)
+
+type lookupConfig struct {
+	attempts int
+	wait     func(attempt int)
+}
+
+// Attempts makes a lookup try up to n times (n < 1 counts as 1), backing off
+// one second more before each retry.
+func Attempts(n int) LookupOption {
+	return func(c *lookupConfig) { c.attempts = max(n, 1) }
+}
+
+// httpClientError is gh's report of a 4xx: an answer from GitHub, not a
+// failure to reach it.
+var httpClientError = regexp.MustCompile(`\(HTTP 4[0-9]{2}\)`)
+
+// RetryWait replaces the back-off before retry number attempt; nil keeps the
+// default. Tests pass a no-op: a retrying test without one sleeps for real.
+func RetryWait(wait func(attempt int)) LookupOption {
+	return func(c *lookupConfig) {
+		if wait != nil {
+			c.wait = wait
+		}
+	}
+}
+
+// linearBackoff waits one second more before each retry.
+func linearBackoff(attempt int) { time.Sleep(time.Duration(attempt) * time.Second) }
 
 func firstLine(s string, fallback error) string {
 	if line, _, _ := strings.Cut(strings.TrimSpace(s), "\n"); line != "" {

@@ -205,3 +205,64 @@ func TestIssueStateNoActiveSpecIsProseLinked(t *testing.T) {
 		t.Fatal("no active spec was checked — the walk found nothing, so this test proves nothing")
 	}
 }
+
+// noWait makes the retry back-off instant.
+var noWait = RetryWait(func(int) {})
+
+// A failure that is not an answer from GitHub (a TLS handshake timeout on the
+// runner, a 502) is retried: one such failure turned all 12 active specs
+// unanswerable and failed a Windows leg (#2450).
+func TestIssueStateGHLookup_RetriesATransientFailure(t *testing.T) {
+	calls := 0
+	lookup := GHIssueStateLookup(func(...string) (string, string, error) {
+		calls++
+		switch calls {
+		case 1:
+			return "", `Get "https://api.github.com/repos/o/r/issues/1": net/http: TLS handshake timeout` + "\n", errors.New("exit status 1")
+		case 2:
+			return "", "gh: Bad Gateway (HTTP 502)\n", errors.New("exit status 1")
+		}
+		return "open\tfalse\n", "", nil
+	}, Attempts(3), noWait)
+	got, err := lookup(IssueRef{"o/r", 1})
+	if err != nil || got != StateOpen || calls != 3 {
+		t.Errorf("got (%v, %v) after %d call(s), want open after 3", got, err, calls)
+	}
+}
+
+// A failure that persists past the attempts is still unanswerable, never an
+// answer; and an HTTP 4xx is GitHub's answer, so it is not retried.
+func TestIssueStateGHLookup_StopsRetrying(t *testing.T) {
+	for name, tc := range map[string]struct {
+		stderr string
+		calls  int
+	}{
+		"a persistent timeout gives up":    {"net/http: TLS handshake timeout\n", 3},
+		"a refusal is answered at once":    {"gh: Bad credentials (HTTP 401)\n", 1},
+		"a rate limit is answered at once": {"gh: API rate limit exceeded (HTTP 403)\n", 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			calls := 0
+			lookup := GHIssueStateLookup(func(...string) (string, string, error) {
+				calls++
+				return "", tc.stderr, errors.New("exit status 1")
+			}, Attempts(3), noWait)
+			got, err := lookup(IssueRef{"o/r", 1})
+			if err == nil || got != StateUnknown || calls != tc.calls {
+				t.Errorf("got (%v, %v) after %d call(s), want unanswerable after %d", got, err, calls, tc.calls)
+			}
+		})
+	}
+}
+
+// Without Attempts the lookup asks once: the doctor's call keeps its bound.
+func TestIssueStateGHLookup_AsksOnceByDefault(t *testing.T) {
+	calls := 0
+	lookup := GHIssueStateLookup(func(...string) (string, string, error) {
+		calls++
+		return "", "net/http: TLS handshake timeout\n", errors.New("exit status 1")
+	}, noWait)
+	if _, err := lookup(IssueRef{"o/r", 1}); err == nil || calls != 1 {
+		t.Errorf("got %v after %d call(s), want unanswerable after 1", err, calls)
+	}
+}

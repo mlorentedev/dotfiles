@@ -13,8 +13,9 @@ import (
 // missing key behaves like a network failure.
 func stubSpecAuditGH(t *testing.T, states map[string]string) {
 	t.Helper()
-	orig := specAuditRun
-	t.Cleanup(func() { specAuditRun = orig })
+	orig, origWait := specAuditRun, specAuditWait
+	t.Cleanup(func() { specAuditRun, specAuditWait = orig, origWait })
+	specAuditWait = func(int) {}
 	specAuditRun = func(args ...string) (string, string, error) {
 		key := strings.TrimPrefix(args[1], "repos/")
 		key = strings.Replace(key, "/issues/", "/", 1)
@@ -80,5 +81,23 @@ func TestSpecAuditRefusesWithoutAHomeRepo(t *testing.T) {
 	stubSpecAuditGH(t, nil)
 	if _, _, err := execute(t, "spec", "audit"); err == nil || !strings.Contains(err.Error(), "--repo") {
 		t.Fatalf("want a refusal naming --repo, got %v", err)
+	}
+}
+
+// The audit gates CI, so one transient failure is retried rather than failing
+// the leg (#2450): the first answer arrives on the third attempt.
+func TestSpecAuditRetriesATransientFailure(t *testing.T) {
+	root := makeRepo(t)
+	seedAuditSpec(t, root, "A-001-one", "#1")
+	stubSpecAuditGH(t, nil)
+	calls := 0
+	specAuditRun = func(...string) (string, string, error) {
+		if calls++; calls < specAuditAttempts {
+			return "", "net/http: TLS handshake timeout\n", errors.New("exit status 1")
+		}
+		return "open\tfalse", "", nil
+	}
+	if stdout, _, err := execute(t, "spec", "audit", "--repo", "mlorentedev/dotfiles"); err != nil {
+		t.Fatalf("err = %v after %d call(s)\n%s", err, calls, stdout)
 	}
 }
