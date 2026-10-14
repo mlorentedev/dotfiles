@@ -301,6 +301,13 @@ func LoadModelMap(repoRoot string) (map[string]any, error) {
 	return parsed, nil
 }
 
+// Harnesses names every harness the map routes to, sorted: the agents a
+// machine may run.
+func Harnesses(m map[string]any) []string {
+	h, _ := m["harnesses"].(map[string]any)
+	return sortedKeys(h)
+}
+
 func toStrings(v any) []string {
 	raw, ok := v.([]any)
 	if !ok {

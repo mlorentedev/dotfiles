@@ -122,3 +122,18 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - pi under mise, the installer guard: `npm install -g --prefix "$HOME/.local" @earendil-works/pi-coding-agent@1.2.0` appended to `setup-linux.sh` -> `setup-linux.sh runs no vendor or npm installer for Claude Code, agy or pi` FAIL; reverted -> ok, and the rest of `tests/setup-windows.bats` and `tests/from-zero-doctor-gate.bats` stays green
 - pi under mise, after the rebase onto `09215a8c` and the doctor hint fix (`801d9dd7`, PR-Agent's findings on #2452; macOS arm64, 2026-10-14): `TestCheckOpenCode_piPathResilience/installed_by_mise_but_the_shims_are_not_on_PATH` FAILs before the change (the npm-era "node version" hint plus `dotf converge --only tools`) and passes after. `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...`, `golangci-lint run` -> exit 0 each, 0 issues. The full suite `bats tests/*.bats` -> 1..1939, 1939 ok, 0 not ok (99 skips), exit 0
 - pi under mise, from zero (run 38522559810, head `5943d379`, both runners): first converge `[CHANGE] pi-settings  seeded settings.json from the repo`, so pi was installed when the step ran; second converge `[ OK ] pi-settings  settings.json present, enabledModels in sync`
+- H6, herdr's agent integrations (#2013, macOS arm64, herdr 0.9.3, 2026-10-14). `go build`, `go vet`, `GOOS=windows go vet` and `go test ./...` -> ok. golangci-lint -> 0 issues.
+  - Mutations, each killed:
+    - the absent-harness skip removed;
+    - `Current` read on the negative;
+    - the plan installing;
+    - herdr's absence ignored;
+    - agy left unmapped.
+  - Live, with this branch's build:
+    - `dotf converge --plan --only agent-extensions` -> `herdr: 5 integration(s) to install, 0 current`.
+    - Apply -> `5 integration(s) installed`, then a second apply -> `0 installed, 5 current`.
+    - `records-bind` plan -> `[ OK ]`. The sorted-key diff of `~/.claude/settings.json` before and after is herdr's one SessionStart group.
+  - Measured beside the deploy: herdr's opencode install writes `tui.jsonc` and `plugins/` and leaves a copied `tui.json` byte-identical (shasum).
+- H6, decided: the integrations are a half of `agent-extensions`, not a `deploy.json` entry, since a command string in the manifest is what #1993 keeps from running.
+  - The harness set is `harness/model-map.json`'s, not a second list. codex is not in it.
+  - Each harness is gated on its binary, because herdr creates an absent agent's config dir for claude and copilot.
