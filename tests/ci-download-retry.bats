@@ -32,6 +32,8 @@ setup() {
 @test "the guard sees the downloads it is about" {
     n=$(grep -cF "curl -fsSL $RETRY" "$REPO/.github/workflows/ci.yml" | tr -d ' ')
     [ "$n" -ge 6 ] || { echo "found $n retried downloads in ci.yml, want at least 6" >&2; false; }
+    n=$(grep -cF "curl -fsSL $RETRY" "$REPO/tests/Dockerfile.integration" | tr -d ' ')
+    [ "$n" -ge 4 ] || { echo "found $n retried downloads in Dockerfile.integration, want at least 4" >&2; false; }
 }
 
 # The same failure through apt: on 2026-10-14 the integration container could
