@@ -18,6 +18,7 @@ tags: [runbook, dotfiles, ai, harness]
 |---|---|---|
 | `records-harness` | instruction files, skills, Claude subagents (`compile-harness.sh --deploy`) | `harness/manifest.json` (`presence`, `skills.deploy`, `doctrine.deploy`, `agents.deploy`) |
 | `tools` | installs the agent CLIs the catalog holds | `packages.json` |
+| `pi-settings` | seeds pi's `settings.json` when it is absent, then keeps its `enabledModels` equal to the repo's; skipped while pi is not installed | `ai/pi/settings.json` |
 | `configs-deploy` | agent settings, models and MCP config files | `ai/deploy.json` |
 | `records-bind` | session and gate hooks | `harness/manifest.json` (`agents.bind`, `agents.bind_named`) |
 | `agent-extensions` | Claude Code's MCP servers (hive among them) and plugins, through the `claude` CLI, skipped while claude is not installed; agy's MCP configs (`~/.gemini/config/mcp_config.json` and the hive-vault plugin), written whether or not agy is installed | `mcp-servers.json`, `ai/claude/plugins.json`, `ai/claude/marketplaces.json`, `ai/agy/mcp_servers.json` |

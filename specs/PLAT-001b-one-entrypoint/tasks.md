@@ -281,6 +281,16 @@ env-contract.json names the directory `AGY_HOME`; `agy.Dirs`, doctor, `setup-lin
 - [x] Evidence on the Mac, dev build in `$TMPDIR`, read-only (no `--fix` on the owner's real settings): six FAILs, `Bash(rm -rf ~/*:*)`, `Bash(git push *--force*:*)`, `Bash(git reset --hard*:*)`, `Bash(git clean -fdx*:*)`, `Bash(git clean -f*:*)`, `Bash(*dotf secrets show*:*)`
 - [ ] The owner runs `dotf doctor --fix` with a release carrying this, and the Claude startup warning is gone
 
+### PR 14 — the pi-settings step: seed before the compaction merge (CLI-092 #1948, first half)
+
+Measured on from-zero run 38516177380 (#2452, pi under mise): `tools` installed pi, so `configs-deploy` ran the `pi-compaction` merge onto a missing `~/.pi/agent/settings.json` and created a file holding only `compaction`. `legacy-setup` runs last, and its seed then printed "pi settings.json present, preserving local edits" about a file converge had created seconds earlier. doctor FAILed on the absent `defaultModel` on both runners. This is lesson 422's class: a step keyed on installed harnesses inherits the install order.
+
+- [x] `pi.InspectSettings` / `pi.ApplySettings`: seed the repo's copy byte for byte when the file is absent; once it exists, make `enabledModels` equal to the repo's list (replace, not union, so a dropped model leaves) and keep every other key, numbers as written, and the file's mode. A file that is not a JSON object is an error, never replaced
+- [x] Converge step `pi-settings`, inserted between `tools` and `configs-deploy` (an insertion; no step moved). Skipped while pi is not on PATH, which is every machine until #2452, since the setup script installs pi after every native step
+- [x] A step, not a `seed` strategy in `ai/deploy.json`: the manifest is read by every machine's pinned dotf, which refuses a strategy it does not know and with it the whole manifest. A step exists only in the binary that carries it, so it needs no `ManifestVersion` bump and no release ordering
+- [x] Tests: the seed then the shipped `pi-compaction` merge leaves `defaultModel`, `defaultProvider` and `compaction` in one file, and a second run changes nothing; pi absent is a skip; pi's own choices survive the model sync; the registry order test names the new step. Mutations killed: no seed, no model sync, mode not kept, seeding without pi
+- [ ] Second half (#1948): delete the shell seed and the jq/PowerShell model sync from both setup scripts, once the release carrying this step is the `DOTF_VERSION` pin. An older dotf has no step, and on the plain `setup-linux.sh` path the shell seed is still what runs before `dotf deploy`
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
