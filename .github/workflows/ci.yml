@@ -299,14 +299,19 @@ jobs:
               exit 0
           fi
 
+          updated=false
           for attempt in 1 2 3; do
               echo "apt-get update, attempt ${attempt}/3"
               # shellcheck disable=SC2086  # apt_opts is a deliberate word-split list
               if sudo apt-get update $apt_opts; then
+                  updated=true
                   break
               fi
               [ "$attempt" -lt 3 ] && sleep 10
           done
+          # Fail here, naming the mirror, rather than in the install below,
+          # which on stale lists reads as a missing package.
+          "$updated" || { echo "::error::apt-get update failed 3 times" >&2; exit 1; }
 
           sudo apt-get install -y --no-install-recommends zsh
 
