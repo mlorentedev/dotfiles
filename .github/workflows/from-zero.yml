@@ -100,13 +100,13 @@ jobs:
           }
 
       # The agents are what a workstation is for (#2317): mise installs Claude
-      # Code and agy on both runners (versions.conf `# mise: latest`, #2013
+      # Code, agy and pi on both runners (versions.conf `# mise: latest`, #2013
       # P5c). Asked in the interactive shell, like doctor below, because that
       # is where `mise activate` puts them on PATH.
       - name: The agents resolve on PATH
         run: |
           sh_=bash; command -v zsh >/dev/null 2>&1 && sh_=zsh
-          for agent in claude agy; do
+          for agent in claude agy pi; do
             "$sh_" -ic "command -v $agent && $agent --version" || {
               echo "::error::$agent is not on PATH after the first converge"
               exit 1

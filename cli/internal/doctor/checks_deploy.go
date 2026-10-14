@@ -364,8 +364,13 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	// pi binary + version. pi is optional → SKIP when truly absent, but FAIL when
 	// it is configured (~/.pi present) yet unreachable on PATH — the Orca / GUI
 	// per-node-version PATH trap: pi installed under an nvm node version not on
-	// the current PATH. The ~/.local launcher (see setup-linux.sh) is the
-	// durable fix; this guard makes the trap loud instead of a misleading SKIP.
+	// the current PATH. mise installs pi on Linux and macOS (#2013 D9) and
+	// setup-windows.ps1 from npm; this guard makes the trap loud instead of a
+	// misleading SKIP.
+	piInstall := "`dotf converge --only tools`"
+	if sys.GOOS == "windows" {
+		piInstall = "setup-windows.ps1"
+	}
 	piLocalBin := filepath.Join(home, ".local", "bin", "pi")
 	piConfigured := pathExists(filepath.Join(home, ".pi", "agent", "models.json"))
 	switch {
@@ -376,9 +381,9 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	case isExecFile(piLocalBin):
 		rep.Fail("pi exists at " + piLocalBin + " but not in PATH (reload shell)")
 	case piConfigured:
-		rep.Fail("pi configured (~/.pi present) but not on PATH — installed under a node version not on this PATH; re-run setup to install into ~/.local")
+		rep.Fail("pi configured (~/.pi present) but not on PATH — installed under a node version not on this PATH; install it with " + piInstall)
 	default:
-		rep.Skip("pi not installed (run setup, or npm i -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent)")
+		rep.Skip("pi not installed (install it with " + piInstall + ")")
 	}
 
 	checkShadowedCatalogTools(sys, cfg, rep)

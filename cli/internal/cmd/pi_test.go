@@ -140,3 +140,26 @@ func TestPiPackagesRepoFlagWinsOverTheCwd(t *testing.T) {
 		t.Fatalf("--repo must choose the manifest:\n%s", out)
 	}
 }
+
+// mise installs pi (#2013 D9) and puts it on PATH ahead of ~/.local/bin, so the
+// pi on PATH is the one the user runs. A pi npm left in ~/.local/bin is the
+// fallback, never the winner: reconciling packages through a stale copy would
+// leave the one in use unreconciled.
+func TestResolvePi_PrefersPathOverTheLocalPrefix(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	local := filepath.Join(home, ".local", "bin", "pi")
+	writeFileAt(t, local, "")
+	orig := piLookPath
+	t.Cleanup(func() { piLookPath = orig })
+
+	piLookPath = func(string) (string, error) { return "/mise/shims/pi", nil }
+	if got, ok := resolvePi(""); !ok || got != "/mise/shims/pi" {
+		t.Errorf("got %q, %v; want the pi on PATH", got, ok)
+	}
+	piLookPath = func(string) (string, error) { return "", errors.New("not found") }
+	if got, ok := resolvePi(""); !ok || got != local {
+		t.Errorf("got %q, %v; want the ~/.local/bin fallback", got, ok)
+	}
+}
