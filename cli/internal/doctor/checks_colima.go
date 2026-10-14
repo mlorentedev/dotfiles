@@ -165,21 +165,51 @@ func setYAMLLine(raw []byte, key string, v int) []byte {
 // restartColima applies a size through the Homebrew service, the only owner of
 // Colima's lifecycle doctor uses: its plist runs `colima start -f` and
 // relaunches it on a clean exit, so a direct `colima stop` or `start` races it.
-// A VM running outside the service is left alone with the command to run.
+// A VM running outside the service has no such race: doctor stops it and hands
+// it to the service, which starts it at the size the file now declares and at
+// every login after (#2013 debt ledger, row D5).
 func restartColima(sys *System, rep *Report, want string) {
 	if !colimaServiceRunning(sys) {
-		rep.Warn("Colima runs outside brew services; apply " + want + " with: colima stop && brew services start colima")
+		adoptColima(sys, rep, want)
 		return
 	}
 	if _, errOut, err := sys.CommandOutputBounded(2*time.Minute, "brew", "services", "restart", "colima"); err != nil {
 		rep.Warn("brew services restart colima failed: " + strings.TrimSpace(errOut+" "+err.Error()))
 		return
 	}
-	// The repair is the VM running at the size, not the engine answering: the
-	// stopping VM can still answer `docker info` on the first probe.
+	waitForColimaSize(sys, rep, "restarted Colima at "+want+" (brew services restart colima); its containers stopped", want)
+}
+
+// adoptColima stops a VM started by hand and starts it again under the
+// Homebrew service.
+func adoptColima(sys *System, rep *Report, want string) {
+	if _, errOut, err := sys.CommandOutputBounded(2*time.Minute, "colima", "stop"); err != nil {
+		rep.Warn("colima stop failed, so Colima keeps running outside brew services at its old size: " + strings.TrimSpace(errOut+" "+err.Error()))
+		return
+	}
+	if _, errOut, err := sys.CommandOutputBounded(2*time.Minute, "brew", "services", "start", "colima"); err != nil {
+		// The VM is already stopped, so leaving it there takes the engine down.
+		// A service that failed to bootstrap is not loaded, so a direct start
+		// cannot race it; it reads the size the file now declares.
+		svcErr := strings.TrimSpace(errOut + " " + err.Error())
+		if _, errOut, err := sys.CommandOutputBounded(5*time.Minute, "colima", "start"); err != nil {
+			rep.Warn("stopped Colima, but neither brew services start colima (" + svcErr + ") nor colima start (" +
+				strings.TrimSpace(errOut+" "+err.Error()) + ") brought it back; the engine is down")
+			return
+		}
+		rep.Warn("brew services start colima failed (" + svcErr + "), so Colima was started directly at " + want +
+			" and will not start at login; a stale launchd job holding sh.brew.colima is the usual cause (launchctl print gui/$UID/sh.brew.colima)")
+		return
+	}
+	waitForColimaSize(sys, rep, "moved Colima into brew services at "+want+"; its containers stopped", want)
+}
+
+// waitForColimaSize reports the repair only once the VM runs at the size: the
+// stopping VM can still answer `docker info` on the first probe.
+func waitForColimaSize(sys *System, rep *Report, done, want string) {
 	for i := 0; i < engineProbeAttempts; i++ {
 		if running, cpu, mem := colimaRunningSize(sys); running && cpu == colimaCPU && mem == colimaMemoryGiB<<30 {
-			rep.Fix("restarted Colima at " + want + " (brew services restart colima); its containers stopped")
+			rep.Fix(done)
 			return
 		}
 		time.Sleep(engineProbeInterval)
