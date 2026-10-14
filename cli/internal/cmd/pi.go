@@ -139,7 +139,7 @@ and exit 0, so a setup run degrades instead of breaking.`,
 		},
 	}
 	cmd.Flags().StringVar(&agentDir, "agent-dir", "", "pi's agent dir (default ~/.pi/agent)")
-	cmd.Flags().StringVar(&piBin, "pi", "", "pi binary (default ~/.local/bin/pi, then pi on PATH)")
+	cmd.Flags().StringVar(&piBin, "pi", "", "pi binary (default pi on PATH, then ~/.local/bin/pi)")
 	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout whose manifest to apply (default: the one containing the cwd)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what would change and change nothing")
 	return cmd
@@ -163,7 +163,7 @@ func runPiApply(out, errOut io.Writer, repo, agentDir, piBin string, dryRun bool
 	}
 	bin, ok := resolvePi(piBin)
 	if !ok {
-		_, _ = fmt.Fprintln(out, "[WARN] pi not installed — skipping pi package reconcile (re-run setup after pi installs)")
+		_, _ = fmt.Fprintln(out, "[WARN] pi not installed — skipping pi package reconcile (install it with `dotf converge --only tools`, then re-run)")
 		return nil
 	}
 	if _, err := piLookPath("npm"); err != nil && len(t.plan.Install) > 0 {
@@ -179,13 +179,17 @@ func runPiApply(out, errOut io.Writer, repo, agentDir, piBin string, dryRun bool
 	return nil
 }
 
-// resolvePi finds the pi binary: an explicit path, then the prefix setup
-// installs into, then PATH. Never the shell function named pi, which wraps
+// resolvePi finds the pi binary: an explicit path, then PATH, where mise puts
+// the pi it installs (#2013 D9), then ~/.local/bin, where an npm install from
+// before mise left it. Never the shell function named pi, which wraps
 // `dotf secrets run` and fails on a locked vault; a binary lookup cannot see it.
 func resolvePi(explicit string) (string, bool) {
 	if explicit != "" {
 		_, err := os.Stat(explicit)
 		return explicit, err == nil
+	}
+	if p, err := piLookPath("pi"); err == nil {
+		return p, true
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		local := filepath.Join(home, ".local", "bin", "pi")
@@ -193,8 +197,7 @@ func resolvePi(explicit string) (string, bool) {
 			return local, true
 		}
 	}
-	p, err := piLookPath("pi")
-	return p, err == nil
+	return "", false
 }
 
 func printPiPlan(w io.Writer, t piTarget) {

@@ -96,6 +96,21 @@ herdr writes its own `config.toml` (onboarding writes `onboarding = false`; the 
   - `TestManifest_EveryRequiredCommandIsInstalledWhereTheEntryDeploys` counts a `# mise:` pin as installed wherever the catalog installs mise, so herdr needs no exemption on linux and darwin; `claude`'s exemption narrows to Windows, where `setup-windows.ps1` runs the official installer
   - Windows: H2 and mise in the Windows catalog (`herdr/windows` exemption)
 
+### H9 — lazygit in a herdr popup (#2013 H9)
+
+lazygit replaces Orca's diff viewer. Its install was done with the mise pins above (`LAZYGIT_VERSION`, tasks 104-105); this is the binding.
+
+- [x] Failing test first: `TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys` wants a lazygit popup in the shipped `keys.command`, and was red before the stanza
+- [x] `[[keys.command]]` in `ai/herdr/config.toml`: `prefix+d` (d for diff; herdr 0.9.3 leaves it unbound, `prefix+g` is goto, `prefix+shift+g` is new_worktree), `type = "popup"`, `command = "lazygit"`. No alt chord: macOS terminals send Option as Alt only when configured to
+- [x] No path argument: herdr 0.9.3's `spawn_popup_command` (`src/app/popup.rs`) falls back to the focused pane's cwd, so the popup shows that pane's worktree, and the bare command also runs under Windows' `cmd.exe /d /c`
+- [x] An array of tables through the TOML merge: `TestDeploy_TOMLMergeUnionsAnArrayOfTables` keeps a binding the user added beside the repo's, the merged file still holds tables, and a second merge is in sync
+- [x] On the Mac, into a scratch `HERDR_CONFIG_DIR` holding a user binding: `dotf deploy herdr` wrote both, a second deploy said `in sync`, and `herdr config check` on the merged file said `config: ok`
+- [x] `herdr config check` does not report a binding that collides with a default (a `prefix+g` command passed it), so the key was chosen against 0.9.3's default keymap (`config-reference.json` at the `v0.9.3` tag). A later herdr that binds `prefix+d` itself would show up as a changed keymap in that file's diff, which a pin bump reads anyway
+- [x] The popup runs the bare `lazygit` with herdr's own environment, so it finds lazygit where herdr was started from a shell: W2b puts mise's shims on PATH for every shell we configure. A herdr started with no shell at all is W2b's open PR 2 (`dotf env persist`)
+- [x] The test pins the key itself, not only a lazygit popup: `prefix+x` in the stanza fails it
+- [ ] The merge keeps a stale binding when one is edited, because lists union by equality: #2455 (CLI-113)
+- [ ] In daily use on the Mac, recorded at gate V
+
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)
 
 - [x] [AC5] Failing tests, then `tools.ParseMiseTools`: pins marked `# mise: cli` on the line before them, name from `NAME_VERSION`; a marker that marks no pin is an error
@@ -254,6 +269,13 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
   - [x] Evidence: from-zero run 38376819599 on the branch (merged with main after BUG-126) is green on both runners. `The agents resolve on PATH` prints claude and agy from `~/.local/share/mise/installs/<tool>/latest/` on each; the gates read `linux: 8 known, 0 new, 0 stale` and `darwin: 3 known, 0 new, 0 stale`; the second converge is `changed: 0` on both
   - [x] The macOS plugin step this row expected does not exist: converge runs the Claude MCP and plugin steps only through the bare `dotf deploy` that `setup-linux.sh` calls, so macOS never runs them. Filed as BUG-127 (#2387), out of this PR
   - [x] agy on macOS un-skips doctor's Antigravity section, whose master `mcp_config.json` only the setup twins write: filed as CLI-105 (#2384) and listed in `from-zero-known-failures.txt` with that owner
+- [ ] pi under `# mise: latest`, the change deferred above (#2278, branch `feat/pi-under-mise`). Re-measured 2026-10-14: `mise ls-remote aqua:earendil-works/pi` ends at 1.2.0, the version npm ships and the Mac runs, so aqua has caught up. #2278 planned an npm catalog entry with a new `ignore_scripts` option; the aqua artifact is a native binary, so no npm script runs and the option is not needed. The forcing bug is #2449's red from-zero: on Linux `setup-linux.sh` installed pi in `legacy-setup`, after `agent-extensions`, so herdr's pi integration landed on the second converge
+  - [x] `PI_VERSION=1.2.0` under `# mise: latest`; `setup-linux.sh` loses its pi install arm and `$PI_BIN` (the config block and the package reconcile stay); `setup-windows.ps1` keeps its npm install at the floor, because Windows has no mise yet (#2013)
+  - [x] Backend: aqua, no `attestedBackend` entry. `mise install -v github:earendil-works/pi@1.2.0` -> `No GitHub artifact attestations found`, so the github backend would verify nothing more than aqua's digest check
+  - [x] pi's update notice off under mise: `PI_SKIP_VERSION_CHECK = "1"` in the rendered `[env]` (pi has no updater, but the notice says `pi update`, a second channel outside mise)
+  - [x] `dotf pi packages apply` resolves pi on PATH before `~/.local/bin/pi`, so a pre-mise npm copy left there is a fallback, never the one reconciled; doctor's pi hints name `dotf converge --only tools` (Windows: `setup-windows.ps1`) instead of an npm command
+  - [x] Guards: the `setup-linux.sh` installer guard in `tests/setup-windows.bats` now also rejects `@earendil-works/pi-coding-agent`; the parity assertion reads `PI_VERSION` under the marker; X1 asserts pi on PATH (`tests/from-zero-doctor-gate.bats`); the integration test asks mise for pi instead of `~/.local/bin/pi`
+  - [ ] Evidence: from-zero on both runners with pi on PATH after the first converge and `changed: 0` on the second; then #2449 rebased, with herdr reporting 5 integrations current on the second pass
 - Windows: the agents stay on `Install-AgentBinary` until Windows mise is measured (#2013)
 
 ### apt index refresh (#2013 X1 finding, #2332)

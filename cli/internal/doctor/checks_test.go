@@ -609,7 +609,8 @@ func TestRun_QuickSkipsHeavySections(t *testing.T) {
 // trap: pi installed under an nvm node version not on the current PATH. The
 // doctor must FAIL loudly (not SKIP "pi not installed") when pi is configured
 // or present at the ~/.local launcher yet unreachable, and PASS/SKIP correctly
-// otherwise. Pairs with the setup-linux.sh `--prefix ~/.local` install (#426).
+// otherwise. The ~/.local launcher case is an npm install from before mise
+// owned pi (#426, #2013 D9).
 func TestCheckOpenCode_piPathResilience(t *testing.T) {
 	cfg := &Config{Versions: map[string]string{"PI_VERSION": "0.79.1", "OPENCODE_VERSION": "1.0.0"}}
 
@@ -637,6 +638,26 @@ func TestCheckOpenCode_piPathResilience(t *testing.T) {
 		}
 	})
 
+	// A process started outside a shell that ran `mise activate` (a GUI app)
+	// has no shims on PATH. pi is installed, so a reinstall hint is the wrong
+	// remedy: mise answers "already installed" and the FAIL stays (#2452).
+	t.Run("installed by mise but the shims are not on PATH", func(t *testing.T) {
+		home := t.TempDir()
+		writeFile(t, filepath.Join(home, ".pi", "agent", "models.json"), `{"models":{}}`)
+		writeExec(t, filepath.Join(home, ".local", "share", "mise", "shims", "pi"))
+		sys := newSys(map[string]string{"HOME": home}, nil, nil)
+		sys.GOOS = "linux"
+		var buf bytes.Buffer
+		checkOpenCode(sys, cfg, capture(&buf))
+		out := buf.String()
+		if !strings.Contains(out, "mise installed pi") || !strings.Contains(out, "shims") {
+			t.Errorf("want the missing-shims cause, not a reinstall hint\n%s", out)
+		}
+		if strings.Contains(out, "converge --only tools") || strings.Contains(out, "node version") {
+			t.Errorf("a reinstall hint or the npm-era cause for a pi mise already installed\n%s", out)
+		}
+	})
+
 	t.Run("on PATH passes", func(t *testing.T) {
 		home := t.TempDir()
 		var buf bytes.Buffer
@@ -655,4 +676,27 @@ func TestCheckOpenCode_piPathResilience(t *testing.T) {
 			t.Errorf("truly-absent pi should SKIP with install hint\n%s", out)
 		}
 	})
+
+	// mise installs pi on Linux and macOS (#2013 D9); Windows has no mise yet
+	// and setup-windows.ps1 still installs it from npm. Each hint names the
+	// installer that owns pi on that OS.
+	for goos, want := range map[string]string{
+		"darwin": "dotf converge --only tools", "linux": "dotf converge --only tools", "windows": "setup-windows.ps1",
+	} {
+		t.Run("the install hint on "+goos, func(t *testing.T) {
+			home := t.TempDir()
+			for _, configured := range []bool{false, true} {
+				if configured {
+					writeFile(t, filepath.Join(home, ".pi", "agent", "models.json"), `{"models":{}}`)
+				}
+				sys := newSys(map[string]string{"HOME": home}, nil, nil)
+				sys.GOOS = goos
+				var buf bytes.Buffer
+				checkOpenCode(sys, cfg, capture(&buf))
+				if out := buf.String(); !strings.Contains(out, want) || strings.Contains(out, "npm i -g") {
+					t.Errorf("configured=%v: want the hint %q and no npm command\n%s", configured, want, out)
+				}
+			}
+		})
+	}
 }

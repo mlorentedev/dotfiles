@@ -40,7 +40,7 @@ if [ "$CURRENT_DIR" = "$DOTFILES_DIR" ]; then
 fi
 
 # Single source of truth for tool versions (REFACTOR-011): source the manifest
-# from the checkout so $PI_VERSION / etc. are reliable
+# from the checkout so the pins it reads are reliable
 # regardless of the parent shell. Read from $CURRENT_DIR: the copy under
 # $DOTFILES_DIR does not exist yet on a first run (it is created below).
 [ -f "$CURRENT_DIR/versions.conf" ] && . "$CURRENT_DIR/versions.conf"
@@ -325,47 +325,13 @@ log_info "Setting up OpenCode configuration..."
 # near the end of this script (#1843 B11).
 
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
-# agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/.
-# Install pinned via npm (guarded); models.json gets the same deploy-time secret
-# substitution as opencode (SDD-009, self-contained cross-OS); AGENTS.md is the
-# same canonical SSOT; settings.json is seeded only when absent (pi mutates it).
+# agents are interchangeable across Linux/Windows. pi reads ~/.pi/agent/. The
+# CLI itself comes from mise (versions.conf `# mise: latest`, #2013 D9), which
+# the tools step installs before anything reads a harness; models.json gets the
+# same deploy-time secret substitution as opencode (SDD-009, self-contained
+# cross-OS); AGENTS.md is the same canonical SSOT; settings.json is seeded only
+# when absent (pi mutates it).
 PI_AGENT_DIR="$HOME/.pi/agent"
-PI_BIN="$HOME/.local/bin/pi"
-if command -v npm >/dev/null 2>&1; then
-    # Install into the manager-independent ~/.local prefix — the same dir that
-    # already carries `claude`/`dotf` and is on PATH for login shells AND
-    # GUI/ADE processes (e.g. Orca). A bare `npm i -g` lands in nvm's
-    # per-node-version tree (~/.nvm/versions/node/<v>/bin), invisible to any
-    # environment running a different node. Guard on the stable location, not
-    # bare `command -v pi`, so a stale nvm-version copy cannot mask a missing
-    # ~/.local launcher.
-    if [ ! -x "$PI_BIN" ]; then
-        PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"
-        log_info "Installing pi ($PI_PKG) into ~/.local ..."
-        if npm install -g --ignore-scripts --prefix "$HOME/.local" "$PI_PKG" >/dev/null 2>&1; then
-            log_success "pi installed -> $PI_BIN"
-        else
-            log_warning "pi install failed — run: npm install -g --ignore-scripts --prefix \"\$HOME/.local\" $PI_PKG"
-        fi
-    else
-        # REFACTOR-013: the pin is a MINIMUM. Presence alone left an outdated pi
-        # in place forever (it was only ever WARNed by healthcheck, #474, never
-        # converged here). Upgrade when installed < pin; leave a newer pi alone.
-        installed_pi=$("$PI_BIN" --version 2>/dev/null | head -1 | awk '{print $NF}')
-        if [ -n "$PI_VERSION" ] && ! version_gte "$installed_pi" "$PI_VERSION"; then
-            log_info "pi ${installed_pi:-unknown} below pinned minimum $PI_VERSION — upgrading..."
-            if npm install -g --ignore-scripts --prefix "$HOME/.local" "@earendil-works/pi-coding-agent@$PI_VERSION" >/dev/null 2>&1; then
-                log_success "pi upgraded to $PI_VERSION"
-            else
-                log_warning "pi upgrade failed — run: npm install -g --ignore-scripts --prefix \"\$HOME/.local\" @earendil-works/pi-coding-agent@$PI_VERSION"
-            fi
-        else
-            log_info "pi already installed ($PI_BIN, ${installed_pi:-unknown} >= ${PI_VERSION:-any})"
-        fi
-    fi
-else
-    log_warning "npm not found — skipping pi install (install Node.js, then re-run setup)"
-fi
 
 ensure_directory "$PI_AGENT_DIR"
 
@@ -462,8 +428,8 @@ fi
 # on every machine. The Go command keeps what that loop established: captured
 # output, elapsed time on every outcome, the DOTFILES_SKIP_PI_PACKAGES skip
 # (CI-002, #1478), and a warning rather than a failure without pi or npm.
-# `--pi "$PI_BIN"`, never the `pi` shell function, which wraps `dotf secrets run`
-# and fails on a locked vault.
+# dotf resolves the pi binary itself (mise's, on PATH), never the `pi` shell
+# function, which wraps `dotf secrets run` and fails on a locked vault.
 _dotf=""
 if command -v dotf >/dev/null 2>&1; then
     _dotf="dotf"
@@ -471,7 +437,7 @@ elif [ -x "$HOME/.local/bin/dotf" ]; then
     _dotf="$HOME/.local/bin/dotf"
 fi
 if [ -n "$_dotf" ]; then
-    "$_dotf" pi packages apply --repo "$CURRENT_DIR" --pi "$PI_BIN" || log_warning "pi package reconcile reported a failure (above) -- run 'dotf pi packages check'"
+    "$_dotf" pi packages apply --repo "$CURRENT_DIR" || log_warning "pi package reconcile reported a failure (above) -- run 'dotf pi packages check'"
 else
     log_warning "dotf not found (PATH or ~/.local/bin) -- pi packages not reconciled"
 fi

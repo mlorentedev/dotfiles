@@ -771,7 +771,9 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
 # ============================================================================
 # Mirror of the opencode block + setup-linux.sh pi deploy so the two agents are
 # interchangeable across Linux/Windows. pi reads %USERPROFILE%\.pi\agent\.
-# npm-pinned install (guarded); models.json gets the same {env:VAR} deploy-time
+# npm install at the PI_VERSION floor (guarded): Linux and macOS get pi from
+# mise (versions.conf `# mise: latest`, #2013 D9), which Windows does not run
+# yet (#2013). models.json gets the same {env:VAR} deploy-time
 # substitution (SDD-009); AGENTS.md is the same SSOT; settings.json seeds only
 # when absent (pi mutates it at runtime).
 $piVersion = $null
