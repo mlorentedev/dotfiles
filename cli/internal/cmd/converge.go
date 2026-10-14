@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/console"
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
@@ -72,6 +74,7 @@ func newConvergeCmd() *cobra.Command {
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	home := env.Home()
 	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
+	paint := convergePainter(w)
 	out := w
 	var rl *converge.RunLog
 	if !plan {
@@ -91,7 +94,7 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 		}
 	}
 	rep, err := converge.Run(reg, e, plan)
-	printConvergeReport(out, rep)
+	printConvergeReport(out, rep, paint)
 	if plan {
 		return err
 	}
@@ -121,7 +124,7 @@ func beginRunLog(w io.Writer, repo string) (*converge.RunLog, io.Writer, func())
 }
 
 // saveConvergeReport writes the run's report beside its transcript and, for a
-// full run, to last.json, which doctor reads. Both carry the transcript's
+// full run, to last.json, which from-zero.yml reads with jq. Both carry the transcript's
 // redaction: a step's detail or the run's error can echo a remote URL with a
 // token in it. A failure to write either is joined to the run's own error.
 func saveConvergeReport(w, out io.Writer, rl *converge.RunLog, rep converge.Report, err error, full bool) error {
@@ -211,16 +214,41 @@ var convergeTag = map[converge.Status]string{
 	converge.StatusOpaque:  "[OPAQUE]",
 }
 
-func printConvergeReport(w io.Writer, rep converge.Report) {
+// convergeColor is each tag's colour, doctor's palette read in converge's
+// words: a change is what doctor's fix is, and opaque, a step that cannot
+// say what it did, is a caution.
+var convergeColor = map[converge.Status][]string{
+	converge.StatusOK:      {console.Green},
+	converge.StatusChange:  {console.Magenta},
+	converge.StatusSkipped: {console.Cyan},
+	converge.StatusFailed:  {console.Red, console.Bold},
+	converge.StatusOpaque:  {console.Yellow},
+}
+
+// convergePainter decides colour on the writer converge was handed, before
+// beginRunLog wraps it in the transcript tee, which is never a terminal. The
+// transcript strips the codes, so one stream serves both (CLI-114).
+func convergePainter(w io.Writer) console.Painter {
+	f, ok := w.(*os.File)
+	return console.Painter{On: console.ColorEnabled(os.Getenv, ok && isTerminal(f.Fd()))}
+}
+
+func printConvergeReport(w io.Writer, rep converge.Report, p console.Painter) {
 	heading, changed := "converge", "changed"
 	if rep.DryRun {
 		heading, changed = "converge plan", "to change"
 	}
 	_, _ = fmt.Fprintf(w, "%s on %s:\n", heading, rep.GOOS)
 	for _, e := range rep.Entries {
-		_, _ = fmt.Fprintf(w, "  %-8s %-16s %s\n", convergeTag[e.Status], e.Name, e.Detail)
+		// Pad the bare tag: escape codes would count toward a %-8s width.
+		tag := convergeTag[e.Status]
+		_, _ = fmt.Fprintf(w, "  %s%s %-16s %s\n", p.Paint(tag, convergeColor[e.Status]...), strings.Repeat(" ", max(0, 8-len(tag))), e.Name, e.Detail)
 	}
 	n := rep.Summary()
-	_, _ = fmt.Fprintf(w, "%d %s, %d ok, %d opaque, %d skipped, %d failed\n",
-		n[converge.StatusChange], changed, n[converge.StatusOK], n[converge.StatusOpaque], n[converge.StatusSkipped], n[converge.StatusFailed])
+	failed := fmt.Sprintf("%d failed", n[converge.StatusFailed])
+	if n[converge.StatusFailed] > 0 {
+		failed = p.Paint(failed, console.Red, console.Bold)
+	}
+	_, _ = fmt.Fprintf(w, "%d %s, %d ok, %d opaque, %d skipped, %s\n",
+		n[converge.StatusChange], changed, n[converge.StatusOK], n[converge.StatusOpaque], n[converge.StatusSkipped], failed)
 }
