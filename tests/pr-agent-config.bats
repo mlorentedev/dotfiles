@@ -1230,7 +1230,7 @@ print(lines[0].endswith(routed) and lines[2].endswith(routed))
     [ "${lines[4]}" = "[]" ]
     [ "${lines[5]}" = "True True true" ]
     [ "${lines[6]}" = "True" ]
-    [ "${lines[7]}" = "32000" ]
+    [ "${lines[7]}" = "40000" ]
     [ "${lines[8]}" = "True" ]
     [ "${lines[9]}" = "True" ]
     [ "${lines[10]}" = "['model', 'model_weak'] True" ]
