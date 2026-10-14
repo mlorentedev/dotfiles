@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // checkSkillRecordsAgainstVault compares each committed harness record with the
@@ -33,10 +31,7 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 	}
 	// The resolver, not a literal default: a vault guessed at ~/Projects/knowledge
 	// would compare against whatever happens to live there (ADR-025).
-	vault := sys.Getenv("VAULT_PATH")
-	if vault == "" {
-		vault = env.ResolvePath("VAULT_PATH")
-	}
+	vault := sys.vaultPath()
 	if vault == "" || !isDir(vault) {
 		rep.Skip("no vault resolves on this machine (VAULT_PATH, machine.json): committed harness records not compared with their source")
 		return
