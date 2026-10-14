@@ -39,6 +39,12 @@ anything. Remove junctions with a link-only `rmdir`, so the deletion does not fo
 the vault. Move any state that exists only there, such as the gate ledgers, back to the real
 `StateDir`.
 
+The converse holds for test isolation: on Windows, redirect `HOME` (and the XDG and `MISE_*`
+directories) but never `USERPROFILE`. The same evening, an isolated from-zero converge that also
+pointed `USERPROFILE` at the fixture made ten aqua installs fail Sigstore verification with
+`TUF error: Could not determine cache directory`. The identical run with only `HOME` redirected
+installed all of them (#2013).
+
 When a Windows doctor run reports paths outside `%USERPROFILE%`, check `HOME` first: that
 symptom means a third-party installer has repointed the home. The durable guard is a doctor
 check that FAILs when `HOME` disagrees with `USERPROFILE`, plus a single home resolver (#2432).
