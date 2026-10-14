@@ -270,14 +270,17 @@ refute_legacy_mise_sync() {
     # release (#2013 D9); setup-linux.sh no longer runs a vendor installer
     grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^CLAUDE_VERSION='
     grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^AGY_VERSION='
+    grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^PI_VERSION='
 }
 
-# #2013 P5c: mise installs Claude Code and agy on Linux and macOS (versions.conf,
-# `# mise: latest`). A vendor installer back in setup-linux.sh would be a second
-# channel that wins on a box where mise has not run yet, and setup would report
-# success on an agent no pin governs.
-@test "setup-linux.sh runs no vendor installer for Claude Code or agy (#2013 P5c)" {
-    for pattern in 'claude.ai/install.sh' 'antigravity.google/cli/install.sh' '@anthropic-ai/claude-code'; do
+# #2013 P5c: mise installs Claude Code, agy and pi on Linux and macOS
+# (versions.conf, `# mise: latest`). A vendor or npm installer back in
+# setup-linux.sh would be a second channel that wins on a box where mise has not
+# run yet, and setup would report success on an agent no pin governs. For pi it
+# was worse: setup ran after converge's agent-extensions step, so a fresh box
+# found pi only on the second converge, and that converge was not a no-op.
+@test "setup-linux.sh runs no vendor or npm installer for Claude Code, agy or pi (#2013 P5c)" {
+    for pattern in 'claude.ai/install.sh' 'antigravity.google/cli/install.sh' '@anthropic-ai/claude-code' '@earendil-works/pi-coding-agent'; do
         run grep -nF "$pattern" "$DOTFILES_DIR/setup-linux.sh"
         printf '%s\n' "$output" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -q . && {
             echo "setup-linux.sh installs an agent outside mise: $output"; false

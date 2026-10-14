@@ -105,11 +105,14 @@ setup() {
     grep -q 'pi packages apply --repo \$DotfilesDir' "$SETUP_PS1"
 }
 
-@test "pi packages: setup-linux hands the command \$PI_BIN, not the shell function" {
+@test "pi packages: setup-linux lets dotf resolve the pi binary, never the shell function" {
     # `pi` on this machine is a shell function wrapping `dotf secrets run`, so it
-    # FAILS on a locked vault. The command resolves a binary, and setup passes
-    # the one it installed.
-    grep -q 'pi packages apply --repo "\$CURRENT_DIR" --pi "\$PI_BIN"' "$SETUP_SH"
+    # FAILS on a locked vault. The command resolves a binary itself (PATH, where
+    # mise puts pi, #2013 D9); setup installs no pi of its own to hand it, and a
+    # stale $PI_BIN pointing at the old npm prefix would reconcile a copy nobody
+    # runs.
+    grep -qF 'pi packages apply --repo "$CURRENT_DIR" ||' "$SETUP_SH"
+    refute_grep 'PI_BIN' "$SETUP_SH"
 }
 
 linux_pi_fallback_present() {
@@ -119,7 +122,7 @@ linux_pi_fallback_present() {
         in_block { print }
         END { if (!started || !ended) exit 1 }' "$1")" || return 1
     grep -qF 'elif [ -x "$HOME/.local/bin/dotf" ]; then' <<<"$block" &&
-        grep -qF '"$_dotf" pi packages apply --repo "$CURRENT_DIR" --pi "$PI_BIN"' <<<"$block"
+        grep -qF '"$_dotf" pi packages apply --repo "$CURRENT_DIR" ||' <<<"$block"
 }
 
 @test "pi packages: Linux dotf fallback is scoped to its pi block (#1925)" {
