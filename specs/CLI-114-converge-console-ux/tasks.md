@@ -39,10 +39,10 @@ created: "2026-10-14"
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] `features.json` lists each AC with a non-vacuous verification command
-- [ ] `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...`, `golangci-lint run` -> exit 0
-- [ ] bats over the files that reference `converge` output (`git grep -l 'dotf converge' -- tests`)
-- [ ] A real `dotf converge --dry-run` on the Mac (terminal) and piped to `cat`, recorded in `verification.md`
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] `features.json` lists each AC with a non-vacuous verification command
+- [x] `go build`, `go vet`, `GOOS=windows go vet`, `go test ./...`, `golangci-lint run` -> exit 0
+- [x] bats over the files that reference `converge` output (`git grep -l 'dotf converge' -- tests`)
+- [x] A real `dotf converge --dry-run` on the Mac (terminal) and piped to `cat`, recorded in `verification.md`
+- [x] `verification.md` filled in
 - [ ] Independent adversarial review before archive (`dotf spec review CLI-114-converge-console-ux`)
