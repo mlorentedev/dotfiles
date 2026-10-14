@@ -264,9 +264,20 @@ var toolHomeVars = []string{
 // checkToolHomeEnvVars reproduces healthcheck section 5: the tool-home vars are
 // set. Unset is a FAIL where the APPS_HOME layout applies (the RC files export
 // them there) and a SKIP elsewhere.
+//
+// A process that read no shell profile (`ssh host dotf doctor` runs a
+// non-login, non-interactive shell) has DOTFILES_DIR unset too, which the
+// generated paths file always exports. Then every variable is missing for one
+// reason, and failing each one reads as five drifts (#2013 debt ledger, D12):
+// it is said once, as a WARN naming how to run doctor with the profile.
 func checkToolHomeEnvVars(sys *System, rep *Report) {
 	rep.Section("Tool-home environment variables")
 	why := appsLayoutSkip(sys.GOOS)
+	if why == "" && profileNotLoaded(sys) {
+		rep.Warn("no shell profile was read by this process (DOTFILES_DIR and every tool-home variable are unset), " +
+			"so these cannot be checked; run doctor from a login shell, e.g. ssh -t <host> \"$SHELL\" -lic 'dotf doctor'")
+		return
+	}
 	for _, v := range toolHomeVars {
 		switch {
 		case sys.Getenv(v) != "":
@@ -277,6 +288,22 @@ func checkToolHomeEnvVars(sys *System, rep *Report) {
 			rep.Fail(v + " is not set")
 		}
 	}
+}
+
+// profileNotLoaded reports a process that inherited nothing from the shell
+// profile: DOTFILES_DIR, which the generated paths file always exports, and all
+// of the tool-home variables are unset. Any one of them set means the profile
+// ran, and a missing variable is then real drift.
+func profileNotLoaded(sys *System) bool {
+	if sys.Getenv("DOTFILES_DIR") != "" {
+		return false
+	}
+	for _, v := range toolHomeVars {
+		if sys.Getenv(v) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // optionalTools is healthcheck section 6's advisory set. terraform lives here
