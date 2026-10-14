@@ -436,4 +436,5 @@ tags: [lessons, index, dotfiles]
 | [415 - An ssh command reads no profile: a health check run that way fails for the environment, not the machine](lesson-415-an-ssh-command-reads-no-profile.md) | 2026-10-14 |
 | [416 - A foreign user-scope HOME on Windows splits git, ssh and dotf across two homes without an error](lesson-416-a-foreign-home-on-windows-splits-every-tool.md) | 2026-10-13 |
 | [417 - bash 3.2 misparses a case pattern's ) inside $(...), and only main's macOS job could see it](lesson-417-bash-32-misparses-a-case-pattern-inside-command-substitution.md) | 2026-10-14 |
+| [419 - A pin bumped right after its release meets a stale uv index cache](lesson-419-a-pin-bumped-right-after-its-release-meets-a-stale-uv-index-cache.md) | 2026-10-14 |
 <!-- END GENERATED -->

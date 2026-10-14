@@ -568,8 +568,10 @@ func hiveTool() Tool {
 // 0.9.29), so one argv covers install and upgrade. --force lets it replace an
 // entry point another installer left in ~/.local/bin, which uv otherwise
 // refuses with exit 2; decideAction runs it only below the pin or when absent.
+// --refresh-package keeps a stale index cache from refusing a version
+// released minutes ago.
 func TestInstallUvTool(t *testing.T) {
-	const want = "uv tool install --force hive-vault==4.2.2"
+	const want = "uv tool install --force --refresh-package hive-vault hive-vault==4.2.2"
 	cases := []struct {
 		name, current string
 		want          Result
@@ -600,7 +602,7 @@ func TestInstallUvTool(t *testing.T) {
 func TestInstallUvTool_Failures(t *testing.T) {
 	var rec []string
 	_, err := newNpmInstaller("", &rec, errors.New("exit status 2")).Install(hiveTool())
-	if err == nil || !strings.Contains(err.Error(), "uv tool install --force hive-vault==4.2.2") {
+	if err == nil || !strings.Contains(err.Error(), "uv tool install --force --refresh-package hive-vault hive-vault==4.2.2") {
 		t.Errorf("a failed uv run returned %v, want the argv named", err)
 	}
 	noPkg := hiveTool()
