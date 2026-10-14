@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Result classifies what Install did, for an honest human message and tests.
@@ -45,26 +46,76 @@ func (r Result) String() string {
 // release asset, the offline case — is an error.
 type Fetcher func(url, destPath string) error
 
+// fetchAttempts and fetchWait bound HTTPFetch's retries. GitHub's release
+// host answers a transient 5xx often enough to fail a from-zero run: twice on
+// 2026-10-14 alone, once on the mise binary, which left the integration
+// container without jq. The wait doubles after each failed attempt. Tests
+// shorten it.
+var (
+	fetchAttempts = 3
+	fetchWait     = 2 * time.Second
+)
+
 // HTTPFetch is the production Fetcher: GET url, stream the body to destPath, and
-// error on any non-200 so a missing asset or checksums file aborts cleanly.
+// error on any non-200 so a missing asset or checksums file aborts cleanly. A
+// failure the server may not repeat (a transport error, a 5xx, a 429, a body
+// cut short) is retried; any other status, and a local write error, is final
+// on the first answer. An offline host is a transport error, so each fetch
+// spends the full 6 s of waits before it fails.
 func HTTPFetch(url, destPath string) error {
+	var err error
+	wait := fetchWait
+	for attempt := 1; ; attempt++ {
+		var transient bool
+		if transient, err = fetchOnce(url, destPath); err == nil || !transient || attempt == fetchAttempts {
+			return err
+		}
+		time.Sleep(wait)
+		wait *= 2
+	}
+}
+
+// fetchOnce is one GET of url into destPath. transient reports whether the
+// same request might succeed if repeated.
+func fetchOnce(url, destPath string) (transient bool, err error) {
 	resp, err := http.Get(url) //nolint:gosec // url is built from the pinned catalog, not user input
 	if err != nil {
-		return fmt.Errorf("download %s: %w", url, err)
+		return true, fmt.Errorf("download %s: %w", url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
+		retry := resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests
+		return retry, fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
 	}
 	f, err := os.Create(destPath)
 	if err != nil {
-		return fmt.Errorf("create %s: %w", destPath, err)
+		return false, fmt.Errorf("create %s: %w", destPath, err)
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("write %s: %w", destPath, err)
+	body := &readSide{r: resp.Body}
+	if _, err := io.Copy(f, body); err != nil {
+		if body.err != nil {
+			return true, fmt.Errorf("download %s: body cut short: %w", url, err)
+		}
+		return false, fmt.Errorf("write %s: %w", destPath, err)
 	}
-	return nil
+	return false, nil
+}
+
+// readSide records an error from the response body, so fetchOnce can tell a
+// body cut short (worth repeating) from a local write that failed, such as a
+// full disk (not worth repeating).
+type readSide struct {
+	r   io.Reader
+	err error
+}
+
+func (b *readSide) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	if err != nil && err != io.EOF {
+		b.err = err
+	}
+	return n, err
 }
 
 // Installer fetches, verifies (sha256 vs the release checksums), and places a

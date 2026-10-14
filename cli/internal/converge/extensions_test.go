@@ -238,3 +238,84 @@ func TestAgentExtensions_TheProbeNamesADriftedAgyConfig(t *testing.T) {
 		t.Errorf("probe = %v; want it to name %s", err, master)
 	}
 }
+
+// herdrRepo is extensionsRepo plus the shipped routing map and its schema,
+// which name the harnesses herdr's integrations go to.
+func herdrRepo(t *testing.T) string {
+	t.Helper()
+	repo := extensionsRepo(t)
+	for _, rel := range []string{"harness/model-map.json", "harness/model-map.schema.json"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", "..", filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(repo, filepath.FromSlash(rel)), string(data))
+	}
+	return repo
+}
+
+// herdrBox is herdr's integration state: every target it knows, and whether
+// each is current. installs counts every install it ran.
+type herdrBox struct {
+	current  map[string]bool
+	installs int
+}
+
+func (b *herdrBox) run(name string, args ...string) ([]byte, error) {
+	if name != "herdr" || len(args) < 2 {
+		return nil, fmt.Errorf("unexpected: %s %v", name, args)
+	}
+	if args[1] == "install" {
+		b.installs++
+		b.current[args[2]] = true
+		return nil, nil
+	}
+	var out strings.Builder
+	for target, ok := range b.current {
+		state := "not installed"
+		if ok {
+			state = "current (v1)"
+		}
+		fmt.Fprintf(&out, "%s: %s (/h/%s)\n", target, state, target)
+	}
+	return []byte(out.String()), nil
+}
+
+// herdr's integration goes to every installed harness the routing map names,
+// the probe then passes, and a second run installs nothing. A harness that is
+// not installed gets none: herdr would create its config directory (#1312).
+func TestAgentExtensions_HerdrIntegratesEveryInstalledHarness(t *testing.T) {
+	box := &herdrBox{current: map[string]bool{
+		"claude": false, "copilot": false, "opencode": false, "pi": true, "antigravity-cli": false,
+	}}
+	installed := map[string]bool{"herdr": true, "claude": true, "pi": true, "agy": true}
+	step := agentExtensions{herdr: box.run, has: func(c string) bool { return installed[c] }}
+	env := Env{RepoRoot: herdrRepo(t)}
+	res, err := step.Reconcile(env, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Changes != 2 || !strings.Contains(res.Detail, "herdr: 2 integration(s) installed, 1 current") {
+		t.Errorf("first run: %+v", res)
+	}
+	if box.current["copilot"] || box.current["opencode"] {
+		t.Errorf("an absent harness got an integration: %v", box.current)
+	}
+	if err := step.Probe(env); err != nil {
+		t.Errorf("probe after the apply: %v", err)
+	}
+	box.installs = 0
+	if again, err := step.Reconcile(env, false); err != nil || again.Changes != 0 || box.installs != 0 {
+		t.Errorf("second run: %+v, %v, %d install(s); want none", again, err, box.installs)
+	}
+}
+
+// Without herdr the half is skipped and named; the step is not failed.
+func TestAgentExtensions_HerdrAbsentIsASkip(t *testing.T) {
+	box := &herdrBox{current: map[string]bool{}}
+	step := agentExtensions{herdr: box.run, has: func(string) bool { return false }}
+	res, err := step.Reconcile(Env{RepoRoot: herdrRepo(t)}, false)
+	if err != nil || !strings.Contains(res.Skip, "herdr is not installed") {
+		t.Errorf("got %+v, %v; want a skip naming herdr", res, err)
+	}
+}

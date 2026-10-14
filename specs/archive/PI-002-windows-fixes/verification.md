@@ -115,3 +115,20 @@ own tickets:
   limits, although models.dev and OpenRouter both reported 163840 / 16384 live.
   `opencode models openrouter --refresh` cleared it. Doctor not checking the
   cache's age is #2434.
+
+## Archive review (round 2, 2026-10-14)
+
+`agy/gemini-3.8-flash-high` returned PASS-WITH-GAPS at `ed901e6d` (`review.md`). Dispositions:
+
+- **Promotion candidates section missing (Major, theoretical):** added below.
+- **AC3 unticked:** the spec-owned section was clean on the Windows run (`[Model limit drift]`, 1 check, all ok). The run's single FAIL is #2258, hive's Windows daemon, which is unrelated and open on its own ticket. The box stays unticked in `proposal.md` because the contract set is closed by the verdict; this line is its disposition.
+- **`features.json` verification is an `echo`:** accepted for this spec, since the contract set is closed. The real assertions are the Go tests named here.
+- **The effect test skips on headless runners:** `TestBWServeDetachAttr_SetsTheDetachFlags` (`cli/internal/secrets/bwserve_windows_test.go`) now asserts `HideWindow` and both creation flags directly, so `test (windows-latest)` checks them on every PR. It is compiled and vetted for `GOOS=windows` here; its first run is that CI job.
+- **Upstream limit flapping:** tracked by #902 (model config from the catalog).
+- **Inflated diff base:** a historical branch-base artifact, no action.
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-333-createprocess-detached-ignores-no-window.md docs/lessons/lesson-334-windows-prompts-to-open-extensionless-scripts.md
+- [ ] ADR-worthy decision? no: two bug fixes and a configuration alignment, with no new architecture or public contract
+- [ ] New pattern candidate for `00_meta/patterns/`? no: a Windows process-creation quirk and a provider limit, both already captured in lessons 333 and 334
