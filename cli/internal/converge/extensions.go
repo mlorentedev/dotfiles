@@ -8,6 +8,9 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/agy"
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/herdr"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // agentExtensions registers what each agent loads beyond its config files: for
@@ -19,6 +22,11 @@ import (
 // install.sh had a Claude Code with no plugins and no hive (#2387) and an agy
 // with no MCP config at all. It runs the same claude.ApplyMCP,
 // claude.ApplyPlugins and agy.ApplyMCP as the bare deploy. Every OS.
+//
+// Its third half installs herdr's integration into every harness that is
+// installed (#2013 H6): herdr.Apply, for the harnesses harness/model-map.json
+// routes to. herdr writes and versions those hooks itself; they sit beside the
+// ones `harness bind` writes, which never touches a foreign hook.
 //
 // It runs after tools, whose PATH reaches the claude that mise installs, and
 // after configs-deploy, which writes Claude Code's settings. It sits last among
@@ -33,6 +41,11 @@ type agentExtensions struct {
 	// Unset, the agy half is skipped. agy's files are written whether or not
 	// agy is installed, as every ai/deploy.json agy entry is.
 	agyPaths func(home string) agy.Paths
+	// herdr runs herdr. Unset, the herdr half is skipped.
+	herdr tools.Runner
+	// has reports whether a command is installed: herdr itself, and each
+	// harness, whose integration is never installed while it is absent.
+	has func(string) bool
 }
 
 func (agentExtensions) Name() string        { return "agent-extensions" }
@@ -52,7 +65,8 @@ func (a agentExtensions) apply(e Env, dryRun bool) (extensionsPlan, error) {
 	var parts []string
 	cErr := a.applyClaude(e, dryRun, &p, &parts)
 	aErr := a.applyAgy(e, dryRun, &p, &parts)
-	if err := errors.Join(cErr, aErr); err != nil {
+	hErr := a.applyHerdr(e, dryRun, &p, &parts)
+	if err := errors.Join(cErr, aErr, hErr); err != nil {
 		return extensionsPlan{}, err
 	}
 	p.detail = strings.Join(parts, "; ")
@@ -131,7 +145,42 @@ func (a agentExtensions) applyAgy(e Env, dryRun bool, p *extensionsPlan, parts *
 	return nil
 }
 
-// Reconcile is skipped only when neither half ran; a half that did not run is
+func (a agentExtensions) applyHerdr(e Env, dryRun bool, p *extensionsPlan, parts *[]string) error {
+	if a.herdr == nil {
+		p.skipped = append(p.skipped, "no herdr runner is wired into this registry")
+		return nil
+	}
+	has := a.has
+	if has == nil {
+		has = onPath
+	}
+	if !has("herdr") {
+		p.skipped = append(p.skipped, "herdr is not installed")
+		return nil
+	}
+	m, err := harness.LoadModelMap(e.RepoRoot)
+	if err != nil {
+		return prefixed("herdr integrations", err)
+	}
+	rep, err := herdr.Apply(a.herdr, harness.Harnesses(m), has, dryRun)
+	if err != nil {
+		return prefixed("herdr integrations", err)
+	}
+	installed := "installed"
+	if dryRun {
+		installed = "to install"
+	}
+	c := fmt.Sprintf("herdr: %d integration(s) %s, %d current", len(rep.Installed), installed, len(rep.Current))
+	if len(rep.Unknown) > 0 {
+		c += ", herdr has none for " + strings.Join(rep.Unknown, ", ")
+	}
+	*parts = append(*parts, c)
+	p.changes += len(rep.Installed)
+	p.todo = append(p.todo, rep.Installed...)
+	return nil
+}
+
+// Reconcile is skipped only when no half ran; a half that did not run is
 // named in the detail of one that did.
 func (a agentExtensions) Reconcile(e Env, dryRun bool) (Result, error) {
 	p, err := a.apply(e, dryRun)
@@ -149,8 +198,8 @@ func (a agentExtensions) Reconcile(e Env, dryRun bool) (Result, error) {
 }
 
 // Probe re-plans: after an apply, nothing may still be to add or to remove. A
-// plan only asks claude (`mcp get`, `plugin list`, `marketplace list`) and
-// reads agy's files.
+// plan only asks claude (`mcp get`, `plugin list`, `marketplace list`), reads
+// agy's files and asks herdr (`integration status`).
 func (a agentExtensions) Probe(e Env) error {
 	p, err := a.apply(e, true)
 	if err != nil {
