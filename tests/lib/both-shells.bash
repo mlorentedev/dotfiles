@@ -14,11 +14,17 @@
 # fail when their status or output differ.  Leaves bash's result in $status and
 # $output for the caller's assertions.  The script's environment comes from the
 # caller (`VAR=value run_both_shells ...`, or an export in the test).
+#
+# zsh runs with -f (NO_RCS): every zsh reads ~/.zshenv, and the deployed one
+# sources path.sh, which puts ~/.local/bin ahead of PATH. Without -f a test that
+# hid dotf with PATH=/usr/bin:/bin hid it from bash only, and the two shells
+# disagreed on a configured machine while CI stayed green. bash reads no
+# startup file for a script unless BASH_ENV is set.
 # shellcheck disable=SC2154  # bats' run assigns status and output
 run_both_shells() {
     local script="$1"
     shift
-    run zsh "$script" "$@"
+    run zsh -f "$script" "$@"
     local zsh_status="$status" zsh_output="$output"
     run bash "$script" "$@"
     if [ "$status" != "$zsh_status" ] || [ "$output" != "$zsh_output" ]; then
