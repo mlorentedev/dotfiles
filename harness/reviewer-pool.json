@@ -132,9 +132,9 @@
       "pr_agent": {
         "model": "anthropic/claude-haiku-5-5",
         "weight": 35,
-        "reasoning_effort": "high"
+        "reasoning_effort": "medium"
       },
-      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B). In the adversarial review it signs only as a FALLBACK, with a classified reason (rate limit, quota, provider error, timeout, content filter, empty answer) when the NaN first signers failed; it never signs first by draw. In PR-Agent it is drawn at weight 35, about a third of reviews, because there it is cheap: about $0.008 a review at 30K tokens, and NaN's shared per-model concurrency is the scarcer resource. Reasoning-class by profile (adaptive thinking at high effort). No calibration against a review of known outcome yet; #2215 and #2216 measure its addressed-comment rate."
+      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B). In the adversarial review it signs only as a FALLBACK, with a classified reason (rate limit, quota, provider error, timeout, content filter, empty answer) when the NaN first signers failed; it never signs first by draw. In PR-Agent it is drawn at weight 35, about a third of reviews, because there it is cheap: about $0.008 a review at 30K tokens, and NaN's shared per-model concurrency is the scarcer resource. Reasoning-class by profile (adaptive thinking). Effort is medium, not high: at high, thinking spent the 32,000-token output cap on large diffs and the answer came back empty in 5 of 11 runs (#2458). No calibration against a review of known outcome yet; #2215 and #2216 measure its addressed-comment rate."
     },
     {
       "id": "anthropic-review/claude-sonnet-5-5",
