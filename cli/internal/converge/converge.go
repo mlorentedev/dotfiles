@@ -229,6 +229,9 @@ func runStep(r Reconciler, env Env, dryRun bool) (Entry, string, error) {
 		}
 	}
 	switch {
+	case err != nil && res.Changes > 0 && res.Detail != "":
+		// What the step changed before failing stays on its line (BUG-136).
+		e.Status, e.Detail = StatusFailed, res.Detail+"; failed: "+err.Error()
 	case err != nil:
 		e.Status, e.Detail = StatusFailed, err.Error()
 	case res.Opaque:
