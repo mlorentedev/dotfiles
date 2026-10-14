@@ -531,6 +531,42 @@ func TestSync_ReadsTheToolPathFromStdoutOnly(t *testing.T) {
 	}
 }
 
+// A tool that crashes is not at its pin, whatever version its stderr names
+// (BUG-142): ansible-lint exited 3 with only ansible-core's 2.21.5 in a
+// warning. A failed run keeps the version it printed on stdout.
+func TestSync_AFailedProbeReadsOnlyStdout(t *testing.T) {
+	for name, tc := range map[string]struct {
+		stdout  string
+		missing bool
+	}{
+		"a crash naming another package's version": {stdout: "", missing: true},
+		"a version, then an unrelated failure":     {stdout: "age v1.3.1\n", missing: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			merged := func(name string, args ...string) ([]byte, error) {
+				if name == "/bin/age" {
+					return []byte(tc.stdout + "UNSUPPORTED: ansible-core 2.21.5\n"), errors.New("exit status 3")
+				}
+				return nil, nil
+			}
+			stdout := func(name string, args ...string) ([]byte, error) {
+				switch name {
+				case "mise":
+					return []byte("/bin/age\n"), nil
+				case "/bin/age":
+					return []byte(tc.stdout), errors.New("exit status 3")
+				}
+				return nil, errors.New("unexpected")
+			}
+			s := MiseSync{ConfigDir: t.TempDir(), Run: merged, Stdout: stdout}
+			p, err := s.Plan([]MiseTool{{"age", "1.3.1"}})
+			if err != nil || (len(p.Missing) == 1) != tc.missing {
+				t.Fatalf("missing = %v, want %v (%v)", p.Missing, tc.missing, err)
+			}
+		})
+	}
+}
+
 // A comment that reads like the marker but is not it would otherwise be an
 // ordinary comment: the pin under it never installs while sync reports success.
 func TestParseMiseTools_RejectsANearMissMarker(t *testing.T) {

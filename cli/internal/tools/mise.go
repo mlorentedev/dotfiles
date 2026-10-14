@@ -667,8 +667,25 @@ func (s MiseSync) runsAtPin(t MiseTool) bool {
 	if !ok {
 		args = []string{"--version"}
 	}
-	v := ProbeVersionArgs(path, s.Run, args...)
+	v := s.probeVersion(path, args...)
 	return v != "" && atLeast(v, t.Version)
+}
+
+// probeVersion is ProbeRunner's rule over the sync's two runners. Run merges
+// stdout and stderr, which a run that exits 0 may use; a failed run has a
+// version only on stdout, read again through Stdout, because its stderr can
+// name another package's (BUG-142, the BUG-141 class). Without a Stdout
+// runner, a failed run has no version.
+func (s MiseSync) probeVersion(path string, args ...string) string {
+	out, err := s.Run(path, args...)
+	if err == nil {
+		return string(semverRE.Find(out))
+	}
+	if s.Stdout == nil {
+		return ""
+	}
+	out, _ = s.Stdout(path, args...)
+	return string(semverRE.Find(out))
 }
 
 // writeFileAtomic writes data to path through a temp file in the same
