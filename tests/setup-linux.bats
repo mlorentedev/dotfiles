@@ -238,20 +238,12 @@ setup() {
     fi
 }
 
-# MCP server list must live in mcp-servers.json, not hardcoded in setup-linux.sh.
-@test "setup-linux.sh MCP registration reads from mcp-servers.json" {
-    refute_grep 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-# MCP registration must check existence before adding, not blindly retry.
-@test "setup-linux.sh MCP registration checks existence with claude mcp get" {
-    grep -q 'claude mcp get' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-# Both setup scripts must read the same SSOT.
-@test "parity: both setup scripts source mcp-servers.json" {
-    grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-windows.ps1"
+# The bare `dotf deploy` registers them (claude-mcp, with drift re-registration
+# and the .claude.json truncation guard). setup-linux.sh's own loop registered
+# every server a second time, into another .claude.json whenever
+# CLAUDE_CONFIG_DIR was unset (from-zero run 38671157122), so none comes back.
+@test "setup-linux.sh registers no Claude MCP server itself: dotf deploy does" {
+    refute_grep '^[[:space:]]*([^#[:space:]].*)?claude mcp (add|get|remove)' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- BUG-020: DOTFILES_REPO_DIR cross-OS export parity ---
@@ -270,57 +262,6 @@ setup() {
         run jq -e '.env_vars | map(select(.name == "DOTFILES_REPO_DIR")) | length == 1' "$DOTFILES_DIR/env-contract.json"
         [ "$status" -eq 0 ]
     fi
-}
-
-# --- BUG-004: defense-in-depth around claude plugin install (truncate guard) ---
-# Linux mirror of the Windows guard. Every `claude plugin install` call triggers
-# upstream anthropics/claude-code#59870, dropping subscription fields out of
-# ~/.claude/.claude.json. The bash idempotence guard (`grep -qF` against
-# `claude plugin list` output) can yield a false negative for a plugin not in
-# that listing -- so a run reinstalls it, truncating .claude.json from ~75 KB to
-# ~1.5 KB. Defense in depth: snapshot before the call, restore if it shrinks
-# >50% from a baseline of >=10 KB. The plugin installs left the script for
-# `dotf deploy` (#2336), which keeps the same guard in cli/internal/claude; the
-# helpers stay for the MCP registration below.
-
-@test "setup-linux.sh defines snapshot_claude_json + restore_claude_json_if_truncated (BUG-004)" {
-    grep -q 'snapshot_claude_json()' "$DOTFILES_DIR/setup-linux.sh"
-    grep -q 'restore_claude_json_if_truncated()' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
-    grep -qF '10240' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "parity: both setup scripts cite upstream issue 59870 in the truncate guard (BUG-004)" {
-    grep -qF '#59870' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF '#59870' "$DOTFILES_DIR/setup-windows.ps1"
-}
-
-# --- BUG-011: extend the BUG-004 guard to every claude CLI call site ---
-# BUG-004 covered only `claude plugin install`. The same upstream truncation
-# (anthropics/claude-code#59870) fires on `claude mcp get`, `claude mcp add`, and
-# `claude plugin list` because they go through the same deserialize-modify-
-# serialize cycle. With ~9 MCP servers, each setup run unwrapped triggered
-# ~18 chances of truncation. These asserts lock in the wrap on every call site.
-
-@test "setup-linux.sh defines snapshot helpers BEFORE the MCP loop (BUG-011)" {
-    # No forward references: helper definitions must precede first use.
-    helper_line=$(grep -n '^snapshot_claude_json()' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    mcp_get_line=$(grep -n 'claude mcp get' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    [ -n "$helper_line" ] && [ -n "$mcp_get_line" ]
-    [ "$helper_line" -lt "$mcp_get_line" ]
-}
-
-@test "setup-linux.sh wraps claude mcp add with snapshot+restore (BUG-011)" {
-    # snapshot called within 15 lines before mcp add (header comments + mcp get
-    # idempotence path live between); restore within 10 lines after.
-    grep -A10 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
-}
-
-@test "parity: both setup scripts wrap claude mcp add with the snapshot guard (BUG-011)" {
-    grep -B15 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
-    grep -B15 'claude mcp add --transport' "$DOTFILES_DIR/setup-windows.ps1" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
 # --- MEM-002: retire claude-mem — no longer installed (ADR-016 Q2) ---

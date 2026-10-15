@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -145,8 +147,11 @@ func newWorktreeAddCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "add <slug>",
-		Short: "Create an external sibling worktree with safety validation and lease metadata",
-		Long: `add creates a new worktree isolated outside the parent repository (<repo>-wt-<slug>).
+		Short: "Create a worktree under WORKTREE_ROOT with safety validation and lease metadata",
+		Long: `add creates a new worktree isolated outside the parent repository, at
+<WORKTREE_ROOT>/<repo>/<branch-slug>: the layout herdr creates, so a worktree made by
+either tool is found by the other. The branch defaults to feat/<slug>, so add foo
+creates <WORKTREE_ROOT>/<repo>/feat-foo. --path overrides the location.
 It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
 adds it to .git/info/exclude.`,
 		Args: cobra.ExactArgs(1),
@@ -158,13 +163,14 @@ adds it to .git/info/exclude.`,
 			}
 
 			opts := worktree.AddOptions{
-				RepoRoot:   root,
-				Slug:       slug,
-				CustomPath: customPath,
-				Branch:     branch,
-				BaseRef:    base,
-				Issue:      issue,
-				TTL:        ttl,
+				RepoRoot:     root,
+				WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
+				Slug:         slug,
+				CustomPath:   customPath,
+				Branch:       branch,
+				BaseRef:      base,
+				Issue:        issue,
+				TTL:          ttl,
 			}
 
 			info, err := worktree.Add(opts)
@@ -173,6 +179,9 @@ adds it to .git/info/exclude.`,
 			}
 
 			c.Printf("Created worktree at %s (branch: %s)\n", info.Path, info.Branch)
+			if name := filepath.Base(info.Path); customPath == "" && name != slug && info.Branch != worktree.DefaultBranch(slug) {
+				c.Printf("The directory follows the branch: tear down with `dotf worktree done %s`\n", name)
+			}
 			if info.Metadata != nil {
 				c.Printf("Lease active until %s\n", info.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
 			}
@@ -290,36 +299,72 @@ func resolveDoneTarget(args []string, worktreePath, repoDir string) (string, err
 }
 
 // resolveDoneArg reads done's argument as the path add printed or the slug add
-// was given. A bare name is also a slug, naming <repo>-wt-<slug> beside the
-// main repository, the path add creates. A name that is both, a directory in
-// the cwd and a sibling worktree, is refused rather than guessed. When it is
-// neither, the error names both paths it tried.
+// was given. A bare name is also a slug, naming any of worktree.SlugCandidates:
+// the legacy <repo>-wt-<slug> sibling, or the worktree under WORKTREE_ROOT. A
+// name that resolves to more than one directory is refused, naming each, rather
+// than guessed. When it names none, the error lists every path it tried.
 func resolveDoneArg(arg, repoDir string) (string, error) {
 	asPath, err := filepath.Abs(arg)
 	if err != nil {
 		return "", err
 	}
-	sibling, rootErr := "", error(nil)
-	if !strings.ContainsAny(arg, `/\`) {
-		var root string
-		if root, rootErr = resolveCommandRepoRoot(repoDir); rootErr == nil {
-			sibling = worktree.ResolveSiblingPath(root, arg)
+	if strings.ContainsAny(arg, `/\`) {
+		if isDirectory(asPath) {
+			return worktreeAt(asPath)
 		}
-	}
-	isPath, isSlug := isDirectory(asPath), sibling != "" && isDirectory(sibling)
-	switch {
-	case isPath && isSlug && asPath != sibling:
-		return "", fmt.Errorf("%q names two directories, %s (as a path) and %s (as a slug); pass the full path of the one to remove", arg, asPath, sibling)
-	case isPath:
-		return worktreeAt(asPath)
-	case isSlug:
-		return worktreeAt(sibling)
-	case rootErr != nil:
-		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, rootErr)
-	case sibling == "":
+		if p := branchUnderRoot(arg, repoDir); p != "" && isDirectory(p) {
+			return worktreeAt(p)
+		}
 		return "", fmt.Errorf("no worktree at %s", asPath)
 	}
-	return "", fmt.Errorf("no worktree %q: neither %s (as a path) nor %s (as a slug, the path add creates) is a directory", arg, asPath, sibling)
+	root, rootErr := resolveCommandRepoRoot(repoDir)
+	if rootErr != nil {
+		if isDirectory(asPath) {
+			return worktreeAt(asPath)
+		}
+		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, rootErr)
+	}
+	wtRoot := env.ResolvePath("WORKTREE_ROOT")
+	tried := append([]string{asPath}, worktree.SlugCandidates(root, wtRoot, arg)...)
+	var found []string
+	for _, p := range tried {
+		if isDirectory(p) && !slices.Contains(found, p) {
+			found = append(found, p)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return "", doneNotFound(arg, tried, wtRoot)
+	case 1:
+		return worktreeAt(found[0])
+	}
+	return "", fmt.Errorf("%q names %d directories, %s; pass the full path of the one to remove", arg, len(found), strings.Join(found, " and "))
+}
+
+// branchUnderRoot reads arg as a branch name and returns where add put its
+// worktree under WORKTREE_ROOT, or "" when no repository or root resolves. A
+// path that exists always wins over this reading.
+func branchUnderRoot(arg, repoDir string) string {
+	if strings.Contains(arg, `\`) {
+		return ""
+	}
+	root, err := resolveCommandRepoRoot(repoDir)
+	wtRoot := env.ResolvePath("WORKTREE_ROOT")
+	if err != nil || wtRoot == "" {
+		return ""
+	}
+	return worktree.ResolveWorktreePath(wtRoot, filepath.Base(filepath.Clean(root)), arg)
+}
+
+// doneNotFound names every path done tried, and says when the root itself was
+// not searched, so a missing env-contract.json reads as that and not as "the
+// worktree does not exist".
+func doneNotFound(arg string, tried []string, wtRoot string) error {
+	msg := fmt.Sprintf("no worktree %q: none of %s is a directory", arg, strings.Join(tried, ", "))
+	if wtRoot == "" {
+		msg += "; WORKTREE_ROOT could not be resolved, so the worktree root was not searched (run `dotf doctor`)"
+	}
+	return errors.New(msg)
 }
 
 // worktreeAt returns the top of the git worktree holding dir, or an error that
@@ -370,12 +415,17 @@ the upstream nor contained in the head of a merged pull request for the branch
 request cannot be listed (no gh, offline), it refuses and says so.
 
 Whatever --force says, it also refuses a worktree that contains the current
-directory or, on Linux, the working directory of a process it runs under: the
+directory or, on Linux and macOS, the working directory of a process it runs under: the
 removal would strand that shell or agent, and a Claude Code session launched
 from the worktree could not be resumed. Run it from outside the worktree.
 
-The argument is the worktree's path, or the slug given to add: a name that is
-not a directory resolves to <repo>-wt-<slug> beside the repository.`,
+The argument is the worktree's path, its branch, or its directory name under
+the root. The directory follows the branch: add <slug> makes feat/<slug> in
+.../feat-<slug>, so the slug works too, but add <slug> -b fix/login makes
+.../fix-login, which done takes as fix/login or fix-login (add prints it). A
+bare name resolves to <WORKTREE_ROOT>/<repo>/<name> or .../feat-<name>, and to
+the legacy <repo>-wt-<name> beside the repository. A name matching more than
+one is refused.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			target, err := resolveDoneTarget(args, worktreePath, repoDir)

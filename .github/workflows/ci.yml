@@ -73,6 +73,8 @@ jobs:
               # adds only such an entry that test is itself skipped, so the
               # failure shows on the push to main (#1879).
               - 'secrets/**'
+              # The lane file and prompt `dotf lane next` reads (CLI-119).
+              - '.dotf/**'
               - 'ssh/**'
               - 'systemd/**'
               - 'forge/**'

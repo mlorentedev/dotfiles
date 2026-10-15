@@ -51,3 +51,13 @@ setup() {
     run jq -e --arg w "$want" '.trustedFolders | index($w)' "$REPO/ai/copilot/config.json"
     [ "$status" -eq 0 ] || { echo "copilot trustedFolders lacks $want"; false; }
 }
+
+@test "WORKTREE_ROOT and herdr's worktrees.directory name the same root (#2503)" {
+    # dotf worktree add places checkouts under WORKTREE_ROOT; herdr under its
+    # [worktrees] directory. Until deploy renders one from the other, they are
+    # kept equal here, or the two tools create worktrees in different trees.
+    run jq -r '.env_vars[] | select(.name == "WORKTREE_ROOT") | .default.linux' "$REPO/env-contract.json"
+    root="${output/#\$HOME/\~}"
+    run grep -E "^directory[[:space:]]*=[[:space:]]*\"$root\"\$" "$SRC"
+    [ "$status" -eq 0 ] || { echo "herdr directory is not \"$root\""; false; }
+}
