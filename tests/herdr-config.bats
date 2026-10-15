@@ -46,8 +46,12 @@ setup() {
     run sed -n 's/^directory[[:space:]]*=[[:space:]]*"~\(.*\)"$/{HOME}\1\/*\/*/p' "$SRC"
     [ -n "$output" ] || { echo "no ~-relative [worktrees] directory in $SRC"; false; }
     want="$output"
-    run jq -e --arg w "$want" '.trustedWorkspaces | index($w)' "$REPO/ai/agy/settings.json"
-    [ "$status" -eq 0 ] || { echo "agy trustedWorkspaces lacks $want"; false; }
+    # agy 1.3.5 does not read `<dir>/*/*` as a glob (measured 2026-10-14, #2533):
+    # a fresh worktree under it still asked. The plain directory is trusted with
+    # everything beneath it, so agy is given the root, not the pattern.
+    agy_want="${want%/\*/\*}"
+    run jq -e --arg w "$agy_want" '.trustedWorkspaces | index($w)' "$REPO/ai/agy/settings.json"
+    [ "$status" -eq 0 ] || { echo "agy trustedWorkspaces lacks $agy_want"; false; }
     run jq -e --arg w "$want" '.trustedFolders | index($w)' "$REPO/ai/copilot/config.json"
     [ "$status" -eq 0 ] || { echo "copilot trustedFolders lacks $want"; false; }
 }
