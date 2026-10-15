@@ -20,6 +20,7 @@ func TestManifestVersion_FreezesTheFieldSet(t *testing.T) {
 		2: {"$comment", "configs", "dst", "mode", "name", "render", "requires", "src", "strategy", "version"},
 		3: {"$comment", "configs", "dst", "mode", "name", "paths", "render", "requires", "src", "strategy", "version"},
 		4: {"$comment", "configs", "dst", "mode", "name", "paths", "platforms", "render", "requires", "src", "strategy", "version"},
+		5: {"$comment", "configs", "dst", "listKeys", "mode", "name", "paths", "platforms", "render", "requires", "src", "strategy", "version"},
 	}
 	want, ok := frozen[ManifestVersion]
 	if !ok {
@@ -36,6 +37,6 @@ func TestManifestVersion_FreezesTheFieldSet(t *testing.T) {
 	}
 	sort.Strings(got)
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("the manifest schema changed without a version bump:\n got %v\nwant %v (ManifestVersion %d)\nbump ManifestVersion and ai/deploy.json together, then extend the frozen set", got, want, ManifestVersion)
+		t.Errorf("the manifest schema changed without a version bump:\n got %v\nwant %v (ManifestVersion %d)\nbump ManifestVersion and extend the frozen set; move ai/deploy.json only after a release carries the reader (#1814)", got, want, ManifestVersion)
 	}
 }
