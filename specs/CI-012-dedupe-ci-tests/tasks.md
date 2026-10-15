@@ -19,7 +19,7 @@ created: "2026-10-07"
 
 ## Implementation
 
-Rows N4, N5 and N7 of #2059 in the first PR, N3 in the second. N1, N2, N6 and N8 follow as their own PRs.
+Rows N4, N5 and N7 of #2059 in the first PR, N3 in the second, N6 in the third. N1, N2 and N8 follow as their own PRs.
 
 - [x] [AC3] Add the Go twins that did not exist: top tier through the command, saturated pool through the command, probe reaching a stub harness; pin `exit` presence in the record test
 - [x] [AC3] Mutate production code once per deleted case and confirm its twin goes red (table in the PR body)
@@ -29,7 +29,10 @@ Rows N4, N5 and N7 of #2059 in the first PR, N3 in the second. N1, N2, N6 and N8
 - [x] [AC2] [AC4] `ci.yml` test job: build once and export `DOTF_BIN`; junit report with timing; upload artifact
 - [x] [AC5] Write `tests/fixture-template-helper.bats` (copy, write guard, builder failure under `||`) before the helper
 - [x] [AC5] `tests/lib/fixture-template.bash`; the five N3 files build their fixture in `setup_file`
-- [ ] Remaining rows: N1, N2, N6, N8
+- [x] [AC6] Write `tests/duplicate-assertions.bats` (13 rule cases on fixtures, plus the repo-wide case) before the scanner
+- [x] [AC6] `tests/lib/check-duplicate-assertions.py`
+- [ ] [AC6] Remove the 67 repeats it reports: keep each in the test that owns the behaviour (a `parity:` test keeps its pair); a test left with no assertion is deleted, not kept empty; then the repo-wide case passes
+- [ ] Remaining rows: N1, N2, N8
 
 ## Closing
 
