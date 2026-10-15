@@ -149,11 +149,11 @@ func TestClassifyActiveStates(t *testing.T) {
 			Metadata: nil,
 		}
 		state, reason := Classify(info, now)
-		if state != StateActive {
-			t.Errorf("expected metadata-less worktree to be StateActive, got %s", state)
+		if state != StateUnadopted {
+			t.Errorf("expected metadata-less worktree to be StateUnadopted, got %s", state)
 		}
-		if !strings.Contains(reason, "no dotf metadata") {
-			t.Errorf("expected reason to mention missing metadata, got %q", reason)
+		if !strings.Contains(reason, "dotf worktree adopt") {
+			t.Errorf("expected reason to name the way to adopt it, got %q", reason)
 		}
 	})
 

@@ -285,3 +285,28 @@ func TestWorktreeDoneRefusesARecentSessionUntilIgnored(t *testing.T) {
 		t.Errorf("%s still exists after done --ignore-recent-session", wt)
 	}
 }
+
+// A worktree git made directly (as herdr does) lists as UNADOPTED until adopt.
+func TestWorktreeAdoptTakesAGitCreatedWorktree(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	wt := filepath.Join(os.Getenv("WORKTREE_ROOT"), "repo", "fix-from-herdr")
+	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "-q", "-b", "fix/from-herdr", wt).CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	out, err := executeWorktree(t, "list", "--repo", repo)
+	if err != nil || !strings.Contains(out, "UNADOPTED") {
+		t.Fatalf("list before adopt: %v\n%s", err, out)
+	}
+	if out, err := executeWorktree(t, "adopt", "fix-from-herdr", "--repo", repo); err != nil || !strings.Contains(out, "Adopted") {
+		t.Fatalf("adopt by slug: %v\n%s", err, out)
+	}
+	if out, err := executeWorktree(t, "adopt", wt, "--repo", repo); err != nil || !strings.Contains(out, "unchanged") {
+		t.Fatalf("second adopt: %v\n%s", err, out)
+	}
+	// The error and the row both count: a list that fails, or prints
+	// nothing, also lacks "UNADOPTED".
+	out, err = executeWorktree(t, "list", "--repo", repo)
+	if err != nil || !strings.Contains(out, "fix-from-herdr") || strings.Contains(out, "UNADOPTED") {
+		t.Errorf("list after adopt: %v, want the worktree listed and adopted:\n%s", err, out)
+	}
+}
