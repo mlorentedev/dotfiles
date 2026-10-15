@@ -48,33 +48,18 @@ func ResolvePaths(home string, getenv, resolve func(string) string) Paths {
 	return p
 }
 
-// LegacyAppDataVar is the name the setups exported before env-contract.json's
-// AGY_HOME was read here. Neither name is read by agy itself; both are ours.
-// It is still honoured when AGY_HOME is unset, so a shell that has not
-// re-sourced its rc file keeps the directory it had.
-const LegacyAppDataVar = "AGY_APP_DATA"
-
 // Dirs is $GEMINI_HOME and $AGY_HOME with their defaults, the contract's
 // names. doctor reads them through it too, so the writer and the checker agree
-// on the paths by construction.
+// on the paths by construction. agy itself reads neither variable; both are
+// ours. The setups' old AGY_APP_DATA is no longer read (#2404).
 func Dirs(home string, getenv func(string) string) (geminiHome, appData string) {
 	if geminiHome = getenv("GEMINI_HOME"); geminiHome == "" {
 		geminiHome = filepath.Join(home, ".gemini")
 	}
-	if appData = getenv(AppDataSource(getenv)); appData == "" {
+	if appData = getenv("AGY_HOME"); appData == "" {
 		appData = filepath.Join(geminiHome, "antigravity-cli")
 	}
 	return geminiHome, appData
-}
-
-// AppDataSource is the variable Dirs takes the app-data dir from: AGY_HOME,
-// or the old name while only that one is set. doctor names it in its findings,
-// so the precedence lives here once.
-func AppDataSource(getenv func(string) string) string {
-	if getenv("AGY_HOME") == "" && getenv(LegacyAppDataVar) != "" {
-		return LegacyAppDataVar
-	}
-	return "AGY_HOME"
 }
 
 // MCPReport is what one ApplyMCP wrote and removed, or under a plan would.

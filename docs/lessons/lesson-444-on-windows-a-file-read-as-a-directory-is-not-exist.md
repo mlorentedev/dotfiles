@@ -1,5 +1,5 @@
 ---
-id: "lesson-443-on-windows-a-file-read-as-a-directory-is-not-exist"
+id: "lesson-444-on-windows-a-file-read-as-a-directory-is-not-exist"
 type: lesson
 status: active
 title: "On Windows a file read as a directory is ErrNotExist: decide absence with Stat"
