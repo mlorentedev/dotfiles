@@ -3,12 +3,10 @@
 # "## Knowledge" section, the lesson, ADR and runbook it wrote, or why none.
 
 load 'lib/both-shells'
+load 'lib/fixture-template'
 
-setup() {
-    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
-    REPO_FIXTURE="$BATS_TEST_TMPDIR/repo"
-    mkdir -p "$REPO_FIXTURE"
-    cd "$REPO_FIXTURE" || exit 1
+# Built once per file and copied per test (CI-012 N3).
+_seed_fixture() {
     git init -q -b main
     git config user.email test@test
     git config user.name test
@@ -20,6 +18,17 @@ setup() {
     git add -A
     git commit -q -m "seed"
     git checkout -q -b feature
+}
+
+setup_file() { fixture_template_build repo _seed_fixture; }
+
+teardown_file() { fixture_template_release; }
+
+setup() {
+    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    REPO_FIXTURE="$BATS_TEST_TMPDIR/repo"
+    fixture_template_copy repo "$REPO_FIXTURE"
+    cd "$REPO_FIXTURE" || exit 1
     unset SDD_PR_BODY SDD_LABELS SDD_PR_AUTHOR
 }
 

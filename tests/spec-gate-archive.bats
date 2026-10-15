@@ -10,12 +10,10 @@
 # `Refs #N` legitimately leaves a spec active when the issue's work continues.
 
 load 'lib/both-shells'
+load 'lib/fixture-template'
 
-setup() {
-    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
-    GATE="$SCRIPTS_DIR/check-spec-gate.sh"
-    REPO_FIXTURE="$(mktemp -d "/tmp/bats_archivegate_XXXXXX")"
-    cd "$REPO_FIXTURE" || exit 1
+# Built once per file and copied per test (CI-012 N3).
+_seed_fixture() {
     git init -q -b main
     git config user.email test@test
     git config user.name test
@@ -26,6 +24,20 @@ setup() {
     # A real origin, so the cross-repo discrimination is exercised rather than
     # sidestepped: qualified references are only ours if the slug matches.
     git remote add origin https://github.com/mlorentedev/dotfiles.git
+}
+
+setup_file() { fixture_template_build repo _seed_fixture; }
+
+teardown_file() { fixture_template_release; }
+
+setup() {
+    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    GATE="$SCRIPTS_DIR/check-spec-gate.sh"
+    # mktemp picks the unique name; the copy needs it not to exist yet.
+    REPO_FIXTURE="$(mktemp -d "/tmp/bats_archivegate_XXXXXX")"
+    rmdir "$REPO_FIXTURE"
+    fixture_template_copy repo "$REPO_FIXTURE"
+    cd "$REPO_FIXTURE" || exit 1
     # Every test starts with a clean env: a leaked label or body from the shell
     # would silently change which branch of the gate is exercised.
     unset SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR

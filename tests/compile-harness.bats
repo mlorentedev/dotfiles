@@ -4,16 +4,15 @@
 # so the real AGENTS.md / CLAUDE.md are never touched.
 
 load 'lib/refute'
+load 'lib/fixture-template'
 
-setup() {
-    SCRIPT="$BATS_TEST_DIRNAME/../scripts/compile-harness.sh"
-    TMP="/tmp/bats_harness_$$_${BATS_TEST_NUMBER:-0}"
-    mkdir -p "$TMP"
-
-    # fake vault with one extractable section
-    VAULT="$TMP/vault"
-    mkdir -p "$VAULT/00_meta/patterns"
-    cat > "$VAULT/00_meta/patterns/test-pattern.md" <<'EOF'
+# The fixture every test starts from: a fake vault with one extractable section
+# and a git repo whose TARGET.md has an empty generated block. Built once in
+# setup_file and copied per test (CI-012 N3): the git init and seed commit were
+# a third of this file's run time.
+_harness_fixture() {
+    mkdir -p vault/00_meta/patterns
+    cat > vault/00_meta/patterns/test-pattern.md <<'EOF'
 # Test Pattern
 
 ## 1. Demo Rule
@@ -24,26 +23,38 @@ setup() {
 - unrelated
 EOF
 
-    # repo fixture
-    REPO="$TMP/repo"
-    mkdir -p "$REPO/harness"
-    cd "$REPO" || exit 1
+    mkdir -p repo/harness
+    cd repo
     git init -q -b main
     git config user.email t@t; git config user.name t; git config commit.gpgsign false
 
-    # Point the real script at this fixture tree (the script defaults to its own
-    # SCRIPT_DIR — the live repo — so without this every mode would operate on the
-    # real harness/ instead of the fixture). Inherited by every `run` below.
-    export HARNESS_REPO_ROOT="$REPO"
-
-    cat > "$REPO/harness/manifest.json" <<'EOF'
+    cat > harness/manifest.json <<'EOF'
 { "version": 1, "vault_subpath": "00_meta/patterns",
   "enforced": [ { "id": "demo", "source": "test-pattern.md#1-demo-rule" } ],
   "targets":  [ { "agent": "t", "kind": "native", "file": "TARGET.md", "inject": ["demo"] } ] }
 EOF
 
-    printf 'intro\n\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n\noutro\n' > "$REPO/TARGET.md"
+    printf 'intro\n\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\n\noutro\n' > TARGET.md
     git add -A; git commit -q -m seed
+}
+
+setup_file() { fixture_template_build harness _harness_fixture; }
+
+teardown_file() { fixture_template_release; }
+
+setup() {
+    SCRIPT="$BATS_TEST_DIRNAME/../scripts/compile-harness.sh"
+    TMP="/tmp/bats_harness_$$_${BATS_TEST_NUMBER:-0}"
+    rm -rf "$TMP"
+    fixture_template_copy harness "$TMP"
+    VAULT="$TMP/vault"
+    REPO="$TMP/repo"
+    cd "$REPO" || exit 1
+
+    # Point the real script at this fixture tree (the script defaults to its own
+    # SCRIPT_DIR — the live repo — so without this every mode would operate on the
+    # real harness/ instead of the fixture). Inherited by every `run` below.
+    export HARNESS_REPO_ROOT="$REPO"
 }
 
 teardown() { cd / || true; rm -rf "$TMP"; }
