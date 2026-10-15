@@ -51,8 +51,18 @@ func TestMigrateMovesAndASecondRunHasNothingToDo(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(root, "repo", "feat-foo")
+	// Through samePath, not the porcelain text: on Windows git prints
+	// C:/Users/runneradmin/... and the temp dir is C:\Users\RUNNER~1\...
 	list, _ := exec.Command("git", "-C", repo, "worktree", "list", "--porcelain").Output()
-	if _, err := os.Stat(legacy); !os.IsNotExist(err) || !strings.Contains(string(list), resolvedPath(target)) {
+	raws, err := ParsePorcelain(string(list))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, raw := range raws {
+		listed = listed || samePath(raw.Path, target)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) || !listed {
 		t.Fatalf("after migrate: legacy stat %v, worktree list:\n%s", err, list)
 	}
 	rep, err := Migrate(MigrateOptions{RepoRoot: repo, WorktreeRoot: root}, time.Now())
