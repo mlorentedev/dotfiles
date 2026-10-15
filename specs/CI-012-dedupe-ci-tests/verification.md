@@ -31,6 +31,8 @@ This spec tracked #2059 across three PRs: N4, N5 and N7 in the first, N3 in #250
 - A missing Go toolchain still skips on a developer machine: the file headers promise a shell-only checkout runs the rest of the suite. In CI it fails.
 - N6 owners where no `parity:` test decided it (#2059 plan): the Aider sunset stays in each file's own suite; `inject_agent_presence` belongs to `compile-harness.bats`, `harness refresh` to `harness-refresh-announce.bats`, the `install.ps1` converge call to `install-ps1.bats`, `dotf tools install` to `setup-windows.bats`, `harness bind` and its probes to the "both setup scripts" test in `claude-settings-template.bats`, the `__HOOK_COMMAND__` placeholder to that file's placeholder test, `Copy-Item.*diff-check` to the CLI-019 deploy test, `systemd/user` to `dotfiles-selfupdate-install.bats`.
 - The Setup rows of `tasks.md` stay unticked: the work landed on `ci/dedupe-bats-build`, `ci/bats-fixture-template` and `test/duplicate-assertion-check`, not the `feat/` branch the template names.
+- `proposal.md` N4 says five files load the `dotf-bin` helper; three do now. #2070 (`38fe45dd`) replaced `vault-health-go-parity.bats` and `knowledge-crystallize-go-parity.bats` with Go golden tests, so the count drifted, not the coverage. Recorded here, not in the proposal, as the archive review asked.
+- The archive review's open Minor gaps (upload `if-no-files-found`, nested `.bats` enumeration, a flag-identity fixture, function length, the 63-vs-67 docstring) are tracked on #2059 (issuecomment-6183266892).
 - The spec was scaffolded with `--over-wip-limit` (19 active against a limit of 10): the rows are independent of the other specs and a block in an unrelated one would have mislabelled both.
 
 ## Promotion candidates
