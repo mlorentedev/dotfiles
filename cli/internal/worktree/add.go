@@ -14,11 +14,15 @@ type AddOptions struct {
 	RepoRoot   string
 	Slug       string
 	CustomPath string
-	Branch     string
-	BaseRef    string
-	Issue      int
-	TTL        time.Duration
-	Creator    string
+	// WorktreeRoot places the checkout at <root>/<repo>/<slug of branch>
+	// (ResolveWorktreePath). Empty is refused unless CustomPath is set: there
+	// is no fallback to the legacy <repo>-wt-<slug> sibling.
+	WorktreeRoot string
+	Branch       string
+	BaseRef      string
+	Issue        int
+	TTL          time.Duration
+	Creator      string
 }
 
 // AddRunner executes the low-level git worktree creation.
@@ -83,14 +87,19 @@ func validateAddOptions(opts AddOptions) error {
 	if opts.Slug == "" && opts.CustomPath == "" {
 		return fmt.Errorf("either slug or custom path must be specified")
 	}
+	// No silent fallback to the legacy sibling: a worktree's layout must not
+	// depend on whether this process could locate env-contract.json.
+	if opts.CustomPath == "" && opts.WorktreeRoot == "" {
+		return fmt.Errorf("WORKTREE_ROOT could not be resolved: run `dotf doctor`, or pass --path")
+	}
 	return nil
 }
 
-func resolveTargetPath(opts AddOptions) string {
+func resolveTargetPath(opts AddOptions, branch string) string {
 	if opts.CustomPath != "" {
 		return opts.CustomPath
 	}
-	return ResolveSiblingPath(opts.RepoRoot, opts.Slug)
+	return ResolveWorktreePath(opts.WorktreeRoot, filepath.Base(filepath.Clean(opts.RepoRoot)), branch)
 }
 
 func resolveCreator(explicit string) string {
@@ -111,7 +120,7 @@ func resolveCreator(explicit string) string {
 func resolveAddDefaults(opts AddOptions) (string, time.Duration, string) {
 	branchName := opts.Branch
 	if branchName == "" {
-		branchName = "feat/" + opts.Slug
+		branchName = DefaultBranch(opts.Slug)
 	}
 
 	ttl := opts.TTL
@@ -129,7 +138,8 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		return nil, err
 	}
 
-	targetPath := resolveTargetPath(opts)
+	branchName, ttl, creator := resolveAddDefaults(opts)
+	targetPath := resolveTargetPath(opts, branchName)
 	if err := ValidateIsolation(opts.RepoRoot, targetPath); err != nil {
 		return nil, err
 	}
@@ -137,8 +147,6 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 	if _, err := os.Stat(targetPath); err == nil {
 		return nil, fmt.Errorf("target path already exists: %s", targetPath)
 	}
-
-	branchName, ttl, creator := resolveAddDefaults(opts)
 
 	// Gate A: warn if parent repository has active auto-commit hooks/plugins
 	if warn := CheckAutoCommitHooks(opts.RepoRoot); warn != "" {
