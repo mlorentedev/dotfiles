@@ -34,10 +34,10 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 ## PR 6 — `--agent` over herdr
 
-- [ ] herdr client over `tools.Runner` with a fake: `worktree open`, `agent start`, `agent prompt` request shape and order; no `--wait`.
-- [ ] States: herdr absent, server down (`herdr status server`), server up. Refusal before any git mutation.
-- [ ] Harness → kind mapping reused from `herdr/integrations.go`.
-- [ ] Agent name derivation and collision refusal; `agent_not_ready` / `agent_blocked` legs exit non-zero.
+- [x] herdr client over `tools.Runner` with a fake: `worktree open`, `agent start`, `agent prompt` request shape and order; no `--wait`.
+- [x] States: herdr absent, server down (`herdr status server`), server up. Refusal before any git mutation.
+- [x] Harness → kind: a dotfiles harness name is its herdr kind as is (`herdr.Kinds`, measured on 0.9.3); the integration target map does not apply (it maps agy to antigravity-cli, and the kind is agy).
+- [x] Agent name derivation and collision refusal; `agent_not_ready` / `agent_blocked` legs exit non-zero.
 
 ## PR 7 — rendering, docs, skills, ADR
 
