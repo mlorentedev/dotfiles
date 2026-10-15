@@ -210,3 +210,13 @@ func TestCallerCwdFallsBackToPWD(t *testing.T) {
 		t.Fatalf("an unreadable cwd must fall back to $PWD, got %q", got)
 	}
 }
+
+func TestWorktreeDoneSaysWhenTheRootWasNotSearched(t *testing.T) {
+	tried := []string{"/a/x", "/a/repo-wt-x"}
+	if err := doneNotFound("x", tried, ""); !strings.Contains(err.Error(), "WORKTREE_ROOT could not be resolved") {
+		t.Errorf("unresolved root: got %v, want it named", err)
+	}
+	if err := doneNotFound("x", tried, "/w"); strings.Contains(err.Error(), "WORKTREE_ROOT") {
+		t.Errorf("resolved root: got %v, want no root note", err)
+	}
+}

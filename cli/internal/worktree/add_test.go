@@ -66,7 +66,8 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 	mainRepo := filepath.Join(tmpDir, "myrepo")
 	_ = os.MkdirAll(filepath.Join(mainRepo, ".git", "info"), 0o755)
 
-	targetPath := filepath.Join(tmpDir, "myrepo-wt-test")
+	root := filepath.Join(tmpDir, "worktrees")
+	targetPath := filepath.Join(root, "myrepo", "feat-test")
 
 	executedCommands := []string{}
 	runner := &MockAddRunner{
@@ -79,11 +80,12 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 	}
 
 	opts := AddOptions{
-		RepoRoot: mainRepo,
-		Slug:     "test",
-		Issue:    1500,
-		TTL:      24 * time.Hour,
-		Creator:  "test-agent",
+		RepoRoot:     mainRepo,
+		WorktreeRoot: root,
+		Slug:         "test",
+		Issue:        1500,
+		TTL:          24 * time.Hour,
+		Creator:      "test-agent",
 	}
 
 	info, err := AddWithRunner(opts, runner, time.Now())

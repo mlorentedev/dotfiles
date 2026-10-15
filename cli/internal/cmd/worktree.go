@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -317,7 +318,8 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 		}
 		return "", fmt.Errorf("no worktree at %s, and no repository to read %q as a slug in: %w", asPath, arg, rootErr)
 	}
-	tried := append([]string{asPath}, worktree.SlugCandidates(root, env.ResolvePath("WORKTREE_ROOT"), arg)...)
+	wtRoot := env.ResolvePath("WORKTREE_ROOT")
+	tried := append([]string{asPath}, worktree.SlugCandidates(root, wtRoot, arg)...)
 	var found []string
 	for _, p := range tried {
 		if isDirectory(p) && !slices.Contains(found, p) {
@@ -326,11 +328,22 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 	}
 	switch len(found) {
 	case 0:
-		return "", fmt.Errorf("no worktree %q: none of %s is a directory", arg, strings.Join(tried, ", "))
+		return "", doneNotFound(arg, tried, wtRoot)
 	case 1:
 		return worktreeAt(found[0])
 	}
 	return "", fmt.Errorf("%q names %d directories, %s; pass the full path of the one to remove", arg, len(found), strings.Join(found, " and "))
+}
+
+// doneNotFound names every path done tried, and says when the root itself was
+// not searched, so a missing env-contract.json reads as that and not as "the
+// worktree does not exist".
+func doneNotFound(arg string, tried []string, wtRoot string) error {
+	msg := fmt.Sprintf("no worktree %q: none of %s is a directory", arg, strings.Join(tried, ", "))
+	if wtRoot == "" {
+		msg += "; WORKTREE_ROOT could not be resolved, so the worktree root was not searched (run `dotf doctor`)"
+	}
+	return errors.New(msg)
 }
 
 // worktreeAt returns the top of the git worktree holding dir, or an error that

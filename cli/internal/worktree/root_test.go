@@ -3,6 +3,7 @@ package worktree
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -87,17 +88,37 @@ func TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan(t *testing.T) {
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(wt, link); err != nil {
-		t.Skipf("symlink: %v", err)
+	cwds := []string{wt, sub}
+	// The symlink row needs a privilege Windows runners may lack; the other
+	// rows run regardless.
+	if link := filepath.Join(t.TempDir(), "link"); os.Symlink(wt, link) == nil {
+		cwds = append(cwds, filepath.Join(link, "cli"))
 	}
 	info := Info{Path: wt, State: StateReapable}
-	for _, cwd := range []string{wt, sub, filepath.Join(link, "cli")} {
+	for _, cwd := range cwds {
 		if _, ok := gateF(info, cwd); ok {
 			t.Errorf("gateF allowed reaping %s with the caller in %s", wt, cwd)
 		}
 	}
 	if _, ok := gateF(info, t.TempDir()); !ok {
 		t.Errorf("gateF refused a caller outside %s", wt)
+	}
+}
+
+// Without a root and without --path, add refuses instead of falling back to the
+// legacy sibling: which layout a worktree lands in must not depend on whether
+// the caller's environment could locate env-contract.json.
+func TestAddRefusesWithoutARoot(t *testing.T) {
+	mainRepo := filepath.Join(t.TempDir(), "myrepo")
+	_ = os.MkdirAll(filepath.Join(mainRepo, ".git", "info"), 0o755)
+	called := false
+	runner := &MockAddRunner{OnWorktreeAdd: func(_, _, _, _ string) error { called = true; return nil }}
+
+	_, err := AddWithRunner(AddOptions{RepoRoot: mainRepo, Slug: "x"}, runner, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "WORKTREE_ROOT") || !strings.Contains(err.Error(), "--path") {
+		t.Fatalf("got %v, want a refusal naming WORKTREE_ROOT and --path", err)
+	}
+	if called {
+		t.Error("git worktree add ran without a root")
 	}
 }

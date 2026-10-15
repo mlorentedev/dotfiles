@@ -31,6 +31,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - `done <slug>` resolution moved from PR 4 into PR 1: once `add` writes under the root, a sibling-only `done <slug>` would have broken in between.
 - `list --all` needed no change: it finds worktrees through `git worktree list`, not by directory layout.
+- `add` refuses when WORKTREE_ROOT resolves empty and no `--path` is given (`TestAddRefusesWithoutARoot`), and `done` says the root was not searched (`TestWorktreeDoneSaysWhenTheRootWasNotSearched`). `env.ResolvePath` returns "" when env-contract.json is neither deployed nor reachable from the cwd; falling back to the sibling there would pick the layout by accident.
 - dotf creates the worktree and herdr only opens it (owner, 2026-10-14), so the lease, branch check and isolation gate hold on every path, Windows included.
 
 ## Promotion candidates

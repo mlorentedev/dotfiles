@@ -86,6 +86,11 @@ func validateAddOptions(opts AddOptions) error {
 	if opts.Slug == "" && opts.CustomPath == "" {
 		return fmt.Errorf("either slug or custom path must be specified")
 	}
+	// No silent fallback to the legacy sibling: a worktree's layout must not
+	// depend on whether this process could locate env-contract.json.
+	if opts.CustomPath == "" && opts.WorktreeRoot == "" {
+		return fmt.Errorf("WORKTREE_ROOT could not be resolved: run `dotf doctor`, or pass --path")
+	}
 	return nil
 }
 
@@ -93,10 +98,7 @@ func resolveTargetPath(opts AddOptions, branch string) string {
 	if opts.CustomPath != "" {
 		return opts.CustomPath
 	}
-	if opts.WorktreeRoot != "" {
-		return ResolveWorktreePath(opts.WorktreeRoot, filepath.Base(filepath.Clean(opts.RepoRoot)), branch)
-	}
-	return ResolveSiblingPath(opts.RepoRoot, opts.Slug)
+	return ResolveWorktreePath(opts.WorktreeRoot, filepath.Base(filepath.Clean(opts.RepoRoot)), branch)
 }
 
 func resolveCreator(explicit string) string {

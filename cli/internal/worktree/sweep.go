@@ -214,7 +214,7 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 	// It is also the cheaper order: Gate f walks all of /proc, so running it
 	// after the cheap refusals means fewer walks, not more.
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd {
+	if err != nil || pathWithin(resolvedPath(absCwd), resolvedPath(absWT)) {
 		return false
 	}
 	if isDirty(info.Path, runner) {
