@@ -109,13 +109,25 @@ func resolveBindInputs(repoRoot, homeDir, dotfPath string) (root, home, binary s
 }
 
 // bindResolver resolves a target's dst {VAR}: through the full env contract for
-// the user's own home, and against an explicit --home alone otherwise, so a run
-// told to bind under a home never writes outside it (#2279).
+// the user's own home, and against any other --home alone, so a run told to bind
+// under a home never writes outside it (#2279). An explicit --home naming the
+// user's own home is the user's home: CLAUDE_CONFIG_DIR still applies there.
 func bindResolver(homeDir string) func(string) string {
-	if homeDir == "" {
+	if homeDir == "" || sameDir(homeDir, env.Home()) {
 		return env.ResolvePath
 	}
 	return func(name string) string { return env.ResolvePathUnder(name, homeDir) }
+}
+
+// sameDir reports whether two paths name one existing directory, through
+// symlinks (macOS's /var is /private/var), which a string compare would miss.
+func sameDir(a, b string) bool {
+	if b == "" {
+		return false
+	}
+	ai, aerr := os.Stat(a)
+	bi, berr := os.Stat(b)
+	return aerr == nil && berr == nil && os.SameFile(ai, bi)
 }
 
 // bindTargets binds every selected target and reports one stable status tag

@@ -688,3 +688,24 @@ func TestBindUnderAnExplicitHomeIgnoresTheInheritedConfigDir(t *testing.T) {
 		t.Errorf("bind wrote outside --home, into the inherited CLAUDE_CONFIG_DIR: %v", entries)
 	}
 }
+
+// An explicit --home that names the user's own home is not a sandbox: there
+// CLAUDE_CONFIG_DIR is where Claude reads its settings, so bind must follow it.
+func TestBindUnderTheUsersOwnHomeFollowsClaudeConfigDir(t *testing.T) {
+	home, raw, _ := bindFixture(t, "")
+	cfg := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
+
+	if _, _, err := captureRealStreams(t, "harness", "bind",
+		"--harness", "claude", "--repo-root", repoRootForTest(t), "--home", home, "--dotf-path", raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cfg, "settings.json")); err != nil {
+		t.Errorf("--home \"$HOME\" did not bind into $CLAUDE_CONFIG_DIR: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("--home \"$HOME\" bound ~/.claude/settings.json, which Claude does not read here (err %v)", err)
+	}
+}
