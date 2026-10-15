@@ -43,17 +43,22 @@ func TestProbeVersion(t *testing.T) {
 // "OpenSSL 1.1.1+" before poetry prints `Poetry (version 2.2.1)`, and the
 // merged stream made `dotf tools install` plan an upgrade from 1.1.1 on every
 // run. stdout comes first; stderr still counts for a tool that prints its
-// version only there.
-func TestExecRunner_ReadsStdoutBeforeStderr(t *testing.T) {
+// version only there, when it ran. A failed run's stderr does not count: the
+// ansible-lint crash of BUG-141 left only ansible-core's version there.
+func TestProbeRunner_ReadsStdoutBeforeStderr(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("sh not on PATH")
 	}
 	for name, tc := range map[string]struct{ script, want string }{
 		"a warning on stderr first": {"echo 'urllib3 v2 only supports OpenSSL 1.1.1+' >&2; echo 'Poetry (version 2.2.1)'", "2.2.1"},
 		"a version on stderr only":  {"echo 'tool 3.4.5' >&2", "3.4.5"},
+		"a crash that names another package's version": {
+			"echo 'UserWarning: UNSUPPORTED: ansible-core 2.21.5 supports Python up to 3.14' >&2; exit 3", "",
+		},
+		"a version, then an unrelated failure": {"echo 'tool 2.3.4'; echo 'error: telemetry unreachable' >&2; exit 1", "2.3.4"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			run := func(string, ...string) ([]byte, error) { return ExecRunner("sh", "-c", tc.script) }
+			run := func(string, ...string) ([]byte, error) { return ProbeRunner("sh", "-c", tc.script) }
 			if got := ProbeVersion("x", run); got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}

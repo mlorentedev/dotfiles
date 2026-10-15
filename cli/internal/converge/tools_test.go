@@ -38,6 +38,9 @@ func fakeMise() (run, stdout tools.Runner, installs *int) {
 		if name == "mise" && args[0] == "ls" {
 			return []byte("{}"), nil
 		}
+		if strings.HasPrefix(name, "/bin/") {
+			return run(name, args...) // a tool's banner is on its stdout
+		}
 		return nil, errors.New("not installed")
 	}
 	return run, stdout, &n
@@ -168,6 +171,8 @@ func TestToolsSync_AnOutdatedLatestToolIsAnUpgrade(t *testing.T) {
 			return []byte(`{"jq": {"requested": "latest", "current": "1.8.2", "latest": "1.8.3"}}`), nil
 		case name == "mise" && args[0] == "ls":
 			return []byte("{}"), nil
+		case name == "/bin/jq":
+			return run(name, args...)
 		}
 		return nil, errors.New("unexpected: " + name + " " + strings.Join(args, " "))
 	}

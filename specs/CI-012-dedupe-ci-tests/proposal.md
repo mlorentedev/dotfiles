@@ -37,10 +37,16 @@ CI had no per-file bats timing for the #1744 budget guard to read.
   case (`--timeout` named on stderr, nothing on stdout): only the compiled binary shows that `main()`
   binds `run` to `os.Stderr`, and mutating that binding turned no other test red.
 - **N7.** The Linux bats step writes a junit report with timing and uploads it as an artifact.
+- **N3.** The five files that ran `git init` and a seed commit in every `setup()`
+  (`compile-harness`, `spec-gate-archive`, `check-knowledge-gate`, `check-spec-gate`,
+  `precommit-fallback`) build that fixture once in `setup_file` and copy it per test, through a
+  shared helper (`tests/lib/fixture-template.bash`). The template is read-only, CI-004's rule for
+  shared fixtures, so a test that writes into it fails. The builder runs in a new `bash -eu`, so a
+  failing step fails the build whatever the caller's context (lesson 430).
 
 ## Out of scope
 
-- N1, N2, N3, N6 and N8 of #2059: later PRs against this spec.
+- N1, N2, N6 and N8 of #2059: later PRs against this spec.
 - `harness-suggest.bats` and `dotf-search.bats` (audit: "keep one smoke each"): their assertions read
   the shipped trigger data and the CLI wrapper's output, and no Go test pins either, so no twin was
   confirmed and nothing was deleted.
@@ -58,6 +64,7 @@ CI had no per-file bats timing for the #1744 budget guard to read.
 - [ ] AC2: with `DOTF_BIN` set, those files run that binary and do not build; set to a non-executable it fails.
 - [ ] AC3: each deleted `dotf-agent-run.bats` case has a Go twin that goes red when the behaviour is mutated.
 - [ ] AC4: the Linux bats step keeps `--jobs` and `--no-parallelize-within-files`, writes `report.xml` with per-file time, and uploads it even when the run is red.
+- [ ] AC5: the five fixture-heavy files copy a fixture built once per file; a copy holds the template's history and is the test's own to write, a write into the template fails, and a builder failing mid-way fails the build.
 
 ## References
 

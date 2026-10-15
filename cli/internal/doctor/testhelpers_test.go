@@ -65,6 +65,10 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		CommandOutput: func(name string, args ...string) (string, error) {
 			return sysCommandOutput(cmdOut, name, args...)
 		},
+		VersionOutput: func(name string, args ...string) ([]byte, error) {
+			out, err := sysCommandOutput(cmdOut, name, args...)
+			return []byte(out), err
+		},
 		CommandOutputEnv: func(_ []string, name string, args ...string) (string, error) {
 			return sysCommandOutput(cmdOut, name, args...)
 		},

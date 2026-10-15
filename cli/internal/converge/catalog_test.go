@@ -96,6 +96,9 @@ func freshMachine(t *testing.T) (toolsSync, Env, *machine) {
 		if name == "mise" && args[0] == "ls" {
 			return []byte("{}"), nil
 		}
+		if strings.HasPrefix(name, "/bin/") {
+			return run(name, args...) // a tool's banner is on its stdout
+		}
 		return nil, errors.New("not installed")
 	}
 	r := toolsSync{run: run, stdout: stdout, has: m.has, getenv: func(string) string { return "" }, catalog: fakeCatalog{m}}

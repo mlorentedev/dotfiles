@@ -27,6 +27,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // System abstracts the non-deterministic, process-global surfaces a check
@@ -49,6 +50,12 @@ type System struct {
 	// CommandOutput runs name with args and returns combined stdout+stderr.
 	// Used for the `<tool> --version` probes; faked in tests.
 	CommandOutput func(name string, args ...string) (string, error)
+	// VersionOutput runs a `<tool> --version` probe (tools.ProbeRunner in
+	// production): stdout then stderr, but a failed run's stdout alone, so a
+	// crashing tool is not read at the version some warning of its names
+	// (BUG-141). Nil means CommandOutput, so a test System never reaches the
+	// real binary.
+	VersionOutput tools.Runner
 	// CommandOutputEnv is CommandOutput with an explicit environment. Checks use
 	// it when inherited process state could redirect a probe to another target.
 	CommandOutputEnv func(env []string, name string, args ...string) (string, error)
@@ -236,6 +243,7 @@ func realSystem() *System {
 			out, err := exec.Command(name, args...).CombinedOutput()
 			return string(out), err
 		},
+		VersionOutput: tools.ProbeRunner,
 		CommandOutputEnv: func(env []string, name string, args ...string) (string, error) {
 			cmd := exec.Command(name, args...)
 			cmd.Env = env
