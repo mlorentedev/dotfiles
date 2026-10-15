@@ -66,13 +66,31 @@ def unquote(value):
     return value
 
 
+def assigned_value(line):
+    """(name, value) when line assigns a variable, else None."""
+    m = ASSIGN_RE.match(line)
+    if not m:
+        return None
+    return m.group(1), unquote(m.group(2).split(' #')[0])
+
+
 def file_vars(lines):
-    """First assignment of each variable in the file, as written."""
-    found = {}
+    """First assignment of each variable outside @test bodies, as written.
+
+    That is the scope every test inherits; a test's own assignments override
+    it for the lines after them (scan).
+    """
+    found, in_test = {}, False
     for line in lines:
-        m = ASSIGN_RE.match(line)
-        if m and m.group(1) not in found:
-            found[m.group(1)] = unquote(m.group(2).split(' #')[0])
+        if TEST_RE.match(line):
+            in_test = True
+            continue
+        if in_test:
+            in_test = not line.startswith('}')
+            continue
+        a = assigned_value(line)
+        if a is not None and a[0] not in found:
+            found[a[0]] = a[1]
     return found
 
 
@@ -121,6 +139,7 @@ def grep_args(rest):
     except ValueError:
         return None
     flags, pattern, positional, downstream = [], None, [], []
+    options_done = False
     i = 0
     while i < len(tokens):
         tok = tokens[i]
@@ -134,6 +153,14 @@ def grep_args(rest):
             break
         if tok in REDIRECT or (tok.isdigit() and i + 1 < len(tokens) and tokens[i + 1] in REDIRECT):
             i += 2 if tok in REDIRECT else 3
+            continue
+        if options_done:
+            positional.append(tok)
+            i += 1
+            continue
+        if tok == '--':
+            options_done = True
+            i += 1
             continue
         if tok == '-e' and i + 1 < len(tokens):
             pattern = tokens[i + 1]
@@ -167,17 +194,22 @@ def scan(root):
         rel_file = 'tests/' + name
         with open(os.path.join(tests_dir, name), encoding='utf-8') as fh:
             lines = fh.read().split('\n')
-        assigned = file_vars(lines)
+        inherited = file_vars(lines)
         test = None
         for lineno, line in enumerate(lines, 1):
             m = TEST_RE.match(line)
             if m:
                 test = m.group(2)
+                assigned = dict(inherited)
                 continue
             if test is None:
                 continue
             if line.startswith('}'):
                 test = None
+                continue
+            a = assigned_value(line)
+            if a is not None:
+                assigned[a[0]] = a[1]
                 continue
             stripped = line.strip()
             if not stripped or stripped.startswith('#') or stripped.startswith(('run ', 'if ', 'elif ', 'while ')):

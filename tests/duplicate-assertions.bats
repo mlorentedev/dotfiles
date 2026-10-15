@@ -153,3 +153,26 @@ _head() {
     run python3 "$SCAN" "$FX"
     [ "$status" -eq 0 ] || { printf '%s\n' "$output"; false; }
 }
+
+@test "a variable a test reassigns resolves to that test's value" {
+    _head one
+    _test one "reads b" "    SCRIPT=\"\$REPO/scripts/b.sh\"
+    grep -q 'alpha' \"\$SCRIPT\""
+    _test one "reads a" "    grep -q 'alpha' \"\$SCRIPT\""
+    run python3 "$SCAN" "$FX"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output"; false; }
+    _test one "reads b again" "    local SCRIPT=\"\$REPO/scripts/b.sh\"
+    grep -q 'alpha' \"\$SCRIPT\""
+    run python3 "$SCAN" "$FX"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"scripts/b.sh: 'alpha' asserted present by 2 tests"* ]] || false
+}
+
+@test "a pattern after -- is read as the pattern, not a flag" {
+    _head one
+    _test one "first" "    grep -q -- '--flag' \"\$SCRIPT\""
+    _test one "second" "    grep -qF -- '--flag' \"\$SCRIPT\""
+    run python3 "$SCAN" "$FX"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"'--flag' asserted present by 2 tests"* ]] || false
+}

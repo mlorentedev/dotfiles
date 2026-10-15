@@ -30,7 +30,7 @@
   {
     "id": "CI-012-dedupe-ci-tests-f5",
     "behavior": "CI runs on main upload the bats-junit artifact",
-    "verification": "gh api 'repos/mlorentedev/dotfiles/actions/artifacts?name=bats-junit&per_page=100' --jq '[.artifacts[] | select(.workflow_run.head_branch == \"main\" and (.expired | not))] | length > 0' | grep -qx true",
+    "verification": "gh api --paginate 'repos/mlorentedev/dotfiles/actions/artifacts?name=bats-junit&per_page=100' --jq '[.artifacts[] | select(.workflow_run.head_branch == \"main\" and (.expired | not))] | length > 0' | grep -qx true",
     "state": "pending",
     "evidence": ""
   },
