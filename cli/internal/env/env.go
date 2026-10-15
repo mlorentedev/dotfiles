@@ -356,6 +356,16 @@ func ResolvePath(name string) string {
 	if v := os.Getenv(name); v != "" {
 		return v
 	}
+	return ResolvePathUnder(name, Home())
+}
+
+// ResolvePathUnder resolves a path key for the given home: that home's
+// machine.json override, else the contract default rendered against it. The
+// process environment is NOT consulted, because it describes the real home: a
+// caller handed an explicit home (`dotf harness bind --home`) that read it would
+// write outside that home. A test did exactly that to ~/.claude/settings.json
+// through an exported CLAUDE_CONFIG_DIR (#2279).
+func ResolvePathUnder(name, home string) string {
 	contractPath := ResolveContractPath()
 	if contractPath == "" {
 		return ""
@@ -364,7 +374,6 @@ func ResolvePath(name string) string {
 	if err != nil {
 		return ""
 	}
-	home := Home()
 	m, err := loadMachine(MachinePath(home))
 	if err != nil {
 		return ""

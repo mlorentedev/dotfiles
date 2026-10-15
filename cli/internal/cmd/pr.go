@@ -17,6 +17,13 @@ import (
 // code here would mean changing main.go's contract for one subcommand.
 var errPending = errors.New("pr triage-queue: reviewer output is awaiting a disposition")
 
+// triageFetch and triageFetchPR are the queue's two questions; variables so a
+// test drives the exit status without GitHub.
+var (
+	triageFetch   = prtriage.FetchWithRegistry
+	triageFetchPR = prtriage.FetchPR
+)
+
 func newPrCmd() *cobra.Command {
 	pr := &cobra.Command{
 		Use:   "pr",
@@ -33,6 +40,7 @@ func newPrCmd() *cobra.Command {
 
 func newTriageQueueCmd() *cobra.Command {
 	var repo, registry string
+	var pr int
 	cmd := &cobra.Command{
 		Use:   "triage-queue",
 		Short: "List open PRs whose reviewer output has not been dispositioned",
@@ -50,7 +58,12 @@ confirmation; nothing here may erode that.
 
 Exit status is 0 when the queue is empty and 1 otherwise — including when the
 question could not be answered, which is deliberate: a queue that cannot be
-computed must not read as an empty one. The message says which.`,
+computed must not read as an empty one. The message says which.
+
+--pr N asks about one pull request only, so another session's untriaged PR
+does not hold up "triage-queue --pr N && pr land N". It exits 0 when N has
+nothing awaiting a disposition, whatever the other PRs hold, and 1 when N
+cannot be read or is not open.`,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -60,7 +73,7 @@ computed must not read as an empty one. The message says which.`,
 				c.PrintErrln("pr triage-queue:", err)
 				return err
 			}
-			pending, err := prtriage.FetchWithRegistry(c.Context(), repo, reg)
+			pending, err := fetchTriageQueue(c, repo, reg, pr)
 			if err != nil {
 				c.PrintErrln("pr triage-queue:", err)
 				return err
@@ -83,8 +96,20 @@ computed must not read as an empty one. The message says which.`,
 		},
 	}
 	cmd.Flags().StringVar(&repo, "repo", "", "owner/name (default: the current repository)")
+	cmd.Flags().IntVar(&pr, "pr", 0, "only this pull request's reviewer output decides the exit status")
 	addReviewerRegistryFlag(cmd, &registry)
 	return cmd
+}
+
+// fetchTriageQueue asks the repo-wide question, or with --pr the one-PR one.
+func fetchTriageQueue(c *cobra.Command, repo string, reg prtriage.Registry, pr int) ([]prtriage.Status, error) {
+	if !c.Flags().Changed("pr") {
+		return triageFetch(c.Context(), repo, reg)
+	}
+	if pr <= 0 {
+		return nil, fmt.Errorf("--pr takes a pull request number, got %d", pr)
+	}
+	return triageFetchPR(c.Context(), repo, reg, pr)
 }
 
 // addReviewerRegistryFlag declares --registry, shared by every pr command that

@@ -18,8 +18,9 @@ import (
 // which seeds the settings files the hooks are merged into; on a machine where
 // legacy-setup also binds, the second bind finds the hooks current.
 type recordsBind struct {
-	dotf func(home string) string // the binary the hooks name; harness.ResolveDotfPath in production
-	has  func(string) bool        // is a command on PATH, for requires_command
+	dotf    func(home string) string // the binary the hooks name; harness.ResolveDotfPath in production
+	has     func(string) bool        // is a command on PATH, for requires_command
+	resolve func(string) string      // a target's dst {VAR}, as configs-deploy resolves it; env.ResolvePath in production
 }
 
 func (recordsBind) Name() string        { return "records-bind" }
@@ -35,7 +36,7 @@ func (r recordsBind) run(env Env, dryRun bool) ([]harness.BindOutcome, error) {
 		return nil, err
 	}
 	return harness.Bind(targets, harness.BindOptions{
-		Home: env.Home, Binary: r.dotf(env.Home), GOOS: env.GOOS, DryRun: dryRun, Has: r.has,
+		Home: env.Home, Binary: r.dotf(env.Home), GOOS: env.GOOS, DryRun: dryRun, Has: r.has, Resolve: r.resolve,
 	})
 }
 

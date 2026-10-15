@@ -35,6 +35,7 @@ func checkHookBinding(sys *System, rep *Report, fix bool) {
 	}
 	outcomes, err := harness.Bind(targets, harness.BindOptions{
 		Home: home, Binary: harness.ResolveDotfPath(home), GOOS: sys.GOOS, DryRun: !fix, Has: sys.has,
+		Resolve: sys.ResolvePath,
 	})
 	for _, o := range outcomes {
 		reportHookBinding(rep, o, fix)
