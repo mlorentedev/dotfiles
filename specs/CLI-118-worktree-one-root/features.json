@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-118-worktree-one-root-root",
+    "behavior": "WORKTREE_ROOT is declared once and rendered into herdr, agy and Copilot configs",
+    "verification": "bats tests/herdr-config.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-118-worktree-one-root-path",
+    "behavior": "add places the worktree at <root>/<repo>/<slugify(branch)>, matching herdr 0.9.3",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestResolveWorktreePath'",
+    "state": "passing",
+    "evidence": "TestResolveWorktreePath, TestAddUnderWorktreeRoot, TestAddUnderWorktreeRootFollowsBranch (PR 1)"
+  },
+  {
+    "id": "CLI-118-worktree-one-root-branch",
+    "behavior": "add refuses a branch that is not <type>/<kebab-slug> or carries a phase token",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestValidateBranch'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-118-worktree-one-root-agent",
+    "behavior": "add --agent opens the worktree in herdr, starts the agent and submits the prompt, without waiting",
+    "verification": "cd cli && go test ./internal/herdr/ -run 'TestLaunch'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-118-worktree-one-root-adopt",
+    "behavior": "unadopted worktrees are listed, adopt writes the lease, sweep reaps only adopted ones",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestAdopt|TestClassifyUnadopted'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-118-worktree-one-root-done",
+    "behavior": "done resolves slugs under the root and deletes the branch only after a verified landing",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestDoneDeletesLandedBranch|TestResolveDoneSlug'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-118-worktree-one-root-live",
+    "behavior": "no command removes a worktree holding the caller or a recent session",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestRecentSession'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-118-worktree-one-root-migrate",
+    "behavior": "migrate moves legacy siblings with git worktree move and is idempotent",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestMigrate'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

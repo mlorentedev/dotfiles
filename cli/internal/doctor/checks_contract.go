@@ -35,6 +35,12 @@ func checkContractEnvVars(sys *System, c *Contract, rep *Report, fix bool) {
 				}
 				continue
 			}
+			if e.DotfResolvesDefault && !e.requiredHere() {
+				// dotf applies this default wherever it reads the var, so there is
+				// nothing to persist and no profile line to hand out (BUG-143).
+				rep.Pass(fmt.Sprintf("%s unset (dotf applies its default %s)", e.Name, def))
+				continue
+			}
 			if fix {
 				rep.Fix(fmt.Sprintf("%s unset — add to your shell profile: export %s=%q", e.Name, e.Name, def))
 			} else if e.requiredHere() {

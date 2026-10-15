@@ -282,6 +282,57 @@ func TestCheckContractEnvVars(t *testing.T) {
 	}
 }
 
+// flaggedLine reports whether the report carries a WARN or FIX line for name.
+func flaggedLine(out, name string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, name) && (strings.Contains(line, "[WARN]") || strings.Contains(line, "[FIX")) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestCheckContractEnvVars_DotfResolvedDefaultIsNotDrift pins BUG-143: an
+// optional variable only dotf reads, whose default dotf applies itself, is not
+// drift while unset, and --fix has no profile edit to hand out for it. The
+// unflagged twin proves the rule is the flag, not "optional with a default".
+func TestCheckContractEnvVars_DotfResolvedDefaultIsNotDrift(t *testing.T) {
+	contract := &Contract{EnvVars: []ContractEnvVar{
+		{Name: "DOTF_ONLY", DotfResolvesDefault: true, Default: map[string]string{"linux": "$HOME/.config/x"}},
+		{Name: "SHELL_READ", Default: map[string]string{"linux": "$HOME/.config/y"}},
+	}}
+	env := map[string]string{"HOME": t.TempDir()}
+
+	for _, fix := range []bool{false, true} {
+		var buf bytes.Buffer
+		rep := capture(&buf)
+		checkContractEnvVars(newSys(env, nil, nil), contract, rep, fix)
+		out := buf.String()
+
+		if flaggedLine(out, "DOTF_ONLY") {
+			t.Errorf("fix=%v: a dotf-resolved default must not warn or hand out a profile edit\n%s", fix, out)
+		}
+		if !flaggedLine(out, "SHELL_READ") {
+			t.Errorf("fix=%v: an unflagged optional var must still report its unset default\n%s", fix, out)
+		}
+	}
+}
+
+// TestShippedContract_HerdrConfigDirIsDotfResolved proves the shipped contract
+// carries the flag on the variable BUG-143 was filed for, and that doctor run
+// against it stays quiet when the variable is unset.
+func TestShippedContract_HerdrConfigDirIsDotfResolved(t *testing.T) {
+	c, err := loadContract(filepath.Join("..", "..", "..", "env-contract.json"))
+	if err != nil {
+		t.Fatalf("load contract: %v", err)
+	}
+	var buf bytes.Buffer
+	checkContractEnvVars(newSys(map[string]string{"HOME": t.TempDir()}, nil, nil), c, capture(&buf), true)
+	if flaggedLine(buf.String(), "HERDR_CONFIG_DIR") {
+		t.Errorf("HERDR_CONFIG_DIR is read by dotf deploy only; doctor must not call it drift\n%s", buf.String())
+	}
+}
+
 func TestCheckSecrets(t *testing.T) {
 	dotfiles := t.TempDir()
 	secrets := filepath.Join(dotfiles, "sensitive")

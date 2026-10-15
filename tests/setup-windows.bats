@@ -602,8 +602,11 @@ FIXTURE
     grep -q 'eza-community.eza' "$PS1_SCRIPT"
 }
 
-@test "parity: both scripts install jq" {
-    grep -q 'command -v jq' "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: both OSes install jq (Linux through mise)" {
+    # It grepped setup-linux.sh for `command -v jq`: a proxy that outlived the
+    # download moving to mise (F-030), held up only by the pi settings sync
+    # until #2522 removed it.
+    grep -B1 '^JQ_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'jqlang.jq' "$PS1_SCRIPT"
 }
 
@@ -996,19 +999,13 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 # uv installer in section 4 a clean box's first run registered neither and only
 # the second run converged -- measured on the CI runner the first time Claude
 # Code installed there (#1360). Ordering is asserted by line number of the
-# invocation, on both OSes.
+# invocation. Linux has no such loop: the bare `dotf deploy` registers the
+# servers after `dotf tools sync` has installed uv.
 @test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
     uv_line=$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     # The executable invocation, never a comment naming it: the block's own
     # comments mention `claude mcp add` 40 lines above the call.
     mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
-}
-
-@test "parity: both setups install uv before registering the Claude MCP servers (OPS-044)" {
-    # Linux: uv is a mise pin, installed by `dotf tools sync` (#2013 W2).
-    uv_line=$(grep -n '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
 }
 

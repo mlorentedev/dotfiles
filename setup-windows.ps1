@@ -818,23 +818,6 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 }
 Ensure-Directory $piAgentDir
 
-# settings.json is SEED-IF-MISSING (Linux parity: setup-linux.sh pi settings
-# block). pi rewrites this file at runtime -- lastChangelogVersion, theme, the
-# model picked in the TUI -- so a "copy unless identical" check can never match
-# and would reset those on every setup run. The seed runs BEFORE `dotf deploy`:
-# its pi-compaction entry merges into this file, and a merge onto a missing
-# file would create one the seed then never fills (#1938).
-$piSettingsSrc = Join-Path $DotfilesDir 'ai\pi\settings.json'
-$piSettingsDst = Join-Path $piAgentDir 'settings.json'
-if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
-    if (Test-Path -LiteralPath $piSettingsDst) {
-        Write-Info "pi settings.json present, preserving local edits"
-    } else {
-        Copy-Item -LiteralPath $piSettingsSrc -Destination $piSettingsDst
-        Write-Success "Seeded pi settings.json at $piSettingsDst"
-    }
-}
-
 # Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
 # every OS, replacing the per-config copies that lived here and their twins in
 # setup-linux.sh. ADR-020 C7 keeps this script on the thin bootstrap; staging,
@@ -844,6 +827,14 @@ if (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf) {
 # two setup scripts -- `dotf deploy pi` left orca-keybindings declared and never
 # installed (CLI-054, #1301).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    # pi's settings.json before deploy, whose pi-compaction entry merges into
+    # it: a merge onto a missing file creates one holding only compaction
+    # (#1938). The step seeds the repo's copy when the file is absent and keeps
+    # its enabledModels equal to the repo's, leaving pi's own keys alone (#1948).
+    & dotf converge --only pi-settings
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf converge --only pi-settings failed -- pi's settings.json was not seeded or synced; see 'dotf doctor'"
+    }
     & dotf deploy
     if ($LASTEXITCODE -ne 0) {
         Write-Err "dotf deploy failed -- the failed rows above name each config; fix them and run setup again"
@@ -872,48 +863,6 @@ if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
     } else {
         Copy-Item -LiteralPath $agentsSrc -Destination $piAgentsDst -Force
         Write-Success "Deployed AGENTS.md to $piAgentsDst (fallback)"
-    }
-}
-
-# Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
-# settings.json exists on the machine -- nothing pi itself writes at runtime
-# touches that array, only theme/lastChangelogVersion/defaultModel are (the
-# seed-if-missing guard above exists for exactly those three). Without this, a
-# catalog addition in the repo (e.g. #1254) never reaches a machine whose
-# settings.json already exists. Linux parity: the same block in setup-linux.sh.
-if ((Test-Path -LiteralPath $piSettingsDst -PathType Leaf) -and (Test-Path -LiteralPath $piSettingsSrc -PathType Leaf)) {
-    try {
-        # Null-check BEFORE wrapping in @(): @($null) is a one-element array
-        # containing $null, so its .Count is 1, not 0 -- wrapping first would
-        # make this guard never fire on a missing/empty enabledModels, and the
-        # block below would go on to write a literal null into a live
-        # settings.json. ConvertFrom-Json also returns $null (not an empty
-        # array) for a JSON `[]` on PowerShell Core (PowerShell/PowerShell#13595),
-        # so the null check alone covers both a missing key and an empty list.
-        $piSrcModelsRaw = (Get-Content -LiteralPath $piSettingsSrc -Raw | ConvertFrom-Json).enabledModels
-        $piSrcModels = if ($null -eq $piSrcModelsRaw) { @() } else { @($piSrcModelsRaw) }
-        if ($piSrcModels.Count -eq 0) {
-            Write-Warn "ai\pi\settings.json has no enabledModels - skipping pi enabledModels sync"
-        } else {
-            $piDstJson = Get-Content -LiteralPath $piSettingsDst -Raw | ConvertFrom-Json
-            $piDstModels = @($piDstJson.enabledModels)
-            # -InputObject, never a pipe: piping a single-element array into
-            # ConvertTo-Json unwraps it before the cmdlet ever sees a
-            # collection, so a 1-model enabledModels would compare unequal to
-            # itself. -InputObject binds the whole array as one parameter and
-            # is safe at any count, including zero.
-            $piSrcModelsJson = ConvertTo-Json -InputObject $piSrcModels -Compress
-            $piDstModelsJson = ConvertTo-Json -InputObject $piDstModels -Compress
-            if ($piSrcModelsJson -eq $piDstModelsJson) {
-                Write-Info "pi enabledModels already in sync"
-            } else {
-                $piDstJson.enabledModels = $piSrcModels
-                $piDstJson | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $piSettingsDst -Encoding UTF8
-                Write-Success "Synced pi enabledModels (theme/defaultModel/lastChangelogVersion preserved)"
-            }
-        }
-    } catch {
-        Write-Warn "failed to sync pi enabledModels - leaving $piSettingsDst untouched"
     }
 }
 

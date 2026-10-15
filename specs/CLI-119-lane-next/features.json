@@ -1,0 +1,44 @@
+[
+  {
+    "id": "CLI-119-lane-next-f1",
+    "behavior": "AC1: claude, pi and agy launch with the prompt as one argv element; an unknown agent is refused",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument$' -count=1 -v | grep -q -- '--- PASS: TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument'",
+    "state": "passing",
+    "evidence": "go test run 2026-10-14"
+  },
+  {
+    "id": "CLI-119-lane-next-f2",
+    "behavior": "AC2: next from a linked worktree creates through the repo parent and leaves the caller's worktree and branch untouched",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone$' -count=1 -v | grep -q -- '--- PASS: TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone'",
+    "state": "passing",
+    "evidence": "go test run 2026-10-14"
+  },
+  {
+    "id": "CLI-119-lane-next-f3",
+    "behavior": "AC3: next run twice picks the same issue and starts one agent",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestQueue_NextIsTheFirstOpenUnassignedIssueAndIsStable$' -count=1 -v | grep -q -- '--- PASS: TestQueue_NextIsTheFirstOpenUnassignedIssueAndIsStable'",
+    "state": "passing",
+    "evidence": "go test run 2026-10-14"
+  },
+  {
+    "id": "CLI-119-lane-next-f4",
+    "behavior": "AC4: --agent defaults to the calling pane's agent; an unknown agent is refused listing the known ones",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused$' -count=1 -v | grep -q -- '--- PASS: TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused'",
+    "state": "passing",
+    "evidence": "go test run 2026-10-14"
+  },
+  {
+    "id": "CLI-119-lane-next-f5",
+    "behavior": "AC5: with no backend next prints the commands and exits 0",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_NoBackendPrintsTheCommands$' -count=1 -v | grep -q -- '--- PASS: TestNext_NoBackendPrintsTheCommands'",
+    "state": "passing",
+    "evidence": "go test run 2026-10-14"
+  },
+  {
+    "id": "CLI-119-lane-next-f6",
+    "behavior": "AC6: a real finisher -> successor chain was observed for claude, pi and agy",
+    "verification": "for a in claude pi agy; do grep -q \"^RESULT $a PASS\" specs/CLI-119-lane-next/verification.md || exit 1; done",
+    "state": "passing",
+    "evidence": "verification.md RESULT lines, 2026-10-14"
+  }
+]

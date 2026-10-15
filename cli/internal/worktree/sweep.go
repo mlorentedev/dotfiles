@@ -153,8 +153,11 @@ func gateF(info Info, absCwd string) (GateFReading, bool) {
 		return GateFReading{}, false
 	}
 	// Gate (f): never reap current working directory or any worktree with active host processes inside
+	// The cwd check is the same within-or-equal test done uses, on resolved
+	// paths: equality alone missed a caller in a subdirectory, or one that
+	// reached the worktree through a symlink.
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd {
+	if err != nil || pathWithin(resolvedPath(absCwd), resolvedPath(absWT)) {
 		return GateFReading{}, false
 	}
 	reading := hostProcessInside(absWT)
@@ -211,7 +214,7 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 	// It is also the cheaper order: Gate f walks all of /proc, so running it
 	// after the cheap refusals means fewer walks, not more.
 	absWT, err := filepath.Abs(info.Path)
-	if err != nil || absWT == absCwd {
+	if err != nil || pathWithin(resolvedPath(absCwd), resolvedPath(absWT)) {
 		return false
 	}
 	if isDirty(info.Path, runner) {
