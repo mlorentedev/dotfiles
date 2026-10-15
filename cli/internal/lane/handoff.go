@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Options is one hand-off: which repo, which queue, which agent.
@@ -23,6 +24,10 @@ type Options struct {
 	// caller passes the path of the binary that decided, so the successor is the
 	// same dotf and not whichever release `dotf` resolves to on the pane's PATH.
 	Dotf string
+	// GitDir is the repository's git common directory: the lease file is
+	// excluded in its info/exclude, which every worktree of the repo reads.
+	GitDir string
+	Now    func() time.Time // the lease's clock; nil is time.Now
 }
 
 // Outcome is what a hand-off decided and did.
@@ -47,6 +52,8 @@ var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./:\\-][A-Za-z0-9_./:\\~-]*$`)
 // starts nothing and returns the commands that would. It never removes a
 // worktree, and running it twice for the same item starts one agent, because
 // an item whose branch is already shown by a workspace is left to that one.
+// Every worktree it starts an agent in, or finds already shown, is leased
+// first, so sweep can reap it once its PR lands.
 func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	issue, ok, err := Next(o.Config, src)
 	if err != nil {
@@ -90,7 +97,10 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	}
 	if found && wt.Open {
 		out.Note = "a workspace already shows " + out.Branch + "; no second agent started"
-		return out, nil
+		if o.DryRun {
+			return out, nil
+		}
+		return out, ensureLease(o, wt.Path, issue.Number, out.Agent)
 	}
 	if o.DryRun {
 		out.Commands = []string{"(write the prompt to " + promptFile + ")", "(" + describe(found) + " " + out.Branch + ")", exec}
@@ -99,18 +109,11 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	if err := writePrompt(o, promptFile, prompt); err != nil {
 		return out, err
 	}
-	var st Started
-	if found {
-		st, err = b.Open(o.Parent, wt)
-	} else {
-		if o.Fetch != nil {
-			if err := o.Fetch(); err != nil {
-				return out, err
-			}
-		}
-		st, err = b.Create(o.Parent, out.Branch, o.Config.Base, fmt.Sprintf("#%d %s", issue.Number, Slug(issue.Title)))
-	}
+	st, err := start(o, b, wt, found, out.Branch, issue)
 	if err != nil {
+		return out, err
+	}
+	if err := ensureLease(o, st.Worktree.Path, issue.Number, out.Agent); err != nil {
 		return out, err
 	}
 	if err := b.Type(st.Pane, exec); err != nil {
@@ -118,6 +121,25 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	}
 	out.Started = true
 	return out, nil
+}
+
+// start opens the worktree that exists, or creates the branch's off the base,
+// and answers with the pane to run the successor in. An opened worktree's path
+// is the one Find reported when the open answer leaves it out.
+func start(o Options, b Backend, wt Worktree, found bool, branch string, issue Issue) (Started, error) {
+	if found {
+		st, err := b.Open(o.Parent, wt)
+		if err == nil && st.Worktree.Path == "" {
+			st.Worktree.Path = wt.Path
+		}
+		return st, err
+	}
+	if o.Fetch != nil {
+		if err := o.Fetch(); err != nil {
+			return Started{}, err
+		}
+	}
+	return b.Create(o.Parent, branch, o.Config.Base, fmt.Sprintf("#%d %s", issue.Number, Slug(issue.Title)))
 }
 
 func describe(found bool) string {

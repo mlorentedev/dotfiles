@@ -84,8 +84,9 @@ func migrateSkip(raw RawWorktree, m Move, opts MigrateOptions, now time.Time) st
 	if err := checkCallerOutside(m.From, opts.Cwd); err != nil {
 		return err.Error()
 	}
-	if err := checkNoRecentSession(opts.ClaudeProjectsDir, m.From, now); err != nil {
-		return err.Error()
+	// sweep's form, not done's: migrate has no override to name.
+	if reason := sessionSkipReason(opts.ClaudeProjectsDir, m.From, now); reason != "" {
+		return reason
 	}
 	if _, err := os.Stat(m.To); err == nil {
 		return fmt.Sprintf("the target %s already exists", m.To)

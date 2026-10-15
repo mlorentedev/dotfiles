@@ -79,6 +79,13 @@ func TestMigrateSkipsWhatItMustNotMove(t *testing.T) {
 			fakeTranscript(t, projects, resolvedPath(legacy), time.Hour)
 			return MigrateOptions{ClaudeProjectsDir: projects}
 		}, "Claude Code session"},
+		{"sessions unreadable", func(t *testing.T, repo, legacy, root string) MigrateOptions {
+			notADir := filepath.Join(t.TempDir(), "projects")
+			if err := os.WriteFile(notADir, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			return MigrateOptions{ClaudeProjectsDir: notADir}
+		}, "could not be inspected"},
 		{"locked", func(t *testing.T, repo, legacy, root string) MigrateOptions {
 			_ = exec.Command("git", "-C", repo, "worktree", "lock", legacy).Run()
 			// A dry run: git worktree move refuses a locked worktree on its
@@ -96,6 +103,11 @@ func TestMigrateSkipsWhatItMustNotMove(t *testing.T) {
 			}
 			if len(rep.Moves) != 1 || !strings.Contains(rep.Moves[0].Skip, tc.skip) {
 				t.Fatalf("plan = %+v, want a skip naming %q", rep.Moves, tc.skip)
+			}
+			// migrate has no override flag: a reason naming done's would send
+			// the operator to a flag this command rejects.
+			if strings.Contains(rep.Moves[0].Skip, "--ignore-recent-session") {
+				t.Errorf("skip %q names a flag migrate does not take", rep.Moves[0].Skip)
 			}
 			if _, err := os.Stat(legacy); err != nil {
 				t.Errorf("a skipped worktree was moved")
