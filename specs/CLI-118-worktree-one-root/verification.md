@@ -11,7 +11,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [ ] AC1 root declared and rendered: declared in `env-contract.json` (PR 1), kept equal to herdr's directory by `tests/herdr-config.bats` "WORKTREE_ROOT and herdr's worktrees.directory name the same root" (mutation: changing herdr's directory fails it). Rendering into the three configs is PR 7.
 - [x] AC2 path: `TestResolveWorktreePath` (four herdr 0.9.3 rows measured on #2503), `TestAddUnderWorktreeRoot`, `TestAddUnderWorktreeRootFollowsBranch` (PR 1).
-- [ ] AC3 branch validation: PR 2.
+- [x] AC3 branch validation (PR 2): `TestValidateBranch` (shape rows, planning-token rows, and near misses `phaseout-legacy`, `milestones-view`, `emphase` that must stay accepted), `TestAddRefusesAnInvalidBranchBeforeCreatingAnything` (given, defaulted and `--path` branches), `TestAcceptedBranchesSlugToThemselves`, `TestPlanningTokensMatchTheEnforcedRule` (mutation: adding `wave` to the list fails it). Default base: `TestAddCreatesFromTheRemoteDefaultBranch`, `TestAddKeepsAnExplicitBase`, `TestAddRefusesWhenNoRemoteDefaultResolves`, `TestRealDefaultBase` (local origin, with and without origin/HEAD).
 - [ ] AC4 `--agent`: PR 6.
 - [ ] AC5 adoption: PR 4.
 - [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4.
@@ -35,6 +35,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - dotf creates the worktree and herdr only opens it (owner, 2026-10-14), so the lease, branch check and isolation gate hold on every path, Windows included.
 
 - `done` identifies a worktree under the root by its branch slug, the one name herdr's layout gives it, not by a second slug recorded in the lease: a herdr-made or adopted worktree would never carry that slug (#2527 review, PR-Agent finding 1).
+- The planning tokens are exactly the words of `harness/enforced/no-phase-references.md` (phase, milestone), not the four the first draft named: that file is extracted from the vault's git-workflow pattern, and a validator that bans words the doctrine does not would be a second, unwritten rule. Widening it is a vault edit first.
+- `add` with no `--base` used to branch from the caller's HEAD. It now fetches and uses origin's default branch, and refuses when none resolves; a failed fetch (offline) warns and uses the last-fetched refs. git 2.48+ restores origin/HEAD on fetch (`remote.<name>.followRemoteHEAD`), so the master fallback is reached only where that is off or the remote has no HEAD.
 
 ## Promotion candidates
 
