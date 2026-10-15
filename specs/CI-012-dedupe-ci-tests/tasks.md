@@ -19,7 +19,7 @@ created: "2026-10-07"
 
 ## Implementation
 
-Rows N4, N5 and N7 of #2059 (this PR). N1, N2, N3, N6 and N8 follow as their own PRs.
+Rows N4, N5 and N7 of #2059 in the first PR, N3 in the second. N1, N2, N6 and N8 follow as their own PRs.
 
 - [x] [AC3] Add the Go twins that did not exist: top tier through the command, saturated pool through the command, probe reaching a stub harness; pin `exit` presence in the record test
 - [x] [AC3] Mutate production code once per deleted case and confirm its twin goes red (table in the PR body)
@@ -27,7 +27,9 @@ Rows N4, N5 and N7 of #2059 (this PR). N1, N2, N3, N6 and N8 follow as their own
 - [x] [AC1] Write `tests/dotf-bin-helper.bats` (helper outcomes, fail-open detector with negative control) before the helper
 - [x] [AC1] [AC2] `tests/lib/dotf-bin.bash`; five files resolve the binary through it
 - [x] [AC2] [AC4] `ci.yml` test job: build once and export `DOTF_BIN`; junit report with timing; upload artifact
-- [ ] Remaining rows: N1, N2, N3, N6, N8
+- [x] [AC5] Write `tests/fixture-template-helper.bats` (copy, write guard, builder failure under `||`) before the helper
+- [x] [AC5] `tests/lib/fixture-template.bash`; the five N3 files build their fixture in `setup_file`
+- [ ] Remaining rows: N1, N2, N6, N8
 
 ## Closing
 
