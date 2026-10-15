@@ -25,6 +25,10 @@ type ContractEnvVar struct {
 	RequiredOn string            `json:"required_on"`
 	Default    map[string]string `json:"default"`
 	Validation string            `json:"validation"`
+	// DotfResolvesDefault marks an optional var that only dotf reads and whose
+	// default dotf applies itself when it is unset, so an unset value is the
+	// designed state and not drift (BUG-143).
+	DotfResolvesDefault bool `json:"dotf_resolves_default"`
 }
 
 // requiredHere reports whether this var must be present on an OS its scope
