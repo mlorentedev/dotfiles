@@ -75,6 +75,7 @@
       "name": "HERDR_CONFIG_DIR",
       "required": false,
       "description": "The directory herdr reads config.toml from by default: ~/.config/herdr on Linux and macOS, %APPDATA%\\herdr on Windows. Read by `dotf deploy` only, so one dst ({HERDR_CONFIG_DIR}/config.toml) works on every OS (#2013 H4). It names a directory, not the file, because deploy picks a merge's format from the dst's extension. herdr itself reads HERDR_CONFIG_PATH, a file, which dotfiles leaves unset so herdr's default and this one stay the same place. No path_exists validation: the directory exists only where herdr does.",
+      "dotf_resolves_default": true,
       "default": {
         "linux": "$HOME/.config/herdr",
         "windows": "$env:USERPROFILE\\AppData\\Roaming\\herdr"
