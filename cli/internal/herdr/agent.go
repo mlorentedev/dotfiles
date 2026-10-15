@@ -51,12 +51,18 @@ type herdrError struct {
 	} `json:"error"`
 }
 
-func errorCode(out []byte) (code, message string) {
+// errorCode reads herdr's error JSON from out. err is the runner's: when
+// stdout carries no message (herdr crashed, was killed, or wrote only to
+// stderr), it is the message, so a refusal never ends in an empty reason.
+func errorCode(out []byte, err error) (code, message string) {
 	var e herdrError
-	if json.Unmarshal(out, &e) != nil || e.Error == nil {
-		return "", strings.TrimSpace(string(out))
+	if json.Unmarshal(out, &e) == nil && e.Error != nil {
+		return e.Error.Code, e.Error.Message
 	}
-	return e.Error.Code, e.Error.Message
+	if message = strings.TrimSpace(string(out)); message == "" && err != nil {
+		message = err.Error()
+	}
+	return "", message
 }
 
 // Preflight refuses, naming the state, before add creates anything: a harness
@@ -84,9 +90,12 @@ func Preflight(run tools.Runner, harness, name string) error {
 	}
 	out, err = run("herdr", "agent", "get", name)
 	if err == nil {
-		return fmt.Errorf("an agent named %s is already live in herdr: finish it, or rename it with `herdr agent rename`", name)
+		// herdr's agent names are per server, not per repository: the live one
+		// may be another repository's worktree on the same branch slug, so the
+		// remedy is a different branch here, never renaming that agent.
+		return fmt.Errorf("an agent named %s is already live in herdr, perhaps another repository's worktree on the same branch: add this worktree under another branch, or finish that agent first", name)
 	}
-	if code, msg := errorCode(out); code != "agent_not_found" {
+	if code, msg := errorCode(out, err); code != "agent_not_found" {
 		return fmt.Errorf("herdr agent get %s: %s", name, msg)
 	}
 	return nil
@@ -104,7 +113,7 @@ type LaunchOptions struct {
 func Launch(run tools.Runner, o LaunchOptions) error {
 	out, err := run("herdr", "worktree", "open", "--cwd", o.Repo, "--path", o.Worktree, "--no-focus")
 	if err != nil {
-		_, msg := errorCode(out)
+		_, msg := errorCode(out, err)
 		return fmt.Errorf("herdr worktree open %s: %s", o.Worktree, msg)
 	}
 	var opened struct {
@@ -119,14 +128,14 @@ func Launch(run tools.Runner, o LaunchOptions) error {
 	}
 	pane := opened.Result.RootPane.PaneID
 	if out, err := run("herdr", "agent", "start", o.Name, "--kind", o.Harness, "--pane", pane); err != nil {
-		code, msg := errorCode(out)
+		code, msg := errorCode(out, err)
 		return fmt.Errorf("herdr agent start %s in %s: %s (%s); the prompt was not sent: inspect it with `herdr agent read %s`", o.Name, pane, msg, code, o.Name)
 	}
 	if o.Prompt == "" {
 		return nil
 	}
 	if out, err := run("herdr", "agent", "prompt", o.Name, o.Prompt); err != nil {
-		code, msg := errorCode(out)
+		code, msg := errorCode(out, err)
 		return fmt.Errorf("herdr agent prompt %s: %s (%s); the prompt was not sent: inspect it with `herdr agent read %s`", o.Name, msg, code, o.Name)
 	}
 	return nil

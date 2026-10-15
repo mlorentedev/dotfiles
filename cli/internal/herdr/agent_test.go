@@ -143,6 +143,25 @@ func TestLaunchFailsOnANotReadyOrBlockedAgent(t *testing.T) {
 	}
 }
 
+// A failure whose stdout is not herdr's error JSON (a crash, a signal, a
+// pipe error) still names why: the runner's error stands in for the message.
+func TestAFailureWithoutHerdrsErrorJSONStillSaysWhy(t *testing.T) {
+	killed := errors.New("signal: killed")
+	for _, key := range []string{"agent get", "worktree open", "agent start", "agent prompt"} {
+		t.Run(key, func(t *testing.T) {
+			f := healthy()
+			f.answers[key] = fakeAnswer{err: killed}
+			err := Preflight(f.run, "claude", "n")
+			if key != "agent get" {
+				err = Launch(f.run, LaunchOptions{Repo: "/r", Worktree: "/w", Harness: "claude", Name: "n", Prompt: "p"})
+			}
+			if err == nil || !strings.Contains(err.Error(), "signal: killed") {
+				t.Fatalf("got %v, want the runner's error in the message", err)
+			}
+		})
+	}
+}
+
 func TestAgentName(t *testing.T) {
 	for in, want := range map[string]string{
 		"feat-foo":       "feat-foo",
