@@ -3,6 +3,8 @@ package worktree
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -62,10 +64,18 @@ func TestPlanningTokensMatchTheEnforcedRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tok := range PlanningTokens {
-		if !strings.Contains(strings.ToLower(string(doc)), tok) {
-			t.Errorf("PlanningTokens has %q, which harness/enforced/no-phase-references.md does not name", tok)
-		}
+	// The rule names its words in its heading, "No internal phase/milestone
+	// references". Both directions: a word the list adds and one the rule adds
+	// each fail, and a reworded heading fails rather than passing on nothing.
+	m := regexp.MustCompile(`\*\*No internal ([a-z/]+) references\*\*`).FindSubmatch(doc)
+	if m == nil {
+		t.Fatal("harness/enforced/no-phase-references.md no longer names its words as **No internal <a>/<b> references**; update this test")
+	}
+	banned := strings.Split(string(m[1]), "/")
+	slices.Sort(banned)
+	got := slices.Sorted(slices.Values(PlanningTokens))
+	if !slices.Equal(got, banned) {
+		t.Errorf("PlanningTokens = %q, the enforced rule bans %q", got, banned)
 	}
 }
 
