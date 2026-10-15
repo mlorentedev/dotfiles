@@ -36,7 +36,7 @@ PR 2 - `dotf lane next` and the herdr backend
 - [x] [P] [AC4] Failing tests `TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused`
 - [x] [AC5] Failing test `TestNext_NoBackendPrintsTheCommands`
 - [x] herdr backend: `worktree create --cwd <parent>`, `pane run`, a `wait-output` for the shell prompt (measure first)
-- [ ] [AC6] Real runs: finisher -> successor for claude, pi and agy; paste the evidence into `verification.md`
+- [x] [AC6] Real runs: finisher -> successor for claude, pi and agy; paste the evidence into `verification.md`
 
 ## Closing
 

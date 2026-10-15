@@ -38,7 +38,7 @@
     "id": "CLI-119-lane-next-f6",
     "behavior": "AC6: a real finisher -> successor chain was observed for claude, pi and agy",
     "verification": "for a in claude pi agy; do grep -q \"^RESULT $a PASS\" specs/CLI-119-lane-next/verification.md || exit 1; done",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification.md RESULT lines, 2026-10-14"
   }
 ]

@@ -19,9 +19,9 @@ These prove the launch half only. The finisher -> successor chain (AC6, `RESULT 
 
 2026-10-14, macOS, herdr 0.9.3, `dotf lane next` built from this branch, run from a worktree of the trusted dotfiles repo with a harmless prompt ("Reply with exactly the word LANE-READY"). Each run created a real worktree through the repo parent, typed `<this binary> lane exec --agent <a> --prompt-file <f>` into the new pane, and started the agent. The test worktrees and branches were removed afterwards.
 
-- RESULT claude PASS: default agent taken from the calling pane (`herdr pane current` -> claude); the successor started with no trust prompt and answered `LANE-READY`.
-- RESULT pi PASS: `--agent pi`; started through `dotf secrets run`, answered `LANE-READY`.
-- RESULT agy BLOCKED: `--agent agy`; the pane ran agy but stopped at its trust dialog for the new worktree, so prompt delivery through the chain was not observed. Tracked in #2533 (the `worktrees/*/*` entry in `trustedWorkspaces` does not suppress it). A direct `lane exec --agent agy` in an already-trusted directory delivered the prompt and answered (Measurements above), so only the trust gate is open.
+RESULT claude PASS: default agent taken from the calling pane (`herdr pane current` -> claude); the successor started with no trust prompt and answered `LANE-READY`.
+RESULT pi PASS: `--agent pi`; started through `dotf secrets run`, answered `LANE-READY`.
+RESULT agy PASS: `--agent agy`; with the worktrees root trusted (#2536; the first attempt stopped at agy's trust dialog because it does not read `worktrees/*/*`, #2533) the successor started and answered `LANE-READY`.
 - Second `lane next` for the same item: "a workspace already shows <branch>; no second agent started", nothing created.
 - A first attempt typed `dotf lane exec` and the pane answered `unknown command "lane"` (the pinned release has none): the cause of typing this binary's absolute path (lesson 438).
 - Claude trust: a worktree of a repo already trusted needs no registration. The same chain in an untrusted scratch repo stopped at Claude's trust dialog, which is the gate working, so no trust step was added.
@@ -33,7 +33,7 @@ These prove the launch half only. The finisher -> successor chain (AC6, `RESULT 
 - [x] AC3 -> `TestQueue_NextIsTheFirstOpenUnassignedIssueAndIsStable`, `TestNext_RunTwiceStartsOneAgent`, live second run above
 - [x] AC4 -> `TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused`
 - [x] AC5 -> `TestNext_NoBackendPrintsTheCommands`, `TestNext_NoBackendDryRunWritesNoPrompt`
-- [ ] AC6 -> claude and pi PASS; agy BLOCKED on #2533
+- [x] AC6 -> claude, pi and agy PASS (agy needs #2536 on a machine that lacks the root in its trust list)
 
 ## Test status
 
