@@ -76,15 +76,15 @@ func TestResolvePaths_DefaultsFollowTheSetups(t *testing.T) {
 	}
 }
 
-// AGY_HOME is the contract's name and wins; the old AGY_APP_DATA is read only
-// when AGY_HOME is unset (#2395).
-func TestDirs_ReadsTheContractNameBeforeTheLegacyOne(t *testing.T) {
+// AGY_HOME is the only name read. The retired AGY_APP_DATA was a fallback for
+// one release after #2401 and is ignored now (#2404).
+func TestDirs_ReadsOnlyTheContractName(t *testing.T) {
 	for name, tc := range map[string]struct {
 		env  map[string]string
 		want string
 	}{
 		"contract only": {map[string]string{"AGY_HOME": "/a"}, "/a"},
-		"legacy only":   {map[string]string{"AGY_APP_DATA": "/l"}, "/l"},
+		"retired only":  {map[string]string{"AGY_APP_DATA": "/l"}, filepath.Join("/h", ".gemini", "antigravity-cli")},
 		"both":          {map[string]string{"AGY_HOME": "/a", "AGY_APP_DATA": "/l"}, "/a"},
 		"neither":       {nil, filepath.Join("/h", ".gemini", "antigravity-cli")},
 	} {
