@@ -15,7 +15,7 @@ created: "2026-10-14"
 
 - [x] Branch created from main: `feat/lane-next` (herdr worktree `feat-lane-next`)
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions" (the pane-readiness wait and the Windows exec are measured in PR 2, not assumed)
+- [x] No open questions left in `proposal.md` "Risks / open questions" (the pane-readiness wait and the Windows exec are measured in PR 2, not assumed)
 
 ## Implementation
 
@@ -23,19 +23,19 @@ Two PRs, each under the ~300 executable-line cap. PR 1 is everything that needs 
 
 PR 1 - `internal/lane`: launch table, queue, prompt, `dotf lane exec`
 
-- [ ] [P] [AC1] Failing test `TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument`: claude, pi and agy argv, a multi-line prompt with quotes stays one element
-- [ ] [AC1] `lane.LaunchArgv(agent, prompt)` and the table; unknown agent returns an error naming the known ones
-- [ ] [P] [AC3] Failing test `TestQueue_NextIsTheFirstOpenUnassignedIssueAndIsStable` with a fake issue source
-- [ ] [AC3] `lane.Config` (`.dotf/lane.json`), `lane.Next`, slug function, prompt render from the template
-- [ ] [AC1] `dotf lane exec --agent --prompt-file` (Unix: `syscall.Exec`; other: child with stdio), registered in root
+- [x] [P] [AC1] Failing test `TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument`: claude, pi and agy argv, a multi-line prompt with quotes stays one element
+- [x] [AC1] `lane.LaunchArgv(agent, prompt)` and the table; unknown agent returns an error naming the known ones
+- [x] [P] [AC3] Failing test `TestQueue_NextIsTheFirstOpenUnassignedIssueAndIsStable` with a fake issue source
+- [x] [AC3] `lane.Config` (`.dotf/lane.json`), `lane.Next`, slug function, prompt render from the template
+- [x] [AC1] `dotf lane exec --agent --prompt-file` (Unix: `syscall.Exec`; other: child with stdio), registered in root
 
 PR 2 - `dotf lane next` and the herdr backend
 
-- [ ] [P] [AC2] Failing test `TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone` with a recording backend
-- [ ] [AC2] [AC3] `lane.Backend` interface, `lane.Next` orchestration, reuse of an existing worktree
-- [ ] [P] [AC4] Failing tests `TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused`
-- [ ] [AC5] Failing test `TestNext_NoBackendPrintsTheCommands`
-- [ ] herdr backend: `worktree create --cwd <parent>`, `pane run`, a `wait-output` for the shell prompt (measure first)
+- [x] [P] [AC2] Failing test `TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone` with a recording backend
+- [x] [AC2] [AC3] `lane.Backend` interface, `lane.Next` orchestration, reuse of an existing worktree
+- [x] [P] [AC4] Failing tests `TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused`
+- [x] [AC5] Failing test `TestNext_NoBackendPrintsTheCommands`
+- [x] herdr backend: `worktree create --cwd <parent>`, `pane run`, a `wait-output` for the shell prompt (measure first)
 - [ ] [AC6] Real runs: finisher -> successor for claude, pi and agy; paste the evidence into `verification.md`
 
 ## Closing

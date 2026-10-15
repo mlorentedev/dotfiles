@@ -88,7 +88,7 @@ func Slug(title string) string {
 		title = rest
 	}
 	var words []string
-	for _, w := range strings.FieldsFunc(strings.ToLower(title), func(r rune) bool {
+	for _, w := range strings.FieldsFunc(strings.ToLower(strings.NewReplacer("'", "", "’", "").Replace(title)), func(r rune) bool {
 		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
 	}) {
 		if len(strings.Join(append(words, w), "-")) > maxSlug {

@@ -49,6 +49,7 @@ func TestSlug_DropsTheTicketIDAndKeepsAWordBoundedBranchName(t *testing.T) {
 		"BUG-143: doctor warns that an optional, defaulted HERDR_CONFIG_DIR is unset and --fix suggests a manual profile edit": "doctor-warns-that-an-optional-defaulted-herdr",
 		"CLI-119: a fix lane has no successor": "a-fix-lane-has-no-successor",
 		"plain title":                          "plain-title",
+		"doctor's check isn’t stale":           "doctors-check-isnt-stale",
 		"  !!  ":                               "lane",
 	} {
 		if got := Slug(title); got != want {
