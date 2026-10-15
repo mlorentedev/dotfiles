@@ -31,6 +31,9 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 ## PR 5 — migrate
 
 - [x] `migrate --dry-run` plan output; `migrate` moves with `git worktree move`; skips refused or existing targets; second run is a no-op.
+- [x] Skips name their reason: locked, the caller inside, a recent session or an unreadable session store (sweep's wording, no override), a target that exists.
+- [x] Refuses when WORKTREE_ROOT does not resolve (`TestMigrateRefusesWithoutARoot`).
+- [x] Cross-OS: the move test compares paths as locations (`samePath`), since Windows lists them in another spelling.
 
 ## PR 6 — `--agent` over herdr
 
