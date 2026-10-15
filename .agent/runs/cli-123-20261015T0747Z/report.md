@@ -44,10 +44,10 @@ The repository has no `blocked` label, and the run created none. Board status wa
 | cold start | `go build ./... && go test ./internal/lane/... ./internal/worktree/... ./internal/cmd/...` on the base tree | 0 | session transcript |
 | #2547 | `go build/vet/test ./...` (42 packages ok), `GOOS=windows go vet ./...`, `golangci-lint run` at the 2.12.2 pin after `cache clean` | 0, 0, 0 (0 issues) | PR #2555 body, `## Verification` |
 | #2547 | merged tree with `origin/main` (#2539, #2545): `go test ./internal/lane/... ./internal/cmd/... ./internal/worktree/...` | 0 | session transcript; merge aborted after |
-| #2547 | `dotf pr land 2555` | 0 (`[MERGED] #2555 at d9f12db`) | session transcript |
+| #2547 | `dotf pr land 2555` | 0 (`[MERGED] #2555 at d9f12db`: the head SHA; squash on main is `f0c1b9e5`) | session transcript |
 | #2549 | same Go suite, Windows vet, pinned lint | 0, 0, 0 | PR #2558 body |
 | #2549 | live `--pr`: 2556 → 0, 2544 → 0, 2555 (merged) → 1, 999999 → 1; repo-wide → 1 (#2557) | as listed | PR #2558 body |
-| #2549 | `dotf pr land 2558` | 0 (`[MERGED] #2558 at 545a786`) | session transcript |
+| #2549 | `dotf pr land 2558` | 0 (`[MERGED] #2558 at 545a786`: the head SHA; squash on main is `81d47061`) | session transcript |
 | #2548 | `./scripts/check-spec-gate.sh --base-ref origin/main --head-ref HEAD` | 0 (0 production LOC) | PR #2560 body |
 | exit | `dotf pr triage-queue` after the #2560 triage | 0 | session transcript |
 
@@ -61,7 +61,7 @@ Reviews: PR-Agent (openai/deepseek-v4-flash) reviewed all three PRs. CodeRabbit 
 
 ## 7. Host suspend
 
-Covered. A `caffeinate -i -t 36000` (PID 63713) ran from arming, and `pmset -g log` shows no Sleep or Wake event between 01:00 and 09:00 local on 2026-10-15.
+Covered. The host runs on MDT (UTC-6), so the run window is 01:47 to 02:50 local. A `caffeinate -i -t 36000` (PID 63713) held from arming and was still alive at disarm. `pmset -g log` has no Sleep, Wake or DarkWake event on 2026-10-14 or 2026-10-15; the last one is a Wake on 2026-10-12 18:31, which shows the same filter does find events.
 
 ## 8. Worktrees left in place
 
