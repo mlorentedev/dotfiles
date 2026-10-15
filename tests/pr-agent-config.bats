@@ -200,12 +200,13 @@ for s in steps:
     [ "${#lines[@]}" -eq 6 ]
 }
 
-@test "pr-agent: PR_AGENT_ANTHROPIC_API_KEY is declared only for the CI that reads it" {
+@test "pr-agent: PR_AGENT_ANTHROPIC_API_KEY is declared only for repositories adopting the pool" {
     # Without the consumer, `dotf secrets sync ci` never delivers the key and the
     # fallback is skipped with a warning. Only repositories whose workflow runs
-    # the pool (this one, and kubelab since kubelab#1843): the rest adopt it in
-    # their own pull requests, and a credential synced where nothing reads it
-    # only widens the surface. Purpose-named, never
+    # the pool, or whose adopting pull request is open (this one, and kubelab
+    # through kubelab#2298): the rest adopt it in their own pull requests, and a
+    # credential synced where nothing reads it only widens the surface. The
+    # declaration delivers nothing until the operator runs the sync. Purpose-named, never
     # ANTHROPIC_API_KEY, which Claude Code and the SDKs read on their own.
     run python3 -c "
 import yaml
