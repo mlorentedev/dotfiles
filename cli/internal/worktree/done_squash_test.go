@@ -42,7 +42,8 @@ func commitFile(t *testing.T, dir, name string) string {
 
 func done(t *testing.T, repoDir, wtDir, lockPath string) error {
 	t.Helper()
-	return Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath})
+	_, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath})
+	return err
 }
 
 func TestDoneRemovesASquashMergedBranchWhoseHeadIsTheMergedHead(t *testing.T) {

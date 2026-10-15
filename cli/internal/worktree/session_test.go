@@ -66,7 +66,7 @@ func TestDoneRefusesARecentSessionUnlessIgnored(t *testing.T) {
 	fakeTranscript(t, projects, wtDir, time.Hour)
 	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, ClaudeProjectsDir: projects}
 
-	err := Done(opts)
+	_, err := Done(opts)
 	if err == nil || !strings.Contains(err.Error(), "--ignore-recent-session") {
 		t.Fatalf("got %v, want a refusal naming --ignore-recent-session", err)
 	}
@@ -76,12 +76,12 @@ func TestDoneRefusesARecentSessionUnlessIgnored(t *testing.T) {
 
 	// --force is about uncommitted work and does not override this check.
 	opts.Force = true
-	if err := Done(opts); err == nil {
+	if _, err := Done(opts); err == nil {
 		t.Fatal("--force overrode the recent-session refusal")
 	}
 
 	opts.Force, opts.IgnoreRecentSession = false, true
-	if err := Done(opts); err != nil {
+	if _, err := Done(opts); err != nil {
 		t.Fatalf("with --ignore-recent-session: %v", err)
 	}
 }

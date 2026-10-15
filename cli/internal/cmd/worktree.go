@@ -477,7 +477,12 @@ the root. The directory follows the branch: add <slug> makes feat/<slug> in
 .../fix-login, which done takes as fix/login or fix-login (add prints it). A
 bare name resolves to <WORKTREE_ROOT>/<repo>/<name> or .../feat-<name>, and to
 the legacy <repo>-wt-<name> beside the repository. A name matching more than
-one is refused.`,
+one is refused.
+
+After removing the worktree it deletes the local branch when the branch has
+landed (its tip is an ancestor of origin's default branch, or the head of a
+merged pull request) and prints the SHA to restore it from. Otherwise the branch
+is kept and the reason printed; after --force it may hold the only copy.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			target, err := resolveDoneTarget(args, worktreePath, repoDir)
@@ -499,11 +504,18 @@ one is refused.`,
 				IgnoreRecentSession: ignoreRecentSession,
 			}
 
-			if err := worktree.Done(opts); err != nil {
+			res, err := worktree.Done(opts)
+			if err != nil {
 				return err
 			}
 
 			c.Printf("Cleaned up worktree at %s\n", target)
+			switch {
+			case res.DeletedBranch != "":
+				c.Printf("Deleted branch %s (was %s)\n", res.DeletedBranch, res.DeletedSHA)
+			case res.KeptBranch != "":
+				c.Printf("Kept branch %s: %s\n", res.KeptBranch, res.KeptReason)
+			}
 			return nil
 		},
 	}
