@@ -231,6 +231,7 @@ func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
 		{"a name with a space", `{"type":"system","brew":"gh cli"}`, "", "brew"},
 		{"a cask name that is a flag", `{"type":"system","cask":"--force"}`, "", "cask"},
 		{"a formula and a cask for one OS", `{"type":"system","brew":"gh","cask":"gh"}`, "", "both a brew formula and a cask"},
+		{"needs_sudo on an entry with no cask", `{"type":"system","apt":"gh","brew":"gh","needs_sudo":true}`, "", "needs_sudo"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -266,6 +267,12 @@ func TestLoad_AcceptsACaskEntry(t *testing.T) {
 	}
 	if c.Tools[0].SupportsOS("linux") || c.Tools[0].SupportsOS("windows") || !c.Tools[0].SupportsOS("darwin") {
 		t.Error("a cask installs on darwin only")
+	}
+
+	marked := `{"tools":[{"name":"veracrypt","source":{"type":"system","cask":"veracrypt","needs_sudo":true}}]}`
+	m, err := Load(writeCatalog(t, marked))
+	if err != nil || !m.Tools[0].Source.NeedsSudo {
+		t.Errorf("a cask marked needs_sudo must load with the mark: %+v, %v", m, err)
 	}
 
 	// The platforms reachability check resolves through SystemPackage, so a

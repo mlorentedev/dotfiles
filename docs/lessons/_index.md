@@ -452,4 +452,5 @@ tags: [lessons, index, dotfiles]
 | [431 - A comment stripper that ignores strings can still produce valid JSON](lesson-431-a-comment-stripper-that-ignores-strings-can-still-produce-valid-json.md) | 2026-10-14 |
 | [432 - A self-update that converges with the binary it replaces misses the new steps](lesson-432-a-self-update-that-converges-with-the-binary-it-replaces-misses-the-new-steps.md) | 2026-10-14 |
 | [433 - launchctl getenv answers for the caller's domain, not the login session](lesson-433-launchctl-getenv-answers-for-the-callers-domain-not-the-login-session.md) | 2026-10-14 |
+| [434 - A privilege check keyed on our own argv cannot see a manager that escalates inside](lesson-434-a-privilege-check-keyed-on-our-own-argv-cannot-see-a-manager-that-escalates.md) | 2026-10-14 |
 <!-- END GENERATED -->
