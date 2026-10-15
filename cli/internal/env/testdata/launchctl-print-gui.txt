@@ -1,0 +1,24 @@
+gui/501 = {
+	type = login
+	handle = 100020
+	active count = 468
+	creator = loginwindow[428]
+	session = Aqua
+	security context = {
+		uid = 501
+		asid = 100020
+	}
+
+	bringup time = 111 ms
+
+	environment = {
+		DOTF_MANAGED_ENV => DOTFILES_DIR;VAULT_PATH
+		VAULT_PATH => /Users/me/My Vault
+		DOTFILES_DIR => /Users/me/.dotfiles
+		SSH_AUTH_SOCK => /var/run/com.apple.launchd.abc/Listeners
+	}
+
+	services = {
+		       0      0 	io.example.helper
+	}
+}
