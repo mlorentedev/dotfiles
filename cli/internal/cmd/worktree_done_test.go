@@ -303,8 +303,11 @@ func TestWorktreeAdoptTakesAGitCreatedWorktree(t *testing.T) {
 	if out, err := executeWorktree(t, "adopt", wt, "--repo", repo); err != nil || !strings.Contains(out, "unchanged") {
 		t.Fatalf("second adopt: %v\n%s", err, out)
 	}
-	if out, _ := executeWorktree(t, "list", "--repo", repo); strings.Contains(out, "UNADOPTED") {
-		t.Errorf("still UNADOPTED after adopt:\n%s", out)
+	// The error and the row both count: a list that fails, or prints
+	// nothing, also lacks "UNADOPTED".
+	out, err = executeWorktree(t, "list", "--repo", repo)
+	if err != nil || !strings.Contains(out, "fix-from-herdr") || strings.Contains(out, "UNADOPTED") {
+		t.Errorf("list after adopt: %v, want the worktree listed and adopted:\n%s", err, out)
 	}
 }
 
