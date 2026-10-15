@@ -33,8 +33,9 @@ height = "90%"
 # herdr creates <directory>/<repo>/<branch-slug>; only the root is configurable.
 # Beside the repos instead of herdr's default ~/.herdr/worktrees (owner,
 # 2026-10-13), and not dot-prefixed: agy excludes **/.worktrees/** from a
-# workspace. agy's trustedWorkspaces and Copilot's trustedFolders trust
-# <directory>/*/*, and tests/herdr-config.bats keeps the three in step (#2503).
+# workspace. Copilot's trustedFolders trusts <directory>/*/*; agy's
+# trustedWorkspaces trusts <directory> itself, because agy does not read the
+# glob (#2533). tests/herdr-config.bats keeps the three in step (#2503).
 directory = "~/Projects/worktrees"
 
 [update]
