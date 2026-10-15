@@ -394,7 +394,8 @@ _check_archive_on_merge() {
             # Ask the head TREE, not the diff: a move only shows up as a rename
             # when git's rename detection fires, and the same change can surface
             # as delete+add. Presence cannot be fooled by how git renders it.
-            archived=$(git ls-tree -r --name-only "$HEAD_REF" -- "specs/archive/$spec_id/" 2>/dev/null) || archived=""
+            # `dotf spec archive --abandoned` ends the lifecycle under _abandoned/.
+            archived=$(git ls-tree -r --name-only "$HEAD_REF" -- "specs/archive/$spec_id/" "specs/archive/_abandoned/$spec_id/" 2>/dev/null) || archived=""
             [[ -n "$archived" ]] || violations="${violations}${spec_id} (#${num})"$'\n'
         done <<< "$map"
     done <<< "$numbers"
