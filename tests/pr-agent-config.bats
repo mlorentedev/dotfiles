@@ -204,7 +204,7 @@ for s in steps:
     # Without the consumer, `dotf secrets sync ci` never delivers the key and the
     # fallback is skipped with a warning. Only repositories whose workflow runs
     # the pool, or whose adopting pull request is open (this one, and kubelab
-    # through kubelab#2298): the rest adopt it in their own pull requests, and a
+    # through kubelab#2302): the rest adopt it in their own pull requests, and a
     # credential synced where nothing reads it only widens the surface. The
     # declaration delivers nothing until the operator runs the sync. Purpose-named, never
     # ANTHROPIC_API_KEY, which Claude Code and the SDKs read on their own.
