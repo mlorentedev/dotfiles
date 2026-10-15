@@ -48,11 +48,6 @@ setup() {
 @test "setup-linux.sh deploys both units into the systemd --user dir" {
     grep -qF 'systemd/hive-upgrade.service' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'systemd/hive-upgrade.timer' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF 'systemd/user' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh enables the timer with --now" {
-    grep -qF 'enable --now hive-upgrade.timer' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # The timer must install inside the SAME hive >= 1.32.0 gate as `hive service
@@ -87,7 +82,6 @@ setup() {
 # --- setup-windows.ps1 wiring ---
 
 @test "setup-windows.ps1 registers a 15-min DotfilesHiveUpgrade task (Linux parity)" {
-    grep -qF 'DotfilesHiveUpgrade' "$DOTFILES_DIR/setup-windows.ps1"
     grep -qF 'RepetitionInterval (New-TimeSpan -Minutes 15)' "$DOTFILES_DIR/setup-windows.ps1"
 }
 

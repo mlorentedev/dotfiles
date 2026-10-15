@@ -451,4 +451,5 @@ tags: [lessons, index, dotfiles]
 | [430 - A subshell cannot turn errexit back on under its caller's \|\|](lesson-430-a-subshell-cannot-turn-errexit-back-on-under-its-callers-or.md) | 2026-10-14 |
 | [431 - A comment stripper that ignores strings can still produce valid JSON](lesson-431-a-comment-stripper-that-ignores-strings-can-still-produce-valid-json.md) | 2026-10-14 |
 | [432 - A self-update that converges with the binary it replaces misses the new steps](lesson-432-a-self-update-that-converges-with-the-binary-it-replaces-misses-the-new-steps.md) | 2026-10-14 |
+| [433 - launchctl getenv answers for the caller's domain, not the login session](lesson-433-launchctl-getenv-answers-for-the-callers-domain-not-the-login-session.md) | 2026-10-14 |
 <!-- END GENERATED -->
