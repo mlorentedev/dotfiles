@@ -20,6 +20,9 @@ const (
 	StateDirty    LifecycleState = "DIRTY"
 	StateUnmerged LifecycleState = "UNMERGED"
 	StateOrphan   LifecycleState = "ORPHAN"
+	// StateUnadopted is a linked worktree with no dotf lease, typically one
+	// herdr created. sweep never reaps it until `dotf worktree adopt`.
+	StateUnadopted LifecycleState = "UNADOPTED"
 )
 
 const MetadataFileName = ".dotf-worktree.json"
@@ -160,7 +163,7 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 
 	// Gate (a): explicit metadata exists in .dotf-worktree.json with reap_ok: true
 	if info.Metadata == nil {
-		return StateActive, "no dotf metadata (reap refused: requires explicit reap_ok=true)"
+		return StateUnadopted, "no dotf lease; sweep will not reap it until `dotf worktree adopt <path>`"
 	}
 
 	if !info.Metadata.ReapOK {

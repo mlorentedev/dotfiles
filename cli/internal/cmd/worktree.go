@@ -35,6 +35,51 @@ workstation clutter without risking data loss.`,
 	cmd.AddCommand(newWorktreeAddCmd())
 	cmd.AddCommand(newWorktreeSweepCmd())
 	cmd.AddCommand(newWorktreeDoneCmd())
+	cmd.AddCommand(newWorktreeAdoptCmd())
+	return cmd
+}
+
+func newWorktreeAdoptCmd() *cobra.Command {
+	var (
+		repoDir string
+		issue   int
+		ttl     time.Duration
+	)
+	cmd := &cobra.Command{
+		Use:   "adopt [path|slug]",
+		Short: "Give a worktree created without dotf (by herdr or git) a lease, so sweep may reap it",
+		Long: `adopt writes the .dotf-worktree.json lease add would have written, for a
+linked worktree that has none: list shows such a worktree as UNADOPTED, and
+sweep never reaps it. With a lease it is reaped like any other once merged,
+clean and past the lease. A worktree that already has a lease keeps it.
+
+The argument is a path or a slug, resolved as done resolves it; without one,
+the worktree holding the current directory.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			root, err := resolveCommandRepoRoot(repoDir)
+			if err != nil {
+				return err
+			}
+			target, err := resolveDoneTarget(args, "", repoDir)
+			if err != nil {
+				return err
+			}
+			res, err := worktree.Adopt(worktree.AdoptOptions{RepoRoot: root, WorktreePath: target, TTL: ttl, Issue: issue}, time.Now())
+			if err != nil {
+				return err
+			}
+			if res.AlreadyAdopted {
+				c.Printf("%s already has a lease, until %s; unchanged\n", target, res.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
+				return nil
+			}
+			c.Printf("Adopted %s; lease active until %s\n", target, res.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
+	cmd.Flags().IntVar(&issue, "issue", 0, "associated GitHub issue number")
+	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "lease duration before sweep may reap it")
 	return cmd
 }
 

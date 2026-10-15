@@ -13,7 +13,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC2 path: `TestResolveWorktreePath` (four herdr 0.9.3 rows measured on #2503), `TestAddUnderWorktreeRoot`, `TestAddUnderWorktreeRootFollowsBranch` (PR 1).
 - [x] AC3 branch validation (PR 2): `TestValidateBranch` (shape rows, planning-token rows, and near misses `phaseout-legacy`, `milestones-view`, `emphase` that must stay accepted), `TestAddRefusesAnInvalidBranchBeforeCreatingAnything` (given, defaulted and `--path` branches), `TestAcceptedBranchesSlugToThemselves`, `TestPlanningTokensMatchTheEnforcedRule` (mutation: adding `wave` to the list fails it). Default base: `TestAddCreatesFromTheRemoteDefaultBranch`, `TestAddKeepsAnExplicitBase`, `TestAddRefusesWhenNoRemoteDefaultResolves`, `TestRealDefaultBase` (local origin, with and without origin/HEAD).
 - [ ] AC4 `--agent`: PR 6.
-- [ ] AC5 adoption: PR 4.
+- [x] AC5 adoption (PR 4a): `TestClassify` (no lease is UNADOPTED, naming adopt), `TestAdoptWritesALeaseOnce` (second adopt keeps the lease), `TestAdoptRefusesWhatIsNotALinkedWorktree` (main checkout, plain dir, missing path), `TestSweepReapsAnAdoptedWorktreeOnly`, `TestWorktreeAdoptTakesAGitCreatedWorktree` (list shows UNADOPTED, adopt by slug, then not).
 - [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4.
 - [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`). Transcript check in PR 3: `TestRecentSession` (worktree, subdirectory, stale, other worktree, none), `TestDoneRefusesARecentSessionUnlessIgnored` (`--force` does not override), `TestSweepSkipsAWorktreeWithARecentSession`, `TestWorktreeDoneRefusesARecentSessionUntilIgnored` (CLI flag); both wirings mutation-checked. `migrate` gets it in PR 5.
 - [ ] AC8 migrate: PR 5.
@@ -40,6 +40,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - The transcript key is computed from the physical path. Claude Code keys a project on getcwd: on this Mac the one scratchpad session under /tmp is `-private-tmp-…` and no project directory starts with `-tmp-` or `-var-`. done passes git's toplevel, which is physical too; the path as given is kept as a second key.
 - A project directory whose name extends the worktree's key by `-` counts (a session started in `wt/cli`). It also matches a sibling `feat-x-y` for `feat-x`: a false refusal, the safe side, and the message names the transcript.
+
+- UNADOPTED applies to every linked worktree without a lease, not only those under WORKTREE_ROOT as the proposal says: a git-created sibling is just as unknown to sweep, and `adopt` works on any linked worktree. Nothing outside the worktree package read the old ACTIVE "no dotf metadata" state (git grep).
 
 ## Promotion candidates
 
