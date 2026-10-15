@@ -154,9 +154,9 @@ type Installer struct {
 	// sudoRefuses caches needsSudoPassword's answer: a plan asks it per apt
 	// entry, and every `sudo -n` refusal is a line in the auth log.
 	sudoRefuses *bool
-	// sudoDeferred is every apt package Install skipped for want of a sudo
+	// sudoDeferred is every package Install skipped for want of a sudo
 	// password, so a run can print one command for all of them (SudoDeferred).
-	sudoDeferred []string
+	sudoDeferred []SudoWait
 	// aptIndexAsked records that this Installer has run `apt-get update`, which
 	// it does once, before its first apt install (refreshAptIndex).
 	aptIndexAsked bool
@@ -281,9 +281,10 @@ const (
 	// not on PATH yet (uv before mise has installed it, npm before node).
 	// Install skips it; Note names the manager.
 	PlanMissingManager PlanAction = "missing-manager"
-	// PlanNeedsSudo: a system package that only root can install, on a host
-	// where sudo wants a password dotf never asks for. Install skips it and
-	// prints the command; Note carries the same command.
+	// PlanNeedsSudo: a system package that needs root (an apt package, or a
+	// cask marked needs_sudo), on a host where sudo wants a password dotf never
+	// asks for. Install skips it and prints the command; Note carries the same
+	// command.
 	PlanNeedsSudo PlanAction = "needs-sudo"
 )
 
@@ -295,9 +296,9 @@ type Plan struct {
 	// Note says why: a skip that is not "already installed" (a source type this
 	// dotf does not know), an unsupported row's platform, a refusal's reason.
 	Note string
-	// Package is the apt package of a needs-sudo row, so a caller can collect
-	// every such row into one SudoInstallCommand.
-	Package string
+	// Manager and Package name a needs-sudo row's package ("apt" or "brew-cask"
+	// and its name), so a caller can collect every such row into one SudoCommand.
+	Manager, Package string
 }
 
 // unknownTypeNote is the words for a source type this dotf cannot read, shared
