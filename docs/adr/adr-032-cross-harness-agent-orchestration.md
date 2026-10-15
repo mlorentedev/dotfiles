@@ -29,6 +29,9 @@ Implementation — in particular the Orca backend waits on #462, #649 and #899. 
 and level-1 native fan-out have no such dependency, which is why the design does not stall behind
 them.
 
+**Amended 2026-10-13:** the Orca backend is withdrawn and herdr does not replace it as an executor.
+See *Amendment 2026-10-13 (ADR-044, #1586)*.
+
 ## Date
 
 2026-08-09
@@ -118,6 +121,9 @@ implementations selected by probe:
 it is ours, and ADR-020 already assigns it this class of surface. Orca is the **default executor
 when present**, never the substrate — that is what keeps C7 (reversibility) true without giving up
 the coordination layer Orca already provides.
+
+> **Amended 2026-10-13:** the `orca` row is retired and the seam's implementations are
+> `subprocess` and `hive.delegate_task`. See *Amendment 2026-10-13 (ADR-044, #1586)*.
 
 **Command surface, and why it is not `dotf harness`.** `dotf harness` is already assigned to
 `refresh` / `deploy` / `check` by CLI-026 — the *compile* side, which turns definitions into
@@ -349,6 +355,43 @@ pools are flat subscriptions and per-token spend (OpenRouter) is escalation-only
 The silent-quality-drop rationale **does** apply and is honoured by §4: the top tier never
 degrades silently.
 
+## Amendment 2026-10-13 (ADR-044, #1586)
+
+ADR-044 retires Orca on every OS and makes herdr the cockpit: the terminal multiplexer an operator
+watches agents in. That leaves this ADR's `orca` executor row pointing at software no machine
+installs. One question follows: does herdr take the row?
+
+It does not. The executor seam's contract is *"run role A on task T, isolated in W, return R"*, so
+a backend has to report how the run ended. herdr 0.9.3 cannot do that. The spike for #1586 used an
+isolated headless server and its socket API, and the full record is on #1586
+(issuecomment-6160190665). It found:
+
+- `pane run` types the command into the pane's shell and presses Enter. It always exits 0 and
+  returns nothing about the command it started.
+- The `pane_exited` event carries only `pane_id` and `workspace_id`, with no exit status.
+  `events.wait` accepts agent-status matches only.
+- A pane always starts a shell. Split, tab and workspace creation take only `cwd` and `env`, so
+  there is no way to run an argv directly. Plugin actions are invoked by `action_id`, not by
+  arbitrary commands.
+
+A backend that cannot tell success from failure would report every run as a success. So:
+
+1. **The `orca` row is retired.** The seam has two implementations, the `subprocess` floor and
+   `hive.delegate_task`. Neither needs a GUI, which is the property the Orca row never had (§8,
+   axis 1).
+2. **herdr is the cockpit, not an executor.** Operators watch workers in it. `dotf` never
+   dispatches through it.
+3. **C7 (reversibility) is unaffected,** and holds more simply. The seam still owns no substrate,
+   and one fewer backend sits behind it.
+4. **Implementation step 5 is closed by this amendment.** #462 (Orca provisioning) and #899 (the
+   Orca CLI wrapper) no longer block anything in this ADR. ADR-044 abandoned the spec behind #462
+   (`DX-007-orca-cli-bootstrap`). Disposing of both issues is owed to the Orca-to-herdr
+   transition (#1586), not to this ADR. #649 (installer archive extraction) stays open on its own merits: other installs need
+   it, but no executor depends on it now.
+5. **Reopen trigger.** Revisit herdr as a backend if it gains either an exit status on
+   `pane_exited`, or a surface that runs an argv and reports how it ended. The probe is the #1586
+   spike, repeated against the new release.
+
 ## Options Considered
 
 | Option | C1 neutral | C3 default-on | C7 reversible | C8 zero marginal | C9 headless | C11 bootstrap | C13 least-priv |
@@ -417,7 +460,8 @@ Inside epic #558, in this order:
    without it. What is lost while it is held is only the *default-on* property (C3) — the
    capability works, it just has to be asked for. That is the honest trade, and it is preferable
    to shipping a seventh record onto a layer with no evidence it changes behaviour.
-5. **#462** is reprioritized from optional to prerequisite for the Orca backend, with **#649**
+5. *(Closed by the 2026-10-13 amendment: the Orca backend is withdrawn.)* **#462** is
+   reprioritized from optional to prerequisite for the Orca backend, with **#649**
    (installer must handle `.deb` / AppImage / installers, not just binaries) and **#899** (the CLI
    wrapper is broken outside Orca's own terminals) as named blockers.
 

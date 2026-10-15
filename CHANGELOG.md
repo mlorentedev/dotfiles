@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.70.0](https://github.com/mlorentedev/dotfiles/compare/v0.69.0...v0.70.0) (2026-10-15)
+
+
+### Features
+
+* **console:** one colour decision for converge and doctor, and colour converge's tags ([#2466](https://github.com/mlorentedev/dotfiles/issues/2466)) ([0dd87f4](https://github.com/mlorentedev/dotfiles/commit/0dd87f49aa7d6661a1f8b972f10fac58bea348b9)), closes [#2460](https://github.com/mlorentedev/dotfiles/issues/2460)
+* **converge:** install herdr's agent integrations for every installed harness ([#2449](https://github.com/mlorentedev/dotfiles/issues/2449)) ([8ba9e74](https://github.com/mlorentedev/dotfiles/commit/8ba9e74920ffc2770aab5f4d678bca6375158e95))
+* **converge:** keep a redacted transcript of every applied run ([#2446](https://github.com/mlorentedev/dotfiles/issues/2446)) ([4670f46](https://github.com/mlorentedev/dotfiles/commit/4670f46f4349f02117899d1818ce13706e9b778c))
+* **converge:** print each step as it finishes, and announce it on a terminal ([#2468](https://github.com/mlorentedev/dotfiles/issues/2468)) ([3cf4bcd](https://github.com/mlorentedev/dotfiles/commit/3cf4bcd12defe7a4f27227dafd1a81a3abdd4ca5))
+* **converge:** prune mise installs no pin asks for ([#2476](https://github.com/mlorentedev/dotfiles/issues/2476)) ([e797146](https://github.com/mlorentedev/dotfiles/commit/e79714673293df3769051c8606a91e5d280d2162))
+* **converge:** seed pi's settings before the compaction merge writes into it ([#2457](https://github.com/mlorentedev/dotfiles/issues/2457)) ([80b364f](https://github.com/mlorentedev/dotfiles/commit/80b364fd4b4bdfc6462f6acce1809fc81125a43a))
+* **converge:** time each step and repeat the failures after the counts ([#2467](https://github.com/mlorentedev/dotfiles/issues/2467)) ([12a2403](https://github.com/mlorentedev/dotfiles/commit/12a2403213ecc1e17d1f9ac60bca7553dac8aa04))
+* **doctor:** warn when a committed harness record differs from its vault source ([#2425](https://github.com/mlorentedev/dotfiles/issues/2425)) ([8e5ec52](https://github.com/mlorentedev/dotfiles/commit/8e5ec5246c878850abc5cffeed2a204d0da52488))
+* **herdr:** create worktrees under ~/Projects/worktrees and trust them in agy and Copilot ([#2504](https://github.com/mlorentedev/dotfiles/issues/2504)) ([2e6efd6](https://github.com/mlorentedev/dotfiles/commit/2e6efd65f44a062e67c4c168671357f872b6308d))
+* **herdr:** open lazygit in a popup over the focused pane ([#2456](https://github.com/mlorentedev/dotfiles/issues/2456)) ([e78f9d3](https://github.com/mlorentedev/dotfiles/commit/e78f9d35cd45e16f26fb2479d9b7bb2239b31f7a))
+* **secrets:** refresh and verify the offline DR copy with dotf secrets usb ([#2436](https://github.com/mlorentedev/dotfiles/issues/2436)) ([4100c8b](https://github.com/mlorentedev/dotfiles/commit/4100c8baa4bb796bb17e0673c25a9566805c0741))
+* **shell:** add hr as the herdr alias in zsh, bash and PowerShell ([#2461](https://github.com/mlorentedev/dotfiles/issues/2461)) ([f507bc1](https://github.com/mlorentedev/dotfiles/commit/f507bc17bceeccb9c85bab6e94a95473286c77f7))
+* **ssh:** pin the kubelab homelab node host keys ([#2465](https://github.com/mlorentedev/dotfiles/issues/2465)) ([9fdc76e](https://github.com/mlorentedev/dotfiles/commit/9fdc76ecb2b5c28f30a099b76cd8cf819466e573))
+* **ssh:** pin the kubelab VPS host key ([#2453](https://github.com/mlorentedev/dotfiles/issues/2453)) ([52c4b24](https://github.com/mlorentedev/dotfiles/commit/52c4b24d9e0af9d2acf8eb432b8ebca9b3cf441a))
+* **tools:** declare VeraCrypt on macOS for the offline DR copy ([#2435](https://github.com/mlorentedev/dotfiles/issues/2435)) ([6e2e80d](https://github.com/mlorentedev/dotfiles/commit/6e2e80dd8dd71bc397bf4393cd8c9a8036f54041))
+* **tools:** install GNU coreutils on macOS ([#2440](https://github.com/mlorentedev/dotfiles/issues/2440)) ([bc45d5b](https://github.com/mlorentedev/dotfiles/commit/bc45d5b53eaa21a973f6de84119012ca6fd69c30))
+* **tools:** install pi through mise at its latest release ([#2452](https://github.com/mlorentedev/dotfiles/issues/2452)) ([0d7677b](https://github.com/mlorentedev/dotfiles/commit/0d7677bf4dd2a3aabffe14a05cd0fe5449ef290c))
+
+
+### Bug Fixes
+
+* **ci:** keep retrying a download for 50 seconds, not 7 ([#2485](https://github.com/mlorentedev/dotfiles/issues/2485)) ([2811a24](https://github.com/mlorentedev/dotfiles/commit/2811a2466c843e2e6fc72efe9fd97cc5f8f003ae))
+* **ci:** retry apt in the integration image and fail on an unreachable mirror ([#2479](https://github.com/mlorentedev/dotfiles/issues/2479)) ([8aefcdb](https://github.com/mlorentedev/dotfiles/commit/8aefcdbbf102a2e1fcd3798e4eb2b60365c8521c))
+* **claude:** deny the gh token-printing subcommand ([#2473](https://github.com/mlorentedev/dotfiles/issues/2473)) ([41ec68f](https://github.com/mlorentedev/dotfiles/commit/41ec68f4ace9a8fcb4207c11bae84c5940931882))
+* **cli:** answer dotf --version like the version subcommand ([#2428](https://github.com/mlorentedev/dotfiles/issues/2428)) ([132fa12](https://github.com/mlorentedev/dotfiles/commit/132fa1292052c8d611ebca276d74c817626743c7))
+* **converge:** keep what a failed step changed in its line and the summary ([#2492](https://github.com/mlorentedev/dotfiles/issues/2492)) ([3576de3](https://github.com/mlorentedev/dotfiles/commit/3576de3b80485cb0cd1c871d5b8a2ccee9b00b1c))
+* **doctor:** move a hand-started Colima into brew services instead of naming the commands ([#2427](https://github.com/mlorentedev/dotfiles/issues/2427)) ([f901df4](https://github.com/mlorentedev/dotfiles/commit/f901df46ac5a28ee036e85162d461050f30d0c74))
+* **doctor:** resolve the vault through the ADR-025 cascade in every check ([#2430](https://github.com/mlorentedev/dotfiles/issues/2430)) ([e850223](https://github.com/mlorentedev/dotfiles/commit/e850223257a579b3675b878d09ad71a307fb50c2))
+* **doctor:** say once that no profile was read instead of failing each tool home ([#2429](https://github.com/mlorentedev/dotfiles/issues/2429)) ([e7338fb](https://github.com/mlorentedev/dotfiles/commit/e7338fb25c89b01a652152892c0985764f469249))
+* **harness:** replace the reviewer pool's dead agy model with Gemini 3.8 Flash ([#2474](https://github.com/mlorentedev/dotfiles/issues/2474)) ([ed901e6](https://github.com/mlorentedev/dotfiles/commit/ed901e6d1edcf9bd115e0402e6267f3cf6871492))
+* **hooks:** keep post-checkout from failing a checkout during a conflicted merge ([#2493](https://github.com/mlorentedev/dotfiles/issues/2493)) ([3e0c6d9](https://github.com/mlorentedev/dotfiles/commit/3e0c6d9066503ffee8ea4358117aeacc9f7b357b))
+* **review:** run PR-Agent's Haiku review at medium effort with a 40,000-token cap ([#2459](https://github.com/mlorentedev/dotfiles/issues/2459)) ([a72b1ff](https://github.com/mlorentedev/dotfiles/commit/a72b1ff4fb514bbf3de2ecc97b44ab68e4bdfda3))
+* **spec:** close every AI-045 second-review finding before the archive ([#2424](https://github.com/mlorentedev/dotfiles/issues/2424)) ([510f751](https://github.com/mlorentedev/dotfiles/commit/510f751494b91c85079b9112e853ea5b13a64083))
+* **spec:** retry a transient GitHub failure in the CI issue-state audit ([#2451](https://github.com/mlorentedev/dotfiles/issues/2451)) ([b219fcf](https://github.com/mlorentedev/dotfiles/commit/b219fcfe4a249499c6b605f67037da98133644b3))
+* **test:** keep the user's zshenv out of run_both_shells ([#2454](https://github.com/mlorentedev/dotfiles/issues/2454)) ([09215a8](https://github.com/mlorentedev/dotfiles/commit/09215a8c1f673cfe139b21c41d350015767f96c0))
+* **test:** parse the ADR-046 weights test under bash 3.2, and parse every bats file there on pull requests ([#2441](https://github.com/mlorentedev/dotfiles/issues/2441)) ([30c8737](https://github.com/mlorentedev/dotfiles/commit/30c87374d730b98b8385cd35540c1c0fae69c0ce))
+* **tools:** build uv tool venvs on the pinned Python series ([#2495](https://github.com/mlorentedev/dotfiles/issues/2495)) ([f3413d8](https://github.com/mlorentedev/dotfiles/commit/f3413d89e364d4eecf612835bbc86fb952edbbe1))
+* **tools:** drop a failed version probe's stderr ([#2498](https://github.com/mlorentedev/dotfiles/issues/2498)) ([2fce9f6](https://github.com/mlorentedev/dotfiles/commit/2fce9f6cafd2a11464d99c3272a53c6c07983b09))
+* **tools:** read a failed mise probe's version from stdout only ([#2499](https://github.com/mlorentedev/dotfiles/issues/2499)) ([e3b8ef2](https://github.com/mlorentedev/dotfiles/commit/e3b8ef2eefd011d2600dbce439d49b901bb388e3))
+* **tools:** retry a transient failure on a release download ([#2478](https://github.com/mlorentedev/dotfiles/issues/2478)) ([6e91381](https://github.com/mlorentedev/dotfiles/commit/6e91381f36dd4b8b6a597aebfce3ba9f977ca06b))
+* **tools:** tell a prune that could not be verified from one that never ran ([#2490](https://github.com/mlorentedev/dotfiles/issues/2490)) ([6b3801b](https://github.com/mlorentedev/dotfiles/commit/6b3801b176ff5b70d01d5ac4e41dd20a5ada8db2))
+
 ## [0.69.0](https://github.com/mlorentedev/dotfiles/compare/v0.68.0...v0.69.0) (2026-10-13)
 
 

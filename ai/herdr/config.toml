@@ -30,9 +30,12 @@ width = "90%"
 height = "90%"
 
 [worktrees]
-# herdr creates <directory>/<repo>/<branch-slug>; beside the repos, not in a
-# hidden dir (owner, 2026-10-13).
-directory = "~/Projects/.worktrees"
+# herdr creates <directory>/<repo>/<branch-slug>; only the root is configurable.
+# Beside the repos instead of herdr's default ~/.herdr/worktrees (owner,
+# 2026-10-13), and not dot-prefixed: agy excludes **/.worktrees/** from a
+# workspace. agy's trustedWorkspaces and Copilot's trustedFolders trust
+# <directory>/*/*, and tests/herdr-config.bats keeps the three in step (#2503).
+directory = "~/Projects/worktrees"
 
 [update]
 # mise installs herdr at the versions.conf pin, so herdr's own "new version"
