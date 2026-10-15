@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/herdr"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -250,6 +252,8 @@ func newWorktreeAddCmd() *cobra.Command {
 		base       string
 		issue      int
 		ttl        time.Duration
+		agent      string
+		promptFile string
 	)
 
 	cmd := &cobra.Command{
@@ -262,7 +266,13 @@ creates <WORKTREE_ROOT>/<repo>/feat-foo. --path overrides the location.
 The branch must be <type>/<kebab-slug> with no phase or milestone token, and
 starts from origin's default branch unless --base names another.
 It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
-adds it to .git/info/exclude.`,
+adds it to .git/info/exclude.
+
+--agent <harness> then opens the worktree in herdr and starts that agent in its
+root pane, named after the worktree directory; --prompt-file sends the file as
+its first prompt. add returns once the prompt is sent, without waiting on the
+agent. With herdr absent, its server down, or an agent of that name live, add
+refuses before creating anything.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			slug := args[0]
@@ -282,6 +292,11 @@ adds it to .git/info/exclude.`,
 				TTL:          ttl,
 			}
 
+			launch, err := prepareAgent(agent, promptFile, slug, branch, customPath)
+			if err != nil {
+				return err
+			}
+
 			info, err := worktree.Add(opts)
 			if err != nil {
 				return fmt.Errorf("creating worktree: %w", err)
@@ -294,6 +309,14 @@ adds it to .git/info/exclude.`,
 			if info.Metadata != nil {
 				c.Printf("Lease active until %s\n", info.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
 			}
+			if launch == nil {
+				return nil
+			}
+			launch.Repo, launch.Worktree = root, info.Path
+			if err := herdr.Launch(herdrRunner, *launch); err != nil {
+				return fmt.Errorf("the worktree exists, but the agent did not start: %w", err)
+			}
+			c.Printf("Started %s agent %s in herdr\n", launch.Harness, launch.Name)
 			return nil
 		},
 	}
@@ -304,8 +327,45 @@ adds it to .git/info/exclude.`,
 	cmd.Flags().StringVar(&base, "base", "", "base commit or branch (defaults to origin's default branch, fetched first: origin/HEAD, origin/main, origin/master)")
 	cmd.Flags().IntVar(&issue, "issue", 0, "associated GitHub issue number")
 	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "initial lease duration before eligible for reap")
+	cmd.Flags().StringVar(&agent, "agent", "", "start this harness (claude, codex, pi, agy, opencode, copilot) in herdr on the new worktree")
+	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "with --agent, send this file as the agent's first prompt")
 
 	return cmd
+}
+
+// herdrRunner runs herdr for add --agent; tests replace it.
+var herdrRunner tools.Runner = tools.ExecRunner
+
+// prepareAgent checks, before add creates anything, everything --agent needs:
+// the prompt file, then herdr's state for the agent name the worktree will
+// get. It returns nil without --agent.
+func prepareAgent(agent, promptFile, slug, branch, customPath string) (*herdr.LaunchOptions, error) {
+	if agent == "" {
+		if promptFile != "" {
+			return nil, errors.New("--prompt-file needs --agent")
+		}
+		return nil, nil
+	}
+	var prompt string
+	if promptFile != "" {
+		b, err := os.ReadFile(promptFile)
+		if err != nil {
+			return nil, fmt.Errorf("--prompt-file: %w", err)
+		}
+		prompt = strings.TrimRight(string(b), "\r\n")
+	}
+	if branch == "" {
+		branch = worktree.DefaultBranch(slug)
+	}
+	dir := filepath.Base(worktree.ResolveWorktreePath("/", "repo", branch))
+	if customPath != "" {
+		dir = filepath.Base(customPath)
+	}
+	name := herdr.AgentName(dir)
+	if err := herdr.Preflight(herdrRunner, agent, name); err != nil {
+		return nil, err
+	}
+	return &herdr.LaunchOptions{Harness: agent, Name: name, Prompt: prompt}, nil
 }
 
 func newWorktreeSweepCmd() *cobra.Command {
