@@ -40,10 +40,12 @@ func RecentSession(projectsDir, wt string, now time.Time, window time.Duration) 
 		return Session{}, false, nil
 	}
 	entries, err := os.ReadDir(projectsDir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return Session{}, false, nil
-	}
 	if err != nil {
+		// Absence is decided by Stat, not by ReadDir's error: on Windows,
+		// reading a file as a directory maps to ErrNotExist too.
+		if _, statErr := os.Stat(projectsDir); errors.Is(statErr, fs.ErrNotExist) {
+			return Session{}, false, nil
+		}
 		return Session{}, false, err
 	}
 	keys := sessionKeys(wt)
