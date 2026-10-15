@@ -34,6 +34,7 @@ type envPersistState struct {
 	drift       []env.ResolvedVar
 	retired     []string
 	markerStale bool
+	inLogin     bool // getenv/setenv reach the login session (not tmux/herdr's Background)
 }
 
 func (s envPersistState) changes() int {
@@ -48,6 +49,10 @@ func (s envPersistState) changes() int {
 		n++
 	}
 	return n
+}
+
+func (r envPersist) store() env.LaunchdUserEnv {
+	return env.LaunchdUserEnv{Run: r.launchctl, UID: r.uid}
 }
 
 func (r envPersist) service() string {
@@ -73,7 +78,10 @@ func (r envPersist) inspect(e Env) (envPersistState, error) {
 	_, err = r.launchctl("print", r.service())
 	st.loaded = err == nil
 
-	store := env.LaunchdUserEnv{Run: r.launchctl}
+	store := r.store()
+	if st.inLogin, err = store.InLoginSession(); err != nil {
+		return st, err
+	}
 	if st.drift, err = env.Drift(vars, store); err != nil {
 		return st, err
 	}
@@ -93,13 +101,19 @@ func (r envPersist) Reconcile(e Env, dryRun bool) (Result, error) {
 		return Result{}, err
 	}
 	res := Result{Changes: st.changes(), Detail: envPersistDetail(st, dryRun)}
+	if res.Changes > 0 && !st.inLogin {
+		// A write from here lands in the caller's own domain, which no GUI app
+		// reads (#2507): report the drift, change nothing.
+		return Result{Skip: "the login session differs (" + envPersistDetail(st, true) +
+			"), and this process cannot reach it: run dotf converge from a login terminal, or log in again"}, nil
+	}
 	if dryRun || res.Changes == 0 {
 		return res, nil
 	}
 	if err := r.loadAgent(e, st); err != nil {
 		return res, err
 	}
-	_, err = env.Persist(st.vars, env.LaunchdUserEnv{Run: r.launchctl})
+	_, err = env.Persist(st.vars, r.store())
 	return res, err
 }
 

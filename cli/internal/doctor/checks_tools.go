@@ -384,7 +384,7 @@ func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 			// merged into doctor since it was built is not running at all on this
 			// machine — a categorically worse gap than an ordinary tool being one
 			// version behind, where the check itself still runs.
-			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run ./install.sh: it installs the pin, then converges)", got, pin))
+			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run `dotf update`, which installs the pin and converges with it once the checkout is clean and level with its upstream; otherwise ./install.sh from the checkout)", got, pin))
 		}
 	}
 }
