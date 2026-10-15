@@ -47,7 +47,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - UNADOPTED applies to every linked worktree without a lease, not only those under WORKTREE_ROOT as the proposal says: a git-created sibling is just as unknown to sweep, and `adopt` works on any linked worktree. Nothing outside the worktree package read the old ACTIVE "no dotf metadata" state (git grep).
 
-- done deletes a branch only on a verified landing: its tip is an ancestor of the base, or the head of a merged pull request (a squash leaves no ancestor). Any other answer keeps the branch with the reason, `--force` included: `--force` overrides the worktree's dirty and unpushed checks, and after it the branch may be the only copy of the work. A `gh` failure keeps it too, naming the error.
+- done deletes a branch only on a verified landing: its tip is an ancestor of the base, or the head of a merged pull request (a squash leaves no ancestor). Any other answer keeps the branch with the reason, `--force` included: `--force` overrides the worktree's dirty and unpushed checks, and after it the branch may be the only copy of the work. A `gh` failure keeps it too, naming the error (`TestDoneKeepsTheBranchWhenThePullRequestLookupFails`; reading the error as landed fails it).
 - The branch and tip are read before the worktree is removed, because after removal the worktree's HEAD is gone; the deletion runs after removal, because git refuses to delete a branch a worktree has checked out. The SHA is printed so `git branch <name> <sha>` restores it.
 - `main` and `master` are never deleted, nor is a detached HEAD: there is no branch to name.
 
