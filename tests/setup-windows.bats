@@ -602,8 +602,11 @@ FIXTURE
     grep -q 'eza-community.eza' "$PS1_SCRIPT"
 }
 
-@test "parity: both scripts install jq" {
-    grep -q 'command -v jq' "$DOTFILES_DIR/setup-linux.sh"
+@test "parity: both OSes install jq (Linux through mise)" {
+    # It grepped setup-linux.sh for `command -v jq`: a proxy that outlived the
+    # download moving to mise (F-030), held up only by the pi settings sync
+    # until #2522 removed it.
+    grep -B1 '^JQ_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'jqlang.jq' "$PS1_SCRIPT"
 }
 
