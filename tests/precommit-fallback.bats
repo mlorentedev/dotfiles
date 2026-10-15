@@ -14,6 +14,15 @@
 
 # bats file_tags=os-sensitive
 
+load 'lib/fixture-template'
+
+# An empty repository, built once per file and copied per test (CI-012 N3).
+_seed_fixture() { git init -q; }
+
+setup_file() { fixture_template_build repo _seed_fixture; }
+
+teardown_file() { fixture_template_release; }
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CHAIN="$REPO/git-hooks/lib/chain-local-hook.sh"
@@ -23,8 +32,8 @@ setup() {
     ARGS_LOG="$WORK/precommit-args"
     STDIN_LOG="$WORK/precommit-stdin"
     FIXTURE="$WORK/repo"
-    mkdir -p "$STUB" "$FIXTURE"
-    git -C "$FIXTURE" init -q
+    mkdir -p "$STUB"
+    fixture_template_copy repo "$FIXTURE"
 }
 
 teardown() { [ -z "${WORK:-}" ] || rm -rf "$WORK"; }

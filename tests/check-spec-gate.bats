@@ -2,12 +2,10 @@
 # Tests for scripts/check-spec-gate.sh — SDD Tier 4 enforcement gate
 
 load 'lib/both-shells'
+load 'lib/fixture-template'
 
-setup() {
-    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
-    REPO_FIXTURE="/tmp/bats_specgate_$$_${BATS_TEST_NUMBER:-0}"
-    mkdir -p "$REPO_FIXTURE"
-    cd "$REPO_FIXTURE" || exit 1
+# Built once per file and copied per test (CI-012 N3).
+_seed_fixture() {
     git init -q -b main
     git config user.email test@test
     git config user.name test
@@ -16,6 +14,18 @@ setup() {
     git add seed.txt
     git commit -q -m "seed"
     git checkout -q -b feature
+}
+
+setup_file() { fixture_template_build repo _seed_fixture; }
+
+teardown_file() { fixture_template_release; }
+
+setup() {
+    SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    REPO_FIXTURE="/tmp/bats_specgate_$$_${BATS_TEST_NUMBER:-0}"
+    rm -rf "$REPO_FIXTURE"
+    fixture_template_copy repo "$REPO_FIXTURE"
+    cd "$REPO_FIXTURE" || exit 1
 }
 
 teardown() {
