@@ -77,6 +77,30 @@ func TestWorktreeDoneTakesTheSlugAddWasGiven(t *testing.T) {
 	}
 }
 
+// With -b, the directory follows the branch, not the slug (#2527 review): add
+// says which name done takes, and done accepts the branch and its slug.
+func TestWorktreeDoneTakesTheBranchGivenToAdd(t *testing.T) {
+	for _, name := range []string{"fix/login", "fix-login"} {
+		t.Run(name, func(t *testing.T) {
+			repo := worktreeTestRepo(t)
+			out, err := executeWorktree(t, "add", "demo", "-b", "fix/login", "--repo", repo)
+			if err != nil {
+				t.Fatalf("add: %v\n%s", err, out)
+			}
+			if !strings.Contains(out, "dotf worktree done fix-login") {
+				t.Errorf("add -b does not say which name done takes:\n%s", out)
+			}
+			wt := filepath.Join(os.Getenv("WORKTREE_ROOT"), "repo", "fix-login")
+			if out, err := executeWorktree(t, "done", name, "--repo", repo); err != nil {
+				t.Fatalf("done %s: %v\n%s", name, err, out)
+			}
+			if _, err := os.Stat(wt); !os.IsNotExist(err) {
+				t.Errorf("%s still exists after done %s (stat err %v)", wt, name, err)
+			}
+		})
+	}
+}
+
 // A worktree in the legacy <repo>-wt-<slug> layout is still found by its slug,
 // so done keeps working on trees made before the one root, until migrate.
 func TestWorktreeDoneTakesTheSlugOfALegacySibling(t *testing.T) {

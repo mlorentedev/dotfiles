@@ -14,7 +14,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC3 branch validation: PR 2.
 - [ ] AC4 `--agent`: PR 6.
 - [ ] AC5 adoption: PR 4.
-- [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`); branch deletion in PR 4.
+- [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4.
 - [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`); transcript check in PR 3.
 - [ ] AC8 migrate: PR 5.
 - [ ] AC9, AC10 docs, skills, ADR: PR 7.
@@ -33,6 +33,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - `list --all` needed no change: it finds worktrees through `git worktree list`, not by directory layout.
 - `add` refuses when WORKTREE_ROOT resolves empty and no `--path` is given (`TestAddRefusesWithoutARoot`), and `done` says the root was not searched (`TestWorktreeDoneSaysWhenTheRootWasNotSearched`). `env.ResolvePath` returns "" when env-contract.json is neither deployed nor reachable from the cwd; falling back to the sibling there would pick the layout by accident. Measured on the Mac the same day: `DOTFILES_REPO_DIR` names the main checkout, which reads its own env-contract.json first, and until PR 1 lands that file has no WORKTREE_ROOT. The dev build refused (`WORKTREE_ROOT could not be resolved`) where the previous code would have made `dotfiles-wt-<slug>` silently.
 - dotf creates the worktree and herdr only opens it (owner, 2026-10-14), so the lease, branch check and isolation gate hold on every path, Windows included.
+
+- `done` identifies a worktree under the root by its branch slug, the one name herdr's layout gives it, not by a second slug recorded in the lease: a herdr-made or adopted worktree would never carry that slug (#2527 review, PR-Agent finding 1).
 
 ## Promotion candidates
 

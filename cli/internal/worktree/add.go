@@ -14,8 +14,9 @@ type AddOptions struct {
 	RepoRoot   string
 	Slug       string
 	CustomPath string
-	// WorktreeRoot, when set, places the checkout at <root>/<repo>/<slug of
-	// branch> (ResolveWorktreePath). Empty keeps the legacy <repo>-wt-<slug>.
+	// WorktreeRoot places the checkout at <root>/<repo>/<slug of branch>
+	// (ResolveWorktreePath). Empty is refused unless CustomPath is set: there
+	// is no fallback to the legacy <repo>-wt-<slug> sibling.
 	WorktreeRoot string
 	Branch       string
 	BaseRef      string

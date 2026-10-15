@@ -179,6 +179,9 @@ adds it to .git/info/exclude.`,
 			}
 
 			c.Printf("Created worktree at %s (branch: %s)\n", info.Path, info.Branch)
+			if name := filepath.Base(info.Path); customPath == "" && name != slug && info.Branch != worktree.DefaultBranch(slug) {
+				c.Printf("The directory follows the branch: tear down with `dotf worktree done %s`\n", name)
+			}
 			if info.Metadata != nil {
 				c.Printf("Lease active until %s\n", info.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
 			}
@@ -309,6 +312,9 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 		if isDirectory(asPath) {
 			return worktreeAt(asPath)
 		}
+		if p := branchUnderRoot(arg, repoDir); p != "" && isDirectory(p) {
+			return worktreeAt(p)
+		}
 		return "", fmt.Errorf("no worktree at %s", asPath)
 	}
 	root, rootErr := resolveCommandRepoRoot(repoDir)
@@ -333,6 +339,21 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 		return worktreeAt(found[0])
 	}
 	return "", fmt.Errorf("%q names %d directories, %s; pass the full path of the one to remove", arg, len(found), strings.Join(found, " and "))
+}
+
+// branchUnderRoot reads arg as a branch name and returns where add put its
+// worktree under WORKTREE_ROOT, or "" when no repository or root resolves. A
+// path that exists always wins over this reading.
+func branchUnderRoot(arg, repoDir string) string {
+	if strings.Contains(arg, `\`) {
+		return ""
+	}
+	root, err := resolveCommandRepoRoot(repoDir)
+	wtRoot := env.ResolvePath("WORKTREE_ROOT")
+	if err != nil || wtRoot == "" {
+		return ""
+	}
+	return worktree.ResolveWorktreePath(wtRoot, filepath.Base(filepath.Clean(root)), arg)
 }
 
 // doneNotFound names every path done tried, and says when the root itself was
@@ -398,9 +419,13 @@ directory or, on Linux and macOS, the working directory of a process it runs und
 removal would strand that shell or agent, and a Claude Code session launched
 from the worktree could not be resumed. Run it from outside the worktree.
 
-The argument is the worktree's path, or the slug given to add: a bare name also
-resolves to <WORKTREE_ROOT>/<repo>/<slug> or .../feat-<slug>, and to the legacy
-<repo>-wt-<slug> beside the repository. A name matching more than one is refused.`,
+The argument is the worktree's path, its branch, or its directory name under
+the root. The directory follows the branch: add <slug> makes feat/<slug> in
+.../feat-<slug>, so the slug works too, but add <slug> -b fix/login makes
+.../fix-login, which done takes as fix/login or fix-login (add prints it). A
+bare name resolves to <WORKTREE_ROOT>/<repo>/<name> or .../feat-<name>, and to
+the legacy <repo>-wt-<name> beside the repository. A name matching more than
+one is refused.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			target, err := resolveDoneTarget(args, worktreePath, repoDir)
