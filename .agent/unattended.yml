@@ -1,0 +1,28 @@
+# Arming envelope for the CLI-123 overnight run (#2546). Written by the operator's
+# session at arming and committed on chore/autopilot-cli-123-run. The run reads the
+# COMMITTED copy only (autopilot skill §1.4). Never widened by the run.
+version: 1
+run_id: ""
+armed_by: manu
+armed_at: 2026-10-15T07:47:30Z
+expires_at: 2026-10-15T17:47:30Z
+objective: "Land the pilot-eligible CLI-123 items #2547 and #2549 under the standing grant, and open the ADR-050 PR for #2548 for the owner to accept."
+scope:
+  write_paths: ["cli/**", "docs/**", "specs/**", ".agent/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "forge/**", "scripts/**", "setup-*", "versions.conf", "secrets/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, make, herdr]
+queue:
+  source: explicit
+  items: [2547, 2549, 2548]   # in this order; nothing else, never another repo
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant        # #2547 and #2549 only; the #2548 ADR PR is never merged by the run
+  push: true
+  open_pr: true
+  advisor_tier: top
