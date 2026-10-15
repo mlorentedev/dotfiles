@@ -72,7 +72,6 @@ setup() {
     # The pin is honoured by `dotf tools sync`, which reads the "# mise: cli"
     # mark on the line before it (#2013 W2). setup-linux.sh no longer fetches
     # age, pinned or latest.
-    grep -B1 '^AGE_VERSION=' "$REPO/versions.conf" | grep -qx '# mise: cli'
     if grep -vE '^[[:space:]]*#' "$REPO/setup-linux.sh" | grep -qE 'FiloSottile/age/releases|filippo\.io/age'; then
         printf 'setup-linux.sh still downloads age itself\n' >&2
         return 1

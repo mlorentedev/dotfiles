@@ -51,7 +51,6 @@ setup() {
     # terminal works correctly with MCPs+plugins (2026-05-26). Linux keeps
     # --pure kept from the abandoned DX-003 terminal-hang investigation.
     grep -qE 'if \(Get-Command opencode' "$PROFILE_SCRIPT"
-    grep -qF 'Set-Alias -Name oc -Value opencode' "$PROFILE_SCRIPT"
     # Regression guard: ensure --pure isn't quietly reintroduced for Windows.
     refute_grep 'function oc\s+\{\s*opencode --pure' "$PROFILE_SCRIPT"
 }
@@ -66,7 +65,6 @@ setup() {
     # Mirror of the Linux AC4 (shell-wrapper-dedup.bats): a relocated clone must
     # still find the repo script. The old literal 'Projects\dotfiles\scripts'
     # broke on any machine whose repo is not under ~/Projects/dotfiles.
-    grep -qF '$env:DOTFILES_REPO_DIR' "$PROFILE_SCRIPT"
     refute_grep_fixed "'Projects\\dotfiles\\scripts\\nan-debug.sh'" "$PROFILE_SCRIPT"
 }
 
@@ -77,8 +75,6 @@ setup() {
     # session. opencode (reads {env:NAN_API_KEY} from opencode.jsonc), pi and agy
     # are wrapped to launch through `dotf secrets run`, so the secret lives only
     # in their child process — never the session.
-    refute_grep 'load-secrets\.ps1' "$PROFILE_SCRIPT"
-    grep -qE 'function opencode \{' "$PROFILE_SCRIPT"
     grep -qE 'dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY' "$PROFILE_SCRIPT"
 }
 

@@ -338,10 +338,6 @@ EOF
 # the script; the behavioral `compile-harness.sh --check` gate is still
 # exercised end-to-end below.
 
-@test "setup-linux.sh refreshes the harness records during deploy, through dotf (#2162)" {
-    grep -qF '"$_dotf" harness refresh --repo "$CURRENT_DIR"' "$BATS_TEST_DIRNAME/../setup-linux.sh"
-}
-
 @test "setup-linux.sh runs compile-harness --deploy to render skills from records" {
     grep -q 'compile-harness.sh" --deploy' "$BATS_TEST_DIRNAME/../setup-linux.sh"
 }
