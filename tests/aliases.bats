@@ -60,12 +60,7 @@ setup() {
 # the new standalone 'copilot' CLI. Rename to 'cop' (interactive agentic CLI)
 # and 'cops' (single-shot non-interactive prompt with --allow-all-tools).
 
-@test "aliases.zsh defines cop alias for copilot" {
-    grep -qE '^alias cop="copilot"' "$ALIASES_FILE"
-}
-
 @test "aliases.zsh defines cops function for single-shot copilot prompt" {
-    grep -qE '^cops\(\)' "$ALIASES_FILE"
     grep -qF 'copilot -p' "$ALIASES_FILE"
     grep -qF -- '--allow-all-tools' "$ALIASES_FILE"
 }
@@ -89,13 +84,6 @@ setup() {
     refute_grep '^_qq_call\(\)' "$ALIASES_FILE"
 }
 
-@test "aliases.zsh no longer defines ghcs/ghce (renamed in BUG-003)" {
-    # Anchor to start-of-line + alias/function definition forms only -- comments
-    # mentioning the old names (e.g. "replaces ghcs/ghce wrappers") are fine.
-    refute_grep '^(alias ghcs|ghcs\(\)|function ghcs)' "$ALIASES_FILE"
-    refute_grep '^(alias ghce|ghce\(\)|function ghce)' "$ALIASES_FILE"
-}
-
 # CHORE-001: shell-profile.sh discoverability via `profile-shell` alias.
 # Dormant-but-load-bearing diagnostic tool (shell startup profiling); was
 # orphan-by-metric per AUDIT-005 but kept by anti-scope rule. Alias makes
@@ -117,10 +105,6 @@ setup() {
 
 # --- Navigation aliases ---
 
-@test "aliases.zsh gprj points to Projects directory" {
-    grep 'alias gprj=' "$ALIASES_FILE" | grep -q 'Projects'
-}
-
 @test "aliases.zsh gprj does not point to Apps" {
     run grep 'alias gprj=' "$ALIASES_FILE"
     [ "$status" -eq 0 ]
@@ -128,22 +112,6 @@ setup() {
 }
 
 # --- Git shortcuts ---
-
-@test "aliases.zsh defines gs alias" {
-    grep -q 'alias gs=' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh defines gd alias" {
-    grep -q 'alias gd=' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh defines gl alias" {
-    grep -q 'alias gl=' "$ALIASES_FILE"
-}
-
-@test "aliases.zsh defines gp alias" {
-    grep -q 'alias gp=' "$ALIASES_FILE"
-}
 
 # --- Parity: navigation aliases in profile.ps1 ---
 

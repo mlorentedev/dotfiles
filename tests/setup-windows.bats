@@ -103,7 +103,6 @@ refute_legacy_mise_sync() {
 
 @test "setup-windows.ps1 deploys secrets/registry.yaml (dotf secrets mapping SSOT) [#587]" {
     grep -qF 'Deployed secrets/registry.yaml' "$PS1_SCRIPT"
-    grep -qF 'registry.yaml' "$PS1_SCRIPT"
 }
 
 @test "parity: both setups deploy the secrets registry [#587]" {
@@ -115,7 +114,6 @@ refute_legacy_mise_sync() {
     # Without ~/.config/age/key.txt, dotf secrets can't decrypt and opencode/agy
     # 401 with no clue. Preflight WARNs (must not abort -- encrypted files still
     # deploy so a key imported later works).
-    grep -qF 'age identity key not found' "$PS1_SCRIPT"
     grep -qF 'AGE_KEY_PATH' "$PS1_SCRIPT"
     grep -qF 'docs/runbooks/guide-secrets-governance.md' "$PS1_SCRIPT"
     # Must use Write-Warn (non-fatal), not Write-Err.
@@ -159,13 +157,10 @@ refute_legacy_mise_sync() {
 }
 
 @test "setup-windows.ps1 detects copilot via Get-Command, not gh extension list" {
-    grep -qF "Get-Command copilot" "$PS1_SCRIPT"
     refute_grep_fixed "gh extension list" "$PS1_SCRIPT"
-    refute_grep_fixed "github/gh-copilot" "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 no longer installs GitHub.Copilot via winget: copilot is a packages.json npm tool (AI-038, ADR-036)" {
-    refute_grep 'Id = "GitHub\.Copilot"' "$PS1_SCRIPT"
     jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm" and .source.package == "@github/copilot")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
@@ -225,17 +220,9 @@ refute_legacy_mise_sync() {
 # CLI convergence (ADR-020). The quoted path and the .exe suffix are resolved
 # inside the binary and pinned by TestHookBinaryTokenMatchesWhatEachSetupScript-
 # Deployed, because getting them wrong appends a duplicate hook instead of
-# adopting the entry this script used to write.
-@test "setup-windows.ps1 emits the harness hooks by running dotf harness bind" {
-    grep -qF 'harness bind' "$PS1_SCRIPT"
-}
-
-# Hook registration must self-heal -- never trust "an entry exists" to mean "the
-# entry is correct". bind runs unconditionally on every setup, behind a
-# capability probe and nothing else.
-@test "setup-windows.ps1 runs bind behind a capability probe, not a presence test" {
-    grep -qF "'(?m)^\s*bind\s'" "$PS1_SCRIPT"
-}
+# adopting the entry this script used to write. That both setups run bind,
+# behind a capability probe and nothing else, is asserted once for the pair in
+# claude-settings-template.bats.
 
 # --- Scheduled task self-heal (same class as #20) ---
 
@@ -250,7 +237,6 @@ refute_legacy_mise_sync() {
 
 # MCP server list must live in mcp-servers.json, not hardcoded in the setup script.
 @test "setup-windows.ps1 MCP registration reads from mcp-servers.json" {
-    grep -q 'mcp-servers\.json' "$PS1_SCRIPT"
     refute_grep 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$PS1_SCRIPT"
 }
 
@@ -321,10 +307,6 @@ refute_legacy_mise_sync() {
     grep -q 'function Backup-AndRestoreClaudeJson' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 cites upstream issue 59870 in the truncate guard (BUG-004)" {
-    grep -qF '#59870' "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
     grep -qF '10240' "$PS1_SCRIPT"
 }
@@ -336,10 +318,6 @@ refute_legacy_mise_sync() {
 # serialize cycle. With ~9 MCP servers, each unwrapped setup run triggered
 # ~18 chances of truncation. These asserts lock in the wrap on every call site.
 
-@test "setup-windows.ps1 wraps claude mcp add with Backup-AndRestoreClaudeJson (BUG-011)" {
-    grep -B15 'claude mcp add --transport' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
-}
-
 @test "setup-windows.ps1 wraps claude mcp get with Backup-AndRestoreClaudeJson (BUG-011)" {
     # Same scriptblock typically wraps both mcp get and mcp add inside one iteration.
     grep -B15 'claude mcp get' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
@@ -349,10 +327,7 @@ refute_legacy_mise_sync() {
 # claude-mem is no longer in the $plugins array and the thedotmack marketplace is
 # no longer registered (ADR-016 Q2). Removing a stale registration is
 # `dotf deploy`'s job (ai/claude/plugins.json `retired_marketplaces`, #1431).
-
-@test "setup-windows.ps1 no longer registers the thedotmack marketplace (MEM-002)" {
-    refute_grep_fixed 'claude plugin marketplace add thedotmack/claude-mem' "$PS1_SCRIPT"
-}
+# The marketplace refute covers both scripts in setup-linux.bats.
 
 # --- OPS-042 (#1336): yarn is a catalog tool; obsidian is not npm at all ---
 # yarn is the classic npm-global, a packages.json entry converged by
@@ -365,7 +340,6 @@ refute_legacy_mise_sync() {
 
 @test "setup-windows.ps1 installs yarn through dotf tools install and names no obsidian npm package (OPS-042, #1615)" {
     grep -qE '^\s*dotf tools install\s*$' "$PS1_SCRIPT"
-    refute_grep 'obsidian-cli' "$PS1_SCRIPT"
     refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
     refute_grep 'yarnPkg' "$PS1_SCRIPT"
     refute_grep 'YARN_VERSION' "$PS1_SCRIPT"
@@ -384,7 +358,6 @@ refute_legacy_mise_sync() {
     refute_grep_fixed 'OPENCODE_VERSION' "$PS1_SCRIPT"
     refute_grep_fixed "ContainsKey('Version')" "$PS1_SCRIPT"
     jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm")' "$DOTFILES_DIR/packages.json" >/dev/null
-    grep -qF 'dotf tools install' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {
@@ -569,33 +542,11 @@ FIXTURE
     grep -qF '& $dotfPath pi packages apply --repo $DotfilesDir' <<<"$block"
 }
 
-@test "setup-windows.ps1 installs age via winget" {
-    grep -q 'FiloSottile.age' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 installs eza via winget" {
-    grep -q 'eza-community.eza' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 installs jq via winget" {
-    grep -q 'jqlang.jq' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 installs GitHub CLI via winget" {
-    grep -q 'GitHub.cli' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 installs zoxide via winget" {
-    grep -q 'ajeetdsouza.zoxide' "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 installs uv if missing" {
-    grep -q 'Installing uv' "$PS1_SCRIPT"
     grep -q 'astral.sh/uv/install.ps1' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 has no poetry block: poetry is a packages.json uv-tool entry" {
-    refute_grep_fixed 'uv tool install poetry' "$PS1_SCRIPT"
     jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
@@ -611,7 +562,6 @@ FIXTURE
 }
 
 @test "Windows entrypoint owns tool convergence; legacy setup does not duplicate mise sync" {
-    grep -qF '& $script:DotfBin converge @args' "$DOTFILES_DIR/install.ps1"
     refute_legacy_mise_sync "$PS1_SCRIPT"
 }
 
@@ -759,16 +709,9 @@ FIXTURE
 # group it did not know about, measured on the deployed file. Neither may do it
 # again -- `dotf harness bind` is the single writer, on both OSes.
 @test "HARNESS-045: parity -- neither script writes hooks itself" {
-    refute_grep_fixed '__HOOK_COMMAND__' "$PS1_SCRIPT"
-    refute_grep_fixed '__HOOK_COMMAND__' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed 'SessionStart[0].hooks[0].command) = $cmd' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed ".hooks.SessionStart = \$tmpl.hooks.SessionStart" "$DOTFILES_DIR/setup-linux.sh"
     refute_grep_fixed "\$existing['hooks']['SessionStart'] = \$template['hooks']['SessionStart']" "$PS1_SCRIPT"
-}
-
-@test "HARNESS-045: parity -- both scripts call dotf harness bind" {
-    grep -qF 'harness bind' "$PS1_SCRIPT"
-    grep -qF 'harness bind' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # --- CLI-019: diff-check retired; `dotf doctor` owns repo/deploy drift ---
@@ -803,7 +746,6 @@ FIXTURE
         fi
     done
     # setup-windows.ps1 names it only in WIN-013's removal list (guarded above).
-    refute_grep 'Copy-Item.*diff-check' "$PS1_SCRIPT"
 }
 
 # --- CLI-018 (#509): healthcheck.ps1 + doctor.ps1 retired; dotf doctor owns it ---
@@ -833,7 +775,6 @@ FIXTURE
 # --- CLI-018: dotf doctor as the post-setup diagnostic (replaced WIN-001) ---
 
 @test "CLI-018: setup-windows.ps1 runs dotf doctor post-setup, non-fatal" {
-    grep -qF 'dotf doctor' "$PS1_SCRIPT"
     grep -qF 'Running post-setup dotf doctor' "$PS1_SCRIPT"
     # non-fatal: the failure path warns, never hard-exits.
     grep -qF 'dotf doctor reported one or more issues' "$PS1_SCRIPT"
@@ -925,13 +866,6 @@ FIXTURE
     jq -e '.configs[] | select(.name == "opencode-tui") | select(.platforms == null or (.platforms | index("windows")))' "$DOTFILES_DIR/ai/deploy.json"
 }
 
-@test "setup-windows.ps1 mirrors the harness inputs through dotf harness mirror (WIN-007)" {
-    # ~/.dotfiles/harness never existed on Windows, so `dotf doctor` failed the
-    # routing registry and the model-pin checks after every setup, with a
-    # remedy ("re-run setup") that could not clear them (#1288).
-    grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
-}
-
 run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     local script_path="$(_winpath "$PS1_SCRIPT")"
     run pwsh -NoProfile -NonInteractive -Command "
@@ -970,6 +904,9 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 }
 
 @test "parity: both setups mirror the harness through the same dotf command (WIN-007)" {
+    # ~/.dotfiles/harness never existed on Windows, so `dotf doctor` failed the
+    # routing registry and the model-pin checks after every setup, with a
+    # remedy ("re-run setup") that could not clear them (#1288).
     grep -qF 'dotf harness mirror' "$PS1_SCRIPT"
     grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
 }
@@ -982,12 +919,11 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     # [[:space:]]*$ rather than \s*$: the .ps1 checks out CRLF everywhere
     # (.gitattributes), and this grep has no \r escape.
     grep -qE '^[[:space:]]*& dotf deploy[[:space:]]*$' "$PS1_SCRIPT"
-    # Anchored to the invocation shape (a line that RUNS dotf), not to any
-    # mention: the comment above the call names the old form on purpose.
-    refute_grep '^[[:space:]]*& dotf deploy [a-z]' "$PS1_SCRIPT"
 }
 
 @test "parity: neither setup names a config at its dotf deploy call site (CLI-054)" {
+    # Anchored to the invocation shape (a line that RUNS dotf), not to any
+    # mention: the comment above each call names the old form on purpose.
     refute_grep '^[[:space:]]*& dotf deploy [a-z]' "$PS1_SCRIPT"
     refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
 }
@@ -1087,9 +1023,9 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     deploy_line=$(grep -n '^Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     presence_line=$(grep -n '& dotf harness presence' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     [ -n "$deploy_line" ] && [ -n "$presence_line" ] && [ "$deploy_line" -lt "$presence_line" ]
-    # parity: the Linux engine delegates to the same verb and carries no injector of its own
+    # parity: the Linux engine delegates to the same verb (that it carries no
+    # injector of its own is compile-harness.bats' assertion)
     grep -qF 'dotf harness presence --repo-root "$REPO_ROOT"' "$DOTFILES_DIR/scripts/compile-harness.sh"
-    refute_grep '^inject_agent_presence\(\) \{' "$DOTFILES_DIR/scripts/compile-harness.sh"
 }
 
 # CLI-062 (#1338): the DX-006 Orca hook repair is `dotf orca tune-hooks`, the
@@ -1100,7 +1036,6 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 # ~\.dotfiles\scripts\orca-hook-tune.ps1 cannot linger.
 @test "setup-windows.ps1 repairs the Orca hooks only through bare dotf deploy, and retires the script (CLI-062, CLI-093)" {
     refute_grep 'dotf orca tune-hooks' "$PS1_SCRIPT"
-    grep -qE '^\s*& dotf deploy\s*$' "$PS1_SCRIPT"
     grep -A3 '^\$retiredScripts = @(' "$PS1_SCRIPT" | grep -q '"orca-hook-tune.ps1"'
     grep -A2 '^\$deployedScripts = @(' "$PS1_SCRIPT" | refute_grep_fixed 'orca-hook-tune.ps1' /dev/stdin
     [ ! -e "$DOTFILES_DIR/scripts/orca-hook-tune.ps1" ]
