@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 1aee3400a0436b9b
+generated_sha: fb74f2be41c59f21
 id: autopilot-skill
 type: skill
 status: active
@@ -48,11 +48,58 @@ When the operator says (any variant): *"Me voy a ausentar / a dormir / a trabaja
    dotf pr triage-queue
    ```
    If pending review items exist on existing PRs, disposing them takes precedence over picking new work.
-4. **Establish Run Budget & Boundaries:**
-   - **Ticket Limit:** Maximum 3–5 tickets per unattended session (unless explicitly given another limit).
-   - **Per-Ticket Time Budget:** 30 minutes max. If a ticket exceeds 30 minutes, trip the circuit breaker (§4.2).
-   - **Token / Turn Budget:** Set `--max-turns` or harness spend limit if available.
-   - **Ask Degrades to Deny:** In unattended mode, any ambiguity, missing input, or interactive prompt degrades to **Deny / Escalate / Blocked**, never to silent approval ("idle is not authorization").
+4. **Write the Arming Envelope — the loop contract (`dotfiles#239`).** Prose budgets do not survive a context reset; the envelope does. Write one file, commit it, and run against it — the objective, the in-scope paths, the allowed commands, the budget and the stop conditions, in one machine-readable place:
+
+   ```yaml
+   # .agent/unattended.yml — written at arming, committed on the run's branch
+   version: 1
+   run_id: ""                       # derived on first entry, written back; never regenerated
+   armed_by: manu
+   armed_at: 2026-10-14T22:05:00Z   # RFC3339
+   expires_at: 2026-10-15T06:00:00Z # RFC3339 — required, and at most 12h after armed_at
+   objective: ""                    # ONE sentence: the single outcome this run must produce
+   scope:
+     write_paths: ["docs/**", "specs/**"]                        # non-empty; globs the run may write
+     frozen_paths: [".github/**", "harness/**", "**/AGENTS.md"] # never written
+     max_files: 8
+     max_loc: 300                   # EXECUTABLE lines per PR (pattern-git-workflow §10)
+   allowed_commands: [dotf, gh, git, make]   # anything else needs the advisor (R2) or a park (R3)
+   queue:
+     source: bitacora
+     filter: '<label/epic this run works>'   # the scope decision the operator made before leaving
+     max_items: 5
+   budget:
+     max_iterations: 8
+     max_minutes_per_iteration: 25
+     max_consecutive_failures: 2
+   authority:
+     merge: standing-grant          # never | standing-grant
+     push: true
+     open_pr: true
+     advisor_tier: top
+   ```
+
+   Three invariants, each checkable without reading prose:
+   - `expires_at > armed_at`, and `expires_at − armed_at ≤ 12h` — a run that outlives a working day has no ceiling in practice.
+   - `scope.write_paths` ∩ `scope.frozen_paths` = ∅.
+   - **The run reads the envelope from the COMMITTED copy, never the working tree**, and refuses if the two differ:
+     ```bash
+     git show "$BASE:.agent/unattended.yml" > "$ENVELOPE"   # the run's ONLY authority
+     git diff --exit-code "$BASE" -- .agent/unattended.yml || { echo "ENVELOPE MUTATED — halt"; exit 1; }
+     ```
+     *Why:* a fence that reads a file the run can rewrite is not a fence. Without this, a run widens `write_paths` locally, does the wide work, commits only the work — the widened file never enters the diff — and the change merges green. That is the single cheapest change that closes the largest hole.
+   - **A PR whose diff touches `.agent/unattended.yml` is never merged** — the same rule as the grant: a PR that changes the grant is not merged under it.
+
+   A missing or malformed envelope parks the run (`envelope-invalid`) — never a default for an authority field. Widening the envelope, the filter or the budget is the one move that voids the grant.
+
+   **Host precondition — the failure everyone forgets.** The dominant real case for "I'm going to sleep" is a laptop whose lid closes. Arm with a wake-lock, or state in the report that the window was not covered:
+   ```bash
+   caffeinate -i -w $$ &                      # macOS
+   systemd-inhibit --what=idle:sleep -- <cmd> # Linux
+   powercfg /change standby-timeout-ac 0      # Windows
+   ```
+
+   Defaults when the operator gave no numbers: 3–5 tickets, 30 min per ticket, and `merge: standing-grant` only where `.github/merge-grant.yml` exists (otherwise `never`). **Ask degrades to deny:** in unattended mode any ambiguity, missing input or interactive prompt degrades to **Deny / Escalate / Parked**, never to silent approval ("idle is not authorization").
 
 ---
 
@@ -62,12 +109,22 @@ A ticket is pilot-eligible only if ALL hold:
 
 - **The 3 a.m. Test:** *If this runs while the operator is away and does exactly what the ticket literally says, is the operator comfortable with the result unreviewed?* If no, leave an issue proposal or comment instead of executing, and move on.
 - **A Plan Already Exists:** Spec, task list, or mechanical nature (bug fix <20 lines with obvious cause, tests, docs, small refactor). Never invent an architectural plan unattended.
-- **Same Epic / Nature Continuity:** Select unassigned tickets belonging to the same active epic or domain:
+- **Same Epic / Nature Continuity — Board Pre-Flight: two queries, always.** One search is not a detector, and a negative is established only by the scan:
   ```bash
-  gh issue list --search "is:open is:issue no:assignee sort:created-asc" --limit 10
-  # Or filter by current epic label:
-  gh issue list --search "is:open is:issue no:assignee label:<epic-label>" --limit 5
+  # 1. Text search. --limit is not optional: the CLI default is 30, so a match at 31 is invisible.
+  gh issue list --state all --limit 500 --search "<the run's topic or epic>"
+  # 2. The board itself, by field — this is the query the run actually picks FROM.
+  gh project item-list 1 --owner mlorentedev --format json --limit 200 \
+  | jq -c --arg repo "https://github.com/mlorentedev/<repo>" '
+      [ .items[] | select(.status == "Backlog")
+        | select(.repository == $repo)                                   # repository is a FULL URL: there is no .repo field
+        | select(.type == "spec" or .type == "bug" or .type == "chore") ]
+      | sort_by([(.priority // "P3"), .content.number])                  # P0<P1<P2<P3, then issue number asc
+      | .[0:3]'                                                          # bounded look-ahead; never scan the whole board
   ```
+  *Verified live 2026-10-14:* `gh project item-list` exposes `status`, `priority`, `type`, `repository` (full URL) and `content.{number,title,type,url}`. A query written against `.repo` selects nothing, silently, in every repository — the run then ends `queue-empty` at minute zero and reports it honestly.
+- **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit** — `dotf spec init` refuses (ADR-043); a refusal is a stop, not a retry.
+- **When the eligible set is empty, the run ENDS — it does not widen.** Not another repo, not another status, not past `Priority`; and never `gh issue create` / `dotf spec init` to manufacture work: a run rewarded for motion produces motion. It ends with `reason: queue-empty` and says so.
 - **No Path Contention:** Check open PRs and branches (`gh pr list --state open`, `git branch -r`) to ensure no peer session is editing the same files/subsystems.
 - **Atomic Claim:** Self-assign the ticket to lease it:
   ```bash
@@ -89,16 +146,26 @@ Check if the worktree already exists (crash recovery / resumability):
 ```bash
 SLUG="issue-${ISSUE_NUM}-<short-topic>"
 BRANCH="feat/${SLUG}"
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-WT_DIR="../$(basename "$REPO_ROOT")-wt-${SLUG}"
 
-if [ -d "$WT_DIR" ]; then
-  cd "$WT_DIR"
-  git pull --rebase origin "$BRANCH" 2>/dev/null || true
-else
-  dotf worktree add "$SLUG" -b "$BRANCH"
-  cd "$WT_DIR"
+# NEVER derive the worktree path. It is not a convention you can compute:
+#   - `git rev-parse --show-toplevel` returns the WORKTREE when you are already inside one,
+#     so `../$(basename …)-wt-<slug>` resolves to nonsense on a resume;
+#   - the on-disk layout is per-machine and changing (dotfiles#2527 moves it under WORKTREE_ROOT).
+# Ask git, which is versioned and stable, and re-read after creating:
+resolve_wt() {
+  git worktree list --porcelain \
+  | awk -v b="refs/heads/${BRANCH}" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}'
+}
+WT_DIR="$(resolve_wt)"
+if [ -z "$WT_DIR" ]; then
+  dotf worktree add "$SLUG" -b "$BRANCH" --issue "$ISSUE_NUM"
+  WT_DIR="$(resolve_wt)"
 fi
+[ -n "$WT_DIR" ] || { echo "worktree resolution failed -> park(lease-lost)"; exit 1; }
+cd "$WT_DIR" || exit 1
+
+# Confirm the lease before working (not to compute the path — only to check state):
+dotf worktree list --json | jq -r --arg b "$BRANCH" '.[] | select(.branch == $b) | .state'
 ```
 
 ### Step 2: Idempotent Implementation & Search-Before-Create
@@ -162,30 +229,32 @@ Escalate immediately upon:
 - Uncovered security/secrets boundaries.
 - Repeated failures tripping the 3x breaker.
 
-**Harness-Agnostic Advisor Invocations:**
-- **Cross-Agent / CLI:**
-  ```bash
-  dotf agent run --role architect --tier top --task "Evaluate architectural crossroads for #${ISSUE_NUM}: [Context and Options]"
-  ```
-- **Claude Code:** Invoke the experimental advisor tool:
-  ```json
-  advisor({ "prompt": "Review architecture and unblock #${ISSUE_NUM}: [Context]" })
-  ```
-- **Antigravity / AGY:** Dispatch a high-thinking subagent (`chat-base` or `research`).
+**The advisor invocation (agent-agnostic):**
+
+```bash
+# `auto` ships the persona RECORD with the task (mandate, method, boundaries).
+# `run --role` only LABELS the dispatch: the role reaches nothing but a log line.
+dotf agent auto --task "Decide <the fork> for #${ISSUE_NUM}. Options: <A> / <B>. Evidence: <logs>" \
+                --tier top --timeout 5m
+```
+
+- **The top tier must not degrade.** `escalated`, `chain_exhausted` and `denied` do **not** fall back to a mid model (ADR-032 §4): they park the work (§4.2). Silent degradation is the "mysterious quality drop" the tier policy exists to prevent. For the same reason a typed `task_failed` is never retried on another model — only `pool_unavailable` advances the chain, and that happens inside the dispatcher, not by your choice.
+- If your harness offers its own second-opinion primitive (a native advisor or subagent tool), use it *in addition* — but the CLI above is the portable floor and the one this skill's evidence covers. Naming a vendor primitive is a coupling: say which harness it exists on rather than implying every agent has it.
 
 ### 4.2 The 3x Fix-Loop Breaker & Parking Tickets
 
 - **Max 3 Fix Iterations:** If the same test or linter failure recurs across 3 rounds, **STOP grinding**.
 - **Park the Ticket Cleanly:**
-  1. Add a detailed root-cause comment:
+  1. One comment, in `pattern-agent-oriented-errors` form — ERROR / WHY / FIX — carrying **two** options and their consequences. A park is a *question*, not a status:
      ```bash
-     gh issue comment "$ISSUE_NUM" --body "Blocked after 3 fix iterations. Root cause: <details>. Tried: <attempts>. Requires operator attention."
+     gh issue comment "$ISSUE_NUM" --body "ERROR: <symptom>. WHY: <root cause>. FIX: (A) <option + consequence> / (B) <option + consequence>."
      ```
-  2. Move the Bitácora project card to `Blocked`:
+  2. Add the `blocked` label, then set Bitácora Status `Blocked` with the documented helper — resolve the field/option IDs **at runtime** and never paste a third copy of them. SSOT: `00_meta/runbooks/bitacora-project-setup.md` §5 (Status option `Blocked` = `7705a647`); the `new-ticket` skill carries the runtime-resolution snippet.
      ```bash
-     dotf ticket update "$ISSUE_NUM" --status Blocked
+     gh issue edit "$ISSUE_NUM" --add-label blocked
      ```
-  3. Record the ruling in your session journal and move to the next eligible ticket.
+     **There is no `dotf ticket` command.** An earlier draft of this skill called `dotf ticket update --status Blocked`, which fails with `unknown command "ticket"` — the park path silently did nothing. Do not reintroduce it.
+  3. `parked` is terminal for the **item** and non-terminal for the **run** — unless the item *is* the run's objective, in which case the run ends (`reason: goal-blocked`). One hard item must not kill a night's work; an unanswerable item must never be guessed. Then record the ruling in the session journal and pick the next eligible ticket.
 
 ---
 
@@ -234,31 +303,79 @@ When the operator returns, the time window expires, the backlog empties, or a st
    dotf worktree done "$SLUG"
    ```
    *(Never delete your own launch worktree if running inside one).*
-2. **Multi-Session Memory Handoff:**
-   Update your session thread under `## Session Handoff` in `MEMORY.md`:
+2. **Multi-Session Memory Handoff — run the `handoff` skill, do not restate it.**
+   `MEMORY.md` does **not** live in the repo root: it lives in the vault at
+   `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (HARNESS-066). Resolve `$VAULT_PATH` in order —
+   env var → `dotf env path VAULT_PATH` → `~/.config/dotfiles/machine.json` → fail closed:
    ```bash
-   dotf mem handoff-write --agent <agent-name> --memory "$REPO_ROOT/MEMORY.md"
+   MEMORY_MD="$(dotf env path VAULT_PATH)/10_projects/<repo>/memory/MEMORY.md"
+   dotf mem thread                        # which thread am I: wt-<slug>, or main@<host>
+   printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD" --agent <agent>
    ```
-3. **Deliver the Pilot Report in Conversation:**
+   The full checklist (journal, board reconciliation, artifact summary, one next action) is
+   `00_meta/skills/handoff/SKILL.md`. `--memory "$REPO_ROOT/MEMORY.md"` — which an earlier draft used —
+   would write the handoff nowhere near where the next session reads it.
+
+3. **Write the durable disarm report** — the operator reads *this*, not the transcript:
+   `.agent/runs/<run-id>/report.md` on the run branch, ordered by **what cannot wait**, not by chronology.
+   1. **Verdict line** — `run <id> — ended <reason> after N iterations / Th — D done, P parked, M merged, U unmerged`,
+      and the one question it answers: *what is waiting on a human, and is anything in it irreversible?*
+   2. **Waiting on you — irreversible first:** anything landed or published, each PR awaiting a merge
+      decision, each park with its two options. Irreversibility is the only thing that cannot wait, so a
+      skimming operator still sees the part that matters.
+   3. **Parked, with the question restated** — reason, the two options, the rung reached, and the cheapest
+      thing that would unblock it. **If empty, say so in one line:** absence must be red, never silent.
+   4. **Done but unmerged** — needs no thought from the operator.
+   5. **Evidence index** — per item: the verification command, its exit code, and a pointer to the full
+      output. Never a paraphrase, never a summary of a summary.
+   6. **Budget spent** — iterations, wall clock, items. Say plainly that **no dollar figure exists**
+      unless the provider exposes one (`nanquota` measures pool quota, not this run): an invented
+      precision is a fabricated fact wearing an authoritative shape.
+   7. **Host-suspend line** — whether the window was genuinely covered, or the machine slept through it.
+      Without this line, "nothing happened" and "the run never started" are indistinguishable.
+   8. **The one next action** (the `/catchup` Rule of One).
+
+4. **Report in conversation** (a summary of the artifact, never a substitute for it):
    ```markdown
-   ### ✈️ Pilot Mode Session Report — [Absence Window]
-   - **Tickets Completed:** #123, #124
-   - **Tickets Parked (Blocked):** #125 (Root cause: 3x breaker tripped on db lock)
-   - **PRs Landed:** #250 (SHA: `a1b2c3d`)
-   - **PRs Awaiting Human Review:** #251 (Draft/Release boundary)
-   - **Knowledge Recorded:**
-     - Lesson: `docs/lessons/lesson-438-...md`
-     - ADR: `docs/adr/0042-...md`
-   - **Next Recommended Action for Operator:** Review #251, inspect Blocked #125.
+   ### Pilot Mode Session Report — [absence window]
+   - **Done:** #123, #124 · **Landed:** #250 (`a1b2c3d`)
+   - **Waiting on you:** #251 (PR open) · #125 parked — *question: A or B?*
+   - **Knowledge:** lesson `docs/lessons/lesson-438-...md` · ADR none: no structural invariant
+   - **Window:** covered / NOT covered (host suspended)
+   - **Next action:** review #251
    ```
 
 ---
 
 ## 7. The Stop List (What Stops You — and ONLY This)
 
-1. **Irreversible Operations:** Production deploys, dropping tables/databases, deleting git history or branches outside your own worktree, force-pushing to trunk.
-2. **Secrets Handling:** Never expose secrets to stdout or write plaintext credentials to files.
-3. **Ask Degrades to Deny:** In unattended mode, any ambiguous requirement or interactive confirmation stops and escalates to the Advisor/Blocked.
+Each row names the primitive that enforces it **today**. Where none exists the row says so, because a
+prohibition described as enforced while unenforced is worse than no prohibition: it occupies the slot a
+real check would go in, and spends the attention that would have written one.
+
+| Forbidden | Enforced by |
+|---|---|
+| Committing to or pushing the default branch (`main`/`master`/`release/*`) | **deterministic**: branch protection (`dotf forge protection`); the envelope's `branch` is checked at preflight |
+| `gh pr merge --auto`, or enabling the repo's auto-merge setting | **deterministic**: `allow_auto_merge=false` + the `no-auto-merge` enforced record |
+| Merging a PR that touches `.agent/unattended.yml` | **deterministic** once the check lands — `dotf pr land` does not read the envelope yet, so today this is discipline plus the diff check in §1.4 |
+| Printing, logging, echoing or committing a secret; `env`/`printenv` under `dotf secrets` | **deterministic**: `dotf secrets show` refuses plaintext in agent sessions; `redactWriter`; `secrets-never-in-output` |
+| Deleting anything; `git reset --hard`; `git stash`; history rewrite; `git push --force` | **NOT ENFORCED — discipline only.** Archive-only is a convention, not a check |
+| Reading credential stores (`~/.ssh`, `~/.aws`, any `.env`, `*credential*`) | **NOT ENFORCED — discipline only.** The operator must decide whether a real boundary is worth building |
+| Publishing: `docker push`, `npm publish`, deploy CLIs, any external message/mail API | **NOT ENFORCED — discipline only**; `git revert` cannot un-send. The run simply holds no such credentials |
+| Starting a new spec at the WIP limit | **deterministic**: `dotf spec init` refuses (ADR-043); `--over-wip-limit` needs a written reason |
+| Editing CI workflows, `harness/**`, or the envelope's authority fields | **deterministic** on the diff via `frozen_paths`; **not** prevented at write time |
+| Running a second unattended run in the same checkout or branch | **deterministic**: the declared `worktree`/`branch` must equal the actual one, else halt |
+| Removing any worktree (especially the launch worktree) or `dotf worktree sweep` mid-run | **deterministic**: `dotf worktree done` refuses the current worktree; `sweep` needs a merged PR + an expired lease |
+| Widening the filter, the scope or the budget to keep working | **NOT ENFORCED — discipline only**, and it voids the grant |
+
+**Run-level stops** (nothing else is picked; the disarm report is written): `expired` · `budget-iterations` ·
+`budget-items` · `stalled` (two iterations changing neither the ledger nor the envelope) · `queue-empty` ·
+`goal-blocked` · `lease-lost` · `envelope-invalid` · `preflight-failed` · `advisor-unavailable`.
+
+**A check that cannot run is `pending`, never `pass`.** If `dotf pr land` is absent, unauthenticated,
+rate-limited, or returns something you cannot interpret: post the triage comment with a
+`merge withheld: <check> could not run` row and leave the PR open. An unrunnable check degrades the
+verdict to pending — absence must be red.
 
 ---
 
@@ -273,6 +390,11 @@ When the operator returns, the time window expires, the backlog empties, or a st
 | "The test failed 4 times, but this next tweak will work" | Tripped breaker. Past 3 rounds, failure is structural. Park it. |
 | "No assignees on the issue, so I don't need to assign myself" | Assignment is your lease claim for peer sessions. Always assign before working. |
 | "I can merge this quick PR modifying CI" | The always-human floor. CI workflows and merge grants are never auto-merged. |
+| "The envelope is mine, so I can widen it for this one item" | A privilege the subject can widen is not a privilege. The fence reads the *committed* copy, and a mutated envelope halts the run. |
+| "I'll arm without a wake-lock, it'll be fine" | The dominant absence is a closing laptop lid. No lock, no covered window — and the report must say the window was not covered. |
+| "Nothing eligible in the queue, so I'll file the ticket I think we need" | The empty set ends the run. A loop rewarded for motion produces motion. |
+| "It's my own PR, so I'll triage my own reviewer findings and land it" | Permitted under the grant, and it must be **disclosed**: the triage comment states it was authored by the run. Disclosure is not independence — say which one you are. |
+| "I'll park it by moving the board card" | `dotf ticket` does not exist. Park with a comment carrying two options, the `blocked` label, and the documented field helper. |
 
 ---
 
@@ -284,3 +406,5 @@ When the operator returns, the time window expires, the backlog empties, or a st
 - You opened a second ticket while the first is unfinished.
 - You ran a command without an isolated git worktree.
 - You cannot produce the command output that proves your completion claim.
+- You widened the envelope, the queue filter or the budget "just for this one item".
+- You are about to report a run you cannot distinguish from one that never started (no ledger, no suspend line).
