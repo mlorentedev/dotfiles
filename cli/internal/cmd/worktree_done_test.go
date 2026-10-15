@@ -11,10 +11,12 @@ import (
 
 // worktreeTestRepo is a git repository with one commit, in a directory whose
 // siblings are the test's own. TMPDIR is redirected so done's lock file is
-// per-test too.
+// per-test too, and WORKTREE_ROOT so add never writes under the real
+// ~/Projects/worktrees.
 func worktreeTestRepo(t *testing.T) string {
 	t.Helper()
 	t.Setenv("TMPDIR", t.TempDir())
+	t.Setenv("WORKTREE_ROOT", filepath.Join(t.TempDir(), "worktrees"))
 	repo := filepath.Join(t.TempDir(), "repo")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
@@ -45,12 +47,23 @@ func executeWorktree(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
+// rootWorktree is where add puts the worktree for slug under the test's
+// WORKTREE_ROOT: the default branch feat/<slug>, slugified.
+func rootWorktree(slug string) string {
+	return filepath.Join(os.Getenv("WORKTREE_ROOT"), "repo", "feat-"+slug)
+}
+
+// legacySibling is the <repo>-wt-<slug> layout that predates the one root.
+func legacySibling(repo, slug string) string {
+	return filepath.Join(filepath.Dir(repo), "repo-wt-"+slug)
+}
+
 func TestWorktreeDoneTakesTheSlugAddWasGiven(t *testing.T) {
 	repo := worktreeTestRepo(t)
 	if out, err := executeWorktree(t, "add", "demo", "--repo", repo); err != nil {
 		t.Fatalf("add: %v\n%s", err, out)
 	}
-	wt := filepath.Join(filepath.Dir(repo), "repo-wt-demo")
+	wt := rootWorktree("demo")
 	if _, err := os.Stat(wt); err != nil {
 		t.Fatalf("add did not create %s: %v", wt, err)
 	}
@@ -64,8 +77,43 @@ func TestWorktreeDoneTakesTheSlugAddWasGiven(t *testing.T) {
 	}
 }
 
-// From inside a worktree, a slug still names a sibling of the main repository,
-// never <worktree>-wt-<slug>.
+// A worktree in the legacy <repo>-wt-<slug> layout is still found by its slug,
+// so done keeps working on trees made before the one root, until migrate.
+func TestWorktreeDoneTakesTheSlugOfALegacySibling(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	wt := legacySibling(repo, "old")
+	if out, err := executeWorktree(t, "add", "old", "--repo", repo, "--path", wt); err != nil {
+		t.Fatalf("add: %v\n%s", err, out)
+	}
+	if out, err := executeWorktree(t, "done", "old", "--repo", repo); err != nil {
+		t.Fatalf("done old: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("%s still exists after done old (stat err %v)", wt, err)
+	}
+}
+
+// A slug that names a worktree in both layouts is refused, naming both, rather
+// than resolved to whichever layout is checked first.
+func TestWorktreeDoneRefusesASlugInBothLayouts(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	if out, err := executeWorktree(t, "add", "twin", "--repo", repo); err != nil {
+		t.Fatalf("add: %v\n%s", err, out)
+	}
+	legacy := legacySibling(repo, "twin")
+	if out, err := executeWorktree(t, "add", "twin", "--repo", repo, "--path", legacy, "-b", "fix/twin"); err != nil {
+		t.Fatalf("add legacy: %v\n%s", err, out)
+	}
+	t.Chdir(t.TempDir())
+
+	_, err := executeWorktree(t, "done", "twin", "--repo", repo)
+	if err == nil || !strings.Contains(err.Error(), legacy) || !strings.Contains(err.Error(), rootWorktree("twin")) {
+		t.Fatalf("got %v, want a refusal naming %s and %s", err, legacy, rootWorktree("twin"))
+	}
+}
+
+// From inside a worktree, a slug still names a worktree of the main repository,
+// never one relative to the worktree the caller stands in.
 func TestWorktreeDoneResolvesASlugBesideTheMainRepository(t *testing.T) {
 	repo := worktreeTestRepo(t)
 	for _, slug := range []string{"one", "two"} {
@@ -73,13 +121,13 @@ func TestWorktreeDoneResolvesASlugBesideTheMainRepository(t *testing.T) {
 			t.Fatalf("add %s: %v\n%s", slug, err, out)
 		}
 	}
-	t.Chdir(filepath.Join(filepath.Dir(repo), "repo-wt-one"))
+	t.Chdir(rootWorktree("one"))
 
 	if out, err := executeWorktree(t, "done", "two"); err != nil {
-		t.Fatalf("done two from inside repo-wt-one: %v\n%s", err, out)
+		t.Fatalf("done two from inside feat-one: %v\n%s", err, out)
 	}
-	if _, err := os.Stat(filepath.Join(filepath.Dir(repo), "repo-wt-two")); !os.IsNotExist(err) {
-		t.Errorf("repo-wt-two still exists (stat err %v)", err)
+	if _, err := os.Stat(rootWorktree("two")); !os.IsNotExist(err) {
+		t.Errorf("feat-two still exists (stat err %v)", err)
 	}
 }
 
@@ -94,7 +142,8 @@ func TestWorktreeDoneNamesBothPathsForAnUnknownName(t *testing.T) {
 	cwd, _ := os.Getwd()
 	for _, want := range []string{
 		filepath.Join(cwd, "nosuch"),
-		filepath.Join(filepath.Dir(repo), "repo-wt-nosuch"),
+		legacySibling(repo, "nosuch"),
+		rootWorktree("nosuch"),
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not name %s", err, want)
@@ -119,7 +168,7 @@ func TestWorktreeDoneRefusesANameThatIsBothAPathAndASlug(t *testing.T) {
 	t.Chdir(cwd)
 
 	_, err := executeWorktree(t, "done", "demo", "--repo", repo)
-	wt := filepath.Join(filepath.Dir(repo), "repo-wt-demo")
+	wt := rootWorktree("demo")
 	if err == nil || !strings.Contains(err.Error(), wt) || !strings.Contains(err.Error(), filepath.Join(cwd, "demo")) {
 		t.Fatalf("got %v, want a refusal naming both %s and the cwd's demo", err, wt)
 	}

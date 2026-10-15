@@ -81,6 +81,15 @@
       }
     },
     {
+      "name": "WORKTREE_ROOT",
+      "required": false,
+      "description": "The one root every git worktree lives under, as <WORKTREE_ROOT>/<repo>/<branch-slug> (#2503). herdr fixes that shape and only lets its root be configured, so `dotf worktree add` follows it, and `dotf deploy` renders the same value into herdr's worktrees.directory and the agy and Copilot trust lists. Visible on purpose: agy excludes **/.worktrees/**. No path_exists validation: the first `dotf worktree add` creates it.",
+      "default": {
+        "linux": "$HOME/Projects/worktrees",
+        "windows": "$env:USERPROFILE\\Projects\\worktrees"
+      }
+    },
+    {
       "name": "VAULT_PATH",
       "required": false,
       "description": "Obsidian knowledge vault root — the cross-machine path seam (ADR-025). Honored by `dotf vault`/`dotf init`, the session-start hooks, and the Go vault resolver. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` renders it into paths.{sh,ps1}.",
