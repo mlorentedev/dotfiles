@@ -145,5 +145,12 @@
     "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestCheckWorkstationTarget_ByStatus$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/not_opted_in' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/nothing_applied' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/converged'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f22",
+    "behavior": "001b PR 10 follow-up (Linux): setup-linux.sh makes no claude mcp call; the bare dotf deploy (claude-mcp) is the one registrar of mcp-servers.json",
+    "verification": "bats -f 'registers no Claude MCP server itself' tests/setup-linux.bats | grep -q '^ok 1 '",
+    "state": "passing",
+    "evidence": "verification exit 0 (2026-10-15); two mutations fail it (an appended `claude mcp get`, an indented `claude mcp add`)"
   }
 ]
