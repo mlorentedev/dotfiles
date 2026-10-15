@@ -504,3 +504,92 @@ func TestSudoInstallCommand(t *testing.T) {
 		t.Errorf("one package: combined %q drifts from the per-package note %q", got, want)
 	}
 }
+
+// veracrypt is the cask BUG-134 met: it depends on macfuse, whose installer runs
+// `sudo installer -pkg`. brew escalates inside its own process, so dotf's argv
+// never starts with sudo and only the catalog can say which casks do.
+func veracrypt() Tool {
+	return Tool{Name: "veracrypt", Profile: "full", Source: Source{Type: "system", Cask: "veracrypt", NeedsSudo: true}}
+}
+
+// A marked cask is not attempted while sudo wants a password: brew would
+// download it and then fail, and that failure stopped every converge step after
+// the tools one (BUG-134). It is a named outcome, not an error, and it names the
+// command without sudo, because brew refuses to run as root.
+func TestInstallSystem_CaskThatNeedsSudoIsDeferredWhileSudoRefuses(t *testing.T) {
+	w := newWorld("brew", "sudo")
+	in := w.installer("darwin")
+	res, err := in.Install(veracrypt())
+	if err != nil || res != Skipped {
+		t.Fatalf("Install = %v, %v; want Skipped, nil\n%s", res, err, w.out.String())
+	}
+	if len(w.ran) != 0 {
+		t.Errorf("ran %v; a cask that cannot be installed is not attempted", w.ran)
+	}
+	if want := "veracrypt: needs sudo; run: brew install --cask veracrypt"; !strings.Contains(w.out.String(), want) {
+		t.Errorf("output %q lacks %q", w.out.String(), want)
+	}
+	if got, want := in.SudoDeferred(), "brew install --cask veracrypt"; got != want {
+		t.Errorf("SudoDeferred = %q, want %q (an apt command would install the wrong thing)", got, want)
+	}
+}
+
+// With sudo usable (a cached ticket, NOPASSWD) the marked cask installs like any
+// other, and when it then fails that is an error: the mark never hides a break.
+func TestInstallSystem_CaskThatNeedsSudoInstallsWhenSudoWorks(t *testing.T) {
+	w := newWorld("brew", "sudo")
+	w.sudoOK = true
+	res, err := w.installer("darwin").Install(veracrypt())
+	if err != nil || res != Installed {
+		t.Fatalf("Install = %v, %v; want Installed, nil\n%s", res, err, w.out.String())
+	}
+	if len(w.ran) != 1 || strings.Join(w.ran[0], " ") != "brew install --cask veracrypt" {
+		t.Errorf("ran %v, want brew install --cask veracrypt", w.ran)
+	}
+
+	w = newWorld("brew", "sudo")
+	w.sudoOK = true
+	w.failRun = fmt.Errorf("exit status 1")
+	if _, err := w.installer("darwin").Install(veracrypt()); err == nil {
+		t.Error("a marked cask that fails with working sudo must stay an error")
+	}
+}
+
+// The mark is what makes a refusal mean "needs a password". On an unattended Mac
+// `sudo -n true` always refuses, so without the mark every cask failure (a 404, a
+// bad token) would read as a missing password and be swallowed.
+func TestInstallSystem_UnmarkedCaskFailureStaysAnErrorWhenSudoRefuses(t *testing.T) {
+	obsidian := Tool{Name: "obsidian", Profile: "full", Source: Source{Type: "system", Cask: "obsidian"}}
+	w := newWorld("brew", "sudo")
+	w.failRun = fmt.Errorf("exit status 1")
+	if _, err := w.installer("darwin").Install(obsidian); err == nil {
+		t.Error("an unmarked cask that fails is an error, whatever sudo says")
+	}
+}
+
+// A plan asks what the apply will do, so the converge probe after an apply does
+// not find an install row it knows will be skipped.
+func TestPlanSystem_CaskThatNeedsSudoPlansAsNeedsSudo(t *testing.T) {
+	w := newWorld("brew", "sudo")
+	p := w.installer("darwin").Plan(veracrypt())
+	if p.Action != PlanNeedsSudo || p.Manager != "brew-cask" || p.Package != "veracrypt" || p.Note != "run: brew install --cask veracrypt" {
+		t.Errorf("Plan = %+v, want needs-sudo naming the brew command", p)
+	}
+
+	w.sudoOK = true
+	if p := w.installer("darwin").Plan(veracrypt()); p.Action != PlanInstall {
+		t.Errorf("with working sudo: Plan = %+v, want install", p)
+	}
+}
+
+// One paste for everything deferred: the apt batch keeps sudo, the casks do not.
+func TestSudoCommand(t *testing.T) {
+	if got := SudoCommand(nil); got != "" {
+		t.Errorf("nothing deferred: got %q", got)
+	}
+	got := SudoCommand([]SudoWait{{"brew-cask", "veracrypt"}, {"apt", "gh"}, {"brew-cask", "macfuse"}})
+	want := "sudo apt-get update && sudo apt-get install -y --no-remove gh && brew install --cask veracrypt macfuse"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

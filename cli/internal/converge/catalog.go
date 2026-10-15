@@ -20,10 +20,10 @@ type CatalogInstaller interface {
 // catalogPass is one walk over packages.json: what it installed (or, planned,
 // would install), and what it left for a reason converge cannot change.
 type catalogPass struct {
-	changed  []string // installed or upgraded; in a plan, to install or upgrade
-	waiting  []wait   // the manager arrives later in the run, or never on this machine
-	needSudo []string // tool names: dotf never asks for a password
-	sudoPkgs []string // their apt packages, for one SudoInstallCommand
+	changed  []string         // installed or upgraded; in a plan, to install or upgrade
+	waiting  []wait           // the manager arrives later in the run, or never on this machine
+	needSudo []string         // tool names: dotf never asks for a password
+	sudoWait []tools.SudoWait // their packages, for one SudoCommand
 	failed   []error
 }
 
@@ -49,7 +49,7 @@ func (p *catalogPass) then(o catalogPass) {
 	p.changed = append(p.changed, o.changed...)
 	p.failed = append(p.failed, o.failed...)
 	p.needSudo = append(p.needSudo, o.needSudo...)
-	p.sudoPkgs = append(p.sudoPkgs, o.sudoPkgs...)
+	p.sudoWait = append(p.sudoWait, o.sudoWait...)
 	p.waiting = o.waiting
 }
 
@@ -72,7 +72,7 @@ func walkCatalog(in CatalogInstaller, entries []tools.Tool, apply bool) catalogP
 			p.waiting = append(p.waiting, wait{t, strings.TrimPrefix(plan.Note, "waits on ")})
 		case tools.PlanNeedsSudo:
 			p.needSudo = append(p.needSudo, t.Name)
-			p.sudoPkgs = append(p.sudoPkgs, plan.Package)
+			p.sudoWait = append(p.sudoWait, tools.SudoWait{Manager: plan.Manager, Package: plan.Package})
 		case tools.PlanRefused:
 			p.failed = append(p.failed, fmt.Errorf("%s: %s", t.Name, plan.Note))
 		}
@@ -119,7 +119,7 @@ func (p catalogPass) detail(dryRun bool) string {
 	}
 	if len(p.needSudo) > 0 {
 		parts = append(parts, "needs sudo: "+strings.Join(p.needSudo, ", ")+
-			" (run once: "+tools.SudoInstallCommand(p.sudoPkgs)+")")
+			" (run once: "+tools.SudoCommand(p.sudoWait)+")")
 	}
 	return strings.Join(parts, "; ")
 }

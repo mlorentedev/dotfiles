@@ -244,10 +244,11 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 	default:
 		p.Action = PlanInstall
 		manager, pkg := t.Source.SystemPackage(in.GOOS)
-		if argv := in.systemInstallArgv(manager, pkg); in.needsSudoPassword(argv) {
-			// The classifier the apply uses after sudo -n refuses, asked up
-			// front, so a plan never promises an install the apply skips.
-			p.Action, p.Note, p.Package = PlanNeedsSudo, "run: "+SudoInstallCommand([]string{pkg}), pkg
+		if in.waitsOnSudo(t, manager, pkg) {
+			// The classifier the apply uses, asked up front, so a plan never
+			// promises an install the apply skips.
+			wait := SudoWait{manager, pkg}
+			p.Action, p.Note, p.Manager, p.Package = PlanNeedsSudo, "run: "+SudoCommand([]SudoWait{wait}), manager, pkg
 		}
 	}
 	return p
@@ -264,18 +265,20 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 		_, _ = fmt.Fprintf(in.Out, "%s: %s is not on PATH; skipping (the next run installs it once %s is there)\n", t.Name, missing, missing)
 		return Skipped, nil
 	}
+	wait := SudoWait{manager, pkg}
+	if manager == "brew-cask" && in.waitsOnSudo(t, manager, pkg) {
+		// Before the install, not after its failure: brew downloads the cask and
+		// only then runs the installer that asks, and no failure of brew's can
+		// be told from a wrong token (see waitsOnSudo).
+		return in.deferForSudo(t, wait), nil
+	}
 	if manager == "apt" {
 		in.refreshAptIndex()
 	}
 	argv := in.systemInstallArgv(manager, pkg)
 	if err := in.Run(argv[0], argv[1:]...); err != nil {
 		if in.needsSudoPassword(argv) {
-			// A named outcome, not a failure: nothing is wrong with the entry
-			// or the machine, only the privilege dotf may not ask for. It says
-			// what to run, and the other tools still converge.
-			_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, SudoInstallCommand([]string{pkg}))
-			in.sudoDeferred = append(in.sudoDeferred, pkg)
-			return Skipped, nil
+			return in.deferForSudo(t, wait), nil
 		}
 		return Skipped, fmt.Errorf("%s: %s: %w", t.Name, strings.Join(argv, " "), err)
 	}
@@ -284,6 +287,42 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s installed via %s (%s)\n", t.Name, manager, pkg)
 	return Installed, nil
+}
+
+// deferForSudo records a package left for a person to install. A named outcome,
+// not a failure: nothing is wrong with the entry or the machine, only the
+// privilege dotf may not ask for. It says what to run, and the other tools
+// still converge.
+func (in *Installer) deferForSudo(t Tool, w SudoWait) Result {
+	_, _ = fmt.Fprintf(in.Out, "%s: needs sudo; run: %s\n", t.Name, SudoCommand([]SudoWait{w}))
+	in.sudoDeferred = append(in.sudoDeferred, w)
+	return Skipped
+}
+
+// SudoWait is a system package left for a person because it needs a sudo
+// password: Manager is "apt" or "brew-cask", Package its name there.
+type SudoWait struct{ Manager, Package string }
+
+// SudoCommand is the one command that installs everything deferred: the apt
+// batch behind sudo (SudoInstallCommand), then the casks, which run without it
+// because brew refuses root and asks for the password itself. "" for nothing.
+func SudoCommand(waits []SudoWait) string {
+	var apt, casks []string
+	for _, w := range waits {
+		if w.Manager == "brew-cask" {
+			casks = append(casks, w.Package)
+		} else {
+			apt = append(apt, w.Package)
+		}
+	}
+	var parts []string
+	if len(apt) > 0 {
+		parts = append(parts, SudoInstallCommand(apt))
+	}
+	if len(casks) > 0 {
+		parts = append(parts, "brew install --cask "+strings.Join(casks, " "))
+	}
+	return strings.Join(parts, " && ")
 }
 
 // SudoInstallCommand is the one command that installs every apt package in
@@ -306,10 +345,22 @@ func SudoInstallCommand(pkgs []string) string {
 	return "sudo apt-get update && sudo " + strings.Join(aptInstallArgv(pkgs...), " ")
 }
 
-// SudoDeferred is the command for every apt package Install skipped because
-// sudo wanted a password, in the order Install met them; "" when none was.
+// SudoDeferred is the command for every package Install skipped because sudo
+// wanted a password, in the order Install met them; "" when none was.
 func (in *Installer) SudoDeferred() string {
-	return SudoInstallCommand(in.sudoDeferred)
+	return SudoCommand(in.sudoDeferred)
+}
+
+// waitsOnSudo reports whether installing pkg would stop on a sudo password.
+// An apt install is wrapped in `sudo -n`, so its own argv says it escalates. A
+// cask escalates inside brew, which the argv cannot show, so only a cask the
+// catalog marks needs_sudo is asked: on an unattended Mac `sudo -n true` always
+// refuses, and asking it of every cask would read any failure as a password.
+func (in *Installer) waitsOnSudo(t Tool, manager, pkg string) bool {
+	if manager == "brew-cask" {
+		return t.Source.NeedsSudo && in.sudoRefused()
+	}
+	return in.needsSudoPassword(in.systemInstallArgv(manager, pkg))
 }
 
 // needsSudoPassword reports whether a failed install failed because sudo wanted
@@ -320,6 +371,11 @@ func (in *Installer) needsSudoPassword(argv []string) bool {
 	if len(argv) < 2 || argv[0] != "sudo" || argv[1] != "-n" {
 		return false
 	}
+	return in.sudoRefused()
+}
+
+// sudoRefused asks `sudo -n true` once per Installer and keeps the answer.
+func (in *Installer) sudoRefused() bool {
 	if in.sudoRefuses == nil {
 		query := in.Query
 		if query == nil {

@@ -450,4 +450,5 @@ tags: [lessons, index, dotfiles]
 | [429 - An installer that picks the newest interpreter fails with the runner image](lesson-429-an-installer-that-picks-the-newest-interpreter-fails-with-the-runner-image.md) | 2026-10-14 |
 | [430 - A subshell cannot turn errexit back on under its caller's \|\|](lesson-430-a-subshell-cannot-turn-errexit-back-on-under-its-callers-or.md) | 2026-10-14 |
 | [431 - A comment stripper that ignores strings can still produce valid JSON](lesson-431-a-comment-stripper-that-ignores-strings-can-still-produce-valid-json.md) | 2026-10-14 |
+| [434 - A privilege check keyed on our own argv cannot see a manager that escalates inside](lesson-434-a-privilege-check-keyed-on-our-own-argv-cannot-see-a-manager-that-escalates.md) | 2026-10-14 |
 <!-- END GENERATED -->
