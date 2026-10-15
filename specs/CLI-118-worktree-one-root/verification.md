@@ -45,6 +45,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - `migrate` moves a worktree out of the directory a Claude Code session is keyed on (`getcwd`), so it skips any worktree with a transcript in the last six hours rather than orphan the session; the help text says a session started in the old path does not follow it.
 
+- AC7's `--ignore-recent-session` exists on `done` only. `sweep` and `migrate` act on many worktrees at once, often unattended, so a worktree with a recent session is skipped with the reason printed, never overridden; the operator who knows the session is dead runs `done <it> --ignore-recent-session`, one worktree at a time.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
