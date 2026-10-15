@@ -11,13 +11,16 @@ setup() {
 }
 
 # "<host>|<hostname>|<port>" for every Host block that pins, one per line.
+# ssh_config keywords are case-insensitive, so they are matched lowercased: a
+# block written `HostName` or `port` must not fall back to the alias or to 22.
 _pinned_hosts() {
     awk '
-        /^Host /       { if (pin) print host "|" name "|" port; host = $2; name = $2; port = 22; pin = 0; next }
-        /^[[:space:]]*Hostname /                 { name = $2 }
-        /^[[:space:]]*Port /                     { port = $2 }
-        /^[[:space:]]*StrictHostKeyChecking yes/ { pin = 1 }
-        END            { if (pin) print host "|" name "|" port }
+        { k = tolower($1); v = tolower($2) }
+        k == "host"     { if (pin) print host "|" name "|" port; host = $2; name = $2; port = 22; pin = 0; next }
+        k == "hostname" { name = $2 }
+        k == "port"     { port = $2 }
+        k == "stricthostkeychecking" && v == "yes" { pin = 1 }
+        END             { if (pin) print host "|" name "|" port }
     ' "$CONFIG"
 }
 
