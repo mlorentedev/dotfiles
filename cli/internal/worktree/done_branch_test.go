@@ -1,7 +1,9 @@
 package worktree
 
 import (
+	"errors"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -53,5 +55,21 @@ func TestDoneKeepsAnUnlandedBranchEvenWithForce(t *testing.T) {
 	}
 	if got := gitOut(t, repoDir, "rev-parse", "feat/test"); got != tip {
 		t.Errorf("feat/test moved to %s, want %s", got, tip)
+	}
+}
+
+// A pull-request lookup that fails cannot prove a squash landing, so the
+// branch stays and the reason names the failure.
+func TestDoneKeepsTheBranchWhenThePullRequestLookupFails(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	stubMergedPRHeads(t, nil, errors.New("gh: HTTP 502"))
+	commitFile(t, wtDir, "wip.txt")
+
+	res, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !branchExists(repoDir, "feat/test") || res.DeletedBranch != "" || !strings.Contains(res.KeptReason, "HTTP 502") {
+		t.Errorf("result %+v; want feat/test kept, naming the lookup failure", res)
 	}
 }
