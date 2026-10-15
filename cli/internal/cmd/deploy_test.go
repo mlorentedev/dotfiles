@@ -35,7 +35,7 @@ func runDeployWithClaude(t *testing.T, repo, home string, args []string, run cla
 	t.Setenv("USERPROFILE", home)
 	// The bare deploy writes agy's MCP configs where these point; a developer's
 	// own exports would aim it at the real ~/.gemini.
-	for _, k := range []string{"GEMINI_HOME", "AGY_HOME", "AGY_APP_DATA", "VAULT_PATH"} {
+	for _, k := range []string{"GEMINI_HOME", "AGY_HOME", "VAULT_PATH"} {
 		t.Setenv(k, "")
 	}
 	orig := deployClaudeRunner

@@ -36,40 +36,16 @@ func TestCheckAntigravity_AbsolutePathAccepted(t *testing.T) {
 	}
 }
 
-// A relative value is reported under the name that supplied it: with only the
-// old name set, sending the user to AGY_HOME would fix nothing.
-func TestCheckAntigravity_ARelativeValueNamesItsSource(t *testing.T) {
-	for name, tc := range map[string]struct {
-		env  map[string]string
-		want string
-	}{
-		"contract": {map[string]string{"AGY_HOME": "rel"}, "AGY_HOME is relative or unset: rel"},
-		"legacy":   {map[string]string{"AGY_APP_DATA": "rel"}, "AGY_APP_DATA is relative or unset: rel"},
-	} {
-		var buf bytes.Buffer
-		checkAntigravity(newSys(tc.env, []string{"agy"}, nil), capture(&buf))
-		if !strings.Contains(buf.String(), tc.want) {
-			t.Errorf("%s: want %q in:\n%s", name, tc.want, buf.String())
-		}
+// A relative AGY_HOME FAILs under its name. The retired AGY_APP_DATA is not
+// read, so it neither supplies the value nor draws a finding (#2404).
+func TestCheckAntigravity_ARelativeAgyHomeFails(t *testing.T) {
+	var buf bytes.Buffer
+	checkAntigravity(newSys(map[string]string{"AGY_HOME": "rel", "AGY_APP_DATA": "/l"}, []string{"agy"}, nil), capture(&buf))
+	if !strings.Contains(buf.String(), "AGY_HOME is relative or unset: rel") {
+		t.Errorf("want the relative AGY_HOME reported:\n%s", buf.String())
 	}
-}
-
-// A machine still exporting the old name to another directory is told which
-// one dotf uses (#2395); the same value, or the old name alone, says nothing.
-func TestCheckAntigravity_ALegacyAppDataThatDisagreesIsWarned(t *testing.T) {
-	for name, tc := range map[string]struct {
-		env  map[string]string
-		warn bool
-	}{
-		"differs":     {map[string]string{"AGY_HOME": "/a", "AGY_APP_DATA": "/l"}, true},
-		"agrees":      {map[string]string{"AGY_HOME": "/a", "AGY_APP_DATA": "/a"}, false},
-		"legacy only": {map[string]string{"AGY_APP_DATA": "/l"}, false},
-	} {
-		var buf bytes.Buffer
-		checkAntigravity(newSys(tc.env, []string{"agy"}, nil), capture(&buf))
-		if got := strings.Contains(buf.String(), "AGY_APP_DATA is set to /l but /a is used"); got != tc.warn {
-			t.Errorf("%s: warned = %v, want %v:\n%s", name, got, tc.warn, buf.String())
-		}
+	if strings.Contains(buf.String(), "AGY_APP_DATA") {
+		t.Errorf("the retired name must draw no finding:\n%s", buf.String())
 	}
 }
 

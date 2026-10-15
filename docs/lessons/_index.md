@@ -460,4 +460,5 @@ tags: [lessons, index, dotfiles]
 | [439 - A cache used as the truth side of a check needs an age, not just a presence](lesson-439-a-cache-used-as-the-truth-side-needs-an-age.md) | 2026-10-15 |
 | [441 - Every path that creates a worktree owes it the lease, or sweep never sees it](lesson-441-every-path-that-creates-a-worktree-owes-it-the-lease.md) | 2026-10-15 |
 | [442 - A declaration read from a checkout is only as current as the checkout](lesson-442-a-declaration-read-from-a-checkout-is-only-as-current-as-the-checkout.md) | 2026-10-15 |
+| [443 - A gate every session runs must be able to answer for one session's change](lesson-443-a-gate-shared-by-every-session-must-answer-for-one.md) | 2026-10-15 |
 <!-- END GENERATED -->
