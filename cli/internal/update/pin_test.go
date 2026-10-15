@@ -137,12 +137,17 @@ func TestRunPinSkippedBranchesNeverInstall(t *testing.T) {
 			tt.mutate(g)
 			d := Deps{
 				Git:      g.run,
-				Pin:      func() (string, error) { t.Fatal("Pin read on a skip branch"); return "", nil },
+				Pin:      func() (string, error) { return "0.70.0", nil },
 				Converge: func() error { t.Fatal("Converge ran on a skip branch"); return nil },
 				Install:  func(string) error { t.Fatal("Install ran on a skip branch"); return nil },
 			}
-			if _, err := Run(Config{Repo: "/repo", Version: "0.69.0"}, d); err != nil {
+			out, err := Run(Config{Repo: "/repo", Version: "0.69.0"}, d)
+			if err != nil {
 				t.Fatalf("err = %v, want nil", err)
+			}
+			// Nothing is installed, but the drift doctor FAILs is named.
+			if !strings.Contains(out.Message, "dotf 0.69.0 is not the pinned 0.70.0") {
+				t.Errorf("message does not name the drift: %q", out.Message)
 			}
 		})
 	}

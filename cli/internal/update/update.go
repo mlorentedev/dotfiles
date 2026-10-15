@@ -72,16 +72,16 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 		// self-update only ever runs what the upstream holds. The skip is right,
 		// but it is not a divergence: the merge base is the upstream and nothing
 		// needs reconciling, so it gets its own tag (#2205).
-		return skip(out.Status, out.Message+" — nothing to deploy")
+		return skipDrift(cfg, d, out.Status, out.Message+" — nothing to deploy")
 	case "not-a-repo":
 		return skip(out.Status, out.Message+" — nothing to self-update")
 	case "dirty":
 		if out.Detail == "" {
-			return skip(out.Status, out.Message+" — skipping")
+			return skipDrift(cfg, d, out.Status, out.Message+" — skipping")
 		}
-		return skip(out.Status, out.Message+" — skipping (commit or stash first). Dirtying paths:\n"+out.Detail)
+		return skipDrift(cfg, d, out.Status, out.Message+" — skipping (commit or stash first). Dirtying paths:\n"+out.Detail)
 	default:
-		return skip(out.Status, out.Message+" — skipping self-update")
+		return skipDrift(cfg, d, out.Status, out.Message+" — skipping self-update")
 	}
 	// The checkout is level with its upstream. A running dotf that is not the
 	// one it pins would converge short of what the checkout declares (and
@@ -105,6 +105,21 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 			fmt.Errorf("converge: %w", err)
 	}
 	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + out.Upstream + ")" + note}, nil
+}
+
+// skipDrift is a skip that installs nothing but names a running dotf that is not
+// the checkout's pin: doctor FAILs that drift and sends the owner to `dotf
+// update`, so an exit-0 skip must not leave it unsaid.
+func skipDrift(cfg Config, d Deps, status, msg string) (Outcome, error) {
+	if !releaseVersion.MatchString(cfg.Version) {
+		return skip(status, msg)
+	}
+	pin, err := d.Pin()
+	if err != nil || pin == "" || pin == cfg.Version {
+		return skip(status, msg)
+	}
+	return skip(status, msg+"\ndotf "+cfg.Version+" is not the pinned "+pin+
+		": `dotf update` installs it once the checkout is clean and level with its upstream, or run ./install.sh from the checkout")
 }
 
 // pinToInstall returns the version to install, or "" when none is due, with a

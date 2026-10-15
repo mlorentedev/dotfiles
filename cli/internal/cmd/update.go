@@ -32,8 +32,9 @@ binary; update does not converge a second time with the old one. A source
 build ("dev") is never replaced: the pin check is skipped and said so.
 
 Anything non-actionable (not a git repo, dirty worktree, unreachable remote, no
-upstream, already current, ahead of the upstream, diverged history) is logged
-and skipped with exit 0.
+upstream, ahead of the upstream, diverged history, or already current with dotf
+at its pin) is logged and skipped with exit 0; a skip names a dotf that is off
+its pin.
 A real converge failure, or a pinned dotf that cannot be installed, is the ONLY
 non-zero exit, so 'systemctl --user status
 dotfiles-selfupdate' (and the journal) surface it.
