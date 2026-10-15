@@ -22,6 +22,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - PR 4b mutations, re-run 2026-10-15 after the review (`go test -count=1 -run TestDone ./internal/worktree/`): never landed as an ancestor -> `TestDoneDeletesALandedBranch` fails; never landed by squash -> `TestDoneDeletesASquashLandedBranch` fails; always landed -> `TestDoneKeepsAnUnlandedBranchEvenWithForce` fails. Three of three killed.
 
+- PR 5, fixed on 2026-10-15 before review:
+  - The session skip reused done's refusal, which ends in "pass --ignore-recent-session", a flag migrate rejects, and speaks of removing the worktree. It now takes sweep's reason. `TestMigrateSkipsWhatItMustNotMove` gained a "sessions unreadable" row and asserts that no skip names `--ignore-recent-session`; both were red on the first version.
+  - `test (windows-latest)` failed `TestMigrateMovesAndASecondRunHasNothingToDo` only on Windows. git lists `C:/Users/runneradmin/...` while `t.TempDir()` is the 8.3 form `C:\Users\RUNNER~1\...`, so the porcelain text never contained the target. The test now parses the list with `ParsePorcelain` and compares through `samePath`.
+
 ## Test status
 
 - PR 1, macOS: `cd cli && go build ./... && go vet ./... && go test ./...` all ok; `GOOS=windows go vet ./internal/worktree/ ./internal/cmd/` clean; `golangci-lint run` (pinned 2.12.2) 0 issues; `bats tests/herdr-config.bats` 6 ok; env-contract consumers (`tests/env-contract.bats`, `guard-setup-preexports-present.bats`, `opencode.bats`, `setup-linux.bats`) 131 ok.
