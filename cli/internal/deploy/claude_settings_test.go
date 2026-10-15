@@ -56,7 +56,7 @@ func TestPerKeyMergePolicy(t *testing.T) {
 			if err := os.WriteFile(dst, []byte(tc.box), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			out, _, err := mergeInto(dst, []byte(tc.tmpl))
+			out, _, err := mergeInto(dst, []byte(tc.tmpl), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

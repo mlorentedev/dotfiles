@@ -31,7 +31,7 @@ func TestMergeInto_KeepsWhatTheToolAddedAtRuntime(t *testing.T) {
   "model": "new-model"
 }`)
 
-	out, changed, err := mergeInto(dst, managed)
+	out, changed, err := mergeInto(dst, managed, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestMergeInto_KeepsWhatTheToolAddedAtRuntime(t *testing.T) {
 	if err := os.WriteFile(dst, out, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	again, changed, err := mergeInto(dst, managed)
+	again, changed, err := mergeInto(dst, managed, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestMergeInto_ComparesNumbersByValue(t *testing.T) {
 	if err := os.WriteFile(dst, []byte(`{"n": 15.0, "m": 1e1, "z": -0}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, changed, err := mergeInto(dst, []byte(`{"n": 15, "m": 10, "z": 0}`))
+	_, changed, err := mergeInto(dst, []byte(`{"n": 15, "m": 10, "z": 0}`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,10 +97,10 @@ func TestRender_RefusesTrailingData(t *testing.T) {
 	if err := os.WriteFile(dst, []byte(`{"a":1} {"b":2}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := mergeInto(dst, []byte(`{"a":1}`)); err == nil || !strings.Contains(err.Error(), "trailing data") {
+	if _, _, err := mergeInto(dst, []byte(`{"a":1}`), nil); err == nil || !strings.Contains(err.Error(), "trailing data") {
 		t.Errorf("mergeInto must refuse a destination with trailing data, got %v", err)
 	}
-	if _, _, err := mergeInto(dst, []byte(`{"a":1} {"b":2}`)); err == nil || !strings.Contains(err.Error(), "trailing data") {
+	if _, _, err := mergeInto(dst, []byte(`{"a":1} {"b":2}`), nil); err == nil || !strings.Contains(err.Error(), "trailing data") {
 		t.Errorf("mergeInto must refuse a source with trailing data, got %v", err)
 	}
 }
@@ -119,7 +119,7 @@ func TestRender_DoesNotHTMLEscape(t *testing.T) {
 	if err := os.WriteFile(dst, []byte(`{"cmd":"a && b"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	merged, _, err := mergeInto(dst, []byte(`{"x":1}`))
+	merged, _, err := mergeInto(dst, []byte(`{"x":1}`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,11 +40,11 @@ const ManifestRel = "ai/deploy.json"
 
 // ManifestVersion is the newest schema this binary reads. It is bumped whenever
 // a new field changes what an entry MEANS (2: `strategy` and `requires`,
-// AI-039; 3: `paths`, AI-042; 4: `platforms`, #1843 B1), so a binary that
+// AI-039; 3: `paths`, AI-042; 4: `platforms`, #1843 B1; 5: `listKeys`, #2455), so a binary that
 // predates the field refuses the manifest instead of deploying every entry the
 // old way. The check is the version, not the field, because a field an old
 // decoder ignores is invisible to it by construction.
-const ManifestVersion = 4
+const ManifestVersion = 5
 
 // MinManifestVersion is the oldest schema this binary reads. A reader that adds
 // a field reads the version before it too, which by construction carries none
@@ -92,6 +92,13 @@ type Config struct {
 	// packages.json's platforms uses (ADR-045): a POSIX rc file is declared for
 	// linux and darwin, because Git Bash on Windows would read it.
 	Platforms []string `json:"platforms"`
+	// ListKeys names, for a merge, the arrays whose elements are tables
+	// identified by one field: path -> that field. A managed element replaces
+	// the destination's element with the same identity, where the default union
+	// would keep the old table beside the new one, two entries for one identity
+	// (#2455). The path is the dotted join of keys from the root, so a key that
+	// itself contains "." is not addressable.
+	ListKeys map[string]string `json:"listKeys"`
 
 	// dirMode is the mode for a directory the deploy creates to hold this
 	// entry's file. ParseManifest derives it from every entry sharing the
@@ -254,6 +261,9 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		if err := validatePlatforms(c, m.Version); err != nil {
 			return nil, err
 		}
+		if err := validateListKeys(c, m.Version); err != nil {
+			return nil, err
+		}
 		if c.Paths != "" && c.Paths != PathsNative && c.Paths != PathsSlash {
 			return nil, fmt.Errorf("config %q: unknown paths form %q (want %s or %s)", c.Name, c.Paths, PathsNative, PathsSlash)
 		}
@@ -406,6 +416,26 @@ func validatePlatforms(c *Config, version int) error {
 	return nil
 }
 
+// validateListKeys refuses listKeys a released reader could not read (one in a
+// version 4 manifest), on an entry that does not merge, and with an empty path
+// or identity field.
+func validateListKeys(c *Config, version int) error {
+	switch {
+	case c.ListKeys == nil:
+		return nil
+	case version < 5:
+		return fmt.Errorf("config %q: listKeys needs manifest version 5", c.Name)
+	case c.strategy() != StrategyMerge:
+		return fmt.Errorf("config %q: listKeys needs strategy merge", c.Name)
+	}
+	for path, field := range c.ListKeys {
+		if path == "" || field == "" {
+			return fmt.Errorf("config %q: listKeys has an empty path or identity field (%q: %q)", c.Name, path, field)
+		}
+	}
+	return nil
+}
+
 // decodeManifest reads exactly one JSON document, strictly.
 //
 // Unknown fields are refused, not ignored: encoding/json's default drops a key
@@ -509,7 +539,7 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 	p := Plan{Dst: dst, Symlink: isSymlink(dst)}
 	switch c.strategy() {
 	case StrategyMerge:
-		p.Content, p.Changed, err = mergeInto(dst, srcData)
+		p.Content, p.Changed, err = mergeInto(dst, srcData, c.ListKeys)
 		if err != nil {
 			return Plan{}, fmt.Errorf("config %q: merge into %s: %w", c.Name, dst, err)
 		}
@@ -861,7 +891,7 @@ func managesAValue(m map[string]any) bool {
 	return false
 }
 
-func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
+func mergeInto(dst string, srcData []byte, listKeys map[string]string) ([]byte, bool, error) {
 	f := mergeFormatFor(dst)
 	managed, err := f.decodeSource(srcData)
 	if err != nil {
@@ -882,7 +912,19 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, false, err
 	}
-	merged, changed := deepMerge(existing, managed)
+	// Checked on the source, before the destination is read: a destination
+	// without the table takes it whole, and deepMerge never reaches the list.
+	for path, field := range listKeys {
+		if value, ok := lookupPath(managed, path); ok {
+			if err := checkIdentities(path, field, value); err != nil {
+				return nil, false, err
+			}
+		}
+	}
+	merged, changed, err := deepMerge(existing, managed, listKeys, "")
+	if err != nil {
+		return nil, false, err
+	}
 	content, err := f.encode(merged)
 	if err != nil {
 		return nil, false, err
@@ -890,9 +932,17 @@ func mergeInto(dst string, srcData []byte) ([]byte, bool, error) {
 	return content, changed, nil
 }
 
-func deepMerge(existing, managed map[string]any) (map[string]any, bool) {
+// deepMerge writes managed into existing. prefix is the dotted path of the
+// tables being merged, the address listKeys is keyed by; mergeInto has
+// checked every list listKeys names.
+func deepMerge(existing, managed map[string]any, listKeys map[string]string, prefix string) (map[string]any, bool, error) {
 	changed := false
 	for key, managedValue := range managed {
+		path := key
+		if prefix != "" {
+			path = prefix + "." + key
+		}
+		field, identified := listKeys[path]
 		existingValue, exists := existing[key]
 		if !exists {
 			existing[key] = managedValue
@@ -902,7 +952,10 @@ func deepMerge(existing, managed map[string]any) (map[string]any, bool) {
 		switch value := managedValue.(type) {
 		case map[string]any:
 			if object, ok := existingValue.(map[string]any); ok {
-				merged, didChange := deepMerge(object, value)
+				merged, didChange, err := deepMerge(object, value, listKeys, path)
+				if err != nil {
+					return nil, false, err
+				}
 				existing[key] = merged
 				changed = changed || didChange
 				continue
@@ -910,6 +963,9 @@ func deepMerge(existing, managed map[string]any) (map[string]any, bool) {
 		case []any:
 			if list, ok := existingValue.([]any); ok {
 				merged, didChange := unionLists(list, value)
+				if identified {
+					merged, didChange = mergeByIdentity(list, value, field)
+				}
 				existing[key] = merged
 				changed = changed || didChange
 				continue
@@ -921,7 +977,94 @@ func deepMerge(existing, managed map[string]any) (map[string]any, bool) {
 		existing[key] = managedValue
 		changed = true
 	}
-	return existing, changed
+	return existing, changed, nil
+}
+
+// lookupPath walks a dotted path through nested tables.
+func lookupPath(m map[string]any, path string) (any, bool) {
+	keys := strings.Split(path, ".")
+	for _, key := range keys[:len(keys)-1] {
+		next, ok := m[key].(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		m = next
+	}
+	value, ok := m[keys[len(keys)-1]]
+	return value, ok
+}
+
+// checkIdentities refuses a managed list listKeys names whose elements cannot
+// each own one slot: an element that is not a table or lacks the identity
+// field, or two elements sharing one identity. Falling back to the union there
+// would bring back, silently, the duplicates the identity exists to stop.
+func checkIdentities(path, field string, managed any) error {
+	list, ok := managed.([]any)
+	if !ok {
+		return fmt.Errorf("listKeys names %s, and the source holds no list there", path)
+	}
+	for i, element := range list {
+		table, ok := element.(map[string]any)
+		if !ok {
+			return fmt.Errorf("listKeys names %s, and its element %d is not a table", path, i)
+		}
+		id, ok := table[field]
+		if !ok {
+			return fmt.Errorf("listKeys names %s by %q, and its element %d has no %q", path, field, i, field)
+		}
+		if j := identityIndex(id, list[:i], field); j >= 0 {
+			return fmt.Errorf("listKeys names %s by %q, and its elements %d and %d share %v", path, field, j, i, id)
+		}
+	}
+	return nil
+}
+
+// mergeByIdentity puts each managed element in the slot of the existing
+// element with the same identity, keeps every other existing element where it
+// is, drops a further existing element with a managed identity (the duplicate
+// the union left), and appends the managed elements the destination lacked.
+// A retired managed element is not removed: nothing records what the repo
+// managed before.
+func mergeByIdentity(existing, managed []any, field string) ([]any, bool) {
+	out := make([]any, 0, len(existing)+len(managed))
+	placed := make([]bool, len(managed))
+	changed := false
+	for _, element := range existing {
+		i := -1
+		if table, ok := element.(map[string]any); ok {
+			if id, ok := table[field]; ok {
+				i = identityIndex(id, managed, field)
+			}
+		}
+		switch {
+		case i < 0:
+			out = append(out, element)
+		case placed[i]:
+			changed = true
+		default:
+			placed[i] = true
+			out = append(out, managed[i])
+			changed = changed || !jsonEqual(element, managed[i])
+		}
+	}
+	for i, element := range managed {
+		if !placed[i] {
+			out = append(out, element)
+			changed = true
+		}
+	}
+	return out, changed
+}
+
+// identityIndex is the index of the element of list whose field equals id, or
+// -1. Every element is a table holding field: checkIdentities ran first.
+func identityIndex(id any, list []any, field string) int {
+	for i, element := range list {
+		if jsonEqual(element.(map[string]any)[field], id) {
+			return i
+		}
+	}
+	return -1
 }
 
 func unionLists(existing, managed []any) ([]any, bool) {
