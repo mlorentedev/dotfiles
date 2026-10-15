@@ -113,7 +113,7 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 	self, _ := os.Executable() // empty falls back to `dotf` on the pane's PATH
 	opts := lane.Options{
 		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
-		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: self,
+		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: self, GitDir: common,
 		Fetch: func() error {
 			remote, branch, _ := strings.Cut(cfg.Base, "/")
 			_, err := laneRun("git", "-C", parent, "fetch", "--quiet", remote, branch)

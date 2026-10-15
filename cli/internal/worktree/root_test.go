@@ -65,7 +65,7 @@ func TestAddUnderWorktreeRootFollowsBranch(t *testing.T) {
 	root := filepath.Join(tmp, "worktrees")
 	runner := &MockAddRunner{OnWorktreeAdd: func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) }}
 
-	info, err := AddWithRunner(AddOptions{RepoRoot: mainRepo, Slug: "x", Branch: "fix/Some_Bug", WorktreeRoot: root}, runner, time.Now())
+	info, err := AddWithRunner(AddOptions{RepoRoot: mainRepo, Slug: "x", Branch: "fix/some-bug", WorktreeRoot: root}, runner, time.Now())
 	if err != nil {
 		t.Fatalf("add: %v", err)
 	}

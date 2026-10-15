@@ -200,6 +200,7 @@ var DefaultSkillDependencies = map[string][]string{
 	"cyclomatic-complexity":   {"test"},
 	"handoff":                 {"adversarial-review"},
 	"pr-review-triage":        {"adversarial-review"},
+	"autopilot":               {"handoff", "pr-review-triage", "test-driven-development", "using-git-worktrees"},
 }
 
 // SkillDependencies is the dependency map the router uses: the `requires:` of

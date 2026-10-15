@@ -19,18 +19,48 @@ type AddOptions struct {
 	// is no fallback to the legacy <repo>-wt-<slug> sibling.
 	WorktreeRoot string
 	Branch       string
-	BaseRef      string
-	Issue        int
-	TTL          time.Duration
-	Creator      string
+	// BaseRef is what the branch starts from. Empty means the remote's default
+	// branch (AddRunner.DefaultBase), never the caller's HEAD.
+	BaseRef string
+	Issue   int
+	TTL     time.Duration
+	Creator string
 }
 
 // AddRunner executes the low-level git worktree creation.
 type AddRunner interface {
 	WorktreeAdd(repo, target, branch, base string) error
+	// DefaultBase fetches origin and returns its default branch ref.
+	DefaultBase(repo string) (string, error)
 }
 
 type RealAddRunner struct{}
+
+// remoteBaseRefs is the order the remote's default branch is looked for in:
+// origin/HEAD where the clone recorded it, else main, else master (the vault).
+var remoteBaseRefs = []string{"origin/HEAD", "origin/main", "origin/master"}
+
+func (r *RealAddRunner) DefaultBase(repo string) (string, error) {
+	// A failed fetch (offline) still leaves the last-fetched refs, which are a
+	// better base than none; say so instead of refusing.
+	if out, err := exec.Command("git", "-C", repo, "fetch", "--quiet", "origin").CombinedOutput(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: git fetch origin failed, using the last-fetched refs: %s\n", strings.TrimSpace(string(out)))
+	}
+	if ref := firstRef(repo, remoteBaseRefs); ref != "" {
+		return ref, nil
+	}
+	return "", fmt.Errorf("no remote default branch in %s (tried %s): pass --base", repo, strings.Join(remoteBaseRefs, ", "))
+}
+
+// firstRef returns the first of refs that resolves in repo, or "".
+func firstRef(repo string, refs []string) string {
+	for _, ref := range refs {
+		if exec.Command("git", "-C", repo, "rev-parse", "--verify", "--quiet", ref).Run() == nil {
+			return ref
+		}
+	}
+	return ""
+}
 
 func (r *RealAddRunner) WorktreeAdd(repo, target, branch, base string) error {
 	args := []string{"-C", repo, "worktree", "add", target, "-b", branch}
@@ -139,6 +169,9 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 	}
 
 	branchName, ttl, creator := resolveAddDefaults(opts)
+	if err := ValidateBranch(branchName); err != nil {
+		return nil, err
+	}
 	targetPath := resolveTargetPath(opts, branchName)
 	if err := ValidateIsolation(opts.RepoRoot, targetPath); err != nil {
 		return nil, err
@@ -153,7 +186,14 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		_, _ = fmt.Fprintln(os.Stderr, warn)
 	}
 
-	if err := runner.WorktreeAdd(opts.RepoRoot, targetPath, branchName, opts.BaseRef); err != nil {
+	base := opts.BaseRef
+	if base == "" {
+		var err error
+		if base, err = runner.DefaultBase(opts.RepoRoot); err != nil {
+			return nil, err
+		}
+	}
+	if err := runner.WorktreeAdd(opts.RepoRoot, targetPath, branchName, base); err != nil {
 		return nil, err
 	}
 
