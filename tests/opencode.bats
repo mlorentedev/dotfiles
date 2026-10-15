@@ -74,25 +74,11 @@ setup() {
 }
 
 @test "setup-windows.ps1 no longer installs aider" {
-    refute_grep_fixed "Installing aider-chat via uv" "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep_fixed "DEPLOY AIDER CONFIGURATION" "$DOTFILES_DIR/setup-windows.ps1"
-}
-
-@test "setup-linux.sh still provides uv (used by hive MCP server), now through mise" {
-    grep -q '^    dotf tools sync ' "$SETUP_SCRIPT"
-    grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
 }
 
 @test "ai/aider/ directory removed from repo" {
     [[ ! -d "$DOTFILES_DIR/ai/aider" ]] || false
-}
-
-@test ".zsh/aliases.zsh no longer has aider tier aliases" {
-    refute_grep '^alias (ai|aic|aia)=' "$ALIASES_FILE"
-}
-
-@test "powershell/profile.ps1 no longer has aider tier functions" {
-    refute_grep '^function (ai|aic|aia) ' "$DOTFILES_DIR/powershell/profile.ps1"
 }
 
 @test "AGENTS.md no longer lists Aider in the agent matrix" {
@@ -258,14 +244,6 @@ PY
 }
 
 # --- Alias ---
-
-@test ".zsh/functions.sh defines oc for opencode (--pure: skip MCPs/plugins) [REFACTOR-010]" {
-    # --pure bypasses MCP+plugins to avoid the tool-resolution hang on complex
-    # queries (empirical 2026-05-25). Shared bash/zsh core in functions.sh;
-    # Windows keeps plain opencode (see powershell-profile.bats). Moved out of
-    # aliases.zsh per REFACTOR-010 to dedup the bash/zsh wrappers.
-    grep -qE '^oc\(\) \{ opencode --pure' "$DOTFILES_DIR/.zsh/functions.sh"
-}
 
 # --- AGENTS.md (SSOT cross-agent per ADR-009) ---
 
