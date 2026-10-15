@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -409,18 +410,54 @@ func extractTOMLKey(p Pin, content []byte) ([]string, error) {
 	return out, nil
 }
 
-var (
-	jsoncBlock = regexp.MustCompile(`(?s)/\*.*?\*/`)
-	jsoncLine  = regexp.MustCompile(`(?m)^\s*//.*$`)
-)
-
-// stripJSONComments removes the comment forms opencode.jsonc uses. Only
-// whole-line `//` comments are stripped, never trailing ones, because a `//`
-// inside a string value ("https://...") is not a comment and removing it would
-// corrupt the very ids being checked.
+// stripJSONComments removes the comment forms opencode.jsonc uses, `/* */`
+// and `//`, outside string values only. A comment marker inside a string is
+// text: the trust globs in ai/agy/settings.json hold `/*` and
+// `"https://..."` holds `//`. A regex that did not know about strings cut
+// `{HOME}/Projects/*` up to the next `*/` in `**/node_modules/**` and still
+// produced valid JSON, until one more glob made it invalid (#2504).
+//
+// An unterminated block comment keeps the rest of the input, so json.Unmarshal
+// reports the malformed file instead of reading a truncated one.
 func stripJSONComments(b []byte) []byte {
-	b = jsoncBlock.ReplaceAll(b, nil)
-	return jsoncLine.ReplaceAll(b, nil)
+	out := make([]byte, 0, len(b))
+	inString, escaped := false, false
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		if inString {
+			out = append(out, c)
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+			continue
+		}
+		if c == '/' && i+1 < len(b) {
+			switch b[i+1] {
+			case '*':
+				end := bytes.Index(b[i+2:], []byte("*/"))
+				if end < 0 {
+					return append(out, b[i:]...)
+				}
+				i += 2 + end + 1
+				continue
+			case '/':
+				end := bytes.IndexByte(b[i:], '\n')
+				if end < 0 {
+					return out
+				}
+				i += end - 1
+				continue
+			}
+		}
+		inString = c == '"'
+		out = append(out, c)
+	}
+	return out
 }
 
 // SortedSiteFiles lists declared files for a scope, for stable diagnostics.

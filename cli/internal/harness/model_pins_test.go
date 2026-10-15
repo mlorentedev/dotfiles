@@ -403,3 +403,24 @@ func TestExtractReachesNestedAndArrayPins(t *testing.T) {
 		t.Error("an empty fallback list extracted nothing and did not error")
 	}
 }
+
+// The stripper reads JSON written for other tools, whose string values hold
+// comment markers as text: trust globs (`/*`, `*/*`) and URLs (`//`).
+func TestStripJSONCommentsLeavesStringsAlone(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"glob in a string", `{"a":["x/*","y/*/*"],"b":"**/n/**"}`, `{"a":["x/*","y/*/*"],"b":"**/n/**"}`},
+		{"url in a string", `{"u":"https://h/p"}`, `{"u":"https://h/p"}`},
+		{"escaped quote in a string", `{"q":"a\"/*b"}`, `{"q":"a\"/*b"}`},
+		{"block comment", "{/* c */\"k\":1}", `{"k":1}`},
+		{"whole-line comment", "{\n  // c\n  \"k\":1\n}", "{\n  \n  \"k\":1\n}"},
+		{"trailing comment", "{\"k\":1 // c\n}", "{\"k\":1 \n}"},
+		{"unterminated block comment kept", `{"k":1 /* c`, `{"k":1 /* c`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := string(stripJSONComments([]byte(c.in))); got != c.want {
+				t.Fatalf("stripJSONComments(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
