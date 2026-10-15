@@ -214,6 +214,22 @@ Host github.com
   StrictHostKeyChecking yes
 # --- GITHUB-END ---
 
+# --- FORGE-START ---
+# The Gitea forge's own sshd: the Beelink's mesh address, port 2222, published on
+# the mesh only (kubelab apps.services.core.gitea.{ssh_host,ssh_port}). Port 22 at
+# the same address is bee's sshd, a different host key. Clone with
+# `git clone forge:<owner>/<repo>.git`; the key is the one registered on the
+# forge account, so off the mesh this fails instead of falling back.
+Host forge
+  Hostname 100.64.0.3
+  Port 2222
+  User git
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+# --- FORGE-END ---
+
 # --- OFFICE-JETSON-START ---
 Host jetson-office
     HostName ssh-pollex.mlorente.dev
