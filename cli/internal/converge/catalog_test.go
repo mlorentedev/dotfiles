@@ -19,7 +19,8 @@ const catalogFixture = `{"tools": [
   {"name": "mise", "version": "2026.9.13", "source": {"type": "github-release", "repo": "jdx/mise", "asset": {"darwin/arm64": "mise-macos-arm64"}, "checksums": "SHASUMS256.txt"}},
   {"name": "hive", "version": "4.2.2", "source": {"type": "uv-tool", "package": "hive-vault"}},
   {"name": "bw", "version": "2026.9.0", "source": {"type": "npm", "package": "@bitwarden/cli"}},
-  {"name": "gh", "source": {"type": "system", "apt": "gh"}}
+  {"name": "gh", "source": {"type": "system", "apt": "gh"}},
+  {"name": "veracrypt", "source": {"type": "system", "cask": "veracrypt", "needs_sudo": true}}
 ]}`
 
 // machine is the fake world: the commands on PATH and the log of what ran,
@@ -45,7 +46,10 @@ func (c fakeCatalog) Plan(t tools.Tool) tools.Plan {
 	case c.m.present[t.Name]:
 		p.Action = tools.PlanSkip
 	case t.Source.Type == "system":
-		p.Action, p.Note, p.Package = tools.PlanNeedsSudo, "run: sudo apt-get install -y "+t.Source.Apt, t.Source.Apt
+		p.Action, p.Manager, p.Package = tools.PlanNeedsSudo, "apt", t.Source.Apt
+		if t.Source.Cask != "" {
+			p.Manager, p.Package = "brew-cask", t.Source.Cask
+		}
 	case manager != "" && !c.m.path[manager]:
 		p.Action, p.Note = tools.PlanMissingManager, "waits on "+manager
 	default:
@@ -115,7 +119,7 @@ func TestToolsCatalog_OneApplyConvergesAFreshMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"catalog to install: mise", "hive (uv)", "bw (npm)", "needs sudo: gh (run once: sudo apt-get update && sudo apt-get install -y --no-remove gh)", "mise is not on PATH"} {
+	for _, want := range []string{"catalog to install: mise", "hive (uv)", "bw (npm)", "needs sudo: gh, veracrypt (run once: sudo apt-get update && sudo apt-get install -y --no-remove gh && brew install --cask veracrypt)", "mise is not on PATH"} {
 		if !strings.Contains(plan.Detail, want) {
 			t.Errorf("plan detail lacks %q: %s", want, plan.Detail)
 		}
@@ -268,5 +272,44 @@ func TestWalkCatalog_NeedsSudoIsOneCommandForEveryPackage(t *testing.T) {
 	}
 	if strings.Count(got, "apt-get install") != 1 {
 		t.Errorf("want one command, got %q", got)
+	}
+}
+
+// BUG-134: a cask whose installer asks for a sudo password stopped the whole
+// converge at the tools step, so nothing after it was deployed. With the real
+// Installer in the step and sudo refusing, the cask is reported as waiting on a
+// person and the step after it still runs.
+func TestRun_ACaskThatNeedsSudoDoesNotStopTheStepsAfterTools(t *testing.T) {
+	r, env, _ := freshMachine(t)
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"packages.json": `{"tools": [{"name": "veracrypt", "source": {"type": "system", "cask": "veracrypt", "needs_sudo": true}}]}`,
+	})
+	var ran [][]string
+	r.catalog = &tools.Installer{
+		GOOS: "darwin", GOARCH: "arm64", Out: &strings.Builder{},
+		HasCommand: func(string) bool { return true },
+		Query: func(name string, args ...string) ([]byte, error) {
+			return nil, errors.New("exit status 1") // sudo wants a password; the cask is not installed
+		},
+		Run: func(name string, args ...string) error {
+			ran = append(ran, append([]string{name}, args...))
+			return errors.New("sudo: a terminal is required to read the password")
+		},
+	}
+	env.GOOS = "darwin"
+	next := &fake{name: "configs-deploy", changes: 1}
+
+	rep, err := Run([]Reconciler{r, next}, env, false)
+	if err != nil {
+		t.Fatalf("converge failed: %v", err)
+	}
+	if !next.applied {
+		t.Error("the step after tools never ran")
+	}
+	if len(ran) != 0 {
+		t.Errorf("ran %v; a cask that cannot install unattended is not attempted", ran)
+	}
+	if want := "needs sudo: veracrypt (run once: brew install --cask veracrypt)"; !strings.Contains(rep.Entries[0].Detail, want) {
+		t.Errorf("tools detail %q lacks %q", rep.Entries[0].Detail, want)
 	}
 }
