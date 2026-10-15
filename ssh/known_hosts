@@ -48,3 +48,8 @@ github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okW
 # jet1
 # SHA256:c08sy+P0HvDiGLoNrgTFG+w0NWx2XNH87kDVPurhcqs
 100.64.0.8,172.16.1.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpLWKWz/+UPEJ9utxttm5+iyeDWXd+Lbf5i2b8DTGw0
+# forge (Gitea's sshd on bee, port 2222): kubelab declares it in common.yaml
+# (apps.services.core.gitea.ssh_host_key), captured 2026-09-02 and cross-checked
+# against the container's own /data/ssh/ssh_host_ed25519_key.pub, not the wire.
+# SHA256:RameCEg0z14vtHICB99Ccj0zbpUk+qeC8i47cx7LcJU
+[100.64.0.3]:2222,[beelink.kubelab.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHECoRmj6C9mt3eJI7NhMKf1xzrz4KJKPGmMDZiv9p9v
