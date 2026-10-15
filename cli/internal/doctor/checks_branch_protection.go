@@ -38,6 +38,13 @@ func checkBranchProtection(sys *System, rep *Report) {
 		rep.Skip("gh not on PATH — cannot read live branch protection")
 		return
 	}
+	// The sweep does not fetch; it compares with origin as last fetched. Only a
+	// definite difference is reported: a stale checkout whose old declaration
+	// still matches the forge would otherwise PASS below.
+	if ref, same, err := forge.LandedDeclaration(repo); err == nil && !same {
+		rep.Warn(fmt.Sprintf("%s in %s differs from %s's (as last fetched): the results below are for a declaration that has not landed; pull, then `dotf forge protection check`",
+			forge.DeclarationFile, repo, ref))
+	}
 	decl, err := forge.Load(repo)
 	if err != nil {
 		rep.Fail("cannot load the declaration: " + err.Error())

@@ -44,12 +44,6 @@ func Done(opts DoneOptions) (DoneResult, error) {
 	if err := checkCallerOutside(absWT, opts.Cwd); err != nil {
 		return DoneResult{}, err
 	}
-	if !opts.IgnoreRecentSession {
-		if err := checkNoRecentSession(opts.ClaudeProjectsDir, absWT, time.Now()); err != nil {
-			return DoneResult{}, err
-		}
-	}
-
 	lockPath := opts.LockPath
 	if lockPath == "" {
 		lockPath = DefaultLockPath()
@@ -65,6 +59,13 @@ func Done(opts DoneOptions) (DoneResult, error) {
 	}
 	if err := checkUnpushedCommits(absRepo, absWT, opts.Force); err != nil {
 		return DoneResult{}, err
+	}
+	// Last before removal, so a session that wrote during the checks above
+	// still counts.
+	if !opts.IgnoreRecentSession {
+		if err := checkNoRecentSession(opts.ClaudeProjectsDir, absWT, time.Now()); err != nil {
+			return DoneResult{}, err
+		}
 	}
 	// Read before removal: the answer needs the worktree's HEAD.
 	branch, tip, landed, why := branchLanding(absRepo, absWT)
