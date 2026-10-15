@@ -1,22 +1,12 @@
 package worktree
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
 )
 
 func branchExists(repo, branch string) bool {
 	return exec.Command("git", "-C", repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
-}
-
-func commitIn(t *testing.T, wt, name string) string {
-	t.Helper()
-	_ = os.WriteFile(filepath.Join(wt, name), []byte(name), 0o644)
-	gitOut(t, wt, "add", name)
-	gitOut(t, wt, "commit", "-q", "-m", name)
-	return gitOut(t, wt, "rev-parse", "HEAD")
 }
 
 func TestDoneDeletesALandedBranch(t *testing.T) {
@@ -35,7 +25,7 @@ func TestDoneDeletesALandedBranch(t *testing.T) {
 
 func TestDoneDeletesASquashLandedBranch(t *testing.T) {
 	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
-	tip := commitIn(t, wtDir, "work.txt")
+	tip := commitFile(t, wtDir, "work.txt")
 	stubMergedPRHeads(t, []string{tip}, nil)
 
 	res, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath})
@@ -52,7 +42,7 @@ func TestDoneDeletesASquashLandedBranch(t *testing.T) {
 func TestDoneKeepsAnUnlandedBranchEvenWithForce(t *testing.T) {
 	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
 	stubMergedPRHeads(t, nil, nil)
-	tip := commitIn(t, wtDir, "wip.txt")
+	tip := commitFile(t, wtDir, "wip.txt")
 
 	res, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Force: true})
 	if err != nil {
