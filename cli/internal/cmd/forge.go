@@ -127,7 +127,7 @@ func loadForgeDecl(c *cobra.Command, verb, repo string, unmerged bool) (forge.De
 	}
 	if !unmerged {
 		if err := forgeFresh(root); err != nil {
-			c.PrintErrln("forge protection "+verb+":", err)
+			c.PrintErrln("forge protection "+verb+":", err.Error()+". Pull, or pass --unmerged to use this checkout's file")
 			return forge.Declaration{}, err
 		}
 	}
@@ -173,8 +173,8 @@ are skipped; apply never removes protection.
 It refuses, writing nothing, when this checkout's declaration differs from
 the one origin's default branch holds: apply writes what has landed, so a
 stale checkout cannot revert the forge to an old declaration. --unmerged
-uses this checkout's file, for a --dry-run of a declaration change on its
-branch.
+uses this checkout's file, and only with --dry-run: it previews a declaration
+change on its branch, and the write waits until the change has landed.
 
   UNCHANGED  live already matches
   PLANNED    --dry-run: what a real run would change
@@ -191,6 +191,11 @@ from git history: protection changes through the admin API, not a merge.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if unmerged && !dryRun {
+				err := errors.New("forge protection apply: --unmerged previews only; add --dry-run. A declaration is written once it has landed")
+				c.PrintErrln(err)
+				return err
+			}
 			decl, err := loadForgeDecl(c, "apply", repo, unmerged)
 			if err != nil {
 				return err

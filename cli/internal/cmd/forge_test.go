@@ -193,3 +193,17 @@ func TestForgeProtectionUnmergedSkipsTheFreshnessGate(t *testing.T) {
 		t.Fatalf("--unmerged uses this checkout's file: %v\n%s", err, out)
 	}
 }
+
+func TestForgeProtectionApplyUnmergedNeedsDryRun(t *testing.T) {
+	root := makeRepo(t)
+	seedForge(t, root, unprotectedRepo)
+	asked := false
+	stubForgeGH(t, func(...string) (string, string, error) { asked = true; return "", "", nil })
+	_, errOut, err := execute(t, "forge", "protection", "apply", "--unmerged")
+	if err == nil || !strings.Contains(errOut, "--dry-run") {
+		t.Fatalf("apply --unmerged without --dry-run must refuse naming --dry-run: %v\n%s", err, errOut)
+	}
+	if asked {
+		t.Error("a refused apply must not ask the forge")
+	}
+}
