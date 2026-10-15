@@ -2,7 +2,8 @@
   "$schema": "./branch-protection.schema.json",
   "$comment": [
     "Branch protection declared in git (GUARD-017, #1451). The first commit records the live state of 2026-09-23, so drift detection starts at zero; changes to it are deliberate edits that the diff shows.",
-    "Check: `dotf forge protection check`, and the `dotf doctor` branch-protection section. Repositories with neither protection nor a specs/ tree are not managed here."
+    "Check: `dotf forge protection check`, and the `dotf doctor` branch-protection section. Repositories with neither protection nor a specs/ tree are not managed here.",
+    "dotfiles runs with strict false as an interim (owner, 2026-10-15): strict made every merge put every other open PR BEHIND, and each then waited a full CI round, test-windows about 25 minutes, so the landing queue moved about two PRs an hour. ADR-049 rejects dropping strict as the permanent answer and turns it off where its merge queue runs; until that gitea-mq pilot lands (blocked on kubelab#2156), a break that two textually disjoint PRs cause together shows on main's push CI, where ci.yml runs test, test-windows, test-macos and integration, and is fixed forward. The interim ends with #2249: it closes only with the queue running, or with strict restored to true here if ADR-049 is rejected or the pilot abandoned."
   ],
   "policy": {
     "required_approving_review_count": 0,
@@ -13,7 +14,7 @@
       "branch": "main",
       "protection": {
         "required_status_checks": {
-          "strict": true,
+          "strict": false,
           "checks": [
             {
               "context": "changes",
