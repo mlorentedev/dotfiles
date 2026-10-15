@@ -16,11 +16,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC5 adoption (PR 4a): `TestClassify` (no lease is UNADOPTED, naming adopt), `TestAdoptWritesALeaseOnce` (second adopt keeps the lease), `TestAdoptRefusesWhatIsNotALinkedWorktree` (main checkout, plain dir, missing path), `TestSweepReapsAnAdoptedWorktreeOnly`, `TestWorktreeAdoptTakesAGitCreatedWorktree` (list shows UNADOPTED, adopt by slug, then not).
 - [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4b: `TestDoneDeletesALandedBranch` (ancestor of the base), `TestDoneDeletesASquashLandedBranch` (merged PR head), `TestDoneKeepsAnUnlandedBranchEvenWithForce`; both directions mutation-checked.
 - [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`). Transcript check in PR 3: `TestRecentSession` (worktree, subdirectory, stale, other worktree, none), `TestDoneRefusesARecentSessionUnlessIgnored` (`--force` does not override), `TestSweepSkipsAWorktreeWithARecentSession`, `TestWorktreeDoneRefusesARecentSessionUntilIgnored` (CLI flag); both wirings mutation-checked. After the #2556 review: an unreadable store fails closed (`TestRecentSessionFailsClosedOnAnUnreadableStore`, `TestDoneRefusesWhenSessionsCannotBeInspected`; mutations on the ReadDir error, the walk error and done's handling each killed), and sweep reports each session skip with its transcript (`SessionSkips`). `migrate` gets it in PR 5.
-- [ ] AC8 migrate: PR 5.
+- [ ] AC8 migrate (PR 5): `TestMigrateDryRunPlansWithoutMoving`, `TestMigrateMovesAndASecondRunHasNothingToDo`, `TestMigrateSkipsWhatItMustNotMove` (target exists, caller inside, recent session, locked), `TestMigrateRefusesWithoutARoot`, `TestWorktreeMigrateMovesALegacySibling` (CLI: dry run, move, no-op). Locked, dry-run and target-exists guards mutation-checked; the locked row runs as a dry run because `git worktree move` refuses a locked worktree on its own and hid the missing guard. Measured 2026-10-15 on the Mac: `migrate --dry-run --repo ~/Projects/dotfiles` printed `Nothing to migrate`, which matches `git worktree list` (every worktree already under the root).
 - [ ] AC9, AC10 docs, skills, ADR: PR 7.
 - [ ] AC11 cross-shell / cross-OS: per PR.
 
 - PR 4b mutations, re-run 2026-10-15 after the review (`go test -count=1 -run TestDone ./internal/worktree/`): never landed as an ancestor -> `TestDoneDeletesALandedBranch` fails; never landed by squash -> `TestDoneDeletesASquashLandedBranch` fails; always landed -> `TestDoneKeepsAnUnlandedBranchEvenWithForce` fails. Three of three killed.
+
+- PR 5, fixed on 2026-10-15 before review:
+  - The session skip reused done's refusal, which ends in "pass --ignore-recent-session", a flag migrate rejects, and speaks of removing the worktree. It now takes sweep's reason. `TestMigrateSkipsWhatItMustNotMove` gained a "sessions unreadable" row and asserts that no skip names `--ignore-recent-session`; both were red on the first version.
+  - `test (windows-latest)` failed `TestMigrateMovesAndASecondRunHasNothingToDo` only on Windows. git lists `C:/Users/runneradmin/...` while `t.TempDir()` is the 8.3 form `C:\Users\RUNNER~1\...`, so the porcelain text never contained the target. The test now parses the list with `ParsePorcelain` and compares through `samePath`.
 
 ## Test status
 
@@ -50,6 +54,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - done deletes a branch only on a verified landing: its tip is an ancestor of the base, or the head of a merged pull request (a squash leaves no ancestor). Any other answer keeps the branch with the reason, `--force` included: `--force` overrides the worktree's dirty and unpushed checks, and after it the branch may be the only copy of the work. A `gh` failure keeps it too, naming the error (`TestDoneKeepsTheBranchWhenThePullRequestLookupFails`; reading the error as landed fails it).
 - The branch and tip are read before the worktree is removed, because after removal the worktree's HEAD is gone; the deletion runs after removal, because git refuses to delete a branch a worktree has checked out. The SHA is printed so `git branch <name> <sha>` restores it.
 - `main` and `master` are never deleted, nor is a detached HEAD: there is no branch to name.
+- `migrate` moves a worktree out of the directory a Claude Code session is keyed on (`getcwd`), so it skips any worktree with a transcript in the last six hours rather than orphan the session; the help text says a session started in the old path does not follow it.
 
 ## Promotion candidates
 

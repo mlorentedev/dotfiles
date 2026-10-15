@@ -310,3 +310,28 @@ func TestWorktreeAdoptTakesAGitCreatedWorktree(t *testing.T) {
 		t.Errorf("list after adopt: %v, want the worktree listed and adopted:\n%s", err, out)
 	}
 }
+
+func TestWorktreeMigrateMovesALegacySibling(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	legacy := filepath.Join(filepath.Dir(repo), "repo-wt-old")
+	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "-q", "-b", "feat/old", legacy).CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	target := filepath.Join(os.Getenv("WORKTREE_ROOT"), "repo", "feat-old")
+	out, err := executeWorktree(t, "migrate", "--dry-run", "--repo", repo)
+	if err != nil || !strings.Contains(out, target) {
+		t.Fatalf("dry run: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		t.Fatalf("dry run moved the worktree: %v", err)
+	}
+	if out, err := executeWorktree(t, "migrate", "--repo", repo); err != nil || !strings.Contains(out, "Moved") {
+		t.Fatalf("migrate: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("target missing after migrate: %v", err)
+	}
+	if out, err := executeWorktree(t, "migrate", "--repo", repo); err != nil || !strings.Contains(out, "Nothing to migrate") {
+		t.Fatalf("second migrate: %v\n%s", err, out)
+	}
+}

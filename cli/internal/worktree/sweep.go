@@ -305,7 +305,8 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	return report, nil
 }
 
-// sessionSkipReason is why sweep must leave wt alone for a session, or "".
+// sessionSkipReason is why sweep or migrate must leave wt alone for a session,
+// or "". It names no override, since neither command has one.
 func sessionSkipReason(projectsDir, wt string, now time.Time) string {
 	s, live, err := RecentSession(projectsDir, wt, now, SessionWindow)
 	if err != nil {
