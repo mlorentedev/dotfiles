@@ -49,7 +49,7 @@ func TestParseVersionsConf(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := parseVersionsConf(path)
+	got, err := ParseVersionsConf(path)
 	if err != nil {
 		t.Fatal(err)
 	}

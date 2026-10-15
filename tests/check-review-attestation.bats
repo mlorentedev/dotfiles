@@ -440,7 +440,6 @@ sys.exit(0 if expected.issubset(types) else 1)
     # violated at the job level inside the check that enforces it.
     local wf="$REPO/.github/workflows/review-attestation.yml"
     grep -q '::error title=Review attestation::' "$wf"
-    grep -q 'merged-unreviewed' "$wf"
     grep -q 'does not veto' "$wf"
 }
 

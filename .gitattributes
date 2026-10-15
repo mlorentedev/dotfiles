@@ -33,6 +33,10 @@ tests/golden/**                   text eol=lf
 # extension, so the extensionless guard never sees them: a Windows checkout
 # turned every line ending into CRLF and failed each golden test there.
 *.golden                          text eol=lf
+# Go testdata holds captured command output (launchctl print, #2507) that a
+# parser reads line by line; a CRLF checkout leaves a \r on every line and the
+# Windows leg reads nothing.
+cli/**/testdata/**                text eol=lf
 ssh/config                        text eol=lf
 ssh/known_hosts                   text eol=lf
 LICENSE                           text eol=lf

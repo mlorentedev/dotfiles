@@ -1,7 +1,7 @@
 ---
 id: "CI-012-dedupe-ci-tests"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-07"
 issue: "mlorentedev/dotfiles#2059"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -43,10 +43,17 @@ CI had no per-file bats timing for the #1744 budget guard to read.
   shared helper (`tests/lib/fixture-template.bash`). The template is read-only, CI-004's rule for
   shared fixtures, so a test that writes into it fails. The builder runs in a new `bash -eu`, so a
   failing step fails the build whatever the caller's context (lesson 430).
+- **N6.** `tests/lib/check-duplicate-assertions.py`, run by `tests/duplicate-assertions.bats`, fails
+  when two tests make the same static assertion: the same pattern grepped from the same tracked
+  file, or the same pipeline, with the claim (present or absent) part of the identity. Extraction
+  (`$(grep ...)`), filters (`grep -v`, `if` conditions) and files a test writes are not assertions.
+  A deliberate repeat says why with `# dup-ok: <reason>`. The repeats it finds are removed in the
+  same PR, each kept in the test that owns the behaviour.
 
 ## Out of scope
 
-- N1, N2, N6 and N8 of #2059: later PRs against this spec.
+- N1, N2 and N8 of #2059: each waits on a blocker (#2013 W10, PLAT-001b, #2013 W2) and stays open on
+  #2059, outside this spec.
 - `harness-suggest.bats` and `dotf-search.bats` (audit: "keep one smoke each"): their assertions read
   the shipped trigger data and the CLI wrapper's output, and no Go test pins either, so no twin was
   confirmed and nothing was deleted.
@@ -60,11 +67,12 @@ CI had no per-file bats timing for the #1744 budget guard to read.
 
 ## Acceptance criteria
 
-- [ ] AC1: a compile error in `cli/` fails the bats files that run the real binary, locally and in CI, instead of skipping them.
-- [ ] AC2: with `DOTF_BIN` set, those files run that binary and do not build; set to a non-executable it fails.
-- [ ] AC3: each deleted `dotf-agent-run.bats` case has a Go twin that goes red when the behaviour is mutated.
-- [ ] AC4: the Linux bats step keeps `--jobs` and `--no-parallelize-within-files`, writes `report.xml` with per-file time, and uploads it even when the run is red.
-- [ ] AC5: the five fixture-heavy files copy a fixture built once per file; a copy holds the template's history and is the test's own to write, a write into the template fails, and a builder failing mid-way fails the build.
+- [x] AC1: a compile error in `cli/` fails the bats files that run the real binary, locally and in CI, instead of skipping them.
+- [x] AC2: with `DOTF_BIN` set, those files run that binary and do not build; set to a non-executable it fails.
+- [x] AC3: each deleted `dotf-agent-run.bats` case has a Go twin that goes red when the behaviour is mutated.
+- [x] AC4: the Linux bats step keeps `--jobs` and `--no-parallelize-within-files`, writes `report.xml` with per-file time, and uploads it even when the run is red.
+- [x] AC5: the five fixture-heavy files copy a fixture built once per file; a copy holds the template's history and is the test's own to write, a write into the template fails, and a builder failing mid-way fails the build.
+- [x] AC6: no two bats tests make the same static assertion, and the check that says so reads hundreds of assertions (a parser that matched nothing fails it).
 
 ## References
 

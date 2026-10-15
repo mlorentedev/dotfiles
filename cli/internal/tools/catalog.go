@@ -65,6 +65,11 @@ type Source struct {
 	// casks in a separate namespace (`--cask`): queried as a formula, an
 	// installed cask reads as absent. An entry names a formula or a cask.
 	Cask string `json:"cask,omitempty"`
+	// NeedsSudo marks a cask whose install escalates inside brew (a pkg
+	// installer run through sudo, as macfuse's is). dotf cannot see that from
+	// its own argv, and brew refuses to run as root, so the catalog says it; an
+	// unattended run then defers the cask instead of failing on a password.
+	NeedsSudo bool `json:"needs_sudo,omitempty"`
 	// Command is the executable a "system" entry puts on PATH. When it declares
 	// one, finding it there counts as installed whichever channel put it there,
 	// so a copy from another channel is never installed over (and installing
@@ -153,7 +158,7 @@ var KnownSourceTypes = []string{"github-release", "npm", "uv-tool", "system"}
 // systemKeys are the source keys a "system" entry may carry. The typed decoder
 // drops any other key without a word, so a misspelt or unsupported manager
 // (pacman, dnf) would read as "no name for this OS" and skip in silence.
-var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "winget": true, "command": true, "platforms": true}
+var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "needs_sudo": true, "winget": true, "command": true, "platforms": true}
 
 // sourceKeys lists, per tool, the keys its source object carries, for the checks
 // the typed decode cannot make.
@@ -178,7 +183,7 @@ func sourceKeys(b []byte) ([]map[string]json.RawMessage, error) {
 func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	for key := range keys {
 		if !systemKeys[key] {
-			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, winget, command or platforms)", t.Name, key)
+			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, needs_sudo, winget, command or platforms)", t.Name, key)
 		}
 	}
 	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Cask == "" && t.Source.Winget == "" {
@@ -199,6 +204,9 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 		if !reachable {
 			return fmt.Errorf("tool %q: system source lists platforms %v but names no package for any of them", t.Name, t.Source.Platforms)
 		}
+	}
+	if t.Source.NeedsSudo && t.Source.Cask == "" {
+		return fmt.Errorf("tool %q: needs_sudo marks a cask, and this entry names none (apt already installs through sudo)", t.Name)
 	}
 	if t.Version != "" {
 		return fmt.Errorf("tool %q: system packages are not pinned, so version %q has no effect; remove it", t.Name, t.Version)

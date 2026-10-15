@@ -111,6 +111,19 @@ run_gate() { run_both_shells "$GATE" --base-ref main --head-ref feature; }
     [ "$status" -eq 0 ]
 }
 
+@test "AC2: the same PR passes once the spec is archived as abandoned" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    # What `dotf spec archive --abandoned` does: the lifecycle ends there too.
+    mkdir -p specs/archive/_abandoned
+    git mv specs/FOO-001-demo specs/archive/_abandoned/FOO-001-demo
+    git commit -q -m "abandon FOO-001-demo"
+    export SDD_PR_BODY="Closes #123"
+
+    run_gate
+    [ "$status" -eq 0 ]
+}
+
 @test "AC3: 'Refs #N' does not trigger the check" {
     # PR #765 is the real case: it says `Refs #748` because the issue's remaining
     # work moved to a follow-up, so its spec must stay active.
