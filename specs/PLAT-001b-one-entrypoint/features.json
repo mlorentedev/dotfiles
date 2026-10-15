@@ -66,8 +66,8 @@
     "id": "PLAT-001b-one-entrypoint-f10",
     "behavior": "AC9: from-zero CI on macos-latest and ubuntu-latest (.github/workflows/from-zero.yml): install.sh, doctor, then a second converge with zero changes",
     "verification": "gh run list --workflow from-zero.yml --branch main --event push --limit 1 --json conclusion --jq '.[0].conclusion' | grep -qx success",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "verification exit 0 (2026-10-15): push run 38671157122 on main, both runners green, second converge changed 0"
   },
   {
     "id": "PLAT-001b-one-entrypoint-f11",
@@ -145,6 +145,13 @@
     "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestCheckWorkstationTarget_ByStatus$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/not_opted_in' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/nothing_applied' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/converged'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f22",
+    "behavior": "001b PR 10 follow-up (Linux): setup-linux.sh makes no claude mcp call; the bare dotf deploy (claude-mcp) is the one registrar of mcp-servers.json",
+    "verification": "bats -f 'registers no Claude MCP server itself' tests/setup-linux.bats | grep -q '^ok 1 '",
+    "state": "passing",
+    "evidence": "verification exit 0 (2026-10-15); two mutations fail it (an appended `claude mcp get`, an indented `claude mcp add`)"
   },
   {
     "id": "PLAT-001b-one-entrypoint-f23",

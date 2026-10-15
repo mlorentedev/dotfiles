@@ -59,8 +59,9 @@ func TestCheckSystemPackages_PassesWhenSudoDoesNotAsk(t *testing.T) {
 	}
 }
 
-// Off Linux nothing escalates, so the check asks no package manager anything:
-// a winget query costs seconds per entry, for an answer that cannot be a wait.
+// Off Linux, nothing but a cask marked needs_sudo escalates, so the check asks
+// no package manager anything about the rest: a winget query costs seconds per
+// entry, for an answer that cannot be a wait.
 func TestCheckSystemPackages_AsksNoManagerOffLinux(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "packages.json"), catalogWithAptEntries)
@@ -91,5 +92,35 @@ func TestCheckSystemPackages_SkipsALinuxWithoutApt(t *testing.T) {
 	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
 	if !strings.Contains(buf.String(), "apt-get is not on PATH") || strings.Contains(buf.String(), "[ OK ]") {
 		t.Errorf("want a skip naming apt-get\n%s", buf.String())
+	}
+}
+
+// On a Mac the one entry that can wait on a password is a cask marked
+// needs_sudo (BUG-134): it is named with the brew command, not an apt one, and
+// the unmarked entries are never asked about.
+func TestCheckSystemPackages_NamesACaskThatNeedsSudoOnDarwin(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "packages.json"), `{"tools":[
+  {"name":"gh","profile":"full","source":{"type":"system","apt":"gh","brew":"gh"}},
+  {"name":"veracrypt","profile":"full","source":{"type":"system","cask":"veracrypt","needs_sudo":true}}
+]}`)
+	sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, []string{"brew", "sudo"}, map[string]string{})
+	sys.GOOS = "darwin"
+	var asked []string
+	run := sys.CommandOutput
+	sys.CommandOutput = func(name string, args ...string) (string, error) {
+		asked = append(asked, name+" "+strings.Join(args, " "))
+		return run(name, args...)
+	}
+	var buf bytes.Buffer
+	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+	out := buf.String()
+	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "(veracrypt)") || !strings.Contains(out, "`brew install --cask veracrypt`") {
+		t.Errorf("want a WARN naming veracrypt and its brew command\n%s", out)
+	}
+	for _, a := range asked {
+		if strings.Contains(a, "gh") {
+			t.Errorf("asked %q; an unmarked formula cannot wait on sudo", a)
+		}
 	}
 }

@@ -53,7 +53,7 @@ func loadConfig(sys *System, startDir string) (*Config, error) {
 	}
 
 	if cfg.VersionsPath != "" {
-		v, err := parseVersionsConf(cfg.VersionsPath)
+		v, err := ParseVersionsConf(cfg.VersionsPath)
 		if err != nil {
 			return nil, err
 		}
@@ -63,10 +63,11 @@ func loadConfig(sys *System, startDir string) (*Config, error) {
 	return cfg, nil
 }
 
-// parseVersionsConf reads the KEY=VALUE manifest (no export, no quotes per its
+// ParseVersionsConf reads the KEY=VALUE manifest (no export, no quotes per its
 // header). Comments (#) and blank lines are skipped; surrounding whitespace is
 // trimmed. This is the native replacement for sourcing the file in shell.
-func parseVersionsConf(path string) (map[string]string, error) {
+// Exported for `dotf update`, which reads the checkout's DOTF_VERSION with it.
+func ParseVersionsConf(path string) (map[string]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open versions.conf: %w", err)
