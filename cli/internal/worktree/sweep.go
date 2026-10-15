@@ -80,12 +80,27 @@ type SweepOptions struct {
 	RepoRoot string
 	LockPath string
 	DryRun   bool
+	// ClaudeProjectsDir is <CLAUDE_CONFIG_DIR>/projects: sweep skips a
+	// worktree with a transcript there under SessionWindow old. It has no
+	// override; done --ignore-recent-session is the deliberate path.
+	ClaudeProjectsDir string
+}
+
+// SessionSkip is a worktree sweep left alone for a Claude Code session, with
+// the transcript or the read error that decided it.
+type SessionSkip struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
 }
 
 type SweepReport struct {
 	Reaped       []Info `json:"reaped"`
 	SkippedCount int    `json:"skipped_count"`
-	DryRun       bool   `json:"dry_run"`
+	// SessionSkips names each worktree counted in SkippedCount for a recent
+	// or uninspectable session: a false refusal (a sibling slug) is only
+	// visible to an operator who sees which worktree it was.
+	SessionSkips []SessionSkip `json:"session_skips,omitempty"`
+	DryRun       bool          `json:"dry_run"`
 	// ProcessDiscovery is false when Gate f has no implementation on this
 	// platform and is therefore refusing everything. Reported because an inert
 	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
@@ -267,6 +282,13 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 			report.SkippedCount++
 			continue
 		}
+		// After gate f, so only a worktree sweep would otherwise reap is
+		// reported: the main checkout's key prefixes every legacy sibling's.
+		if reason := sessionSkipReason(opts.ClaudeProjectsDir, info.Path, now); reason != "" {
+			report.SkippedCount++
+			report.SessionSkips = append(report.SessionSkips, SessionSkip{Path: info.Path, Reason: reason})
+			continue
+		}
 
 		if opts.DryRun {
 			report.Reaped = append(report.Reaped, info)
@@ -281,6 +303,18 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	}
 
 	return report, nil
+}
+
+// sessionSkipReason is why sweep must leave wt alone for a session, or "".
+func sessionSkipReason(projectsDir, wt string, now time.Time) string {
+	s, live, err := RecentSession(projectsDir, wt, now, SessionWindow)
+	if err != nil {
+		return "Claude Code sessions could not be inspected: " + err.Error()
+	}
+	if live {
+		return fmt.Sprintf("a Claude Code session wrote %s %s ago", s.Transcript, now.Sub(s.Modified).Round(time.Minute))
+	}
+	return ""
 }
 
 func Sweep(opts SweepOptions) (*SweepReport, error) {

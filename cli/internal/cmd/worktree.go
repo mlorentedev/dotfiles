@@ -152,6 +152,8 @@ func newWorktreeAddCmd() *cobra.Command {
 <WORKTREE_ROOT>/<repo>/<branch-slug>: the layout herdr creates, so a worktree made by
 either tool is found by the other. The branch defaults to feat/<slug>, so add foo
 creates <WORKTREE_ROOT>/<repo>/feat-foo. --path overrides the location.
+The branch must be <type>/<kebab-slug> with no phase or milestone token, and
+starts from origin's default branch unless --base names another.
 It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
 adds it to .git/info/exclude.`,
 		Args: cobra.ExactArgs(1),
@@ -192,7 +194,7 @@ adds it to .git/info/exclude.`,
 	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
 	cmd.Flags().StringVar(&customPath, "path", "", "custom external target path")
 	cmd.Flags().StringVarP(&branch, "branch", "b", "", "custom branch name (defaults to feat/<slug>)")
-	cmd.Flags().StringVar(&base, "base", "", "base commit or branch for checkout")
+	cmd.Flags().StringVar(&base, "base", "", "base commit or branch (defaults to origin's default branch, fetched first: origin/HEAD, origin/main, origin/master)")
 	cmd.Flags().IntVar(&issue, "issue", 0, "associated GitHub issue number")
 	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "initial lease duration before eligible for reap")
 
@@ -219,8 +221,9 @@ clean git status, confirmed merged PR, and minimum age.`,
 			}
 
 			opts := worktree.SweepOptions{
-				RepoRoot: root,
-				DryRun:   dryRun,
+				RepoRoot:          root,
+				DryRun:            dryRun,
+				ClaudeProjectsDir: claudeProjectsDir(),
 			}
 
 			report, err := worktree.Sweep(opts)
@@ -253,6 +256,9 @@ clean git status, confirmed merged PR, and minimum age.`,
 					report.UninspectableProcesses)
 			}
 
+			for _, s := range report.SessionSkips {
+				c.Printf("  - skipped: %s: %s\n", s.Path, s.Reason)
+			}
 			if opts.DryRun {
 				c.Printf("[DRY-RUN] Found %d reapable worktree(s), %d skipped.\n", len(report.Reaped), report.SkippedCount)
 				for _, r := range report.Reaped {
@@ -261,7 +267,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 				return nil
 			}
 
-			c.Printf("Sweep complete: reaped %d worktree(s), %d skipped (active/dirty/unmerged).\n", len(report.Reaped), report.SkippedCount)
+			c.Printf("Sweep complete: reaped %d worktree(s), %d skipped (active, dirty, unmerged or a recent session).\n", len(report.Reaped), report.SkippedCount)
 			for _, r := range report.Reaped {
 				c.Printf("  - reaped: %s (%s)\n", r.Path, r.Branch)
 			}
@@ -400,9 +406,10 @@ func resolveDoneRepoRoot(repoDir, target string) (string, error) {
 
 func newWorktreeDoneCmd() *cobra.Command {
 	var (
-		repoDir      string
-		worktreePath string
-		force        bool
+		repoDir             string
+		worktreePath        string
+		force               bool
+		ignoreRecentSession bool
 	)
 
 	cmd := &cobra.Command{
@@ -418,6 +425,9 @@ Whatever --force says, it also refuses a worktree that contains the current
 directory or, on Linux and macOS, the working directory of a process it runs under: the
 removal would strand that shell or agent, and a Claude Code session launched
 from the worktree could not be resumed. Run it from outside the worktree.
+It also refuses one whose Claude Code transcript was written in the last 6h,
+a session that may still be resumed; --ignore-recent-session overrides that
+check, and --force does not.
 
 The argument is the worktree's path, its branch, or its directory name under
 the root. The directory follows the branch: add <slug> makes feat/<slug> in
@@ -439,10 +449,12 @@ one is refused.`,
 			}
 
 			opts := worktree.DoneOptions{
-				RepoRoot:     root,
-				WorktreePath: target,
-				Cwd:          callerCwd(os.Getwd, os.Getenv),
-				Force:        force,
+				RepoRoot:            root,
+				WorktreePath:        target,
+				Cwd:                 callerCwd(os.Getwd, os.Getenv),
+				Force:               force,
+				ClaudeProjectsDir:   claudeProjectsDir(),
+				IgnoreRecentSession: ignoreRecentSession,
 			}
 
 			if err := worktree.Done(opts); err != nil {
@@ -457,6 +469,7 @@ one is refused.`,
 	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
 	cmd.Flags().StringVar(&worktreePath, "path", "", "path to worktree to remove (defaults to the one holding the current directory, which done then refuses)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "force removal even if there are uncommitted changes")
+	cmd.Flags().BoolVar(&ignoreRecentSession, "ignore-recent-session", false, "remove even though a Claude Code session wrote its transcript in the last 6h (--force does not)")
 
 	return cmd
 }
@@ -470,4 +483,10 @@ func callerCwd(getwd func() (string, error), getenv func(string) string) string 
 		return cwd
 	}
 	return getenv("PWD")
+}
+
+// claudeProjectsDir is where Claude Code keeps one transcript directory per
+// working directory, read by done and sweep to spot a live session (#1653).
+func claudeProjectsDir() string {
+	return filepath.Join(claudeConfigDir(env.Home()), "projects")
 }

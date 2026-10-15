@@ -68,6 +68,16 @@ Run on 2026-09-25 in `dotfiles-wt-protection-apply` (branch `feat/protection-app
 - **LOC.** About 300 executable production lines by a heuristic count (declarations, help text and brace-only lines excluded): `apply.go` 109, `preflight.go` 106, `cmd/forge.go` 87, of which 20 move existing code into `loadForgeDecl`. Excluded: 39 declaration lines, 21 lines of `--help` text, 17 braces.
 - **No shell or PowerShell script was touched, and nothing was written to any forge.** Every live call was a GET.
 
+## Evidence: stale-declaration refusal (2026-10-15)
+
+On 2026-10-15 the owner ran `apply` and `check` from a main checkout that predated #2545: both reported `UNCHANGED`/`OK` while the live forge had `strict: true` and main declared false. After `git pull` the same commands reported `[APPLIED] ... strict: true -> false` and `check` 0 drift. Fixed here at the owner's request (fix, not ticket). Lesson 442.
+
+- [x] `forge.CheckFresh` fetches origin and byte-compares the checkout's declaration with origin's default branch's. `TestCheckFresh` against real git histories (bare origin plus a second clone that lands a change): fresh; stale behind a landed change (names `origin/main`); behind on other files only (fresh); an unmerged local edit; the declaration absent from main; an origin with no default branch while a local `main` exists; an unreachable origin; `origin/HEAD` naming `trunk` wins over `origin/main`.
+- [x] `check`, `apply` and `apply --dry-run` refuse a stale declaration without asking the forge: `TestForgeProtectionRefusesAStaleDeclaration`. `--unmerged` skips the gate: `TestForgeProtectionUnmergedSkipsTheFreshnessGate`.
+- [x] Mutations, each killed by a test failure (`-count=1`): `CheckFresh` never reporting a difference; a local `main` fallback in the default-branch resolution (survived at first: the no-remote row failed at the fetch before reaching resolution, so the row now uses a reachable origin whose HEAD names a missing branch); the gate dropped from `loadForgeDecl`.
+- `go vet` and `GOOS=windows go vet` on `internal/forge` and `internal/cmd`: clean. `go test ./...`: ok. `golangci-lint run` (pinned) on both packages: 0 issues.
+- [x] After the #2557 review (PR-Agent, three findings): `forge.LandedDeclaration` compares without fetching, and `dotf doctor` WARNs when the declaration differs from origin's default branch as last fetched (`TestCheckBranchProtectionWarnsOnADeclarationThatHasNotLanded`: a stale checkout whose old declaration still matches the forge, which PASSed before). The sweep does not fetch, and an unanswerable comparison draws nothing there: the gate is `check`/`apply`. `apply --unmerged` refuses without `--dry-run` (`TestForgeProtectionApplyUnmergedNeedsDryRun`), so an unlanded declaration is never written. The fetch is bounded at 60 s. Mutations on the doctor WARN, the `--unmerged` guard and the comparison (always "same") are each killed.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.

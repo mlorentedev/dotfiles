@@ -103,7 +103,7 @@ func Registry(o Options) []Reconciler {
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
-		recordsBind{dotf: o.DotfPath, has: onPath},
+		recordsBind{dotf: o.DotfPath, has: onPath, resolve: o.ResolvePath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},

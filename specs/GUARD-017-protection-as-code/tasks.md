@@ -33,6 +33,7 @@ created: "2026-09-23"
 - [x] [AC5] Failing tests against a fake forge: complete PUT body, re-read assert, `changed=0` on the second run → `TestProtectionApply*`
 - [x] [AC5] Reported-context preflight → `TestProtectionApplyRefusesUnreportedContext`
 - [ ] [AC6] Declare `spec-gate` on dotfiles `main`; the owner runs `apply`
+- [x] [AC1] [AC5] `check` and `apply` refuse a declaration that differs from origin's default branch, `--unmerged` to override → `TestCheckFresh`, `TestForgeProtectionRefusesAStaleDeclaration` (2026-10-15, lesson 442)
 
 ## Closing
 

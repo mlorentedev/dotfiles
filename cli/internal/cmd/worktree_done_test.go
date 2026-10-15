@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 )
 
 // worktreeTestRepo is a git repository with one commit, in a directory whose
@@ -17,15 +19,23 @@ func worktreeTestRepo(t *testing.T) string {
 	t.Helper()
 	t.Setenv("TMPDIR", t.TempDir())
 	t.Setenv("WORKTREE_ROOT", filepath.Join(t.TempDir(), "worktrees"))
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir()) // never the operator's transcripts
 	repo := filepath.Join(t.TempDir(), "repo")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
+	}
+	// A local bare origin: add creates from origin's default branch.
+	origin := filepath.Join(t.TempDir(), "origin.git")
+	if out, err := exec.Command("git", "init", "-q", "--bare", "-b", "main", origin).CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare: %v\n%s", err, out)
 	}
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main"},
 		{"config", "user.name", "Test"},
 		{"config", "user.email", "test@example.com"},
 		{"commit", "-q", "--allow-empty", "-m", "initial"},
+		{"remote", "add", "origin", origin},
+		{"push", "-q", "origin", "main"},
 	} {
 		c := exec.Command("git", args...)
 		c.Dir = repo
@@ -242,5 +252,36 @@ func TestWorktreeDoneSaysWhenTheRootWasNotSearched(t *testing.T) {
 	}
 	if err := doneNotFound("x", tried, "/w"); strings.Contains(err.Error(), "WORKTREE_ROOT") {
 		t.Errorf("resolved root: got %v, want no root note", err)
+	}
+}
+
+func TestWorktreeDoneRefusesARecentSessionUntilIgnored(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	if _, err := executeWorktree(t, "add", "live", "--repo", repo); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	wt := rootWorktree("live")
+	// Claude Code keys a session on getcwd, the physical path ($TMPDIR is a
+	// symlink on macOS).
+	physical, err := filepath.EvalSymlinks(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "projects", memlink.ClaudeProjectKey(physical))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "s.jsonl"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := executeWorktree(t, "done", "live", "--repo", repo, "--force"); err == nil || !strings.Contains(err.Error(), "--ignore-recent-session") {
+		t.Fatalf("done --force: got %v, want the recent-session refusal", err)
+	}
+	if _, err := executeWorktree(t, "done", "live", "--repo", repo, "--ignore-recent-session"); err != nil {
+		t.Fatalf("done --ignore-recent-session: %v", err)
+	}
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("%s still exists after done --ignore-recent-session", wt)
 	}
 }
