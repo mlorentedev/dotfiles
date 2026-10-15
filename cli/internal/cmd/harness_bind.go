@@ -69,13 +69,14 @@ hook does not leave the old entry firing where it no longer parses.`,
 			if err != nil {
 				return err
 			}
-			return bindTargets(cmd.OutOrStdout(), targets, harnessName, home, binary, dryRun)
+			return bindTargets(cmd.OutOrStdout(), targets, harnessName, home, binary, bindResolver(homeDir), dryRun)
 		},
 	}
 
 	cmd.Flags().StringVar(&harnessName, "harness", "", "bind only this harness (default: every declared target)")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "root containing harness/manifest.json")
-	cmd.Flags().StringVar(&homeDir, "home", "", "home directory the settings files live under (default: the user's)")
+	cmd.Flags().StringVar(&homeDir, "home", "", "home directory the settings files live under (default: the user's); "+
+		"a target's dst resolves against it, never against the process environment")
 	cmd.Flags().StringVar(&dotfPath, "dotf-path", "", "absolute path emitted into the hook commands (default: resolved)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change without writing")
 	return cmd
@@ -107,13 +108,24 @@ func resolveBindInputs(repoRoot, homeDir, dotfPath string) (root, home, binary s
 	return root, home, binary, nil
 }
 
+// bindResolver resolves a target's dst {VAR}: through the full env contract for
+// the user's own home, and against an explicit --home alone otherwise, so a run
+// told to bind under a home never writes outside it (#2279).
+func bindResolver(homeDir string) func(string) string {
+	if homeDir == "" {
+		return env.ResolvePath
+	}
+	return func(name string) string { return env.ResolvePathUnder(name, homeDir) }
+}
+
 // bindTargets binds every selected target and reports one stable status tag
 // per line: `skip`, `ok`, `would update` or `bind`. Tests assert those tags, not
 // the prose after them.
-func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home, binary string, dryRun bool) error {
+func bindTargets(out io.Writer, targets []harness.BindTarget, harnessName, home, binary string, resolve func(string) string, dryRun bool) error {
 	outcomes, err := harness.Bind(targets, harness.BindOptions{
 		Home: home, Binary: binary, GOOS: runtime.GOOS, Only: harnessName, DryRun: dryRun,
-		Has: func(name string) bool { _, err := exec.LookPath(name); return err == nil },
+		Resolve: resolve,
+		Has:     func(name string) bool { _, err := exec.LookPath(name); return err == nil },
 	})
 	for _, o := range outcomes {
 		switch {

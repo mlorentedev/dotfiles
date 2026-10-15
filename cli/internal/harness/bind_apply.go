@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 )
 
 // BindOptions are the ambient inputs of one bind run: where the settings files
@@ -22,6 +24,10 @@ type BindOptions struct {
 	// Only binds a single agent; empty binds every declared target.
 	Only   string
 	DryRun bool
+	// Resolve resolves a {VAR} token in a target's dst through the env contract
+	// (env.ResolvePath in production). Needed only by a target declaring dst;
+	// one that does with no Resolve fails rather than fall back to file.
+	Resolve func(string) string
 	// Has reports whether a command is on PATH, for requires_command. Required:
 	// Bind refuses options without it.
 	Has func(string) bool
@@ -62,9 +68,8 @@ func Bind(targets []BindTarget, o BindOptions) ([]BindOutcome, error) {
 		case t.RequiresCommand != "" && !o.Has(t.RequiresCommand):
 			res.Skip = t.RequiresCommand + " is not installed"
 		default:
-			token := HookBinaryTokenForTarget(o.Binary, o.GOOS, t.Format)
-			changed, retired, err := bindOne(t, o.Home, token, o.DryRun)
-			res.Changed, res.Retired = changed, retired
+			var err error
+			res, err = bindTarget(t, o)
 			if err != nil {
 				// bindOne can fail after writing (a retirement that cannot be
 				// read): that target's outcome is kept, since it changed a file.
@@ -81,6 +86,23 @@ func Bind(targets []BindTarget, o BindOptions) ([]BindOutcome, error) {
 	return out, nil
 }
 
+// bindTarget binds one emitting target into the file it resolves to. Under dst
+// the outcome names that resolved file, so a report never says "current" about
+// a file the harness does not read (#2279).
+func bindTarget(t BindTarget, o BindOptions) (BindOutcome, error) {
+	res := BindOutcome{Agent: t.Agent, File: t.File}
+	path, err := settingsPath(t, o)
+	if err != nil {
+		return res, err
+	}
+	if t.Dst != "" {
+		res.File = path
+	}
+	token := HookBinaryTokenForTarget(o.Binary, o.GOOS, t.Format)
+	res.Changed, res.Retired, err = bindOne(t, path, o.Home, token, o.DryRun)
+	return res, err
+}
+
 // bindOne merges one target's hooks into its settings file, then retires the
 // hooks the target says it no longer emits. It reports whether the file changed
 // and which retirements took effect.
@@ -88,12 +110,11 @@ func Bind(targets []BindTarget, o BindOptions) ([]BindOutcome, error) {
 // The new home is written BEFORE the old entry is retired. The other order would
 // leave a harness with no hook at all if the write failed halfway, and a gate that
 // is briefly doubled is the smaller harm than one that is briefly absent.
-func bindOne(t BindTarget, home, binary string, dryRun bool) (bool, []RetiredHook, error) {
+func bindOne(t BindTarget, path, home, binary string, dryRun bool) (bool, []RetiredHook, error) {
 	cmds, err := t.HookCommands(binary)
 	if err != nil {
 		return false, nil, err
 	}
-	path := filepath.Join(home, filepath.FromSlash(t.File))
 
 	doc, err := readSettingsDoc(path)
 	if err != nil {
@@ -135,6 +156,21 @@ func bindOne(t BindTarget, home, binary string, dryRun bool) (bool, []RetiredHoo
 		}
 	}
 	return changed, retired, nil
+}
+
+// settingsPath is the file a target binds into: its dst resolved the way
+// configs-deploy resolves ai/deploy.json's destinations, so the two writers of
+// one settings file cannot name two files; else its file under the home.
+func settingsPath(t BindTarget, o BindOptions) (string, error) {
+	if t.Dst == "" {
+		return filepath.Join(o.Home, filepath.FromSlash(t.File)), nil
+	}
+	resolve := o.Resolve
+	if resolve == nil {
+		// Unresolved rather than file: falling back is the defect (#2279).
+		resolve = func(string) string { return "" }
+	}
+	return deploy.ExpandDst(t.Dst, o.Home, resolve)
 }
 
 // retireOne removes one retired hook from its file, reporting whether it was

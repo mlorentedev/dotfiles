@@ -644,3 +644,47 @@ func TestBindAgyDryRunWritesNothing(t *testing.T) {
 		t.Error("a dry run wrote a file")
 	}
 }
+
+// #2279: with CLAUDE_CONFIG_DIR set, bind writes the hooks into the settings
+// file Claude reads there (configs-deploy's {CLAUDE_CONFIG_DIR}/settings.json),
+// not into ~/.claude/settings.json, which Claude would never read.
+func TestBindFollowsClaudeConfigDir(t *testing.T) {
+	home, raw, _ := bindFixture(t, "")
+	cfg := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
+
+	if _, _, err := captureRealStreams(t, "harness", "bind",
+		"--harness", "claude", "--repo-root", repoRootForTest(t), "--dotf-path", raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	doc, err := os.ReadFile(filepath.Join(cfg, "settings.json"))
+	if err != nil || !containsSub(string(doc), "harness gate --harness claude") {
+		t.Fatalf("the gate is not in $CLAUDE_CONFIG_DIR/settings.json (%v):\n%s", err, doc)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("bind also wrote ~/.claude/settings.json, which Claude does not read here (err %v)", err)
+	}
+}
+
+// An explicit --home is the whole home: a CLAUDE_CONFIG_DIR inherited from the
+// caller's shell names the REAL config dir and must not pull the write out of
+// it. Before this, the suite's own fixtures rewrote the developer's live
+// ~/.claude/settings.json with hooks naming a temp binary (#2279).
+func TestBindUnderAnExplicitHomeIgnoresTheInheritedConfigDir(t *testing.T) {
+	home, raw, dotf := bindFixture(t, "")
+	elsewhere := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", elsewhere)
+
+	if _, _, err := captureRealStreams(t, "harness", "bind",
+		"--harness", "claude", "--repo-root", repoRootForTest(t), "--home", home, "--dotf-path", raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	if got := hookCommands(t, readSettings(t, home), "PreToolUse"); !contains(got, dotf+" harness gate --harness claude") {
+		t.Errorf("the gate is not under --home: %v", got)
+	}
+	if entries, _ := os.ReadDir(elsewhere); len(entries) != 0 {
+		t.Errorf("bind wrote outside --home, into the inherited CLAUDE_CONFIG_DIR: %v", entries)
+	}
+}
