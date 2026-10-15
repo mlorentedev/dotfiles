@@ -90,6 +90,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The mise check runs mise through a new `System.CommandStdoutDir` seam from HOME: `mise which` prints its path on stdout and warnings on stderr, and the merged `CommandOutputDir` would make a warning part of the path.
 - P5b runs Colima as Homebrew's launchd service (`brew services start colima`, once) rather than a plist written here or a `colima start` in an rc file. Homebrew is the class-3 manager that installs colima, the formula ships the service, and it restarts the VM at login. The cost: `brew services` passes no `colima start` flags, so the VM's size comes from `~/.colima/default/colima.yaml` (2 CPU, 2 GiB by default) until that file is declared too
 - P5b's `docker-config` deploy entry gates on `requires: colima`, not on `platforms: [darwin]`. `platforms` needs manifest version 4, which waits for a release carrying its reader (#1843 B1). colima is provisioned only by the brew entry, so the gate selects the Mac today; a Linux box with Homebrew's colima would get a plugin directory that does not exist there, which the docker CLI ignores
+- #2455 identifies list elements by a declared field (`listKeys`) rather than by guessing one (`key`, `name`, `id`): which field names an element is a fact about the tool's format, as `strategy` and `paths` are, and a guess that matched the wrong field would replace a user's table. A managed element without the field is an error, never the union, since falling back would bring the duplicates back silently. A retired managed element is not removed: nothing records what the repo managed before
 - P5b leaves the kubectl and helm pins out. `ProbeVersion` runs `<tool> --version`, which both reject, so `dotf tools sync` would install them and then report them not running at their pin. Found by the toolset worker before this PR pushed
 
 ## Promotion candidates
@@ -145,3 +146,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - H6, decided: the integrations are a half of `agent-extensions`, not a `deploy.json` entry, since a command string in the manifest is what #1993 keeps from running.
   - The harness set is `harness/model-map.json`'s, not a second list. codex is not in it.
   - Each harness is gated on its binary, because herdr creates an absent agent's config dir for claude and copilot.
+- H4, the stale-binding merge, #2455 phase 1 (CLI-113, macOS arm64, 2026-10-15). The reader learns manifest version 5 and `listKeys`; `ai/deploy.json` stays at 4.
+  - `go build ./...`, `go vet ./...`, `GOOS=windows go vet ./...`, `go test ./...` -> ok. golangci-lint -> 0 issues.
+  - `TestDeploy_MergeReplacesAListElementByIdentity`: one changed field gives one `prefix+d` with the source's value, the user's binding keeps its slot, and a second deploy is in sync.
+  - `TestDeploy_MergeCollapsesDuplicatesOfAManagedIdentity`: the duplicate the union already left is dropped and reported as a change.
+  - `TestDeploy_MergeRefusesAManagedElementWithoutItsIdentity`, into an empty home: a missing `key`, a non-table element and two elements sharing a key are refused, naming `keys.command`.
+  - Eleven mutations, each removing one guard (the identity branch, the dedupe, both change reports, the append, the source-duplicate check, both identity checks, the version, strategy and empty gates), all fail the suite.
+- H4, phase 2 (owner-gated, after the release that carries the version 5 reader): `ai/deploy.json` to 5, `"listKeys": {"keys.command": "key"}` on the herdr entry, the "Until #2455" comment out of `ai/herdr/config.toml`. Not run here.
