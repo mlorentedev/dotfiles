@@ -455,4 +455,5 @@ tags: [lessons, index, dotfiles]
 | [434 - A privilege check keyed on our own argv cannot see a manager that escalates inside](lesson-434-a-privilege-check-keyed-on-our-own-argv-cannot-see-a-manager-that-escalates.md) | 2026-10-14 |
 | [435 - A claude call without CLAUDE_CONFIG_DIR writes another .claude.json](lesson-435-a-claude-call-without-claude-config-dir-writes-another-claude-json.md) | 2026-10-15 |
 | [437 - A drift check must know who reads the variable](lesson-437-a-drift-check-must-know-who-reads-the-variable.md) | 2026-10-14 |
+| [438 - A command typed into a pane runs the pane's world, not the caller's](lesson-438-a-command-typed-into-a-pane-runs-the-panes-world-not-the-callers.md) | 2026-10-14 |
 <!-- END GENERATED -->
