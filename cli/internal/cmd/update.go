@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/doctor"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
@@ -20,10 +24,18 @@ func newUpdateCmd() *cobra.Command {
 'dotf converge' from it (which runs the setup script last on Linux and
 Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
 
+The checkout's DOTF_VERSION pin is part of being up to date. When the running
+dotf is not that version (after a fast-forward, or when the checkout was
+already current), update runs the checkout's installer (install.sh, or
+install.ps1 under pwsh), which installs the pin and converges with the NEW
+binary; update does not converge a second time with the old one. A source
+build ("dev") is never replaced: the pin check is skipped and said so.
+
 Anything non-actionable (not a git repo, dirty worktree, unreachable remote, no
 upstream, already current, ahead of the upstream, diverged history) is logged
 and skipped with exit 0.
-A real converge failure is the ONLY non-zero exit, so 'systemctl --user status
+A real converge failure, or a pinned dotf that cannot be installed, is the ONLY
+non-zero exit, so 'systemctl --user status
 dotfiles-selfupdate' (and the journal) surface it.
 
 Env:
@@ -36,9 +48,11 @@ Env:
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
 			repo := repoForUpdate()
-			out, err := update.Run(update.Config{Repo: repo}, update.Deps{
+			out, err := update.Run(update.Config{Repo: repo, Version: dotfVersion}, update.Deps{
 				Git:      gitRunner(repo),
 				Converge: func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
+				Pin:      func() (string, error) { return pinnedDotfVersion(repo) },
+				Install:  func(pin string) error { return runInstaller(c, repo, pin) },
 			})
 			c.Println(out.Message)
 			if err != nil {
@@ -48,6 +62,48 @@ Env:
 		},
 	}
 	return cmd
+}
+
+// pinnedDotfVersion reads DOTF_VERSION from the checkout's versions.conf, the
+// file doctor compares the installed dotf against. "" means it is not pinned.
+func pinnedDotfVersion(repo string) (string, error) {
+	pins, err := doctor.ParseVersionsConf(filepath.Join(repo, env.CheckoutMarker))
+	if err != nil {
+		return "", err
+	}
+	return pins["DOTF_VERSION"], nil
+}
+
+// installerInvocation is the command that runs the checkout's installer for
+// goos, handing it the checkout so its converge reads the one update just
+// moved rather than resolving another. Every argument install.{sh,ps1} gets
+// goes on to `dotf converge`.
+func installerInvocation(goos, repo string) (name string, args []string) {
+	if goos == "windows" {
+		return "pwsh", []string{"-NoProfile", "-File", filepath.Join(repo, "install.ps1"), "--repo", repo}
+	}
+	return filepath.Join(repo, "install.sh"), []string{"--repo", repo}
+}
+
+// runInstaller installs the dotf release pin and converges with it, through the
+// checkout's own installer: it stages the binary beside the target and renames
+// it into place (install.ps1 parks a live dotf.exe first), so replacing the
+// binary of this very process is safe. DOTF_VERSION is set explicitly because
+// the installer prefers an exported one to the checkout's versions.conf, and a
+// shell that sourced a stale deploy copy exports the old pin.
+func runInstaller(c *cobra.Command, repo, pin string) error {
+	name, args := installerInvocation(runtime.GOOS, repo)
+	cmd := exec.Command(name, args...) //nolint:gosec // the checkout's own installer, at a path built from the resolved checkout
+	cmd.Dir = repo
+	cmd.Env = append(os.Environ(), "DOTF_VERSION="+pin)
+	// Stdin stays closed, as ExecSetup leaves it: update is the unattended
+	// scheduler path, so the identity epilogue of the installer's converge
+	// prints what is left instead of walking a restore.
+	cmd.Stdout, cmd.Stderr = c.OutOrStdout(), c.ErrOrStderr()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %w", filepath.Base(name), err)
+	}
+	return nil
 }
 
 // repoForUpdate resolves the dotfiles checkout to fast-forward. The cascade

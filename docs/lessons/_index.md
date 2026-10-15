@@ -450,4 +450,5 @@ tags: [lessons, index, dotfiles]
 | [429 - An installer that picks the newest interpreter fails with the runner image](lesson-429-an-installer-that-picks-the-newest-interpreter-fails-with-the-runner-image.md) | 2026-10-14 |
 | [430 - A subshell cannot turn errexit back on under its caller's \|\|](lesson-430-a-subshell-cannot-turn-errexit-back-on-under-its-callers-or.md) | 2026-10-14 |
 | [431 - A comment stripper that ignores strings can still produce valid JSON](lesson-431-a-comment-stripper-that-ignores-strings-can-still-produce-valid-json.md) | 2026-10-14 |
+| [432 - A self-update that converges with the binary it replaces misses the new steps](lesson-432-a-self-update-that-converges-with-the-binary-it-replaces-misses-the-new-steps.md) | 2026-10-14 |
 <!-- END GENERATED -->
