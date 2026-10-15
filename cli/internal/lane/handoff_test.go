@@ -156,7 +156,7 @@ func TestNext_NoBackendPrintsTheCommands(t *testing.T) {
 	if err != nil || out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
 	}
-	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[1], "git -C /repos/dotfiles worktree add -b fix/first-thing /repos/worktrees/dotfiles/first-thing origin/main") ||
+	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[1], "git -C /repos/dotfiles worktree add -b fix/first-thing "+filepath.Join("/repos", "worktrees", "dotfiles", "first-thing")+" origin/main") ||
 		!strings.HasPrefix(out.Commands[3], "dotf lane exec --agent claude --prompt-file ") {
 		t.Errorf("commands = %q", out.Commands)
 	}
@@ -205,9 +205,11 @@ func TestNext_NothingFreeIsNotAnError(t *testing.T) {
 // is not a word every shell reads alike; then it is `dotf` on the pane's PATH.
 func TestNext_TheSuccessorRunsTheBinaryThatDecided(t *testing.T) {
 	for dotf, want := range map[string]string{
-		"/opt/dotf/bin/dotf": "/opt/dotf/bin/dotf lane exec ",
-		"/home/a b/dotf":     "dotf lane exec ",
-		"":                   "dotf lane exec ",
+		"/opt/dotf/bin/dotf":         "/opt/dotf/bin/dotf lane exec ",
+		"/home/a b/dotf":             "dotf lane exec ",
+		`C:\Users\RUNNER~1\dotf.exe`: `C:\Users\RUNNER~1\dotf.exe lane exec `,
+		"~/dotf":                     "dotf lane exec ",
+		"":                           "dotf lane exec ",
 	} {
 		b := &fakeBackend{agent: "claude"}
 		o := opts(t)

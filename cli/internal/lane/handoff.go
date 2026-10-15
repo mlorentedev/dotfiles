@@ -38,8 +38,10 @@ type Outcome struct {
 // plainWord is the one shape a path may take in the command typed into the
 // successor's pane: that line is read by zsh, bash, PowerShell or cmd, and a
 // word of these characters means the same in all four. Anything else would need
-// quoting rules per shell, which is what lane exec exists to avoid.
-var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./:\\-]+$`)
+// quoting rules per shell, which is what lane exec exists to avoid. A tilde is
+// allowed after the first character: Windows short names (RUNNER~1) carry one,
+// and no shell expands it mid-word.
+var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./:\\-][A-Za-z0-9_./:\\~-]*$`)
 
 // Handoff starts the successor of a finished lane item. With a nil backend it
 // starts nothing and returns the commands that would. It never removes a
@@ -69,7 +71,7 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	}
 	promptFile := filepath.Join(o.PromptDir, strconv.Itoa(issue.Number)+".md")
 	if !plainWord.MatchString(promptFile) {
-		return out, fmt.Errorf("lane: the prompt path %q has characters a pane's shell would read differently; use a PromptDir of letters, digits and _ . / : \\ -", promptFile)
+		return out, fmt.Errorf("lane: the prompt path %q has characters a pane's shell would read differently; use a PromptDir of letters, digits and _ . / : \\ ~ -", promptFile)
 	}
 	dotf := o.Dotf
 	if dotf == "" || !plainWord.MatchString(dotf) {
