@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 )
 
 // Model limit drift: `ai/pi/models.json` declares a context window and an output
@@ -46,6 +47,14 @@ import (
 // routes on, so a disagreement is a real inconsistency in this machine's toolchain
 // rather than a difference of opinion between two directories.
 const catalogRelPath = ".cache/opencode/models.json"
+
+// catalogMaxAge is how old the cached catalog may be and still be compared. The
+// cache refreshes only when opencode runs, so on a box where it has not run for
+// months it still carries limits the provider has since raised, and an honest
+// declaration reads as an overstatement (#2434: two false FAILs from a June
+// cache in October). Providers revise limits on a scale of weeks; two weeks
+// catches that without nagging a machine where opencode runs now and then.
+const catalogMaxAge = 14 * 24 * time.Hour
 
 // piModelsRelPath is the DECLARATION half, read from the checkout rather than the
 // deploy dir: a drift finding is only actionable where it can be committed.
@@ -108,7 +117,7 @@ func checkModelLimits(sys *System, cfg *Config, rep *Report) {
 	if !ok {
 		return
 	}
-	cat, ok := readCatalog(sys.home(), rep)
+	cat, ok := readCatalog(sys, rep)
 	if !ok {
 		return
 	}
@@ -174,16 +183,29 @@ func readDeclaration(repoDir string, rep *Report) (declaredCatalog, bool) {
 }
 
 // readCatalog loads opencode's cached models.dev catalog. It is a per-machine
-// CACHE, not repo content, so its problems WARN: the declaration may be perfectly
-// right and this machine simply unable to say so.
-func readCatalog(home string, rep *Report) (map[string]catalogProvider, bool) {
-	raw, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(catalogRelPath)))
+// CACHE, not repo content, so none of its problems can FAIL: the declaration may
+// be perfectly right and this machine simply unable to say so. Absent or STALE
+// skips, because the machine has no current answer; unreadable or unparseable
+// warns, because the file is there and broken, which is worth someone's look.
+func readCatalog(sys *System, rep *Report) (map[string]catalogProvider, bool) {
+	path := filepath.Join(sys.home(), filepath.FromSlash(catalogRelPath))
+	info, err := os.Stat(path)
 	switch {
 	case os.IsNotExist(err):
 		rep.Skip("opencode's model catalog is not cached on this machine (" +
 			catalogRelPath + "); run opencode once to populate it")
 		return nil, false
 	case err != nil:
+		rep.Warn(fmt.Sprintf("%s unreadable: %v", catalogRelPath, err))
+		return nil, false
+	}
+	if age := sys.Now().Sub(info.ModTime()); age > catalogMaxAge {
+		rep.Skip(fmt.Sprintf("%s is %d days old, so its limits may predate the provider's; "+
+			"run `opencode models --refresh` to update it", catalogRelPath, int(age.Hours()/24)))
+		return nil, false
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
 		rep.Warn(fmt.Sprintf("%s unreadable: %v", catalogRelPath, err))
 		return nil, false
 	}
