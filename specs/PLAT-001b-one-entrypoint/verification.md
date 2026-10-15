@@ -58,6 +58,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Guard `setup-linux.sh registers no Claude MCP server itself: dotf deploy does`: an appended `claude mcp get hive …` and an indented `if mcp_err=$(claude mcp add --transport …)` each fail it. Its first regex, `^[[:space:]]*[^#[:space:]].*claude mcp`, let a line that starts with `claude` through (the first character class ate the `c`); the optional group form catches both
 - Read before deleting, from-zero 38671157122 (ubuntu): converge's `agent-extensions` added the 4 servers; inside `legacy-setup`, `claude-mcp` reported `0 added, 4 already present`, then the loop `4 added, 0 already present` (lesson 435)
 - Removed with the loop: the `parity: both setups install uv before registering the Claude MCP servers` test (its Linux half anchored on the loop's `claude mcp add`) and the BUG-004/BUG-011 helper tests; the Windows-side tests of the same guards stay, as the Windows loop does
+- pi settings twins (#1948 second half, macOS arm64, 2026-10-15): `bash -n`, `zsh -n`, `shellcheck --severity=warning setup-linux.sh` -> clean; `go build ./... && go vet ./internal/converge/` -> ok (a doc comment only)
+- Every bats suite that names `setup-linux.sh` or `setup-windows.ps1` (40 files) -> 743/743 ok
+- Guards in `tests/pi-config.bats`, three mutations caught: an appended `PI_SETTINGS_DST=…` in `setup-linux.sh` and a `$piSettingsDst = …` in `setup-windows.ps1` fail `neither setup writes pi's settings.json itself`; the Linux call turned into a no-op fails `both setups converge pi-settings BEFORE dotf deploy`
+- The replaced bats tests evaluated the shell sync block on fixtures and grepped the PowerShell one; their properties (seed only when absent, model list replaced, other keys and the mode kept, a non-object file refused) are the Go tests of PR 14 in `internal/pi` and `internal/converge`
+- Not run here: the apply on a scratch HOME. The live runs are CI's `integration` job (a plain `setup-linux.sh`) and `test-windows` (`setup-windows.ps1` end to end, then doctor), both on this PR, and from-zero, which the `pisettings.go` comment change triggers
 
 ## Decisions made during implementation
 

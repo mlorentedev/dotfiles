@@ -152,5 +152,12 @@
     "verification": "bats -f 'registers no Claude MCP server itself' tests/setup-linux.bats | grep -q '^ok 1 '",
     "state": "passing",
     "evidence": "verification exit 0 (2026-10-15); two mutations fail it (an appended `claude mcp get`, an indented `claude mcp add`)"
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f23",
+    "behavior": "#1948 second half: both setup scripts hand pi's settings.json to the pi-settings converge step, called before their bare dotf deploy, and write the file nowhere else",
+    "verification": "out=$(bats -f 'converge pi-settings BEFORE dotf deploy|writes pi.s settings.json itself' tests/pi-config.bats) && printf '%s' \"$out\" | grep -q '^ok 1 ' && printf '%s' \"$out\" | grep -q '^ok 2 '",
+    "state": "passing",
+    "evidence": "verification exit 0 (2026-10-15); three mutations fail one of the two tests"
   }
 ]
