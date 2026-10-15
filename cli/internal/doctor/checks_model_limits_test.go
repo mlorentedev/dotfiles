@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // limitsFixture writes a declaration into a fake checkout and a catalog into a
@@ -42,7 +43,12 @@ func limitsFixture(t *testing.T, declaration, catalog string) (*System, *Config)
 		}
 	}
 
-	return piSys(home), &Config{RepoDir: repo, DotfilesDir: repo}
+	// A frozen clock, so the catalog's age is whatever a test sets its mtime to
+	// rather than however long the test took to reach the check.
+	sys := piSys(home)
+	now := time.Now()
+	sys.Now = func() time.Time { return now }
+	return sys, &Config{RepoDir: repo, DotfilesDir: repo}
 }
 
 // limitsRun runs the check and returns both the rendered report and the status
@@ -147,6 +153,53 @@ func TestModelLimitsSkipsWhenTheCatalogIsNotCached(t *testing.T) {
 	}
 	if totals[StatusPass] != 0 {
 		t.Errorf("an uncomparable state must never read as agreement: %d\n%s", totals[StatusPass], out)
+	}
+}
+
+// A stale catalog must SKIP, never compare (#2434). The cache only refreshes when
+// opencode runs: on a box where it had not run since June, the June limits of
+// openrouter/deepseek/deepseek-chat produced two false FAILs against a
+// declaration the live catalog agreed with. The declaration here is ABOVE the
+// cached limits, the FAIL direction, so a comparison that still ran would show.
+// The fresh row pins the other side of the threshold: a check that always
+// skipped would pass the stale rows alone.
+func TestModelLimitsSkipsWhenTheCatalogIsStale(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		age       time.Duration
+		wantFail  int
+		wantSkip  int
+		wantInOut []string
+	}{
+		{"fresh catalog is compared", 13 * 24 * time.Hour, 2, 0, nil},
+		{"stale catalog is skipped", 15 * 24 * time.Hour, 0, 1, []string{"15 days old", "opencode models --refresh"}},
+		{"months-old catalog is skipped", 126 * 24 * time.Hour, 0, 1, []string{"126 days old"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sys, cfg := limitsFixture(t,
+				decl("openrouter", "deepseek/deepseek-chat", 163840, 16384),
+				cat("openrouter", "deepseek/deepseek-chat", 128000, 16000))
+			cached := filepath.Join(sys.home(), ".cache", "opencode", "models.json")
+			written := sys.Now().Add(-tt.age)
+			if err := os.Chtimes(cached, written, written); err != nil {
+				t.Fatal(err)
+			}
+
+			out, totals := limitsRun(t, sys, cfg)
+
+			if totals[StatusFail] != tt.wantFail || totals[StatusSkip] != tt.wantSkip {
+				t.Fatalf("want %d FAIL / %d SKIP, got %d / %d\n%s",
+					tt.wantFail, tt.wantSkip, totals[StatusFail], totals[StatusSkip], out)
+			}
+			if totals[StatusPass] != 0 {
+				t.Errorf("an uncompared catalog must never read as agreement: %d\n%s", totals[StatusPass], out)
+			}
+			for _, want := range tt.wantInOut {
+				if !strings.Contains(out, want) {
+					t.Errorf("report must name %q\n%s", want, out)
+				}
+			}
+		})
 	}
 }
 
