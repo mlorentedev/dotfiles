@@ -145,5 +145,12 @@
     "verification": "cd cli && out=$(go test ./internal/doctor/ -run '^TestCheckWorkstationTarget_ByStatus$' -count=1 -v) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/not_opted_in' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/nothing_applied' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestCheckWorkstationTarget_ByStatus/converged'",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-001b-one-entrypoint-f23",
+    "behavior": "#1948 second half: both setup scripts hand pi's settings.json to the pi-settings converge step, called before their bare dotf deploy, and write the file nowhere else",
+    "verification": "out=$(bats -f 'converge pi-settings BEFORE dotf deploy|writes pi.s settings.json itself' tests/pi-config.bats) && printf '%s' \"$out\" | grep -q '^ok 1 ' && printf '%s' \"$out\" | grep -q '^ok 2 '",
+    "state": "passing",
+    "evidence": "verification exit 0 (2026-10-15); three mutations fail one of the two tests"
   }
 ]

@@ -329,32 +329,8 @@ log_info "Setting up OpenCode configuration..."
 # CLI itself comes from mise (versions.conf `# mise: latest`, #2013 D9), which
 # the tools step installs before anything reads a harness; models.json gets the
 # same deploy-time secret substitution as opencode (SDD-009, self-contained
-# cross-OS); AGENTS.md is the same canonical SSOT; settings.json is seeded only
-# when absent (pi mutates it).
-PI_AGENT_DIR="$HOME/.pi/agent"
-
-ensure_directory "$PI_AGENT_DIR"
-
-# settings.json is SEED-IF-MISSING, unlike models.json/tui.json (dotf deploy): pi
-# rewrites this file at runtime (lastChangelogVersion, theme, the model picked
-# in the TUI), so it is the one deployed config the user's own tool edits.
-# It previously used the same "copy unless identical" shape as its neighbours,
-# which for a self-mutating file means copy ALWAYS -- tests/pi-config.bats
-# forbids lastChangelogVersion in the committed copy, so `cmp` could never
-# match once pi had run, and every setup run silently reset the user's theme
-# and default model. Seed it, then never touch it again. The seed runs BEFORE
-# `dotf deploy`: its pi-compaction entry merges into this file, and a merge
-# onto a missing file would create one the seed then never fills (#1938).
-PI_SETTINGS_SRC="$CURRENT_DIR/ai/pi/settings.json"
-PI_SETTINGS_DST="$PI_AGENT_DIR/settings.json"
-if [ -f "$PI_SETTINGS_SRC" ]; then
-    if [ -f "$PI_SETTINGS_DST" ]; then
-        log_info "pi settings.json present, preserving local edits"
-    else
-        cp "$PI_SETTINGS_SRC" "$PI_SETTINGS_DST"
-        log_success "Seeded pi settings.json at $PI_SETTINGS_DST"
-    fi
-fi
+# cross-OS); AGENTS.md is the same canonical SSOT; settings.json is the
+# pi-settings converge step's, called with `dotf deploy` below.
 
 # Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
 # every OS, replacing the per-config copies that lived here and their twins in
@@ -369,6 +345,11 @@ fi
 _dotf=""
 if command -v dotf >/dev/null 2>&1; then _dotf="dotf"; elif [ -x "$HOME/.local/bin/dotf" ]; then _dotf="$HOME/.local/bin/dotf"; fi
 if [ -n "$_dotf" ]; then
+    # pi's settings.json before deploy, whose pi-compaction entry merges into
+    # it: a merge onto a missing file creates one holding only compaction
+    # (#1938). The step seeds the repo's copy when the file is absent and keeps
+    # its enabledModels equal to the repo's, leaving pi's own keys alone (#1948).
+    "$_dotf" converge --only pi-settings || log_warning "dotf converge --only pi-settings failed -- pi's settings.json was not seeded or synced; see 'dotf doctor'"
     "$_dotf" deploy || { log_error "dotf deploy failed -- the failed rows above name each config; fix them and run setup again"; exit 1; }
     # After deploy, which writes the file the include names (#2207).
     "$_dotf" converge --only git-config || log_warning "dotf converge --only git-config failed -- a dotf older than the flag cannot run it; re-run setup once DOTF_VERSION carries it, or see 'dotf doctor'"
@@ -380,45 +361,6 @@ else
     exit 1
 fi
 unset _dotf
-
-# Field-level sync (AI-032, #1247): enabledModels is dotfiles-owned even once
-# settings.json exists on the machine -- nothing pi itself writes at runtime
-# touches that array, only theme/lastChangelogVersion/defaultModel are (the
-# seed-if-missing guard above exists for exactly those three). Without this, a
-# catalog addition in the repo (e.g. #1254) never reaches a machine whose
-# settings.json already exists; the only way to pick it up was deleting the
-# live file and re-running setup, which would also blow away the user's real
-# theme/model choice. Runs unconditionally on a present destination -- on a
-# freshly-seeded file the two are already equal, so it is a same-second no-op.
-if [ -f "$PI_SETTINGS_DST" ] && [ -f "$PI_SETTINGS_SRC" ]; then
-    if ! command -v jq >/dev/null 2>&1; then
-        log_warning "jq not found — skipping pi enabledModels sync"
-    else
-        PI_MODELS_SRC_JSON=$(jq -c '.enabledModels' "$PI_SETTINGS_SRC" 2>/dev/null) || PI_MODELS_SRC_JSON=""
-        if [ -z "$PI_MODELS_SRC_JSON" ] || [ "$PI_MODELS_SRC_JSON" = "null" ]; then
-            log_warning "ai/pi/settings.json has no enabledModels — skipping pi enabledModels sync"
-        elif jq -e --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels == $m' "$PI_SETTINGS_DST" >/dev/null 2>&1; then
-            log_info "pi enabledModels already in sync"
-        else
-            # Same directory as the destination, not $TMPDIR: a cross-filesystem
-            # mv degrades to copy+delete (not atomic) and mktemp's 0600 mode
-            # would silently tighten the destination's permissions on the first
-            # sync. Copying the live file's mode before the swap keeps a rename
-            # within one filesystem both atomic and permission-preserving. The
-            # mode is read with GNU stat or, failing that, BSD stat: chmod
-            # --reference is GNU-only and silently failed here on macOS.
-            PI_SETTINGS_TMP=$(mktemp "$(dirname "$PI_SETTINGS_DST")/.settings.json.XXXXXX")
-            if jq --argjson m "$PI_MODELS_SRC_JSON" '.enabledModels = $m' "$PI_SETTINGS_DST" > "$PI_SETTINGS_TMP" 2>/dev/null \
-                && chmod "$(stat -c '%a' "$PI_SETTINGS_DST" 2>/dev/null || stat -f '%Lp' "$PI_SETTINGS_DST")" "$PI_SETTINGS_TMP" 2>/dev/null; then
-                mv "$PI_SETTINGS_TMP" "$PI_SETTINGS_DST"
-                log_success "Synced pi enabledModels (theme/defaultModel/lastChangelogVersion preserved)"
-            else
-                rm -f "$PI_SETTINGS_TMP"
-                log_warning "failed to sync pi enabledModels — leaving $PI_SETTINGS_DST untouched"
-            fi
-        fi
-    fi
-fi
 
 # pi packages (HARNESS-139, #1628): `dotf pi packages apply` converges pi on
 # ai/pi/packages.json in BOTH directions -- installs what is declared, removes

@@ -53,6 +53,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - ufw behaviour the step relies on, measured in ubuntu:24.04 (ufw 0.36.2), stdin from `/dev/null`: `ufw allow in on tailscale0 to any port 22 proto tcp comment 'ssh: mesh only'` writes the v4 and v6 tuples, and a second run prints `Skipping adding existing rule` and exits 0; `ufw delete allow in on tailscale0 to any port 22 proto tcp`, without the comment, removes both tuples without a prompt and exits 0; `ufw default deny|allow incoming` rewrites `DEFAULT_INPUT_POLICY`; with `NET_ADMIN`, `ufw --force enable` exits 0 and `ufw status verbose` prints `Status: active`, `Default: deny (incoming)` and `22/tcp on tailscale0  ALLOW IN  Anywhere  # ssh: mesh only`, the three things the apply checks before it records the witness
 - msi, read without root 2026-10-13: `/etc/ufw/ufw.conf` `ENABLED=no`, `/etc/default/ufw` `DEFAULT_INPUT_POLICY="DROP"`, `user.rules` and `user6.rules` mode 0640 root. The spec's row said ufw was active; it was not
 
+- pi settings twins (#1948 second half, macOS arm64, 2026-10-15): `bash -n`, `zsh -n`, `shellcheck --severity=warning setup-linux.sh` -> clean; `go build ./... && go vet ./internal/converge/` -> ok (a doc comment only)
+- Every bats suite that names `setup-linux.sh` or `setup-windows.ps1` (40 files) -> 743/743 ok
+- Guards in `tests/pi-config.bats`, three mutations caught: an appended `PI_SETTINGS_DST=…` in `setup-linux.sh` and a `$piSettingsDst = …` in `setup-windows.ps1` fail `neither setup writes pi's settings.json itself`; the Linux call turned into a no-op fails `both setups converge pi-settings BEFORE dotf deploy`
+- The replaced bats tests evaluated the shell sync block on fixtures and grepped the PowerShell one; their properties (seed only when absent, model list replaced, other keys and the mode kept, a non-object file refused) are the Go tests of PR 14 in `internal/pi` and `internal/converge`
+- Not run here: the apply on a scratch HOME. The live runs are CI's `integration` job (a plain `setup-linux.sh`) and `test-windows` (`setup-windows.ps1` end to end, then doctor), both on this PR, and from-zero, which the `pisettings.go` comment change triggers
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
