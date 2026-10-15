@@ -36,6 +36,7 @@ workstation clutter without risking data loss.`,
 	cmd.AddCommand(newWorktreeSweepCmd())
 	cmd.AddCommand(newWorktreeDoneCmd())
 	cmd.AddCommand(newWorktreeAdoptCmd())
+	cmd.AddCommand(newWorktreeMigrateCmd())
 	return cmd
 }
 
@@ -81,6 +82,67 @@ the worktree holding the current directory.`,
 	cmd.Flags().IntVar(&issue, "issue", 0, "associated GitHub issue number")
 	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "lease duration before sweep may reap it")
 	return cmd
+}
+
+func newWorktreeMigrateCmd() *cobra.Command {
+	var (
+		repoDir string
+		dryRun  bool
+	)
+	cmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Move legacy <repo>-wt-<slug> siblings under WORKTREE_ROOT",
+		Long: `migrate moves each worktree of the repository still in the legacy sibling
+layout, <parent>/<repo>-wt-<slug>, to <WORKTREE_ROOT>/<repo>/<branch-slug> with
+git worktree move, so git's own records follow it. It skips, and says why, a
+worktree that is locked, that holds the current directory or a Claude Code
+session active in the last six hours, or whose target already exists. A second
+run finds nothing to do.
+
+Moving a worktree changes the directory a Claude Code session is keyed on: a
+session started in the old path does not follow it.`,
+		Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			root, err := resolveCommandRepoRoot(repoDir)
+			if err != nil {
+				return err
+			}
+			cwd, _ := os.Getwd()
+			rep, err := worktree.Migrate(worktree.MigrateOptions{
+				RepoRoot:          root,
+				WorktreeRoot:      env.ResolvePath("WORKTREE_ROOT"),
+				DryRun:            dryRun,
+				Cwd:               cwd,
+				ClaudeProjectsDir: claudeProjectsDir(),
+			}, time.Now())
+			if err != nil {
+				return err
+			}
+			printMigrateReport(c, rep)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the plan without moving anything")
+	return cmd
+}
+
+func printMigrateReport(c *cobra.Command, rep *worktree.MigrateReport) {
+	if len(rep.Moves) == 0 {
+		c.Println("Nothing to migrate: no legacy <repo>-wt-* worktree")
+		return
+	}
+	verb := "Moved"
+	if rep.DryRun {
+		verb = "Would move"
+	}
+	for _, m := range rep.Moves {
+		if m.Skip != "" {
+			c.Printf("Skipped %s: %s\n", m.From, m.Skip)
+			continue
+		}
+		c.Printf("%s %s -> %s\n", verb, m.From, m.To)
+	}
 }
 
 func resolveCommandRepoRoot(repoDir string) (string, error) {

@@ -30,7 +30,7 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 ## PR 5 — migrate
 
-- [ ] `migrate --dry-run` plan output; `migrate` moves with `git worktree move`; skips refused or existing targets; second run is a no-op.
+- [x] `migrate --dry-run` plan output; `migrate` moves with `git worktree move`; skips refused or existing targets; second run is a no-op.
 
 ## PR 6 — `--agent` over herdr
 
