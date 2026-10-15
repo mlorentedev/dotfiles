@@ -248,30 +248,6 @@ assert_absent() {
     return 0
 }
 
-@test "setup-linux.sh seeds pi settings.json only when absent" {
-    block="$(extract_block "$DOTFILES_DIR/setup-linux.sh" '^PI_SETTINGS_SRC=' '^fi$')"
-    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
-    [ "$(printf '%s\n' "$block" | wc -l)" -le 20 ] \
-        || { echo "range never closed -- assertions would cover unrelated code"; return 1; }
-    printf '%s\n' "$block" | grep -qF -e 'if [ -f "$PI_SETTINGS_DST" ]' \
-        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
-    assert_absent 'cmp -s "$PI_SETTINGS_SRC"' \
-        "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"
-}
-
-@test "setup-windows.ps1 seeds pi settings.json only when absent (Linux parity)" {
-    block="$(extract_block "$DOTFILES_DIR/setup-windows.ps1" '^\$piSettingsSrc = ' '^}$')"
-    [ -n "$block" ] || { echo "pi settings deploy block not found"; return 1; }
-    [ "$(printf '%s\n' "$block" | wc -l)" -le 20 ] \
-        || { echo "range never closed -- assertions would cover unrelated code"; return 1; }
-    printf '%s\n' "$block" | grep -qF -e 'if (Test-Path -LiteralPath $piSettingsDst)' \
-        || { echo "deploy is not guarded on the destination being absent:"; printf '%s\n' "$block"; return 1; }
-    assert_absent 'Compare-Object' \
-        "settings.json compares against the destination again -- that branch is dead code for a self-mutating file"
-    # -Force would overwrite the very file the guard exists to protect.
-    assert_absent '-Force' "Copy-Item still passes -Force"
-}
-
 # --- #1938: declarative compaction, merged into the seeded settings.json ---
 # pi auto-compacts when contextTokens > contextWindow - reserveTokens, so a 40%
 # trigger is reserveTokens = round(0.6 x contextWindow). The window lives in
@@ -318,90 +294,30 @@ assert_absent() {
 
 # A merge onto a missing destination creates it, so if `dotf deploy` ran first
 # on a fresh box it would write a settings.json holding only compaction, and
-# the seed above would then see a file and never write defaultModel. The order
-# of two blocks in a script is incidental until something asserts it.
-@test "both setups seed pi settings.json BEFORE dotf deploy merges compaction into it" {
-    seed="$(grep -n '^PI_SETTINGS_SRC=' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
+# the seed would then see a file and never write defaultModel. The seed and the
+# enabledModels sync are the pi-settings converge step (#1948, Go tests in
+# internal/pi and internal/converge); the setups only call it, before the bare
+# deploy. The order of two calls in a script is incidental until something
+# asserts it.
+@test "both setups converge pi-settings BEFORE dotf deploy merges compaction into it" {
+    step="$(grep -n '^[[:space:]]*"$_dotf" converge --only pi-settings' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
     # The bare deploy, which merges compaction; the tail re-deploys named rc files only.
     deploy="$(grep -n '"$_dotf" deploy ||' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)"
-    [ -n "$seed" ] && [ -n "$deploy" ] || { echo "linux anchors missing: seed=$seed deploy=$deploy"; return 1; }
-    [ "$seed" -lt "$deploy" ] || { echo "setup-linux.sh: seed at $seed, dotf deploy at $deploy"; return 1; }
-    seed="$(grep -n '^\$piSettingsSrc = ' "$DOTFILES_DIR/setup-windows.ps1" | cut -d: -f1)"
-    deploy="$(grep -n '& dotf deploy' "$DOTFILES_DIR/setup-windows.ps1" | cut -d: -f1)"
-    [ -n "$seed" ] && [ -n "$deploy" ] || { echo "windows anchors missing: seed=$seed deploy=$deploy"; return 1; }
-    [ "$seed" -lt "$deploy" ] || { echo "setup-windows.ps1: seed at $seed, dotf deploy at $deploy"; return 1; }
+    [ -n "$step" ] && [ -n "$deploy" ] || { echo "linux anchors missing: step=$step deploy=$deploy"; return 1; }
+    [ "$step" -lt "$deploy" ] || { echo "setup-linux.sh: pi-settings at $step, dotf deploy at $deploy"; return 1; }
+    step="$(grep -n '^[[:space:]]*& dotf converge --only pi-settings' "$DOTFILES_DIR/setup-windows.ps1" | cut -d: -f1)"
+    deploy="$(grep -n '^[[:space:]]*& dotf deploy' "$DOTFILES_DIR/setup-windows.ps1" | head -1 | cut -d: -f1)"
+    [ -n "$step" ] && [ -n "$deploy" ] || { echo "windows anchors missing: step=$step deploy=$deploy"; return 1; }
+    [ "$step" -lt "$deploy" ] || { echo "setup-windows.ps1: pi-settings at $step, dotf deploy at $deploy"; return 1; }
 }
 
-# --- AI-032 (#1247): enabledModels field-level sync on an EXISTING settings.json ---
-# The two tests above guard the whole-file seed-if-missing contract; these guard
-# the layer on top of it that lets a catalog addition (e.g. #1254's
-# qwen3.8-flash/glm5.3-flash) reach a machine that already has settings.json,
-# without resetting theme/defaultModel/lastChangelogVersion -- the exact bug #756
-# fixed by making the whole file seed-once. This one IS fully executable outside
-# a container (pure jq over temp files, no $HOME involved), unlike the seed
-# block's second-run behavior that lesson-150 documents as uncoverable here.
-
-# bats test_tags=os-sensitive
-@test "setup-linux.sh pi enabledModels sync updates the model list and preserves theme/defaultModel/lastChangelogVersion" {
-    command -v jq >/dev/null || skip "jq not available"
-    PI_SETTINGS_SRC="$BATS_TEST_TMPDIR/src.json"
-    PI_SETTINGS_DST="$BATS_TEST_TMPDIR/dst.json"
-    cat > "$PI_SETTINGS_SRC" <<'JSON'
-{"enabledModels": ["nan/qwen3.6", "nan/glm5.3-flash"]}
-JSON
-    cat > "$PI_SETTINGS_DST" <<'JSON'
-{"theme": "light", "defaultModel": "nan/mimo-v2.5", "lastChangelogVersion": "0.50.0", "enabledModels": ["nan/qwen3.6"]}
-JSON
-
-    # Stubs for the real script's logger calls -- this test only cares about
-    # the file mutation, not the log lines. eval runs in THIS shell, so no
-    # export/subshell is needed for the block to see them.
-    log_info() { :; }
-    log_success() { :; }
-    log_warning() { :; }
-
-    block="$(sed -n '/^# Field-level sync (AI-032/,/^fi$/p' "$DOTFILES_DIR/setup-linux.sh")"
-    [ -n "$block" ] || { echo "pi enabledModels sync block not found"; return 1; }
-    eval "$block"
-
-    run jq -e '.enabledModels == ["nan/qwen3.6","nan/glm5.3-flash"]
-        and .theme == "light"
-        and .defaultModel == "nan/mimo-v2.5"
-        and .lastChangelogVersion == "0.50.0"' "$PI_SETTINGS_DST"
-    [ "$status" -eq 0 ] || { echo "post-sync dst.json:"; cat "$PI_SETTINGS_DST"; return 1; }
-
-    # Second run: the already-in-sync branch must not error and must not
-    # change the result (idempotent -- same jq block, same fixtures now equal).
-    eval "$block"
-    run jq -e '.enabledModels == ["nan/qwen3.6","nan/glm5.3-flash"] and .theme == "light"' "$PI_SETTINGS_DST"
-    [ "$status" -eq 0 ] || { echo "second run changed dst.json:"; cat "$PI_SETTINGS_DST"; return 1; }
-}
-
-@test "setup-windows.ps1 pi enabledModels sync block guards both files, preserves other fields, avoids the pipe/ConvertTo-Json array-collapse bug (Linux parity)" {
-    block="$(extract_block "$DOTFILES_DIR/setup-windows.ps1" '^# Field-level sync (AI-032' '^}$')"
-    [ -n "$block" ] || { echo "pi enabledModels sync block not found"; return 1; }
-    printf '%s\n' "$block" | grep -qF -e 'Test-Path -LiteralPath $piSettingsDst -PathType Leaf' \
-        || { echo "sync is not guarded on the destination existing:"; printf '%s\n' "$block"; return 1; }
-    printf '%s\n' "$block" | grep -qF -e 'Test-Path -LiteralPath $piSettingsSrc -PathType Leaf' \
-        || { echo "sync is not guarded on the source existing:"; printf '%s\n' "$block"; return 1; }
-    # @($null).Count is 1, not 0 -- wrapping the source's enabledModels in @()
-    # before checking for null/missing would make the "no models" guard never
-    # fire and go on to write a literal null into a live settings.json. The
-    # null check must happen BEFORE the @() wrap (reviewer-found, adversarial
-    # review of this spec, initially FAIL on exactly this).
-    printf '%s\n' "$block" | grep -qF -e '$null -eq $piSrcModelsRaw' \
-        || { echo "src guard does not null-check before wrapping in @() -- @(\$null).Count is 1, not 0:"; printf '%s\n' "$block"; return 1; }
-    # -InputObject, never a bare pipe into ConvertTo-Json: piping unwraps a
-    # single-element array before the cmdlet sees a collection.
-    printf '%s\n' "$block" | grep -qF -e 'ConvertTo-Json -InputObject $piSrcModels' \
-        || { echo "src comparison pipes into ConvertTo-Json instead of using -InputObject:"; printf '%s\n' "$block"; return 1; }
-    printf '%s\n' "$block" | grep -qF -e 'ConvertTo-Json -InputObject $piDstModels' \
-        || { echo "dst comparison pipes into ConvertTo-Json instead of using -InputObject:"; printf '%s\n' "$block"; return 1; }
-    # Only .enabledModels may be assigned -- theme/defaultModel/lastChangelogVersion
-    # are pi's own runtime state and this block must never write them.
-    assert_absent '.theme =' "the sync block assigns .theme -- that is pi's own runtime state"
-    assert_absent '.defaultModel =' "the sync block assigns .defaultModel -- that is pi's own runtime state"
-    assert_absent '.lastChangelogVersion =' "the sync block assigns .lastChangelogVersion -- that is pi's own runtime state"
+# The shell and PowerShell copies of the seed and the jq/ConvertTo-Json model
+# sync are gone (#1948): a second writer of the same file is how the seed
+# found a compaction-only file and never filled it (lesson 422).
+@test "neither setup writes pi's settings.json itself" {
+    # Executable lines only: the comment above each call names enabledModels.
+    refute_grep '^[[:space:]]*([^#[:space:]].*)?(PI_SETTINGS_(SRC|DST)|enabledModels)' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep '^[[:space:]]*([^#[:space:]].*)?(\$piSettings(Src|Dst)|enabledModels)' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # CLI-018: the "missing age identity is optional for pi models.json" assertion

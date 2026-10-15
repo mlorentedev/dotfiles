@@ -11,35 +11,22 @@ name: from-zero
 # release's. install.sh's download-and-verify path is covered by the file://
 # fixture in tests/install.bats, not here.
 #
-# Not a required check yet: non-blocking until it has run green several times
-# in a row (owner, 2026-10-10). Its paths filter is the owner's trigger: the
-# install path on pull requests, and every push to main. A filtered workflow
-# never reports on an unlisted diff, so making it required means dropping the
-# filter first (CI-004, #1739). Hosted macOS minutes are free on a public
+# `from-zero-gate` is the check branch protection can require. A required
+# check that a filtered workflow never reports stays pending, so the workflow
+# runs on every pull request and its `from-zero-changes` job narrows the
+# machine matrix to the owner's trigger (2026-10-10): the install path on pull
+# requests, every push to main. The gate reports on every pull request, green
+# when both runners passed or were skipped for a diff outside that path (the
+# cli-gate pattern, CI-004 #1739). Hosted macOS minutes are free on a public
 # repository; the cost is wall-clock and the macOS concurrency it shares with
-# test-macos.
+# test-macos, which the filter keeps to the diffs that can break a bootstrap.
 #
 # No continue-on-error anywhere: a red run that names its cause is the design.
 # doctor's FAILs that the #2013 ledger already owns are listed with their
 # owners and gated both ways (from-zero-doctor-gate.sh), not ignored.
 on:
+  # No paths filter: from-zero-gate must report on every pull request.
   pull_request:
-    paths:
-      - 'install.sh'
-      - 'install.ps1'
-      - 'cli/internal/converge/**'
-      # Converge's own path outside its package: the command and its identity
-      # epilogue, and the git-hooks step's installer.
-      - 'cli/internal/cmd/converge.go'
-      - 'cli/internal/cmd/identity.go'
-      - 'cli/internal/identity/**'
-      - 'cli/internal/hooks/**'
-      - 'packages.json'
-      - 'versions.conf'
-      - 'env-contract.json'
-      - '.github/workflows/from-zero.yml'
-      - '.github/scripts/from-zero-doctor-gate.sh'
-      - '.github/scripts/from-zero-known-failures.txt'
   push:
     branches: [main]
   workflow_dispatch:
@@ -52,8 +39,47 @@ permissions:
   contents: read
 
 jobs:
+  # Narrows the machine matrix on pull requests to the install path; a push to
+  # main and a manual run always build the machine, so the default branch
+  # carries a run for every commit (PLAT-001b AC9).
+  changes:
+    name: from-zero-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      install: ${{ github.event_name != 'pull_request' || steps.filter.outputs.install == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: github.event_name == 'pull_request'
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            install:
+              - 'install.sh'
+              - 'install.ps1'
+              - 'cli/internal/converge/**'
+              # Converge's own path outside its package: the command and its
+              # identity epilogue, and the git-hooks step's installer.
+              - 'cli/internal/cmd/converge.go'
+              - 'cli/internal/cmd/identity.go'
+              - 'cli/internal/identity/**'
+              - 'cli/internal/hooks/**'
+              - 'packages.json'
+              - 'versions.conf'
+              - 'env-contract.json'
+              - '.github/workflows/from-zero.yml'
+              - '.github/scripts/from-zero-doctor-gate.sh'
+              - '.github/scripts/from-zero-known-failures.txt'
+
   from-zero:
     name: from-zero (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.install == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -169,3 +195,25 @@ jobs:
             echo "::error::the second converge was not a no-op; the entries with changes are the non-idempotent steps"
             exit 1
           }
+
+  # The one check from this workflow branch protection can require. Requiring
+  # the matrix jobs would not work: skipped at job level, GitHub reports them
+  # under the unexpanded name `from-zero (${{ matrix.os }})`. Red when either
+  # runner failed or was cancelled, or when `changes` itself failed.
+  from-zero-gate:
+    name: from-zero-gate
+    needs: [changes, from-zero]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Both runners passed, or were skipped for a diff outside the install path
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a from-zero job ended '$r' (results: $RESULTS)"; exit 1 ;;
+            esac
+          done

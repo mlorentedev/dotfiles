@@ -17,8 +17,8 @@ import (
 // pi-compaction entry merges into the same file: a merge onto a missing file
 // creates one holding only compaction, and the setup script's seed, which
 // runs last, then finds a file and never fills it (#1948, lesson 422). The
-// setup scripts keep their own seed and sync until the release carrying this
-// step is the DOTF_VERSION pin, because an older dotf does not have it.
+// setup scripts call this step (`dotf converge --only pi-settings`) before
+// their bare `dotf deploy`; their own seed and sync are gone.
 type piSettings struct {
 	has func(string) bool // is a command on PATH
 }
