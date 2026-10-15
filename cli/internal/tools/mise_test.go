@@ -518,8 +518,11 @@ func TestSync_ReadsTheToolPathFromStdoutOnly(t *testing.T) {
 		return nil, nil
 	}
 	stdout := func(name string, args ...string) ([]byte, error) {
-		if name == "mise" && args[0] == "which" {
+		switch {
+		case name == "mise" && args[0] == "which":
 			return []byte("/bin/age\n"), nil
+		case name == "/bin/age":
+			return []byte("v1.3.1"), nil
 		}
 		return nil, errors.New("unexpected")
 	}
@@ -528,6 +531,49 @@ func TestSync_ReadsTheToolPathFromStdoutOnly(t *testing.T) {
 	p, err := s.Plan(tools)
 	if err != nil || len(p.Missing) != 0 {
 		t.Fatalf("want age at its pin through the stdout runner, got %+v, %v", p, err)
+	}
+}
+
+// A tool is read the way ProbeRunner reads it (BUG-142, the BUG-141 class):
+// stdout first, so a warning that reaches the merged stream before the banner
+// never wins; a failed run only by its stdout, so ansible-lint's crash with
+// ansible-core's 2.21.5 on stderr is not at its pin.
+func TestSync_ProbesStdoutFirstAndAFailedRunOnlyThere(t *testing.T) {
+	for name, tc := range map[string]struct {
+		merged, stdout string
+		fails, missing bool
+	}{
+		"a crash naming another package's version": {merged: "UNSUPPORTED: ansible-core 2.21.5\n", fails: true, missing: true},
+		"a version, then an unrelated failure":     {merged: "age v1.3.1\nerror: x\n", stdout: "age v1.3.1\n", fails: true},
+		"a warning on stderr before the banner":    {merged: "urllib3 needs OpenSSL 1.1.1+\nage v1.3.1\n", stdout: "age v1.3.1\n"},
+		"a version only on stderr, exit 0":         {merged: "age v1.3.1\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var fail error
+			if tc.fails {
+				fail = errors.New("exit status 3")
+			}
+			merged := func(name string, args ...string) ([]byte, error) {
+				if name == "/bin/age" {
+					return []byte(tc.merged), fail
+				}
+				return nil, nil
+			}
+			stdout := func(name string, args ...string) ([]byte, error) {
+				switch name {
+				case "mise":
+					return []byte("/bin/age\n"), nil
+				case "/bin/age":
+					return []byte(tc.stdout), fail
+				}
+				return nil, errors.New("unexpected")
+			}
+			s := MiseSync{ConfigDir: t.TempDir(), Run: merged, Stdout: stdout}
+			p, err := s.Plan([]MiseTool{{"age", "1.3.1"}})
+			if err != nil || (len(p.Missing) == 1) != tc.missing {
+				t.Fatalf("missing = %v, want %v (%v)", p.Missing, tc.missing, err)
+			}
+		})
 	}
 }
 

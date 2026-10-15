@@ -177,7 +177,8 @@ func TestCheckMiseTools_LeftoversAreNotTouchedWhileAPinIsMissing(t *testing.T) {
 	s, cfg, home := shadowFixture(t, "jq")
 	// The shim exists, so only the guard on the pins can stop the link.
 	writeFile(t, filepath.Join(home, ".local", "share", "mise", "shims", "jq"), "#!/bin/sh\n")
-	s.CommandOutputDir = newSys(nil, nil, map[string]string{"mise which jq": "/m/jq\n", "/m/jq --version": "jq-1.7.1", "mise which age": "/m/age\n", "/m/age --version": "v1.0.0"}).CommandOutputDir
+	below := newSys(nil, nil, map[string]string{"mise which jq": "/m/jq\n", "/m/jq --version": "jq-1.7.1", "mise which age": "/m/age\n", "/m/age --version": "v1.0.0"})
+	s.CommandOutputDir, s.CommandStdoutDir = below.CommandOutputDir, below.CommandStdoutDir
 	var b bytes.Buffer
 	rep := capture(&b)
 	checkMiseTools(s, cfg, rep, true)
