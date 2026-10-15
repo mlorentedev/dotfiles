@@ -3,6 +3,8 @@ package env
 import (
 	"encoding/xml"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -13,6 +15,8 @@ type fakeLaunchd map[string]string
 
 func (f fakeLaunchd) run(args ...string) (string, error) {
 	switch args[0] {
+	case "managername":
+		return "Aqua\n", nil
 	case "getenv":
 		if v, ok := f[args[1]]; ok {
 			return v + "\n", nil
@@ -95,5 +99,89 @@ func TestLaunchAgentPlist_RunsTheInstalledDotfAtLogin(t *testing.T) {
 	}
 	if doc.Dict.Strings[0] != LaunchAgentLabel {
 		t.Errorf("Label = %q", doc.Dict.Strings[0])
+	}
+}
+
+// backgroundLaunchd is launchctl as a process under tmux or herdr sees it
+// (#2507): its own domain is "Background", so getenv and setenv reach that
+// domain, and the login session is visible only through `print gui/<uid>`.
+type backgroundLaunchd struct {
+	own   fakeLaunchd
+	print string // the raw `launchctl print gui/501` output
+}
+
+func (b backgroundLaunchd) run(args ...string) (string, error) {
+	switch {
+	case args[0] == "managername":
+		return "Background\n", nil
+	case args[0] == "print" && len(args) == 2 && args[1] == "gui/501":
+		return b.print, nil
+	}
+	return b.own.run(args...)
+}
+
+func measuredPrint(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "launchctl-print-gui.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+// The defect of #2507: under herdr every variable read as missing, because
+// getenv answered for the Background domain. Outside the login session the
+// store reads the login session's environment block instead, and never the
+// caller's own domain, even where that holds a value.
+func TestLaunchdUserEnv_OutsideTheLoginSessionReadsTheLoginSession(t *testing.T) {
+	b := backgroundLaunchd{own: fakeLaunchd{"VAULT_PATH": "/stale"}, print: measuredPrint(t)}
+	s := LaunchdUserEnv{Run: b.run, UID: 501}
+	for name, want := range map[string]string{
+		"VAULT_PATH":       "/Users/me/My Vault",
+		"DOTFILES_DIR":     "/Users/me/.dotfiles",
+		"DOTF_MANAGED_ENV": "DOTFILES_DIR;VAULT_PATH",
+	} {
+		if v, ok, err := s.Get(name); err != nil || !ok || v != want {
+			t.Errorf("Get(%s) = %q, %v, %v; want %q", name, v, ok, err, want)
+		}
+	}
+	if _, ok, err := s.Get("AGE_KEY_PATH"); err != nil || ok {
+		t.Errorf("a name the login session lacks must read as absent, got ok=%v err=%v", ok, err)
+	}
+}
+
+// A session with nothing set prints no environment block; that is an empty
+// scope, not an error.
+func TestLaunchdUserEnv_NoEnvironmentBlockReadsAsEmpty(t *testing.T) {
+	b := backgroundLaunchd{own: fakeLaunchd{}, print: "gui/501 = {\n\ttype = login\n\tsession = Aqua\n}\n"}
+	s := LaunchdUserEnv{Run: b.run, UID: 501}
+	if _, ok, err := s.Get("VAULT_PATH"); err != nil || ok {
+		t.Fatalf("want absent, got ok=%v err=%v", ok, err)
+	}
+}
+
+// Output that is not a domain listing at all means launchctl changed shape:
+// that must surface, not read as "nothing set" and report drift.
+func TestLaunchdUserEnv_UnrecognisedPrintIsAnError(t *testing.T) {
+	b := backgroundLaunchd{own: fakeLaunchd{}, print: "Bad request.\n"}
+	s := LaunchdUserEnv{Run: b.run, UID: 501}
+	if _, _, err := s.Get("VAULT_PATH"); err == nil {
+		t.Fatal("want an error for output with no gui/501 domain header")
+	}
+}
+
+// setenv from Background lands in Background, where no Dock app reads it, so
+// the store refuses rather than report a write the login session never saw.
+func TestLaunchdUserEnv_OutsideTheLoginSessionRefusesToWrite(t *testing.T) {
+	b := backgroundLaunchd{own: fakeLaunchd{}, print: measuredPrint(t)}
+	s := LaunchdUserEnv{Run: b.run, UID: 501}
+	if err := s.Set("VAULT_PATH", "/x"); !errors.Is(err, ErrOutsideLoginSession) {
+		t.Errorf("Set: want ErrOutsideLoginSession, got %v", err)
+	}
+	if err := s.Delete("VAULT_PATH"); !errors.Is(err, ErrOutsideLoginSession) {
+		t.Errorf("Delete: want ErrOutsideLoginSession, got %v", err)
+	}
+	if len(b.own) != 0 {
+		t.Errorf("nothing may reach the caller's own domain, got %v", b.own)
 	}
 }
