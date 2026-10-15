@@ -1,11 +1,12 @@
 ---
 id: FIX-WIN-TUI-001
 type: proposal
-status: draft
+status: abandoned
 owner: "@mlorentedev"
 created: "2026-10-02"
 issue: "mlorentedev/dotfiles#2019"   # the fix merged as #1971 (issue #1970, closed); #2019 tracks review and archive
 wip_override: "critical fix for interactive CLIs on Windows"
+review_bypass: "force-without-review; overrode: review.md records verdict FAIL — address the findings and re-review before archiving; reason: review FAILed (2026-10-13) and the owner replaced the reviewed Base64 wrapper with ConPTY (#1650); the wrapper is superseded, so no re-review can pass this proposal; date: 2026-10-14"
 ---
 
 # Fix Windows TTY failure for interactive Node CLIs (pi, opencode)
