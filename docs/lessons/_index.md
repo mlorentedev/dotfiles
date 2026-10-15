@@ -458,4 +458,5 @@ tags: [lessons, index, dotfiles]
 | [437 - A drift check must know who reads the variable](lesson-437-a-drift-check-must-know-who-reads-the-variable.md) | 2026-10-14 |
 | [438 - A command typed into a pane runs the pane's world, not the caller's](lesson-438-a-command-typed-into-a-pane-runs-the-panes-world-not-the-callers.md) | 2026-10-14 |
 | [439 - A cache used as the truth side of a check needs an age, not just a presence](lesson-439-a-cache-used-as-the-truth-side-needs-an-age.md) | 2026-10-15 |
+| [445 - A merge rule keyed by path is checked on the source, not where the walk reaches it](lesson-445-a-merge-rule-keyed-by-path-checks-the-source-not-the-walk.md) | 2026-10-15 |
 <!-- END GENERATED -->

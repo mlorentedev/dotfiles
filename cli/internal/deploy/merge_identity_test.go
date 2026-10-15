@@ -1,6 +1,8 @@
 package deploy
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -150,6 +152,7 @@ func TestParseManifest_ListKeys(t *testing.T) {
 		"accepted at version 5":   {`{"version":5,"configs":[` + entry + `{"keys.command":"key"}}]}`, ""},
 		"refused at version 4":    {`{"version":4,"configs":[` + entry + `{"keys.command":"key"}}]}`, "listKeys needs manifest version 5"},
 		"refused without merge":   {`{"version":5,"configs":[{"name":"x","src":"a.toml","dst":"b.toml","listKeys":{"k":"id"}}]}`, "listKeys needs strategy merge"},
+		"refused when empty":      {`{"version":5,"configs":[` + entry + `{}}]}`, "empty listKeys"},
 		"refused with empty path": {`{"version":5,"configs":[` + entry + `{"":"key"}}]}`, "empty"},
 		"refused with empty key":  {`{"version":5,"configs":[` + entry + `{"keys.command":""}}]}`, "empty"},
 	} {
@@ -162,5 +165,19 @@ func TestParseManifest_ListKeys(t *testing.T) {
 				t.Fatalf("want an error containing %q, got %v", tc.want, err)
 			}
 		})
+	}
+}
+
+// A key holding "." is read as nesting by the up-front check and reaches the
+// merge under the same dotted path: it is refused there, never a panic on a
+// list of non-tables.
+func TestMergeInto_ListKeysOnADottedKeyIsRefused(t *testing.T) {
+	dst := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(dst, []byte(`{"a.b":[{"id":1}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := mergeInto(dst, []byte(`{"a.b":[1,2]}`), map[string]string{"a.b": "id"})
+	if err == nil || !strings.Contains(err.Error(), "not a table") {
+		t.Fatalf("got %v, want a refusal naming the non-table element", err)
 	}
 }
