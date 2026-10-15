@@ -329,8 +329,9 @@ log_info "Setting up OpenCode configuration..."
 # CLI itself comes from mise (versions.conf `# mise: latest`, #2013 D9), which
 # the tools step installs before anything reads a harness; models.json gets the
 # same deploy-time secret substitution as opencode (SDD-009, self-contained
-# cross-OS); AGENTS.md is the same canonical SSOT; settings.json is the
-# pi-settings converge step's, called with `dotf deploy` below.
+# cross-OS); AGENTS.md is the same canonical SSOT; settings.json belongs to
+# the pi-settings converge step, which the `dotf converge --only pi-settings`
+# line below runs just before the bare `dotf deploy` (deploy never runs it).
 
 # Agent configs are deployed by `dotf deploy` (CLI-039): one implementation for
 # every OS, replacing the per-config copies that lived here and their twins in
