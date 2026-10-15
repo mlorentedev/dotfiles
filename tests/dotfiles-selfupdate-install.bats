@@ -37,18 +37,10 @@ setup() {
 
 # --- setup-linux.sh opt-in wiring (tri-state gate) ---
 
-@test "setup-linux.sh gates the timer on DOTFILES_AUTODEPLOY" {
-    grep -qF 'DOTFILES_AUTODEPLOY' "$DOTFILES_DIR/setup-linux.sh"
-}
-
 @test "setup-linux.sh deploys both units into the systemd --user dir" {
     grep -qF 'systemd/dotfiles-selfupdate.service' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'systemd/dotfiles-selfupdate.timer' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'systemd/user' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-linux.sh enables the timer with --now when opted in" {
-    grep -qF 'enable --now dotfiles-selfupdate.timer' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh disables + removes the timer on opt-out (=0)" {
@@ -64,11 +56,6 @@ setup() {
 }
 
 # --- setup-windows.ps1 parity ---
-
-@test "setup-windows.ps1 registers a daily DotfilesSelfUpdate task gated on the env var" {
-    grep -qF 'DotfilesSelfUpdate' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'DOTFILES_AUTODEPLOY' "$DOTFILES_DIR/setup-windows.ps1"
-}
 
 @test "setup-windows.ps1 self-deploy task runs 'dotf update'" {
     grep -qF 'dotf.exe' "$DOTFILES_DIR/setup-windows.ps1"

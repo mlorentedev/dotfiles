@@ -43,13 +43,11 @@ setup() {
 # uv is a mise-pinned CLI and poetry a packages.json uv-tool entry (#2013 W2):
 # no unpinned installer and no per-script poetry block survive.
 @test "setup-linux.sh gets uv from mise, not from uv's curl installer" {
-    grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
     refute_grep_fixed 'astral.sh/uv/install.sh' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "poetry is a packages.json uv-tool entry, and setup-linux.sh has no poetry block" {
     jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool" and (.source.platforms == null))' "$DOTFILES_DIR/packages.json" >/dev/null
-    refute_grep_fixed 'uv tool install poetry' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # install places mise, sync installs the pinned CLIs (uv), and the second
@@ -194,13 +192,10 @@ setup() {
 #
 # HARNESS-045 AC1 moved the SSOT. The hook command used to be a literal in this
 # script (EXPECTED_HOOK_COMMAND) and is now declared in harness/manifest.json,
-# emitted by `dotf harness bind`. These guards follow it: this file asserts the
-# script still RUNS the emitter on every setup, and the manifest asserts WHAT it
-# emits. Asserting a literal here again would recreate the second writer.
-
-@test "setup-linux.sh emits the harness hooks by running dotf harness bind" {
-    grep -qF 'harness bind' "$DOTFILES_DIR/setup-linux.sh"
-}
+# emitted by `dotf harness bind`. These guards follow it: claude-settings-
+# template.bats asserts both scripts still RUN the emitter on every setup, and
+# the manifest asserts WHAT it emits. Asserting a literal here again would
+# recreate the second writer.
 
 @test "the manifest declares the session hooks setup used to hardcode" {
     local manifest="$DOTFILES_DIR/harness/manifest.json"
@@ -218,7 +213,6 @@ setup() {
     # The call sits behind a capability probe (is dotf new enough) and nothing
     # else -- notably not behind a "does the file already have hooks" test.
     refute_grep_fixed 'if.*hooks.*then.*harness bind' "$DOTFILES_DIR/setup-linux.sh"
-    grep -qF "grep -q '^[[:space:]]*bind[[:space:]]'" "$DOTFILES_DIR/setup-linux.sh"
 }
 
 # CLI-025 cutover guard: no deploy/registration file may deploy or invoke the
@@ -246,7 +240,6 @@ setup() {
 
 # MCP server list must live in mcp-servers.json, not hardcoded in setup-linux.sh.
 @test "setup-linux.sh MCP registration reads from mcp-servers.json" {
-    grep -q 'mcp-servers\.json' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$DOTFILES_DIR/setup-linux.sh"
 }
 
@@ -295,10 +288,6 @@ setup() {
     grep -q 'restore_claude_json_if_truncated()' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-linux.sh cites upstream issue 59870 in the truncate guard (BUG-004)" {
-    grep -qF '#59870' "$DOTFILES_DIR/setup-linux.sh"
-}
-
 @test "setup-linux.sh uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
     grep -qF '10240' "$DOTFILES_DIR/setup-linux.sh"
 }
@@ -326,7 +315,6 @@ setup() {
 @test "setup-linux.sh wraps claude mcp add with snapshot+restore (BUG-011)" {
     # snapshot called within 15 lines before mcp add (header comments + mcp get
     # idempotence path live between); restore within 10 lines after.
-    grep -B15 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'snapshot_claude_json'
     grep -A10 'claude mcp add --transport' "$DOTFILES_DIR/setup-linux.sh" | grep -q 'restore_claude_json_if_truncated'
 }
 
@@ -499,14 +487,8 @@ sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") ==
 # CLI-012/CLI-018: both setups fold the old doctor + healthcheck blocks into ONE
 # `dotf doctor` call (the consolidated sweep).
 @test "setup-linux.sh runs dotf doctor non-fatally post-setup" {
-    grep -q 'dotf doctor' "$DOTFILES_DIR/setup-linux.sh"
     # non-fatal: the failure path warns, never hard-exits.
     grep -q 'dotf doctor || log_warning' "$DOTFILES_DIR/setup-linux.sh"
-}
-
-@test "setup-windows.ps1 runs dotf doctor post-setup (CLI-018)" {
-    grep -qF 'dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
-    grep -qF 'Running post-setup dotf doctor' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 # Required binaries in the contract must include min_version pins.
@@ -551,7 +533,6 @@ sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") ==
 # sub-check would see drift).
 
 @test "setup-linux.sh mirrors harness/ into the deploy dir through dotf harness mirror (WIN-007)" {
-    grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
     # The bash+jq block is gone -- one implementation for both OSes. A `run` +
     # status check, not a bare negation: a negated assertion is exempt from
     # set -e and cannot fail a test (lesson 224).
@@ -566,7 +547,6 @@ sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") ==
     # per-target assertions stayed green while `dotf doctor` failed permanently.
     # The OUTCOME -- every declared target present in $DOTFILES_DIR -- is
     # asserted by verify-setup.bats against a real deploy.
-    grep -qF 'dotf harness mirror' "$DOTFILES_DIR/setup-linux.sh"
     run grep -qF 'safe_copy "$CURRENT_DIR/$_harness_target"' "$DOTFILES_DIR/setup-linux.sh"
     [ "$status" -ne 0 ]
 }
@@ -662,9 +642,6 @@ $block"
 # edited -- the manifest is the SSOT of what gets deployed, not the call site.
 @test "setup-linux.sh deploys agent configs with bare dotf deploy, naming no config (CLI-054)" {
     grep -qE '"\$_dotf" deploy( \|\||$)' "$DOTFILES_DIR/setup-linux.sh"
-    # Anchored to the invocation shape (a line that RUNS dotf), not to any
-    # mention: the comment above the call names the old form on purpose.
-    refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
 }
 
 @test "setup-linux.sh resolves dotf by path for the config deploy, not only by name (#1305 class)" {

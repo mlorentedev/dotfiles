@@ -29,8 +29,8 @@
   },
   {
     "id": "CI-012-dedupe-ci-tests-f5",
-    "behavior": "A CI run of this change uploaded the bats-junit artifact",
-    "verification": "gh api 'repos/mlorentedev/dotfiles/actions/artifacts?name=bats-junit' --jq '[.artifacts[] | select(.workflow_run.head_branch == \"ci/dedupe-bats-build\" and (.expired | not))] | length > 0' | grep -qx true",
+    "behavior": "CI runs on main upload the bats-junit artifact",
+    "verification": "gh api --paginate 'repos/mlorentedev/dotfiles/actions/artifacts?name=bats-junit&per_page=100' --jq '[.artifacts[] | select(.workflow_run.head_branch == \"main\" and (.expired | not))] | length > 0' | grep -qx true",
     "state": "pending",
     "evidence": ""
   },
@@ -38,6 +38,13 @@
     "id": "CI-012-dedupe-ci-tests-f6",
     "behavior": "The shared fixture template: copies hold its history and are writable, the template is read-only, a failing builder fails the build",
     "verification": "cd \"$(git rev-parse --show-toplevel)\" && bats tests/fixture-template-helper.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-012-dedupe-ci-tests-f7",
+    "behavior": "No two bats tests make the same static assertion, and the check's rules hold on fixtures",
+    "verification": "cd \"$(git rev-parse --show-toplevel)\" && bats tests/duplicate-assertions.bats",
     "state": "pending",
     "evidence": ""
   }
