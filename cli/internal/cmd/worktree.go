@@ -256,6 +256,9 @@ clean git status, confirmed merged PR, and minimum age.`,
 					report.UninspectableProcesses)
 			}
 
+			for _, s := range report.SessionSkips {
+				c.Printf("  - skipped: %s: %s\n", s.Path, s.Reason)
+			}
 			if opts.DryRun {
 				c.Printf("[DRY-RUN] Found %d reapable worktree(s), %d skipped.\n", len(report.Reaped), report.SkippedCount)
 				for _, r := range report.Reaped {
@@ -264,7 +267,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 				return nil
 			}
 
-			c.Printf("Sweep complete: reaped %d worktree(s), %d skipped (active/dirty/unmerged).\n", len(report.Reaped), report.SkippedCount)
+			c.Printf("Sweep complete: reaped %d worktree(s), %d skipped (active, dirty, unmerged or a recent session).\n", len(report.Reaped), report.SkippedCount)
 			for _, r := range report.Reaped {
 				c.Printf("  - reaped: %s (%s)\n", r.Path, r.Branch)
 			}
