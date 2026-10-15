@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -208,14 +209,10 @@ func countRevList(dir, revRange string) (int, error) {
 	return count, nil
 }
 
+// resolveBaseRef is what a branch's landing is checked against: the remote's
+// default branch, else a local main or master.
 func resolveBaseRef(repoDir string) string {
-	candidates := []string{"origin/HEAD", "origin/main", "origin/master", "main", "master"}
-	for _, ref := range candidates {
-		if exec.Command("git", "-C", repoDir, "rev-parse", "--verify", ref).Run() == nil {
-			return ref
-		}
-	}
-	return ""
+	return firstRef(repoDir, append(slices.Clone(remoteBaseRefs), "main", "master"))
 }
 
 func removeWorktree(absRepo, absWT string, force bool) error {

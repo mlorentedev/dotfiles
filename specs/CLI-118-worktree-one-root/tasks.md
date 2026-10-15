@@ -13,8 +13,8 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 ## PR 2 — branch validation
 
-- [ ] `ValidateBranch` table test: accepts `feat/foo-bar`, refuses `foo`, `Feat/x`, `feat/Foo`, `feat/phase-3-x`, `feat/milestone2`, naming the rule.
-- [ ] `add` default base from origin/HEAD → origin/main → origin/master (fetch first; refuse when none resolves).
+- [x] `ValidateBranch` table test: accepts `feat/foo-bar`, refuses `foo`, `Feat/x`, `feat/Foo`, `feat/phase-3-x`, `feat/milestone2`, naming the rule.
+- [x] `add` default base from origin/HEAD → origin/main → origin/master (fetch first; refuse when none resolves).
 
 ## PR 3 — live-session refusal (#1653)
 

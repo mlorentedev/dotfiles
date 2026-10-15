@@ -120,7 +120,17 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 }
 
 type MockAddRunner struct {
-	OnWorktreeAdd func(repo, target, branch, base string) error
+	OnWorktreeAdd  func(repo, target, branch, base string) error
+	OnDefaultBase  func(repo string) (string, error)
+	DefaultBaseRan bool
+}
+
+func (m *MockAddRunner) DefaultBase(repo string) (string, error) {
+	m.DefaultBaseRan = true
+	if m.OnDefaultBase != nil {
+		return m.OnDefaultBase(repo)
+	}
+	return "origin/main", nil
 }
 
 func (m *MockAddRunner) WorktreeAdd(repo, target, branch, base string) error {
