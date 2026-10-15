@@ -593,3 +593,26 @@ func TestSudoCommand(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// The probe before the install can pass on a cached ticket that expires while
+// brew downloads, and brew's own sudo then asks and fails. Asked again past the
+// cache, a refusal defers the cask (the converge stays green); a still-working
+// sudo leaves the failure an error.
+func TestInstallSystem_CaskWhoseSudoTicketExpiredMidInstallIsDeferred(t *testing.T) {
+	w := newWorld("brew", "sudo")
+	w.sudoOK = true
+	in := w.installer("darwin")
+	run := in.Run
+	in.Run = func(name string, args ...string) error {
+		_ = run(name, args...)
+		w.sudoOK = false // the ticket ran out while brew downloaded
+		return fmt.Errorf("exit status 1")
+	}
+	res, err := in.Install(veracrypt())
+	if err != nil || res != Skipped {
+		t.Fatalf("Install = %v, %v; want Skipped, nil\n%s", res, err, w.out.String())
+	}
+	if got, want := in.SudoDeferred(), "brew install --cask veracrypt"; got != want {
+		t.Errorf("SudoDeferred = %q, want %q", got, want)
+	}
+}

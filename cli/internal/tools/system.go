@@ -277,7 +277,7 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 	}
 	argv := in.systemInstallArgv(manager, pkg)
 	if err := in.Run(argv[0], argv[1:]...); err != nil {
-		if in.needsSudoPassword(argv) {
+		if in.needsSudoPassword(argv) || in.markedCaskLostSudo(t, manager) {
 			return in.deferForSudo(t, wait), nil
 		}
 		return Skipped, fmt.Errorf("%s: %s: %w", t.Name, strings.Join(argv, " "), err)
@@ -349,6 +349,20 @@ func SudoInstallCommand(pkgs []string) string {
 // wanted a password, in the order Install met them; "" when none was.
 func (in *Installer) SudoDeferred() string {
 	return SudoCommand(in.sudoDeferred)
+}
+
+// markedCaskLostSudo reports whether a marked cask's install failed after sudo
+// stopped working: the probe before it passed on a cached ticket that expired
+// (default five minutes) while brew downloaded, so brew's own sudo then asked.
+// It asks again, past the cache. A marked cask is known to need the password,
+// so a refusal now is the likeliest cause of the failure; with sudo still
+// working the failure is something else and stays an error.
+func (in *Installer) markedCaskLostSudo(t Tool, manager string) bool {
+	if manager != "brew-cask" || !t.Source.NeedsSudo {
+		return false
+	}
+	in.sudoRefuses = nil
+	return in.sudoRefused()
 }
 
 // waitsOnSudo reports whether installing pkg would stop on a sudo password.
