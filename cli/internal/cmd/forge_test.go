@@ -16,6 +16,7 @@ var forgeSchemaPath, _ = filepath.Abs(filepath.Join("..", "..", "..", "forge", "
 // real one, so the command validates exactly what the repo ships).
 func seedForge(t *testing.T, root, repos string) {
 	t.Helper()
+	stubForgeFresh(t, func(string) error { return nil })
 	schema, err := os.ReadFile(forgeSchemaPath)
 	if err != nil {
 		t.Fatal(err)
@@ -37,6 +38,16 @@ func stubForgeGH(t *testing.T, fn func(args ...string) (string, string, error)) 
 	orig := forgeRun
 	t.Cleanup(func() { forgeRun = orig })
 	forgeRun = fn
+}
+
+// stubForgeFresh replaces the freshness gate; seedForge passes it, since
+// makeRepo's repository has no origin. internal/forge tests the real one
+// against real git histories.
+func stubForgeFresh(t *testing.T, fn func(root string) error) {
+	t.Helper()
+	orig := forgeFresh
+	t.Cleanup(func() { forgeFresh = orig })
+	forgeFresh = fn
 }
 
 const unprotectedRepo = `"o/r":{"branch":"main","state":"unprotected","reason":"not protected on purpose"}`
@@ -139,5 +150,46 @@ func TestForgeProtectionApplyExitsNonZeroWhenAReadFails(t *testing.T) {
 	out, _, err := execute(t, "forge", "protection", "apply")
 	if err == nil || !strings.Contains(out, "[FAILED] o/r") {
 		t.Fatalf("a failed read must never exit 0: err=%v\n%s", err, out)
+	}
+}
+
+func TestForgeProtectionRefusesAStaleDeclaration(t *testing.T) {
+	for _, args := range [][]string{
+		{"forge", "protection", "check"},
+		{"forge", "protection", "apply"},
+		{"forge", "protection", "apply", "--dry-run"},
+	} {
+		t.Run(strings.Join(args[2:], " "), func(t *testing.T) {
+			root := makeRepo(t)
+			seedForge(t, root, unprotectedRepo)
+			stubForgeFresh(t, func(string) error {
+				return errors.New("forge/branch-protection.json differs from origin/main's")
+			})
+			asked := false
+			stubForgeGH(t, func(...string) (string, string, error) { asked = true; return "", "", nil })
+
+			_, errOut, err := execute(t, args...)
+			if err == nil {
+				t.Fatal("a stale declaration must exit non-zero")
+			}
+			if !strings.Contains(errOut, "origin/main") {
+				t.Errorf("the refusal must say what the declaration differs from:\n%s", errOut)
+			}
+			if asked {
+				t.Error("the forge must not be asked, let alone written, for a stale declaration")
+			}
+		})
+	}
+}
+
+func TestForgeProtectionUnmergedSkipsTheFreshnessGate(t *testing.T) {
+	root := makeRepo(t)
+	seedForge(t, root, unprotectedRepo)
+	stubForgeFresh(t, func(string) error { t.Error("--unmerged must not run the freshness gate"); return nil })
+	stubForgeGH(t, func(...string) (string, string, error) {
+		return "", "gh: Branch not protected (HTTP 404)\n", errors.New("exit status 1")
+	})
+	if out, _, err := execute(t, "forge", "protection", "apply", "--dry-run", "--unmerged"); err != nil {
+		t.Fatalf("--unmerged uses this checkout's file: %v\n%s", err, out)
 	}
 }

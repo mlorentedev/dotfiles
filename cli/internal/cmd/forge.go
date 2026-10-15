@@ -42,6 +42,14 @@ var forgeRun forge.Runner = func(args ...string) (string, string, error) {
 	return out.String(), errOut.String(), err
 }
 
+// forgeFresh confirms the declaration is the one origin's default branch
+// holds; a package var so cmd tests, whose repos have no origin, drive it.
+var forgeFresh = forge.CheckFresh
+
+// unmergedUsage is the help of the flag that skips forgeFresh, shared by
+// check and apply.
+const unmergedUsage = "use this checkout's declaration even where it differs from origin's default branch (previewing a declaration change on its branch)"
+
 func newForgeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "forge",
@@ -62,6 +70,7 @@ func newForgeCmd() *cobra.Command {
 
 func newForgeProtectionCheckCmd() *cobra.Command {
 	var repo string
+	var unmerged bool
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "Diff every declared repository's live branch protection against the declaration",
@@ -77,13 +86,17 @@ a repository.
   STATE         declared unavailable or unprotected, with its reason
   UNANSWERABLE  the forge could not be asked (auth, network, a 403)
 
+It first fetches origin and refuses when this checkout's declaration differs
+from the default branch's: a stale checkout would answer for a declaration
+that is no longer in force. --unmerged checks this checkout's file instead.
+
 Exit status is 0 only when nothing drifted and every question was answered.`,
 		Example:       "  dotf forge protection check\n  dotf forge protection check --repo mlorentedev/hive",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			decl, err := loadForgeDecl(c, "check", repo)
+			decl, err := loadForgeDecl(c, "check", repo, unmerged)
 			if err != nil {
 				return err
 			}
@@ -96,12 +109,14 @@ Exit status is 0 only when nothing drifted and every question was answered.`,
 		},
 	}
 	cmd.Flags().StringVar(&repo, "repo", "", "check one declared owner/name only")
+	cmd.Flags().BoolVar(&unmerged, "unmerged", false, unmergedUsage)
 	return cmd
 }
 
 // loadForgeDecl loads the declaration of the checkout containing the cwd,
-// restricted to one repository when repo is set.
-func loadForgeDecl(c *cobra.Command, verb, repo string) (forge.Declaration, error) {
+// restricted to one repository when repo is set. Unless unmerged, it refuses a
+// declaration that differs from the one origin's default branch holds.
+func loadForgeDecl(c *cobra.Command, verb, repo string, unmerged bool) (forge.Declaration, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return forge.Declaration{}, err
@@ -109,6 +124,12 @@ func loadForgeDecl(c *cobra.Command, verb, repo string) (forge.Declaration, erro
 	root, err := spec.RepoRoot(cwd)
 	if err != nil {
 		return forge.Declaration{}, err
+	}
+	if !unmerged {
+		if err := forgeFresh(root); err != nil {
+			c.PrintErrln("forge protection "+verb+":", err)
+			return forge.Declaration{}, err
+		}
 	}
 	decl, err := forge.Load(root)
 	if err != nil {
@@ -130,7 +151,7 @@ func loadForgeDecl(c *cobra.Command, verb, repo string) (forge.Declaration, erro
 
 func newForgeProtectionApplyCmd() *cobra.Command {
 	var repo string
-	var dryRun bool
+	var dryRun, unmerged bool
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Converge every declared repository's live branch protection on the declaration",
@@ -149,6 +170,12 @@ otherwise: with enforce_admins, a required check that never reports locks the
 branch, the owner included. Repositories declared unavailable or unprotected
 are skipped; apply never removes protection.
 
+It refuses, writing nothing, when this checkout's declaration differs from
+the one origin's default branch holds: apply writes what has landed, so a
+stale checkout cannot revert the forge to an old declaration. --unmerged
+uses this checkout's file, for a --dry-run of a declaration change on its
+branch.
+
   UNCHANGED  live already matches
   PLANNED    --dry-run: what a real run would change
   APPLIED    written and verified
@@ -164,7 +191,7 @@ from git history: protection changes through the admin API, not a merge.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			decl, err := loadForgeDecl(c, "apply", repo)
+			decl, err := loadForgeDecl(c, "apply", repo, unmerged)
 			if err != nil {
 				return err
 			}
@@ -180,6 +207,7 @@ from git history: protection changes through the admin API, not a merge.`,
 	}
 	cmd.Flags().StringVar(&repo, "repo", "", "apply to one declared owner/name only")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what would change, run the preflight, and write nothing")
+	cmd.Flags().BoolVar(&unmerged, "unmerged", false, unmergedUsage)
 	return cmd
 }
 
