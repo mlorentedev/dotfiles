@@ -22,6 +22,7 @@ This spec tracked #2059 across three PRs: N4, N5 and N7 in the first, N3 in #250
 - Full bats suite, branch vs a clean `origin/main` worktree on this Mac: 61 failing on `main`, the same 61 on the branch plus one that was mine (`stub-real-pairing` wanted an exemption for the suite that stubs `go`), fixed in this change. The 61 are macOS environment failures (`/private` path prefix, GNU userland, PyYAML), a separate piece of work.
 - No regressions in existing test suite: yes (after the fix above).
 - N6, on this Mac: `bats --jobs 4 tests/*.bats` -> 1938 ok, 0 not ok, exit 0.
+- Re-verified on `main` at `6d92b561` (2026-10-14, after #2505 merged): every `features.json` verification, f1 to f7, exits 0.
 
 ## Decisions made during implementation
 

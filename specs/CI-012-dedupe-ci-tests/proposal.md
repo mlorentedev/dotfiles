@@ -67,12 +67,12 @@ CI had no per-file bats timing for the #1744 budget guard to read.
 
 ## Acceptance criteria
 
-- [ ] AC1: a compile error in `cli/` fails the bats files that run the real binary, locally and in CI, instead of skipping them.
-- [ ] AC2: with `DOTF_BIN` set, those files run that binary and do not build; set to a non-executable it fails.
-- [ ] AC3: each deleted `dotf-agent-run.bats` case has a Go twin that goes red when the behaviour is mutated.
-- [ ] AC4: the Linux bats step keeps `--jobs` and `--no-parallelize-within-files`, writes `report.xml` with per-file time, and uploads it even when the run is red.
-- [ ] AC5: the five fixture-heavy files copy a fixture built once per file; a copy holds the template's history and is the test's own to write, a write into the template fails, and a builder failing mid-way fails the build.
-- [ ] AC6: no two bats tests make the same static assertion, and the check that says so reads hundreds of assertions (a parser that matched nothing fails it).
+- [x] AC1: a compile error in `cli/` fails the bats files that run the real binary, locally and in CI, instead of skipping them.
+- [x] AC2: with `DOTF_BIN` set, those files run that binary and do not build; set to a non-executable it fails.
+- [x] AC3: each deleted `dotf-agent-run.bats` case has a Go twin that goes red when the behaviour is mutated.
+- [x] AC4: the Linux bats step keeps `--jobs` and `--no-parallelize-within-files`, writes `report.xml` with per-file time, and uploads it even when the run is red.
+- [x] AC5: the five fixture-heavy files copy a fixture built once per file; a copy holds the template's history and is the test's own to write, a write into the template fails, and a builder failing mid-way fails the build.
+- [x] AC6: no two bats tests make the same static assertion, and the check that says so reads hundreds of assertions (a parser that matched nothing fails it).
 
 ## References
 
