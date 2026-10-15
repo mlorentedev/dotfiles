@@ -21,11 +21,18 @@ func worktreeTestRepo(t *testing.T) string {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// A local bare origin: add creates from origin's default branch.
+	origin := filepath.Join(t.TempDir(), "origin.git")
+	if out, err := exec.Command("git", "init", "-q", "--bare", "-b", "main", origin).CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare: %v\n%s", err, out)
+	}
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main"},
 		{"config", "user.name", "Test"},
 		{"config", "user.email", "test@example.com"},
 		{"commit", "-q", "--allow-empty", "-m", "initial"},
+		{"remote", "add", "origin", origin},
+		{"push", "-q", "origin", "main"},
 	} {
 		c := exec.Command("git", args...)
 		c.Dir = repo
