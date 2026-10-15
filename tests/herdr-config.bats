@@ -39,3 +39,15 @@ setup() {
     run jq -r '.env_vars[] | select(.name == "HERDR_CONFIG_DIR") | .default.windows' "$contract"
     [ "$output" = '$env:USERPROFILE\AppData\Roaming\herdr' ]
 }
+
+@test "every harness that trusts folders trusts the worktrees herdr creates (#2503)" {
+    # herdr puts a worktree at <directory>/<repo>/<branch-slug>. A harness that
+    # does not trust that path asks, or refuses, in every worktree herdr opens.
+    run sed -n 's/^directory[[:space:]]*=[[:space:]]*"~\(.*\)"$/{HOME}\1\/*\/*/p' "$SRC"
+    [ -n "$output" ] || { echo "no ~-relative [worktrees] directory in $SRC"; false; }
+    want="$output"
+    run jq -e --arg w "$want" '.trustedWorkspaces | index($w)' "$REPO/ai/agy/settings.json"
+    [ "$status" -eq 0 ] || { echo "agy trustedWorkspaces lacks $want"; false; }
+    run jq -e --arg w "$want" '.trustedFolders | index($w)' "$REPO/ai/copilot/config.json"
+    [ "$status" -eq 0 ] || { echo "copilot trustedFolders lacks $want"; false; }
+}

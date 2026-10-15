@@ -3,6 +3,7 @@
     "{HOME}/Projects",
     "{HOME}/Projects/*",
     "{HOME}/Projects/Workspace",
-    "{HOME}/Projects/Workspace/*"
+    "{HOME}/Projects/Workspace/*",
+    "{HOME}/Projects/worktrees/*/*"
   ]
 }
