@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 )
 
 type DoneOptions struct {
@@ -16,6 +17,11 @@ type DoneOptions struct {
 	// contains it; empty skips that one check (the ancestor walk still runs).
 	Cwd   string
 	Force bool
+	// ClaudeProjectsDir is <CLAUDE_CONFIG_DIR>/projects. done refuses a
+	// worktree with a transcript there under SessionWindow old unless
+	// IgnoreRecentSession; Force does not override it.
+	ClaudeProjectsDir   string
+	IgnoreRecentSession bool
 }
 
 // Done tears down a completed worktree safely.
@@ -27,7 +33,6 @@ func Done(opts DoneOptions) error {
 	if err := checkCallerOutside(absWT, opts.Cwd); err != nil {
 		return err
 	}
-
 	lockPath := opts.LockPath
 	if lockPath == "" {
 		lockPath = DefaultLockPath()
@@ -43,6 +48,13 @@ func Done(opts DoneOptions) error {
 	}
 	if err := checkUnpushedCommits(absRepo, absWT, opts.Force); err != nil {
 		return err
+	}
+	// Last before removal, so a session that wrote during the checks above
+	// still counts.
+	if !opts.IgnoreRecentSession {
+		if err := checkNoRecentSession(opts.ClaudeProjectsDir, absWT, time.Now()); err != nil {
+			return err
+		}
 	}
 	return removeWorktree(absRepo, absWT, opts.Force)
 }

@@ -461,4 +461,5 @@ tags: [lessons, index, dotfiles]
 | [440 - An explicit home must scope every path resolved under it, or a test writes the live file](lesson-440-an-explicit-home-must-scope-every-path-resolved-under-it.md) | 2026-10-15 |
 | [441 - Every path that creates a worktree owes it the lease, or sweep never sees it](lesson-441-every-path-that-creates-a-worktree-owes-it-the-lease.md) | 2026-10-15 |
 | [443 - A gate every session runs must be able to answer for one session's change](lesson-443-a-gate-shared-by-every-session-must-answer-for-one.md) | 2026-10-15 |
+| [444 - On Windows a file read as a directory is ErrNotExist: decide absence with Stat](lesson-444-on-windows-a-file-read-as-a-directory-is-not-exist.md) | 2026-10-15 |
 <!-- END GENERATED -->
