@@ -301,6 +301,9 @@ To maximize developer velocity without sacrificing review hygiene:
    Before closing a session or merging, the agent queries `dotf pr triage-queue`.
    The agent evaluates findings, applies fixes via TDD, pushes updates, and posts
    the `## Review triage` table on each PR until the queue reports `[OK] 0 pending`.
+   Before landing one PR, `dotf pr triage-queue --pr <N>` asks about that PR alone:
+   exit 0 means N has nothing awaiting a disposition, whatever other sessions' PRs
+   hold (#2549).
    A PR whose diff is exactly a signature under `exempt.signatures` in
    `harness/review-attestation.json` (the release PR) is not listed. The
    attestation gate reports the same diff as exempt; one registry, two

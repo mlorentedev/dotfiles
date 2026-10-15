@@ -59,9 +59,9 @@ The manual steps are the fallback when `dotf pr land` cannot be used:
    The new head can take a few seconds to appear. Poll until the sha differs from step 1's.
 
 3. **Wait for every check on the new head.** Budget 10 to 15 minutes; the Windows test job is the slow one.
-4. **Gate the merge.** Merge only when every check on the new head passed and `dotf pr triage-queue` answered without listing the PR. The update can bring new reviewer output, so read the queue after CI, not before. The command exits 1 in two cases, and only one of them lets the merge go ahead:
-   - **It printed a list of PRs:** the queue was computed. Merge if this PR is not in the list. Other sessions' PRs in the list do not block it. If this PR is listed, triage it first.
-   - **It printed an error and no list:** the queue could not be computed. Stop. An unanswered queue is not an empty one.
+4. **Gate the merge.** Merge only when every check on the new head passed and `dotf pr triage-queue --pr <N>` exits 0. The update can bring new reviewer output, so read the queue after CI, not before. `--pr` asks about this PR alone, so other sessions' untriaged PRs do not block it (#2549). It exits 1 in two cases, and neither lets the merge go ahead:
+   - **It listed this PR:** its reviewer output awaits a disposition. Triage it first.
+   - **It printed an error and no list:** the queue could not be computed, or the PR is not open. Stop. An unanswered queue is not an empty one.
 5. **Merge on the head you verified:**
 
    ```bash
