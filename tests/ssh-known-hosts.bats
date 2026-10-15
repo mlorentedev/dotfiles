@@ -10,13 +10,14 @@ setup() {
     CONFIG="$REPO/ssh/config"
 }
 
-# "<host>|<hostname>" for every Host block that pins, one per line.
+# "<host>|<hostname>|<port>" for every Host block that pins, one per line.
 _pinned_hosts() {
     awk '
-        /^Host /       { if (pin) print host "|" name; host = $2; name = $2; pin = 0; next }
+        /^Host /       { if (pin) print host "|" name "|" port; host = $2; name = $2; port = 22; pin = 0; next }
         /^[[:space:]]*Hostname /                 { name = $2 }
+        /^[[:space:]]*Port /                     { port = $2 }
         /^[[:space:]]*StrictHostKeyChecking yes/ { pin = 1 }
-        END            { if (pin) print host "|" name }
+        END            { if (pin) print host "|" name "|" port }
     ' "$CONFIG"
 }
 
@@ -27,12 +28,17 @@ _pinned_hosts() {
     [ "${#lines[@]}" -eq "$keys" ]
 }
 
-@test "ssh-known-hosts: every host that pins has a key for its Hostname" {
+# ssh looks a non-22 port up as "[name]:port", never as the bare name. A bare
+# lookup would find the key of whatever listens on 22 at the same address (the
+# forge shares bee's), and call a host pinned that ssh can never reach.
+@test "ssh-known-hosts: every host that pins has a key for its Hostname and Port" {
     rows=$(_pinned_hosts)
     [ -n "$rows" ]
-    while IFS='|' read -r host name; do
-        ssh-keygen -F "$name" -f "$PINS" >/dev/null || {
-            echo "$host pins, but ssh/known_hosts has no key for $name"
+    while IFS='|' read -r host name port; do
+        entry=$name
+        [ "$port" = 22 ] || entry="[$name]:$port"
+        ssh-keygen -F "$entry" -f "$PINS" >/dev/null || {
+            echo "$host pins, but ssh/known_hosts has no key for $entry"
             return 1
         }
     done <<< "$rows"
