@@ -16,7 +16,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC5 adoption (PR 4a): `TestClassify` (no lease is UNADOPTED, naming adopt), `TestAdoptWritesALeaseOnce` (second adopt keeps the lease), `TestAdoptRefusesWhatIsNotALinkedWorktree` (main checkout, plain dir, missing path), `TestSweepReapsAnAdoptedWorktreeOnly`, `TestWorktreeAdoptTakesAGitCreatedWorktree` (list shows UNADOPTED, adopt by slug, then not).
 - [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`); branch deletion in PR 4b: `TestDoneDeletesALandedBranch` (ancestor of the base), `TestDoneDeletesASquashLandedBranch` (merged PR head), `TestDoneKeepsAnUnlandedBranchEvenWithForce`; both directions mutation-checked.
 - [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`). Transcript check in PR 3: `TestRecentSession` (worktree, subdirectory, stale, other worktree, none), `TestDoneRefusesARecentSessionUnlessIgnored` (`--force` does not override), `TestSweepSkipsAWorktreeWithARecentSession`, `TestWorktreeDoneRefusesARecentSessionUntilIgnored` (CLI flag); both wirings mutation-checked. `migrate` gets it in PR 5.
-- [ ] AC8 migrate: PR 5.
+- [ ] AC8 migrate (PR 5): `TestMigrateDryRunPlansWithoutMoving`, `TestMigrateMovesAndASecondRunHasNothingToDo`, `TestMigrateSkipsWhatItMustNotMove` (target exists, caller inside, recent session, locked), `TestMigrateRefusesWithoutARoot`, `TestWorktreeMigrateMovesALegacySibling` (CLI: dry run, move, no-op). Locked, dry-run and target-exists guards mutation-checked; the locked row runs as a dry run because `git worktree move` refuses a locked worktree on its own and hid the missing guard. Measured 2026-10-15 on the Mac: `migrate --dry-run --repo ~/Projects/dotfiles` printed `Nothing to migrate`, which matches `git worktree list` (every worktree already under the root).
 - [ ] AC9, AC10 docs, skills, ADR: PR 7.
 - [ ] AC11 cross-shell / cross-OS: per PR.
 
@@ -42,6 +42,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - A project directory whose name extends the worktree's key by `-` counts (a session started in `wt/cli`). It also matches a sibling `feat-x-y` for `feat-x`: a false refusal, the safe side, and the message names the transcript.
 
 - UNADOPTED applies to every linked worktree without a lease, not only those under WORKTREE_ROOT as the proposal says: a git-created sibling is just as unknown to sweep, and `adopt` works on any linked worktree. Nothing outside the worktree package read the old ACTIVE "no dotf metadata" state (git grep).
+
+- `migrate` moves a worktree out of the directory a Claude Code session is keyed on (`getcwd`), so it skips any worktree with a transcript in the last six hours rather than orphan the session; the help text says a session started in the old path does not follow it.
 
 ## Promotion candidates
 
