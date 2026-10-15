@@ -53,6 +53,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - ufw behaviour the step relies on, measured in ubuntu:24.04 (ufw 0.36.2), stdin from `/dev/null`: `ufw allow in on tailscale0 to any port 22 proto tcp comment 'ssh: mesh only'` writes the v4 and v6 tuples, and a second run prints `Skipping adding existing rule` and exits 0; `ufw delete allow in on tailscale0 to any port 22 proto tcp`, without the comment, removes both tuples without a prompt and exits 0; `ufw default deny|allow incoming` rewrites `DEFAULT_INPUT_POLICY`; with `NET_ADMIN`, `ufw --force enable` exits 0 and `ufw status verbose` prints `Status: active`, `Default: deny (incoming)` and `22/tcp on tailscale0  ALLOW IN  Anywhere  # ssh: mesh only`, the three things the apply checks before it records the witness
 - msi, read without root 2026-10-13: `/etc/ufw/ufw.conf` `ENABLED=no`, `/etc/default/ufw` `DEFAULT_INPUT_POLICY="DROP"`, `user.rules` and `user6.rules` mode 0640 root. The spec's row said ufw was active; it was not
 
+- Setup MCP loop removal (Linux, macOS arm64, 2026-10-15): `bash -n` and `zsh -n setup-linux.sh` -> ok; `shellcheck --severity=warning setup-linux.sh` -> clean
+- Every bats suite that names `setup-linux.sh` (35 files, lesson 347) -> 677/677 ok
+- Guard `setup-linux.sh registers no Claude MCP server itself: dotf deploy does`: an appended `claude mcp get hive …` and an indented `if mcp_err=$(claude mcp add --transport …)` each fail it. Its first regex, `^[[:space:]]*[^#[:space:]].*claude mcp`, let a line that starts with `claude` through (the first character class ate the `c`); the optional group form catches both
+- Read before deleting, from-zero 38671157122 (ubuntu): converge's `agent-extensions` added the 4 servers; inside `legacy-setup`, `claude-mcp` reported `0 added, 4 already present`, then the loop `4 added, 0 already present` (lesson 435)
+- Removed with the loop: the `parity: both setups install uv before registering the Claude MCP servers` test (its Linux half anchored on the loop's `claude mcp add`) and the BUG-004/BUG-011 helper tests; the Windows-side tests of the same guards stay, as the Windows loop does
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.

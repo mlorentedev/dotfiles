@@ -497,125 +497,20 @@ fi
 # enforcement point: drift blocks the merge instead of a deploy rewriting a
 # committed file behind the user's back.
 
-# BUG-004 + BUG-011: defense-in-depth wrapper around EVERY `claude <subcommand>`
-# invocation in this script. The Claude Code CLI's deserialize-modify-serialize
-# cycle drops fields outside its internal struct (organizationType,
-# organizationRateLimitTier, projects map, onboarding flags) -- upstream bug
-# anthropics/claude-code#59870 -- shrinking ~/.claude/.claude.json from ~75 KB
-# to ~1.5 KB and forcing re-authentication. The bug fires on ANY subcommand
-# (`plugin install`, `plugin list`, `mcp get`, `mcp add`), not just install.
-#
-# BUG-004 (PR #57) wrapped only `claude plugin install`. BUG-011 extends the
-# guard to every other call site (MCP loop iterations + plugin list pre-fetch)
-# after the user empirically observed truncation recurrence in an MCP-only path.
-#
-# snapshot_claude_json copies the file to a tempfile BEFORE the call;
-# restore_claude_json_if_truncated restores it AFTER, iff the snapshot was
-# >= 10 KB and the new file is < 50% of the snapshot size. Complementary to
-# SDD-021 session-start canary in dotf mem session-start (same 10240-byte
-# threshold, same upstream issue). See dotfiles#33 for the original incomplete
-# trigger fix that motivated this layer.
-snapshot_claude_json() {
-    local claude_json="$HOME/.claude/.claude.json"
-    [ -f "$claude_json" ] || return 0
-    local backup
-    backup=$(mktemp "${TMPDIR:-/tmp}/.claude.json.bug004.XXXXXX")
-    cp -f "$claude_json" "$backup"
-    printf '%s' "$backup"
-}
-
-restore_claude_json_if_truncated() {
-    local backup="$1"
-    [ -n "$backup" ] && [ -f "$backup" ] || return 0
-    local claude_json="$HOME/.claude/.claude.json"
-    if [ -f "$claude_json" ]; then
-        local snapshot_size new_size half
-        snapshot_size=$(stat -c %s "$backup" 2>/dev/null || stat -f %z "$backup" 2>/dev/null || echo 0)
-        new_size=$(stat -c %s "$claude_json" 2>/dev/null || stat -f %z "$claude_json" 2>/dev/null || echo 0)
-        half=$((snapshot_size / 2))
-        if [ "$snapshot_size" -ge 10240 ] && [ "$new_size" -lt "$half" ]; then
-            cp -f "$backup" "$claude_json"
-            log_warning ".claude.json shrunk from $snapshot_size to $new_size bytes after install (upstream #59870); restored from backup"
-        fi
-    fi
-    rm -f "$backup"
-}
-
-# Register MCP servers (requires Claude Code CLI, Node.js, jq)
-# Idempotent: server list lives in mcp-servers.json (SSOT shared with Windows);
-# `claude mcp get` is used to skip already-registered entries, and `add` errors
-# are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
-# invocation is wrapped with snapshot_claude_json / restore_claude_json_if_truncated
-# because both subcommands hit the same #59870 truncation path as `plugin install`.
-MCP_CONFIG="$DOTFILES_DIR/mcp-servers.json"
-if command -v claude >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-    if [ ! -f "$MCP_CONFIG" ]; then
-        log_warning "mcp-servers.json not found at $MCP_CONFIG, skipping MCP registration"
-    else
-        log_info "Registering Claude Code MCP servers from $MCP_CONFIG..."
-        mcp_added=0
-        mcp_skipped=0
-        mcp_failed=0
-        # HIVE-118: migrate a stale `uvx hive-vault` entry by REMOVING it here so
-        # the skip-if-present loop below re-adds the current definition
-        # (`hive client`) from mcp-servers.json. Remove-only -- the loop owns every
-        # `claude mcp add` so this stays SSOT-driven (no hardcoded server add).
-        if claude mcp get hive 2>/dev/null | grep -qE 'uvx|hive-vault'; then
-            _snap=$(snapshot_claude_json)
-            if claude mcp remove hive --scope user >/dev/null 2>&1; then
-                log_info "Migrating hive MCP entry: uvx hive-vault -> hive client (via mcp-servers.json)"
-            fi
-            restore_claude_json_if_truncated "$_snap"
-        fi
-        while IFS=$'\t' read -r mcp_name mcp_transport mcp_args mcp_prereq_bin mcp_prereq_cmd; do
-            # Check prerequisite binary, run prerequisite command if specified
-            if [ -n "$mcp_prereq_bin" ]; then
-                if ! command -v "$mcp_prereq_bin" >/dev/null 2>&1; then
-                    log_warning "MCP $mcp_name: prerequisite '$mcp_prereq_bin' not found, skipping"
-                    mcp_failed=$((mcp_failed + 1))
-                    continue
-                fi
-                if [ -n "$mcp_prereq_cmd" ]; then
-                    # shellcheck disable=SC2086
-                    if ! $mcp_prereq_cmd >/dev/null 2>&1; then
-                        log_warning "MCP $mcp_name: prerequisite command failed: $mcp_prereq_cmd"
-                    fi
-                fi
-            fi
-            # BUG-011: snapshot before both `mcp get` and `mcp add` (one snapshot
-            # per iteration -- legitimate `mcp add` additions are <<50% of file
-            # size, so restore only fires on the real #59870 truncation).
-            _snap=$(snapshot_claude_json)
-            # Idempotence: skip if `claude mcp get` already knows this name
-            if claude mcp get "$mcp_name" >/dev/null 2>&1; then
-                log_info "MCP $mcp_name already registered, skipping"
-                mcp_skipped=$((mcp_skipped + 1))
-                restore_claude_json_if_truncated "$_snap"
-                continue
-            fi
-            # Word-split args intentionally; entries in mcp-servers.json are
-            # tokenized for `claude mcp add` argv after `--`.
-            # shellcheck disable=SC2086
-            if mcp_err=$(claude mcp add --transport "$mcp_transport" "$mcp_name" --scope user -- $mcp_args 2>&1); then
-                log_success "Registered MCP $mcp_name"
-                mcp_added=$((mcp_added + 1))
-            else
-                log_warning "Failed to register MCP $mcp_name: $mcp_err"
-                mcp_failed=$((mcp_failed + 1))
-            fi
-            restore_claude_json_if_truncated "$_snap"
-        done < <(jq -r '.servers[] | [.name, .transport, .args, (.prerequisite_binary // ""), (.prerequisite_command // "")] | @tsv' "$MCP_CONFIG")
-        log_success "MCP servers: $mcp_added added, $mcp_skipped already present, $mcp_failed failed"
-    fi
-else
-    log_warning "Claude Code CLI, npx, or jq not found, skipping MCP server registration"
-fi
+# Claude Code's MCP servers (mcp-servers.json) are registered by the bare
+# `dotf deploy` above (claude-mcp), which re-registers a server whose arguments
+# drifted and guards .claude.json against the upstream truncation (#59870). The
+# shell loop that did it here, with its own HIVE-118 remove and snapshot
+# helpers, inherited setup's environment: with CLAUDE_CONFIG_DIR unset, claude
+# kept a second .claude.json and the loop registered every server again there
+# (from-zero run 38671157122: deploy `4 already present`, then the loop `4 added`).
 
 # Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
-# `hive serve` service now that the MCP loop's prerequisite has installed/upgraded
-# the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing
-# `hive service`, which an older hive routes to the blocking stdio server). The MCP
-# entry itself is already `hive client` (re-added from mcp-servers.json above).
+# `hive serve` service now that `dotf tools install` has installed hive (the
+# packages.json uv-tool entry, at its pin). Gated on hive-vault >= 1.32.0 via
+# the package version (NOT by probing `hive service`, which an older hive
+# routes to the blocking stdio server). The MCP entry itself is already
+# `hive client` (registered from mcp-servers.json above).
 # Non-fatal: a missing systemd --user or any failure leaves the in-process fallback.
 # Probe the BINARY, not the installer registry: hive moved to its own installer
 # and `uv tool list` stopped seeing a healthy install (AI-028/#791), so this
