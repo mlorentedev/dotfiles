@@ -200,11 +200,12 @@ for s in steps:
     [ "${#lines[@]}" -eq 6 ]
 }
 
-@test "pr-agent: PR_AGENT_ANTHROPIC_API_KEY is declared for this repo's CI only" {
+@test "pr-agent: PR_AGENT_ANTHROPIC_API_KEY is declared only for the CI that reads it" {
     # Without the consumer, `dotf secrets sync ci` never delivers the key and the
-    # fallback is skipped with a warning. Only this repository: the other
-    # workflows adopt the fallback in their own pull requests, and a credential
-    # synced where nothing reads it only widens the surface. Purpose-named, never
+    # fallback is skipped with a warning. Only repositories whose workflow runs
+    # the pool (this one, and kubelab since kubelab#1843): the rest adopt it in
+    # their own pull requests, and a credential synced where nothing reads it
+    # only widens the surface. Purpose-named, never
     # ANTHROPIC_API_KEY, which Claude Code and the SDKs read on their own.
     run python3 -c "
 import yaml
@@ -214,7 +215,7 @@ print(s['consumers'], s['expose'], s['plane'])
 print(any(s.get('expose', {}).get('env') == 'ANTHROPIC_API_KEY' for s in d['secrets']))
 "
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "['ci:mlorentedev/dotfiles'] {'env': 'PR_AGENT_ANTHROPIC_API_KEY'} app" ]
+    [ "${lines[0]}" = "['ci:mlorentedev/dotfiles', 'ci:mlorentedev/kubelab'] {'env': 'PR_AGENT_ANTHROPIC_API_KEY'} app" ]
     [ "${lines[1]}" = "False" ]
 }
 
