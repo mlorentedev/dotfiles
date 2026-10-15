@@ -150,3 +150,39 @@ func TestRecordsBind_AFailureAfterAWriteStillCountsTheWrite(t *testing.T) {
 		t.Errorf("the hooks were written before the failure; want 1 change, got %+v", res)
 	}
 }
+
+// #2279: records-bind resolves a target's dst the way configs-deploy resolves
+// ai/deploy.json, so with CLAUDE_CONFIG_DIR set the hooks land, and are probed,
+// in the file Claude reads there rather than in ~/.claude/settings.json.
+func TestRecordsBind_FollowsClaudeConfigDir(t *testing.T) {
+	repo, home, cfg := t.TempDir(), t.TempDir(), t.TempDir()
+	writeFixture(t, repo, map[string]string{
+		"harness/manifest.json": `{"agents": {"bind": [
+		  {"agent": "claude", "file": ".claude/settings.json", "dst": "{CLAUDE_CONFIG_DIR}/settings.json",
+		   "format": "command-hook", "matcher": true,
+		   "emit_hooks": [{"id": "gate", "event": "PreToolUse", "command": "harness gate --harness claude", "timeout": 5}]}
+		]}}`,
+	})
+	env := Env{RepoRoot: repo, Home: home, GOOS: "darwin"}
+	r := newRecordsBind()
+	r.resolve = func(name string) string {
+		if name == "CLAUDE_CONFIG_DIR" {
+			return cfg
+		}
+		return ""
+	}
+
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Fatalf("probe after apply: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(cfg, "settings.json"))
+	if err != nil || !strings.Contains(string(raw), "harness gate --harness claude") {
+		t.Fatalf("the gate is not in $CLAUDE_CONFIG_DIR/settings.json (%v):\n%s", err, raw)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("records-bind wrote ~/.claude/settings.json, which Claude does not read here (err %v)", err)
+	}
+}

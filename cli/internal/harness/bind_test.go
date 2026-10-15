@@ -816,6 +816,24 @@ func TestLoadBindTargetsRefusesAFormatInTheWrongKey(t *testing.T) {
 			t.Error("a claude-shaped target under bind_named must be refused")
 		}
 	})
+	// #2279: an older binary joins `file` to the home verbatim, so a {VAR} there
+	// would create "~/{CLAUDE_CONFIG_DIR}/settings.json" and report it current.
+	// A resolved path belongs in `dst`, which such a binary never reads.
+	t.Run("a {VAR} token in file is refused", func(t *testing.T) {
+		tokened := `{"agent":"claude","file":"{CLAUDE_CONFIG_DIR}/settings.json","format":"command-hook"}`
+		root := write(t, `{"agents":{"bind":[`+tokened+`]}}`)
+		if _, err := LoadBindTargets(root); err == nil || !strings.Contains(err.Error(), "dst") {
+			t.Errorf("want a refusal pointing at dst, got %v", err)
+		}
+	})
+	t.Run("a {VAR} token in a retired file is refused", func(t *testing.T) {
+		retiring := `{"agent":"claude","file":".claude/settings.json","format":"command-hook",` +
+			`"retire":[{"file":"{CLAUDE_CONFIG_DIR}/settings.json","event":"Stop","id":"x"}]}`
+		root := write(t, `{"agents":{"bind":[`+retiring+`]}}`)
+		if _, err := LoadBindTargets(root); err == nil {
+			t.Error("a retired file is joined to the home verbatim too; a {VAR} there must be refused")
+		}
+	})
 	t.Run("an empty bind is still an error", func(t *testing.T) {
 		root := write(t, `{"agents":{"bind_named":[`+agy+`]}}`)
 		if _, err := LoadBindTargets(root); err == nil {
