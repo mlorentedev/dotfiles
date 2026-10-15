@@ -52,7 +52,8 @@ CI had no per-file bats timing for the #1744 budget guard to read.
 
 ## Out of scope
 
-- N1, N2 and N8 of #2059: later PRs against this spec.
+- N1, N2 and N8 of #2059: each waits on a blocker (#2013 W10, PLAT-001b, #2013 W2) and stays open on
+  #2059, outside this spec.
 - `harness-suggest.bats` and `dotf-search.bats` (audit: "keep one smoke each"): their assertions read
   the shipped trigger data and the CLI wrapper's output, and no Go test pins either, so no twin was
   confirmed and nothing was deleted.
