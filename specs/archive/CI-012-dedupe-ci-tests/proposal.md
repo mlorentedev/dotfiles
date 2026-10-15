@@ -1,7 +1,7 @@
 ---
 id: "CI-012-dedupe-ci-tests"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-07"
 issue: "mlorentedev/dotfiles#2059"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

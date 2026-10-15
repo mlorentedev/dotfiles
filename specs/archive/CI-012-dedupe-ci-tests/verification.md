@@ -43,7 +43,7 @@ This spec tracked #2059 across three PRs: N4, N5 and N7 in the first, N3 in #250
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CI-012-dedupe-ci-tests/` -> `specs/archive/CI-012-dedupe-ci-tests/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CI-012-dedupe-ci-tests/` -> `specs/archive/CI-012-dedupe-ci-tests/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
