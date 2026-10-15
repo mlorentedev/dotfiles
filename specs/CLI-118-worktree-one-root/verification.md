@@ -15,7 +15,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC4 `--agent`: PR 6.
 - [ ] AC5 adoption: PR 4.
 - [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4.
-- [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`); transcript check in PR 3.
+- [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`). Transcript check in PR 3: `TestRecentSession` (worktree, subdirectory, stale, other worktree, none), `TestDoneRefusesARecentSessionUnlessIgnored` (`--force` does not override), `TestSweepSkipsAWorktreeWithARecentSession`, `TestWorktreeDoneRefusesARecentSessionUntilIgnored` (CLI flag); both wirings mutation-checked. `migrate` gets it in PR 5.
 - [ ] AC8 migrate: PR 5.
 - [ ] AC9, AC10 docs, skills, ADR: PR 7.
 - [ ] AC11 cross-shell / cross-OS: per PR.
@@ -37,6 +37,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - `done` identifies a worktree under the root by its branch slug, the one name herdr's layout gives it, not by a second slug recorded in the lease: a herdr-made or adopted worktree would never carry that slug (#2527 review, PR-Agent finding 1).
 - The planning tokens are exactly the words of `harness/enforced/no-phase-references.md` (phase, milestone), not the four the first draft named: that file is extracted from the vault's git-workflow pattern, and a validator that bans words the doctrine does not would be a second, unwritten rule. Widening it is a vault edit first.
 - `add` with no `--base` used to branch from the caller's HEAD. It now fetches and uses origin's default branch, and refuses when none resolves; a failed fetch (offline) warns and uses the last-fetched refs. git 2.48+ restores origin/HEAD on fetch (`remote.<name>.followRemoteHEAD`), so the master fallback is reached only where that is off or the remote has no HEAD.
+
+- The transcript key is computed from the physical path. Claude Code keys a project on getcwd: on this Mac the one scratchpad session under /tmp is `-private-tmp-…` and no project directory starts with `-tmp-` or `-var-`. done passes git's toplevel, which is physical too; the path as given is kept as a second key.
+- A project directory whose name extends the worktree's key by `-` counts (a session started in `wt/cli`). It also matches a sibling `feat-x-y` for `feat-x`: a false refusal, the safe side, and the message names the transcript.
 
 ## Promotion candidates
 

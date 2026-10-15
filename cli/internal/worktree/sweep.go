@@ -80,6 +80,10 @@ type SweepOptions struct {
 	RepoRoot string
 	LockPath string
 	DryRun   bool
+	// ClaudeProjectsDir is <CLAUDE_CONFIG_DIR>/projects: sweep skips a
+	// worktree with a transcript there under SessionWindow old. It has no
+	// override; done --ignore-recent-session is the deliberate path.
+	ClaudeProjectsDir string
 }
 
 type SweepReport struct {
@@ -259,6 +263,10 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	absCwd, _ := filepath.Abs(cwd)
 
 	for _, info := range infos {
+		if _, live := RecentSession(opts.ClaudeProjectsDir, info.Path, now, SessionWindow); live {
+			report.SkippedCount++
+			continue
+		}
 		reading, candidate := gateF(info, absCwd)
 		if reading.Uninspectable > report.UninspectableProcesses {
 			report.UninspectableProcesses = reading.Uninspectable

@@ -18,9 +18,9 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 ## PR 3 — live-session refusal (#1653)
 
-- [ ] `recentTranscript(path, now, window)` with a fake `~/.claude/projects/<key>` dir: refuses when under 6h, allows when stale or absent.
-- [ ] Wire into `done` and `sweep`; `--ignore-recent-session` distinct from `--force`.
-- [ ] File one ticket per non-Claude harness session store (agy, copilot, codex, opencode, pi).
+- [x] `RecentSession(projectsDir, wt, now, window)` with a fake `~/.claude/projects/<key>` dir: refuses when under 6h, allows when stale or absent.
+- [x] Wire into `done` and `sweep`; `--ignore-recent-session` distinct from `--force`.
+- [ ] File one ticket per non-Claude harness session store (agy, copilot, codex, opencode, pi). Proposed on #1653 during the unattended run; filing needs the owner's ID confirmation (new-ticket).
 
 ## PR 4 — adoption and done
 
