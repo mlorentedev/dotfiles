@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -26,34 +27,45 @@ type Session struct {
 // directory below it, whose transcript was written within window of now.
 //
 // projectsDir is <CLAUDE_CONFIG_DIR>/projects; "" or a missing directory means
-// none. A session started in wt/cli has the key of wt plus "-cli", so a project
+// none. Any other read failure is returned: a store that could not be
+// inspected must not read as one with no session in it. A session started in wt/cli has the key of wt plus "-cli", so a project
 // directory whose name extends wt's key by "-" counts too. That also matches a
 // sibling such as feat-x-y for wt feat-x: a false refusal, the safe side, and
 // the message names the transcript so the operator can tell.
 //
 // This is the Claude-only layer over checkCallerOutside's process check, which
 // covers every harness but only while a process is alive.
-func RecentSession(projectsDir, wt string, now time.Time, window time.Duration) (Session, bool) {
+func RecentSession(projectsDir, wt string, now time.Time, window time.Duration) (Session, bool, error) {
 	if projectsDir == "" {
-		return Session{}, false
+		return Session{}, false, nil
 	}
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
-		return Session{}, false
+		// Absence is decided by Stat, not by ReadDir's error: on Windows,
+		// reading a file as a directory maps to ErrNotExist too.
+		if _, statErr := os.Stat(projectsDir); errors.Is(statErr, fs.ErrNotExist) {
+			return Session{}, false, nil
+		}
+		return Session{}, false, err
 	}
 	keys := sessionKeys(wt)
 	var newest Session
 	for _, e := range entries {
-		if e.IsDir() && matchesKey(e.Name(), keys) {
-			if s := newestTranscript(filepath.Join(projectsDir, e.Name())); s.Modified.After(newest.Modified) {
-				newest = s
-			}
+		if !e.IsDir() || !matchesKey(e.Name(), keys) {
+			continue
+		}
+		s, err := newestTranscript(filepath.Join(projectsDir, e.Name()))
+		if err != nil {
+			return Session{}, false, err
+		}
+		if s.Modified.After(newest.Modified) {
+			newest = s
 		}
 	}
 	if newest.Transcript == "" || now.Sub(newest.Modified) >= window {
-		return Session{}, false
+		return Session{}, false, nil
 	}
-	return newest, true
+	return newest, true, nil
 }
 
 // sessionKeys are the project keys a session in wt can have. Claude Code keys
@@ -76,24 +88,42 @@ func matchesKey(name string, keys []string) bool {
 	return false
 }
 
-func newestTranscript(dir string) Session {
+// newestTranscript returns walk errors other than an entry vanishing mid-walk,
+// which is a session ending, not a store that cannot be read.
+func newestTranscript(dir string) (Session, error) {
 	var newest Session
-	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(p) != ".jsonl" {
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if d.IsDir() || filepath.Ext(p) != ".jsonl" {
 			return nil
 		}
-		if info, err := d.Info(); err == nil && info.ModTime().After(newest.Modified) {
+		info, err := d.Info()
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if info.ModTime().After(newest.Modified) {
 			newest = Session{Transcript: p, Modified: info.ModTime()}
 		}
 		return nil
 	})
-	return newest
+	return newest, err
 }
 
 // checkNoRecentSession is done's form of the check: a refusal naming the
 // transcript and the override.
 func checkNoRecentSession(projectsDir, absWT string, now time.Time) error {
-	s, live := RecentSession(projectsDir, absWT, now, SessionWindow)
+	s, live, err := RecentSession(projectsDir, absWT, now, SessionWindow)
+	if err != nil {
+		return fmt.Errorf("cannot tell whether a Claude Code session is using %s: %w. Fix the read, or pass --ignore-recent-session", absWT, err)
+	}
 	if !live {
 		return nil
 	}

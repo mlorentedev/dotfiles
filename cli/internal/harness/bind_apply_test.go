@@ -86,7 +86,7 @@ func TestBindOneRefusesAFormatItDoesNotKnow(t *testing.T) {
 		Agent: "future", File: ".future/hooks.json", Format: "hooks-yaml", Matcher: true,
 		EmitHooks: []EmitHook{{ID: "gate", Event: "PreToolUse", Command: "harness gate", Timeout: 5}},
 	}
-	if _, _, err := bindOne(target, home, "/opt/dotf", false); err == nil || !strings.Contains(err.Error(), "unsupported bind format") {
+	if _, _, err := bindOne(target, filepath.Join(home, ".future", "hooks.json"), home, "/opt/dotf", false); err == nil || !strings.Contains(err.Error(), "unsupported bind format") {
 		t.Fatalf("want an unsupported-format refusal, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".future", "hooks.json")); !os.IsNotExist(err) {
@@ -152,5 +152,67 @@ func TestBindReportsNothingForATargetThatFailedBeforeWriting(t *testing.T) {
 func TestBindRefusesOptionsWithoutHas(t *testing.T) {
 	if _, err := Bind(nil, BindOptions{Home: t.TempDir()}); err == nil || !strings.Contains(err.Error(), "Has is required") {
 		t.Fatalf("want a refusal naming Has, got %v", err)
+	}
+}
+
+// #2279: a target declaring `dst` binds into the file its {VAR} resolves to,
+// the way configs-deploy writes ai/deploy.json's destinations, and never into
+// the home-relative `file` an older binary would read. The outcome names the
+// file actually written, so a report cannot say "current" about another one.
+func TestBindResolvesDstThroughTheContract(t *testing.T) {
+	home, cfg := t.TempDir(), t.TempDir()
+	target := BindTarget{
+		Agent: "claude", File: ".claude/settings.json", Dst: "{CLAUDE_CONFIG_DIR}/settings.json",
+		Format:    "command-hook",
+		EmitHooks: []EmitHook{{ID: "gate", Event: "PreToolUse", Command: "harness gate --harness claude"}},
+	}
+	resolve := func(name string) string {
+		if name == "CLAUDE_CONFIG_DIR" {
+			return cfg
+		}
+		return ""
+	}
+	out, err := Bind([]BindTarget{target}, BindOptions{
+		Home: home, Binary: "/opt/dotf", GOOS: "linux", Resolve: resolve, Has: func(string) bool { return true },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(cfg, "settings.json")
+	if len(out) != 1 || out[0].File != want || !out[0].Changed {
+		t.Fatalf("outcome = %+v, want one change naming %s", out, want)
+	}
+	if raw, err := os.ReadFile(want); err != nil || !strings.Contains(string(raw), "harness gate --harness claude") {
+		t.Errorf("the gate hook is not in the resolved file %s: %v\n%s", want, err, raw)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("bind wrote the home-relative file too: %v", err)
+	}
+}
+
+// A `dst` that cannot be resolved is an error that writes nothing: falling back
+// to `file` is the defect itself, and an empty segment would write "/settings.json".
+func TestBindRefusesADstItCannotResolve(t *testing.T) {
+	target := BindTarget{
+		Agent: "claude", File: ".claude/settings.json", Dst: "{CLAUDE_CONFIG_DIR}/settings.json",
+		Format:    "command-hook",
+		EmitHooks: []EmitHook{{ID: "gate", Event: "PreToolUse", Command: "harness gate --harness claude"}},
+	}
+	for name, resolve := range map[string]func(string) string{
+		"no resolver":       nil,
+		"unresolvable name": func(string) string { return "" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			out, err := Bind([]BindTarget{target}, BindOptions{
+				Home: home, Binary: "/opt/dotf", GOOS: "linux", Resolve: resolve, Has: func(string) bool { return true },
+			})
+			if err == nil || !strings.Contains(err.Error(), "CLAUDE_CONFIG_DIR") || len(out) != 0 {
+				t.Fatalf("want an error naming CLAUDE_CONFIG_DIR and no outcome, got %+v, %v", out, err)
+			}
+			if entries, _ := os.ReadDir(home); len(entries) != 0 {
+				t.Errorf("a refused bind wrote under the home: %v", entries)
+			}
+		})
 	}
 }

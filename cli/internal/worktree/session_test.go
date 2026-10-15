@@ -3,6 +3,7 @@ package worktree
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -48,14 +49,66 @@ func TestRecentSession(t *testing.T) {
 			if tc.cwd != "" {
 				fakeTranscript(t, projects, tc.cwd, tc.age)
 			}
-			s, found := RecentSession(projects, wt, time.Now(), SessionWindow)
+			s, found, err := RecentSession(projects, wt, time.Now(), SessionWindow)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if found != tc.found {
 				t.Errorf("found = %v (%+v), want %v", found, s, tc.found)
 			}
 		})
 	}
-	if _, found := RecentSession("", wt, time.Now(), SessionWindow); found {
-		t.Error("an unknown projects directory reported a session")
+	if _, found, err := RecentSession("", wt, time.Now(), SessionWindow); found || err != nil {
+		t.Errorf("an unknown projects directory reported a session or an error: %v", err)
+	}
+	if _, found, err := RecentSession(filepath.Join(t.TempDir(), "absent"), wt, time.Now(), SessionWindow); found || err != nil {
+		t.Errorf("a missing projects directory is no session, not an error: %v", err)
+	}
+}
+
+func TestRecentSessionFailsClosedOnAnUnreadableStore(t *testing.T) {
+	wt := filepath.Join(t.TempDir(), "repo", "feat-x")
+
+	// A projects path that exists but is not a readable directory.
+	notADir := filepath.Join(t.TempDir(), "projects")
+	if err := os.WriteFile(notADir, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := RecentSession(notADir, wt, time.Now(), SessionWindow); err == nil {
+		t.Error("an unreadable projects directory must be an error, not \"no session\"")
+	}
+
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		return // mode bits do not deny a read there
+	}
+	projects := t.TempDir()
+	fakeTranscript(t, projects, wt, time.Hour)
+	sealed := filepath.Join(projects, memlink.ClaudeProjectKey(wt), "subagents")
+	if err := os.MkdirAll(sealed, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(sealed, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(sealed, 0o755) })
+	if _, _, err := RecentSession(projects, wt, time.Now(), SessionWindow); err == nil {
+		t.Error("a project directory the walk could not read must be an error")
+	}
+}
+
+func TestDoneRefusesWhenSessionsCannotBeInspected(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	stubMergedPRHeads(t, nil, nil)
+	notADir := filepath.Join(t.TempDir(), "projects")
+	if err := os.WriteFile(notADir, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, ClaudeProjectsDir: notADir}
+	if _, err := Done(opts); err == nil || !strings.Contains(err.Error(), "cannot tell") {
+		t.Fatalf("got %v, want a refusal saying the sessions could not be inspected", err)
+	}
+	if _, err := os.Stat(wtDir); err != nil {
+		t.Fatal("the worktree was removed although its sessions were never inspected")
 	}
 }
 
@@ -113,8 +166,12 @@ func TestSweepSkipsAWorktreeWithARecentSession(t *testing.T) {
 		OnWorktreeRemove: func(_, path string) error { reaped = append(reaped, path); return nil },
 	}
 	opts := SweepOptions{RepoRoot: mainRepo, LockPath: filepath.Join(tmpDir, "sweep.lock"), ClaudeProjectsDir: projects}
-	if _, err := SweepWithRunner(opts, runner, now); err != nil {
+	report, err := SweepWithRunner(opts, runner, now)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(report.SessionSkips) != 1 || report.SessionSkips[0].Path != live || !strings.Contains(report.SessionSkips[0].Reason, ".jsonl") {
+		t.Errorf("the session skip must name the worktree and its transcript: %+v", report.SessionSkips)
 	}
 	if len(reaped) != 1 || reaped[0] != idle {
 		t.Errorf("reaped %v, want only %s: %s has a session from an hour ago", reaped, idle, live)

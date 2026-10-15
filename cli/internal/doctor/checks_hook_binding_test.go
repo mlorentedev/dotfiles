@@ -71,3 +71,36 @@ func TestCheckHookBinding_SkipsWithoutAHome(t *testing.T) {
 		t.Errorf("want SKIP, got %v\n%s", got, buf.String())
 	}
 }
+
+// #2279: the check plans the bind against the file CLAUDE_CONFIG_DIR names, so
+// a gate missing there FAILs even when ~/.claude/settings.json carries it.
+func TestCheckHookBinding_FollowsClaudeConfigDir(t *testing.T) {
+	repo, home, cfg := t.TempDir(), t.TempDir(), t.TempDir()
+	writeFile(t, filepath.Join(repo, "harness", "manifest.json"), `{"agents":{"bind":[
+  {"agent":"claude","file":".claude/settings.json","dst":"{CLAUDE_CONFIG_DIR}/settings.json",
+   "format":"command-hook","matcher":true,
+   "emit_hooks":[{"id":"gate","event":"PreToolUse","command":"harness gate --harness claude","timeout":5}]}]}}`)
+	sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
+	sys.ResolvePath = func(name string) string {
+		if name == "CLAUDE_CONFIG_DIR" {
+			return cfg
+		}
+		return ""
+	}
+	check := func(fix bool) string {
+		var buf bytes.Buffer
+		checkHookBinding(sys, NewReport(&buf, true), fix)
+		return buf.String()
+	}
+	settings := filepath.Join(cfg, "settings.json")
+
+	if got := statusOfLine(check(true), "claude: hooks bound in "+settings); got != StatusFix {
+		t.Fatalf("--fix: want FIX naming %s", settings)
+	}
+	if got := statusOfLine(check(false), "claude: hooks current in "+settings); got != StatusPass {
+		t.Errorf("after --fix want PASS naming %s", settings)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Errorf("the check bound ~/.claude/settings.json, which Claude does not read here (err %v)", err)
+	}
+}

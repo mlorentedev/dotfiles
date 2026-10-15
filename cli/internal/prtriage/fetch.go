@@ -51,6 +51,7 @@ type restPR struct {
 	Number  int    `json:"number"`
 	Title   string `json:"title"`
 	HTMLURL string `json:"html_url"`
+	State   string `json:"state"` // read by fetchPRWith; the list asks for open ones only
 }
 
 // restComment is one item of `GET /repos/{owner}/{repo}/issues/{n}/comments`.
@@ -131,6 +132,44 @@ func fetchWith(ctx context.Context, run ghRunner, repo string, reg Registry) ([]
 		return nil, fmt.Errorf("GitHub returned %d open pull requests (a full page); the queue may be truncated — page through with `gh api %s/pulls --paginate`", prLimit, base)
 	}
 
+	return pendingOf(ctx, run, base, wire, reg)
+}
+
+// FetchPR is FetchWithRegistry scoped to one pull request: the answer is that
+// PR's verdict alone, so another session's untriaged PR cannot hold up
+// `triage-queue --pr N && pr land N` (#2549). The open-PR list is never read.
+//
+// The repo-wide refusals hold here too: a PR that cannot be read, or whose
+// comments cannot be, is an error. So is a PR that is not open, which the
+// repo-wide queue never sees: an empty answer for a merged PR would read as
+// "clear to land" for a PR that can no longer land.
+func FetchPR(ctx context.Context, repo string, reg Registry, number int) ([]Status, error) {
+	return fetchPRWith(ctx, execGH, repo, reg, number)
+}
+
+func fetchPRWith(ctx context.Context, run ghRunner, repo string, reg Registry, number int) ([]Status, error) {
+	base := repoBase(repo)
+	out, err := run(ctx, "api", fmt.Sprintf("%s/pulls/%d", base, number))
+	if err != nil {
+		return nil, fmt.Errorf("gh api pull request #%d: %w", number, err)
+	}
+	var wire restPR
+	if err := json.Unmarshal(out, &wire); err != nil {
+		return nil, fmt.Errorf("parse pull request #%d: %w", number, err)
+	}
+	if wire.Number != number {
+		return nil, fmt.Errorf("asked for pull request #%d, GitHub answered with #%d", number, wire.Number)
+	}
+	if wire.State != "open" {
+		return nil, fmt.Errorf("pull request #%d is %s, not open; its queue cannot be clear to land", number, wire.State)
+	}
+	return pendingOf(ctx, run, base, []restPR{wire}, reg)
+}
+
+// pendingOf joins each pull request to its conversation and keeps the ones the
+// registry reports pending, less any whose diff is an exempt signature. It is
+// the one verdict path both the repo-wide and the scoped queue take.
+func pendingOf(ctx context.Context, run ghRunner, base string, wire []restPR, reg Registry) ([]Status, error) {
 	prs, err := withComments(ctx, run, base, wire)
 	if err != nil {
 		return nil, err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // EmitHook is one hook a bind target emits: which event, running what.
@@ -33,7 +34,15 @@ type EmitHook struct {
 // and the hooks this repository owns inside it.
 type BindTarget struct {
 	Agent string `json:"agent"`
-	File  string `json:"file"`
+	// File is the settings file relative to HOME. Every binary reads it, so it
+	// never carries a {VAR} token: an older binary joins it to the home verbatim.
+	File string `json:"file"`
+	// Dst, when set, is where the file really is, spelled with ai/deploy.json's
+	// {VAR} tokens and resolved through the env contract, so bind writes the
+	// file configs-deploy writes and the harness reads (CLAUDE_CONFIG_DIR, #2279).
+	// It wins over File; a binary older than the key ignores it and uses File,
+	// which is the same file under the contract default.
+	Dst string `json:"dst"`
 	// Format is the emission kind. "command-hook" is claude's shape (a `hooks`
 	// key of events); "hooks-json" is a document of NAMED hooks, agy's; and
 	// "ts-extension" needs a generated-code template and is declared with
@@ -138,6 +147,11 @@ func LoadBindTargets(root string) ([]BindTarget, error) {
 				"declare it under agents.bind_named, which they never read", ManifestFile, t.Agent, t.Format)
 		}
 	}
+	for _, t := range append(doc.Agents.Bind, doc.Agents.BindNamed...) {
+		if err := refuseTokenedFiles(t); err != nil {
+			return nil, err
+		}
+	}
 	for _, t := range doc.Agents.BindNamed {
 		if t.Format != NamedHooksFormat {
 			return nil, fmt.Errorf("%s: agents.bind_named target %q has format %q, want %q",
@@ -145,4 +159,21 @@ func LoadBindTargets(root string) ([]BindTarget, error) {
 		}
 	}
 	return append(doc.Agents.Bind, doc.Agents.BindNamed...), nil
+}
+
+// refuseTokenedFiles rejects a {VAR} token in a home-relative path. Every binary
+// joins `file` to the home verbatim, so a token there would make one create
+// "~/{CLAUDE_CONFIG_DIR}/settings.json" and report it current (#2279).
+func refuseTokenedFiles(t BindTarget) error {
+	files := []string{t.File}
+	for _, r := range t.Retire {
+		files = append(files, r.File)
+	}
+	for _, f := range files {
+		if strings.ContainsAny(f, "{}") {
+			return fmt.Errorf("%s: bind target %q names %q, but a path with a {VAR} token belongs in dst; "+
+				"file is joined to the home verbatim", ManifestFile, t.Agent, f)
+		}
+	}
+	return nil
 }
