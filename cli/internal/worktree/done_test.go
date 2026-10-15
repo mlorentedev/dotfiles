@@ -14,7 +14,7 @@ func TestDoneTeardown(t *testing.T) {
 	mainRepo := filepath.Join(tmpDir, "myrepo")
 
 	// 1. Refuse teardown if path is main repository
-	err := Done(DoneOptions{
+	_, err := Done(DoneOptions{
 		RepoRoot:     mainRepo,
 		WorktreePath: mainRepo,
 	})
@@ -23,7 +23,7 @@ func TestDoneTeardown(t *testing.T) {
 	}
 
 	// 2. Error if worktreePath is empty
-	err = Done(DoneOptions{
+	_, err = Done(DoneOptions{
 		RepoRoot:     mainRepo,
 		WorktreePath: "",
 	})
@@ -73,7 +73,7 @@ func TestDoneRefusesUnpushedCommitsWithNoUpstream(t *testing.T) {
 	_ = cmd.Run()
 
 	// 1. Done without force must refuse to remove
-	err := Done(DoneOptions{
+	_, err := Done(DoneOptions{
 		RepoRoot:     repoDir,
 		WorktreePath: wtDir,
 		LockPath:     lockPath,
@@ -92,7 +92,7 @@ func TestDoneRefusesUnpushedCommitsWithNoUpstream(t *testing.T) {
 	}
 
 	// 2. Done with force must succeed
-	err = Done(DoneOptions{
+	_, err = Done(DoneOptions{
 		RepoRoot:     repoDir,
 		WorktreePath: wtDir,
 		LockPath:     lockPath,
@@ -112,7 +112,7 @@ func TestDoneSucceedsOnCleanBranchWithoutCommits(t *testing.T) {
 	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
 
 	// Fresh worktree has 0 commits ahead of main and no upstream
-	err := Done(DoneOptions{
+	_, err := Done(DoneOptions{
 		RepoRoot:     repoDir,
 		WorktreePath: wtDir,
 		LockPath:     lockPath,
@@ -219,7 +219,7 @@ func TestResolveWorktreeAndMainRepoRoot(t *testing.T) {
 	subMainRoot, subWTRoot := testResolveFromSubdir(t, wtDir, absRepoDir, absWTDir)
 
 	// 3. Teardown using the resolved roots (the in-worktree CLI flow)
-	err := Done(DoneOptions{
+	_, err := Done(DoneOptions{
 		RepoRoot:     subMainRoot,
 		WorktreePath: subWTRoot,
 		Force:        false,
@@ -258,7 +258,7 @@ func TestDonePreservesGitignoredLocalFiles(t *testing.T) {
 	}
 
 	// 1. Done without force must refuse to remove and protect .env
-	err := Done(DoneOptions{
+	_, err := Done(DoneOptions{
 		RepoRoot:     repoDir,
 		WorktreePath: wtDir,
 		LockPath:     lockPath,
@@ -274,7 +274,7 @@ func TestDonePreservesGitignoredLocalFiles(t *testing.T) {
 	}
 
 	// 2. Done with force removes worktree
-	err = Done(DoneOptions{
+	_, err = Done(DoneOptions{
 		RepoRoot:     repoDir,
 		WorktreePath: wtDir,
 		LockPath:     lockPath,
@@ -300,7 +300,7 @@ func TestDoneRefusesTheWorktreeHoldingTheCallersCwdEvenWithForce(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, cwd := range []string{wtDir, sub} {
-		err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: cwd, Force: true})
+		_, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: cwd, Force: true})
 		if err == nil || !strings.Contains(err.Error(), "current directory") {
 			t.Fatalf("cwd %s: want a refusal naming the current directory, got %v", cwd, err)
 		}
@@ -318,7 +318,7 @@ func TestDoneAllowsACwdInASiblingSharingANamePrefix(t *testing.T) {
 	if err := os.Mkdir(sibling, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: sibling}); err != nil {
+	if _, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: sibling}); err != nil {
 		t.Fatalf("a sibling cwd must not block done: %v", err)
 	}
 }
@@ -333,7 +333,7 @@ func TestDoneRefusesACwdReachedThroughASymlink(t *testing.T) {
 	if err := os.Symlink(wtDir, link); err != nil {
 		t.Fatal(err)
 	}
-	err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: link, Force: true})
+	_, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Cwd: link, Force: true})
 	if err == nil || !strings.Contains(err.Error(), "current directory") {
 		t.Fatalf("want a refusal for a symlinked cwd, got %v", err)
 	}
@@ -350,7 +350,7 @@ func TestDoneRefusesWhenAnAncestorProcessIsInsideEvenWithForce(t *testing.T) {
 	callerInside = func(target string) (ancestor, bool) {
 		return ancestor{PID: 4242, Comm: "claude", Cwd: target}, true
 	}
-	err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Force: true})
+	_, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Force: true})
 	if err == nil || !strings.Contains(err.Error(), "4242") || !strings.Contains(err.Error(), "claude") {
 		t.Fatalf("want a refusal naming the process, got %v", err)
 	}

@@ -14,11 +14,13 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC3 branch validation (PR 2): `TestValidateBranch` (shape rows, planning-token rows, and near misses `phaseout-legacy`, `milestones-view`, `emphase` that must stay accepted), `TestAddRefusesAnInvalidBranchBeforeCreatingAnything` (given, defaulted and `--path` branches), `TestAcceptedBranchesSlugToThemselves`, `TestPlanningTokensMatchTheEnforcedRule` (mutation: adding `wave` to the list fails it). Default base: `TestAddCreatesFromTheRemoteDefaultBranch`, `TestAddKeepsAnExplicitBase`, `TestAddRefusesWhenNoRemoteDefaultResolves`, `TestRealDefaultBase` (local origin, with and without origin/HEAD).
 - [ ] AC4 `--agent`: PR 6.
 - [x] AC5 adoption (PR 4a): `TestClassify` (no lease is UNADOPTED, naming adopt), `TestAdoptWritesALeaseOnce` (second adopt keeps the lease), `TestAdoptRefusesWhatIsNotALinkedWorktree` (main checkout, plain dir, missing path), `TestSweepReapsAnAdoptedWorktreeOnly`, `TestWorktreeAdoptTakesAGitCreatedWorktree` (list shows UNADOPTED, adopt by slug, then not).
-- [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4.
+- [ ] AC6 done: slug resolution in PR 1 (`TestWorktreeDoneTakesTheSlugAddWasGiven`, `TestWorktreeDoneTakesTheSlugOfALegacySibling`, `TestWorktreeDoneRefusesASlugInBothLayouts`, and `TestWorktreeDoneTakesTheBranchGivenToAdd` for `add <slug> -b <branch>`, whose directory follows the branch: done takes the branch or its slug, and add prints which); branch deletion in PR 4b: `TestDoneDeletesALandedBranch` (ancestor of the base), `TestDoneDeletesASquashLandedBranch` (merged PR head), `TestDoneKeepsAnUnlandedBranchEvenWithForce`; both directions mutation-checked.
 - [ ] AC7 live session: gate f cwd check fixed in PR 1 (`TestGateFRefusesACwdInsideTheWorktreeWithoutTheProcessScan`). Transcript check in PR 3: `TestRecentSession` (worktree, subdirectory, stale, other worktree, none), `TestDoneRefusesARecentSessionUnlessIgnored` (`--force` does not override), `TestSweepSkipsAWorktreeWithARecentSession`, `TestWorktreeDoneRefusesARecentSessionUntilIgnored` (CLI flag); both wirings mutation-checked. After the #2556 review: an unreadable store fails closed (`TestRecentSessionFailsClosedOnAnUnreadableStore`, `TestDoneRefusesWhenSessionsCannotBeInspected`; mutations on the ReadDir error, the walk error and done's handling each killed), and sweep reports each session skip with its transcript (`SessionSkips`). `migrate` gets it in PR 5.
 - [ ] AC8 migrate: PR 5.
 - [ ] AC9, AC10 docs, skills, ADR: PR 7.
 - [ ] AC11 cross-shell / cross-OS: per PR.
+
+- PR 4b mutations, re-run 2026-10-15 after the review (`go test -count=1 -run TestDone ./internal/worktree/`): never landed as an ancestor -> `TestDoneDeletesALandedBranch` fails; never landed by squash -> `TestDoneDeletesASquashLandedBranch` fails; always landed -> `TestDoneKeepsAnUnlandedBranchEvenWithForce` fails. Three of three killed.
 
 ## Test status
 
@@ -44,6 +46,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - A project directory whose name extends the worktree's key by `-` counts (a session started in `wt/cli`). It also matches a sibling `feat-x-y` for `feat-x`: a false refusal, the safe side, and the message names the transcript.
 
 - UNADOPTED applies to every linked worktree without a lease, not only those under WORKTREE_ROOT as the proposal says: a git-created sibling is just as unknown to sweep, and `adopt` works on any linked worktree. Nothing outside the worktree package read the old ACTIVE "no dotf metadata" state (git grep).
+
+- done deletes a branch only on a verified landing: its tip is an ancestor of the base, or the head of a merged pull request (a squash leaves no ancestor). Any other answer keeps the branch with the reason, `--force` included: `--force` overrides the worktree's dirty and unpushed checks, and after it the branch may be the only copy of the work. A `gh` failure keeps it too, naming the error (`TestDoneKeepsTheBranchWhenThePullRequestLookupFails`; reading the error as landed fails it).
+- The branch and tip are read before the worktree is removed, because after removal the worktree's HEAD is gone; the deletion runs after removal, because git refuses to delete a branch a worktree has checked out. The SHA is printed so `git branch <name> <sha>` restores it.
+- `main` and `master` are never deleted, nor is a detached HEAD: there is no branch to name.
 
 ## Promotion candidates
 

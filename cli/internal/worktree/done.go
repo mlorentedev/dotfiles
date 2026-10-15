@@ -24,14 +24,25 @@ type DoneOptions struct {
 	IgnoreRecentSession bool
 }
 
-// Done tears down a completed worktree safely.
-func Done(opts DoneOptions) error {
+// DoneResult reports what happened to the worktree's branch.
+type DoneResult struct {
+	DeletedBranch string // the local branch removed after a verified landing
+	DeletedSHA    string // its tip, to restore it with git branch <name> <sha>
+	KeptBranch    string // the branch left in place, when there is one
+	KeptReason    string // why it was kept
+}
+
+// Done tears down a completed worktree safely, then deletes its local branch
+// when the branch is verified to have landed: its tip is an ancestor of the
+// base, or the head of a merged pull request (the squash case). Anything else
+// keeps the branch, which after --force may be the only copy of the work.
+func Done(opts DoneOptions) (DoneResult, error) {
 	absRepo, absWT, err := validateDoneOptions(opts)
 	if err != nil {
-		return err
+		return DoneResult{}, err
 	}
 	if err := checkCallerOutside(absWT, opts.Cwd); err != nil {
-		return err
+		return DoneResult{}, err
 	}
 	lockPath := opts.LockPath
 	if lockPath == "" {
@@ -39,24 +50,64 @@ func Done(opts DoneOptions) error {
 	}
 	unlock, err := TryLockFile(lockPath)
 	if err != nil {
-		return fmt.Errorf("acquiring worktree lock: %w", err)
+		return DoneResult{}, fmt.Errorf("acquiring worktree lock: %w", err)
 	}
 	defer unlock()
 
 	if err := checkUncommittedChanges(absWT, opts.Force); err != nil {
-		return err
+		return DoneResult{}, err
 	}
 	if err := checkUnpushedCommits(absRepo, absWT, opts.Force); err != nil {
-		return err
+		return DoneResult{}, err
 	}
 	// Last before removal, so a session that wrote during the checks above
 	// still counts.
 	if !opts.IgnoreRecentSession {
 		if err := checkNoRecentSession(opts.ClaudeProjectsDir, absWT, time.Now()); err != nil {
-			return err
+			return DoneResult{}, err
 		}
 	}
-	return removeWorktree(absRepo, absWT, opts.Force)
+	// Read before removal: the answer needs the worktree's HEAD.
+	branch, tip, landed, why := branchLanding(absRepo, absWT)
+	if err := removeWorktree(absRepo, absWT, opts.Force); err != nil {
+		return DoneResult{}, err
+	}
+	switch {
+	case branch == "":
+		return DoneResult{}, nil
+	case !landed:
+		return DoneResult{KeptBranch: branch, KeptReason: why}, nil
+	}
+	if out, err := exec.Command("git", "-C", absRepo, "branch", "-D", branch).CombinedOutput(); err != nil {
+		return DoneResult{KeptBranch: branch, KeptReason: "git branch -D failed: " + strings.TrimSpace(string(out))}, nil
+	}
+	return DoneResult{DeletedBranch: branch, DeletedSHA: tip}, nil
+}
+
+// branchLanding reads the worktree's branch and tip, and whether that tip has
+// landed. A detached HEAD has no branch to delete; neither has main or master.
+func branchLanding(absRepo, absWT string) (branch, tip string, landed bool, why string) {
+	out, err := exec.Command("git", "-C", absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	if err != nil {
+		return "", "", false, ""
+	}
+	branch = strings.TrimSpace(string(out))
+	if branch == "main" || branch == "master" {
+		return "", "", false, ""
+	}
+	if out, err = exec.Command("git", "-C", absWT, "rev-parse", "HEAD").Output(); err != nil {
+		return branch, "", false, "its tip could not be read"
+	}
+	tip = strings.TrimSpace(string(out))
+	if base := resolveBaseRef(absRepo); base != "" && exec.Command("git", "-C", absRepo, "merge-base", "--is-ancestor", tip, base).Run() == nil {
+		return branch, tip, true, ""
+	}
+	if ok, err := landedInMergedPR(absWT, branch, tip); ok {
+		return branch, tip, true, ""
+	} else if err != nil {
+		return branch, tip, false, fmt.Sprintf("could not check for a merged pull request: %v", err)
+	}
+	return branch, tip, false, "not landed: neither an ancestor of the base nor the head of a merged pull request"
 }
 
 func validateDoneOptions(opts DoneOptions) (string, string, error) {

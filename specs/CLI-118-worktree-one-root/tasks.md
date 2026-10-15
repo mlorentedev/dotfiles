@@ -26,7 +26,7 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 - [x] `Classify` returns `unadopted` for a worktree under the root without metadata; `sweep` still refuses it.
 - [x] `adopt` writes the lease; `sweep` then reaps a merged, clean, expired one.
-- [ ] (PR 4b, split for size) `done` deletes the local branch after a verified landing, prints the SHA; keeps it otherwise.
+- [x] (PR 4b, split for size) `done` deletes the local branch after a verified landing, prints the SHA; keeps it otherwise.
 
 ## PR 5 — migrate
 
