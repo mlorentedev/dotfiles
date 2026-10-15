@@ -7,6 +7,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // fakeBackend records what a hand-off asks of the session backend. It has no
@@ -16,6 +19,16 @@ type fakeBackend struct {
 	existing map[string]Worktree
 	calls    []string
 	typed    map[string]string
+	created  string // the path Create answers with, as herdr's answer does
+	last     string // the worktree the last Create or Open made available
+	// leased records, per pane, whether the worktree had its lease when the
+	// agent's command was typed: the lease must exist before anything runs.
+	leased map[string]bool
+}
+
+func newFake(t *testing.T, agent string) *fakeBackend {
+	t.Helper()
+	return &fakeBackend{agent: agent, created: t.TempDir()}
 }
 
 func (f *fakeBackend) CallingAgent() (string, error) { return f.agent, nil }
@@ -26,11 +39,13 @@ func (f *fakeBackend) Find(repo, branch string) (Worktree, bool, error) {
 }
 func (f *fakeBackend) Create(repo, branch, base, label string) (Started, error) {
 	f.calls = append(f.calls, "create "+repo+" "+branch+" "+base+" "+label)
-	return Started{Pane: "w1:p1"}, nil
+	f.last = f.created
+	return Started{Pane: "w1:p1", Worktree: Worktree{Path: f.created, Branch: branch, Open: true}}, nil
 }
 func (f *fakeBackend) Open(repo string, wt Worktree) (Started, error) {
 	f.calls = append(f.calls, "open "+repo+" "+wt.Path)
-	return Started{Pane: "w2:p1"}, nil
+	f.last = wt.Path
+	return Started{Pane: "w2:p1", Worktree: Worktree{Path: wt.Path, Branch: wt.Branch, Open: true}}, nil
 }
 func (f *fakeBackend) Type(pane, command string) error {
 	f.calls = append(f.calls, "type "+pane)
@@ -38,6 +53,11 @@ func (f *fakeBackend) Type(pane, command string) error {
 		f.typed = map[string]string{}
 	}
 	f.typed[pane] = command
+	if f.leased == nil {
+		f.leased = map[string]bool{}
+	}
+	_, err := os.Stat(filepath.Join(f.last, worktree.MetadataFileName))
+	f.leased[pane] = err == nil
 	return nil
 }
 
@@ -57,6 +77,8 @@ func opts(t *testing.T) Options {
 		Template:  "Work on #{{.Number}} {{.Title}} on {{.Branch}}; then {{len .Remaining}} more.",
 		Parent:    "/repos/dotfiles",
 		PromptDir: filepath.Join(t.TempDir(), "lane"),
+		GitDir:    t.TempDir(),
+		Now:       func() time.Time { return leaseNow },
 	}
 }
 
@@ -71,7 +93,7 @@ var queue = mapSource{
 // to find, create and type. Nothing in the interface can touch the caller's own
 // worktree or branch.
 func TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone(t *testing.T) {
-	b := &fakeBackend{agent: "claude"}
+	b := newFake(t, "claude")
 	o := opts(t)
 	out, err := Handoff(o, b, queue)
 	if err != nil || !out.Started {
@@ -98,7 +120,8 @@ func TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone(
 // Twice is once: after the first run a workspace shows the branch, so the
 // second finds it open and starts nothing.
 func TestNext_RunTwiceStartsOneAgent(t *testing.T) {
-	b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: "/w/first", Branch: "fix/first-thing", Open: true}}}
+	shown := t.TempDir()
+	b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: shown, Branch: "fix/first-thing", Open: true}}}
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || out.Started || !strings.Contains(out.Note, "no second agent") {
 		t.Fatalf("Handoff = %+v, %v", out, err)
@@ -112,12 +135,13 @@ func TestNext_RunTwiceStartsOneAgent(t *testing.T) {
 
 // A worktree that exists but that no workspace shows is opened, not recreated.
 func TestNext_ReusesAWorktreeNothingShows(t *testing.T) {
-	b := &fakeBackend{agent: "pi", existing: map[string]Worktree{"fix/first-thing": {Path: "/w/first", Branch: "fix/first-thing"}}}
+	idle := t.TempDir()
+	b := &fakeBackend{agent: "pi", existing: map[string]Worktree{"fix/first-thing": {Path: idle, Branch: "fix/first-thing"}}}
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || !out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
 	}
-	want := []string{"find /repos/dotfiles fix/first-thing", "open /repos/dotfiles /w/first", "type w2:p1"}
+	want := []string{"find /repos/dotfiles fix/first-thing", "open /repos/dotfiles " + idle, "type w2:p1"}
 	if !reflect.DeepEqual(b.calls, want) {
 		t.Errorf("calls = %q, want %q", b.calls, want)
 	}
@@ -126,18 +150,18 @@ func TestNext_ReusesAWorktreeNothingShows(t *testing.T) {
 // The successor is the same kind of agent as the finisher unless told
 // otherwise, and an agent the table lacks is refused naming the ones it has.
 func TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused(t *testing.T) {
-	b := &fakeBackend{agent: "agy"}
+	b := newFake(t, "agy")
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || out.Agent != "agy" || !strings.Contains(b.typed["w1:p1"], "--agent agy ") {
 		t.Fatalf("calling pane's agent: %+v, %v", out, err)
 	}
 	o := opts(t)
 	o.Agent = "pi"
-	if out, err := Handoff(o, &fakeBackend{agent: "agy"}, queue); err != nil || out.Agent != "pi" {
+	if out, err := Handoff(o, newFake(t, "agy"), queue); err != nil || out.Agent != "pi" {
 		t.Errorf("explicit agent: %+v, %v", out, err)
 	}
 	for _, agent := range []string{"codex", ""} {
-		bb := &fakeBackend{agent: agent}
+		bb := newFake(t, agent)
 		_, err = Handoff(opts(t), bb, queue)
 		if err == nil || !strings.Contains(err.Error(), "agy, claude, pi") {
 			t.Errorf("pane agent %q: want a refusal naming the known agents, got %v", agent, err)
@@ -167,7 +191,7 @@ func TestNext_NoBackendPrintsTheCommands(t *testing.T) {
 
 // A dry run decides and reports; it writes no prompt and creates nothing.
 func TestNext_DryRunChangesNothing(t *testing.T) {
-	b := &fakeBackend{agent: "claude"}
+	b := newFake(t, "claude")
 	o := opts(t)
 	o.DryRun = true
 	out, err := Handoff(o, b, queue)
@@ -188,14 +212,14 @@ func TestNext_DryRunChangesNothing(t *testing.T) {
 func TestNext_RefusesAPromptPathThatNeedsQuoting(t *testing.T) {
 	o := opts(t)
 	o.PromptDir = "/home/a b/lane"
-	if _, err := Handoff(o, &fakeBackend{agent: "claude"}, queue); err == nil || !strings.Contains(err.Error(), "prompt path") {
+	if _, err := Handoff(o, newFake(t, "claude"), queue); err == nil || !strings.Contains(err.Error(), "prompt path") {
 		t.Errorf("want a refusal, got %v", err)
 	}
 }
 
 func TestNext_NothingFreeIsNotAnError(t *testing.T) {
 	closed := mapSource{7: {Number: 7, State: "CLOSED"}, 8: {Number: 8, State: "CLOSED"}, 9: {Number: 9, State: "CLOSED"}}
-	out, err := Handoff(opts(t), &fakeBackend{agent: "claude"}, closed)
+	out, err := Handoff(opts(t), newFake(t, "claude"), closed)
 	if err != nil || out.Started || out.Note == "" {
 		t.Errorf("Handoff = %+v, %v", out, err)
 	}
@@ -211,7 +235,7 @@ func TestNext_TheSuccessorRunsTheBinaryThatDecided(t *testing.T) {
 		"~/dotf":                     "dotf lane exec ",
 		"":                           "dotf lane exec ",
 	} {
-		b := &fakeBackend{agent: "claude"}
+		b := newFake(t, "claude")
 		o := opts(t)
 		o.Dotf = dotf
 		if _, err := Handoff(o, b, queue); err != nil || !strings.HasPrefix(b.typed["w1:p1"], want) {
