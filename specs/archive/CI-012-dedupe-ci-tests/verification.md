@@ -22,6 +22,7 @@ This spec tracked #2059 across three PRs: N4, N5 and N7 in the first, N3 in #250
 - Full bats suite, branch vs a clean `origin/main` worktree on this Mac: 61 failing on `main`, the same 61 on the branch plus one that was mine (`stub-real-pairing` wanted an exemption for the suite that stubs `go`), fixed in this change. The 61 are macOS environment failures (`/private` path prefix, GNU userland, PyYAML), a separate piece of work.
 - No regressions in existing test suite: yes (after the fix above).
 - N6, on this Mac: `bats --jobs 4 tests/*.bats` -> 1938 ok, 0 not ok, exit 0.
+- Re-verified on `main` at `6d92b561` (2026-10-14, after #2505 merged): every `features.json` verification, f1 to f7, exits 0.
 
 ## Decisions made during implementation
 
@@ -30,6 +31,8 @@ This spec tracked #2059 across three PRs: N4, N5 and N7 in the first, N3 in #250
 - A missing Go toolchain still skips on a developer machine: the file headers promise a shell-only checkout runs the rest of the suite. In CI it fails.
 - N6 owners where no `parity:` test decided it (#2059 plan): the Aider sunset stays in each file's own suite; `inject_agent_presence` belongs to `compile-harness.bats`, `harness refresh` to `harness-refresh-announce.bats`, the `install.ps1` converge call to `install-ps1.bats`, `dotf tools install` to `setup-windows.bats`, `harness bind` and its probes to the "both setup scripts" test in `claude-settings-template.bats`, the `__HOOK_COMMAND__` placeholder to that file's placeholder test, `Copy-Item.*diff-check` to the CLI-019 deploy test, `systemd/user` to `dotfiles-selfupdate-install.bats`.
 - The Setup rows of `tasks.md` stay unticked: the work landed on `ci/dedupe-bats-build`, `ci/bats-fixture-template` and `test/duplicate-assertion-check`, not the `feat/` branch the template names.
+- `proposal.md` N4 says five files load the `dotf-bin` helper; three do now. #2070 (`38fe45dd`) replaced `vault-health-go-parity.bats` and `knowledge-crystallize-go-parity.bats` with Go golden tests, so the count drifted, not the coverage. Recorded here, not in the proposal, as the archive review asked.
+- The archive review's open Minor gaps (upload `if-no-files-found`, nested `.bats` enumeration, a flag-identity fixture, function length, the 63-vs-67 docstring) are tracked on #2059 (issuecomment-6183266892).
 - The spec was scaffolded with `--over-wip-limit` (19 active against a limit of 10): the rows are independent of the other specs and a block in an unrelated one would have mislabelled both.
 
 ## Promotion candidates
@@ -40,7 +43,7 @@ This spec tracked #2059 across three PRs: N4, N5 and N7 in the first, N3 in #250
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CI-012-dedupe-ci-tests/` -> `specs/archive/CI-012-dedupe-ci-tests/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CI-012-dedupe-ci-tests/` -> `specs/archive/CI-012-dedupe-ci-tests/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
