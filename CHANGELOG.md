@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.71.0](https://github.com/mlorentedev/dotfiles/compare/v0.70.0...v0.71.0) (2026-10-15)
+
+
+### Features
+
+* **deploy:** merge a list of tables by a declared identity field ([#2561](https://github.com/mlorentedev/dotfiles/issues/2561)) ([430b2e3](https://github.com/mlorentedev/dotfiles/commit/430b2e34391e8303750160698df2ad236bc19953)), closes [#2455](https://github.com/mlorentedev/dotfiles/issues/2455)
+* **harness:** register the autopilot skill record ([#2542](https://github.com/mlorentedev/dotfiles/issues/2542)) ([bf2514e](https://github.com/mlorentedev/dotfiles/commit/bf2514ec0b74afc3fd5a0abcc5a0634a77ea06aa))
+* **lane:** start an agent on a file prompt without a shell ([#2532](https://github.com/mlorentedev/dotfiles/issues/2532)) ([58909de](https://github.com/mlorentedev/dotfiles/commit/58909de710e7f584046c754e00b130f6d36227ed))
+* **pr:** scope triage-queue to one pull request with --pr ([#2558](https://github.com/mlorentedev/dotfiles/issues/2558)) ([81d4706](https://github.com/mlorentedev/dotfiles/commit/81d4706156ee74231a3b7be3468ff8ac000c678a)), closes [#2549](https://github.com/mlorentedev/dotfiles/issues/2549)
+* **secrets:** deliver PR_AGENT_ANTHROPIC_API_KEY to kubelab's CI ([#2508](https://github.com/mlorentedev/dotfiles/issues/2508)) ([57e7f11](https://github.com/mlorentedev/dotfiles/commit/57e7f11089f96eb9d908bf349d27f3c2918da2be))
+* **ssh:** declare the Gitea forge as a pinned SSH target ([#2513](https://github.com/mlorentedev/dotfiles/issues/2513)) ([720a885](https://github.com/mlorentedev/dotfiles/commit/720a885624a87d8c52bfffeaaff7437018a9cd50))
+* **worktree:** create worktrees under WORKTREE_ROOT in herdr's layout ([#2527](https://github.com/mlorentedev/dotfiles/issues/2527)) ([ff0b161](https://github.com/mlorentedev/dotfiles/commit/ff0b1612e816b4adc355874d0cd2c09ca89419e3))
+* **worktree:** delete the local branch in done once it has landed ([#2563](https://github.com/mlorentedev/dotfiles/issues/2563)) ([1c6a204](https://github.com/mlorentedev/dotfiles/commit/1c6a204de6bcb1c323eada1e8ea6b2da0b4e7380))
+* **worktree:** list unleased worktrees as UNADOPTED and add adopt ([#2562](https://github.com/mlorentedev/dotfiles/issues/2562)) ([57355aa](https://github.com/mlorentedev/dotfiles/commit/57355aa286f90eab9e37e906b21cbe6463aa75c5))
+* **worktree:** move legacy sibling worktrees under the root with migrate ([#2564](https://github.com/mlorentedev/dotfiles/issues/2564)) ([6153adf](https://github.com/mlorentedev/dotfiles/commit/6153adf7c640625ad2c72805d8b45633ef16a301)), closes [#2503](https://github.com/mlorentedev/dotfiles/issues/2503)
+* **worktree:** refuse to remove a worktree whose Claude session is recent ([#2556](https://github.com/mlorentedev/dotfiles/issues/2556)) ([ac5208a](https://github.com/mlorentedev/dotfiles/commit/ac5208a301aecfba238ad64431930d7d60bb0e6c))
+* **worktree:** start an agent in herdr with add --agent ([#2565](https://github.com/mlorentedev/dotfiles/issues/2565)) ([d9a8ad9](https://github.com/mlorentedev/dotfiles/commit/d9a8ad9d73d02d1a52451011ee508e54c334d826)), closes [#2503](https://github.com/mlorentedev/dotfiles/issues/2503)
+* **worktree:** validate the branch add creates and start it from origin's default branch ([#2539](https://github.com/mlorentedev/dotfiles/issues/2539)) ([fdfef1f](https://github.com/mlorentedev/dotfiles/commit/fdfef1f38584cf8bd8c66385c8a1ca3515641e11))
+
+
+### Bug Fixes
+
+* **agy:** trust the worktrees root, not a glob agy does not read ([#2536](https://github.com/mlorentedev/dotfiles/issues/2536)) ([f0deadf](https://github.com/mlorentedev/dotfiles/commit/f0deadf3133344264796a50b88dba270bf142b6b))
+* **doctor:** do not report an unset variable that only dotf reads and defaults ([#2530](https://github.com/mlorentedev/dotfiles/issues/2530)) ([cfffe79](https://github.com/mlorentedev/dotfiles/commit/cfffe79de47b31b326ae1222248f78414bd6e55a)), closes [#2501](https://github.com/mlorentedev/dotfiles/issues/2501)
+* **doctor:** skip the model-limit check when opencode's catalog cache is stale ([#2541](https://github.com/mlorentedev/dotfiles/issues/2541)) ([bd96680](https://github.com/mlorentedev/dotfiles/commit/bd96680045ee42d5426de8ae6f037c3773ba94a2)), closes [#2434](https://github.com/mlorentedev/dotfiles/issues/2434)
+* **env:** read the login session's launchd environment from tmux and herdr ([#2509](https://github.com/mlorentedev/dotfiles/issues/2509)) ([0cbcc11](https://github.com/mlorentedev/dotfiles/commit/0cbcc110d1e704213c5f9182a24d639501e28f9a)), closes [#2507](https://github.com/mlorentedev/dotfiles/issues/2507)
+* **forge:** refuse a branch-protection declaration that has not landed ([#2557](https://github.com/mlorentedev/dotfiles/issues/2557)) ([a9d6e5b](https://github.com/mlorentedev/dotfiles/commit/a9d6e5bb5e5812aaafdd6dbec1d0ed435a15cf14))
+* **harness:** bind claude's hooks into CLAUDE_CONFIG_DIR, as configs-deploy does ([#2544](https://github.com/mlorentedev/dotfiles/issues/2544)) ([b91a7a5](https://github.com/mlorentedev/dotfiles/commit/b91a7a5d0f751bfdb18c9bf13fb6623270d3083a))
+* **lane:** lease the worktrees lane next starts so sweep can reap them ([#2555](https://github.com/mlorentedev/dotfiles/issues/2555)) ([f0c1b9e](https://github.com/mlorentedev/dotfiles/commit/f0c1b9e53c8c67c92cad108407cb176156672362)), closes [#2547](https://github.com/mlorentedev/dotfiles/issues/2547)
+* **spec-gate:** accept an abandoned spec as the end of archive-on-merge ([#2524](https://github.com/mlorentedev/dotfiles/issues/2524)) ([7cb980d](https://github.com/mlorentedev/dotfiles/commit/7cb980df42c9655ddbfcda0d21f045b533abcf33))
+* **tools:** defer a cask that needs a sudo password instead of failing converge ([#2518](https://github.com/mlorentedev/dotfiles/issues/2518)) ([d3116f5](https://github.com/mlorentedev/dotfiles/commit/d3116f5c4a312590f6838c5f8445500ba6ffdbc7))
+* **update:** install the pinned dotf before converging ([#2510](https://github.com/mlorentedev/dotfiles/issues/2510)) ([7f3cf29](https://github.com/mlorentedev/dotfiles/commit/7f3cf296e8e10727295670fbf21c6bcf90134067)), closes [#2506](https://github.com/mlorentedev/dotfiles/issues/2506)
+
 ## [0.70.0](https://github.com/mlorentedev/dotfiles/compare/v0.69.0...v0.70.0) (2026-10-15)
 
 
