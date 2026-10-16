@@ -272,6 +272,17 @@ after the first review, into review-second.md. A member that declares
 					"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
 					id, slot.Request, slot.Request)
 			}
+			// A re-review used to overwrite the round the author's dispositions
+			// answer (#2264). Keep it under a round number instead; the slot then
+			// holds no verdict, so a run that ends without writing one leaves
+			// nothing to archive rather than the previous round's.
+			kept, err := spec.RotateReviewRound(specDir, slot)
+			if err != nil {
+				return fmt.Errorf("could not keep the previous round's %s before the new one overwrites it: %w", slot.Review, err)
+			}
+			if kept != "" {
+				cmd.Printf("Kept:       the previous verdict as %s\n", kept)
+			}
 			if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, chosen.ID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
 				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
 					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
