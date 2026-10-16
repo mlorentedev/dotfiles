@@ -48,7 +48,7 @@ func LoadConfig(repoRoot string) (Config, error) {
 	if cfg.Base == "" {
 		cfg.Base = "origin/main"
 	}
-	if remote, branch := cfg.Remote(); !refWord.MatchString(remote) || !refWord.MatchString(branch) {
+	if remote, branch := cfg.Remote(); !plainRef(remote) || !plainRef(branch) {
 		return Config{}, fmt.Errorf("lane: %s: base %q must be <remote>/<branch>, e.g. origin/main, made of letters, digits and . _ / -", ConfigPath, cfg.Base)
 	}
 	return cfg, nil
@@ -58,6 +58,13 @@ func LoadConfig(repoRoot string) (Config, error) {
 // into commands a person pastes, and a space or a metacharacter in it would
 // make one of them run a second command (CLI-119 review round 3).
 var refWord = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_./-]*$`)
+
+// plainRef is refWord plus the shapes git itself refuses in a ref name, so a
+// base git would reject fails here, at load, and not at the fetch.
+func plainRef(s string) bool {
+	return refWord.MatchString(s) && !strings.Contains(s, "..") && !strings.Contains(s, "//") &&
+		!strings.HasSuffix(s, "/") && !strings.HasSuffix(s, ".") && !strings.HasSuffix(s, ".lock")
+}
 
 // Remote splits Base into the remote to fetch and the branch to fetch from it.
 func (c Config) Remote() (remote, branch string) {
