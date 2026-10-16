@@ -224,7 +224,7 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 		// one-line remedy dotf prints for a person to paste: a flag, a second
 		// word or a shell metacharacter would change what either does.
 		if pkg != "" && !packageName.MatchString(pkg) {
-			return fmt.Errorf("tool %q: %s name %q is not a package name (letters, digits and . _ + @ / : -, not starting with - )", t.Name, manager, pkg)
+			return fmt.Errorf("tool %q: %s name %q is not a package name (start with a letter or digit; then letters, digits and . _ + @ / : -)", t.Name, manager, pkg)
 		}
 	}
 	return nil
