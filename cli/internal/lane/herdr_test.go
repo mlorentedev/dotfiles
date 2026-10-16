@@ -94,7 +94,10 @@ func TestHerdr_AnIdlePaneIsOneWhoseForegroundIsOnlyItsShell(t *testing.T) {
 	if _, _, err := h.IdlePane(Worktree{}); err == nil {
 		t.Error("a worktree no workspace shows has no pane to probe")
 	}
-	if _, _, err := (Herdr{Run: fakeRun(map[string]string{"herdr pane list": list, "herdr pane process-info": `{"result":{"process_info":{}}}`}, new([]string))}).IdlePane(Worktree{Workspace: "wB"}); err == nil {
-		t.Error("an answer with no shell pid cannot be read as idle")
+	// fakeRun matches by prefix, so these two keys answer the real calls; the
+	// error must come from the missing shell pid and not from an unanswered call.
+	noPID := Herdr{Run: fakeRun(map[string]string{"herdr pane list": list, "herdr pane process-info": `{"result":{"process_info":{}}}`}, new([]string))}
+	if _, _, err := noPID.IdlePane(Worktree{Workspace: "wB"}); err == nil || !strings.Contains(err.Error(), "no shell pid") {
+		t.Errorf("an answer with no shell pid cannot be read as idle, got %v", err)
 	}
 }
