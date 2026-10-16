@@ -468,4 +468,5 @@ tags: [lessons, index, dotfiles]
 | [447 - A harness session store is keyed by path, by id, or not at all; read each by its own key](lesson-447-a-session-store-is-keyed-by-path-by-id-or-not-at-all.md) | 2026-10-16 |
 | [448 - A review gate must read every channel a reviewer publishes on, not the one it was first seen on](lesson-448-a-review-gate-must-read-every-channel-a-reviewer-publishes-on.md) | 2026-10-16 |
 | [450 - Ancestry reads a fresh branch as merged, and a one-row-per-phase table hides how the rules compete](lesson-450-ancestry-reads-a-fresh-branch-as-merged-and-a-phase-table-hides-how-rules-compete.md) | 2026-10-16 |
+| [451 - A reconcile that starts work must see the work it started, or changed=0 never arrives](lesson-451-a-reconcile-that-starts-work-must-see-the-work-it-started.md) | 2026-10-16 |
 <!-- END GENERATED -->

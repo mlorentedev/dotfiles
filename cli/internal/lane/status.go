@@ -95,7 +95,14 @@ type Row struct {
 	Live    Liveness `json:"live,omitempty"`
 	Herdr   string   `json:"herdr"`
 	Dirty   bool     `json:"dirty,omitempty"`
-	Phase   Phase    `json:"phase"`
+	// State and StateReason are worktree.Classify's reading, the one sweep
+	// acts on, so plan mirrors sweep's gates instead of re-deriving them.
+	State       worktree.LifecycleState `json:"state,omitempty"`
+	StateReason string                  `json:"state_reason,omitempty"`
+	// Meta is the lease, kept for plan's due times. It is not part of the
+	// status table: Lease already carries the expiry for a reader.
+	Meta  *worktree.Metadata `json:"-"`
+	Phase Phase              `json:"phase"`
 }
 
 // Status is the read-only join of git, the forge, liveness and herdr. It
@@ -150,7 +157,7 @@ func (s Sources) onDiskLane(info worktree.Info, forge PRSource) (lane, error) {
 	live := s.Live(info.Path)
 	herdr := s.herdr(info.Branch)
 	f := Facts{Info: info, Exists: true, PR: pr.State, Live: live != LiveIdle, HerdrPresent: herdr != HerdrAbsent}
-	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Live: live, Herdr: herdr, Dirty: info.Dirty, Ticket: ticketOf(info)}
+	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Live: live, Herdr: herdr, Dirty: info.Dirty, State: info.State, StateReason: info.StateReason, Meta: info.Metadata, Ticket: ticketOf(info)}
 	if m := info.Metadata; m != nil {
 		r.Agent, r.Lease = m.Creator, m.LeaseExpiresAt.Format(time.RFC3339)
 	}

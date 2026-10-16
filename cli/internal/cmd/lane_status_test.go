@@ -114,3 +114,46 @@ func TestLaneStatus_NoLanesAndFailure(t *testing.T) {
 		t.Error("a repository that cannot be read must fail, not print an empty table")
 	}
 }
+
+// plan prints each action with its class and, for an ambiguous one, the
+// command that resolves it; --json carries the actions and the landing order.
+func TestLanePlan_PrintsClassesAndResolvingCommands(t *testing.T) {
+	statusFixture(t)
+	out, err := runLaneOut(t, "plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"CLASS", "ambiguous", "flag", "fix/b", "landing order:", "#40 fix/2501-a", "dotf pr triage-queue --pr 40 && dotf pr land 40"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plan lacks %q:\n%s", want, out)
+		}
+	}
+	js, err := runLaneOut(t, "plan", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Actions []lane.Action  `json:"actions"`
+		Landing []lane.Landing `json:"landing"`
+	}
+	if err := json.Unmarshal([]byte(js), &got); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, js)
+	}
+	if len(got.Actions) != 1 || got.Actions[0].Class != lane.ClassAmbiguous || len(got.Landing) != 1 || !got.Landing[0].Head {
+		t.Errorf("plan = %+v", got)
+	}
+}
+
+func TestLanePlan_NothingToDo(t *testing.T) {
+	prev := laneSources
+	t.Cleanup(func() { laneSources = prev })
+	laneSources = func() (lane.Sources, error) {
+		return lane.Sources{List: func() ([]worktree.Info, error) { return nil, nil }, Forge: stubForge{}}, nil
+	}
+	if out, err := runLaneOut(t, "plan"); err != nil || !strings.Contains(out, "nothing to do") {
+		t.Errorf("empty plan = %q, %v", out, err)
+	}
+	if out, err := runLaneOut(t, "plan", "--json"); err != nil || !strings.Contains(out, `"actions": []`) {
+		t.Errorf("empty JSON plan = %q, %v", out, err)
+	}
+}

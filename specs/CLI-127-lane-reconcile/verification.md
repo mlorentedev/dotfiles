@@ -10,13 +10,14 @@ created: "2026-10-15"
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] AC1 (PR 1, `lane status`) -> `TestDerive` (one row per phase, herdr absent in several) and `TestStatus` (subtests: the 9 phases through the join, herdr absent, unknown liveness, landing head); the f1 verification line passes. `TestLaneStatus*` in `cli/internal/cmd` pins the `--json` and table shapes.
-- [ ] AC2 (PR 2, `lane plan`) -> not started
+- [x] AC2 (PR 2, `lane plan`) -> `TestPlan` (one row per D1 case, the D2 rows, the D3 landing row) and `TestPlanMutatesNothing` (a real git fixture, a non-empty plan, a hash of refs, worktrees, statuses and leases before and after); the f2 verification line passes. `TestLanePlan*` in `cli/internal/cmd` pins the text and `--json` shapes.
 - [ ] AC3 (PR 3, `lane apply`) -> not started
 - [ ] AC4 (PR 3, live process never reaped) -> not started. The read-only half ran on 2026-10-16, see Test status.
 
 ## Test status
 
 - PR 1: `cd cli && go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...` all pass; `golangci-lint run` (2.12.2, the pin) reports 0 issues.
+- PR 2: the same suite passes. `dotf lane plan` ran live and read-only on 2026-10-16: no worktree with a live session was classed `auto` (the merged ones with a running lease are `pending`, the unleased ones `ambiguous`).
 - Manual smoke test (read-only, against the running herdr, no server started): `dotf lane status` on this machine listed 12 lanes in about 10s wall time (network-bound: one REST call and one `herdr worktree list` per branch). The first run found the landing-head defect now pinned by `TestStatus/LandingHeadIsPickedAmongReviewLanes` (lesson 450).
 - No regressions in existing test suite: yes.
 
@@ -28,6 +29,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - **No lease outranks everything.** A worktree with an open or merged PR but no `.dotf-worktree.json` reads Unadopted, not Review or Landed, until `worktree adopt` (D2: adoption is never `auto`).
 - **Merged comes from the REST forge alone** (`lane.ForgeGit`). Ancestry is dropped because a branch with no commit yet reads as merged; the cost is that a branch merged without a PR reads unmerged, which is the safe side because `sweep` re-checks its own gates.
 - **Liveness has three answers.** `Combine` of a process scan (`worktree.ProcessInside`, a new read-only export in `process_export.go`, agreed with CLI-118 on #2550) and a session transcript. A probe that cannot answer (no scan on Windows, unreadable store) is `unknown`, shown as such, and reads as live for the phase. It never feeds an auto action.
+- **`plan` mirrors sweep through `Row.State`**, the lifecycle state `Classify` already computed: REAPABLE with an idle liveness is `auto`; ACTIVE for a time-only reason (lease running, under 15 minutes old) is `pending` with the later of the two as its due time; liveness `live` or `unknown`, DIRTY, a reap hold, Stalled and Orphan are `ambiguous` with `dotf worktree done --force <path>`.
+- **A start is `auto` only while no lane is in flight**, and only for the first pending item in queue order, so a second apply finds the lane the first one started (lesson 451).
+- **The head PR's four-condition check is not printed yet.** `plan` prints the landing order and the head's command (`dotf pr triage-queue --pr N && dotf pr land N`, D3). Evaluating the four conditions needs an exported read-only fact reader in `cli/internal/prland`, which is outside this run's write paths; it is ticketed rather than copied, so the landing conditions keep one implementation (`prland.Decide`).
 - **Session half covers every harness** through `RecentHarnessSession` (#2575, BUG-148): Claude Code, pi and Copilot.
 
 ## Promotion candidates
