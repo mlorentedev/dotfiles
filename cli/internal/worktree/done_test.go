@@ -219,10 +219,13 @@ func TestResolveWorktreeAndMainRepoRoot(t *testing.T) {
 	subMainRoot, subWTRoot := testResolveFromSubdir(t, wtDir, absRepoDir, absWTDir)
 
 	// 3. Teardown using the resolved roots (the in-worktree CLI flow)
+	// Its own lock: the default is machine-wide, shared with every other
+	// package's tests and any real `dotf worktree` running at the time.
 	_, err := Done(DoneOptions{
 		RepoRoot:     subMainRoot,
 		WorktreePath: subWTRoot,
 		Force:        false,
+		LockPath:     filepath.Join(t.TempDir(), "worktree.lock"),
 	})
 	if err != nil {
 		t.Fatalf("expected Done with resolved roots to succeed, got: %v", err)
