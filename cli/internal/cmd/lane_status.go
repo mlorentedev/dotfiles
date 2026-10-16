@@ -54,6 +54,15 @@ func newLaneStatusCmd() *cobra.Command {
 	return c
 }
 
+// orDash fills a cell a lane has no value for, such as the agent of an
+// unadopted worktree or the liveness of a lane with no worktree.
+func orDash(v string) string {
+	if v == "" {
+		return "-"
+	}
+	return v
+}
+
 func writeLaneJSON(w io.Writer, rows []lane.Row) error {
 	if rows == nil {
 		rows = []lane.Row{} // [] and not null, for a consumer that indexes it
@@ -78,11 +87,7 @@ func writeLaneTable(w io.Writer, rows []lane.Row) error {
 		if r.Ticket != 0 {
 			ticket = fmt.Sprintf("#%d", r.Ticket)
 		}
-		agent := r.Agent
-		if agent == "" {
-			agent = "-"
-		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.Phase, ticket, r.Branch, pr, agent, r.Live, r.Herdr)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.Phase, ticket, r.Branch, pr, orDash(r.Agent), orDash(string(r.Live)), r.Herdr)
 	}
 	return tw.Flush()
 }

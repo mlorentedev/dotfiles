@@ -92,7 +92,7 @@ type Row struct {
 	PRState string   `json:"pr_state,omitempty"`
 	Agent   string   `json:"agent,omitempty"`
 	Lease   string   `json:"lease,omitempty"`
-	Live    Liveness `json:"live"`
+	Live    Liveness `json:"live,omitempty"`
 	Herdr   string   `json:"herdr"`
 	Dirty   bool     `json:"dirty,omitempty"`
 	Phase   Phase    `json:"phase"`
