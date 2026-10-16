@@ -144,15 +144,21 @@ func handoffIssue(o Options, b Backend, issue Issue) (out Outcome, lost string, 
 		out.Note = p.note
 		return out, "", nil
 	}
-	if err := launch(o, b, wt, found, out, p); err != nil {
-		// The claim was taken for a lane that did not start: give it back, or
-		// every later run skips an issue nobody is working on. A worktree that
-		// was created survives, and the next run finds it.
+	st, err := start(o, b, wt, found, out.Branch, out.Issue)
+	if err != nil {
+		// The claim was taken for a lane that has no worktree: give it back, or
+		// every later run skips an issue nobody is working on.
 		if !found && o.Claims != nil && !o.DryRun {
 			if rerr := o.Claims.Release(issue.Number, false); rerr != nil {
 				err = errors.Join(err, fmt.Errorf("lane: the claim on #%d could not be released (run `dotf lane release %d`): %w", issue.Number, issue.Number, rerr))
 			}
 		}
+		return out, "", err
+	}
+	// Past this point the worktree exists and the next run finds it, which
+	// skips the claim: keep it, or a live worktree would run with nobody
+	// holding the issue and a second checkout could win it.
+	if err := typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p); err != nil {
 		return out, "", err
 	}
 	out.Started, out.Note = true, p.note
@@ -209,16 +215,6 @@ func sameIssue(wt Worktree, issue Issue, branch string) error {
 // directory, so the line carries no path anyone chose: a git directory, a temp
 // directory or a home with a space in it cannot reach the pane's shell.
 const PromptFile = ".dotf-lane-prompt.md"
-
-// launch starts the branch's worktree, leases it, leaves the prompt in it, and
-// only then types the command: the lease must exist before anything runs there.
-func launch(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) error {
-	st, err := start(o, b, wt, found, out.Branch, out.Issue)
-	if err != nil {
-		return err
-	}
-	return typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p)
-}
 
 // typeSuccessor leases the worktree, leaves the prompt in it and types the
 // command, in that order: the lease must exist before anything runs there.

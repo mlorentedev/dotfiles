@@ -204,3 +204,25 @@ func TestHandoffReleasesTheClaimWhenTheLaneDoesNotStart(t *testing.T) {
 		t.Errorf("claims = %q, want the claim given back after the failed start", c.calls)
 	}
 }
+
+// failingType is a backend whose worktree is created but whose pane cannot be
+// typed into: the worktree exists, and the next run will find it.
+type failingType struct{ *fakeBackend }
+
+func (failingType) Type(string, string) error { return errors.New("herdr: pane gone") }
+
+// Once the worktree exists a later run skips the claim, so giving it back
+// would leave a live worktree that nobody holds the issue for.
+func TestHandoffKeepsTheClaimOnceTheWorktreeExists(t *testing.T) {
+	b := failingType{newFake(t, "claude")}
+	c := &fakeClaims{}
+	o := opts(t)
+	o.Claims = c
+
+	if _, err := Handoff(o, b, queue); err == nil {
+		t.Fatal("want the type error")
+	}
+	if !reflect.DeepEqual(c.calls, []string{"acquire 7"}) {
+		t.Errorf("claims = %q, want the claim kept after a post-create failure", c.calls)
+	}
+}
