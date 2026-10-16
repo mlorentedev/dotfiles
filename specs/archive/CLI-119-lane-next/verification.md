@@ -72,6 +72,16 @@ Review: `review.md` (merged via #2586). Fixes in the PR that carries this sectio
 - Mutations on `Handoff` (open-worktree check, quoting guard, parent checkout, dry-run write): all killed; two survivors (dry-run write without a backend, agent validation) closed by a test and by removing the redundant check.
 - Not measured: the Windows `lane exec` child-process path (compiles under `GOOS=windows`); the pane-shell-ready wait (input typed right after create was read by zsh in every run, so no wait was added).
 
+## Review round 3 (PASS at `ec982b38`, nan/mimo-v2.6-flash) dispositions
+
+Verdict PASS: no Blocker, no REAL Major; all rubric dimensions B. The reviewer re-ran the whole gate at `ec982b38` (build, vet, `GOOS=windows go vet`, full test suite, lint, all six `features.json` commands) and reproduced the round-2 Major on a scratch repo under `a b/repo`: it now exits 0 with the quoted commands.
+
+- Finding 1 (`readPrompt` repo-root fallback has no named test, Minor): ticketed on #2587.
+- Finding 2 (a path with `$`, backtick, `!`, `%` or `"` exits 1 with no backend, Minor, REAL): ruled correct. AC5 promises the commands; for such a path no shell reads one alike, so refusing loudly is the contract. The refusal names the cause and the fix.
+- Finding 3 (`Config.Base` and its remote half printed unquoted, Minor, SPECULATIVE): ticketed on #2587.
+- Question (`features.json` evidence strings predate f2's extended command): the command itself was re-run by the reviewer at `ec982b38`, exit 0; refreshing the strings is ticketed on #2587.
+- Still open, as before: #2576 (start race, create-then-type stall, slug collision, exclude read-modify-write) and #2587 item 2 (serial `gh issue view`). The Windows `lane exec` child path stays compile-verified only, and no live herdr run of the new typed line was made.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -90,7 +100,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-119-lane-next/` -> `specs/archive/CLI-119-lane-next/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-119-lane-next/` -> `specs/archive/CLI-119-lane-next/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Promotions above executed (if any)
