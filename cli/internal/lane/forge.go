@@ -15,6 +15,12 @@ type REST struct{ Run Runner }
 // that cannot answer is an error and never "no pull request", which would
 // read a lane as Stalled.
 func (r REST) PRFor(branch string) (PRInfo, error) {
+	// A worktree on a detached HEAD has no branch, and `head={owner}:` with
+	// nothing after it matches every pull request: the newest one would be
+	// read as this worktree's own.
+	if branch == "" {
+		return PRInfo{}, nil
+	}
 	out, err := r.Run("gh", "api", "repos/{owner}/{repo}/pulls?state=all&sort=created&direction=desc&per_page=1&head={owner}:"+branch)
 	if err != nil {
 		return PRInfo{}, err
@@ -23,6 +29,7 @@ func (r REST) PRFor(branch string) (PRInfo, error) {
 		Number   int     `json:"number"`
 		State    string  `json:"state"`
 		MergedAt *string `json:"merged_at"`
+		Draft    bool    `json:"draft"`
 	}
 	if err := json.Unmarshal([]byte(out), &pulls); err != nil {
 		return PRInfo{}, fmt.Errorf("gh api pulls head=%s: %w", branch, err)
@@ -35,7 +42,7 @@ func (r REST) PRFor(branch string) (PRInfo, error) {
 	case p.MergedAt != nil:
 		return PRInfo{Number: p.Number, State: PRMerged}, nil
 	case p.State == "open":
-		return PRInfo{Number: p.Number, State: PROpen}, nil
+		return PRInfo{Number: p.Number, State: PROpen, Draft: p.Draft}, nil
 	}
 	return PRInfo{Number: p.Number, State: PRClosed}, nil
 }
