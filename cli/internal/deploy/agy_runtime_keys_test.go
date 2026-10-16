@@ -67,7 +67,7 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Deploy(cfg, root, home, noResolve, nil, false); err != nil {
+	if _, err := Deploy(cfg, root, home, worktreeRoot, nil, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,8 +80,8 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	if !containsAll(ws, "/home/u/Projects/ts-bridge") {
 		t.Errorf("a trust path the machine added was lost: %v", got["trustedWorkspaces"])
 	}
-	if !containsAll(ws, filepath.ToSlash(home)+"/Projects/*") {
-		t.Errorf("the baseline trust path is missing: %v", got["trustedWorkspaces"])
+	if !containsAll(ws, filepath.ToSlash(home)+"/Projects/*", "/r/worktrees") {
+		t.Errorf("the baseline trust path or the rendered worktree root is missing: %v", got["trustedWorkspaces"])
 	}
 
 	perms, _ := got["permissions"].(map[string]any)

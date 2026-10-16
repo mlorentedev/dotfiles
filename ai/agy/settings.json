@@ -17,7 +17,7 @@
   "trustedWorkspaces": [
     "{HOME}/Projects/*",
     "{HOME}/Projects/Workspace/*",
-    "{HOME}/Projects/worktrees"
+    "{WORKTREE_ROOT}"
   ],
   "workspace": {
     "autoSave": true,

@@ -43,9 +43,9 @@ setup() {
 @test "every harness that trusts folders trusts the worktrees herdr creates (#2503)" {
     # herdr puts a worktree at <directory>/<repo>/<branch-slug>. A harness that
     # does not trust that path asks, or refuses, in every worktree herdr opens.
-    run sed -n 's/^directory[[:space:]]*=[[:space:]]*"~\(.*\)"$/{HOME}\1\/*\/*/p' "$SRC"
-    [ -n "$output" ] || { echo "no ~-relative [worktrees] directory in $SRC"; false; }
-    want="$output"
+    # Both trust lists render the root from WORKTREE_ROOT, the root dotf
+    # worktree add uses; the next test keeps herdr's directory equal to it.
+    want='{WORKTREE_ROOT}/*/*'
     # agy 1.3.5 does not read `<dir>/*/*` as a glob (measured 2026-10-14, #2533):
     # a fresh worktree under it still asked. The plain directory is trusted with
     # everything beneath it, so agy is given the root, not the pattern.

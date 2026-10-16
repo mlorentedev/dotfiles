@@ -133,8 +133,8 @@ load 'lib/refute'
     # they moved to where the change lives.
     #
     # AI-043 did not supersede Copilot's half: `trustedFolders` is still ours to
-    # ship, so its full list is pinned here (#2504 added the herdr worktree root).
-    [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*","{HOME}/Projects/worktrees/*/*"]' ]
+    # ship, so its full list is pinned here (#2504 added the worktree root, #2503 renders it from WORKTREE_ROOT).
+    [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*","{WORKTREE_ROOT}/*/*"]' ]
     [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json slash" ]
     # paths needs version 3; later versions keep it (4 added platforms, #1843 B1).
     [ "$(jq -r '.version' "$MANIFEST")" -ge 3 ]
