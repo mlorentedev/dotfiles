@@ -117,7 +117,7 @@ lazygit replaces Orca's diff viewer. Its install was done with the mise pins abo
 - [x] The popup runs the bare `lazygit` with herdr's own environment, so it finds lazygit where herdr was started from a shell: W2b puts mise's shims on PATH for every shell we configure. A herdr started with no shell at all is W2b's open PR 2 (`dotf env persist`)
 - [x] The test pins the key itself, not only a lazygit popup: `prefix+x` in the stanza fails it
 - [x] The merge keeps a stale binding when one is edited, because lists union by equality: #2455 (CLI-113) phase 1. The reader learns manifest version 5 and `listKeys` (path -> identity field): a managed table replaces the destination's table with the same identity, collapses the duplicates the union left, and a managed element without the field is an error. `TestDeploy_MergeReplacesAListElementByIdentity` and its siblings; eleven mutations killed (verification.md lists them)
-- [ ] #2455 phase 2, after a release carries the version 5 reader (#1814): `ai/deploy.json` to version 5, `"listKeys": {"keys.command": "key"}` on the herdr entry, and the "Until #2455" comment in `ai/herdr/config.toml` removed. A retired managed binding is still not removed; nothing records what the repo managed before
+- [x] #2455 phase 2, after a release carries the version 5 reader (#1814): `ai/deploy.json` to version 5, `"listKeys": {"keys.command": "key"}` on the herdr entry, and the "Until #2455" comment in `ai/herdr/config.toml` removed. A retired managed binding is still not removed; nothing records what the repo managed before
 - [ ] In daily use on the Mac, recorded at gate V
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)

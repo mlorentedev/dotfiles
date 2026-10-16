@@ -54,7 +54,7 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 ## PR 7 — rendering, docs, skills, ADR
 
 - [x] (PR 7a, reader) `expandPaths` renders TOML string values behind `paths:`, allowed on a TOML source from manifest version 6 only (a 0.71.0 reader refuses it per entry, so the entry must read as a newer schema). Five mutations killed.
-- [ ] (PR 7b, flip, owner lands after every box runs the release carrying 7a) `ai/deploy.json` to version 6 in one move with CLI-113 phase 2 (owner, 2026-10-16: one fleet update, not two): herdr entry declares `paths` and `listKeys`; `ai/herdr/config.toml` uses `{WORKTREE_ROOT}`; `tests/herdr-config.bats` compares the token.
+- [x] (PR 7b, flip, owner lands after every box runs the release carrying 7a) `ai/deploy.json` to version 6 in one move with CLI-113 phase 2 (owner, 2026-10-16: one fleet update, not two): herdr entry declares `paths` and `listKeys`; `ai/herdr/config.toml` uses `{WORKTREE_ROOT}`; `tests/herdr-config.bats` compares the token.
 - [x] Trust lists: Copilot `{WORKTREE_ROOT}/*/*`, agy `{WORKTREE_ROOT}` itself (agy does not read the glob, #2533); #2504's test and the exact-list assertions updated. JSON entries already render `paths`, and `WORKTREE_ROOT` resolves to its default when unset (measured: `dotf env path WORKTREE_ROOT` on 0.71.0), so this needs no fleet floor.
 - [ ] AGENTS.md §9; vault `00_meta/skills/using-git-worktrees` and `handoff`, re-deployed via `compile-harness.sh`.
 - [ ] ADR-032 dispatch clarification; lesson for the herdr path rule.
