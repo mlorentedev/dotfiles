@@ -770,9 +770,11 @@ _reviewable_kept() { # $1 = newline-separated file list; prints how many survive
 
 @test "pr-agent: one reviewable file is enough to run the review (#1618)" {
     run _reviewable_kept $'sensitive/dr/escrow-manifest.json\ncli/internal/secrets/bw.go'
-    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
     run _reviewable_kept $'specs/X-1/review-transcript.jsonl\nspecs/X-1/review.md'
-    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
 }
 
 @test "pr-agent: an unanswerable reviewable check falls through to running PR-Agent (#1618)" {
@@ -807,17 +809,21 @@ _upstream_handler='def is_valid_file(filename, bad_extensions=None):
 @test "pr-agent: a readable file next to type-filtered ones keeps the review (#1417)" {
     UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="$_upstream_handler" \
         run _reviewable_kept $'.gitignore\nscripts/utils.sh'
-    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
 }
 
 @test "pr-agent: a failed read of either upstream list narrows the skip, never widens it (#1417)" {
     # Both lists are fetched at run time. Whichever read fails contributes nothing.
     UPSTREAM_EXT="" UPSTREAM_HANDLER="$_upstream_handler" run _reviewable_kept $'.gitignore\ngo.sum'
-    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
     UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="" run _reviewable_kept $'.gitignore\ngo.sum'
-    [ "$status" -eq 0 ] && [ "$output" = "1" ]
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
     UPSTREAM_EXT="" UPSTREAM_HANDLER="" run _reviewable_kept $'.gitignore\ngo.sum'
-    [ "$status" -eq 0 ] && [ "$output" = "2" ]
+    [ "$status" -eq 0 ]
+    [ "$output" = "2" ]
 }
 
 @test "pr-agent: the extension list is read at the same commit the action is pinned to (#1417)" {

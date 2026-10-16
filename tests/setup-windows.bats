@@ -48,7 +48,9 @@ refute_legacy_mise_sync() {
     refute_grep 'gitconfigSource|Copy-Item[^#]*\.gitconfig' "$PS1_SCRIPT"
     deploy=$(grep -nE '^    & dotf deploy[[:space:]]*$' "$PS1_SCRIPT" | cut -d: -f1)
     converge=$(grep -n '^    & dotf converge --only git-config' "$PS1_SCRIPT" | cut -d: -f1)
-    [ -n "$deploy" ] && [ -n "$converge" ] && [ "$converge" -gt "$deploy" ]
+    [ -n "$deploy" ]
+    [ -n "$converge" ]
+    [ "$converge" -gt "$deploy" ]
 }
 
 @test "setup-windows.ps1 deploys versions.conf" {
@@ -956,7 +958,8 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     # end anchor on every OS, and GNU grep reads no CR escape anyway.
     node_line=$(grep -n 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     tools_line=$(grep -nE '^    dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$node_line" ] && [ -n "$tools_line" ]
+    [ -n "$node_line" ]
+    [ -n "$tools_line" ]
     [ "$node_line" -lt "$tools_line" ]
 }
 
@@ -1006,7 +1009,9 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     # The executable invocation, never a comment naming it: the block's own
     # comments mention `claude mcp add` 40 lines above the call.
     mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$uv_line" ] && [ -n "$mcp_line" ] && [ "$uv_line" -lt "$mcp_line" ]
+    [ -n "$uv_line" ]
+    [ -n "$mcp_line" ]
+    [ "$uv_line" -lt "$mcp_line" ]
 }
 
 # HARNESS-092 (#1326): agent presence -- the forced-skills roster between
@@ -1019,7 +1024,9 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     grep -qE '^[[:space:]]*& dotf harness presence --repo-root \$DotfilesDir[[:space:]]*$' "$PS1_SCRIPT"
     deploy_line=$(grep -n '^Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     presence_line=$(grep -n '& dotf harness presence' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$deploy_line" ] && [ -n "$presence_line" ] && [ "$deploy_line" -lt "$presence_line" ]
+    [ -n "$deploy_line" ]
+    [ -n "$presence_line" ]
+    [ "$deploy_line" -lt "$presence_line" ]
     # parity: the Linux engine delegates to the same verb (that it carries no
     # injector of its own is compile-harness.bats' assertion)
     grep -qF 'dotf harness presence --repo-root "$REPO_ROOT"' "$DOTFILES_DIR/scripts/compile-harness.sh"

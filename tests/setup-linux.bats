@@ -169,7 +169,9 @@ setup() {
     [ "$status" -eq 1 ]
     deploy=$(grep -n '"\$_dotf" deploy ||' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)
     converge=$(grep -n '"\$_dotf" converge --only git-config ||' "$DOTFILES_DIR/setup-linux.sh" | cut -d: -f1)
-    [ -n "$deploy" ] && [ -n "$converge" ] && [ "$converge" -gt "$deploy" ]
+    [ -n "$deploy" ]
+    [ -n "$converge" ]
+    [ "$converge" -gt "$deploy" ]
 }
 
 # tmux and xclip are packages.json `system` entries (#2013 P5b): `dotf tools
@@ -596,7 +598,8 @@ $block"
     # Both anchors are invocations: a comment names `dotf harness mirror` above
     # the call, and matching it would pin the order of the prose instead.
     mirror_line=$(grep -n 'harness mirror --repo' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    [ -n "$refresh_line" ] && [ -n "$mirror_line" ]
+    [ -n "$refresh_line" ]
+    [ -n "$mirror_line" ]
     [ "$mirror_line" -gt "$refresh_line" ]
 }
 
