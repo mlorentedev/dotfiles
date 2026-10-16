@@ -33,6 +33,23 @@ func TestREST_AsksOnePullsRequestPerBranch(t *testing.T) {
 	}
 }
 
+// A ref name may hold & # and {, which git accepts: raw in the query they add a
+// parameter, cut the query, or read as gh's own placeholder (#2616). The branch
+// is one value, whatever it holds.
+func TestREST_ABranchIsOneEncodedQueryValue(t *testing.T) {
+	var calls []string
+	if _, err := (REST{Run: pullsRunner(t, `[]`, nil, &calls)}).PRFor("fix/a&state=all#x{branch}"); err != nil {
+		t.Fatal(err)
+	}
+	const want = "head={owner}:fix/a%26state%3Dall%23x%7Bbranch%7D"
+	if len(calls) != 1 || !strings.HasSuffix(calls[0], want) {
+		t.Errorf("call = %q, want it to end in %q", calls, want)
+	}
+	if strings.Count(calls[0], "state=") != 1 || strings.Count(calls[0], "&") != 4 {
+		t.Errorf("call %q gained a parameter from the branch", calls[0])
+	}
+}
+
 func TestREST_NewestPullRequestDecidesTheState(t *testing.T) {
 	cases := []struct {
 		name string
