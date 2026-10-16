@@ -47,7 +47,16 @@ func LoadConfig(repoRoot string) (Config, error) {
 	if cfg.Base == "" {
 		cfg.Base = "origin/main"
 	}
+	if remote, branch := cfg.Remote(); remote == "" || branch == "" {
+		return Config{}, fmt.Errorf("lane: %s: base %q must be <remote>/<branch>, e.g. origin/main", ConfigPath, cfg.Base)
+	}
 	return cfg, nil
+}
+
+// Remote splits Base into the remote to fetch and the branch to fetch from it.
+func (c Config) Remote() (remote, branch string) {
+	remote, branch, _ = strings.Cut(c.Base, "/")
+	return remote, branch
 }
 
 // Issue is the part of a forge issue the lane reads.

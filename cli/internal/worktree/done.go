@@ -17,10 +17,10 @@ type DoneOptions struct {
 	// contains it; empty skips that one check (the ancestor walk still runs).
 	Cwd   string
 	Force bool
-	// ClaudeProjectsDir is <CLAUDE_CONFIG_DIR>/projects. done refuses a
-	// worktree with a transcript there under SessionWindow old unless
-	// IgnoreRecentSession; Force does not override it.
-	ClaudeProjectsDir   string
+	// Sessions are the harness session stores. done refuses a worktree with
+	// a session there under SessionWindow old unless IgnoreRecentSession;
+	// Force does not override it.
+	Sessions            SessionStores
 	IgnoreRecentSession bool
 }
 
@@ -63,7 +63,7 @@ func Done(opts DoneOptions) (DoneResult, error) {
 	// Last before removal, so a session that wrote during the checks above
 	// still counts.
 	if !opts.IgnoreRecentSession {
-		if err := checkNoRecentSession(opts.ClaudeProjectsDir, absWT, time.Now()); err != nil {
+		if err := checkNoRecentSession(opts.Sessions, absWT, time.Now()); err != nil {
 			return DoneResult{}, err
 		}
 	}

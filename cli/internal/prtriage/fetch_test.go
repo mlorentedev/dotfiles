@@ -24,8 +24,9 @@ type fakeGH struct {
 	maxFlight int
 
 	// responses maps a substring of the request path to its canned body. The
-	// first match wins, so a test can register a general list plus specific
-	// per-PR comment payloads.
+	// longest matching substring wins, so a test can register a general list
+	// ("/pulls") plus specific per-PR payloads ("/pulls/7/reviews") and get the
+	// specific one every time; map order would make it a coin toss.
 	responses map[string]string
 	errs      map[string]error
 	delay     time.Duration
@@ -61,10 +62,24 @@ func (f *fakeGH) run(ctx context.Context, args ...string) ([]byte, error) {
 			return nil, err
 		}
 	}
-	for frag, body := range f.responses {
-		if strings.Contains(joined, frag) {
-			return []byte(body), nil
+	// A reviews request is answered only by a fragment naming reviews, and
+	// otherwise by "no reviews": every fixture written before #1686 describes
+	// a PR with none, and "/pulls/7" must not answer for "/pulls/7/reviews".
+	isReviews := strings.Contains(joined, "/reviews")
+	best, found := "", false
+	for frag := range f.responses {
+		if isReviews && !strings.Contains(frag, "/reviews") {
+			continue
 		}
+		if strings.Contains(joined, frag) && (!found || len(frag) > len(best)) {
+			best, found = frag, true
+		}
+	}
+	if found {
+		return []byte(f.responses[best]), nil
+	}
+	if isReviews {
+		return []byte(`[]`), nil
 	}
 	return nil, fmt.Errorf("fakeGH: no canned response for %q", joined)
 }
@@ -448,5 +463,136 @@ func TestFetchKeepsAPRWhoseFilesCannotBeRead(t *testing.T) {
 	}
 	if len(got) != 2 {
 		t.Fatalf("both PRs stay listed, got %+v", got)
+	}
+}
+
+// TestFetchCountsAFormalReviewFiledAfterTheTriage is #1686, measured twice: on
+// #1683 and on #2581, which merged over it. CodeRabbit files a review WITH
+// findings through the reviews API, with inline comments and no marker, so a
+// queue that reads only issue comments never sees it and answers clear. The
+// timestamps are #2581's: triage at 03:04:46, review at 03:19:14, merge 82
+// seconds later.
+func TestFetchCountsAFormalReviewFiledAfterTheTriage(t *testing.T) {
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls": `[{"number":2581,"title":"t","html_url":"u"}]`,
+		"/issues/2581/comments": `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nf",
+		                            "created_at":"2026-10-16T02:55:00Z"},
+		                           {"user":{"login":"mlorentedev"},"body":"## Review triage\nall declined",
+		                            "created_at":"2026-10-16T03:04:46Z"}]`,
+		"/pulls/2581/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"COMMENTED",
+		                          "body":"**Actionable comments posted: 3**","submitted_at":"2026-10-16T03:19:14Z"}]`,
+	}}
+
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("queue length = %d, want 1: a review filed after the triage is output the triage did not read", len(got))
+	}
+	if got[0].Reviewer != "coderabbitai" || got[0].Reason != "coderabbitai reviewed again after the last triage" {
+		t.Errorf("Reviewer = %q, Reason = %q", got[0].Reviewer, got[0].Reason)
+	}
+	var asked bool
+	for _, req := range fake.seen() {
+		asked = asked || strings.Contains(req, "/pulls/2581/reviews")
+	}
+	if !asked {
+		t.Error("the reviews endpoint was never called")
+	}
+}
+
+// TestFetchIgnoresDismissedAndPendingReviews: a dismissed review was withdrawn
+// and a pending one was never submitted; neither is output owed a disposition.
+func TestFetchIgnoresDismissedAndPendingReviews(t *testing.T) {
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls":             `[{"number":5,"title":"t","html_url":"u"}]`,
+		"/issues/5/comments": `[]`,
+		"/pulls/5/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"DISMISSED","body":"x","submitted_at":"2026-10-16T03:00:00Z"},
+		                      {"user":{"login":"coderabbitai[bot]"},"state":"PENDING","body":"y"}]`,
+	}}
+
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("queue = %+v, want empty", got)
+	}
+}
+
+// TestFetchReviewTriagedAfterwardsIsClear: the reverse order of #2581. A
+// triage written after the review read it, so the queue is clear.
+func TestFetchReviewTriagedAfterwardsIsClear(t *testing.T) {
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls": `[{"number":8,"title":"t","html_url":"u"}]`,
+		"/issues/8/comments": `[{"user":{"login":"mlorentedev"},"body":"## Review triage\napplied",
+		                         "created_at":"2026-10-16T03:30:00Z"}]`,
+		"/pulls/8/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"COMMENTED","body":"3 findings",
+		                       "submitted_at":"2026-10-16T03:19:14Z"}]`,
+	}}
+
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("queue = %+v, want empty: the triage is newer than the review", got)
+	}
+}
+
+// TestFetchRefusesAFullPageOfReviews: the reviews axis truncates the same way
+// the comments axis does, and the newest review is the one a short page drops.
+func TestFetchRefusesAFullPageOfReviews(t *testing.T) {
+	items := make([]string, commentLimit)
+	for i := range items {
+		items[i] = `{"user":{"login":"someone"},"state":"COMMENTED","body":"b","submitted_at":"2026-10-16T03:00:00Z"}`
+	}
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls":             `[{"number":9,"title":"t","html_url":"u"}]`,
+		"/issues/9/comments": `[]`,
+		"/pulls/9/reviews":   "[" + strings.Join(items, ",") + "]",
+	}}
+
+	_, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err == nil || !strings.Contains(err.Error(), "full page") {
+		t.Fatalf("err = %v, want a full-page refusal", err)
+	}
+}
+
+// TestFetchDoesNotCountANoticeAsReview is #1686's second criterion: a
+// rate-limit or in-progress notice is status, not review. It carries no
+// marker, and it is an issue comment, so reading reviews must not change that.
+func TestFetchDoesNotCountANoticeAsReview(t *testing.T) {
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls": `[{"number":6,"title":"t","html_url":"u"}]`,
+		"/issues/6/comments": `[{"user":{"login":"coderabbitai[bot]"},
+		                         "body":"<!-- rate limited by coderabbit.ai -->\n## Review limit reached",
+		                         "created_at":"2026-10-16T03:25:58Z"}]`,
+		"/pulls/6/reviews": `[]`,
+	}}
+
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("queue = %+v, want empty: a notice is not review output", got)
+	}
+}
+
+// TestFetchFailsWhenReviewsCannotBeRead is #1686's fourth criterion: a PR
+// whose reviews could not be read is not a PR with no reviews.
+func TestFetchFailsWhenReviewsCannotBeRead(t *testing.T) {
+	fake := &fakeGH{
+		responses: map[string]string{
+			"/pulls":             `[{"number":4,"title":"t","html_url":"u"}]`,
+			"/issues/4/comments": `[]`,
+		},
+		errs: map[string]error{"/pulls/4/reviews": fmt.Errorf("HTTP 502")},
+	}
+
+	if _, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry()); err == nil {
+		t.Fatal("fetchWith returned a queue; an unreadable reviews endpoint must fail it")
 	}
 }

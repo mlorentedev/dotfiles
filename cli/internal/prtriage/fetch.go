@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,6 +58,15 @@ type restPR struct {
 // restComment is one item of `GET /repos/{owner}/{repo}/issues/{n}/comments`.
 // Pull request conversation comments are issue comments; this is the same set
 // the previous `gh pr list --json comments` returned.
+type restReview struct {
+	User struct {
+		Login string `json:"login"`
+	} `json:"user"`
+	State       string    `json:"state"`
+	Body        string    `json:"body"`
+	SubmittedAt time.Time `json:"submitted_at"`
+}
+
 type restComment struct {
 	User struct {
 		Login string `json:"login"`
@@ -101,6 +111,30 @@ func Fetch(ctx context.Context, repo, registryPath string) ([]Status, error) {
 		return nil, err
 	}
 	return FetchWithRegistry(ctx, repo, reg)
+}
+
+// FetchRegistry reads repo's reviewer registry from its default branch; an
+// empty repo is the current one. A repository without the file is an error,
+// never an empty registry: the queue it would compute could not be trusted.
+func FetchRegistry(ctx context.Context, repo string) (Registry, error) {
+	return fetchRegistry(ctx, execGH, repo)
+}
+
+func fetchRegistry(ctx context.Context, run ghRunner, repo string) (Registry, error) {
+	name := repo
+	if name == "" {
+		name = "the current repository"
+	}
+	raw, err := run(ctx, "api", "-H", "Accept: application/vnd.github.raw+json", repoBase(repo)+"/contents/"+RegistryPath)
+	switch {
+	case err == nil:
+		return ParseRegistry(raw, name+":"+RegistryPath)
+	case strings.Contains(err.Error(), "HTTP 404"):
+		// GitHub answers 404 for a repository the token cannot read as well as
+		// for a missing file, so the message names both.
+		return Registry{}, fmt.Errorf("%s has no %s on its default branch, or the token cannot read it (HTTP 404)", name, RegistryPath)
+	}
+	return Registry{}, fmt.Errorf("read %s from %s: %w", RegistryPath, name, err)
 }
 
 // FetchWithRegistry asks GitHub for open PRs using a pre-loaded Registry,
@@ -260,7 +294,12 @@ func withComments(ctx context.Context, run ghRunner, base string, wire []restPR)
 				errs[i] = err
 				return
 			}
-			prs[i] = PR{Number: w.Number, Title: w.Title, URL: w.HTMLURL, Comments: comments}
+			reviews, err := fetchReviews(ctx, run, base, w.Number)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			prs[i] = PR{Number: w.Number, Title: w.Title, URL: w.HTMLURL, Comments: comments, Reviews: reviews}
 		}()
 	}
 	wg.Wait()
@@ -302,6 +341,33 @@ func fetchComments(ctx context.Context, run ghRunner, base string, number int) (
 		})
 	}
 	return comments, nil
+}
+
+// fetchReviews reads one pull request's submitted reviews. Issue comments alone
+// miss a reviewer that files its findings as a review with inline comments and
+// no marker: CodeRabbit does, and #2581 merged over three of them (#1686).
+// Inline comments need no read of their own, since each belongs to a review.
+func fetchReviews(ctx context.Context, run ghRunner, base string, number int) ([]Comment, error) {
+	out, err := run(ctx, "api", fmt.Sprintf("%s/pulls/%d/reviews?per_page=%d", base, number, commentLimit))
+	if err != nil {
+		return nil, fmt.Errorf("gh api reviews for #%d: %w", number, err)
+	}
+	var wire []restReview
+	if err := json.Unmarshal(out, &wire); err != nil {
+		return nil, fmt.Errorf("parse reviews for #%d: %w", number, err)
+	}
+	if len(wire) >= commentLimit {
+		return nil, fmt.Errorf("pull request #%d returned %d reviews (a full page); its triage verdict would be computed from partial data — read them with `gh api %s/pulls/%d/reviews --paginate`", number, commentLimit, base, number)
+	}
+	reviews := make([]Comment, 0, len(wire))
+	for _, w := range wire {
+		// A dismissed review was withdrawn and a pending one never submitted.
+		if w.State == "DISMISSED" || w.State == "PENDING" || w.SubmittedAt.IsZero() {
+			continue
+		}
+		reviews = append(reviews, Comment{Author: w.User.Login, Body: w.Body, CreatedAt: w.SubmittedAt})
+	}
+	return reviews, nil
 }
 
 // repoBase renders the REST path prefix. An empty repo yields gh's own

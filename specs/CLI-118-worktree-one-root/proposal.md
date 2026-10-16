@@ -56,8 +56,8 @@ Worktrees live in two layouts at once. `dotf worktree add` creates `<repo>-wt-<s
 - [ ] AC6: `done <slug>` resolves under the new root and the legacy sibling, refuses ambiguity, and deletes the local branch only after a verified landing, printing the SHA.
 - [ ] AC7: `done`, `sweep` and `migrate` refuse a target containing the caller's cwd or ancestor regardless of `--force`. They also refuse one whose Claude project dir has a transcript under 6h old, unless `--ignore-recent-session` is passed. Tests cover both directions with a fake transcript directory (#1653 AC1, AC2, AC4).
 - [ ] AC8: `migrate --dry-run` lists every `<repo>-wt-*` with its target. `migrate` moves them with `git worktree move` and skips (naming why) any refused by AC7 or whose target exists. A second run reports nothing to do.
-- [ ] AC9: AGENTS.md §9 and the `using-git-worktrees` and `handoff` skills (vault source, re-deployed) state the new layout. The handoff skill no longer removes the session's own worktree.
-- [ ] AC10: ADR-032 carries the dispatch clarification.
+- [x] AC9: AGENTS.md §9 and the `using-git-worktrees` and `handoff` skills (vault source, re-deployed) state the new layout. The handoff skill no longer removes the session's own worktree.
+- [x] AC10: ADR-032 carries the dispatch clarification.
 - [ ] AC11: the tests pass under bash and zsh for the shell layer and on Linux and macOS for Go. `GOOS=windows go vet ./...` is clean, and the Windows leg is covered with fakes.
 
 ## References

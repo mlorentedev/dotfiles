@@ -21,7 +21,7 @@ func TestPrLandRunner_ErrorCarriesGhStderr(t *testing.T) {
 	}
 	t.Setenv("PATH", stubs)
 
-	out, err := prLandOptions("", "").Run(context.Background(), "pr", "checks", "30", "--json", "name,bucket")
+	out, err := prLandOptions("", nil).Run(context.Background(), "pr", "checks", "30", "--json", "name,bucket")
 	if len(out) != 0 || err == nil {
 		t.Fatalf("want empty stdout and an error, got %q, %v", out, err)
 	}

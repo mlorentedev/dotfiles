@@ -20,7 +20,16 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 - [x] `RecentSession(projectsDir, wt, now, window)` with a fake `~/.claude/projects/<key>` dir: refuses when under 6h, allows when stale or absent.
 - [x] Wire into `done` and `sweep`; `--ignore-recent-session` distinct from `--force`.
-- [ ] File one ticket per non-Claude harness session store (agy, copilot, codex, opencode, pi). Proposed on #1653 during the unattended run; filing needs the owner's ID confirmation (new-ticket).
+- [x] Non-Claude harness session stores: one ticket (#2569, BUG-148) rather than five, since the stores were measured together. pi and Copilot are consulted; agy (SQLite blobs, no readable cwd), codex and opencode (no store on the Mac) are stated gaps the process check covers while alive.
+
+## PR 3b — every harness's session store (#2569, BUG-148)
+
+- [x] Measure each store on the Mac: Claude Code and pi key a directory by the path, Copilot keys by session id with `cwd:` in `workspace.yaml`, agy keeps SQLite blobs with no readable cwd, codex and opencode have none.
+- [x] `SessionStores` and `RecentHarnessSession`: one row per harness, first live hit wins, a store that exists and cannot be read refuses naming the harness.
+- [x] pi row: the `--<path>--` key for an absolute POSIX path only (Windows unmeasured), subdirectories by `<stem>-…--`.
+- [x] Copilot row: every `workspace.yaml` parsed, cwd matched by `pathWithin`, age from `events.jsonl`.
+- [x] done, sweep and migrate take `Sessions SessionStores`; their messages and help name the harness.
+- [x] Mutations (ten, all killed) and a live read of the real stores, recorded in verification.md.
 
 ## PR 4 — adoption and done
 
@@ -47,6 +56,6 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 - [x] (PR 7a, reader) `expandPaths` renders TOML string values behind `paths:`, allowed on a TOML source from manifest version 6 only (a 0.71.0 reader refuses it per entry, so the entry must read as a newer schema). Five mutations killed.
 - [ ] (PR 7b, flip, owner lands after every box runs the release carrying 7a) `ai/deploy.json` to version 6 in one move with CLI-113 phase 2 (owner, 2026-10-16: one fleet update, not two): herdr entry declares `paths` and `listKeys`; `ai/herdr/config.toml` uses `{WORKTREE_ROOT}`; `tests/herdr-config.bats` compares the token.
 - [ ] Trust lists: Copilot `{WORKTREE_ROOT}/*/*`, agy `{WORKTREE_ROOT}` itself (agy does not read the glob, #2533); #2504's test and the exact-list assertions updated. JSON entries already render `paths`, and `WORKTREE_ROOT` resolves to its default when unset (measured: `dotf env path WORKTREE_ROOT` on 0.71.0), so this needs no fleet floor.
-- [ ] AGENTS.md §9; vault `00_meta/skills/using-git-worktrees` and `handoff`, re-deployed via `compile-harness.sh`.
-- [ ] ADR-032 dispatch clarification; lesson for the herdr path rule.
-- [ ] Doc drift found in passing: `done_proc_other.go:8`, `sweep_proc_other.go:26` and `done`'s Long text still say Linux-only after #2293.
+- [x] AGENTS.md §9; vault `00_meta/skills/using-git-worktrees` and `handoff` (knowledge `f9f68924`), records refreshed with `compile-harness.sh --refresh`.
+- [x] ADR-032 dispatch clarification; lesson for the herdr path rule (lesson 436 already records it).
+- [x] Doc drift found in passing: `done_proc_other.go:8`, `sweep_proc_other.go:26` and `done`'s Long text still say Linux-only after #2293.

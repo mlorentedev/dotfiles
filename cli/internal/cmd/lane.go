@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 )
 
@@ -38,10 +40,9 @@ func newLaneExecCmd() *cobra.Command {
 			"hands it the prompt as one argument, so no shell quoting is involved and the\n" +
 			"same call works from zsh, bash and PowerShell. An agent dotf has no launch\n" +
 			"command for is refused, naming the ones it has.",
-		Example:       "  dotf lane exec --agent claude --prompt-file prompt.md",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Example:      "  dotf lane exec --agent claude --prompt-file prompt.md",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			b, err := os.ReadFile(promptFile)
 			if err != nil {
@@ -73,11 +74,11 @@ func newLaneNextCmd() *cobra.Command {
 			"The agent is the one running in the calling pane unless --agent says\n" +
 			"otherwise. It never removes a worktree, the caller's included, and a second\n" +
 			"run for the same issue starts nothing. With no backend it prints the\n" +
-			"commands to run instead.",
-		Example:       "  dotf lane next\n  dotf lane next --agent pi --dry-run",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+			"commands to run instead, with the agent left for the person to pick when\n" +
+			"--agent does not name one.",
+		Example:      "  dotf lane next\n  dotf lane next --agent pi --dry-run",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runLaneNext(c, agent, dryRun)
 		},
@@ -110,12 +111,12 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 		return fmt.Errorf("lane next: prompt template: %w", err)
 	}
 	parent := filepath.Dir(common)
-	self, _ := os.Executable() // empty falls back to `dotf` on the pane's PATH
 	opts := lane.Options{
 		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
-		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: self, GitDir: common,
+		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: selfBinary(c), GitDir: common,
+		WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
 		Fetch: func() error {
-			remote, branch, _ := strings.Cut(cfg.Base, "/")
+			remote, branch := cfg.Remote()
 			_, err := laneRun("git", "-C", parent, "fetch", "--quiet", remote, branch)
 			return err
 		},
@@ -128,7 +129,11 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 	if err != nil {
 		return err
 	}
-	w := c.OutOrStdout()
+	printOutcome(c.OutOrStdout(), out)
+	return nil
+}
+
+func printOutcome(w io.Writer, out lane.Outcome) {
 	if out.Issue.Number != 0 {
 		_, _ = fmt.Fprintf(w, "next: #%d %s -> %s (%s)\n", out.Issue.Number, out.Issue.Title, out.Branch, out.Agent)
 	}
@@ -141,5 +146,16 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 	if out.Started {
 		_, _ = fmt.Fprintln(w, "started the successor")
 	}
-	return nil
+}
+
+// selfBinary is the path of the running dotf, which the successor is told to
+// run. An empty answer falls back to `dotf` on the pane's PATH, which may be a
+// different release: say so rather than start it silently.
+func selfBinary(c *cobra.Command) string {
+	self, err := os.Executable()
+	if err != nil {
+		_, _ = fmt.Fprintf(c.ErrOrStderr(), "lane next: cannot locate this binary (%v); the successor runs `dotf` from the pane's PATH\n", err)
+		return ""
+	}
+	return self
 }

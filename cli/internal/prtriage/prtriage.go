@@ -45,9 +45,9 @@ type Signature struct {
 	Files []string `json:"files"`
 }
 
-// Reviewer is one declared reviewer. ReviewMarkers are the headings a reviewer
-// that publishes through the comments API uses for its review output; a
-// reviewer that files proper reviews carries none.
+// Reviewer is one declared reviewer. ReviewMarkers are the headings it uses for
+// review output published through the comments API. A formal review needs no
+// marker: PR.Reviews counts by login, and one reviewer may use both channels.
 type Reviewer struct {
 	Login         string   `json:"login"`
 	ReviewMarkers []string `json:"review_markers"`
@@ -87,6 +87,10 @@ type PR struct {
 	Title    string    `json:"title"`
 	URL      string    `json:"url"`
 	Comments []Comment `json:"comments"`
+	// Reviews are the formal reviews submitted through the reviews API, each
+	// as a Comment stamped with its submission time. A review is review output
+	// by its type, so no marker is needed to count it (#1686).
+	Reviews []Comment `json:"reviews,omitempty"`
 	// Files is the diff's file list, or nil when it was not read. Only a PR
 	// the queue would otherwise report has it read (see fetchWith).
 	Files []string `json:"files,omitempty"`
@@ -101,21 +105,30 @@ type Status struct {
 	Reason   string    // human-readable, always set
 }
 
+// RegistryPath is where a repository keeps its reviewer registry.
+const RegistryPath = "harness/review-attestation.json"
+
 // LoadRegistry reads the reviewer registry from disk.
 func LoadRegistry(path string) (Registry, error) {
-	var r Registry
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return r, fmt.Errorf("read reviewer registry: %w", err)
+		return Registry{}, fmt.Errorf("read reviewer registry: %w", err)
 	}
+	return ParseRegistry(raw, path)
+}
+
+// ParseRegistry checks a registry's bytes, wherever they came from; source
+// names them in the errors.
+func ParseRegistry(raw []byte, source string) (Registry, error) {
+	var r Registry
 	if err := json.Unmarshal(raw, &r); err != nil {
-		return r, fmt.Errorf("parse reviewer registry %s: %w", path, err)
+		return r, fmt.Errorf("parse reviewer registry %s: %w", source, err)
 	}
 	if strings.TrimSpace(r.Triage.Marker) == "" {
 		// Fail toward "cannot tell", never toward "nothing pending". An empty
 		// marker would match every comment and silently empty the queue, which
 		// is the shape of failure this repo has spent a week cataloguing.
-		return r, fmt.Errorf("reviewer registry %s declares no triage.marker", path)
+		return r, fmt.Errorf("reviewer registry %s declares no triage.marker", source)
 	}
 	return r, nil
 }
@@ -128,28 +141,40 @@ func normaliseLogin(s string) string {
 	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(s), "[bot]"))
 }
 
-// reviewOutput returns the newest comment on pr that a declared reviewer wrote
-// and that carries one of that reviewer's review markers.
+// reviewOutput returns the newest output on pr from a declared reviewer: a
+// comment carrying one of that reviewer's review markers, or any formal review
+// it submitted.
 func reviewOutput(pr PR, reg Registry) (Comment, string, bool) {
 	var newest Comment
 	var by string
 	found := false
-	for _, c := range pr.Comments {
-		for _, rv := range reg.Reviewers {
-			if normaliseLogin(c.Author) != normaliseLogin(rv.Login) {
-				continue
+	consider := func(c Comment, login string) {
+		if !found || c.Spoken().After(newest.Spoken()) {
+			newest, by, found = c, login, true
+		}
+	}
+	for _, rv := range reg.Reviewers {
+		for _, c := range pr.Comments {
+			if normaliseLogin(c.Author) == normaliseLogin(rv.Login) && hasMarker(c.Body, rv.ReviewMarkers) {
+				consider(c, rv.Login)
 			}
-			for _, m := range rv.ReviewMarkers {
-				if m == "" || !strings.Contains(c.Body, m) {
-					continue
-				}
-				if !found || c.Spoken().After(newest.Spoken()) {
-					newest, by, found = c, rv.Login, true
-				}
+		}
+		for _, r := range pr.Reviews {
+			if normaliseLogin(r.Author) == normaliseLogin(rv.Login) {
+				consider(r, rv.Login)
 			}
 		}
 	}
 	return newest, by, found
+}
+
+func hasMarker(body string, markers []string) bool {
+	for _, m := range markers {
+		if m != "" && strings.Contains(body, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // lastTriage returns the newest triage record on pr. The marker is matched at
