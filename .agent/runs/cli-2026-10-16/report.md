@@ -49,7 +49,7 @@ The full outputs are in each PR's Verification section and its `## Review triage
 
 ## Host suspend
 
-Covered for the run's active span. `caffeinate -i -t 36000` (pid 62792) was alive throughout. The run ended early with `queue-empty`, about 8.5 h before the envelope's 14:45Z expiry. The lock outlives the run until it times out.
+Covered for the run's active span. `caffeinate -i -t 36000` (pid 62792) was alive throughout. The run ended early with `queue-empty`, about 8.5 h before the envelope's 14:45Z expiry. The lock was released at disarm (06:12Z).
 
 ## Next action
 
