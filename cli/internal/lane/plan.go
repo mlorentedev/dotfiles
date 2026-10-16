@@ -83,8 +83,21 @@ func phaseWhy(p Phase) string {
 // abandon flags a lane only a human can judge. The command it carries removes
 // the worktree, so the yes is an explicit one.
 func abandon(r Row, why string) Action {
-	return Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket, Reason: why,
-		Resolve: "dotf worktree done --force " + r.Path}
+	a := Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket, Reason: why}
+	a.Resolve, a.Reason = withPath("dotf worktree done --force ", r.Path, a.Reason)
+	return a
+}
+
+// withPath appends a path to a command the way a person pastes it into a
+// shell: quoted when it needs it. A path no shell quotes alike gets no command
+// at all, and the reason says why, since a printed command that does not run
+// (or runs on the wrong word) is worse than none (lesson 449).
+func withPath(cmd, path, reason string) (string, string) {
+	quoted, err := humanPath(path)
+	if err != nil {
+		return "", reason + " (the path has a character no shell quotes alike; move the worktree, then remove it by hand)"
+	}
+	return cmd + quoted, reason
 }
 
 // planLanded mirrors sweep's gates through the state Classify already
@@ -130,7 +143,7 @@ func planUnadopted(r Row) Action {
 	a := Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket, Reason: "no lease, and no intent to adopt it under"}
 	if r.Ticket != 0 || r.PR != 0 {
 		a.Kind, a.Reason = KindAdopt, "no lease; the branch or its PR names the intent"
-		a.Resolve = "dotf worktree adopt " + r.Path
+		a.Resolve, a.Reason = withPath("dotf worktree adopt ", r.Path, a.Reason)
 	}
 	return a
 }
