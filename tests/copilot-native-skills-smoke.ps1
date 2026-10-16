@@ -107,9 +107,15 @@ try {
     Copy-Item -LiteralPath (Join-Path $repoRoot 'harness\manifest.json') -Destination (Join-Path $fixtureDir 'harness\manifest.json') -Force
     $fixtureMd = (Get-Content -LiteralPath (Join-Path $repoRoot 'harness\skills\handoff\SKILL.md') -Raw) -replace '(?m)^name: handoff\r?$', "name: claude-only`ntargets: [claude]"
     [System.IO.File]::WriteAllText((Join-Path $fixtureRecord 'SKILL.md'), $fixtureMd, (New-Object System.Text.UTF8Encoding($false)))
+    # Its own home: a deploy prunes generated outputs whose record is missing, and
+    # this fixture holds only one record, so deploying into the home the Copilot
+    # discovery check reads below would delete handoff from it.
+    $fixtureHome = Join-Path $scratch 'fixture-home'
+    $env:USERPROFILE = $fixtureHome
     Deploy-SkillRecord -DotfilesDir $fixtureDir
-    $claudeOnlyForClaude = Join-Path $scratch '.claude\skills\claude-only\SKILL.md'
-    $claudeOnlyForCopilot = Join-Path $copilotHome 'skills\claude-only'
+    $env:USERPROFILE = $scratch
+    $claudeOnlyForClaude = Join-Path $fixtureHome '.claude\skills\claude-only\SKILL.md'
+    $claudeOnlyForCopilot = Join-Path $fixtureHome '.copilot\skills\claude-only'
     if (-not (Test-Path -LiteralPath $claudeOnlyForClaude)) {
         throw "Windows deploy did not render the Claude-only fixture for the claude target: $claudeOnlyForClaude"
     }
