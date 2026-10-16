@@ -38,6 +38,10 @@ These candidates did not fit the envelope:
 
 Covered: `caffeinate -i -t 14400` ran for the whole run (background task `bmjui6bb1`) and was stopped at the end of the run.
 
+## Run branch
+
+This branch was pushed with `SKIP=sdd-spec-gate`. It carries only the envelope and this report, it is never merged, and the local hook has no PR to read a rationale from.
+
 ## Next action
 
 Decide whether `scripts/**` is in scope for the next run. If it is, #2407 (one markdown stripper for both PR gates) has a written plan and acceptance criteria.
