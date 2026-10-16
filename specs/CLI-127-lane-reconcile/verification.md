@@ -28,7 +28,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - **No lease outranks everything.** A worktree with an open or merged PR but no `.dotf-worktree.json` reads Unadopted, not Review or Landed, until `worktree adopt` (D2: adoption is never `auto`).
 - **Merged comes from the REST forge alone** (`lane.ForgeGit`). Ancestry is dropped because a branch with no commit yet reads as merged; the cost is that a branch merged without a PR reads unmerged, which is the safe side because `sweep` re-checks its own gates.
 - **Liveness has three answers.** `Combine` of a process scan (`worktree.ProcessInside`, a new read-only export in `process_export.go`, agreed with CLI-118 on #2550) and a session transcript. A probe that cannot answer (no scan on Windows, unreadable store) is `unknown`, shown as such, and reads as live for the phase. It never feeds an auto action.
-- **Follow-up, not shipped here:** the session half still reads Claude Code's store through `RecentSession`. Once #2575 (BUG-148) lands, `sessionLiveness` in `cli/internal/cmd/lane_status.go` swaps to `RecentHarnessSession` so pi and Copilot count too.
+- **Session half covers every harness** through `RecentHarnessSession` (#2575, BUG-148): Claude Code, pi and Copilot.
 
 ## Promotion candidates
 

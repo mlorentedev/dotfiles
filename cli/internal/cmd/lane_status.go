@@ -133,11 +133,10 @@ func processLiveness(path string) lane.Liveness {
 	return lane.LiveIdle
 }
 
-// sessionLiveness is the transcript half. It reads Claude Code's store only
-// until RecentHarnessSession (#2575, BUG-148) lands, which adds pi and Copilot;
-// swap it here, behind this one function. An unreadable store is unknown.
+// sessionLiveness is the transcript half, over every harness dotf reads
+// (Claude Code, pi, Copilot). An unreadable store is unknown, never idle.
 func sessionLiveness(path string, now time.Time) lane.Liveness {
-	_, live, err := worktree.RecentSession(claudeProjectsDir(), path, now, worktree.SessionWindow)
+	_, live, err := worktree.RecentHarnessSession(sessionStores(), path, now, worktree.SessionWindow)
 	switch {
 	case err != nil:
 		return lane.LiveUnknown
