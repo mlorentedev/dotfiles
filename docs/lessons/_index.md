@@ -470,5 +470,6 @@ tags: [lessons, index, dotfiles]
 | [449 - A typed line may carry no path anyone chose](lesson-449-a-typed-line-may-carry-no-path-anyone-chose.md) | 2026-10-16 |
 | [450 - Ancestry reads a fresh branch as merged, and a one-row-per-phase table hides how the rules compete](lesson-450-ancestry-reads-a-fresh-branch-as-merged-and-a-phase-table-hides-how-rules-compete.md) | 2026-10-16 |
 | [451 - A reconcile that starts work must see the work it started, or changed=0 never arrives](lesson-451-a-reconcile-that-starts-work-must-see-the-work-it-started.md) | 2026-10-16 |
+| [452 - A tee through a pipe reorders output written around it; order needs a barrier through the same pipe](lesson-452-a-tee-through-a-pipe-reorders-output-written-around-it.md) | 2026-10-16 |
 | [453 - A safety precondition checked in one branch of a classifier is not checked](lesson-453-a-safety-precondition-checked-in-one-branch-of-a-classifier-is-not-checked.md) | 2026-10-16 |
 <!-- END GENERATED -->
