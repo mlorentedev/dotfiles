@@ -183,11 +183,11 @@ func TestDeploy_TOMLMergeRefusesADestinationItCannotRead(t *testing.T) {
 	}
 }
 
-// `paths` rewrites the string values of the source, parsed as JSON, before it
-// is installed; on a TOML source it would fail at deploy time, on every
-// machine. The manifest is refused instead. What decides is the source's
-// format: a replace installs the source's bytes whatever the destination's
-// extension says.
+// `paths` rewrites the string values of the source before it is installed. A
+// TOML source needs version 6 (TestParseManifest_PathsOnATOMLSourceNeedsVersion6),
+// so a version 3 manifest refuses it. What decides is the source's format: a
+// replace installs the source's bytes whatever the destination's extension
+// says.
 func TestParseManifest_RefusesPathsOnATOMLSource(t *testing.T) {
 	for _, pair := range [][2]string{{"a.toml", "{HOME}/b.toml"}, {"a.toml", "{HOME}/b.json"}} {
 		_, err := ParseManifest([]byte(`{"version":3,"configs":[{"name":"x","src":"` + pair[0] + `","dst":"` + pair[1] + `","paths":"native"}]}`))

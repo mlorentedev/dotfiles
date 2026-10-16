@@ -464,4 +464,5 @@ tags: [lessons, index, dotfiles]
 | [443 - A gate every session runs must be able to answer for one session's change](lesson-443-a-gate-shared-by-every-session-must-answer-for-one.md) | 2026-10-15 |
 | [444 - On Windows a file read as a directory is ErrNotExist: decide absence with Stat](lesson-444-on-windows-a-file-read-as-a-directory-is-not-exist.md) | 2026-10-15 |
 | [445 - A merge rule keyed by path is checked on the source, not where the walk reaches it](lesson-445-a-merge-rule-keyed-by-path-checks-the-source-not-the-walk.md) | 2026-10-15 |
+| [446 - herdr isolates a second server only by HOME; its variables move the sockets, not the session](lesson-446-herdr-isolates-a-second-server-only-by-home.md) | 2026-10-16 |
 <!-- END GENERATED -->

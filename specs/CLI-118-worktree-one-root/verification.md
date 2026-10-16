@@ -61,6 +61,11 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - A herdr failure whose stdout is not herdr's error JSON (a crash, a signal) names the runner's error rather than ending in a bare colon (`TestAFailureWithoutHerdrsErrorJSONStillSaysWhy`, from the #2565 review).
 - herdr's agent names are per server, so the same branch slug in two repositories collides. The refusal fails closed and names the likely cause; it no longer suggests renaming the live agent, which may be the other repository's. Putting the repository in the derived name is left to the owner: it changes the naming this spec records, and the 32-character cap would then cut the slug.
 
+- PR 7a (manifest reader): `paths` on a TOML source is gated at version 6 rather than allowed at 5. 0.71.0 reads version 5 and refuses `paths` on TOML per entry, which would blame the herdr entry; at 6 the same binary says the schema is newer and to update dotf, which is the fix. `dotf update` does not read the manifest, so a stale box heals itself.
+- The rendering codec is chosen by the source's extension, as ParseManifest's checks are; a replace installs the source's bytes whatever the destination is called (`TestDeploy_PathsRenderBySourceFormatNotDestination`). go-toml keeps an int64 and a datetime across the re-encode (`TestExpandPaths_TOMLKeepsValuesItDoesNotRender`).
+- Mutations on PR 7a, each run against `go test ./internal/deploy/`: drop the version gate, gate at 5, render every source as JSON, encode TOML as JSON, choose the codec by destination. All five killed.
+- The live `add --agent` check must not start a second herdr server: herdr 0.9.3 isolates only by `HOME` (lesson 446, measured 2026-10-16 when a "scratch" server resumed the operator's agents).
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
