@@ -1,5 +1,5 @@
 ---
-id: "lesson-449-ancestry-reads-a-fresh-branch-as-merged-and-a-phase-table-hides-how-rules-compete"
+id: "lesson-450-ancestry-reads-a-fresh-branch-as-merged-and-a-phase-table-hides-how-rules-compete"
 type: lesson
 status: active
 title: "Ancestry reads a fresh branch as merged, and a one-row-per-phase table hides how the rules compete"
