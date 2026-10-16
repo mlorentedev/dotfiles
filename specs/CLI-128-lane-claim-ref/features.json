@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-128-lane-claim-ref-f1",
+    "behavior": "Acquire wins on a free issue and is refused for a second claimant, and the refusal names the holder",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestClaimAcquire|TestClaimedErrorNamesTheHolder)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestClaimAcquire ' \"$o\" && grep -q -- '^--- PASS: TestClaimedErrorNamesTheHolder ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-128-lane-claim-ref-f2",
+    "behavior": "concurrent claims of one issue produce exactly one winner, and the claim ref is invisible to a default clone",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestClaimConcurrent|TestClaimIsInvisibleToADefaultClone)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestClaimConcurrent ' \"$o\" && grep -q -- '^--- PASS: TestClaimIsInvisibleToADefaultClone ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-128-lane-claim-ref-f3",
+    "behavior": "lane next claims before it starts, skips to the next free item on a loss, and starts nothing for the loser",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestHandoffClaimsBeforeItStarts|TestHandoffSkipsToTheNextFreeItemOnALoss)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestHandoffClaimsBeforeItStarts ' \"$o\" && grep -q -- '^--- PASS: TestHandoffSkipsToTheNextFreeItemOnALoss ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-128-lane-claim-ref-f4",
+    "behavior": "lane release deletes the caller's claim, refuses another holder's without --force, and a second release is a no-op",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/cmd/ -run '^(TestLaneRelease)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestLaneRelease ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  }
+]
