@@ -210,7 +210,9 @@ _test_job() {
     build=$(printf '%s\n' "$job" | grep -n 'go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf' | head -1 | cut -d: -f1)
     export_line=$(printf '%s\n' "$job" | grep -n 'DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"' | head -1 | cut -d: -f1)
     run_line=$(printf '%s\n' "$job" | grep -n 'run-bats.sh' | head -1 | cut -d: -f1)
-    [ -n "$build" ] && [ -n "$export_line" ] && [ -n "$run_line" ]
+    [ -n "$build" ]
+    [ -n "$export_line" ]
+    [ -n "$run_line" ]
     [ "$build" -lt "$run_line" ]
     [ "$export_line" -lt "$run_line" ]
 }

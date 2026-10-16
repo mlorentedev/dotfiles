@@ -40,8 +40,10 @@ setup() {
     for name in SCRIPTS_DIR AGY_HOME COPILOT_HOME OPENCODE_HOME; do
         linux=$(jq -r ".env_vars[] | select(.name == \"$name\") | .default.linux" "$CONTRACT")
         windows=$(jq -r ".env_vars[] | select(.name == \"$name\") | .default.windows" "$CONTRACT")
-        [ -n "$linux" ] && [ "$linux" != "null" ]
-        [ -n "$windows" ] && [ "$windows" != "null" ]
+        [ -n "$linux" ]
+        [ "$linux" != "null" ]
+        [ -n "$windows" ]
+        [ "$windows" != "null" ]
     done
 }
 

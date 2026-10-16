@@ -90,9 +90,11 @@ setup() {
 # not a replacement — REFACTOR-005 scope choice). ---
 
 @test "backing script: vault-maintenance-weekly.sh still exists and executable" {
-    [ -f "$MAINT_SCRIPT" ] && [ -x "$MAINT_SCRIPT" ]
+    [ -f "$MAINT_SCRIPT" ]
+    [ -x "$MAINT_SCRIPT" ]
 }
 
 @test "backing script: check-md-escapes.sh still exists and executable" {
-    [ -f "$ESCAPES_SCRIPT" ] && [ -x "$ESCAPES_SCRIPT" ]
+    [ -f "$ESCAPES_SCRIPT" ]
+    [ -x "$ESCAPES_SCRIPT" ]
 }

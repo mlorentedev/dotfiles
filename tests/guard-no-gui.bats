@@ -13,7 +13,8 @@ setup() {
 # Whether setup_suite ran at all. bats loads it only for a directory or more
 # than one file, so a single-file run has no guard — reported, never hidden.
 _guard_is_active() {
-    [ -n "${GUI_GUARD_BIN_DIR:-}" ] && [ -d "${GUI_GUARD_BIN_DIR:-/nonexistent}" ]
+    # One test, not an && chain: an unset or empty dir resolves to /nonexistent.
+    [ -d "${GUI_GUARD_BIN_DIR:-/nonexistent}" ]
 }
 
 @test "guard: setup_suite.bash declares the GUI binaries it intercepts" {
