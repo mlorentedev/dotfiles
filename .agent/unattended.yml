@@ -1,0 +1,41 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "cli-127b-20261016T0805Z"
+armed_by: manu
+armed_at: 2026-10-16T08:05:00Z
+expires_at: 2026-10-16T18:05:00Z
+objective: "Land the CLI-123 lane children #2551, #2552, #2553 and #2554, first fixing what the CLI-127 review found, each merged only under the standing grant."
+scope:
+  write_paths:
+    - "cli/internal/lane/**"
+    - "cli/internal/prland/**"
+    - "cli/internal/worktree/**"
+    - "cli/internal/lessons/**"
+    - "cli/internal/initrepo/**"
+    - "cli/internal/cmd/lane*.go"
+    - "cli/internal/cmd/lessons*.go"
+    - "cli/internal/cmd/initrepo*.go"
+    - "cli/internal/cmd/agent*.go"
+    - "cli/internal/agent/**"
+    - "specs/**"
+    - "docs/lessons/**"
+    - "docs/adr/**"
+    - "docs/runbooks/**"
+    - "tests/**"
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml"]
+  max_files: 20
+  max_loc: 400
+allowed_commands: [dotf, gh, git, go, golangci-lint, tmux, caffeinate]
+queue:
+  source: bitacora
+  filter: "in order: CLI-127 review fixes (#2550) and its re-review, #2596, WIP reduction by reviewing specs that only await review, #2551, #2554, #2552, #2553 (PR left open, authority widening). Then unassigned Backlog bug/chore items whose paths fit write_paths and that no peer holds."
+  max_items: 10
+budget:
+  max_iterations: 14
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
