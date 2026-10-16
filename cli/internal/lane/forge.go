@@ -15,7 +15,7 @@ type REST struct{ Run Runner }
 // that cannot answer is an error and never "no pull request", which would
 // read a lane as Stalled.
 func (r REST) PRFor(branch string) (PRInfo, error) {
-	out, err := r.Run("gh", "api", "repos/{owner}/{repo}/pulls?state=all&per_page=1&head={owner}:"+branch)
+	out, err := r.Run("gh", "api", "repos/{owner}/{repo}/pulls?state=all&sort=created&direction=desc&per_page=1&head={owner}:"+branch)
 	if err != nil {
 		return PRInfo{}, err
 	}

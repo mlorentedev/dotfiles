@@ -28,8 +28,8 @@ func TestREST_AsksOnePullsRequestPerBranch(t *testing.T) {
 	if strings.Contains(calls[0], "graphql") || strings.Contains(calls[0], "gh pr ") {
 		t.Errorf("call %q reaches GraphQL", calls[0])
 	}
-	if !strings.Contains(calls[0], "head={owner}:fix/a-b") || !strings.Contains(calls[0], "state=all") {
-		t.Errorf("call %q must filter on owner:branch and state=all", calls[0])
+	if !strings.Contains(calls[0], "head={owner}:fix/a-b") || !strings.Contains(calls[0], "state=all") || !strings.Contains(calls[0], "sort=created&direction=desc") {
+		t.Errorf("call %q must filter on owner:branch, state=all and sort newest first explicitly", calls[0])
 	}
 }
 
