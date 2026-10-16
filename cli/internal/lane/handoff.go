@@ -94,6 +94,11 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	if err != nil {
 		return out, err
 	}
+	if found {
+		if err := sameIssue(wt, issue, out.Branch); err != nil {
+			return out, err
+		}
+	}
 	if found && wt.Open {
 		out.Note = "a workspace already shows " + out.Branch + "; no second agent started"
 		if o.DryRun {
@@ -111,6 +116,22 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	}
 	out.Started, out.Note = true, p.note
 	return out, nil
+}
+
+// sameIssue refuses a worktree the lane started for another issue. A branch is
+// named from the title alone, so two issues whose titles slug alike (or have no
+// word to slug) share one, and the second would be read as the first's: no
+// agent started, and the queue silent about why. A worktree with no lease, or
+// one for this issue, is this issue's.
+func sameIssue(wt Worktree, issue Issue, branch string) error {
+	meta, err := worktree.LoadMetadata(wt.Path)
+	if err != nil {
+		return fmt.Errorf("lane: %w", err)
+	}
+	if meta != nil && meta.Issue != 0 && meta.Issue != issue.Number {
+		return fmt.Errorf("lane: branch %s already belongs to #%d, and #%d's title slugs the same; retitle #%d so its branch differs, or finish #%d and remove its worktree", branch, meta.Issue, issue.Number, issue.Number, meta.Issue)
+	}
+	return nil
 }
 
 // PromptFile is the name the prompt is left under, inside the successor's
