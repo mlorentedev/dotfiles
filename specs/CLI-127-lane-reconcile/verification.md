@@ -74,3 +74,12 @@ Not changed: the sequential `gh api` per branch (compliant with the proposal) an
 - no detached worktree carries a PR.
 
 `apply` was not run live (AC4 policy above). The independent review of the whole spec is re-run after this change lands.
+
+## Review round 2 (2026-10-16): FAIL (nan/deepseek-v4-flash, reviewed `65d2486e`), fixed
+
+Two Major and two Minor findings were real; F5 is a scope observation (the range aggregates unrelated commits by launcher construction), no action.
+
+- **F1 (Major), the apply wiring was unguarded.** `realLaneVerbs` is the only place the sweep gets its forge and its session stores, and the oracle test built its own runner. `TestRealLaneVerbsSweepHonoursTheForgeAndTheSessions` drives the real wiring over a real repository and a pi session on disk. Mutations, each reverted: dropping `Forge: src.Forge` fails it (nil dereference), dropping `Sessions: sessionStores()` fails it (the live-session worktree is reaped). Lesson 457.
+- **F2 (Major), the live-session resolver did not resolve.** `done` refuses a recent session whatever `--force` says. The row now carries `--force --ignore-recent-session` and says it strands the session; `TestPlanResolverForALiveWorktreeRunsThroughDone` runs the printed string through the real `worktree done` (mutation: without the flag it fails).
+- **F3 (Minor), an adopt with nothing to run.** `planUnadopted` now falls back to `KindFlag` when the path cannot be quoted, as `abandon` does (`TestPlanResolversDoWhatTheyPromise`).
+- **F4 (Minor), the dirty row hid its loss.** The reason now says the command discards the uncommitted changes (same test). This is the code route, so no contract file changed.
