@@ -177,14 +177,15 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 
 // humanPath is a path as a person pastes it into their own shell: bare when it
 // is a plain word, else in double quotes, which bash, zsh, PowerShell and cmd
-// all read as one word. A character that is live inside double quotes is
-// refused, since no quoting of it means the same in all four.
+// all read as one word. A character that is live inside double quotes in one
+// of them ($ and backtick in bash and zsh, ! for their history expansion, % for
+// cmd's variables) is refused, since no quoting of it means the same in all four.
 func humanPath(p string) (string, error) {
 	if plainWord.MatchString(p) {
 		return p, nil
 	}
-	if strings.ContainsAny(p, "\"$`") {
-		return "", fmt.Errorf("lane: %q has a character no shell quotes alike; move the repository to a path without a quote, $ or backtick", p)
+	if strings.ContainsAny(p, "\"$`!%") {
+		return "", fmt.Errorf("lane: %q has a character no shell quotes alike; move the repository to a path without a quote, $, backtick, ! or %%", p)
 	}
 	return `"` + p + `"`, nil
 }

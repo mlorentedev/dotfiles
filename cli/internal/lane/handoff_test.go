@@ -314,7 +314,7 @@ func TestNext_NoBackendQuotesAPathWithASpace(t *testing.T) {
 	if !reflect.DeepEqual(out.Commands, want) {
 		t.Errorf("commands =\n%q\nwant\n%q", out.Commands, want)
 	}
-	for _, bad := range []string{`/repos/a"b`, "/repos/$HOME x", "/repos/a`b c"} {
+	for _, bad := range []string{`/repos/a"b`, "/repos/$HOME x", "/repos/a`b c", "/repos/100% x", "/repos/hey! x"} {
 		o.Parent = bad
 		if _, err := Handoff(o, nil, queue); err == nil {
 			t.Errorf("Parent %q: want a refusal", bad)
