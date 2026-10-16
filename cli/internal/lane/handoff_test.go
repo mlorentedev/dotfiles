@@ -379,3 +379,43 @@ func TestNext_NoBackendDryRunWritesNoPrompt(t *testing.T) {
 		t.Errorf("a dry run wrote %s", o.PromptDir)
 	}
 }
+
+// Two issues whose titles slug alike share a branch. The worktree the lane
+// started for the first must not be read as the second's: that would start no
+// agent and say nothing. The refusal names both issues and touches nothing.
+func TestNext_ABranchLeasedToAnotherIssueIsARefusalNotASilentSkip(t *testing.T) {
+	for name, tc := range map[string]struct {
+		leased int // 0: no lease file
+		open   bool
+		refuse bool
+	}{
+		"another issue, shown":     {leased: 99, open: true, refuse: true},
+		"another issue, not shown": {leased: 99, refuse: true},
+		"this issue":               {leased: 7, open: true},
+		"no lease":                 {open: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.leased != 0 {
+				if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: tc.leased}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: dir, Branch: "fix/first-thing", Open: tc.open}}}
+			_, err := Handoff(opts(t), b, queue)
+			if tc.refuse != (err != nil) {
+				t.Fatalf("err = %v, want refusal=%v", err, tc.refuse)
+			}
+			if tc.refuse {
+				if !strings.Contains(err.Error(), "#99") || !strings.Contains(err.Error(), "#7") {
+					t.Errorf("the refusal names both issues, got %v", err)
+				}
+				for _, c := range b.calls {
+					if strings.HasPrefix(c, "create") || strings.HasPrefix(c, "open") || strings.HasPrefix(c, "type") {
+						t.Errorf("a refusal ran %q", c)
+					}
+				}
+			}
+		})
+	}
+}
