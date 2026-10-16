@@ -172,9 +172,39 @@ type Landing struct {
 	PR     int    `json:"pr"`
 	Branch string `json:"branch"`
 	Head   bool   `json:"head"`
+	Draft  bool   `json:"draft,omitempty"`
 	// Command is what lands the head, run by the lane that opened the PR or by
 	// the owner (decision D3). It is empty for the rest.
 	Command string `json:"command,omitempty"`
+	// Checked is whether the head's landing conditions were read; Blockers is
+	// what stands in the way of landing it now. An unread head is not a
+	// clear one: Checked is false and Blockers says why.
+	Checked  bool     `json:"checked,omitempty"`
+	Blockers []string `json:"blockers,omitempty"`
+}
+
+// LandCheck reads why one PR cannot land now: no reasons means it can. It is
+// the landing conditions' own reader, so the plan never holds a second copy.
+type LandCheck func(pr int) ([]string, error)
+
+// CheckHead reads the landing conditions of the head of the order, and only
+// of the head: it is the one PR that may land next. A check that cannot run
+// leaves the head unchecked with the reason, never clear.
+func CheckHead(order []Landing, check LandCheck) {
+	if check == nil {
+		return
+	}
+	for i := range order {
+		if !order[i].Head {
+			continue
+		}
+		blockers, err := check(order[i].PR)
+		if err != nil {
+			order[i].Blockers = []string{"the landing conditions could not be read: " + err.Error()}
+			continue
+		}
+		order[i].Checked, order[i].Blockers = true, blockers
+	}
 }
 
 // LandingOrder lists the open PRs of the lanes in Review or Landing, lowest
@@ -186,7 +216,7 @@ func LandingOrder(rows []Row) []Landing {
 		if r.Phase != PhaseLanding && r.Phase != PhaseReview {
 			continue
 		}
-		l := Landing{PR: r.PR, Branch: r.Branch, Head: r.Phase == PhaseLanding}
+		l := Landing{PR: r.PR, Branch: r.Branch, Head: r.Phase == PhaseLanding, Draft: r.Draft}
 		if l.Head {
 			l.Command = fmt.Sprintf("dotf pr triage-queue --pr %d && dotf pr land %d", r.PR, r.PR)
 		}

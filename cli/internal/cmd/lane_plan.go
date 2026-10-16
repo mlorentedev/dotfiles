@@ -4,13 +4,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
+	"github.com/mlorentedev/dotfiles/cli/internal/prland"
 )
+
+// laneLandCheck builds the reader of the head PR's landing conditions: the
+// ones `dotf pr land` decides on, read once and changing nothing. A variable so
+// a test answers without asking GitHub.
+var laneLandCheck = realLaneLandCheck
+
+func realLaneLandCheck(c *cobra.Command) lane.LandCheck {
+	o := prLandOptions("", reviewerRegistry("", ""))
+	return func(pr int) ([]string, error) { return prland.Blockers(c.Context(), o, pr) }
+}
 
 func newLanePlanCmd() *cobra.Command {
 	var asJSON bool
@@ -37,6 +49,7 @@ func newLanePlanCmd() *cobra.Command {
 				return err
 			}
 			plan := lanePlan{Actions: lane.Plan(rows, src.Queue, src.Now), Landing: lane.LandingOrder(rows)}
+			lane.CheckHead(plan.Landing, laneLandCheck(c))
 			if plan.Actions == nil {
 				plan.Actions = []lane.Action{}
 			}
@@ -77,13 +90,31 @@ func writeLanePlan(w io.Writer, p lanePlan, now time.Time) error {
 		_, _ = fmt.Fprintln(w, "\nlanding order:")
 		for i, l := range p.Landing {
 			line := fmt.Sprintf("  %d. #%d %s", i+1, l.PR, l.Branch)
-			if l.Command != "" {
-				line += "\n     " + l.Command
+			if l.Draft {
+				line += " (draft)"
 			}
+			line += landingDetail(l)
 			_, _ = fmt.Fprintln(w, line)
 		}
 	}
 	return nil
+}
+
+// landingDetail says what stands between the head and a landing: its command
+// when the conditions hold, the reasons when they do not, and that the
+// conditions could not be read when they could not.
+func landingDetail(l lane.Landing) string {
+	switch {
+	case l.Command == "":
+		return ""
+	case l.Checked && len(l.Blockers) == 0:
+		return "\n     ready: " + l.Command
+	case l.Checked:
+		return "\n     blocked: " + strings.Join(l.Blockers, "; ") + "\n     then: " + l.Command
+	case len(l.Blockers) > 0:
+		return "\n     not checked: " + strings.Join(l.Blockers, "; ") + "\n     " + l.Command
+	}
+	return "\n     " + l.Command
 }
 
 // planDetail is the last column: when a pending action is due, the command

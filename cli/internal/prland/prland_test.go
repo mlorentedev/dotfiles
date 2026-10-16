@@ -631,3 +631,49 @@ func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 		t.Errorf("calls:\n%s\nwant (no restore):\n%s", strings.Join(*calls, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// Blockers is Land's read without its merge: the same reasons, and nothing
+// mutated however the PR stands.
+func TestBlockers_ReadsTheReasonsLandWouldRefuseOnAndChangesNothing(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: `[{"name":"test","bucket":"pending"}]`, deps: `[]`}
+	got, err := Blockers(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(got, ";"), "test: pending") || len(g.calls) != 0 {
+		t.Errorf("blockers=%v calls=%v, want the pending check named and no mutation", got, g.calls)
+	}
+}
+
+func TestBlockers_AReadyPRHasNone(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`}
+	got, err := Blockers(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil || len(got) != 0 || len(g.calls) != 0 {
+		t.Errorf("blockers=%v calls=%v err=%v, want none", got, g.calls, err)
+	}
+}
+
+func TestBlockers_NamesTheMissingGrantAndTheUntriagedReviewer(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`, noGrant: true}
+	untriaged := func(context.Context) ([]int, error) { return []int{30}, nil }
+	got, _ := Blockers(context.Background(), Options{Run: g.run, Untriaged: untriaged}, 30)
+	all := strings.Join(got, ";")
+	if !strings.Contains(all, GrantFile) || !strings.Contains(all, "awaits triage") {
+		t.Errorf("blockers=%v, want the grant and the triage named", got)
+	}
+}
+
+// A fact that cannot be read is an error, never an empty list: "nothing
+// blocks it" must not be what an unanswered question reads as.
+func TestBlockers_AnUnreadableFactIsAnErrorNotNoBlockers(t *testing.T) {
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		if args[0] == "api" {
+			return nil, errors.New("gh: HTTP 502")
+		}
+		return (&fakeGH{view: readyView, checks: greenChecks, deps: `[]`}).run(ctx, args...)
+	}
+	got, err := Blockers(context.Background(), Options{Run: run, Untriaged: noneUntriaged}, 30)
+	if err == nil || got != nil {
+		t.Errorf("blockers=%v err=%v, want an error", got, err)
+	}
+}
