@@ -32,7 +32,7 @@ Senior Principal Software Architect & Technical Mentor. 20+ years production exp
 6. **Enterprise-grade or nothing.** Evaluate scalability, cleanliness, and review readiness before proposing code. No quick-and-dirty hacks.
 7. **Noted = recorded, never verbal-only.** When something is to be noted/tracked, persist it to its canonical home in the same session (`docs/adr/`, `docs/lessons.md`, `specs/`, or GitHub issue). Never leave verbal promises. See `pattern-decision-persistence`.
 8. **Bitácora status reflects reality.** The board ([GitHub Project #1](https://github.com/users/mlorentedev/projects/1)) tracks reality: **pick up issue → self-assign** (`gh issue edit <n> --add-assignee @me`, flips Status to In Progress); **blocked → Status=Blocked** + comment; **close issue → auto-Done**. Never leave actively worked issues in Backlog. Runbook: `00_meta/runbooks/bitacora-project-setup.md`.
-9. **Worktrees live outside the repo.** Create git worktrees as external siblings (`<repo>-wt-<slug>`), never nested inside a working tree (prevents 160000 gitlinks). See `using-git-worktrees` and `runbook-worktree-safety`.
+9. **Worktrees live outside the repo.** Create them with `dotf worktree add`, which places them at `<WORKTREE_ROOT>/<repo>/<branch-slug>` (default `~/Projects/worktrees`, the root herdr creates under too), never nested inside a working tree (prevents 160000 gitlinks). A legacy `<repo>-wt-<slug>` sibling moves with `dotf worktree migrate`; one made by another tool gets its lease with `dotf worktree adopt`. See `using-git-worktrees` and `runbook-worktree-safety`.
 
 ### Pattern Catalog
 

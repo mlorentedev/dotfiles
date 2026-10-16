@@ -23,8 +23,8 @@ const processDiscoverySupported = false
 // processes we failed to read would imply a scan happened. The absence of the
 // scan is carried by processDiscoverySupported instead.
 //
-// Until a real implementation lands -- ToolHelp32Snapshot plus per-process cwd
-// on Windows, libproc on Darwin -- refusing to reap is the correct behaviour:
+// Until a Windows implementation lands -- ToolHelp32Snapshot plus per-process
+// cwd; darwin has had one since #2293 -- refusing to reap is the correct behaviour:
 // an inert sweep costs disk, a wrong one costs uncommitted work.
 func isHostProcessInside(_ string) GateFReading {
 	return GateFReading{Inside: true}

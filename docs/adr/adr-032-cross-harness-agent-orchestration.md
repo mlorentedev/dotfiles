@@ -392,6 +392,13 @@ A backend that cannot tell success from failure would report every run as a succ
    `pane_exited`, or a surface that runs an argv and reports how it ended. The probe is the #1586
    spike, repeated against the new release.
 
+**Clarification 2026-10-14 (owner, CLI-118).** "Dispatch" in point 2 means the executor seam:
+`dotf agent run`, run role A on task T and return R. Launching an interactive agent into a pane an
+operator watches is cockpit use, and allowed: `dotf worktree add --agent` opens the worktree in
+herdr, starts the agent and submits its prompt, then returns saying the prompt was submitted and
+nothing about how the agent did. It is not a backend of the seam, and no caller reads its exit
+status as the task's result.
+
 ## Options Considered
 
 | Option | C1 neutral | C3 default-on | C7 reversible | C8 zero marginal | C9 headless | C11 bootstrap | C13 least-priv |
