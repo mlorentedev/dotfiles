@@ -46,7 +46,18 @@ func TestLaneExec_HandsTheAgentTheFilePromptAsOneArgument(t *testing.T) {
 // next wires git, gh and herdr to the hand-off: from a repo with a lane file it
 // names the first free issue and, under --dry-run, starts nothing.
 func TestLaneNext_DryRunNamesTheNextIssueAndChangesNothing(t *testing.T) {
-	top := t.TempDir()
+	laneNextDryRun(t, t.TempDir())
+}
+
+// A checkout under a path with a space (C:\Users\Jane Doe\...) must hand the
+// lane over like any other (#2537): the command typed into the pane carries no
+// path of the repository's.
+func TestLaneNext_ARepositoryUnderAPathWithASpaceHandsTheLaneOver(t *testing.T) {
+	laneNextDryRun(t, filepath.Join(t.TempDir(), "Jane Doe", "my repo"))
+}
+
+func laneNextDryRun(t *testing.T, top string) {
+	t.Helper()
 	if err := os.MkdirAll(filepath.Join(top, ".dotf"), 0o755); err != nil {
 		t.Fatal(err)
 	}
