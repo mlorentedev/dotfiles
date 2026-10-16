@@ -208,3 +208,10 @@ func TestClaimRefFormOnARemote(t *testing.T) {
 		t.Fatalf("after release Holder = (%v, %v), want none", ok, err)
 	}
 }
+
+func TestClaimedErrorWithoutATimeSaysSo(t *testing.T) {
+	msg := (&ClaimedError{Issue: 7, Holder: "ana@box-a"}).Error()
+	if !strings.Contains(msg, "unknown time") || strings.Contains(msg, "0001") {
+		t.Errorf("message %q must say the time is unknown, not print the zero time", msg)
+	}
+}

@@ -38,7 +38,13 @@ type ClaimedError struct {
 }
 
 func (e *ClaimedError) Error() string {
-	return fmt.Sprintf("#%d is claimed by %s since %s", e.Issue, e.Holder, e.At.UTC().Format(time.RFC3339))
+	// A claim commit whose time cannot be read still names its holder, and
+	// refusing to release it over that would strand it: say the time is unknown.
+	since := "an unknown time"
+	if !e.At.IsZero() {
+		since = e.At.UTC().Format(time.RFC3339)
+	}
+	return fmt.Sprintf("#%d is claimed by %s since %s", e.Issue, e.Holder, since)
 }
 
 // Claimer takes, reads and releases claims on Remote, from the repository in
