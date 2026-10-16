@@ -14,13 +14,13 @@ created: "2026-10-15"
 ## Setup
 
 - [x] Branch created from main: `feat/2550-lane-reconcile` (worktree `feat-2550-lane-reconcile`)
-- [ ] `proposal.md` is complete and acceptance criteria are testable: owner review of the `[AGENT-DRAFT]` sections
+- [x] `proposal.md` is complete and acceptance criteria are testable: owner approved the draft on 2026-10-16
 - [x] No open questions left in `proposal.md` "Risks / open questions": the two MUST items became D1 and D2, and D3 was added (2026-10-16)
-- [ ] `/spec check CLI-127-lane-reconcile` returns PASS
+- [x] `/spec check CLI-127-lane-reconcile` returns PASS (2026-10-16: AC1 5 tasks, AC2 3, AC3 3, AC4 2, all by `[AC<n>]` tag; no orphans)
 
 ## Implementation
 
-> [AGENT-DRAFT — review before archive] Three PRs, one per verb. All code goes in `cli/internal/lane/` and `cli/internal/cmd/lane.go`. `cli/internal/worktree` and `cli/internal/herdr` are reached through their exported API only, because CLI-118 holds them. Run every test from `cli/`.
+> Three PRs, one per verb. All code goes in `cli/internal/lane/` and `cli/internal/cmd/lane.go`. `cli/internal/worktree` and `cli/internal/herdr` are reached through their exported API only, because CLI-118 holds them. Run every test from `cli/`.
 
 ### PR 1: `dotf lane status`
 

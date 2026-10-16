@@ -17,11 +17,11 @@ wip_override: "Owner chose option B on 2026-10-16 (#2550 park, epic #2546): CLI-
 
 <!-- from issue #2550: CLI-127: dotf lane status, plan and apply -->
 
-[AGENT-DRAFT — review before archive] Parallel lanes are coordinated by prose and memory, and the thread gets lost: on 2026-10-15, 16 dotfiles worktrees existed, herdr showed 4, 10 had no lease, and 5 finished ones were still on disk (#2546). After this run's cleanup, 2026-10-16, `dotf worktree list` still shows 4 UNADOPTED, 1 DIRTY and 1 merged worktree held by a live session. Every one of those was found by hand. ADR-050 decision 4 makes the controller code: a level-triggered `status | plan | apply`, so the agent in main judges only what the plan marks ambiguous.
+Parallel lanes are coordinated by prose and memory, and the thread gets lost: on 2026-10-15, 16 dotfiles worktrees existed, herdr showed 4, 10 had no lease, and 5 finished ones were still on disk (#2546). After this run's cleanup, 2026-10-16, `dotf worktree list` still shows 4 UNADOPTED, 1 DIRTY and 1 merged worktree held by a live session. Every one of those was found by hand. ADR-050 decision 4 makes the controller code: a level-triggered `status | plan | apply`, so the agent in main judges only what the plan marks ambiguous.
 
 ## What
 
-[AGENT-DRAFT — review before archive] Three verbs, one per PR:
+Three verbs, one per PR:
 
 1. `dotf lane status [--json]`. A read-only join of `git worktree list`, `.dotf-worktree.json`, the forge (REST pulls, never the GraphQL quota), a process scan for liveness and the herdr snapshot when present. It prints one row per worktree: ticket, branch, PR and its state, agent, lease and a **derived** phase (`Pending`, `Running`, `Review`, `Landing`, `Landed`, `Reaped`, `Stalled`, `Orphan`, `Unadopted`). Phases are never stored. herdr absent is a supported state, not an error.
 2. `dotf lane plan`. From `status` and `.dotf/lane.json`, it prints the actions a reconcile would take, each in one of three classes (decision D1): `auto`, `pending` (with the time it becomes due) or `ambiguous` (with the exact command that would resolve it). It also prints the landing order and the head PR's four-condition check. It mutates nothing.
@@ -29,14 +29,12 @@ wip_override: "Owner chose option B on 2026-10-16 (#2550 park, epic #2546): CLI-
 
 ## Out of scope
 
-[AGENT-DRAFT — review before archive]
 - The atomic claim (`refs/dotf/claims/*` or `claim/*`): that is #2551. `status` lists claims only once #2551 defines them.
 - A daemon, cron, bus or state store: ADR-050 rejects each one. `apply` runs on demand only.
 - The headless tier (#2553), `initrepo` scaffolding (#2552), and anything in `cli/internal/worktree` beyond its exported API (CLI-118 owns it).
 
 ## Risks / open questions
 
-[AGENT-DRAFT — review before archive]
 - Liveness is a process scan on cwd (as `worktree done` does) plus transcript age through `worktree.RecentSession` (#2556), which fails closed on an unreadable store. CLI-118 is extending it to the non-Claude stores, so do not reimplement it (#2550 comment 6205806273). Both signals are heuristics, and a false "dead" reaps a live session. Default to "alive" when unsure.
 - herdr 0.9.3 cannot isolate a second server: `HERDR_SOCKET_PATH`, `HERDR_HOME` and `HERDR_CONFIG_PATH` move only the sockets. A second server restores the owner's `session.json` and resumes every agent, measured by CLI-118 on 2026-10-16. `status` only reads the snapshot of the running server, and no test or live run starts a herdr server. Only a different `HOME` isolates.
 - Paths held by CLI-118 (`cli/internal/worktree/session*.go`, `cli/internal/herdr/**`, `cli/internal/deploy/**`) are consumed through their exported API only.
@@ -52,7 +50,6 @@ Decided with the owner on 2026-10-16, on the advisor's recommendation.
 
 ## Acceptance criteria
 
-[AGENT-DRAFT — review before archive]
 - [ ] AC1: `dotf lane status --json` on a fixture of git, lease, forge and process state returns the expected phase for each of the 9 phases. One table test per phase, with herdr absent in at least one row.
 - [ ] AC2: `dotf lane plan` on the same fixture prints the expected actions, each classed `auto`, `pending` (with its due time) or `ambiguous` (with its resolving command). The fixture's files and refs are byte-identical afterwards.
 - [ ] AC3: `dotf lane apply` executes only `auto` actions through `worktree sweep` and `lane next` (the test asserts the verb calls), never `worktree adopt` or `pr land`, and reports `changed=N`. A second run on the resulting state reports `changed=0`.
