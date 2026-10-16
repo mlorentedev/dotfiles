@@ -58,6 +58,13 @@ type Claimer struct {
 	Now    func() time.Time
 }
 
+// Claims is what a hand-off needs of the claim store: take a claim, and ask
+// whether one is held without taking it (a dry run changes nothing).
+type Claims interface {
+	Acquire(issue int) (Claim, error)
+	Held(issue int) (bool, error)
+}
+
 func claimRef(issue int) string  { return claimRefPrefix + strconv.Itoa(issue) }
 func claimSeen(issue int) string { return claimSeenPrefix + strconv.Itoa(issue) }
 
@@ -119,6 +126,15 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 		}
 	}
 	return Claim{}, fmt.Errorf("claim #%d: %w", issue, pushErr)
+}
+
+// Held says whether anybody holds the claim on issue, without reading who.
+func (c Claimer) Held(issue int) (bool, error) {
+	out, err := c.git("ls-remote", c.Remote, claimRef(issue))
+	if err != nil {
+		return false, fmt.Errorf("ls-remote %s: %w", claimRef(issue), err)
+	}
+	return strings.TrimSpace(out) != "", nil
 }
 
 // Holder reads the claim on issue. The bool is false when nobody holds it.

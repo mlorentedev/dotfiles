@@ -31,14 +31,14 @@ created: "2026-10-16"
 
 ### PR 2: `lane next`, `lane claim`, `lane release`
 
-- [ ] [AC4] Write `TestHandoffClaimsBeforeItStarts` and `TestHandoffSkipsToTheNextFreeItemOnALoss` with a fake claimer: a loser starts nothing; the assignee is set only after a win. Expected: FAIL.
-- [ ] [AC4] Wire `Handoff` through the claim until they pass; a forge or push failure fails closed with the reason.
-- [ ] [AC5] Add `newLaneClaimCmd` and `newLaneReleaseCmd` and their cmd tests, including the refusal of another holder's claim and the `--force` path.
-- [ ] `lane status` shows a claim and its age (read-only, no new store).
-- [ ] Verify, lesson, open the PR.
+- [x] [AC4] `TestHandoffClaimsBeforeItStarts`, `TestHandoffSkipsToTheNextFreeItemOnALoss`, `TestHandoffStartsNothingWhenEveryItemIsClaimed`, `TestHandoffFailsClosedWhenTheClaimCannotBeTaken`, `TestHandoffDoesNotClaimAWorktreeThatExists`, `TestHandoffDryRunTakesNoClaimButSkipsAHeldItem` (all failed before the wiring; a mutation that disables the claim fails 5)
+- [x] [AC4] `Handoff` claims through `Options.Claims` before `launch`
+- [x] [AC5] `lane claim` and `lane release [--force]` and `TestLaneRelease` (real git, two checkouts)
+- [x] Verify (build, vet, `GOOS=windows go vet`, `go test ./...`, golangci-lint), open the PR.
 
 ### PR 3: the decision on record
 
+- [ ] `lane status` shows a claim and its age (read-only, no new store).
 - [ ] [AC7] Amend ADR-050 decision 2 from "open" to the decided form, naming the forges the probe passed on; record any forge that refused.
 - [ ] Close #2551 with the evidence; answer the promotion candidates in `verification.md`.
 

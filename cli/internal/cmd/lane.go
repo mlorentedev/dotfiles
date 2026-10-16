@@ -29,7 +29,7 @@ func newLaneCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd())
+	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd(), newLaneClaimCmd(), newLaneReleaseCmd())
 	return c
 }
 
@@ -144,6 +144,7 @@ func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, erro
 		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
 		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: selfBinary(c), GitDir: common,
 		WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
+		Claims:       laneClaimer(cfg, top, parent),
 		Fetch: func() error {
 			remote, branch := cfg.Remote()
 			_, err := laneRun("git", "-C", parent, "fetch", "--quiet", remote, branch)

@@ -90,7 +90,15 @@ type IssueSource interface {
 // skipped, and an issue kept open on purpose after its fix landed stays out of
 // the way once somebody owns it. ok is false when nothing is free.
 func Next(cfg Config, src IssueSource) (Issue, bool, error) {
+	return nextFree(cfg, src, nil)
+}
+
+// nextFree is Next past the issues in skip: the ones a hand-off found claimed.
+func nextFree(cfg Config, src IssueSource, skip map[int]bool) (Issue, bool, error) {
 	for _, n := range cfg.Queue {
+		if skip[n] {
+			continue
+		}
 		is, err := src.Issue(n)
 		if err != nil {
 			return Issue{}, false, fmt.Errorf("lane: issue #%d: %w", n, err)

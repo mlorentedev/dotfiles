@@ -81,6 +81,8 @@ func laneNextDryRun(t *testing.T, top string) {
 			return filepath.Join(top, ".git") + "\n", nil
 		case strings.HasPrefix(line, "gh issue view 5"):
 			return `{"number":5,"state":"OPEN","title":"BUG-5: the first","assignees":[]}`, nil
+		case strings.Contains(line, " ls-remote origin refs/dotf/claims/5"):
+			return "", nil // nobody holds #5
 		case strings.HasPrefix(line, "herdr pane current"):
 			return `{"result":{"pane":{"agent":"claude"}}}`, nil
 		case strings.HasPrefix(line, "herdr worktree list"):
@@ -101,7 +103,7 @@ func laneNextDryRun(t *testing.T, top string) {
 		t.Errorf("output:\n%s", out.String())
 	}
 	for _, a := range asked {
-		if strings.Contains(a, "create") || strings.Contains(a, "pane run") || strings.Contains(a, "fetch") {
+		if strings.Contains(a, "create") || strings.Contains(a, "pane run") || strings.Contains(a, "fetch") || strings.Contains(a, " push ") {
 			t.Errorf("a dry run asked %q", a)
 		}
 	}
