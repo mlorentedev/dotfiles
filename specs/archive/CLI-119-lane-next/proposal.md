@@ -1,7 +1,7 @@
 ---
 id: "CLI-119-lane-next"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-14"
 issue: "mlorentedev/dotfiles#2528"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
