@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
@@ -86,12 +88,12 @@ func newSecretsSyncCiCmd() *cobra.Command {
 
 			sel := reg.SelectCI(repo)
 			if sel.Upload, err = scopeUpload(sel.Upload, names, repo); err != nil {
-				return err
+				return fmt.Errorf("%w. %s", err, registryProvenance(registryPath()))
 			}
 			err = pushCI(cmd.OutOrStdout(), sel, repo, dryRun, skipVerify)
 			if errors.Is(err, errNoCISecrets) {
-				return fmt.Errorf("nothing was delivered to %s: no secret in %s lists ci:%s as a consumer, or each one was skipped above. "+
-					"The registry is read from the working tree, so a checkout behind its upstream selects what it last pulled", repo, registryPath(), repo)
+				return fmt.Errorf("nothing was delivered to %s: no secret lists ci:%s as a consumer, or each one was skipped above. %s",
+					repo, repo, registryProvenance(registryPath()))
 			}
 			return err
 		},
@@ -100,6 +102,20 @@ func newSecretsSyncCiCmd() *cobra.Command {
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report VAR→repo without uploading (names + byte lengths, never values)")
 	c.Flags().BoolVar(&skipVerify, "skip-verify", false, "skip the github-token liveness check for entries marked validate: github-token")
 	return c
+}
+
+// registryProvenance says which registry a refusal was decided on. The deployed
+// copy is what the reader falls back to when no dotfiles checkout is found, and
+// it lags the checkout until a records-mirror run: a consumer merged and pulled
+// is absent from it, so "add the consumer" would be the wrong fix (#2531).
+func registryProvenance(path string) string {
+	deployed := filepath.Join(env.DotfilesDir(env.Home()), "secrets", "registry.yaml")
+	if path == deployed {
+		return fmt.Sprintf("The registry read was the deployed copy %s, which lags the checkout until "+
+			"`dotf converge --only records-mirror` refreshes it. If the checkout already declares the consumer, "+
+			"refresh the copy, or run from the dotfiles checkout (or set DOTFILES_REPO_DIR to it)", path)
+	}
+	return fmt.Sprintf("The registry read was %s, so a checkout behind its upstream selects what it last pulled", path)
 }
 
 // errNoCISecrets is pushCI's answer when the selection holds nothing to upload:
