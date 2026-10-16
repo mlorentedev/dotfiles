@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: 12d85e4847497816
+generated_sha: 49c478eb28a75163
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -120,14 +120,16 @@ to remove the gitlink. Do not proceed.
 ### 1. Create the worktree (new branch)
 
 ```bash
-dotf worktree add "$SLUG" -b "<type>/$SLUG" &&  # fallback: git worktree add "$wt_path" -b "<type>/$SLUG" &&
+dotf worktree add "$SLUG" -b "<type>/$SLUG" &&
 wt_path="$(git worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')" &&
 [ -n "$wt_path" ] &&
 cd "$wt_path"                                  # asked of git, never derived
 ```
 
 The chain matters: a failed `add` or an empty lookup stops here, instead of carrying on
-in the directory you started from.
+in the directory you started from. Without `dotf`, run `git worktree add "$wt_path" -b
+"<type>/$SLUG" && cd "$wt_path"` instead, with `wt_path` from the fallback in Directory
+Selection; nothing retries one with the other.
 
 With herdr running, `dotf worktree add … --agent <harness> --prompt-file <f>` opens it in
 a herdr pane and starts the agent there. Never start a second herdr server on a box that
