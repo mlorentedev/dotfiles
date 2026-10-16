@@ -184,25 +184,11 @@ path_without_copilot() {
     grep -q '## Session Handoff' "$SHARED/.claude/skills/handoff/SKILL.md"
 }
 
-@test "AC8 smoke: a Claude-only skill is NOT exposed to opencode/agy" {
-    shared_home clean
-    # crystallize is targets:[claude] (agent-local auto-memory store)
-    [ -f "$SHARED/.claude/skills/crystallize/SKILL.md" ]
-    [ ! -f "$SHARED/.config/opencode/commands/crystallize.md" ]
-    [ ! -d "$SHARED/.gemini/skills/crystallize" ]
-}
-
 @test "AI-022: pi gets /spec as a native skill (regular copy, not a symlink)" {
     shared_home clean
     [ -f "$SHARED/.pi/agent/skills/spec/SKILL.md" ]
     grep -q '^name: spec' "$SHARED/.pi/agent/skills/spec/SKILL.md"
     [ ! -L "$SHARED/.pi/agent/skills/spec" ]
-}
-
-@test "AI-022: a Claude-only skill is NOT exposed to pi" {
-    shared_home clean
-    # crystallize is targets:[claude] (agent-local auto-memory store)
-    [ ! -d "$SHARED/.pi/agent/skills/crystallize" ]
 }
 
 @test "AI-022: deploy leaves pi-installed sibling symlinks alone" {
@@ -223,10 +209,9 @@ path_without_copilot() {
     [ -z "$(find "$SHARED/.claude/skills" "$SHARED/.config/opencode/commands" "$SHARED/.gemini/skills" "$SHARED/.gemini/prompts" "$SHARED/.copilot/skills" -type l 2>/dev/null)" ]
 }
 
-@test "AC6 smoke: the copilot catalog lists /spec but not the Claude-only skill" {
+@test "AC6 smoke: the copilot catalog lists /spec" {
     shared_home clean
     grep -qF -- '**spec**' "$SHARED/.copilot/copilot-instructions.md"
-    refute_grep_fixed '**crystallize**' "$SHARED/.copilot/copilot-instructions.md"
 }
 
 @test "HARNESS-051: copilot gets native /spec and /handoff skills" {
@@ -239,9 +224,8 @@ path_without_copilot() {
     [ ! -L "$SHARED/.copilot/skills/handoff" ]
 }
 
-@test "HARNESS-051: copilot target filtering and auxiliary files are preserved" {
+@test "HARNESS-051: copilot auxiliary files are preserved" {
     shared_home copilot
-    [ ! -d "$SHARED/.copilot/skills/crystallize" ]
     [ -f "$SHARED/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
 }
 

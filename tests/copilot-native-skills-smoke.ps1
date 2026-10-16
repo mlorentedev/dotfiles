@@ -88,15 +88,39 @@ try {
 
     $handoff = Join-Path $copilotHome 'skills\handoff\SKILL.md'
     $auxiliary = Join-Path $copilotHome 'skills\systematic-debugging\root-cause-tracing.md'
-    $claudeOnly = Join-Path $copilotHome 'skills\crystallize'
     if (-not (Test-Path -LiteralPath $handoff)) {
         throw "Windows deploy did not create $handoff"
     }
     if (-not (Test-Path -LiteralPath $auxiliary)) {
         throw "Windows deploy did not preserve $auxiliary"
     }
-    if (Test-Path -LiteralPath $claudeOnly) {
-        throw "Windows deploy ignored Copilot target filtering: $claudeOnly"
+
+    # Target filtering is proved on a skill this test owns. It used to name a real
+    # skill (crystallize), which stopped being Claude-only when the vault dropped
+    # its targets, and the assertion then failed for a reason that is not a bug.
+    # The fixture is the handoff record with targets: [claude] added, deployed from
+    # a scratch dotfiles dir: the claude target must receive it (the control that
+    # the fixture deployed at all) and the copilot target must not.
+    $fixtureDir = Join-Path $scratch 'fixture'
+    $fixtureRecord = Join-Path $fixtureDir 'harness\skills\claude-only'
+    Ensure-Directory $fixtureRecord
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'harness\manifest.json') -Destination (Join-Path $fixtureDir 'harness\manifest.json') -Force
+    $fixtureMd = (Get-Content -LiteralPath (Join-Path $repoRoot 'harness\skills\handoff\SKILL.md') -Raw) -replace '(?m)^name: handoff\r?$', "name: claude-only`ntargets: [claude]"
+    [System.IO.File]::WriteAllText((Join-Path $fixtureRecord 'SKILL.md'), $fixtureMd, (New-Object System.Text.UTF8Encoding($false)))
+    # Its own home: a deploy prunes generated outputs whose record is missing, and
+    # this fixture holds only one record, so deploying into the home the Copilot
+    # discovery check reads below would delete handoff from it.
+    $fixtureHome = Join-Path $scratch 'fixture-home'
+    $env:USERPROFILE = $fixtureHome
+    Deploy-SkillRecord -DotfilesDir $fixtureDir
+    $env:USERPROFILE = $scratch
+    $claudeOnlyForClaude = Join-Path $fixtureHome '.claude\skills\claude-only\SKILL.md'
+    $claudeOnlyForCopilot = Join-Path $fixtureHome '.copilot\skills\claude-only'
+    if (-not (Test-Path -LiteralPath $claudeOnlyForClaude)) {
+        throw "Windows deploy did not render the Claude-only fixture for the claude target: $claudeOnlyForClaude"
+    }
+    if (Test-Path -LiteralPath $claudeOnlyForCopilot) {
+        throw "Windows deploy ignored Copilot target filtering: $claudeOnlyForCopilot"
     }
 
     $output = & $copilot.Source skill list 2>&1

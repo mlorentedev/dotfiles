@@ -1,14 +1,13 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: d221e6a0da05e84f
+generated_sha: d1317ad74785f3ff
 id: insights-skill
 type: skill
 status: active
 created: '2026-05-30'
 owner: manu
 name: insights
-targets: [claude]
 description: Use when checking AI workflow health, vault structural integrity, or
   knowledge pipeline status. Run weekly as maintenance habit. Triggers include stale
   MEMORY.md, unpersisted decisions, vault structural issues, or before starting a

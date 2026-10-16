@@ -416,9 +416,10 @@ setup() {
     local count
     count=$(find "$HOME/.config/opencode/commands" -maxdepth 1 -name '*.md' | wc -l)
     [ "$count" -eq "$expected" ]
-    # Spot check: spec.md present (portable), crystallize.md absent (targets:[claude]).
+    # Spot check: spec.md present (portable). The targets filter itself is the count
+    # above, which skips every record whose targets omit opencode; naming a real
+    # skill as the absent one broke when the vault dropped its targets (#2583).
     [ -f "$HOME/.config/opencode/commands/spec.md" ]
-    [ ! -f "$HOME/.config/opencode/commands/crystallize.md" ]
     # rendered command carries provenance + drops name: (opencode keys off filename)
     grep -qE '^generated_sha: [0-9a-f]{16}' "$HOME/.config/opencode/commands/spec.md"
     refute_grep '^name:' "$HOME/.config/opencode/commands/spec.md"
