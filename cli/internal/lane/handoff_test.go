@@ -23,12 +23,21 @@ type fakeBackend struct {
 	last     string // the worktree the last Create or Open made available
 	// leased records, per pane, whether the worktree had its lease when the
 	// agent's command was typed: the lease must exist before anything runs.
-	leased map[string]bool
+	leased  map[string]bool
+	idle    bool  // nothing but the shell runs in a shown workspace's pane
+	idleErr error // the backend could not tell
 }
 
 func newFake(t *testing.T, agent string) *fakeBackend {
 	t.Helper()
 	return &fakeBackend{agent: agent, created: t.TempDir()}
+}
+
+// IdlePane answers for the one pane the tests use: f.idle says whether nothing
+// but its shell runs, f.idleErr that the backend could not tell.
+func (f *fakeBackend) IdlePane(wt Worktree) (string, bool, error) {
+	f.calls = append(f.calls, "idle "+wt.Path)
+	return "w3:p1", f.idle, f.idleErr
 }
 
 func (f *fakeBackend) CallingAgent() (string, error) { return f.agent, nil }
@@ -422,5 +431,75 @@ func TestNext_ABranchLeasedToAnotherIssueIsARefusalNotASilentSkip(t *testing.T) 
 				}
 			}
 		})
+	}
+}
+
+// Create succeeded and Type failed: the workspace is shown, leased and has no
+// agent, and every later run used to answer "no second agent" forever. A lease
+// of this issue older than the grace, with only a shell in the pane, is typed
+// into again; anything else is left alone.
+func TestNext_AShownWorkspaceWithNoAgentInItIsStartedAgain(t *testing.T) {
+	old := leaseNow.Add(-2 * idleGrace)
+	for name, tc := range map[string]struct {
+		leased  int
+		created time.Time
+		idle    bool
+		idleErr error
+		started bool // the successor is typed into the pane
+		refuse  bool
+	}{
+		"idle, aged lease of this issue":   {leased: 7, created: old, idle: true, started: true},
+		"an agent runs in the pane":        {leased: 7, created: old},
+		"idle, but the lease is young":     {leased: 7, created: leaseNow.Add(-time.Second), idle: true},
+		"idle, but no lease: not the lane": {idle: true},
+		"the backend cannot tell":          {leased: 7, created: old, idleErr: errors.New("socket closed"), refuse: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.leased != 0 {
+				if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: tc.leased, CreatedAt: tc.created}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			b := &fakeBackend{agent: "claude", idle: tc.idle, idleErr: tc.idleErr, last: dir,
+				existing: map[string]Worktree{"fix/first-thing": {Path: dir, Branch: "fix/first-thing", Open: true, Workspace: "w3"}}}
+			out, err := Handoff(opts(t), b, queue)
+			if tc.refuse != (err != nil) {
+				t.Fatalf("err = %v, want refusal=%v", err, tc.refuse)
+			}
+			typed := b.typed["w3:p1"]
+			if tc.started != (typed != "" && out.Started) {
+				t.Errorf("started = %v (typed %q), want %v; out = %+v", out.Started, typed, tc.started, out)
+			}
+			if tc.started {
+				if !strings.Contains(typed, "--prompt-file "+PromptFile) {
+					t.Errorf("typed %q", typed)
+				}
+				if got, err := os.ReadFile(filepath.Join(dir, PromptFile)); err != nil || !strings.Contains(string(got), "#7") {
+					t.Errorf("the prompt is left in the worktree again: %q, %v", got, err)
+				}
+			}
+			if !tc.started && typed != "" {
+				t.Errorf("a second agent was typed into a pane: %q", typed)
+			}
+			if tc.refuse && !strings.Contains(err.Error(), "dotf lane exec") {
+				t.Errorf("the refusal names the line to run, got %v", err)
+			}
+		})
+	}
+}
+
+// A dry run reports the restart and types nothing.
+func TestNext_ADryRunReportsTheRestartOfAnIdleWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: 7, CreatedAt: leaseNow.Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	b := &fakeBackend{agent: "claude", idle: true, existing: map[string]Worktree{"fix/first-thing": {Path: dir, Branch: "fix/first-thing", Open: true, Workspace: "w3"}}}
+	o := opts(t)
+	o.DryRun = true
+	out, err := Handoff(o, b, queue)
+	if err != nil || out.Started || len(out.Commands) != 1 || len(b.typed) != 0 {
+		t.Fatalf("out = %+v, typed = %v, err = %v", out, b.typed, err)
 	}
 }

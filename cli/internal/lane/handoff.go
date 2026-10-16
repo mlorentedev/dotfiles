@@ -100,11 +100,7 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 		}
 	}
 	if found && wt.Open {
-		out.Note = "a workspace already shows " + out.Branch + "; no second agent started"
-		if o.DryRun {
-			return out, nil
-		}
-		return out, ensureLease(o, wt.Path, issue.Number, out.Agent)
+		return shown(o, b, wt, out, p)
 	}
 	if o.DryRun {
 		out.Commands = []string{"(write the prompt to " + PromptFile + " in the new worktree)", "(" + describe(found) + " " + out.Branch + ")", p.exec(PromptFile)}
@@ -147,16 +143,71 @@ func launch(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) 
 	if err != nil {
 		return err
 	}
-	if err := ensureLease(o, st.Worktree.Path, out.Issue.Number, out.Agent); err != nil {
+	return typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p)
+}
+
+// typeSuccessor leases the worktree, leaves the prompt in it and types the
+// command, in that order: the lease must exist before anything runs there.
+func typeSuccessor(o Options, b Backend, path, pane string, out Outcome, p plan) error {
+	if err := ensureLease(o, path, out.Issue.Number, out.Agent); err != nil {
 		return err
 	}
 	if err := excludeFile(o.GitDir, PromptFile); err != nil {
 		return err
 	}
-	if err := writePrompt(o, filepath.Join(st.Worktree.Path, PromptFile), p.prompt); err != nil {
+	if err := writePrompt(o, filepath.Join(path, PromptFile), p.prompt); err != nil {
 		return err
 	}
-	return b.Type(st.Pane, p.exec(PromptFile))
+	return b.Type(pane, p.exec(PromptFile))
+}
+
+// idleGrace is how old a lease must be before a shown workspace with nothing
+// but its shell in it is read as a hand-off that stalled. A run between Create
+// and Type holds the lease too, and has typed nothing yet.
+const idleGrace = 30 * time.Second
+
+// IdleProber is the part of a Backend that can say whether a shown workspace
+// runs anything but its shell. It is optional: without it, a shown workspace is
+// always left alone.
+type IdleProber interface {
+	IdlePane(wt Worktree) (pane string, idle bool, err error)
+}
+
+// shown answers a branch a workspace already shows. It is left to its agent,
+// except when the lane itself leased it for this issue, the lease is older than
+// idleGrace and nothing but a shell runs in its pane: Create succeeded, Type
+// failed, and every later run would otherwise answer "no second agent" for an
+// agent that never started. When the backend cannot tell, nothing is typed (a
+// second agent in a working pane is worse than the stall) and the refusal says
+// what to run.
+func shown(o Options, b Backend, wt Worktree, out Outcome, p plan) (Outcome, error) {
+	out.Note = "a workspace already shows " + out.Branch + "; no second agent started"
+	meta, err := worktree.LoadMetadata(wt.Path)
+	if err != nil {
+		return out, fmt.Errorf("lane: %w", err)
+	}
+	prober, ok := b.(IdleProber)
+	if ok && meta != nil && meta.Issue == out.Issue.Number && o.now().Sub(meta.CreatedAt) > idleGrace {
+		pane, idle, err := prober.IdlePane(wt)
+		switch {
+		case err != nil:
+			return out, fmt.Errorf("lane: %s is shown, but whether an agent runs in it cannot be told (%w); if none does, run `%s` in that workspace", out.Branch, err, p.exec(PromptFile))
+		case idle && o.DryRun:
+			out.Commands = []string{p.exec(PromptFile)}
+			out.Note = "a workspace shows " + out.Branch + " with no agent in it; would start the successor there"
+			return out, nil
+		case idle:
+			if err := typeSuccessor(o, b, wt.Path, pane, out, p); err != nil {
+				return out, err
+			}
+			out.Started, out.Note = true, "a workspace showed "+out.Branch+" with no agent in it; started the successor there"
+			return out, nil
+		}
+	}
+	if o.DryRun {
+		return out, nil
+	}
+	return out, ensureLease(o, wt.Path, out.Issue.Number, out.Agent)
 }
 
 // plan is what a hand-off hands the successor: its prompt, the dotf its pane

@@ -473,4 +473,5 @@ tags: [lessons, index, dotfiles]
 | [452 - A tee through a pipe reorders output written around it; order needs a barrier through the same pipe](lesson-452-a-tee-through-a-pipe-reorders-output-written-around-it.md) | 2026-10-16 |
 | [453 - A safety precondition checked in one branch of a classifier is not checked](lesson-453-a-safety-precondition-checked-in-one-branch-of-a-classifier-is-not-checked.md) | 2026-10-16 |
 | [454 - A preview and the verb that executes it must ask the same oracle](lesson-454-a-preview-and-the-verb-that-executes-it-must-ask-the-same-oracle.md) | 2026-10-16 |
+| [456 - A hand-off decides from a read and acts later, so it must name what it saw](lesson-456-a-handoff-decides-from-a-read-and-acts-later-so-name-what-it-saw.md) | 2026-10-16 |
 <!-- END GENERATED -->

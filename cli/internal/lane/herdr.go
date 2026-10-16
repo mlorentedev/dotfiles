@@ -2,6 +2,7 @@ package lane
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -10,6 +11,8 @@ type Worktree struct {
 	Path   string
 	Branch string
 	Open   bool // a workspace already shows it, so an agent may be working there
+	// Workspace is the id of the workspace that shows it, empty when none does.
+	Workspace string
 }
 
 // Started is a worktree the backend just made available, with the pane to run
@@ -75,7 +78,7 @@ type herdrWorktree struct {
 }
 
 func (w herdrWorktree) worktree() Worktree {
-	return Worktree{Path: w.Path, Branch: w.Branch, Open: w.OpenWorkspaceID != ""}
+	return Worktree{Path: w.Path, Branch: w.Branch, Open: w.OpenWorkspaceID != "", Workspace: w.OpenWorkspaceID}
 }
 
 func (h Herdr) Find(repo, branch string) (Worktree, bool, error) {
@@ -136,4 +139,55 @@ func parseStarted(out, what string) (Started, error) {
 func (h Herdr) Type(pane, command string) error {
 	_, err := h.herdr("pane", "run", pane, command)
 	return err
+}
+
+// IdlePane implements IdleProber: the workspace's first pane, and whether the
+// only thing in its foreground is the shell itself. That is the one answer every
+// agent gives alike. herdr's own agent detection is not: it names claude and
+// leaves pi and agy unnamed, so reading it would type a second agent into a
+// working one.
+func (h Herdr) IdlePane(wt Worktree) (string, bool, error) {
+	if wt.Workspace == "" {
+		return "", false, errors.New("the worktree is not shown by a workspace")
+	}
+	out, err := h.herdr("pane", "list", "--workspace", wt.Workspace)
+	if err != nil {
+		return "", false, err
+	}
+	var panes struct {
+		Result struct {
+			Panes []struct {
+				PaneID string `json:"pane_id"`
+			} `json:"panes"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &panes); err != nil {
+		return "", false, fmt.Errorf("herdr pane list: %w", err)
+	}
+	if len(panes.Result.Panes) == 0 {
+		return "", false, fmt.Errorf("herdr pane list: workspace %s has no pane", wt.Workspace)
+	}
+	pane := panes.Result.Panes[0].PaneID
+	out, err = h.herdr("pane", "process-info", "--pane", pane)
+	if err != nil {
+		return pane, false, err
+	}
+	var info struct {
+		Result struct {
+			ProcessInfo struct {
+				ShellPID   int `json:"shell_pid"`
+				Foreground []struct {
+					PID int `json:"pid"`
+				} `json:"foreground_processes"`
+			} `json:"process_info"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(out), &info); err != nil {
+		return pane, false, fmt.Errorf("herdr pane process-info: %w", err)
+	}
+	pi := info.Result.ProcessInfo
+	if pi.ShellPID == 0 {
+		return pane, false, errors.New("herdr pane process-info: no shell pid in the answer")
+	}
+	return pane, len(pi.Foreground) == 1 && pi.Foreground[0].PID == pi.ShellPID, nil
 }
