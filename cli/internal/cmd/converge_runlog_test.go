@@ -378,3 +378,47 @@ func TestMarkPrefixLen(t *testing.T) {
 		}
 	}
 }
+
+// A console that stopped reading fills the pipe, and a mark written into a
+// full pipe never returns. sync must still return within drainTimeout, and
+// then stay off: every later line would otherwise wait drainTimeout too.
+func TestRunCapture_SyncIsBoundedWhenThePipeIsFull(t *testing.T) {
+	rOut, wOut, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rErr, wErr, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for _, f := range []*os.File{wOut, wErr, rOut, rErr} {
+			_ = f.Close()
+		}
+	})
+	// Nothing reads rOut: a pump blocked on its console. Fill the pipe.
+	go func() { _, _ = wOut.Write(make([]byte, 4<<20)) }()
+	time.Sleep(100 * time.Millisecond)
+	c := &runCapture{wOut: wOut, wErr: wErr, reached: make(chan struct{}, 1)}
+
+	done := make(chan time.Duration, 1)
+	go func() {
+		start := time.Now()
+		c.sync()
+		done <- time.Since(start)
+	}()
+	select {
+	case took := <-done:
+		if took < drainTimeout/2 {
+			t.Errorf("sync returned after %v; it cannot have waited for a mark it could not write", took)
+		}
+	case <-time.After(drainTimeout + 3*time.Second):
+		t.Fatal("sync blocked on a full pipe past drainTimeout")
+	}
+
+	start := time.Now()
+	c.sync()
+	if took := time.Since(start); took > 100*time.Millisecond {
+		t.Errorf("a barrier that timed out must stay off; the next sync took %v", took)
+	}
+}

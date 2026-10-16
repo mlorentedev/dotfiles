@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -89,9 +90,12 @@ type runCapture struct {
 	// until each pump has copied everything ahead of it. mu serialises sync
 	// with itself and with stop; sent counts the marks written per pipe and
 	// seen the marks each pump has reached, so a mark acknowledged after its
-	// sync timed out is never read as the next one's.
+	// sync timed out is never read as the next one's. A barrier that timed out
+	// or failed is off for the rest of the run: a console that stopped
+	// reading would otherwise cost every later line drainTimeout.
 	mu      sync.Mutex
 	stopped bool
+	off     bool
 	sent    int64
 	seen    [2]atomic.Int64
 	reached chan struct{}
@@ -176,24 +180,36 @@ func markPrefixLen(p []byte) int {
 
 // sync returns once everything written to the captured stdout and stderr
 // before it was called has reached the console and the transcript, so a line
-// printed next lands after it (CLI-116). Bounded by drainTimeout, like stop: a
-// pump blocked on a console that stopped reading must not hang the run.
+// printed next lands after it (CLI-116). Bounded by drainTimeout, like stop,
+// and the bound covers the marks' writes too: with a pump blocked on a console
+// that stopped reading, the pipe fills and a write into it never returns. That
+// write finishes or fails in its goroutine once stop closes the pipe.
 func (c *runCapture) sync() {
 	if c == nil {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.stopped {
+	if c.stopped || c.off {
 		return
 	}
-	_, errOut := io.WriteString(c.wOut, syncMark)
-	_, errErr := io.WriteString(c.wErr, syncMark)
-	if errOut != nil || errErr != nil {
+	c.off = true // until the barrier is known to have held
+	wrote := make(chan error, 1)
+	go func() {
+		_, errOut := io.WriteString(c.wOut, syncMark)
+		_, errErr := io.WriteString(c.wErr, syncMark)
+		wrote <- errors.Join(errOut, errErr)
+	}()
+	deadline := time.After(drainTimeout)
+	select {
+	case err := <-wrote:
+		if err != nil {
+			return
+		}
+	case <-deadline:
 		return
 	}
 	c.sent++
-	deadline := time.After(drainTimeout)
 	for c.seen[0].Load() < c.sent || c.seen[1].Load() < c.sent {
 		select {
 		case <-c.reached:
@@ -201,6 +217,7 @@ func (c *runCapture) sync() {
 			return
 		}
 	}
+	c.off = false
 }
 
 // stop restores stdout and stderr and waits, bounded, for the pipes to drain.
