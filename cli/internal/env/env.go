@@ -109,10 +109,15 @@ func Home() string {
 // <home>/.local/state/dotfiles. It is always absolute: when no absolute home
 // resolves, it is an error, never a path under the working directory.
 func StateDir() (string, error) {
-	if x := os.Getenv("XDG_STATE_HOME"); x != "" && filepath.IsAbs(x) {
+	return StateDirFor(os.Getenv, Home())
+}
+
+// StateDirFor is StateDir from a caller's own environment and home, for a
+// command whose environment is a seam (doctor's System, converge's Env).
+func StateDirFor(getenv func(string) string, home string) (string, error) {
+	if x := getenv("XDG_STATE_HOME"); x != "" && filepath.IsAbs(x) {
 		return filepath.Join(x, "dotfiles"), nil
 	}
-	home := Home()
 	if !filepath.IsAbs(home) {
 		return "", fmt.Errorf("cannot place dotf's state: no absolute home from HOME, USERPROFILE or the user database (got %q); set XDG_STATE_HOME or HOME", home)
 	}

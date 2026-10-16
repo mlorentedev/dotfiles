@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 // configsDeploy converges every ai/deploy.json entry that applies to this
@@ -39,6 +40,10 @@ func (r configsDeploy) run(env Env, dryRun bool) (deploy.RunResult, error) {
 	if err != nil {
 		return deploy.RunResult{}, err
 	}
+	records, err := deploy.MergeRecords(man.Configs, func() (string, error) { return envpkg.StateDirFor(os.Getenv, env.Home) })
+	if err != nil {
+		return deploy.RunResult{}, err
+	}
 	return deploy.Run(man, man.Configs, deploy.RunOptions{
 		RepoRoot:  env.RepoRoot,
 		Home:      env.Home,
@@ -47,6 +52,7 @@ func (r configsDeploy) run(env Env, dryRun bool) (deploy.RunResult, error) {
 		Render:    r.render,
 		Available: r.has,
 		DryRun:    dryRun,
+		Records:   records,
 	})
 }
 
