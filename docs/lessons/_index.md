@@ -476,4 +476,5 @@ tags: [lessons, index, dotfiles]
 | [455 - An empty lookup key matches the newest row, and a queue head must be ready to land](lesson-455-an-empty-key-matches-the-newest-row-and-a-head-must-be-ready-to-land.md) | 2026-10-16 |
 | [456 - A hand-off decides from a read and acts later, so it must name what it saw](lesson-456-a-handoff-decides-from-a-read-and-acts-later-so-name-what-it-saw.md) | 2026-10-16 |
 | [457 - A shared oracle is only shared where the production wiring supplies it](lesson-457-a-shared-oracle-is-only-shared-where-the-production-wiring-supplies-it.md) | 2026-10-16 |
+| [458 - A Go reader that predicts an awk reader cannot use bufio.Scanner](lesson-458-a-go-reader-that-predicts-an-awk-reader-cannot-use-bufio-scanner.md) | 2026-10-16 |
 <!-- END GENERATED -->
