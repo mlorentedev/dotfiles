@@ -103,7 +103,7 @@ func TestDoneRefusesWhenSessionsCannotBeInspected(t *testing.T) {
 	if err := os.WriteFile(notADir, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, ClaudeProjectsDir: notADir}
+	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Sessions: SessionStores{ClaudeProjects: notADir}}
 	if _, err := Done(opts); err == nil || !strings.Contains(err.Error(), "cannot tell") {
 		t.Fatalf("got %v, want a refusal saying the sessions could not be inspected", err)
 	}
@@ -117,7 +117,7 @@ func TestDoneRefusesARecentSessionUnlessIgnored(t *testing.T) {
 	stubMergedPRHeads(t, nil, nil)
 	projects := t.TempDir()
 	fakeTranscript(t, projects, wtDir, time.Hour)
-	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, ClaudeProjectsDir: projects}
+	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Sessions: SessionStores{ClaudeProjects: projects}}
 
 	_, err := Done(opts)
 	if err == nil || !strings.Contains(err.Error(), "--ignore-recent-session") {
@@ -165,7 +165,7 @@ func TestSweepSkipsAWorktreeWithARecentSession(t *testing.T) {
 		},
 		OnWorktreeRemove: func(_, path string) error { reaped = append(reaped, path); return nil },
 	}
-	opts := SweepOptions{RepoRoot: mainRepo, LockPath: filepath.Join(tmpDir, "sweep.lock"), ClaudeProjectsDir: projects}
+	opts := SweepOptions{RepoRoot: mainRepo, LockPath: filepath.Join(tmpDir, "sweep.lock"), Sessions: SessionStores{ClaudeProjects: projects}}
 	report, err := SweepWithRunner(opts, runner, now)
 	if err != nil {
 		t.Fatal(err)

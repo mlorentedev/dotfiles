@@ -87,14 +87,14 @@ func TestMigrateSkipsWhatItMustNotMove(t *testing.T) {
 		{"recent session", func(t *testing.T, repo, legacy, root string) MigrateOptions {
 			projects := t.TempDir()
 			fakeTranscript(t, projects, resolvedPath(legacy), time.Hour)
-			return MigrateOptions{ClaudeProjectsDir: projects}
+			return MigrateOptions{Sessions: SessionStores{ClaudeProjects: projects}}
 		}, "Claude Code session"},
 		{"sessions unreadable", func(t *testing.T, repo, legacy, root string) MigrateOptions {
 			notADir := filepath.Join(t.TempDir(), "projects")
 			if err := os.WriteFile(notADir, nil, 0o644); err != nil {
 				t.Fatal(err)
 			}
-			return MigrateOptions{ClaudeProjectsDir: notADir}
+			return MigrateOptions{Sessions: SessionStores{ClaudeProjects: notADir}}
 		}, "could not be inspected"},
 		{"locked", func(t *testing.T, repo, legacy, root string) MigrateOptions {
 			_ = exec.Command("git", "-C", repo, "worktree", "lock", legacy).Run()

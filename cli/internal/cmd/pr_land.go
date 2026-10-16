@@ -25,7 +25,7 @@ import (
 var errNotLanded = errors.New("pr land: not merged")
 
 // prLandOptions builds the GitHub wiring; tests replace it.
-var prLandOptions = func(repo, registry string) prland.Options {
+var prLandOptions = func(repo string, registry registryLoader) prland.Options {
 	return prland.Options{
 		Repo: repo,
 		Run: func(ctx context.Context, args ...string) ([]byte, error) {
@@ -33,7 +33,7 @@ var prLandOptions = func(repo, registry string) prland.Options {
 			return out, execerr.WithStderr(err)
 		},
 		Untriaged: func(ctx context.Context) ([]int, error) {
-			reg, err := prtriage.LoadRegistry(registry)
+			reg, err := registry(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -109,7 +109,7 @@ with a note.`,
 			if err != nil {
 				return err
 			}
-			o := prLandOptions(repo, reviewerRegistryPath(c, registry))
+			o := prLandOptions(repo, reviewerRegistry(repo, registry))
 			o.Wait, o.UpdateBranch, o.UnknownWait = wait, update, unknownWait
 			release, err := lockLand(c, o)
 			if err != nil {

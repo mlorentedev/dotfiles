@@ -31,9 +31,26 @@ RESULT agy PASS: `--agent agy`; with the worktrees root trusted (#2536; the firs
 - [x] AC1 -> `TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument`, `TestLaneExec_HandsTheAgentTheFilePromptAsOneArgument`, real launches above
 - [x] AC2 -> `TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone` (the interface has no remove method)
 - [x] AC3 -> `TestQueue_NextIsTheFirstOpenUnassignedIssueAndIsStable`, `TestNext_RunTwiceStartsOneAgent`, live second run above
-- [x] AC4 -> `TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused`
-- [x] AC5 -> `TestNext_NoBackendPrintsTheCommands`, `TestNext_NoBackendDryRunWritesNoPrompt`
+- [x] AC4 -> `TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused`, `TestLane_RefusalsAreShownOnStderr` (the refusal text reaches stderr; round 1 found it swallowed)
+- [x] AC5 -> `TestNext_NoBackendPrintsTheCommands` (path pinned to `worktree.ResolveWorktreePath` under an off-default root), `TestNext_NoBackendAndNoAgentPrintsAPlaceholder`, `TestNext_NoBackendWithoutAWorktreeRootRefuses`, `TestNext_NoBackendDryRunWritesNoPrompt`
 - [x] AC6 -> claude, pi and agy PASS (agy needs #2536 on a machine that lacks the root in its trust list)
+
+## Review round 1 (FAIL at ff0b1612): dispositions
+
+Review: `review.md` (merged via #2573). Fixes in the PR that carries this section.
+
+- Blocker, errors swallowed: applied. `SilenceErrors` removed from `lane exec` and `lane next`; `TestLane_RefusalsAreShownOnStderr` asserts the text on stderr. Mutation: restoring `SilenceErrors` fails it. Live: `dotf lane exec --agent copilot ...` prints `Error: lane: no launch command for agent "copilot" (known: agy, claude, pi)`, exit 1.
+- Major, AC5 with no backend and no `--agent`: applied in code, contract text unchanged. The commands print with `--agent <agy|claude|pi>` and a note to fill it; no harness is privileged by a default. If the re-review rules a placeholder is not "the commands", AC5 is reworded to require `--agent`.
+- Major, printed worktree path: applied. `manualCommands` builds the path from `WORKTREE_ROOT` and `worktree.ResolveWorktreePath`, and refuses when the root does not resolve instead of printing a path in another tree.
+- Major, `dotf` without `lane` on a pane's PATH: resolved by the release, not by code. 0.71.0 (#2520) merged 2026-10-16T00:52Z and `dotf --version` reports 0.71.0 with `dotf lane --help` answering. The first lane run on a release binary is the AC6 re-run of the next review.
+- Major, silent bare-`dotf` substitution: applied. An untypeable binary path puts a note in the outcome (`TestNext_ASubstitutedBinaryIsSaidSo`); a failed `os.Executable()` is reported on stderr.
+- Minor, `base` without a slash: applied. `LoadConfig` rejects it (`TestLoadConfig_BaseMustNameARemoteAndABranch`).
+- Minor, `Handoff` and `runLaneNext` over 40 lines: applied. Both measured at 39 (were 72 and 51).
+- Minors, Find->Create race, create-then-type stall, slug collisions: ticketed as #2576 with root cause and fix options. The race may be subsumed by the atomic claim of CLI-128 (#2551).
+- Minor, stale boxes: applied. `proposal.md` ACs and `tasks.md` Closing ticked after the gate re-ran green.
+- Question (a), who set `passing` in `features.json`: the author wrote `state` and `evidence` by hand although `tasks.md` reserves it to the harness. Each of the six commands was re-run by the reviewer and passes; the states are left as they stood and the harness re-captures them on the next `dotf spec review`. Not repeated in this round: only two `verification` commands were extended (f4, f5), no state edited.
+- Question (b), CLI-118 without `review.md`: that spec's own archive gate; not acted on here.
+- Not re-measured live: with the queue now all closed or held, `lane next --dry-run` prints "nothing to hand off", so the no-backend commands are covered by the unit tests above and not by a live run.
 
 ## Test status
 

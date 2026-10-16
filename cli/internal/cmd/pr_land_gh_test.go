@@ -22,7 +22,7 @@ func TestPrLandGhRunnerKeepsGhsStderr(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
-	_, err := prLandOptions("o/r", "").Run(context.Background(), "pr", "update-branch", "1")
+	_, err := prLandOptions("o/r", nil).Run(context.Background(), "pr", "update-branch", "1")
 	if err == nil || !strings.Contains(err.Error(), "GraphQL: Head branch was modified") {
 		t.Errorf("pr land's gh runner error = %v; want gh's stderr in it", err)
 	}

@@ -101,21 +101,30 @@ type Status struct {
 	Reason   string    // human-readable, always set
 }
 
+// RegistryPath is where a repository keeps its reviewer registry.
+const RegistryPath = "harness/review-attestation.json"
+
 // LoadRegistry reads the reviewer registry from disk.
 func LoadRegistry(path string) (Registry, error) {
-	var r Registry
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return r, fmt.Errorf("read reviewer registry: %w", err)
+		return Registry{}, fmt.Errorf("read reviewer registry: %w", err)
 	}
+	return ParseRegistry(raw, path)
+}
+
+// ParseRegistry checks a registry's bytes, wherever they came from; source
+// names them in the errors.
+func ParseRegistry(raw []byte, source string) (Registry, error) {
+	var r Registry
 	if err := json.Unmarshal(raw, &r); err != nil {
-		return r, fmt.Errorf("parse reviewer registry %s: %w", path, err)
+		return r, fmt.Errorf("parse reviewer registry %s: %w", source, err)
 	}
 	if strings.TrimSpace(r.Triage.Marker) == "" {
 		// Fail toward "cannot tell", never toward "nothing pending". An empty
 		// marker would match every comment and silently empty the queue, which
 		// is the shape of failure this repo has spent a week cataloguing.
-		return r, fmt.Errorf("reviewer registry %s declares no triage.marker", path)
+		return r, fmt.Errorf("reviewer registry %s declares no triage.marker", source)
 	}
 	return r, nil
 }

@@ -95,3 +95,33 @@ func TestLaneNext_DryRunNamesTheNextIssueAndChangesNothing(t *testing.T) {
 		}
 	}
 }
+
+// A refusal reaches the terminal: with the error silenced, a successor's pane
+// died at a blank prompt (exit 1, nothing printed). The text a person needs is
+// the one the error carries, so assert it on stderr and not only in the return.
+func TestLane_RefusalsAreShownOnStderr(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "p.md")
+	if err := os.WriteFile(f, []byte("go"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"unknown agent":       {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, `no launch command for agent "copilot"`},
+		"known agents listed": {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, "agy, claude, pi"},
+		"missing prompt":      {[]string{"exec", "--agent", "claude", "--prompt-file", f + ".missing"}, "lane exec:"},
+	} {
+		root := New("test", "test")
+		var stderr strings.Builder
+		root.SetOut(new(strings.Builder))
+		root.SetErr(&stderr)
+		root.SetArgs(append([]string{"lane"}, tc.args...))
+		if err := root.Execute(); err == nil {
+			t.Fatalf("%s: want an error", name)
+		}
+		if !strings.Contains(stderr.String(), tc.want) {
+			t.Errorf("%s: stderr = %q, want it to contain %q", name, stderr.String(), tc.want)
+		}
+	}
+}
