@@ -1,14 +1,13 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: 36e875828f9a7762
+generated_sha: dfdfb9bec5bf5325
 id: crystallize-skill
 type: skill
 status: active
 created: '2026-05-30'
 owner: manu
 name: crystallize
-targets: [claude]
 description: Use when /insights shows unpersisted decisions, stale MEMORY.md, or
   after completing a significant sprint. Addresses knowledge gaps between session
   journals and vault lessons.

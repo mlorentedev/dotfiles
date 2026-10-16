@@ -80,3 +80,21 @@ run_guard() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"architect: bundles 2 skill(s)"* ]] || false
 }
+
+# #2583: the vault's catalog sync rewrote every row from `**curator**` to a wikilink
+# whose pipe is escaped for the table, and the guard then reported all six personas
+# as having no row. The row's typography is not drift; the skills are.
+@test "roster: a wikilink persona cell (the catalog sync form) is read like a bold one" {
+    roster '| [[00_meta/agents/definitions/curator/AGENT\|curator]] | Crystallize | handoff, crystallize, insights |'
+    definition curator '[crystallize, insights, handoff]'
+    run_guard
+    [ "$status" -eq 0 ]
+}
+
+@test "roster: a wikilink persona cell still reports real drift, naming the role" {
+    roster '| [[00_meta/agents/definitions/curator/AGENT\|curator]] | Crystallize | handoff, crystallize, insights |'
+    definition curator '[crystallize, handoff, vault-doctor]'
+    run_guard
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"curator: skills diverge"* ]] || false
+}

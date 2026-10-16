@@ -381,7 +381,8 @@ seed_skills_fixture() {
                 { "agent": "opencode", "render": "command", "dir": ".config/opencode/commands" },
                 { "agent": "agy",      "render": "skill",   "dir": ".gemini/skills" },
                 { "agent": "agy",      "render": "prompt",  "dir": ".gemini/prompts" },
-                { "agent": "copilot",  "render": "skill",   "dir": ".copilot/skills" } ],
+                { "agent": "copilot",  "render": "skill",   "dir": ".copilot/skills" },
+                { "agent": "pi",       "render": "skill",   "dir": ".pi/agent/skills" } ],
     "catalog": { "agent": "copilot", "file": ".copilot/copilot-instructions.md" } } }
 EOF
     cat > "$REPO/harness/skill-frontmatter.schema.json" <<'EOF'
@@ -575,6 +576,9 @@ EOF
     [ ! -d "$FAKEHOME/.gemini/skills/claude-only" ]
     [ ! -f "$FAKEHOME/.gemini/prompts/claude-only.md" ]
     [ ! -d "$FAKEHOME/.copilot/skills/claude-only" ]
+    # AI-022: pi is a target too, and a Claude-only skill must stay out of it
+    [ -f "$FAKEHOME/.pi/agent/skills/demo-skill/SKILL.md" ]
+    [ ! -d "$FAKEHOME/.pi/agent/skills/claude-only" ]
 }
 
 @test "AC1: --deploy prunes an output whose skill dropped this agent from targets[]" {
