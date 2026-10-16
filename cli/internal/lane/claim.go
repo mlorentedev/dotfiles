@@ -63,6 +63,8 @@ type Claimer struct {
 type Claims interface {
 	Acquire(issue int) (Claim, error)
 	Held(issue int) (bool, error)
+	// Release gives back a claim this hand-off took and could not use.
+	Release(issue int, force bool) error
 }
 
 func claimRef(issue int) string  { return claimRefPrefix + strconv.Itoa(issue) }
@@ -130,21 +132,36 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 
 // Held says whether anybody holds the claim on issue, without reading who.
 func (c Claimer) Held(issue int) (bool, error) {
-	out, err := c.git("ls-remote", c.Remote, claimRef(issue))
+	sha, err := c.remoteSha(issue)
+	return sha != "", err
+}
+
+// remoteSha is the sha the claim ref points at on the remote, or "" when it
+// does not exist. ls-remote matches a pattern by its tail, so the answer is
+// kept only for the exact ref: a branch that happens to end the same way is not
+// a claim.
+func (c Claimer) remoteSha(issue int) (string, error) {
+	ref := claimRef(issue)
+	out, err := c.git("ls-remote", c.Remote, ref)
 	if err != nil {
-		return false, fmt.Errorf("ls-remote %s: %w", claimRef(issue), err)
+		return "", fmt.Errorf("ls-remote %s: %w", ref, err)
 	}
-	return strings.TrimSpace(out) != "", nil
+	for _, line := range strings.Split(out, "\n") {
+		if sha, name, ok := strings.Cut(strings.TrimSpace(line), "\t"); ok && name == ref {
+			return sha, nil
+		}
+	}
+	return "", nil
 }
 
 // Holder reads the claim on issue. The bool is false when nobody holds it.
 func (c Claimer) Holder(issue int) (Claim, bool, error) {
 	ref := claimRef(issue)
-	out, err := c.git("ls-remote", c.Remote, ref)
+	sha, err := c.remoteSha(issue)
 	if err != nil {
-		return Claim{}, false, fmt.Errorf("ls-remote %s: %w", ref, err)
+		return Claim{}, false, err
 	}
-	if strings.TrimSpace(out) == "" {
+	if sha == "" {
 		return Claim{}, false, nil
 	}
 	// The claim commit carries the holder, so read it into a private ref

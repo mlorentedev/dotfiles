@@ -17,7 +17,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC6 -> `TestClaimIsInvisibleToADefaultClone`
 ### PR 2 (wiring)
 
-- [x] AC4 -> `TestHandoffClaimsBeforeItStarts`, `TestHandoffSkipsToTheNextFreeItemOnALoss`, `TestHandoffStartsNothingWhenEveryItemIsClaimed`, `TestHandoffFailsClosedWhenTheClaimCannotBeTaken`, `TestHandoffDoesNotClaimAWorktreeThatExists`, `TestHandoffDryRunTakesNoClaimButSkipsAHeldItem`
+- [x] AC4 -> `TestHandoffClaimsBeforeItStarts`, `TestHandoffSkipsToTheNextFreeItemOnALoss`, `TestHandoffStartsNothingWhenEveryItemIsClaimed`, `TestHandoffFailsClosedWhenTheClaimCannotBeTaken`, `TestHandoffDoesNotClaimAWorktreeThatExists`, `TestHandoffDryRunTakesNoClaimButSkipsAHeldItem`, `TestHandoffReleasesTheClaimWhenTheLaneDoesNotStart` (review finding: a failed start must not leak the claim), `TestClaimIgnoresARefThatOnlyEndsLikeTheClaim` (`ls-remote` matches by tail)
 - [x] AC5 -> `TestLaneRelease` (real git, two checkouts), primitive `TestClaimRelease`
 - [ ] AC7 (forge probe) -> PR 3
 

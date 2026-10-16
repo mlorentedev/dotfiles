@@ -145,6 +145,14 @@ func handoffIssue(o Options, b Backend, issue Issue) (out Outcome, lost string, 
 		return out, "", nil
 	}
 	if err := launch(o, b, wt, found, out, p); err != nil {
+		// The claim was taken for a lane that did not start: give it back, or
+		// every later run skips an issue nobody is working on. A worktree that
+		// was created survives, and the next run finds it.
+		if !found && o.Claims != nil && !o.DryRun {
+			if rerr := o.Claims.Release(issue.Number, false); rerr != nil {
+				err = errors.Join(err, fmt.Errorf("lane: the claim on #%d could not be released (run `dotf lane release %d`): %w", issue.Number, issue.Number, rerr))
+			}
+		}
 		return out, "", err
 	}
 	out.Started, out.Note = true, p.note

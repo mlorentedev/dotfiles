@@ -32,6 +32,11 @@ func (f *fakeClaims) Acquire(n int) (Claim, error) {
 	return Claim{Issue: n}, nil
 }
 
+func (f *fakeClaims) Release(n int, force bool) error {
+	f.record("release " + itoa(n))
+	return nil
+}
+
 func (f *fakeClaims) Held(n int) (bool, error) {
 	f.record("held " + itoa(n))
 	_, ok := f.held[n]
@@ -140,6 +145,7 @@ type failingClaims struct{}
 
 func (failingClaims) Acquire(int) (Claim, error) { return Claim{}, errors.New("remote unreachable") }
 func (failingClaims) Held(int) (bool, error)     { return false, errors.New("remote unreachable") }
+func (failingClaims) Release(int, bool) error    { return errors.New("remote unreachable") }
 
 // A branch a workspace already shows was claimed when it was started: a second
 // run must not read its own earlier claim as a loss and move to the next item.
@@ -174,5 +180,27 @@ func TestHandoffDryRunTakesNoClaimButSkipsAHeldItem(t *testing.T) {
 		if strings.HasPrefix(call, "acquire") {
 			t.Errorf("a dry run took a claim: %q", call)
 		}
+	}
+}
+
+// failingStart is a backend whose worktree cannot be created.
+type failingStart struct{ *fakeBackend }
+
+func (failingStart) Create(string, string, string, string) (Started, error) {
+	return Started{}, errors.New("herdr: no space left")
+}
+
+func TestHandoffReleasesTheClaimWhenTheLaneDoesNotStart(t *testing.T) {
+	b := failingStart{newFake(t, "claude")}
+	c := &fakeClaims{}
+	o := opts(t)
+	o.Claims = c
+
+	out, err := Handoff(o, b, queue)
+	if err == nil || out.Started {
+		t.Fatalf("Handoff = %+v, %v; want the launch error", out, err)
+	}
+	if !reflect.DeepEqual(c.calls, []string{"acquire 7", "release 7"}) {
+		t.Errorf("claims = %q, want the claim given back after the failed start", c.calls)
 	}
 }

@@ -215,3 +215,22 @@ func TestClaimedErrorWithoutATimeSaysSo(t *testing.T) {
 		t.Errorf("message %q must say the time is unknown, not print the zero time", msg)
 	}
 }
+
+// ls-remote matches a pattern by its tail: a branch that ends like a claim ref
+// must not read as one.
+func TestClaimIgnoresARefThatOnlyEndsLikeTheClaim(t *testing.T) {
+	remote := claimRemote(t)
+	a := claimerIn(t, remote, "ana@box-a")
+	claimGit(t, a.Dir, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "seed")
+	claimGit(t, a.Dir, "push", "-q", "origin", "HEAD:refs/heads/x/refs/dotf/claims/7")
+
+	if held, err := a.Held(7); err != nil || held {
+		t.Errorf("Held(7) = (%v, %v) with only a look-alike branch, want (false, nil)", held, err)
+	}
+	if _, ok, err := a.Holder(7); err != nil || ok {
+		t.Errorf("Holder(7) = (%v, %v) with only a look-alike branch, want none", ok, err)
+	}
+	if _, err := a.Acquire(7); err != nil {
+		t.Errorf("Acquire(7) = %v, want a win: nobody holds it", err)
+	}
+}
