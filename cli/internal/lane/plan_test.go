@@ -194,6 +194,13 @@ func TestPlanResolversDoWhatTheyPromise(t *testing.T) {
 			t.Errorf("kind=%s resolve=%q reason=%q, want a flag, no command, the reason", a.Kind, a.Resolve, a.Reason)
 		}
 	})
+	t.Run("a cost is named only where a command is offered", func(t *testing.T) {
+		r := row("fix/g", PhaseLanded, func(r *Row) { r.Path, r.Live, r.Dirty = "/wt/a$b/g", LiveYes, true })
+		a := find(t, Plan([]Row{r}, nil, phaseNow), "fix/g")
+		if a.Resolve != "" || strings.Contains(a.Reason, "strands") || strings.Contains(a.Reason, "discards") {
+			t.Errorf("resolve=%q reason=%q, want no command and no warning about one", a.Resolve, a.Reason)
+		}
+	})
 	t.Run("a dirty row says the command discards uncommitted changes", func(t *testing.T) {
 		r := row("fix/f", PhaseStalled, func(r *Row) { r.Path, r.Dirty = "/wt/f", true })
 		if a := find(t, Plan([]Row{r}, nil, phaseNow), "fix/f"); !strings.Contains(a.Reason, "discards its uncommitted changes") {

@@ -84,7 +84,7 @@ func phaseWhy(p Phase) string {
 // the worktree, so the yes is an explicit one, and a reason that names what the
 // command loses.
 func abandon(r Row, why string) Action {
-	return abandonWith(r, why, "dotf worktree done --force ")
+	return abandonWith(r, why, "dotf worktree done --force ", "")
 }
 
 // abandonLive is abandon for a worktree someone may be inside. done refuses a
@@ -92,15 +92,23 @@ func abandon(r Row, why string) Action {
 // that resolves the row carries the one flag that overrides it, and the reason
 // says what that costs.
 func abandonLive(r Row, why string) Action {
-	return abandonWith(r, why+"; removing it strands a session that may be resumed", "dotf worktree done --force --ignore-recent-session ")
+	return abandonWith(r, why, "dotf worktree done --force --ignore-recent-session ", "removing it strands a session that may be resumed")
 }
 
-func abandonWith(r Row, why, cmd string) Action {
-	if r.Dirty {
-		why += "; the command discards its uncommitted changes"
+// abandonWith names what the command costs only when there is a command: a
+// reason that warns about nothing offered reads as a defect.
+func abandonWith(r Row, why, cmd, cost string) Action {
+	a := Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket}
+	a.Resolve, a.Reason = withPath(cmd, r.Path, why)
+	if a.Resolve == "" {
+		return a
 	}
-	a := Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket, Reason: why}
-	a.Resolve, a.Reason = withPath(cmd, r.Path, a.Reason)
+	if cost != "" {
+		a.Reason += "; " + cost
+	}
+	if r.Dirty {
+		a.Reason += "; the command discards its uncommitted changes"
+	}
 	return a
 }
 
