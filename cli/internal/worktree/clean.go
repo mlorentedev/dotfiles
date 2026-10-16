@@ -67,9 +67,15 @@ func isDisposableDirectoryPath(path string) bool {
 
 // IsDisposableIgnoredPath checks if an ignored relative path is disposable (e.g. build cache, metadata).
 func IsDisposableIgnoredPath(relPath string) bool {
-	clean := filepath.ToSlash(strings.TrimSpace(relPath))
+	clean := strings.TrimSpace(relPath)
 	clean = strings.TrimPrefix(clean, "!! ")
-	clean = strings.TrimSpace(clean)
+	return isDisposableExactPath(strings.TrimSpace(clean))
+}
+
+// isDisposableExactPath classifies a path exactly as git spelled it: no
+// whitespace is trimmed, so " node_modules" is not node_modules.
+func isDisposableExactPath(relPath string) bool {
+	clean := filepath.ToSlash(relPath)
 	clean = strings.TrimPrefix(clean, "./")
 	clean = strings.TrimSuffix(clean, "/")
 
@@ -93,20 +99,30 @@ func HasNonDisposableIgnored(porcelainOutput string) bool {
 // NonDisposableIgnored lists, in git's order, the ignored paths in
 // `git status --ignored --porcelain` output that are not known build output.
 // Entries are NUL-separated when the output came from -z, which leaves paths
-// unquoted, and newline-separated otherwise.
+// unquoted and exact, so nothing is trimmed from them: a name with a leading
+// or trailing space is classified, and reported, as git spelled it. Output
+// without -z is newline-separated and trimmed.
 func NonDisposableIgnored(porcelainOutput string) []string {
+	exact := strings.Contains(porcelainOutput, "\x00")
 	sep := "\n"
-	if strings.Contains(porcelainOutput, "\x00") {
+	if exact {
 		sep = "\x00"
 	}
 	var paths []string
-	for _, line := range strings.Split(porcelainOutput, sep) {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "!! ") {
+	for _, entry := range strings.Split(porcelainOutput, sep) {
+		if !exact {
+			entry = strings.TrimSpace(entry)
+		}
+		relPath, ok := strings.CutPrefix(entry, "!! ")
+		if !ok {
 			continue
 		}
-		relPath := strings.TrimSpace(strings.TrimPrefix(line, "!!"))
-		if !IsDisposableIgnoredPath(relPath) {
+		disposable := isDisposableExactPath(relPath)
+		if !exact {
+			relPath = strings.TrimSpace(relPath)
+			disposable = IsDisposableIgnoredPath(relPath)
+		}
+		if !disposable {
 			paths = append(paths, relPath)
 		}
 	}

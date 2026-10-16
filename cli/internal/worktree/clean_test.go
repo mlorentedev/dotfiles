@@ -98,6 +98,16 @@ func TestNonDisposableIgnoredNamesThePaths(t *testing.T) {
 	}
 }
 
+// -z output is exact, so a name is classified and reported as git spelled it:
+// " node_modules/" is somebody's file, not build output (PR-Agent on #2601).
+func TestNonDisposableIgnoredKeepsExactNamesFromZ(t *testing.T) {
+	got := NonDisposableIgnored("!! node_modules/\x00!!  node_modules/\x00!! keep me \x00")
+	want := []string{" node_modules/", "keep me "}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("NonDisposableIgnored = %q, want %q", got, want)
+	}
+}
+
 func TestSummarizePathsCountsWhatItDoesNotName(t *testing.T) {
 	if got := summarizePaths([]string{"a", "b"}); got != "a, b" {
 		t.Errorf("summarizePaths(2) = %q", got)
