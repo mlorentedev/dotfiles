@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: fdc66791250765ae
+generated_sha: 0bcd7e7f6bd70223
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -47,6 +47,7 @@ physical: put the worktree where the parent repo cannot see it.
 ### 1. Default — `dotf worktree add`, under the one root
 
 ```bash
+repo_root="$(git rev-parse --show-toplevel)"  # Gates A and B read it
 dotf worktree add "$SLUG" -b "<type>/$SLUG"    # e.g. feat/research-agents
 ```
 
@@ -65,9 +66,13 @@ A worktree made another way (herdr, a bare `git worktree add`) shows as `UNADOPT
 
 ```bash
 root="${WORKTREE_ROOT:-$HOME/Projects/worktrees}"
-project="$(basename "$(git rev-parse --show-toplevel)")"
-path="$root/$project/$SLUG"                    # OUTSIDE every repo's working tree
+# the repository, not the worktree you may be in: --show-toplevel answers the worktree
+project="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+wt_path="$root/$project/$SLUG"                 # OUTSIDE every repo's working tree
 ```
+
+The variable is `wt_path`, never `path`: in zsh `path` is tied to `$PATH`, so assigning
+it empties the command search path and every later command fails as "not found".
 
 Any location is acceptable **as long as it is outside every repo's working tree.**
 
@@ -98,7 +103,7 @@ Both checks MUST pass:
 
 ```bash
 # 1. The new worktree must NOT appear in the parent repo's status.
-git -C "$repo_root" status --porcelain | grep -q "$(basename "$path")" && echo "LEAK: visible in parent status"
+git -C "$repo_root" status --porcelain | grep -q "$(basename "$wt_path")" && echo "LEAK: visible in parent status"
 
 # 2. No worktree path may be tracked as a gitlink (mode 160000) in the parent index.
 git -C "$repo_root" ls-files --stage | awk '$1==160000 {print "LEAK: gitlink ->", $4}'
@@ -113,8 +118,9 @@ to remove the gitlink. Do not proceed.
 ### 1. Create the worktree (new branch)
 
 ```bash
-dotf worktree add "$SLUG" -b "<type>/$SLUG"    # fallback: git worktree add "$path" -b "<type>/$SLUG"
-cd "$(git worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')"
+dotf worktree add "$SLUG" -b "<type>/$SLUG"    # fallback: git worktree add "$wt_path" -b "<type>/$SLUG"
+wt_path="$(git worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')"
+cd "$wt_path"                                  # asked of git, never derived
 ```
 
 With herdr running, `dotf worktree add … --agent <harness> --prompt-file <f>` opens it in
@@ -152,7 +158,7 @@ Ready to work in parallel.
 
 ```bash
 dotf worktree done "<type>/$SLUG"      # by branch; refuses while a session lives in it; deletes a landed branch
-# fallback: git worktree remove "$path" (add --force only if intentionally discarding work)
+# fallback: git worktree remove "$wt_path" (add --force only if intentionally discarding work)
 # If a nested fallback was ever used: remove its line from .git/info/exclude
 git -C "$repo_root" ls-files --stage | awk '$1==160000'   # must be empty
 git worktree prune
