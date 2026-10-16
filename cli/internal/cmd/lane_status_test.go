@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/spf13/cobra"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
@@ -119,12 +120,13 @@ func TestLaneStatus_NoLanesAndFailure(t *testing.T) {
 // plan prints each action with its class and, for an ambiguous one, the
 // command that resolves it; --json carries the actions and the landing order.
 func TestLanePlan_PrintsClassesAndResolvingCommands(t *testing.T) {
+	stubLandCheck(t, func(int) ([]string, error) { return nil, nil })
 	statusFixture(t)
 	out, err := runLaneOut(t, "plan")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"CLASS", "ambiguous", "flag", "fix/b", "landing order:", "#40 fix/2501-a", "dotf pr triage-queue --pr 40 && dotf pr land 40"} {
+	for _, want := range []string{"CLASS", "ambiguous", "flag", "fix/b", "landing order:", "#40 fix/2501-a", "ready: dotf pr triage-queue --pr 40 && dotf pr land 40"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("plan lacks %q:\n%s", want, out)
 		}
@@ -142,6 +144,31 @@ func TestLanePlan_PrintsClassesAndResolvingCommands(t *testing.T) {
 	}
 	if len(got.Actions) != 1 || got.Actions[0].Class != lane.ClassAmbiguous || len(got.Landing) != 1 || !got.Landing[0].Head {
 		t.Errorf("plan = %+v", got)
+	}
+}
+
+func stubLandCheck(t *testing.T, check lane.LandCheck) {
+	t.Helper()
+	prev := laneLandCheck
+	t.Cleanup(func() { laneLandCheck = prev })
+	laneLandCheck = func(*cobra.Command) lane.LandCheck { return check }
+}
+
+// The head's landing conditions are printed with the reasons that stand in the
+// way, and a reader that fails says the head was not checked, never ready.
+func TestLanePlan_PrintsTheHeadsLandingConditions(t *testing.T) {
+	statusFixture(t)
+	stubLandCheck(t, func(int) ([]string, error) {
+		return []string{"test-windows: pending", "reviewer output awaits triage"}, nil
+	})
+	out, err := runLaneOut(t, "plan")
+	if err != nil || !strings.Contains(out, "blocked: test-windows: pending; reviewer output awaits triage") || strings.Contains(out, "ready:") {
+		t.Errorf("blocked head printed %q, %v", out, err)
+	}
+	stubLandCheck(t, func(int) ([]string, error) { return nil, errors.New("HTTP 502") })
+	out, err = runLaneOut(t, "plan")
+	if err != nil || !strings.Contains(out, "not checked:") || strings.Contains(out, "ready:") {
+		t.Errorf("unreadable head printed %q, %v", out, err)
 	}
 }
 

@@ -205,6 +205,31 @@ func statusAHandNamedLaneIsNotAlsoPending(t *testing.T) {
 	}
 }
 
+// A draft is still being iterated on: it is in Review, but the lowest-numbered
+// ready PR, not the lowest draft, is what lands next.
+func statusADraftIsNeverTheLandingHead(t *testing.T) {
+	src := Sources{
+		Now: phaseNow,
+		List: func() ([]worktree.Info, error) {
+			return []worktree.Info{wt("fix/draft", leased(time.Hour)), wt("fix/ready", leased(time.Hour))}, nil
+		},
+		Forge: &fakeForge{prs: map[string]PRInfo{
+			"fix/draft": {Number: 10, State: PROpen, Draft: true},
+			"fix/ready": {Number: 20, State: PROpen},
+		}},
+		Live: func(string) Liveness { return LiveYes },
+	}
+	rows, err := Status(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for branch, want := range map[string]Phase{"fix/draft": PhaseReview, "fix/ready": PhaseLanding} {
+		if got := rowFor(t, rows, branch).Phase; got != want {
+			t.Errorf("%s: %q, want %q", branch, got, want)
+		}
+	}
+}
+
 // TestStatus is the one entry the spec's verification names; each scenario is a subtest.
 func TestStatus(t *testing.T) {
 	t.Run("OneRowPerLaneWithItsDerivedPhase", statusOneRowPerLaneWithItsDerivedPhase)
@@ -212,6 +237,7 @@ func TestStatus(t *testing.T) {
 	t.Run("UnknownLivenessReadsAsLiveForThePhase", statusUnknownLivenessReadsAsLiveForThePhase)
 	t.Run("LandingHeadIsPickedAmongReviewLanes", statusLandingHeadIsPickedAmongReviewLanes)
 	t.Run("AHandNamedLaneIsNotAlsoPending", statusAHandNamedLaneIsNotAlsoPending)
+	t.Run("ADraftIsNeverTheLandingHead", statusADraftIsNeverTheLandingHead)
 }
 
 // Combine never lets a probe that could not answer read as idle, and never lets

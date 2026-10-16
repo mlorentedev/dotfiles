@@ -41,6 +41,7 @@ func TestREST_NewestPullRequestDecidesTheState(t *testing.T) {
 	}{
 		{"no pull request", `[]`, PRInfo{}},
 		{"open", `[{"number":9,"state":"open","merged_at":null}]`, PRInfo{Number: 9, State: PROpen}},
+		{"an open draft", `[{"number":10,"state":"open","merged_at":null,"draft":true}]`, PRInfo{Number: 10, State: PROpen, Draft: true}},
 		{"merged", `[{"number":8,"state":"closed","merged_at":"2026-10-15T10:00:00Z"}]`, PRInfo{Number: 8, State: PRMerged}},
 		{"closed unmerged", `[{"number":7,"state":"closed","merged_at":null}]`, PRInfo{Number: 7, State: PRClosed}},
 		{"newest first: an open retry after a closed attempt", `[{"number":12,"state":"open","merged_at":null},{"number":7,"state":"closed","merged_at":null}]`, PRInfo{Number: 12, State: PROpen}},
@@ -53,6 +54,18 @@ func TestREST_NewestPullRequestDecidesTheState(t *testing.T) {
 				t.Errorf("PRFor = %+v, %v; want %+v", got, err, c.want)
 			}
 		})
+	}
+}
+
+// A detached worktree has no branch, and `head={owner}:` with nothing after it
+// matches every pull request: it must not be asked, or the newest PR of the
+// repository becomes this worktree's own (seen live: #2601 three times in the
+// landing order).
+func TestREST_ADetachedWorktreeHasNoPR(t *testing.T) {
+	var calls []string
+	got, err := REST{Run: pullsRunner(t, `[{"number":2601,"state":"open","merged_at":null}]`, nil, &calls)}.PRFor("")
+	if err != nil || got != (PRInfo{}) || len(calls) != 0 {
+		t.Errorf("PRFor(\"\") = %+v, %v after %d calls; want no PR and no request", got, err, len(calls))
 	}
 }
 

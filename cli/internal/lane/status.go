@@ -13,6 +13,9 @@ import (
 type PRInfo struct {
 	Number int
 	State  PRState
+	// Draft is an open pull request still being iterated on: it is in Review,
+	// but it is not what lands next.
+	Draft bool
 }
 
 // PRSource answers for one branch. It is asked once per branch per run: a
@@ -102,6 +105,7 @@ type Row struct {
 	// Meta is the lease, kept for plan's due times. It is not part of the
 	// status table: Lease already carries the expiry for a reader.
 	Meta  *worktree.Metadata `json:"-"`
+	Draft bool               `json:"draft,omitempty"`
 	Phase Phase              `json:"phase"`
 }
 
@@ -161,7 +165,7 @@ func (s Sources) onDiskLane(info worktree.Info, forge PRSource) (lane, error) {
 	live := s.Live(info.Path)
 	herdr := s.herdr(info.Branch)
 	f := Facts{Info: info, Exists: true, PR: pr.State, Live: live != LiveIdle, HerdrPresent: herdr != HerdrAbsent}
-	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Live: live, Herdr: herdr, Dirty: info.Dirty, State: info.State, StateReason: info.StateReason, Meta: info.Metadata, Ticket: ticketOf(info)}
+	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Draft: pr.Draft, Live: live, Herdr: herdr, Dirty: info.Dirty, State: info.State, StateReason: info.StateReason, Meta: info.Metadata, Ticket: ticketOf(info)}
 	if m := info.Metadata; m != nil {
 		r.Agent, r.Lease = m.Creator, m.LeaseExpiresAt.Format(time.RFC3339)
 	}
@@ -214,14 +218,14 @@ func (s Sources) herdr(branch string) string {
 	return HerdrListed
 }
 
-// markHead promotes the Review lane with the lowest PR number to Landing. It
+// markHead promotes the Review lane with the lowest PR number, drafts apart, to Landing. It
 // picks among the lanes that derived to Review, not among every open PR: an
 // unadopted worktree with an older PR is not in the landing order, and must
 // not take the head with it.
 func markHead(lanes []lane, now time.Time) {
 	head := -1
 	for i, l := range lanes {
-		if l.row.Phase == PhaseReview && (head < 0 || l.row.PR < lanes[head].row.PR) {
+		if l.row.Phase == PhaseReview && !l.row.Draft && (head < 0 || l.row.PR < lanes[head].row.PR) {
 			head = i
 		}
 	}

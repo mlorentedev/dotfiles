@@ -1,6 +1,7 @@
 package lane
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -171,4 +172,45 @@ func TestPlanQuotesTheResolvingCommand(t *testing.T) {
 	if a.Resolve != "" || !strings.Contains(a.Reason, "no shell quotes alike") {
 		t.Errorf("unquotable path: resolve=%q reason=%q, want no command and the reason", a.Resolve, a.Reason)
 	}
+}
+
+// The head's landing conditions come from the landing reader, for the head
+// only, and a reader that cannot answer leaves the head unchecked: it never
+// reads as clear.
+func TestCheckHead(t *testing.T) {
+	order := func() []Landing {
+		return []Landing{{PR: 20, Branch: "fix/a", Head: true}, {PR: 30, Branch: "fix/b"}}
+	}
+	t.Run("reads the head and only the head", func(t *testing.T) {
+		var asked []int
+		o := order()
+		CheckHead(o, func(pr int) ([]string, error) { asked = append(asked, pr); return []string{"test: pending"}, nil })
+		if len(asked) != 1 || asked[0] != 20 {
+			t.Errorf("asked %v, want only #20", asked)
+		}
+		if !o[0].Checked || len(o[0].Blockers) != 1 || o[1].Checked {
+			t.Errorf("order = %+v", o)
+		}
+	})
+	t.Run("a head with no blockers is checked and clear", func(t *testing.T) {
+		o := order()
+		CheckHead(o, func(int) ([]string, error) { return nil, nil })
+		if !o[0].Checked || len(o[0].Blockers) != 0 {
+			t.Errorf("head = %+v", o[0])
+		}
+	})
+	t.Run("a reader that fails leaves the head unchecked, with the reason", func(t *testing.T) {
+		o := order()
+		CheckHead(o, func(int) ([]string, error) { return nil, errors.New("HTTP 502") })
+		if o[0].Checked || len(o[0].Blockers) != 1 || !strings.Contains(o[0].Blockers[0], "HTTP 502") {
+			t.Errorf("head = %+v, want unchecked and the error named", o[0])
+		}
+	})
+	t.Run("no reader leaves the order as it was", func(t *testing.T) {
+		o := order()
+		CheckHead(o, nil)
+		if o[0].Checked || o[0].Blockers != nil {
+			t.Errorf("head = %+v", o[0])
+		}
+	})
 }
