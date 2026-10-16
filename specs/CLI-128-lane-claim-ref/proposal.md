@@ -25,7 +25,9 @@ A claim is the ref `refs/dotf/claims/<issue>` (form (a), accepted by the owner o
 
 - `lane.Claim` (new, `cli/internal/lane/claim.go`): `Acquire`, `Holder`, `Release` over a small `Git` seam, so the production path and the tests run the same code.
 - A loser gets a typed `ClaimedError` naming the holder and when it claimed, never a generic push failure.
-- `dotf lane next` claims the first free queued issue before it starts anything, sets the forge assignee after the claim wins (for people), and moves to the next free item when it loses. A loser starts nothing.
+- `dotf lane next` claims the first free queued issue before it creates anything, and moves to the next free item when it loses. A loser starts nothing, and a claim that cannot be read or taken starts nothing either (fail closed). A branch whose worktree already exists is not claimed again: it was claimed when it was started, and a second run must not read its own claim as a loss.
+- `lane next` does not set the forge assignee. `Next` skips assigned issues, so assigning would turn a second invocation for the same item into a second lane; the claim ref is the record, and `lane status` shows it.
+- The holder is the checkout (`user@host:<worktree>`), not the process: `lane claim` and a later `lane release` from one worktree are the same claimant, two sessions in two worktrees are not.
 - `dotf lane claim <issue>` and `dotf lane release <issue>` expose the same primitive to every harness, the autopilot skill included: one implementation, no Claude-only path.
 - `lane status` shows a claim and its age. A stale claim is a human decision, as adoption is (D2): `release --force` is the resolving command, never an automatic expiry.
 - The claim push skips the repository's pre-push hooks: it publishes no branch, and the spec gate reads a branch.
@@ -49,7 +51,7 @@ A claim is the ref `refs/dotf/claims/<issue>` (form (a), accepted by the owner o
 - [ ] AC1: Acquire on a free issue wins; a second Acquire of the same issue, with the same or another sha, is refused (real git, a local bare remote).
 - [ ] AC2: the refusal is a `ClaimedError` that names the holder and the time of the claim, read from the claim commit.
 - [ ] AC3: N concurrent Acquires of one issue produce exactly one winner.
-- [ ] AC4: `lane next` claims before it starts, sets the assignee after the win, skips to the next free item on a loss and starts nothing for the loser.
+- [ ] AC4: `lane next` claims before it starts, skips to the next free item on a loss and starts nothing for the loser or when the claim cannot be taken.
 - [ ] AC5: `lane release` deletes a claim its caller holds, refuses another holder's without `--force`, and a second release is a no-op.
 - [ ] AC6: the claim ref is not fetched by a default clone and appears in no branch list.
 - [ ] AC7: the ref form is verified by the probe on GitHub and on Gitea and ADR-050 decision 2 is amended from open to decided.

@@ -15,7 +15,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC2 -> `TestClaimedErrorNamesTheHolder`
 - [x] AC3 -> `TestClaimConcurrent` (8 claimants, 1 winner, 20 runs green)
 - [x] AC6 -> `TestClaimIsInvisibleToADefaultClone`
-- [ ] AC4 (`lane next` claims first), AC5 (`lane release`; the primitive is `TestClaimRelease`), AC7 (forge probe) -> PR 2 and 3
+### PR 2 (wiring)
+
+- [x] AC4 -> `TestHandoffClaimsBeforeItStarts`, `TestHandoffSkipsToTheNextFreeItemOnALoss`, `TestHandoffStartsNothingWhenEveryItemIsClaimed`, `TestHandoffFailsClosedWhenTheClaimCannotBeTaken`, `TestHandoffDoesNotClaimAWorktreeThatExists`, `TestHandoffDryRunTakesNoClaimButSkipsAHeldItem`, `TestHandoffReleasesTheClaimWhenTheLaneDoesNotStart` (review finding: a start that creates no worktree must not leak the claim), `TestHandoffKeepsTheClaimOnceTheWorktreeExists` (CodeRabbit: after `Create` the next run skips the claim, so it must stay), `TestClaimIgnoresARefThatOnlyEndsLikeTheClaim` (`ls-remote` matches by tail)
+- [x] AC5 -> `TestLaneRelease` (real git, two checkouts), primitive `TestClaimRelease`
+- [ ] AC7 (forge probe) -> PR 3
 
 The forge probe is `TestClaimRefFormOnARemote`, opt-in through `DOTF_CLAIM_PROBE_REMOTE`; it passes against a local bare remote. A push of a probe ref to the real `origin` was refused by the harness, so GitHub and Gitea are still unprobed and AC7 stays open until the owner runs it.
 
@@ -29,6 +33,8 @@ The forge probe is `TestClaimRefFormOnARemote`, opt-in through `DOTF_CLAIM_PROBE
 
 - Every claim commit carries a random nonce: an identical commit pushed over itself is "up to date" and would let two same-holder claims both win (lesson 459).
 - The claim time is read from the commit message, not the commit date, so a test (and a future caller) controls it; an unreadable time prints as unknown rather than blocking a release.
+- The holder is the checkout (`user@host:<worktree>`), not the process: a per-process nonce would make every `lane release` from a later invocation another holder's and force `--force`; a per-user id would make two same-user sessions one claimant.
+- `lane next` does not set the forge assignee: `Next` skips assigned issues, so a second invocation for the same item would start a second lane. A claim whose worktree already exists is not re-claimed (a second run is not a loss); a claim held by the same checkout from a run that died before creating the worktree fails closed and says `lane release`.
 - The empty tree is the constant SHA-1 id: SHA-256 repositories are out of scope until one exists in the fleet.
 
 ## Promotion candidates

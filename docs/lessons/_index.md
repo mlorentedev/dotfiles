@@ -478,4 +478,5 @@ tags: [lessons, index, dotfiles]
 | [457 - A shared oracle is only shared where the production wiring supplies it](lesson-457-a-shared-oracle-is-only-shared-where-the-production-wiring-supplies-it.md) | 2026-10-16 |
 | [458 - A Go reader that predicts an awk reader cannot use bufio.Scanner](lesson-458-a-go-reader-that-predicts-an-awk-reader-cannot-use-bufio-scanner.md) | 2026-10-16 |
 | [459 - Pushing an object the ref already points at is not a refusal](lesson-459-pushing-an-object-the-ref-already-points-at-is-not-a-refusal.md) | 2026-10-16 |
+| [460 - A claim is held by the checkout, not the process or the user](lesson-460-a-claim-is-held-by-the-checkout-not-the-process-or-the-user.md) | 2026-10-16 |
 <!-- END GENERATED -->

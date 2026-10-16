@@ -38,6 +38,9 @@ type Options struct {
 	// excluded in its info/exclude, which every worktree of the repo reads.
 	GitDir string
 	Now    func() time.Time // the lease's clock; nil is time.Now
+	// Claims is the store a hand-off claims an issue in before it starts a
+	// lane for it. Nil claims nothing: a caller with no remote still works.
+	Claims Claims
 }
 
 // Outcome is what a hand-off decided and did.
@@ -74,44 +77,121 @@ func plainWordFor(goos string) *regexp.Regexp {
 // Every worktree it starts an agent in, or finds already shown, is leased
 // first, so sweep can reap it once its PR lands.
 func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
-	issue, ok, err := Next(o.Config, src)
-	if err != nil {
-		return Outcome{}, err
+	skip := map[int]bool{}
+	var skipped []string
+	for {
+		issue, ok, err := nextFree(o.Config, src, skip)
+		if err != nil {
+			return Outcome{}, err
+		}
+		if !ok {
+			note := "every queued issue is closed or held; nothing to hand off"
+			if len(skipped) > 0 {
+				note += " (" + strings.Join(skipped, "; ") + ")"
+			}
+			return Outcome{Note: note}, nil
+		}
+		out, lost, err := handoffIssue(o, b, issue)
+		if lost != "" {
+			skip[issue.Number] = true
+			skipped = append(skipped, lost)
+			continue
+		}
+		if len(skipped) > 0 && err == nil {
+			out.Note = strings.Join(append(skipped, out.Note), "; ")
+		}
+		return out, err
 	}
-	if !ok {
-		return Outcome{Note: "every queued issue is closed or held; nothing to hand off"}, nil
-	}
-	out := Outcome{Issue: issue, Branch: o.Config.BranchPrefix + "/" + Slug(issue.Title)}
+}
+
+// handoffIssue starts the lane for one issue. lost is non-empty, and nothing
+// is started, when somebody else holds the claim on it: the caller moves on to
+// the next free issue.
+func handoffIssue(o Options, b Backend, issue Issue) (out Outcome, lost string, err error) {
+	out = Outcome{Issue: issue, Branch: o.Config.BranchPrefix + "/" + Slug(issue.Title)}
 
 	p, err := prepare(o, b, &out)
 	if err != nil {
-		return out, err
+		return out, "", err
 	}
 	if b == nil {
-		return noBackend(o, out, p)
+		out, err = noBackend(o, out, p)
+		return out, "", err
 	}
 	wt, found, err := b.Find(o.Parent, out.Branch)
 	if err != nil {
-		return out, err
+		return out, "", err
 	}
 	if found {
 		if err := sameIssue(wt, issue, out.Branch); err != nil {
-			return out, err
+			return out, "", err
 		}
 	}
 	if found && wt.Open {
-		return shown(o, b, wt, out, p)
+		out, err = shown(o, b, wt, out, p)
+		return out, "", err
+	}
+	// A worktree that exists was claimed when it was started, and a second run
+	// must not read that claim as a loss. A new one is claimed first, so the
+	// loser of a race starts nothing.
+	if !found {
+		if lost, err := claim(o, issue); err != nil || lost != "" {
+			return out, lost, err
+		}
 	}
 	if o.DryRun {
 		out.Commands = []string{"(write the prompt to " + PromptFile + " in the new worktree)", "(" + describe(found) + " " + out.Branch + ")", p.exec(PromptFile)}
 		out.Note = p.note
-		return out, nil
+		return out, "", nil
 	}
-	if err := launch(o, b, wt, found, out, p); err != nil {
-		return out, err
+	st, err := start(o, b, wt, found, out.Branch, out.Issue)
+	if err != nil {
+		// The claim was taken for a lane that has no worktree: give it back, or
+		// every later run skips an issue nobody is working on.
+		if !found && o.Claims != nil && !o.DryRun {
+			if rerr := o.Claims.Release(issue.Number, false); rerr != nil {
+				err = errors.Join(err, fmt.Errorf("lane: the claim on #%d could not be released (run `dotf lane release %d`): %w", issue.Number, issue.Number, rerr))
+			}
+		}
+		return out, "", err
+	}
+	// Past this point the worktree exists and the next run finds it, which
+	// skips the claim: keep it, or a live worktree would run with nobody
+	// holding the issue and a second checkout could win it.
+	if err := typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p); err != nil {
+		return out, "", err
 	}
 	out.Started, out.Note = true, p.note
-	return out, nil
+	return out, "", nil
+}
+
+// claim takes the claim on issue, or says who holds it. A dry run only looks.
+// An error means the claim could not be read or taken, and nothing may start:
+// a claim in an unknown state is the race the claim exists to prevent.
+func claim(o Options, issue Issue) (lost string, err error) {
+	if o.Claims == nil {
+		return "", nil
+	}
+	if o.DryRun {
+		held, err := o.Claims.Held(issue.Number)
+		if err != nil {
+			return "", fmt.Errorf("lane: cannot tell whether #%d is claimed (%w); nothing started", issue.Number, err)
+		}
+		if held {
+			return fmt.Sprintf("#%d is claimed", issue.Number), nil
+		}
+		return "", nil
+	}
+	_, err = o.Claims.Acquire(issue.Number)
+	var held *ClaimedError
+	switch {
+	case err == nil:
+		return "", nil
+	case errors.As(err, &held):
+		return held.Error() + "; skipped", nil
+	default:
+		return "", fmt.Errorf("lane: cannot claim #%d (%w); nothing started", issue.Number, err)
+	}
 }
 
 // sameIssue refuses a worktree the lane started for another issue. A branch is
@@ -135,16 +215,6 @@ func sameIssue(wt Worktree, issue Issue, branch string) error {
 // directory, so the line carries no path anyone chose: a git directory, a temp
 // directory or a home with a space in it cannot reach the pane's shell.
 const PromptFile = ".dotf-lane-prompt.md"
-
-// launch starts the branch's worktree, leases it, leaves the prompt in it, and
-// only then types the command: the lease must exist before anything runs there.
-func launch(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) error {
-	st, err := start(o, b, wt, found, out.Branch, out.Issue)
-	if err != nil {
-		return err
-	}
-	return typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p)
-}
 
 // typeSuccessor leases the worktree, leaves the prompt in it and types the
 // command, in that order: the lease must exist before anything runs there.

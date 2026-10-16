@@ -58,6 +58,15 @@ type Claimer struct {
 	Now    func() time.Time
 }
 
+// Claims is what a hand-off needs of the claim store: take a claim, and ask
+// whether one is held without taking it (a dry run changes nothing).
+type Claims interface {
+	Acquire(issue int) (Claim, error)
+	Held(issue int) (bool, error)
+	// Release gives back a claim this hand-off took and could not use.
+	Release(issue int, force bool) error
+}
+
 func claimRef(issue int) string  { return claimRefPrefix + strconv.Itoa(issue) }
 func claimSeen(issue int) string { return claimSeenPrefix + strconv.Itoa(issue) }
 
@@ -121,14 +130,38 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 	return Claim{}, fmt.Errorf("claim #%d: %w", issue, pushErr)
 }
 
-// Holder reads the claim on issue. The bool is false when nobody holds it.
-func (c Claimer) Holder(issue int) (Claim, bool, error) {
+// Held says whether anybody holds the claim on issue, without reading who.
+func (c Claimer) Held(issue int) (bool, error) {
+	sha, err := c.remoteSha(issue)
+	return sha != "", err
+}
+
+// remoteSha is the sha the claim ref points at on the remote, or "" when it
+// does not exist. ls-remote matches a pattern by its tail, so the answer is
+// kept only for the exact ref: a branch that happens to end the same way is not
+// a claim.
+func (c Claimer) remoteSha(issue int) (string, error) {
 	ref := claimRef(issue)
 	out, err := c.git("ls-remote", c.Remote, ref)
 	if err != nil {
-		return Claim{}, false, fmt.Errorf("ls-remote %s: %w", ref, err)
+		return "", fmt.Errorf("ls-remote %s: %w", ref, err)
 	}
-	if strings.TrimSpace(out) == "" {
+	for _, line := range strings.Split(out, "\n") {
+		if sha, name, ok := strings.Cut(strings.TrimSpace(line), "\t"); ok && name == ref {
+			return sha, nil
+		}
+	}
+	return "", nil
+}
+
+// Holder reads the claim on issue. The bool is false when nobody holds it.
+func (c Claimer) Holder(issue int) (Claim, bool, error) {
+	ref := claimRef(issue)
+	sha, err := c.remoteSha(issue)
+	if err != nil {
+		return Claim{}, false, err
+	}
+	if sha == "" {
 		return Claim{}, false, nil
 	}
 	// The claim commit carries the holder, so read it into a private ref
