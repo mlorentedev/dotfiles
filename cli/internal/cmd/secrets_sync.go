@@ -108,9 +108,14 @@ func newSecretsSyncCiCmd() *cobra.Command {
 // copy is what the reader falls back to when no dotfiles checkout is found, and
 // it lags the checkout until a records-mirror run: a consumer merged and pulled
 // is absent from it, so "add the consumer" would be the wrong fix (#2531).
+//
+// The path is compared as the resolver spells it: its fallback is this same join
+// over the same DOTFILES_DIR, so no canonicalisation is needed. A DOTFILES_DIR
+// that is itself a git checkout is the checkout, not a copy of it.
 func registryProvenance(path string) string {
-	deployed := filepath.Join(env.DotfilesDir(env.Home()), "secrets", "registry.yaml")
-	if path == deployed {
+	dir := env.DotfilesDir(env.Home())
+	_, gitErr := os.Stat(filepath.Join(dir, ".git"))
+	if path == filepath.Join(dir, "secrets", "registry.yaml") && gitErr != nil {
 		return fmt.Sprintf("The registry read was the deployed copy %s, which lags the checkout until "+
 			"`dotf converge --only records-mirror` refreshes it. If the checkout already declares the consumer, "+
 			"refresh the copy, or run from the dotfiles checkout (or set DOTFILES_REPO_DIR to it)", path)

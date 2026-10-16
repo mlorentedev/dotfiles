@@ -432,3 +432,16 @@ func TestSecretsSyncCi_RefusalFromACheckoutNamesTheFileOnly(t *testing.T) {
 		})
 	}
 }
+
+// A DOTFILES_DIR that is itself a git checkout is not a copy of one: the refusal
+// must not tell the operator it lags the checkout it is.
+func TestSecretsSyncCi_RefusalFromACheckoutAtDotfilesDirIsNotTheCopy(t *testing.T) {
+	path := useDeployedRegistry(t, ciRegistry)
+	if err := os.Mkdir(filepath.Join(os.Getenv("DOTFILES_DIR"), ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_, err := syncCiRun(t, fakeSetter{}, fakeBW{}, nil, syncRefusals[0].args...)
+	if err == nil || !strings.Contains(err.Error(), path) || strings.Contains(err.Error(), "records-mirror") {
+		t.Fatalf("want the checkout form naming %s, got:\n%v", path, err)
+	}
+}
