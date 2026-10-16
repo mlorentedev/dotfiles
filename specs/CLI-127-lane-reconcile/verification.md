@@ -9,22 +9,26 @@ created: "2026-10-15"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] AC1 (PR 1, `lane status`) -> `TestDerive` (one row per phase, herdr absent in several) and `TestStatus` (subtests: the 9 phases through the join, herdr absent, unknown liveness, landing head); the f1 verification line passes. `TestLaneStatus*` in `cli/internal/cmd` pins the `--json` and table shapes.
+- [ ] AC2 (PR 2, `lane plan`) -> not started
+- [ ] AC3 (PR 3, `lane apply`) -> not started
+- [ ] AC4 (PR 3, live process never reaped) -> not started. The read-only half ran on 2026-10-16, see Test status.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- PR 1: `cd cli && go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...` all pass; `golangci-lint run` (2.12.2, the pin) reports 0 issues.
+- Manual smoke test (read-only, against the running herdr, no server started): `dotf lane status` on this machine listed 12 lanes in about 10s wall time (network-bound: one REST call and one `herdr worktree list` per branch). The first run found the landing-head defect now pinned by `TestStatus/LandingHeadIsPickedAmongReviewLanes` (lesson 450).
+- No regressions in existing test suite: yes.
 
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
--
--
+- **Landing order** is the lowest-numbered open PR among the lanes that derived to Review: FIFO by PR number, an interim until ADR-049's queue defines it. An unadopted worktree's PR is not in it.
+- **No lease outranks everything.** A worktree with an open or merged PR but no `.dotf-worktree.json` reads Unadopted, not Review or Landed, until `worktree adopt` (D2: adoption is never `auto`).
+- **Merged comes from the REST forge alone** (`lane.ForgeGit`). Ancestry is dropped because a branch with no commit yet reads as merged; the cost is that a branch merged without a PR reads unmerged, which is the safe side because `sweep` re-checks its own gates.
+- **Liveness has three answers.** `Combine` of a process scan (`worktree.ProcessInside`, a new read-only export in `process_export.go`, agreed with CLI-118 on #2550) and a session transcript. A probe that cannot answer (no scan on Windows, unreadable store) is `unknown`, shown as such, and reads as live for the phase. It never feeds an auto action.
+- **Session half covers every harness** through `RecentHarnessSession` (#2575, BUG-148): Claude Code, pi and Copilot.
 
 ## Promotion candidates
 

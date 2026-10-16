@@ -514,10 +514,19 @@ func checkReviewProvenanceIn(specDir string, slot ReviewSlot, review Review) err
 	}
 
 	if req.ReviewedSHA != "" && review.ReviewedSHA != "" && req.ReviewedSHA != review.ReviewedSHA {
-		return fmt.Errorf("%s claims reviewed_sha %s but the review was launched against %s\n"+
+		// In full, one per line: two values sharing a prefix must not read as
+		// equal (#2519, where the reviewer dropped 8 characters mid-sha).
+		malformed := ""
+		if !isFullSHA(review.ReviewedSHA) {
+			malformed = "the claim is not a valid full sha: the reviewer mis-copied it\n"
+		}
+		return fmt.Errorf("%s's reviewed_sha does not match the head the review was launched against\n"+
+			"  claimed:  %s\n"+
+			"  launched: %s\n"+
+			"%s"+
 			"the launcher records the head it pointed the reviewer at; the frontmatter is the reviewer's own claim about it\n"+
 			"re-run /adversarial-review against the current head",
-			slot.Review, short(review.ReviewedSHA), short(req.ReviewedSHA))
+			slot.Review, review.ReviewedSHA, req.ReviewedSHA, malformed)
 	}
 
 	// Reviewer identity, last of the three: checkReviewerPool already refuses a
@@ -536,10 +545,15 @@ func checkReviewProvenanceIn(specDir string, slot ReviewSlot, review Review) err
 // nothing, the one case whose cause the transcript can name.
 var errNoNewVerdict = errors.New("the reviewer wrote no verdict")
 
-// short renders a sha for a human-readable error without hiding a short input.
-func short(sha string) string {
-	if len(sha) <= 12 {
-		return sha
+// isFullSHA reports whether s is a full SHA-1 or SHA-256 object name.
+func isFullSHA(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
 	}
-	return sha[:12]
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }
