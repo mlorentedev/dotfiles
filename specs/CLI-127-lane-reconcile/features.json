@@ -1,8 +1,29 @@
 [
   {
     "id": "CLI-127-lane-reconcile-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "lane status derives every one of the 9 phases from fixture facts, herdr absent included",
+    "verification": "cd cli && go test ./internal/lane/ -run 'TestDerive|TestStatus' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-127-lane-reconcile-f2",
+    "behavior": "lane plan classes each action auto, pending (with due time) or ambiguous (with resolving command) and mutates nothing",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'TestPlan|TestLanePlan' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-127-lane-reconcile-f3",
+    "behavior": "lane apply runs only auto actions via sweep and lane next, never adopt or land, and a second run reports changed=0",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'TestApply|TestLaneApply' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-127-lane-reconcile-f4",
+    "behavior": "a worktree with a live process or a recent session is never reaped by apply",
+    "verification": "cd cli && go test ./internal/lane/ -run 'TestApply.*Live' -count=1",
     "state": "pending",
     "evidence": ""
   }
