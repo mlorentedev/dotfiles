@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -314,13 +315,18 @@ func TestConverge_AStepsOutputPrecedesItsResultLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// records-harness runs the child on every OS (legacy-setup only off darwin).
-	at := regexp.MustCompile(`(?m)^  \[[^\]]*\]\s+records-harness\s`).FindIndex(raw)
+	// The first step that runs the child: records-harness on linux and darwin,
+	// legacy-setup on windows, where records-harness does not run.
+	step := "records-harness"
+	if runtime.GOOS == "windows" {
+		step = "legacy-setup"
+	}
+	at := regexp.MustCompile(`(?m)^  \[[^\]]*\]\s+` + step + `\s`).FindIndex(raw)
 	if at == nil {
-		t.Fatalf("no result line for records-harness in the transcript:\n%s", bytes.ReplaceAll(raw, []byte(line), nil))
+		t.Fatalf("no result line for %s in the transcript:\n%s", step, bytes.ReplaceAll(raw, []byte(line), nil))
 	}
 	if got := bytes.Count(raw[:at[0]], []byte(line)); got != repeat {
-		t.Errorf("%d of the child's %d lines precede records-harness's result line", got, repeat)
+		t.Errorf("%d of the child's %d lines precede %s's result line", got, repeat, step)
 	}
 	if bytes.Contains(raw, []byte(syncMark)) || bytes.Contains(console.Bytes(), []byte(syncMark)) {
 		t.Error("the barrier's marker leaked into the output")
