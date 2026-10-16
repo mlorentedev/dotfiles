@@ -57,6 +57,9 @@ func TestPlan(t *testing.T) {
 			Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
 		{"reapable with unknown liveness is ambiguous", row("fix/a", PhaseLanded, func(r *Row) { reapable(r); r.Live = LiveUnknown }),
 			Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
+		{"merged with the lease still running and a live session is ambiguous, not pending", row("fix/a", PhaseLanded, func(r *Row) {
+			r.State, r.Live, r.Meta = worktree.StateActive, LiveYes, lease(phaseNow.Add(-24*time.Hour), soon, true)
+		}), Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
 		{"merged and dirty is ambiguous", row("fix/a", PhaseLanded, func(r *Row) {
 			r.State, r.Dirty, r.Meta = worktree.StateDirty, true, lease(phaseNow.Add(-48*time.Hour), phaseNow.Add(-time.Hour), true)
 		}), Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},

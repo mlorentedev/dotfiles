@@ -94,11 +94,13 @@ func abandon(r Row, why string) Action {
 func planLanded(r Row, now time.Time) Action {
 	a := Action{Kind: KindReap, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket}
 	switch {
-	case r.State == worktree.StateReapable && r.Live == LiveIdle:
+	case r.Live != LiveIdle:
+		// Before any time-only reason: a pending reap would read "wait, and
+		// it goes", and a worktree someone may be inside must not read so.
+		return abandon(r, "PR merged, but liveness is "+string(r.Live)+": someone may be inside")
+	case r.State == worktree.StateReapable:
 		a.Class, a.Reason = ClassAuto, "PR merged, clean tree, lease expired, nobody inside"
 		return a
-	case r.State == worktree.StateReapable:
-		return abandon(r, "PR merged, but liveness is "+string(r.Live)+": someone may be inside")
 	case r.State == worktree.StateActive && r.Meta != nil && r.Meta.ReapOK:
 		if due := reapDue(r.Meta); due.After(now) {
 			a.Class, a.Due, a.Reason = ClassPending, due, "PR merged; waiting for the lease and the minimum age"
