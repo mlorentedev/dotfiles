@@ -1,0 +1,31 @@
+# Arming envelope for the follow-up run of 2026-10-16. Written at arming from the
+# operator's "venga, continuemos", answering the proposal to re-arm a new run for
+# #2531 (and #2534, dropped at arming: it needs a new command and touches a peer's
+# lane path). Committed on chore/autopilot-run-2026-10-16c. The run reads the
+# COMMITTED copy only (autopilot skill §1.4). Never widened by the run.
+version: 1
+run_id: "bugs-20261016T2130Z"
+armed_by: manu
+armed_at: 2026-10-16T21:30:00Z
+expires_at: 2026-10-17T01:30:00Z
+objective: "Land the #2531 fix (sync ci names which registry it read and how to refresh a stale mirror) under the standing grant, then unclaimed quick-win bugs no peer holds."
+scope:
+  write_paths: ["cli/**", "docs/**", "specs/**", "tests/**", ".agent/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "forge/**", "scripts/**", "setup-*", "versions.conf", "secrets/**", "ai/**", "cli/internal/lane/**", "cli/internal/cmd/lane*.go", "cli/internal/prland/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, make, mise]
+queue:
+  source: explicit-then-bitacora
+  items: [2531]
+  filter: "then unassigned Backlog bug/chore items in mlorentedev/dotfiles whose paths fit write_paths, with no open PR, branch, assignee or recent claim comment, and a plan already written; never #2534, #2550-#2554, #2582, #2591, #2605 or release PRs"
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant        # own PRs only; never a release PR, never #2582
+  push: true
+  open_pr: true
+  advisor_tier: top
