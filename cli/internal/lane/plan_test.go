@@ -56,12 +56,12 @@ func TestPlan(t *testing.T) {
 	}{
 		{"reapable and idle is auto", row("fix/a", PhaseLanded, reapable), Action{Kind: KindReap, Class: ClassAuto}, nil},
 		{"reapable with a live session is ambiguous", row("fix/a", PhaseLanded, func(r *Row) { reapable(r); r.Live = LiveYes }),
-			Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
+			Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force --ignore-recent-session /wt/fix/a"}, nil},
 		{"reapable with unknown liveness is ambiguous", row("fix/a", PhaseLanded, func(r *Row) { reapable(r); r.Live = LiveUnknown }),
-			Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
+			Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force --ignore-recent-session /wt/fix/a"}, nil},
 		{"merged with the lease still running and a live session is ambiguous, not pending", row("fix/a", PhaseLanded, func(r *Row) {
 			r.State, r.Live, r.Meta = worktree.StateActive, LiveYes, lease(phaseNow.Add(-24*time.Hour), soon, true)
-		}), Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
+		}), Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force --ignore-recent-session /wt/fix/a"}, nil},
 		{"merged and dirty is ambiguous", row("fix/a", PhaseLanded, func(r *Row) {
 			r.State, r.Dirty, r.Meta = worktree.StateDirty, true, lease(phaseNow.Add(-48*time.Hour), phaseNow.Add(-time.Hour), true)
 		}), Action{Kind: KindFlag, Class: ClassAmbiguous, Resolve: "dotf worktree done --force /wt/fix/a"}, nil},
@@ -172,6 +172,34 @@ func TestPlanQuotesTheResolvingCommand(t *testing.T) {
 	if a.Resolve != "" || !strings.Contains(a.Reason, "no shell quotes alike") {
 		t.Errorf("unquotable path: resolve=%q reason=%q, want no command and the reason", a.Resolve, a.Reason)
 	}
+}
+
+// The command a row carries has to do what the row promises (CLI-127 review
+// round 2). A worktree with a live session is refused by done whatever --force
+// says; an adopt with nothing to run is a flag; a dirty row names the loss.
+func TestPlanResolversDoWhatTheyPromise(t *testing.T) {
+	t.Run("a live worktree gets the command that overrides its session", func(t *testing.T) {
+		for _, live := range []Liveness{LiveYes, LiveUnknown} {
+			r := row("fix/d", PhaseLanded, func(r *Row) { r.Path, r.Live = "/wt/d", live })
+			a := find(t, Plan([]Row{r}, nil, phaseNow), "fix/d")
+			if a.Resolve != "dotf worktree done --force --ignore-recent-session /wt/d" || !strings.Contains(a.Reason, "strands a session") {
+				t.Errorf("live=%s: resolve=%q reason=%q", live, a.Resolve, a.Reason)
+			}
+		}
+	})
+	t.Run("an adopt with an unquotable path is a flag with no command", func(t *testing.T) {
+		r := row("fix/e", PhaseUnadopted, func(r *Row) { r.Path, r.Ticket = "/wt/a$b/fix/e", 5 })
+		a := find(t, Plan([]Row{r}, nil, phaseNow), "fix/e")
+		if a.Kind != KindFlag || a.Resolve != "" || !strings.Contains(a.Reason, "no shell quotes alike") {
+			t.Errorf("kind=%s resolve=%q reason=%q, want a flag, no command, the reason", a.Kind, a.Resolve, a.Reason)
+		}
+	})
+	t.Run("a dirty row says the command discards uncommitted changes", func(t *testing.T) {
+		r := row("fix/f", PhaseStalled, func(r *Row) { r.Path, r.Dirty = "/wt/f", true })
+		if a := find(t, Plan([]Row{r}, nil, phaseNow), "fix/f"); !strings.Contains(a.Reason, "discards its uncommitted changes") {
+			t.Errorf("reason = %q", a.Reason)
+		}
+	})
 }
 
 // The head's landing conditions come from the landing reader, for the head

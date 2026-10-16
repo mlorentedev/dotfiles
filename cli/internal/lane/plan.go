@@ -81,10 +81,26 @@ func phaseWhy(p Phase) string {
 }
 
 // abandon flags a lane only a human can judge. The command it carries removes
-// the worktree, so the yes is an explicit one.
+// the worktree, so the yes is an explicit one, and a reason that names what the
+// command loses.
 func abandon(r Row, why string) Action {
+	return abandonWith(r, why, "dotf worktree done --force ")
+}
+
+// abandonLive is abandon for a worktree someone may be inside. done refuses a
+// worktree with a recent harness session whatever --force says, so the command
+// that resolves the row carries the one flag that overrides it, and the reason
+// says what that costs.
+func abandonLive(r Row, why string) Action {
+	return abandonWith(r, why+"; removing it strands a session that may be resumed", "dotf worktree done --force --ignore-recent-session ")
+}
+
+func abandonWith(r Row, why, cmd string) Action {
+	if r.Dirty {
+		why += "; the command discards its uncommitted changes"
+	}
 	a := Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket, Reason: why}
-	a.Resolve, a.Reason = withPath("dotf worktree done --force ", r.Path, a.Reason)
+	a.Resolve, a.Reason = withPath(cmd, r.Path, a.Reason)
 	return a
 }
 
@@ -110,7 +126,7 @@ func planLanded(r Row, now time.Time) Action {
 	case r.Live != LiveIdle:
 		// Before any time-only reason: a pending reap would read "wait, and
 		// it goes", and a worktree someone may be inside must not read so.
-		return abandon(r, "PR merged, but liveness is "+string(r.Live)+": someone may be inside")
+		return abandonLive(r, "PR merged, but liveness is "+string(r.Live)+": someone may be inside")
 	case r.State == worktree.StateReapable:
 		a.Class, a.Reason = ClassAuto, "PR merged, clean tree, lease expired, nobody inside"
 		return a
@@ -142,8 +158,10 @@ func reapDue(m *worktree.Metadata) time.Time {
 func planUnadopted(r Row) Action {
 	a := Action{Kind: KindFlag, Class: ClassAmbiguous, Branch: r.Branch, Path: r.Path, Ticket: r.Ticket, Reason: "no lease, and no intent to adopt it under"}
 	if r.Ticket != 0 || r.PR != 0 {
-		a.Kind, a.Reason = KindAdopt, "no lease; the branch or its PR names the intent"
-		a.Resolve, a.Reason = withPath("dotf worktree adopt ", r.Path, a.Reason)
+		a.Reason = "no lease; the branch or its PR names the intent"
+		if a.Resolve, a.Reason = withPath("dotf worktree adopt ", r.Path, a.Reason); a.Resolve != "" {
+			a.Kind = KindAdopt // an adopt with nothing to run stays a flag, as abandon does
+		}
 	}
 	return a
 }
