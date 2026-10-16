@@ -66,6 +66,11 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Mutations on PR 7a, each run against `go test ./internal/deploy/`: drop the version gate, gate at 5, render every source as JSON, encode TOML as JSON, choose the codec by destination. All five killed.
 - The live `add --agent` check must not start a second herdr server: herdr 0.9.3 isolates only by `HOME` (lesson 446, measured 2026-10-16 when a "scratch" server resumed the operator's agents).
 
+- AC9: AGENTS.md §9 and the two vault skills (knowledge `f9f68924`) name `dotf worktree add` and `<WORKTREE_ROOT>/<repo>/<branch-slug>`. The handoff skill already refused to remove the launch worktree (step 3.2); it now removes others with `dotf worktree done <branch>`. Every claim the skills make was checked against 0.71.0: `add` refuses `-b nope` with "is not <type>/<kebab-slug>", forks from origin's default branch, and `done` deletes a landed branch.
+- The skills pass `done` the branch, not the slug: a bare name resolves to `<root>/<repo>/<name>` or `.../feat-<name>` only (done's help), so `done <slug>` misses a worktree made with `-b fix/<slug>`, whose directory is `fix-<slug>`.
+- `compile-harness.sh --refresh` reads `$VAULT_PATH`'s working tree, which defaults to the shared vault checkout. That checkout held another session's staged work and lacked the commit just pushed, so the first refresh left both skills unchanged. The records were refreshed from a detached worktree of `origin/master` (`VAULT_PATH=<wt> compile-harness.sh --refresh`); reading the working tree is the root cause of #836 (HARNESS-060), measured there.
+- AC10: ADR-032's 2026-10-13 amendment carries the owner's clarification as a dated paragraph after point 5: `dotf agent run` is dispatch, `add --agent` is cockpit use that reports submission only.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
