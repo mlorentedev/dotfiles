@@ -66,6 +66,11 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Mutations on PR 7a, each run against `go test ./internal/deploy/`: drop the version gate, gate at 5, render every source as JSON, encode TOML as JSON, choose the codec by destination. All five killed.
 - The live `add --agent` check must not start a second herdr server: herdr 0.9.3 isolates only by `HOME` (lesson 446, measured 2026-10-16 when a "scratch" server resumed the operator's agents).
 
+- #2569 (BUG-148): done, sweep and migrate consult every harness store that resumes a session from its directory, in one table (`SessionStores`, `RecentHarnessSession`). pi keys a directory by the path (`--<path, / as ->--`), Copilot keys by session id and records `cwd:` in `workspace.yaml`, so its row reads every session; lesson 447. Tests: `TestRecentHarnessSession` (pi in the worktree, in a subdirectory, stale, another worktree; Copilot in a subdirectory, stale, a sibling sharing the prefix; Claude Code; none), `TestRecentHarnessSessionFailsClosedOnAnUnreadableStore`, `TestPiSessionKeysOnlyForAPOSIXPath`, `TestSessionSkipReasonNamesTheHarness`.
+- Mutations on #2569, each against the session, sweep and migrate tests: drop the Copilot row, drop the pi row, drop pi's subdirectory match, swallow a `workspace.yaml` parse error, read any store error as absent, match Copilot's cwd by bare prefix, ignore the window, date a Copilot session by `workspace.yaml` only, key a Windows path for pi, drop the harness name from the skip reason. All ten killed.
+- Live read on the Mac (2026-10-16, a throwaway test, not committed): each of the nine dotfiles worktrees resolved against the real stores without a read error, including the one Copilot session.
+- A store that exists and cannot be read, a Copilot `workspace.yaml` that does not parse included, refuses done and skips sweep and migrate, naming the harness and the file: one corrupt session of another harness blocks removals until fixed or overridden. A store that is absent, and a harness whose store is not keyed by directory (agy), consult nothing.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
