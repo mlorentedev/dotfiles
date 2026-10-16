@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: 0bcd7e7f6bd70223
+generated_sha: 12d85e4847497816
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -46,12 +46,14 @@ physical: put the worktree where the parent repo cannot see it.
 
 ### 1. Default — `dotf worktree add`, under the one root
 
+This section only decides *where*; [Creation Steps](#creation-steps) is the one place
+that runs the command. Record the repository root first, since Gates A and B read it:
+
 ```bash
-repo_root="$(git rev-parse --show-toplevel)"  # Gates A and B read it
-dotf worktree add "$SLUG" -b "<type>/$SLUG"    # e.g. feat/research-agents
+repo_root="$(git rev-parse --show-toplevel)"
 ```
 
-It places the worktree at `<WORKTREE_ROOT>/<repo>/<branch-slug>` (`WORKTREE_ROOT`
+`dotf worktree add` places the worktree at `<WORKTREE_ROOT>/<repo>/<branch-slug>` (`WORKTREE_ROOT`
 defaults to `~/Projects/worktrees`; `dotf env path WORKTREE_ROOT` prints it). That is
 the layout herdr creates too, so a worktree opened from either side is the same kind of
 thing. `add` also forks from the remote default branch, refuses a branch name without a
@@ -118,10 +120,14 @@ to remove the gitlink. Do not proceed.
 ### 1. Create the worktree (new branch)
 
 ```bash
-dotf worktree add "$SLUG" -b "<type>/$SLUG"    # fallback: git worktree add "$wt_path" -b "<type>/$SLUG"
-wt_path="$(git worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')"
+dotf worktree add "$SLUG" -b "<type>/$SLUG" &&  # fallback: git worktree add "$wt_path" -b "<type>/$SLUG" &&
+wt_path="$(git worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')" &&
+[ -n "$wt_path" ] &&
 cd "$wt_path"                                  # asked of git, never derived
 ```
+
+The chain matters: a failed `add` or an empty lookup stops here, instead of carrying on
+in the directory you started from.
 
 With herdr running, `dotf worktree add … --agent <harness> --prompt-file <f>` opens it in
 a herdr pane and starts the agent there. Never start a second herdr server on a box that
@@ -156,7 +162,12 @@ Ready to work in parallel.
 
 ## Teardown (deterministic)
 
+Run it from a shell **outside** the worktree being removed, after the session that worked
+in it has ended. A session cannot resume once its launch directory is gone, which is why
+`done` refuses the caller's own worktree and one with a recent session.
+
 ```bash
+cd "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"  # the main checkout, never the target
 dotf worktree done "<type>/$SLUG"      # by branch; refuses while a session lives in it; deletes a landed branch
 # fallback: git worktree remove "$wt_path" (add --force only if intentionally discarding work)
 # If a nested fallback was ever used: remove its line from .git/info/exclude
