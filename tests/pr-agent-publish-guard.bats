@@ -197,6 +197,31 @@ calls_to() { grep -c "^$1\$" "$CALLS" || true; }
     [ "$(cat "$PROBE_OUT")" = "published=false" ]
 }
 
+# Only the bot's comment is a review (#2529). Anyone can paste the heading; if
+# that counted, the probe would skip the second attempt and the final guard
+# would pass a PR nobody reviewed.
+@test "probe: the heading pasted by someone other than the bot answers false" {
+    local pasted='[{"user":{"login":"mallory"},"updated_at":"2026-10-07T10:00:00Z","body":"## PR Reviewer Guide"}]'
+    export STUB_BASE="$REGISTRY" STUB_COMMENTS="$pasted"
+    _probe
+    [ "$status" -eq 0 ]
+    [ "$(cat "$PROBE_OUT")" = "published=false" ]
+}
+
+# On the head-ref fallback the marker is PR-Agent's own heading, never one the
+# head declares (#2529): a head marker, or an empty one, would let any bot
+# comment, such as the code-suggestions one, pass as a review.
+@test "probe: on the head-ref fallback, a bot comment without PR-Agent's heading answers false" {
+    local head_reg suggestions
+    head_reg=$(printf '%s' '{"reviewers":[{"login":"github-actions","review_markers":["PR Code Suggestions"]}]}' | base64 | tr -d "\n")
+    suggestions='[{"user":{"login":"github-actions[bot]"},"updated_at":"2026-10-07T10:00:00Z","body":"## PR Code Suggestions"}]'
+    export STUB_BASE=fail:404 STUB_HEAD="$head_reg" STUB_COMMENTS="$suggestions"
+    _probe
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"reviewer registry entry found only on the PR head"* ]] || false
+    [ "$(cat "$PROBE_OUT")" = "published=false" ]
+}
+
 @test "probe: an API that keeps failing answers unknown, never false" {
     export STUB_BASE="$REGISTRY" STUB_COMMENTS=fail:502
     _probe
