@@ -309,7 +309,7 @@ func TestNext_NoBackendQuotesAPathWithASpace(t *testing.T) {
 		`git -C "/repos/my repo" fetch origin`,
 		`git -C "/repos/my repo" worktree add -b fix/first-thing ` + dir + ` origin/main`,
 		`cd ` + dir,
-		`dotf lane exec --agent claude --prompt-file "/repos/my repo/.git/dotf-lane/7.md"`,
+		`dotf lane exec --agent claude --prompt-file "` + filepath.Join(o.PromptDir, "7.md") + `"`,
 	}
 	if !reflect.DeepEqual(out.Commands, want) {
 		t.Errorf("commands =\n%q\nwant\n%q", out.Commands, want)
