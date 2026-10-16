@@ -530,3 +530,67 @@ func TestDefaultCheckoutDirMatchesTheContract(t *testing.T) {
 		}
 	}
 }
+
+// writeCheckout makes dir look like a dotfiles checkout holding a registry.
+func writeCheckout(t *testing.T, dir string) string {
+	t.Helper()
+	reg := filepath.Join(dir, "secrets", "registry.yaml")
+	if err := os.MkdirAll(filepath.Dir(reg), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for p, body := range map[string]string{reg: "version: 1\n", filepath.Join(dir, CheckoutMarker): ""} {
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return reg
+}
+
+// #1593: run from another project's checkout, the registry reader fell through
+// to the deployed copy (possibly days stale) and the writer pointed into that
+// project. Both must resolve to the dotfiles checkout DOTFILES_REPO_DIR names.
+func TestRegistryFromAnotherRepositoryResolvesTheDotfilesCheckout(t *testing.T) {
+	dotfiles := t.TempDir()
+	want := writeCheckout(t, dotfiles)
+	t.Setenv("DOTFILES_REPO_DIR", dotfiles)
+	t.Setenv("DOTFILES_DIR", t.TempDir())
+
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(other)
+
+	if got := ResolveRegistryPath(); got != want {
+		t.Errorf("ResolveRegistryPath() from another repo = %q, want the checkout's %q", got, want)
+	}
+	if got, err := RepoRegistryPath(); err != nil || got != want {
+		t.Errorf("RepoRegistryPath() from another repo = %q, %v; want %q", got, err, want)
+	}
+
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	if got, err := RepoRegistryPath(); err == nil {
+		t.Errorf("RepoRegistryPath() from another repo with no checkout declared = %q; want a refusal, not a path inside that repo", got)
+	}
+}
+
+// A dotfiles worktree the cwd is in still wins over DOTFILES_REPO_DIR (BUG-072).
+func TestDotfilesCheckoutPrefersTheWorktreeTheCwdIsIn(t *testing.T) {
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir())
+	wt := t.TempDir()
+	writeCheckout(t, wt)
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: elsewhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(wt, "cli")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	got, _ := filepath.EvalSymlinks(DotfilesCheckout())
+	want, _ := filepath.EvalSymlinks(wt)
+	if got != want {
+		t.Errorf("DotfilesCheckout() = %q, want the worktree %q", got, want)
+	}
+}

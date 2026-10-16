@@ -173,6 +173,9 @@ func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 		status := "clean"
 		if info.Dirty {
 			status = "dirty"
+			if len(info.IgnoredContent) > 0 {
+				status = "ignored"
+			}
 		}
 
 		prStatus := "-"

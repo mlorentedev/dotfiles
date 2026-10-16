@@ -13,6 +13,9 @@ import (
 type PRInfo struct {
 	Number int
 	State  PRState
+	// Draft is an open pull request still being iterated on: it is in Review,
+	// but it is not what lands next.
+	Draft bool
 }
 
 // PRSource answers for one branch. It is asked once per branch per run: a
@@ -102,6 +105,7 @@ type Row struct {
 	// Meta is the lease, kept for plan's due times. It is not part of the
 	// status table: Lease already carries the expiry for a reader.
 	Meta  *worktree.Metadata `json:"-"`
+	Draft bool               `json:"draft,omitempty"`
 	Phase Phase              `json:"phase"`
 }
 
@@ -115,18 +119,22 @@ func Status(src Sources) ([]Row, error) {
 	forge := CachedForge(src.Forge)
 	var lanes []lane
 	onDisk := map[string]bool{}
+	tickets := map[int]bool{}
 	for _, info := range infos {
 		if info.IsMain {
 			continue
 		}
 		onDisk[info.Branch] = true
+		if n := ticketOf(info); n != 0 {
+			tickets[n] = true
+		}
 		l, err := src.onDiskLane(info, forge)
 		if err != nil {
 			return nil, err
 		}
 		lanes = append(lanes, l)
 	}
-	queued, err := src.queuedLanes(forge, onDisk)
+	queued, err := src.queuedLanes(forge, onDisk, tickets)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +165,7 @@ func (s Sources) onDiskLane(info worktree.Info, forge PRSource) (lane, error) {
 	live := s.Live(info.Path)
 	herdr := s.herdr(info.Branch)
 	f := Facts{Info: info, Exists: true, PR: pr.State, Live: live != LiveIdle, HerdrPresent: herdr != HerdrAbsent}
-	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Live: live, Herdr: herdr, Dirty: info.Dirty, State: info.State, StateReason: info.StateReason, Meta: info.Metadata, Ticket: ticketOf(info)}
+	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Draft: pr.Draft, Live: live, Herdr: herdr, Dirty: info.Dirty, State: info.State, StateReason: info.StateReason, Meta: info.Metadata, Ticket: ticketOf(info)}
 	if m := info.Metadata; m != nil {
 		r.Agent, r.Lease = m.Creator, m.LeaseExpiresAt.Format(time.RFC3339)
 	}
@@ -165,10 +173,15 @@ func (s Sources) onDiskLane(info worktree.Info, forge PRSource) (lane, error) {
 }
 
 // queuedLanes are the queue's issues that no worktree on disk carries: not
-// started yet (Pending) or finished and reaped (Reaped).
-func (s Sources) queuedLanes(forge PRSource, onDisk map[string]bool) ([]lane, error) {
+// started yet (Pending) or finished and reaped (Reaped). A worktree carries an
+// issue by its branch name or by its lease or branch number, so a lane named by
+// hand (feat/2550-...) is not also read as a Pending one.
+func (s Sources) queuedLanes(forge PRSource, onDisk map[string]bool, tickets map[int]bool) ([]lane, error) {
 	var out []lane
 	for _, n := range s.Queue {
+		if tickets[n] {
+			continue
+		}
 		is, err := s.Issues.Issue(n)
 		if err != nil {
 			return nil, fmt.Errorf("lane status: issue #%d: %w", n, err)
@@ -205,14 +218,14 @@ func (s Sources) herdr(branch string) string {
 	return HerdrListed
 }
 
-// markHead promotes the Review lane with the lowest PR number to Landing. It
+// markHead promotes the Review lane with the lowest PR number, drafts apart, to Landing. It
 // picks among the lanes that derived to Review, not among every open PR: an
 // unadopted worktree with an older PR is not in the landing order, and must
 // not take the head with it.
 func markHead(lanes []lane, now time.Time) {
 	head := -1
 	for i, l := range lanes {
-		if l.row.Phase == PhaseReview && (head < 0 || l.row.PR < lanes[head].row.PR) {
+		if l.row.Phase == PhaseReview && !l.row.Draft && (head < 0 || l.row.PR < lanes[head].row.PR) {
 			head = i
 		}
 	}

@@ -258,3 +258,16 @@ func TestClassifyReapableAndUnmerged(t *testing.T) {
 		}
 	})
 }
+
+// #1607: list must tell "you have unsaved work" from "you have files I do not
+// recognise", and name the latter.
+func TestClassifyNamesIgnoredContent(t *testing.T) {
+	info := Info{Dirty: true, IgnoredContent: []string{".env", "site/public/beoe/"}}
+	state, reason := Classify(info, time.Now())
+	if state != StateDirty || !strings.Contains(reason, ".env, site/public/beoe/") || strings.Contains(reason, "uncommitted") {
+		t.Errorf("Classify = %s %q; want dirty naming the ignored paths", state, reason)
+	}
+	if _, reason := Classify(Info{Dirty: true}, time.Now()); reason != "uncommitted changes" {
+		t.Errorf("tracked dirt reason = %q, want uncommitted changes", reason)
+	}
+}

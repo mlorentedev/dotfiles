@@ -31,16 +31,16 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - **Liveness has three answers.** `Combine` of a process scan (`worktree.ProcessInside`, a new read-only export in `process_export.go`, agreed with CLI-118 on #2550) and a session transcript. A probe that cannot answer (no scan on Windows, unreadable store) is `unknown`, shown as such, and reads as live for the phase. It never feeds an auto action.
 - **`plan` mirrors sweep through `Row.State`**, the lifecycle state `Classify` already computed: REAPABLE with an idle liveness is `auto`; ACTIVE for a time-only reason (lease running, under 15 minutes old) is `pending` with the later of the two as its due time; liveness `live` or `unknown`, DIRTY, a reap hold, Stalled and Orphan are `ambiguous` with `dotf worktree done --force <path>`.
 - **A start is `auto` only while no lane is in flight**, and only for the first pending item in queue order, so a second apply finds the lane the first one started (lesson 451).
-- **The head PR's four-condition check is not printed yet.** `plan` prints the landing order and the head's command (`dotf pr triage-queue --pr N && dotf pr land N`, D3). Evaluating the four conditions needs an exported read-only fact reader in `cli/internal/prland`, which is outside this run's write paths; it is ticketed rather than copied, so the landing conditions keep one implementation (`prland.Decide`).
+- **The head PR's four-condition check (#2596, closed by the follow-up change).** `plan` now asks `prland.Blockers`, the read-only entry into `prland.Decide`, and prints each blocker under the head's command; `TestBlockers_*`, `TestCheckHead` and `TestLanePlan_PrintsTheHeadsLandingConditions` pin it. A draft is never the head (`TestStatus/ADraftIsNeverTheLandingHead`) and a detached worktree has no PR (`TestREST_ADetachedWorktreeHasNoPR`), both found by a read-only run on the live forge (lesson 455).
 - **Session half covers every harness** through `RecentHarnessSession` (#2575, BUG-148): Claude Code, pi and Copilot.
 
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-454-a-preview-and-the-verb-that-executes-it-must-ask-the-same-oracle.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-050 already carries the lane contract; this spec made no decision beyond it
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the lessons concern one project's verbs; they recur in no second one yet
 
 ## Archive checklist
 
@@ -52,3 +52,25 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 ### PR 3 live evidence (2026-10-16, read-only)
 
 `dotf lane status --json` and `dotf lane plan --json` ran on this machine against the running herdr (none started): 20 lanes, 9 with a live session. The plan was 4 `adopt/ambiguous` and 4 `flag/ambiguous`; none of the 9 was `auto` or `pending`. The first run found two live worktrees (`feat/deploy-toml-paths`, `feat/worktree-harness-sessions`) classed `reap/pending`: the pending branch read time only, so the plan said "wait and it goes" for a worktree with a live session. Not `auto`, but not the AC4 wording either. Fixed in PR 2 (liveness is checked before any time-only reason, with a table case); the re-run is the evidence above. `apply` was not run live: a safety check is not performed by the reaper it guards against.
+
+## Review round 1 (2026-10-16): FAIL, fixed
+
+`review.md` (nan/qwen3.8-flash, reviewed `79cf7e5d`) found two Major and three Minor gaps. Fixed in one change:
+
+- **F1 (Major), apply reaped under a different oracle than plan.** `lane.ForgeSweep` gives sweep the forge's merge answer; `TestApplyNeverReapsWhatPlanCalledAmbiguous` runs the real sweep over a real repository (lesson 454). Replacing the override with ancestry makes it fail (`changed=2`).
+- **F2 (Major), the resolving command was unquoted.** `withPath` quotes with `humanPath`; a path no shell quotes alike gets no command and the reason says so. `TestPlanQuotesTheResolvingCommand`.
+- **F3 (Minor), queue to lane matched by derived branch name only.** `Status` also skips a queued issue whose number a worktree already carries. `TestStatus/AHandNamedLaneIsNotAlsoPending`.
+- **F6 (Minor), the four-condition deferral named no ticket.** It is #2596, above.
+- **Handoff hygiene (Minor).** The promotion lines are answered above.
+
+Not changed: the sequential `gh api` per branch (compliant with the proposal) and the `BranchPrefix` default `fix` (it only feeds the queued-branch derivation).
+
+## Review round 1 follow-up (2026-10-16): #2596 and two live-run defects
+
+`dotf lane plan` was run read-only against the live forge after the change. The first run, before the fixes, printed PR #2601 against three detached worktrees (an empty branch matched the newest PR) and named the draft #2582 the landing head. After the fixes the same run reads:
+
+- the draft #2582 is listed but never the head, and the head's line is the first non-draft, #2600;
+- under the head, `blocked:` names each unmet condition from `prland.Decide` (checks pending, merge state UNKNOWN), and the command follows;
+- no detached worktree carries a PR.
+
+`apply` was not run live (AC4 policy above). The independent review of the whole spec is re-run after this change lands.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -214,11 +215,25 @@ func newSecretsVerifyCmd() *cobra.Command {
 }
 
 func loadRegistry() (*secrets.Registry, error) {
-	data, err := os.ReadFile(registryPath())
+	data, err := readRegistry()
+	if err != nil {
+		return nil, err
+	}
+	return secrets.ParseRegistry(data)
+}
+
+// readRegistry reads the registry, and names what to do when there is none: a
+// missing file must not read as a registry with nothing in it (#1593).
+func readRegistry() ([]byte, error) {
+	path := registryPath()
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("no secrets registry at %s: run from the dotfiles checkout, or set DOTFILES_REPO_DIR to it", path)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("read registry: %w", err)
 	}
-	return secrets.ParseRegistry(data)
+	return data, nil
 }
 
 // loadRegistryPartial is the health-check door: it returns the well-formed secrets plus
@@ -226,9 +241,9 @@ func loadRegistry() (*secrets.Registry, error) {
 // every write path stays on loadRegistry's fail-loud behaviour, because a half-valid
 // registry is precisely the state in which `set`/`migrate`/`render` must not run.
 func loadRegistryPartial() (*secrets.Registry, []secrets.SecretDefect, error) {
-	data, err := os.ReadFile(registryPath())
+	data, err := readRegistry()
 	if err != nil {
-		return nil, nil, fmt.Errorf("read registry: %w", err)
+		return nil, nil, err
 	}
 	return secrets.ParseRegistryPartial(data)
 }

@@ -249,17 +249,17 @@ type toctouErrorRunner struct {
 	callCount  int
 }
 
-func (r *toctouErrorRunner) IsDirty(path string) (bool, error) {
+func (r *toctouErrorRunner) Dirt(path string) (Dirt, error) {
 	r.callCount++
 	// Call 1 is during ListWithRunner
 	if r.callCount == 1 {
-		return false, nil
+		return Dirt{}, nil
 	}
 	// Call 2 is during Sweep TOCTOU check
 	if r.failTOCTOU {
-		return false, os.ErrPermission
+		return Dirt{}, os.ErrPermission
 	}
-	return false, nil
+	return Dirt{}, nil
 }
 
 func TestSweepTOCTOUUnmergedFailsClosed(t *testing.T) {
