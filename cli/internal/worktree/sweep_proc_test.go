@@ -169,9 +169,9 @@ type orderRecordingRunner struct {
 	order *[]string
 }
 
-func (r *orderRecordingRunner) IsDirty(path string) (bool, error) {
+func (r *orderRecordingRunner) Dirt(path string) (Dirt, error) {
 	*r.order = append(*r.order, "dirty")
-	return r.MockSweepRunner.IsDirty(path)
+	return r.MockSweepRunner.Dirt(path)
 }
 
 func (r *orderRecordingRunner) IsPRMerged(repoRoot, branch string) (bool, error) {

@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -23,6 +24,7 @@ var disposableDirNames = map[string]bool{
 	".turbo":            true,
 	".next":             true,
 	".nuxt":             true,
+	".astro":            true,
 	".svelte-kit":       true,
 	".output":           true,
 	".gradle":           true,
@@ -65,9 +67,15 @@ func isDisposableDirectoryPath(path string) bool {
 
 // IsDisposableIgnoredPath checks if an ignored relative path is disposable (e.g. build cache, metadata).
 func IsDisposableIgnoredPath(relPath string) bool {
-	clean := filepath.ToSlash(strings.TrimSpace(relPath))
+	clean := strings.TrimSpace(relPath)
 	clean = strings.TrimPrefix(clean, "!! ")
-	clean = strings.TrimSpace(clean)
+	return isDisposableExactPath(strings.TrimSpace(clean))
+}
+
+// isDisposableExactPath classifies a path exactly as git spelled it: no
+// whitespace is trimmed, so " node_modules" is not node_modules.
+func isDisposableExactPath(relPath string) bool {
+	clean := filepath.ToSlash(relPath)
 	clean = strings.TrimPrefix(clean, "./")
 	clean = strings.TrimSuffix(clean, "/")
 
@@ -85,16 +93,48 @@ func IsDisposableIgnoredPath(relPath string) bool {
 
 // HasNonDisposableIgnored inspects porcelain output and returns true if any non-disposable ignored file exists.
 func HasNonDisposableIgnored(porcelainOutput string) bool {
-	lines := strings.Split(porcelainOutput, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "!! ") {
+	return len(NonDisposableIgnored(porcelainOutput)) > 0
+}
+
+// NonDisposableIgnored lists, in git's order, the ignored paths in
+// `git status --ignored --porcelain` output that are not known build output.
+// Entries are NUL-separated when the output came from -z, which leaves paths
+// unquoted and exact, so nothing is trimmed from them: a name with a leading
+// or trailing space is classified, and reported, as git spelled it. Output
+// without -z is newline-separated and trimmed.
+func NonDisposableIgnored(porcelainOutput string) []string {
+	exact := strings.Contains(porcelainOutput, "\x00")
+	sep := "\n"
+	if exact {
+		sep = "\x00"
+	}
+	var paths []string
+	for _, entry := range strings.Split(porcelainOutput, sep) {
+		if !exact {
+			entry = strings.TrimSpace(entry)
+		}
+		relPath, ok := strings.CutPrefix(entry, "!! ")
+		if !ok {
 			continue
 		}
-		relPath := strings.TrimSpace(strings.TrimPrefix(line, "!!"))
-		if !IsDisposableIgnoredPath(relPath) {
-			return true
+		disposable := isDisposableExactPath(relPath)
+		if !exact {
+			relPath = strings.TrimSpace(relPath)
+			disposable = IsDisposableIgnoredPath(relPath)
+		}
+		if !disposable {
+			paths = append(paths, relPath)
 		}
 	}
-	return false
+	return paths
+}
+
+// summarizePaths names the first few paths and counts the rest, so a refusal
+// stays one line on a worktree holding hundreds of them.
+func summarizePaths(paths []string) string {
+	const shown = 3
+	if len(paths) <= shown {
+		return strings.Join(paths, ", ")
+	}
+	return fmt.Sprintf("%s (+%d more)", strings.Join(paths[:shown], ", "), len(paths)-shown)
 }

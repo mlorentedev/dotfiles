@@ -192,12 +192,15 @@ func checkUncommittedChanges(absWT string, force bool) error {
 		return nil
 	}
 	runner := &RealGitRunner{}
-	dirty, err := runner.IsDirty(absWT)
+	dirt, err := runner.Dirt(absWT)
 	if err != nil {
 		return fmt.Errorf("checking worktree status: %w; pass --force to override", err)
 	}
-	if dirty {
-		return fmt.Errorf("worktree has uncommitted changes or local scratchpad files (%s); commit, stash, or pass --force", absWT)
+	if dirt.Tracked {
+		return fmt.Errorf("worktree has uncommitted changes (%s); commit or stash them, or pass --force", absWT)
+	}
+	if len(dirt.Ignored) > 0 {
+		return fmt.Errorf("worktree holds ignored files that are not known build output (%s): %s; move or delete them, or pass --force", absWT, summarizePaths(dirt.Ignored))
 	}
 	return nil
 }
