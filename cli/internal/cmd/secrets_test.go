@@ -26,7 +26,13 @@ func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-	_, _ = io.WriteString(os.Stdout, os.Getenv("FOO"))
+	repeat, err := strconv.Atoi(os.Getenv("FOO_REPEAT"))
+	if err != nil {
+		repeat = 1
+	}
+	for range repeat {
+		_, _ = io.WriteString(os.Stdout, os.Getenv("FOO"))
+	}
 	code, _ := strconv.Atoi(os.Getenv("EXIT_CODE"))
 	os.Exit(code)
 }

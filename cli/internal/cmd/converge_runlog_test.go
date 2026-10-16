@@ -1,12 +1,17 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 )
@@ -286,5 +291,84 @@ func TestConverge_TheIdentityWalkAsksTheConsole(t *testing.T) {
 	}
 	if len(answers) == 0 || !answers[0] {
 		t.Errorf("during a captured run identityTerminal() said no terminal (%v); it asked the transcript's pipe, not the console", answers)
+	}
+}
+
+// TestConverge_AStepsOutputPrecedesItsResultLine is CLI-116 (#2486): a step's
+// child writes into the capture pipe and a pump copies it on, so without a
+// barrier the bytes still in the pipe when the child exits land after the
+// step's result line. The child here writes more than a pipe holds, so some of
+// it is always in flight when the step returns.
+func TestConverge_AStepsOutputPrecedesItsResultLine(t *testing.T) {
+	const line = "child-output-line-of-forty-bytes-----\n"
+	const repeat = 4000 // ~150 KiB, past every OS's pipe buffer
+	t.Setenv("FOO_REPEAT", strconv.Itoa(repeat))
+	repo, state, _ := runLogFixture(t, line)
+	var console bytes.Buffer
+	_ = runConverge(&console, repo, false, nil)
+	logs := runTranscripts(t, state)
+	if len(logs) != 1 {
+		t.Fatalf("want one transcript, got %v", logs)
+	}
+	raw, err := os.ReadFile(logs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	// records-harness runs the child on every OS (legacy-setup only off darwin).
+	at := regexp.MustCompile(`(?m)^  \[[^\]]*\]\s+records-harness\s`).FindIndex(raw)
+	if at == nil {
+		t.Fatalf("no result line for records-harness in the transcript:\n%s", bytes.ReplaceAll(raw, []byte(line), nil))
+	}
+	if got := bytes.Count(raw[:at[0]], []byte(line)); got != repeat {
+		t.Errorf("%d of the child's %d lines precede records-harness's result line", got, repeat)
+	}
+	if bytes.Contains(raw, []byte(syncMark)) || bytes.Contains(console.Bytes(), []byte(syncMark)) {
+		t.Error("the barrier's marker leaked into the output")
+	}
+}
+
+// A mark split across two reads is still stripped and counted: the pump holds
+// back a tail that may begin one, and only that tail.
+func TestRunCapture_StripsAMarkSplitAcrossReads(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	console, err := os.CreateTemp(t.TempDir(), "console")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = console.Close() }()
+	var log bytes.Buffer
+	c := &runCapture{reached: make(chan struct{}, 1)}
+	c.pump(r, console, &log, &c.seen[0])
+	_, _ = io.WriteString(w, "abc"+syncMark[:5])
+	time.Sleep(50 * time.Millisecond) // let the pump read the first half alone
+	_, _ = io.WriteString(w, syncMark[5:]+"def\x00")
+	_ = w.Close()
+	c.drained.Wait()
+	if got := log.String(); got != "abcdef\x00" {
+		t.Errorf("transcript = %q, want %q", got, "abcdef\x00")
+	}
+	if got := c.seen[0].Load(); got != 1 {
+		t.Errorf("seen = %d, want 1", got)
+	}
+}
+
+func TestMarkPrefixLen(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want int
+	}{
+		{"", 0},
+		{"plain", 0},
+		{"abc\x00", 1},
+		{"abc" + syncMark[:7], 7},
+		{"abc" + syncMark[:len(syncMark)-1], len(syncMark) - 1},
+		{"\x00x", 0},
+	} {
+		if got := markPrefixLen([]byte(tc.in)); got != tc.want {
+			t.Errorf("markPrefixLen(%q) = %d, want %d", tc.in, got, tc.want)
+		}
 	}
 }
