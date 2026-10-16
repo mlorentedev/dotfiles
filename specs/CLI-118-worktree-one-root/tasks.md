@@ -22,6 +22,15 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 - [x] Wire into `done` and `sweep`; `--ignore-recent-session` distinct from `--force`.
 - [x] Non-Claude harness session stores: one ticket (#2569, BUG-148) rather than five, since the stores were measured together. pi and Copilot are consulted; agy (SQLite blobs, no readable cwd), codex and opencode (no store on the Mac) are stated gaps the process check covers while alive.
 
+## PR 3b — every harness's session store (#2569, BUG-148)
+
+- [x] Measure each store on the Mac: Claude Code and pi key a directory by the path, Copilot keys by session id with `cwd:` in `workspace.yaml`, agy keeps SQLite blobs with no readable cwd, codex and opencode have none.
+- [x] `SessionStores` and `RecentHarnessSession`: one row per harness, first live hit wins, a store that exists and cannot be read refuses naming the harness.
+- [x] pi row: the `--<path>--` key for an absolute POSIX path only (Windows unmeasured), subdirectories by `<stem>-…--`.
+- [x] Copilot row: every `workspace.yaml` parsed, cwd matched by `pathWithin`, age from `events.jsonl`.
+- [x] done, sweep and migrate take `Sessions SessionStores`; their messages and help name the harness.
+- [x] Mutations (ten, all killed) and a live read of the real stores, recorded in verification.md.
+
 ## PR 4 — adoption and done
 
 - [x] `Classify` returns `unadopted` for a worktree under the root without metadata; `sweep` still refuses it.
