@@ -1,7 +1,6 @@
 package doctor
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -115,21 +114,26 @@ func checkRecordTier(cfg *Config, parsed map[string]any, rep *Report, record str
 // declares. Deliberately minimal: it answers only what this check asks, and the
 // authoritative parse lives in the render pipeline.
 //
+// It reads them the way the render's `skill_field` (scripts/compile-harness.sh)
+// does, byte for byte, because this check predicts the render (GUARD-020,
+// #1740): a fence is `---` at column 0, optionally followed by whitespace; a
+// key matches only at column 0 and directly before its colon; a value loses
+// the whitespace after the colon and keeps everything else, a CR included. So
+// a CRLF record reports `top\r`, the tier the render fails to resolve, rather
+// than `top`. TestRecordModelAgreesWithTheRender runs the awk beside this.
+//
 // Values are returned raw, including any YAML flow-sequence brackets, because
 // the caller decides what a given key's shape means.
 func readAgentFrontmatter(path string) (map[string]string, error) {
-	f, err := os.Open(path) // #nosec G304 -- path is built from the manifest's own record_dir
+	data, err := os.ReadFile(path) // #nosec G304 -- path is built from the manifest's own record_dir
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = f.Close() }()
-
+	const awkSpace = " \t\n\v\f\r" // awk's [[:space:]]
 	out := map[string]string{}
-	sc := bufio.NewScanner(f)
 	delims := 0
-	for sc.Scan() {
-		line := sc.Text()
-		if strings.TrimSpace(line) == "---" {
+	for _, line := range strings.Split(string(data), "\n") {
+		if rest, ok := strings.CutPrefix(line, "---"); ok && strings.Trim(rest, awkSpace) == "" {
 			delims++
 			if delims >= 2 {
 				break
@@ -140,17 +144,14 @@ func readAgentFrontmatter(path string) (map[string]string, error) {
 			continue
 		}
 		key, value, found := strings.Cut(line, ":")
-		if !found || strings.HasPrefix(key, " ") || strings.HasPrefix(key, "\t") {
+		if !found {
 			continue
 		}
 		// The first occurrence wins, as it does in the render's awk (`exit` on
 		// the first match).
-		if k := strings.TrimSpace(key); !seen(out, k) {
-			out[k] = strings.TrimSpace(value)
+		if !seen(out, key) {
+			out[key] = strings.TrimLeft(value, awkSpace)
 		}
-	}
-	if err := sc.Err(); err != nil {
-		return nil, err
 	}
 	return out, nil
 }
