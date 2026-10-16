@@ -2,28 +2,28 @@
   {
     "id": "CLI-127-lane-reconcile-f1",
     "behavior": "lane status derives every one of the 9 phases from fixture facts, herdr absent included",
-    "verification": "cd cli && go test ./internal/lane/ -run 'TestDerive|TestStatus' -count=1",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestDerive|TestStatus)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestDerive ' \"$o\" && grep -q -- '^--- PASS: TestStatus ' \"$o\"",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-127-lane-reconcile-f2",
     "behavior": "lane plan classes each action auto, pending (with due time) or ambiguous (with resolving command) and mutates nothing",
-    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'TestPlan|TestLanePlan' -count=1",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestPlan|TestPlanMutatesNothing)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestPlan ' \"$o\" && grep -q -- '^--- PASS: TestPlanMutatesNothing ' \"$o\"",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-127-lane-reconcile-f3",
     "behavior": "lane apply runs only auto actions via sweep and lane next, never adopt or land, and a second run reports changed=0",
-    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'TestApply|TestLaneApply' -count=1",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestApply)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestApply ' \"$o\"",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "CLI-127-lane-reconcile-f4",
     "behavior": "a worktree with a live process or a recent session is never reaped by apply",
-    "verification": "cd cli && go test ./internal/lane/ -run 'TestApply.*Live' -count=1",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lane/ -run '^(TestApplyNeverReapsALiveWorktree)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestApplyNeverReapsALiveWorktree ' \"$o\"",
     "state": "pending",
     "evidence": ""
   }

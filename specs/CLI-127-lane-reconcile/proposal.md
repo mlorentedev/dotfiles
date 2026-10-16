@@ -53,7 +53,7 @@ Decided with the owner on 2026-10-16, on the advisor's recommendation.
 - [ ] AC1: `dotf lane status --json` on a fixture of git, lease, forge and process state returns the expected phase for each of the 9 phases. One table test per phase, with herdr absent in at least one row.
 - [ ] AC2: `dotf lane plan` on the same fixture prints the expected actions, each classed `auto`, `pending` (with its due time) or `ambiguous` (with its resolving command). The fixture's files and refs are byte-identical afterwards.
 - [ ] AC3: `dotf lane apply` executes only `auto` actions through `worktree sweep` and `lane next` (the test asserts the verb calls), never `worktree adopt` or `pr land`, and reports `changed=N`. A second run on the resulting state reports `changed=0`.
-- [ ] AC4: A worktree whose cwd holds a live process, or whose transcript `RecentSession` reports as recent, is never reaped by `apply`, whatever its PR state. Covered by a test and by one live run on this machine against the already-running herdr (read only). The live run never starts a second herdr server.
+- [ ] AC4: A worktree whose cwd holds a live process, or whose transcript `RecentSession` reports as recent, is never reaped by `apply`, whatever its PR state. Covered by a test and by one live run of the read-only verbs (`status`, `plan`) on this machine, against the already-running herdr: every worktree with a live session is classed `ambiguous`. The live run never runs `apply` and never starts a herdr server.
 
 ## References
 
