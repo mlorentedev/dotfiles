@@ -11,8 +11,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] AC1 (PR 1, `lane status`) -> `TestDerive` (one row per phase, herdr absent in several) and `TestStatus` (subtests: the 9 phases through the join, herdr absent, unknown liveness, landing head); the f1 verification line passes. `TestLaneStatus*` in `cli/internal/cmd` pins the `--json` and table shapes.
 - [x] AC2 (PR 2, `lane plan`) -> `TestPlan` (one row per D1 case, the D2 rows, the D3 landing row) and `TestPlanMutatesNothing` (a real git fixture, a non-empty plan, a hash of refs, worktrees, statuses and leases before and after); the f2 verification line passes. `TestLanePlan*` in `cli/internal/cmd` pins the text and `--json` shapes.
-- [ ] AC3 (PR 3, `lane apply`) -> not started
-- [ ] AC4 (PR 3, live process never reaped) -> not started. The read-only half ran on 2026-10-16, see Test status.
+- [x] AC3 (PR 3, `lane apply`) -> `TestApply` (auto actions only, one sweep and one next, a second apply over the post-state is `changed=0`, a printed-only start is not a change, the first verb error stops the run) and `TestLaneApply_PrintsChangedAndRunsOnlyAutoVerbs`; the f3 verification line passes.
+- [x] AC4 (PR 3, live process never reaped) -> `TestApplyNeverReapsALiveWorktree` (liveness `live` and `unknown` on a merged, clean, expired worktree: ambiguous, and apply never reaches sweep); the f4 verification line passes. Live half: see Test status.
 
 ## Test status
 
@@ -48,3 +48,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - [ ] Folder moved: `specs/CLI-127-lane-reconcile/` -> `specs/archive/CLI-127-lane-reconcile/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+### PR 3 live evidence (2026-10-16, read-only)
+
+`dotf lane status --json` and `dotf lane plan --json` ran on this machine against the running herdr (none started): 20 lanes, 9 with a live session. The plan was 4 `adopt/ambiguous` and 4 `flag/ambiguous`; none of the 9 was `auto` or `pending`. The first run found two live worktrees (`feat/deploy-toml-paths`, `feat/worktree-harness-sessions`) classed `reap/pending`: the pending branch read time only, so the plan said "wait and it goes" for a worktree with a live session. Not `auto`, but not the AC4 wording either. Fixed in PR 2 (liveness is checked before any time-only reason, with a table case); the re-run is the evidence above. `apply` was not run live: a safety check is not performed by the reaper it guards against.

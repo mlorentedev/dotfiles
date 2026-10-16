@@ -29,7 +29,7 @@ func newLaneCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd())
+	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd())
 	return c
 }
 
@@ -112,21 +112,32 @@ func gitOut(args ...string) (string, error) {
 }
 
 func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
-	top, err := gitOut("rev-parse", "--show-toplevel")
-	if err != nil {
-		return fmt.Errorf("lane next: not in a git checkout: %w", err)
-	}
-	common, err := gitOut("rev-parse", "--path-format=absolute", "--git-common-dir")
-	if err != nil {
-		return fmt.Errorf("lane next: %w", err)
-	}
-	cfg, err := lane.LoadConfig(top)
+	out, err := doLaneNext(c, agent, dryRun)
 	if err != nil {
 		return err
 	}
+	printOutcome(c.OutOrStdout(), out)
+	return nil
+}
+
+// doLaneNext hands off to the next queued item and returns what happened, so
+// apply can count a start without parsing what next prints.
+func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, error) {
+	top, err := gitOut("rev-parse", "--show-toplevel")
+	if err != nil {
+		return lane.Outcome{}, fmt.Errorf("lane next: not in a git checkout: %w", err)
+	}
+	common, err := gitOut("rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return lane.Outcome{}, fmt.Errorf("lane next: %w", err)
+	}
+	cfg, err := lane.LoadConfig(top)
+	if err != nil {
+		return lane.Outcome{}, err
+	}
 	tmpl, err := os.ReadFile(filepath.Join(top, filepath.FromSlash(cfg.Template)))
 	if err != nil {
-		return fmt.Errorf("lane next: prompt template: %w", err)
+		return lane.Outcome{}, fmt.Errorf("lane next: prompt template: %w", err)
 	}
 	parent := filepath.Dir(common)
 	opts := lane.Options{
@@ -143,12 +154,7 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 	if h := (lane.Herdr{Run: laneRun}); h.Available() {
 		backend = h
 	}
-	out, err := lane.Handoff(opts, backend, lane.GH{Run: laneRun})
-	if err != nil {
-		return err
-	}
-	printOutcome(c.OutOrStdout(), out)
-	return nil
+	return lane.Handoff(opts, backend, lane.GH{Run: laneRun})
 }
 
 func printOutcome(w io.Writer, out lane.Outcome) {

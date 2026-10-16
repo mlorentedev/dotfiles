@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/spf13/cobra"
 	"strings"
 	"testing"
 	"time"
@@ -155,5 +156,30 @@ func TestLanePlan_NothingToDo(t *testing.T) {
 	}
 	if out, err := runLaneOut(t, "plan", "--json"); err != nil || !strings.Contains(out, `"actions": []`) {
 		t.Errorf("empty JSON plan = %q, %v", out, err)
+	}
+}
+
+func TestLaneApply_PrintsChangedAndRunsOnlyAutoVerbs(t *testing.T) {
+	prevS, prevV := laneSources, laneVerbs
+	t.Cleanup(func() { laneSources, laneVerbs = prevS, prevV })
+	laneSources = func() (lane.Sources, error) {
+		return lane.Sources{List: func() ([]worktree.Info, error) { return nil, nil }, Forge: stubForge{}}, nil
+	}
+	var sweeps, nexts int
+	laneVerbs = func(*cobra.Command) lane.Verbs {
+		return lane.Verbs{
+			Sweep: func() (int, error) { sweeps++; return 1, nil },
+			Next:  func() (bool, error) { nexts++; return true, nil },
+		}
+	}
+	out, err := runLaneOut(t, "apply")
+	if err != nil || out != "changed=0\n" {
+		t.Errorf("apply over an empty plan = %q, %v; want changed=0", out, err)
+	}
+	if sweeps != 0 || nexts != 0 {
+		t.Errorf("sweeps=%d nexts=%d: an empty plan ran a verb", sweeps, nexts)
+	}
+	if out, err := runLaneOut(t, "apply", "--json"); err != nil || !strings.Contains(out, `"changed":0`) {
+		t.Errorf("JSON apply = %q, %v", out, err)
 	}
 }
