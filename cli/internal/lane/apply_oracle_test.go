@@ -65,11 +65,18 @@ func TestApplyNeverReapsWhatPlanCalledAmbiguous(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Changed != 1 {
-		t.Errorf("changed=%d, want 1: only the merged worktree", got.Changed)
-	}
 	if _, err := os.Stat(stalled); err != nil {
 		t.Errorf("apply removed a worktree plan classed ambiguous: %v", err)
+	}
+	// Where no process scan exists (Windows) sweep reaps nothing at all: gate f
+	// refuses rather than guesses. The half above holds there too; this one
+	// needs a platform that can look.
+	if _, scans := worktree.ProcessInside(merged); !scans {
+		t.Logf("no process scan on this platform: sweep reaps nothing, changed=%d", got.Changed)
+		return
+	}
+	if got.Changed != 1 {
+		t.Errorf("changed=%d, want 1: only the merged worktree", got.Changed)
 	}
 	if _, err := os.Stat(merged); !os.IsNotExist(err) {
 		t.Errorf("apply left the merged worktree plan classed auto (stat err: %v)", err)
