@@ -64,3 +64,13 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - **Handoff hygiene (Minor).** The promotion lines are answered above.
 
 Not changed: the sequential `gh api` per branch (compliant with the proposal) and the `BranchPrefix` default `fix` (it only feeds the queued-branch derivation).
+
+## Review round 1 follow-up (2026-10-16): #2596 and two live-run defects
+
+`dotf lane plan` was run read-only against the live forge after the change. The first run, before the fixes, printed PR #2601 against three detached worktrees (an empty branch matched the newest PR) and named the draft #2582 the landing head. After the fixes the same run reads:
+
+- the draft #2582 is listed but never the head, and the head's line is the first non-draft, #2600;
+- under the head, `blocked:` names each unmet condition from `prland.Decide` (checks pending, merge state UNKNOWN), and the command follows;
+- no detached worktree carries a PR.
+
+`apply` was not run live (AC4 policy above). The independent review of the whole spec is re-run after this change lands.
