@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -255,12 +256,14 @@ after the first review, into review-second.md. A member that declares
 			// the head we actually pointed it at, the pool member we resolved,
 			// and the digest of whatever review.md held going in.
 			//
-			// The digest is the load-bearing one. A detached launch can only ever
-			// report that the runner STARTED, so nothing here can observe a run
-			// that ends without writing a verdict — measured twice on 2026-08-22,
-			// once by turn cap and once by a provider quota — and the previous
-			// round's verdict then sits on disk looking exactly like a fresh one.
-			// `spec archive` compares the digest and refuses.
+			// A detached launch can only ever report that the runner STARTED, so
+			// nothing here can observe a run that ends without writing a verdict
+			// (measured twice on 2026-08-22, once by turn cap and once by a
+			// provider quota). The previous round's verdict used to sit on disk
+			// then, looking exactly like a fresh one. The rotation below now moves
+			// it aside first, so the digest is normally of nothing; it still
+			// catches a verdict that comes back by another route, and `spec
+			// archive` compares it and refuses.
 			//
 			// A failure to write it refuses the launch. It used to be a warning,
 			// but `spec archive` refuses a review with no sidecar (#1908), so a run
@@ -272,10 +275,23 @@ after the first review, into review-second.md. A member that declares
 					"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
 					id, slot.Request, slot.Request)
 			}
+			// A re-review used to overwrite the round the author's dispositions
+			// answer (#2264). Keep it under a round number instead; the slot then
+			// holds no verdict, so a run that ends without writing one leaves
+			// nothing to archive rather than the previous round's. If the request
+			// cannot be written, nothing has started: the previous round goes
+			// back, so a verdict that was still valid stays archivable.
+			kept, undoRotation, err := spec.RotateReviewRound(specDir, slot)
+			if err != nil {
+				return fmt.Errorf("could not keep the previous round's %s before the new one overwrites it: %w", slot.Review, err)
+			}
 			if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, chosen.ID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
 				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
 					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
-					err, slot.Request)
+					errors.Join(err, undoRotation()), slot.Request)
+			}
+			if kept != "" {
+				cmd.Printf("Kept:       the previous verdict as %s\n", kept)
 			}
 
 			if useTmux {

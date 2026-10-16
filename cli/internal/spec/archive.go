@@ -162,7 +162,8 @@ var ReviewStateFiles = []string{
 	SecondSigner.Review, SecondSigner.Transcript, StderrPath(SecondSigner.Transcript), SecondSigner.Request,
 }
 
-// IsReviewState reports whether name is one of ReviewStateFiles.
+// IsReviewState reports whether name is one of ReviewStateFiles, or a kept
+// round of one (RoundName: review-round1.md, #2264).
 //
 // The tag scan must skip these, because scanning them makes the gate unpassable
 // by construction (#998). The adversarial-review skill instructs the reviewer
@@ -184,8 +185,18 @@ var ReviewStateFiles = []string{
 // folder is still scanned, so an artifact added later (design.md, notes.md) is
 // guarded with no code change. That direction is deliberate and matches
 // ScanUnresolvedTags above — a deny-list errs toward refusing an archive, an
-// allow-list would silently stop guarding a file someone adds.
+// allow-list would silently stop guarding a file someone adds. A kept round is
+// matched by its declared base name plus a round number, never by a looser
+// shape, so notes-round1.md is still scanned.
 func IsReviewState(name string) bool {
+	if isDeclaredReviewState(name) {
+		return true
+	}
+	_, _, ok := parseRound(name)
+	return ok
+}
+
+func isDeclaredReviewState(name string) bool {
 	for _, f := range ReviewStateFiles {
 		if name == f {
 			return true
