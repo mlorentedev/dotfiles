@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.72.0](https://github.com/mlorentedev/dotfiles/compare/v0.71.0...v0.72.0) (2026-10-16)
+
+
+### Features
+
+* **deploy:** render paths in a TOML source from manifest version 6 ([#2568](https://github.com/mlorentedev/dotfiles/issues/2568)) ([1ac9240](https://github.com/mlorentedev/dotfiles/commit/1ac92409f1e8af930e55ee20dcbfc2e55d96edaa))
+* **lane:** add dotf lane apply ([#2595](https://github.com/mlorentedev/dotfiles/issues/2595)) ([a55776c](https://github.com/mlorentedev/dotfiles/commit/a55776cea9e3cf01eddfbbe6d7343534dc1a3429)), closes [#2550](https://github.com/mlorentedev/dotfiles/issues/2550)
+* **lane:** add dotf lane plan ([#2594](https://github.com/mlorentedev/dotfiles/issues/2594)) ([8ff83b0](https://github.com/mlorentedev/dotfiles/commit/8ff83b00368bb6c11c468074dc55774c437bd4c0)), closes [#2550](https://github.com/mlorentedev/dotfiles/issues/2550)
+* **lane:** add dotf lane status ([#2577](https://github.com/mlorentedev/dotfiles/issues/2577)) ([dd1f5c7](https://github.com/mlorentedev/dotfiles/commit/dd1f5c787db7d60550cc82646a78c06c8478d570))
+* **trust:** render the agy and Copilot worktree trust from WORKTREE_ROOT ([#2580](https://github.com/mlorentedev/dotfiles/issues/2580)) ([0016351](https://github.com/mlorentedev/dotfiles/commit/0016351656e4d4c2cda119117a5969e859a7e65c))
+
+
+### Bug Fixes
+
+* **converge:** print a step's result after all of its output ([#2590](https://github.com/mlorentedev/dotfiles/issues/2590)) ([79cf7e5](https://github.com/mlorentedev/dotfiles/commit/79cf7e5d30f34216a715bc5ba269f3a929479048))
+* **deploy:** remove what a merge source stopped managing ([#2579](https://github.com/mlorentedev/dotfiles/issues/2579)) ([71c1259](https://github.com/mlorentedev/dotfiles/commit/71c12594b3d014a219a8d0037fa14b1dc19923aa))
+* **doctor:** refresh a stale opencode model catalog under --fix ([#2592](https://github.com/mlorentedev/dotfiles/issues/2592)) ([7c4a1c5](https://github.com/mlorentedev/dotfiles/commit/7c4a1c5fbdeaee7a1709f41abb2b8742ba8d70c5)), closes [#2540](https://github.com/mlorentedev/dotfiles/issues/2540)
+* **lane:** hold the lane base to a plain ref and test the prompt-file fallback ([#2598](https://github.com/mlorentedev/dotfiles/issues/2598)) ([f74dd09](https://github.com/mlorentedev/dotfiles/commit/f74dd093fe6b22f2a1e798f1aafec9be815f0ae6))
+* **lane:** leave the prompt in the new worktree so a path with a space reaches no pane ([#2588](https://github.com/mlorentedev/dotfiles/issues/2588)) ([ec982b3](https://github.com/mlorentedev/dotfiles/commit/ec982b38eb026c54e8154c1b1d2351557a7b21dd))
+* **lane:** show refusals, print no-backend commands for any agent in the worktree layout ([#2578](https://github.com/mlorentedev/dotfiles/issues/2578)) ([94fea6b](https://github.com/mlorentedev/dotfiles/commit/94fea6b6baaa7ed3bdd58ef0f1933351684cfa31))
+* **mem:** read the session-start triage registry from the checkout root ([#2593](https://github.com/mlorentedev/dotfiles/issues/2593)) ([da4beff](https://github.com/mlorentedev/dotfiles/commit/da4beffe25497cfcfc102c5b49106357e3ae71ef)), closes [#1281](https://github.com/mlorentedev/dotfiles/issues/1281)
+* **pr:** count formal reviews in the triage queue and land gate ([#2585](https://github.com/mlorentedev/dotfiles/issues/2585)) ([8e8a936](https://github.com/mlorentedev/dotfiles/commit/8e8a936671a4a6024d85cb3ee30e8738d4931e18))
+* **pr:** read the reviewer registry of the repository named by --repo ([#2574](https://github.com/mlorentedev/dotfiles/issues/2574)) ([86a4be6](https://github.com/mlorentedev/dotfiles/commit/86a4be64b0c3bdda1262cbd7121994498fc05d16))
+* **skills:** apply the review findings on using-git-worktrees ([#2584](https://github.com/mlorentedev/dotfiles/issues/2584)) ([8d0f940](https://github.com/mlorentedev/dotfiles/commit/8d0f940bd16612bcf7489430219298a82c2fd792))
+* **spec:** print both shas in full when a review's reviewed_sha does not match ([#2589](https://github.com/mlorentedev/dotfiles/issues/2589)) ([d748547](https://github.com/mlorentedev/dotfiles/commit/d7485473fb11de86365287ee2ee189c89ec37322))
+* **worktree:** consult pi and Copilot session stores before removing a worktree ([#2575](https://github.com/mlorentedev/dotfiles/issues/2575)) ([6543c83](https://github.com/mlorentedev/dotfiles/commit/6543c8309c745dddab568d798841451ea8e80f09))
+
 ## [0.71.0](https://github.com/mlorentedev/dotfiles/compare/v0.70.0...v0.71.0) (2026-10-15)
 
 
