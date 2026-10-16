@@ -351,6 +351,8 @@ func TestRecordModelAgreesWithTheRender(t *testing.T) {
 		"body model only":   "---\nname: x\n---\nmodel: top\n",
 		"no frontmatter":    "model: top\n",
 		"fence with spaces": "---  \nmodel: mid\n---\n",
+		"bare CR after ':'": "---\r\nmodel:\r\n---\r\n",
+		"CR fence, LF body": "---\r\nmodel: top\n---\n",
 	}
 	for name, content := range records {
 		path := filepath.Join(t.TempDir(), "AGENT.md")
