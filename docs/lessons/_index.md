@@ -469,5 +469,5 @@ tags: [lessons, index, dotfiles]
 | [448 - A review gate must read every channel a reviewer publishes on, not the one it was first seen on](lesson-448-a-review-gate-must-read-every-channel-a-reviewer-publishes-on.md) | 2026-10-16 |
 | [449 - A typed line may carry no path anyone chose](lesson-449-a-typed-line-may-carry-no-path-anyone-chose.md) | 2026-10-16 |
 | [450 - Ancestry reads a fresh branch as merged, and a one-row-per-phase table hides how the rules compete](lesson-450-ancestry-reads-a-fresh-branch-as-merged-and-a-phase-table-hides-how-rules-compete.md) | 2026-10-16 |
-| [451 - A tee through a pipe reorders output written around it; order needs a barrier through the same pipe](lesson-451-a-tee-through-a-pipe-reorders-output-written-around-it.md) | 2026-10-16 |
+| [452 - A tee through a pipe reorders output written around it; order needs a barrier through the same pipe](lesson-452-a-tee-through-a-pipe-reorders-output-written-around-it.md) | 2026-10-16 |
 <!-- END GENERATED -->
