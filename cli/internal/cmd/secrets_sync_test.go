@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -41,6 +42,13 @@ func useOriginResolver(t *testing.T, fn func() (string, error)) {
 func syncCiExec(t *testing.T, registry string, setter fakeSetter, bw fakeBW, ageVals map[string]string, args ...string) (string, error) {
 	t.Helper()
 	useTempRegistry(t, registry)
+	return syncCiRun(t, setter, bw, ageVals, args...)
+}
+
+// syncCiRun is syncCiExec without the registry: the caller has pointed the read
+// seam at one already.
+func syncCiRun(t *testing.T, setter fakeSetter, bw fakeBW, ageVals map[string]string, args ...string) (string, error) {
+	t.Helper()
 	useBwReader(t, bw)
 	useGHSecretSetter(t, setter)
 	old := ageDecryptor
@@ -347,5 +355,93 @@ func TestCheckAligned_RefusesAMisalignedResolution(t *testing.T) {
 	}
 	if err := checkAligned([]string{"A=1", "B=2"}, upload, "o/a"); err != nil {
 		t.Errorf("aligned: %v", err)
+	}
+}
+
+// useDeployedRegistry writes the registry where the deployed copy lives
+// (DOTFILES_DIR/secrets/registry.yaml) and points the read seam at it: the path
+// the resolver falls back to when no dotfiles checkout is found (#2531).
+func useDeployedRegistry(t *testing.T, body string) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("DOTFILES_DIR", dir)
+	p := filepath.Join(dir, "secrets", "registry.yaml")
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := registryPath
+	registryPath = func() string { return p }
+	t.Cleanup(func() { registryPath = old })
+	return p
+}
+
+// syncRefusals are the two ways `sync ci` refuses because of what the registry
+// selects: a named secret the repo's set lacks, and a repo with no set at all.
+var syncRefusals = []struct {
+	name string
+	args []string
+}{
+	{"named secret not selected", []string{"--repo", "mlorentedev/dotfiles", "OTHER_TOKEN"}},
+	{"nothing selected", []string{"--repo", "mlorentedev/kubelab"}},
+}
+
+// #2531: a refusal read from the deployed copy names that copy and the step that
+// refreshes it. Without it the operator is told to add a consumer the checkout
+// they just pulled already declares.
+func TestSecretsSyncCi_RefusalFromTheDeployedCopyNamesTheRefresh(t *testing.T) {
+	for _, tc := range syncRefusals {
+		t.Run(tc.name, func(t *testing.T) {
+			path := useDeployedRegistry(t, ciRegistry)
+			setter := fakeSetter{}
+			_, err := syncCiRun(t, setter, fakeBW{}, nil, tc.args...)
+			if err == nil {
+				t.Fatal("want a refusal")
+			}
+			for _, want := range []string{path, "deployed copy", "dotf converge --only records-mirror", "DOTFILES_REPO_DIR"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("refusal lacks %q:\n%v", want, err)
+				}
+			}
+			if len(setter) != 0 {
+				t.Errorf("nothing may upload on a refusal, got %v", setter)
+			}
+		})
+	}
+}
+
+// The same refusals read from a checkout name the file and no refresh step: a
+// checkout is the SSOT, so pointing at the mirror there would send the operator
+// the wrong way.
+func TestSecretsSyncCi_RefusalFromACheckoutNamesTheFileOnly(t *testing.T) {
+	t.Setenv("DOTFILES_DIR", t.TempDir())
+	for _, tc := range syncRefusals {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := syncCiExec(t, ciRegistry, fakeSetter{}, fakeBW{}, nil, tc.args...)
+			if err == nil {
+				t.Fatal("want a refusal")
+			}
+			if !strings.Contains(err.Error(), registryPath()) {
+				t.Errorf("refusal does not name the registry it read (%s):\n%v", registryPath(), err)
+			}
+			if strings.Contains(err.Error(), "records-mirror") {
+				t.Errorf("a checkout read must not suggest refreshing the mirror:\n%v", err)
+			}
+		})
+	}
+}
+
+// A DOTFILES_DIR that is itself a git checkout is not a copy of one: the refusal
+// must not tell the operator it lags the checkout it is.
+func TestSecretsSyncCi_RefusalFromACheckoutAtDotfilesDirIsNotTheCopy(t *testing.T) {
+	path := useDeployedRegistry(t, ciRegistry)
+	if err := os.Mkdir(filepath.Join(os.Getenv("DOTFILES_DIR"), ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_, err := syncCiRun(t, fakeSetter{}, fakeBW{}, nil, syncRefusals[0].args...)
+	if err == nil || !strings.Contains(err.Error(), path) || strings.Contains(err.Error(), "records-mirror") {
+		t.Fatalf("want the checkout form naming %s, got:\n%v", path, err)
 	}
 }
