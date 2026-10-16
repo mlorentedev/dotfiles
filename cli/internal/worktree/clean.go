@@ -92,9 +92,15 @@ func HasNonDisposableIgnored(porcelainOutput string) bool {
 
 // NonDisposableIgnored lists, in git's order, the ignored paths in
 // `git status --ignored --porcelain` output that are not known build output.
+// Entries are NUL-separated when the output came from -z, which leaves paths
+// unquoted, and newline-separated otherwise.
 func NonDisposableIgnored(porcelainOutput string) []string {
+	sep := "\n"
+	if strings.Contains(porcelainOutput, "\x00") {
+		sep = "\x00"
+	}
 	var paths []string
-	for _, line := range strings.Split(porcelainOutput, "\n") {
+	for _, line := range strings.Split(porcelainOutput, sep) {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "!! ") {
 			continue

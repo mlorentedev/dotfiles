@@ -371,7 +371,7 @@ func TestDoneRefusesWhenAnAncestorProcessIsInsideEvenWithForce(t *testing.T) {
 // apart, and reads the ignored paths only when nothing tracked is dirty.
 func TestRealGitRunnerDirtSeparatesTrackedFromIgnored(t *testing.T) {
 	_, wtDir, _ := setupTestGitRepoAndWorktree(t)
-	_ = os.WriteFile(filepath.Join(wtDir, ".gitignore"), []byte(".env\nnode_modules/\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(wtDir, ".gitignore"), []byte(".env\nnode_modules/\nnotes*\n"), 0o644)
 	for _, args := range [][]string{{"add", ".gitignore"}, {"commit", "-m", "ignore"}} {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = wtDir
@@ -392,6 +392,13 @@ func TestRealGitRunnerDirtSeparatesTrackedFromIgnored(t *testing.T) {
 	dirt, err = runner.Dirt(wtDir)
 	if err != nil || dirt.Tracked || !reflect.DeepEqual(dirt.Ignored, []string{".env"}) {
 		t.Fatalf("ignored .env: Dirt = %+v, err = %v; want Ignored [.env] and nothing tracked", dirt, err)
+	}
+
+	// A name with a space is reported as itself, not in git's quotes.
+	_ = os.WriteFile(filepath.Join(wtDir, "notes draft.txt"), []byte("n"), 0o644)
+	dirt, err = runner.Dirt(wtDir)
+	if err != nil || !reflect.DeepEqual(dirt.Ignored, []string{".env", "notes draft.txt"}) {
+		t.Fatalf("ignored name with a space: Dirt = %+v, err = %v; want [.env notes draft.txt]", dirt, err)
 	}
 
 	_ = os.WriteFile(filepath.Join(wtDir, "initial.txt"), []byte("changed"), 0o644)

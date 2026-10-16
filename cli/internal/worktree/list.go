@@ -59,7 +59,9 @@ func (r *RealGitRunner) Dirt(worktreePath string) (Dirt, error) {
 	}
 
 	// Fail-closed data loss guard: check for non-disposable gitignored local content (e.g. .env, scratchpad notes)
-	ignoredCmd := exec.Command("git", "-C", worktreePath, "status", "--ignored", "--porcelain")
+	// -z: paths unquoted and NUL-separated, so a name with a space is reported
+	// as itself rather than in git's C-style quotes.
+	ignoredCmd := exec.Command("git", "-C", worktreePath, "status", "--ignored", "--porcelain", "-z")
 	ignoredOut, err := ignoredCmd.Output()
 	if err != nil {
 		return Dirt{}, fmt.Errorf("git status --ignored: %w", err)
