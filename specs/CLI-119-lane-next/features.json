@@ -9,7 +9,7 @@
   {
     "id": "CLI-119-lane-next-f2",
     "behavior": "AC2: next from a linked worktree creates through the repo parent and leaves the caller's worktree and branch untouched",
-    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone$' -count=1 -v | grep -q -- '--- PASS: TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone'",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone$' -count=1 -v | grep -q -- '--- PASS: TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone' && go test ./internal/lane/ -run '^TestNext_APathWithASpaceReachesNoPane$' -count=1 -v | grep -q -- '--- PASS: TestNext_APathWithASpaceReachesNoPane'",
     "state": "passing",
     "evidence": "go test run 2026-10-14"
   },

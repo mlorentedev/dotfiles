@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +46,7 @@ func newLaneExecCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			b, err := os.ReadFile(promptFile)
+			b, err := readPrompt(promptFile)
 			if err != nil {
 				return fmt.Errorf("lane exec: %w", err)
 			}
@@ -60,6 +62,22 @@ func newLaneExecCmd() *cobra.Command {
 	_ = c.MarkFlagRequired("agent")
 	_ = c.MarkFlagRequired("prompt-file")
 	return c
+}
+
+// readPrompt reads the prompt file. The line `lane next` types into a pane
+// names it relative to the pane's directory (lane.PromptFile), so a relative
+// path that is not there is looked for at the worktree root too, in case the
+// pane stands in a subdirectory.
+func readPrompt(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if err == nil || filepath.IsAbs(path) || !errors.Is(err, fs.ErrNotExist) {
+		return b, err
+	}
+	top, gitErr := gitOut("rev-parse", "--show-toplevel")
+	if gitErr != nil {
+		return nil, err
+	}
+	return os.ReadFile(filepath.Join(top, path))
 }
 
 func newLaneNextCmd() *cobra.Command {

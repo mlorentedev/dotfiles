@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,12 +17,14 @@ import (
 
 // Options is one hand-off: which repo, which queue, which agent.
 type Options struct {
-	Agent     string // empty: the agent of the calling pane
-	DryRun    bool   // decide and print, change nothing
-	Config    Config
-	Template  string // the prompt template's text
-	Parent    string // the repository's parent checkout
-	PromptDir string // where the rendered prompt is left for the successor
+	Agent    string // empty: the agent of the calling pane
+	DryRun   bool   // decide and print, change nothing
+	Config   Config
+	Template string // the prompt template's text
+	Parent   string // the repository's parent checkout
+	// PromptDir is where the prompt is left when there is no worktree to put it
+	// in yet (no backend): a person reads the path from the printed commands.
+	PromptDir string
 	// WorktreeRoot is where `dotf worktree add` and herdr put a branch's
 	// worktree. Only the commands printed for a person need it: a backend
 	// decides the path itself.
@@ -47,13 +50,22 @@ type Outcome struct {
 	Commands []string // what a person runs when nothing could be run for them
 }
 
-// plainWord is the one shape a path may take in the command typed into the
-// successor's pane: that line is read by zsh, bash, PowerShell or cmd, and a
-// word of these characters means the same in all four. Anything else would need
-// quoting rules per shell, which is what lane exec exists to avoid. A tilde is
-// allowed after the first character: Windows short names (RUNNER~1) carry one,
-// and no shell expands it mid-word.
-var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./:\\-][A-Za-z0-9_./:\\~-]*$`)
+// plainWord is the one shape the binary's path may take in the command typed
+// into the successor's pane: that line is read by zsh, bash, PowerShell or cmd,
+// and a word of these characters means the same in all four. Anything else
+// would need quoting rules per shell, which is what lane exec exists to avoid.
+// A tilde is allowed after the first character: Windows short names (RUNNER~1)
+// carry one, and no shell expands it mid-word. A backslash is a path separator
+// only on Windows; zsh and bash read it as an escape, so it is a plain
+// character there only on Windows.
+var plainWord = plainWordFor(runtime.GOOS)
+
+func plainWordFor(goos string) *regexp.Regexp {
+	if goos == "windows" {
+		return regexp.MustCompile(`^[A-Za-z0-9_./:\\-][A-Za-z0-9_./:\\~-]*$`)
+	}
+	return regexp.MustCompile(`^[A-Za-z0-9_./:-][A-Za-z0-9_./:~-]*$`)
+}
 
 // Handoff starts the successor of a finished lane item. With a nil backend it
 // starts nothing and returns the commands that would. It never removes a
@@ -90,7 +102,7 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 		return out, ensureLease(o, wt.Path, issue.Number, out.Agent)
 	}
 	if o.DryRun {
-		out.Commands = []string{"(write the prompt to " + p.file + ")", "(" + describe(found) + " " + out.Branch + ")", p.exec}
+		out.Commands = []string{"(write the prompt to " + PromptFile + " in the new worktree)", "(" + describe(found) + " " + out.Branch + ")", p.exec(PromptFile)}
 		out.Note = p.note
 		return out, nil
 	}
@@ -101,12 +113,15 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	return out, nil
 }
 
-// launch leaves the prompt, starts the branch's worktree, leases it, and only
-// then types the command: the lease must exist before anything runs in it.
+// PromptFile is the name the prompt is left under, inside the successor's
+// worktree. The command typed into the pane names it relative to that pane's
+// directory, so the line carries no path anyone chose: a git directory, a temp
+// directory or a home with a space in it cannot reach the pane's shell.
+const PromptFile = ".dotf-lane-prompt.md"
+
+// launch starts the branch's worktree, leases it, leaves the prompt in it, and
+// only then types the command: the lease must exist before anything runs there.
 func launch(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) error {
-	if err := writePrompt(o, p.file, p.prompt); err != nil {
-		return err
-	}
 	st, err := start(o, b, wt, found, out.Branch, out.Issue)
 	if err != nil {
 		return err
@@ -114,13 +129,24 @@ func launch(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) 
 	if err := ensureLease(o, st.Worktree.Path, out.Issue.Number, out.Agent); err != nil {
 		return err
 	}
-	return b.Type(st.Pane, p.exec)
+	if err := excludeFile(o.GitDir, PromptFile); err != nil {
+		return err
+	}
+	if err := writePrompt(o, filepath.Join(st.Worktree.Path, PromptFile), p.prompt); err != nil {
+		return err
+	}
+	return b.Type(st.Pane, p.exec(PromptFile))
 }
 
-// plan is what a hand-off hands the successor: its prompt, the file the prompt
-// is left in, the command line typed into its pane, and a note when that line
-// is not quite what the caller asked for.
-type plan struct{ prompt, file, exec, note string }
+// plan is what a hand-off hands the successor: its prompt, the dotf its pane
+// runs, and a note when that is not quite what the caller asked for.
+type plan struct{ prompt, dotf, agent, note string }
+
+// exec is the command line typed into the successor's pane, reading its prompt
+// from file.
+func (p plan) exec(file string) string {
+	return fmt.Sprintf("%s lane exec --agent %s --prompt-file %s", p.dotf, p.agent, file)
+}
 
 // prepare renders the prompt, settles the agent and builds the command line.
 // out.Agent is set as a side effect, so a refusal still names it.
@@ -139,10 +165,6 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 			return plan{}, err
 		}
 	}
-	file := filepath.Join(o.PromptDir, strconv.Itoa(out.Issue.Number)+".md")
-	if !plainWord.MatchString(file) {
-		return plan{}, fmt.Errorf("lane: the prompt path %q has characters a pane's shell would read differently; use a PromptDir of letters, digits and _ . / : \\ ~ -", file)
-	}
 	dotf, note := o.Dotf, ""
 	if dotf == "" || !plainWord.MatchString(dotf) {
 		if dotf != "" {
@@ -150,7 +172,22 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 		}
 		dotf = "dotf"
 	}
-	return plan{prompt, file, fmt.Sprintf("%s lane exec --agent %s --prompt-file %s", dotf, out.Agent, file), note}, nil
+	return plan{prompt, dotf, out.Agent, note}, nil
+}
+
+// humanPath is a path as a person pastes it into their own shell: bare when it
+// is a plain word, else in double quotes, which bash, zsh, PowerShell and cmd
+// all read as one word. A character that is live inside double quotes in one
+// of them ($ and backtick in bash and zsh, ! for their history expansion, % for
+// cmd's variables) is refused, since no quoting of it means the same in all four.
+func humanPath(p string) (string, error) {
+	if plainWord.MatchString(p) {
+		return p, nil
+	}
+	if strings.ContainsAny(p, "\"$`!%") {
+		return "", fmt.Errorf("lane: %q has a character no shell quotes alike; move the repository to a path without a quote, $, backtick, ! or %%", p)
+	}
+	return `"` + p + `"`, nil
 }
 
 // noBackend answers a hand-off with nothing to start the successor in: the
@@ -158,7 +195,12 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 // cannot be guessed (no pane to ask, and no harness is privileged), so the
 // printed line carries a placeholder for the person to fill.
 func noBackend(o Options, out Outcome, p plan) (Outcome, error) {
-	cmds, err := manualCommands(o, out, p.exec)
+	file := filepath.Join(o.PromptDir, strconv.Itoa(out.Issue.Number)+".md")
+	quoted, err := humanPath(file)
+	if err != nil {
+		return out, err
+	}
+	cmds, err := manualCommands(o, out, p.exec(quoted))
 	if err != nil {
 		return out, err
 	}
@@ -171,7 +213,7 @@ func noBackend(o Options, out Outcome, p plan) (Outcome, error) {
 		notes = append(notes, p.note)
 	}
 	out.Note = strings.Join(notes, "; ")
-	return out, writePrompt(o, p.file, p.prompt)
+	return out, writePrompt(o, file, p.prompt)
 }
 
 // start opens the worktree that exists, or creates the branch's off the base,
@@ -248,11 +290,18 @@ func manualCommands(o Options, out Outcome, exec string) ([]string, error) {
 	if o.WorktreeRoot == "" {
 		return nil, errors.New("lane: WORKTREE_ROOT does not resolve, so the worktree's path cannot be printed; run `dotf doctor`")
 	}
-	dir := worktree.ResolveWorktreePath(o.WorktreeRoot, filepath.Base(o.Parent), out.Branch)
+	dir, err := humanPath(worktree.ResolveWorktreePath(o.WorktreeRoot, filepath.Base(o.Parent), out.Branch))
+	if err != nil {
+		return nil, err
+	}
+	parent, err := humanPath(o.Parent)
+	if err != nil {
+		return nil, err
+	}
 	remote, _ := o.Config.Remote()
 	return []string{
-		"git -C " + o.Parent + " fetch " + remote,
-		"git -C " + o.Parent + " worktree add -b " + out.Branch + " " + dir + " " + o.Config.Base,
+		"git -C " + parent + " fetch " + remote,
+		"git -C " + parent + " worktree add -b " + out.Branch + " " + dir + " " + o.Config.Base,
 		"cd " + dir,
 		exec,
 	}, nil
