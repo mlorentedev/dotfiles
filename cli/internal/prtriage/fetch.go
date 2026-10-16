@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,6 +102,30 @@ func Fetch(ctx context.Context, repo, registryPath string) ([]Status, error) {
 		return nil, err
 	}
 	return FetchWithRegistry(ctx, repo, reg)
+}
+
+// FetchRegistry reads repo's reviewer registry from its default branch; an
+// empty repo is the current one. A repository without the file is an error,
+// never an empty registry: the queue it would compute could not be trusted.
+func FetchRegistry(ctx context.Context, repo string) (Registry, error) {
+	return fetchRegistry(ctx, execGH, repo)
+}
+
+func fetchRegistry(ctx context.Context, run ghRunner, repo string) (Registry, error) {
+	name := repo
+	if name == "" {
+		name = "the current repository"
+	}
+	raw, err := run(ctx, "api", "-H", "Accept: application/vnd.github.raw+json", repoBase(repo)+"/contents/"+RegistryPath)
+	switch {
+	case err == nil:
+		return ParseRegistry(raw, name+":"+RegistryPath)
+	case strings.Contains(err.Error(), "HTTP 404"):
+		// GitHub answers 404 for a repository the token cannot read as well as
+		// for a missing file, so the message names both.
+		return Registry{}, fmt.Errorf("%s has no %s on its default branch, or the token cannot read it (HTTP 404)", name, RegistryPath)
+	}
+	return Registry{}, fmt.Errorf("read %s from %s: %w", RegistryPath, name, err)
 }
 
 // FetchWithRegistry asks GitHub for open PRs using a pre-loaded Registry,
