@@ -1,5 +1,5 @@
 ---
-id: "lesson-449-a-tee-through-a-pipe-reorders-output-written-around-it"
+id: "lesson-451-a-tee-through-a-pipe-reorders-output-written-around-it"
 type: lesson
 status: active
 title: "A tee through a pipe reorders output written around it; order needs a barrier through the same pipe"

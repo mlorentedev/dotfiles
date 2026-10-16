@@ -52,6 +52,20 @@ Review: `review.md` (merged via #2573). Fixes in the PR that carries this sectio
 - Question (b), CLI-118 without `review.md`: that spec's own archive gate; not acted on here.
 - Not re-measured live: with the queue now all closed or held, `lane next --dry-run` prints "nothing to hand off", so the no-backend commands are covered by the unit tests above and not by a live run.
 
+## Review round 2 (FAIL at 94fea6b6): dispositions
+
+Review: `review.md` (merged via #2586). Fixes in the PR that carries this section.
+
+- Major, `lane next` fails when the repository path has a space (#2537): applied. The prompt is written into the new worktree as `.dotf-lane-prompt.md` (excluded from `git status`) and the typed line names it relative to the pane's directory, so no chosen path reaches the pane's shell. The printed no-backend commands double-quote their paths. Tests: `TestNext_APathWithASpaceReachesNoPane`, `TestNext_NoBackendQuotesAPathWithASpace`, `TestLaneNext_ARepositoryUnderAPathWithASpaceHandsTheLaneOver`. Lesson 449.
+  - Before (release 0.71.0, scratch repo `$TMPDIR/a b/repo`, stubbed `gh`, no herdr): `dotf lane next --dry-run --agent claude` -> exit 1.
+  - After (this branch, same repo): exit 0, the four commands print with `"…/a b/repo"` quoted and `--prompt-file "…/a b/repo/.git/dotf-lane/999.md"`.
+  - The backend path (herdr) is covered by the unit tests only: the successor's pane starts in the worktree (herdr reports a pane's `cwd`), and `lane exec` falls back to the worktree root for a relative file it does not find.
+- Minor, `plainWord` admits a backslash on POSIX (#2587 item 1): applied. The allowed set is per OS (`TestPlainWord_BackslashIsAPathSeparatorOnlyOnWindows`); the guard now covers the binary's path only.
+- Minor, `excludeLease` read-modify-write race: ticketed in #2576, open.
+- Minor, serial `gh issue view` per queued item (#2587 item 2): ticketed, open (#2587 stays open for it).
+- Question, process (hand-authored `passing`, CLI-118 without a `review.md`): accepted by the reviewer; unchanged.
+- Not measured: the Windows `lane exec` child-process path (compiles under `GOOS=windows`; no Windows box in this run).
+
 ## Test status
 
 - `go build ./... && go vet ./... && go test ./internal/lane ./internal/cmd` clean; `GOOS=windows go vet` and golangci-lint 2.12.2 clean.

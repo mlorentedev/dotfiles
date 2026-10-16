@@ -109,11 +109,10 @@ func TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone(
 	if !reflect.DeepEqual(b.calls, want) {
 		t.Errorf("calls = %q, want %q", b.calls, want)
 	}
-	cmd := b.typed["w1:p1"]
-	if !strings.HasPrefix(cmd, "dotf lane exec --agent claude --prompt-file ") {
+	if cmd := b.typed["w1:p1"]; cmd != "dotf lane exec --agent claude --prompt-file "+PromptFile {
 		t.Errorf("typed %q", cmd)
 	}
-	got, err := os.ReadFile(strings.TrimPrefix(cmd, "dotf lane exec --agent claude --prompt-file "))
+	got, err := os.ReadFile(filepath.Join(b.created, PromptFile))
 	if err != nil || string(got) != "Work on #7 BUG-7: first thing on fix/first-thing; then 2 more." {
 		t.Errorf("prompt file = %q, %v", got, err)
 	}
@@ -256,12 +255,90 @@ func TestNext_DryRunChangesNothing(t *testing.T) {
 	}
 }
 
-// A prompt path a shell would read differently is refused rather than quoted.
-func TestNext_RefusesAPromptPathThatNeedsQuoting(t *testing.T) {
+// The line typed into a pane carries no path anyone chose (#2537): a repository,
+// a temp directory or a worktree root with a space in it must not reach the
+// pane's shell. The prompt goes into the new worktree under a fixed name, and
+// the line names it relative to the pane's directory.
+func TestNext_APathWithASpaceReachesNoPane(t *testing.T) {
+	spaced := filepath.Join(t.TempDir(), "Jane Doe")
+	b := newFake(t, "claude")
+	b.created = filepath.Join(spaced, "worktrees", "my repo", "fix-first-thing")
+	if err := os.MkdirAll(b.created, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	o := opts(t)
-	o.PromptDir = "/home/a b/lane"
-	if _, err := Handoff(o, newFake(t, "claude"), queue); err == nil || !strings.Contains(err.Error(), "prompt path") {
-		t.Errorf("want a refusal, got %v", err)
+	o.Parent = filepath.Join(spaced, "my repo")
+	o.GitDir = filepath.Join(spaced, "my repo", ".git")
+	o.PromptDir = filepath.Join(o.GitDir, "dotf-lane")
+	out, err := Handoff(o, b, queue)
+	if err != nil || !out.Started {
+		t.Fatalf("Handoff = %+v, %v", out, err)
+	}
+	cmd := b.typed["w1:p1"]
+	if want := "dotf lane exec --agent claude --prompt-file " + PromptFile; cmd != want {
+		t.Errorf("typed %q, want %q", cmd, want)
+	}
+	if strings.Contains(cmd, "Jane") || strings.Contains(cmd, spaced) {
+		t.Errorf("the typed line carries a chosen path: %q", cmd)
+	}
+	if got, err := os.ReadFile(filepath.Join(b.created, PromptFile)); err != nil || !strings.HasPrefix(string(got), "Work on #7") {
+		t.Errorf("prompt file = %q, %v", got, err)
+	}
+	// The file is excluded from git status in every worktree, like the lease.
+	ex, err := os.ReadFile(filepath.Join(o.GitDir, "info", "exclude"))
+	if err != nil || !strings.Contains(string(ex), PromptFile+"\n") {
+		t.Errorf("info/exclude = %q, %v", ex, err)
+	}
+}
+
+// A person pastes the printed commands into their own shell, so a path with a
+// space is double-quoted there. A character live inside double quotes is
+// refused: no quoting of it means the same in all four shells.
+func TestNext_NoBackendQuotesAPathWithASpace(t *testing.T) {
+	o := opts(t)
+	o.Agent, o.DryRun = "claude", true // nothing is written: the paths are not real
+	o.Parent = "/repos/my repo"
+	o.WorktreeRoot = "/srv/my wt"
+	o.PromptDir = "/repos/my repo/.git/dotf-lane"
+	out, err := Handoff(o, nil, queue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := `"` + worktree.ResolveWorktreePath(o.WorktreeRoot, "my repo", "fix/first-thing") + `"`
+	want := []string{
+		`git -C "/repos/my repo" fetch origin`,
+		`git -C "/repos/my repo" worktree add -b fix/first-thing ` + dir + ` origin/main`,
+		`cd ` + dir,
+		`dotf lane exec --agent claude --prompt-file "` + filepath.Join(o.PromptDir, "7.md") + `"`,
+	}
+	if !reflect.DeepEqual(out.Commands, want) {
+		t.Errorf("commands =\n%q\nwant\n%q", out.Commands, want)
+	}
+	for _, bad := range []string{`/repos/a"b`, "/repos/$HOME x", "/repos/a`b c", "/repos/100% x", "/repos/hey! x"} {
+		o.Parent = bad
+		if _, err := Handoff(o, nil, queue); err == nil {
+			t.Errorf("Parent %q: want a refusal", bad)
+		}
+	}
+}
+
+// A backslash is a path separator on Windows only. zsh and bash read it as an
+// escape, so a POSIX path holding one is not a plain word (#2587).
+func TestPlainWord_BackslashIsAPathSeparatorOnlyOnWindows(t *testing.T) {
+	for _, tc := range []struct {
+		goos, path string
+		want       bool
+	}{
+		{"windows", `C:\Users\RUNNER~1\dotf.exe`, true},
+		{"linux", `C:\Users\RUNNER~1\dotf.exe`, false},
+		{"darwin", `/opt/a\b/dotf`, false},
+		{"darwin", "/opt/dotf/bin/dotf", true},
+		{"linux", "/home/a b/dotf", false},
+		{"windows", "~/dotf", false},
+	} {
+		if got := plainWordFor(tc.goos).MatchString(tc.path); got != tc.want {
+			t.Errorf("%s %q: plain = %v, want %v", tc.goos, tc.path, got, tc.want)
+		}
 	}
 }
 
@@ -277,11 +354,10 @@ func TestNext_NothingFreeIsNotAnError(t *testing.T) {
 // is not a word every shell reads alike; then it is `dotf` on the pane's PATH.
 func TestNext_TheSuccessorRunsTheBinaryThatDecided(t *testing.T) {
 	for dotf, want := range map[string]string{
-		"/opt/dotf/bin/dotf":         "/opt/dotf/bin/dotf lane exec ",
-		"/home/a b/dotf":             "dotf lane exec ",
-		`C:\Users\RUNNER~1\dotf.exe`: `C:\Users\RUNNER~1\dotf.exe lane exec `,
-		"~/dotf":                     "dotf lane exec ",
-		"":                           "dotf lane exec ",
+		"/opt/dotf/bin/dotf": "/opt/dotf/bin/dotf lane exec ",
+		"/home/a b/dotf":     "dotf lane exec ",
+		"~/dotf":             "dotf lane exec ",
+		"":                   "dotf lane exec ",
 	} {
 		b := newFake(t, "claude")
 		o := opts(t)
