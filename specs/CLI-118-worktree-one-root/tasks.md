@@ -20,7 +20,7 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 - [x] `RecentSession(projectsDir, wt, now, window)` with a fake `~/.claude/projects/<key>` dir: refuses when under 6h, allows when stale or absent.
 - [x] Wire into `done` and `sweep`; `--ignore-recent-session` distinct from `--force`.
-- [ ] File one ticket per non-Claude harness session store (agy, copilot, codex, opencode, pi). Proposed on #1653 during the unattended run; filing needs the owner's ID confirmation (new-ticket).
+- [x] Non-Claude harness session stores: one ticket (#2569, BUG-148) rather than five, since the stores were measured together. pi and Copilot are consulted; agy (SQLite blobs, no readable cwd), codex and opencode (no store on the Mac) are stated gaps the process check covers while alive.
 
 ## PR 4 — adoption and done
 

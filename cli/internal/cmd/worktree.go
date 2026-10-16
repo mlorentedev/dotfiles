@@ -97,12 +97,13 @@ func newWorktreeMigrateCmd() *cobra.Command {
 		Long: `migrate moves each worktree of the repository still in the legacy sibling
 layout, <parent>/<repo>-wt-<slug>, to <WORKTREE_ROOT>/<repo>/<branch-slug> with
 git worktree move, so git's own records follow it. It skips, and says why, a
-worktree that is locked, that holds the current directory or a Claude Code
-session active in the last six hours, or whose target already exists. A second
+worktree that is locked, that holds the current directory or a Claude Code,
+pi or Copilot session active in the last six hours, or whose target already
+exists. A second
 run finds nothing to do.
 
-Moving a worktree changes the directory a Claude Code session is keyed on: a
-session started in the old path does not follow it.`,
+Moving a worktree changes the directory a session is keyed on: a session
+started in the old path does not follow it.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			root, err := resolveCommandRepoRoot(repoDir)
@@ -111,11 +112,11 @@ session started in the old path does not follow it.`,
 			}
 			cwd, _ := os.Getwd()
 			rep, err := worktree.Migrate(worktree.MigrateOptions{
-				RepoRoot:          root,
-				WorktreeRoot:      env.ResolvePath("WORKTREE_ROOT"),
-				DryRun:            dryRun,
-				Cwd:               cwd,
-				ClaudeProjectsDir: claudeProjectsDir(),
+				RepoRoot:     root,
+				WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
+				DryRun:       dryRun,
+				Cwd:          cwd,
+				Sessions:     sessionStores(),
 			}, time.Now())
 			if err != nil {
 				return err
@@ -388,9 +389,9 @@ clean git status, confirmed merged PR, and minimum age.`,
 			}
 
 			opts := worktree.SweepOptions{
-				RepoRoot:          root,
-				DryRun:            dryRun,
-				ClaudeProjectsDir: claudeProjectsDir(),
+				RepoRoot: root,
+				DryRun:   dryRun,
+				Sessions: sessionStores(),
 			}
 
 			report, err := worktree.Sweep(opts)
@@ -592,8 +593,8 @@ Whatever --force says, it also refuses a worktree that contains the current
 directory or, on Linux and macOS, the working directory of a process it runs under: the
 removal would strand that shell or agent, and a Claude Code session launched
 from the worktree could not be resumed. Run it from outside the worktree.
-It also refuses one whose Claude Code transcript was written in the last 6h,
-a session that may still be resumed; --ignore-recent-session overrides that
+It also refuses one where a Claude Code, pi or Copilot session wrote in the
+last 6h, a session that may still be resumed; --ignore-recent-session overrides that
 check, and --force does not.
 
 The argument is the worktree's path, its branch, or its directory name under
@@ -625,7 +626,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 				WorktreePath:        target,
 				Cwd:                 callerCwd(os.Getwd, os.Getenv),
 				Force:               force,
-				ClaudeProjectsDir:   claudeProjectsDir(),
+				Sessions:            sessionStores(),
 				IgnoreRecentSession: ignoreRecentSession,
 			}
 
@@ -648,7 +649,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 	cmd.Flags().StringVar(&repoDir, "repo", "", "target repository root (defaults to current repo)")
 	cmd.Flags().StringVar(&worktreePath, "path", "", "path to worktree to remove (defaults to the one holding the current directory, which done then refuses)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "force removal even if there are uncommitted changes")
-	cmd.Flags().BoolVar(&ignoreRecentSession, "ignore-recent-session", false, "remove even though a Claude Code session wrote its transcript in the last 6h (--force does not)")
+	cmd.Flags().BoolVar(&ignoreRecentSession, "ignore-recent-session", false, "remove even though a Claude Code, pi or Copilot session wrote to it in the last 6h (--force does not)")
 
 	return cmd
 }
@@ -664,8 +665,14 @@ func callerCwd(getwd func() (string, error), getenv func(string) string) string 
 	return getenv("PWD")
 }
 
-// claudeProjectsDir is where Claude Code keeps one transcript directory per
-// working directory, read by done and sweep to spot a live session (#1653).
-func claudeProjectsDir() string {
-	return filepath.Join(claudeConfigDir(env.Home()), "projects")
+// sessionStores are where the harnesses that resume a session from its
+// directory keep it, read by done, sweep and migrate to spot a live one
+// (#1653, #2569).
+func sessionStores() worktree.SessionStores {
+	home := env.Home()
+	return worktree.SessionStores{
+		ClaudeProjects: filepath.Join(claudeConfigDir(home), "projects"),
+		PiSessions:     filepath.Join(home, ".pi", "agent", "sessions"),
+		CopilotState:   filepath.Join(home, ".copilot", "session-state"),
+	}
 }
