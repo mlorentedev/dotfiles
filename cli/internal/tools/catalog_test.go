@@ -230,6 +230,11 @@ func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
 		{"a name that is a flag", `{"type":"system","apt":"-y"}`, "", "apt"},
 		{"a name with a space", `{"type":"system","brew":"gh cli"}`, "", "brew"},
 		{"a cask name that is a flag", `{"type":"system","cask":"--force"}`, "", "cask"},
+		{"an apt name with a command separator", `{"type":"system","apt":"x;rm"}`, "", "apt"},
+		{"a brew name with a substitution", `{"type":"system","brew":"x$(id)"}`, "", "brew"},
+		{"a winget id with a backtick", "{\"type\":\"system\",\"winget\":\"x`id\"}", "", "winget"},
+		{"a cask name with a redirect", `{"type":"system","cask":"x>y"}`, "", "cask"},
+		{"a command with a pipe", `{"type":"system","apt":"gh","command":"gh|id"}`, "", "command"},
 		{"a formula and a cask for one OS", `{"type":"system","brew":"gh","cask":"gh"}`, "", "both a brew formula and a cask"},
 		{"needs_sudo on an entry with no cask", `{"type":"system","apt":"gh","brew":"gh","needs_sudo":true}`, "", "needs_sudo"},
 	}
@@ -341,4 +346,23 @@ func TestTheRepoCatalogDeclaresBrewBashWithoutACommand(t *testing.T) {
 		return
 	}
 	t.Fatal("packages.json declares no bash entry")
+}
+
+// The charset is the shipping catalog's and the managers' own forms: a rule that
+// refused a real name would break a converge, so each form is a case.
+func TestLoad_AcceptsEveryFormAManagerDefines(t *testing.T) {
+	for _, name := range []string{"gh", "libstdc++", "node@20", "owner/tap/formula", "GitHub.cli", "python3.12", "pkg:amd64", "a_b-c"} {
+		body := `{"tools":[{"name":"t","source":{"type":"system","apt":"` + name + `"}}]}`
+		if _, err := Load(writeCatalog(t, body)); err != nil {
+			t.Errorf("%q must load: %v", name, err)
+		}
+	}
+}
+
+// The catalog this repository ships is the other half of the acceptance: the
+// stricter rule must not turn a working entry into a load error.
+func TestLoad_TheShippingCatalogStillLoads(t *testing.T) {
+	if _, err := Load(filepath.Join("..", "..", "..", "packages.json")); err != nil {
+		t.Fatalf("packages.json: %v", err)
+	}
 }
