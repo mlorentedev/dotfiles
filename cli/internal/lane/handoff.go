@@ -1,6 +1,7 @@
 package lane
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // Options is one hand-off: which repo, which queue, which agent.
@@ -19,7 +22,11 @@ type Options struct {
 	Template  string // the prompt template's text
 	Parent    string // the repository's parent checkout
 	PromptDir string // where the rendered prompt is left for the successor
-	Fetch     func() error
+	// WorktreeRoot is where `dotf worktree add` and herdr put a branch's
+	// worktree. Only the commands printed for a person need it: a backend
+	// decides the path itself.
+	WorktreeRoot string
+	Fetch        func() error
 	// Dotf is the command word the successor's pane runs `lane exec` with. The
 	// caller passes the path of the binary that decided, so the successor is the
 	// same dotf and not whichever release `dotf` resolves to on the pane's PATH.
@@ -64,32 +71,12 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 	}
 	out := Outcome{Issue: issue, Branch: o.Config.BranchPrefix + "/" + Slug(issue.Title)}
 
-	prompt, err := RenderPrompt(o.Template, PromptData{
-		Number: issue.Number, Title: issue.Title, Branch: out.Branch, Remaining: remaining(o.Config.Queue, issue.Number),
-	})
+	p, err := prepare(o, b, &out)
 	if err != nil {
 		return out, err
 	}
-	if out.Agent, err = resolveAgent(o.Agent, b); err != nil {
-		return out, err
-	}
-	if _, err := LaunchArgv(out.Agent, prompt); err != nil {
-		return out, err
-	}
-	promptFile := filepath.Join(o.PromptDir, strconv.Itoa(issue.Number)+".md")
-	if !plainWord.MatchString(promptFile) {
-		return out, fmt.Errorf("lane: the prompt path %q has characters a pane's shell would read differently; use a PromptDir of letters, digits and _ . / : \\ ~ -", promptFile)
-	}
-	dotf := o.Dotf
-	if dotf == "" || !plainWord.MatchString(dotf) {
-		dotf = "dotf"
-	}
-	exec := fmt.Sprintf("%s lane exec --agent %s --prompt-file %s", dotf, out.Agent, promptFile)
-
 	if b == nil {
-		out.Commands = manualCommands(o, out, exec)
-		out.Note = "no session backend found; run these commands"
-		return out, writePrompt(o, promptFile, prompt)
+		return noBackend(o, out, p)
 	}
 	wt, found, err := b.Find(o.Parent, out.Branch)
 	if err != nil {
@@ -103,24 +90,88 @@ func Handoff(o Options, b Backend, src IssueSource) (Outcome, error) {
 		return out, ensureLease(o, wt.Path, issue.Number, out.Agent)
 	}
 	if o.DryRun {
-		out.Commands = []string{"(write the prompt to " + promptFile + ")", "(" + describe(found) + " " + out.Branch + ")", exec}
+		out.Commands = []string{"(write the prompt to " + p.file + ")", "(" + describe(found) + " " + out.Branch + ")", p.exec}
+		out.Note = p.note
 		return out, nil
 	}
-	if err := writePrompt(o, promptFile, prompt); err != nil {
+	if err := launch(o, b, wt, found, out, p); err != nil {
 		return out, err
 	}
-	st, err := start(o, b, wt, found, out.Branch, issue)
+	out.Started, out.Note = true, p.note
+	return out, nil
+}
+
+// launch leaves the prompt, starts the branch's worktree, leases it, and only
+// then types the command: the lease must exist before anything runs in it.
+func launch(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) error {
+	if err := writePrompt(o, p.file, p.prompt); err != nil {
+		return err
+	}
+	st, err := start(o, b, wt, found, out.Branch, out.Issue)
+	if err != nil {
+		return err
+	}
+	if err := ensureLease(o, st.Worktree.Path, out.Issue.Number, out.Agent); err != nil {
+		return err
+	}
+	return b.Type(st.Pane, p.exec)
+}
+
+// plan is what a hand-off hands the successor: its prompt, the file the prompt
+// is left in, the command line typed into its pane, and a note when that line
+// is not quite what the caller asked for.
+type plan struct{ prompt, file, exec, note string }
+
+// prepare renders the prompt, settles the agent and builds the command line.
+// out.Agent is set as a side effect, so a refusal still names it.
+func prepare(o Options, b Backend, out *Outcome) (plan, error) {
+	prompt, err := RenderPrompt(o.Template, PromptData{
+		Number: out.Issue.Number, Title: out.Issue.Title, Branch: out.Branch, Remaining: remaining(o.Config.Queue, out.Issue.Number),
+	})
+	if err != nil {
+		return plan{}, err
+	}
+	if out.Agent, err = resolveAgent(o.Agent, b); err != nil {
+		return plan{}, err
+	}
+	if out.Agent != agentPlaceholder() {
+		if _, err := LaunchArgv(out.Agent, prompt); err != nil {
+			return plan{}, err
+		}
+	}
+	file := filepath.Join(o.PromptDir, strconv.Itoa(out.Issue.Number)+".md")
+	if !plainWord.MatchString(file) {
+		return plan{}, fmt.Errorf("lane: the prompt path %q has characters a pane's shell would read differently; use a PromptDir of letters, digits and _ . / : \\ ~ -", file)
+	}
+	dotf, note := o.Dotf, ""
+	if dotf == "" || !plainWord.MatchString(dotf) {
+		if dotf != "" {
+			note = fmt.Sprintf("the successor runs `dotf` from its pane's PATH: %q is not a path every shell reads alike", dotf)
+		}
+		dotf = "dotf"
+	}
+	return plan{prompt, file, fmt.Sprintf("%s lane exec --agent %s --prompt-file %s", dotf, out.Agent, file), note}, nil
+}
+
+// noBackend answers a hand-off with nothing to start the successor in: the
+// commands a person runs, and the prompt they read. When no agent was named it
+// cannot be guessed (no pane to ask, and no harness is privileged), so the
+// printed line carries a placeholder for the person to fill.
+func noBackend(o Options, out Outcome, p plan) (Outcome, error) {
+	cmds, err := manualCommands(o, out, p.exec)
 	if err != nil {
 		return out, err
 	}
-	if err := ensureLease(o, st.Worktree.Path, issue.Number, out.Agent); err != nil {
-		return out, err
+	out.Commands = cmds
+	notes := []string{"no session backend found; run these commands"}
+	if out.Agent == agentPlaceholder() {
+		notes = append(notes, "replace "+out.Agent+" with the agent to start")
 	}
-	if err := b.Type(st.Pane, exec); err != nil {
-		return out, err
+	if p.note != "" {
+		notes = append(notes, p.note)
 	}
-	out.Started = true
-	return out, nil
+	out.Note = strings.Join(notes, "; ")
+	return out, writePrompt(o, p.file, p.prompt)
 }
 
 // start opens the worktree that exists, or creates the branch's off the base,
@@ -149,14 +200,19 @@ func describe(found bool) string {
 	return "create a worktree for"
 }
 
-// resolveAgent is the explicit agent, else the calling pane's. LaunchArgv then
-// refuses one the table lacks: a pane running something else is a reason to
-// say so, not to start a different kind of successor.
+// agentPlaceholder stands in for the agent in the commands printed when there
+// is no backend to ask and no --agent: a default would privilege one harness.
+func agentPlaceholder() string { return "<" + strings.Join(Agents(), "|") + ">" }
+
+// resolveAgent is the explicit agent, else the calling pane's, else (with no
+// backend to ask) the placeholder. LaunchArgv then refuses one the table lacks:
+// a pane running something else is a reason to say so, not to start a
+// different kind of successor.
 func resolveAgent(want string, b Backend) (string, error) {
 	agent := want
 	if agent == "" {
 		if b == nil {
-			return "", fmt.Errorf("lane: no --agent given and no session backend to ask (known: %s)", strings.Join(Agents(), ", "))
+			return agentPlaceholder(), nil
 		}
 		got, err := b.CallingAgent()
 		if err != nil {
@@ -185,13 +241,19 @@ func writePrompt(o Options, path, prompt string) error {
 	return os.WriteFile(path, []byte(prompt), 0o600)
 }
 
-func manualCommands(o Options, out Outcome, exec string) []string {
-	dir := filepath.Join(filepath.Dir(o.Parent), "worktrees", filepath.Base(o.Parent), Slug(out.Issue.Title))
-	base := o.Config.Base
+// manualCommands is what a person runs to do what a backend would. The worktree
+// goes where `dotf worktree add` and herdr put it, so `dotf worktree done` and
+// the sweep find it by its branch.
+func manualCommands(o Options, out Outcome, exec string) ([]string, error) {
+	if o.WorktreeRoot == "" {
+		return nil, errors.New("lane: WORKTREE_ROOT does not resolve, so the worktree's path cannot be printed; run `dotf doctor`")
+	}
+	dir := worktree.ResolveWorktreePath(o.WorktreeRoot, filepath.Base(o.Parent), out.Branch)
+	remote, _ := o.Config.Remote()
 	return []string{
-		"git -C " + o.Parent + " fetch " + strings.SplitN(base, "/", 2)[0],
-		"git -C " + o.Parent + " worktree add -b " + out.Branch + " " + dir + " " + base,
+		"git -C " + o.Parent + " fetch " + remote,
+		"git -C " + o.Parent + " worktree add -b " + out.Branch + " " + dir + " " + o.Config.Base,
 		"cd " + dir,
 		exec,
-	}
+	}, nil
 }

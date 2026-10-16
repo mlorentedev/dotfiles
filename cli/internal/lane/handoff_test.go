@@ -77,8 +77,10 @@ func opts(t *testing.T) Options {
 		Template:  "Work on #{{.Number}} {{.Title}} on {{.Branch}}; then {{len .Remaining}} more.",
 		Parent:    "/repos/dotfiles",
 		PromptDir: filepath.Join(t.TempDir(), "lane"),
-		GitDir:    t.TempDir(),
-		Now:       func() time.Time { return leaseNow },
+		// An off-default root: a printed path built from anything but this is wrong.
+		WorktreeRoot: filepath.Join("/srv", "wt"),
+		GitDir:       t.TempDir(),
+		Now:          func() time.Time { return leaseNow },
 	}
 }
 
@@ -180,12 +182,58 @@ func TestNext_NoBackendPrintsTheCommands(t *testing.T) {
 	if err != nil || out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
 	}
-	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[1], "git -C /repos/dotfiles worktree add -b fix/first-thing "+filepath.Join("/repos", "worktrees", "dotfiles", "first-thing")+" origin/main") ||
+	// The worktree goes where `dotf worktree add` puts it (the layout rule is
+	// worktree.ResolveWorktreePath's), so the branch's slug is the directory.
+	dir := worktree.ResolveWorktreePath(o.WorktreeRoot, "dotfiles", "fix/first-thing")
+	if want := filepath.Join("/srv", "wt", "dotfiles", "fix-first-thing"); dir != want {
+		t.Fatalf("layout rule = %q, want %q", dir, want)
+	}
+	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[1], "git -C /repos/dotfiles worktree add -b fix/first-thing "+dir+" origin/main") ||
+		out.Commands[2] != "cd "+dir ||
 		!strings.HasPrefix(out.Commands[3], "dotf lane exec --agent claude --prompt-file ") {
 		t.Errorf("commands = %q", out.Commands)
 	}
-	if _, err := Handoff(opts(t), nil, queue); err == nil {
-		t.Error("no backend and no --agent cannot guess an agent")
+}
+
+// With no backend to ask and no --agent, nothing may pick a harness: the
+// commands are printed with a placeholder and the exit is still success (AC5).
+func TestNext_NoBackendAndNoAgentPrintsAPlaceholder(t *testing.T) {
+	o := opts(t)
+	out, err := Handoff(o, nil, queue)
+	if err != nil || out.Started {
+		t.Fatalf("Handoff = %+v, %v", out, err)
+	}
+	want := "dotf lane exec --agent <agy|claude|pi> --prompt-file "
+	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[3], want) {
+		t.Errorf("commands = %q, want the last to start %q", out.Commands, want)
+	}
+	if !strings.Contains(out.Note, "replace <agy|claude|pi> with the agent to start") {
+		t.Errorf("note = %q", out.Note)
+	}
+}
+
+// A root that does not resolve would print a path in the wrong tree; refuse.
+func TestNext_NoBackendWithoutAWorktreeRootRefuses(t *testing.T) {
+	o := opts(t)
+	o.Agent, o.WorktreeRoot = "claude", ""
+	if _, err := Handoff(o, nil, queue); err == nil || !strings.Contains(err.Error(), "WORKTREE_ROOT") {
+		t.Errorf("err = %v, want one naming WORKTREE_ROOT", err)
+	}
+}
+
+// A binary path no shell reads alike is replaced by bare `dotf`; the outcome
+// says so instead of reporting success on a different release.
+func TestNext_ASubstitutedBinaryIsSaidSo(t *testing.T) {
+	b := newFake(t, "claude")
+	o := opts(t)
+	o.Dotf = "/home/a b/dotf"
+	out, err := Handoff(o, b, queue)
+	if err != nil || !out.Started || !strings.Contains(out.Note, "runs `dotf` from its pane's PATH") {
+		t.Errorf("Handoff = %+v, %v", out, err)
+	}
+	o.Dotf = "/opt/dotf/bin/dotf"
+	if out, err = Handoff(o, newFake(t, "claude"), queue); err != nil || out.Note != "" {
+		t.Errorf("a typeable binary needs no note, got %+v, %v", out, err)
 	}
 }
 
