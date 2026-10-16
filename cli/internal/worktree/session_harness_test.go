@@ -3,6 +3,7 @@ package worktree
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,9 @@ func TestRecentHarnessSession(t *testing.T) {
 		{"no store holds anything", func(*testing.T, SessionStores) {}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.harness == "pi" || strings.Contains(tc.name, "pi session") {
+				skipPiOffPOSIX(t)
+			}
 			home := t.TempDir()
 			st := SessionStores{
 				ClaudeProjects: filepath.Join(home, ".claude", "projects"),
@@ -113,6 +117,9 @@ func TestRecentHarnessSessionFailsClosedOnAnUnreadableStore(t *testing.T) {
 		t.Errorf("want an error naming Copilot, got %v", err)
 	}
 
+	if runtime.GOOS == "windows" {
+		return // the pi row keys no Windows path, so it never reads its store there
+	}
 	st = SessionStores{PiSessions: filepath.Join(home, "sessions-file")}
 	if err := os.WriteFile(st.PiSessions, nil, 0o644); err != nil {
 		t.Fatal(err)
@@ -124,6 +131,15 @@ func TestRecentHarnessSessionFailsClosedOnAnUnreadableStore(t *testing.T) {
 	absent := SessionStores{PiSessions: filepath.Join(home, "none"), CopilotState: filepath.Join(home, "none2")}
 	if _, found, err := RecentHarnessSession(absent, wt, time.Now(), SessionWindow); err != nil || found {
 		t.Errorf("absent stores: found=%v err=%v, want none", found, err)
+	}
+}
+
+// skipPiOffPOSIX: the pi row keys only an absolute POSIX path, so a pi
+// fixture under a Windows temp directory has no name to be found by.
+func skipPiOffPOSIX(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("pi's directory name for a Windows path is unmeasured; the row consults nothing there")
 	}
 }
 
@@ -141,12 +157,12 @@ func TestPiSessionKeysOnlyForAPOSIXPath(t *testing.T) {
 func TestSessionSkipReasonNamesTheHarness(t *testing.T) {
 	wt := filepath.Join(t.TempDir(), "feat-x")
 	home := t.TempDir()
-	st := SessionStores{PiSessions: filepath.Join(home, "sessions")}
-	fakePiSession(t, st.PiSessions, wt, 2*time.Hour)
-	if r := sessionSkipReason(st, wt, time.Now()); !strings.HasPrefix(r, "a pi session wrote ") {
-		t.Errorf("reason = %q, want it to name pi", r)
+	st := SessionStores{CopilotState: filepath.Join(home, "session-state")}
+	fakeCopilotSession(t, st.CopilotState, wt, 2*time.Hour)
+	if r := sessionSkipReason(st, wt, time.Now()); !strings.HasPrefix(r, "a Copilot session wrote ") {
+		t.Errorf("reason = %q, want it to name Copilot", r)
 	}
-	if err := checkNoRecentSession(st, wt, time.Now()); err == nil || !strings.Contains(err.Error(), "a pi session") || !strings.Contains(err.Error(), "--ignore-recent-session") {
-		t.Errorf("done's refusal = %v, want it to name pi and the override", err)
+	if err := checkNoRecentSession(st, wt, time.Now()); err == nil || !strings.Contains(err.Error(), "a Copilot session") || !strings.Contains(err.Error(), "--ignore-recent-session") {
+		t.Errorf("done's refusal = %v, want it to name Copilot and the override", err)
 	}
 }
