@@ -130,6 +130,10 @@ func newDeployCmd() *cobra.Command {
 				targets = []deploy.Config{*c}
 			}
 
+			records, err := deploy.MergeRecords(targets, env.StateDir)
+			if err != nil {
+				return err
+			}
 			w := cmd.OutOrStdout()
 			res, err := deploy.Run(man, targets, deploy.RunOptions{
 				RepoRoot:  repoRoot,
@@ -139,6 +143,7 @@ func newDeployCmd() *cobra.Command {
 				Render:    deployRenderer,
 				Available: deployCommandAvailable,
 				DryRun:    dryRun,
+				Records:   records,
 			})
 			printDeploySteps(w, res, dryRun)
 			if err != nil {
