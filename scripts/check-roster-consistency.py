@@ -47,13 +47,22 @@ def _try(cmd: list) -> str:
         return ""
 
 
+# A persona cell is either bold (`**architect**`) or the vault's catalog sync form,
+# a wikilink whose pipe is escaped for the table (`[[.../AGENT\|architect]]`). The
+# sync rewrote every row to the second form on 2026-10-15 and this guard read none
+# of them (#2583), so both are accepted: the guard checks drift, not typography.
+ROW = re.compile(
+    r"\|\s*(?:\*\*(\w[\w-]*)\*\*|\[\[[^\]|]*?\\\|(\w[\w-]*)\]\])\s*\|\s*(\w+)\s*\|\s*([^|]+)\|"
+)
+
+
 def roster_rows(path: str) -> dict:
     """Parse the invocable table. Autonomous roles are cataloged, not phase-bound."""
     rows = {}
     for line in open(path, encoding="utf-8"):
-        m = re.match(r"\|\s*\*\*(\w[\w-]*)\*\*\s*\|\s*(\w+)\s*\|\s*([^|]+)\|", line)
-        if m and m.group(2) != "Phase":
-            rows[m.group(1)] = [s.strip() for s in m.group(3).split(",") if s.strip()]
+        m = ROW.match(line)
+        if m and m.group(3) != "Phase":
+            rows[m.group(1) or m.group(2)] = [s.strip() for s in m.group(4).split(",") if s.strip()]
     return rows
 
 
