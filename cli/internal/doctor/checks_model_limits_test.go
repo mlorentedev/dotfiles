@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -56,9 +57,14 @@ func limitsFixture(t *testing.T, declaration, catalog string) (*System, *Config)
 // that matches on "[FAIL]" also matches the word inside a message.
 func limitsRun(t *testing.T, sys *System, cfg *Config) (string, map[Status]int) {
 	t.Helper()
+	return limitsRunFix(t, sys, cfg, false)
+}
+
+func limitsRunFix(t *testing.T, sys *System, cfg *Config, fix bool) (string, map[Status]int) {
+	t.Helper()
 	var buf bytes.Buffer
 	rep := NewReport(&buf, true)
-	checkModelLimits(sys, cfg, rep)
+	checkModelLimits(sys, cfg, rep, fix)
 	rep.flush()
 	return buf.String(), rep.totals
 }
@@ -304,5 +310,88 @@ func TestModelLimitsSkipsOutsideACheckout(t *testing.T) {
 
 	if totals[StatusSkip] != 1 || totals[StatusPass] != 0 {
 		t.Fatalf("want exactly one SKIP and no PASS outside a checkout\n%s", out)
+	}
+}
+
+// Under --fix a stale cache is refreshed with opencode's own command and then
+// compared (#2540). Every way the refresh can fall short leaves the stale-cache
+// SKIP, never a FAIL: offline is not a finding against the declaration. The
+// declaration is ABOVE the stale limits and equal to the fresh ones, so a
+// comparison against the stale copy would FAIL and one against the fresh copy
+// passes.
+func TestModelLimitsRefreshesAStaleCatalogUnderFix(t *testing.T) {
+	fresh := cat("openrouter", "deepseek/deepseek-chat", 163840, 16384)
+	for _, tt := range []struct {
+		name      string
+		fix       bool
+		onPath    bool
+		refresh   func(path string) (string, error) // what the faked opencode does
+		wantCalls int
+		wantFix   int
+		wantPass  int
+		wantSkip  int
+		wantInOut []string
+	}{
+		{name: "refreshed and compared", fix: true, onPath: true,
+			refresh: func(path string) (string, error) {
+				return "", os.WriteFile(path, []byte(fresh), 0o644)
+			},
+			wantCalls: 1, wantFix: 1, wantPass: 1, wantInOut: []string{"refreshed", "15 days old"}},
+		{name: "refresh fails offline", fix: true, onPath: true,
+			refresh: func(string) (string, error) {
+				return "fetch failed: getaddrinfo ENOTFOUND models.dev", errors.New("exit status 1")
+			},
+			wantCalls: 1, wantSkip: 1, wantInOut: []string{"could not be refreshed", "ENOTFOUND"}},
+		{name: "refresh exits 0 without rewriting", fix: true, onPath: true,
+			refresh:   func(string) (string, error) { return "", nil },
+			wantCalls: 1, wantSkip: 1, wantInOut: []string{"did not rewrite"}},
+		{name: "opencode not installed", fix: true, onPath: false,
+			wantSkip: 1, wantInOut: []string{"not on PATH"}},
+		{name: "no fix never refreshes", fix: false, onPath: true,
+			wantSkip: 1, wantInOut: []string{"dotf doctor --fix"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sys, cfg := limitsFixture(t,
+				decl("openrouter", "deepseek/deepseek-chat", 163840, 16384),
+				cat("openrouter", "deepseek/deepseek-chat", 128000, 16000))
+			cached := filepath.Join(sys.home(), ".cache", "opencode", "models.json")
+			written := sys.Now().Add(-15 * 24 * time.Hour)
+			if err := os.Chtimes(cached, written, written); err != nil {
+				t.Fatal(err)
+			}
+			sys.LookPath = func(n string) (string, error) {
+				if tt.onPath {
+					return "/usr/bin/" + n, nil
+				}
+				return "", errors.New("not found")
+			}
+			calls := 0
+			sys.CommandOutputBounded = func(_ time.Duration, name string, args ...string) (string, string, error) {
+				calls++
+				if got := name + " " + strings.Join(args, " "); got != "opencode models --refresh" {
+					t.Errorf("ran %q, want opencode models --refresh", got)
+				}
+				errOut, err := tt.refresh(cached)
+				return "", errOut, err
+			}
+
+			out, totals := limitsRunFix(t, sys, cfg, tt.fix)
+
+			if calls != tt.wantCalls {
+				t.Errorf("refresh ran %d times, want %d", calls, tt.wantCalls)
+			}
+			if totals[StatusFail] != 0 {
+				t.Errorf("the stale limits must never be compared: %d FAIL\n%s", totals[StatusFail], out)
+			}
+			if totals[StatusFix] != tt.wantFix || totals[StatusPass] != tt.wantPass || totals[StatusSkip] != tt.wantSkip {
+				t.Fatalf("want %d FIX / %d PASS / %d SKIP, got %d / %d / %d\n%s", tt.wantFix, tt.wantPass, tt.wantSkip,
+					totals[StatusFix], totals[StatusPass], totals[StatusSkip], out)
+			}
+			for _, want := range tt.wantInOut {
+				if !strings.Contains(out, want) {
+					t.Errorf("report must name %q\n%s", want, out)
+				}
+			}
+		})
 	}
 }

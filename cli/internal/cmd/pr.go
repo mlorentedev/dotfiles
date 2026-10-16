@@ -1,12 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
-	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +67,7 @@ cannot be read or is not open.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			reg, err := prtriage.LoadRegistry(reviewerRegistryPath(c, registry))
+			reg, err := reviewerRegistry(repo, registry)(c.Context())
 			if err != nil {
 				c.PrintErrln("pr triage-queue:", err)
 				return err
@@ -113,24 +112,24 @@ func fetchTriageQueue(c *cobra.Command, repo string, reg prtriage.Registry, pr i
 }
 
 // addReviewerRegistryFlag declares --registry, shared by every pr command that
-// reads the reviewer registry. Read it through reviewerRegistryPath.
+// reads the reviewer registry. Read it through reviewerRegistry.
 func addReviewerRegistryFlag(cmd *cobra.Command, registry *string) {
-	cmd.Flags().StringVar(registry, "registry", filepath.Join("harness", "review-attestation.json"),
-		"path to the reviewer registry (default: under the root of the current checkout; "+
-			"for a --repo other than this checkout's, pass that repository's registry)")
+	cmd.Flags().StringVar(registry, "registry", "",
+		"path to a reviewer registry file (default: "+prtriage.RegistryPath+
+			" on the default branch of --repo, read through the GitHub API)")
 }
 
-// reviewerRegistryPath resolves --registry. A path given on the command line
-// is used as given; the default is the current checkout's, found from any
-// directory in it. Outside a checkout the default stays relative, and reading
-// it fails with the path named.
-func reviewerRegistryPath(c *cobra.Command, registry string) string {
-	if c.Flags().Changed("registry") {
-		return registry
+// registryLoader reads the reviewer registry when a command needs it.
+type registryLoader func(context.Context) (prtriage.Registry, error)
+
+// reviewerRegistry resolves --registry: the file it names, else the named
+// repository's own registry from its default branch. Never the checkout the
+// command runs in: that may belong to another repository, and on a branch that
+// edits the registry it would let a PR change the check it is held to, which
+// is why pr land reads the merge grant from the base too.
+func reviewerRegistry(repo, registry string) registryLoader {
+	if registry != "" {
+		return func(context.Context) (prtriage.Registry, error) { return prtriage.LoadRegistry(registry) }
 	}
-	root, err := worktree.ResolveWorktreeRoot(".")
-	if err != nil {
-		return registry
-	}
-	return filepath.Join(root, registry)
+	return func(ctx context.Context) (prtriage.Registry, error) { return prtriage.FetchRegistry(ctx, repo) }
 }

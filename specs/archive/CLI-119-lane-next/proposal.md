@@ -1,7 +1,7 @@
 ---
 id: "CLI-119-lane-next"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-14"
 issue: "mlorentedev/dotfiles#2528"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -43,12 +43,12 @@ Two commands under `dotf lane`, one implementation for every OS and every projec
 
 ## Acceptance criteria
 
-- [ ] `dotf lane exec` launches claude, pi and agy with the prompt as one argv element, shown by an argv-recording fake in tests and by a real launch of each, recorded in verification.md.
-- [ ] `dotf lane next` from a LINKED worktree creates the successor's worktree through the repo parent, runs `lane exec` in its pane and leaves the caller's worktree and branch untouched.
-- [ ] The same `lane next` run twice picks the same issue and starts one agent.
-- [ ] `--agent` defaults to the calling pane's agent; an unknown agent is refused with the list of known ones.
-- [ ] With no backend it prints the commands and exits 0.
-- [ ] An end-to-end run on this Mac chains finisher -> successor for each of claude, pi and agy.
+- [x] `dotf lane exec` launches claude, pi and agy with the prompt as one argv element, shown by an argv-recording fake in tests and by a real launch of each, recorded in verification.md.
+- [x] `dotf lane next` from a LINKED worktree creates the successor's worktree through the repo parent, runs `lane exec` in its pane and leaves the caller's worktree and branch untouched.
+- [x] The same `lane next` run twice picks the same issue and starts one agent.
+- [x] `--agent` defaults to the calling pane's agent; an unknown agent is refused with the list of known ones.
+- [x] With no backend it prints the commands and exits 0.
+- [x] An end-to-end run on this Mac chains finisher -> successor for each of claude, pi and agy.
 
 ## References
 

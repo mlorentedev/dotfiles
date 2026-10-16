@@ -118,6 +118,14 @@ lazygit replaces Orca's diff viewer. Its install was done with the mise pins abo
 - [x] The test pins the key itself, not only a lazygit popup: `prefix+x` in the stanza fails it
 - [x] The merge keeps a stale binding when one is edited, because lists union by equality: #2455 (CLI-113) phase 1. The reader learns manifest version 5 and `listKeys` (path -> identity field): a managed table replaces the destination's table with the same identity, collapses the duplicates the union left, and a managed element without the field is an error. `TestDeploy_MergeReplacesAListElementByIdentity` and its siblings; eleven mutations killed (verification.md lists them)
 - [ ] #2455 phase 2, after a release carries the version 5 reader (#1814): `ai/deploy.json` to version 5, `"listKeys": {"keys.command": "key"}` on the herdr entry, and the "Until #2455" comment in `ai/herdr/config.toml` removed. A retired managed binding is still not removed; nothing records what the repo managed before
+- [x] #2455's removal half, BUG-149 (#2570): a merge entry records the source it last merged and retires what it no longer declares (ADR-051).
+  - [x] Record at `<StateDir>/deploy/merged/<name>.json`: `{version, dst, source}`, the source text after `paths`, decoded by the codec that merged it.
+  - [x] Retire table keys, union-list elements by value and `listKeys` elements by identity, only while the destination still holds the recorded value; an emptied table goes too.
+  - [x] No record, another `dst` or an unknown version removes nothing and writes a baseline; a record that does not parse is an error naming the file and the recovery.
+  - [x] Written after a landed or in-sync merge, never on a dry run; atomic, and an unchanged record is not rewritten.
+  - [x] `dotf deploy`, converge's `configs` and doctor's deploy check read the same records (`RunOptions.Records`, `PlanConfigWith`); a state directory that cannot be placed fails only a run that merges (`MergeRecords`).
+  - [x] `env.StateDirFor`, so doctor and converge place state from their own seams and no test writes into the machine's state directory.
+  - [x] Mutations, thirteen, all killed (verification.md).
 - [ ] In daily use on the Mac, recorded at gate V
 
 ### T2 — `dotf tools sync` (this PR, stacked on T1a)

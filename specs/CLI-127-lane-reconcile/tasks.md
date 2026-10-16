@@ -24,27 +24,27 @@ created: "2026-10-15"
 
 ### PR 1: `dotf lane status`
 
-- [ ] [AC1] Write `cli/internal/lane/phase_test.go`: a table test over `Derive(Facts) Phase`, one row per phase (`Pending`, `Running`, `Review`, `Landing`, `Landed`, `Reaped`, `Stalled`, `Orphan`, `Unadopted`). `Facts` holds a `worktree.Info`, the PR state, `Live bool` and `HerdrPresent bool`. At least one row has herdr absent. Run `go test ./internal/lane/ -run TestDerive`; expected: FAIL, `undefined: Derive`.
-- [ ] [AC1] Write `cli/internal/lane/phase.go` with `Phase`, `Facts` and `Derive` until the test passes. Phases are computed and never stored.
-- [ ] [AC1] Write `cli/internal/lane/status_test.go` (`TestStatus`). `Status(Sources)` joins fakes for `worktree.ListWithRunner`, a forge seam (`PRFor(branch)`, one REST request per run, cached), liveness (`worktree.RecentSession` plus the process seam) and herdr's `Find`. It returns one `Row` per worktree. The test asserts the rows and that the forge seam is asked once per branch. Expected: FAIL.
-- [ ] [AC1] Write `cli/internal/lane/status.go` until it passes. If herdr is unavailable, rows are still returned, with `herdr: absent`.
-- [ ] [AC1] In `cli/internal/cmd/lane.go`, add `newLaneStatusCmd` (`--json`) with seams like `laneExec`/`laneRun`, plus `cli/internal/cmd/lane_status_test.go` covering the text and JSON shapes and the exit code.
-- [ ] Verify: `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`, and `golangci-lint run` at the pin. Lesson. Open the PR.
+- [x] [AC1] Write `cli/internal/lane/phase_test.go`: a table test over `Derive(Facts) Phase`, one row per phase (`Pending`, `Running`, `Review`, `Landing`, `Landed`, `Reaped`, `Stalled`, `Orphan`, `Unadopted`). `Facts` holds a `worktree.Info`, the PR state, `Live bool` and `HerdrPresent bool`. At least one row has herdr absent. Run `go test ./internal/lane/ -run TestDerive`; expected: FAIL, `undefined: Derive`.
+- [x] [AC1] Write `cli/internal/lane/phase.go` with `Phase`, `Facts` and `Derive` until the test passes. Phases are computed and never stored.
+- [x] [AC1] Write `cli/internal/lane/status_test.go` (`TestStatus`). `Status(Sources)` joins fakes for `worktree.ListWithRunner`, a forge seam (`PRFor(branch)`, one REST request per run, cached), liveness (`worktree.RecentSession` plus the process seam) and herdr's `Find`. It returns one `Row` per worktree. The test asserts the rows and that the forge seam is asked once per branch. Expected: FAIL.
+- [x] [AC1] Write `cli/internal/lane/status.go` until it passes. If herdr is unavailable, rows are still returned, with `herdr: absent`.
+- [x] [AC1] In `cli/internal/cmd/lane.go`, add `newLaneStatusCmd` (`--json`) with seams like `laneExec`/`laneRun`, plus `cli/internal/cmd/lane_status_test.go` covering the text and JSON shapes and the exit code.
+- [x] Verify: `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`, and `golangci-lint run` at the pin. Lesson. Open the PR.
 
 ### PR 2: `dotf lane plan`
 
-- [ ] [AC2] Write `cli/internal/lane/plan_test.go` (`TestPlan`): a table test over `Plan(rows, queue, now) []Action`. Each `Action` has `Kind` (reap, start, adopt, flag), `Class` (`auto`, `pending`, `ambiguous`), `Due` for `pending` and `Resolve` (the exact command) for `ambiguous`. There is one row per D1 case, a D2 row with a derivable branch (adopt offered as `ambiguous`), a D2 row without one (no proposal), and a D3 row (landing order printed, no land action). Expected: FAIL.
-- [ ] [AC2] Write `cli/internal/lane/plan.go` until it passes.
-- [ ] [AC2] Add `newLanePlanCmd` and `TestPlanMutatesNothing` in `cli/internal/lane/`, asserting that the fixture repo's files and refs are byte-identical after `plan`, using a hash of `git for-each-ref` plus the lease files, before and after.
-- [ ] Verify (same suite as PR 1). Lesson. Open the PR.
+- [x] [AC2] Write `cli/internal/lane/plan_test.go` (`TestPlan`): a table test over `Plan(rows, queue, now) []Action`. Each `Action` has `Kind` (reap, start, adopt, flag), `Class` (`auto`, `pending`, `ambiguous`), `Due` for `pending` and `Resolve` (the exact command) for `ambiguous`. There is one row per D1 case, a D2 row with a derivable branch (adopt offered as `ambiguous`), a D2 row without one (no proposal), and a D3 row (landing order printed, no land action). Expected: FAIL.
+- [x] [AC2] Write `cli/internal/lane/plan.go` until it passes.
+- [x] [AC2] Add `newLanePlanCmd` and `TestPlanMutatesNothing` in `cli/internal/lane/`, asserting that the fixture repo's files and refs are byte-identical after `plan`, using a hash of `git for-each-ref` plus the lease files, before and after.
+- [x] Verify (same suite as PR 1). Lesson. Open the PR.
 
 ### PR 3: `dotf lane apply`
 
-- [ ] [AC3] Write `cli/internal/lane/apply_test.go` (`TestApply`): `Apply(actions, verbs)` calls `verbs.Sweep` and `verbs.Next` only for `auto` actions, never adopt or land (asserted on a recording fake), and returns `changed`. A second `Apply` over the post-state returns `changed=0`. Expected: FAIL.
-- [ ] [AC3] Write `cli/internal/lane/apply.go` until it passes. Reaps go through `worktree.Sweep` (its fail-closed gates, the process gate f included, are the safety). Starts go through the existing `lane next` path.
-- [ ] [AC4] Add `TestApplyNeverReapsALiveWorktree` with a row where the process seam reports a process inside a merged, clean, expired worktree, and another where `RecentSession` reports a recent transcript. Neither is reaped, and both show as `ambiguous`.
-- [ ] [AC3] Add `newLaneApplyCmd` printing `changed=N`, plus its cmd test.
-- [ ] [AC4] Live run on this machine, read-only verbs only: `dotf lane status` and `dotf lane plan` from the main checkout, against the herdr already running (never start a herdr server, per #2550 comment 6205806273). Record in `verification.md` that every worktree with a live session is classed `ambiguous`, never `auto`. `apply` is not run live as AC4 evidence: a safety check must not be performed by the reaper it guards against.
+- [x] [AC3] Write `cli/internal/lane/apply_test.go` (`TestApply`): `Apply(actions, verbs)` calls `verbs.Sweep` and `verbs.Next` only for `auto` actions, never adopt or land (asserted on a recording fake), and returns `changed`. A second `Apply` over the post-state returns `changed=0`. Expected: FAIL.
+- [x] [AC3] Write `cli/internal/lane/apply.go` until it passes. Reaps go through `worktree.Sweep` (its fail-closed gates, the process gate f included, are the safety). Starts go through the existing `lane next` path.
+- [x] [AC4] Add `TestApplyNeverReapsALiveWorktree` with a row where the process seam reports a process inside a merged, clean, expired worktree, and another where `RecentSession` reports a recent transcript. Neither is reaped, and both show as `ambiguous`.
+- [x] [AC3] Add `newLaneApplyCmd` printing `changed=N`, plus its cmd test.
+- [x] [AC4] Live run on this machine, read-only verbs only: `dotf lane status` and `dotf lane plan` from the main checkout, against the herdr already running (never start a herdr server, per #2550 comment 6205806273). Record in `verification.md` that every worktree with a live session is classed `ambiguous`, never `auto`. `apply` is not run live as AC4 evidence: a safety check must not be performed by the reaper it guards against.
 - [ ] Verify (same suite). Lesson. Open the PR.
 
 ## Machine-readable features

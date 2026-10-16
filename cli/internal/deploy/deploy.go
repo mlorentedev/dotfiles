@@ -222,6 +222,9 @@ type Plan struct {
 	// `would fix mode` and doctor reports drift. It is false whenever Changed
 	// is true: a rewrite installs the converged mode anyway (installMode).
 	ModeDrift bool
+	// record is the merge source to record once the deploy lands (#2570),
+	// nil for a replace or when no records directory was given.
+	record []byte
 }
 
 var (
@@ -249,6 +252,9 @@ func ParseManifest(data []byte) (*Manifest, error) {
 		switch {
 		case c.Name == "":
 			return nil, fmt.Errorf("config #%d: empty name", i)
+		case strings.ContainsAny(c.Name, `/\`) || c.Name == "." || c.Name == "..":
+			// A merge entry's record is <name>.json in the records directory.
+			return nil, fmt.Errorf("config name %q names a file: it may not hold a path separator, or be \".\" or \"..\" alone", c.Name)
 		case seen[c.Name]:
 			return nil, fmt.Errorf("duplicate config name %q", c.Name)
 		case c.Src == "":
@@ -533,6 +539,13 @@ type Renderer func(path string) error
 // whether the destination already holds it. Nothing under the destination is
 // created or written; a rendered config returns ErrNeedsRender.
 func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (Plan, error) {
+	return PlanConfigWith(c, repoRoot, home, resolve, "")
+}
+
+// PlanConfigWith is PlanConfig reading merge records from records (#2570): a
+// merge entry also removes what its last recorded source managed and the
+// current one no longer declares. "" reads no record, and removes nothing.
+func PlanConfigWith(c Config, repoRoot, home string, resolve func(string) string, records string) (Plan, error) {
 	if c.Render {
 		return Plan{}, fmt.Errorf("config %q: %w", c.Name, ErrNeedsRender)
 	}
@@ -543,9 +556,16 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 	p := Plan{Dst: dst, Symlink: isSymlink(dst)}
 	switch c.strategy() {
 	case StrategyMerge:
-		p.Content, p.Changed, err = mergeInto(dst, srcData, c.ListKeys)
+		prior, err := readPrior(records, c, dst)
+		if err != nil {
+			return Plan{}, fmt.Errorf("config %q: %w", c.Name, err)
+		}
+		p.Content, p.Changed, err = mergeIntoWith(dst, srcData, c.ListKeys, prior)
 		if err != nil {
 			return Plan{}, fmt.Errorf("config %q: merge into %s: %w", c.Name, dst, err)
+		}
+		if records != "" {
+			p.record = srcData
 		}
 	default:
 		p.Content = srcData
@@ -575,6 +595,14 @@ func PlanConfig(c Config, repoRoot, home string, resolve func(string) string) (P
 // filesystem exactly as it found it, and an in-sync deploy rewrites nothing: at
 // most it corrects the file's mode in place (ensureMode).
 func Deploy(c Config, repoRoot, home string, resolve func(string) string, render Renderer, dryRun bool) (Outcome, error) {
+	return DeployWith(c, repoRoot, home, resolve, render, dryRun, "")
+}
+
+// DeployWith is Deploy with merge records under records (PlanConfigWith). A
+// merge that lands, or is already in sync, records its source there, so a box
+// deployed before records existed takes its baseline on the next run. A dry
+// run records nothing.
+func DeployWith(c Config, repoRoot, home string, resolve func(string) string, render Renderer, dryRun bool, records string) (Outcome, error) {
 	out := Outcome{Name: c.Name, DryRun: dryRun}
 	mode, err := c.FileMode()
 	if err != nil {
@@ -582,7 +610,7 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 	}
 
 	if !c.Render {
-		p, err := PlanConfig(c, repoRoot, home, resolve)
+		p, err := PlanConfigWith(c, repoRoot, home, resolve, records)
 		if err != nil {
 			return out, err
 		}
@@ -591,7 +619,10 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 			// In sync by content; the mode may still be off (CLI-055: a 0600
 			// deployed by an older binary keeps its inherited ACL forever
 			// unless someone looks). Nothing is rewritten either way.
-			return ensureMode(c, out, p.Dst, mode, dryRun)
+			if out, err = ensureMode(c, out, p.Dst, mode, dryRun); err != nil || dryRun {
+				return out, err
+			}
+			return out, recordMerge(records, c, p)
 		}
 		out.Changed = true
 		if dryRun {
@@ -606,7 +637,10 @@ func Deploy(c Config, repoRoot, home string, resolve func(string) string, render
 		if out.BackedUp, err = backupOnce(p.Dst, install); err != nil {
 			return out, err
 		}
-		return out, commit(c, staged, p.Dst, install)
+		if err := commit(c, staged, p.Dst, install); err != nil {
+			return out, err
+		}
+		return out, recordMerge(records, c, p)
 	}
 
 	// A rendered config is only comparable after `secrets render` ran on a
@@ -896,6 +930,13 @@ func managesAValue(m map[string]any) bool {
 }
 
 func mergeInto(dst string, srcData []byte, listKeys map[string]string) ([]byte, bool, error) {
+	return mergeIntoWith(dst, srcData, listKeys, nil)
+}
+
+// mergeIntoWith is mergeInto that first retires what prior, the source last
+// recorded, managed and srcData no longer declares (#2570). nil retires
+// nothing.
+func mergeIntoWith(dst string, srcData []byte, listKeys map[string]string, prior map[string]any) ([]byte, bool, error) {
 	f := mergeFormatFor(dst)
 	managed, err := f.decodeSource(srcData)
 	if err != nil {
@@ -925,10 +966,12 @@ func mergeInto(dst string, srcData []byte, listKeys map[string]string) ([]byte, 
 			}
 		}
 	}
+	retired := retire(existing, prior, managed, listKeys, "")
 	merged, changed, err := deepMerge(existing, managed, listKeys, "")
 	if err != nil {
 		return nil, false, err
 	}
+	changed = changed || retired
 	content, err := f.encode(merged)
 	if err != nil {
 		return nil, false, err
@@ -1033,8 +1076,8 @@ func checkIdentities(path, field string, managed any) error {
 // element with the same identity, keeps every other existing element where it
 // is, drops a further existing element with a managed identity (the duplicate
 // the union left), and appends the managed elements the destination lacked.
-// A retired managed element is not removed: nothing records what the repo
-// managed before.
+// A retired managed element is removed before this runs, by retire, from the
+// record of what the repo managed (#2570).
 func mergeByIdentity(existing, managed []any, field string) ([]any, bool) {
 	out := make([]any, 0, len(existing)+len(managed))
 	placed := make([]bool, len(managed))

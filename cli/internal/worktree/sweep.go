@@ -80,13 +80,13 @@ type SweepOptions struct {
 	RepoRoot string
 	LockPath string
 	DryRun   bool
-	// ClaudeProjectsDir is <CLAUDE_CONFIG_DIR>/projects: sweep skips a
-	// worktree with a transcript there under SessionWindow old. It has no
-	// override; done --ignore-recent-session is the deliberate path.
-	ClaudeProjectsDir string
+	// Sessions are the harness session stores: sweep skips a worktree with a
+	// session there under SessionWindow old. It has no override; done
+	// --ignore-recent-session is the deliberate path.
+	Sessions SessionStores
 }
 
-// SessionSkip is a worktree sweep left alone for a Claude Code session, with
+// SessionSkip is a worktree sweep left alone for a harness session, with
 // the transcript or the read error that decided it.
 type SessionSkip struct {
 	Path   string `json:"path"`
@@ -284,7 +284,7 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 		}
 		// After gate f, so only a worktree sweep would otherwise reap is
 		// reported: the main checkout's key prefixes every legacy sibling's.
-		if reason := sessionSkipReason(opts.ClaudeProjectsDir, info.Path, now); reason != "" {
+		if reason := sessionSkipReason(opts.Sessions, info.Path, now); reason != "" {
 			report.SkippedCount++
 			report.SessionSkips = append(report.SessionSkips, SessionSkip{Path: info.Path, Reason: reason})
 			continue
@@ -303,19 +303,6 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	}
 
 	return report, nil
-}
-
-// sessionSkipReason is why sweep or migrate must leave wt alone for a session,
-// or "". It names no override, since neither command has one.
-func sessionSkipReason(projectsDir, wt string, now time.Time) string {
-	s, live, err := RecentSession(projectsDir, wt, now, SessionWindow)
-	if err != nil {
-		return "Claude Code sessions could not be inspected: " + err.Error()
-	}
-	if live {
-		return fmt.Sprintf("a Claude Code session wrote %s %s ago", s.Transcript, now.Sub(s.Modified).Round(time.Minute))
-	}
-	return ""
 }
 
 func Sweep(opts SweepOptions) (*SweepReport, error) {

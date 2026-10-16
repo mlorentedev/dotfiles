@@ -465,4 +465,11 @@ tags: [lessons, index, dotfiles]
 | [444 - On Windows a file read as a directory is ErrNotExist: decide absence with Stat](lesson-444-on-windows-a-file-read-as-a-directory-is-not-exist.md) | 2026-10-15 |
 | [445 - A merge rule keyed by path is checked on the source, not where the walk reaches it](lesson-445-a-merge-rule-keyed-by-path-checks-the-source-not-the-walk.md) | 2026-10-15 |
 | [446 - herdr isolates a second server only by HOME; its variables move the sockets, not the session](lesson-446-herdr-isolates-a-second-server-only-by-home.md) | 2026-10-16 |
+| [447 - A harness session store is keyed by path, by id, or not at all; read each by its own key](lesson-447-a-session-store-is-keyed-by-path-by-id-or-not-at-all.md) | 2026-10-16 |
+| [448 - A review gate must read every channel a reviewer publishes on, not the one it was first seen on](lesson-448-a-review-gate-must-read-every-channel-a-reviewer-publishes-on.md) | 2026-10-16 |
+| [449 - A typed line may carry no path anyone chose](lesson-449-a-typed-line-may-carry-no-path-anyone-chose.md) | 2026-10-16 |
+| [450 - Ancestry reads a fresh branch as merged, and a one-row-per-phase table hides how the rules compete](lesson-450-ancestry-reads-a-fresh-branch-as-merged-and-a-phase-table-hides-how-rules-compete.md) | 2026-10-16 |
+| [451 - A reconcile that starts work must see the work it started, or changed=0 never arrives](lesson-451-a-reconcile-that-starts-work-must-see-the-work-it-started.md) | 2026-10-16 |
+| [452 - A tee through a pipe reorders output written around it; order needs a barrier through the same pipe](lesson-452-a-tee-through-a-pipe-reorders-output-written-around-it.md) | 2026-10-16 |
+| [453 - A safety precondition checked in one branch of a classifier is not checked](lesson-453-a-safety-precondition-checked-in-one-branch-of-a-classifier-is-not-checked.md) | 2026-10-16 |
 <!-- END GENERATED -->

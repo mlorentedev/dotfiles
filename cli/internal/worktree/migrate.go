@@ -15,10 +15,10 @@ type MigrateOptions struct {
 	RepoRoot     string
 	WorktreeRoot string
 	DryRun       bool
-	// Cwd and ClaudeProjectsDir feed the same live-session refusals done
-	// applies (#1653): a worktree a session lives in is skipped, never moved.
-	Cwd               string
-	ClaudeProjectsDir string
+	// Cwd and Sessions feed the same live-session refusals done applies
+	// (#1653): a worktree a session lives in is skipped, never moved.
+	Cwd      string
+	Sessions SessionStores
 }
 
 // Move is one legacy worktree and where it goes. Skip is empty when it is (or,
@@ -85,7 +85,7 @@ func migrateSkip(raw RawWorktree, m Move, opts MigrateOptions, now time.Time) st
 		return err.Error()
 	}
 	// sweep's form, not done's: migrate has no override to name.
-	if reason := sessionSkipReason(opts.ClaudeProjectsDir, m.From, now); reason != "" {
+	if reason := sessionSkipReason(opts.Sessions, m.From, now); reason != "" {
 		return reason
 	}
 	if _, err := os.Stat(m.To); err == nil {

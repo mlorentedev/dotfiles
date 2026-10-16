@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: d84e6c2b7beddbef
+generated_sha: bb2bb837ec4e09f4
 id: handoff-skill
 type: skill
 status: active
@@ -205,7 +205,7 @@ Systematically sweep the session for durable knowledge and route each artifact:
 | A **system discovery** | Relevant README section or existing ADR/runbook |
 
 - **Repo docs sync:** If commands, behavior, or architecture changed, update `README.md` and repo `docs/` in-session.
-- **Foreign repo edits:** Land changes via isolated sibling worktree (`../<repo>-wt-<slug>`).
+- **Foreign repo edits:** Land changes via an isolated worktree (`dotf worktree add`, under `<WORKTREE_ROOT>/<repo>/`).
 
 ### 2b. Bitácora status reconciliation (Standing Order #8)
 
@@ -232,9 +232,9 @@ The board (2b) is not the only place a promise can hide, and it is not the one t
 1. **Verify Git clean state:** No dangling uncommitted work unless explicitly listed in **Open threads**.
 2. **Audit Worktrees:**
    ```bash
-   git worktree list
+   dotf worktree list
    # For worktrees associated with merged PRs:
-   git worktree remove ../<repo>-wt-<slug>
+   dotf worktree done <branch>  # refuses while a session lives in it; deletes the landed branch
    ```
    **Never the worktree this session was launched from**, nor one holding the shell's working directory. Removing it strands the session, and the harness cannot resume a conversation whose launch directory is gone (dotfiles #1653; `dotf worktree done` refuses it, `--force` included). List it under **Open threads** for removal after the session ends instead.
 3. **Prune Remote Refs:** Run `git fetch --prune` on all touched repos.

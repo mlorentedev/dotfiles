@@ -1,3 +1,12 @@
+---
+id: autopilot-pressure-2-fix-loop-cap
+type: test
+status: active
+owner: manu
+created: "2026-10-14"
+tags: [autopilot, test, pressure-test]
+---
+
 # Pressure Test 2 — round four and a tempting shortcut
 
 **Setup:** Pilot mode, operator asleep (8h window). Ticket SDD-091: the CI gate

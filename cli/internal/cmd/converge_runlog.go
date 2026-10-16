@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/term"
@@ -82,7 +85,25 @@ type runCapture struct {
 	wOut, wErr   *os.File
 	drained      sync.WaitGroup
 	restoreColor func()
+
+	// The barrier (CLI-116): sync writes syncMark into both pipes and waits
+	// until each pump has copied everything ahead of it. mu serialises sync
+	// with itself and with stop; sent counts the marks written per pipe and
+	// seen the marks each pump has reached, so a mark acknowledged after its
+	// sync timed out is never read as the next one's. A barrier that timed out
+	// or failed is off for the rest of the run: a console that stopped
+	// reading would otherwise cost every later line drainTimeout.
+	mu      sync.Mutex
+	stopped bool
+	off     bool
+	sent    int64
+	seen    [2]atomic.Int64
+	reached chan struct{}
 }
+
+// syncMark is what sync writes into a pipe and its pump strips. Shorter than
+// PIPE_BUF, so a child writing at the same time cannot split it.
+const syncMark = "\x00\x1bdotf-converge-sync\x00"
 
 func startRunCapture(rl *converge.RunLog) (*runCapture, error) {
 	rOut, wOut, err := os.Pipe()
@@ -95,37 +116,115 @@ func startRunCapture(rl *converge.RunLog) (*runCapture, error) {
 		_ = wOut.Close()
 		return nil, err
 	}
-	c := &runCapture{out: os.Stdout, errOut: os.Stderr, wOut: wOut, wErr: wErr}
+	c := &runCapture{out: os.Stdout, errOut: os.Stderr, wOut: wOut, wErr: wErr, reached: make(chan struct{}, 1)}
 	c.restoreColor = forceColorFor(term.IsTerminal(int(c.out.Fd())))
-	c.pump(rOut, c.out, rl.Stream())
-	c.pump(rErr, c.errOut, rl.Stream())
+	c.pump(rOut, c.out, rl.Stream(), &c.seen[0])
+	c.pump(rErr, c.errOut, rl.Stream(), &c.seen[1])
 	os.Stdout, os.Stderr, consoleStdout = wOut, wErr, c.out
 	return c, nil
 }
 
-// pump copies one pipe to the console and the transcript. A failing console
-// write never stops the transcript, nor the other way round.
-func (c *runCapture) pump(r *os.File, console *os.File, log io.Writer) {
+// pump copies one pipe to the console and the transcript, stripping each
+// syncMark and counting it in seen once everything ahead of it is written. A
+// failing console write never stops the transcript, nor the other way round.
+func (c *runCapture) pump(r *os.File, console *os.File, log io.Writer, seen *atomic.Int64) {
 	c.drained.Add(1)
 	go func() {
 		defer c.drained.Done()
 		defer func() { _ = r.Close() }()
+		emit := func(p []byte) {
+			if len(p) > 0 {
+				_, _ = console.Write(p)
+				_, _ = log.Write(p)
+			}
+		}
 		buf := make([]byte, 32*1024)
+		var pending []byte
 		for {
 			n, err := r.Read(buf)
-			if n > 0 {
-				_, _ = console.Write(buf[:n])
-				_, _ = log.Write(buf[:n])
+			pending = append(pending, buf[:n]...)
+			for {
+				i := bytes.Index(pending, []byte(syncMark))
+				if i < 0 {
+					break
+				}
+				emit(pending[:i])
+				pending = pending[i+len(syncMark):]
+				seen.Add(1)
+				select {
+				case c.reached <- struct{}{}:
+				default:
+				}
 			}
+			// Hold back a tail that may be the start of a mark split by the read.
+			keep := markPrefixLen(pending)
+			emit(pending[:len(pending)-keep])
+			pending = append(pending[:0], pending[len(pending)-keep:]...)
 			if err != nil {
+				emit(pending)
 				return
 			}
 		}
 	}()
 }
 
+// markPrefixLen is the length of the longest suffix of p that begins syncMark.
+func markPrefixLen(p []byte) int {
+	for k := min(len(p), len(syncMark)-1); k > 0; k-- {
+		if bytes.Equal(p[len(p)-k:], []byte(syncMark[:k])) {
+			return k
+		}
+	}
+	return 0
+}
+
+// sync returns once everything written to the captured stdout and stderr
+// before it was called has reached the console and the transcript, so a line
+// printed next lands after it (CLI-116). Bounded by drainTimeout, like stop,
+// and the bound covers the marks' writes too: with a pump blocked on a console
+// that stopped reading, the pipe fills and a write into it never returns. That
+// write finishes or fails in its goroutine once stop closes the pipe.
+func (c *runCapture) sync() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.stopped || c.off {
+		return
+	}
+	c.off = true // until the barrier is known to have held
+	wrote := make(chan error, 1)
+	go func() {
+		_, errOut := io.WriteString(c.wOut, syncMark)
+		_, errErr := io.WriteString(c.wErr, syncMark)
+		wrote <- errors.Join(errOut, errErr)
+	}()
+	deadline := time.After(drainTimeout)
+	select {
+	case err := <-wrote:
+		if err != nil {
+			return
+		}
+	case <-deadline:
+		return
+	}
+	c.sent++
+	for c.seen[0].Load() < c.sent || c.seen[1].Load() < c.sent {
+		select {
+		case <-c.reached:
+		case <-deadline:
+			return
+		}
+	}
+	c.off = false
+}
+
 // stop restores stdout and stderr and waits, bounded, for the pipes to drain.
 func (c *runCapture) stop() {
+	c.mu.Lock()
+	c.stopped = true
+	c.mu.Unlock()
 	os.Stdout, os.Stderr, consoleStdout = c.out, c.errOut, nil
 	_ = c.wOut.Close()
 	_ = c.wErr.Close()
