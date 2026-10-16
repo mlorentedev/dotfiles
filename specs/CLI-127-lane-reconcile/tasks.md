@@ -40,11 +40,11 @@ created: "2026-10-15"
 
 ### PR 3: `dotf lane apply`
 
-- [ ] [AC3] Write `cli/internal/lane/apply_test.go` (`TestApply`): `Apply(actions, verbs)` calls `verbs.Sweep` and `verbs.Next` only for `auto` actions, never adopt or land (asserted on a recording fake), and returns `changed`. A second `Apply` over the post-state returns `changed=0`. Expected: FAIL.
-- [ ] [AC3] Write `cli/internal/lane/apply.go` until it passes. Reaps go through `worktree.Sweep` (its fail-closed gates, the process gate f included, are the safety). Starts go through the existing `lane next` path.
-- [ ] [AC4] Add `TestApplyNeverReapsALiveWorktree` with a row where the process seam reports a process inside a merged, clean, expired worktree, and another where `RecentSession` reports a recent transcript. Neither is reaped, and both show as `ambiguous`.
-- [ ] [AC3] Add `newLaneApplyCmd` printing `changed=N`, plus its cmd test.
-- [ ] [AC4] Live run on this machine, read-only verbs only: `dotf lane status` and `dotf lane plan` from the main checkout, against the herdr already running (never start a herdr server, per #2550 comment 6205806273). Record in `verification.md` that every worktree with a live session is classed `ambiguous`, never `auto`. `apply` is not run live as AC4 evidence: a safety check must not be performed by the reaper it guards against.
+- [x] [AC3] Write `cli/internal/lane/apply_test.go` (`TestApply`): `Apply(actions, verbs)` calls `verbs.Sweep` and `verbs.Next` only for `auto` actions, never adopt or land (asserted on a recording fake), and returns `changed`. A second `Apply` over the post-state returns `changed=0`. Expected: FAIL.
+- [x] [AC3] Write `cli/internal/lane/apply.go` until it passes. Reaps go through `worktree.Sweep` (its fail-closed gates, the process gate f included, are the safety). Starts go through the existing `lane next` path.
+- [x] [AC4] Add `TestApplyNeverReapsALiveWorktree` with a row where the process seam reports a process inside a merged, clean, expired worktree, and another where `RecentSession` reports a recent transcript. Neither is reaped, and both show as `ambiguous`.
+- [x] [AC3] Add `newLaneApplyCmd` printing `changed=N`, plus its cmd test.
+- [x] [AC4] Live run on this machine, read-only verbs only: `dotf lane status` and `dotf lane plan` from the main checkout, against the herdr already running (never start a herdr server, per #2550 comment 6205806273). Record in `verification.md` that every worktree with a live session is classed `ambiguous`, never `auto`. `apply` is not run live as AC4 evidence: a safety check must not be performed by the reaper it guards against.
 - [ ] Verify (same suite). Lesson. Open the PR.
 
 ## Machine-readable features
