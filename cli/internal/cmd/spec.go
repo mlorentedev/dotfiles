@@ -255,12 +255,14 @@ after the first review, into review-second.md. A member that declares
 			// the head we actually pointed it at, the pool member we resolved,
 			// and the digest of whatever review.md held going in.
 			//
-			// The digest is the load-bearing one. A detached launch can only ever
-			// report that the runner STARTED, so nothing here can observe a run
-			// that ends without writing a verdict — measured twice on 2026-08-22,
-			// once by turn cap and once by a provider quota — and the previous
-			// round's verdict then sits on disk looking exactly like a fresh one.
-			// `spec archive` compares the digest and refuses.
+			// A detached launch can only ever report that the runner STARTED, so
+			// nothing here can observe a run that ends without writing a verdict
+			// (measured twice on 2026-08-22, once by turn cap and once by a
+			// provider quota). The previous round's verdict used to sit on disk
+			// then, looking exactly like a fresh one. The rotation below now moves
+			// it aside first, so the digest is normally of nothing; it still
+			// catches a verdict that comes back by another route, and `spec
+			// archive` compares it and refuses.
 			//
 			// A failure to write it refuses the launch. It used to be a warning,
 			// but `spec archive` refuses a review with no sidecar (#1908), so a run
