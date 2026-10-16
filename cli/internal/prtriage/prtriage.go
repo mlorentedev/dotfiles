@@ -45,9 +45,9 @@ type Signature struct {
 	Files []string `json:"files"`
 }
 
-// Reviewer is one declared reviewer. ReviewMarkers are the headings a reviewer
-// that publishes through the comments API uses for its review output; a
-// reviewer that files proper reviews carries none.
+// Reviewer is one declared reviewer. ReviewMarkers are the headings it uses for
+// review output published through the comments API. A formal review needs no
+// marker: PR.Reviews counts by login, and one reviewer may use both channels.
 type Reviewer struct {
 	Login         string   `json:"login"`
 	ReviewMarkers []string `json:"review_markers"`

@@ -559,3 +559,40 @@ func TestFetchRefusesAFullPageOfReviews(t *testing.T) {
 		t.Fatalf("err = %v, want a full-page refusal", err)
 	}
 }
+
+// TestFetchDoesNotCountANoticeAsReview is #1686's second criterion: a
+// rate-limit or in-progress notice is status, not review. It carries no
+// marker, and it is an issue comment, so reading reviews must not change that.
+func TestFetchDoesNotCountANoticeAsReview(t *testing.T) {
+	fake := &fakeGH{responses: map[string]string{
+		"/pulls": `[{"number":6,"title":"t","html_url":"u"}]`,
+		"/issues/6/comments": `[{"user":{"login":"coderabbitai[bot]"},
+		                         "body":"<!-- rate limited by coderabbit.ai -->\n## Review limit reached",
+		                         "created_at":"2026-10-16T03:25:58Z"}]`,
+		"/pulls/6/reviews": `[]`,
+	}}
+
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("queue = %+v, want empty: a notice is not review output", got)
+	}
+}
+
+// TestFetchFailsWhenReviewsCannotBeRead is #1686's fourth criterion: a PR
+// whose reviews could not be read is not a PR with no reviews.
+func TestFetchFailsWhenReviewsCannotBeRead(t *testing.T) {
+	fake := &fakeGH{
+		responses: map[string]string{
+			"/pulls":             `[{"number":4,"title":"t","html_url":"u"}]`,
+			"/issues/4/comments": `[]`,
+		},
+		errs: map[string]error{"/pulls/4/reviews": fmt.Errorf("HTTP 502")},
+	}
+
+	if _, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry()); err == nil {
+		t.Fatal("fetchWith returned a queue; an unreadable reviews endpoint must fail it")
+	}
+}
