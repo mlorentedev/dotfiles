@@ -16,6 +16,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -195,7 +196,10 @@ func runClaudeHook(cmd *cobra.Command) error {
 }
 
 // memTriageQueue builds the session-start triage probe for cwd, or nil when this
-// repository does not run the review-triage loop at all.
+// repository does not run the review-triage loop at all. The registry is read
+// from the checkout root, not from cwd: a session started in a subdirectory
+// (cli/, where most work here happens) otherwise read as "no registry" and
+// the probe stayed silent on a queue that was not clear (#1281).
 //
 // The nil case is load-bearing and is NOT the same as an empty queue. Most repos
 // carry no reviewer registry; reporting "could not be computed" in every one of
@@ -207,7 +211,15 @@ func runClaudeHook(cmd *cobra.Command) error {
 // nobody volunteered for, and an unreachable API must degrade to one visible
 // message rather than a hung shell.
 func memTriageQueue(cwd string) func() (string, error) {
-	registry := filepath.Join(cwd, "harness", "review-attestation.json")
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		return nil
+	}
+	root, err := spec.RepoRoot(abs)
+	if err != nil {
+		return nil
+	}
+	registry := filepath.Join(root, filepath.FromSlash(prtriage.RegistryPath))
 	if _, err := os.Stat(registry); err != nil {
 		return nil
 	}
