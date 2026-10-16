@@ -39,12 +39,13 @@ import (
 const ManifestRel = "ai/deploy.json"
 
 // ManifestVersion is the newest schema this binary reads. It is bumped whenever
-// a new field changes what an entry MEANS (2: `strategy` and `requires`,
-// AI-039; 3: `paths`, AI-042; 4: `platforms`, #1843 B1; 5: `listKeys`, #2455), so a binary that
-// predates the field refuses the manifest instead of deploying every entry the
-// old way. The check is the version, not the field, because a field an old
+// a field, new or newly allowed, changes what an entry MEANS (2: `strategy` and
+// `requires`, AI-039; 3: `paths`, AI-042; 4: `platforms`, #1843 B1; 5:
+// `listKeys`, #2455; 6: `paths` on a TOML source, #2503), so a binary that
+// predates it refuses the manifest instead of deploying every entry the old
+// way. The check is the version, not the field, because a field an old
 // decoder ignores is invisible to it by construction.
-const ManifestVersion = 5
+const ManifestVersion = 6
 
 // MinManifestVersion is the oldest schema this binary reads. A reader that adds
 // a field reads the version before it too, which by construction carries none
@@ -82,9 +83,9 @@ type Config struct {
 	// (#843), and the integration guard asserts ~/.copilot is never created
 	// on a box without copilot (#1312).
 	Requires string `json:"requires"`
-	// Paths renders {VAR} tokens inside the source's JSON string values in the
-	// declared separator form ("native" | "slash") before the strategy runs
-	// (AI-042, #1334). Declared per entry because which form a tool accepts is a
+	// Paths renders {VAR} tokens inside the source's string values (JSON, or
+	// TOML from version 6) in the declared separator form ("native" | "slash")
+	// before the strategy runs (AI-042, #1334). Declared per entry because which form a tool accepts is a
 	// measured fact about the tool, not a property of the OS.
 	Paths string `json:"paths"`
 	// Platforms lists the GOOS values the entry applies on; absent means every
@@ -268,9 +269,10 @@ func ParseManifest(data []byte) (*Manifest, error) {
 			return nil, fmt.Errorf("config %q: unknown paths form %q (want %s or %s)", c.Name, c.Paths, PathsNative, PathsSlash)
 		}
 		// paths rewrites the source before it is installed or merged, so the
-		// source's format is the one that must be JSON.
-		if c.Paths != "" && isTOML(c.Src) {
-			return nil, fmt.Errorf("config %q: paths rewrites JSON string values, and %s is TOML", c.Name, c.Src)
+		// source's format is the one that decides. A reader before version 6
+		// refuses it on TOML, and must read "newer schema", not this entry.
+		if c.Paths != "" && isTOML(c.Src) && m.Version < 6 {
+			return nil, fmt.Errorf("config %q: paths on a TOML source (%s) needs manifest version 6", c.Name, c.Src)
 		}
 		switch c.strategy() {
 		case StrategyReplace:
@@ -732,7 +734,7 @@ func load(c Config, repoRoot, home string, resolve func(string) string) ([]byte,
 		return nil, "", fmt.Errorf("config %q: %w", c.Name, err)
 	}
 	if c.Paths != "" {
-		if srcData, err = expandPaths(srcData, c.Paths, home, resolve); err != nil {
+		if srcData, err = expandPathsAs(pathsCodecFor(c.Src), srcData, c.Paths, home, resolve); err != nil {
 			return nil, "", fmt.Errorf("config %q: %w", c.Name, err)
 		}
 	}

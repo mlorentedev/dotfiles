@@ -44,12 +44,52 @@ const (
 //     ({HOME}/Projects/*); a token inside a URL (https://host/{VAR}/x) is not a
 //     path, and converting its slashes under `native` would corrupt it.
 func expandPaths(src []byte, form, home string, resolve func(string) string) ([]byte, error) {
+	return expandPathsAs(jsonPaths, src, form, home, resolve)
+}
+
+// pathsCodec is how a source format is read and written back for rendering.
+// The rules above are the same for every format; only the codec differs.
+type pathsCodec struct {
+	what   string
+	decode func([]byte) (any, error)
+	encode func(any) ([]byte, error)
+}
+
+var jsonPaths = pathsCodec{what: "JSON", decode: decodeJSONNumbers, encode: encodeJSON}
+
+// tomlPaths renders a TOML source (#2503: herdr's worktrees.directory is
+// WORKTREE_ROOT). go-toml decodes an integer as int64 and a datetime as a
+// time value, so re-encoding writes back what was read, as UseNumber does for
+// JSON. Comments do not survive the re-encode; a merge re-encodes anyway.
+var tomlPaths = pathsCodec{
+	what: "TOML",
+	decode: func(raw []byte) (any, error) {
+		return decodeTOMLTable(raw)
+	},
+	encode: func(doc any) ([]byte, error) {
+		table, ok := doc.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("a TOML document is a table, got %T", doc)
+		}
+		return encodeTOML(table)
+	},
+}
+
+// pathsCodecFor chooses by the source's extension, as ParseManifest does.
+func pathsCodecFor(src string) pathsCodec {
+	if isTOML(src) {
+		return tomlPaths
+	}
+	return jsonPaths
+}
+
+func expandPathsAs(codec pathsCodec, src []byte, form, home string, resolve func(string) string) ([]byte, error) {
 	if form != PathsNative && form != PathsSlash {
 		return nil, fmt.Errorf("unknown paths form %q (want %s or %s)", form, PathsNative, PathsSlash)
 	}
-	doc, err := decodeJSONNumbers(src)
+	doc, err := codec.decode(src)
 	if err != nil {
-		return nil, fmt.Errorf("paths rendering needs a JSON source: %w", err)
+		return nil, fmt.Errorf("paths rendering needs a %s source: %w", codec.what, err)
 	}
 	var bad []string
 	render := func(s string) string {
@@ -80,7 +120,7 @@ func expandPaths(src []byte, form, home string, resolve func(string) string) ([]
 	if len(bad) > 0 {
 		return nil, fmt.Errorf("unresolvable path variable(s) %s", strings.Join(bad, ", "))
 	}
-	return encodeJSON(doc)
+	return codec.encode(doc)
 }
 
 // decodeJSONNumbers decodes one JSON document into `any` keeping every number
@@ -126,7 +166,7 @@ func encodeJSON(value any) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// walkStrings applies fn to every string value in a decoded JSON document.
+// walkStrings applies fn to every string value in a decoded document.
 func walkStrings(v any, fn func(string) string) any {
 	switch x := v.(type) {
 	case string:
