@@ -98,7 +98,7 @@ func TestLoadConfig_DefaultsAndRefusesAnUnknownKey(t *testing.T) {
 // base is <remote>/<branch>: without a slash `git fetch main` would be run
 // with a remote named main and no branch, far from the file that is wrong.
 func TestLoadConfig_BaseMustNameARemoteAndABranch(t *testing.T) {
-	for base, ok := range map[string]bool{"origin/main": true, "upstream/release/1.x": true, "main": false, "origin/": false, "/main": false} {
+	for base, ok := range map[string]bool{"origin/main": true, "upstream/release/1.x": true, "main": false, "origin/": false, "/main": false, "origin/main; x": false, "or igin/main": false, "origin/$(x)": false, "origin/-flag": false, "-o/main": false} {
 		dir := t.TempDir()
 		if err := os.MkdirAll(filepath.Join(dir, ".dotf"), 0o755); err != nil {
 			t.Fatal(err)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 )
@@ -47,11 +48,16 @@ func LoadConfig(repoRoot string) (Config, error) {
 	if cfg.Base == "" {
 		cfg.Base = "origin/main"
 	}
-	if remote, branch := cfg.Remote(); remote == "" || branch == "" {
-		return Config{}, fmt.Errorf("lane: %s: base %q must be <remote>/<branch>, e.g. origin/main", ConfigPath, cfg.Base)
+	if remote, branch := cfg.Remote(); !refWord.MatchString(remote) || !refWord.MatchString(branch) {
+		return Config{}, fmt.Errorf("lane: %s: base %q must be <remote>/<branch>, e.g. origin/main, made of letters, digits and . _ / -", ConfigPath, cfg.Base)
 	}
 	return cfg, nil
 }
+
+// refWord is what a remote or branch name may be made of. The base is printed
+// into commands a person pastes, and a space or a metacharacter in it would
+// make one of them run a second command (CLI-119 review round 3).
+var refWord = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_./-]*$`)
 
 // Remote splits Base into the remote to fetch and the branch to fetch from it.
 func (c Config) Remote() (remote, branch string) {
