@@ -40,6 +40,8 @@ func (r configsDeploy) run(env Env, dryRun bool) (deploy.RunResult, error) {
 	if err != nil {
 		return deploy.RunResult{}, err
 	}
+	// env.Home is the env.Home() `dotf deploy` places env.StateDir() from, so
+	// deploy and converge read and write one set of records (ADR-051).
 	records, err := deploy.MergeRecords(man.Configs, func() (string, error) { return envpkg.StateDirFor(os.Getenv, env.Home) })
 	if err != nil {
 		return deploy.RunResult{}, err

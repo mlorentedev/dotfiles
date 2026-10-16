@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -48,5 +49,16 @@ func TestRun_PassesRecordsToEachMerge(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(records, "m.json")); err != nil {
 		t.Errorf("Run did not record the merge: %v", err)
+	}
+}
+
+// A merge entry's name is its record's file name, so a name that would leave
+// the records directory is refused when the manifest is read.
+func TestParseManifest_RefusesANameThatIsAPath(t *testing.T) {
+	for _, name := range []string{"../x", `a\\b`, "a/b", ".", ".."} {
+		_, err := ParseManifest([]byte(`{"version": 4, "configs": [{"name": "` + name + `", "src": "m.json", "dst": "{HOME}/m.json"}]}`))
+		if err == nil || !strings.Contains(err.Error(), "names a file") {
+			t.Errorf("name %q: want a refusal, got %v", name, err)
+		}
 	}
 }

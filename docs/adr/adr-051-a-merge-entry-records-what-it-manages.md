@@ -40,7 +40,7 @@ The owner set the constraint on 2026-10-16: the record is the decision, meaning 
 
 - Removing a key, a table or a binding from a merge source now converges every machine on its next deploy, with no manual step.
 - "Managed" means "declared by the source at a past deploy on this machine". Suppose a union-list element or a key the user already had, with the same value, before the repo declared it. It is indistinguishable from one the repo added, so when the repo retires it, it is removed. This is the accepted edge of the equality rule, not a defect: the alternative, recording the destination's prior state, would need a snapshot of user data in dotf's state.
-- The first deploy after upgrading retires nothing. It records the baseline, and only a later source change removes anything.
+- The first deploy after upgrading retires nothing. It records the baseline, and only a later source change removes anything. So a value removed from a source before a machine's first recording run stays on that machine until removed by hand: no record ever held it. Measured on 2026-10-16, herdr has none (no binding has ever left `ai/herdr/config.toml`, and the Mac's only binding is the declared `prefix+d`). A Claude Code permission rule dropped from the template earlier may linger; the ones Claude Code rejects are removed by `dotf doctor --fix` (#2350).
 - Deleting `<StateDir>/deploy/merged/` is always safe. It costs one round of retirements, never removes a value.
 
 ## Alternatives considered
