@@ -1,0 +1,31 @@
+# Arming envelope for the bug-queue run of 2026-10-16. Written at arming from the
+# operator's sentence ("acabar los tickets que has definido en la lista y si los
+# acabas e integras sin errores ir cogiendo otros quickwin no asignados") and
+# committed on chore/autopilot-run-2026-10-16b. The run reads the COMMITTED copy
+# only (autopilot skill §1.4). Never widened by the run.
+version: 1
+run_id: "bugs-20261016T0803Z"
+armed_by: manu
+armed_at: 2026-10-16T08:03:00Z
+expires_at: 2026-10-16T18:03:00Z
+objective: "Land fixes for #1607 (part 1), #1593 (part 1), #2442 and #2526 under the standing grant, then unclaimed quick-win bugs no peer holds."
+scope:
+  write_paths: ["cli/**", "docs/**", "specs/**", "tests/**", ".agent/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "forge/**", "scripts/**", "setup-*", "versions.conf", "secrets/**", "ai/**", "cli/internal/lane/**", "cli/internal/cmd/lane*.go", "cli/internal/prland/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, make, mise]
+queue:
+  source: explicit-then-bitacora
+  items: [1607, 1593, 2442, 2526]   # in this order
+  filter: "then unassigned Backlog bug/chore items in mlorentedev/dotfiles whose paths fit write_paths, with no open PR, branch, assignee or recent claim comment; never #2550-#2554, #2576, #2587, #2580, #2582 or release PRs (peers cli-127b and pilot-r4 hold those)"
+  max_items: 8
+budget:
+  max_iterations: 12
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant        # own PRs only; never a release PR, never #2580/#2582
+  push: true
+  open_pr: true
+  advisor_tier: top
