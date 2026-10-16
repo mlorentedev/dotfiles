@@ -28,7 +28,7 @@ created: "2026-10-15"
 - [x] [AC1] Write `cli/internal/lane/phase.go` with `Phase`, `Facts` and `Derive` until the test passes. Phases are computed and never stored.
 - [x] [AC1] Write `cli/internal/lane/status_test.go` (`TestStatus`). `Status(Sources)` joins fakes for `worktree.ListWithRunner`, a forge seam (`PRFor(branch)`, one REST request per run, cached), liveness (`worktree.RecentSession` plus the process seam) and herdr's `Find`. It returns one `Row` per worktree. The test asserts the rows and that the forge seam is asked once per branch. Expected: FAIL.
 - [x] [AC1] Write `cli/internal/lane/status.go` until it passes. If herdr is unavailable, rows are still returned, with `herdr: absent`.
-- [ ] [AC1] In `cli/internal/cmd/lane.go`, add `newLaneStatusCmd` (`--json`) with seams like `laneExec`/`laneRun`, plus `cli/internal/cmd/lane_status_test.go` covering the text and JSON shapes and the exit code.
+- [x] [AC1] In `cli/internal/cmd/lane.go`, add `newLaneStatusCmd` (`--json`) with seams like `laneExec`/`laneRun`, plus `cli/internal/cmd/lane_status_test.go` covering the text and JSON shapes and the exit code.
 - [ ] Verify: `go build ./... && go vet ./... && go test ./...`, `GOOS=windows go vet ./...`, and `golangci-lint run` at the pin. Lesson. Open the PR.
 
 ### PR 2: `dotf lane plan`

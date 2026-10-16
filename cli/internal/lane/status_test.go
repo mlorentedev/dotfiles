@@ -48,7 +48,7 @@ func rowFor(t *testing.T, rows []Row, branch string) Row {
 
 // Status joins the worktree list, the forge, liveness and herdr into one row
 // per lane, and reaches the forge once per branch however many rows ask.
-func TestStatus_OneRowPerLaneWithItsDerivedPhase(t *testing.T) {
+func statusOneRowPerLaneWithItsDerivedPhase(t *testing.T) {
 	main := worktree.Info{Path: "/repo", Branch: "main", IsMain: true}
 	forge := &fakeForge{prs: map[string]PRInfo{
 		"fix/review":  {Number: 30, State: PROpen},
@@ -78,7 +78,12 @@ func TestStatus_OneRowPerLaneWithItsDerivedPhase(t *testing.T) {
 			}, nil
 		},
 		Forge: forge,
-		Live:  func(p string) (bool, error) { return p == "/wt/fix/running", nil },
+		Live: func(p string) Liveness {
+			if p == "/wt/fix/running" {
+				return LiveYes
+			}
+			return LiveIdle
+		},
 		Herdr: fakeFinder{found: map[string]Worktree{"fix/running": {Open: true}}},
 	}
 	rows, err := Status(src)
@@ -113,12 +118,12 @@ func TestStatus_OneRowPerLaneWithItsDerivedPhase(t *testing.T) {
 
 // herdr being unreachable is a supported state: the rows are still there,
 // marked absent, and the phases are the ones git and the forge give.
-func TestStatus_HerdrAbsentStillAnswers(t *testing.T) {
+func statusHerdrAbsentStillAnswers(t *testing.T) {
 	src := Sources{
 		Now:   phaseNow,
 		List:  func() ([]worktree.Info, error) { return []worktree.Info{wt("fix/a", leased(time.Hour))}, nil },
 		Forge: &fakeForge{},
-		Live:  func(string) (bool, error) { return false, nil },
+		Live:  func(string) Liveness { return LiveIdle },
 		Herdr: fakeFinder{err: errors.New("no herdr server")},
 	}
 	rows, err := Status(src)
@@ -130,21 +135,76 @@ func TestStatus_HerdrAbsentStillAnswers(t *testing.T) {
 	}
 }
 
-// A liveness probe that fails reads as alive: reaping a live session is the
+// A probe that cannot answer reads as alive for the phase: reaping a live session is the
 // expensive mistake, a stale "Running" row is not.
-func TestStatus_UnreadableLivenessReadsAsLive(t *testing.T) {
+func statusUnknownLivenessReadsAsLiveForThePhase(t *testing.T) {
 	src := Sources{
 		Now:   phaseNow,
 		List:  func() ([]worktree.Info, error) { return []worktree.Info{wt("fix/a", leased(-time.Hour))}, nil },
 		Forge: &fakeForge{},
-		Live:  func(string) (bool, error) { return false, errors.New("cannot read the session store") },
+		Live:  func(string) Liveness { return LiveUnknown },
 		Herdr: fakeFinder{},
 	}
 	rows, err := Status(src)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := rows[0]; !r.Live || r.Phase != PhaseRunning {
-		t.Errorf("row = %+v, want live and Running", r)
+	if r := rows[0]; r.Live != LiveUnknown || r.Phase != PhaseRunning {
+		t.Errorf("row = %+v, want unknown liveness and Running", r)
+	}
+}
+
+// The head of the landing order is the lowest-numbered PR among the lanes in
+// Review: an unadopted worktree's older PR is not in that order.
+func statusLandingHeadIsPickedAmongReviewLanes(t *testing.T) {
+	src := Sources{
+		Now: phaseNow,
+		List: func() ([]worktree.Info, error) {
+			return []worktree.Info{wt("fix/unadopted", nil), wt("fix/second", leased(time.Hour)), wt("fix/first", leased(time.Hour))}, nil
+		},
+		Forge: &fakeForge{prs: map[string]PRInfo{
+			"fix/unadopted": {Number: 1, State: PROpen},
+			"fix/second":    {Number: 30, State: PROpen},
+			"fix/first":     {Number: 20, State: PROpen},
+		}},
+		Live: func(string) Liveness { return LiveYes },
+	}
+	rows, err := Status(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for branch, want := range map[string]Phase{"fix/unadopted": PhaseUnadopted, "fix/first": PhaseLanding, "fix/second": PhaseReview} {
+		if got := rowFor(t, rows, branch).Phase; got != want {
+			t.Errorf("%s: %q, want %q", branch, got, want)
+		}
+	}
+}
+
+// TestStatus is the one entry the spec's verification names; each scenario is a subtest.
+func TestStatus(t *testing.T) {
+	t.Run("OneRowPerLaneWithItsDerivedPhase", statusOneRowPerLaneWithItsDerivedPhase)
+	t.Run("HerdrAbsentStillAnswers", statusHerdrAbsentStillAnswers)
+	t.Run("UnknownLivenessReadsAsLiveForThePhase", statusUnknownLivenessReadsAsLiveForThePhase)
+	t.Run("LandingHeadIsPickedAmongReviewLanes", statusLandingHeadIsPickedAmongReviewLanes)
+}
+
+// Combine never lets a probe that could not answer read as idle, and never lets
+// an idle probe hide a live one.
+func TestCombine(t *testing.T) {
+	cases := []struct {
+		in   []Liveness
+		want Liveness
+	}{
+		{nil, LiveIdle},
+		{[]Liveness{LiveIdle, LiveIdle}, LiveIdle},
+		{[]Liveness{LiveIdle, LiveUnknown}, LiveUnknown},
+		{[]Liveness{LiveUnknown, LiveIdle}, LiveUnknown},
+		{[]Liveness{LiveUnknown, LiveYes}, LiveYes},
+		{[]Liveness{LiveIdle, LiveYes}, LiveYes},
+	}
+	for _, c := range cases {
+		if got := Combine(c.in...); got != c.want {
+			t.Errorf("Combine(%v) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }

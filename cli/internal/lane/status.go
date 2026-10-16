@@ -2,7 +2,6 @@ package lane
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,9 +44,8 @@ type Sources struct {
 
 	List  func() ([]worktree.Info, error)
 	Forge PRSource
-	// Live reports whether someone is working in a worktree: a process inside
-	// it, or a recent session. An error reads as live (see Status).
-	Live  func(path string) (bool, error)
+	// Live reads whether someone is working in a worktree. See Liveness.
+	Live  func(path string) Liveness
 	Herdr Finder
 
 	// The queue, for the lanes that have no worktree yet or no longer.
@@ -56,19 +54,48 @@ type Sources struct {
 	BranchPrefix string
 }
 
+// Liveness is what the probes could establish about whether someone is working
+// in a worktree. There are three answers, not two: a probe that cannot run
+// (no process scan on this platform, an unreadable session store) knows
+// nothing, and reading that as "idle" would let a live session be reaped.
+type Liveness string
+
+const (
+	LiveYes     Liveness = "live"
+	LiveIdle    Liveness = "idle"
+	LiveUnknown Liveness = "unknown"
+)
+
+// Combine merges independent probes: any live reading wins, then any unknown,
+// and only when every probe answered "idle" is the worktree idle. A phase
+// treats unknown as live (see Status); the row keeps the distinction so a
+// reader can see the difference.
+func Combine(readings ...Liveness) Liveness {
+	out := LiveIdle
+	for _, r := range readings {
+		switch r {
+		case LiveYes:
+			return LiveYes
+		case LiveUnknown:
+			out = LiveUnknown
+		}
+	}
+	return out
+}
+
 // Row is one lane in the status table.
 type Row struct {
-	Ticket  int    `json:"ticket,omitempty"`
-	Branch  string `json:"branch"`
-	Path    string `json:"path,omitempty"`
-	PR      int    `json:"pr,omitempty"`
-	PRState string `json:"pr_state,omitempty"`
-	Agent   string `json:"agent,omitempty"`
-	Lease   string `json:"lease,omitempty"`
-	Live    bool   `json:"live"`
-	Herdr   string `json:"herdr"`
-	Dirty   bool   `json:"dirty,omitempty"`
-	Phase   Phase  `json:"phase"`
+	Ticket  int      `json:"ticket,omitempty"`
+	Branch  string   `json:"branch"`
+	Path    string   `json:"path,omitempty"`
+	PR      int      `json:"pr,omitempty"`
+	PRState string   `json:"pr_state,omitempty"`
+	Agent   string   `json:"agent,omitempty"`
+	Lease   string   `json:"lease,omitempty"`
+	Live    Liveness `json:"live"`
+	Herdr   string   `json:"herdr"`
+	Dirty   bool     `json:"dirty,omitempty"`
+	Phase   Phase    `json:"phase"`
 }
 
 // Status is the read-only join of git, the forge, liveness and herdr. It
@@ -97,10 +124,12 @@ func Status(src Sources) ([]Row, error) {
 		return nil, err
 	}
 	lanes = append(lanes, queued...)
-	markHead(lanes)
 	var rows []Row
+	for i := range lanes {
+		lanes[i].row.Phase = Derive(lanes[i].facts, src.Now)
+	}
+	markHead(lanes, src.Now)
 	for _, l := range lanes {
-		l.row.Phase = Derive(l.facts, src.Now)
 		if l.row.Phase != PhaseNone {
 			rows = append(rows, l.row)
 		}
@@ -118,12 +147,9 @@ func (s Sources) onDiskLane(info worktree.Info, forge PRSource) (lane, error) {
 	if err != nil {
 		return lane{}, fmt.Errorf("lane status: forge: %w", err)
 	}
-	live, err := s.Live(info.Path)
-	if err != nil {
-		live = true // unsure reads as alive: a false "dead" reaps a live session
-	}
+	live := s.Live(info.Path)
 	herdr := s.herdr(info.Branch)
-	f := Facts{Info: info, Exists: true, PR: pr.State, Live: live, HerdrPresent: herdr != HerdrAbsent}
+	f := Facts{Info: info, Exists: true, PR: pr.State, Live: live != LiveIdle, HerdrPresent: herdr != HerdrAbsent}
 	r := Row{Branch: info.Branch, Path: info.Path, PR: pr.Number, PRState: string(pr.State), Live: live, Herdr: herdr, Dirty: info.Dirty, Ticket: ticketOf(info)}
 	if m := info.Metadata; m != nil {
 		r.Agent, r.Lease = m.Creator, m.LeaseExpiresAt.Format(time.RFC3339)
@@ -172,19 +198,22 @@ func (s Sources) herdr(branch string) string {
 	return HerdrListed
 }
 
-// markHead flags the open PR first in the landing order, the lowest number.
-func markHead(lanes []lane) {
-	var open []int
+// markHead promotes the Review lane with the lowest PR number to Landing. It
+// picks among the lanes that derived to Review, not among every open PR: an
+// unadopted worktree with an older PR is not in the landing order, and must
+// not take the head with it.
+func markHead(lanes []lane, now time.Time) {
+	head := -1
 	for i, l := range lanes {
-		if l.facts.PR == PROpen && l.facts.Exists {
-			open = append(open, i)
+		if l.row.Phase == PhaseReview && (head < 0 || l.row.PR < lanes[head].row.PR) {
+			head = i
 		}
 	}
-	if len(open) == 0 {
+	if head < 0 {
 		return
 	}
-	sort.Slice(open, func(a, b int) bool { return lanes[open[a]].row.PR < lanes[open[b]].row.PR })
-	lanes[open[0]].facts.Head = true
+	lanes[head].facts.Head = true
+	lanes[head].row.Phase = Derive(lanes[head].facts, now)
 }
 
 // ticketOf is the issue a worktree is for: the lease's, else the number a
