@@ -254,7 +254,7 @@ func ParseManifest(data []byte) (*Manifest, error) {
 			return nil, fmt.Errorf("config #%d: empty name", i)
 		case strings.ContainsAny(c.Name, `/\`) || c.Name == "." || c.Name == "..":
 			// A merge entry's record is <name>.json in the records directory.
-			return nil, fmt.Errorf("config name %q names a file, so it holds no path separator and is not . or ..", c.Name)
+			return nil, fmt.Errorf("config name %q names a file: it may not hold a path separator, or be \".\" or \"..\" alone", c.Name)
 		case seen[c.Name]:
 			return nil, fmt.Errorf("duplicate config name %q", c.Name)
 		case c.Src == "":
