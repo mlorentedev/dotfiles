@@ -1,0 +1,30 @@
+version: 1
+run_id: "pilot-r4-20261016T0803Z"
+armed_by: manu
+armed_at: 2026-10-16T08:03:00Z
+expires_at: 2026-10-16T18:03:00Z
+objective: "Finish #2576 (lane next failure modes) and then land unclaimed quick-win tickets that no peer holds, each as its own small reviewed PR."
+scope:
+  write_paths:
+    - "cli/**"
+    - "docs/**"
+    - "tests/**"
+    - "specs/**"
+    - ".agent/runs/**"
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "versions.conf", "secrets/**"]
+  max_files: 16
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, make, tmux, python3, shellcheck, bats]
+queue:
+  source: bitacora
+  filter: "#2576 (points 2 and 3; point 1 belongs to CLI-128), then bug/chore/debt quick wins in the dotfiles repo that are unclaimed by a peer (no open PR, branch or recent claim comment); never #2551-#2554, #2550, #2503 or release PRs"
+  max_items: 6
+budget:
+  max_iterations: 12
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
