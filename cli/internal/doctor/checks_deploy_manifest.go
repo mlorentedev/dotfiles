@@ -50,6 +50,13 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 	}
 
 	home := sys.home()
+	// The records deploy reads (#2570), so a key a source retired is drift
+	// here exactly when deploy would remove it. A state directory that cannot
+	// be placed reads no record: deploy itself refuses to run there.
+	records := ""
+	if state, err := env.StateDirFor(sys.Getenv, home); err == nil {
+		records = deploy.RecordsDir(state)
+	}
 	inSync, drifted, notCompared := 0, 0, 0
 	for _, c := range man.Configs {
 		if !c.AppliesOn(sys.GOOS) || (c.Requires != "" && !sys.has(c.Requires)) {
@@ -83,7 +90,7 @@ func checkDeployManifest(sys *System, rep *Report, fix bool) {
 			}
 			continue
 		}
-		p, err := deploy.PlanConfig(c, repo, home, env.ResolvePath)
+		p, err := deploy.PlanConfigWith(c, repo, home, env.ResolvePath, records)
 		if err != nil {
 			rep.Warn(fmt.Sprintf("%s: %v (run: dotf deploy %s)", c.Name, err, c.Name))
 			drifted++

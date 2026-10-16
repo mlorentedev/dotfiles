@@ -21,6 +21,9 @@ type RunOptions struct {
 	Render         Renderer            // nil leaves {env:VAR} placeholders as they are
 	Available      func(string) bool   // is a command on PATH, for `requires`
 	DryRun         bool
+	// Records is where merge entries record what they manage (RecordsDir);
+	// "" records nothing and removes nothing a source retired (#2570).
+	Records string
 }
 
 // Step is one entry's line in a run.
@@ -76,7 +79,7 @@ func Run(man *Manifest, targets []Config, o RunOptions) (RunResult, error) {
 		case c.Requires != "" && (o.Available == nil || !o.Available(c.Requires)):
 			step.Skipped, step.Absent = c.Requires+" not installed", c.Requires
 		default:
-			out, err := Deploy(c, o.RepoRoot, o.Home, o.Resolve, o.Render, o.DryRun)
+			out, err := DeployWith(c, o.RepoRoot, o.Home, o.Resolve, o.Render, o.DryRun, o.Records)
 			if errors.Is(err, ErrRenderIncomplete) {
 				step.Skipped, step.Kept = fmt.Sprintf("kept the installed file: %v", err), true
 				break
