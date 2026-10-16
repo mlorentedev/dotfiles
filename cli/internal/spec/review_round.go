@@ -32,7 +32,9 @@ func parseRound(name string) (base string, n int, ok bool) {
 		return "", 0, false
 	}
 	digits := stem[i+len(roundInfix):]
-	if digits == "" || strings.Trim(digits, "0123456789") != "" {
+	// RoundName never writes a leading zero, so review-round01.md is not a
+	// kept round: it is scanned like any file the author wrote.
+	if digits == "" || digits[0] == '0' || strings.Trim(digits, "0123456789") != "" {
 		return "", 0, false
 	}
 	n, err := strconv.Atoi(digits)
@@ -50,19 +52,21 @@ func parseRound(name string) (base string, n int, ok bool) {
 // overwrites it (#2264). review.md and the request it answered move to the
 // next round number, so the dispositions an author wrote against a failed
 // round still have the verdict they answer. It returns the kept review's
-// name, or "" when the slot held no verdict.
+// name, or "" when the slot held no verdict, and an undo that puts both files
+// back, for a launch that fails before the new round has started.
 //
 // The number is one past the highest round already kept, counting both files,
 // so a round made by hand before this existed is never overwritten.
-func RotateReviewRound(specDir string, slot ReviewSlot) (string, error) {
+func RotateReviewRound(specDir string, slot ReviewSlot) (kept string, undo func() error, err error) {
+	none := func() error { return nil }
 	if _, err := os.Lstat(filepath.Join(specDir, slot.Review)); errors.Is(err, fs.ErrNotExist) {
-		return "", nil
+		return "", none, nil
 	} else if err != nil {
-		return "", err
+		return "", none, err
 	}
 	entries, err := os.ReadDir(specDir)
 	if err != nil {
-		return "", err
+		return "", none, err
 	}
 	next := 1
 	for _, e := range entries {
@@ -70,15 +74,25 @@ func RotateReviewRound(specDir string, slot ReviewSlot) (string, error) {
 			next = n + 1
 		}
 	}
-	kept := RoundName(slot.Review, next)
-	if err := os.Rename(filepath.Join(specDir, slot.Review), filepath.Join(specDir, kept)); err != nil {
-		return "", err
+	var moved [][2]string // {from, to}, in the order they were moved
+	undo = func() error {
+		var errs []error
+		for i := len(moved) - 1; i >= 0; i-- {
+			errs = append(errs, os.Rename(moved[i][1], moved[i][0]))
+		}
+		return errors.Join(errs...)
 	}
-	request := filepath.Join(specDir, slot.Request)
-	if _, err := os.Lstat(request); errors.Is(err, fs.ErrNotExist) {
-		return kept, nil
-	} else if err != nil {
-		return kept, err
+	for _, name := range []string{slot.Review, slot.Request} {
+		from, to := filepath.Join(specDir, name), filepath.Join(specDir, RoundName(name, next))
+		if _, err := os.Lstat(from); errors.Is(err, fs.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return "", none, errors.Join(err, undo())
+		}
+		if err := os.Rename(from, to); err != nil {
+			return "", none, errors.Join(err, undo())
+		}
+		moved = append(moved, [2]string{from, to})
 	}
-	return kept, os.Rename(request, filepath.Join(specDir, RoundName(slot.Request, next)))
+	return RoundName(slot.Review, next), undo, nil
 }

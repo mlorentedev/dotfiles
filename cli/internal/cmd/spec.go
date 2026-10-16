@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -277,18 +278,20 @@ after the first review, into review-second.md. A member that declares
 			// A re-review used to overwrite the round the author's dispositions
 			// answer (#2264). Keep it under a round number instead; the slot then
 			// holds no verdict, so a run that ends without writing one leaves
-			// nothing to archive rather than the previous round's.
-			kept, err := spec.RotateReviewRound(specDir, slot)
+			// nothing to archive rather than the previous round's. If the request
+			// cannot be written, nothing has started: the previous round goes
+			// back, so a verdict that was still valid stays archivable.
+			kept, undoRotation, err := spec.RotateReviewRound(specDir, slot)
 			if err != nil {
 				return fmt.Errorf("could not keep the previous round's %s before the new one overwrites it: %w", slot.Review, err)
-			}
-			if kept != "" {
-				cmd.Printf("Kept:       the previous verdict as %s\n", kept)
 			}
 			if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, chosen.ID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
 				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
 					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
-					err, slot.Request)
+					errors.Join(err, undoRotation()), slot.Request)
+			}
+			if kept != "" {
+				cmd.Printf("Kept:       the previous verdict as %s\n", kept)
 			}
 
 			if useTmux {

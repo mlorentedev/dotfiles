@@ -15,7 +15,7 @@ func TestRotateReviewRoundKeepsThePreviousVerdict(t *testing.T) {
 		ReviewFile:        "verdict: FAIL\n",
 		ReviewRequestFile: `{"reviewer":"a"}` + "\n",
 	})
-	kept, err := RotateReviewRound(dir, FirstSigner)
+	kept, _, err := RotateReviewRound(dir, FirstSigner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +35,32 @@ func TestRotateReviewRoundKeepsThePreviousVerdict(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte("verdict: PASS\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if kept, err = RotateReviewRound(dir, FirstSigner); err != nil || kept != "review-round2.md" {
+	if kept, _, err = RotateReviewRound(dir, FirstSigner); err != nil || kept != "review-round2.md" {
 		t.Fatalf("second rotation = %q, %v; want review-round2.md", kept, err)
 	}
 	assertFile(t, dir, "review-round1.md", "verdict: FAIL\n")
 	assertFile(t, dir, "review-round2.md", "verdict: PASS\n")
+}
+
+// A launch that fails before the new round starts puts the previous round back,
+// so a spec whose verdict was still valid can archive (PR-Agent on #2610).
+func TestRotateReviewRoundUndoRestoresTheSlot(t *testing.T) {
+	dir := writeSpec(t, t.TempDir(), "AI-001-x", map[string]string{
+		ReviewFile:        "verdict: PASS\n",
+		ReviewRequestFile: `{"reviewer":"a"}` + "\n",
+	})
+	_, undo, err := RotateReviewRound(dir, FirstSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	assertFile(t, dir, ReviewFile, "verdict: PASS\n")
+	assertFile(t, dir, ReviewRequestFile, `{"reviewer":"a"}`+"\n")
+	if _, err := os.Stat(filepath.Join(dir, "review-round1.md")); !os.IsNotExist(err) {
+		t.Errorf("the undone round is still kept (err=%v)", err)
+	}
 }
 
 func TestRotateReviewRoundIsANoOpWithoutAVerdict(t *testing.T) {
@@ -47,7 +68,7 @@ func TestRotateReviewRoundIsANoOpWithoutAVerdict(t *testing.T) {
 		"proposal.md":     "clean\n",
 		ReviewRequestFile: `{"reviewer":"a"}` + "\n",
 	})
-	kept, err := RotateReviewRound(dir, FirstSigner)
+	kept, _, err := RotateReviewRound(dir, FirstSigner)
 	if err != nil || kept != "" {
 		t.Fatalf("RotateReviewRound = %q, %v; want no rotation", kept, err)
 	}
@@ -60,7 +81,7 @@ func TestRotateReviewRoundKeepsEachSlotApart(t *testing.T) {
 		"review-round1.md":  "first signer's round\n",
 		SecondSigner.Review: "second signer's verdict\n",
 	})
-	kept, err := RotateReviewRound(dir, SecondSigner)
+	kept, _, err := RotateReviewRound(dir, SecondSigner)
 	if err != nil || kept != "review-second-round1.md" {
 		t.Fatalf("RotateReviewRound = %q, %v; want review-second-round1.md", kept, err)
 	}
@@ -78,6 +99,7 @@ func TestDraftScanSkipsKeptRoundsButNotLookalikes(t *testing.T) {
 		"notes-round1.md":                   "[AGENT-DRAFT] the author's own\n",
 		"review-roundx.md":                  "[AGENT-DRAFT] not a round number\n",
 		"review-round0.md":                  "[AGENT-DRAFT] rounds start at 1\n",
+		"review-round01.md":                 "[AGENT-DRAFT] never written with a leading zero\n",
 		"review-transcript-round1.jsonl.md": "[AGENT-DRAFT] no such base file\n",
 	})
 	tags, err := FindUnresolvedTags(dir)
@@ -85,7 +107,7 @@ func TestDraftScanSkipsKeptRoundsButNotLookalikes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.Join(tags, "\n")
-	for _, want := range []string{"notes-round1.md:", "review-roundx.md:", "review-round0.md:", "review-transcript-round1.jsonl.md:"} {
+	for _, want := range []string{"notes-round1.md:", "review-roundx.md:", "review-round0.md:", "review-round01.md:", "review-transcript-round1.jsonl.md:"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%s is not a kept round and must still be scanned; got %v", want, tags)
 		}
