@@ -24,17 +24,14 @@ func ensureLease(o Options, path string, issue int, agent string) error {
 	if path == "" {
 		return errors.New("lane: the session backend named no worktree path, so no lease can be written; no agent started")
 	}
-	if err := excludeLease(o.GitDir); err != nil {
+	if err := excludeFile(o.GitDir, worktree.MetadataFileName); err != nil {
 		return err
 	}
 	meta, err := worktree.LoadMetadata(path)
 	if err != nil || meta != nil {
 		return err
 	}
-	now := time.Now()
-	if o.Now != nil {
-		now = o.Now()
-	}
+	now := o.now()
 	lease := worktree.Metadata{Creator: agent, Issue: issue, CreatedAt: now, LeaseExpiresAt: now.Add(leaseTTL), ReapOK: true}
 	if err := worktree.SaveMetadata(path, lease); err != nil {
 		return fmt.Errorf("lane: writing the lease: %w", err)
@@ -42,13 +39,14 @@ func ensureLease(o Options, path string, issue int, agent string) error {
 	return nil
 }
 
-// excludeLease keeps the lease file out of `git status` in every worktree of
-// the repo, as dotf worktree add does. The worktree package keeps its own
-// helper unexported, so this is the one line of the same rule, checked first
-// so a rerun appends nothing.
-func excludeLease(gitDir string) error {
+// excludeFile keeps a file a lane leaves in its worktrees (the lease, the
+// prompt) out of `git status` in every worktree of the repo, as dotf worktree
+// add does for the lease. The worktree package keeps its own helper
+// unexported, so this is the one line of the same rule, checked first so a
+// rerun appends nothing.
+func excludeFile(gitDir, name string) error {
 	if gitDir == "" {
-		return errors.New("lane: no git directory to exclude the lease file in")
+		return fmt.Errorf("lane: no git directory to exclude %s in", name)
 	}
 	path := filepath.Join(gitDir, "info", "exclude")
 	data, err := os.ReadFile(path)
@@ -56,16 +54,24 @@ func excludeLease(gitDir string) error {
 		return fmt.Errorf("lane: %w", err)
 	}
 	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) == worktree.MetadataFileName {
+		if strings.TrimSpace(line) == name {
 			return nil
 		}
 	}
 	if len(data) > 0 && data[len(data)-1] != '\n' {
 		data = append(data, '\n')
 	}
-	data = append(data, worktree.MetadataFileName+"\n"...)
+	data = append(data, name+"\n"...)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("lane: %w", err)
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+// now is the hand-off's clock: time.Now unless a test set one.
+func (o Options) now() time.Time {
+	if o.Now != nil {
+		return o.Now()
+	}
+	return time.Now()
 }

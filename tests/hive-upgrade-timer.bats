@@ -56,7 +56,8 @@ setup() {
 @test "setup-linux.sh timer install is inside the version gate (after sort -V)" {
     gate_line=$(grep -n 'sort -V' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
     enable_line=$(grep -n 'enable --now hive-upgrade.timer' "$DOTFILES_DIR/setup-linux.sh" | head -1 | cut -d: -f1)
-    [ -n "$gate_line" ] && [ -n "$enable_line" ]
+    [ -n "$gate_line" ]
+    [ -n "$enable_line" ]
     [ "$enable_line" -gt "$gate_line" ]
 }
 
@@ -95,7 +96,8 @@ setup() {
 @test "setup-windows.ps1 hive-upgrade task is inside the version gate" {
     gate_line=$(grep -n "ge \[version\]'1.32.0'" "$DOTFILES_DIR/setup-windows.ps1" | head -1 | cut -d: -f1)
     task_line=$(grep -n 'Register-HiveScheduledTask -TaskName $hiveUpgradeTask' "$DOTFILES_DIR/setup-windows.ps1" | head -1 | cut -d: -f1)
-    [ -n "$gate_line" ] && [ -n "$task_line" ]
+    [ -n "$gate_line" ]
+    [ -n "$task_line" ]
     [ "$task_line" -gt "$gate_line" ]
 }
 

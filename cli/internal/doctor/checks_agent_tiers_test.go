@@ -320,3 +320,55 @@ func TestRecordTargetsAgreesWithTheRender(t *testing.T) {
 		}
 	}
 }
+
+// TestRecordModelAgreesWithTheRender holds the model: half to the render the
+// way the test above holds targets: (GUARD-020, #1740). The render reads the
+// tier with `skill_field` from scripts/compile-harness.sh; the check must read
+// the same bytes the same way, or it reports OK for a tier the render fails on.
+func TestRecordModelAgreesWithTheRender(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil || runtime.GOOS == "windows" {
+		t.Skip("needs bash to run the render's reader")
+	}
+	script, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "compile-harness.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn := regexp.MustCompile(`(?ms)^skill_field\(\) \{\n.*?^\}\n`).Find(script)
+	if fn == nil {
+		t.Fatal("skill_field not found in compile-harness.sh; this test must follow it")
+	}
+
+	records := map[string]string{
+		"plain":             "---\nname: x\nmodel: top\n---\n\nBody.\n",
+		"CRLF":              "---\r\nname: x\r\nmodel: top\r\n---\r\n\r\nBody.\r\n",
+		"space before ':'":  "---\nname: x\nmodel : top\n---\n\nBody.\n",
+		"indented fences":   "  ---\nmodel: top\n  ---\n",
+		"indented closer":   "---\nname: x\n  ---\nmodel: top\n---\n",
+		"trailing space":    "---\nmodel: top  \n---\n",
+		"tab after ':'":     "---\nmodel:\ttop\n---\n",
+		"first one wins":    "---\nmodel: top\nmodel: mid\n---\n",
+		"body model only":   "---\nname: x\n---\nmodel: top\n",
+		"no frontmatter":    "model: top\n",
+		"fence with spaces": "---  \nmodel: mid\n---\n",
+		"bare CR after ':'": "---\r\nmodel:\r\n---\r\n",
+		"CR fence, LF body": "---\r\nmodel: top\n---\n",
+	}
+	for name, content := range records {
+		path := filepath.Join(t.TempDir(), "AGENT.md")
+		mustWrite(t, path, content)
+		fm, err := readAgentFrontmatter(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// #nosec G204 -- the script text is this repository's own file
+		out, err := exec.Command(bash, "-c", string(fn)+`skill_field "$1" model`, "_", path).Output()
+		if err != nil {
+			t.Fatalf("%s: skill_field: %v", name, err)
+		}
+		render := strings.TrimSuffix(string(out), "\n") // the $(...) the render reads it through drops it
+		if got := fm["model"]; got != render {
+			t.Errorf("%s: check reads model %q, render reads %q", name, got, render)
+		}
+	}
+}

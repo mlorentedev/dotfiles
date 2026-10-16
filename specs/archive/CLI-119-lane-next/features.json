@@ -9,7 +9,7 @@
   {
     "id": "CLI-119-lane-next-f2",
     "behavior": "AC2: next from a linked worktree creates through the repo parent and leaves the caller's worktree and branch untouched",
-    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone$' -count=1 -v | grep -q -- '--- PASS: TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone'",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone$' -count=1 -v | grep -q -- '--- PASS: TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone' && go test ./internal/lane/ -run '^TestNext_APathWithASpaceReachesNoPane$' -count=1 -v | grep -q -- '--- PASS: TestNext_APathWithASpaceReachesNoPane'",
     "state": "passing",
     "evidence": "go test run 2026-10-14"
   },
@@ -23,14 +23,14 @@
   {
     "id": "CLI-119-lane-next-f4",
     "behavior": "AC4: --agent defaults to the calling pane's agent; an unknown agent is refused listing the known ones",
-    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused$' -count=1 -v | grep -q -- '--- PASS: TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused'",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused$' -count=1 -v | grep -q -- '--- PASS: TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused' && go test ./internal/cmd/ -run '^TestLane_RefusalsAreShownOnStderr$' -count=1 -v | grep -q -- '--- PASS: TestLane_RefusalsAreShownOnStderr'",
     "state": "passing",
     "evidence": "go test run 2026-10-14"
   },
   {
     "id": "CLI-119-lane-next-f5",
     "behavior": "AC5: with no backend next prints the commands and exits 0",
-    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_NoBackendPrintsTheCommands$' -count=1 -v | grep -q -- '--- PASS: TestNext_NoBackendPrintsTheCommands'",
+    "verification": "cd cli && go test ./internal/lane/ -run '^TestNext_NoBackendPrintsTheCommands$' -count=1 -v | grep -q -- '--- PASS: TestNext_NoBackendPrintsTheCommands' && go test ./internal/lane/ -run '^TestNext_NoBackendAndNoAgentPrintsAPlaceholder$' -count=1 -v | grep -q -- '--- PASS: TestNext_NoBackendAndNoAgentPrintsAPlaceholder'",
     "state": "passing",
     "evidence": "go test run 2026-10-14"
   },

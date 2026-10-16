@@ -44,6 +44,11 @@ setup() {
 #                             compile the tree, and a real `go` only produces that by breaking the
 #                             tree under test. The real build path is driven for real by every
 #                             suite that calls the helper (compile-harness-real among them).
+#   gh-auth-helper            stubs `gh` to fail `auth status` the way an API blip does, which a real
+#                             gh cannot be made to do on demand. The helper runs against the real gh
+#                             in spec-gate-pr-real and spec-gate-prepush-real on every CI run, and a
+#                             real `gh auth token` cannot be pinned to "no login": on macOS it exits 0
+#                             even with an empty GH_CONFIG_DIR (measured 2026-10-16, #2442).
 #   guard-memory-sink         stubs `git` — the real path is covered end-to-end by the dispatcher's own commit-time behaviour
 #   guard-no-gui              stubs `obsidian` — and here a real run is not merely inconvenient, it is
 #                             the defect. That suite's whole subject is that a test must never launch a
@@ -84,7 +89,7 @@ setup() {
 #                             resolves a terraform, and against that path. A real terraform gives
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
-EXEMPT_SUITES="bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper guard-memory-sink guard-no-gui
+EXEMPT_SUITES="bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
 hermes-setup install model-canary pr-agent-publish-guard pr-agent-queue-skip release-pr-body-refs setup-no-arch-downloads shell-profile skills-pipeline
 tmux vault-maintenance-weekly zshrc-guards"
 

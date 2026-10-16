@@ -22,7 +22,8 @@ test_windows_job() {
     printf '%s\n' "$job" | grep -qF 'Add-Content $env:GITHUB_PATH $bin'
     build_line=$(printf '%s\n' "$job" | grep -n 'Build dotf from this PR' | head -1 | cut -d: -f1)
     setup_line=$(printf '%s\n' "$job" | grep -n 'run: .\\setup-windows.ps1' | head -1 | cut -d: -f1)
-    [ -n "$build_line" ] && [ -n "$setup_line" ]
+    [ -n "$build_line" ]
+    [ -n "$setup_line" ]
     [ "$build_line" -lt "$setup_line" ]
 }
 

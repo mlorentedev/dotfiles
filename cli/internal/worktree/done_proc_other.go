@@ -6,7 +6,7 @@ package worktree
 // inside".
 //
 // That is the permissive answer, and it is chosen rather than inherited: Gate f
-// refuses off Linux because an inert sweep only costs disk, but a done that
+// refuses off Linux and darwin because an inert sweep only costs disk, but a done that
 // refused every call would leave no way to remove a worktree at all. What still
 // holds everywhere is the caller's own cwd (DoneOptions.Cwd), which is the
 // launch directory of an agent's shell tool unless it changed directory first.

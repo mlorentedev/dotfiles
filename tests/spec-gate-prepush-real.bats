@@ -20,6 +20,8 @@ _need() {
     return 1
 }
 
+load 'lib/gh-auth'
+
 setup() {
     command -v gh >/dev/null || _need "gh is not installed"
 
@@ -33,7 +35,9 @@ setup() {
     # nothing while still reporting green -- which is precisely how spec-gate-
     # pr-real.bats's equivalent test passed locally (authenticated) and failed
     # in CI (not) on its first run.
-    gh auth status >/dev/null 2>&1 || _need "gh is not authenticated"
+    # Offline on purpose: `gh auth status` probes the API, and a blip there
+    # read as a missing token and turned main red (#2442).
+    gh_has_token || _need "gh has no token (GH_TOKEN, DOTF_TEST_GH_TOKEN or a stored login)"
 
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
     OUTSIDE="/tmp/bats_specgateprepush_real_$$_${BATS_TEST_NUMBER:-0}"

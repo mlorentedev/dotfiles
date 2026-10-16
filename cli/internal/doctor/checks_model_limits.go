@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -39,9 +40,12 @@ import (
 // forfeits capability that was paid for, so it warns. Reporting both alike would
 // either cry wolf over a conservative cap or bury a request-breaking overstatement.
 //
-// IT NEVER WRITES. The fix is a repo edit that belongs in a reviewed PR, next to
+// IT NEVER WRITES THE DECLARATION. The fix is a repo edit that belongs in a reviewed PR, next to
 // the comment explaining which model changed and why — not a silent rewrite of a
-// file whose values a human chose.
+// file whose values a human chose. What `--fix` may write is the CACHE: a stale
+// one is refreshed with opencode's own command (#2540), since the cache only
+// refreshes as a side effect of running opencode and a box that rarely runs it
+// would otherwise skip this comparison for good.
 
 // catalogRelPath is opencode's models.dev cache: the same catalog opencode itself
 // routes on, so a disagreement is a real inconsistency in this machine's toolchain
@@ -55,6 +59,11 @@ const catalogRelPath = ".cache/opencode/models.json"
 // cache in October). Providers revise limits on a scale of weeks; two weeks
 // catches that without nagging a machine where opencode runs now and then.
 const catalogMaxAge = 14 * 24 * time.Hour
+
+// catalogRefreshTimeout bounds `opencode models --refresh`, one fetch from
+// models.dev. Offline it fails or hangs; either way the check falls back to
+// the stale-cache SKIP.
+const catalogRefreshTimeout = time.Minute
 
 // piModelsRelPath is the DECLARATION half, read from the checkout rather than the
 // deploy dir: a drift finding is only actionable where it can be committed.
@@ -104,7 +113,7 @@ type catalogProvider struct {
 // checkModelLimits compares every model declared in ai/pi/models.json against the
 // provider catalog and reports each disagreement with the severity its direction
 // earns.
-func checkModelLimits(sys *System, cfg *Config, rep *Report) {
+func checkModelLimits(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Model limit drift")
 
 	if cfg.RepoDir == "" {
@@ -117,7 +126,7 @@ func checkModelLimits(sys *System, cfg *Config, rep *Report) {
 	if !ok {
 		return
 	}
-	cat, ok := readCatalog(sys, rep)
+	cat, ok := readCatalog(sys, rep, fix)
 	if !ok {
 		return
 	}
@@ -187,7 +196,8 @@ func readDeclaration(repoDir string, rep *Report) (declaredCatalog, bool) {
 // be perfectly right and this machine simply unable to say so. Absent or STALE
 // skips, because the machine has no current answer; unreadable or unparseable
 // warns, because the file is there and broken, which is worth someone's look.
-func readCatalog(sys *System, rep *Report) (map[string]catalogProvider, bool) {
+// Under fix, a stale cache is refreshed first and the skip is the fallback.
+func readCatalog(sys *System, rep *Report, fix bool) (map[string]catalogProvider, bool) {
 	path := filepath.Join(sys.home(), filepath.FromSlash(catalogRelPath))
 	info, err := os.Stat(path)
 	switch {
@@ -200,9 +210,18 @@ func readCatalog(sys *System, rep *Report) (map[string]catalogProvider, bool) {
 		return nil, false
 	}
 	if age := sys.Now().Sub(info.ModTime()); age > catalogMaxAge {
-		rep.Skip(fmt.Sprintf("%s is %d days old, so its limits may predate the provider's; "+
-			"run `opencode models --refresh` to update it", catalogRelPath, int(age.Hours()/24)))
-		return nil, false
+		days := int(age.Hours() / 24)
+		if !fix {
+			rep.Skip(fmt.Sprintf("%s is %d days old, so its limits may predate the provider's; "+
+				"run `opencode models --refresh` (or `dotf doctor --fix`) to update it", catalogRelPath, days))
+			return nil, false
+		}
+		if why := refreshCatalog(sys, path); why != "" {
+			rep.Skip(fmt.Sprintf("%s is %d days old and could not be refreshed (%s), so its limits may predate the provider's",
+				catalogRelPath, days, why))
+			return nil, false
+		}
+		rep.Fix(fmt.Sprintf("refreshed %s, which was %d days old, with `opencode models --refresh`", catalogRelPath, days))
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -215,6 +234,29 @@ func readCatalog(sys *System, rep *Report) (map[string]catalogProvider, bool) {
 		return nil, false
 	}
 	return cat, true
+}
+
+// refreshCatalog runs opencode's own refresh and returns why the cache is
+// still stale afterwards, or "". A refresh that exits 0 and leaves the file as
+// old as it was has not refreshed it, so the mtime is what decides.
+func refreshCatalog(sys *System, path string) string {
+	if _, err := sys.LookPath("opencode"); err != nil {
+		return "opencode is not on PATH"
+	}
+	if _, errOut, err := sys.CommandOutputBounded(catalogRefreshTimeout, "opencode", "models", "--refresh"); err != nil {
+		if msg := strings.TrimSpace(errOut); msg != "" {
+			return fmt.Sprintf("opencode models --refresh: %v: %s", err, firstLine(msg))
+		}
+		return fmt.Sprintf("opencode models --refresh: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Sprintf("opencode models --refresh left no readable cache: %v", err)
+	}
+	if sys.Now().Sub(info.ModTime()) > catalogMaxAge {
+		return "opencode models --refresh exited 0 but did not rewrite it"
+	}
+	return ""
 }
 
 // compareModel reports each limit that disagrees with the catalog and returns how

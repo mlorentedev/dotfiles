@@ -20,7 +20,8 @@ setup() {
     # The build must follow the COPY of the repo (it compiles what was copied).
     copy_line=$(grep -n '^COPY --chown=testuser:testuser \. /home/testuser/dotfiles-repo' "$DOCKERFILE" | head -1 | cut -d: -f1)
     build_line=$(grep -n 'go build -o /home/testuser/.local/bin/dotf' "$DOCKERFILE" | head -1 | cut -d: -f1)
-    [ -n "$copy_line" ] && [ -n "$build_line" ]
+    [ -n "$copy_line" ]
+    [ -n "$build_line" ]
     [ "$build_line" -gt "$copy_line" ]
 }
 

@@ -52,19 +52,22 @@ type RawWorktree struct {
 
 // Info captures the evaluated state of a worktree.
 type Info struct {
-	Path        string         `json:"path"`
-	Head        string         `json:"head"`
-	Branch      string         `json:"branch"`
-	IsBare      bool           `json:"is_bare,omitempty"`
-	IsDetached  bool           `json:"is_detached,omitempty"`
-	IsMain      bool           `json:"is_main,omitempty"`
-	IsCurrent   bool           `json:"is_current,omitempty"`
-	IsOrphan    bool           `json:"is_orphan,omitempty"`
-	Dirty       bool           `json:"dirty"`
-	PRMerged    bool           `json:"pr_merged"`
-	Metadata    *Metadata      `json:"metadata,omitempty"`
-	State       LifecycleState `json:"state"`
-	StateReason string         `json:"state_reason,omitempty"`
+	Path       string `json:"path"`
+	Head       string `json:"head"`
+	Branch     string `json:"branch"`
+	IsBare     bool   `json:"is_bare,omitempty"`
+	IsDetached bool   `json:"is_detached,omitempty"`
+	IsMain     bool   `json:"is_main,omitempty"`
+	IsCurrent  bool   `json:"is_current,omitempty"`
+	IsOrphan   bool   `json:"is_orphan,omitempty"`
+	Dirty      bool   `json:"dirty"`
+	// IgnoredContent names what made a worktree with no tracked changes
+	// Dirty: ignored paths that are not known build output (#1607).
+	IgnoredContent []string       `json:"ignored_content,omitempty"`
+	PRMerged       bool           `json:"pr_merged"`
+	Metadata       *Metadata      `json:"metadata,omitempty"`
+	State          LifecycleState `json:"state"`
+	StateReason    string         `json:"state_reason,omitempty"`
 }
 
 // IsSubmoduleGitDir returns true if the gitdir path indicates a git submodule.
@@ -158,6 +161,9 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 	}
 
 	if info.Dirty {
+		if len(info.IgnoredContent) > 0 {
+			return StateDirty, "ignored files that are not known build output: " + summarizePaths(info.IgnoredContent)
+		}
 		return StateDirty, "uncommitted changes"
 	}
 

@@ -180,8 +180,8 @@ func gateF(info Info, absCwd string) (GateFReading, bool) {
 }
 
 func isDirty(path string, runner SweepRunner) bool {
-	dirty, err := runner.IsDirty(path)
-	return err != nil || dirty
+	dirt, err := runner.Dirt(path)
+	return err != nil || dirt.Any()
 }
 
 func isMerged(repoRoot, branch string, runner SweepRunner) bool {

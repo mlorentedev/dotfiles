@@ -123,12 +123,7 @@ type Result struct {
 // PR whose base branch is deleted. An error means a fact could not be read; a
 // refusal is a Result with reasons.
 func Land(ctx context.Context, o Options, number int) (Result, error) {
-	gh := func(args ...string) ([]byte, error) {
-		if o.Repo != "" {
-			args = append(args, "-R", o.Repo)
-		}
-		return o.Run(ctx, args...)
-	}
+	gh := o.gh(ctx)
 	n := strconv.Itoa(number)
 	f, err := settle(ctx, gh, o, number, o.Wait)
 	if err != nil {
@@ -167,6 +162,32 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		return res, nil
 	}
 	return merge(gh, n, f, res)
+}
+
+// gh runs gh for the repository the options name.
+func (o Options) gh(ctx context.Context) ghFunc {
+	return func(args ...string) ([]byte, error) {
+		if o.Repo != "" {
+			args = append(args, "-R", o.Repo)
+		}
+		return o.Run(ctx, args...)
+	}
+}
+
+// Blockers is every reason the PR cannot land right now, read the way Land
+// reads them and from the same Decide, and none when it can. It reads once and
+// waits for nothing, and it changes nothing: a PR still running its checks is
+// a reason, not a pause. An error means a fact could not be read, which is not
+// the same as "nothing blocks it".
+func Blockers(ctx context.Context, o Options, number int) ([]string, error) {
+	f, err := settle(ctx, o.gh(ctx), o, number, false)
+	if err != nil {
+		return nil, err
+	}
+	if f.GrantDeclared, err = grantDeclared(ctx, o, f.BaseRef); err != nil {
+		return nil, err
+	}
+	return Decide(f), nil
 }
 
 // grantDeclared reports whether base carries GrantFile. Only a 404 means it

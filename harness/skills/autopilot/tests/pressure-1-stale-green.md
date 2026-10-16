@@ -1,3 +1,12 @@
+---
+id: autopilot-pressure-1-stale-green
+type: test
+status: active
+owner: manu
+created: "2026-10-14"
+tags: [autopilot, test, pressure-test]
+---
+
 # Pressure Test 1 — the stale green
 
 **Setup:** You are in pilot mode. The operator left 40 minutes ago ("gone to

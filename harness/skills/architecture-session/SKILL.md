@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: 370e4dcb7660c1ee
+generated_sha: 1b0929bdd943bd80
 id: architecture-session-skill
 type: skill
 status: active
@@ -20,7 +20,7 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, mcp__hive__vault_query, mcp
   mcp__hive__vault_write, mcp__hive__vault_patch, mcp__hive__capture_lesson]
 keywords: [architecture session, sesion de arquitectura, definir arquitectura, arch
     session, adr decision, evaluar opciones]
-paths: [docs/adr/**, '**/30-architecture/**']
+paths: [docs/adr/**, '**/prestudy/**', '**/30-architecture/**']
 requires: [read-all-adrs, spec]
 ---
 # Architecture Session
@@ -66,9 +66,9 @@ requires: [read-all-adrs, spec]
    - `$PROJECT_AREA/roadmap.md` (active phase, what is done vs pending)
    - GitHub Project board status via `gh project item-list` (task progress — bitácora is the SSOT per ADR-018)
    - the repo's `docs/adr/` directory (latest ADR number, accepted/deferred status — GitHub self-indexes; legacy vault-only projects still use `$PROJECT_AREA/30-architecture/`)
-   - `$PROJECT_AREA/30-architecture/plan-*.md` -- newest mtime first
+   - `$PROJECT_AREA/prestudy/plan-*.md` (legacy: `$PROJECT_AREA/30-architecture/plan-*.md`) -- newest mtime first
    - `$PROJECT_AREA/memory/MEMORY.md` -- Session Handoff section
-2. If a `$PROJECT_AREA/30-architecture/session-protocol.md` exists, read it -- it is the project-specific overlay (constraints, rejection list, pending ADRs).
+2. If a `$PROJECT_AREA/prestudy/session-protocol.md` exists (legacy: `$PROJECT_AREA/30-architecture/session-protocol.md`), read it -- it is the project-specific overlay (constraints, rejection list, pending ADRs).
 3. **Verify reality, not memory.** For each repo mentioned in `context.md`:
    - Resolve its on-disk path. Read `pyproject.toml` / `package.json` / equivalent for current version.
    - If git, `git log -1 --format=%cI` for last commit date and `git status --short` for dirty state.
@@ -100,7 +100,7 @@ requires: [read-all-adrs, spec]
 **Steps:**
 
 1. **Reference #1 is always the local library — grep `00_meta/patterns/` for the topic BEFORE any external search.** The store holds patterns already audited against industry references, and it records constraints found nowhere else. It is also the least discoverable layer: most patterns are referenced from nowhere and no index reaches agent context (dotfiles#538), so nothing surfaces them automatically — the search has to be deliberate. An audit that cites only external sources has skipped the cheapest and most specific one, and will re-derive a decision the store already made. If the grep returns nothing, say so explicitly in the divergence log rather than leaving the omission silent.
-2. **Inventory the remaining references.** Read the project's own inventory file if one exists (e.g. `30-architecture/<domain>-reference-audit-matrix.md`). If absent, create it from `00_meta/templates/` and offer it to the user.
+2. **Inventory the remaining references.** Read the project's own inventory file if one exists (e.g. `$PROJECT_AREA/prestudy/<domain>-reference-audit-matrix.md`; legacy: `30-architecture/`). If absent, create it from `00_meta/templates/` and offer it to the user.
 3. **Pick the audit set.** Minimum N=2 references plus the gold standard (if one exists). For the platform case (`python-sensor-sdk-platform`), gold standard is Hydra3D; pick 2+ additional sensors maximizing paradigm diversity (per ADR-015 decision criteria).
 4. **For each reference, populate the audit matrix.** The matrix columns are project-defined (in `session-protocol.md`); typical fields:
    - Paradigm / domain category
@@ -123,7 +123,7 @@ requires: [read-all-adrs, spec]
 
 **Steps:**
 
-1. **Read existing constraints** from `$PROJECT_AREA/30-architecture/session-protocol.md` if present. These persist across sessions (numbered `C1`, `C2`, ...). Example for `python-sensor-sdk-platform`: C1 self-contained artifacts; C2 onboard new team <30min; C3 one-command bootstrap; ... C10 escape hatch for divergent branches.
+1. **Read existing constraints** from `$PROJECT_AREA/prestudy/session-protocol.md` (legacy: `$PROJECT_AREA/30-architecture/session-protocol.md`) if present. These persist across sessions (numbered `C1`, `C2`, ...). Example for `python-sensor-sdk-platform`: C1 self-contained artifacts; C2 onboard new team <30min; C3 one-command bootstrap; ... C10 escape hatch for divergent branches.
 2. **Surface any new constraint** introduced by today's topic. Number it sequentially. Source it from a user statement, an ADR, or a lesson -- not from speculation.
 3. **Render the constraint table** to the user for confirmation:
 

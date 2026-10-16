@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
@@ -178,6 +179,13 @@ func sourceKeys(b []byte) ([]map[string]json.RawMessage, error) {
 	return keys, nil
 }
 
+// packageName is what a manager's package name may be made of: every shipping
+// apt, brew, cask and winget name, plus the forms the managers define (a
+// tap-qualified formula, node@20, libstdc++, pkg:arch). None of these characters
+// is live in bash, zsh, PowerShell or cmd, so a name that matches prints the
+// same as it runs.
+var packageName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+@/:-]*$`)
+
 // validateSystem refuses a "system" entry that could not converge or that asks
 // for something it does not do, each naming the entry.
 func validateSystem(t Tool, keys map[string]json.RawMessage) error {
@@ -212,10 +220,11 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 		return fmt.Errorf("tool %q: system packages are not pinned, so version %q has no effect; remove it", t.Name, t.Version)
 	}
 	for manager, pkg := range map[string]string{"apt": t.Source.Apt, "brew": t.Source.Brew, "cask": t.Source.Cask, "winget": t.Source.Winget, "command": t.Source.Command} {
-		// The name becomes one argument of the manager's command line: a flag
-		// or a second word would change what that command does.
-		if strings.HasPrefix(pkg, "-") || strings.ContainsAny(pkg, " \t\n") {
-			return fmt.Errorf("tool %q: %s name %q is not a package name", t.Name, manager, pkg)
+		// The name becomes one argument of the manager's command line, and the
+		// one-line remedy dotf prints for a person to paste: a flag, a second
+		// word or a shell metacharacter would change what either does.
+		if pkg != "" && !packageName.MatchString(pkg) {
+			return fmt.Errorf("tool %q: %s name %q is not a package name (start with a letter or digit; then letters, digits and . _ + @ / : -)", t.Name, manager, pkg)
 		}
 	}
 	return nil

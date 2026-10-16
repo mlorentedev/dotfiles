@@ -1,0 +1,97 @@
+package lane
+
+import (
+	"errors"
+	"strings"
+	"testing"
+)
+
+func pullsRunner(t *testing.T, body string, err error, got *[]string) Runner {
+	t.Helper()
+	return func(name string, args ...string) (string, error) {
+		*got = append(*got, name+" "+strings.Join(args, " "))
+		return body, err
+	}
+}
+
+// The forge is asked over REST, one request for a branch, never GraphQL: a
+// fleet of worktrees would drain that quota (#2550).
+func TestREST_AsksOnePullsRequestPerBranch(t *testing.T) {
+	var calls []string
+	f := REST{Run: pullsRunner(t, `[]`, nil, &calls)}
+	if _, err := f.PRFor("fix/a-b"); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 || !strings.HasPrefix(calls[0], "gh api ") || !strings.Contains(calls[0], "repos/{owner}/{repo}/pulls") {
+		t.Fatalf("calls = %q, want one gh api repos/{owner}/{repo}/pulls", calls)
+	}
+	if strings.Contains(calls[0], "graphql") || strings.Contains(calls[0], "gh pr ") {
+		t.Errorf("call %q reaches GraphQL", calls[0])
+	}
+	if !strings.Contains(calls[0], "head={owner}:fix/a-b") || !strings.Contains(calls[0], "state=all") || !strings.Contains(calls[0], "sort=created&direction=desc") {
+		t.Errorf("call %q must filter on owner:branch, state=all and sort newest first explicitly", calls[0])
+	}
+}
+
+// A ref name may hold & # and {, which git accepts: raw in the query they add a
+// parameter, cut the query, or read as gh's own placeholder (#2616). The branch
+// is one value, whatever it holds.
+func TestREST_ABranchIsOneEncodedQueryValue(t *testing.T) {
+	var calls []string
+	if _, err := (REST{Run: pullsRunner(t, `[]`, nil, &calls)}).PRFor("fix/a&state=all#x{branch}"); err != nil {
+		t.Fatal(err)
+	}
+	const want = "head={owner}:fix/a%26state%3Dall%23x%7Bbranch%7D"
+	if len(calls) != 1 || !strings.HasSuffix(calls[0], want) {
+		t.Errorf("call = %q, want it to end in %q", calls, want)
+	}
+	if strings.Count(calls[0], "state=") != 1 || strings.Count(calls[0], "&") != 4 {
+		t.Errorf("call %q gained a parameter from the branch", calls[0])
+	}
+}
+
+func TestREST_NewestPullRequestDecidesTheState(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want PRInfo
+	}{
+		{"no pull request", `[]`, PRInfo{}},
+		{"open", `[{"number":9,"state":"open","merged_at":null}]`, PRInfo{Number: 9, State: PROpen}},
+		{"an open draft", `[{"number":10,"state":"open","merged_at":null,"draft":true}]`, PRInfo{Number: 10, State: PROpen, Draft: true}},
+		{"merged", `[{"number":8,"state":"closed","merged_at":"2026-10-15T10:00:00Z"}]`, PRInfo{Number: 8, State: PRMerged}},
+		{"closed unmerged", `[{"number":7,"state":"closed","merged_at":null}]`, PRInfo{Number: 7, State: PRClosed}},
+		{"newest first: an open retry after a closed attempt", `[{"number":12,"state":"open","merged_at":null},{"number":7,"state":"closed","merged_at":null}]`, PRInfo{Number: 12, State: PROpen}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var calls []string
+			got, err := REST{Run: pullsRunner(t, c.body, nil, &calls)}.PRFor("fix/x")
+			if err != nil || got != c.want {
+				t.Errorf("PRFor = %+v, %v; want %+v", got, err, c.want)
+			}
+		})
+	}
+}
+
+// A detached worktree has no branch, and `head={owner}:` with nothing after it
+// matches every pull request: it must not be asked, or the newest PR of the
+// repository becomes this worktree's own (seen live: #2601 three times in the
+// landing order).
+func TestREST_ADetachedWorktreeHasNoPR(t *testing.T) {
+	var calls []string
+	got, err := REST{Run: pullsRunner(t, `[{"number":2601,"state":"open","merged_at":null}]`, nil, &calls)}.PRFor("")
+	if err != nil || got != (PRInfo{}) || len(calls) != 0 {
+		t.Errorf("PRFor(\"\") = %+v, %v after %d calls; want no PR and no request", got, err, len(calls))
+	}
+}
+
+func TestREST_AFailedRequestIsAnErrorNotNoPR(t *testing.T) {
+	var calls []string
+	if _, err := (REST{Run: pullsRunner(t, "", errors.New("HTTP 403"), &calls)}).PRFor("fix/x"); err == nil {
+		t.Error("a forge failure read as \"no pull request\"")
+	}
+	if _, err := (REST{Run: pullsRunner(t, `not json`, nil, &calls)}).PRFor("fix/x"); err == nil {
+		t.Error("an unparseable answer read as \"no pull request\"")
+	}
+}

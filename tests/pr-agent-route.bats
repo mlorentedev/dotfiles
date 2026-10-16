@@ -200,6 +200,21 @@ every_point() {
     [ "$(out route)" = "draw" ]
 }
 
+# Every fixture member declares its effort, so without this the default was never
+# exercised (#2529): a member that declares none runs at medium.
+@test "route: an Anthropic member with no declared reasoning_effort runs at medium" {
+    cat > "$POOL_FILE" <<'JSON'
+{"pool": [
+ {"id": "nan/mimo-v2.6-flash", "pr_agent": {"model": "openai/mimo-v2.6-flash", "weight": 5}},
+ {"id": "anthropic-review/claude-haiku-5-5", "pr_agent": {"model": "anthropic/claude-haiku-5-5", "weight": 5}}
+]}
+JSON
+    PR_AGENT_DRAW=5 route
+    [ "$status" -eq 0 ]
+    [ "$(out anthropic_model)" = "anthropic/claude-haiku-5-5" ]
+    [ "$(out anthropic_effort)" = "medium" ]
+}
+
 # --- the risk route --------------------------------------------------------------
 
 @test "route: a PR at the line threshold reviews first on the risk member, NaN second" {

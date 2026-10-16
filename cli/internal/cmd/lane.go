@@ -1,13 +1,17 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 )
 
@@ -25,7 +29,7 @@ func newLaneCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newLaneExecCmd(), newLaneNextCmd())
+	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd())
 	return c
 }
 
@@ -38,12 +42,11 @@ func newLaneExecCmd() *cobra.Command {
 			"hands it the prompt as one argument, so no shell quoting is involved and the\n" +
 			"same call works from zsh, bash and PowerShell. An agent dotf has no launch\n" +
 			"command for is refused, naming the ones it has.",
-		Example:       "  dotf lane exec --agent claude --prompt-file prompt.md",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Example:      "  dotf lane exec --agent claude --prompt-file prompt.md",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			b, err := os.ReadFile(promptFile)
+			b, err := readPrompt(promptFile)
 			if err != nil {
 				return fmt.Errorf("lane exec: %w", err)
 			}
@@ -61,6 +64,22 @@ func newLaneExecCmd() *cobra.Command {
 	return c
 }
 
+// readPrompt reads the prompt file. The line `lane next` types into a pane
+// names it relative to the pane's directory (lane.PromptFile), so a relative
+// path that is not there is looked for at the worktree root too, in case the
+// pane stands in a subdirectory.
+func readPrompt(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if err == nil || filepath.IsAbs(path) || !errors.Is(err, fs.ErrNotExist) {
+		return b, err
+	}
+	top, gitErr := gitOut("rev-parse", "--show-toplevel")
+	if gitErr != nil {
+		return nil, err
+	}
+	return os.ReadFile(filepath.Join(top, path))
+}
+
 func newLaneNextCmd() *cobra.Command {
 	var agent string
 	var dryRun bool
@@ -73,11 +92,11 @@ func newLaneNextCmd() *cobra.Command {
 			"The agent is the one running in the calling pane unless --agent says\n" +
 			"otherwise. It never removes a worktree, the caller's included, and a second\n" +
 			"run for the same issue starts nothing. With no backend it prints the\n" +
-			"commands to run instead.",
-		Example:       "  dotf lane next\n  dotf lane next --agent pi --dry-run",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+			"commands to run instead, with the agent left for the person to pick when\n" +
+			"--agent does not name one.",
+		Example:      "  dotf lane next\n  dotf lane next --agent pi --dry-run",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runLaneNext(c, agent, dryRun)
 		},
@@ -93,29 +112,40 @@ func gitOut(args ...string) (string, error) {
 }
 
 func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
-	top, err := gitOut("rev-parse", "--show-toplevel")
-	if err != nil {
-		return fmt.Errorf("lane next: not in a git checkout: %w", err)
-	}
-	common, err := gitOut("rev-parse", "--path-format=absolute", "--git-common-dir")
-	if err != nil {
-		return fmt.Errorf("lane next: %w", err)
-	}
-	cfg, err := lane.LoadConfig(top)
+	out, err := doLaneNext(c, agent, dryRun)
 	if err != nil {
 		return err
 	}
+	printOutcome(c.OutOrStdout(), out)
+	return nil
+}
+
+// doLaneNext hands off to the next queued item and returns what happened, so
+// apply can count a start without parsing what next prints.
+func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, error) {
+	top, err := gitOut("rev-parse", "--show-toplevel")
+	if err != nil {
+		return lane.Outcome{}, fmt.Errorf("lane next: not in a git checkout: %w", err)
+	}
+	common, err := gitOut("rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return lane.Outcome{}, fmt.Errorf("lane next: %w", err)
+	}
+	cfg, err := lane.LoadConfig(top)
+	if err != nil {
+		return lane.Outcome{}, err
+	}
 	tmpl, err := os.ReadFile(filepath.Join(top, filepath.FromSlash(cfg.Template)))
 	if err != nil {
-		return fmt.Errorf("lane next: prompt template: %w", err)
+		return lane.Outcome{}, fmt.Errorf("lane next: prompt template: %w", err)
 	}
 	parent := filepath.Dir(common)
-	self, _ := os.Executable() // empty falls back to `dotf` on the pane's PATH
 	opts := lane.Options{
 		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
-		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: self, GitDir: common,
+		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: selfBinary(c), GitDir: common,
+		WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
 		Fetch: func() error {
-			remote, branch, _ := strings.Cut(cfg.Base, "/")
+			remote, branch := cfg.Remote()
 			_, err := laneRun("git", "-C", parent, "fetch", "--quiet", remote, branch)
 			return err
 		},
@@ -124,11 +154,10 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 	if h := (lane.Herdr{Run: laneRun}); h.Available() {
 		backend = h
 	}
-	out, err := lane.Handoff(opts, backend, lane.GH{Run: laneRun})
-	if err != nil {
-		return err
-	}
-	w := c.OutOrStdout()
+	return lane.Handoff(opts, backend, lane.GH{Run: laneRun})
+}
+
+func printOutcome(w io.Writer, out lane.Outcome) {
 	if out.Issue.Number != 0 {
 		_, _ = fmt.Fprintf(w, "next: #%d %s -> %s (%s)\n", out.Issue.Number, out.Issue.Title, out.Branch, out.Agent)
 	}
@@ -141,5 +170,16 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 	if out.Started {
 		_, _ = fmt.Fprintln(w, "started the successor")
 	}
-	return nil
+}
+
+// selfBinary is the path of the running dotf, which the successor is told to
+// run. An empty answer falls back to `dotf` on the pane's PATH, which may be a
+// different release: say so rather than start it silently.
+func selfBinary(c *cobra.Command) string {
+	self, err := os.Executable()
+	if err != nil {
+		_, _ = fmt.Fprintf(c.ErrOrStderr(), "lane next: cannot locate this binary (%v); the successor runs `dotf` from the pane's PATH\n", err)
+		return ""
+	}
+	return self
 }

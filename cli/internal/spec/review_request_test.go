@@ -111,6 +111,43 @@ func TestProvenanceCatchesAVerdictOnAnotherSha(t *testing.T) {
 	}
 }
 
+// TestProvenanceMismatchPrintsBothShasInFull is BUG-146 (#2519), measured on
+// the CI-012 archive: the reviewer dropped eight characters from the middle of
+// the head sha, both values share their first 12 characters, and an error that
+// shortens them reads as "these are equal", the one conclusion it must not
+// suggest.
+func TestProvenanceMismatchPrintsBothShasInFull(t *testing.T) {
+	const launched = "a8d5b821a428a6c429ae87a2c9daa1666abbe5e9"
+	for _, tc := range []struct {
+		name, claimed string
+		malformed     bool
+	}{
+		{"malformed claim", "a8d5b821a428a6c429daa1666abbe5e9", true},
+		{"another full sha", "a8d5b821a428ffffffffffffffffffffffffffff", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := seedProvenanceSpec(t, "old content")
+			if err := WriteReviewRequest(dir, launched, "nan/deepseek-v4-flash", "basebasebase"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(provenanceReviewDoc), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			err := checkReviewProvenance(dir, Review{Verdict: "PASS", ReviewedSHA: tc.claimed, Reviewer: "nan/deepseek-v4-flash"})
+			if err == nil {
+				t.Fatal("a mismatched sha must not archive")
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, tc.claimed) || !strings.Contains(msg, launched) {
+				t.Errorf("both shas must appear in full:\n%s", msg)
+			}
+			if got := strings.Contains(msg, "not a valid"); got != tc.malformed {
+				t.Errorf("malformed note = %v, want %v:\n%s", got, tc.malformed, msg)
+			}
+		})
+	}
+}
+
 // TestProvenanceCatchesADifferentPoolMember is the gap checkReviewerPool cannot
 // see: both ids are admitted, so only the sidecar knows which one was asked.
 func TestProvenanceCatchesADifferentPoolMember(t *testing.T) {

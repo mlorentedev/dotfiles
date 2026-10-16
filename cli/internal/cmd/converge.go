@@ -81,9 +81,10 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	paint := convergePainter(terminal)
 	out := w
 	var rl *converge.RunLog
+	barrier := func() {}
 	if !plan {
 		var done func()
-		rl, out, done = beginRunLog(w, repo)
+		rl, out, barrier, done = beginRunLog(w, repo)
 		defer done()
 	}
 	opts := convergeOptions()
@@ -98,6 +99,7 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 		}
 	}
 	pr := newConvergePrinter(out, reg, paint, terminal)
+	pr.barrier = barrier
 	pr.header(plan, e.GOOS)
 	rep, err := converge.RunObserved(reg, e, plan, pr)
 	pr.finish(rep)
@@ -109,19 +111,20 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 
 // beginRunLog opens the run's transcript and captures this process's output
 // into it. It returns the transcript (nil when it could not be opened), the
-// writer the report goes to, and what to run when the run ends. The capture
+// writer the report goes to, the barrier that drains the capture before a
+// line is printed to that writer, and what to run when the run ends. The capture
 // starts before the options are built: they bind os.Stderr (the installers'
 // progress) when they are made.
-func beginRunLog(w io.Writer, repo string) (*converge.RunLog, io.Writer, func()) {
+func beginRunLog(w io.Writer, repo string) (*converge.RunLog, io.Writer, func(), func()) {
 	rl := openConvergeRunLog(w, repo, os.Args)
 	if rl == nil {
-		return nil, w, func() {}
+		return nil, w, func() {}, func() {}
 	}
 	c, err := startRunCapture(rl)
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "warning: this run's transcript misses subprocess output: %v\n", err)
 	}
-	return rl, teeWriter{w, rl.Stream()}, func() {
+	return rl, teeWriter{w, rl.Stream()}, c.sync, func() {
 		if c != nil {
 			c.stop()
 		}
@@ -247,10 +250,13 @@ type convergePrinter struct {
 	terminal bool
 	width    int // the name column, which fits the longest name
 	printed  int // how many of the report's entries Done has printed
+	// barrier drains the run's output capture before a line is printed, so
+	// what a step's children wrote lands ahead of its result (CLI-116).
+	barrier func()
 }
 
 func newConvergePrinter(w io.Writer, reg []converge.Reconciler, p console.Painter, terminal bool) *convergePrinter {
-	c := &convergePrinter{w: w, p: p, terminal: terminal, width: 16}
+	c := &convergePrinter{w: w, p: p, terminal: terminal, width: 16, barrier: func() {}}
 	for _, r := range reg {
 		c.width = max(c.width, len(r.Name()))
 	}
@@ -267,6 +273,7 @@ func (c *convergePrinter) header(dryRun bool, goos string) {
 
 // Start announces a step on a terminal; a pipe gets only result lines.
 func (c *convergePrinter) Start(name string) {
+	c.barrier()
 	if c.terminal {
 		_, _ = fmt.Fprintf(c.w, "→ %s\n", name)
 	}
@@ -275,6 +282,7 @@ func (c *convergePrinter) Start(name string) {
 // Done prints a step's line. converge.RunObserved calls it in the report's
 // order, and the entries it never calls it for are the report's tail.
 func (c *convergePrinter) Done(e converge.Entry) {
+	c.barrier()
 	c.line(e)
 	c.printed++
 }

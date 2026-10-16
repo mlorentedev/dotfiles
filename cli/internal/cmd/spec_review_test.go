@@ -198,6 +198,35 @@ func TestSpecReviewFailsWhenTheLaunchDiedImmediately(t *testing.T) {
 	}
 }
 
+// #2264: a re-review keeps the round it replaces. seedSpec leaves a verdict and
+// its request, as a finished first round does.
+func TestSpecReviewKeepsThePreviousRound(t *testing.T) {
+	root := makeRepo(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, true)
+	dir := filepath.Join(root, "specs", "AI-001-x")
+	previous, err := os.ReadFile(filepath.Join(dir, "review.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x")
+	if err != nil {
+		t.Fatalf("launch failed: %v\n%s", err, stdout+stderr)
+	}
+	kept, err := os.ReadFile(filepath.Join(dir, "review-round1.md"))
+	if err != nil || string(kept) != string(previous) {
+		t.Fatalf("the previous verdict was not kept as review-round1.md (err=%v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "review-request-round1.json")); err != nil {
+		t.Errorf("the previous request was not kept beside its verdict: %v", err)
+	}
+	if !strings.Contains(stdout, "review-round1.md") {
+		t.Errorf("the launch does not say where the previous verdict went:\n%s", stdout)
+	}
+}
+
 // #1908: the archive refuses a review with no launcher sidecar, so a launch that
 // cannot write one would spend a review that can never archive. It refuses
 // before starting anything. The sidecar path is made a directory, a write
@@ -211,6 +240,11 @@ func TestSpecReviewRefusesWhenTheRequestCannotBeRecorded(t *testing.T) {
 	runCommand = func(string, []string) error { launched = true; return nil }
 	req := filepath.Join(root, "specs", "AI-001-x", "review-request.json")
 	if err := os.Remove(req); err != nil {
+		t.Fatal(err)
+	}
+	// No previous verdict, so the launch keeps no round (#2264) and the blocker
+	// below stays where the request is written.
+	if err := os.Remove(filepath.Join(root, "specs", "AI-001-x", "review.md")); err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(req, "blocker"), 0o755); err != nil {
