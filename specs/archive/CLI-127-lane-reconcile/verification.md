@@ -44,10 +44,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-127-lane-reconcile/` -> `specs/archive/CLI-127-lane-reconcile/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-127-lane-reconcile/` -> `specs/archive/CLI-127-lane-reconcile/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 ### PR 3 live evidence (2026-10-16, read-only)
 
@@ -83,3 +83,12 @@ Two Major and two Minor findings were real; F5 is a scope observation (the range
 - **F2 (Major), the live-session resolver did not resolve.** `done` refuses a recent session whatever `--force` says. The row now carries `--force --ignore-recent-session` and says it strands the session; `TestPlanResolverForALiveWorktreeRunsThroughDone` runs the printed string through the real `worktree done` (mutation: without the flag it fails).
 - **F3 (Minor), an adopt with nothing to run.** `planUnadopted` now falls back to `KindFlag` when the path cannot be quoted, as `abandon` does (`TestPlanResolversDoWhatTheyPromise`).
 - **F4 (Minor), the dirty row hid its loss.** The reason now says the command discards the uncommitted changes (same test). This is the code route, so no contract file changed.
+
+## Review round 3 (2026-10-16): PASS (nan/mimo-v2.6-flash, reviewed `7a49aa8e`)
+
+No Blocker and no REAL Major. Four mutations by the reviewer each broke the test that guards the property (auto-only filter, liveness ordering, forge oracle and session stores in the real wiring). Dispositions:
+
+- **AC4 wording (Minor).** "Every worktree with a live session is classed ambiguous" holds for the lanes plan acts on; a live `Running` lane gets no action by design and is never `auto`. The safety property, never reaped, is the tested one. Recorded here and not in the contract set, which stays untouched.
+- **Branch not encoded in `REST.PRFor` (Minor, speculative).** Ticketed: https://github.com/mlorentedev/dotfiles/issues/2616.
+- **Simultaneous `lane apply` (question).** Ticketed: https://github.com/mlorentedev/dotfiles/issues/2617, to be done after the atomic claim (#2551) since it changes the start half.
+- **Scope of the range (Minor).** Launcher construction, same as round 2 F5. No action.
