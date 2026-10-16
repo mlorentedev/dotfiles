@@ -239,17 +239,48 @@ func ResolveRegistryPath() string {
 // so a read fell through to the deployed copy, possibly days stale, and a write
 // would have landed in the other project. Here the cwd's repository counts only
 // when it is a dotfiles checkout, so a dotfiles worktree still wins (BUG-072);
-// otherwise DOTFILES_REPO_DIR names it, and "" means neither.
+// otherwise DOTFILES_REPO_DIR names it (checkoutFromEnv says what counts), and ""
+// means neither.
 func DotfilesCheckout() string {
 	if cwd, err := os.Getwd(); err == nil {
 		if git := walkUpFor(cwd, ".git"); git != "" && IsDotfilesCheckout(filepath.Dir(git)) {
 			return filepath.Dir(git)
 		}
 	}
-	if r := os.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
-		return r
+	root, _ := checkoutFromEnv()
+	return root
+}
+
+// checkoutFromEnv is DOTFILES_REPO_DIR when it names a dotfiles checkout. Unset
+// is ("", nil). Set but not a checkout is ("", err), the error naming the
+// variable and its value so a writer can say what to fix instead of telling the
+// operator to set what they already set. A checkout is a directory holding a
+// .git entry and the marker: the deploy dir (~/.dotfiles) carries the marker
+// too, and a write there is the one #635 refuses, so the marker alone cannot
+// tell the two apart.
+func checkoutFromEnv() (string, error) {
+	r := os.Getenv("DOTFILES_REPO_DIR")
+	if r == "" {
+		return "", nil
 	}
-	return ""
+	switch {
+	case !isDir(r):
+		return "", fmt.Errorf("DOTFILES_REPO_DIR=%q is not a directory", r)
+	case !fileExists(filepath.Join(r, ".git")):
+		return "", fmt.Errorf("DOTFILES_REPO_DIR=%q has no .git entry, so it is not a checkout (a deployed copy has none)", r)
+	case !IsDotfilesCheckout(r):
+		return "", fmt.Errorf("DOTFILES_REPO_DIR=%q has no %s, so it is not a dotfiles checkout", r, CheckoutMarker)
+	}
+	return r, nil
+}
+
+// noCheckoutError says why the writers found no checkout: the variable they
+// were given and rejected, else that nothing named one.
+func noCheckoutError(what string) error {
+	if _, err := checkoutFromEnv(); err != nil {
+		return fmt.Errorf("%w — refusing to write %s to the deployed copy", err, what)
+	}
+	return fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write %s to the deployed copy", what)
 }
 
 // ResolveCatalogPath locates packages.json for READS, the checkout first and the
@@ -320,7 +351,7 @@ func ResolveHarnessRoot() string {
 func RepoRegistryPath() (string, error) {
 	root := DotfilesCheckout()
 	if root == "" {
-		return "", fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write the registry SSOT to the deployed copy")
+		return "", noCheckoutError("the registry SSOT")
 	}
 	return filepath.Join(root, "secrets", "registry.yaml"), nil
 }
@@ -334,7 +365,7 @@ func RepoRegistryPath() (string, error) {
 func RepoSensitiveDir() (string, error) {
 	root := DotfilesCheckout()
 	if root == "" {
-		return "", fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write the DR escrow to the deployed copy")
+		return "", noCheckoutError("the DR escrow")
 	}
 	return filepath.Join(root, "sensitive"), nil
 }
