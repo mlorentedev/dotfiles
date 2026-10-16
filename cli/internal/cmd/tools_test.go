@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -147,6 +148,10 @@ func writeCatalog(t *testing.T, dir, tool string) {
 func TestToolsList_CheckoutCatalogWins(t *testing.T) {
 	checkout, mirror := t.TempDir(), t.TempDir()
 	if err := os.Mkdir(filepath.Join(checkout, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A repository without the marker is another project, not the checkout (#1593).
+	if err := os.WriteFile(filepath.Join(checkout, env.CheckoutMarker), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	writeCatalog(t, checkout, "fromcheckout")

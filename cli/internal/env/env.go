@@ -230,12 +230,26 @@ func RepoDir() string {
 // no checkout is found or the file is absent there. Mirrors ResolveContractPath and
 // implements the read side of the registry source model (ADR-030, #635).
 func ResolveRegistryPath() string {
-	if root := RepoDir(); root != "" {
-		if p := filepath.Join(root, "secrets", "registry.yaml"); fileExists(p) {
-			return p
+	return resolveInCheckout("secrets/registry.yaml", fileExists)
+}
+
+// DotfilesCheckout is the checkout the registry, the secret store and the
+// harness resolve against. RepoDir answers "which repository is the cwd in",
+// which from another project is that project (#1593): its registry is absent,
+// so a read fell through to the deployed copy, possibly days stale, and a write
+// would have landed in the other project. Here the cwd's repository counts only
+// when it is a dotfiles checkout, so a dotfiles worktree still wins (BUG-072);
+// otherwise DOTFILES_REPO_DIR names it, and "" means neither.
+func DotfilesCheckout() string {
+	if cwd, err := os.Getwd(); err == nil {
+		if git := walkUpFor(cwd, ".git"); git != "" && IsDotfilesCheckout(filepath.Dir(git)) {
+			return filepath.Dir(git)
 		}
 	}
-	return filepath.Join(DotfilesDir(Home()), "secrets", "registry.yaml")
+	if r := os.Getenv("DOTFILES_REPO_DIR"); r != "" && isDir(r) {
+		return r
+	}
+	return ""
 }
 
 // ResolveCatalogPath locates packages.json for READS, the checkout first and the
@@ -259,7 +273,7 @@ func ResolveVersionsPath() string {
 // is found and has it, else rel under the deploy dir. One rule for every
 // checkout-first read, so the readers cannot drift apart.
 func resolveInCheckout(rel string, exists func(string) bool) string {
-	if root := RepoDir(); root != "" {
+	if root := DotfilesCheckout(); root != "" {
 		if p := filepath.Join(root, filepath.FromSlash(rel)); exists(p) {
 			return p
 		}
@@ -289,7 +303,7 @@ func ResolveSensitiveDir() string {
 // Resolving to a path that does not exist keeps the error where it belongs — in
 // LoadModelMap, phrased as "this is not an empty routing map".
 func ResolveHarnessRoot() string {
-	if root := RepoDir(); root != "" {
+	if root := DotfilesCheckout(); root != "" {
 		if isDir(filepath.Join(root, "harness")) {
 			return root
 		}
@@ -304,7 +318,7 @@ func ResolveHarnessRoot() string {
 // the next redeploy and never reaches git — the durability bug behind #635. This
 // fails loud rather than write a throwaway copy.
 func RepoRegistryPath() (string, error) {
-	root := RepoDir()
+	root := DotfilesCheckout()
 	if root == "" {
 		return "", fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write the registry SSOT to the deployed copy")
 	}
@@ -318,7 +332,7 @@ func RepoRegistryPath() (string, error) {
 // reaches git (the #635 durability class, the write-side analog of ResolveSensitiveDir).
 // Fails loud rather than write a throwaway copy.
 func RepoSensitiveDir() (string, error) {
-	root := RepoDir()
+	root := DotfilesCheckout()
 	if root == "" {
 		return "", fmt.Errorf("no dotfiles checkout found (set DOTFILES_REPO_DIR or run from inside the repo) — refusing to write the DR escrow to the deployed copy")
 	}
