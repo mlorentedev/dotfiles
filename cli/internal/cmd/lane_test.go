@@ -136,3 +136,38 @@ func TestLane_RefusalsAreShownOnStderr(t *testing.T) {
 		}
 	}
 }
+
+// The line `lane next` types names the prompt relative to the pane's directory.
+// A pane standing in a subdirectory of the worktree does not hold the file, so
+// readPrompt looks at the worktree root; a file that is nowhere stays an error.
+func TestReadPrompt_FallsBackToTheWorktreeRoot(t *testing.T) {
+	top, sub := t.TempDir(), filepath.Join(t.TempDir(), "sub")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(top, "p.md"), []byte("from the root"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+	prev := laneRun
+	laneRun = func(name string, args ...string) (string, error) {
+		if name == "git" && strings.Join(args, " ") == "rev-parse --show-toplevel" {
+			return top + "\n", nil
+		}
+		return "", errors.New("unexpected: " + name)
+	}
+	t.Cleanup(func() { laneRun = prev })
+	got, err := readPrompt("p.md")
+	if err != nil || string(got) != "from the root" {
+		t.Errorf("readPrompt(p.md) = %q, %v; want the root's file", got, err)
+	}
+	if _, err := readPrompt("missing.md"); err == nil {
+		t.Error("a prompt that is nowhere is an error")
+	}
+	if err := os.WriteFile(filepath.Join(sub, "p.md"), []byte("from the cwd"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := readPrompt("p.md"); err != nil || string(got) != "from the cwd" {
+		t.Errorf("a file in the cwd wins: %q, %v", got, err)
+	}
+}
