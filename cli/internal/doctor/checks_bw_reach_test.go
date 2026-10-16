@@ -54,6 +54,13 @@ func TestBWBackedSecrets_CountsOnlyBWBackend(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "secrets", "registry.yaml"), []byte(testRegistry), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// DOTFILES_REPO_DIR is accepted only for a checkout: a .git entry and the marker.
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "versions.conf"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("DOTFILES_REPO_DIR", root)
 	t.Chdir(root)
 
@@ -84,6 +91,13 @@ secrets:
     expose: { env: A_AGE }
 `
 	if err := os.WriteFile(filepath.Join(root, "secrets", "registry.yaml"), []byte(noBW), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// DOTFILES_REPO_DIR is accepted only for a checkout: a .git entry and the marker.
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "versions.conf"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DOTFILES_REPO_DIR", root)

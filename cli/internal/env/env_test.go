@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -337,6 +338,7 @@ func TestResolveRegistryPathPrefersRepoCheckout(t *testing.T) {
 	if err := os.WriteFile(want, []byte("version: 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	markCheckout(t, repo)
 	t.Setenv("DOTFILES_REPO_DIR", repo)
 	t.Chdir(t.TempDir())
 
@@ -361,6 +363,7 @@ func TestResolveRegistryPathFallsBackToDeployed(t *testing.T) {
 
 func TestRepoRegistryPathReturnsCheckoutPath(t *testing.T) {
 	repo := t.TempDir()
+	markCheckout(t, repo)
 	t.Setenv("DOTFILES_REPO_DIR", repo)
 	t.Chdir(t.TempDir())
 	got, err := RepoRegistryPath()
@@ -390,6 +393,7 @@ func TestResolveSensitiveDirPrefersRepoCheckout(t *testing.T) {
 	if err := os.Mkdir(want, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	markCheckout(t, repo)
 	t.Setenv("DOTFILES_REPO_DIR", repo)
 	t.Chdir(t.TempDir())
 
@@ -416,6 +420,7 @@ func TestRepoSensitiveDirPrefersRepoCheckout(t *testing.T) {
 	// The DR-escrow write seam returns the checkout's sensitive/ so the escrow is
 	// committable (the write side of ADR-030 / #635).
 	repo := t.TempDir()
+	markCheckout(t, repo)
 	t.Setenv("DOTFILES_REPO_DIR", repo)
 	t.Chdir(t.TempDir())
 	got, err := RepoSensitiveDir()
@@ -445,6 +450,7 @@ func TestResolveCatalogPathPrefersRepoCheckout(t *testing.T) {
 	if err := os.WriteFile(want, []byte(`{"tools":[]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	markCheckout(t, repo)
 	t.Setenv("DOTFILES_REPO_DIR", repo)
 	t.Setenv("DOTFILES_DIR", t.TempDir())
 	t.Chdir(t.TempDir())
@@ -532,17 +538,29 @@ func TestDefaultCheckoutDirMatchesTheContract(t *testing.T) {
 }
 
 // writeCheckout makes dir look like a dotfiles checkout holding a registry.
+// markCheckout makes dir look like a dotfiles checkout: the .git entry and the
+// marker DOTFILES_REPO_DIR must carry to be accepted.
+func markCheckout(t *testing.T, dir string) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, CheckoutMarker), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func writeCheckout(t *testing.T, dir string) string {
 	t.Helper()
 	reg := filepath.Join(dir, "secrets", "registry.yaml")
 	if err := os.MkdirAll(filepath.Dir(reg), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for p, body := range map[string]string{reg: "version: 1\n", filepath.Join(dir, CheckoutMarker): ""} {
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.WriteFile(reg, []byte("version: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
+	markCheckout(t, dir)
 	return reg
 }
 
@@ -579,6 +597,9 @@ func TestDotfilesCheckoutPrefersTheWorktreeTheCwdIsIn(t *testing.T) {
 	t.Setenv("DOTFILES_REPO_DIR", t.TempDir())
 	wt := t.TempDir()
 	writeCheckout(t, wt)
+	if err := os.RemoveAll(filepath.Join(wt, ".git")); err != nil { // a worktree's .git is a file
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: elsewhere\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -592,5 +613,65 @@ func TestDotfilesCheckoutPrefersTheWorktreeTheCwdIsIn(t *testing.T) {
 	want, _ := filepath.EvalSymlinks(wt)
 	if got != want {
 		t.Errorf("DotfilesCheckout() = %q, want the worktree %q", got, want)
+	}
+}
+
+// #2609: DOTFILES_REPO_DIR was accepted for any directory. The deploy dir carries
+// versions.conf too, so only a .git entry tells a checkout from the copy whose
+// write the registry writers refuse (#635).
+func TestDotfilesRepoDirNamingTheDeployedCopyIsRefusedByName(t *testing.T) {
+	deployed := t.TempDir()
+	writeCheckout(t, deployed)
+	if err := os.RemoveAll(filepath.Join(deployed, ".git")); err != nil { // a deploy has none
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", deployed)
+	t.Setenv("DOTFILES_DIR", deployed)
+	t.Chdir(t.TempDir())
+
+	if got := DotfilesCheckout(); got != "" {
+		t.Errorf("DotfilesCheckout() = %q, want none for a directory without .git", got)
+	}
+	for name, write := range map[string]func() (string, error){"registry": RepoRegistryPath, "sensitive": RepoSensitiveDir} {
+		got, err := write()
+		if err == nil {
+			t.Fatalf("%s writer returned %q for the deployed copy, want a refusal", name, got)
+		}
+		if !strings.Contains(err.Error(), "DOTFILES_REPO_DIR="+strconv.Quote(deployed)) || !strings.Contains(err.Error(), ".git") {
+			t.Errorf("%s writer error %q must name the variable, its value and the missing .git", name, err)
+		}
+	}
+}
+
+// A value that is set and names nothing used to be dropped silently, and the
+// error then told the operator to set the variable they had already set.
+func TestDotfilesRepoDirNamingNothingIsRefusedByName(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "gone")
+	t.Setenv("DOTFILES_REPO_DIR", missing)
+	t.Chdir(t.TempDir())
+
+	_, err := RepoRegistryPath()
+	if err == nil {
+		t.Fatal("RepoRegistryPath() = nil error for a variable naming no directory")
+	}
+	if !strings.Contains(err.Error(), "DOTFILES_REPO_DIR="+strconv.Quote(missing)) || !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("error %q must name the variable, its value and why", err)
+	}
+	if strings.Contains(err.Error(), "set DOTFILES_REPO_DIR") {
+		t.Errorf("error %q tells the operator to set the variable they set", err)
+	}
+}
+
+// A git repository with no marker is some other project, not a dotfiles checkout.
+func TestDotfilesRepoDirNamingAnotherProjectIsRefused(t *testing.T) {
+	other := t.TempDir()
+	if err := os.Mkdir(filepath.Join(other, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTFILES_REPO_DIR", other)
+	t.Chdir(t.TempDir())
+
+	if got := DotfilesCheckout(); got != "" {
+		t.Errorf("DotfilesCheckout() = %q, want none for a repository without %s", got, CheckoutMarker)
 	}
 }
