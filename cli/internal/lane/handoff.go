@@ -129,7 +129,7 @@ func sameIssue(wt Worktree, issue Issue, branch string) error {
 		return fmt.Errorf("lane: %w", err)
 	}
 	if meta != nil && meta.Issue != 0 && meta.Issue != issue.Number {
-		return fmt.Errorf("lane: branch %s already belongs to #%d, and #%d's title slugs the same; retitle one of them so the branches differ, or close #%d", branch, meta.Issue, issue.Number, meta.Issue)
+		return fmt.Errorf("lane: branch %s already belongs to #%d, and #%d's title slugs the same; retitle #%d so its branch differs, or finish #%d and remove its worktree", branch, meta.Issue, issue.Number, issue.Number, meta.Issue)
 	}
 	return nil
 }

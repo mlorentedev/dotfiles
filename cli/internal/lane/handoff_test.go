@@ -410,6 +410,11 @@ func TestNext_ABranchLeasedToAnotherIssueIsARefusalNotASilentSkip(t *testing.T) 
 				if !strings.Contains(err.Error(), "#99") || !strings.Contains(err.Error(), "#7") {
 					t.Errorf("the refusal names both issues, got %v", err)
 				}
+				// Retitling the holder cannot clear it (its worktree keeps the branch);
+				// the way out the message gives is to retitle this issue.
+				if !strings.Contains(err.Error(), "retitle #7") {
+					t.Errorf("the refusal tells the operator to retitle the new issue, got %v", err)
+				}
 				for _, c := range b.calls {
 					if strings.HasPrefix(c, "create") || strings.HasPrefix(c, "open") || strings.HasPrefix(c, "type") {
 						t.Errorf("a refusal ran %q", c)
