@@ -132,3 +132,23 @@ func TestPlan(t *testing.T) {
 		}
 	})
 }
+
+// minAge restates a literal in worktree.Classify, which is not exported. Plan
+// prints a due time from it, so a drift would print a time sweep still refuses.
+// This pins the two to the same second.
+func TestMinAgeMatchesClassify(t *testing.T) {
+	at := func(age time.Duration) worktree.LifecycleState {
+		info := worktree.Info{
+			Metadata: &worktree.Metadata{CreatedAt: phaseNow.Add(-age), LeaseExpiresAt: phaseNow.Add(-time.Hour), ReapOK: true},
+			PRMerged: true,
+		}
+		state, _ := worktree.Classify(info, phaseNow)
+		return state
+	}
+	if got := at(minAge - time.Second); got != worktree.StateActive {
+		t.Errorf("just under minAge classifies %s, want ACTIVE", got)
+	}
+	if got := at(minAge); got != worktree.StateReapable {
+		t.Errorf("exactly minAge classifies %s, want REAPABLE", got)
+	}
+}
