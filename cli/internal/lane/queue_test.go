@@ -94,3 +94,22 @@ func TestLoadConfig_DefaultsAndRefusesAnUnknownKey(t *testing.T) {
 		t.Error("a repo with no .dotf/lane.json has no lane")
 	}
 }
+
+// base is <remote>/<branch>: without a slash `git fetch main` would be run
+// with a remote named main and no branch, far from the file that is wrong.
+func TestLoadConfig_BaseMustNameARemoteAndABranch(t *testing.T) {
+	for base, ok := range map[string]bool{"origin/main": true, "upstream/release/1.x": true, "main": false, "origin/": false, "/main": false} {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".dotf"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		body := `{"queue":[1],"base":"` + base + `"}`
+		if err := os.WriteFile(filepath.Join(dir, ConfigPath), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := LoadConfig(dir)
+		if (err == nil) != ok {
+			t.Errorf("base %q: err = %v, want ok=%v", base, err, ok)
+		}
+	}
+}
