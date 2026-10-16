@@ -33,10 +33,10 @@ created: "2026-10-15"
 
 ### PR 2: `dotf lane plan`
 
-- [ ] [AC2] Write `cli/internal/lane/plan_test.go` (`TestPlan`): a table test over `Plan(rows, queue, now) []Action`. Each `Action` has `Kind` (reap, start, adopt, flag), `Class` (`auto`, `pending`, `ambiguous`), `Due` for `pending` and `Resolve` (the exact command) for `ambiguous`. There is one row per D1 case, a D2 row with a derivable branch (adopt offered as `ambiguous`), a D2 row without one (no proposal), and a D3 row (landing order printed, no land action). Expected: FAIL.
-- [ ] [AC2] Write `cli/internal/lane/plan.go` until it passes.
-- [ ] [AC2] Add `newLanePlanCmd` and `TestPlanMutatesNothing` in `cli/internal/lane/`, asserting that the fixture repo's files and refs are byte-identical after `plan`, using a hash of `git for-each-ref` plus the lease files, before and after.
-- [ ] Verify (same suite as PR 1). Lesson. Open the PR.
+- [x] [AC2] Write `cli/internal/lane/plan_test.go` (`TestPlan`): a table test over `Plan(rows, queue, now) []Action`. Each `Action` has `Kind` (reap, start, adopt, flag), `Class` (`auto`, `pending`, `ambiguous`), `Due` for `pending` and `Resolve` (the exact command) for `ambiguous`. There is one row per D1 case, a D2 row with a derivable branch (adopt offered as `ambiguous`), a D2 row without one (no proposal), and a D3 row (landing order printed, no land action). Expected: FAIL.
+- [x] [AC2] Write `cli/internal/lane/plan.go` until it passes.
+- [x] [AC2] Add `newLanePlanCmd` and `TestPlanMutatesNothing` in `cli/internal/lane/`, asserting that the fixture repo's files and refs are byte-identical after `plan`, using a hash of `git for-each-ref` plus the lease files, before and after.
+- [x] Verify (same suite as PR 1). Lesson. Open the PR.
 
 ### PR 3: `dotf lane apply`
 
