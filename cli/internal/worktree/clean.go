@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -23,6 +24,7 @@ var disposableDirNames = map[string]bool{
 	".turbo":            true,
 	".next":             true,
 	".nuxt":             true,
+	".astro":            true,
 	".svelte-kit":       true,
 	".output":           true,
 	".gradle":           true,
@@ -85,16 +87,32 @@ func IsDisposableIgnoredPath(relPath string) bool {
 
 // HasNonDisposableIgnored inspects porcelain output and returns true if any non-disposable ignored file exists.
 func HasNonDisposableIgnored(porcelainOutput string) bool {
-	lines := strings.Split(porcelainOutput, "\n")
-	for _, line := range lines {
+	return len(NonDisposableIgnored(porcelainOutput)) > 0
+}
+
+// NonDisposableIgnored lists, in git's order, the ignored paths in
+// `git status --ignored --porcelain` output that are not known build output.
+func NonDisposableIgnored(porcelainOutput string) []string {
+	var paths []string
+	for _, line := range strings.Split(porcelainOutput, "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "!! ") {
 			continue
 		}
 		relPath := strings.TrimSpace(strings.TrimPrefix(line, "!!"))
 		if !IsDisposableIgnoredPath(relPath) {
-			return true
+			paths = append(paths, relPath)
 		}
 	}
-	return false
+	return paths
+}
+
+// summarizePaths names the first few paths and counts the rest, so a refusal
+// stays one line on a worktree holding hundreds of them.
+func summarizePaths(paths []string) string {
+	const shown = 3
+	if len(paths) <= shown {
+		return strings.Join(paths, ", ")
+	}
+	return fmt.Sprintf("%s (+%d more)", strings.Join(paths[:shown], ", "), len(paths)-shown)
 }

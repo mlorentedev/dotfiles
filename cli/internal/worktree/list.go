@@ -14,9 +14,24 @@ import (
 
 type GitRunner interface {
 	WorktreeListPorcelain(repoRoot string) (string, error)
-	IsDirty(worktreePath string) (bool, error)
+	Dirt(worktreePath string) (Dirt, error)
 	IsPRMerged(repoRoot, branch string) (bool, error)
 	IsOrphan(repoRoot, branch string) (bool, error)
+}
+
+// Dirt is what keeps a worktree from being clean, as two facts the operator
+// acts on differently (#1607): Tracked is work git would show in `git status`,
+// Ignored lists ignored paths that are not known build output (a .env, a
+// scratch note, a cache this package does not recognise). Ignored is read only
+// when Tracked is false.
+type Dirt struct {
+	Tracked bool
+	Ignored []string
+}
+
+// Any reports whether the worktree holds anything removal would lose.
+func (d Dirt) Any() bool {
+	return d.Tracked || len(d.Ignored) > 0
 }
 
 type RealGitRunner struct {
@@ -33,23 +48,23 @@ func (r *RealGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
 	return string(out), nil
 }
 
-func (r *RealGitRunner) IsDirty(worktreePath string) (bool, error) {
+func (r *RealGitRunner) Dirt(worktreePath string) (Dirt, error) {
 	cmd := exec.Command("git", "-C", worktreePath, "status", "--porcelain")
 	out, err := cmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("git status: %w", err)
+		return Dirt{}, fmt.Errorf("git status: %w", err)
 	}
 	if len(strings.TrimSpace(string(out))) > 0 {
-		return true, nil
+		return Dirt{Tracked: true}, nil
 	}
 
 	// Fail-closed data loss guard: check for non-disposable gitignored local content (e.g. .env, scratchpad notes)
 	ignoredCmd := exec.Command("git", "-C", worktreePath, "status", "--ignored", "--porcelain")
 	ignoredOut, err := ignoredCmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("git status --ignored: %w", err)
+		return Dirt{}, fmt.Errorf("git status --ignored: %w", err)
 	}
-	return HasNonDisposableIgnored(string(ignoredOut)), nil
+	return Dirt{Ignored: NonDisposableIgnored(string(ignoredOut))}, nil
 }
 
 // ParseGitHubSlug extracts owner/repo from SSH or HTTPS GitHub URLs.
@@ -205,6 +220,7 @@ func (r *RealGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
 type MockGitRunner struct {
 	PorcelainOutput string
 	DirtyPaths      map[string]bool
+	IgnoredPaths    map[string][]string
 	DirtyErrors     map[string]error
 	MergedBranches  map[string]bool
 	OrphanBranches  map[string]bool
@@ -214,11 +230,14 @@ func (m *MockGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
 	return m.PorcelainOutput, nil
 }
 
-func (m *MockGitRunner) IsDirty(worktreePath string) (bool, error) {
+func (m *MockGitRunner) Dirt(worktreePath string) (Dirt, error) {
 	if m.DirtyErrors != nil && m.DirtyErrors[worktreePath] != nil {
-		return false, m.DirtyErrors[worktreePath]
+		return Dirt{}, m.DirtyErrors[worktreePath]
 	}
-	return m.DirtyPaths[worktreePath], nil
+	if m.DirtyPaths[worktreePath] {
+		return Dirt{Tracked: true}, nil
+	}
+	return Dirt{Ignored: m.IgnoredPaths[worktreePath]}, nil
 }
 
 func (m *MockGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
@@ -274,10 +293,10 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		isMain := isMainWorktree(raw.Path, i)
 		isCurrent := (absPath == absRepoRoot)
 
-		dirty, err := runner.IsDirty(raw.Path)
+		dirt, err := runner.Dirt(raw.Path)
 		if err != nil {
 			// Fail-closed: treat error in status check as dirty so it is never reaped (F2)
-			dirty = true
+			dirt = Dirt{Tracked: true}
 		}
 		merged, _ := runner.IsPRMerged(repoRoot, raw.Branch)
 		orphan, _ := runner.IsOrphan(repoRoot, raw.Branch)
@@ -296,9 +315,11 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			IsMain:     isMain,
 			IsCurrent:  isCurrent,
 			IsOrphan:   orphan,
-			Dirty:      dirty,
+			Dirty:      dirt.Any(),
 			PRMerged:   merged,
 			Metadata:   meta,
+
+			IgnoredContent: dirt.Ignored,
 		}
 
 		info.State, info.StateReason = Classify(info, now)

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -270,6 +271,10 @@ func TestDonePreservesGitignoredLocalFiles(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected Done without force to fail when non-disposable gitignored file exists")
 	}
+	// #1607: the refusal names the path and does not call it uncommitted work.
+	if msg := err.Error(); !strings.Contains(msg, ".env") || !strings.Contains(msg, "not known build output") || strings.Contains(msg, "uncommitted") {
+		t.Errorf("refusal must name the ignored path and not call it uncommitted, got: %v", err)
+	}
 
 	content, err := os.ReadFile(envFile)
 	if err != nil || string(content) != "SECRET=precious_credentials" {
@@ -359,5 +364,39 @@ func TestDoneRefusesWhenAnAncestorProcessIsInsideEvenWithForce(t *testing.T) {
 	}
 	if _, statErr := os.Stat(wtDir); statErr != nil {
 		t.Fatalf("the worktree must survive the refusal: %v", statErr)
+	}
+}
+
+// #1607: a tracked change and ignored content are two facts. Dirt keeps them
+// apart, and reads the ignored paths only when nothing tracked is dirty.
+func TestRealGitRunnerDirtSeparatesTrackedFromIgnored(t *testing.T) {
+	_, wtDir, _ := setupTestGitRepoAndWorktree(t)
+	_ = os.WriteFile(filepath.Join(wtDir, ".gitignore"), []byte(".env\nnode_modules/\n"), 0o644)
+	for _, args := range [][]string{{"add", ".gitignore"}, {"commit", "-m", "ignore"}} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = wtDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runner := &RealGitRunner{}
+
+	_ = os.MkdirAll(filepath.Join(wtDir, "node_modules"), 0o755)
+	_ = os.WriteFile(filepath.Join(wtDir, "node_modules", "x.js"), []byte("x"), 0o644)
+	dirt, err := runner.Dirt(wtDir)
+	if err != nil || dirt.Any() {
+		t.Fatalf("disposable ignored content only: Dirt = %+v, err = %v; want clean", dirt, err)
+	}
+
+	_ = os.WriteFile(filepath.Join(wtDir, ".env"), []byte("K=V"), 0o644)
+	dirt, err = runner.Dirt(wtDir)
+	if err != nil || dirt.Tracked || !reflect.DeepEqual(dirt.Ignored, []string{".env"}) {
+		t.Fatalf("ignored .env: Dirt = %+v, err = %v; want Ignored [.env] and nothing tracked", dirt, err)
+	}
+
+	_ = os.WriteFile(filepath.Join(wtDir, "initial.txt"), []byte("changed"), 0o644)
+	dirt, err = runner.Dirt(wtDir)
+	if err != nil || !dirt.Tracked {
+		t.Fatalf("tracked change: Dirt = %+v, err = %v; want Tracked", dirt, err)
 	}
 }

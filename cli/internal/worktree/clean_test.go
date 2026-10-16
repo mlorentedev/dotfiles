@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -34,6 +35,8 @@ func TestIsDisposableIgnoredPath(t *testing.T) {
 		{"out/main", true},
 		{".cache/item", true},
 		{".terraform/providers", true},
+		{"site/.astro/", true},
+		{"site/.astro/types.d.ts", true},
 		{"foo.pyc", true},
 		{"lib.so", true},
 		// Non-disposable paths (scratchpad files, secrets, local configs)
@@ -78,5 +81,28 @@ func TestHasNonDisposableIgnored(t *testing.T) {
 `
 	if !HasNonDisposableIgnored(scratchOutput) {
 		t.Errorf("expected output with notes.txt to return true, got false")
+	}
+}
+
+// #1607: the refusal has to say WHICH ignored paths it found, or the operator
+// cannot tell a build cache from a .env and reaches for --force.
+func TestNonDisposableIgnoredNamesThePaths(t *testing.T) {
+	out := "!! .dotf-worktree.json\n!! site/dist/\n!! site/.astro/\n!! .env\n!! site/public/beoe/\n"
+	got := NonDisposableIgnored(out)
+	want := []string{".env", "site/public/beoe/"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("NonDisposableIgnored = %q, want %q", got, want)
+	}
+	if NonDisposableIgnored("!! node_modules/\n") != nil {
+		t.Errorf("only disposable content must yield no paths")
+	}
+}
+
+func TestSummarizePathsCountsWhatItDoesNotName(t *testing.T) {
+	if got := summarizePaths([]string{"a", "b"}); got != "a, b" {
+		t.Errorf("summarizePaths(2) = %q", got)
+	}
+	if got := summarizePaths([]string{"a", "b", "c", "d", "e"}); got != "a, b, c (+2 more)" {
+		t.Errorf("summarizePaths(5) = %q", got)
 	}
 }
