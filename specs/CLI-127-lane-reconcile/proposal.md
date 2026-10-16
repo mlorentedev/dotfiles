@@ -39,7 +39,9 @@ wip_override: "Owner chose option B on 2026-10-16 (#2550 park, epic #2546): CLI-
 [AGENT-DRAFT — review before archive]
 - **MUST resolve before tasks.md:** where `ambiguous` begins. Proposal: anything that removes work is `ambiguous` unless sweep's fail-closed gates (merged PR, clean tree, expired lease, no live process) all hold. That covers a DIRTY worktree, a merged worktree with a live session, and an UNADOPTED one with no PR.
 - **MUST resolve:** whether `apply` may adopt an UNADOPTED worktree on its own. Adoption writes a lease that makes the worktree reapable later, so it is not neutral.
-- The liveness signal is a process scan on cwd (as `worktree done` does) plus the transcript's age. Both are heuristics, and a false "dead" reaps a live session. Default to "alive" when unsure.
+- Liveness is a process scan on cwd (as `worktree done` does) plus transcript age through `worktree.RecentSession` (#2556), which fails closed on an unreadable store. CLI-118 is extending it to the non-Claude stores, so do not reimplement it (#2550 comment 6205806273). Both signals are heuristics, and a false "dead" reaps a live session. Default to "alive" when unsure.
+- herdr 0.9.3 cannot isolate a second server: `HERDR_SOCKET_PATH`, `HERDR_HOME` and `HERDR_CONFIG_PATH` move only the sockets. A second server restores the owner's `session.json` and resumes every agent, measured by CLI-118 on 2026-10-16. `status` only reads the snapshot of the running server, and no test or live run starts a herdr server. Only a different `HOME` isolates.
+- Paths held by CLI-118 (`cli/internal/worktree/session*.go`, `cli/internal/herdr/**`, `cli/internal/deploy/**`) are consumed through their exported API only.
 - Forge rate limits with N worktrees: use one `pulls?state=all&head=` request per branch, or one list request, and cache it for the run.
 
 ## Acceptance criteria
@@ -48,7 +50,7 @@ wip_override: "Owner chose option B on 2026-10-16 (#2550 park, epic #2546): CLI-
 - [ ] AC1: `dotf lane status --json` on a fixture of git, lease, forge and process state returns the expected phase for each of the 9 phases. One table test per phase, with herdr absent in at least one row.
 - [ ] AC2: `dotf lane plan` on the same fixture prints the expected actions, each marked `auto` or `ambiguous`, and the fixture's files and refs are byte-identical afterwards.
 - [ ] AC3: `dotf lane apply` executes only `auto` actions through the existing verbs (the test asserts the verb calls), reports `changed=N`, and a second run on the resulting state reports `changed=0`.
-- [ ] AC4: A worktree whose cwd holds a live process is never reaped by `apply`, whatever its PR state. Covered by a test and by one live run on this machine.
+- [ ] AC4: A worktree whose cwd holds a live process, or whose transcript `RecentSession` reports as recent, is never reaped by `apply`, whatever its PR state. Covered by a test and by one live run on this machine against the already-running herdr (read only). The live run never starts a second herdr server.
 
 ## References
 
