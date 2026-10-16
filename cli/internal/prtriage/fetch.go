@@ -121,7 +121,9 @@ func fetchRegistry(ctx context.Context, run ghRunner, repo string) (Registry, er
 	case err == nil:
 		return ParseRegistry(raw, name+":"+RegistryPath)
 	case strings.Contains(err.Error(), "HTTP 404"):
-		return Registry{}, fmt.Errorf("%s has no %s on its default branch", name, RegistryPath)
+		// GitHub answers 404 for a repository the token cannot read as well as
+		// for a missing file, so the message names both.
+		return Registry{}, fmt.Errorf("%s has no %s on its default branch, or the token cannot read it (HTTP 404)", name, RegistryPath)
 	}
 	return Registry{}, fmt.Errorf("read %s from %s: %w", RegistryPath, name, err)
 }
