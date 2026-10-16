@@ -87,6 +87,10 @@ type PR struct {
 	Title    string    `json:"title"`
 	URL      string    `json:"url"`
 	Comments []Comment `json:"comments"`
+	// Reviews are the formal reviews submitted through the reviews API, each
+	// as a Comment stamped with its submission time. A review is review output
+	// by its type, so no marker is needed to count it (#1686).
+	Reviews []Comment `json:"reviews,omitempty"`
 	// Files is the diff's file list, or nil when it was not read. Only a PR
 	// the queue would otherwise report has it read (see fetchWith).
 	Files []string `json:"files,omitempty"`
@@ -137,28 +141,40 @@ func normaliseLogin(s string) string {
 	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(s), "[bot]"))
 }
 
-// reviewOutput returns the newest comment on pr that a declared reviewer wrote
-// and that carries one of that reviewer's review markers.
+// reviewOutput returns the newest output on pr from a declared reviewer: a
+// comment carrying one of that reviewer's review markers, or any formal review
+// it submitted.
 func reviewOutput(pr PR, reg Registry) (Comment, string, bool) {
 	var newest Comment
 	var by string
 	found := false
-	for _, c := range pr.Comments {
-		for _, rv := range reg.Reviewers {
-			if normaliseLogin(c.Author) != normaliseLogin(rv.Login) {
-				continue
+	consider := func(c Comment, login string) {
+		if !found || c.Spoken().After(newest.Spoken()) {
+			newest, by, found = c, login, true
+		}
+	}
+	for _, rv := range reg.Reviewers {
+		for _, c := range pr.Comments {
+			if normaliseLogin(c.Author) == normaliseLogin(rv.Login) && hasMarker(c.Body, rv.ReviewMarkers) {
+				consider(c, rv.Login)
 			}
-			for _, m := range rv.ReviewMarkers {
-				if m == "" || !strings.Contains(c.Body, m) {
-					continue
-				}
-				if !found || c.Spoken().After(newest.Spoken()) {
-					newest, by, found = c, rv.Login, true
-				}
+		}
+		for _, r := range pr.Reviews {
+			if normaliseLogin(r.Author) == normaliseLogin(rv.Login) {
+				consider(r, rv.Login)
 			}
 		}
 	}
 	return newest, by, found
+}
+
+func hasMarker(body string, markers []string) bool {
+	for _, m := range markers {
+		if m != "" && strings.Contains(body, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // lastTriage returns the newest triage record on pr. The marker is matched at

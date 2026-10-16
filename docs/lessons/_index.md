@@ -466,4 +466,5 @@ tags: [lessons, index, dotfiles]
 | [445 - A merge rule keyed by path is checked on the source, not where the walk reaches it](lesson-445-a-merge-rule-keyed-by-path-checks-the-source-not-the-walk.md) | 2026-10-15 |
 | [446 - herdr isolates a second server only by HOME; its variables move the sockets, not the session](lesson-446-herdr-isolates-a-second-server-only-by-home.md) | 2026-10-16 |
 | [447 - A harness session store is keyed by path, by id, or not at all; read each by its own key](lesson-447-a-session-store-is-keyed-by-path-by-id-or-not-at-all.md) | 2026-10-16 |
+| [448 - A review gate must read every channel a reviewer publishes on, not the one it was first seen on](lesson-448-a-review-gate-must-read-every-channel-a-reviewer-publishes-on.md) | 2026-10-16 |
 <!-- END GENERATED -->
