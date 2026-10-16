@@ -31,10 +31,7 @@ func ensureLease(o Options, path string, issue int, agent string) error {
 	if err != nil || meta != nil {
 		return err
 	}
-	now := time.Now()
-	if o.Now != nil {
-		now = o.Now()
-	}
+	now := o.now()
 	lease := worktree.Metadata{Creator: agent, Issue: issue, CreatedAt: now, LeaseExpiresAt: now.Add(leaseTTL), ReapOK: true}
 	if err := worktree.SaveMetadata(path, lease); err != nil {
 		return fmt.Errorf("lane: writing the lease: %w", err)
@@ -69,4 +66,12 @@ func excludeFile(gitDir, name string) error {
 		return fmt.Errorf("lane: %w", err)
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+// now is the hand-off's clock: time.Now unless a test set one.
+func (o Options) now() time.Time {
+	if o.Now != nil {
+		return o.Now()
+	}
+	return time.Now()
 }

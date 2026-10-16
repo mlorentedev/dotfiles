@@ -474,4 +474,5 @@ tags: [lessons, index, dotfiles]
 | [453 - A safety precondition checked in one branch of a classifier is not checked](lesson-453-a-safety-precondition-checked-in-one-branch-of-a-classifier-is-not-checked.md) | 2026-10-16 |
 | [454 - A preview and the verb that executes it must ask the same oracle](lesson-454-a-preview-and-the-verb-that-executes-it-must-ask-the-same-oracle.md) | 2026-10-16 |
 | [455 - An empty lookup key matches the newest row, and a queue head must be ready to land](lesson-455-an-empty-key-matches-the-newest-row-and-a-head-must-be-ready-to-land.md) | 2026-10-16 |
+| [456 - A hand-off decides from a read and acts later, so it must name what it saw](lesson-456-a-handoff-decides-from-a-read-and-acts-later-so-name-what-it-saw.md) | 2026-10-16 |
 <!-- END GENERATED -->
