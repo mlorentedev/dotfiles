@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: fb74f2be41c59f21
+generated_sha: 994ad9da78f2871b
 id: autopilot-skill
 type: skill
 status: active
@@ -274,12 +274,16 @@ An agent may merge a PR **it opened** ONLY when all six conditions hold on the *
 ### Landing Execution:
 
 ```bash
-# 1. Verify queue clear
-dotf pr triage-queue
+# 1. Verify THIS PR's queue is clear. Scoped on purpose: the repo-wide form exits 1
+#    on any other session's untriaged PR, which blocks a clean land (dotfiles#2549).
+#    A PR that is not open is refused, never reported clear.
+dotf pr triage-queue --pr "$PR_NUM"
 
 # 2. Land PR via deterministic CLI
 dotf pr land "$PR_NUM"
 ```
+
+The repo-wide `dotf pr triage-queue` (§1 step 3) stays the session-start brief: it answers "what is waiting anywhere", not "may this PR land".
 
 ### The Always-Human Floor (Exclusions):
 
