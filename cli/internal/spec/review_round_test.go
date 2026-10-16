@@ -107,3 +107,19 @@ func assertFile(t *testing.T, dir, name, want string) {
 		t.Errorf("%s = %q, want %q", name, got, want)
 	}
 }
+
+// #1722: the archive carries every kept round with the spec, and a round that
+// quotes the tag literal does not block it.
+func TestArchiveCarriesTheKeptRounds(t *testing.T) {
+	root := t.TempDir()
+	writeSpec(t, root, "AI-001-x", map[string]string{
+		"proposal.md":      "---\nstatus: implementing\n---\n# AI-001-x\n",
+		"review.md":        passingReview("AI-001-x"),
+		"review-round1.md": "verdict: FAIL\n| No [AGENT-DRAFT] tags | OK |\n",
+	})
+	target, err := Archive(root, "AI-001-x", ArchiveOptions{})
+	if err != nil {
+		t.Fatalf("a kept round must not block the archive: %v", err)
+	}
+	assertFile(t, target, "review-round1.md", "verdict: FAIL\n| No [AGENT-DRAFT] tags | OK |\n")
+}
