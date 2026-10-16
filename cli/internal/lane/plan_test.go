@@ -1,6 +1,7 @@
 package lane
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -150,5 +151,24 @@ func TestMinAgeMatchesClassify(t *testing.T) {
 	}
 	if got := at(minAge); got != worktree.StateReapable {
 		t.Errorf("exactly minAge classifies %s, want REAPABLE", got)
+	}
+}
+
+// The command an ambiguous action carries is pasted into a shell: a path with a
+// space is quoted, and one no shell quotes alike is not given as a command at
+// all, with the reason said instead (lesson 449).
+func TestPlanQuotesTheResolvingCommand(t *testing.T) {
+	spaced := row("fix/a", PhaseUnadopted, func(r *Row) { r.Path, r.Ticket = "/wt/My Worktrees/fix/a", 5 })
+	if got := find(t, Plan([]Row{spaced}, nil, phaseNow), "fix/a").Resolve; got != `dotf worktree adopt "/wt/My Worktrees/fix/a"` {
+		t.Errorf("adopt = %q, want the spaced path in double quotes", got)
+	}
+	stalled := row("fix/b", PhaseStalled, func(r *Row) { r.Path = "/wt/My Worktrees/fix/b" })
+	if got := find(t, Plan([]Row{stalled}, nil, phaseNow), "fix/b").Resolve; got != `dotf worktree done --force "/wt/My Worktrees/fix/b"` {
+		t.Errorf("done = %q, want the spaced path in double quotes", got)
+	}
+	live := row("fix/c", PhaseStalled, func(r *Row) { r.Path = "/wt/a$b/fix/c" })
+	a := find(t, Plan([]Row{live}, nil, phaseNow), "fix/c")
+	if a.Resolve != "" || !strings.Contains(a.Reason, "no shell quotes alike") {
+		t.Errorf("unquotable path: resolve=%q reason=%q, want no command and the reason", a.Resolve, a.Reason)
 	}
 }

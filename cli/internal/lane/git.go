@@ -18,10 +18,24 @@ type ForgeGit struct {
 }
 
 // IsPRMerged implements worktree.GitRunner.
-func (g ForgeGit) IsPRMerged(_, branch string) (bool, error) {
+func (g ForgeGit) IsPRMerged(_, branch string) (bool, error) { return forgeMerged(g.Forge, branch) }
+
+// ForgeSweep is the sweep runner that gives the same answer ForgeGit gives.
+// status and plan decide what is reapable from the forge, so the sweep apply
+// runs must too: left on its own it asks ancestry, and reaps a worktree whose
+// branch has no commit yet, which plan handed to a human as ambiguous.
+type ForgeSweep struct {
+	*worktree.RealSweepRunner
+	Forge PRSource
+}
+
+// IsPRMerged implements worktree.GitRunner.
+func (g ForgeSweep) IsPRMerged(_, branch string) (bool, error) { return forgeMerged(g.Forge, branch) }
+
+func forgeMerged(forge PRSource, branch string) (bool, error) {
 	if branch == "" {
 		return false, nil
 	}
-	pr, err := g.Forge.PRFor(branch)
+	pr, err := forge.PRFor(branch)
 	return pr.State == PRMerged, err
 }

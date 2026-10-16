@@ -166,7 +166,7 @@ func TestLaneApply_PrintsChangedAndRunsOnlyAutoVerbs(t *testing.T) {
 		return lane.Sources{List: func() ([]worktree.Info, error) { return nil, nil }, Forge: stubForge{}}, nil
 	}
 	var sweeps, nexts int
-	laneVerbs = func(*cobra.Command) lane.Verbs {
+	laneVerbs = func(*cobra.Command, lane.Sources) lane.Verbs {
 		return lane.Verbs{
 			Sweep: func() (int, error) { sweeps++; return 1, nil },
 			Next:  func() (bool, error) { nexts++; return true, nil },

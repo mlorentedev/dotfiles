@@ -180,12 +180,38 @@ func statusLandingHeadIsPickedAmongReviewLanes(t *testing.T) {
 	}
 }
 
+// A queued issue whose lane already exists under a hand-chosen branch is that
+// lane, not a second, Pending one: matching by the derived branch name alone
+// would also let plan offer to start an issue whose lane has already landed.
+func statusAHandNamedLaneIsNotAlsoPending(t *testing.T) {
+	meta := leased(time.Hour)
+	meta.Issue = 2550
+	src := Sources{
+		Now:          phaseNow,
+		List:         func() ([]worktree.Info, error) { return []worktree.Info{wt("feat/2550-lane-reconcile", meta)}, nil },
+		Forge:        &fakeForge{},
+		Live:         func(string) Liveness { return LiveIdle },
+		Herdr:        fakeFinder{},
+		Queue:        []int{2550},
+		Issues:       fakeIssues{2550: {Number: 2550, Title: "CLI-127: lane status, plan and apply", State: "OPEN"}},
+		BranchPrefix: "fix",
+	}
+	rows, err := Status(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Branch != "feat/2550-lane-reconcile" {
+		t.Errorf("rows = %+v, want the one on-disk lane and no phantom Pending row for #2550", rows)
+	}
+}
+
 // TestStatus is the one entry the spec's verification names; each scenario is a subtest.
 func TestStatus(t *testing.T) {
 	t.Run("OneRowPerLaneWithItsDerivedPhase", statusOneRowPerLaneWithItsDerivedPhase)
 	t.Run("HerdrAbsentStillAnswers", statusHerdrAbsentStillAnswers)
 	t.Run("UnknownLivenessReadsAsLiveForThePhase", statusUnknownLivenessReadsAsLiveForThePhase)
 	t.Run("LandingHeadIsPickedAmongReviewLanes", statusLandingHeadIsPickedAmongReviewLanes)
+	t.Run("AHandNamedLaneIsNotAlsoPending", statusAHandNamedLaneIsNotAlsoPending)
 }
 
 // Combine never lets a probe that could not answer read as idle, and never lets

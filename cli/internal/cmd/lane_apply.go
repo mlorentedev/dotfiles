@@ -37,7 +37,7 @@ func newLaneApplyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			done, err := lane.Apply(lane.Plan(rows, src.Queue, src.Now), laneVerbs(c))
+			done, err := lane.Apply(lane.Plan(rows, src.Queue, src.Now), laneVerbs(c, src))
 			if asJSON {
 				if encErr := json.NewEncoder(c.OutOrStdout()).Encode(done); encErr != nil && err == nil {
 					err = encErr
@@ -53,15 +53,18 @@ func newLaneApplyCmd() *cobra.Command {
 }
 
 // realLaneVerbs wires apply to worktree sweep and lane next, run from the
-// repository the command is in.
-func realLaneVerbs(c *cobra.Command) lane.Verbs {
+// repository the command is in. The sweep asks the same forge, through the same
+// cache, that status and plan asked: one answer to "is it merged?", so apply
+// never reaps what plan handed to a person.
+func realLaneVerbs(c *cobra.Command, src lane.Sources) lane.Verbs {
 	return lane.Verbs{
 		Sweep: func() (int, error) {
 			root, err := resolveCommandRepoRoot("")
 			if err != nil {
 				return 0, err
 			}
-			report, err := worktree.Sweep(worktree.SweepOptions{RepoRoot: root, Sessions: sessionStores()})
+			runner := lane.ForgeSweep{RealSweepRunner: &worktree.RealSweepRunner{}, Forge: src.Forge}
+			report, err := worktree.SweepWithRunner(worktree.SweepOptions{RepoRoot: root, Sessions: sessionStores()}, runner, src.Now)
 			if err != nil {
 				return 0, err
 			}

@@ -115,18 +115,22 @@ func Status(src Sources) ([]Row, error) {
 	forge := CachedForge(src.Forge)
 	var lanes []lane
 	onDisk := map[string]bool{}
+	tickets := map[int]bool{}
 	for _, info := range infos {
 		if info.IsMain {
 			continue
 		}
 		onDisk[info.Branch] = true
+		if n := ticketOf(info); n != 0 {
+			tickets[n] = true
+		}
 		l, err := src.onDiskLane(info, forge)
 		if err != nil {
 			return nil, err
 		}
 		lanes = append(lanes, l)
 	}
-	queued, err := src.queuedLanes(forge, onDisk)
+	queued, err := src.queuedLanes(forge, onDisk, tickets)
 	if err != nil {
 		return nil, err
 	}
@@ -165,10 +169,15 @@ func (s Sources) onDiskLane(info worktree.Info, forge PRSource) (lane, error) {
 }
 
 // queuedLanes are the queue's issues that no worktree on disk carries: not
-// started yet (Pending) or finished and reaped (Reaped).
-func (s Sources) queuedLanes(forge PRSource, onDisk map[string]bool) ([]lane, error) {
+// started yet (Pending) or finished and reaped (Reaped). A worktree carries an
+// issue by its branch name or by its lease or branch number, so a lane named by
+// hand (feat/2550-...) is not also read as a Pending one.
+func (s Sources) queuedLanes(forge PRSource, onDisk map[string]bool, tickets map[int]bool) ([]lane, error) {
 	var out []lane
 	for _, n := range s.Queue {
+		if tickets[n] {
+			continue
+		}
 		is, err := s.Issues.Issue(n)
 		if err != nil {
 			return nil, fmt.Errorf("lane status: issue #%d: %w", n, err)
