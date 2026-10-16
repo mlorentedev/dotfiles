@@ -1,0 +1,32 @@
+# Arming envelope for the CLI tickets run of 2026-10-16. Written by the operator's
+# session at arming ("te dejo en /autopilot haciendo tickets del cli") and committed
+# on chore/autopilot-cli-run. The run reads the COMMITTED copy only (autopilot skill
+# §1.4). Never widened by the run.
+version: 1
+run_id: "cli-2026-10-16"
+armed_by: manu
+armed_at: 2026-10-16T04:45:00Z
+expires_at: 2026-10-16T14:45:00Z
+objective: "Land the pilot-eligible dotf CLI bug fixes #2519, #2486 and #2540 under the standing grant, and close #2414 and #1281 with evidence that #2574 and #2413 already fixed them."
+scope:
+  write_paths: ["cli/**", "docs/**", "specs/**", ".agent/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "forge/**", "scripts/**", "setup-*", "versions.conf", "secrets/**", "ai/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, make, opencode]
+queue:
+  source: explicit
+  items: [2519, 2486, 2540, 2414, 1281]   # in this order; nothing else, never another repo
+  max_items: 5
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant        # own PRs only; never release #2571, never #2580/#2582
+  push: true
+  open_pr: true
+  advisor_tier: top
+# Until 0.72.0 (carries #2585) is installed, the installed dotf 0.71 cannot see
+# formal reviews: before every land, also read pulls/<n>/reviews by hand and name
+# the result in the triage comment.
