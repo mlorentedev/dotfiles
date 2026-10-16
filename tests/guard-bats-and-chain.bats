@@ -30,7 +30,8 @@ and_chain_count() {
 suite_files() {
     local f
     for f in "$BATS_TEST_DIRNAME"/*.bats "$BATS_TEST_DIRNAME"/*.bash "$BATS_TEST_DIRNAME"/lib/*.bash; do
-        [ -e "$f" ] && printf '%s\n' "$f"
+        [ -e "$f" ] || continue
+        printf '%s\n' "$f"
     done
 }
 
