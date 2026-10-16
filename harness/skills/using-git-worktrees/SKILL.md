@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: d2a1b78a8da3f1b9
+generated_sha: 0bcd7e7f6bd70223
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -44,25 +44,35 @@ physical: put the worktree where the parent repo cannot see it.
 
 ## Directory Selection (deterministic)
 
-### 1. Default — external sibling
+### 1. Default — `dotf worktree add`, under the one root
 
 ```bash
-repo_root="$(git rev-parse --show-toplevel)"
-project="$(basename "$repo_root")"
-path="$(dirname "$repo_root")/${project}-wt-${SLUG}"   # sibling of the repo, OUTSIDE it
+repo_root="$(git rev-parse --show-toplevel)"  # Gates A and B read it
+dotf worktree add "$SLUG" -b "<type>/$SLUG"    # e.g. feat/research-agents
 ```
 
-This is the default for **every** repo. It matches the existing convention
-(`dotfiles-wt-<slug>`) and needs no `.gitignore` cooperation.
+It places the worktree at `<WORKTREE_ROOT>/<repo>/<branch-slug>` (`WORKTREE_ROOT`
+defaults to `~/Projects/worktrees`; `dotf env path WORKTREE_ROOT` prints it). That is
+the layout herdr creates too, so a worktree opened from either side is the same kind of
+thing. `add` also forks from the remote default branch, refuses a branch name without a
+`<type>/` prefix, and writes the lease `list`, `sweep` and `done` read. Never derive the
+path yourself: ask `git worktree list --porcelain` for it after creating.
 
-### 2. Optional — a configured worktree root
+A worktree made another way (herdr, a bare `git worktree add`) shows as `UNADOPTED` in
+`dotf worktree list`; `dotf worktree adopt <path>` gives it the lease. A legacy
+`<repo>-wt-<slug>` sibling moves with `dotf worktree migrate`.
 
-If `CLAUDE.md` / `AGENTS.md` specifies a worktree root, honour it:
+### 2. Fallback — no `dotf` on the machine
 
 ```bash
-grep -i "worktree.*\(director\|root\)" AGENTS.md CLAUDE.md 2>/dev/null
-# e.g. path="$WORKTREE_ROOT/$project/$SLUG"
+root="${WORKTREE_ROOT:-$HOME/Projects/worktrees}"
+# the repository, not the worktree you may be in: --show-toplevel answers the worktree
+project="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+wt_path="$root/$project/$SLUG"                 # OUTSIDE every repo's working tree
 ```
+
+The variable is `wt_path`, never `path`: in zsh `path` is tied to `$PATH`, so assigning
+it empties the command search path and every later command fails as "not found".
 
 Any location is acceptable **as long as it is outside every repo's working tree.**
 
@@ -93,7 +103,7 @@ Both checks MUST pass:
 
 ```bash
 # 1. The new worktree must NOT appear in the parent repo's status.
-git -C "$repo_root" status --porcelain | grep -q "$(basename "$path")" && echo "LEAK: visible in parent status"
+git -C "$repo_root" status --porcelain | grep -q "$(basename "$wt_path")" && echo "LEAK: visible in parent status"
 
 # 2. No worktree path may be tracked as a gitlink (mode 160000) in the parent index.
 git -C "$repo_root" ls-files --stage | awk '$1==160000 {print "LEAK: gitlink ->", $4}'
@@ -108,9 +118,14 @@ to remove the gitlink. Do not proceed.
 ### 1. Create the worktree (new branch)
 
 ```bash
-git worktree add "$path" -b "${USER_PREFIX}/${SLUG}"   # e.g. mlorentedev/research-agents
-cd "$path"
+dotf worktree add "$SLUG" -b "<type>/$SLUG"    # fallback: git worktree add "$wt_path" -b "<type>/$SLUG"
+wt_path="$(git worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')"
+cd "$wt_path"                                  # asked of git, never derived
 ```
+
+With herdr running, `dotf worktree add … --agent <harness> --prompt-file <f>` opens it in
+a herdr pane and starts the agent there. Never start a second herdr server on a box that
+has one: talk to the live one, or skip `--agent`.
 
 ### 2. Run project setup (auto-detect)
 
@@ -142,7 +157,8 @@ Ready to work in parallel.
 ## Teardown (deterministic)
 
 ```bash
-git worktree remove "$path"            # add --force only if intentionally discarding work
+dotf worktree done "<type>/$SLUG"      # by branch; refuses while a session lives in it; deletes a landed branch
+# fallback: git worktree remove "$wt_path" (add --force only if intentionally discarding work)
 # If a nested fallback was ever used: remove its line from .git/info/exclude
 git -C "$repo_root" ls-files --stage | awk '$1==160000'   # must be empty
 git worktree prune
@@ -152,12 +168,12 @@ git worktree prune
 
 | Situation | Action |
 |-----------|--------|
-| Any repo | External sibling `<repo>-wt-<slug>` (default) |
+| Any repo | `dotf worktree add` → `<WORKTREE_ROOT>/<repo>/<branch-slug>` (default) |
 | Auto-commit repo (obsidian-git etc.) | External **mandatory** — Gate A blocks nesting |
 | User insists on nested | Allow only if no auto-committer AND `.worktrees/` ignored |
 | Gate B reports gitlink/visible | Move out + run runbook-worktree-safety |
 | Baseline fails | Report + ask |
-| Done | `git worktree remove` + re-audit gitlinks + prune |
+| Done | `dotf worktree done <branch>` + re-audit gitlinks + prune |
 
 ## Common Mistakes
 
@@ -186,10 +202,10 @@ git worktree prune
 - Skip baseline verification
 
 **Always:**
-- Place worktrees externally (sibling `<repo>-wt-<slug>`)
+- Place worktrees externally (`<WORKTREE_ROOT>/<repo>/<branch-slug>`, via `dotf worktree add`)
 - Run Gate A (auto-commit detection) before creating
 - Run Gate B (status + `160000` audit) after creating
-- Tear down with `git worktree remove` + gitlink re-audit + prune
+- Tear down with `dotf worktree done` + gitlink re-audit + prune; never the worktree a session was launched from (dotfiles#1653)
 
 ## Integration
 
