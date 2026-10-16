@@ -537,7 +537,6 @@ func TestDefaultCheckoutDirMatchesTheContract(t *testing.T) {
 	}
 }
 
-// writeCheckout makes dir look like a dotfiles checkout holding a registry.
 // markCheckout makes dir look like a dotfiles checkout: the .git entry and the
 // marker DOTFILES_REPO_DIR must carry to be accepted.
 func markCheckout(t *testing.T, dir string) string {
@@ -551,6 +550,7 @@ func markCheckout(t *testing.T, dir string) string {
 	return dir
 }
 
+// writeCheckout makes dir look like a dotfiles checkout holding a registry.
 func writeCheckout(t *testing.T, dir string) string {
 	t.Helper()
 	reg := filepath.Join(dir, "secrets", "registry.yaml")
