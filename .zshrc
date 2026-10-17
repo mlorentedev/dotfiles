@@ -42,7 +42,10 @@ else
     _zcfull=1
     for _zc in "$_zcd"(N.mh-24); do _zcfull=; done
     for _zc in "$HOME"/.zsh/completions/_*(N.e:'[[ $REPLY -nt $_zcd ]]':); do _zcfull=1; break; done
-    if [[ -n "$_zcfull" ]]; then compinit; else compinit -C; fi
+    # -u on the full run: Debian and Ubuntu ship /usr/local/share/zsh/site-functions
+    # group-writable, so compaudit would ask "Ignore insecure directories?" on
+    # every rebuild. -C already trusted every file; -u keeps that and rebuilds.
+    if [[ -n "$_zcfull" ]]; then compinit -u; else compinit -C; fi
     unset _zcd _zcfull _zc
 fi
 # Case-insensitive, partial-word completion.

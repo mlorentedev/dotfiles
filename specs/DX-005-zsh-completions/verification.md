@@ -21,14 +21,15 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 
 ## Test status
 
-- `bats tests/zshrc-guards.bats` 12/12; `bats tests/guard-zsh-*.bats` green.
+- `bats tests/zshrc-guards.bats` 13/13 on macOS and in `ubuntu:24.04` as a non-root user with a group-writable `/usr/local/share/zsh/site-functions` (the CI runner shape); `bats tests/guard-zsh-*.bats` green.
 - `cd cli && go build ./... && go vet ./... && go test ./internal/converge ./internal/cmd`; `GOOS=windows go vet` on both; `golangci-lint run` (pinned 2.12.2) 0 issues.
-- Not measured: Linux (no Linux box in this session); the step and the rc use no macOS-only call, and the step is `linux, darwin`.
+- Not measured: a real Linux host (the container run above stands in); the step and the rc use no macOS-only call, and the step is `linux, darwin`.
 
 ## Decisions made during implementation
 
 - The step compares content, not mtime, and runs each tool's own `completion zsh`; a stdout-only runner (`ExecStdout`) keeps a tool's stderr warning out of the file.
 - The rc, not the step, owns dump freshness: a completion newer than the dump forces a full `compinit`, so the step needs no knowledge of `~/.zcompdump` or `ZDOTDIR`.
+- The full `compinit` runs with `-u`: stock Debian/Ubuntu ship a group-writable site-functions, and a plain run aborts non-interactively ("initialization aborted"), which failed CI on the first push. `-C` already trusted every file, so `-u` keeps the previous trust level.
 - Linuxbrew prefix left out of the brew block (out of scope, changes Linux PATH order).
 
 ## Promotion candidates

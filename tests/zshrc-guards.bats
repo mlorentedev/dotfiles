@@ -161,6 +161,18 @@ add_foo_completion() {
     [ "$output" = "foo=1" ] || false
 }
 
+@test "an insecure completion directory neither prompts nor blocks the rebuild (dump)" {
+    # Stock Debian and Ubuntu (and GitHub's runners) have a group-writable
+    # site-functions on fpath; a plain compinit warns on stderr and asks.
+    comp_setup
+    chmod 777 "$COMPDIR"
+    add_foo_completion
+    touch -t 202001010000 "$DUMP"
+    run load_rc 'print -r -- "foo=${+_comps[foo]}"'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [ "$output" = "foo=1" ] || false
+}
+
 @test "a completion newer than a fresh dump rebuilds it (dump)" {
     comp_setup
     sleep 1
