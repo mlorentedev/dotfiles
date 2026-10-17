@@ -1,0 +1,44 @@
+[
+  {
+    "id": "PLAT-003-cross-os-verification-f1",
+    "behavior": "AC1: dotf converge --only pwsh-modules applies the pinned modules and a second plan reports 0 changes",
+    "verification": "cd cli && go test ./internal/converge/ -run TestPwshModules_InstallsWhatIsNotAtItsPin",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f2",
+    "behavior": "AC2: # pwsh-module: markers parse; malformed and near-miss markers are errors naming the line",
+    "verification": "cd cli && go test ./internal/pwsh/ -run TestParseModules",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f3",
+    "behavior": "AC3: pwsh-modules skips without pwsh, installs only what is missing, and its probe fails when a module is still missing",
+    "verification": "cd cli && go test ./internal/converge/ -run TestPwshModules",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f4",
+    "behavior": "AC4: dotf doctor reports pwsh and the pinned modules: fail, warn and skip per OS",
+    "verification": "cd cli && go test ./internal/doctor/ -run TestCheckPowerShell",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f5",
+    "behavior": "AC5: dotf lint powershell lints what a commit would ship",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestLintFiles|TestAnalyzerPin'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f6",
+    "behavior": "AC6: the lint's parameters match ci.yml's lint-powershell job",
+    "verification": "cd cli && go test ./internal/pwsh/ -run TestLintMatchesCIsLintPowershellJob",
+    "state": "pending",
+    "evidence": ""
+  }
+]

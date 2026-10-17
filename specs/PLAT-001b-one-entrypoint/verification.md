@@ -69,13 +69,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - only the differing keys are set, in one `pmset -c disksleep 0 autorestart 1`, `displaysleep` stays 15, and a second plan is clean: `TestPmsetSetsOnlyWhatDiffersOnACAndProvesIt`
   - a converged Mac runs nothing as root: `TestPmsetConvergedRunsNothingAsRoot`
   - the undo restores the values read before the apply, also after a failure part way: `TestPmsetUndoRestoresThePreviousValues`, `TestPmsetFailedApplyReturnsItsUndo`
-  - battery is never read into the plan nor set: `TestPmsetLeavesBatteryAlone`
+  - battery is never read into the plan nor set: battery alone differing runs nothing as root, and an AC key differing runs exactly `pmset -c disksleep 0`: `TestPmsetLeavesBatteryAlone` (round 1 of review found its first form vacuous, it never called `Apply`)
+  - the parser reads the macmini's `pmset -g custom` captured verbatim on 2026-10-17, padded columns and the multi-word `Sleep On Power Button` key included, to exactly the five profile keys: `TestParsePmsetReadsTheMacminiOutput`
   - a key the hardware does not report is skipped, the proof names what still differs, and output with no AC section is refused: `TestPmsetSkipsAKeyTheHardwareDoesNotReport`, `TestPmsetProofNamesWhatStillDiffers`, `TestPmsetRefusesOutputWithoutAnACSection`
   - the plan on darwin lists `power policy` (`TestWorkstationTarget_PlanNeedsNoRoot`, 5 changes); doctor reads pmset and never sets it (`TestCheckWorkstationTarget_ByStatus`)
 - Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --only workstation-target --plan`:
   `[CHANGE] workstation-target   15ms  to apply as root: power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; firewall not managed on darwin yet: sshd's AllowUsers is the only fence` / `1 to change, 0 ok, 0 opaque, 0 skipped, 0 failed`; `dotf doctor` -> `[WARN] differs from the declared state: power policy; run dotf converge --only workstation-target (it asks for root once)`
 - Not run: the apply, which needs the owner at the sudo prompt
-- Test suite (PR 7d, mesh service, stacked on the `pmset` change, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues
+- Test suite (PR 7d, mesh service, on main after #2675, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues
 - What the mesh-service tests prove, against injected runners:
   - macOS reads the tailscaled launchd job and names the login a reboot needs without it: `TestMeshAtBootOnDarwinReadsTheTailscaledDaemon`
   - Linux reads the unit state, enabled is quiet, disabled, masked and a missing unit each name the command that fixes them: `TestMeshAtBootOnLinuxReadsTheSystemdUnit`
