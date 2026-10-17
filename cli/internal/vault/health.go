@@ -691,40 +691,38 @@ func (h *healthRun) section6Tags() {
 	}
 }
 
-// runIntegrityChecks is the FIRST of section 7's two passes. It returns
-// (code, true) the moment a file drifts — the ORACLE DEFECT (#1314): the shell
-// re-execs check-backlog-integrity.sh a SECOND time, piped straight into `sed`,
-// to print output it already has a verdict for — instead of capturing to a
-// variable first, the way runMergedChecks below correctly does. Under
-// `set -euo pipefail` that unnegated pipeline's non-zero exit (inherited from
-// the script it just reported failing) aborts the WHOLE SCRIPT right here: no
-// later file in this same loop, no merged-check pass, no closing footer.
-// Pinned by the backlog-drift golden, whose expected/stdout simply stops after
-// this file's detail. Not "fixed" here — see #1314.
-func (h *healthRun) runIntegrityChecks(matches []string) (int, bool) {
+// runIntegrityChecks is the FIRST of section 7's two passes: one FAIL per
+// drifting or unreadable tasks file, each with its detail, and the PASS only
+// when every file is clean. The shell twin stopped at the first drift: it
+// re-ran check-backlog-integrity.sh piped straight into `sed` to print what it
+// already had, and under `set -euo pipefail` that pipeline's exit aborted the
+// whole script, so a second broken file, the merged pass and the footer never
+// ran. The port reproduced that until the script retired; #1314 fixed it
+// (lesson 241).
+func (h *healthRun) runIntegrityChecks(matches []string) {
+	clean := true
 	for _, tasks := range matches {
 		out, drift, err := BacklogIntegrity(tasks)
-		if err != nil {
-			// The script printed nothing here and exited 2; the reason is
-			// what a reader needs, so the port says it.
+		switch {
+		case err != nil:
 			h.fail("Backlog integrity: cannot read %s/11-tasks.md: %v", filepath.Base(filepath.Dir(tasks)), err)
-			return 2, true
-		}
-		if drift {
+			clean = false
+		case drift:
 			h.fail("Backlog drift in %s/11-tasks.md (duplicate IDs / status contradictions)",
 				filepath.Base(filepath.Dir(tasks)))
 			printPrefixed(h.w, out, "        ")
-			return 1, true
+			clean = false
 		}
 	}
-	h.pass("Backlog integrity: %d task file(s) clean (one ticket = one entry)", len(matches))
-	return 0, false
+	if clean {
+		h.pass("Backlog integrity: %d task file(s) clean (one ticket = one entry)", len(matches))
+	}
 }
 
 // runMergedChecks is section 7's SECOND, independent pass: semantic drift is
 // ADVISORY (warn, never fail). It captures each script's output to a variable
-// before printing, so — unlike runIntegrityChecks above — it does NOT share
-// section 7's pipefail landmine: a captured string cannot fail a pipeline.
+// before printing, which is why the shell twin's pipefail abort (#1314) never
+// reached it.
 func (h *healthRun) runMergedChecks(matches []string) {
 	for _, tasks := range matches {
 		out, stale, err := BacklogMerged(tasks, "")
@@ -740,17 +738,15 @@ func (h *healthRun) runMergedChecks(matches []string) {
 	}
 }
 
-// section7Backlog returns (code, true) when the shell would have aborted the
-// entire script right here (runIntegrityChecks' oracle defect), short-
-// circuiting everything after it, footer included — exactly like
-// section2Connectivity's two abort points.
-func (h *healthRun) section7Backlog() (int, bool) {
+// section7Backlog runs both passes over every 10_projects/*/11-tasks.md. A
+// failure is counted, never an early return: the footer reports it (#1314).
+func (h *healthRun) section7Backlog() {
 	h.section("7/7", "Backlog Integrity")
 
 	vd := h.opts.VaultDir
 	if !isDir(vd) {
 		h.skip("Backlog integrity", "vault dir not found")
-		return 0, false
+		return
 	}
 
 	matches, _ := filepath.Glob(filepath.Join(vd, "10_projects", "*", "11-tasks.md"))
@@ -758,14 +754,11 @@ func (h *healthRun) section7Backlog() (int, bool) {
 
 	if len(matches) == 0 {
 		h.skip("Backlog integrity", "no 10_projects/*/11-tasks.md found")
-		return 0, false
+		return
 	}
 
-	if code, aborted := h.runIntegrityChecks(matches); aborted {
-		return code, true
-	}
+	h.runIntegrityChecks(matches)
 	h.runMergedChecks(matches)
-	return 0, false
 }
 
 // RunHealth runs the full 7-section report and returns the exit code the shell
@@ -791,9 +784,7 @@ func RunHealth(w io.Writer, opts HealthOptions) (int, error) {
 	h.section5Frontmatter()
 	h.section6Tags()
 
-	if code, aborted := h.section7Backlog(); aborted {
-		return code, nil
-	}
+	h.section7Backlog()
 
 	emit(w, "\n========================================\n")
 	emit(w, "Results: %d passed, %d failed, %d skipped\n", h.passed, h.failed, h.skipped)
