@@ -113,17 +113,6 @@
       }
     },
     {
-      "name": "gh",
-      "profile": "full",
-      "source": {
-        "type": "system",
-        "apt": "gh",
-        "brew": "gh",
-        "winget": "GitHub.cli",
-        "command": "gh"
-      }
-    },
-    {
       "name": "tea",
       "profile": "full",
       "source": {

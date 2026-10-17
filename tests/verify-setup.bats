@@ -12,7 +12,7 @@ setup() {
     export DOTFILES_DIR="$HOME/.dotfiles"
     export REPO_DIR="$HOME/dotfiles-repo"
     # The PATH a user's shell has after setup: the rc files put ~/.local/bin on
-    # it (dotf, eza, gh), and `mise activate` puts the mise-pinned CLIs ahead
+    # it (dotf, eza), and `mise activate` puts the mise-pinned CLIs ahead
     # of it, some of which setup installs only there (jq among them, #2013 W2).
     # The entrypoint's PATH has neither, so without this the dotf tests below
     # skipped on every run and verified nothing (#696, #915).
