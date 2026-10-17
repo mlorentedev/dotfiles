@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // A claim is the ref refs/dotf/claims/<issue>, pointing at an empty-tree commit
@@ -68,6 +69,19 @@ type Claims interface {
 	Release(issue int, force bool) error
 }
 
+// who is the holder as it is written into the claim commit. A control
+// character (a tab or newline in a worktree path) would break the one-line
+// "holder:" record and the tables that print it, so it becomes "?"; the same
+// form is compared on release, so a holder always matches itself.
+func (c Claimer) who() string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return '?'
+		}
+		return r
+	}, c.As)
+}
+
 func claimRef(issue int) string  { return claimRefPrefix + strconv.Itoa(issue) }
 func claimSeen(issue int) string { return claimSeenPrefix + strconv.Itoa(issue) }
 
@@ -100,7 +114,7 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 	if _, err := rand.Read(nonce); err != nil {
 		return Claim{}, fmt.Errorf("claim #%d: %w", issue, err)
 	}
-	msg := fmt.Sprintf("claim #%d\n\nholder: %s\nat: %s\nnonce: %s\n", issue, c.As, now.Format(time.RFC3339), hex.EncodeToString(nonce))
+	msg := fmt.Sprintf("claim #%d\n\nholder: %s\nat: %s\nnonce: %s\n", issue, c.who(), now.Format(time.RFC3339), hex.EncodeToString(nonce))
 	sha, err := c.git("-c", "user.name=dotf", "-c", "user.email=dotf@localhost", "commit-tree", emptyTree, "-m", msg)
 	if err != nil {
 		return Claim{}, fmt.Errorf("claim #%d: build the claim commit: %w", issue, err)
@@ -109,7 +123,7 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 
 	pushErr := c.push(issue, "", sha)
 	if pushErr == nil {
-		return Claim{Issue: issue, Holder: c.As, At: now}, nil
+		return Claim{Issue: issue, Holder: c.who(), At: now}, nil
 	}
 	// A refused push is either a lost race or a failure. The ref says which.
 	// An empty read right after a refusal is the lock another claimant held
@@ -124,7 +138,7 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 		}
 		if attempt == 0 {
 			if pushErr = c.push(issue, "", sha); pushErr == nil {
-				return Claim{Issue: issue, Holder: c.As, At: now}, nil
+				return Claim{Issue: issue, Holder: c.who(), At: now}, nil
 			}
 		}
 	}
@@ -173,15 +187,20 @@ func (c Claimer) List() ([]Claim, error) {
 		}
 	}
 	slices.Sort(issues)
-	var claims []Claim
+	if len(issues) == 0 {
+		return nil, nil
+	}
+	// One fetch brings every claim commit, however many there are.
+	if _, err := c.git("fetch", "--quiet", "--no-tags", c.Remote, "+"+claimRefPrefix+"*:"+claimSeenPrefix+"*"); err != nil {
+		return nil, fmt.Errorf("fetch %s*: %w", claimRefPrefix, err)
+	}
+	claims := make([]Claim, 0, len(issues))
 	for _, n := range issues {
-		cl, ok, err := c.Holder(n)
+		cl, err := c.readSeen(n)
 		if err != nil {
 			return nil, err
 		}
-		if ok {
-			claims = append(claims, cl)
-		}
+		claims = append(claims, cl)
 	}
 	return claims, nil
 }
@@ -201,9 +220,15 @@ func (c Claimer) Holder(issue int) (Claim, bool, error) {
 	if _, err := c.git("fetch", "--quiet", "--no-tags", c.Remote, "+"+ref+":"+claimSeen(issue)); err != nil {
 		return Claim{}, false, fmt.Errorf("fetch %s: %w", ref, err)
 	}
+	cl, err := c.readSeen(issue)
+	return cl, err == nil, err
+}
+
+// readSeen reads the claim commit fetched into the private ref.
+func (c Claimer) readSeen(issue int) (Claim, error) {
 	body, err := c.git("cat-file", "commit", claimSeen(issue))
 	if err != nil {
-		return Claim{}, false, fmt.Errorf("read the claim on #%d: %w", issue, err)
+		return Claim{}, fmt.Errorf("read the claim on #%d: %w", issue, err)
 	}
 	cl := Claim{Issue: issue}
 	for _, line := range strings.Split(body, "\n") {
@@ -215,9 +240,9 @@ func (c Claimer) Holder(issue int) (Claim, bool, error) {
 		}
 	}
 	if cl.Holder == "" {
-		return Claim{}, false, fmt.Errorf("the claim on #%d names no holder", issue)
+		return Claim{}, fmt.Errorf("the claim on #%d names no holder", issue)
 	}
-	return cl, true, nil
+	return cl, nil
 }
 
 // Release deletes the claim on issue. Releasing a claim nobody holds is a
@@ -228,7 +253,7 @@ func (c Claimer) Release(issue int, force bool) error {
 	if err != nil || !ok {
 		return err
 	}
-	if held.Holder != c.As && !force {
+	if held.Holder != c.who() && !force {
 		return &ClaimedError{Issue: issue, Holder: held.Holder, At: held.At}
 	}
 	sha, err := c.git("rev-parse", claimSeen(issue))

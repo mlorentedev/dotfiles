@@ -21,6 +21,9 @@ type claimRow struct {
 	At     time.Time `json:"at"`
 	Age    string    `json:"age"`
 	Closed bool      `json:"closed"`
+	// Unknown is true when the issue's state could not be read: Closed is then
+	// false for lack of an answer, not because the issue is open.
+	Unknown bool `json:"state_unknown"`
 }
 
 func newLaneClaimsCmd() *cobra.Command {
@@ -57,7 +60,8 @@ func newLaneClaimsCmd() *cobra.Command {
 }
 
 // claimRows joins each claim with its issue's state. An issue that cannot be
-// read is left open: a claim is never called releasable on a guess.
+// read is left open and marked unknown: a claim is never called releasable on a
+// guess, and a forge that is down does not make the list look clean.
 func claimRows(claims []lane.Claim, src lane.IssueSource, now time.Time) []claimRow {
 	rows := make([]claimRow, 0, len(claims))
 	for _, cl := range claims {
@@ -65,7 +69,11 @@ func claimRows(claims []lane.Claim, src lane.IssueSource, now time.Time) []claim
 		if !cl.At.IsZero() {
 			r.Age = now.Sub(cl.At).Round(time.Minute).String()
 		}
-		if is, err := src.Issue(cl.Issue); err == nil && is.State == "CLOSED" {
+		is, err := src.Issue(cl.Issue)
+		switch {
+		case err != nil:
+			r.Unknown = true
+		case is.State == "CLOSED":
 			r.Closed = true
 		}
 		rows = append(rows, r)
@@ -88,8 +96,11 @@ func writeClaimsTable(w io.Writer, rows []claimRow) error {
 	_, _ = fmt.Fprintln(tw, "ISSUE\tHOLDER\tAGE\tNOTE")
 	for _, r := range rows {
 		note := "-"
-		if r.Closed {
+		switch {
+		case r.Closed:
 			note = "issue closed: release with `dotf lane release " + fmt.Sprint(r.Issue) + " --force`"
+		case r.Unknown:
+			note = "issue state unreadable (gh): not known whether it is closed"
 		}
 		_, _ = fmt.Fprintf(tw, "#%d\t%s\t%s\t%s\n", r.Issue, r.Holder, r.Age, note)
 	}

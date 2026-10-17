@@ -104,6 +104,9 @@ func TestClaimRowsFlagsAClosedIssueAndLeavesAnUnreadableOneOpen(t *testing.T) {
 		{Issue: 3, Holder: "cy"},
 	}, claimIssues{1: {State: "CLOSED"}, 2: {State: "OPEN"}}, now)
 
+	if !rows[2].Unknown || rows[0].Unknown || rows[1].Unknown {
+		t.Errorf("unknown flags = %v %v %v, want false false true (a forge that cannot be read is said so)", rows[0].Unknown, rows[1].Unknown, rows[2].Unknown)
+	}
 	if !rows[0].Closed || rows[1].Closed || rows[2].Closed {
 		t.Errorf("closed flags = %v %v %v, want true false false (an unreadable issue is never releasable)", rows[0].Closed, rows[1].Closed, rows[2].Closed)
 	}

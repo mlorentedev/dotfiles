@@ -260,3 +260,21 @@ func TestClaimList(t *testing.T) {
 		t.Errorf("List = %+v, want #2551 by ana and #2552 by bo, in that order", got)
 	}
 }
+
+// A control character in the holder would break the one-line record and the
+// table that prints it: it is written as "?", and the holder still matches
+// itself when it releases.
+func TestClaimHolderWithControlCharactersRoundTrips(t *testing.T) {
+	remote := claimRemote(t)
+	a := claimerIn(t, remote, "ana@box:/wt/a\tb\nholder: forged")
+	if _, err := a.Acquire(2551); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := a.Holder(2551)
+	if err != nil || !ok || strings.ContainsAny(got.Holder, "\t\n") || got.Holder != "ana@box:/wt/a?b?holder: forged" {
+		t.Fatalf("Holder = %+v, %v, %v; want the control characters replaced", got, ok, err)
+	}
+	if err := a.Release(2551, false); err != nil {
+		t.Errorf("a holder must release its own claim without --force: %v", err)
+	}
+}
