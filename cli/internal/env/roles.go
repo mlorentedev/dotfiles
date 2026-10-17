@@ -13,10 +13,16 @@ import (
 // declares it.
 const RoleSSHTarget = "ssh-target"
 
-// knownRoles are the roles a machine may declare. A role changes how a machine
-// faces the network, so none is taken by default and none is taken by a typo:
-// a name not listed here is an error, never a role nobody reads.
-var knownRoles = []string{RoleSSHTarget}
+// RoleSelfDeploy makes a machine run `dotf update` daily from its native
+// scheduler (OPS-053, ADR-019): converge's self-deploy step installs the
+// trigger only on a machine that declares it.
+const RoleSelfDeploy = "self-deploy"
+
+// knownRoles are the roles a machine may declare. A role changes what a machine
+// does unattended or how it faces the network, so none is taken by default and
+// none is taken by a typo: a name not listed here is an error, never a role
+// nobody reads.
+var knownRoles = []string{RoleSelfDeploy, RoleSSHTarget}
 
 // KnownRoles returns the roles a machine may declare.
 func KnownRoles() []string { return slices.Clone(knownRoles) }
