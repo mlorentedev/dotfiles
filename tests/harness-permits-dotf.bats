@@ -153,7 +153,8 @@ EOF
 
 # Counts the `deny` values a session-level opencode permission puts on bash,
 # whichever form the file uses: `"permission": "deny"`, `{"bash": "deny"}` or the
-# pattern object `{"bash": {"dotf *": "deny"}}`. The file is JSONC with
+# pattern object `{"bash": {"dotf *": "deny"}}`. Without a `bash` key the `"*"`
+# entry is bash's default, so `{"*": "deny"}` counts too. The file is JSONC with
 # full-line comments only, which is how it is kept. A file that cannot be read
 # or parsed is an error, never a count of zero.
 opencode_bash_denies() {
@@ -162,7 +163,7 @@ opencode_bash_denies() {
     stripped="$(grep -vE '^[[:space:]]*//' "$1")" || { echo "nothing left of $1 after comments" >&2; return 2; }
     printf '%s\n' "$stripped" | jq -er '
         [ (.permission? // empty)
-          | (if type == "string" then . elif type == "object" then (.bash? // empty) else empty end)
+          | (if type == "string" then . elif type == "object" then (.bash? // .["*"]? // empty) else empty end)
           | (if type == "object" then .[] else . end)
           | select(. == "deny") ] | length'
 }
@@ -186,6 +187,10 @@ config_keys_matching() {
     printf '%s' '{"permission":{"bash":{"*":"deny","git *":"allow"}}}' >"$f"
     [ "$(opencode_bash_denies "$f")" -eq 1 ]
     printf '%s' '{"permission":{"edit":"deny","bash":"allow"}}' >"$f"
+    [ "$(opencode_bash_denies "$f")" -eq 0 ]
+    printf '%s' '{"permission":{"*":"deny"}}' >"$f"
+    [ "$(opencode_bash_denies "$f")" -eq 1 ]
+    printf '%s' '{"permission":{"*":"deny","bash":"allow"}}' >"$f"
     [ "$(opencode_bash_denies "$f")" -eq 0 ]
     run opencode_bash_denies "$PROBE_DIR/absent.jsonc"
     [ "$status" -eq 2 ]
