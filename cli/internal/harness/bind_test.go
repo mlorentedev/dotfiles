@@ -834,6 +834,29 @@ func TestLoadBindTargetsRefusesAFormatInTheWrongKey(t *testing.T) {
 			t.Error("a retired file is joined to the home verbatim too; a {VAR} there must be refused")
 		}
 	})
+	// #2543: a target names its settings file once. With neither there is no
+	// file to bind; with both, dst wins and file is a second spelling nothing
+	// reads, kept in step with dst by nothing.
+	t.Run("a target with neither file nor dst is refused", func(t *testing.T) {
+		root := write(t, `{"agents":{"bind":[{"agent":"claude","format":"command-hook"}]}}`)
+		if _, err := LoadBindTargets(root); err == nil || !strings.Contains(err.Error(), "neither") {
+			t.Errorf("want a refusal naming the missing path, got %v", err)
+		}
+	})
+	t.Run("a target with both file and dst is refused", func(t *testing.T) {
+		both := `{"agent":"claude","file":".claude/settings.json","dst":"{CLAUDE_CONFIG_DIR}/settings.json","format":"command-hook"}`
+		root := write(t, `{"agents":{"bind":[`+both+`]}}`)
+		if _, err := LoadBindTargets(root); err == nil || !strings.Contains(err.Error(), "both") {
+			t.Errorf("want a refusal naming the two spellings, got %v", err)
+		}
+	})
+	t.Run("a target with only dst loads", func(t *testing.T) {
+		root := write(t, `{"agents":{"bind":[{"agent":"claude","dst":"{CLAUDE_CONFIG_DIR}/settings.json","format":"command-hook"}]}}`)
+		got, err := LoadBindTargets(root)
+		if err != nil || len(got) != 1 || got[0].File != "" {
+			t.Errorf("a dst-only target must load as declared: %+v, %v", got, err)
+		}
+	})
 	t.Run("an empty bind is still an error", func(t *testing.T) {
 		root := write(t, `{"agents":{"bind_named":[`+agy+`]}}`)
 		if _, err := LoadBindTargets(root); err == nil {

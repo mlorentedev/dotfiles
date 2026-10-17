@@ -162,7 +162,7 @@ func TestBindRefusesOptionsWithoutHas(t *testing.T) {
 func TestBindResolvesDstThroughTheContract(t *testing.T) {
 	home, cfg := t.TempDir(), t.TempDir()
 	target := BindTarget{
-		Agent: "claude", File: ".claude/settings.json", Dst: "{CLAUDE_CONFIG_DIR}/settings.json",
+		Agent: "claude", Dst: "{CLAUDE_CONFIG_DIR}/settings.json",
 		Format:    "command-hook",
 		EmitHooks: []EmitHook{{ID: "gate", Event: "PreToolUse", Command: "harness gate --harness claude"}},
 	}
@@ -194,7 +194,7 @@ func TestBindResolvesDstThroughTheContract(t *testing.T) {
 // to `file` is the defect itself, and an empty segment would write "/settings.json".
 func TestBindRefusesADstItCannotResolve(t *testing.T) {
 	target := BindTarget{
-		Agent: "claude", File: ".claude/settings.json", Dst: "{CLAUDE_CONFIG_DIR}/settings.json",
+		Agent: "claude", Dst: "{CLAUDE_CONFIG_DIR}/settings.json",
 		Format:    "command-hook",
 		EmitHooks: []EmitHook{{ID: "gate", Event: "PreToolUse", Command: "harness gate --harness claude"}},
 	}
