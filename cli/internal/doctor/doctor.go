@@ -317,6 +317,7 @@ func (e sweepEnv) deployAndHooks() []check {
 		{kind: kindIdentity, section: "branch-protection", restore: restoreGH, run: func() { checkBranchProtection(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkAntigravity(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkOrcaHook(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkHerdrWorktreePath(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkHookBinding(e.sys, e.rep, e.opts.Fix) }},
 	}
 }

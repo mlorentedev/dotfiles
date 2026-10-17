@@ -357,6 +357,11 @@ func prepareAgent(agent, promptFile, slug, branch, customPath string) (*herdr.La
 			return nil, fmt.Errorf("--prompt-file: %w", err)
 		}
 		prompt = strings.TrimRight(string(b), "\r\n")
+		// An empty prompt would start the agent with no task and report
+		// success: refuse it here, before anything is created.
+		if strings.TrimSpace(prompt) == "" {
+			return nil, fmt.Errorf("--prompt-file %s is empty: the agent would start with no task; write the prompt, or drop --prompt-file to start it idle", promptFile)
+		}
 	}
 	if branch == "" {
 		branch = worktree.DefaultBranch(slug)
