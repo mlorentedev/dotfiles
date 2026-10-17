@@ -38,6 +38,7 @@ func (p Powercfg) Differs() (bool, error) {
 }
 
 // Apply sets each differing AC value; the undo sets back the value it read.
+// A write that fails is read back, and undone too when it persisted anyway.
 func (p Powercfg) Apply(root Root) (func() error, error) {
 	noop := func() error { return nil }
 	pending, prev, err := p.pending()
@@ -56,6 +57,9 @@ func (p Powercfg) Apply(root Root) (func() error, error) {
 	}
 	for _, s := range pending {
 		if err := setAC(root, s.Sub, s.Setting, s.Value); err != nil {
+			if cur, rerr := p.read(s); rerr != nil || cur != prev[s.Setting] {
+				set = append(set, s)
+			}
 			return undo, err
 		}
 		set = append(set, s)
@@ -83,13 +87,9 @@ func (p Powercfg) pending() ([]PowercfgSetting, map[string]uint64, error) {
 	cur := map[string]uint64{}
 	var pending []PowercfgSetting
 	for _, s := range PowercfgProfile {
-		out, err := p.Run("powercfg", "/q", "SCHEME_CURRENT", s.Sub, s.Setting)
+		ac, err := p.read(s)
 		if err != nil {
-			return nil, nil, fmt.Errorf("powercfg /q SCHEME_CURRENT %s %s: %w: %s", s.Sub, s.Setting, err, bytes.TrimSpace(out))
-		}
-		ac, err := parsePowercfgAC(out)
-		if err != nil {
-			return nil, nil, fmt.Errorf("powercfg /q SCHEME_CURRENT %s %s: %w", s.Sub, s.Setting, err)
+			return nil, nil, err
 		}
 		cur[s.Setting] = ac
 		if ac != s.Value {
@@ -97,6 +97,19 @@ func (p Powercfg) pending() ([]PowercfgSetting, map[string]uint64, error) {
 		}
 	}
 	return pending, cur, nil
+}
+
+// read is the AC index of s in the active scheme.
+func (p Powercfg) read(s PowercfgSetting) (uint64, error) {
+	out, err := p.Run("powercfg", "/q", "SCHEME_CURRENT", s.Sub, s.Setting)
+	if err != nil {
+		return 0, fmt.Errorf("powercfg /q SCHEME_CURRENT %s %s: %w: %s", s.Sub, s.Setting, err, bytes.TrimSpace(out))
+	}
+	ac, err := parsePowercfgAC(out)
+	if err != nil {
+		return 0, fmt.Errorf("powercfg /q SCHEME_CURRENT %s %s: %w", s.Sub, s.Setting, err)
+	}
+	return ac, nil
 }
 
 var powercfgHex = regexp.MustCompile(`:\s*0x([0-9a-fA-F]+)\s*$`)

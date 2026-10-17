@@ -32,14 +32,16 @@ func powercfgQ(lang, setting string, ac, dc uint64) string {
 }
 
 // fakeWin holds the active scheme's AC and DC values and applies powercfg run
-// elevated. failAt, when set, fails the /setacvalueindex for that setting.
+// elevated. failAt, when set, fails the /setacvalueindex for that setting;
+// failAfterWrite makes that failure come after the value was written.
 type fakeWin struct {
-	t         *testing.T
-	lang      string
-	ac, dc    map[string]uint64
-	failAt    string
-	activated int
-	rootCalls []string
+	t              *testing.T
+	lang           string
+	ac, dc         map[string]uint64
+	failAt         string
+	failAfterWrite bool
+	activated      int
+	rootCalls      []string
 }
 
 func newFakeWin(t *testing.T, lang string) *fakeWin {
@@ -65,7 +67,7 @@ func (w *fakeWin) Run(argv ...string) ([]byte, error) {
 	case slices.Equal(argv, []string{"powercfg", "/setactive", "SCHEME_CURRENT"}):
 		w.activated++
 	case len(argv) == 6 && argv[1] == "/setacvalueindex":
-		if argv[4] == w.failAt {
+		if argv[4] == w.failAt && !w.failAfterWrite {
 			return []byte("Invalid Parameters"), errors.New("exit status 1")
 		}
 		v, err := strconv.ParseUint(argv[5], 10, 64)
@@ -73,6 +75,9 @@ func (w *fakeWin) Run(argv ...string) ([]byte, error) {
 			w.t.Fatalf("non-decimal value in %v", argv)
 		}
 		w.ac[argv[4]] = v
+		if argv[4] == w.failAt {
+			return []byte("Access is denied."), errors.New("exit status 1")
+		}
 	default:
 		w.t.Fatalf("unexpected elevated command %v", argv)
 	}
@@ -150,6 +155,27 @@ func TestPowercfgUndoRestoresTheValuesItRead(t *testing.T) {
 	}
 	if w.activated != 1 {
 		t.Errorf("the undo activated the scheme %d times, want once", w.activated)
+	}
+}
+
+// A write that fails after powercfg persisted it is undone too: the undo
+// covers every setting Apply tried, not only those that reported success.
+func TestPowercfgUndoRestoresAWriteThatFailedAfterPersisting(t *testing.T) {
+	w := newFakeWin(t, "en")
+	w.failAt, w.failAfterWrite = "LIDACTION", true
+	undo, err := (Powercfg{Run: w.user}).Apply(w)
+	if err == nil {
+		t.Fatal("Apply succeeded on a failing powercfg")
+	}
+	if w.ac["LIDACTION"] != 0 {
+		t.Fatal("the fake did not persist the failing write")
+	}
+	w.failAt = ""
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	if w.ac["LIDACTION"] != 1 {
+		t.Errorf("after the undo LIDACTION = %#x, want the stock 0x1", w.ac["LIDACTION"])
 	}
 }
 
