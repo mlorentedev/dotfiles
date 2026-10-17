@@ -49,6 +49,15 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: no alternative with lasting cost was chosen.
 - [x] New pattern candidate for `00_meta/patterns/`? no: single project.
 
+## Review dispositions
+
+Review `review.md` (nan/glm5.3-flash, PASS-WITH-GAPS on `9b9e99f0`):
+
+- Finding 1, `ExecStdout` stderr exclusion untested: ticketed as #2686, root cause and fix there. The claim under *Decisions* holds by code read only until that test lands.
+- Finding 2, the dump rule governs only the non-oh-my-zsh branch: declined. No machine this repo provisions runs oh-my-zsh. On an omz machine its own policy applies, and completions are not lost, only deferred to omz's next full run.
+- Finding 3, `compinit -u` on every full rebuild: declined, already recorded under *Decisions*. `-C` trusted every file before, so the trust level is unchanged. Revisit together with the completion-directory policy if it ever changes.
+- Question, review range carries other specs' merged work: no action. The launcher resolves the base from the spec's first commit, and the reviewer confirmed it found no cross-feature interaction.
+
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
