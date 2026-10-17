@@ -1,7 +1,7 @@
 ---
 id: "CLI-128-lane-claim-ref"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-16"
 issue: "mlorentedev/dotfiles#2551"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
