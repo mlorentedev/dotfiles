@@ -333,6 +333,15 @@ func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skill
 		"  files a staleness check watches, so editing one would invalidate your own review the\n" +
 		"  moment you wrote it. If you believe one needs changing, say so as a finding instead.\n")
 	b.WriteString("- Do not commit, push, or comment on the PR. Writing the review is the deliverable.\n")
+	// The archive gate's rules are implemented in the dotfiles checkout, which is
+	// not the repository under review. A reviewer verifying the gate goes looking
+	// for it, and a walk of the home directory held one tool call for six minutes
+	// and cost a whole round (#1975).
+	fmt.Fprintf(&b, "- The archive gate's implementation lives outside this repository and is out of\n"+
+		"  scope. Do not search outside `%s` (no `find ~`, no walk of the home directory or of\n"+
+		"  ~/Projects): a walk that size stalls a tool call and the run's cap then discards the\n"+
+		"  whole round. Run `dotf` commands to observe the gate; what you cannot reach, mark\n"+
+		"  UNVERIFIED.\n", repoRoot)
 	b.WriteString("- Verify claims by running things — the build, the linters, the test suite, and\n" +
 		"  mutation edits that you revert afterwards — not by reading assertions about them.\n" +
 		"  Leave the working tree clean apart from your review.\n\n")

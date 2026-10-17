@@ -322,6 +322,29 @@ func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.
 	}
 }
 
+// A reviewer that audits the archive gate is invited to look for the gate's
+// implementation, which lives in the dotfiles checkout and not in the repository
+// under review (#1975). On ts-bridge it ran `find ~/Projects`, a walk that held
+// one tool call for six minutes and, at the run's cap, cost the whole round.
+// The prompt has to say the walk is out of scope, for every slot and runner.
+func TestReviewPromptKeepsTheReviewerInsideTheRepository(t *testing.T) {
+	for name, p := range map[string]string{
+		"first signer":  ReviewPromptIn(FirstSigner, "AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md", "basebasebase"),
+		"second signer": ReviewPromptIn(SecondSigner, "AI-001-x", "/repo", "agy/gemini-3.1-pro-high", "agy", "/skill/SKILL.md", "basebasebase"),
+	} {
+		for _, want := range []string{
+			"lives outside this repository",
+			"Do not search outside `/repo`",
+			"find ~",
+			"UNVERIFIED",
+		} {
+			if !strings.Contains(p, want) {
+				t.Errorf("%s: the prompt must carry %q", name, want)
+			}
+		}
+	}
+}
+
 // The two runners take their prompt differently, and getting agy's wrong does
 // not fail loudly — it produces a reviewer that greets you.
 //
