@@ -39,7 +39,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 ## Test status
 
 - Test suite: `cd cli && go test ./internal/lane/ -run TestClaim -count=20` -> ok; `go vet`, `GOOS=windows go vet`, `golangci-lint run ./internal/lane/...` -> 0 issues
-- Manual smoke test: `TestClaimRefFormOnARemote` against a local bare remote -> PASS; GitHub and Gitea not yet probed (see above)
+- Manual smoke test: `TestClaimRefFormOnARemote` against a local bare remote -> PASS; GitHub and Gitea probed (see PR 3 above)
 - No regressions in existing test suite: yes (PR 1 adds files only)
 
 ## Decisions made during implementation
@@ -62,7 +62,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-128-lane-claim-ref/` -> `specs/archive/CLI-128-lane-claim-ref/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-128-lane-claim-ref/` -> `specs/archive/CLI-128-lane-claim-ref/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
