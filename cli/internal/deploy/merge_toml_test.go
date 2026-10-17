@@ -306,7 +306,7 @@ func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
 		if name == "HERDR_CONFIG_DIR" {
 			return filepath.Dir(dst)
 		}
-		return ""
+		return worktreeRoot(name)
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		t.Fatal(err)
@@ -330,8 +330,8 @@ func TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys(t *testing.T) {
 	if keys["prefix"] == "ctrl+b" || keys["prefix"] == nil {
 		t.Errorf("keys.prefix = %v: D6 wants a prefix that is not tmux's ctrl+b", keys["prefix"])
 	}
-	if worktrees["directory"] == nil {
-		t.Errorf("worktrees.directory not written: %v", got)
+	if want := filepath.FromSlash(worktreeRoot("WORKTREE_ROOT")); worktrees["directory"] != want {
+		t.Errorf("worktrees.directory = %v, want WORKTREE_ROOT rendered as %q", worktrees["directory"], want)
 	}
 	if got["onboarding"] != false || keys["zoom"] != "prefix+z" || ui["accent"] != "magenta" {
 		t.Errorf("a key herdr wrote was lost: %v", got)

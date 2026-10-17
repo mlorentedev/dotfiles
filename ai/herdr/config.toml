@@ -18,9 +18,8 @@ next_tab = ["prefix+n", "ctrl+alt+]"]
 # Option as Alt only when configured to. A popup opens in the focused pane's
 # directory, so it shows that pane's worktree on every OS; mise installs
 # lazygit at its versions.conf pin.
-# Until #2455 the merge matches list elements whole, so editing this binding
-# in place leaves the old one beside it in the deployed file: change the key
-# only together with that fix.
+# The deploy entry matches bindings by key (listKeys), so an edited binding
+# replaces its deployed copy.
 [[keys.command]]
 key = "prefix+d"
 type = "popup"
@@ -35,8 +34,9 @@ height = "90%"
 # 2026-10-13), and not dot-prefixed: agy excludes **/.worktrees/** from a
 # workspace. Copilot's trustedFolders trusts <directory>/*/*; agy's
 # trustedWorkspaces trusts <directory> itself, because agy does not read the
-# glob (#2533). tests/herdr-config.bats keeps the three in step (#2503).
-directory = "~/Projects/worktrees"
+# glob (#2533). All three render WORKTREE_ROOT, the root dotf worktree add
+# uses (#2503).
+directory = "{WORKTREE_ROOT}"
 
 [update]
 # mise installs herdr at the versions.conf pin, so herdr's own "new version"
