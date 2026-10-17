@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -262,6 +263,102 @@ func TestForgePREditIsTheIssueEdit(t *testing.T) {
 	}
 	if rec.number != 6 || rec.edit.Title == nil || *rec.edit.Title != "retitled" || strings.Join(rec.calls, ",") != "edit" {
 		t.Errorf("backend got number=%d edit=%+v calls=%v", rec.number, rec.edit, rec.calls)
+	}
+}
+
+// boardRecorder is a backend that can also place a card on a board.
+type boardRecorder struct {
+	*commentRecorder
+	resolved  forgewrite.BoardFields
+	placedURL string
+	placeErr  error
+}
+
+func (b *boardRecorder) ResolveBoard(_ context.Context, board forgewrite.Board, f forgewrite.BoardFields) (forgewrite.BoardPlan, error) {
+	b.resolved = f
+	b.calls = append(b.calls, "resolve")
+	return forgewrite.BoardPlan{Board: board, ProjectID: "P"}, nil
+}
+
+func (b *boardRecorder) PlaceOnBoard(_ context.Context, _ forgewrite.BoardPlan, url string) error {
+	b.placedURL = url
+	b.calls = append(b.calls, "place")
+	return b.placeErr
+}
+
+func stubBoards(t *testing.T, boards map[string]forgewrite.Board) {
+	t.Helper()
+	old := forgeWriteBoards
+	forgeWriteBoards = func() (map[string]forgewrite.Board, error) { return boards, nil }
+	t.Cleanup(func() { forgeWriteBoards = old })
+}
+
+func useBackend(t *testing.T, b forgewrite.Backend) {
+	t.Helper()
+	old := forgeWriteBackend
+	forgeWriteBackend = func(forgewrite.Repo) (forgewrite.Backend, error) { return b, nil }
+	t.Cleanup(func() { forgeWriteBackend = old })
+}
+
+func createArgs(t *testing.T, extra ...string) []string {
+	return append([]string{"create", "--title", "TOOL-1: x", "--body-file", writeBody(t, "b")}, extra...)
+}
+
+func TestForgeIssueCreateBoardResolvesThenCreatesThenPlaces(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/mlorentedev/dotfiles.git")
+	br := &boardRecorder{commentRecorder: rec}
+	useBackend(t, br)
+	stubBoards(t, map[string]forgewrite.Board{"github.com": {Owner: "mlorentedev", Number: 1}})
+	if _, err := runForgeIssue(t, createArgs(t, "--board", "--type", "chore", "--id", "TOOL-1-x")...); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(rec.calls, ","); got != "resolve,create,place" {
+		t.Errorf("order = %s, want resolve before create, place after", got)
+	}
+	want := forgewrite.BoardFields{Status: "Backlog", Priority: "P2", Type: "chore", ID: "TOOL-1-x"}
+	if br.resolved != want || br.placedURL != "https://forge.example/i/9" {
+		t.Errorf("resolved=%+v placed=%q", br.resolved, br.placedURL)
+	}
+}
+
+// A refused --board writes nothing, not even the issue.
+func TestForgeIssueCreateBoardRefusalsWriteNothing(t *testing.T) {
+	stubBoards(t, map[string]forgewrite.Board{"github.com": {Owner: "o", Number: 1}})
+	cases := map[string]struct {
+		origin string
+		args   []string
+		want   string
+	}{
+		"gitea has no projects": {"git@gitea.kubelab.live:p/r.git", []string{"--board", "--type", "bug"}, "not supported"},
+		"board not declared":    {"https://ghe.example/o/n.git", []string{"--board", "--type", "bug"}, "no board is declared"},
+		"type is a decision":    {"https://github.com/o/n.git", []string{"--board"}, "--type"},
+	}
+	for name, c := range cases {
+		rec := stubForgeWrite(t, c.origin)
+		if !strings.Contains(c.origin, "gitea") {
+			useBackend(t, &boardRecorder{commentRecorder: rec})
+		}
+		_, err := runForgeIssue(t, createArgs(t, c.args...)...)
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: err = %v, want it to mention %q", name, err, c.want)
+		}
+		for _, call := range rec.calls {
+			if call == "create" || call == "place" {
+				t.Errorf("%s: a refused --board still wrote: %v", name, rec.calls)
+			}
+		}
+	}
+}
+
+// If the card cannot be placed the issue already exists; the error must say so
+// and tell the caller not to create it again.
+func TestForgeIssueCreateBoardFailureNamesTheIssue(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	useBackend(t, &boardRecorder{commentRecorder: rec, placeErr: errors.New("boom")})
+	stubBoards(t, map[string]forgewrite.Board{"github.com": {Owner: "o", Number: 1}})
+	_, err := runForgeIssue(t, createArgs(t, "--board", "--type", "bug")...)
+	if err == nil || !strings.Contains(err.Error(), "https://forge.example/i/9") || !strings.Contains(err.Error(), "do not run create again") {
+		t.Errorf("got %v", err)
 	}
 }
 

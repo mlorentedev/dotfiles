@@ -1,6 +1,9 @@
 {
-  "$comment": "Forges dotf may write to besides github.com (TOOL-030). The secret is a registry id; the token is read at call time and never printed.",
+  "$comment": "Forges dotf may write to besides github.com (TOOL-030). The secret is a registry id; the token is read at call time and never printed. The boards map names the GitHub Project that dotf forge issue create --board places cards on.",
   "hosts": {
     "gitea.kubelab.live": { "kind": "gitea", "secret": "GITEA_KUBELAB_TOKEN" }
+  },
+  "boards": {
+    "github.com": { "owner": "mlorentedev", "number": 1 }
   }
 }
