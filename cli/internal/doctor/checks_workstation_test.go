@@ -118,6 +118,10 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 					return `{"adapter":true,"exists":true,"enabled":"True","action":"Allow","remote":["100.64.0.0/255.192.0.0"],"iface":["Tailscale"],"disabled":[],"others":[]}`, nil
 				case name == "powershell.exe" && strings.Contains(strings.Join(args, " "), "ConvertTo-Json"):
 					return `{"adapter":true,"exists":true,"enabled":"True","action":"Allow","remote":["Any"],"iface":["Any"],"disabled":[],"others":[]}`, nil
+				case name == "powercfg" && args[0] == "/q" && loaded:
+					return "    Current AC Power Setting Index: 0x00000000\r\n    Current DC Power Setting Index: 0x00000001\r\n", nil
+				case name == "powercfg" && args[0] == "/q":
+					return "    Current AC Power Setting Index: 0x00000001\r\n    Current DC Power Setting Index: 0x00000001\r\n", nil
 				case name == "launchctl" && args[0] == "print":
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil

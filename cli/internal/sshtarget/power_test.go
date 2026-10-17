@@ -139,9 +139,12 @@ func TestLogindProofFailsWhenLogindKeepsTheOldPolicy(t *testing.T) {
 	}
 }
 
-func TestPowerForDeclaresAPolicyOnLinuxOnly(t *testing.T) {
+func TestPowerForDeclaresAPolicyPerOS(t *testing.T) {
 	if _, ok := PowerFor("linux", nil, Paths{}).(Logind); !ok {
 		t.Error("linux declares the logind policy")
+	}
+	if _, ok := PowerFor("windows", nil, Paths{}).(Powercfg); !ok {
+		t.Error("windows declares the powercfg profile")
 	}
 	if p := PowerFor("darwin", nil, Paths{}); p != nil {
 		t.Errorf("darwin → %T; pmset is not declared yet", p)

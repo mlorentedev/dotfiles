@@ -312,7 +312,10 @@ fdesetup status          # FileVault on: see section 1
 `autorestart 1` powers the Mac back on after a power cut. With FileVault on, it
 then waits at the unlock screen.
 
-**Windows** (elevated):
+**Windows:** `dotf converge --only workstation-target`, elevated, sets the
+three AC values below (standby and hibernate never on idle, the lid does
+nothing) and activates the scheme; battery keeps the scheme's own. Doctor reads
+them without elevation. By hand, the same thing:
 
 ```powershell
 powercfg /change standby-timeout-ac 0
