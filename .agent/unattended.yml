@@ -1,0 +1,27 @@
+version: 1
+run_id: "vh1314-20261017T1821Z"
+armed_by: manu
+armed_at: 2026-10-17T18:21:00Z
+expires_at: 2026-10-18T04:21:00Z
+objective: "dotf vault health reports every drifting 11-tasks.md, runs the stale-merged pass and prints its footer (#1314), landed under the merge grant."
+worktree: /Users/manu/Projects/worktrees/dotfiles/fix-issue-1314-vault-health-drift
+branch: fix/issue-1314-vault-health-drift
+scope:
+  write_paths: ["cli/**", "tests/**", "docs/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "scripts/**", "setup-*.sh", "setup-*.ps1"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck]
+queue:
+  source: bitacora
+  filter: "exactly #1314 (owner, relayed by dotfiles-20, 2026-10-17)"
+  max_items: 1
+budget:
+  max_iterations: 4
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
