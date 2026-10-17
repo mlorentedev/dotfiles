@@ -26,7 +26,7 @@ func TestScaffoldCreatesStructureAndFiles(t *testing.T) {
 		}
 	}
 
-	wantFiles := []string{".gitignore", ".pre-commit-config.yaml", "CLAUDE.md", "env-contract.json", "docs/lessons/_index.md"}
+	wantFiles := []string{".gitignore", ".pre-commit-config.yaml", "CLAUDE.md", "env-contract.json"}
 	for _, f := range wantFiles {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(f))); err != nil {
 			t.Errorf("expected file %s: %v", f, err)
@@ -42,13 +42,11 @@ func TestScaffoldCreatesStructureAndFiles(t *testing.T) {
 		t.Errorf("CLAUDE.md should point at AGENTS.md:\n%s", claude)
 	}
 
-	// {{repo}} is substituted with the repo basename in lessons index.
-	lessons := readFile(t, filepath.Join(root, "docs", "lessons", "_index.md"))
-	if strings.Contains(lessons, "{{repo}}") {
-		t.Errorf("lessons _index.md still contains the {{repo}} placeholder:\n%s", lessons)
-	}
-	if !strings.Contains(lessons, "myproj") {
-		t.Errorf("lessons _index.md should mention the repo name 'myproj':\n%s", lessons)
+	// CLI-131: the lessons index is rendered on read, never committed, so a new
+	// repository starts without one (two PRs that each add a lesson would
+	// conflict on it).
+	if _, err := os.Stat(filepath.Join(root, "docs", "lessons", "_index.md")); err == nil {
+		t.Error("Scaffold wrote docs/lessons/_index.md; the index is rendered by `dotf lessons index`")
 	}
 }
 

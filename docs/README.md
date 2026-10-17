@@ -6,7 +6,7 @@ Project-bound knowledge for `dotfiles`, kept in-repo (docs-as-code). The *operat
 - [`adr/`](adr/) — Architecture Decision Records (the *why* behind decisions) and the repo audits (`audit-*.md`) / architecture map
 - [`runbooks/`](runbooks/) — operational procedures (setup, secrets, tooling; indexed at [`runbooks/_index.md`](runbooks/_index.md))
 - [`troubleshooting/`](troubleshooting/) — known issues and their fixes (indexed at [`troubleshooting/_index.md`](troubleshooting/_index.md))
-- [`lessons/`](lessons/) — accumulated gotchas and post-mortems (indexed at [`lessons/_index.md`](lessons/_index.md); legacy stub: [`lessons.md`](lessons.md))
+- [`lessons/`](lessons/) — accumulated gotchas and post-mortems (index rendered on read: `dotf lessons index`; legacy stub: [`lessons.md`](lessons.md))
 - [`secrets-inventory.md`](secrets-inventory.md) — dated secrets-migration snapshot (see its own banner for current status)
 
 ## I want to…
