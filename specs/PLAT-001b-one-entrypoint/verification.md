@@ -84,6 +84,17 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - doctor WARNs on both OSes once the rest is converged: `TestCheckWorkstationTarget_ByStatus` (linux and darwin `noMesh` rows); mutation: replacing the `rep.Warn` with a no-op fails both rows
 - Live on the macmini (Standalone app), read-only: `go run ./cmd/dotf converge --only workstation-target --plan` on main plus this change -> `[ OK ] workstation-target ... converged; a run proves: ...; tailscale runs as the app, not the tailscaled system daemon: after a reboot the node rejoins the mesh only once someone logs in (and unlocks FileVault)`; `dotf doctor --verbose` -> `[ OK ] key, host keys, sshd drop-in and service as declared ...` then `[WARN] tailscale runs as the app ...`. msi: `systemctl is-enabled tailscaled` -> `enabled`, so no note there
 
+- Test suite (PR 7d, pf draft, stacked on the mesh-service change, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues. Nothing loaded pf: every test uses injected runners, and the live read was the plan only
+- What the pf tests prove:
+  - the timer is armed before the anchor loads, Apply never disarms it, Commit does, and a second plan is clean: `TestPFLoadsTheAnchorBehindATimerAndCommitDisarmsIt`
+  - the pass rule matches the mesh address as destination, loopback stays open, nothing reaches beyond port 22: `TestPFRulesMatchTheDestinationAndBlockOnlyPort22`
+  - the LaunchDaemon loads only its anchor (`-a`) at boot: `TestPFLaunchDaemonLoadsOnlyItsAnchor`
+  - a session that arrived on the LAN is refused with no root command run; mesh, loopback and local sessions proceed: `TestPFRefusesASessionTheAnchorWouldCut`
+  - the undo, after a success or a load pf did not take, flushes only our anchor, removes both files, boots the job out and disarms the timer, and never runs `pfctl -d`: `TestPFFailedLoadFlushesOnlyItsAnchor`
+  - the timer flushes the anchor and disables the job, and never switches pf off: `TestPFTimerFlushesTheAnchorAndDisablesTheJob`
+  - Target commits the firewall only after the whole proof passes: `TestApplyCommitsTheFirewallOnlyAfterTheProofPasses`
+- Live on the macmini, plan only, against a scratch `XDG_CONFIG_HOME` holding the real `machine.json` with only the `ssh-target` role: `to apply as root: firewall, power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; tailscale runs as the app ...`
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.

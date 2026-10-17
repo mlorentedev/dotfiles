@@ -388,3 +388,33 @@ func TestAFirewallThatRefusesDoesSoBeforeAnythingChanges(t *testing.T) {
 		t.Errorf("root ran before the refusal: %q", m.rootCalls)
 	}
 }
+
+// committingFirewall records when Target commits it.
+type committingFirewall struct{ commits *int }
+
+func (committingFirewall) Differs() (bool, error)           { return false, nil }
+func (committingFirewall) Apply(Root) (func() error, error) { return func() error { return nil }, nil }
+func (committingFirewall) Prove() error                     { return nil }
+func (c committingFirewall) Commit(Root) error              { *c.commits++; return nil }
+
+// A firewall with a commit-confirm timer is committed only once the whole
+// proof, sshd's included, has passed: a failed proof leaves the timer armed.
+func TestApplyCommitsTheFirewallOnlyAfterTheProofPasses(t *testing.T) {
+	for _, proofPasses := range []bool{true, false} {
+		m := newMachine(t)
+		if !proofPasses {
+			m.accepts = func(string) bool { return false }
+		}
+		commits := 0
+		tg := m.target()
+		tg.Firewall = committingFirewall{commits: &commits}
+		p, _ := tg.Inspect()
+		err := tg.Apply(p)
+		if proofPasses && (err != nil || commits != 1) {
+			t.Errorf("proof passes: Apply = %v, commits = %d; want nil and one commit", err, commits)
+		}
+		if !proofPasses && (err == nil || commits != 0) {
+			t.Errorf("proof fails: Apply = %v, commits = %d; want an error and no commit", err, commits)
+		}
+	}
+}
