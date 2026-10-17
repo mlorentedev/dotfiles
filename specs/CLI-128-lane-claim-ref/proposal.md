@@ -48,12 +48,12 @@ A claim is the ref `refs/dotf/claims/<issue>` (form (a), accepted by the owner o
 
 ## Acceptance criteria
 
-- [ ] AC1: Acquire on a free issue wins; a second Acquire of the same issue, with the same or another sha, is refused (real git, a local bare remote).
-- [ ] AC2: the refusal is a `ClaimedError` that names the holder and the time of the claim, read from the claim commit.
-- [ ] AC3: N concurrent Acquires of one issue produce exactly one winner.
-- [ ] AC4: `lane next` claims before it starts, skips to the next free item on a loss and starts nothing for the loser or when the claim cannot be taken.
-- [ ] AC5: `lane release` deletes a claim its caller holds, refuses another holder's without `--force`, and a second release is a no-op.
-- [ ] AC6: the claim ref is not fetched by a default clone and appears in no branch list.
+- [x] AC1: Acquire on a free issue wins; a second Acquire of the same issue, with the same or another sha, is refused (real git, a local bare remote).
+- [x] AC2: the refusal is a `ClaimedError` that names the holder and the time of the claim, read from the claim commit.
+- [x] AC3: N concurrent Acquires of one issue produce exactly one winner.
+- [x] AC4: `lane next` claims before it starts, skips to the next free item on a loss and starts nothing for the loser or when the claim cannot be taken.
+- [x] AC5: `lane release` deletes a claim its caller holds, refuses another holder's without `--force`, and a second release is a no-op.
+- [x] AC6: the claim ref is not fetched by a default clone and appears in no branch list.
 - [x] AC7: the ref form is verified by the probe on GitHub and on Gitea and ADR-050 decision 2 is amended from open to decided.
 
 ## References

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -101,6 +102,12 @@ func laneNextDryRun(t *testing.T, top string) {
 	}
 	if !strings.Contains(out.String(), "next: #5 BUG-5: the first -> fix/the-first (claude)") {
 		t.Errorf("output:\n%s", out.String())
+	}
+	// The claim store is wired into `lane next`: a dry run asks the remote
+	// whether #5 is held. Dropping the wiring leaves every other assertion here
+	// green, so this one is the guard (lesson 457).
+	if !slices.ContainsFunc(asked, func(a string) bool { return strings.Contains(a, " ls-remote origin refs/dotf/claims/5") }) {
+		t.Errorf("lane next never asked the remote about the claim on #5; asked:\n%s", strings.Join(asked, "\n"))
 	}
 	for _, a := range asked {
 		if strings.Contains(a, "create") || strings.Contains(a, "pane run") || strings.Contains(a, "fetch") || strings.Contains(a, " push ") {

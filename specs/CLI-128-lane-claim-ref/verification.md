@@ -15,16 +15,26 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC2 -> `TestClaimedErrorNamesTheHolder`
 - [x] AC3 -> `TestClaimConcurrent` (8 claimants, 1 winner, 20 runs green)
 - [x] AC6 -> `TestClaimIsInvisibleToADefaultClone`
+
 ### PR 2 (wiring)
 
 - [x] AC4 -> `TestHandoffClaimsBeforeItStarts`, `TestHandoffSkipsToTheNextFreeItemOnALoss`, `TestHandoffStartsNothingWhenEveryItemIsClaimed`, `TestHandoffFailsClosedWhenTheClaimCannotBeTaken`, `TestHandoffDoesNotClaimAWorktreeThatExists`, `TestHandoffDryRunTakesNoClaimButSkipsAHeldItem`, `TestHandoffReleasesTheClaimWhenTheLaneDoesNotStart` (review finding: a start that creates no worktree must not leak the claim), `TestHandoffKeepsTheClaimOnceTheWorktreeExists` (CodeRabbit: after `Create` the next run skips the claim, so it must stay), `TestClaimIgnoresARefThatOnlyEndsLikeTheClaim` (`ls-remote` matches by tail)
 - [x] AC5 -> `TestLaneRelease` (real git, two checkouts), primitive `TestClaimRelease`
+
 ### PR 3 (the decision on record)
 
 - [x] AC7 -> `TestClaimRefFormOnARemote` passed on GitHub (`mlorentedev/dotfiles`, 6.9s) and on Gitea (`gitea.kubelab.live/personal/imagesensortool`, 14.9s), each followed by an empty `ls-remote 'refs/dotf/*'`; `gh run list --event push` shows no workflow for the ref. ADR-050 decision 2 amended from open to decided.
 - [x] `lane claims` shows every claim with its holder and age -> `TestClaimList`, `TestClaimRowsFlagsAClosedIssueAndLeavesAnUnreadableOneOpen`, `TestLaneClaimsListsWhatTheRemoteHolds`
 
-The forge probe is `TestClaimRefFormOnARemote`, opt-in through `DOTF_CLAIM_PROBE_REMOTE`; it passes against a local bare remote. A push of a probe ref to the real `origin` was refused by the harness, so GitHub and Gitea are still unprobed and AC7 stays open until the owner runs it.
+### Review round 1 (FAIL, fixed in the following round)
+
+- Major, REAL: the one production construction of `Options.Claims` (`doLaneNext`) was untested -> applied: `TestLaneNext_DryRunNamesTheNextIssueAndChangesNothing` asserts the `ls-remote origin refs/dotf/claims/5` probe is asked; deleting `Claims:` from `doLaneNext` makes it fail (mutation checked).
+- Minor, REAL: checkbox drift in `tasks.md` and `proposal.md` -> applied. AC7 contradiction in this file -> applied (stale paragraph removed).
+- Minor, REAL: `handoffIssue` complexity 18 and `List` 11 -> applied: `findLane`, `startLane` and `claimIssues` extracted; both are under 10 (measured with gocyclo at min-complexity 10).
+- Minor, UNTESTED: the claim push skips the pre-push hook -> applied: `TestClaimPushSkipsThePrePushHook` (a failing hook refuses a plain push and not the claim; removing `--no-verify` fails it).
+- Minor, SPECULATIVE: two holders whose paths differ only in a control character collide -> declined: a claim is coordination, not an authorisation boundary, and such a path is not one a worktree root produces.
+- Minor, THEORETICAL: `List` aborts if a claim vanishes between `ls-remote` and `fetch` -> declined: the listing is a diagnostic and a second run answers; swallowing the error would hide a real read failure.
+- Disclosure, not a defect: the review range contains three unrelated merged PRs (#2622, #2623, #2582) because they interleaved on main.
 
 ## Test status
 
