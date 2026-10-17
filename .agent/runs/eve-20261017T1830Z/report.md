@@ -36,9 +36,10 @@ Both are `Blocked` on the board; the comments are https://github.com/mlorentedev
 - **review-attestation lagged pr-agent by about two minutes on #2707.** The status was still the failure set at 19:24:57Z, before pr-agent reviewed at 19:36Z, so the first `dotf pr land` was refused (`review-attestation: fail`). Its re-evaluation runs sat in the queue on main behind other sessions' runs and turned green at 19:41:20Z; the second land succeeded. Nothing to fix: the gate failed closed and recovered without intervention.
 - **The GraphQL user-level limit** blocked `gh pr ready 2707` from about 18:44Z to 19:21Z, although `gh api rate_limit` showed headroom. REST kept working; a background retry marked it ready.
 - **#1712 warns rather than refuses.** Refusing a stale deploy would block every other session's deploy with no override in place; the warning names the missing commit and its subject.
-- **A pre-existing red test on main is not this run's:** `harness-doctrine-records.bats`, "--refresh against the real vault leaves the working tree's records unchanged". It waits on the peer's #2664.
+- **A pre-existing red test on main is not this run's:** `harness-doctrine-records.bats`, "--refresh against the real vault leaves the working tree's records unchanged". It was waiting on the peer's #2664, which has since merged; this run did not re-run the test on main.
 - **The repo-wide `dotf pr triage-queue`** lists only peer PRs (#2716, `feat/sec-014-target-record`), not this run's.
-- **The orchestrator dotfiles-20 was messaged at the end**, best-effort: cross-session messages need approval and can expire silently.
+- **The orchestrator dotfiles-20 was messaged at the end** (sent to its inbox at about 20:30Z, not confirmed read): cross-session messages need approval and can expire silently.
+- **CodeRabbit posted rate-limit notices only** on both PRs; pr-agent (claude-haiku-5-5) is the reviewer of record.
 
 ## 6. Budget
 
