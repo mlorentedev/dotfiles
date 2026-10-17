@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,5 +67,24 @@ func TestLessonsIndex_PrintsTheTableAndWritesNothing(t *testing.T) {
 	entries, _ := os.ReadDir(dir)
 	if len(entries) != 1 {
 		t.Errorf("index wrote into the directory: %v", entries)
+	}
+}
+
+// `dotf lessons --help` is what an agent reads first. It once promised a generated
+// index, which is the committed file CLI-131 removed. The assertion reads the
+// rendered help, so a Long added later is covered too.
+func TestLessonsHelp_DoesNotPromiseACommittedIndex(t *testing.T) {
+	var out bytes.Buffer
+	c := newLessonsCmd()
+	c.SetOut(&out)
+	c.SetErr(&out)
+	c.SetArgs([]string{"--help"})
+	if err := c.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	for _, phrase := range []string{"generated index", "committed index"} {
+		if strings.Contains(out.String(), phrase) {
+			t.Errorf("the lessons help still promises %q:\n%s", phrase, out.String())
+		}
 	}
 }
