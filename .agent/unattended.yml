@@ -1,0 +1,27 @@
+version: 1
+run_id: "ops-053-20261017T0807Z"
+armed_by: manu
+armed_at: 2026-10-17T08:07:00Z
+expires_at: 2026-10-17T20:07:00Z
+objective: "One dotf converge step owns the self-deploy trigger on darwin, linux and windows (OPS-053, #2502), landed under the merge grant."
+worktree: /Users/manu/Projects/worktrees/dotfiles/feat-self-deploy-trigger
+branch: feat/self-deploy-trigger
+scope:
+  write_paths: ["cli/**", "setup-linux.sh", "setup-windows.ps1", "systemd/**", "tests/**", "docs/**", "specs/**", "packages.json"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml"]
+  max_files: 30
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, launchctl, brew]
+queue:
+  source: bitacora
+  filter: "#2502 (OPS-053), then PLAT-001c casks after #2669 lands, then the reserved refill #1331, #2399, #2201"
+  max_items: 5
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
