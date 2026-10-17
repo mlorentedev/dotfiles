@@ -268,13 +268,18 @@ func ghBlocked(m Machine) string {
 // getAll returns every value of a key in the global configuration. git exits 1
 // when the key is absent; that is an empty list, not an error.
 func getAll(run Runner, key string) ([]string, error) {
-	out, err := run("git", "config", "--global", "--get-all", key)
+	return getAllIn(run, "--global", key)
+}
+
+// getAllIn is getAll in scope (--global or --system).
+func getAllIn(run Runner, scope, key string) ([]string, error) {
+	out, err := run("git", "config", scope, "--get-all", key)
 	if err != nil {
 		var ec interface{ ExitCode() int }
 		if errors.As(err, &ec) && ec.ExitCode() == 1 {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("git config --global --get-all %s: %w", key, err)
+		return nil, fmt.Errorf("git config %s --get-all %s: %w", scope, key, err)
 	}
 	// Drop only the final newline: a last value that is empty (a reset) prints
 	// as a blank last line, and trimming every trailing newline would lose it.
