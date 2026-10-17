@@ -321,6 +321,15 @@ func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skill
 	fmt.Fprintf(&b, "- Write your verdict to `specs/%s/%s`, overwriting what is there. The YAML\n"+
 		"  frontmatter is part of the deliverable; `dotf spec archive` parses it and refuses a\n"+
 		"  malformed one.\n", specID, slot.Review)
+	// Write first (CLI-094, #2448): a run the cap or the stall detector stops
+	// writes no verdict, and a reviewer that verifies hard does not re-read the
+	// clock. Asked at turn one, a provisional record is something a model
+	// follows; asked at the soft mark, after hundreds of tool calls, it was not.
+	fmt.Fprintf(&b, "- As your first action, before you explore, write a provisional `specs/%s/%s`:\n"+
+		"  frontmatter with `verdict: PENDING` and `reviewer: %s`, then the findings so far.\n"+
+		"  Keep refining it as you verify, and replace it with your real verdict at the end.\n"+
+		"  A run that is stopped (the time cap, a stalled tool call) writes no verdict, so\n"+
+		"  that provisional file is all it leaves behind; `dotf spec archive` refuses it by name.\n", specID, slot.Review, reviewerID)
 	if slot.Name == SecondSigner.Name {
 		fmt.Fprintf(&b, "- You are the SECOND signer, of a different vendor than the first. Do NOT read\n"+
 			"  `specs/%s/%s` or its transcript: your verdict must be independent of it, and the\n"+
