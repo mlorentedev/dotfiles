@@ -1,0 +1,25 @@
+version: 1
+run_id: "eve-20261017T1830Z"
+armed_by: manu
+armed_at: 2026-10-17T18:30:00Z
+expires_at: 2026-10-18T04:20:00Z
+objective: "Work #2102, #2462 and #1712 in that order: build what passes the 3 a.m. test as small PRs landed under the grant, and park with two options anything that needs a spec slot, a human decision or a live Windows/msi check."
+scope:
+  write_paths: ["tests/pi-config.bats", "scripts/compile-harness.sh", "tests/compile-harness.bats", "tests/compile-harness-deploy-base.bats", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", ".agent/runs/eve-20261017T1830Z/**"]
+  frozen_paths: [".github/**", ".agent/unattended.yml", "setup-*", "harness/**", "secrets/**", "**/AGENTS.md", "cli/internal/lane/**", "cli/internal/prland/**", "cli/internal/forgewrite/**", "cli/internal/cmd/forge*.go", "forge/**", "specs/CLI-131-lessons-index-on-read/**", "specs/TOOL-030-forge-write-surface/**"]
+  max_files: 6
+  max_loc: 150
+allowed_commands: [dotf, gh, git, go, bats, shellcheck, jq]
+queue:
+  source: bitacora
+  filter: "#2102, #2462, #1712, in that order and nothing else. Owner instruction received 2026-10-17T18:21Z in this session's user channel (relayed through dotfiles-20 with the owner's explicit authorisation). WIP is 13/10 and no --over-wip-limit is granted."
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
