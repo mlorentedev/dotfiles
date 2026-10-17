@@ -22,7 +22,7 @@ created: "2026-10-16"
 - `golangci-lint run` (v2.12.2, the pin) over the four touched packages: 0 issues
 - all 7 `features.json` verification commands exit 0
 - `git grep -l lessons -- 'tests/*.bats' | xargs bats` (14 files): 228 tests, none failing, re-measured 2026-10-17 at 3fcaf22f (the earlier "98 tests" counted a hand-picked five files)
-- Not measured: the pre-commit `lessons-fmt` hook, which runs the installed 0.72 `dotf` and so fails on a tree with no index until a release carrying this change is installed (lesson 464). The deleting commit skipped that one hook; CI builds `dotf` from the checkout and is the gate.
+- Pre-commit `lessons-fmt` hook: measured after release v0.73.0 (pin `DOTF_VERSION=0.73.0`, installed binary 0.73.0; the CLI-131 commit is an ancestor of the `v0.73.0` tag). The hook's own command exits 0 on a tree with no committed index. The window recorded in lesson 464 closed with that release. The hook runs the installed release, which CI cannot pin, so it has no committed test by design.
 
 ## Decisions made during implementation
 
@@ -41,10 +41,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-131-lessons-index-on-read/` -> `specs/archive/CLI-131-lessons-index-on-read/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-131-lessons-index-on-read/` -> `specs/archive/CLI-131-lessons-index-on-read/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 ## Review round 1 (2026-10-17, nan/qwen3.8-flash): FAIL, findings dispositioned
 
@@ -62,3 +62,12 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - Minor, REAL (`fmt` returned the stray-index error bare): wrapped like every other failure path (`lessons fmt: <err>`).
 - Minor, THEORETICAL (`newestLesson` drops I/O errors, so an unreadable `docs/lessons/` silences the staleness warning): ticketed as #2690, not fixed here.
 - Question (WIP override text, `status: draft`): unchanged, the owner's call.
+
+
+## Review round 3 (2026-10-17, nan/qwen3.8-flash): PASS WITH GAPS, gaps dispositioned
+
+- Minor, REAL (`StrayIndexes` stops at the first category level while the proposal says any level): blast radius measured as zero by the reviewer; ticketed as #2700, not fixed here.
+- Minor, REAL (`repo-hygiene.yml:3-4` still says "generated index"): a workflow file, owner-lands; tracked in #2659.
+- Minor, REAL (seven skill records still say `dotf lessons fmt` regenerates the index): vault records, owner-lands; tracked in #2659.
+- Minor, REAL (the hook line above understated its evidence): re-measured after the release and rewritten, see "Pre-commit `lessons-fmt` hook" above.
+- Minor, SPECULATIVE (`renderTable` double-escapes a title that already carries `\|`): cosmetic, no title does; not acted on.
