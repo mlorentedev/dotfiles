@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-const fakeToken = "tok-3f9a-SECRET-do-not-print"
+const fakeToken = "fixture-value-not-a-credential"
 
 func TestParseOrigin(t *testing.T) {
 	cases := map[string]Repo{
