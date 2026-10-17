@@ -1,0 +1,31 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "reserved-20261017T1825Z"
+armed_by: manu
+armed_at: 2026-10-17T18:25:00Z
+expires_at: 2026-10-18T04:25:00Z
+objective: "Work the three reserved tickets #2470, #1186 and #2303 in order: build what passes the 3 a.m. test, park with two options what needs a spec slot (WIP 13/10, no override), a human decision or a live Windows/msi check."
+scope:
+  write_paths:
+    - "harness/skills/**"
+    - "docs/lessons/**"
+    - "docs/runbooks/**"
+    - "tests/**"
+    - "scripts/check-spec-gate.sh"
+  frozen_paths: [".github/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml"]
+  max_files: 15
+  max_loc: 300
+allowed_commands: [dotf, gh, git, bats, shellcheck, go, golangci-lint, caffeinate]
+queue:
+  source: bitacora
+  filter: "exactly #2470, #1186, #2303, in that order (owner instruction 2026-10-17, in the user turn). Nothing else."
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
