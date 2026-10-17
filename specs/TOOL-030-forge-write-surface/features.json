@@ -36,8 +36,8 @@
   },
   {
     "id": "TOOL-030-forge-write-surface-f6",
-    "behavior": "the measured classifier result for a Gitea write is recorded on #2635 before the allow set lands",
-    "verification": "gh issue view 2635 --repo mlorentedev/dotfiles --json comments -q '.comments[].body' | grep -q 'classifier result'",
+    "behavior": "the measured classifier result for a Gitea write is recorded on #2635 as a line 'classifier-result: allowed|refused <exact command>' before the allow set lands",
+    "verification": "gh issue view 2635 --repo mlorentedev/dotfiles --json comments -q '.comments[].body' | grep -qE '^classifier-result: (allowed|refused) dotf forge issue comment'",
     "state": "pending",
     "evidence": ""
   },
