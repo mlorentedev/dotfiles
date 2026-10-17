@@ -53,6 +53,18 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:
 # Arrow-key menu on a second TAB.
 zstyle ':completion:*' menu select
 
+# zsh-autosuggestions: `dotf tools sync` installs the pinned plugin through mise
+# (http backend). The path is built from mise's data dir rather than asked of
+# `mise`, which would cost a process on every shell; `latest` is the symlink
+# mise keeps at the installed version. Sourced after compinit (the plugin wraps
+# the widgets that exist by then), only when the file is there and nothing else
+# (an oh-my-zsh plugin) has loaded it already.
+_zas="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/installs/http-zsh-autosuggestions/latest/zsh-autosuggestions.zsh"
+if [[ -r "$_zas" ]] && (( ! $+functions[_zsh_autosuggest_start] )); then
+    . "$_zas"
+fi
+unset _zas
+
 # ==========================
 #       ENVIRONMENT
 # ==========================

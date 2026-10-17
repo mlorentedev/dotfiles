@@ -215,3 +215,31 @@ setup() {
         }' "$VERSIONS_CONF"
     [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
 }
+
+# A file tool (a zsh plugin) installs through mise's http backend, which only a
+# dotf carrying the fileTools table (cli/internal/tools/mise_files.go) renders.
+# Up to v0.72.0 no release knows the name, so marking it turns every machine's
+# `dotf tools sync` into a registry lookup that fails and doctor red, while CI,
+# which builds dotf from the tree, stays green (lesson 373). `last` is the
+# newest release without the table; raise it if a release ships first, and mark
+# the pin only once DOTF_VERSION is past it (DX-007, #2654). This guards the
+# first mark only: a later bump of ZSH_AUTOSUGGESTIONS_VERSION needs its sha256
+# in fileTools in a RELEASED dotf first, or the parse fails on every machine.
+@test "versions.conf marks no file tool while DOTF_VERSION predates the fileTools table" {
+    run awk -v last="0.72.0" '
+        function gt(a, b,   x, y, i) {
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) return x[i] + 0 > y[i] + 0
+            return 0
+        }
+        marked && /^[[:space:]]*ZSH_AUTOSUGGESTIONS_VERSION[[:space:]]*=/ {
+            n = $0; sub(/^[[:space:]]*/, "", n); sub(/_VERSION.*/, "", n); uses = uses " " n
+        }
+        { t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t); marked = (t == "# mise: cli" || t == "# mise: latest") }
+        /^DOTF_VERSION=/ { dotf = $0; sub(/^DOTF_VERSION=/, "", dotf) }
+        END {
+            if (dotf == "") { print "no DOTF_VERSION"; exit 1 }
+            if (uses != "" && !gt(dotf, last)) { print "marked for mise:" uses ", but DOTF_VERSION=" dotf " does not know file tools"; exit 1 }
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}
