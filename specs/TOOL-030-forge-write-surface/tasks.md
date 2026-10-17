@@ -40,7 +40,7 @@ created: "2026-10-16"
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 
 **PR 3: the guard**
-- [ ] [AC5] `tests/harness-permits-dotf.bats`, one `@test` per harness config, passing under bash 3.2 and zsh
+- [x] [AC5] `tests/harness-permits-dotf.bats`, one `@test` per harness config, passing under bash 3.2 and zsh. The command list is the autopilot envelope's `allowed_commands`, read from the skill. It reads the deploy sources ADR-048 names; `capability-map.json` has no session section until #1852, so the guard moves there then. Ten mutations (wholesale denies in each dialect, a missing list) turn it red, and a subcommand deny (`Bash(dotf secrets rotate:*)`) stays green.
 
 **PR 4: skills and the allow set (owner lands)**
 - [ ] [AC7] `new-ticket`, `pr-review-triage` and `autopilot` call `dotf forge` (vault edit, then refresh the records)
