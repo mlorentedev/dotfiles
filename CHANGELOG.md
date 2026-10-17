@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.74.0](https://github.com/mlorentedev/dotfiles/compare/v0.73.0...v0.74.0) (2026-10-17)
+
+
+### Features
+
+* **converge:** own the self-deploy trigger on Linux and Windows ([#2693](https://github.com/mlorentedev/dotfiles/issues/2693)) ([ba75009](https://github.com/mlorentedev/dotfiles/commit/ba750094e4e3ae83eb8221d20569bdf21388a819))
+* **converge:** own the self-deploy trigger on macOS ([#2682](https://github.com/mlorentedev/dotfiles/issues/2682)) ([bc0185d](https://github.com/mlorentedev/dotfiles/commit/bc0185d01d724c1b9914fb5a2a4e5eda9e0ce732))
+* **converge:** write git's lfs filter to the global config ([#2697](https://github.com/mlorentedev/dotfiles/issues/2697)) ([099961b](https://github.com/mlorentedev/dotfiles/commit/099961b52ef149f5d038cee872ea0ef1c84b5032))
+* **doctor:** report the self-deploy trigger and the last dotf update ([#2695](https://github.com/mlorentedev/dotfiles/issues/2695)) ([adb56ad](https://github.com/mlorentedev/dotfiles/commit/adb56ad090b2ae2953b8fdcc6b87fc0e509be937))
+* **forge:** skills write through dotf forge and the template allows it ([#2664](https://github.com/mlorentedev/dotfiles/issues/2664)) ([ae149b6](https://github.com/mlorentedev/dotfiles/commit/ae149b61e15286d964b76eeb4384ff3510fc7329))
+* **sshtarget:** converge the macOS AC power profile through pmset ([#2675](https://github.com/mlorentedev/dotfiles/issues/2675)) ([8f39519](https://github.com/mlorentedev/dotfiles/commit/8f39519598cb88c99446ce90342861e8c2e91b6d)), closes [#2356](https://github.com/mlorentedev/dotfiles/issues/2356)
+* **sshtarget:** drive sshd, its keys and the firewall on Windows ([#2672](https://github.com/mlorentedev/dotfiles/issues/2672)) ([cc2d090](https://github.com/mlorentedev/dotfiles/commit/cc2d0906f2eca0862c3906dd0c89e10d460cdd4a)), closes [#2356](https://github.com/mlorentedev/dotfiles/issues/2356)
+* **sshtarget:** report when the mesh does not come back after an unattended reboot ([#2692](https://github.com/mlorentedev/dotfiles/issues/2692)) ([89ca70c](https://github.com/mlorentedev/dotfiles/commit/89ca70ce548fafa272945af3db650029f39ff218))
+* **tools:** converge pwsh and its pinned modules, add dotf lint powershell ([#2679](https://github.com/mlorentedev/dotfiles/issues/2679)) ([452d35b](https://github.com/mlorentedev/dotfiles/commit/452d35bc9a4e3909cbb5e058028afe1838de9977)), closes [#2344](https://github.com/mlorentedev/dotfiles/issues/2344)
+* **tools:** declare the Mac's casks in the catalog ([#2694](https://github.com/mlorentedev/dotfiles/issues/2694)) ([57a2dcb](https://github.com/mlorentedev/dotfiles/commit/57a2dcb7c940d9beabbbcc57af30051cd284f955))
+* **vm:** verify a from-zero converge in a throwaway Lima Linux guest ([#2689](https://github.com/mlorentedev/dotfiles/issues/2689)) ([4c651ef](https://github.com/mlorentedev/dotfiles/commit/4c651efc315e9d91df72dcda7e4bca0854e8110b)), closes [#2344](https://github.com/mlorentedev/dotfiles/issues/2344)
+
+
+### Bug Fixes
+
+* **deploy:** spell agent config destinations with the env contract's directory tokens ([#2673](https://github.com/mlorentedev/dotfiles/issues/2673)) ([5746913](https://github.com/mlorentedev/dotfiles/commit/57469134ccb903e5cd24e92de4ce764091b805ce))
+* **lessons:** clear the CLI-131 round-1 findings ([#2674](https://github.com/mlorentedev/dotfiles/issues/2674)) ([ab176f3](https://github.com/mlorentedev/dotfiles/commit/ab176f3eb50c551ccd82e5e10e74df0df6de222a))
+* **lessons:** pin the index sort against file-name order and wrap the stray-index error ([#2691](https://github.com/mlorentedev/dotfiles/issues/2691)) ([2888f9c](https://github.com/mlorentedev/dotfiles/commit/2888f9cc3bbadd012238baf8394819c64668d8e0))
+* **spec:** resolve the review base of a spec renamed on a merged branch ([#2665](https://github.com/mlorentedev/dotfiles/issues/2665)) ([afa5f26](https://github.com/mlorentedev/dotfiles/commit/afa5f26bb58bef36ef6bfe391a1236fdc835bae9))
+* **tools:** mark veracrypt needs_sudo so converge defers it instead of stopping ([#2669](https://github.com/mlorentedev/dotfiles/issues/2669)) ([3bb0349](https://github.com/mlorentedev/dotfiles/commit/3bb034940007d9d0c8bdb84deae35d37ad4d9ea5))
+
 ## [0.73.0](https://github.com/mlorentedev/dotfiles/compare/v0.72.0...v0.73.0) (2026-10-17)
 
 
