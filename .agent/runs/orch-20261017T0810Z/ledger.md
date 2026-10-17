@@ -48,3 +48,4 @@ The orchestrator implements nothing and merges nothing. Each session lands only 
 - The runs coordinated their own landing order; one out-of-order land (#2682 before #2672) left a one-line rebase that sec011 absorbed by merging main.
 - 18:04Z all six runs ended (queue-empty or goal-reached). Orchestrator disarmed.
 - 18:15Z owner said go: refill relayed through `herdr agent prompt`, labelled as the owner's, into five panes. tool030 #2470 #1186 #2303; night #2102 #2462 #1712; pilot-r5 #1975 #2448; plat003 #2136 #2320; OPS-053 #1314 (moved from tool030 to balance). Not relayed: #1331 (needs a spec, WIP 13/10), and nothing for wintarget (its refills closed or parked). All five sessions confirmed working.
+- 18:46Z plat003: #2688 (BUG-154, option B) committed locally at `186e52f5`, live proof passed on msi; its PR waits for #2708 (#2136) to land first. OPS-053 review round 1 FAILED (`1fad8cf2` on chore/review-ops-053); fix-round relay awaits the owner.
