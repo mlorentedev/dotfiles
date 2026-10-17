@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: f77de9668ecb8354
+generated_sha: 6c1b4a2270a5ee35
 id: autopilot-skill
 type: skill
 status: active
@@ -249,10 +249,12 @@ dotf agent auto --task "Decide <the fork> for #${ISSUE_NUM}. Options: <A> / <B>.
      ```bash
      gh issue comment "$ISSUE_NUM" --body "ERROR: <symptom>. WHY: <root cause>. FIX: (A) <option + consequence> / (B) <option + consequence>."
      ```
-  2. Add the `blocked` label, then set Bitácora Status `Blocked` with the documented helper — resolve the field/option IDs **at runtime** and never paste a third copy of them. SSOT: `00_meta/runbooks/bitacora-project-setup.md` §5 (Status option `Blocked` = `7705a647`); the `new-ticket` skill carries the runtime-resolution snippet.
+  2. Set Bitácora Status `Blocked`: the board is the one park signal (ADR-018), and nothing reads a label. One command, with gh resolving the project, field and option by name at runtime, so no id is pasted anywhere (SSOT for the field set: `00_meta/runbooks/bitacora-project-setup.md` §5). Check its exit status: a park that did not land is not a park.
      ```bash
-     gh issue edit "$ISSUE_NUM" --add-label blocked
+     gh project item-edit 1 --owner mlorentedev --url "$(gh issue view "$ISSUE_NUM" --json url -q .url)" --field Status --value Blocked \
+       || echo "PARK NOT RECORDED on the board: say so in the report"
      ```
+     **No `blocked` label.** An earlier draft added one; repos do not declare it, so `gh issue edit --add-label blocked` failed with `'blocked' not found` and a run that skipped the exit status parked with no signal (dotfiles#2605).
      **There is no `dotf ticket` command.** An earlier draft of this skill called `dotf ticket update --status Blocked`, which fails with `unknown command "ticket"` — the park path silently did nothing. Do not reintroduce it.
   3. `parked` is terminal for the **item** and non-terminal for the **run** — unless the item *is* the run's objective, in which case the run ends (`reason: goal-blocked`). One hard item must not kill a night's work; an unanswerable item must never be guessed. Then record the ruling in the session journal and pick the next eligible ticket.
 
@@ -398,7 +400,7 @@ verdict to pending — absence must be red.
 | "I'll arm without a wake-lock, it'll be fine" | The dominant absence is a closing laptop lid. No lock, no covered window — and the report must say the window was not covered. |
 | "Nothing eligible in the queue, so I'll file the ticket I think we need" | The empty set ends the run. A loop rewarded for motion produces motion. |
 | "It's my own PR, so I'll triage my own reviewer findings and land it" | Permitted under the grant, and it must be **disclosed**: the triage comment states it was authored by the run. Disclosure is not independence — say which one you are. |
-| "I'll park it by moving the board card" | `dotf ticket` does not exist. Park with a comment carrying two options, the `blocked` label, and the documented field helper. |
+| "I'll park it by moving the board card" | `dotf ticket` does not exist. Park with a comment carrying two options, then set the board Status to `Blocked` with `gh project item-edit --field Status --value Blocked`. |
 
 ---
 
