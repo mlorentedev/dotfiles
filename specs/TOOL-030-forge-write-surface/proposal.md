@@ -41,6 +41,8 @@ A `dotf forge` write surface for agents, forge-neutral:
 
 - **The classifier may still refuse Gitea writes through `dotf forge`.** The hypothesis (it flags raw HTTP plus token to a non-GitHub host, not the write itself) is unmeasured. PR 1 ships one read verb and one Gitea comment, and records the classifier's answer on #2635 before any allow rule is added. If it refuses, the fallback is `autoMode.environment` naming the Gitea host, which is prose and still passes the classifier.
 - Gitea REST differs from GitHub on labels, projects and draft state; `--board` is GitHub-only at first and degrades with a stated message, never silently.
+- **No token for the target Gitea yet.** `secrets/registry.yaml` holds `GITEA_TELEDYNE_TOKEN`, the PoC bot of a different, private organisation; it must not be reused for `gitea.kubelab.live`. PR 1 adds the registry entry for the kubelab Gitea (ADR-028), the owner provisions the value, and the Gitea leg and its measurement wait for it. The GitHub leg does not.
+- **Measurement protocol.** Build the binary into `$TMPDIR/dotf-dev` (a `go run <path>` command line confounds what the classifier sees), run it from the imagesensortool checkout so origin detection fires, and target a comment labelled as a measurement, never another session's pending work. Record the exact command, the classifier's exact answer and the session's permission mode on #2635. The dev binary is evidence, not the gate: the measurement is repeated once with the released `dotf forge` before PR 4's allow set lands.
 - The allow set widens agent authority: prepared by the agent, landed by the owner.
 - Shell portability: nothing here is shell; it is Go in `cli/`, and the guard bats must pass under bash and zsh and macOS bash 3.2.
 

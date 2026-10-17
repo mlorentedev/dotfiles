@@ -23,13 +23,14 @@ created: "2026-10-16"
 
 **PR 1: the interface and the measurement (no allow rules)**
 - [ ] [AC1] [AC3] Write failing tests for forge detection from origin and for body-from-file only
-- [ ] [AC1] [AC3] Add `cli/internal/forgewrite` with the `Forge` interface, detection (reusing `initrepo.ClassifyOrigin`) and the GitHub backend over the `gh` REST endpoint
-- [ ] [AC4] Add the Gitea REST backend; the token comes from `dotf secrets` at call time; test that it never leaks
-- [ ] [AC1] Wire `dotf forge issue create` and `issue comment`
-- [ ] [AC6] Run one Gitea comment from an agent session and record the classifier's answer on #2635
+- [ ] [AC1] [AC3] Add `cli/internal/forgewrite` with a `Backend` interface (not `Forge`: `initrepo.Forge` is a type), detection reusing `initrepo.ClassifyOrigin`, and the GitHub backend over the `gh` REST endpoint
+- [ ] [AC4] Add the Gitea REST backend. The token is read through the internal `cli/internal/secrets` resolver, never by running `dotf secrets show`. Test with a fake token that a 4xx, a 5xx and a malformed response leave it out of stdout, stderr and every `error.Error()`
+- [ ] [AC1] Register `dotf forge issue comment` next to `protection` in `cli/internal/cmd/forge.go`. One verb only; `issue create` moves to PR 2 because it drags labels and the NNN convention
+- [ ] Write the ADR for the contract (one write surface, bodies from files, no merge or close, Gitea through dotf rather than `tea`)
+- [ ] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635
 
 **PR 2: the remaining verbs**
-- [ ] [P] [AC2] `issue edit`, `pr create`, `pr comment`, `pr edit`, each with a failing test first
+- [ ] [P] [AC1] [AC2] `issue create` (labels and ID convention), `issue edit`, `pr create`, `pr comment`, `pr edit`, each with a failing test first
 - [ ] [AC2] Test that no `merge` or `close` verb is registered
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 
