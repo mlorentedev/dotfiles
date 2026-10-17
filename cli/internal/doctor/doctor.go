@@ -253,6 +253,7 @@ func (e sweepEnv) toolchain() []check {
 		{kind: kindMachine, run: func() { checkMiseTools(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkSystemPackages(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkPython(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkPowerShell(e.sys, e.cfg, e.rep) }},
 	}
 }
 
