@@ -5,15 +5,15 @@ armed_at: 2026-10-17T08:00:00Z
 expires_at: 2026-10-17T19:30:00Z
 objective: "Advance SEC-011 (#2356): put the Windows leg up as a PR rebased on main (held for lab acceptance), land the macOS pmset power profile and the tailscale-service report, and leave the pf anchor as a draft behind the owner's three root measurements."
 scope:
-  write_paths: ["cli/internal/sshtarget/**", "cli/internal/converge/workstation*.go", "cli/internal/converge/records.go", "cli/internal/cmd/converge.go", "cli/internal/doctor/checks_workstation*.go", "specs/PLAT-001b-one-entrypoint/**", "docs/runbooks/guide-workstation-ssh-target.md", "docs/lessons/**", "docs/adr/**", "ssh/**", ".agent/runs/sec011-20261017T0800Z/**"]
+  write_paths: ["ssh/config", "tests/ssh-*.bats", "cli/internal/sshtarget/**", "cli/internal/converge/workstation*.go", "cli/internal/converge/records.go", "cli/internal/cmd/converge.go", "cli/internal/doctor/checks_workstation*.go", "specs/PLAT-001b-one-entrypoint/**", "docs/runbooks/guide-workstation-ssh-target.md", "docs/lessons/**", "docs/adr/**", "ssh/**", ".agent/runs/sec011-20261017T0800Z/**"]
   frozen_paths: [".github/**", ".agent/unattended.yml", "scripts/**", "harness/**", "**/AGENTS.md", "setup-*", "secrets/**", "versions.conf", "packages.json", "cli/internal/tools/**", "cli/internal/harness/**", "cli/internal/env/**", "cli/internal/spec/**", "cli/internal/deploy/**", "specs/DX-005-zsh-completions/**", "specs/CLI-131-lessons-index-on-read/**", "specs/TOOL-030-forge-write-surface/**"]
   max_files: 16
   max_loc: 300
 allowed_commands: [dotf, gh, git, go, make, bats, shellcheck, golangci-lint, jq, caffeinate, pmset]
 queue:
   source: bitacora
-  filter: "#2356 SEC-011 rows of PLAT-001b PR 7: 214 (Windows half, PR held), 210 (pmset, tailscale service, pf as draft only); #2388 SEC-014 and row 215 (host keys pinned) parked with a question, not built"
-  max_items: 5
+  filter: "#2356 SEC-011 rows of PLAT-001b PR 7: 214 (Windows half, PR held), 210 (pmset, tailscale service, pf as draft only); #2388 SEC-014 and row 215 (host keys pinned) parked with a question, not built; refill 2026-10-17T09:30Z: #2374 (PLAT-004) and #2464 (SEC-015), both SSH-target tickets inside the owner's 'SEC-011 and related' grant, reserved for this run by orchestrator orch-20261017T0810Z"
+  max_items: 7
 budget:
   max_iterations: 10
   max_minutes_per_iteration: 60
