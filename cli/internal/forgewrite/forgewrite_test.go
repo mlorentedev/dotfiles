@@ -110,6 +110,21 @@ func TestGiteaCommentPostsBodyAndToken(t *testing.T) {
 	}
 }
 
+// A 2xx whose body cannot be read still means the comment was posted; an error
+// here would make a retrying caller post it twice.
+func TestGiteaSuccessWithUnreadableBodyIsNotAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"html_url": trunc`)
+	}))
+	defer srv.Close()
+	g := Gitea{BaseURL: srv.URL, Token: func() (string, error) { return fakeToken, nil }}
+	url, err := g.CommentIssue(context.Background(), Repo{"h", "o", "n"}, 7, "b")
+	if err != nil || url != "" {
+		t.Fatalf("CommentIssue = %q, %v; want empty URL and no error", url, err)
+	}
+}
+
 // A happy path that leaks nothing proves little: every failure shape must keep
 // the token out of the error as well.
 func TestGiteaTokenNeverLeaks(t *testing.T) {
@@ -127,7 +142,6 @@ func TestGiteaTokenNeverLeaks(t *testing.T) {
 	cases := map[string]Gitea{
 		"401":       {BaseURL: echo(401, "bad credentials ").URL},
 		"500":       {BaseURL: echo(500, "boom ").URL},
-		"malformed": {BaseURL: echo(200, "not json ").URL},
 		"transport": {BaseURL: closedURL},
 	}
 	for name, g := range cases {

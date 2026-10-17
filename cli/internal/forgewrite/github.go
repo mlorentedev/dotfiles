@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // GHRunner runs `gh` with stdin and returns its stdout; a seam so tests never
@@ -29,8 +28,8 @@ func (g GitHub) CommentIssue(ctx context.Context, r Repo, number int, body strin
 	var resp struct {
 		HTMLURL string `json:"html_url"`
 	}
-	if err := json.Unmarshal(out, &resp); err != nil || resp.HTMLURL == "" {
-		return "", fmt.Errorf("gh api POST %s answered without a comment URL: %s", endpoint, strings.TrimSpace(string(out)))
-	}
+	// gh exited 0, so the comment exists; an unreadable body must not read as
+	// a failure that a retry would turn into a duplicate.
+	_ = json.Unmarshal(out, &resp)
 	return resp.HTMLURL, nil
 }

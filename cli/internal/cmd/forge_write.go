@@ -130,6 +130,9 @@ func newForgeIssueCommentCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if url == "" {
+				url = "posted (the forge returned no comment URL)"
+			}
 			_, _ = fmt.Fprintln(c.OutOrStdout(), url)
 			return nil
 		},

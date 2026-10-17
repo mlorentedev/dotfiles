@@ -61,8 +61,9 @@ func (g Gitea) CommentIssue(ctx context.Context, r Repo, number int, body string
 	var out struct {
 		HTMLURL string `json:"html_url"`
 	}
-	if err := json.Unmarshal(raw, &out); err != nil || out.HTMLURL == "" {
-		return "", fmt.Errorf("gitea POST %s answered HTTP %d without a comment URL", url, resp.StatusCode)
-	}
+	// A 2xx means the comment exists. An unreadable body must not turn that
+	// into a failure, or a caller that retries posts the comment twice; the
+	// URL is a convenience, so return it empty rather than an error.
+	_ = json.Unmarshal(raw, &out)
 	return out.HTMLURL, nil
 }
