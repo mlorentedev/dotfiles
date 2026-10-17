@@ -5,7 +5,7 @@ created: "2026-10-17"
 
 # Verification - CLI-094-stopped-review-leaves-a-record
 
-> Spec stage: no implementation yet. Only AC6 (the measurement) has evidence; the other criteria are pending and none is claimed passing.
+> Implementation complete (2026-10-17); the independent archive review is pending, so nothing here is a verdict.
 
 ## Measurement for the stall timeout (AC6)
 
@@ -26,10 +26,10 @@ Note on what the transcript records: `durationMs` is per tool call and there are
 
 ## Acceptance criteria
 
-- [ ] AC1 stall detector stops a silent runner: pending
-- [ ] AC2 a growing or briefly silent transcript is never stopped: pending
+- [x] AC1 stall detector stops a silent runner: `cd cli && go test ./internal/spec/ ./internal/cmd/ -run 'TestRunWithLimitsStopsARunnerWhoseTranscriptGoesSilent|TestLastToolCall|TestSpecDeadlineStopsAStalledRunAndNamesTheLastCall' -count=1` exits 0. The stop exits 125 (not the cap's 124) and stderr names `bash: find ~/Projects`. Mutations that failed the tests: `stalled()` never true; `ExitStalled` set to 124.
+- [x] AC2 a growing or briefly silent transcript is never stopped: `cd cli && go test ./internal/spec/ -run 'TestRunWithLimitsNeverStopsARunnerThatKeepsWriting|TestRunWithLimitsToleratesSilenceShorterThanTheTimeout' -count=1` exits 0. Mutation that failed the first: growth no longer counted as progress. The tests use the ratio 97s : 10 min at scale (0.6s silence against a 3s timeout), not the real 97s.
 - [x] AC3 prompt asks for a provisional `review.md`: `cd cli && go test ./internal/spec/ -run TestReviewPromptAsksForAProvisionalReviewFirst -count=1` exits 0 for both signers; the test failed before the change (none of `provisional`, `verdict: PENDING`, `before you explore` in the prompt).
-- [ ] AC4 stopped run reports kept or not rewritten, exits non-zero: pending
+- [x] AC4 stopped run reports kept or not rewritten, exits non-zero: `cd cli && go test ./internal/spec/ ./internal/cmd/ -run 'TestStoppedRunRecord|TestSpecDeadlineStopsAStalledRunAndNamesTheLastCall|TestSpecDeadlineReportsAProvisionalReviewKeptAtTheCap' -count=1` exits 0: "review.md was not rewritten by this run", "provisional review.md kept (verdict PENDING)", or the signed verdict, at both the cap (124) and the stall (125).
 - [x] AC5 `dotf spec archive` refuses PENDING by name: `cd cli && go test ./internal/spec/ -run 'TestParseReviewRefusesAPendingVerdictByName|TestFindReviewRefusesAPendingReviewFile' -count=1` exits 0; both tests failed before the change (the message said "unrecognized verdict"). Archive reads review.md through `FindReview`, which the second test covers.
 - [x] AC6 measurement and N recorded above
 

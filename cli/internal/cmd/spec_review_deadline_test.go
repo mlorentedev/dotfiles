@@ -16,7 +16,7 @@ func TestSpecReviewBoundsTheReviewerInBothModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(fg, "'spec' 'deadline' '45m0s' '--'") || !strings.Contains(fg, "'pi' '--print'") {
+	if !strings.Contains(fg, "'spec' 'deadline' '45m0s'") || !strings.Contains(fg, "'--' '") || !strings.Contains(fg, "'pi' '--print'") {
 		t.Errorf("the foreground reviewer is not run under the deadline:\n%s", fg)
 	}
 
@@ -24,7 +24,7 @@ func TestSpecReviewBoundsTheReviewerInBothModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(custom, "'spec' 'deadline' '10m0s' '--'") {
+	if !strings.Contains(custom, "'spec' 'deadline' '10m0s'") {
 		t.Errorf("--timeout does not reach the deadline:\n%s", custom)
 	}
 
@@ -53,5 +53,36 @@ func TestSpecReviewPromptCarriesTheTimeBudget(t *testing.T) {
 	}
 	if !strings.Contains(out, "Time budget:") || !strings.Contains(out, "UNVERIFIED") {
 		t.Errorf("the reviewer's prompt carries no time budget:\n%s", out)
+	}
+}
+
+// CLI-094: the stall detector rides on the same wrapper in both modes, watching
+// the transcript the launcher announces and reporting against the review file
+// the launcher keeps. 10 minutes by default, and --stall-timeout moves it.
+func TestSpecReviewWiresTheStallDetectorIntoTheDeadline(t *testing.T) {
+	root := makeRepo(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+
+	def, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground", "--dry-run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"'--stall-timeout' '10m0s'", "'--transcript'", "review-transcript.jsonl'", "'--review'", "review.md'"} {
+		if !strings.Contains(def, want) {
+			t.Errorf("the default launch lacks %s:\n%s", want, def)
+		}
+	}
+
+	custom, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground", "--dry-run", "--stall-timeout", "3m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(custom, "'--stall-timeout' '3m0s'") {
+		t.Errorf("--stall-timeout does not reach the deadline:\n%s", custom)
+	}
+
+	if _, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground", "--dry-run", "--stall-timeout", "-1m"); err == nil {
+		t.Error("a negative --stall-timeout must be refused")
 	}
 }

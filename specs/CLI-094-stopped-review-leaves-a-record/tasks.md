@@ -24,20 +24,20 @@ created: "2026-10-17"
 - [x] [AC5] Teach the review parser a PENDING verdict that always refuses, with that wording
 - [x] [P] [AC3] Write failing test: `ReviewPromptIn` asks both signers for a provisional `review.md` with `verdict: PENDING` first
 - [x] [AC3] Add the write-first instruction to `ReviewPromptIn`
-- [ ] [AC1] [AC2] (after task 1) Write failing tests with a fake runner: silent transcript is stopped at the stall timeout (exit not 124, stderr names the last tool call); a growing transcript, and one silent for 97s, are never stopped
-- [ ] [AC1] [AC2] Add the stall watcher beside the cap in `RunWithDeadline`, with `--stall-timeout` on `spec deadline` and `spec review`
-- [ ] [AC4] Write failing test: a stopped run prints "provisional review.md kept" or "review.md was not rewritten" and exits non-zero
-- [ ] [AC4] Report which in the stop path of `cli/internal/cmd/spec.go`
-- [ ] Refactor for clarity (one termination path for cap and wedge)
+- [x] [AC1] [AC2] (after task 1) Write failing tests with a fake runner: silent transcript is stopped at the stall timeout (exit not 124, stderr names the last tool call); a growing transcript, and one silent for 97s, are never stopped
+- [x] [AC1] [AC2] Add the stall watcher beside the cap (`RunWithLimits`; `RunWithDeadline` is now its cap-only wrapper), with `--stall-timeout` on `spec deadline` and `spec review`
+- [x] [AC4] Write failing test: a stopped run prints "provisional review.md kept" or "review.md was not rewritten" and exits non-zero
+- [x] [AC4] Report which in the stop path of `cli/internal/cmd/spec.go`
+- [x] Refactor for clarity (one termination path for cap and wedge)
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features

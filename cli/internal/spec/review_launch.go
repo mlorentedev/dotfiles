@@ -29,6 +29,18 @@ import (
 // Override per run with `dotf spec review --timeout`.
 const DefaultReviewerTimeout = 45 * time.Minute
 
+// DefaultStallTimeout is how long a reviewer's transcript may stay unchanged
+// while it runs before the launcher stops it, instead of waiting for the cap
+// (CLI-094, #1975). A wedged tool call held one review for six minutes; with
+// only the cap, a wedge that never returns costs all 45.
+//
+// It is 10 minutes because the longest legitimate tool call measured in the
+// surviving transcripts took 96.9s (specs/CLI-094-stopped-review-leaves-a-record/
+// verification.md): six times that, so a full test run is never mistaken for a
+// wedge, and a real wedge still ends at minute 10. Override per run with
+// `dotf spec review --stall-timeout`; 0 turns the detector off.
+const DefaultStallTimeout = 10 * time.Minute
+
 // TranscriptFile is where a launched review's machine-readable event stream is
 // written, beside the review.md it produces.
 //
@@ -328,7 +340,7 @@ func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skill
 	fmt.Fprintf(&b, "- As your first action, before you explore, write a provisional `specs/%s/%s`:\n"+
 		"  frontmatter with `verdict: PENDING` and `reviewer: %s`, then the findings so far.\n"+
 		"  Keep refining it as you verify, and replace it with your real verdict at the end.\n"+
-		"  A run that is stopped (the time cap) writes no verdict, so\n"+
+		"  A run that is stopped (the time cap, or a tool call that never returns) writes no verdict, so\n"+
 		"  that provisional file is all it leaves behind; `dotf spec archive` refuses it by name.\n", specID, slot.Review, reviewerID)
 	if slot.Name == SecondSigner.Name {
 		fmt.Fprintf(&b, "- You are the SECOND signer, of a different vendor than the first. Do NOT read\n"+

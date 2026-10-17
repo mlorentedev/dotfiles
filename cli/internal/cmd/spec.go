@@ -129,6 +129,7 @@ func newSpecReviewCmd() *cobra.Command {
 		second         bool
 		fallbackReason string
 		timeout        time.Duration
+		stallTimeout   time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -216,12 +217,12 @@ after the first review, into review-second.md. A member that declares
 					"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
 			}
 
-			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, baseSHA, timeout)
+			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
+			limits := spec.Limits{Deadline: timeout, StallTimeout: stallTimeout, Transcript: transcript}
+			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, baseSHA, limits, filepath.Join(specDir, slot.Review))
 			if err != nil {
 				return err
 			}
-
-			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
 			session := slot.Session(id)
 			useTmux := !foreground
 			if useTmux {
@@ -325,6 +326,8 @@ after the first review, into review-second.md. A member that declares
 		"launch a `signs: fallback` member as the first signer, naming how the first signers failed: "+strings.Join(spec.FallbackReasons, ", "))
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
+	cmd.Flags().DurationVar(&stallTimeout, "stall-timeout", spec.DefaultStallTimeout,
+		"stop the reviewer when its transcript has not changed for this long, instead of waiting for --timeout; 0 turns it off")
 	return cmd
 }
 
@@ -400,29 +403,41 @@ growing length.`,
 // reviewerArgv is the pooled runner's command with its prompt, the time budget
 // included, under the deadline every runner gets in both modes (HARNESS-152).
 // Only agy used to be bounded, through its own --print-timeout.
-func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill, baseSHA string, timeout time.Duration) ([]string, error) {
+func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill, baseSHA string, limits spec.Limits, review string) ([]string, error) {
+	if limits.StallTimeout < 0 {
+		return nil, fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", limits.StallTimeout)
+	}
+	timeout := limits.Deadline
 	if timeout <= 0 {
 		timeout = spec.DefaultReviewerTimeout
 	}
+	limits.Deadline = timeout
 	prompt := spec.ReviewPromptIn(slot, id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA) +
 		"\n" + spec.TimeBudget(time.Now(), timeout)
 	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
 	if err != nil {
 		return nil, err
 	}
-	return deadlineWrap(timeout, argv), nil
+	return deadlineWrap(limits, review, argv), nil
 }
 
 // newSpecDeadlineCmd is plumbing, like transcript-sink: `spec review` runs every
 // reviewer under it, so the --timeout it promises binds whichever runner the
-// pool drew (HARNESS-152).
+// pool drew (HARNESS-152), and so does the stall detector (CLI-094).
 func newSpecDeadlineCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "deadline <duration> -- <command> [args...]",
-		Short: "Internal: run a reviewer and stop it, with every process it started, at a deadline",
+	var stall time.Duration
+	var transcript, review string
+	cmd := &cobra.Command{
+		Use:   "deadline <duration> [flags] -- <command> [args...]",
+		Short: "Internal: run a reviewer and stop it, with every process it started, at a deadline or when its transcript stalls",
 		Long: `Run the command, and stop it and every process it started when the duration
 passes. A stopped run exits 124 and says so on stderr: the time limit ended it,
-not a verdict. Otherwise the command's own exit status passes through.`,
+not a verdict. Otherwise the command's own exit status passes through.
+
+With --stall-timeout and --transcript the run is also stopped when the
+transcript has not changed for that long. That run exits 125, and stderr names
+the last tool call the transcript recorded. With --review, a stopped run also
+says whether review.md holds a provisional record or was not rewritten.`,
 		Hidden:        true,
 		Args:          cobra.MinimumNArgs(2),
 		SilenceUsage:  true,
@@ -432,30 +447,52 @@ not a verdict. Otherwise the command's own exit status passes through.`,
 			if err != nil || limit <= 0 {
 				return fmt.Errorf("deadline %q: want a positive duration such as 45m", args[0])
 			}
-			code, stopped, err := spec.RunWithDeadline(limit, args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+			res, err := spec.RunWithLimits(spec.Limits{Deadline: limit, StallTimeout: stall, Transcript: transcript},
+				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
 			if err != nil {
 				return err
 			}
-			if stopped {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
+			errw := cmd.ErrOrStderr()
+			switch res.Stop {
+			case spec.StopDeadline:
+				_, _ = fmt.Fprintf(errw, "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
+			case spec.StopStall:
+				_, _ = fmt.Fprintf(errw, "[review] stalled: the transcript did not change for %s, so this run was stopped, not a verdict\n", stall)
+				if res.LastCall != "" {
+					_, _ = fmt.Fprintf(errw, "[review] last tool call recorded: %s\n", res.LastCall)
+				}
 			}
-			if code != 0 {
-				return withExitCode(code, fmt.Errorf("exit %d", code))
+			if res.Stop != spec.StopNone && review != "" {
+				_, _ = fmt.Fprintf(errw, "[review] %s\n", spec.StoppedRunRecord(review))
+			}
+			if res.Code != 0 {
+				return withExitCode(res.Code, fmt.Errorf("exit %d", res.Code))
 			}
 			return nil
 		},
 	}
+	cmd.Flags().DurationVar(&stall, "stall-timeout", 0, "stop the run when --transcript has not changed for this long (0: off)")
+	cmd.Flags().StringVar(&transcript, "transcript", "", "the transcript file the stall detector watches")
+	cmd.Flags().StringVar(&review, "review", "", "the review file a stopped run reports on")
+	return cmd
 }
 
 // deadlineWrap runs argv under this binary's `spec deadline`, resolved by
 // absolute path for the reason transcriptSink gives: the command runs detached,
 // and a `dotf` found on PATH may be a build without the subcommand.
-var deadlineWrap = func(timeout time.Duration, argv []string) []string {
+var deadlineWrap = func(limits spec.Limits, review string, argv []string) []string {
 	self, err := os.Executable()
 	if err != nil {
 		self = "dotf"
 	}
-	return append([]string{self, "spec", "deadline", timeout.String(), "--"}, argv...)
+	wrap := []string{self, "spec", "deadline", limits.Deadline.String()}
+	if limits.StallTimeout > 0 && limits.Transcript != "" {
+		wrap = append(wrap, "--stall-timeout", limits.StallTimeout.String(), "--transcript", limits.Transcript)
+	}
+	if review != "" {
+		wrap = append(wrap, "--review", review)
+	}
+	return append(append(wrap, "--"), argv...)
 }
 
 // transcriptSink names the command the reviewer's stdout is piped into.
