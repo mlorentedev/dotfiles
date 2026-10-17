@@ -77,7 +77,7 @@ func TestCheckHookBinding_SkipsWithoutAHome(t *testing.T) {
 func TestCheckHookBinding_FollowsClaudeConfigDir(t *testing.T) {
 	repo, home, cfg := t.TempDir(), t.TempDir(), t.TempDir()
 	writeFile(t, filepath.Join(repo, "harness", "manifest.json"), `{"agents":{"bind":[
-  {"agent":"claude","file":".claude/settings.json","dst":"{CLAUDE_CONFIG_DIR}/settings.json",
+  {"agent":"claude","dst":"{CLAUDE_CONFIG_DIR}/settings.json",
    "format":"command-hook","matcher":true,
    "emit_hooks":[{"id":"gate","event":"PreToolUse","command":"harness gate --harness claude","timeout":5}]}]}}`)
 	sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home, "DOTFILES_REPO_DIR": repo}, nil, nil)
