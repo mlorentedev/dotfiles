@@ -74,7 +74,8 @@ def denied(perm):
         return ["*"]
     if not isinstance(perm, dict):
         return []
-    bash = perm.get("bash")
+    # "*" is the default for every tool without its own key, bash included.
+    bash = perm.get("bash", perm.get("*"))
     if bash == "deny":
         return ["*"]
     if isinstance(bash, dict):
