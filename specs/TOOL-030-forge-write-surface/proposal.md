@@ -25,8 +25,9 @@ A `dotf forge` write surface for agents, forge-neutral:
 
 - Verbs: `dotf forge issue create|comment|edit`, `dotf forge pr create|comment|edit`, and `--board` to set the Project fields `new-ticket` sets by hand today. No `merge`, no `close`: merging stays `dotf pr land` behind the merge grant, closing stays with the owner.
 - A body is read only from `--body-file` or stdin, never from an argument, so prose never reaches a permission glob.
-- The forge is detected from `origin` (the `initrepo.ClassifyOrigin` classification is the starting point). GitHub is served through the `gh` REST endpoint, as `lane.REST` already does; Gitea through a REST client inside `dotf`. The token comes from `dotf secrets` at call time and is never printed or kept as login state. No `tea` dependency.
+- The forge is detected from `origin` (the `initrepo.ClassifyOrigin` classification is the starting point). GitHub is served through the `gh` REST endpoint, as `lane.REST` already does; Gitea through a REST client inside `dotf`. The token comes from `dotf secrets` at call time and is never printed or kept as login state. The agent surface has no `tea` dependency.
 - One narrow allow set replaces per-tool rules: `Bash(dotf forge issue:*)`, `Bash(dotf forge pr create:*)`, `Bash(dotf forge pr comment:*)`, `Bash(dotf forge pr edit:*)`. The settings PR that adds it also reverts #2629 (wrong premise) and is landed by the owner (#2178).
+- `tea` as a human tool, separate from the agent surface: the owner works on Gitea daily, so `tea` joins `packages.json` as a `system` entry (brew, apt where packaged, winget) and installs on every OS through `dotf tools`. Agents do not call it; they use `dotf forge`. Which package id each manager uses is checked, not assumed, in PR 0.
 - A per-harness guard: one bats `@test` per harness config (claude, agy, opencode, copilot, pi) asserting `dotf` is not denied in that harness's dialect, so the dialects cannot drift apart silently.
 - The `new-ticket`, `pr-review-triage` and `autopilot` skills call `dotf forge` instead of carrying `gh` recipes.
 

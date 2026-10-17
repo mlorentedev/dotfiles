@@ -21,6 +21,11 @@ created: "2026-10-16"
 
 > Four PRs, sequenced. PR 1 measures before anything widens authority.
 
+**PR 0: `tea` for the human, on every OS**
+- [ ] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one)
+- [ ] Add `tea` to `packages.json` and a catalog test; `dotf tools sync` twice reports `changed=0`
+- [ ] Log in from the secrets store through `dotf secrets run`, token never printed (shares the registry entry PR 1 adds for the kubelab Gitea)
+
 **PR 1: the interface and the measurement (no allow rules)**
 - [ ] [AC1] [AC3] Write failing tests for forge detection from origin and for body-from-file only
 - [ ] [AC1] [AC3] Add `cli/internal/forgewrite` with a `Backend` interface (not `Forge`: `initrepo.Forge` is a type), detection reusing `initrepo.ClassifyOrigin`, and the GitHub backend over the `gh` REST endpoint
