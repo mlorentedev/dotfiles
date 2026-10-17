@@ -312,6 +312,12 @@ func resolveInCheckout(rel string, exists func(string) bool) string {
 	return filepath.Join(DotfilesDir(Home()), filepath.FromSlash(rel))
 }
 
+// ResolveForgeHostsPath locates forge/hosts.json for READS, the checkout first
+// and the deployed copy second, like the registry it names secrets from.
+func ResolveForgeHostsPath() string {
+	return resolveInCheckout("forge/hosts.json", fileExists)
+}
+
 // ResolveSensitiveDir locates the age secret store (sensitive/) for READS. Like
 // ResolveRegistryPath (ADR-030), it prefers the dotfiles checkout — the version-
 // controlled SSOT where rotations land — falling back to the deployed copy under

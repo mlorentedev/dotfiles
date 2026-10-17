@@ -65,6 +65,7 @@ func newForgeCmd() *cobra.Command {
 	}
 	protection.AddCommand(newForgeProtectionCheckCmd(), newForgeProtectionApplyCmd())
 	cmd.AddCommand(protection)
+	cmd.AddCommand(newForgeIssueCmd())
 	return cmd
 }
 

@@ -366,3 +366,31 @@ func TestLoad_TheShippingCatalogStillLoads(t *testing.T) {
 		t.Fatalf("packages.json: %v", err)
 	}
 }
+
+// Gitea's CLI is `tea` in brew and `Gitea.tea` in winget, but apt's `tea` is
+// an unrelated graphical text editor (Debian, measured on msi 2026-10-17), so an
+// apt name would install the wrong program and `command: tea` would then report
+// it satisfied. Linux has no packaged channel and skips the entry, said so.
+func TestTheRepoCatalogDeclaresGiteaTeaWithoutApt(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "tea" {
+			continue
+		}
+		s := tool.Source
+		if s.Type != "system" || s.Brew != "tea" || s.Winget != "Gitea.tea" || s.Command != "tea" {
+			t.Errorf("tea source = %+v, want system, brew tea, winget Gitea.tea, command tea", s)
+		}
+		if s.Apt != "" {
+			t.Errorf("tea names apt %q: apt's tea is a text editor, not Gitea's CLI", s.Apt)
+		}
+		if tool.SupportsOS("linux") {
+			t.Error("tea must skip linux, where no channel packages Gitea's CLI")
+		}
+		return
+	}
+	t.Fatal("packages.json declares no tea entry")
+}

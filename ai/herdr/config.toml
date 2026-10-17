@@ -28,6 +28,18 @@ description = "lazygit in this pane's repository"
 width = "90%"
 height = "90%"
 
+[ui.sidebar.agents.rows_by_agent]
+# pi's sidebar entry carries the session title on its own row, as Claude's does.
+# pi 1.2.0 sets the terminal title itself (π - <session> - <cwd>, from
+# interactive-mode.js updateTerminalTitle), which herdr reads as
+# terminal_title; terminal_title_stripped drops one leading glyph. No pi
+# extension is needed (#2646). The key is herdr's canonical agent id.
+pi = [
+    ["state_icon", "machine", "workspace", "tab"],
+    ["terminal_title_stripped"],
+    ["agent"],
+]
+
 [worktrees]
 # herdr creates <directory>/<repo>/<branch-slug>; only the root is configurable.
 # Beside the repos instead of herdr's default ~/.herdr/worktrees (owner,
