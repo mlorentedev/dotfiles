@@ -18,6 +18,7 @@ type commentRecorder struct {
 	number int
 	body   string
 	newIss forgewrite.NewIssue
+	newPR  forgewrite.NewPR
 	edit   forgewrite.IssueEdit
 	calls  []string
 }
@@ -26,6 +27,12 @@ func (r *commentRecorder) CreateIssue(_ context.Context, repo forgewrite.Repo, i
 	r.repo, r.newIss = repo, in
 	r.calls = append(r.calls, "create")
 	return "https://forge.example/i/9", nil
+}
+
+func (r *commentRecorder) CreatePR(_ context.Context, repo forgewrite.Repo, in forgewrite.NewPR) (string, error) {
+	r.repo, r.newPR = repo, in
+	r.calls = append(r.calls, "createpr")
+	return "https://forge.example/p/3", nil
 }
 
 func (r *commentRecorder) EditIssue(_ context.Context, repo forgewrite.Repo, n int, in forgewrite.IssueEdit) (string, error) {
@@ -198,6 +205,54 @@ func TestForgePRCommentUsesTheCommentEndpoint(t *testing.T) {
 	}
 	if rec.number != 8 || rec.body != "triage" {
 		t.Errorf("backend got %+v", rec)
+	}
+}
+
+func TestForgePRCreateSendsHeadBaseAndBody(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	old := forgeWriteBranch
+	forgeWriteBranch = func() (string, error) { return "feat/x", nil }
+	t.Cleanup(func() { forgeWriteBranch = old })
+	out, err := runForge(t, "pr", "create", "--title", "feat: x", "--base", "main", "--draft", "--body-file", writeBody(t, "why\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := forgewrite.NewPR{Title: "feat: x", Body: "why\n", Head: "feat/x", Base: "main", Draft: true}
+	if rec.newPR != want {
+		t.Errorf("backend got %+v, want %+v", rec.newPR, want)
+	}
+	if !strings.Contains(out, "https://forge.example/p/3") {
+		t.Errorf("the pull request URL was not printed: %q", out)
+	}
+	if _, err := runForge(t, "pr", "create", "--title", "t", "--base", "main", "--head", "other", "--body-file", writeBody(t, "b")); err != nil || rec.newPR.Head != "other" {
+		t.Errorf("an explicit --head must win: err=%v head=%q", err, rec.newPR.Head)
+	}
+}
+
+func TestForgePRCreateNeverGuessesTheBase(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	for name, args := range map[string][]string{
+		"no base":  {"--title", "t", "--body-file", writeBody(t, "b")},
+		"no title": {"--base", "main", "--body-file", writeBody(t, "b")},
+		"no body":  {"--title", "t", "--base", "main"},
+		"inline":   {"--title", "t", "--base", "main", "--body", "prose"},
+	} {
+		if _, err := runForge(t, append([]string{"pr", "create"}, args...)...); err == nil {
+			t.Errorf("%s: want a refusal", name)
+		}
+	}
+	if len(rec.calls) != 0 {
+		t.Errorf("a refused create reached the backend: %v", rec.calls)
+	}
+}
+
+func TestForgePREditIsTheIssueEdit(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	if _, err := runForge(t, "pr", "edit", "6", "--title", "retitled"); err != nil {
+		t.Fatal(err)
+	}
+	if rec.number != 6 || rec.edit.Title == nil || *rec.edit.Title != "retitled" || strings.Join(rec.calls, ",") != "edit" {
+		t.Errorf("backend got number=%d edit=%+v calls=%v", rec.number, rec.edit, rec.calls)
 	}
 }
 

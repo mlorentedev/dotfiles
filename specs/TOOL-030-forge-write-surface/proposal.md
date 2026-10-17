@@ -38,6 +38,9 @@ A `dotf forge` write surface for agents, forge-neutral:
 - `issue edit` replaces the title and/or the body and sends only the fields named. It has no state flag, so it cannot close.
 - `pr comment` is `issue comment` under another name: a pull request is an issue on both forges, so it adds no backend method.
 - A 2xx whose body cannot be read is success with an empty URL, never an error: the write exists, and an error invites a retry that writes it twice.
+- `pr create` takes `--title`, `--body-file`, a required `--base` and `--head` defaulting to the checked-out branch. The base is never defaulted: which branch a pull request targets is a decision, and a wrong guess opens a pull request against the wrong line. Heads are branches of the same repository; cross-fork heads are out of scope.
+- `--draft` is a GitHub field. Gitea marks a draft with a title prefix the instance configures, so `pr create --draft` on Gitea fails with ERROR/WHY/FIX before any request instead of guessing the prefix.
+- `pr edit` is `issue edit` under the pr name, as `pr comment` is `issue comment`: a pull request is an issue on both forges, so title and body change through the issue endpoint.
 - `--title` is the one argument that still carries prose on the command line, so it can still reach a deny glob. Bodies, where the long prose lives, cannot.
 
 ## Out of scope

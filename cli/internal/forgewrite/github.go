@@ -51,3 +51,9 @@ func (g GitHub) writeURL(ctx context.Context, method, endpoint string, payload a
 	_ = json.Unmarshal(out, &resp)
 	return resp.HTMLURL, nil
 }
+
+// CreatePR implements Backend.
+func (g GitHub) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
+	return g.writeURL(ctx, "POST", fmt.Sprintf("repos/%s/%s/pulls", r.Owner, r.Name),
+		map[string]any{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base, "draft": in.Draft})
+}

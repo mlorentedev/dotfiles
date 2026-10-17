@@ -99,7 +99,7 @@ func newForgePRCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	pr.AddCommand(newForgeCommentCmd("a pull request"))
+	pr.AddCommand(newForgeCommentCmd("a pull request"), newForgePRCreateCmd(), newForgePREditCmd())
 	return pr
 }
 
@@ -171,6 +171,74 @@ func newForgeCommentCmd(what string) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&bodyFile, "body-file", "", "file holding the comment body, or - for stdin (required)")
+	return c
+}
+
+// forgeWriteBranch returns the checked-out branch; a seam for tests.
+var forgeWriteBranch = func() (string, error) {
+	out, err := exec.Command("git", "symbolic-ref", "--short", "-q", "HEAD").Output()
+	name := strings.TrimSpace(string(out))
+	if err != nil || name == "" {
+		return "", fmt.Errorf("ERROR: no branch is checked out. WHY: --head defaults to the current branch and HEAD is detached. FIX: pass --head <branch>")
+	}
+	return name, nil
+}
+
+func newForgePRCreateCmd() *cobra.Command {
+	var title, bodyFile, head, base string
+	var draft bool
+	c := &cobra.Command{
+		Use:   "create --title <title> --base <branch> --body-file <file|-> [--head <branch>] [--draft]",
+		Short: "Open a pull request from a branch of this repository",
+		Long: "create opens a pull request in the repository the cwd's origin names. The body is\n" +
+			"read only from --body-file (or stdin with -). --head defaults to the current\n" +
+			"branch; --base is required, because the default branch is not something to guess.\n" +
+			"--draft works on GitHub only. It never merges.",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, _ []string) error {
+			if strings.TrimSpace(title) == "" {
+				return fmt.Errorf("ERROR: no title. WHY: a pull request needs one. FIX: pass --title <text>")
+			}
+			if strings.TrimSpace(base) == "" {
+				return fmt.Errorf("ERROR: no base branch. WHY: dotf forge does not guess which branch the pull request targets. FIX: pass --base <branch>")
+			}
+			body, err := readForgeBody(bodyFile)
+			if err != nil {
+				return err
+			}
+			if head == "" {
+				if head, err = forgeWriteBranch(); err != nil {
+					return err
+				}
+			}
+			repo, backend, err := forgeTarget()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(c.Context(), forgeWriteTimeout)
+			defer cancel()
+			url, err := backend.CreatePR(ctx, repo, forgewrite.NewPR{Title: title, Body: body, Head: head, Base: base, Draft: draft})
+			if err != nil {
+				return err
+			}
+			printForgeURL(c, url)
+			return nil
+		},
+	}
+	c.Flags().StringVar(&title, "title", "", "pull request title (required)")
+	c.Flags().StringVar(&bodyFile, "body-file", "", "file holding the pull request body, or - for stdin (required)")
+	c.Flags().StringVar(&head, "head", "", "branch to merge from (default: the current branch)")
+	c.Flags().StringVar(&base, "base", "", "branch to merge into (required)")
+	c.Flags().BoolVar(&draft, "draft", false, "open as a draft (GitHub only)")
+	return c
+}
+
+// newForgePREditCmd is issue edit under the pr name: a pull request is an
+// issue on both forges, so title and body change through the same endpoint.
+func newForgePREditCmd() *cobra.Command {
+	c := newForgeIssueEditCmd()
+	c.Short = "Change the title or body of a pull request"
 	return c
 }
 

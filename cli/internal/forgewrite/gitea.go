@@ -49,6 +49,17 @@ func (g Gitea) EditIssue(ctx context.Context, r Repo, number int, in IssueEdit) 
 	return g.writeURL(ctx, http.MethodPatch, g.repoPath(r, fmt.Sprintf("issues/%d", number)), editPayload(in))
 }
 
+// CreatePR implements Backend. Gitea's pull request API has no draft field (a
+// draft is a title prefix the instance configures), so a draft request is
+// refused rather than guessed.
+func (g Gitea) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
+	if in.Draft {
+		return "", fmt.Errorf("ERROR: --draft is not supported on %s. WHY: Gitea marks a draft with a configurable title prefix, not a field, and dotf forge does not guess it. FIX: open the pull request without --draft", r.Host)
+	}
+	return g.writeURL(ctx, http.MethodPost, g.repoPath(r, "pulls"),
+		map[string]string{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
+}
+
 func (g Gitea) repoPath(r Repo, tail string) string {
 	return fmt.Sprintf("/api/v1/repos/%s/%s/%s", r.Owner, r.Name, tail)
 }

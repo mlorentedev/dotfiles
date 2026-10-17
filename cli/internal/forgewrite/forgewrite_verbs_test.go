@@ -165,3 +165,49 @@ func TestGiteaLabelLookupSaysWhenTheListingWasCutOff(t *testing.T) {
 		t.Fatalf("want a truncation error, got %v", err)
 	}
 }
+
+func TestGiteaCreatePRSendsHeadAndBase(t *testing.T) {
+	srv, log := giteaServer(t, 201, `{"html_url":"https://gitea.example/o/n/pulls/2"}`)
+	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
+	url, err := g.CreatePR(context.Background(), Repo{"h", "o", "n"}, NewPR{Title: "t", Body: "b", Head: "feat/x", Base: "main"})
+	if err != nil || !strings.HasSuffix(url, "/pulls/2") {
+		t.Fatalf("CreatePR = %q, %v", url, err)
+	}
+	p := (*log)[0]
+	if p.method != http.MethodPost || p.path != "/api/v1/repos/o/n/pulls" || p.body["head"] != "feat/x" || p.body["base"] != "main" {
+		t.Errorf("request was %+v", p)
+	}
+}
+
+// Gitea has no draft field; guessing a title prefix would be silent behaviour.
+func TestGiteaCreatePRRefusesDraftBeforeAnyRequest(t *testing.T) {
+	srv, log := giteaServer(t, 201, `{}`)
+	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
+	_, err := g.CreatePR(context.Background(), Repo{"gitea.example", "o", "n"}, NewPR{Title: "t", Head: "h", Base: "b", Draft: true})
+	if err == nil || !strings.Contains(err.Error(), "FIX:") {
+		t.Fatalf("want ERROR/WHY/FIX, got %v", err)
+	}
+	if len(*log) != 0 {
+		t.Errorf("a refused draft reached the forge: %v", *log)
+	}
+}
+
+func TestGitHubCreatePRUsesThePullsEndpointWithDraft(t *testing.T) {
+	var args []string
+	var stdin string
+	g := GitHub{Run: func(_ context.Context, in []byte, a ...string) ([]byte, error) {
+		args, stdin = a, string(in)
+		return []byte(`{"html_url":"https://github.com/o/n/pull/9"}`), nil
+	}}
+	prose := "a body that must stay off the command line"
+	url, err := g.CreatePR(context.Background(), Repo{"github.com", "o", "n"}, NewPR{Title: "t", Body: prose, Head: "feat/x", Base: "main", Draft: true})
+	if err != nil || !strings.HasSuffix(url, "/pull/9") {
+		t.Fatalf("CreatePR = %q, %v", url, err)
+	}
+	if got := strings.Join(args, " "); got != "api -X POST repos/o/n/pulls --input -" {
+		t.Errorf("ran gh %s", got)
+	}
+	if !strings.Contains(stdin, `"draft":true`) || !strings.Contains(stdin, `"head":"feat/x"`) || strings.Contains(strings.Join(args, " "), prose) {
+		t.Errorf("payload = %s, args = %v", stdin, args)
+	}
+}

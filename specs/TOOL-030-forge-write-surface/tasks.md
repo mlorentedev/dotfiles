@@ -36,7 +36,7 @@ created: "2026-10-16"
 
 **PR 2: the remaining verbs**
 - [x] [P] [AC1] [AC2] `issue create`, `issue edit` and `pr comment`, each with a test. `--label` takes names (Gitea maps them to IDs and refuses an unknown one); the caller computes any AREA-NNN title, `dotf forge` does not scan for the next number. `pr comment` is the `issue comment` endpoint on both forges, so it adds no backend method
-- [ ] [P] [AC1] [AC2] `pr create` and `pr edit`, each with a test first (next PR)
+- [x] [P] [AC1] [AC2] `pr create` and `pr edit`, each with a test. `pr edit` is `issue edit` under the pr name (same endpoint on both forges); `pr create` takes `--base` as required and `--head` defaulting to the current branch
 - [x] [AC2] Test that no `merge` or `close` verb is registered, walking the whole tree
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 

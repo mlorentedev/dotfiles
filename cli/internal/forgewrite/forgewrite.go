@@ -31,6 +31,19 @@ type Backend interface {
 	// EditIssue changes the title and/or body of an issue or pull request and
 	// returns its URL. It never changes state: there is no close.
 	EditIssue(ctx context.Context, r Repo, number int, in IssueEdit) (string, error)
+	// CreatePR opens a pull request from a branch of the same repository and
+	// returns its URL. It never merges.
+	CreatePR(ctx context.Context, r Repo, in NewPR) (string, error)
+}
+
+// NewPR is what an agent supplies to open a pull request. Head and Base are
+// branch names in the repository itself: no cross-fork heads.
+type NewPR struct {
+	Title string
+	Body  string
+	Head  string
+	Base  string
+	Draft bool
 }
 
 // NewIssue is what an agent supplies to open an issue. The caller computes the
