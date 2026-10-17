@@ -88,7 +88,7 @@ func newForgeIssueCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	issue.AddCommand(newForgeCommentCmd("issue or pull request"), newForgeIssueCreateCmd(), newForgeIssueEditCmd())
+	issue.AddCommand(newForgeCommentCmd("an issue or pull request"), newForgeIssueCreateCmd(), newForgeIssueEditCmd())
 	return issue
 }
 
@@ -99,7 +99,7 @@ func newForgePRCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	pr.AddCommand(newForgeCommentCmd("pull request"))
+	pr.AddCommand(newForgeCommentCmd("a pull request"))
 	return pr
 }
 
@@ -140,8 +140,8 @@ func newForgeCommentCmd(what string) *cobra.Command {
 	var bodyFile string
 	c := &cobra.Command{
 		Use:   "comment <number> --body-file <file|->",
-		Short: "Comment on an " + what,
-		Long: "comment posts the body of --body-file (or stdin with -) on the " + what + "\n" +
+		Short: "Comment on " + what,
+		Long: "comment posts the body of --body-file (or stdin with -) on " + what + "\n" +
 			"<number> of the repository the cwd's origin names. A pull request is an issue on\n" +
 			"both supported forges. The body is never an argument, so no prose reaches a\n" +
 			"permission rule. There is no merge and no close verb.",

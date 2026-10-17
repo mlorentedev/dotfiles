@@ -142,3 +142,26 @@ func TestGitHubCreateAndEditUseTheIssuesEndpoint(t *testing.T) {
 		}
 	}
 }
+
+// A label listing cut off at the page bound must say so, not claim the label
+// does not exist.
+func TestGiteaLabelLookupSaysWhenTheListingWasCutOff(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		var b strings.Builder
+		b.WriteString("[")
+		for i := 0; i < 50; i++ {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(`{"id":` + string(rune('0'+i%10)) + `,"name":"l"}`)
+		}
+		b.WriteString("]")
+		_, _ = io.WriteString(w, b.String())
+	}))
+	defer srv.Close()
+	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
+	_, err := g.CreateIssue(context.Background(), Repo{"h", "o", "n"}, NewIssue{Title: "t", Body: "b", Labels: []string{"late"}})
+	if err == nil || !strings.Contains(err.Error(), "cut off") || strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("want a truncation error, got %v", err)
+	}
+}

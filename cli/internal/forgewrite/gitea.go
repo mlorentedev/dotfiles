@@ -69,6 +69,7 @@ func editPayload(in IssueEdit) map[string]string {
 // labelIDs maps label names to Gitea IDs from the repository's own labels.
 func (g Gitea) labelIDs(ctx context.Context, r Repo, names []string) ([]int64, error) {
 	byName := map[string]int64{}
+	truncated := true
 	for page := 1; page <= maxLabelPages; page++ {
 		raw, err := g.do(ctx, http.MethodGet, g.repoPath(r, fmt.Sprintf("labels?limit=50&page=%d", page)), nil)
 		if err != nil {
@@ -85,12 +86,16 @@ func (g Gitea) labelIDs(ctx context.Context, r Repo, names []string) ([]int64, e
 			byName[l.Name] = l.ID
 		}
 		if len(labels) < 50 {
+			truncated = false
 			break
 		}
 	}
 	ids := make([]int64, 0, len(names))
 	for _, n := range names {
 		id, ok := byName[n]
+		if !ok && truncated {
+			return nil, fmt.Errorf("ERROR: label %q was not found in the first %d labels of %s. WHY: the listing was cut off, so the label may exist beyond it. FIX: use a repository with fewer labels or create the issue without --label", n, maxLabelPages*50, r)
+		}
 		if !ok {
 			return nil, fmt.Errorf("ERROR: label %q does not exist on %s. WHY: Gitea takes label IDs, so a name must already exist there. FIX: create the label first, or drop it from --label", n, r)
 		}
