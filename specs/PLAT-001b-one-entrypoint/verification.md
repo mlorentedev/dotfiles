@@ -100,6 +100,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - entries are written once, and a failed proof removes the record with the rest of the run: `TestRecordEntriesAreWrittenOnce`, `TestRecordIsUndoneWithAFailedApply`
   - a malformed record, or one of a later version, stops the plan naming the file: `TestInspectRefusesARecordItCannotRead`; the path per OS: `TestRecordPathPerOS`
   - three mutations caught: an entry rewritten on every apply, a converged drop-in recorded as `created`, and a later version accepted
+- Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --plan --only workstation-target --repo ~/Projects/dotfiles` from this branch, on the machine converged an hour earlier with 0.74.0: `[CHANGE] workstation-target   14ms  to apply as root: state record; then proves: ...` / `1 to change`; `/var/db/dotf` does not exist yet, which `writeRecord`'s `install -d` creates
 - Not proven yet: the live write on the macmini, which needs the owner at the sudo prompt once this is released (`1 changed`, then `0 changed`, then `cat /var/db/dotf/workstation-target.json`, readable without root, shows three `unknown` entries)
 
 ## Decisions made during implementation
