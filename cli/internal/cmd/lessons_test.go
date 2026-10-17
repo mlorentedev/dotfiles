@@ -68,3 +68,11 @@ func TestLessonsIndex_PrintsTheTableAndWritesNothing(t *testing.T) {
 		t.Errorf("index wrote into the directory: %v", entries)
 	}
 }
+
+// The parent summary is what `dotf lessons --help` shows first. It once said the
+// tool keeps a generated index, which is the committed file CLI-131 removed.
+func TestLessonsHelp_DoesNotPromiseACommittedIndex(t *testing.T) {
+	if short := newLessonsCmd().Short; strings.Contains(short, "generated index") {
+		t.Errorf("the lessons summary still describes a committed generated index: %q", short)
+	}
+}
