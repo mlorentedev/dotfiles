@@ -105,6 +105,13 @@ screen until someone types the password. Pick one for each Mac and record it:
   a person at the unlock screen.
 - **Attended:** keep the app. The Mac is reachable only while a user is logged in.
 
+The `workstation-target` step does not switch variants; it reports which one
+runs. Its plan, and `dotf doctor` as a WARN, say so while the mesh would not
+come back after an unattended reboot: on macOS while `launchctl print
+system/com.tailscale.tailscaled` finds no daemon, on Linux while `systemctl
+is-enabled tailscaled` is not `enabled`. On `macmini` the WARN stays by
+decision (attended, #2356 2026-10-13).
+
 **Windows** (elevated PowerShell, after installing Tailscale):
 
 ```powershell

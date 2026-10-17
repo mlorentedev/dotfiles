@@ -75,6 +75,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --only workstation-target --plan`:
   `[CHANGE] workstation-target   15ms  to apply as root: power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; firewall not managed on darwin yet: sshd's AllowUsers is the only fence` / `1 to change, 0 ok, 0 opaque, 0 skipped, 0 failed`; `dotf doctor` -> `[WARN] differs from the declared state: power policy; run dotf converge --only workstation-target (it asks for root once)`
 - Not run: the apply, which needs the owner at the sudo prompt
+- Test suite (PR 7d, mesh service, stacked on the `pmset` change, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues
+- What the mesh-service tests prove, against injected runners:
+  - macOS reads the tailscaled launchd job and names the login a reboot needs without it: `TestMeshAtBootOnDarwinReadsTheTailscaledDaemon`
+  - Linux reads the unit state, enabled is quiet, disabled, masked and a missing unit each name the command that fixes them: `TestMeshAtBootOnLinuxReadsTheSystemdUnit`
+  - Windows reads nothing yet: `TestMeshAtBootIsNotReadOnOtherOSes`
+  - the note never makes the plan pending: `TestInspectCarriesTheMeshNoteWithoutMakingItPending`; the converge plan carries it: `TestWorkstationTarget_PlanNeedsNoRoot`
+  - doctor WARNs on both OSes once the rest is converged: `TestCheckWorkstationTarget_ByStatus` (linux and darwin `noMesh` rows); mutation: replacing the `rep.Warn` with a no-op fails both rows
+- Live on the macmini (Standalone app), read-only: `go run ./cmd/dotf converge --only workstation-target --plan` on main plus this change -> `[ OK ] workstation-target ... converged; a run proves: ...; tailscale runs as the app, not the tailscaled system daemon: after a reboot the node rejoins the mesh only once someone logs in (and unlocks FileVault)`; `dotf doctor --verbose` -> `[ OK ] key, host keys, sshd drop-in and service as declared ...` then `[WARN] tailscale runs as the app ...`. msi: `systemctl is-enabled tailscaled` -> `enabled`, so no note there
 
 ## Decisions made during implementation
 
