@@ -34,11 +34,13 @@ created: "2026-10-16"
 - [x] Write the ADR for the contract (ADR-052) (one write surface, bodies from files, no merge or close, Gitea through dotf rather than `tea`)
 - [x] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635. Recorded as `classifier-result: allowed dotf forge issue comment` with its caveats (dev binary, one verb); repeated with the released binary before PR 4
 
-**PR 2: the remaining verbs**
+**PR 2: the remaining verbs** (split three ways at build time, each under the size guideline: 2a landed as #2655, 2b is `pr create` and `pr edit`, 2c is `--board`)
 - [x] [P] [AC1] [AC2] `issue create`, `issue edit` and `pr comment`, each with a test. `--label` takes names (Gitea maps them to IDs and refuses an unknown one); the caller computes any AREA-NNN title, `dotf forge` does not scan for the next number. `pr comment` is the `issue comment` endpoint on both forges, so it adds no backend method
 - [x] [P] [AC1] [AC2] `pr create` and `pr edit`, each with a test. `pr edit` is `issue edit` under the pr name (same endpoint on both forges); `pr create` takes `--base` as required and `--head` defaulting to the current branch
 - [x] [AC2] Test that no `merge` or `close` verb is registered, walking the whole tree
-- [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
+- [ ] `--board` for GitHub Project fields (PR 2c). GitHub only, and not part of `Backend`: an optional interface the GitHub backend satisfies, so `dotf forge` prints a stated message when the selected backend lacks it. Field and option ids are resolved at run time, as the `new-ticket` skill does, never pasted
+- [ ] A `--board` run on a Gitea origin exits with ERROR/WHY/FIX and writes nothing, not even the issue
+- [ ] Every verb PR records that its verbs are unmeasured against the classifier; the released-binary measurement stays before PR 4
 
 **PR 3: the guard**
 - [x] [AC5] Extend ADR-048's session-level allow lists (`harness/capability-map.json` and its leaves) with `dotf forge` and let that guard assert it, one case per harness, instead of a second file; if ADR-048's renderer is not there yet, a `tests/harness-permits-dotf.bats` stands in and is folded into it later. Passes under bash 3.2 and zsh Delivered as the stand-in: `harness/capability-map.json` has no session-level section yet (ADR-048 decision 3 is unbuilt), so `tests/harness-permits-dotf.bats` ships now (#2651) and is folded into the map guard when that lands.
