@@ -28,7 +28,7 @@ Note on what the transcript records: `durationMs` is per tool call and there are
 
 - [ ] AC1 stall detector stops a silent runner: pending
 - [ ] AC2 a growing or briefly silent transcript is never stopped: pending
-- [ ] AC3 prompt asks for a provisional `review.md`: pending
+- [x] AC3 prompt asks for a provisional `review.md`: `cd cli && go test ./internal/spec/ -run TestReviewPromptAsksForAProvisionalReviewFirst -count=1` exits 0 for both signers; the test failed before the change (none of `provisional`, `verdict: PENDING`, `before you explore` in the prompt).
 - [ ] AC4 stopped run reports kept or not rewritten, exits non-zero: pending
 - [x] AC5 `dotf spec archive` refuses PENDING by name: `cd cli && go test ./internal/spec/ -run 'TestParseReviewRefusesAPendingVerdictByName|TestFindReviewRefusesAPendingReviewFile' -count=1` exits 0; both tests failed before the change (the message said "unrecognized verdict"). Archive reads review.md through `FindReview`, which the second test covers.
 - [x] AC6 measurement and N recorded above
