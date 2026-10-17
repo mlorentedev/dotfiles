@@ -22,8 +22,8 @@ created: "2026-10-16"
 > Four PRs, sequenced. PR 1 measures before anything widens authority.
 
 **PR 0: `tea` for the human, on every OS**
-- [ ] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one)
-- [ ] Add `tea` to `packages.json` and a catalog test; `dotf tools sync` twice reports `changed=0`
+- [x] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one) -- brew `tea` 0.16.0 verified on macOS; apt and winget could not be installed from this host, so the entry names neither and a dotf skips it there, stated in the catalog test. Verify on a Linux or Windows box before adding either.
+- [x] Add `tea` to `packages.json` and a catalog test; `dotf tools install --dry-run` twice reports `tea present, skip` (`tools sync` is the mise pins and does not read system entries)
 - [ ] Log in from the secrets store through `dotf secrets run`, token never printed (shares the registry entry PR 1 adds for the kubelab Gitea)
 
 **PR 1: the interface and the measurement (no allow rules)**

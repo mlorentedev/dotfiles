@@ -62,3 +62,17 @@ mise_catalog_excludes_windows() {
     DOTF_VERSION=0.69.0 run mise_catalog_excludes_windows "$fixture"
     [ "$status" -eq 1 ] || { echo "release pin bypassed the Windows catalog guard"; false; }
 }
+
+# TOOL-030: `tea` is the owner's Gitea tool, not the agents' write surface (that
+# is `dotf forge`). Homebrew is the one manager whose package id was verified,
+# by installing it (tea 0.16.0); apt and winget are named nowhere, so a dotf
+# skips the entry there rather than guess an id. Adding one means verifying it
+# first, and this test then changes with it.
+@test "tea is a system entry whose only verified manager is brew" {
+    local entry
+    entry="$(jq -c '.tools[] | select(.name == "tea")' "$CATALOG")"
+    [ -n "$entry" ]
+    [ "$(printf '%s' "$entry" | jq -r '.source.type')" = "system" ]
+    [ "$(printf '%s' "$entry" | jq -r '.source.brew')" = "tea" ]
+    [ "$(printf '%s' "$entry" | jq -r '.source | has("apt") or has("winget")')" = "false" ]
+}

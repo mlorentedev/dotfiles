@@ -124,6 +124,15 @@
       }
     },
     {
+      "name": "tea",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "tea",
+        "command": "tea"
+      }
+    },
+    {
       "name": "bash",
       "profile": "full",
       "source": {
