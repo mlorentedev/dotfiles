@@ -1,9 +1,9 @@
 # Run reserved-20261017T1825Z
 
-**Verdict:** run reserved-20261017T1825Z — ended `queue-empty` after 3 items / ~2h of a 10h window — 2 done, 1 parked, 2 merged, 0 unmerged. Waiting on you: the tool-side choice on #2470 (A or B) and the #1186 park. Nothing landed is irreversible beyond two squashed PRs that are on main.
+**Verdict:** run reserved-20261017T1825Z — ended `queue-empty` after 3 items / ~2h of a 10h window — 2 done, 1 parked, 0 merged by this session (2 merged by the owner account), 0 unmerged. Waiting on you: the tool-side choice on #2470 (A or B) and the #1186 park. Nothing landed is irreversible beyond two squashed PRs that are on main.
 
 ## Waiting on you, irreversible first
-- **Landed:** #2703 (`90c1a417`, skills run `dotf lessons fmt` only where the repo uses dotf's format) and #2706 (`633b72ea`, spec-gate adjacency report). Both squashed to main under the standing grant; neither touched the envelope or a frozen path.
+- **Landed:** #2703 (`90c1a417`, skills run `dotf lessons fmt` only where the repo uses dotf's format) and #2706 (`633b72ea`, spec-gate adjacency report). Both were merged by the owner account while this session's `dotf pr land` attempts were failing on the GraphQL limit; this session landed neither. Neither touched the envelope or a frozen path.
 - **#2470 stays open, your call:** (A) `dotf lessons fmt` defers to a formatter the repo declares (tool contract change, needs a WIP slot; recommended) or (B) kubelab adopts the canon in one 577-file PR and retires `toolkit tools lessons-index`. Comment on the issue has both.
 - **#1186 parked, Status Blocked:** (A) fold the executable-line counter into the Go port of the gates (#2407; recommended) or (B) shell now, after a WIP slot and a spec, and you state the data-file rule first.
 
