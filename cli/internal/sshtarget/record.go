@@ -1,6 +1,7 @@
 package sshtarget
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -37,8 +38,9 @@ type Prior struct {
 
 // The states of a Prior, from the step's side.
 const (
-	// PriorCreated: absent (the listener: not enabled) before the step, so
-	// the step's own. Retiring removes or disables it.
+	// PriorCreated: absent (the listener: not enabled) before the step, or
+	// a drop-in carrying DropInMarker, so the step's own. Retiring removes or
+	// disables it.
 	PriorCreated = "created"
 	// PriorReplaced: the drop-in was there with other content, kept in
 	// Content. Retiring puts it back.
@@ -77,6 +79,10 @@ func (r *Record) fill(p Plan, pending func(string) bool) bool {
 	}
 	set(&r.Key, onlyIf(pending(resKey), Prior{State: PriorCreated}))
 	switch {
+	case ownDropIn(p.prevDrop):
+		// A render of the step's own file, from this build or an earlier
+		// one: restoring it on retirement would put dotf's file back.
+		set(&r.DropIn, Prior{State: PriorCreated})
 	case !pending(resDropIn):
 		set(&r.DropIn, Prior{State: PriorUnknown})
 	case p.prevDrop == nil:
@@ -87,6 +93,12 @@ func (r *Record) fill(p Plan, pending func(string) bool) bool {
 	set(&r.Listener, onlyIf(pending(resService), Prior{State: PriorCreated}))
 	return added
 }
+
+// DropInMarker opens every drop-in the step has rendered
+// (ssh/sshd-workstation.conf).
+const DropInMarker = "# Managed by `dotf converge --only workstation-target`"
+
+func ownDropIn(drop []byte) bool { return bytes.HasPrefix(drop, []byte(DropInMarker)) }
 
 // onlyIf is created when the step is about to create the resource, and
 // unknown when it found it already in place.

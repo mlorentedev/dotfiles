@@ -86,6 +86,41 @@ func TestRecordKeepsTheDropInItReplaced(t *testing.T) {
 	}
 }
 
+// A drop-in carrying the step's marker is the step's own, whichever build
+// rendered it: recorded as created, never as content to restore.
+func TestRecordTakesADropInWithTheMarkerAsTheStepsOwn(t *testing.T) {
+	for name, prev := range map[string]string{
+		"an earlier render": DropInMarker + " (#2356).\nPasswordAuthentication no\n",
+		"this render":       "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			m, tg := recorded(t)
+			m.write(m.paths.HostKey, hostKey+"\n")
+			tg.Template = []byte(DropInMarker + " (#2356).\n" + template)
+			if prev == "" {
+				prev = string(tg.DropIn())
+			}
+			m.write(m.paths.DropIn, prev)
+			applyPlan(t, tg)
+			if r := loadRecord(t, m.paths.Record); r.DropIn == nil || r.DropIn.State != PriorCreated || r.DropIn.Content != "" {
+				t.Errorf("drop-in = %+v, want created", r.DropIn)
+			}
+		})
+	}
+}
+
+// The marker is how the record knows the step's file: the template in the
+// checkout must keep opening with it.
+func TestTheDropInTemplateOpensWithTheMarker(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", TemplateFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ownDropIn(data) {
+		t.Errorf("%s does not open with %q:\n%s", TemplateFile, DropInMarker, data)
+	}
+}
+
 // A machine converged before the record existed (the macmini and msi under
 // 0.74.0) gets one: the only change is the record, and what nothing can tell
 // any more is written as unknown, never guessed.
