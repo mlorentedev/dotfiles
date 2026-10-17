@@ -64,6 +64,19 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - The replaced bats tests evaluated the shell sync block on fixtures and grepped the PowerShell one; their properties (seed only when absent, model list replaced, other keys and the mode kept, a non-object file refused) are the Go tests of PR 14 in `internal/pi` and `internal/converge`
 - Not run here: the apply on a scratch HOME. The live runs are CI's `integration` job (a plain `setup-linux.sh`) and `test-windows` (`setup-windows.ps1` end to end, then doctor), both on this PR, and from-zero, which the `pisettings.go` comment change triggers
 
+- Test suite (PR 7d, macOS power, macOS arm64, 2026-10-17): `go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> ok; `golangci-lint run` (2.12.2) -> 0 issues
+- What the `pmset` tests prove, against a fake `pmset` seeded with the macmini's real `pmset -g custom`:
+  - only the differing keys are set, in one `pmset -c disksleep 0 autorestart 1`, `displaysleep` stays 15, and a second plan is clean: `TestPmsetSetsOnlyWhatDiffersOnACAndProvesIt`
+  - a converged Mac runs nothing as root: `TestPmsetConvergedRunsNothingAsRoot`
+  - the undo restores the values read before the apply, also after a failure part way: `TestPmsetUndoRestoresThePreviousValues`, `TestPmsetFailedApplyReturnsItsUndo`
+  - battery is never read into the plan nor set: battery alone differing runs nothing as root, and an AC key differing runs exactly `pmset -c disksleep 0`: `TestPmsetLeavesBatteryAlone` (round 1 of review found its first form vacuous, it never called `Apply`)
+  - the parser reads the macmini's `pmset -g custom` captured verbatim on 2026-10-17, padded columns and the multi-word `Sleep On Power Button` key included, to exactly the five profile keys: `TestParsePmsetReadsTheMacminiOutput`
+  - a key the hardware does not report is skipped, the proof names what still differs, and output with no AC section is refused: `TestPmsetSkipsAKeyTheHardwareDoesNotReport`, `TestPmsetProofNamesWhatStillDiffers`, `TestPmsetRefusesOutputWithoutAnACSection`
+  - the plan on darwin lists `power policy` (`TestWorkstationTarget_PlanNeedsNoRoot`, 5 changes); doctor reads pmset and never sets it (`TestCheckWorkstationTarget_ByStatus`)
+- Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --only workstation-target --plan`:
+  `[CHANGE] workstation-target   15ms  to apply as root: power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; firewall not managed on darwin yet: sshd's AllowUsers is the only fence` / `1 to change, 0 ok, 0 opaque, 0 skipped, 0 failed`; `dotf doctor` -> `[WARN] differs from the declared state: power policy; run dotf converge --only workstation-target (it asks for root once)`
+- Not run: the apply, which needs the owner at the sudo prompt
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.

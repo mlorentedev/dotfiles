@@ -108,6 +108,11 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
 				case name == "systemctl" && (args[0] == "is-enabled" || args[0] == "is-active"):
+				case name == "pmset" && len(args) == 2 && args[0] == "-g" && args[1] == "custom":
+					if loaded {
+						return "AC Power:\n sleep 0\n disksleep 0\n womp 1\n autorestart 1\n powernap 1\n", nil
+					}
+					return "AC Power:\n sleep 0\n disksleep 10\n womp 1\n autorestart 0\n powernap 1\n", nil
 				default:
 					t.Fatalf("doctor ran %s %v; it must only read", name, args)
 				}

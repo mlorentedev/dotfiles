@@ -45,8 +45,13 @@ func workstationFixture(t *testing.T, root sshtarget.Root) (workstationTarget, E
 	}
 	writeFile(t, paths.SSHDConfig, "Include "+filepath.Dir(paths.DropIn)+"/*\n")
 	r := workstationTarget{
-		root:  root,
-		run:   func(...string) ([]byte, error) { return nil, errors.New("exit status 113") },
+		root: root,
+		run: func(argv ...string) ([]byte, error) {
+			if strings.Join(argv, " ") == "pmset -g custom" {
+				return []byte("AC Power:\n sleep 0\n disksleep 10\n womp 1\n autorestart 0\n powernap 1\n"), nil
+			}
+			return nil, errors.New("exit status 113")
+		},
 		addrs: func() ([]net.IP, error) { return []net.IP{net.ParseIP("100.64.0.15")}, nil },
 		paths: func(string) sshtarget.Paths { return paths },
 		user:  func() (string, error) { return "manu", nil },
@@ -81,7 +86,7 @@ func TestWorkstationTarget_PlanNeedsNoRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Changes != 4 || !strings.HasPrefix(res.Detail, "to apply as root: authorized key, host keys, sshd drop-in, sshd service") {
+	if res.Changes != 5 || !strings.HasPrefix(res.Detail, "to apply as root: authorized key, host keys, sshd drop-in, sshd service, power policy") {
 		t.Fatalf("plan = %+v", res)
 	}
 	if !strings.Contains(res.Detail, "firewall not managed on darwin yet") {
