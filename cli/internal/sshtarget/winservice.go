@@ -19,8 +19,9 @@ type WindowsService struct {
 // The numeric codes sc.exe prints beside the names. The names are translated
 // on a localized Windows; the numbers are not.
 const (
-	scAutoStart = 2 // START_TYPE AUTO_START
-	scRunning   = 4 // STATE RUNNING
+	scAutoStart     = 2    // START_TYPE AUTO_START
+	scRunning       = 4    // STATE RUNNING
+	scNoSuchService = 1060 // sc.exe's exit code: ERROR_SERVICE_DOES_NOT_EXIST
 )
 
 const capabilityHint = "install it first, elevated: Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
@@ -45,11 +46,14 @@ func (s WindowsService) running() (bool, error) {
 }
 
 // scField reads the number sc.exe prints after "<field> :". sc exits 1060
-// when no such service exists, which is the capability not installed.
+// (ERROR_SERVICE_DOES_NOT_EXIST) when no such service exists, which is the
+// capability not installed. The exit code decides, not the output: sc's prose
+// is localized, and a 1060 in it may be anything.
 func (s WindowsService) scField(verb, field string) (int, error) {
 	out, err := s.Run("sc.exe", verb, "sshd")
 	if err != nil {
-		if bytes.Contains(out, []byte("1060")) {
+		var exit interface{ ExitCode() int }
+		if errors.As(err, &exit) && exit.ExitCode() == scNoSuchService {
 			return 0, errors.New("no sshd service: the OpenSSH server is not installed; " + capabilityHint)
 		}
 		return 0, fmt.Errorf("sc.exe %s sshd: %w: %s", verb, err, bytes.TrimSpace(out))

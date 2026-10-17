@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -111,11 +112,23 @@ func TestWindowsServiceReadsSCNumbersNotNames(t *testing.T) {
 	}
 }
 
+// exitErr is a failed command as exec reports it: an error with its exit code.
+type exitErr int
+
+func (e exitErr) Error() string { return "exit status " + strconv.Itoa(int(e)) }
+func (e exitErr) ExitCode() int { return int(e) }
+
 func TestWindowsServiceNamesTheCapabilityWhenSSHDIsMissing(t *testing.T) {
-	r := &recorder{answers: map[string]answer{"sc.exe qc": {out: "[SC] OpenService FAILED 1060:", err: errors.New("exit status 1060")}}}
+	r := &recorder{answers: map[string]answer{"sc.exe qc": {out: "[SC] OpenService FAILED 1060:", err: exitErr(1060)}}}
 	_, err := WindowsService{Run: r.run}.Enabled()
 	if err == nil || !strings.Contains(err.Error(), "Add-WindowsCapability -Online -Name OpenSSH.Server") {
 		t.Fatalf("Enabled() = %v, want the capability named", err)
+	}
+	// Another failure whose output carries 1060 is reported as itself.
+	r = &recorder{answers: map[string]answer{"sc.exe qc": {out: "[SC] OpenService FAILED 5: Access is denied (pid 1060)", err: exitErr(5)}}}
+	_, err = WindowsService{Run: r.run}.Enabled()
+	if err == nil || strings.Contains(err.Error(), "not installed") || !strings.Contains(err.Error(), "Access is denied") {
+		t.Fatalf("Enabled() = %v, want sc's own error, not a missing capability", err)
 	}
 }
 
