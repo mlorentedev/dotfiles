@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 )
 
 // laneClaimRepo is a checkout with a lane file whose remote is a local bare
@@ -79,5 +83,70 @@ func TestLaneRelease(t *testing.T) {
 	}
 	if err := runLane(t, "claim", "not-a-number"); err == nil {
 		t.Error("a non-numeric issue must be refused")
+	}
+}
+
+type claimIssues map[int]lane.Issue
+
+func (m claimIssues) Issue(n int) (lane.Issue, error) {
+	if is, ok := m[n]; ok {
+		return is, nil
+	}
+	return lane.Issue{}, errors.New("no such issue")
+}
+
+func TestClaimRowsFlagsAClosedIssueAndLeavesAnUnreadableOneOpen(t *testing.T) {
+	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+	at := now.Add(-90 * time.Minute)
+	rows := claimRows([]lane.Claim{
+		{Issue: 1, Holder: "ana", At: at},
+		{Issue: 2, Holder: "bo", At: at},
+		{Issue: 3, Holder: "cy"},
+	}, claimIssues{1: {State: "CLOSED"}, 2: {State: "OPEN"}}, now)
+
+	if !rows[2].Unknown || rows[0].Unknown || rows[1].Unknown {
+		t.Errorf("unknown flags = %v %v %v, want false false true (a forge that cannot be read is said so)", rows[0].Unknown, rows[1].Unknown, rows[2].Unknown)
+	}
+	if !rows[0].Closed || rows[1].Closed || rows[2].Closed {
+		t.Errorf("closed flags = %v %v %v, want true false false (an unreadable issue is never releasable)", rows[0].Closed, rows[1].Closed, rows[2].Closed)
+	}
+	if rows[0].Age != "1h30m0s" || rows[2].Age != "unknown" {
+		t.Errorf("ages = %q and %q", rows[0].Age, rows[2].Age)
+	}
+	var out strings.Builder
+	if err := writeClaimsTable(&out, rows); err != nil || !strings.Contains(out.String(), "dotf lane release 1 --force") {
+		t.Errorf("table = %q, %v", out.String(), err)
+	}
+}
+
+func TestLaneClaimsListsWhatTheRemoteHolds(t *testing.T) {
+	remote := t.TempDir()
+	if out, err := exec.Command("git", "-C", remote, "init", "-q", "--bare").CombinedOutput(); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	top := laneClaimRepo(t, remote)
+	inDir(t, top)
+	if err := runLane(t, "claim", "2551"); err != nil {
+		t.Fatal(err)
+	}
+	prev := laneRun
+	laneRun = func(name string, args ...string) (string, error) {
+		if name == "gh" {
+			return `{"number":2551,"state":"CLOSED","title":"t","assignees":[]}`, nil
+		}
+		return prev(name, args...)
+	}
+	t.Cleanup(func() { laneRun = prev })
+
+	root := New("test", "test")
+	var out strings.Builder
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"lane", "claims"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "#2551") || !strings.Contains(out.String(), "issue closed") {
+		t.Errorf("output:\n%s", out.String())
 	}
 }

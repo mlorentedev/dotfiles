@@ -234,3 +234,47 @@ func TestClaimIgnoresARefThatOnlyEndsLikeTheClaim(t *testing.T) {
 		t.Errorf("Acquire(7) = %v, want a win: nobody holds it", err)
 	}
 }
+
+func TestClaimList(t *testing.T) {
+	remote := claimRemote(t)
+	a := claimerIn(t, remote, "ana@box-a")
+	b := claimerIn(t, remote, "bo@box-b")
+	if got, err := a.List(); err != nil || len(got) != 0 {
+		t.Fatalf("List on a remote with no claims = %v, %v", got, err)
+	}
+	if _, err := b.Acquire(2552); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Acquire(2551); err != nil {
+		t.Fatal(err)
+	}
+	// A look-alike branch and a non-numeric claim ref are not claims.
+	claimGit(t, a.Dir, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "seed")
+	claimGit(t, a.Dir, "push", "-q", "origin", "HEAD:refs/heads/x/refs/dotf/claims/9", "HEAD:refs/dotf/claims/not-a-number")
+
+	got, err := a.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Issue != 2551 || got[0].Holder != "ana@box-a" || got[1].Issue != 2552 || got[1].Holder != "bo@box-b" {
+		t.Errorf("List = %+v, want #2551 by ana and #2552 by bo, in that order", got)
+	}
+}
+
+// A control character in the holder would break the one-line record and the
+// table that prints it: it is written as "?", and the holder still matches
+// itself when it releases.
+func TestClaimHolderWithControlCharactersRoundTrips(t *testing.T) {
+	remote := claimRemote(t)
+	a := claimerIn(t, remote, "ana@box:/wt/a\tb\nholder: forged")
+	if _, err := a.Acquire(2551); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := a.Holder(2551)
+	if err != nil || !ok || strings.ContainsAny(got.Holder, "\t\n") || got.Holder != "ana@box:/wt/a?b?holder: forged" {
+		t.Fatalf("Holder = %+v, %v, %v; want the control characters replaced", got, ok, err)
+	}
+	if err := a.Release(2551, false); err != nil {
+		t.Errorf("a holder must release its own claim without --force: %v", err)
+	}
+}

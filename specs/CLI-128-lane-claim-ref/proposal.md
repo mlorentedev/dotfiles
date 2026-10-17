@@ -29,7 +29,7 @@ A claim is the ref `refs/dotf/claims/<issue>` (form (a), accepted by the owner o
 - `lane next` does not set the forge assignee. `Next` skips assigned issues, so assigning would turn a second invocation for the same item into a second lane; the claim ref is the record, and `lane status` shows it.
 - The holder is the checkout (`user@host:<worktree>`), not the process: `lane claim` and a later `lane release` from one worktree are the same claimant, two sessions in two worktrees are not.
 - `dotf lane claim <issue>` and `dotf lane release <issue>` expose the same primitive to every harness, the autopilot skill included: one implementation, no Claude-only path.
-- `lane status` shows a claim and its age. A stale claim is a human decision, as adoption is (D2): `release --force` is the resolving command, never an automatic expiry.
+- `dotf lane claims` shows every claim with its holder and age, and flags one whose issue is closed. A stale claim is a human decision, as adoption is (D2): `release --force` is the resolving command, never an automatic expiry.
 - The claim push skips the repository's pre-push hooks: it publishes no branch, and the spec gate reads a branch.
 
 ## Out of scope
@@ -37,11 +37,11 @@ A claim is the ref `refs/dotf/claims/<issue>` (form (a), accepted by the owner o
 - Editing the autopilot skill or other harness files (frozen paths); this change ships the verbs they call.
 - Automatic expiry or takeover of a stale claim.
 - Landing, the queue order, and the iris backend.
-- Running the probe against Gitea from this session: the Gitea host is the owner's; the probe is shipped as an opt-in test and its result recorded when run.
+- Automatic release of a claim on land or park (see `verification.md`).
 
 ## Risks / open questions
 
-- A forge may refuse a non-branch ref or a custom namespace. GitHub is believed to accept it and Gitea likewise, both from recall. The opt-in probe test (`DOTF_CLAIM_PROBE_REMOTE`) pushes the form with an empty expected value, pushes again to confirm the refusal, and deletes the ref; the first push to a real remote needs the owner's go-ahead. Until a forge passes, ADR-050 decision 2 stays open for it.
+- A forge may refuse a non-branch ref or a custom namespace. Resolved 2026-10-17: the opt-in probe test (`DOTF_CLAIM_PROBE_REMOTE`) passed on GitHub and on Gitea, and ADR-050 decision 2 is decided. A forge not yet probed is probed by the same test.
 - A dead session leaves a claim that nobody releases. The age is shown and a human releases it; an expiry would be a second source of truth.
 - A forge outage or a missing push right stops claims: `lane next` fails closed with the reason and starts nothing, as an outage already stops CI.
 - Reading the holder needs the claim commit's object: `Holder` fetches the ref into a private namespace and reads the message, so the claim carries its own identity with no extra store.
@@ -54,7 +54,7 @@ A claim is the ref `refs/dotf/claims/<issue>` (form (a), accepted by the owner o
 - [ ] AC4: `lane next` claims before it starts, skips to the next free item on a loss and starts nothing for the loser or when the claim cannot be taken.
 - [ ] AC5: `lane release` deletes a claim its caller holds, refuses another holder's without `--force`, and a second release is a no-op.
 - [ ] AC6: the claim ref is not fetched by a default clone and appears in no branch list.
-- [ ] AC7: the ref form is verified by the probe on GitHub and on Gitea and ADR-050 decision 2 is amended from open to decided.
+- [x] AC7: the ref form is verified by the probe on GitHub and on Gitea and ADR-050 decision 2 is amended from open to decided.
 
 ## References
 
