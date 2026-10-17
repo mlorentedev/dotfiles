@@ -310,7 +310,8 @@
       "profile": "full",
       "source": {
         "type": "system",
-        "cask": "veracrypt"
+        "cask": "veracrypt",
+        "needs_sudo": true
       }
     },
     {
