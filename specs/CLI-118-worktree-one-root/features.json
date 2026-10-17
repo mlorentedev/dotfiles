@@ -9,21 +9,21 @@
   {
     "id": "CLI-118-worktree-one-root-path",
     "behavior": "add places the worktree at <root>/<repo>/<slugify(branch)>, matching herdr 0.9.3",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'TestResolveWorktreePath'",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestResolveWorktreePath|TestAddUnderWorktreeRoot'",
     "state": "passing",
     "evidence": "TestResolveWorktreePath, TestAddUnderWorktreeRoot, TestAddUnderWorktreeRootFollowsBranch (PR 1)"
   },
   {
     "id": "CLI-118-worktree-one-root-branch",
     "behavior": "add refuses a branch that is not <type>/<kebab-slug> or carries a phase token",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'TestValidateBranch'",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestValidateBranch|TestAddRefusesAnInvalidBranchBeforeCreatingAnything|TestPlanningTokensMatchTheEnforcedRule'",
     "state": "passing",
     "evidence": "TestValidateBranch, TestAddRefusesAnInvalidBranchBeforeCreatingAnything, TestPlanningTokensMatchTheEnforcedRule (PR 2)"
   },
   {
     "id": "CLI-118-worktree-one-root-agent",
     "behavior": "add --agent opens the worktree in herdr, starts the agent and submits the prompt, without waiting",
-    "verification": "cd cli && go test ./internal/herdr/ -run 'TestLaunch'",
+    "verification": "cd cli && go test ./internal/herdr/ -run 'TestLaunch|TestPreflightNamesTheStateItRefuses'",
     "state": "passing",
     "evidence": "TestLaunchOpensStartsAndPromptsWithoutWaiting, TestLaunchFailsOnANotReadyOrBlockedAgent, TestPreflightNamesTheStateItRefuses (PR 6), against a fake herdr"
   },

@@ -48,17 +48,17 @@ Worktrees live in two layouts at once. `dotf worktree add` creates `<repo>-wt-<s
 
 ## Acceptance criteria
 
-- [ ] AC1: `WORKTREE_ROOT` is declared once in `env-contract.json`. `dotf deploy` renders it into herdr `config.toml`, agy `trustedWorkspaces` and Copilot `trustedFolders`, and a test fails if any of the three diverges.
-- [ ] AC2: `dotf worktree add foo` creates `<root>/<repo>/feat-foo` from the remote default branch on branch `feat/foo` and writes the lease. The slugify table test pins exactly the four measured herdr 0.9.3 rows.
-- [ ] AC3: `add` refuses a branch that is not `<type>/<kebab-slug>`, or that carries a phase/milestone token, naming the rule. Table-driven test.
-- [ ] AC4: `add --agent <h> --prompt-file <f>` with a fake `herdr` calls, in order, `worktree open --cwd --path`, `agent start --kind --pane <root_pane>` and `agent prompt <name> <text>` without `--wait`, then returns. With herdr absent or its server down, or an agent of the same name live, it refuses before creating anything, naming the state. `agent_not_ready` and `agent_blocked` exit non-zero without sending (or after failing to send) the prompt.
-- [ ] AC5: `list` shows `unadopted` for a herdr-created worktree under the root. `adopt` writes the lease. `sweep` reaps an adopted merged worktree and refuses an unadopted one.
-- [ ] AC6: `done <slug>` resolves under the new root and the legacy sibling, refuses ambiguity, and deletes the local branch only after a verified landing, printing the SHA.
-- [ ] AC7: `done`, `sweep` and `migrate` refuse a target containing the caller's cwd or ancestor regardless of `--force`. They also refuse one whose Claude project dir has a transcript under 6h old: `done` unless `--ignore-recent-session` is passed, `sweep` and `migrate` by skipping it with the reason printed, with no override. Tests cover both directions with a fake transcript directory (#1653 AC1, AC2, AC4).
-- [ ] AC8: `migrate --dry-run` lists every `<repo>-wt-*` with its target. `migrate` moves them with `git worktree move` and skips (naming why) any refused by AC7 or whose target exists. A second run reports nothing to do.
+- [x] AC1: `WORKTREE_ROOT` is declared once in `env-contract.json`. `dotf deploy` renders it into herdr `config.toml`, agy `trustedWorkspaces` and Copilot `trustedFolders`, and a test fails if any of the three diverges.
+- [x] AC2: `dotf worktree add foo` creates `<root>/<repo>/feat-foo` from the remote default branch on branch `feat/foo` and writes the lease. The slugify table test pins exactly the four measured herdr 0.9.3 rows.
+- [x] AC3: `add` refuses a branch that is not `<type>/<kebab-slug>`, or that carries a phase/milestone token, naming the rule. Table-driven test.
+- [x] AC4: `add --agent <h> --prompt-file <f>` with a fake `herdr` calls, in order, `worktree open --cwd --path`, `agent start --kind --pane <root_pane>` and `agent prompt <name> <text>` without `--wait`, then returns. With herdr absent or its server down, or an agent of the same name live, it refuses before creating anything, naming the state. `agent_not_ready` and `agent_blocked` exit non-zero without sending (or after failing to send) the prompt.
+- [x] AC5: `list` shows `unadopted` for a herdr-created worktree under the root. `adopt` writes the lease. `sweep` reaps an adopted merged worktree and refuses an unadopted one.
+- [x] AC6: `done <slug>` resolves under the new root and the legacy sibling, refuses ambiguity, and deletes the local branch only after a verified landing, printing the SHA.
+- [x] AC7: `done`, `sweep` and `migrate` refuse a target containing the caller's cwd or ancestor regardless of `--force`. They also refuse one whose Claude project dir has a transcript under 6h old: `done` unless `--ignore-recent-session` is passed, `sweep` and `migrate` by skipping it with the reason printed, with no override. Tests cover both directions with a fake transcript directory (#1653 AC1, AC2, AC4).
+- [x] AC8: `migrate --dry-run` lists every `<repo>-wt-*` with its target. `migrate` moves them with `git worktree move` and skips (naming why) any refused by AC7 or whose target exists. A second run reports nothing to do.
 - [x] AC9: AGENTS.md §9 and the `using-git-worktrees` and `handoff` skills (vault source, re-deployed) state the new layout. The handoff skill no longer removes the session's own worktree.
 - [x] AC10: ADR-032 carries the dispatch clarification.
-- [ ] AC11: the tests pass under bash and zsh for the shell layer and on Linux and macOS for Go. `GOOS=windows go vet ./...` is clean, and the Windows leg is covered with fakes.
+- [x] AC11: the tests pass under bash and zsh for the shell layer and on Linux and macOS for Go. `GOOS=windows go vet ./...` is clean, and the Windows leg is covered with fakes.
 
 ## References
 
