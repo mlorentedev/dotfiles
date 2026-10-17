@@ -31,6 +31,16 @@ func (Sudo) Run(argv ...string) ([]byte, error) {
 	return exec.Command("sudo", append([]string{"-n"}, argv...)...).CombinedOutput() //nolint:gosec // the target's fixed commands
 }
 
+// RootFor is how the target gets root on goos: sudo, asking on terminal,
+// or on Windows the process's own elevation, since UAC has no credential
+// cache a batch of commands could share.
+func RootFor(goos string, terminal func() (*os.File, bool)) Root {
+	if goos == "windows" {
+		return Elevated{Exec: Exec}
+	}
+	return Sudo{Terminal: terminal}
+}
+
 // Exec runs a command as the current user and returns its combined output.
 func Exec(argv ...string) ([]byte, error) {
 	return exec.Command(argv[0], argv[1:]...).CombinedOutput() //nolint:gosec // the target's fixed commands

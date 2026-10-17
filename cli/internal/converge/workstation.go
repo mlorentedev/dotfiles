@@ -15,28 +15,29 @@ import (
 // SSH from the mesh and from nothing else (#2356, #2013 A1). The plan reads
 // without root. The apply asks for root once on the terminal, and without a
 // terminal it is skipped with the plan as its reason (ADR-045 amendment
-// 2026-10-12). Every apply, and every probe, ends with sshd accepting the
+// 2026-10-12); on Windows it runs only in an elevated process, and is skipped
+// the same way in any other. Every apply, and every probe, ends with sshd accepting the
 // owner's key from the mesh address and refusing it from the LAN address.
 type workstationTarget struct {
 	root  sshtarget.Root   // sudo on the terminal in production
 	run   sshtarget.Runner // the user's commands: launchctl print, ssh
 	addrs func() ([]net.IP, error)
-	paths func(home string) sshtarget.Paths
+	paths func(goos, home string) sshtarget.Paths
 	user  func() (string, error)
 }
 
 func (workstationTarget) Name() string { return "workstation-target" }
 
-// Platforms is where sshd has a service manager the target drives: launchd
-// and systemd. Windows follows (#2356, PLAT-001b PR 7e).
-func (workstationTarget) Platforms() []string { return []string{"darwin", "linux"} }
+// Platforms is where sshd has a service manager the target drives: launchd,
+// systemd and the Windows service control manager (#2356, PLAT-001b PR 7e).
+func (workstationTarget) Platforms() []string { return []string{"darwin", "linux", "windows"} }
 
 func (r workstationTarget) target(e Env) (sshtarget.Target, error) {
 	u, err := r.user()
 	if err != nil {
 		return sshtarget.Target{}, err
 	}
-	t, err := sshtarget.New(e.RepoRoot, u, e.GOOS, r.paths(e.Home), r.run, r.addrs)
+	t, err := sshtarget.New(e.RepoRoot, u, e.GOOS, r.paths(e.GOOS, e.Home), r.run, r.addrs)
 	t.Root = r.root
 	return t, err
 }
@@ -68,7 +69,7 @@ func (r workstationTarget) Reconcile(e Env, dryRun bool) (Result, error) {
 		return res, nil
 	}
 	err = t.Apply(p)
-	if errors.Is(err, sshtarget.ErrNoTerminal) {
+	if errors.Is(err, sshtarget.ErrNoTerminal) || errors.Is(err, sshtarget.ErrNotElevated) {
 		return Result{Skip: err.Error() + "; " + workstationDetail(p, true)}, nil
 	}
 	return res, err

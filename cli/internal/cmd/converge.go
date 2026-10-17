@@ -191,7 +191,7 @@ var convergeOptions = func() converge.Options {
 		ResolvePath:   env.ResolvePath,
 		Launchctl:     env.ExecLaunchctl,
 		UID:           os.Getuid(),
-		SSHRoot:       sshtarget.Sudo{Terminal: identityTerminal},
+		SSHRoot:       sshtarget.RootFor(runtime.GOOS, identityTerminal),
 		UserRun:       sshtarget.Exec,
 		Claude:        claudeSyncer,
 		AgyPaths:      agyPaths,

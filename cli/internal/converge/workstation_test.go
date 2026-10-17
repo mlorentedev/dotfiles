@@ -53,7 +53,7 @@ func workstationFixture(t *testing.T, root sshtarget.Root) (workstationTarget, E
 			return nil, errors.New("exit status 113")
 		},
 		addrs: func() ([]net.IP, error) { return []net.IP{net.ParseIP("100.64.0.15")}, nil },
-		paths: func(string) sshtarget.Paths { return paths },
+		paths: func(string, string) sshtarget.Paths { return paths },
 		user:  func() (string, error) { return "manu", nil },
 	}
 	return r, Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
@@ -97,17 +97,22 @@ func TestWorkstationTarget_PlanNeedsNoRoot(t *testing.T) {
 	}
 }
 
-func TestWorkstationTarget_ApplyWithoutATerminalIsSkippedWithThePlan(t *testing.T) {
-	r, e := workstationFixture(t, noRoot{t: t, ready: sshtarget.ErrNoTerminal})
-	if _, err := env.SetMachineRole(env.MachinePath(e.Home), env.RoleSSHTarget, true); err != nil {
-		t.Fatal(err)
-	}
-	res, err := r.Reconcile(e, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(res.Skip, "no terminal") || !strings.Contains(res.Skip, "to apply as root") {
-		t.Fatalf("Reconcile = %+v; want a skip carrying the plan", res)
+func TestWorkstationTarget_ApplyWithoutRootIsSkippedWithThePlan(t *testing.T) {
+	for why, ready := range map[string]error{
+		"no terminal":              sshtarget.ErrNoTerminal,  // sudo with nothing to ask on
+		"administrator rights are": sshtarget.ErrNotElevated, // Windows, not elevated
+	} {
+		r, e := workstationFixture(t, noRoot{t: t, ready: ready})
+		if _, err := env.SetMachineRole(env.MachinePath(e.Home), env.RoleSSHTarget, true); err != nil {
+			t.Fatal(err)
+		}
+		res, err := r.Reconcile(e, false)
+		if err != nil {
+			t.Fatalf("%s: %v", why, err)
+		}
+		if !strings.Contains(res.Skip, why) || !strings.Contains(res.Skip, "to apply as root") {
+			t.Fatalf("Reconcile = %+v; want a skip naming %q and carrying the plan", res, why)
+		}
 	}
 }
 

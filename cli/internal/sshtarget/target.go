@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -49,8 +50,13 @@ type Paths struct {
 	DropIn         string
 	HostKey        string // the ed25519 host public key
 	AuthorizedKeys string
-	ClientKey      string // the private key the probe offers
-	LogindDropIn   string // Linux: the lid policy (Logind)
+	// AdminKeys says AuthorizedKeys is a root-owned file that only
+	// administrators may read: Windows' administrators_authorized_keys,
+	// which sshd reads for every member of Administrators instead of the
+	// account's own ~/.ssh/authorized_keys.
+	AdminKeys    bool
+	ClientKey    string // the private key the probe offers
+	LogindDropIn string // Linux: the lid policy (Logind)
 	// Linux, UFW: its switch, its input policy, the rule files, and the
 	// witness of the rule files the last apply read as root.
 	UFWConf         string
@@ -77,6 +83,40 @@ func DefaultPaths(home string) Paths {
 	}
 }
 
+// WindowsPaths are the locations of the OpenSSH.Server capability under
+// programData (%ProgramData%). The owner is an administrator, since only an
+// administrator can run the apply, so sshd reads the owner's key from
+// administrators_authorized_keys and never from home.
+func WindowsPaths(programData, home string) Paths {
+	ssh := winJoin(programData, "ssh")
+	return Paths{
+		SSHDConfig:     winJoin(ssh, "sshd_config"),
+		DropIn:         winJoin(ssh, "sshd_config.d", "01-workstation.conf"),
+		HostKey:        winJoin(ssh, "ssh_host_ed25519_key.pub"),
+		AuthorizedKeys: winJoin(ssh, "administrators_authorized_keys"),
+		AdminKeys:      true,
+		ClientKey:      winJoin(home, ".ssh", "id_ed25519"),
+	}
+}
+
+// PathsFor are the locations on goos for the account whose home is home.
+func PathsFor(goos, home string) Paths {
+	if goos != "windows" {
+		return DefaultPaths(home)
+	}
+	pd := os.Getenv("ProgramData")
+	if pd == "" {
+		pd = `C:\ProgramData`
+	}
+	return WindowsPaths(pd, home)
+}
+
+// winJoin joins with Windows' separator whatever the host, so the paths are
+// the same when a test builds them on macOS.
+func winJoin(elem ...string) string {
+	return strings.Join(elem, `\`)
+}
+
 // The repo files a target is built from, relative to the checkout.
 const (
 	KeyFile      = "ssh/id_ed25519.pub"
@@ -89,11 +129,11 @@ const (
 func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
 	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs}
 	var err error
-	if t.Service, err = ServiceFor(goos, run); err != nil {
+	if t.Service, err = ServiceFor(goos, run, paths); err != nil {
 		return t, err
 	}
 	t.Power = PowerFor(goos, run, paths)
-	t.Firewall, t.FirewallNote = FirewallFor(goos, paths)
+	t.Firewall, t.FirewallNote = FirewallFor(goos, run, paths)
 	t.MeshAtBoot = MeshAtBootFor(goos, run)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
@@ -109,7 +149,27 @@ func CurrentUser() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if runtime.GOOS == "windows" {
+		return windowsAccount(u.Username, os.Getenv("COMPUTERNAME"))
+	}
 	return u.Username, nil
+}
+
+// windowsAccount is the name AllowUsers matches a local Windows account by:
+// Windows reports MACHINE\name, sshd matches the bare name, and Win32-OpenSSH
+// documents account names in its Allow and Deny directives as lower case. A
+// domain account would need the domain in the pattern, which the template
+// does not render, so it is refused rather than written as a line that
+// matches nobody.
+func windowsAccount(username, computer string) (string, error) {
+	domain, name, found := strings.Cut(username, `\`)
+	if !found {
+		return strings.ToLower(username), nil
+	}
+	if !strings.EqualFold(domain, computer) {
+		return "", fmt.Errorf("%s is a domain account; the SSH target opens sshd to local accounts only", username)
+	}
+	return strings.ToLower(name), nil
 }
 
 // Service turns sshd on and off on one OS.
@@ -534,7 +594,32 @@ func directives(data []byte) []string {
 	return keys
 }
 
+// fileRoot is a Root that writes root-owned files itself, where the OS has no
+// `install`: Elevated on Windows.
+type fileRoot interface {
+	Install(path string, data []byte) error
+	InstallAdminOnly(path string, data []byte) error
+	Remove(path string) error
+}
+
+// adminFiles is the root that may write AuthorizedKeys when only
+// administrators may: one that writes files itself and sets their ACL.
+func (t Target) adminFiles() (fileRoot, error) {
+	fr, ok := t.Root.(fileRoot)
+	if !ok {
+		return nil, fmt.Errorf("%s is readable by administrators only, and this root cannot set that ACL", t.Paths.AuthorizedKeys)
+	}
+	return fr, nil
+}
+
 func (t Target) writeKeys(data []byte) error {
+	if t.Paths.AdminKeys {
+		fr, err := t.adminFiles()
+		if err != nil {
+			return err
+		}
+		return fr.InstallAdminOnly(t.Paths.AuthorizedKeys, data)
+	}
 	if err := os.MkdirAll(filepath.Dir(t.Paths.AuthorizedKeys), 0o700); err != nil {
 		return err
 	}
@@ -542,6 +627,13 @@ func (t Target) writeKeys(data []byte) error {
 }
 
 func (t Target) restoreKeys(prev []byte) error {
+	if prev == nil && t.Paths.AdminKeys {
+		fr, err := t.adminFiles()
+		if err != nil {
+			return err
+		}
+		return fr.Remove(t.Paths.AuthorizedKeys)
+	}
 	if prev == nil {
 		return os.Remove(t.Paths.AuthorizedKeys)
 	}
@@ -552,8 +644,12 @@ func (t Target) installRoot(path string, data []byte) error { return installRoot
 
 func (t Target) restoreRoot(path string, prev []byte) error { return restoreRoot(t.Root, path, prev) }
 
-// installRoot writes data to a root-owned path through a file of the user's.
+// installRoot writes data to a root-owned path through a file of the user's,
+// or, for a root that writes files itself, through that root.
 func installRoot(root Root, path string, data []byte) error {
+	if fr, ok := root.(fileRoot); ok {
+		return fr.Install(path, data)
+	}
 	f, err := os.CreateTemp("", "workstation-dropin-*")
 	if err != nil {
 		return err
@@ -575,6 +671,9 @@ func installRoot(root Root, path string, data []byte) error {
 func restoreRoot(root Root, path string, prev []byte) error {
 	if prev != nil {
 		return installRoot(root, path, prev)
+	}
+	if fr, ok := root.(fileRoot); ok {
+		return fr.Remove(path)
 	}
 	if out, err := root.Run("rm", "-f", path); err != nil {
 		return fmt.Errorf("remove %s: %w: %s", path, err, bytes.TrimSpace(out))

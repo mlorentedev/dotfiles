@@ -139,12 +139,14 @@ func (Systemd) Validate(root Root) error {
 }
 
 // ServiceFor is sshd's service manager on goos.
-func ServiceFor(goos string, run Runner) (Service, error) {
+func ServiceFor(goos string, run Runner, paths Paths) (Service, error) {
 	switch goos {
 	case "darwin":
 		return Launchd{Run: run}, nil
 	case "linux":
 		return Systemd{Run: run}, nil
+	case "windows":
+		return WindowsService{Run: run, Config: paths.SSHDConfig}, nil
 	}
 	return nil, fmt.Errorf("no sshd service manager for %s", goos)
 }
