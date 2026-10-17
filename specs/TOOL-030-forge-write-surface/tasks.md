@@ -40,7 +40,7 @@ created: "2026-10-16"
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 
 **PR 3: the guard**
-- [ ] [AC5] Extend ADR-048's session-level allow lists (`harness/capability-map.json` and its leaves) with `dotf forge` and let that guard assert it, one case per harness, instead of a second file; if ADR-048's renderer is not there yet, a `tests/harness-permits-dotf.bats` stands in and is folded into it later. Passes under bash 3.2 and zsh
+- [x] [AC5] Extend ADR-048's session-level allow lists (`harness/capability-map.json` and its leaves) with `dotf forge` and let that guard assert it, one case per harness, instead of a second file; if ADR-048's renderer is not there yet, a `tests/harness-permits-dotf.bats` stands in and is folded into it later. Passes under bash 3.2 and zsh Delivered as the stand-in: `harness/capability-map.json` has no session-level section yet (ADR-048 decision 3 is unbuilt), so `tests/harness-permits-dotf.bats` ships now (#2651) and is folded into the map guard when that lands.
 
 **PR 4: skills and the allow set (owner lands)**
 - [ ] [AC7] `new-ticket`, `pr-review-triage` and `autopilot` call `dotf forge` (vault edit, then refresh the records)
