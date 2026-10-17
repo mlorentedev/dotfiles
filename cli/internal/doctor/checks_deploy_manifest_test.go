@@ -396,3 +396,31 @@ func TestCheckDeployManifest_ModeDrift(t *testing.T) {
 		}
 	})
 }
+
+// #2638: doctor compares against the source rendered with the root in force
+// now, so a WORKTREE_ROOT moved after a deploy is drift (herdr keeps the old
+// root until `dotf deploy`), and the root the file was deployed with is not.
+func TestCheckDeployManifest_AMovedWorktreeRootIsDrift(t *testing.T) {
+	for _, tc := range []struct {
+		root string
+		want Status
+		line string
+	}{
+		{"/old/root", StatusPass, "1 deployed config(s) in sync"},
+		{"/new/root", StatusWarn, "dotf deploy w"},
+	} {
+		t.Run(tc.root, func(t *testing.T) {
+			repo, home := t.TempDir(), t.TempDir()
+			writeFile(t, filepath.Join(repo, "ai", "deploy.json"), `{"version":3,"configs":[
+  {"name":"w","src":"ai/w.json","dst":"{HOME}/.w/config.json","render":false,"mode":"0644","strategy":"merge","paths":"slash"}]}`)
+			writeFile(t, filepath.Join(repo, "ai", "w.json"), `{"directory":"{WORKTREE_ROOT}"}`)
+			writeFile(t, filepath.Join(home, ".w", "config.json"), `{"directory":"/old/root"}`)
+			t.Setenv("WORKTREE_ROOT", tc.root)
+
+			out := runCheckDeployManifest(t, repo, home, nil)
+			if got := statusOfLine(out, tc.line); got != tc.want {
+				t.Errorf("WORKTREE_ROOT=%s: want %v on %q, got %v\n%s", tc.root, tc.want, tc.line, got, out)
+			}
+		})
+	}
+}
