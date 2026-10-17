@@ -75,7 +75,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - the plan on darwin lists `power policy` (`TestWorkstationTarget_PlanNeedsNoRoot`, 5 changes); doctor reads pmset and never sets it (`TestCheckWorkstationTarget_ByStatus`)
 - Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --only workstation-target --plan`:
   `[CHANGE] workstation-target   15ms  to apply as root: power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; firewall not managed on darwin yet: sshd's AllowUsers is the only fence` / `1 to change, 0 ok, 0 opaque, 0 skipped, 0 failed`; `dotf doctor` -> `[WARN] differs from the declared state: power policy; run dotf converge --only workstation-target (it asks for root once)`
-- Not run: the apply, which needs the owner at the sudo prompt
+- Accepted live on the macmini (dotf 0.74.0, darwin/arm64, 2026-10-17), from the main checkout:
+  - the owner's attended `dotf converge --only workstation-target`, root asked once: `[CHANGE] workstation-target   5.9s  applied: power policy; sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; ...` / `1 changed, 0 ok, 0 opaque, 0 skipped, 0 failed` (transcript `converge/runs/20261017T185557Z.log`)
+  - the same command again, no root: `[ OK ]   workstation-target  332ms  converged; ...` / `0 changed, 1 ok, 0 opaque, 0 skipped, 0 failed` (`20261017T185629Z.log`)
+  - `pmset -g custom`, AC Power: `sleep 0`, `disksleep 0`, `womp 1`, `autorestart 1`, `powernap 1`, `displaysleep 15`, `autorestartatconnect 0`. Before the step the macmini read `disksleep 10`, `autorestart 0`; nothing else moved
+  - `dotf doctor`, *Workstation SSH target*: the power WARN is gone; the one WARN left is the tailscale app note of the mesh-service row, which is report-only
 - Test suite (PR 7d, mesh service, on main after #2675, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues
 - What the mesh-service tests prove, against injected runners:
   - macOS reads the tailscaled launchd job and names the login a reboot needs without it: `TestMeshAtBootOnDarwinReadsTheTailscaledDaemon`
