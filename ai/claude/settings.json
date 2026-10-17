@@ -82,6 +82,7 @@
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(gh search:*)",
       "Bash(gh issue list:*)",
+      "Bash(gh issue create:*)",
       "Bash(gh run view:*)",
       "Bash(gh pr diff:*)"
     ]
