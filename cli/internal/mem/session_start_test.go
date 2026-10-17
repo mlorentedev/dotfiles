@@ -242,6 +242,38 @@ func TestLessonsStaleness(t *testing.T) {
 			t.Errorf("got %q", got)
 		}
 	})
+
+	// CLI-131: there is no committed _index.md to stat, so the newest lesson
+	// stands for the directory. A directory with no index used to read as "no
+	// lessons" and the warning died in silence.
+	dated := func(t *testing.T, dir, rel string, at time.Time) {
+		t.Helper()
+		p := filepath.Join(dir, "docs", "lessons", rel)
+		mustWrite(t, p, "x\n")
+		if err := os.Chtimes(p, at, at); err != nil {
+			t.Fatalf("chtimes: %v", err)
+		}
+	}
+	old := now.Add(-100 * 24 * time.Hour)
+
+	t.Run("an old newest lesson is flagged with no index present", func(t *testing.T) {
+		dir := t.TempDir()
+		dated(t, dir, "lesson-001-a.md", old)
+		dated(t, dir, "lesson-002-b.md", old)
+		got := lessonsStaleness(dir, 14, now)
+		if !strings.HasPrefix(got, "\n[lessons] docs/lessons/ not updated in >14 days") {
+			t.Errorf("got %q", got)
+		}
+	})
+
+	t.Run("one fresh lesson keeps it silent, whichever directory holds it", func(t *testing.T) {
+		dir := t.TempDir()
+		dated(t, dir, "lesson-001-a.md", old)
+		dated(t, dir, filepath.Join("category", "lesson-002-b.md"), now)
+		if got := lessonsStaleness(dir, 14, now); got != "" {
+			t.Errorf("want empty, got %q", got)
+		}
+	})
 }
 
 // --- Brief assembly ----------------------------------------------------------

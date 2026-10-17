@@ -1,7 +1,9 @@
-// Package lessons keeps a repository's lessons in one format and their index
-// generated from them (DOCS-020, #2038). Each lesson file is the source of
-// truth for its title and date; the index table is derived, so it can never
-// disagree with the files and a conflict on it is resolved by re-running fmt.
+// Package lessons keeps a repository's lessons in one format and renders their
+// index on read (DOCS-020, #2038; CLI-131). Each lesson file is the source of
+// truth for its title and date. The index is never committed: two PRs that each
+// add a lesson would conflict on it, and under a merge queue a conflict ejects
+// the PR. It is rendered on demand by Index, so it cannot disagree with the
+// files.
 package lessons
 
 import (
@@ -41,9 +43,7 @@ var leadingKeys = []string{"id", "type", "status", "title", "created"}
 // Normalize returns the lesson's canonical form and what it declares:
 // frontmatter with id (the file name), type, status, title and created, an H1
 // equal to the title, and the date in one place. The body is left as written.
-// seedTitle is used only when the file declares no title yet (the one-time
-// migration from a hand-kept index).
-func Normalize(name string, raw []byte, seedTitle string) (Lesson, []byte, error) {
+func Normalize(name string, raw []byte) (Lesson, []byte, error) {
 	m := fileRE.FindStringSubmatch(name)
 	if m == nil {
 		return Lesson{}, nil, fmt.Errorf("%s: not a lesson-NNN-<slug>.md file", name)
@@ -61,7 +61,7 @@ func Normalize(name string, raw []byte, seedTitle string) (Lesson, []byte, error
 	if h1 == nil {
 		return Lesson{}, nil, fmt.Errorf("%s: no H1 title", name)
 	}
-	l.Title = firstNonEmpty(fm.get("title"), seedTitle, h1PrefixRE.ReplaceAllString(h1[1], ""))
+	l.Title = firstNonEmpty(fm.get("title"), h1PrefixRE.ReplaceAllString(h1[1], ""))
 
 	body = removeInlineDate(body, l.Created)
 	body = strings.Replace(body, h1[0], "# "+l.Title, 1)
@@ -193,67 +193,64 @@ func slicesDelete(s []string, v string) []string {
 	return out
 }
 
-// Index markers delimit the generated table inside _index.md; everything
-// outside them is the index's own prose and is kept.
-const (
-	IndexBegin = "<!-- BEGIN GENERATED: dotf lessons fmt — edit the lesson files, not this table -->"
-	IndexEnd   = "<!-- END GENERATED -->"
-)
-
-var rowRE = regexp.MustCompile(`(?m)^\| \[\d+ - (.*?)\]\((lesson-[^)]+\.md)\) \|`)
-
-// IndexTitles reads the titles a hand-kept index gives each lesson file: the
-// seed for files that do not declare a title yet.
-func IndexTitles(index []byte) map[string]string {
-	out := map[string]string{}
-	for _, m := range rowRE.FindAllSubmatch(index, -1) {
-		out[string(m[2])] = strings.ReplaceAll(string(m[1]), `\|`, "|")
-	}
-	return out
-}
-
-// RenderIndex returns index with its generated table replaced by one built
-// from lessons, sorted by number. An index without markers has its first
-// table (the hand-kept one) replaced, and gains the markers.
-func RenderIndex(index []byte, lessons []Lesson) []byte {
+// renderTable renders lessons as one markdown table sorted by number, each link
+// prefixed with rel (the directory below the root, "" for the root).
+func renderTable(lessons []Lesson, rel string) string {
 	sort.Slice(lessons, func(i, j int) bool { return lessons[i].Number < lessons[j].Number })
-	var t bytes.Buffer
-	t.WriteString(IndexBegin + "\n| Lesson | Date |\n|---|---|\n")
+	var t strings.Builder
+	t.WriteString("| Lesson | Date |\n|---|---|\n")
 	for _, l := range lessons {
-		fmt.Fprintf(&t, "| [%03d - %s](%s) | %s |\n", l.Number, strings.ReplaceAll(l.Title, "|", `\|`), l.File, l.Created)
+		fmt.Fprintf(&t, "| [%03d - %s](%s%s) | %s |\n", l.Number, strings.ReplaceAll(l.Title, "|", `\|`), rel, l.File, l.Created)
 	}
-	t.WriteString(IndexEnd + "\n")
-	s := strings.ReplaceAll(string(index), "\r\n", "\n")
-	if b := strings.Index(s, IndexBegin); b >= 0 {
-		if e := strings.Index(s[b:], IndexEnd); e >= 0 {
-			rest := strings.TrimPrefix(s[b+e+len(IndexEnd):], "\n")
-			return []byte(s[:b] + t.String() + rest)
-		}
-	}
-	start, end := firstTable(s)
-	if start < 0 {
-		return []byte(strings.TrimRight(s, "\n") + "\n\n" + t.String())
-	}
-	return []byte(s[:start] + t.String() + s[end:])
+	return t.String()
 }
 
-// firstTable returns the byte span of the first markdown table, or -1.
-func firstTable(s string) (int, int) {
-	start, pos := -1, 0
-	for _, line := range strings.SplitAfter(s, "\n") {
-		isRow := strings.HasPrefix(line, "|")
-		switch {
-		case isRow && start < 0:
-			start = pos
-		case !isRow && start >= 0:
-			return start, pos
+// Index renders the index of the lessons under dir: a table for the lessons in
+// dir itself, then one section per first-level category directory that holds
+// lessons. It reads only, and a lesson that cannot be normalised is an error,
+// never a missing row.
+func Index(dir string) ([]byte, error) {
+	dirs, err := lessonDirs(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out strings.Builder
+	out.WriteString("# Lessons\n")
+	seen := map[int]string{}
+	for _, d := range dirs {
+		ls, _, err := readDir(d, seen)
+		if err != nil {
+			return nil, err
 		}
-		pos += len(line)
+		if len(ls) == 0 {
+			continue
+		}
+		rel := ""
+		if d != dir {
+			name := filepath.Base(d)
+			out.WriteString("\n## " + name + "\n")
+			rel = name + "/"
+		}
+		out.WriteString("\n" + renderTable(ls, rel))
 	}
-	if start >= 0 {
-		return start, len(s)
+	return []byte(out.String()), nil
+}
+
+// StrayIndexes names every committed _index.md under dir. fmt no longer reads
+// or writes one: a repository that still commits it holds a table nothing
+// regenerates, so --check reports it rather than let it go stale in silence.
+func StrayIndexes(dir string) ([]string, error) {
+	dirs, err := lessonDirs(dir)
+	if err != nil {
+		return nil, err
 	}
-	return -1, -1
+	var out []string
+	for _, d := range dirs {
+		if p := filepath.Join(d, "_index.md"); fileExists(p) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }
 
 // Change is one file fmt would rewrite.
@@ -263,8 +260,8 @@ type Change struct {
 }
 
 // Plan normalises every lesson under dir and its first-level category
-// directories, and regenerates each directory's _index.md. It reads only.
-// A number used twice anywhere in the tree is an error.
+// directories. It reads only. A number used twice anywhere in the tree is an
+// error, and so is a wikilink that names no lesson.
 func Plan(dir string) ([]Change, error) {
 	dirs, err := lessonDirs(dir)
 	if err != nil {
@@ -279,12 +276,7 @@ func Plan(dir string) ([]Change, error) {
 		}
 		changes = append(changes, cs...)
 	}
-	// The root index is the one the repository's pointers link, so it must
-	// exist whenever a lesson exists anywhere, even only in a category.
-	if _, err := os.Stat(filepath.Join(dir, "_index.md")); len(seen) > 0 && err != nil {
-		return nil, fmt.Errorf("%s has lessons but no root _index.md", dir)
-	}
-	dangling, err := danglingLinks(dir, dirs, seen)
+	dangling, err := danglingLinks(dir, seen)
 	if err != nil {
 		return nil, err
 	}
@@ -299,22 +291,16 @@ func Plan(dir string) ([]Change, error) {
 // alias or heading separator.
 var wikilink = regexp.MustCompile(`\[\[(lesson-[^\]|#]+)`)
 
-// danglingLinks names every wikilink, in any lesson or index of the tree, that
-// resolves to no lesson file. An index counts because its prose above the
-// generated table is hand-written. Two forms are in use and both resolve:
+// danglingLinks names every wikilink, in any lesson of the tree, that
+// resolves to no lesson file. Two forms are in use and both resolve:
 // [[lesson-212]] names a lesson by number, [[lesson-268-full-slug]] names the
 // file (#1514). Each is reported with its path relative to root.
-func danglingLinks(root string, dirs []string, lessons map[int]string) ([]string, error) {
+func danglingLinks(root string, lessons map[int]string) ([]string, error) {
 	stems := make([]string, 0, len(lessons))
-	files := make([]string, 0, len(lessons)+len(dirs))
+	files := make([]string, 0, len(lessons))
 	for _, p := range lessons {
 		stems = append(stems, strings.TrimSuffix(filepath.Base(p), ".md"))
 		files = append(files, p)
-	}
-	for _, d := range dirs {
-		if idx := filepath.Join(d, "_index.md"); fileExists(idx) {
-			files = append(files, idx)
-		}
 	}
 	resolves := func(target string) bool {
 		for _, s := range stems {
@@ -363,40 +349,35 @@ func lessonDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-func planDir(dir string, seen map[int]string) ([]Change, error) {
-	files, err := filepath.Glob(filepath.Join(dir, "lesson-*.md"))
+// readDir normalises every lesson file directly in dir. It returns the lessons
+// and the changes that would rewrite them, and records each number in seen,
+// failing when one is used twice.
+func readDir(dir string, seen map[int]string) ([]Lesson, []Change, error) {
+	// os.ReadDir, not filepath.Glob: Glob drops an I/O error (an unreadable
+	// category directory) and returns no matches, so its lessons would vanish
+	// from the index without a word.
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	indexPath := filepath.Join(dir, "_index.md")
-	index, err := os.ReadFile(indexPath) //nolint:gosec // the repository's own docs
-	if len(files) == 0 {
-		// No lessons here, but a generated table may still list some that
-		// moved into a category: regenerate it empty so stale rows go.
-		if err == nil && bytes.Contains(index, []byte(IndexBegin)) {
-			if want := RenderIndex(index, nil); !bytes.Equal(index, want) {
-				return []Change{{Path: indexPath, Want: want}}, nil
-			}
-		}
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("%s has lessons but no _index.md", dir)
-	}
-	seeds := IndexTitles(index)
 	var changes []Change
 	var all []Lesson
-	for _, f := range files {
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasPrefix(name, "lesson-") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		f := filepath.Join(dir, name)
 		raw, err := os.ReadFile(f) //nolint:gosec // the repository's own docs
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		l, want, err := Normalize(filepath.Base(f), raw, seeds[filepath.Base(f)])
+		l, want, err := Normalize(filepath.Base(f), raw)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if prev, dup := seen[l.Number]; dup {
-			return nil, fmt.Errorf("lesson number %03d is used twice: %s and %s", l.Number, prev, f)
+			return nil, nil, fmt.Errorf("lesson number %03d is used twice: %s and %s", l.Number, prev, f)
 		}
 		seen[l.Number] = f
 		all = append(all, l)
@@ -404,10 +385,12 @@ func planDir(dir string, seen map[int]string) ([]Change, error) {
 			changes = append(changes, Change{Path: f, Want: want})
 		}
 	}
-	if want := RenderIndex(index, all); !bytes.Equal(index, want) {
-		changes = append(changes, Change{Path: indexPath, Want: want})
-	}
-	return changes, nil
+	return all, changes, nil
+}
+
+func planDir(dir string, seen map[int]string) ([]Change, error) {
+	_, changes, err := readDir(dir, seen)
+	return changes, err
 }
 
 // Apply writes the planned changes.

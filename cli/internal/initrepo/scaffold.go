@@ -30,7 +30,6 @@ var staticFiles = []struct{ template, dest string }{
 	{"pre-commit-config.yaml", ".pre-commit-config.yaml"},
 	{"claude-md", "CLAUDE.md"},
 	{"env-contract.json", "env-contract.json"},
-	{"lessons-index.md", filepath.Join("docs", "lessons", "_index.md")},
 }
 
 // ScaffoldResult reports what Scaffold wrote, in repo-relative paths.

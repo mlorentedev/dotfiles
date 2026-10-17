@@ -242,24 +242,45 @@ func dirHasDraftTag(dir string) bool {
 	return found
 }
 
-// lessonsStaleness flags a stale docs/lessons/_index.md or docs/lessons.md in the current repo (HARNESS-024):
-// leading newline when older than staleDays, nothing when absent or fresh.
+// lessonsStaleness flags stale lessons in the current repo (HARNESS-024): a
+// leading newline when the newest docs/lessons/**/lesson-*.md (or the single
+// docs/lessons.md) is older than staleDays, nothing when absent or fresh. The
+// directory's index is rendered on read (CLI-131), so there is no file whose
+// mtime stands for it: the newest lesson does.
 func lessonsStaleness(cwd string, staleDays int, now time.Time) string {
-	lessons := filepath.Join(cwd, "docs", "lessons", "_index.md")
 	targetName := "docs/lessons/"
-	info, err := os.Stat(lessons)
-	if err != nil {
-		lessons = filepath.Join(cwd, "docs", "lessons.md")
+	newest, found := newestLesson(filepath.Join(cwd, "docs", "lessons"))
+	if !found {
 		targetName = "docs/lessons.md"
-		info, err = os.Stat(lessons)
+		info, err := os.Stat(filepath.Join(cwd, "docs", "lessons.md"))
 		if err != nil || info.IsDir() {
 			return ""
 		}
+		newest = info.ModTime()
 	}
-	if now.Sub(info.ModTime()) > time.Duration(staleDays)*24*time.Hour {
+	if now.Sub(newest) > time.Duration(staleDays)*24*time.Hour {
 		return fmt.Sprintf("\n[lessons] %s not updated in >%d days — capture fixes/discoveries from this session (handoff Step 2) or note the gap (HARNESS-024).", targetName, staleDays)
 	}
 	return ""
+}
+
+// newestLesson returns the latest mtime of a lesson-*.md file directly in dir or
+// in a first-level category directory of it.
+func newestLesson(dir string) (time.Time, bool) {
+	var newest time.Time
+	found := false
+	for _, pattern := range []string{"lesson-*.md", filepath.Join("*", "lesson-*.md")} {
+		files, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err != nil {
+			continue
+		}
+		for _, f := range files {
+			if info, err := os.Stat(f); err == nil && !info.IsDir() && (!found || info.ModTime().After(newest)) {
+				newest, found = info.ModTime(), true
+			}
+		}
+	}
+	return newest, found
 }
 
 // vaultBaseline is the defensive check that every 00_meta/skills/<n>/ has a

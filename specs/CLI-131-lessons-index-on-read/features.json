@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CLI-131-lessons-index-on-read-f1",
+    "behavior": "dotf lessons index prints one row per lesson sorted by number, one section per category, and writes no file",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lessons/ -run '^(TestIndex_OneTablePerDirectorySortedByNumber)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestIndex_OneTablePerDirectorySortedByNumber ' \"$o\" && cd .. && cd cli && o=$(mktemp) && go test ./internal/cmd/ -run '^(TestLessonsIndex_PrintsTheTableAndWritesNothing)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestLessonsIndex_PrintsTheTableAndWritesNothing ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-131-lessons-index-on-read-f2",
+    "behavior": "dotf lessons fmt and --check pass on a tree with lessons and no _index.md, and never create one",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lessons/ -run '^(TestPlan_NeedsNoIndexAndWritesNone)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestPlan_NeedsNoIndexAndWritesNone ' \"$o\" && cd .. && cd cli && o=$(mktemp) && go test ./internal/cmd/ -run '^(TestLessonsFmt_CheckFailsThenFmtConvergesThenCheckPasses)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestLessonsFmt_CheckFailsThenFmtConvergesThenCheckPasses ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-131-lessons-index-on-read-f3",
+    "behavior": "dotf lessons fmt --check exits 1 naming a committed _index.md and the fix; fmt does not delete it",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lessons/ -run '^(TestStrayIndexes_NamesACommittedIndexAtAnyLevel)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestStrayIndexes_NamesACommittedIndexAtAnyLevel ' \"$o\" && cd .. && cd cli && o=$(mktemp) && go test ./internal/cmd/ -run '^(TestLessonsFmt_CheckNamesACommittedIndexAndFmtLeavesItAlone)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestLessonsFmt_CheckNamesACommittedIndexAndFmtLeavesItAlone ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-131-lessons-index-on-read-f4",
+    "behavior": "A number used twice and a dangling wikilink are still errors without an index",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/lessons/ -run '^(TestPlan_RefusesANumberUsedTwice|TestPlan_RefusesAWikilinkThatNamesNoLesson)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestPlan_RefusesANumberUsedTwice ' \"$o\" && grep -q -- '^--- PASS: TestPlan_RefusesAWikilinkThatNamesNoLesson ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-131-lessons-index-on-read-f5",
+    "behavior": "dotf init scaffolds no docs/lessons/_index.md",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/initrepo/ -run '^(TestScaffoldCreatesStructureAndFiles)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestScaffoldCreatesStructureAndFiles ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-131-lessons-index-on-read-f6",
+    "behavior": "The staleness warning fires on an old newest lesson and is silent on a fresh one, with no index present",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/mem/ -run '^(TestLessonsStaleness)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestLessonsStaleness ' \"$o\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-131-lessons-index-on-read-f7",
+    "behavior": "docs/lessons/_index.md is gone from dotfiles and dotf lessons fmt --check --dir docs/lessons exits 0 there",
+    "verification": "test ! -e docs/lessons/_index.md && cd cli && go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons",
+    "state": "pending",
+    "evidence": ""
+  }
+]
