@@ -97,3 +97,7 @@ ticketed separately: #1314.
   documents the value the pipeline inherits
 - `tests/vault-health-go-parity.bats` — 16/16 byte-identical including this case
 - `#1314` — the ticket for the actual shell fix
+
+## Resolution
+
+`scripts/vault-health.sh` retired in #2150, which left the Go port as the corpus's only consumer, and #1314 then fixed the defect there: `runIntegrityChecks` reports every drifting or unreadable tasks file, the stale-merged pass runs after it, and the footer is printed. The `backlog-drift` golden gained that footer, recorded as a Go behaviour change in `tests/golden/vault-health/ORACLE`, not as a recapture. The Evidence above describes the shell as captured.

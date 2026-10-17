@@ -75,7 +75,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - the plan on darwin lists `power policy` (`TestWorkstationTarget_PlanNeedsNoRoot`, 5 changes); doctor reads pmset and never sets it (`TestCheckWorkstationTarget_ByStatus`)
 - Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --only workstation-target --plan`:
   `[CHANGE] workstation-target   15ms  to apply as root: power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; firewall not managed on darwin yet: sshd's AllowUsers is the only fence` / `1 to change, 0 ok, 0 opaque, 0 skipped, 0 failed`; `dotf doctor` -> `[WARN] differs from the declared state: power policy; run dotf converge --only workstation-target (it asks for root once)`
-- Not run: the apply, which needs the owner at the sudo prompt
+- Accepted live on the macmini (dotf 0.74.0, darwin/arm64, 2026-10-17), from the main checkout:
+  - the owner's attended `dotf converge --only workstation-target`, root asked once: `[CHANGE] workstation-target   5.9s  applied: power policy; sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; ...` / `1 changed, 0 ok, 0 opaque, 0 skipped, 0 failed` (transcript `converge/runs/20261017T185557Z.log`)
+  - the same command again, no root: `[ OK ]   workstation-target  332ms  converged; ...` / `0 changed, 1 ok, 0 opaque, 0 skipped, 0 failed` (`20261017T185629Z.log`)
+  - `pmset -g custom`, AC Power: `sleep 0`, `disksleep 0`, `womp 1`, `autorestart 1`, `powernap 1`, `displaysleep 15`, `autorestartatconnect 0`. Before the step the macmini read `disksleep 10`, `autorestart 0`; nothing else moved
+  - `dotf doctor`, *Workstation SSH target*: the power WARN is gone; the one WARN left is the tailscale app note of the mesh-service row, which is report-only
 - Test suite (PR 7d, mesh service, on main after #2675, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues
 - What the mesh-service tests prove, against injected runners:
   - macOS reads the tailscaled launchd job and names the login a reboot needs without it: `TestMeshAtBootOnDarwinReadsTheTailscaledDaemon`
@@ -103,6 +107,17 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - the timer flushes the anchor and disables the job, and never switches pf off: `TestPFTimerFlushesTheAnchorAndDisablesTheJob`
   - Target commits the firewall only after the whole proof passes: `TestApplyCommitsTheFirewallOnlyAfterTheProofPasses`
 - Live on the macmini, plan only, against a scratch `XDG_CONFIG_HOME` holding the real `machine.json` with only the `ssh-target` role: `to apply as root: firewall, power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; tailscale runs as the app ...`
+- SEC-014 PR 1, the record (#2388, macOS arm64, 2026-10-17): `go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> ok; `golangci-lint run ./...` (2.12.2) and `GOOS=windows golangci-lint run` on sshtarget and converge -> 0 issues. What the tests prove, against the fake macOS node:
+  - a fresh machine records the key, drop-in and listener as `created`, the record is the last resource, and the next plan is converged without root: `TestRecordWritesWhatTheFirstApplyCreated`
+  - a drop-in with other content is kept byte for byte as `replaced`: `TestRecordKeepsTheDropInItReplaced`
+  - a machine converged before the record plans only `state record`, writes it with every entry `unknown` (the fake template carries no marker), and runs nothing as root but the two `install` calls: `TestRecordMarksWhatAConvergedMachineAlreadyHadUnknown`
+  - entries are written once, and a failed proof removes the record it wrote with the rest of the run: `TestRecordEntriesAreWrittenOnce`, `TestRecordIsUndoneWithAFailedApply` (review of #2716: it now asserts the record was written before the undo, so dropping the write fails it)
+  - a later entry keeps the stamp of the build that first wrote the record: `TestRecordKeepsTheBuildThatFirstWroteIt`
+  - a drop-in that opens with the step's marker, from this build or an earlier one, is recorded as `created`, never as content to restore, and the checkout's template keeps the marker (review of #2716): `TestRecordTakesADropInWithTheMarkerAsTheStepsOwn`, `TestTheDropInTemplateOpensWithTheMarker`
+  - a malformed record, or one of a later version, stops the plan naming the file: `TestInspectRefusesARecordItCannotRead`; the path per OS: `TestRecordPathPerOS`
+  - six mutations caught: an entry rewritten on every apply, a converged drop-in recorded as `created`, a later version accepted, the record write dropped, the build stamp overwritten, and the marker rule dropped
+- Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --plan --only workstation-target --repo ~/Projects/dotfiles` from this branch, on the machine converged an hour earlier with 0.74.0: `[CHANGE] workstation-target   14ms  to apply as root: state record; then proves: ...` / `1 to change`; `/var/db/dotf` does not exist yet, which `writeRecord`'s `install -d` creates
+- Not proven yet: the live write on the macmini, which needs the owner at the sudo prompt once this is released (`1 changed`, then `0 changed`, then `cat /var/db/dotf/workstation-target.json`, readable without root, shows the key and listener `unknown` and the drop-in `created`, since it carries the marker)
 
 ## Decisions made during implementation
 
