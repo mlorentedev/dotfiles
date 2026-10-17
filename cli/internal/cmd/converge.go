@@ -196,6 +196,7 @@ var convergeOptions = func() converge.Options {
 		AgyPaths:      agyPaths,
 		HerdrRun:      tools.ExecRunner,
 		CompletionRun: converge.ExecStdout,
+		Scheduler:     converge.NativeScheduler(os.Getuid()),
 		RunSetup:      converge.ExecSetup,
 		DotfPath:      harness.ResolveDotfPath,
 	}

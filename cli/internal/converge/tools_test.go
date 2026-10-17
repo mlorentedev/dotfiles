@@ -124,7 +124,9 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // (#1948). shell-completions follows configs-deploy, which deploys the .zshrc
 // that reads what it writes, and tools, which installs herdr. records-bind follows configs-deploy, which seeds the settings files
 // the hooks merge into. env-persist closes the configs step: the env files are configs too
-// (ADR-045 decision 4, step 5). workstation-target follows: it reads the
+// (ADR-045 decision 4, step 5). self-deploy follows it: the trigger is a
+// user-session agent like env-persist's, and it names the dotf the tools layer
+// installed (OPS-053). workstation-target follows: it reads the
 // deployed public key's source in the checkout and changes how the machine
 // faces the network, so it comes after everything a user session needs.
 // agent-extensions comes after tools, whose PATH reaches the claude mise
@@ -136,7 +138,7 @@ func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,pi-settings,configs-deploy,shell-completions,records-bind,git-config,git-hooks,env-persist,workstation-target,agent-extensions,legacy-setup" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,pi-settings,configs-deploy,shell-completions,records-bind,git-config,git-hooks,env-persist,self-deploy,workstation-target,agent-extensions,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }
