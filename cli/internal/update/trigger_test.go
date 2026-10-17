@@ -17,7 +17,7 @@ func TestTrigger_NamesTheInstalledDotfPerOS(t *testing.T) {
 		{"windows", `C:\Users\me`, `C:\Users\me\.local\bin\dotf.exe`, false},
 	}
 	for _, tt := range tests {
-		job := Trigger(tt.goos, tt.home, "")
+		job := Trigger(tt.goos, tt.home, noEnv)
 		if job.Program != tt.program || strings.Join(job.Args, " ") != "update" {
 			t.Errorf("%s: runs %q %q, want %q update", tt.goos, job.Program, job.Args, tt.program)
 		}
@@ -28,19 +28,32 @@ func TestTrigger_NamesTheInstalledDotfPerOS(t *testing.T) {
 			t.Errorf("%s: a daily job that never runs at load, got daily=%v runAtLoad=%v", tt.goos, job.Daily, job.RunAtLoad)
 		}
 	}
-	if p := Trigger("darwin", "/Users/me", "").Env[0].Value; !strings.HasPrefix(p, "/Users/me/.local/bin:") || !strings.Contains(p, "/opt/homebrew/bin") {
+	if p := Trigger("darwin", "/Users/me", noEnv).Env[0].Value; !strings.HasPrefix(p, "/Users/me/.local/bin:") || !strings.Contains(p, "/opt/homebrew/bin") {
 		t.Errorf("launchd PATH = %q: it must reach dotf and Homebrew", p)
 	}
 }
 
-// The job reads the machine.json the installing run read: a scheduler does not
-// inherit the shell's XDG_CONFIG_HOME, and a job that finds no role removes
-// itself.
-func TestTrigger_CarriesTheConfigHomeOfTheInstallingRun(t *testing.T) {
+// The job reads the machine.json the installing run read, and writes its
+// last-run record where that run's doctor looks: a scheduler does not inherit
+// the shell's XDG_CONFIG_HOME or XDG_STATE_HOME, a job that finds no role
+// removes itself, and a record in another state dir reads as no run at all.
+func TestTrigger_CarriesTheXDGHomesOfTheInstallingRun(t *testing.T) {
+	getenv := func(k string) string {
+		return map[string]string{"XDG_CONFIG_HOME": "/srv/cfg", "XDG_STATE_HOME": "/srv/state"}[k]
+	}
 	for _, goos := range []string{"darwin", "linux", "windows"} {
-		env := Trigger(goos, "/home/me", "/srv/cfg").Env
-		if last := env[len(env)-1]; last.Name != "XDG_CONFIG_HOME" || last.Value != "/srv/cfg" {
-			t.Errorf("%s: env %v, want XDG_CONFIG_HOME=/srv/cfg", goos, env)
+		env := Trigger(goos, "/home/me", getenv).Env
+		got := map[string]string{}
+		for _, v := range env {
+			got[v.Name] = v.Value
+		}
+		if got["XDG_CONFIG_HOME"] != "/srv/cfg" || got["XDG_STATE_HOME"] != "/srv/state" {
+			t.Errorf("%s: env %v, want both XDG homes", goos, env)
 		}
 	}
+	for _, v := range Trigger("linux", "/home/me", noEnv).Env {
+		t.Errorf("an unset XDG home is not rendered: %v", v)
+	}
 }
+
+func noEnv(string) string { return "" }

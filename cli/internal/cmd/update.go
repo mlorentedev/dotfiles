@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -19,10 +21,12 @@ func newUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Self-deploy: fast-forward the dotfiles repo and converge from it (opt-in, scheduler-invoked)",
-		Long: `update is the opt-in self-deploy entrypoint the systemd --user timer (Linux)
-/ Scheduled Task (Windows) invokes. It pulls the dotfiles repo and runs
-'dotf converge' from it (which runs the setup script last on Linux and
-Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
+		Long: `update is the opt-in self-deploy entrypoint the native scheduler invokes once a
+day: a launchd agent (macOS), a systemd --user timer (Linux) or a Scheduled
+Task (Windows), which the 'dotf converge' step self-deploy installs on a machine
+that declares the role ('dotf env role add self-deploy'). It pulls the dotfiles
+repo and runs 'dotf converge' from it (which runs the setup script last on
+Linux and Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
 
 The checkout's DOTF_VERSION pin is part of being up to date. When the running
 dotf is not that version (after a fast-forward, or when the checkout was
@@ -36,8 +40,10 @@ upstream, ahead of the upstream, diverged history, or already current with dotf
 at its pin) is logged and skipped with exit 0; a skip names a dotf that is off
 its pin.
 A real converge failure, or a pinned dotf that cannot be installed, is the ONLY
-non-zero exit, so 'systemctl --user status
-dotfiles-selfupdate' (and the journal) surface it.
+non-zero exit, so the scheduler's last result (launchd's log, 'systemctl --user
+status dotfiles-selfupdate', the task's LastTaskResult) surfaces it. Every run,
+a skip included, records its outcome in <state dir>/update/last.json, which
+'dotf doctor' reads in its Self-deploy section.
 
 Env:
   DOTFILES_REPO_DIR              repo to update  (default: the env-contract path)
@@ -59,10 +65,24 @@ Env:
 			if err != nil {
 				c.PrintErrln("update:", err)
 			}
+			recordUpdate(c.ErrOrStderr(), out, err)
 			return err
 		},
 	}
 	return cmd
+}
+
+// recordUpdate keeps the run's outcome where doctor reads it. A record that
+// cannot be written is said and leaves the exit alone: update fails only when
+// the deploy broke, and doctor reads a missing record as no recent run.
+func recordUpdate(w io.Writer, out update.Outcome, runErr error) {
+	state, err := env.StateDir()
+	if err == nil {
+		err = update.WriteRecord(state, update.NewRecord(time.Now(), out, runErr))
+	}
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "warning: recording this run for doctor: %v\n", err)
+	}
 }
 
 // pinnedDotfVersion reads DOTF_VERSION from the checkout's versions.conf, the

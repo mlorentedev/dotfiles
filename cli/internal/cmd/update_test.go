@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
 // TestRepoForUpdatePrefersExistingCascadeDir: a cascade value that names a real
@@ -96,7 +98,8 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 	gitIn(t, writer, "push", "-q", "origin", "HEAD")
 	gitIn(t, root, "clone", "-q", upstream, checkout)
 	t.Setenv("DOTFILES_REPO_DIR", checkout)
-	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local", "state"))
+	state := filepath.Join(home, ".local", "state")
+	t.Setenv("XDG_STATE_HOME", state)
 
 	setups := 0
 	fixture := convergeOptions
@@ -110,6 +113,7 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 	if err != nil || setups != 0 || strings.Contains(stdout, "converge on") {
 		t.Fatalf("nothing to pull must converge nothing: err=%v setups=%d\n%s", err, setups, stdout)
 	}
+	assertUpdateRecord(t, filepath.Join(state, "dotfiles"), "current")
 
 	writeCommit(t, writer, "README.md", "new\n")
 	gitIn(t, writer, "push", "-q", "origin", "HEAD")
@@ -121,11 +125,47 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 	if !strings.Contains(stdout, "converge on") || !strings.Contains(stdout, "self-update complete") {
 		t.Errorf("update must print the converge report and complete:\n%s", stdout)
 	}
+	assertUpdateRecord(t, filepath.Join(state, "dotfiles"), "updated")
 	wantSetups := 1
 	if runtime.GOOS == "darwin" {
 		wantSetups = 0 // no setup script on macOS (ADR-045)
 	}
 	if setups != wantSetups {
 		t.Errorf("setup ran %d time(s), want %d", setups, wantSetups)
+	}
+}
+
+// AC7: every run leaves its outcome where doctor reads it.
+func assertUpdateRecord(t *testing.T, stateDir, status string) {
+	t.Helper()
+	r, err := update.ReadRecord(stateDir)
+	if err != nil {
+		t.Fatalf("no update record after the run: %v", err)
+	}
+	if r.Status != status || r.Failed() {
+		t.Errorf("update record = %+v, want status %q and no error", r, status)
+	}
+}
+
+// A failed run is recorded with its error, and a record that cannot be
+// written is said without changing the run's exit.
+func TestRecordUpdate_KeepsTheFailureAndNeverFailsTheRun(t *testing.T) {
+	state := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", state)
+	var w strings.Builder
+	recordUpdate(&w, update.Outcome{Status: "converge-failed", Message: "converge failed"}, errors.New("converge: exit 1"))
+	r, err := update.ReadRecord(filepath.Join(state, "dotfiles"))
+	if err != nil || r.Status != "converge-failed" || r.Error != "converge: exit 1" {
+		t.Fatalf("record = %+v, %v", r, err)
+	}
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_STATE_HOME", blocker)
+	w.Reset()
+	recordUpdate(&w, update.Outcome{Status: "current"}, nil)
+	if !strings.Contains(w.String(), "warning: recording this run for doctor") {
+		t.Errorf("an unwritable record went unsaid: %q", w.String())
 	}
 }

@@ -1621,44 +1621,8 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 # 9. SUMMARY
 # ============================================================================
 
-# OPS-001: opt-in self-deploy Scheduled Task (Windows parity of the systemd timer).
-# Tri-state, gated on DOTFILES_AUTODEPLOY so a normal setup never touches it:
-#   1     -> deploy the selfupdate script + register a daily scheduled task
-#   0     -> unregister the task (clean opt-out)
-#   unset -> no-op (opt-in, default OFF)
-# Routes through Register-HiveScheduledTask (the strongest-principal registrar:
-# windowless S4U when elevated, Interactive fallback when not), same as the
-# hive tasks.
-$selfUpdateTask = "DotfilesSelfUpdate"
-switch ("$env:DOTFILES_AUTODEPLOY") {
-    "1" {
-        # CLI-027: the task runs the Go 'dotf update' directly (no .ps1 wrapper).
-        # dotf resolves the repo via the ADR-025 seam with a
-        # $USERPROFILE\Projects\dotfiles fallback, so the bare task env needs no
-        # DOTFILES_REPO_DIR wiring.
-        $dotfExe = Join-Path $env:USERPROFILE ".local\bin\dotf.exe"
-        if (Test-Path $dotfExe) {
-            try {
-                $suAction = New-ScheduledTaskAction -Execute $dotfExe -Argument "update"
-                $suTrigger = New-ScheduledTaskTrigger -Daily -At 3am
-                $suSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
-                Register-HiveScheduledTask -TaskName $selfUpdateTask -Action $suAction -Trigger $suTrigger `
-                    -Settings $suSettings `
-                    -Description "dotfiles self-deploy: daily 'dotf update' (git pull --ff-only + idempotent setup, OPS-001)"
-                Write-Success "Enabled DotfilesSelfUpdate task (daily 'dotf update', $($script:HiveTaskLogonType) principal)"
-            } catch {
-                Write-Warn "Could not register DotfilesSelfUpdate task (non-fatal): $_"
-            }
-        } else {
-            Write-Warn "dotf not found at $dotfExe -- run setup to install it before enabling self-deploy"
-        }
-    }
-    "0" {
-        Unregister-ScheduledTask -TaskName $selfUpdateTask -Confirm:$false -ErrorAction SilentlyContinue
-        Write-Info "Disabled DotfilesSelfUpdate task (DOTFILES_AUTODEPLOY=0)"
-    }
-    default { }
-}
+# The opt-in self-deploy Scheduled Task (OPS-001) is the `dotf converge` step
+# self-deploy, gated on the self-deploy machine role (OPS-053).
 
 # ============================================================================
 # WIN-005: OPT-IN WINDOWS ENGINEERING DEFAULTS (HKCU)

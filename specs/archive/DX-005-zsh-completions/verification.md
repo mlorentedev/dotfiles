@@ -27,6 +27,7 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 - Latency (medians of 20 `zsh -ic exit`, two rounds): main 44.6 / 44.5 ms; branch without the plugin 43.6 / 44.0 ms; branch with the plugin sourced 45.0 / 44.5 ms.
 - The rc builds the plugin path with the precedence `MiseShimsDir` uses (`MISE_DATA_DIR`, then `XDG_DATA_HOME/mise`, then `~/.local/share/mise`); on this Mac `mise where age` is under `~/.local/share/mise/installs`, so the two agree. `tests/zshrc-guards.bats` 17/17 also in `ubuntu:24.04` as a non-root user.
 - Live prune (mise 2026.10.3, scratch dirs): with the plugin no longer in the config, `mise ls --prunable --json` lists `http:zsh-autosuggestions` and `mise prune --yes --tools http:zsh-autosuggestions` removed `installs/http-zsh-autosuggestions` and its cache; this is the spec `orphanTools` builds. The sync verifies `<root>/latest/<file>` too, the path `.zshrc` sources: with `latest` deleted the next sync repaired it, the one after reported nothing to do.
+- Mark, 2026-10-17 on the macmini with the released dotf 0.73.0 (the first release carrying `fileTools`): `dotf tools sync --dry-run --versions <branch>/versions.conf` listed `zsh-autosuggestions 0.7.1` and `to install: zsh-autosuggestions`; the real sync printed `installed: zsh-autosuggestions` and `39 tool(s) at their pin` (exit 0); `installs/http-zsh-autosuggestions/latest/zsh-autosuggestions.zsh` exists; `zsh -ic` reports `$+functions[_zsh_autosuggest_start]` = 1; a second sync printed `nothing to do`.
 - Not measured: the prune through the converge itself (`dotf tools sync` does not set `Prune`), a Linux host (the table and the rc use no macOS-only call), Windows (compiled and vetted with `GOOS=windows`, the skip is by `runtime.GOOS`), the suggestions appearing in a live terminal.
 
 ## Test status
@@ -48,9 +49,18 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: no alternative with lasting cost was chosen.
 - [x] New pattern candidate for `00_meta/patterns/`? no: single project.
 
+## Review dispositions
+
+Review `review.md` (nan/glm5.3-flash, PASS-WITH-GAPS on `9b9e99f0`):
+
+- Finding 1, `ExecStdout` stderr exclusion untested: ticketed as #2686, root cause and fix there. The claim under *Decisions* holds by code read only until that test lands.
+- Finding 2, the dump rule governs only the non-oh-my-zsh branch: declined. No machine this repo provisions runs oh-my-zsh. On an omz machine its own policy applies, and completions are not lost, only deferred to omz's next full run.
+- Finding 3, `compinit -u` on every full rebuild: declined, already recorded under *Decisions*. `-C` trusted every file before, so the trust level is unchanged. Revisit together with the completion-directory policy if it ever changes.
+- Question, review range carries other specs' merged work: no action. The launcher resolves the base from the spec's first commit, and the reviewer confirmed it found no cross-feature interaction.
+
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/DX-005-zsh-completions/` -> `specs/archive/DX-005-zsh-completions/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/DX-005-zsh-completions/` -> `specs/archive/DX-005-zsh-completions/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)

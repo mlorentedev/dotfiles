@@ -164,14 +164,18 @@ func TestSystemdValidateReportsARejectedConfig(t *testing.T) {
 }
 
 func TestServiceForPicksTheOSManager(t *testing.T) {
-	if s, _ := ServiceFor("darwin", nil); !isType[Launchd](s) {
+	if s, _ := ServiceFor("darwin", nil, Paths{}); !isType[Launchd](s) {
 		t.Errorf("darwin → %T", s)
 	}
-	if s, _ := ServiceFor("linux", nil); !isType[Systemd](s) {
+	if s, _ := ServiceFor("linux", nil, Paths{}); !isType[Systemd](s) {
 		t.Errorf("linux → %T", s)
 	}
-	if _, err := ServiceFor("windows", nil); err == nil {
-		t.Error("windows has no service manager yet, and must say so")
+	paths := WindowsPaths(`C:\ProgramData`, `C:\Users\manu`)
+	if s, _ := ServiceFor("windows", nil, paths); !isType[WindowsService](s) || s.(WindowsService).Config != paths.SSHDConfig {
+		t.Errorf("windows → %#v, want WindowsService validating %s", s, paths.SSHDConfig)
+	}
+	if _, err := ServiceFor("plan9", nil, Paths{}); err == nil {
+		t.Error("an OS with no service manager must say so")
 	}
 }
 

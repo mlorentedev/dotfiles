@@ -16,6 +16,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
@@ -190,14 +191,14 @@ var convergeOptions = func() converge.Options {
 		ResolvePath:   env.ResolvePath,
 		Launchctl:     env.ExecLaunchctl,
 		UID:           os.Getuid(),
-		SSHRoot:       sshtarget.Sudo{Terminal: identityTerminal},
+		SSHRoot:       sshtarget.RootFor(runtime.GOOS, identityTerminal),
 		UserRun:       sshtarget.Exec,
 		Claude:        claudeSyncer,
 		AgyPaths:      agyPaths,
 		HerdrRun:      tools.ExecRunner,
 		PwshRun:       tools.ExecRunner,
 		CompletionRun: converge.ExecStdout,
-		Scheduler:     converge.NativeScheduler(os.Getuid()),
+		Scheduler:     converge.NativeScheduler(os.Getuid(), schedule.Elevated),
 		RunSetup:      converge.ExecSetup,
 		DotfPath:      harness.ResolveDotfPath,
 	}

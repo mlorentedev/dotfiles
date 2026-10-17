@@ -295,8 +295,8 @@ func TestFirewallForManagesUFWOnlyWhereItIsInstalled(t *testing.T) {
 	if f, note := FirewallFor("darwin", paths, nil, nil, ""); f == nil || note != "" {
 		t.Errorf("darwin: FirewallFor = %v, %q; want pf and no note", f, note)
 	}
-	if f, note := FirewallFor("windows", paths, nil, nil, ""); f != nil || note == "" {
-		t.Errorf("windows: FirewallFor = %v, %q; want nil and a note", f, note)
+	if f, note := FirewallFor("windows", paths, nil, nil, ""); !isType[WindowsFirewall](f) || note != "" {
+		t.Errorf("windows: FirewallFor = %v, %q; want WindowsFirewall and no note", f, note)
 	}
 }
 

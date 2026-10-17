@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 1c72af7e0a65bd2d
+generated_sha: 78f30b67d04b39aa
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -189,7 +189,7 @@ Reviewer output dispositioned: <reviewer login>, <timestamp of their newest comm
 ```
 
 ```bash
-gh pr comment <N> --repo <owner>/<repo> --body-file <file>
+dotf forge pr comment <N> --body-file <file>    # run inside the repo's checkout: the repository comes from origin
 ```
 
 **The heading is a contract, not a formatting choice.** `dotf pr triage-queue` reads it back to decide whether a PR is still pending: a PR is pending when its newest reviewer output is newer than its newest triage record. The string is declared once, in `harness/review-attestation.json` under `triage.marker` — this skill writes it and the queue reads it. Match it exactly, at the start of a line.

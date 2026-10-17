@@ -75,9 +75,8 @@ role in `machine.json` (`dotf env role add self-deploy`), not `DOTFILES_AUTODEPL
 setup script: a role persists, so doctor and every later converge can tell whether the machine
 opted in. The trigger is owned by the `dotf converge` step `self-deploy` on all three OSes, a
 launchd agent on macOS added to the systemd user timer and the Scheduled Task, all rendered from
-one job declaration (`update.Trigger`, package `schedule`). The launchd half lands first; the
-systemd and Scheduled Task backends follow, and that change ports both setup-script blocks into
-the step and deletes them.
+one job declaration (`update.Trigger`, package `schedule`). Both setup-script blocks are ported
+into the step and deleted.
 
 Opt-out is the role's absence, bounded by ownership: the step removes only a trigger carrying the
 marker it writes, and reports an unmarked one, the trigger a setup script installed before this

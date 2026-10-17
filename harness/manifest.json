@@ -248,7 +248,6 @@
     "bind": [
       {
         "agent": "claude",
-        "file": ".claude/settings.json",
         "dst": "{CLAUDE_CONFIG_DIR}/settings.json",
         "format": "command-hook",
         "matcher": true,

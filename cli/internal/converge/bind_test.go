@@ -158,7 +158,7 @@ func TestRecordsBind_FollowsClaudeConfigDir(t *testing.T) {
 	repo, home, cfg := t.TempDir(), t.TempDir(), t.TempDir()
 	writeFixture(t, repo, map[string]string{
 		"harness/manifest.json": `{"agents": {"bind": [
-		  {"agent": "claude", "file": ".claude/settings.json", "dst": "{CLAUDE_CONFIG_DIR}/settings.json",
+		  {"agent": "claude", "dst": "{CLAUDE_CONFIG_DIR}/settings.json",
 		   "format": "command-hook", "matcher": true,
 		   "emit_hooks": [{"id": "gate", "event": "PreToolUse", "command": "harness gate --harness claude", "timeout": 5}]}
 		]}}`,

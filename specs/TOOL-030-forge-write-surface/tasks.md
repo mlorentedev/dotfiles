@@ -47,8 +47,10 @@ created: "2026-10-16"
 - [x] [AC5] Extend ADR-048's session-level allow lists (`harness/capability-map.json` and its leaves) with `dotf forge` and let that guard assert it, one case per harness, instead of a second file; if ADR-048's renderer is not there yet, a `tests/harness-permits-dotf.bats` stands in and is folded into it later. Passes under bash 3.2 and zsh Delivered as the stand-in: `harness/capability-map.json` has no session-level section yet (ADR-048 decision 3 is unbuilt), so `tests/harness-permits-dotf.bats` ships now (#2651) and is folded into the map guard when that lands.
 
 **PR 4: skills and the allow set (owner lands)**
-- [ ] [AC7] `new-ticket`, `pr-review-triage` and `autopilot` call `dotf forge` (vault edit, then refresh the records)
-- [ ] [AC7] Settings PR: the four `dotf forge` allows; the owner lands it (#2178, ADR-048 clause 6). #2629 is removed from the template, but ADR-048's deploy can only add, so removing it from machines that hold it is an owner action recorded in that PR
+- [x] [AC7] `new-ticket`, `pr-review-triage` and `autopilot` call `dotf forge` (vault commit `4b7f3deb`, then `compile-harness.sh --refresh`). Only the writes that carried prose moved: claim and park comments, the triage record, the PR body and the issue body. `gh issue edit --add-assignee` stays, because `dotf forge issue edit` sets title and body only
+- [x] [AC7] The four `dotf forge` allows are in the Claude template in this PR, which the owner lands (#2178, ADR-048 clause 6). `tests/forge-skills-use-dotf-forge.bats` asserts the skills and the allows together, and that no merge or close verb is allowed
+- [ ] [AC7] Owner decision, not in this PR: #2629 (`Bash(gh issue create:*)`) stays in the template for now. It covers the tickets that still go through `gh` (a Gitea issue needs `dotf forge`; a GitHub one works with either). Removing it later is a template edit, and ADR-048's deploy can only add, so a machine that holds it keeps it until the owner removes it by hand
+- [ ] Verb coverage: only `issue comment` is measured against the classifier (released 0.73.0, comment 2709). `issue create`, `pr create`, `pr comment` and `pr edit` are allowed in the template on the strength of the rule shape, not of a measurement; the first unattended use of each is the measurement and goes on #2635
 
 ## Closing
 

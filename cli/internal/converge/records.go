@@ -118,10 +118,11 @@ func Registry(o Options) []Reconciler {
 		shellCompletions{run: o.CompletionRun, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath, resolve: o.ResolvePath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
+		gitLFS{run: o.GitRun, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		selfDeploy{scheduler: o.Scheduler},
-		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: sshtarget.CurrentUser},
+		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.PathsFor, user: sshtarget.CurrentUser},
 		agentExtensions{claude: o.Claude, agyPaths: o.AgyPaths, herdr: o.HerdrRun, has: onPath},
 		legacySetup{run: o.RunSetup},
 	}
