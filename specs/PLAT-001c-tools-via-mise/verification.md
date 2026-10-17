@@ -53,6 +53,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - #2570 (BUG-149), merge retirement (ADR-051). Tests: `TestDeploy_MergeRemovesWhatTheSourceStoppedManaging`, `TestDeploy_MergeKeepsARetiredValueTheUserChanged`, `TestDeploy_MergeWithoutARecordRemovesNothing` (no record, an in-sync dry run, a record for another destination), `TestDeploy_MergeRefusesACorruptRecord`, `TestPlanConfig_ReportsARetiredKeyAndADryRunRecordsNothing`, `TestDeploy_MergeRemovesARetiredListElementByIdentity` (a user binding and an edited one kept, an edited declared one kept in its slot), `TestDeploy_MergeRemovesARetiredTOMLValueExactly`, `TestMergeRecords`, `TestRun_PassesRecordsToEachMerge`, doctor's `TestCheckDeployManifest_ARetiredMergeKeyIsDrift`.
 - Mutations on #2570, each against `go test ./internal/deploy/ ./internal/doctor/`, all thirteen killed: retire never runs; remove without the equality check; use a record written for another destination; read a corrupt record as none; record on an in-sync dry run; keep an emptied table; ignore listKeys identity; write no baseline when in sync; doctor reads no record; ignore a state directory that cannot be placed; Run drops Records; retire no list element; clear a table the user changed. Two first versions were killed only by a compile error and two survived (another destination's record had nothing to remove; an emptied table is reached only when the user deleted part of it); the tests and mutations were rewritten until each failed on behaviour.
 
+- [x] P5b cask entries (2026-10-17, macmini, `--repo` the branch worktree):
+  - Source list: vault runbook `runbook-macos-workstation-setup` §5.2, 16 casks. `brew list --cask` holds those 16 plus `veracrypt` (declared since #2234) and `macfuse` (veracrypt's dependency, left to brew).
+  - `brew info --cask --json=v2` artifacts: `tailscale-app` and `google-drive` are `pkg`, every other cask an `app`, `font` or `binary`. The two `pkg` entries carry `needs_sudo`, so converge defers them instead of stopping (#2669).
+  - `dotf converge --plan --only tools`, dev build and installed 0.73.0 alike: `[CHANGE] tools  mise config to write`, no `catalog to install`. The pinned release loads the catalog, so the new entries break no machine on the pin.
+  - Probe: renaming the `vlc` entry's cask to `vlc-dotf-probe` made the dev plan report `catalog to install: vlc`, so the entries are read rather than skipped; reverted before commit.
+  - `tests/setup-linux.bats` OPS-042 parity test rejected any entry named `obsidian`; it now rejects only the npm CLI it retired. Appending an npm `obsidian-cli` entry still fails it.
+  - Every bats file that references `packages.json` (11 files): 349 ok, exit 0. `go test ./...`: all ok.
+
 ## Test status
 
 - Test suite (T1a, macOS arm64): `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./... -count=1` -> ok; `golangci-lint run` (2.12.2) -> 0 issues; features f1 to f3 -> PASS
