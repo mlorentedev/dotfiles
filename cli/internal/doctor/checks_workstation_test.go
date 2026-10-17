@@ -79,6 +79,8 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				writeFile(t, p.AuthorizedKeys, "ssh-ed25519 AAAAOwner manu@msi\n")
 				writeFile(t, p.HostKey, "ssh-ed25519 AAAAHost root@macmini\n")
 				writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
+				writeFile(t, p.PFAnchor, sshtarget.PFRules(net.ParseIP("100.64.0.15")))
+				writeFile(t, p.PFPlist, sshtarget.PFLaunchDaemon(p.PFAnchor))
 			}},
 	}
 	for _, tc := range cases {
@@ -99,6 +101,8 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				UFWRules:        filepath.Join(sys, "ufw", "user.rules"),
 				UFWRules6:       filepath.Join(sys, "ufw", "user6.rules"),
 				FirewallWitness: filepath.Join(sys, "dotf", "workstation-firewall"),
+				PFAnchor:        filepath.Join(sys, "pf.anchors", "dotf-ssh"),
+				PFPlist:         filepath.Join(sys, "LaunchDaemons", "pf-ssh.plist"),
 			}
 			writeFile(t, paths.SSHDConfig, "Include "+filepath.Dir(paths.DropIn)+"/*\n")
 			loaded := false

@@ -3,6 +3,7 @@ package sshtarget
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -25,9 +26,23 @@ const MeshInterface = "tailscale0"
 
 // FirewallFor is the firewall the target manages on goos, with a note naming
 // why there is none: a plan says so rather than reading converged.
-func FirewallFor(goos string, run Runner, paths Paths) (Firewall, string) {
+func FirewallFor(goos string, paths Paths, run Runner, addrs func() ([]net.IP, error), session string) (Firewall, string) {
 	if goos == "windows" {
 		return WindowsFirewall{Run: run}, ""
+	}
+	if goos == "darwin" {
+		return &PF{Anchor: paths.PFAnchor, Plist: paths.PFPlist, Run: run, Session: session,
+			Mesh: func() (net.IP, error) {
+				ips, err := addrs()
+				if err != nil {
+					return nil, err
+				}
+				mesh, _ := splitAddrs(ips)
+				if mesh == nil {
+					return nil, ErrNoMesh
+				}
+				return mesh, nil
+			}}, ""
 	}
 	if goos != "linux" {
 		return nil, "firewall not managed on " + goos + " yet: sshd's AllowUsers is the only fence"

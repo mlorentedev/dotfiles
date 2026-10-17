@@ -240,25 +240,35 @@ the only fence.
 Check: `sudo ufw status verbose` reads `Status: active`, `Default: deny (incoming)`,
 and lists port 22 only `on tailscale0`.
 
-**macOS** (pf, as a sub-anchor of the `com.apple/*` anchor that `/etc/pf.conf`
-already declares, so the system file stays untouched):
+**macOS** (pf): converged by the same step, as a sub-anchor of the
+`com.apple/*` anchor that `/etc/pf.conf` already evaluates, so the system file
+stays untouched. The step writes `/etc/pf.anchors/dotf-ssh`:
 
 ```text
-# /etc/pf.anchors/kubelab.ssh
-pass in quick inet proto tcp from 100.64.0.0/10 to any port 22 flags S/SA keep state
-block drop in quick proto tcp from any to any port 22
+pass in quick on lo0 proto tcp to any port 22
+pass in quick proto tcp to <this node's mesh address> port 22 flags S/SA keep state
+block drop in quick proto tcp to any port 22
 ```
 
-```bash
-sudo pfctl -n -f /etc/pf.anchors/kubelab.ssh                   # parse only: the dry run
-sudo pfctl -a com.apple/250.KubelabSSH -f /etc/pf.anchors/kubelab.ssh
-sudo pfctl -E
-sudo pfctl -a com.apple/250.KubelabSSH -s rules                # check: both rules loaded
-```
+It matches the destination, not the source: a LAN host can spoof a source, not
+where its packet arrives. It blocks port 22 only, so nothing else on the Mac
+changes. The anchor is `com.apple/150.dotf-ssh`, sorting before Apple's
+`200.AirDrop` and `250.ApplicationFirewall`, and the LaunchDaemon
+`com.github.mlorentedev.dotf.pf-ssh` loads it at boot with one
+`pfctl -E -a com.apple/150.dotf-ssh -f /etc/pf.anchors/dotf-ssh` (`-a` keeps
+Apple's main ruleset).
 
-A runtime-loaded anchor does not survive a reboot. Until SEC-011 installs the
-LaunchDaemon that reloads it, re-run the two load commands after each restart.
-The sshd `AllowUsers` rule still holds while the anchor is absent.
+The apply refuses when its own ssh session arrived on an address the anchor
+closes (run it over the mesh, or at the machine). Before loading, it arms a
+root timer that, after 120 s, flushes the anchor and disables the job; the
+timer is disarmed only once the whole proof has passed, so a run cut off with
+its session leaves port 22 fenced by `AllowUsers` alone, never a Mac nobody can
+reach. A failure flushes only this anchor; nothing ever runs `pfctl -d`.
+
+A self-connection crosses `lo0`, so the Mac proves that pf is enabled and holds
+the anchor, not what the LAN sees: run the negative check below from another
+LAN host. Check: `sudo pfctl -a com.apple/150.dotf-ssh -s rules` lists the
+three rules, `sudo pfctl -s info` reads `Status: Enabled`.
 
 **Windows:** `scripts/windows-openssh-authorize.ps1` creates or narrows the
 `OpenSSH-Server-In-TCP` rule. It matches the `Tailscale` adapter and

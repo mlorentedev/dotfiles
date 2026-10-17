@@ -67,6 +67,8 @@ type Paths struct {
 	UFWRules        string
 	UFWRules6       string
 	FirewallWitness string
+	PFAnchor        string // the pf anchor file on macOS
+	PFPlist         string // the LaunchDaemon that loads it at boot
 	// Record is what the step found before it first changed each resource
 	// (Record); "" keeps none.
 	Record string
@@ -86,6 +88,8 @@ func DefaultPaths(home string) Paths {
 		UFWRules:        "/etc/ufw/user.rules",
 		UFWRules6:       "/etc/ufw/user6.rules",
 		FirewallWitness: "/var/lib/dotf/workstation-firewall",
+		PFAnchor:        "/etc/pf.anchors/dotf-ssh",
+		PFPlist:         "/Library/LaunchDaemons/" + pfLabel + ".plist",
 		Record:          "/var/lib/dotf/workstation-target.json",
 	}
 }
@@ -147,7 +151,7 @@ func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]n
 		return t, err
 	}
 	t.Power = PowerFor(goos, run, paths)
-	t.Firewall, t.FirewallNote = FirewallFor(goos, run, paths)
+	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, os.Getenv("SSH_CONNECTION"))
 	t.MeshAtBoot = MeshAtBootFor(goos, run)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
@@ -372,6 +376,13 @@ func (t Target) Apply(p Plan) error {
 		err = t.Prove(p)
 	}
 	if err == nil {
+		// A firewall that armed a commit-confirm timer keeps what it loaded
+		// only once the whole proof, sshd's included, has passed.
+		if c, ok := t.Firewall.(interface{ Commit(Root) error }); ok {
+			err = c.Commit(t.Root)
+		}
+	}
+	if err == nil {
 		return nil
 	}
 	for i := len(undo) - 1; i >= 0; i-- {
@@ -540,6 +551,15 @@ func (t Target) addresses() (mesh, lan net.IP, err error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	mesh, lan = splitAddrs(ips)
+	if mesh == nil {
+		return nil, nil, ErrNoMesh
+	}
+	return mesh, lan, nil
+}
+
+// splitAddrs picks the node's first mesh address and first private LAN one.
+func splitAddrs(ips []net.IP) (mesh, lan net.IP) {
 	_, cidr, _ := net.ParseCIDR(MeshCIDR)
 	for _, ip := range ips {
 		switch {
@@ -552,10 +572,7 @@ func (t Target) addresses() (mesh, lan net.IP, err error) {
 			lan = ip
 		}
 	}
-	if mesh == nil {
-		return nil, nil, ErrNoMesh
-	}
-	return mesh, lan, nil
+	return mesh, lan
 }
 
 // checkInclude refuses a main config that does not read the drop-in dir, and
