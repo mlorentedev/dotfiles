@@ -1,7 +1,7 @@
 ---
 id: "CLI-118-worktree-one-root"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-14"
 issue: "mlorentedev/dotfiles#2503"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, worktree, herdr]
