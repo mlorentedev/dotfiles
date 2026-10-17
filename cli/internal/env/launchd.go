@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 )
 
 // LaunchctlRunner runs `launchctl <args>` and returns its stdout.
@@ -159,31 +161,11 @@ func LaunchAgentPath(home string) string {
 func LaunchAgentPlist(home string) []byte {
 	// launchd reads these on macOS, so they are POSIX paths on every OS that
 	// renders them, never filepath's separator.
-	dotf := path.Join(home, ".local", "bin", "dotf")
-	log := path.Join(home, "Library", "Logs", "dotf-env-persist.log")
-	return []byte(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>` + LaunchAgentLabel + `</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>` + xmlEscape(dotf) + `</string>
-		<string>env</string>
-		<string>persist</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>StandardOutPath</key>
-	<string>` + xmlEscape(log) + `</string>
-	<key>StandardErrorPath</key>
-	<string>` + xmlEscape(log) + `</string>
-</dict>
-</plist>
-`)
-}
-
-func xmlEscape(s string) string {
-	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
+	return schedule.LaunchdPlist(schedule.Job{
+		Names:     schedule.Names{Launchd: LaunchAgentLabel},
+		Program:   path.Join(home, ".local", "bin", "dotf"),
+		Args:      []string{"env", "persist"},
+		RunAtLoad: true,
+		Log:       path.Join(home, "Library", "Logs", "dotf-env-persist.log"),
+	})
 }

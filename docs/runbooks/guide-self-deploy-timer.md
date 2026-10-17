@@ -2,7 +2,7 @@
 id: "guide-self-deploy-timer"
 type: runbook
 status: active
-tags: [runbook, self-deploy, systemd, scheduled-task, ops, opt-in]
+tags: [runbook, self-deploy, systemd, launchd, scheduled-task, ops, opt-in]
 created: "2026-06-09"
 ---
 
@@ -51,6 +51,33 @@ DOTFILES_AUTODEPLOY=1 ./setup-linux.sh
 # Disable: stop, disable, and remove the units
 DOTFILES_AUTODEPLOY=0 ./setup-linux.sh
 ```
+
+### macOS (launchd agent)
+
+macOS opts in through the `self-deploy` machine role, and `dotf converge` owns the agent
+(OPS-053, ADR-019 amendment 2026-10-17). Linux and Windows move to the same role when their
+backends land; until then they keep `DOTFILES_AUTODEPLOY`.
+
+```bash
+# Enable: declare the role, then converge writes and loads the agent (daily at 03:00)
+dotf env role add self-deploy
+dotf converge --only self-deploy
+
+# Disable: drop the role; the next converge boots the agent out and deletes its plist
+dotf env role rm self-deploy
+dotf converge --only self-deploy
+```
+
+Declare the role only with a `dotf` that knows it (newer than 0.73.0): an older release on the same
+machine refuses an unknown role, and every `dotf converge` fails until it is updated (lesson 468).
+
+```bash
+# Verify: the agent is loaded and runs the installed dotf
+launchctl print "gui/$(id -u)/com.github.mlorentedev.dotf.self-deploy" | grep -E 'program|Hour|Minute'
+tail ~/Library/Logs/dotf-self-deploy.log   # last run's output
+```
+
+launchd runs a slot missed while the Mac slept at wake, but not one missed while it was off.
 
 ### Windows (Scheduled Task)
 

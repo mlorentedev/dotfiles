@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/console/consoletest"
 )
 
 // fakeLaunchd is the user's launchd session as launchctl reports it: getenv
@@ -184,4 +186,12 @@ func TestLaunchdUserEnv_OutsideTheLoginSessionRefusesToWrite(t *testing.T) {
 	if len(b.own) != 0 {
 		t.Errorf("nothing may reach the caller's own domain, got %v", b.own)
 	}
+}
+
+// env-persist compares the installed plist with this renderer byte for byte
+// (envPersist.inspect), so any change to its bytes rewrites and reloads the
+// login agent on every Mac at the next converge. The golden is the renderer's
+// output before it moved to package schedule (OPS-053).
+func TestLaunchAgentPlist_BytesArePinned(t *testing.T) {
+	consoletest.Golden(t, "env-persist-plist", LaunchAgentPlist("/Users/a&b"))
 }

@@ -3,6 +3,7 @@ package sshtarget
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -153,22 +154,66 @@ func TestPmsetFailedApplyReturnsItsUndo(t *testing.T) {
 }
 
 // Battery is never read or set: a laptop that never sleeps on battery drains
-// to a hard power-off. A key differing on battery only leaves the plan clean.
+// to a hard power-off. A key differing on battery only leaves the plan clean,
+// and an apply over a differing AC key writes that key with -c and nothing else.
 func TestPmsetLeavesBatteryAlone(t *testing.T) {
 	ac := map[string]string{}
 	for _, s := range PmsetProfile {
 		ac[s.Key] = s.Value
 	}
+	battery := map[string]string{"sleep": "1", "disksleep": "10", "autorestart": "0"}
 	m := newFakeMac(t, ac)
-	m.battery = map[string]string{"sleep": "1", "disksleep": "10", "autorestart": "0"}
+	m.battery = battery
 	p := Pmset{Run: m.user}
 	if d, err := p.Differs(); err != nil || d {
 		t.Errorf("Differs() = %v, %v with only battery differing, want false", d, err)
 	}
-	for _, c := range m.rootCalls {
-		if slices.Contains(c, "-b") || slices.Contains(c, "-a") {
-			t.Errorf("root ran %v, which reaches battery", c)
-		}
+	if _, err := p.Apply(m); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.rootCalls) != 0 {
+		t.Errorf("battery alone differing ran %v as root", m.rootCalls)
+	}
+
+	ac["disksleep"] = "10"
+	m = newFakeMac(t, ac)
+	m.battery = battery
+	if _, err := (Pmset{Run: m.user}).Apply(m); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"pmset", "-c", "disksleep", "0"}}
+	if !slices.EqualFunc(m.rootCalls, want, slices.Equal[[]string]) {
+		t.Errorf("root ran %v, want only %v", m.rootCalls, want)
+	}
+}
+
+// pmsetMacmini is `pmset -g custom` as the macmini printed it on 2026-10-17,
+// verbatim: a desktop with an AC section only, keys padded to a column, and
+// one key of several words that no profile entry names.
+const pmsetMacmini = `AC Power:
+ Sleep On Power Button 1
+ autorestartatconnect 0
+ lowpowermode         0
+ standby              0
+ ttyskeepawake        1
+ powernap             1
+ displaysleep         15
+ womp                 1
+ networkoversleep     0
+ sleep                0
+ tcpkeepalive         1
+ autorestart          0
+ disksleep            10
+`
+
+func TestParsePmsetReadsTheMacminiOutput(t *testing.T) {
+	got, err := parsePmsetAC([]byte(pmsetMacmini))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"sleep": "0", "disksleep": "10", "womp": "1", "autorestart": "0", "powernap": "1"}
+	if !maps.Equal(got, want) {
+		t.Errorf("parsed %v, want %v", got, want)
 	}
 }
 

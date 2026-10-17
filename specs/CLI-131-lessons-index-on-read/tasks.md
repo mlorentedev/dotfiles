@@ -32,7 +32,7 @@ One PR: the change is a removal plus a render command, and splitting it would le
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Type checks pass
+- [x] Lint passes
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder

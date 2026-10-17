@@ -222,6 +222,28 @@ func TestResolveReviewBaseFollowsARenamedSpecFolder(t *testing.T) {
 	}
 }
 
+// #2642: a spec added and renamed on a branch that later merged with --no-ff. The
+// old name does not exist at HEAD and the merge is TREESAME to its first parent
+// for that path, so history simplification pruned the side branch where the folder
+// was added and the resolver found nothing. The base is the commit the branch left.
+func TestResolveReviewBaseFollowsARenameOnAMergedBranch(t *testing.T) {
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	wantBase := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	git(t, repoRoot, "checkout", "-q", "-b", "work")
+	writeAndCommit(t, repoRoot, "add the spec", "specs/OLD-001-x/proposal.md")
+	git(t, repoRoot, "mv", "specs/OLD-001-x", "specs/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+	git(t, repoRoot, "checkout", "-q", "main")
+	git(t, repoRoot, "merge", "-q", "--no-ff", "work", "-m", "merge the work")
+	writeAndCommit(t, repoRoot, "implement", "impl.go")
+
+	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != wantBase {
+		t.Errorf("ResolveReviewBase = %q, want %q (the commit the merged branch left)", got, wantBase)
+	}
+}
+
 // The projects-toolkit shape from #1829: the implementation and the spec are in
 // the root commit and the spec is renamed later. There is no commit before the
 // work, so no base resolves, and the caller refuses rather than reviewing a

@@ -12,6 +12,8 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/pwsh"
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
@@ -75,9 +77,15 @@ type Options struct {
 	// HerdrRun runs herdr for its agent integrations; unset, that half of
 	// agent-extensions is skipped.
 	HerdrRun tools.Runner
+	// PwshRun runs pwsh for the pwsh-modules step; tools.ExecRunner in
+	// production. Unset, that step is skipped.
+	PwshRun pwsh.Runner
 	// CompletionRun runs a tool's `completion zsh` and returns its stdout;
 	// ExecStdout in production. Unset, the shell-completions step is skipped.
 	CompletionRun tools.Runner
+	// Scheduler returns the native scheduler of a run's OS; NativeScheduler
+	// in production. Unset, the self-deploy step is skipped.
+	Scheduler func(Env) (schedule.Backend, error)
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -104,6 +112,7 @@ func Registry(o Options) []Reconciler {
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
+		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
 		shellCompletions{run: o.CompletionRun, has: onPath},
@@ -111,6 +120,7 @@ func Registry(o Options) []Reconciler {
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
+		selfDeploy{scheduler: o.Scheduler},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.DefaultPaths, user: sshtarget.CurrentUser},
 		agentExtensions{claude: o.Claude, agyPaths: o.AgyPaths, herdr: o.HerdrRun, has: onPath},
 		legacySetup{run: o.RunSetup},
