@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.73.0](https://github.com/mlorentedev/dotfiles/compare/v0.72.0...v0.73.0) (2026-10-17)
+
+
+### Features
+
+* **deploy:** render herdr's worktree root and match its bindings by key ([#2582](https://github.com/mlorentedev/dotfiles/issues/2582)) ([ca26754](https://github.com/mlorentedev/dotfiles/commit/ca2675443b692d3bc3fd9a05820a00c4f8760dbe))
+* **forge:** add dotf forge issue comment behind a Backend interface (TOOL-030) ([#2649](https://github.com/mlorentedev/dotfiles/issues/2649)) ([43f5502](https://github.com/mlorentedev/dotfiles/commit/43f550261efc8e278b5092ae97f24547b2c70372))
+* **forge:** add issue create --board for GitHub Projects (TOOL-030) ([#2662](https://github.com/mlorentedev/dotfiles/issues/2662)) ([ca2f673](https://github.com/mlorentedev/dotfiles/commit/ca2f673a65adaf7f4aa8a8b07492a22890324a00))
+* **forge:** add issue create, issue edit and pr comment (TOOL-030) ([#2655](https://github.com/mlorentedev/dotfiles/issues/2655)) ([a84933c](https://github.com/mlorentedev/dotfiles/commit/a84933c9a6ab47464635f7b68ebaab43defd291e))
+* **forge:** add pr create and pr edit (TOOL-030) ([#2661](https://github.com/mlorentedev/dotfiles/issues/2661)) ([89aca1d](https://github.com/mlorentedev/dotfiles/commit/89aca1d77f5aaed1c5ce5a27fbda4456ad7180d3))
+* **herdr:** show the session title on pi's sidebar entry ([#2647](https://github.com/mlorentedev/dotfiles/issues/2647)) ([4702862](https://github.com/mlorentedev/dotfiles/commit/4702862e9c33393eec3d68ecdb9012cc657d4361))
+* **lane:** claim an issue with one push to a git ref ([#2624](https://github.com/mlorentedev/dotfiles/issues/2624)) ([54865c7](https://github.com/mlorentedev/dotfiles/commit/54865c787cd55563707938129bcbeec5c9196443))
+* **lane:** claim before starting a lane, and add lane claim and release ([#2625](https://github.com/mlorentedev/dotfiles/issues/2625)) ([4a21f56](https://github.com/mlorentedev/dotfiles/commit/4a21f560c3ac9b7cdb22127d1f6861b16b981685))
+* **lane:** list claims and record the claim ref as decided ([#2627](https://github.com/mlorentedev/dotfiles/issues/2627)) ([0aa64cc](https://github.com/mlorentedev/dotfiles/commit/0aa64cc2764445b07f237d44d48bba308a3eccd4))
+* **lane:** plan evaluates the landing head's conditions and skips drafts ([#2607](https://github.com/mlorentedev/dotfiles/issues/2607)) ([65d2486](https://github.com/mlorentedev/dotfiles/commit/65d2486e4b96f9264ae63594758ff369284d65b0)), closes [#2596](https://github.com/mlorentedev/dotfiles/issues/2596)
+* **lessons:** render the lessons index on read instead of committing it ([#2656](https://github.com/mlorentedev/dotfiles/issues/2656)) ([e5889a1](https://github.com/mlorentedev/dotfiles/commit/e5889a10c7d59a582c0fcfe98f36ba47babee6c1))
+* **tools:** install Gitea's tea CLI for the human on macOS and Windows ([#2650](https://github.com/mlorentedev/dotfiles/issues/2650)) ([cc1d97e](https://github.com/mlorentedev/dotfiles/commit/cc1d97e0990abca50bfed3cba5ef8466954bf40e)), closes [#2635](https://github.com/mlorentedev/dotfiles/issues/2635)
+* **tools:** install zsh-autosuggestions through mise's http backend ([#2658](https://github.com/mlorentedev/dotfiles/issues/2658)) ([f952488](https://github.com/mlorentedev/dotfiles/commit/f95248867fa10c920855a18f5af44b6e4c8cf004))
+* **zsh:** cross-platform completion refresh and dotf/herdr completions ([#2648](https://github.com/mlorentedev/dotfiles/issues/2648)) ([20e68aa](https://github.com/mlorentedev/dotfiles/commit/20e68aa3614f1391471c758f76b7fb7fbc29d98e))
+
+
+### Bug Fixes
+
+* **doctor:** read an agent record's model tier the way the render does ([#2614](https://github.com/mlorentedev/dotfiles/issues/2614)) ([a5d4924](https://github.com/mlorentedev/dotfiles/commit/a5d4924381b93e496dbcf99333cb40e1792e4ce1))
+* **env:** accept DOTFILES_REPO_DIR only for a checkout, and name it when refused ([#2615](https://github.com/mlorentedev/dotfiles/issues/2615)) ([3986974](https://github.com/mlorentedev/dotfiles/commit/39869747e45df6e2e171bea1c5c65d41ead2cf9f))
+* **env:** say once when a rejected DOTFILES_REPO_DIR is ignored on a read ([#2633](https://github.com/mlorentedev/dotfiles/issues/2633)) ([7da279a](https://github.com/mlorentedev/dotfiles/commit/7da279aa8885916ad769e2378190298388e3d866))
+* **harness:** park autopilot items with the board status, not a blocked label ([#2641](https://github.com/mlorentedev/dotfiles/issues/2641)) ([9471b14](https://github.com/mlorentedev/dotfiles/commit/9471b149dd8236402653f4347814f41b02729b99)), closes [#2605](https://github.com/mlorentedev/dotfiles/issues/2605)
+* **harness:** read both roster row forms and stop testing Claude-only filtering on a real skill ([#2623](https://github.com/mlorentedev/dotfiles/issues/2623)) ([25bb6a9](https://github.com/mlorentedev/dotfiles/commit/25bb6a929736b46c415172942371b30f7df34730))
+* **lane:** apply reaps under the oracle plan used ([#2599](https://github.com/mlorentedev/dotfiles/issues/2599)) ([75c36c0](https://github.com/mlorentedev/dotfiles/commit/75c36c0927099105721cd89860984749802c4ab7)), closes [#2550](https://github.com/mlorentedev/dotfiles/issues/2550)
+* **lane:** encode the branch in the pulls query ([#2619](https://github.com/mlorentedev/dotfiles/issues/2619)) ([378581a](https://github.com/mlorentedev/dotfiles/commit/378581a8900d3af023146b22a396271bbe2fcc90)), closes [#2616](https://github.com/mlorentedev/dotfiles/issues/2616)
+* **lane:** guard the lane next claim wiring and the hook skip ([#2636](https://github.com/mlorentedev/dotfiles/issues/2636)) ([d3f0038](https://github.com/mlorentedev/dotfiles/commit/d3f0038565b16241a1881e53847a5e431696984a))
+* **lane:** refuse a branch the lane leased to another issue ([#2600](https://github.com/mlorentedev/dotfiles/issues/2600)) ([cf89a31](https://github.com/mlorentedev/dotfiles/commit/cf89a31b211420b40b8a9a0a2ce5bde23367b88c))
+* **lane:** start the successor again in a shown workspace that runs no agent ([#2611](https://github.com/mlorentedev/dotfiles/issues/2611)) ([1321e33](https://github.com/mlorentedev/dotfiles/commit/1321e3337594f4f444f1fac446b87a5963bcbaf7))
+* **lane:** test the apply wiring and print resolvers that resolve ([#2613](https://github.com/mlorentedev/dotfiles/issues/2613)) ([7a49aa8](https://github.com/mlorentedev/dotfiles/commit/7a49aa8e87da304519e7d7f0011b9fccbffb1b18)), closes [#2550](https://github.com/mlorentedev/dotfiles/issues/2550)
+* **secrets:** name the registry a sync ci refusal was decided on ([#2622](https://github.com/mlorentedev/dotfiles/issues/2622)) ([9773c73](https://github.com/mlorentedev/dotfiles/commit/9773c737c47469aa1940bc46f360301388b02786))
+* **secrets:** resolve the registry from the dotfiles checkout, not the cwd's repo ([#2602](https://github.com/mlorentedev/dotfiles/issues/2602)) ([3a7e70a](https://github.com/mlorentedev/dotfiles/commit/3a7e70a4f84f44f4f11cef53ae445c9cc406f415)), closes [#1593](https://github.com/mlorentedev/dotfiles/issues/1593)
+* **spec:** keep the previous review round instead of overwriting it ([#2610](https://github.com/mlorentedev/dotfiles/issues/2610)) ([424f2c7](https://github.com/mlorentedev/dotfiles/commit/424f2c75615ea290fc4118634d1ee5d5b0314506))
+* **tools:** refuse package names outside the managers' charset at catalog load ([#2612](https://github.com/mlorentedev/dotfiles/issues/2612)) ([57e3371](https://github.com/mlorentedev/dotfiles/commit/57e33711d70ee4bd6aebac62066873f00dc29712))
+* **tools:** report a latest tool upstream has not released as behind, not failed ([#2630](https://github.com/mlorentedev/dotfiles/issues/2630)) ([79a9c0a](https://github.com/mlorentedev/dotfiles/commit/79a9c0a3a76712ea6aede7fafb302872a77b0444))
+* **worktree:** refuse an empty --prompt-file and report a herdr without worktree open --path ([#2660](https://github.com/mlorentedev/dotfiles/issues/2660)) ([8c602e7](https://github.com/mlorentedev/dotfiles/commit/8c602e7c619dbe13727d86d5d5f46814a3b4259c))
+* **worktree:** tell ignored content from uncommitted changes and name it ([#2601](https://github.com/mlorentedev/dotfiles/issues/2601)) ([65140ae](https://github.com/mlorentedev/dotfiles/commit/65140ae121ec14d7cdc1cb1cb730712350f34ca4))
+
 ## [0.72.0](https://github.com/mlorentedev/dotfiles/compare/v0.71.0...v0.72.0) (2026-10-16)
 
 
