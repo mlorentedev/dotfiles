@@ -22,7 +22,7 @@ created: "2026-10-16"
 - `golangci-lint run` (v2.12.2, the pin) over the four touched packages: 0 issues
 - all 7 `features.json` verification commands exit 0
 - `bats` over the files that mention lessons (doc paths, knowledge gate, agents-md, ci-path-filtering, twin retirement): 98 tests, none failing
-- Not measured: the pre-commit `lessons-fmt` hook, which runs the installed 0.72 `dotf` and so fails on a tree with no index until a release carrying this change is installed (lesson 463). The deleting commit skipped that one hook; CI builds `dotf` from the checkout and is the gate.
+- Not measured: the pre-commit `lessons-fmt` hook, which runs the installed 0.72 `dotf` and so fails on a tree with no index until a release carrying this change is installed (lesson 464). The deleting commit skipped that one hook; CI builds `dotf` from the checkout and is the gate.
 
 ## Decisions made during implementation
 
@@ -34,7 +34,7 @@ created: "2026-10-16"
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-463-removing-a-file-a-pinned-tool-requires-needs-a-release-before-the-hook-passes.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-464-removing-a-file-a-pinned-tool-requires-needs-a-release-before-the-hook-passes.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a removal of a generated file with a render command; the decision and its blast radius are in proposal.md
 - [x] New pattern candidate for `00_meta/patterns/`? no: lesson 280 and 374 already record the committed-generated-file conflict; nothing new across projects
 

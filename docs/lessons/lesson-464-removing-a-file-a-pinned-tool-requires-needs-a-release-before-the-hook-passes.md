@@ -1,5 +1,5 @@
 ---
-id: "lesson-463-removing-a-file-a-pinned-tool-requires-needs-a-release-before-the-hook-passes"
+id: "lesson-464-removing-a-file-a-pinned-tool-requires-needs-a-release-before-the-hook-passes"
 type: lesson
 status: active
 title: "Removing a file a pinned tool requires needs a release before the hook passes"
