@@ -40,5 +40,19 @@
     "verification": "cd cli && go test ./internal/pwsh/ -run TestLintMatchesCIsLintPowershellJob",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f7",
+    "behavior": "AC7: the Lima template shares nothing with the host, and dotf vm linux checks systemd is PID 1 and no host directory is mounted before converging",
+    "verification": "cd cli && go test ./internal/vm/ -run 'TestLinuxTemplate|TestIsolated|TestVerify'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-003-cross-os-verification-f8",
+    "behavior": "AC8: inside the guest, ./install.sh converges with no failed step and a second dotf converge changes nothing",
+    "verification": "cd cli && go test ./internal/vm/ -run 'TestIdempotent|TestVerify' && dotf vm linux --ref main",
+    "state": "pending",
+    "evidence": ""
   }
 ]

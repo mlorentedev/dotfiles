@@ -27,8 +27,11 @@ created: "2026-10-17"
 
 ## PR 2 — Tier 3a, Lima Linux VM
 
-- [ ] [AC7] Declarative Lima template: Ubuntu 24.04, systemd, guest-local `$HOME`, no credential mounts
-- [ ] [AC8] Guest clones the repo and converges `setup-linux.sh`; second run reports nothing to change
+- [x] [AC7] Declarative Lima template embedded in `dotf` (plain mode, `mounts: []`, base the image alone, no forwarded agent or host keys); a test pins each and seven mutations fail the suite
+- [x] [AC7] `dotf vm linux`: boot, check systemd is PID 1 and no host directory is mounted, clone a pushed ref, converge twice, delete the guest (even on failure) unless `--keep`; GITHUB_TOKEN only on stdin
+- [x] [AC7] Live run on the Mac: isolation checked in the guest
+- [ ] [AC8] Live run green: blocked on #2688 (BUG-154, `install.sh` leaves `~/.local/bin` off PATH, found by this run); re-run `dotf vm linux --ref <fix>`
+- [x] Lesson 473; `lima` catalog entry
 
 ## PR 3 — Tier 3b, Windows 11 ARM VM (after the owner installs a hypervisor)
 

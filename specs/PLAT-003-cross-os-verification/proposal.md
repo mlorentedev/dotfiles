@@ -26,7 +26,7 @@ Three tiers, one PR each, in this order. Tier 2 is deferred.
   - `versions.conf` marks `PSSCRIPTANALYZER_VERSION` and `PESTER_VERSION` with `# pwsh-module: <Name>`. A new `dotf converge` reconciler, `pwsh-modules`, installs each marked module at its exact pin into the CurrentUser scope, with the same `Install-Module` flags CI uses, and its probe imports each at that version. Skipped where `pwsh` is not on PATH.
   - `dotf doctor` gains a PowerShell section: `pwsh` absent where the catalog names a manager for this OS fails; a marked module not importable at its pin warns, naming `dotf converge --only pwsh-modules`.
   - `dotf lint powershell` runs PSScriptAnalyzer at the pin over the checkout's `.ps1`/`.psm1` files with CI's settings file and severities, and exits 1 on any finding. A Go test reads `ci.yml` and fails when the job's parameters drift from the command's.
-- **Tier 3a — Lima Linux VM (PR 2).** A declarative Lima template in the repo: Ubuntu 24.04 under systemd, a guest `$HOME` that is not the host's, no host mount of credential directories, no credentials in the image. The guest clones the repo and converges `setup-linux.sh`. Started on demand, deleted after.
+- **Tier 3a — Lima Linux VM (PR 2).** `dotf vm linux` boots a declarative Lima template embedded in `dotf`: Ubuntu 24.04 under systemd, in Lima's plain mode with no mount at all, so the guest `$HOME` is guest-local and no host directory, credential or working tree reaches it. The guest clones a pushed ref from GitHub and runs `./install.sh`, then `dotf converge` a second time, which is the Linux bootstrap on main and what `from-zero.yml` checks (the issue's brief said `setup-linux.sh`, which `install.sh` replaced). Started on demand, deleted after. It certifies the `dotf` release the ref pins, not a build of the tree: `from-zero` covers the tree's binary. `lima` gets an explicit catalog entry rather than arriving as `colima`'s dependency.
 - **Tier 3b — Windows 11 ARM VM (PR 3).** A `clean-base` snapshot, reverted before each run, exercising `setup-windows.ps1` and asserting `changed=0` on the second run. It needs a hypervisor (VMware Fusion or UTM); installing one is the owner's step, and this PR does not start before it exists.
 - **Tier 2 — ARM runners in CI (deferred, no PR in this spec).** `ubuntu-24.04-arm` in dotfiles and `windows-11-arm` in ts-bridge. Deferred: it changes `.github/workflows/` (owner-lands) and the CI duration ceilings of #2246.
 
@@ -57,7 +57,7 @@ Tier 1 (PR 1):
 Tier 3a (PR 2):
 
 - [ ] AC7: the Lima template boots Ubuntu 24.04 with systemd as PID 1, the guest `$HOME` is not a host mount, and no host credential directory is mounted.
-- [ ] AC8: inside the guest, a clone of the repo converges `setup-linux.sh`, and a second run reports nothing to change.
+- [ ] AC8: inside the guest, a clone of the ref converges with `./install.sh` and no step fails, and a second `dotf converge` changes nothing (`last.json`: `result` ok, `changed` 0), as `from-zero.yml` asserts.
 
 Tier 3b (PR 3, after the owner installs a hypervisor):
 
