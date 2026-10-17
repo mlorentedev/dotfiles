@@ -74,7 +74,7 @@ func newConvergeCmd() *cobra.Command {
 // `dotf update` both run through here.
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	home := env.Home()
-	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
+	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS, Dotf: dotfVersion}
 	// Decided once, on the writer converge was handed: beginRunLog wraps it in
 	// the transcript tee, which is never a terminal, and the transcript strips
 	// colour, so one stream serves both (CLI-114).
