@@ -26,7 +26,7 @@ One PR: the change is a removal plus a render command, and splitting it would le
 - [x] [AC5] `dotf init` stops scaffolding the index
 - [x] [AC6] The session-start staleness warning reads the newest lesson
 - [x] [AC7] `git rm docs/lessons/_index.md`; reword the stale pointers (docs README, legacy stub, lane prompt, pre-commit name and comment)
-- [ ] Follow-up, not in this PR: the vault skill records that still say `dotf lessons fmt` regenerates `_index.md` (architecture-session, autopilot, crystallize, handoff, insights, place-knowledge, spec) and the comment in `.github/workflows/repo-hygiene.yml` (owner-lands path)
+- [ ] Follow-up, ticketed as #2659, not in this PR: the vault skill records that still say `dotf lessons fmt` regenerates `_index.md` (architecture-session, autopilot, crystallize, handoff, insights, place-knowledge, spec) and the comment in `.github/workflows/repo-hygiene.yml` (owner-lands path)
 
 ## Closing
 
