@@ -40,7 +40,7 @@ created: "2026-10-16"
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 
 **PR 3: the guard**
-- [ ] [AC5] `tests/harness-permits-dotf.bats`, one `@test` per harness config, passing under bash 3.2 and zsh
+- [x] [AC5] `tests/harness-permits-dotf.bats`, one `@test` per harness config, passing under bash 3.2 and zsh
 
 **PR 4: skills and the allow set (owner lands)**
 - [ ] [AC7] `new-ticket`, `pr-review-triage` and `autopilot` call `dotf forge` (vault edit, then refresh the records)
