@@ -60,7 +60,7 @@ Review `review.md` (nan/glm5.3-flash, PASS-WITH-GAPS on `9b9e99f0`):
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/DX-005-zsh-completions/` -> `specs/archive/DX-005-zsh-completions/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/DX-005-zsh-completions/` -> `specs/archive/DX-005-zsh-completions/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
