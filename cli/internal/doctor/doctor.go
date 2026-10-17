@@ -253,6 +253,7 @@ func (e sweepEnv) toolchain() []check {
 		{kind: kindMachine, run: func() { checkMiseTools(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkSystemPackages(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkPython(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkPowerShell(e.sys, e.cfg, e.rep) }},
 	}
 }
 
@@ -262,6 +263,7 @@ func (e sweepEnv) knowledgeAndSecrets() []check {
 		{kind: kindIdentity, section: "Knowledge vault (presence)", restore: restoreVault, run: func() { checkVault(e.sys, e.rep) }},
 		{kind: kindIdentity, section: "Knowledge vault hooks (secret gate)", restore: restoreVault, run: func() { checkVaultHooks(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkGitConfig(e.sys, e.rep, e.opts.Fix) }},
+		{kind: kindMachine, run: func() { checkGitLFS(e.sys, e.rep) }},
 		{kind: kindIdentity, section: "Auto-memory vault link", restore: restoreVault, run: func() { checkAutoMemoryLink(e.sys, e.start, e.rep, e.opts.Fix) }},
 		{kind: kindIdentity, section: "Auto-memory file shape", restore: restoreVault, run: func() { checkMemoryShape(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkPathFiles(e.sys, e.cfg, e.rep) }},
@@ -304,6 +306,7 @@ func (e sweepEnv) deployAndHooks() []check {
 		{kind: kindMachine, run: func() { checkHarnessDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkDeployDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkWorkstationTarget(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkSelfDeploy(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkDockerEngine(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkColimaSize(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkDockerCompose(e.sys, e.rep) }},

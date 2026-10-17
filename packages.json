@@ -134,6 +134,16 @@
       }
     },
     {
+      "name": "powershell",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "powershell",
+        "winget": "Microsoft.PowerShell",
+        "command": "pwsh"
+      }
+    },
+    {
       "name": "bash",
       "profile": "full",
       "source": {
@@ -230,6 +240,15 @@
       }
     },
     {
+      "name": "lima",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "lima",
+        "command": "limactl"
+      }
+    },
+    {
       "name": "docker",
       "profile": "full",
       "source": {
@@ -310,7 +329,138 @@
       "profile": "full",
       "source": {
         "type": "system",
-        "cask": "veracrypt"
+        "cask": "veracrypt",
+        "needs_sudo": true
+      }
+    },
+    {
+      "name": "appcleaner",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "appcleaner"
+      }
+    },
+    {
+      "name": "bitwarden",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "bitwarden"
+      }
+    },
+    {
+      "name": "codexbar",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "codexbar"
+      }
+    },
+    {
+      "name": "coteditor",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "coteditor"
+      }
+    },
+    {
+      "name": "firefox",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "firefox"
+      }
+    },
+    {
+      "name": "font-jetbrains-mono-nerd-font",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "font-jetbrains-mono-nerd-font"
+      }
+    },
+    {
+      "name": "google-drive",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "google-drive",
+        "needs_sudo": true
+      }
+    },
+    {
+      "name": "keka",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "keka"
+      }
+    },
+    {
+      "name": "maccy",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "maccy"
+      }
+    },
+    {
+      "name": "monitorcontrol",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "monitorcontrol"
+      }
+    },
+    {
+      "name": "obsidian",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "obsidian"
+      }
+    },
+    {
+      "name": "spotify",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "spotify"
+      }
+    },
+    {
+      "name": "stats",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "stats"
+      }
+    },
+    {
+      "name": "tailscale-app",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "tailscale-app",
+        "needs_sudo": true
+      }
+    },
+    {
+      "name": "visual-studio-code",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "visual-studio-code"
+      }
+    },
+    {
+      "name": "vlc",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "cask": "vlc"
       }
     },
     {

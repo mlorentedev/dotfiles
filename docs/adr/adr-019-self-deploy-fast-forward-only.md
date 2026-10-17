@@ -67,3 +67,21 @@ a full `setup` blindly is wasteful.
 ## Amendment 2026-09-30 (ADR-041, #1843)
 
 Decision 3 is amended by ADR-041 decision 5. A convergence run acts when `HEAD` moved, or when the machine's channel targets a binary newer than the installed one. When neither holds, the run is still a no-op. Decision 2 (fast-forward only) is unchanged, and it is the first step of every convergence run.
+
+## Amendment 2026-10-17 (OPS-053, #2502)
+
+Decision 5 and the triggers of the Context are amended. The opt-in is the `self-deploy` machine
+role in `machine.json` (`dotf env role add self-deploy`), not `DOTFILES_AUTODEPLOY` read by a
+setup script: a role persists, so doctor and every later converge can tell whether the machine
+opted in. The trigger is owned by the `dotf converge` step `self-deploy` on all three OSes, a
+launchd agent on macOS added to the systemd user timer and the Scheduled Task, all rendered from
+one job declaration (`update.Trigger`, package `schedule`). Both setup-script blocks are ported
+into the step and deleted.
+
+Opt-out is the role's absence, bounded by ownership: the step removes only a trigger carrying the
+marker it writes, and reports an unmarked one, the trigger a setup script installed before this
+amendment, with the command that adopts it. Removing every trigger whose machine lacks the role
+was rejected: each machine that opted in through `DOTFILES_AUTODEPLOY=1` would lose its
+self-deploy silently at its first converge, which is the defect #2502 reports. Decision 6
+(daily, catch-up, spread) holds on systemd and Windows; launchd catches up a slot missed while
+asleep but not one missed while powered off.

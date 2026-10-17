@@ -1,0 +1,26 @@
+# The Linux verification guest for `dotf vm linux`: a clean Ubuntu 24.04 that
+# sees nothing of the host. The run clones a pushed ref from GitHub; no host
+# directory is shared, so the host's $HOME, credentials and working tree never
+# reach the guest. Secrets reach the guest only on a command's stdin, never on
+# its disk (TestLinuxTemplate_SharesNothingWithTheHost pins this file).
+minimumLimaVersion: 2.0.0
+
+# The image only: Lima's ubuntu-24.04 template also bases on
+# template:_default/mounts, which shares the host's ~ with the guest.
+base:
+- template:_images/ubuntu-24.04
+
+vmType: vz
+cpus: 4
+memory: 8GiB
+disk: 30GiB
+
+# Plain mode: Lima ignores mounts, port forwarding and containerd, and runs no
+# guest agent. `mounts: []` states the same thing should plain mode change.
+plain: true
+mounts: []
+
+ssh:
+  loadDotSSHPubKeys: false
+  forwardAgent: false
+  forwardX11: false

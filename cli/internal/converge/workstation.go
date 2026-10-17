@@ -100,6 +100,9 @@ func workstationDetail(p sshtarget.Plan, dryRun bool) string {
 	for _, n := range p.Notes {
 		proof += "; " + n
 	}
+	if p.MeshAtBoot != "" {
+		proof += "; " + p.MeshAtBoot
+	}
 	switch {
 	case p.Converged() && dryRun:
 		return "converged; a run proves: " + proof
