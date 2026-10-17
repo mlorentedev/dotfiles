@@ -124,6 +124,16 @@
       }
     },
     {
+      "name": "tea",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "tea",
+        "winget": "Gitea.tea",
+        "command": "tea"
+      }
+    },
+    {
       "name": "bash",
       "profile": "full",
       "source": {
