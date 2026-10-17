@@ -177,13 +177,14 @@ func TestNativeScheduler_PicksTheBackendOfTheRunsOS(t *testing.T) {
 func TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler(t *testing.T) {
 	bus := errors.New("systemctl --user show: Failed to connect to bus")
 	for _, tc := range []struct {
-		name string
-		step func(*fakeBackend) selfDeploy
+		name    string
+		step    func(*fakeBackend) selfDeploy
+		backend bool // a backend exists that could be written to
 	}{
-		{"inspect fails", func(f *fakeBackend) selfDeploy { f.inspectErr = bus; return f.step() }},
+		{"inspect fails", func(f *fakeBackend) selfDeploy { f.inspectErr = bus; return f.step() }, true},
 		{"no backend", func(*fakeBackend) selfDeploy {
 			return selfDeploy{scheduler: func(Env) (schedule.Backend, error) { return nil, bus }}
-		}},
+		}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &fakeBackend{}
@@ -198,7 +199,7 @@ func TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler(t *testing.
 			if err := r.Probe(e); err != nil {
 				t.Errorf("probe: %v", err)
 			}
-			if f.installs+f.removals != 0 {
+			if tc.backend && f.installs+f.removals != 0 {
 				t.Errorf("installs %d, removals %d: the backend was written", f.installs, f.removals)
 			}
 		})

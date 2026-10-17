@@ -8,12 +8,15 @@
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
+    # The step keeps the setup scripts' names (update.TriggerNames), so these
+    # match the legacy trigger and the current one alike.
+    PATTERN='DOTFILES_AUTODEPLOY|DotfilesSelfUpdate|dotfiles-selfupdate'
 }
 
 @test "neither setup script installs a self-deploy trigger" {
     for f in setup-linux.sh setup-windows.ps1; do
         [ -f "$REPO/$f" ] || { echo "$f is missing" >&2; false; }
-        run bash -c "tr -d '\r' < '$REPO/$f' | grep -v '^[[:space:]]*#' | grep -nE 'DOTFILES_AUTODEPLOY|DotfilesSelfUpdate|dotfiles-selfupdate'"
+        run bash -c "tr -d '\r' < '$REPO/$f' | grep -v '^[[:space:]]*#' | grep -nE '$PATTERN'"
         [ "$status" -eq 1 ] || { echo "$f still installs the trigger: $output" >&2; false; }
     done
 }
@@ -26,4 +29,13 @@ setup() {
 
 @test "converge registers the self-deploy step" {
     grep -qF 'selfDeploy{' "$REPO/cli/internal/converge/records.go" || false
+}
+
+@test "the guard's pattern names the trigger the step writes" {
+    run grep -oE '(Systemd|Task):[[:space:]]+"[^"]+"' "$REPO/cli/internal/update/trigger.go"
+    [ "$status" -eq 0 ] && [ "${#lines[@]}" -eq 2 ] || { echo "TriggerNames not found: $output" >&2; false; }
+    for l in "${lines[@]}"; do
+        name="${l#*\"}"; name="${name%\"}"
+        printf '%s\n' "$name" | grep -qE "^($PATTERN)\$" || { echo "the guard does not match the trigger name $name" >&2; false; }
+    done
 }
