@@ -344,7 +344,10 @@ func (t Target) inspectRecord(p *Plan) error {
 	if t.Now != nil {
 		now = t.Now
 	}
-	r.Version, r.Dotf, r.Written = RecordVersion, t.Dotf, now().UTC()
+	if r.Dotf == "" {
+		r.Dotf = t.Dotf
+	}
+	r.Version, r.Written = RecordVersion, now().UTC()
 	if p.record, err = json.MarshalIndent(r, "", "  "); err != nil {
 		return err
 	}

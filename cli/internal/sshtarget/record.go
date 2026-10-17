@@ -21,7 +21,7 @@ const RecordVersion = 1
 // later apply rewrites it; only the retirement removes the file.
 type Record struct {
 	Version  int       `json:"version"`
-	Dotf     string    `json:"dotf"`    // the build that wrote it
+	Dotf     string    `json:"dotf"`    // the build that first wrote it
 	Written  time.Time `json:"written"` // when the last entry was added
 	Key      *Prior    `json:"authorized_key,omitempty"`
 	DropIn   *Prior    `json:"sshd_drop_in,omitempty"`

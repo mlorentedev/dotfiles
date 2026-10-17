@@ -150,8 +150,27 @@ func TestRecordIsUndoneWithAFailedApply(t *testing.T) {
 	if err := tg.Apply(p); err == nil {
 		t.Fatal("Apply succeeded with sshd refusing the mesh")
 	}
+	wrote := slices.ContainsFunc(m.rootCalls, func(c string) bool {
+		return strings.HasPrefix(c, "install -m") && strings.HasSuffix(c, " "+m.paths.Record)
+	})
+	if !wrote {
+		t.Fatalf("the apply never wrote the record, so its undo is untested: %q", m.rootCalls)
+	}
 	if _, err := os.Stat(m.paths.Record); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("the record survived the undo: %v", err)
+	}
+}
+
+// An entry added later keeps the stamp of the build that first wrote the
+// record; only the time moves.
+func TestRecordKeepsTheBuildThatFirstWroteIt(t *testing.T) {
+	m, tg := recorded(t)
+	m.write(m.paths.HostKey, hostKey+"\n")
+	m.write(m.paths.Record, `{"version": 1, "dotf": "0.74.9", "written": "2026-10-01T00:00:00Z", "authorized_key": {"state": "created"}, "sshd_drop_in": {"state": "created"}}`)
+	applyPlan(t, tg)
+	r := loadRecord(t, m.paths.Record)
+	if r.Dotf != "0.74.9" || !r.Written.Equal(recordTime) || r.Listener == nil {
+		t.Errorf("record = %+v, want 0.74.9 kept, the time moved and the listener added", r)
 	}
 }
 

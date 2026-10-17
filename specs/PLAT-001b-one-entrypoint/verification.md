@@ -97,9 +97,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - a fresh machine records the key, drop-in and listener as `created`, the record is the last resource, and the next plan is converged without root: `TestRecordWritesWhatTheFirstApplyCreated`
   - a drop-in with other content is kept byte for byte as `replaced`: `TestRecordKeepsTheDropInItReplaced`
   - a machine converged before the record plans only `state record`, writes it with every entry `unknown`, and runs nothing as root but the two `install` calls: `TestRecordMarksWhatAConvergedMachineAlreadyHadUnknown`
-  - entries are written once, and a failed proof removes the record with the rest of the run: `TestRecordEntriesAreWrittenOnce`, `TestRecordIsUndoneWithAFailedApply`
+  - entries are written once, and a failed proof removes the record it wrote with the rest of the run: `TestRecordEntriesAreWrittenOnce`, `TestRecordIsUndoneWithAFailedApply` (review of #2716: it now asserts the record was written before the undo, so dropping the write fails it)
+  - a later entry keeps the stamp of the build that first wrote the record: `TestRecordKeepsTheBuildThatFirstWroteIt`
   - a malformed record, or one of a later version, stops the plan naming the file: `TestInspectRefusesARecordItCannotRead`; the path per OS: `TestRecordPathPerOS`
-  - three mutations caught: an entry rewritten on every apply, a converged drop-in recorded as `created`, and a later version accepted
+  - five mutations caught: an entry rewritten on every apply, a converged drop-in recorded as `created`, a later version accepted, the record write dropped, and the build stamp overwritten
 - Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --plan --only workstation-target --repo ~/Projects/dotfiles` from this branch, on the machine converged an hour earlier with 0.74.0: `[CHANGE] workstation-target   14ms  to apply as root: state record; then proves: ...` / `1 to change`; `/var/db/dotf` does not exist yet, which `writeRecord`'s `install -d` creates
 - Not proven yet: the live write on the macmini, which needs the owner at the sudo prompt once this is released (`1 changed`, then `0 changed`, then `cat /var/db/dotf/workstation-target.json`, readable without root, shows three `unknown` entries)
 
