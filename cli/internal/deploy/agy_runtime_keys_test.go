@@ -67,7 +67,14 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Deploy(cfg, root, home, worktreeRoot, nil, false); err != nil {
+	// The dst is spelled {AGY_HOME} (#2402); resolve it to the contract default.
+	resolve := func(name string) string {
+		if name == "AGY_HOME" {
+			return filepath.Dir(dst)
+		}
+		return worktreeRoot(name)
+	}
+	if _, err := Deploy(cfg, root, home, resolve, nil, false); err != nil {
 		t.Fatal(err)
 	}
 

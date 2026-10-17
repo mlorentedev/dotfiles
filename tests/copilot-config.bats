@@ -69,9 +69,9 @@ load 'lib/refute'
 }
 
 @test "ai/deploy.json deploys settings.json and config.json by merge, mcp-config.json by replace, all gated on copilot" {
-    [ "$(jq -r '.configs[] | select(.name=="copilot-settings") | "\(.src) \(.dst) \(.strategy) \(.requires)"' "$MANIFEST")" = "ai/copilot/settings.json {HOME}/.copilot/settings.json merge copilot" ]
-    [ "$(jq -r '.configs[] | select(.name=="copilot-config") | "\(.src) \(.dst) \(.strategy) \(.requires) \(.paths)"' "$MANIFEST")" = "ai/copilot/config.json {HOME}/.copilot/config.json merge copilot native" ]
-    [ "$(jq -r '.configs[] | select(.name=="copilot-mcp") | "\(.src) \(.dst) \(.strategy // "replace") \(.requires)"' "$MANIFEST")" = "ai/copilot/mcp-config.json {HOME}/.copilot/mcp-config.json replace copilot" ]
+    [ "$(jq -r '.configs[] | select(.name=="copilot-settings") | "\(.src) \(.dst) \(.strategy) \(.requires)"' "$MANIFEST")" = "ai/copilot/settings.json {COPILOT_HOME}/settings.json merge copilot" ]
+    [ "$(jq -r '.configs[] | select(.name=="copilot-config") | "\(.src) \(.dst) \(.strategy) \(.requires) \(.paths)"' "$MANIFEST")" = "ai/copilot/config.json {COPILOT_HOME}/config.json merge copilot native" ]
+    [ "$(jq -r '.configs[] | select(.name=="copilot-mcp") | "\(.src) \(.dst) \(.strategy // "replace") \(.requires)"' "$MANIFEST")" = "ai/copilot/mcp-config.json {COPILOT_HOME}/mcp-config.json replace copilot" ]
 }
 
 @test "neither setup copies ai/copilot by glob; copilot-instructions.md is a gated presence entry (the JSON is dotf deploy's)" {
@@ -135,7 +135,7 @@ load 'lib/refute'
     # AI-043 did not supersede Copilot's half: `trustedFolders` is still ours to
     # ship, so its full list is pinned here (#2504 added the worktree root, #2503 renders it from WORKTREE_ROOT).
     [ "$(jq -c '.trustedFolders' "$CFG")" = '["{HOME}/Projects","{HOME}/Projects/*","{HOME}/Projects/Workspace","{HOME}/Projects/Workspace/*","{WORKTREE_ROOT}/*/*"]' ]
-    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {HOME}/.gemini/antigravity-cli/settings.json slash" ]
+    [ "$(jq -r '.configs[] | select(.name=="agy-settings") | "\(.src) \(.dst) \(.paths)"' "$MANIFEST")" = "ai/agy/settings.json {AGY_HOME}/settings.json slash" ]
     # paths needs version 3; later versions keep it (4 added platforms, #1843 B1).
     [ "$(jq -r '.version' "$MANIFEST")" -ge 3 ]
 }

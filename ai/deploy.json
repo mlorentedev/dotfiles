@@ -57,10 +57,11 @@
     "own keys. Bump it again whenever a new field changes meaning: a field an old",
     "decoder does not know is invisible to it, the version is not.",
     "",
-    "Copilot's destinations are spelled {HOME}/.copilot rather than {COPILOT_HOME}:",
-    "`dotf deploy` runs before `dotf env set`/`generate` in both setups, so on a",
-    "first run machine.json — which {COPILOT_HOME} needs to resolve — does not",
-    "exist yet. The contract's default for COPILOT_HOME is this very path.",
+    "A destination under a directory env-contract.json names is spelled with that",
+    "directory's token ({COPILOT_HOME}, {OPENCODE_HOME}, {AGY_HOME}), never with",
+    "{HOME}, so an overridden directory gets the file the agent reads (#2402). A",
+    "first run resolves them too: an absent machine.json yields the contract default.",
+    "TestDeployDstUnderAContractDirUsesItsToken (cli/internal/env) enforces it.",
     "",
     "opencode renders its {env:VAR} secrets at deploy time, like pi, so it works",
     "when launched from a parent without the shell's environment (SDD-009). The",
@@ -106,7 +107,7 @@
     {
       "name": "opencode-tui",
       "src": "ai/opencode/tui.json",
-      "dst": "{HOME}/.config/opencode/tui.json",
+      "dst": "{OPENCODE_HOME}/tui.json",
       "render": false,
       "mode": "0644",
       "strategy": "merge",
@@ -115,7 +116,7 @@
     {
       "name": "opencode",
       "src": "ai/opencode/opencode.jsonc",
-      "dst": "{HOME}/.config/opencode/opencode.jsonc",
+      "dst": "{OPENCODE_HOME}/opencode.jsonc",
       "render": true,
       "mode": "0600",
       "requires": "opencode"
@@ -155,7 +156,7 @@
     {
       "name": "copilot-settings",
       "src": "ai/copilot/settings.json",
-      "dst": "{HOME}/.copilot/settings.json",
+      "dst": "{COPILOT_HOME}/settings.json",
       "render": false,
       "mode": "0644",
       "strategy": "merge",
@@ -164,7 +165,7 @@
     {
       "name": "copilot-config",
       "src": "ai/copilot/config.json",
-      "dst": "{HOME}/.copilot/config.json",
+      "dst": "{COPILOT_HOME}/config.json",
       "render": false,
       "mode": "0644",
       "strategy": "merge",
@@ -174,7 +175,7 @@
     {
       "name": "copilot-mcp",
       "src": "ai/copilot/mcp-config.json",
-      "dst": "{HOME}/.copilot/mcp-config.json",
+      "dst": "{COPILOT_HOME}/mcp-config.json",
       "render": false,
       "mode": "0644",
       "requires": "copilot"
@@ -182,7 +183,7 @@
     {
       "name": "agy-settings",
       "src": "ai/agy/settings.json",
-      "dst": "{HOME}/.gemini/antigravity-cli/settings.json",
+      "dst": "{AGY_HOME}/settings.json",
       "render": false,
       "mode": "0644",
       "paths": "slash",

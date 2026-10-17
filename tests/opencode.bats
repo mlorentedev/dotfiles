@@ -31,7 +31,7 @@ setup() {
     # The `opencode` entry of ai/deploy.json does the same through `dotf deploy`:
     # render the {env:VAR} secrets, install at 0600 because the result holds
     # API keys.
-    jq -e '.configs[] | select(.name == "opencode" and .src == "ai/opencode/opencode.jsonc" and .dst == "{HOME}/.config/opencode/opencode.jsonc" and .render == true and .mode == "0600" and .requires == "opencode")' "$DOTFILES_DIR/ai/deploy.json"
+    jq -e '.configs[] | select(.name == "opencode" and .src == "ai/opencode/opencode.jsonc" and .dst == "{OPENCODE_HOME}/opencode.jsonc" and .render == true and .mode == "0600" and .requires == "opencode")' "$DOTFILES_DIR/ai/deploy.json"
     # Every OS: a `platforms` list would have to name both.
     jq -e '.configs[] | select(.name == "opencode") | .platforms == null' "$DOTFILES_DIR/ai/deploy.json"
     refute_grep 'OPENCODE_CONFIG_(SRC|DST|TMP)' "$SETUP_SCRIPT"
@@ -340,7 +340,7 @@ PY
     # tui.json carries no secrets: never `dotf secrets render`. It is merged, not
     # replaced: Orca registers its status plugin under `plugin` in the deployed
     # file, and a replace deleted that key on every `dotf deploy` (#2260).
-    jq -e '.configs[] | select(.name == "opencode-tui" and .src == "ai/opencode/tui.json" and .dst == "{HOME}/.config/opencode/tui.json" and .render == false and .strategy == "merge")' "$DOTFILES_DIR/ai/deploy.json"
+    jq -e '.configs[] | select(.name == "opencode-tui" and .src == "ai/opencode/tui.json" and .dst == "{OPENCODE_HOME}/tui.json" and .render == false and .strategy == "merge")' "$DOTFILES_DIR/ai/deploy.json"
     # The repo must not claim the key Orca owns, or the merge would overwrite it.
     refute_grep '"plugin"' "$DOTFILES_DIR/ai/opencode/tui.json"
     refute_grep 'TUI_(SRC|DST)=' "$SETUP_SCRIPT"
