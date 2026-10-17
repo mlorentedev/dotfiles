@@ -132,3 +132,16 @@ func TestCheckSelfDeploy_UnreadableRolesWarn(t *testing.T) {
 		t.Fatalf("status %q, want WARN\n%s", tagOf(got), buf.String())
 	}
 }
+
+// A scheduler that exists but cannot be reached is said; only an OS with none
+// has no section.
+func TestCheckSelfDeploy_AnUnreachableSchedulerWarns(t *testing.T) {
+	s := newSys(map[string]string{"HOME": t.TempDir()}, nil, nil)
+	s.GOOS = "linux"
+	s.Scheduler = func(string, string) (schedule.Backend, error) { return nil, errors.New("no user bus") }
+	var buf bytes.Buffer
+	checkSelfDeploy(s, capture(&buf))
+	if got := statusOfLine(buf.String(), "no user bus"); got != StatusWarn {
+		t.Fatalf("status %q, want WARN\n%s", tagOf(got), buf.String())
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
@@ -30,10 +31,14 @@ func checkSelfDeploy(sys *System, rep *Report) {
 		return
 	}
 	backend, err := sys.Scheduler(sys.GOOS, sys.home())
-	if err != nil {
+	if errors.Is(err, schedule.ErrUnsupported) {
 		return // no scheduler on this OS: the step does not run here either
 	}
 	rep.Section("Self-deploy")
+	if err != nil {
+		rep.Warn("cannot reach the scheduler: " + err.Error())
+		return
+	}
 	home := sys.home()
 	roles, err := envpkg.LoadMachineRoles(envpkg.MachinePath(home))
 	if err != nil {
