@@ -248,9 +248,46 @@ func newForgePREditCmd() *cobra.Command {
 	return c
 }
 
+// forgeWriteBoards returns the declared boards; a seam for tests.
+var forgeWriteBoards = func() (map[string]forgewrite.Board, error) {
+	return forgewrite.LoadBoards(env.ResolveForgeHostsPath())
+}
+
+// boardOpts are the --board flags of issue create.
+type boardOpts struct {
+	on                        bool
+	status, priority, typ, id string
+}
+
+// resolveBoard checks everything --board needs before the issue is written, so
+// a Gitea origin, an undeclared board or a misspelt option writes nothing, not
+// even the issue.
+func resolveBoard(c *cobra.Command, repo forgewrite.Repo, backend forgewrite.Backend, o boardOpts) (forgewrite.BoardWriter, forgewrite.BoardPlan, error) {
+	bw, ok := backend.(forgewrite.BoardWriter)
+	if !ok {
+		return nil, forgewrite.BoardPlan{}, fmt.Errorf("ERROR: --board is not supported on %s. WHY: board placement uses GitHub Projects and this forge has none. FIX: run it without --board", repo.Host)
+	}
+	boards, err := forgeWriteBoards()
+	if err != nil {
+		return nil, forgewrite.BoardPlan{}, err
+	}
+	board, ok := boards[repo.Host]
+	if !ok {
+		return nil, forgewrite.BoardPlan{}, fmt.Errorf("ERROR: no board is declared for %s. WHY: dotf forge does not guess which project to use. FIX: add \"boards\": {\"%s\": {\"owner\": ..., \"number\": ...}} to forge/hosts.json", repo.Host, repo.Host)
+	}
+	if strings.TrimSpace(o.typ) == "" {
+		return nil, forgewrite.BoardPlan{}, fmt.Errorf("ERROR: --board needs --type. WHY: the kind of work is a decision, not a default. FIX: pass --type spec|bug|chore|ideas")
+	}
+	ctx, cancel := context.WithTimeout(c.Context(), forgeWriteTimeout)
+	defer cancel()
+	plan, err := bw.ResolveBoard(ctx, board, forgewrite.BoardFields{Status: o.status, Priority: o.priority, Type: o.typ, ID: o.id})
+	return bw, plan, err
+}
+
 func newForgeIssueCreateCmd() *cobra.Command {
 	var title, bodyFile string
 	var labels []string
+	var board boardOpts
 	c := &cobra.Command{
 		Use:   "create --title <title> --body-file <file|-> [--label <name>]...",
 		Short: "Open an issue",
@@ -272,6 +309,13 @@ func newForgeIssueCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var bw forgewrite.BoardWriter
+			var plan forgewrite.BoardPlan
+			if board.on {
+				if bw, plan, err = resolveBoard(c, repo, backend, board); err != nil {
+					return err
+				}
+			}
 			ctx, cancel := context.WithTimeout(c.Context(), forgeWriteTimeout)
 			defer cancel()
 			url, err := backend.CreateIssue(ctx, repo, forgewrite.NewIssue{Title: title, Body: body, Labels: labels})
@@ -279,12 +323,25 @@ func newForgeIssueCreateCmd() *cobra.Command {
 				return err
 			}
 			printForgeURL(c, url)
+			if bw != nil {
+				if url == "" {
+					return fmt.Errorf("ERROR: the issue was created but the forge returned no URL. WHY: the board needs the URL to add the card. FIX: add the issue to the board by hand; do not run create again")
+				}
+				if err := bw.PlaceOnBoard(ctx, plan, url); err != nil {
+					return fmt.Errorf("ERROR: the issue was created at %s but placing it on the board failed: %v. WHY: the board write is a separate step. FIX: do not run create again; add the card to the board and set its fields", url, err)
+				}
+			}
 			return nil
 		},
 	}
 	c.Flags().StringVar(&title, "title", "", "issue title (required)")
 	c.Flags().StringVar(&bodyFile, "body-file", "", "file holding the issue body, or - for stdin (required)")
 	c.Flags().StringArrayVar(&labels, "label", nil, "label name; repeat for several")
+	c.Flags().BoolVar(&board.on, "board", false, "also place the issue on the declared GitHub Project (GitHub only)")
+	c.Flags().StringVar(&board.status, "status", "Backlog", "board Status option (with --board)")
+	c.Flags().StringVar(&board.priority, "priority", "P2", "board Priority option (with --board)")
+	c.Flags().StringVar(&board.typ, "type", "", "board Type option: spec, bug, chore or ideas (required with --board)")
+	c.Flags().StringVar(&board.id, "id", "", "board ID text field, e.g. AREA-NNN-slug (with --board)")
 	return c
 }
 

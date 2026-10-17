@@ -38,8 +38,8 @@ created: "2026-10-16"
 - [x] [P] [AC1] [AC2] `issue create`, `issue edit` and `pr comment`, each with a test. `--label` takes names (Gitea maps them to IDs and refuses an unknown one); the caller computes any AREA-NNN title, `dotf forge` does not scan for the next number. `pr comment` is the `issue comment` endpoint on both forges, so it adds no backend method
 - [x] [P] [AC1] [AC2] `pr create` and `pr edit`, each with a test. `pr edit` is `issue edit` under the pr name (same endpoint on both forges); `pr create` takes `--base` as required and `--head` defaulting to the current branch
 - [x] [AC2] Test that no `merge` or `close` verb is registered, walking the whole tree
-- [ ] `--board` for GitHub Project fields (PR 2c). GitHub only, and not part of `Backend`: an optional interface the GitHub backend satisfies, so `dotf forge` prints a stated message when the selected backend lacks it. Field and option ids are resolved at run time, as the `new-ticket` skill does, never pasted
-- [ ] A `--board` run on a Gitea origin exits with ERROR/WHY/FIX and writes nothing, not even the issue
+- [x] `--board` for GitHub Project fields (PR 2c), on `issue create` only. GitHub only, and not part of `Backend`: an optional `BoardWriter` the GitHub backend satisfies, so a Gitea origin gets a stated refusal. The project is declared per host under `boards` in `forge/hosts.json`, never guessed. Field and option ids are resolved from the live board at run time, as the `new-ticket` skill does, never pasted
+- [x] A `--board` run that cannot proceed (Gitea origin, undeclared board, unknown option, missing `--type`) exits with ERROR/WHY/FIX and writes nothing, not even the issue; resolution happens before the create. A failed card placement names the created issue and says not to create it again
 - [ ] Every verb PR records that its verbs are unmeasured against the classifier; the released-binary measurement stays before PR 4
 
 **PR 3: the guard**
