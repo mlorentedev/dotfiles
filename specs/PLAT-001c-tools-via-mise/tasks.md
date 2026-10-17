@@ -229,6 +229,16 @@ The installers W2 deletes left copies on every machine they ran on. Measured on 
 - [x] Review triage: an entry from `mise bin-paths --bin-names` that is a path rather than a file name (a separator, `.` or `..`) is reported and left alone, so `--fix` can never rename over a file outside `~/.local/bin` (`TestCheckMiseTools_AnEntryThatIsAPathIsNeverTouched`, mutation-checked). The doc comment on `checkMiseTools` now says the fix links, not removes
 - [x] Review triage: the pin-guard test was vacuous. Its fixture had no shim, so with the guard removed `--fix` still left the copy, for a different reason. The fixture now writes the shim and asserts the copy is still a regular file; deleting the guard's `return` turns it red (measured 2026-10-09)
 
+### W2d — doctor reports the copies in `~/.local/bin` that shadow a `system` entry (#2320)
+
+W2's leftover cleanup reached only a non-amd64 Linux host, so the eza and gh downloads it deleted stayed in `~/.local/bin` wherever setup had run, ahead of apt's copies on PATH. W2c covers mise's pins and `checkShadowedCatalogTools` npm entries; nothing covered `system` entries.
+
+- [x] Failing tests first (`checks_system_shadow_test.go`): a regular file named like a system entry's `command` ahead of the manager's copy warns naming both; `--fix` removes it once the manager's copy runs `--version`, and a second run is clean; it stays while that copy does not run; the only copy on PATH is named and kept, since the presence rule counts it as installed; a symlink, an entry this OS does not install and an entry of another source type are left alone
+- [x] Wired into doctor's *System packages* section on every OS (`checkSystemPackages` takes `fix`)
+- [x] Removes rather than links (W2c links): the manager's directory is already on every PATH, so no consumer loses the tool
+- [x] Mutation-checked, 7 of 7 killed: the run guard dropped, `Lstat` turned to `Stat`, `~/.local/bin` counted as the managed copy, the call unwired, the per-OS package guard dropped, the source-type guard dropped, the only-copy WARN demoted
+- [x] Runbook: `docs/runbooks/tool-installation.md`, the system-package section
+
 ### Python, the Wave 3 canary (#2062) — PR1, the reader and the check
 
 > The release constraint: `versions.conf` is unchanged here. The released `dotf` (v0.65.0) rejects any `# mise:` comment but `# mise: cli`, so the pins are marked in PR2, once `DOTF_VERSION` carries this parser.

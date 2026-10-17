@@ -19,8 +19,13 @@ import (
 // casks marked needs_sudo escalate, so the check plans those alone: elsewhere it
 // could only spend a `brew list` or a multi-second `winget list` per entry on
 // an answer that is never a sudo wait.
-func checkSystemPackages(sys *System, cfg *Config, rep *Report) {
+//
+// The section also names the ~/.local/bin copies that shadow a system entry's
+// managed one (checkShadowingSystemCopies), on every OS.
+func checkSystemPackages(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("System packages (packages.json)")
+	cat := loadCatalog(sys, cfg)
+	checkShadowingSystemCopies(sys, cat, rep, fix)
 	manager, _ := (tools.Source{}).SystemPackage(sys.GOOS)
 	if manager != "apt" && manager != "brew" {
 		rep.Skip("only apt and casks marked needs_sudo ask for sudo, and " + sys.GOOS + " installs through another manager")
@@ -42,7 +47,7 @@ func checkSystemPackages(sys *System, cfg *Config, rep *Report) {
 	}
 	var names []string
 	var waits []tools.SudoWait
-	for _, t := range loadCatalog(sys, cfg).Tools {
+	for _, t := range cat.Tools {
 		if t.Source.Type != "system" || (manager == "brew" && !t.Source.NeedsSudo) {
 			continue
 		}

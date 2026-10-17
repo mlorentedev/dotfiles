@@ -31,7 +31,7 @@ func systemPackagesReport(t *testing.T, sudo bool) string {
 	sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, []string{"apt-get", "sudo", "dpkg-query"}, cmds)
 	sys.GOOS = "linux"
 	var buf bytes.Buffer
-	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf), false)
 	return buf.String()
 }
 
@@ -74,7 +74,7 @@ func TestCheckSystemPackages_AsksNoManagerOffLinux(t *testing.T) {
 			return "", nil
 		}
 		var buf bytes.Buffer
-		checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+		checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf), false)
 		if len(asked) != 0 || strings.Contains(buf.String(), "[WARN]") {
 			t.Errorf("%s: asked %v\n%s", goos, asked, buf.String())
 		}
@@ -89,7 +89,7 @@ func TestCheckSystemPackages_SkipsALinuxWithoutApt(t *testing.T) {
 	sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, []string{"sudo"}, nil)
 	sys.GOOS = "linux"
 	var buf bytes.Buffer
-	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf), false)
 	if !strings.Contains(buf.String(), "apt-get is not on PATH") || strings.Contains(buf.String(), "[ OK ]") {
 		t.Errorf("want a skip naming apt-get\n%s", buf.String())
 	}
@@ -113,7 +113,7 @@ func TestCheckSystemPackages_NamesACaskThatNeedsSudoOnDarwin(t *testing.T) {
 		return run(name, args...)
 	}
 	var buf bytes.Buffer
-	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+	checkSystemPackages(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf), false)
 	out := buf.String()
 	if !strings.Contains(out, "[WARN]") || !strings.Contains(out, "(veracrypt)") || !strings.Contains(out, "`brew install --cask veracrypt`") {
 		t.Errorf("want a WARN naming veracrypt and its brew command\n%s", out)
