@@ -10,8 +10,10 @@ Nothing else is awaiting a merge.
 
 ## Parked, with the question restated
 
-- **#2448 (HARNESS-181, the reviewer's time budget is advisory and the cap discards the round).** The ticket says "Options (not decided)", so the 3 a.m. test fails, and it needs a spec (WIP 13 of 10, no override). Board Status is `Blocked` (verified through `gh issue view 2448 --json projectItems`). (A) Write-first protocol: the reviewer writes a provisional `review.md` (`verdict: PENDING`) and refines it; runner-agnostic and testable with a fake runner. (B) Steer at the soft mark through the runner's input channel; smaller, but needs a per-runner probe on pi and agy. Cheapest unblock: choose A or B and free a WIP slot.
-- **#1975 options 1 and 2 (a wedged tool call costs the round).** Option 1 needs the runner's per-tool deadline, which nothing in this repo passes or probes (a live check); option 2 needs a stall threshold, a rule for which process to kill, and a spec. (A) Wedge detection in the launcher: transcript not growing for N minutes while the process lives, fail loudly naming the tool call. (B) Per-tool deadline per runner. Cheapest unblock: choose A or B and free a WIP slot. #1975 stays open and `In Progress` (it `Refs` #2702).
+- **#2448 (HARNESS-181, the reviewer's time budget is advisory and the cap discards the round).** The ticket says "Options (not decided)", so the 3 a.m. test fails, and it needs a spec (WIP 13 of 10, no override). Board Status is `Blocked` (verified through `gh issue view 2448 --json projectItems`). (A) Write-first protocol: the reviewer writes a provisional `review.md` (`verdict: PENDING`) and refines it; runner-agnostic and testable with a fake runner. (B) Steer at the soft mark through the runner's input channel; smaller, but needs a per-runner probe on pi and agy. Advisor recommendation: **A**. B's premise is unverified (both runners are one-shot, so an input channel at the soft mark probably does not exist), and the soft mark failed because it asks for compliance after 241 tool calls, while write-first asks at turn 1. Cheapest unblock: free a WIP slot (shared with #1975-A, see below).
+- **#1975 options 1 and 2 (a wedged tool call costs the round).** Option 1 needs the runner's per-tool deadline, which nothing in this repo passes or probes (a live check); option 2 needs a stall threshold, a rule for which process to kill, and a spec. (A) Wedge detection in the launcher: transcript not growing for N minutes while the process lives, fail loudly naming the tool call. (B) Per-tool deadline per runner. Advisor recommendation: **A**. The repo already chose a launcher-side bound once (HARNESS-152, because per-runner flags covered only agy); B reintroduces that per-runner gap. The spec must settle N from measured transcript timestamps, and the first increment fails loudly and names the call. #1975 stays open and `In Progress` (it `Refs` #2702).
+
+**One spec, not two.** #1975-A and #2448-A share the launcher's termination path, so they are one spec ("a stopped review run leaves a record and names why"). The recommendations are posted on both park comments.
 
 ## Done but unmerged
 
@@ -45,4 +47,4 @@ Window covered by `caffeinate -i -t 36000`. The run ended early, so no suspend w
 
 ## Next action
 
-Pick A or B for #2448 and for #1975, and free a WIP slot so one spec can open.
+Free one WIP slot and open one spec covering #1975-A and #2448-A.
