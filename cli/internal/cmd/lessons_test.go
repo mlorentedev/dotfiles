@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,10 +70,21 @@ func TestLessonsIndex_PrintsTheTableAndWritesNothing(t *testing.T) {
 	}
 }
 
-// The parent summary is what `dotf lessons --help` shows first. It once said the
-// tool keeps a generated index, which is the committed file CLI-131 removed.
+// `dotf lessons --help` is what an agent reads first. It once promised a generated
+// index, which is the committed file CLI-131 removed. The assertion reads the
+// rendered help, so a Long added later is covered too.
 func TestLessonsHelp_DoesNotPromiseACommittedIndex(t *testing.T) {
-	if short := newLessonsCmd().Short; strings.Contains(short, "generated index") {
-		t.Errorf("the lessons summary still describes a committed generated index: %q", short)
+	var out bytes.Buffer
+	c := newLessonsCmd()
+	c.SetOut(&out)
+	c.SetErr(&out)
+	c.SetArgs([]string{"--help"})
+	if err := c.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	for _, phrase := range []string{"generated index", "committed index"} {
+		if strings.Contains(out.String(), phrase) {
+			t.Errorf("the lessons help still promises %q:\n%s", phrase, out.String())
+		}
 	}
 }
