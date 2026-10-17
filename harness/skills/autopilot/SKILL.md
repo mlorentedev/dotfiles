@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 60d40c58088bd959
+generated_sha: dad72ddad5eb26d5
 id: autopilot-skill
 type: skill
 status: active
@@ -175,7 +175,7 @@ dotf worktree list --json | jq -r --arg b "$BRANCH" '.[] | select(.branch == $b)
 - **TDD & Small Diffs:** Write the failing test first, make it pass, adhere to the ~300 LOC cap.
 - **Zero Manual Operations:** Never perform ad-hoc manual mutations on remote systems or servers. All configuration must be reproducible, idempotent IaC (`changed=0` on re-run).
 - **In-Flight Documentation (Zero Debt):**
-  - Record lessons in `docs/lessons/` (run `dotf lessons fmt` or update `docs/lessons/_index.md`).
+  - Record lessons in `docs/lessons/`, formatted by the repo's own lesson formatter (`dotf lessons fmt` only where the repo uses dotf's format, #2470; the index is rendered by `dotf lessons index`, not committed).
   - Record ADRs in `docs/adr/` if making an architectural or non-obvious design decision.
 
 ### Step 3: Machine-Checkable Verification Gate
