@@ -82,10 +82,27 @@ func (l Launchd) read(job Job) (launchdState, error) {
 		return launchdState{}, err
 	}
 	st := launchdState{exists: err == nil, stale: !bytes.Equal(have, LaunchdPlist(job))}
-	// `launchctl print` exits non-zero (113) for a service launchd does not know.
-	_, err = l.Run("print", l.service(job))
-	st.loaded = err == nil
-	return st, nil
+	st.loaded, err = l.loaded(job)
+	return st, err
+}
+
+// launchdUnknown is the status `launchctl print` exits with for a service
+// launchd does not know.
+const launchdUnknown = 113
+
+// loaded reports whether launchd knows the job. Only launchdUnknown means it
+// does not: reading any other failure as "not loaded" would delete the plist
+// of a running agent on opt-out and leave it running.
+func (l Launchd) loaded(job Job) (bool, error) {
+	_, err := l.Run("print", l.service(job))
+	var exit interface{ ExitCode() int }
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.As(err, &exit) && exit.ExitCode() == launchdUnknown:
+		return false, nil
+	}
+	return false, fmt.Errorf("launchctl print %s: %w", l.service(job), err)
 }
 
 func (l Launchd) Inspect(job Job) (State, error) {
@@ -105,11 +122,17 @@ func (l Launchd) Inspect(job Job) (State, error) {
 
 // Install writes the plist and has launchd load it. A loaded agent whose plist
 // changed is booted out first: bootstrap refuses a loaded label, and launchd
-// keeps the definition it read at load time.
+// keeps the definition it read at load time. The bootout comes before the
+// write, so a failed one leaves the old plist behind and the next run retries.
 func (l Launchd) Install(job Job) error {
 	st, err := l.read(job)
 	if err != nil {
 		return err
+	}
+	if st.stale && st.loaded {
+		if _, err := l.Run("bootout", l.service(job)); err != nil {
+			return fmt.Errorf("launchctl bootout %s: %w", l.service(job), err)
+		}
 	}
 	if st.stale {
 		if err := os.MkdirAll(l.Dir, 0o755); err != nil { //nolint:gosec // ~/Library/LaunchAgents is world-readable by convention
@@ -117,11 +140,6 @@ func (l Launchd) Install(job Job) error {
 		}
 		if err := writeAtomic(l.path(job), LaunchdPlist(job), 0o644); err != nil {
 			return err
-		}
-		if st.loaded {
-			if _, err := l.Run("bootout", l.service(job)); err != nil {
-				return fmt.Errorf("launchctl bootout %s: %w", l.service(job), err)
-			}
 		}
 	}
 	if st.stale || !st.loaded {

@@ -3,6 +3,7 @@ package converge
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -66,7 +67,7 @@ func (r selfDeploy) inspect(e Env) (selfDeployView, error) {
 	if err != nil {
 		return selfDeployView{}, err
 	}
-	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home), optedIn: slices.Contains(roles, env.RoleSelfDeploy)}
+	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home, os.Getenv("XDG_CONFIG_HOME")), optedIn: slices.Contains(roles, env.RoleSelfDeploy)}
 	v.state, err = b.Inspect(v.job)
 	return v, err
 }

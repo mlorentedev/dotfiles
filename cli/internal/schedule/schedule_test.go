@@ -3,7 +3,9 @@ package schedule
 import (
 	"encoding/xml"
 	"errors"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -20,22 +22,31 @@ func testJob() Job {
 	}
 }
 
-var errNotFound = errors.New("exit status 113")
+// exitStatus is a failed command's exit, as *exec.ExitError reports it.
+type exitStatus int
 
-// fakeLaunchctl is launchd's view of one user: the labels it has loaded.
+func (e exitStatus) Error() string { return "exit status " + strconv.Itoa(int(e)) }
+func (e exitStatus) ExitCode() int { return int(e) }
+
+// fakeLaunchctl is launchd's view of one user: the labels it has loaded. fail
+// makes the named subcommand fail with that error.
 type fakeLaunchctl struct {
 	loaded map[string]bool
+	fail   map[string]error
 	calls  []string
 }
 
 func (f *fakeLaunchctl) run(args ...string) (string, error) {
 	f.calls = append(f.calls, strings.Join(args, " "))
+	if err := f.fail[args[0]]; err != nil {
+		return "", err
+	}
 	switch args[0] {
 	case "print":
 		if f.loaded[args[1]] {
 			return "loaded", nil
 		}
-		return "", errNotFound
+		return "", exitStatus(113)
 	case "bootstrap":
 		f.loaded["gui/501/com.example.job"] = true
 	case "bootout":
@@ -101,6 +112,48 @@ func TestLaunchd_InstallThenCurrentThenRemove(t *testing.T) {
 	}
 	if st, _ = b.Inspect(job); st.Present {
 		t.Errorf("after remove: %+v, want absent", st)
+	}
+}
+
+// A print that fails for any reason but an unknown service is an error: read
+// as "not loaded", opt-out would delete a running agent's plist and leave it
+// running.
+func TestLaunchd_AFailedPrintIsNotAnAbsentAgent(t *testing.T) {
+	lc := &fakeLaunchctl{loaded: map[string]bool{}}
+	b := Launchd{Run: lc.run, UID: 501, Dir: filepath.Join(t.TempDir(), "LaunchAgents")}
+	job := testJob()
+	if err := b.Install(job); err != nil {
+		t.Fatal(err)
+	}
+	lc.fail = map[string]error{"print": exitStatus(5)}
+	if _, err := b.Inspect(job); err == nil {
+		t.Error("inspect must fail when print fails")
+	}
+	if err := b.Remove(job); err == nil {
+		t.Error("remove must fail when print fails")
+	}
+	if _, err := os.Stat(filepath.Join(b.Dir, "com.example.job.plist")); err != nil {
+		t.Errorf("the plist must survive a failed remove: %v", err)
+	}
+}
+
+// A failed bootout leaves the old plist, so the next run still sees the agent
+// stale and retries, instead of reading a current file over a stale load.
+func TestLaunchd_AFailedBootoutLeavesTheChangePending(t *testing.T) {
+	lc := &fakeLaunchctl{loaded: map[string]bool{}}
+	b := Launchd{Run: lc.run, UID: 501, Dir: filepath.Join(t.TempDir(), "LaunchAgents")}
+	job := testJob()
+	if err := b.Install(job); err != nil {
+		t.Fatal(err)
+	}
+	job.Daily = &Clock{Hour: 4}
+	lc.fail = map[string]error{"bootout": errors.New("boom")}
+	if err := b.Install(job); err == nil {
+		t.Fatal("install must fail when bootout fails")
+	}
+	lc.fail = nil
+	if st, err := b.Inspect(job); err != nil || st.Current() {
+		t.Errorf("after a failed bootout: %+v, %v; want the change still pending", st, err)
 	}
 }
 
