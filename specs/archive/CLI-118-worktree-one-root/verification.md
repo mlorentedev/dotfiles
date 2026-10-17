@@ -76,6 +76,12 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - `compile-harness.sh --refresh` reads `$VAULT_PATH`'s working tree, which defaults to the shared vault checkout. That checkout held another session's staged work and lacked the commit just pushed, so the first refresh left both skills unchanged. The records were refreshed from a detached worktree of `origin/master` (`VAULT_PATH=<wt> compile-harness.sh --refresh`); reading the working tree is the root cause of #836 (HARNESS-060), measured there.
 - AC10: ADR-032's 2026-10-13 amendment carries the owner's clarification as a dated paragraph after point 5: `dotf agent run` is dispatch, `add --agent` is cockpit use that reports submission only.
 
+## Review dispositions
+
+- Round 1 (FAIL, `c14994be`, kept as `review-round1.md`): F1 fixed by #2582; F2 answered by #2632, which states AC7 as implemented (owner confirmed 2026-10-16: the override stays on `done` only); the `features.json` command finding fixed by #2632; F4 (herdr schema drift guard) and F5 (empty `--prompt-file`) filed as #2638.
+- Round 2 (PASS WITH GAPS, `6c2c3bcd`): the Windows path-depth Major filed as #2637; root drift after a deploy filed in #2638; the session-store TOCTOU is the documented limit above, accepted.
+- `ca267544` (#2582) also changed herdr's merge to match `keys.command` bindings by `key` (`listKeys`). That is herdr key-binding behaviour, not part of the worktree root.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
@@ -86,7 +92,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-118-worktree-one-root/` -> `specs/archive/CLI-118-worktree-one-root/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-118-worktree-one-root/` -> `specs/archive/CLI-118-worktree-one-root/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
