@@ -105,6 +105,7 @@ func newLessonsFmtCmd() *cobra.Command {
 			}
 			stray, err := lessons.StrayIndexes(d)
 			if err != nil {
+				c.PrintErrln("lessons fmt:", err)
 				return err
 			}
 			w := c.OutOrStdout()
