@@ -18,21 +18,21 @@ created: "2026-10-16"
 
 PR 1 (this one): `.zshrc` + the `shell-completions` step.
 
-- [ ] [AC1] Failing bats for the dump rule: fresh dump trusted, aged dump rebuilt, newer completion file rebuilds
-- [ ] [AC1] `.zshrc`: rebuild only when stale
-- [ ] [P] [AC2] Failing bats: fpath order, no duplicates, `menu select`
-- [ ] [AC2] `.zshrc`: brew `shellenv` above `compinit`, `~/.zsh/completions` and `typeset -U fpath` before it, `menu select`
-- [ ] [AC4] Failing Go test for `shell-completions` (write, idempotent, skip missing tool, dry run, probe)
-- [ ] [AC4] Implement the step, register it, extend the registry-order test and the provisioning runbook
+- [x] [AC1] Failing bats for the dump rule: fresh dump trusted, aged dump rebuilt, newer completion file rebuilds
+- [x] [AC1] `.zshrc`: rebuild only when stale
+- [x] [P] [AC2] Failing bats: fpath order, no duplicates, `menu select`
+- [x] [AC2] `.zshrc`: brew `shellenv` above `compinit`, `~/.zsh/completions` and `typeset -U fpath` before it, `menu select`
+- [x] [AC4] Failing Go test for `shell-completions` (write, idempotent, skip missing tool, dry run, probe)
+- [x] [AC4] Implement the step, register it, extend the registry-order test and the provisioning runbook
 
 PR 2 (follow-up under this spec): zsh-autosuggestions, once the pin and install mechanism are decided.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder

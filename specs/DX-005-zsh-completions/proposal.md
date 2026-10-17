@@ -1,7 +1,7 @@
 ---
 id: "DX-005-zsh-completions"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-10-16"
 issue: "mlorentedev/dotfiles#2645"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -38,11 +38,11 @@ After this PR a new shell:
 
 ## Acceptance criteria
 
-- [ ] AC1: a dump older than 24 h, or older than a file in `~/.zsh/completions`, is rebuilt; a fresh one is not (`-C`).
-- [ ] AC2: Homebrew's site-functions and `~/.zsh/completions` are on `fpath` before `compinit`, with no duplicates; the brew block no longer follows `compinit`.
-- [ ] AC3: `menu select` is set.
-- [ ] AC4: `dotf converge --only shell-completions` writes `_dotf` and `_herdr`, a second run reports `changed=0`, and a tool absent from PATH is skipped by name.
-- [ ] AC5: startup of `zsh -ic exit` does not regress by more than 10 ms against the pre-change median.
+- [x] AC1: a dump older than 24 h, or older than a file in `~/.zsh/completions`, is rebuilt; a fresh one is not (`-C`).
+- [x] AC2: Homebrew's site-functions and `~/.zsh/completions` are on `fpath` before `compinit`, with no duplicates; the brew block no longer follows `compinit`.
+- [x] AC3: `menu select` is set.
+- [x] AC4: `dotf converge --only shell-completions` writes `_dotf` and `_herdr`, a second run reports `changed=0`, and a tool absent from PATH is skipped by name.
+- [x] AC5: startup of `zsh -ic exit` does not regress by more than 10 ms against the pre-change median.
 
 ## References
 

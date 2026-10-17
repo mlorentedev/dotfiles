@@ -15,6 +15,8 @@ PR 1 (`.zshrc` + `shell-completions`). Autosuggestions is PR 2, not covered here
 - [x] AC4 (step) -> `go test ./internal/converge -run ShellCompletions` (write, drift, dry run, skipped tool, nothing-to-run, empty or failing completion); live: `dotf converge --only shell-completions` in a scratch HOME printed `1 changed … wrote _dotf, _herdr`, then `0 changed, 1 ok`.
 - [x] AC5 (latency) -> medians of 20 runs of `zsh -ic exit` under a scratch ZDOTDIR, warm dump: main `.zshrc` 44.4 and 45.5 ms; this branch 44.2 and 44.7 ms; this branch with `~/.zsh/completions` populated 43.9 ms. The daily full `compinit` costs 51.5 ms once.
 
+PATH order: `print -l $path` under a clean `PATH=/usr/bin:/bin:/usr/sbin:/sbin` and an empty `HOMEBREW_PREFIX`, main `.zshrc` versus this branch: identical (73 entries, `/opt/homebrew/bin` at 47 in both), so moving the brew block did not reorder PATH.
+
 End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[herdr]=1`, and `~/.zsh/completions` first on `fpath`.
 
 ## Test status
