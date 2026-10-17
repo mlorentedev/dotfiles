@@ -157,17 +157,248 @@ func TestLaunchd_AFailedBootoutLeavesTheChangePending(t *testing.T) {
 	}
 }
 
-func TestFor_PicksTheBackendOfTheOS(t *testing.T) {
-	b, err := For("darwin", Runners{Launchctl: (&fakeLaunchctl{}).run, UID: 501})
-	if l, ok := b.(Launchd); err != nil || !ok || l.UID != 501 {
-		t.Errorf("For(darwin) = %#v, %v", b, err)
+// fakeSystemctl is a user manager: which timers are enabled and active.
+type fakeSystemctl struct {
+	on    map[string]bool
+	fail  bool // the manager cannot be reached
+	calls []string
+}
+
+func (f *fakeSystemctl) run(args ...string) (string, error) {
+	f.calls = append(f.calls, strings.Join(args, " "))
+	switch args[0] {
+	case "show":
+		if f.fail {
+			return "", exitStatus(1)
+		}
+		if f.on[args[3]] {
+			return "UnitFileState=enabled\nActiveState=active\n", nil
+		}
+		return "UnitFileState=\nActiveState=inactive\n", nil
+	case "enable":
+		f.on[args[2]] = true
+	case "disable":
+		delete(f.on, args[2])
 	}
-	for _, goos := range []string{"linux", "windows"} {
-		if _, err := For(goos, Runners{Launchctl: (&fakeLaunchctl{}).run}); !errors.Is(err, ErrUnsupported) {
-			t.Errorf("For(%s): want ErrUnsupported until its backend lands, got %v", goos, err)
+	return "", nil
+}
+
+func TestSystemdUnits_RenderTheJob(t *testing.T) {
+	svc, tmr := SystemdUnits(testJob())
+	for _, s := range []string{Marker + "\n", "Type=oneshot\n", "ExecStart=/home/me/.local/bin/dotf update\n"} {
+		if !strings.Contains(string(svc), s) {
+			t.Errorf("service lacks %q", s)
 		}
 	}
-	if _, err := For("darwin", Runners{}); !errors.Is(err, ErrUnsupported) {
+	for _, s := range []string{"OnCalendar=*-*-* 03:05:00\n", "Persistent=true\n", "RandomizedDelaySec=", "WantedBy=timers.target\n"} {
+		if !strings.Contains(string(tmr), s) {
+			t.Errorf("timer lacks %q", s)
+		}
+	}
+	if !strings.Contains(string(svc), `Environment="PATH=/home/me/.local/bin:/usr/bin"`+"\n") {
+		t.Errorf("the job's environment must reach the service:\n%s", svc)
+	}
+	job := testJob()
+	job.Program = "/home/a b/.local/bin/dotf"
+	if svc, _ = SystemdUnits(job); !strings.Contains(string(svc), `ExecStart="/home/a b/.local/bin/dotf" update`) {
+		t.Errorf("a path with a space must be quoted:\n%s", svc)
+	}
+}
+
+// A manager dotf cannot reach is an error, not a disabled timer: read as one,
+// opt-out would delete the units of a running timer.
+func TestSystemd_AnUnreachableManagerIsNotAnAbsentTimer(t *testing.T) {
+	sc := &fakeSystemctl{on: map[string]bool{}}
+	b := Systemd{Run: sc.run, Dir: filepath.Join(t.TempDir(), "systemd", "user")}
+	if err := b.Install(testJob()); err != nil {
+		t.Fatal(err)
+	}
+	sc.fail = true
+	if _, err := b.Inspect(testJob()); err == nil {
+		t.Error("inspect must fail when the manager cannot be reached")
+	}
+	if err := b.Remove(testJob()); err == nil {
+		t.Error("remove must fail when the manager cannot be reached")
+	}
+}
+
+func TestSystemd_InstallThenCurrentThenRemove(t *testing.T) {
+	sc := &fakeSystemctl{on: map[string]bool{}}
+	b := Systemd{Run: sc.run, Dir: filepath.Join(t.TempDir(), "systemd", "user")}
+	job := testJob()
+
+	if err := b.Install(job); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(sc.calls, "; "); !strings.Contains(got, "daemon-reload; enable --now example-job.timer") {
+		t.Errorf("install must reload, then enable --now: %q", got)
+	}
+	st, err := b.Inspect(job)
+	if err != nil || !st.Current() || !st.Managed {
+		t.Fatalf("after install: %+v, %v", st, err)
+	}
+
+	delete(sc.on, "example-job.timer") // someone ran `systemctl --user disable --now`
+	if st, _ = b.Inspect(job); st.Current() || st.Pending[0] != "enable --now example-job.timer" {
+		t.Errorf("a disabled timer is pending: %+v", st)
+	}
+	sc.calls = nil
+	if err := b.Install(job); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(sc.calls, "; "); strings.Contains(got, "daemon-reload") {
+		t.Errorf("unchanged units need no reload: %q", got)
+	}
+
+	if err := b.Remove(job); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ = b.Inspect(job); st.Present {
+		t.Errorf("after remove: %+v", st)
+	}
+}
+
+// A unit a setup script copied before OPS-053 carries no marker.
+func TestSystemd_UnitWithoutTheMarkerIsUnmanaged(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "example-job.timer"), []byte("[Timer]\nOnCalendar=daily\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	b := Systemd{Run: (&fakeSystemctl{on: map[string]bool{"example-job.timer": true}}).run, Dir: dir}
+	st, err := b.Inspect(testJob())
+	if err != nil || !st.Present || st.Managed || st.Current() {
+		t.Errorf("legacy unit: %+v, %v; want present, unmanaged, not current", st, err)
+	}
+}
+
+// errNotFound is schtasks' exit for a task it does not have.
+var errNotFound = exitStatus(1)
+
+// fakeSchtasks is the Task Scheduler: the XML each task was created from,
+// handed back UTF-16 with a byte-order mark, as schtasks prints it.
+type fakeSchtasks struct {
+	tasks map[string]string
+	calls []string
+}
+
+func (f *fakeSchtasks) run(args ...string) (string, error) {
+	f.calls = append(f.calls, strings.Join(args, " "))
+	switch args[0] {
+	case "/Query":
+		x, ok := f.tasks[args[2]]
+		if !ok {
+			return "", errNotFound
+		}
+		return string(utf16LE(x)), nil
+	case "/Create":
+		raw, err := os.ReadFile(args[4])
+		if err != nil {
+			return "", err
+		}
+		f.tasks[args[2]] = decodeText(raw)
+	case "/Delete":
+		delete(f.tasks, args[2])
+	}
+	return "", nil
+}
+
+func TestTaskXML_IsWellFormedAndCarriesTheDigest(t *testing.T) {
+	job := testJob()
+	job.Program = `C:\Users\me\.local\bin\dotf.exe`
+	x := TaskXML(job, `HOST\me`, LogonS4U)
+	var doc struct {
+		Desc    string `xml:"RegistrationInfo>Description"`
+		Logon   string `xml:"Principals>Principal>LogonType"`
+		Command string `xml:"Actions>Exec>Command"`
+		Args    string `xml:"Actions>Exec>Arguments"`
+		Start   string `xml:"Triggers>CalendarTrigger>StartBoundary"`
+	}
+	// encoding/xml refuses a UTF-16 declaration on a Go string; the body is what is checked.
+	if err := xml.Unmarshal([]byte(strings.Replace(x, `encoding="UTF-16"`, `encoding="UTF-8"`, 1)), &doc); err != nil {
+		t.Fatalf("task XML must be well-formed: %v", err)
+	}
+	if !strings.HasSuffix(doc.Desc, "[dotf:"+TaskDigest(job)+"]") || doc.Logon != LogonS4U ||
+		doc.Command != job.Program || doc.Args != "update" || doc.Start != "2026-01-01T03:05:00" {
+		t.Errorf("task XML fields: %+v", doc)
+	}
+}
+
+func TestSchtasks_InstallThenCurrentThenRemove(t *testing.T) {
+	st := &fakeSchtasks{tasks: map[string]string{}}
+	elevated := false
+	b := Schtasks{Run: st.run, User: `HOST\me`, Elevated: func() bool { return elevated }, TempDir: t.TempDir()}
+	job := testJob()
+
+	if err := b.Install(job); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(st.tasks["ExampleJob"], "<LogonType>InteractiveToken</LogonType>") {
+		t.Error("a standard user registers an InteractiveToken task")
+	}
+	s, _ := b.Inspect(job)
+	if !s.Current() || !s.Managed {
+		t.Fatalf("after install: %+v", s)
+	}
+	st.calls = nil
+	if err := b.Install(job); err != nil || len(st.calls) != 1 {
+		t.Errorf("a second install must only query, ran %q (%v)", st.calls, err)
+	}
+
+	elevated = true
+	if s, _ = b.Inspect(job); s.Current() {
+		t.Error("an elevated caller upgrades an InteractiveToken task to S4U")
+	}
+	if err := b.Install(job); err != nil {
+		t.Fatal(err)
+	}
+	elevated = false
+	if s, _ = b.Inspect(job); !s.Current() {
+		t.Errorf("a standard user never downgrades an S4U task: %+v", s)
+	}
+
+	job.Args = []string{"update", "--verbose"}
+	if s, _ = b.Inspect(job); s.Current() {
+		t.Error("a changed job changes the digest")
+	}
+
+	if err := b.Remove(job); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ = b.Inspect(job); s.Present {
+		t.Errorf("after remove: %+v", s)
+	}
+}
+
+// The task setup-windows.ps1 registered carries no digest.
+func TestSchtasks_TaskWithoutTheDigestIsUnmanaged(t *testing.T) {
+	st := &fakeSchtasks{tasks: map[string]string{"ExampleJob": "<Task><RegistrationInfo><Description>dotfiles self-deploy</Description></RegistrationInfo></Task>"}}
+	s, err := Schtasks{Run: st.run, TempDir: t.TempDir()}.Inspect(testJob())
+	if err != nil || !s.Present || s.Managed || s.Current() {
+		t.Errorf("legacy task: %+v, %v", s, err)
+	}
+}
+
+func TestFor_PicksTheBackendOfTheOS(t *testing.T) {
+	r := Runners{Launchctl: (&fakeLaunchctl{}).run, Systemctl: (&fakeSystemctl{}).run, Schtasks: (&fakeSchtasks{}).run}
+	for goos, want := range map[string]string{"darwin": "schedule.Launchd", "linux": "schedule.Systemd", "windows": "schedule.Schtasks"} {
+		b, err := For(goos, r)
+		if err != nil || typeName(b) != want {
+			t.Errorf("For(%s) = %s, %v", goos, typeName(b), err)
+		}
+	}
+	if _, err := For("linux", Runners{}); !errors.Is(err, ErrUnsupported) {
 		t.Errorf("an unwired runner is unsupported, got %v", err)
 	}
+}
+
+func typeName(b Backend) string {
+	switch b.(type) {
+	case Launchd:
+		return "schedule.Launchd"
+	case Systemd:
+		return "schedule.Systemd"
+	case Schtasks:
+		return "schedule.Schtasks"
+	}
+	return "<nil>"
 }

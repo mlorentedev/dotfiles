@@ -31,13 +31,13 @@ created: "2026-10-17"
 
 ## PR B — systemd and Scheduled Task backends, twins deleted (AC2, AC3, AC4, AC6)
 
-- [ ] [AC2] `schedule` systemd backend: render service + timer with the marker, inspect (bytes + `is-enabled`/`is-active`), install (write, daemon-reload, enable --now), remove; fake-runner tests
-- [ ] [AC3] `schedule` schtasks backend: task XML with a digest marker in Description, inspect (`/Query /XML`), install (`/Create /XML /F`), remove (`/Delete /F`); logon type from an elevation probe; fake-runner tests
-- [ ] [AC4] Unmarked units/task (the setup scripts' install) read as unmanaged
-- [ ] [AC6] Delete the setup-linux.sh and setup-windows.ps1 blocks, `systemd/dotfiles-selfupdate.*`, `tests/dotfiles-selfupdate-install.bats`; fix the `systemd/hive.service.d/10-dotf-secrets.conf` mention
-- [ ] [AC6] `dotf update --help`, runbook rewritten around the role on every OS
-- [ ] Gates as above, plus bats for every file that references a changed script
-- [ ] Verification boundary in the PR: live `changed=0` on Linux (msi) and Windows (work-lab box) is not proved here
+- [x] [AC2] `schedule` systemd backend: render service + timer with the marker, inspect (bytes + `is-enabled`/`is-active`), install (write, daemon-reload, enable --now), remove; fake-runner tests
+- [x] [AC3] `schedule` schtasks backend: task XML with a digest marker in Description, inspect (`/Query /XML`), install (`/Create /XML /F`), remove (`/Delete /F`); logon type from an elevation probe; fake-runner tests
+- [x] [AC4] Unmarked units/task (the setup scripts' install) read as unmanaged
+- [x] [AC6] Delete the setup-linux.sh and setup-windows.ps1 blocks, `systemd/dotfiles-selfupdate.*`, `tests/dotfiles-selfupdate-install.bats`; fix the `systemd/hive.service.d/10-dotf-secrets.conf` mention
+- [x] [AC6] `dotf update --help`, runbook rewritten around the role on every OS
+- [x] Gates as above, plus bats for every file that references a changed script
+- [x] Verification boundary in the PR: live `changed=0` on Linux (msi) and Windows (work-lab box) is not proved here
 
 ## PR C — last-run record and doctor (AC7)
 

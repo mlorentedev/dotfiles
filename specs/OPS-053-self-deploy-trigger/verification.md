@@ -11,11 +11,11 @@ PR A (darwin) is below. PR B (linux, windows, twin deletion) and PR C (last-run 
 fill in their criteria when they land.
 
 - [x] AC1 (darwin) -> `TestLaunchd_InstallThenCurrentThenRemove`, `TestSelfDeploy_OptedInInstallsThenIsConverged`, `TestNativeScheduler_PicksTheBackendOfTheRunsOS`; live run below
-- [ ] AC2 (linux) -> PR B
-- [ ] AC3 (windows) -> PR B
+- [x] AC2 (linux) -> `TestSystemd*` in `cli/internal/schedule` (fake systemctl); live `changed=0` not proved here, needs msi
+- [x] AC3 (windows) -> `TestSchtasks*`, `TestTaskXML*` (fake schtasks), `GOOS=windows go vet ./...`; live `changed=0` not proved here, needs the work-lab Windows box
 - [x] AC4 (step rule) -> `TestSelfDeploy_WithoutTheRole`, `TestSelfDeploy_OptedInAdoptsAnUnmanagedTrigger`; darwin removal live below. Unmarked triggers exist only on linux/windows, so their detection lands with PR B
 - [x] AC5 -> `TestLaunchAgentPlist_BytesArePinned`, golden written from `cdf425af` before the renderer moved
-- [ ] AC6 -> PR B
+- [x] AC6 -> no `DOTFILES_AUTODEPLOY` in either setup script; `systemd/dotfiles-selfupdate.*` and `tests/dotfiles-selfupdate-install.bats` deleted; runbook rewritten around the role
 - [ ] AC7 -> PR C
 
 ## Test status

@@ -142,19 +142,28 @@ func TestSelfDeploy_SkipsWithoutAScheduler(t *testing.T) {
 	}
 }
 
-// The production scheduler addresses the run's home; the OSes without a
-// backend yet are a skip, never a failure.
+// The production scheduler addresses the run's home on every OS.
 func TestNativeScheduler_PicksTheBackendOfTheRunsOS(t *testing.T) {
-	s := NativeScheduler(501)
-	b, err := s(Env{Home: "/Users/me", GOOS: "darwin"})
-	if l, ok := b.(schedule.Launchd); err != nil || !ok || l.UID != 501 || l.Dir != filepath.Join("/Users/me", "Library", "LaunchAgents") {
-		t.Errorf("darwin: %#v, %v", b, err)
-	}
-	for _, goos := range []string{"linux", "windows"} {
-		r, e := selfDeploy{scheduler: s}, selfDeployEnv(t, true)
-		e.GOOS = goos
-		if res, err := r.Reconcile(e, true); err != nil || res.Skip == "" {
-			t.Errorf("%s: %+v, %v; want a skip", goos, res, err)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	s := NativeScheduler(501, func() bool { return false })
+	for goos, want := range map[string]any{"darwin": schedule.Launchd{}, "linux": schedule.Systemd{}, "windows": schedule.Schtasks{}} {
+		b, err := s(Env{Home: "/home/me", GOOS: goos})
+		if err != nil {
+			t.Fatalf("%s: %v", goos, err)
+		}
+		switch b := b.(type) {
+		case schedule.Launchd:
+			if _, ok := want.(schedule.Launchd); !ok || b.UID != 501 || !strings.HasSuffix(b.Dir, "LaunchAgents") {
+				t.Errorf("%s: %+v", goos, b)
+			}
+		case schedule.Systemd:
+			if _, ok := want.(schedule.Systemd); !ok || b.Dir != filepath.Join("/home/me", ".config", "systemd", "user") {
+				t.Errorf("%s: %+v", goos, b)
+			}
+		case schedule.Schtasks:
+			if _, ok := want.(schedule.Schtasks); !ok {
+				t.Errorf("%s: %+v", goos, b)
+			}
 		}
 	}
 }
