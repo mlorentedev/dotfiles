@@ -82,6 +82,10 @@ func (r toolsSync) Probe(env Env) error {
 	if r.unavailable() != "" {
 		return nil
 	}
+	// The probe checks this machine, not upstream: a Latest tool still behind
+	// its newest release after the apply is a release mise does not yet
+	// install (#2526), which the apply reported and the next run retries.
+	s.CheckUpgrades = false
 	p, err := s.Plan(pins)
 	if err != nil {
 		return err
@@ -212,8 +216,11 @@ func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
 	if len(p.MissingPackages) > 0 {
 		parts = append(parts, "python packages "+verb+": "+strings.Join(p.MissingPackages, ", "))
 	}
-	if len(p.Outdated) > 0 {
-		parts = append(parts, up+" to their newest release: "+strings.Join(p.Outdated, ", "))
+	if names := p.Upgraded(); len(names) > 0 {
+		parts = append(parts, up+" to their newest release: "+strings.Join(names, ", "))
+	}
+	if len(p.Behind) > 0 {
+		parts = append(parts, "still behind their newest release, retried next run: "+strings.Join(p.Behind, ", "))
 	}
 	if len(p.Orphans) > 0 {
 		gone := "pruned"

@@ -896,17 +896,56 @@ func TestSync_UpgradesInTheRunThatTurnsAPinIntoLatest(t *testing.T) {
 	}
 }
 
-func TestSync_FailsWhenTheUpgradeDoesNotTake(t *testing.T) {
-	_, s, tools := newLatestSync(t, map[string]string{}, "2.1.300")
+// #2526: mise skips a release younger than minimum_release_age (24h by
+// default), and near that cutoff `mise outdated` and `mise upgrade` can
+// disagree on which release is eligible. An upgrade that ran and left the tool
+// where it was is upstream lag, not a fault of this machine: the sync reports
+// it as behind and succeeds, and the next run tries again.
+func TestSync_ALatestToolStillBehindAfterItsUpgradeIsReportedNotFailed(t *testing.T) {
+	f, s, tools := newLatestSync(t, map[string]string{}, "2.1.300")
 	run := s.Run
 	s.Run = func(name string, args ...string) ([]byte, error) {
 		if name == "mise" && len(args) > 0 && args[0] == "upgrade" {
+			f.upgrades = append(f.upgrades, args[1:])
 			return nil, nil // reports success and changes nothing
 		}
 		return run(name, args...)
 	}
-	if _, err := s.Apply(tools); err == nil || !strings.Contains(err.Error(), "claude") {
-		t.Fatalf("want an error naming claude, got %v", err)
+	f.installed["claude"] = "2.1.299"
+	f.installed["age"] = "1.3.1"
+	p, err := s.Apply(tools)
+	if err != nil {
+		t.Fatalf("an upgrade upstream has not caught up with must not fail the sync: %v", err)
+	}
+	if strings.Join(p.Behind, ",") != "claude" || len(f.upgrades) != 1 {
+		t.Errorf("want claude reported behind after one upgrade, got %+v after %v", p, f.upgrades)
+	}
+	if again, err := s.Apply(tools); err != nil || len(f.upgrades) != 2 || strings.Join(again.Behind, ",") != "claude" {
+		t.Errorf("the next run must try the upgrade again: err %v, upgrades %v, plan %+v", err, f.upgrades, again)
+	}
+}
+
+// What the upgrade must never do is leave a tool older than it found it: that
+// is a fault here, whatever upstream says.
+func TestSync_FailsWhenTheUpgradeRegressesALatestTool(t *testing.T) {
+	f, s, tools := newLatestSync(t, map[string]string{"age": "1.3.1", "claude": "2.1.299"}, "2.1.300")
+	if err := os.MkdirAll(filepath.Dir(f.cfg), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f.cfg, s.render(tools), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run := s.Run
+	s.Run = func(name string, args ...string) ([]byte, error) {
+		if name == "mise" && len(args) > 0 && args[0] == "upgrade" {
+			f.installed["claude"] = "2.1.298"
+			return nil, nil
+		}
+		return run(name, args...)
+	}
+	_, err := s.Apply(tools)
+	if err == nil || !strings.Contains(err.Error(), "claude") || !strings.Contains(err.Error(), "2.1.298") {
+		t.Fatalf("want an error naming claude and the older version, got %v", err)
 	}
 }
 

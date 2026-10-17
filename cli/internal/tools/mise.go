@@ -318,6 +318,26 @@ type SyncPlan struct {
 	MissingPackages []string // python packages mise's Python lacks at their pin
 	Outdated        []string // Latest tools installed with a newer release available
 	Orphans         []string // installs no pin asks for, as tool@version (Prune only)
+	// Behind names the Latest tools an Apply upgraded that mise still reports
+	// behind their newest release. That is upstream lag, not a fault here: mise
+	// skips a release younger than minimum_release_age (24h by default), and
+	// near that cutoff `outdated` and `upgrade` can disagree on which release
+	// is eligible (#2526). The next run upgrades them again. Only Apply sets it.
+	Behind []string
+
+	current map[string]string // installed version of each Outdated tool
+}
+
+// Upgraded names the Outdated tools the upgrade brought to their newest
+// release: Outdated without Behind.
+func (p SyncPlan) Upgraded() []string {
+	var out []string
+	for _, name := range p.Outdated {
+		if !contains(p.Behind, name) {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // Pending reports whether Apply has anything to do.
@@ -372,7 +392,7 @@ func (s MiseSync) plan(tools []MiseTool) (p SyncPlan, unlisted, err error) {
 		}
 	}
 	p.MissingPackages = s.missingPythonPackages()
-	if p.Outdated, err = s.outdated(p.Missing); err != nil {
+	if p.Outdated, p.current, err = s.outdated(p.Missing); err != nil {
 		return p, nil, err
 	}
 	if s.Prune {
@@ -434,11 +454,12 @@ type outdatedEntry struct {
 }
 
 // outdated names the Latest tools that are installed and have a newer release,
-// as `mise outdated` reports it. A missing tool is left to `mise install`,
-// which installs the newest release of a tool requested as `latest`.
-func (s MiseSync) outdated(missing []string) ([]string, error) {
+// as `mise outdated` reports it, with the version each one runs now. A missing
+// tool is left to `mise install`, which installs the newest release of a tool
+// requested as `latest`.
+func (s MiseSync) outdated(missing []string) ([]string, map[string]string, error) {
 	if !s.CheckUpgrades {
-		return nil, nil
+		return nil, nil, nil
 	}
 	var ask []string
 	for _, name := range s.Latest {
@@ -447,7 +468,7 @@ func (s MiseSync) outdated(missing []string) ([]string, error) {
 		}
 	}
 	if len(ask) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	run := s.Stdout
 	if run == nil {
@@ -455,19 +476,34 @@ func (s MiseSync) outdated(missing []string) ([]string, error) {
 	}
 	out, err := run("mise", append([]string{"outdated", "--json"}, ask...)...)
 	if err != nil {
-		return nil, fmt.Errorf("mise outdated: %w\n%s", err, strings.TrimSpace(string(out)))
+		return nil, nil, fmt.Errorf("mise outdated: %w\n%s", err, strings.TrimSpace(string(out)))
 	}
 	var report map[string]outdatedEntry
 	if err := json.Unmarshal(out, &report); err != nil {
-		return nil, fmt.Errorf("mise outdated: unreadable report %q: %w", strings.TrimSpace(string(out)), err)
+		return nil, nil, fmt.Errorf("mise outdated: unreadable report %q: %w", strings.TrimSpace(string(out)), err)
 	}
 	var names []string
+	current := map[string]string{}
 	for _, name := range ask {
 		if e, ok := report[name]; ok && e.Latest != "" && e.Latest != e.Current {
 			names = append(names, name)
+			current[name] = e.Current
 		}
 	}
-	return names, nil
+	return names, current, nil
+}
+
+// regressed names each tool still behind after the upgrade that now runs an
+// older version than it did before it, as tool@before->after.
+func regressed(before, after map[string]string, behind []string) []string {
+	var out []string
+	for _, name := range behind {
+		was, now := before[name], after[name]
+		if was != "" && now != "" && compareVersions(now, was) < 0 {
+			out = append(out, name+"@"+was+"->"+now)
+		}
+	}
+	return out
 }
 
 // Apply writes the config when it differs, runs `mise install` when anything is
@@ -528,7 +564,7 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 		// The config just written may have turned an exact pin into
 		// `latest`, which mise install leaves at the installed version; ask
 		// again so this run upgrades it instead of the next one.
-		if p.Outdated, err = s.outdated(nil); err != nil {
+		if p.Outdated, p.current, err = s.outdated(nil); err != nil {
 			return p, err
 		}
 	}
@@ -557,9 +593,10 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 	if len(after.Missing) > 0 {
 		return p, fmt.Errorf("after mise install, not running at their pin: %s", strings.Join(after.Missing, ", "))
 	}
-	if len(after.Outdated) > 0 {
-		return p, fmt.Errorf("after mise upgrade, still behind their newest release: %s", strings.Join(after.Outdated, ", "))
+	if older := regressed(p.current, after.current, after.Outdated); len(older) > 0 {
+		return p, fmt.Errorf("after mise upgrade, older than before: %s", strings.Join(older, ", "))
 	}
+	p.Behind = after.Outdated
 	if len(after.MissingPackages) == 0 {
 		return p, nil
 	}
