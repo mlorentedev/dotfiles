@@ -303,10 +303,18 @@ logind could not reload (until then it still reports the old value):
 `busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandleLidSwitchExternalPower`
 prints `s "ignore"`.
 
-A GNOME desktop has its own idle suspend, which logind does not govern:
+A GNOME desktop has its own idle suspend, which logind does not govern. On
+Ubuntu it is off on AC out of the box: GNOME's schema default is `'suspend'`,
+but the `ubuntu-settings` package overrides `sleep-inactive-ac-timeout` to `0`
+(`/usr/share/glib-2.0/schemas/10_ubuntu-settings.gschema.override`), and a zero
+timeout never fires. Check both keys:
 `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type`
-must print `'nothing'` (it does on msi). Converging it is
-[#2374](https://github.com/mlorentedev/dotfiles/issues/2374).
+prints `'nothing'`, or `sleep-inactive-ac-timeout` prints `0`. Measured on msi
+(Ubuntu 26.04.1, 2026-10-17): `'nothing'` in the user's dconf, the override at
+`0`, and no `Suspending system` in the journal since the lid policy landed on
+2026-10-13 ([#2374](https://github.com/mlorentedev/dotfiles/issues/2374)).
+A GNOME without that override (Fedora, upstream GNOME) suspends an idle session
+on AC: set the type to `'nothing'` there by hand before it becomes a target.
 
 **macOS:** the same converge step sets the AC profile `sleep 0`, `disksleep 0`,
 `womp 1`, `autorestart 1` and `powernap 1` with one `pmset -c`, and only the keys
