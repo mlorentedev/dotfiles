@@ -165,4 +165,11 @@ func TestParsePowercfgRefusesOutputWithoutIndexes(t *testing.T) {
 	if _, err := parsePowercfgAC([]byte("Invalid Parameters -- try \"/?\" for help\r\n")); err == nil {
 		t.Fatal("parsed an error message as a setting")
 	}
+	// A range setting's bounds are hex too: without the current indexes after
+	// them, the maximum must not be read as the AC value.
+	full := powercfgQ("en", "STANDBYIDLE", 1800, 900)
+	bounds := full[:strings.Index(full, "    Current AC")]
+	if v, err := parsePowercfgAC([]byte(bounds)); err == nil {
+		t.Fatalf("parsed %#x from the range bounds alone", v)
+	}
 }

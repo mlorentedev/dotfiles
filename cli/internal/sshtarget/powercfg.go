@@ -102,26 +102,26 @@ func (p Powercfg) pending() ([]PowercfgSetting, map[string]uint64, error) {
 var powercfgHex = regexp.MustCompile(`:\s*0x([0-9a-fA-F]+)\s*$`)
 
 // parsePowercfgAC reads the AC index of one setting from `powercfg /q`. The
-// labels are in the system's language, so it reads none of them: the AC and
-// DC indexes are always the last two hexadecimal values, AC first. A range
-// setting lists its minimum, maximum and increment before them, in hex too.
+// labels are in the system's language, so it reads none of them: the current
+// AC and DC indexes are always the last two lines, AC first, each ending in a
+// hexadecimal value. A range setting prints its minimum, maximum and increment
+// in hex too, but a units line follows them, so an output that has the bounds
+// and no current indexes ends in a line that is not hex and is refused.
 func parsePowercfgAC(out []byte) (uint64, error) {
-	var vals []uint64
+	var lines []string
 	for _, line := range strings.Split(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n") {
-		m := powercfgHex.FindStringSubmatch(line)
-		if m == nil {
-			continue
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
 		}
-		v, err := strconv.ParseUint(m[1], 16, 64)
-		if err != nil {
-			return 0, err
-		}
-		vals = append(vals, v)
 	}
-	if len(vals) < 2 {
+	if len(lines) < 2 {
 		return 0, fmt.Errorf("no AC and DC index in the output: %s", bytes.TrimSpace(out))
 	}
-	return vals[len(vals)-2], nil
+	ac := powercfgHex.FindStringSubmatch(lines[len(lines)-2])
+	if ac == nil || !powercfgHex.MatchString(lines[len(lines)-1]) {
+		return 0, fmt.Errorf("no AC and DC index in the output: %s", bytes.TrimSpace(out))
+	}
+	return strconv.ParseUint(ac[1], 16, 64)
 }
 
 func setAC(root Root, sub, setting string, v uint64) error {
