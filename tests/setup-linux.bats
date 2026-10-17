@@ -327,7 +327,8 @@ setup() {
 # scoped name was "fixed" by dropping the scope. The refute below keeps any
 # obsidian npm entry from returning under either name.
 @test "parity: yarn is a catalog tool and obsidian is not an npm tool (OPS-042, #1615)" {
-    [ -z "$(jq -r '.tools[] | select(.name=="obsidian" or .source.package=="obsidian-cli") | .name' "$DOTFILES_DIR/packages.json")" ]
+    # The Obsidian app is a cask (PLAT-001c); what OPS-042 retired is the npm CLI.
+    [ -z "$(jq -r '.tools[] | select(.source.type=="npm" and (.name=="obsidian" or .source.package=="obsidian-cli")) | .name' "$DOTFILES_DIR/packages.json")" ]
     [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"
