@@ -105,6 +105,13 @@ screen until someone types the password. Pick one for each Mac and record it:
   a person at the unlock screen.
 - **Attended:** keep the app. The Mac is reachable only while a user is logged in.
 
+The `workstation-target` step does not switch variants; it reports which one
+runs. Its plan, and `dotf doctor` as a WARN, say so while the mesh would not
+come back after an unattended reboot: on macOS while `launchctl print
+system/com.tailscale.tailscaled` finds no daemon, on Linux while `systemctl
+is-enabled tailscaled` is not `enabled`. On `macmini` the WARN stays by
+decision (attended, #2356 2026-10-13).
+
 **Windows** (elevated PowerShell, after installing Tailscale):
 
 ```powershell
@@ -296,16 +303,30 @@ logind could not reload (until then it still reports the old value):
 `busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandleLidSwitchExternalPower`
 prints `s "ignore"`.
 
-A GNOME desktop has its own idle suspend, which logind does not govern:
+A GNOME desktop has its own idle suspend, which logind does not govern. On
+Ubuntu it is off on AC out of the box: GNOME's schema default is `'suspend'`,
+but the `ubuntu-settings` package overrides `sleep-inactive-ac-timeout` to `0`
+(`/usr/share/glib-2.0/schemas/10_ubuntu-settings.gschema.override`), and a zero
+timeout never fires. Check both keys:
 `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type`
-must print `'nothing'` (it does on msi). Converging it is
-[#2374](https://github.com/mlorentedev/dotfiles/issues/2374).
+prints `'nothing'`, or `sleep-inactive-ac-timeout` prints `0`. Measured on msi
+(Ubuntu 26.04.1, 2026-10-17): `'nothing'` in the user's dconf, the override at
+`0`, and no `Suspending system` in the journal since the lid policy landed on
+2026-10-13 ([#2374](https://github.com/mlorentedev/dotfiles/issues/2374)).
+A GNOME without that override (Fedora, upstream GNOME) suspends an idle session
+on AC, and the step does not converge it: such a machine needs that resource
+added to the step (the `ConditionACPower=false` drop-in #2374 sketches) before
+it becomes a target.
 
-**macOS:**
+**macOS:** the same converge step sets the AC profile `sleep 0`, `disksleep 0`,
+`womp 1`, `autorestart 1` and `powernap 1` with one `pmset -c`, and only the keys
+that differ. `displaysleep` and every battery setting are left alone. A key the
+hardware does not report on AC (`womp` on a Mac without Ethernet) is skipped.
+The plan reads `pmset -g custom` without root and lists `power policy` while any
+key differs; the proof reads it back after the apply. Check:
 
 ```bash
-sudo pmset -c sleep 0 disksleep 0 womp 1 autorestart 1
-pmset -g custom          # check: AC Power shows sleep 0, womp 1, autorestart 1
+pmset -g custom          # AC Power: sleep 0, disksleep 0, womp 1, autorestart 1, powernap 1
 fdesetup status          # FileVault on: see section 1
 ```
 
@@ -382,5 +403,5 @@ dated backups taken in the preflight, then:
 
 - **Linux:** if the machine served no ssh before it became a target, stop the listener first, so sshd never runs on the stock config (which allows passwords) once the drop-in is gone. This mirrors the step's own rollback (`sshtarget.Systemd.Disable`): `sudo systemctl disable --now ssh.socket && sudo systemctl stop ssh.service` where sshd is socket-activated (Ubuntu 22.10 and later), else `sudo systemctl disable --now ssh` (`sshd` on Fedora and Arch). Then `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf /etc/systemd/logind.conf.d/50-workstation.conf`; if sshd stays enabled, `sudo sshd -t && sudo systemctl reload ssh`; `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp` (and `sudo ufw disable` if ufw was off before the target); and `sudo rm /var/lib/dotf/workstation-firewall`.
 - **Linux, a node set up by hand before the converge step:** the earlier version of this runbook masked the sleep targets, which the step neither writes nor removes. `systemctl is-enabled suspend.target` prints `masked` on such a node, and it then never suspends, on battery included. `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target` restores the distribution's behaviour; the logind drop-in keeps the lid policy.
-- **macOS:** if the Mac stops being a target, stop Remote Login first, for the same reason: `sudo launchctl bootout system/com.openssh.sshd && sudo launchctl disable system/com.openssh.sshd`. `bootout` alone only stops the running job, so Remote Login returns at the next boot; `disable` persists the off state, as the step's own rollback does (`sshtarget.Launchd.Disable`). Then `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf` and `sudo pfctl -a com.apple/250.KubelabSSH -F all`.
+- **macOS:** if the Mac stops being a target, stop Remote Login first, for the same reason: `sudo launchctl bootout system/com.openssh.sshd && sudo launchctl disable system/com.openssh.sshd`. `bootout` alone only stops the running job, so Remote Login returns at the next boot; `disable` persists the off state, as the step's own rollback does (`sshtarget.Launchd.Disable`). Then `sudo rm /etc/ssh/sshd_config.d/01-workstation.conf` and `sudo pfctl -a com.apple/250.KubelabSSH -F all`. The power profile is not security-relevant and may stay; to return to the defaults, `sudo pmset -c disksleep 10 autorestart 0` (the values the macmini had before the step).
 - **Windows:** restore `sshd_config`, `sshd -t`, `Restart-Service sshd`. To retire the target, run `Stop-Service sshd; Set-Service sshd -StartupType Disabled` (a stop alone returns at the next boot) and `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP`.

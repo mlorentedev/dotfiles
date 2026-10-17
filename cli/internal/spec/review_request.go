@@ -174,9 +174,15 @@ func ResolveReviewBase(repoRoot, specDir string) string {
 // earliestAdding is the first commit that added a file under rel. --diff-filter=A finds the commits that ADDED it; the last line of a
 // reverse-chronological log is the earliest. `--` guards a path that could be
 // read as a revision.
+//
+// --full-history keeps the side branches of a merge. Without it, a name the
+// folder had only on a branch merged with --no-ff is absent from HEAD and the
+// merge is TREESAME to its first parent for that path, so git prunes the branch
+// that added it and the log comes back empty (#2642). Merge commits themselves
+// never match --diff-filter=A (no -m), so only real adding commits are listed.
 func earliestAdding(repoRoot, rel string) string {
 	out, err := exec.Command("git", "-C", repoRoot,
-		"log", "--diff-filter=A", "--format=%H", "--", rel).Output()
+		"log", "--full-history", "--diff-filter=A", "--format=%H", "--", rel).Output()
 	if err != nil {
 		return ""
 	}

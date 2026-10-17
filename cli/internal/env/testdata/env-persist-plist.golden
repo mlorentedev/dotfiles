@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.github.mlorentedev.dotf.env-persist</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/a&amp;b/.local/bin/dotf</string>
+		<string>env</string>
+		<string>persist</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/Users/a&amp;b/Library/Logs/dotf-env-persist.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/a&amp;b/Library/Logs/dotf-env-persist.log</string>
+</dict>
+</plist>

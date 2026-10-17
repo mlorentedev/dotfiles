@@ -72,6 +72,9 @@ func checkWorkstationTarget(sys *System, cfg *Config, rep *Report) {
 		}
 		rep.Pass(msg)
 	}
+	if err == nil && p.MeshAtBoot != "" {
+		rep.Warn(p.MeshAtBoot)
+	}
 }
 
 func workstationPaths(sys *System, home string) sshtarget.Paths {

@@ -134,6 +134,16 @@
       }
     },
     {
+      "name": "powershell",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "powershell",
+        "winget": "Microsoft.PowerShell",
+        "command": "pwsh"
+      }
+    },
+    {
       "name": "bash",
       "profile": "full",
       "source": {
@@ -230,6 +240,15 @@
       }
     },
     {
+      "name": "lima",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "lima",
+        "command": "limactl"
+      }
+    },
+    {
       "name": "docker",
       "profile": "full",
       "source": {
@@ -310,7 +329,8 @@
       "profile": "full",
       "source": {
         "type": "system",
-        "cask": "veracrypt"
+        "cask": "veracrypt",
+        "needs_sudo": true
       }
     },
     {

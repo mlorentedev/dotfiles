@@ -70,8 +70,9 @@ func newEnvRoleCmd() *cobra.Command {
 		Use:   "role [add|rm <ROLE>]",
 		Short: "List, add or remove the roles this machine opts into (machine.json)",
 		Long: "role records in ~/.config/dotfiles/machine.json the roles this machine\n" +
-			"takes beyond the common converge. A role changes how the machine faces the\n" +
-			"network, so none is on by default and an unknown name is rejected. With no\n" +
+			"takes beyond the common converge. A role changes what the machine does\n" +
+			"unattended or how it faces the network, so none is on by default and an\n" +
+			"unknown name is rejected. With no\n" +
 			"argument it lists the declared roles. Known roles: " + strings.Join(env.KnownRoles(), ", ") + ".",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,

@@ -17,10 +17,13 @@ type Power interface {
 }
 
 // PowerFor is the power policy the target declares on goos, nil where it
-// declares none yet (macOS pmset is PR 7d's).
+// declares none yet.
 func PowerFor(goos string, run Runner, paths Paths) Power {
-	if goos == "linux" {
+	switch goos {
+	case "linux":
 		return Logind{Run: run, DropIn: paths.LogindDropIn}
+	case "darwin":
+		return Pmset{Run: run}
 	}
 	return nil
 }
