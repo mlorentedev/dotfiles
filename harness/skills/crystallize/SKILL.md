@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: dfdfb9bec5bf5325
+generated_sha: 08f5a589f64b675e
 id: crystallize-skill
 type: skill
 status: active
@@ -21,7 +21,7 @@ Full maintenance ritual for the Neural Hive knowledge loop. Run when `/insights`
 ## Protocol
 
 ### Step 1 — Audit State
-- Read the project's `memory/MEMORY.md` (agent auto-memory store)
+- Read the project's MEMORY.md at `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (keep `$VAULT_PATH` if already set and non-empty; otherwise assign it from `dotf env path VAULT_PATH`, and stop and ask the user if that is empty)
 - Note: line count, Last Crystallized date, days elapsed since last run
 - Read the repo's `docs/lessons/` and `docs/lessons/_index.md` for current **project** lesson state (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/patterns/` for cross-project state
 
@@ -70,7 +70,7 @@ tags: [tag1, tag2]
 - If no matching pattern file exists → propose creating `pattern-<topic>.md`
 
 ### Step 6 — MEMORY.md Trim
-- Remove any sections from MEMORY.md that are already covered verbatim by `.claude/CLAUDE.md`
+- Remove any sections from MEMORY.md that are already covered verbatim by the repo's agent instructions (`AGENTS.md`)
 - Keep: User Preferences, CI Pipeline, Bugs Found, Backlog Status, Last Crystallized
 - Update `## Last Crystallized: YYYY-MM-DD` to today
 
