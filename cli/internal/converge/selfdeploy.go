@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -27,16 +26,11 @@ type selfDeploy struct {
 func (selfDeploy) Name() string        { return "self-deploy" }
 func (selfDeploy) Platforms() []string { return []string{"darwin", "linux", "windows"} }
 
-// NativeScheduler is the production scheduler: the real launchctl, addressed
-// for the run's home; uid names the launchd domain. Linux and Windows have no
-// backend yet, and the step skips there.
-func NativeScheduler(uid int) func(Env) (schedule.Backend, error) {
+// NativeScheduler is the production scheduler, update.NativeBackend for the
+// run's OS and home.
+func NativeScheduler(uid int, elevated func() bool) func(Env) (schedule.Backend, error) {
 	return func(e Env) (schedule.Backend, error) {
-		return schedule.For(e.GOOS, schedule.Runners{
-			Launchctl: schedule.Runner(env.ExecLaunchctl),
-			UID:       uid,
-			AgentsDir: filepath.Join(e.Home, "Library", "LaunchAgents"),
-		})
+		return update.NativeBackend(e.GOOS, e.Home, os.Getenv, uid, elevated)
 	}
 }
 
@@ -67,7 +61,7 @@ func (r selfDeploy) inspect(e Env) (selfDeployView, error) {
 	if err != nil {
 		return selfDeployView{}, err
 	}
-	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home, os.Getenv("XDG_CONFIG_HOME")), optedIn: slices.Contains(roles, env.RoleSelfDeploy)}
+	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home, os.Getenv), optedIn: slices.Contains(roles, env.RoleSelfDeploy)}
 	v.state, err = b.Inspect(v.job)
 	return v, err
 }

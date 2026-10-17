@@ -31,7 +31,7 @@ PR 2 (#2654): zsh-autosuggestions through mise's http backend.
 - [x] [AC6] `fileTools` table, render, `runsAtPin` on the file, orphan name mapping, `--force` repair, doctor `bin-paths` without file tools
 - [x] [AC6] Failing bats: plugin sourced after compinit, `MISE_DATA_DIR`/`XDG_DATA_HOME`, absent, not twice
 - [x] [AC6] `.zshrc` sources the plugin; `versions-conf.bats` holds the release order
-- [ ] Follow-up PR (after the next release): mark `ZSH_AUTOSUGGESTIONS_VERSION=0.7.1` under `# mise: cli` in `versions.conf`
+- [x] Follow-up PR (after the next release): mark `ZSH_AUTOSUGGESTIONS_VERSION=0.7.1` under `# mise: cli` in `versions.conf` (v0.73.0 carries `fileTools`)
 
 ## Closing
 

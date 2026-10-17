@@ -475,10 +475,20 @@ setup() {
     # The awk above is a second reading of versions.conf; dotf's own reading
     # (tools.ParseMiseTools) is what the sync rendered. They must agree, or this
     # test checks a different pin set than the one dotf installs.
-    local rendered from_dotf
+    # A file tool renders as an inline table under its backend's name,
+    # "http:zsh-autosuggestions" = { version = "0.7.1", ... } (DX-005), so the
+    # version comes from its `version` key and the name keeps the backend for
+    # `mise where`; the comparison with versions.conf drops the backend.
+    local rendered mise_pins from_dotf
     rendered="${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}/conf.d/dotfiles.toml"
-    from_dotf="$(awk '/^\[/ { t = ($0 == "[tools]"); next }
-        t && / = "/ { v = $3; gsub(/"/, "", v); print $1 "@" v }' "$rendered" | sort)"
+    mise_pins="$(awk '/^\[/ { t = ($0 == "[tools]"); next }
+        t && / = ["{]/ {
+            n = $1; gsub(/"/, "", n)
+            if ($3 == "{") { v = $0; sub(/.*version = "/, "", v); sub(/".*/, "", v) }
+            else { v = $3; gsub(/"/, "", v) }
+            print n "@" v
+        }' "$rendered" | sort)"
+    from_dotf="$(printf '%s\n' "$mise_pins" | sed 's/^http://' | sort)"
     [ "$(printf '%s\n' "$pins" | sort)" = "$from_dotf" ] || {
         echo "versions.conf read here: $(printf '%s\n' "$pins" | sort | tr '\n' ' ')"
         echo "rendered by dotf ($rendered): $(printf '%s' "$from_dotf" | tr '\n' ' ')"
@@ -490,7 +500,7 @@ setup() {
         # published, so a "latest" tool passes once mise has installed it.
         bash -c 'cd "$HOME" && "$1" where "$2"' _ "$mise" "$pin" >/dev/null 2>&1 ||
             missing="$missing $pin"
-    done <<< "$pins"
+    done <<< "$mise_pins"
     [ -z "$missing" ] || { echo "not installed through mise at the pin:$missing"; false; }
 }
 

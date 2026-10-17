@@ -83,6 +83,10 @@
       "Bash(gh search:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue create:*)",
+      "Bash(dotf forge issue:*)",
+      "Bash(dotf forge pr create:*)",
+      "Bash(dotf forge pr comment:*)",
+      "Bash(dotf forge pr edit:*)",
       "Bash(gh run view:*)",
       "Bash(gh pr diff:*)"
     ]

@@ -1,0 +1,18 @@
+[INFO] Spec-gate breakdown (main...feature)
+  Threshold: 50 LOC
+  Production LOC (added+removed): 60
+  Active-spec LOC (added+removed): 0 (floor 10 to count as a spec touch)
+  Spec folder touched: no
+  Files counted:
+    scripts/knowledge-crystallize.ps1:30
+    scripts/knowledge-crystallize.sh:30
+[FAIL] SDD Discipline Gate violation:
+       Production diff: 60 LOC (>= threshold 50)
+       No specs/<feature-id>/ folder touched in this PR.
+
+       Options:
+         (a) Create a spec folder: dotf spec init <feature-id>
+         (b) Add the "skip-sdd" label to the PR AND a non-empty
+             "## SDD skip rationale" section in the PR body.
+
+       Reference: AGENTS.md "Discipline Gate (NON-NEGOTIABLE)" section.

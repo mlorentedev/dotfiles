@@ -22,11 +22,13 @@ var TriggerNames = schedule.Names{
 // the running binary: a `go run` build lives in a temp dir that outlives
 // nothing. Paths are spelled for goos, whatever OS renders them.
 //
-// configHome is the XDG_CONFIG_HOME of the run that installs the job. A
-// scheduler does not start jobs from the user's shell, so without it the job
-// would read a different machine.json, find no self-deploy role, and remove
-// itself at its first converge.
-func Trigger(goos, home, configHome string) schedule.Job {
+// getenv is the environment of the run that installs the job, and the job
+// carries its XDG homes. A scheduler does not start jobs from the user's
+// shell: without XDG_CONFIG_HOME the job would read a different machine.json,
+// find no self-deploy role, and remove itself at its first converge; without
+// XDG_STATE_HOME it would write its last-run record where doctor does not
+// look, and every run would read as none.
+func Trigger(goos, home string, getenv func(string) string) schedule.Job {
 	job := schedule.Job{
 		Names:       TriggerNames,
 		Description: "dotfiles self-deploy: daily dotf update (fast-forward the checkout, then converge; ADR-019)",
@@ -44,8 +46,10 @@ func Trigger(goos, home, configHome string) schedule.Job {
 		job.Env = []schedule.EnvVar{{Name: "PATH", Value: bin + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"}}
 		job.Log = path.Join(home, "Library", "Logs", "dotf-self-deploy.log")
 	}
-	if configHome != "" {
-		job.Env = append(job.Env, schedule.EnvVar{Name: "XDG_CONFIG_HOME", Value: configHome})
+	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME"} {
+		if v := getenv(name); v != "" {
+			job.Env = append(job.Env, schedule.EnvVar{Name: name, Value: v})
+		}
 	}
 	return job
 }

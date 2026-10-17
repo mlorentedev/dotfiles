@@ -43,7 +43,7 @@
   },
   {
     "id": "TOOL-030-forge-write-surface-f7",
-    "behavior": "the new-ticket, pr-review-triage and autopilot skills call dotf forge, and the settings PR reverts #2629",
+    "behavior": "the new-ticket, pr-review-triage and autopilot skills call dotf forge for every write that carries prose, and the Claude template allows the four dotf forge write verbs and no merge or close verb",
     "verification": "bats tests/forge-skills-use-dotf-forge.bats",
     "state": "pending",
     "evidence": ""
