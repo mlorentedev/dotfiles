@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.75.0](https://github.com/mlorentedev/dotfiles/compare/v0.74.0...v0.75.0) (2026-10-17)
+
+
+### Features
+
+* **doctor:** report ~/.local/bin copies that shadow a system entry ([#2725](https://github.com/mlorentedev/dotfiles/issues/2725)) ([39a3289](https://github.com/mlorentedev/dotfiles/commit/39a3289cb347d2d9b15bfd6a13bc61d8a330f03e)), closes [#2320](https://github.com/mlorentedev/dotfiles/issues/2320)
+* **spec:** ask the reviewer for a provisional review before it explores ([#2722](https://github.com/mlorentedev/dotfiles/issues/2722)) ([e2d366a](https://github.com/mlorentedev/dotfiles/commit/e2d366a8afd40c555be332961862531b6be4036c))
+* **spec:** stop a reviewer whose transcript stalls and say what review.md holds ([#2726](https://github.com/mlorentedev/dotfiles/issues/2726)) ([eadb884](https://github.com/mlorentedev/dotfiles/commit/eadb884d814e787e39696c6353552ad5737832bd))
+* **sshtarget:** record what the workstation target found before it changed it ([#2716](https://github.com/mlorentedev/dotfiles/issues/2716)) ([a2264db](https://github.com/mlorentedev/dotfiles/commit/a2264db5260bddfeea8b51f1010c7a9e85fc3b16))
+* **tools:** pin gh through mise on Linux and macOS ([#2708](https://github.com/mlorentedev/dotfiles/issues/2708)) ([f178fc6](https://github.com/mlorentedev/dotfiles/commit/f178fc628999ad4fd7c4ad424a01d85e39abd9f3)), closes [#2136](https://github.com/mlorentedev/dotfiles/issues/2136)
+
+
+### Bug Fixes
+
+* **converge:** put the running dotf first on its children's PATH ([#2721](https://github.com/mlorentedev/dotfiles/issues/2721)) ([dc1e7d9](https://github.com/mlorentedev/dotfiles/commit/dc1e7d9baf0ac2b38a928bb99bc2b15054f369e9)), closes [#2688](https://github.com/mlorentedev/dotfiles/issues/2688)
+* **converge:** skip self-deploy on an unreachable scheduler without the role, escape % in systemd units ([#2717](https://github.com/mlorentedev/dotfiles/issues/2717)) ([1281887](https://github.com/mlorentedev/dotfiles/commit/12818876a31f4b4fe0287519f89b0f4897d6178e)), closes [#2502](https://github.com/mlorentedev/dotfiles/issues/2502)
+* **harness:** warn when a deploy's checkout lacks main's last harness change ([#2723](https://github.com/mlorentedev/dotfiles/issues/2723)) ([84bc390](https://github.com/mlorentedev/dotfiles/commit/84bc39009814ffd9a1c71e9c771d40edba685d9e)), closes [#1712](https://github.com/mlorentedev/dotfiles/issues/1712)
+* **spec-gate:** match adjacent issues on whole words and escape report output ([#2706](https://github.com/mlorentedev/dotfiles/issues/2706)) ([633b72e](https://github.com/mlorentedev/dotfiles/commit/633b72ea60c2fe901d9cb8e4259a87f11b3ca735)), closes [#2303](https://github.com/mlorentedev/dotfiles/issues/2303)
+* **spec:** refuse a provisional PENDING review by name ([#2719](https://github.com/mlorentedev/dotfiles/issues/2719)) ([6f0f1df](https://github.com/mlorentedev/dotfiles/commit/6f0f1dfea5f12e383632429c259fc45cbbd7a08f))
+* **spec:** tell the reviewer the archive gate's implementation is out of scope ([#2702](https://github.com/mlorentedev/dotfiles/issues/2702)) ([e5d47d3](https://github.com/mlorentedev/dotfiles/commit/e5d47d3647553ca599fe3d05f2c5c06e98aff778))
+* **vault:** report every drifting tasks file in vault health ([#2705](https://github.com/mlorentedev/dotfiles/issues/2705)) ([f13d0b6](https://github.com/mlorentedev/dotfiles/commit/f13d0b606a6818ec617b2c5deff203c692f090e5)), closes [#1314](https://github.com/mlorentedev/dotfiles/issues/1314)
+
 ## [0.74.0](https://github.com/mlorentedev/dotfiles/compare/v0.73.0...v0.74.0) (2026-10-17)
 
 
