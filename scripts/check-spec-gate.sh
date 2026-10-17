@@ -511,6 +511,30 @@ _adjacent_open_issues() {
     return 0
 }
 
+# The CI-only half of the report: a workflow annotation and a step-summary table.
+# Split out of _report_adjacent_issues to keep it under the 40-line function rule
+# (#2709); #2407 ports this script to Go, so the split is deliberately minimal.
+_emit_adjacency_ci_artifacts() {
+    local rows="$1" num file_path haystack
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        printf '::warning title=Adjacent open issues::%s\n' \
+            "$(printf '%s' "$rows" | awk -F'\t' '{printf "#%s (%s) ", $1, $2}' | sed 's/%/%25/g')"
+    fi
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+            printf '\n### Adjacent open issues (advisory)\n\n'
+            printf '| Issue | Names | Title |\n|---|---|---|\n'
+            while IFS=$'\t' read -r num file_path haystack; do
+                if [[ -z "$num" ]]; then continue; fi
+                # shellcheck disable=SC2016  # backticks are markdown code spans
+                # for the step-summary table, not command substitution.
+                printf '| #%s | `%s` | %.88s |\n' "$num" "${file_path//|/\\|}" "${haystack//|/\\|}"
+            done <<< "$rows"
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
+    return 0
+}
+
 # Emits the report to stdout, plus a CI annotation and step-summary table when
 # running under Actions. Every failure path returns 0: an advisory check that can
 # break the gate is worse than no advisory check at all.
@@ -537,22 +561,7 @@ _report_adjacent_issues() {
     printf '       change does not cover. Fold it in, or record why it is separate,\n'
     printf '       before merging (HARNESS-063).\n'
 
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-        printf '::warning title=Adjacent open issues::%s\n' \
-            "$(printf '%s' "$rows" | awk -F'\t' '{printf "#%s (%s) ", $1, $2}' | sed 's/%/%25/g')"
-    fi
-    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-        {
-            printf '\n### Adjacent open issues (advisory)\n\n'
-            printf '| Issue | Names | Title |\n|---|---|---|\n'
-            while IFS=$'\t' read -r num file_path haystack; do
-                if [[ -z "$num" ]]; then continue; fi
-                # shellcheck disable=SC2016  # backticks are markdown code spans
-                # for the step-summary table, not command substitution.
-                printf '| #%s | `%s` | %.88s |\n' "$num" "${file_path//|/\\|}" "${haystack//|/\\|}"
-            done <<< "$rows"
-        } >> "$GITHUB_STEP_SUMMARY"
-    fi
+    _emit_adjacency_ci_artifacts "$rows"
     return 0
 }
 
