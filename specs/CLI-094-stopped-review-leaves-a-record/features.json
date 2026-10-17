@@ -2,43 +2,43 @@
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f1",
     "behavior": "stall detector stops a silent runner before the cap and names the last tool call",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestStall.*Silent' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/spec/ ./internal/cmd/ -run 'TestRunWithLimitsStopsARunnerWhoseTranscriptGoesSilent|TestRunWithLimitsCountsAMissingTranscriptAsSilence|TestLastToolCall|TestSpecDeadlineStopsAStalledRunAndNamesTheLastCall' -count=1",
+    "state": "passing",
+    "evidence": "exit 0 (2026-10-17). Mutations killed: stalled() never true; exit status equal to the cap's 124"
   },
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f2",
     "behavior": "a growing transcript, and one silent for less than N, is never stopped by the stall detector",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestStall.*Growing' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestRunWithLimitsNeverStopsARunnerThatKeepsWriting|TestRunWithLimitsToleratesSilenceShorterThanTheTimeout|TestRunWithLimitsWithoutAStallTimeoutOnlyTheCapBinds' -count=1",
+    "state": "passing",
+    "evidence": "exit 0 (2026-10-17). Mutation killed: growth of the transcript no longer counted as progress"
   },
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f3",
     "behavior": "the reviewer prompt asks both signers for a provisional review.md with verdict PENDING",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestReviewPrompt.*Provisional' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestReviewPromptAsksForAProvisionalReviewFirst' -count=1",
+    "state": "passing",
+    "evidence": "exit 0 (#2722)"
   },
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f4",
     "behavior": "a stopped run says whether a provisional review.md was kept and exits non-zero",
-    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSpecReview.*Stopped' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/spec/ ./internal/cmd/ -run 'TestStoppedRunRecord|TestSpecDeadlineStopsAStalledRunAndNamesTheLastCall|TestSpecDeadlineReportsAProvisionalReviewKeptAtTheCap' -count=1",
+    "state": "passing",
+    "evidence": "exit 0 (2026-10-17): exit 125 for a stall, 124 at the cap, each with the review.md state on stderr"
   },
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f5",
     "behavior": "spec archive refuses verdict PENDING as a provisional unsigned record",
-    "verification": "cd cli && go test ./internal/spec/ -run 'TestArchive.*Pending|TestParseReview.*Pending' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestParseReviewRefusesAPendingVerdictByName|TestFindReviewRefusesAPendingReviewFile' -count=1",
+    "state": "passing",
+    "evidence": "exit 0 (#2719)"
   },
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f6",
     "behavior": "verification.md records the measured gap and the chosen N",
     "verification": "grep -qE 'longest legitimate tool call: [0-9]+(\\.[0-9]+)?s' specs/CLI-094-stopped-review-leaves-a-record/verification.md && grep -qE 'stall timeout N: [0-9]+ minutes' specs/CLI-094-stopped-review-leaves-a-record/verification.md",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "measured 2026-10-17 in verification.md: 96.9s, N = 10 minutes"
   }
 ]
