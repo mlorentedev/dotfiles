@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -29,6 +30,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 		want    Status
 		needle  string
 		section bool
+		noMesh  bool // tailscaled is neither a launchd daemon nor an enabled unit
 	}{
 		{name: "windows → no section", goos: "windows", optIn: true, addrs: mesh, section: false},
 		{name: "linux, nothing applied → WARN naming the converge command", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "dotf converge --only workstation-target", section: true},
@@ -56,6 +58,16 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 		{name: "a directive read before the drop-in → WARN", goos: "darwin", optIn: true, addrs: mesh, want: StatusWarn, needle: "sets PasswordAuthentication before the drop-in", section: true,
 			state: func(t *testing.T, p sshtarget.Paths, _ string) {
 				writeFile(t, p.SSHDConfig, "PasswordAuthentication yes\nInclude "+filepath.Dir(p.DropIn)+"/*\n")
+			}},
+		{name: "linux, converged, tailscaled disabled → WARN naming the reboot", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "tailscaled is disabled under systemd", section: true, noMesh: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeConverged(t, p, user)
+			}},
+		{name: "darwin, converged, tailscale as the app → WARN naming the login", goos: "darwin", optIn: true, addrs: mesh, want: StatusWarn, needle: "only once someone logs in", section: true, noMesh: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeFile(t, p.AuthorizedKeys, "ssh-ed25519 AAAAOwner manu@msi\n")
+				writeFile(t, p.HostKey, "ssh-ed25519 AAAAHost root@macmini\n")
+				writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
 			}},
 		{name: "converged → PASS", goos: "darwin", optIn: true, addrs: mesh, want: StatusPass, needle: "as declared for the mesh address 100.64.0.15", section: true,
 			state: func(t *testing.T, p sshtarget.Paths, user string) {
@@ -104,6 +116,8 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			s.MeshAddrs = func() ([]net.IP, error) { return tc.addrs, nil }
 			s.CommandOutput = func(name string, args ...string) (string, error) {
 				switch {
+				case tc.noMesh && strings.Contains(strings.Join(args, " "), "tailscale"):
+					return "disabled\n", errors.New("exit status 1")
 				case name == "launchctl" && args[0] == "print":
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
