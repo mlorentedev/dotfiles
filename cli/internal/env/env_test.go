@@ -1,12 +1,14 @@
 package env
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -673,5 +675,52 @@ func TestDotfilesRepoDirNamingAnotherProjectIsRefused(t *testing.T) {
 
 	if got := DotfilesCheckout(); got != "" {
 		t.Errorf("DotfilesCheckout() = %q, want none for a repository without %s", got, CheckoutMarker)
+	}
+}
+
+// A rejected DOTFILES_REPO_DIR must not vanish on a read: the read still falls
+// back to the deployed copy, but the operator is told once why (#2631).
+func TestRejectedRepoDirIsReportedOnceOnTheReadPath(t *testing.T) {
+	t.Chdir(t.TempDir()) // outside any checkout, so only the variable is consulted
+	t.Setenv("DOTFILES_REPO_DIR", filepath.Join(t.TempDir(), "typo"))
+	var out bytes.Buffer
+	old := rejectedOut
+	rejectedOut = &out
+	rejectedWarned = sync.Map{}
+	t.Cleanup(func() { rejectedOut = old; rejectedWarned = sync.Map{} })
+
+	if got := DotfilesCheckout(); got != "" {
+		t.Fatalf("a rejected variable must still fall back, got checkout %q", got)
+	}
+	_ = ResolveRegistryPath() // a second read in the same process
+
+	msg := out.String()
+	if !strings.Contains(msg, "DOTFILES_REPO_DIR=") || !strings.Contains(msg, "is not a directory") {
+		t.Errorf("the rejection is not named: %q", msg)
+	}
+	if n := strings.Count(msg, "dotf: ignoring"); n != 1 {
+		t.Errorf("reported %d times, want once per process: %q", n, msg)
+	}
+}
+
+// An unset variable, or a cwd that is itself a checkout, says nothing.
+func TestNoWarningWhenTheVariableIsUnsetOrUnused(t *testing.T) {
+	var out bytes.Buffer
+	old := rejectedOut
+	rejectedOut = &out
+	rejectedWarned = sync.Map{}
+	t.Cleanup(func() { rejectedOut = old; rejectedWarned = sync.Map{} })
+
+	t.Chdir(t.TempDir())
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	_ = DotfilesCheckout()
+
+	co := markCheckout(t, t.TempDir())
+	t.Chdir(co)
+	t.Setenv("DOTFILES_REPO_DIR", "/definitely/not/here")
+	_ = DotfilesCheckout()
+
+	if out.Len() != 0 {
+		t.Errorf("expected silence, got %q", out.String())
 	}
 }
