@@ -22,16 +22,16 @@ created: "2026-10-16"
 > Four PRs, sequenced. PR 1 measures before anything widens authority.
 
 **PR 0: `tea` for the human, on every OS**
-- [ ] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one)
-- [ ] Add `tea` to `packages.json` and a catalog test; `dotf tools sync` twice reports `changed=0`
+- [x] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one). Measured 2026-10-17: brew `tea` is Gitea's CLI (installed, 0.16.0); winget `Gitea.tea` is in winget-pkgs (0.16.0), with the install unmeasured until the Windows session; apt's `tea` is a graphical text editor (msi), so Linux names no package and `dotf tools install` prints `tea is not installed on linux by this catalog; skipping`.
+- [x] Add `tea` to `packages.json` and a catalog test; `dotf tools sync` twice reports `changed=0`. The catalog installs system entries with `dotf tools install` (`tools sync` is mise's): the first run installed through brew, the second printed `tea already installed; skipping`. Test: `TestTheRepoCatalogDeclaresGiteaTeaWithoutApt` (mutation: adding `apt: tea` fails it).
 - [ ] Log in from the secrets store through `dotf secrets run`, token never printed (shares the registry entry PR 1 adds for the kubelab Gitea)
 
 **PR 1: the interface and the measurement (no allow rules)**
-- [ ] [AC1] [AC3] Write failing tests for forge detection from origin and for body-from-file only
-- [ ] [AC1] [AC3] Add `cli/internal/forgewrite` with a `Backend` interface (not `Forge`: `initrepo.Forge` is a type), detection reusing `initrepo.ClassifyOrigin`, and the GitHub backend over the `gh` REST endpoint
-- [ ] [AC4] Add the Gitea REST backend. The token is read through the internal `cli/internal/secrets` resolver, never by running `dotf secrets show`. Test with a fake token that a 4xx, a 5xx and a malformed response leave it out of stdout, stderr and every `error.Error()`
-- [ ] [AC1] Register `dotf forge issue comment` next to `protection` in `cli/internal/cmd/forge.go`. One verb only; `issue create` moves to PR 2 because it drags labels and the NNN convention
-- [ ] Write the ADR for the contract (one write surface, bodies from files, no merge or close, Gitea through dotf rather than `tea`)
+- [x] [AC1] [AC3] Write failing tests for forge detection from origin and for body-from-file only
+- [x] [AC1] [AC3] Add `cli/internal/forgewrite` with a `Backend` interface (not `Forge`: `initrepo.Forge` is a type), detection reusing `initrepo.ClassifyOrigin`, and the GitHub backend over the `gh` REST endpoint
+- [x] [AC4] Add the Gitea REST backend. The token is read through the internal `cli/internal/secrets` resolver, never by running `dotf secrets show`. Test with a fake token that a 4xx, a 5xx and a malformed response leave it out of stdout, stderr and every `error.Error()`
+- [x] [AC1] Register `dotf forge issue comment` next to `protection` in `cli/internal/cmd/forge.go`. One verb only; `issue create` moves to PR 2 because it drags labels and the NNN convention
+- [x] Write the ADR for the contract (ADR-052) (one write surface, bodies from files, no merge or close, Gitea through dotf rather than `tea`)
 - [ ] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635
 
 **PR 2: the remaining verbs**
@@ -40,11 +40,11 @@ created: "2026-10-16"
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 
 **PR 3: the guard**
-- [x] [AC5] `tests/harness-permits-dotf.bats`, one `@test` per harness config, passing under bash 3.2 and zsh
+- [x] [AC5] Extend ADR-048's session-level allow lists (`harness/capability-map.json` and its leaves) with `dotf forge` and let that guard assert it, one case per harness, instead of a second file; if ADR-048's renderer is not there yet, a `tests/harness-permits-dotf.bats` stands in and is folded into it later. Passes under bash 3.2 and zsh Delivered as the stand-in: `harness/capability-map.json` has no session-level section yet (ADR-048 decision 3 is unbuilt), so `tests/harness-permits-dotf.bats` ships now (#2651) and is folded into the map guard when that lands.
 
 **PR 4: skills and the allow set (owner lands)**
 - [ ] [AC7] `new-ticket`, `pr-review-triage` and `autopilot` call `dotf forge` (vault edit, then refresh the records)
-- [ ] [AC7] Settings PR: the four `dotf forge` allows and the revert of #2629; the owner lands it (#2178)
+- [ ] [AC7] Settings PR: the four `dotf forge` allows; the owner lands it (#2178, ADR-048 clause 6). #2629 is removed from the template, but ADR-048's deploy can only add, so removing it from machines that hold it is an owner action recorded in that PR
 
 ## Closing
 

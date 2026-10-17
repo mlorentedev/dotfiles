@@ -26,7 +26,7 @@ A `dotf forge` write surface for agents, forge-neutral:
 - Verbs: `dotf forge issue create|comment|edit`, `dotf forge pr create|comment|edit`, and `--board` to set the Project fields `new-ticket` sets by hand today. No `merge`, no `close`: merging stays `dotf pr land` behind the merge grant, closing stays with the owner.
 - A body is read only from `--body-file` or stdin, never from an argument, so prose never reaches a permission glob.
 - The forge is detected from `origin` (the `initrepo.ClassifyOrigin` classification is the starting point). GitHub is served through the `gh` REST endpoint, as `lane.REST` already does; Gitea through a REST client inside `dotf`. The token comes from `dotf secrets` at call time and is never printed or kept as login state. The agent surface has no `tea` dependency.
-- One narrow allow set replaces per-tool rules: `Bash(dotf forge issue:*)`, `Bash(dotf forge pr create:*)`, `Bash(dotf forge pr comment:*)`, `Bash(dotf forge pr edit:*)`. The settings PR that adds it also reverts #2629 (wrong premise) and is landed by the owner (#2178).
+- One narrow allow set replaces per-tool rules: `Bash(dotf forge issue:*)`, `Bash(dotf forge pr create:*)`, `Bash(dotf forge pr comment:*)`, `Bash(dotf forge pr edit:*)`. The settings PR that adds it is landed by the owner (#2178). #2629 rested on a wrong premise; ADR-048's deploy only adds, so dropping it from the template does not remove it from machines that hold it, and that removal is an owner action recorded in the PR.
 - `tea` as a human tool, separate from the agent surface: the owner works on Gitea daily, so `tea` joins `packages.json` as a `system` entry (brew, apt where packaged, winget) and installs on every OS through `dotf tools`. Agents do not call it; they use `dotf forge`. Which package id each manager uses is checked, not assumed, in PR 0.
 - A per-harness guard: one bats `@test` per harness config (claude, agy, opencode, copilot, pi) asserting `dotf` is not denied in that harness's dialect, so the dialects cannot drift apart silently.
 - The `new-ticket`, `pr-review-triage` and `autopilot` skills call `dotf forge` instead of carrying `gh` recipes.
@@ -55,7 +55,7 @@ A `dotf forge` write surface for agents, forge-neutral:
 - [ ] The Gitea token is read from `dotf secrets` at call time and appears in no output, log or argument (a test greps for it).
 - [ ] A bats guard has one `@test` per harness config and fails when `dotf` is denied in that harness's dialect.
 - [ ] The measured classifier result for a Gitea write is recorded on #2635 before the allow set lands.
-- [ ] The three skills use `dotf forge`; #2629 is reverted in the owner-landed settings PR.
+- [ ] The three skills use `dotf forge`; the allow set is in the owner-landed settings PR, which also records what is done about #2629.
 
 ## References
 
