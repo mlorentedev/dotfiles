@@ -99,8 +99,12 @@ PY
     # config.json (ADR-048 ¶4), so the surface is any file that passes the flag.
     run jq -e '[paths | map(tostring) | join(".") | select(test("(?i)den(y|ied).*tool|tool.*den(y|ied)"))] | length == 0' "$COPILOT_CONFIG"
     [ "$status" -eq 0 ] || { echo "config.json declares a command deny key; extend this guard to read it"; false; }
-    run git -C "$COPILOT_SCAN_ROOT" grep -h -o -I -E -e "--deny-tool[= ]+['\"]?[^'\" ]+" -- . ':!tests/harness-permits-dotf.bats'
-    deny="$(printf '%s\n' "$output" | sed -E "s/^--deny-tool[= ]+['\"]?//; s/^shell\\(//; s/\\)\$//" | jq -Rc '[inputs, . | select(length > 0)] | unique')"
+    # A quoted spec is read to its closing quote, so a scoped deny such as
+    # `shell(git push --force)` is not truncated to a wholesale-looking `git`.
+    run git -C "$COPILOT_SCAN_ROOT" grep -h -o -I -E -e "--deny-tool[= ]+(\"[^\"]*\"|'[^']*'|[^'\" ]+)" -- . ':!tests/harness-permits-dotf.bats'
+    # 1 is "no match"; anything else is git failing to look, which must not read as "nothing denied".
+    [ "$status" -le 1 ] || { echo "git grep failed in $COPILOT_SCAN_ROOT (exit $status): $output"; false; }
+    deny="$(printf '%s\n' "$output" | sed -E "s/^--deny-tool[= ]+//; s/^[\"']//; s/[\"']\$//; s/^shell\\(//; s/\\)\$//" | jq -Rc '[inputs, . | select(length > 0)] | unique')"
     assert_none_denied copilot "$deny"
 }
 
