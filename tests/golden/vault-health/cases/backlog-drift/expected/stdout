@@ -32,3 +32,7 @@ Vault: knowledge (<VAULT>)
   FAIL: Backlog drift in beta/11-tasks.md (duplicate IDs / status contradictions)
         <VAULT>/10_projects/beta/11-tasks.md:
           CONTRADICTION: BETA-001-only — 2 entries, marked BOTH open and done
+
+========================================
+Results: 4 passed, 7 failed, 1 skipped
+========================================
