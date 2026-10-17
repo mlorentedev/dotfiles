@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -290,12 +289,13 @@ func TestClaimPushSkipsThePrePushHook(t *testing.T) {
 	if err := os.WriteFile(hook, []byte("#!/bin/sh\necho pre-push ran >&2\nexit 1\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if runtime.GOOS != "windows" {
-		// Prove the hook would have refused an ordinary push from this repository.
-		claimGit(t, a.Dir, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "seed")
-		if out, err := exec.Command("git", "-C", a.Dir, "push", "-q", "origin", "HEAD:refs/heads/probe").CombinedOutput(); err == nil {
-			t.Fatalf("the hook did not refuse a plain push, so this test proves nothing: %s", out)
-		}
+	// Prove the hook is live and is what refuses an ordinary push from this
+	// repository: its own output must be in the refusal, or the test would pass
+	// for any other reason a push can fail.
+	claimGit(t, a.Dir, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "seed")
+	out, err := exec.Command("git", "-C", a.Dir, "push", "-q", "origin", "HEAD:refs/heads/probe").CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "pre-push ran") {
+		t.Fatalf("the hook did not refuse a plain push (err=%v), so this test proves nothing: %s", err, out)
 	}
 	if _, err := a.Acquire(2551); err != nil {
 		t.Fatalf("the claim push ran the pre-push hook: %v", err)
