@@ -374,3 +374,43 @@ func readTrimmed(t *testing.T, p string) string {
 	}
 	return strings.TrimSpace(strings.Join(lines, " "))
 }
+
+// TestRunHealthUnreadableTasksFileExitsOne: an unreadable tasks file is a
+// counted failure: the run reaches its footer and exits 1. The shell twin
+// stopped there with exit 2, the code RunHealth reserves for an unreachable
+// GUI (#1314), and an early return of it would fail both checks. The
+// backlog-drift case supplies the obsidian answers; only beta's tasks file
+// changes, into a directory, which no OS reads as a file.
+func TestRunHealthUnreadableTasksFileExitsOne(t *testing.T) {
+	caseDir := filepath.Join(goldenRepoRoot(t), "tests", "golden", "vault-health", "cases", "backlog-drift")
+	stubBin := installObsidianStub(t)
+	vaultDir := filepath.Join(t.TempDir(), "vault")
+	copyTree(t, filepath.Join(caseDir, "vault"), vaultDir)
+	beta := filepath.Join(vaultDir, "10_projects", "beta", "11-tasks.md")
+	if err := os.Remove(beta); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if err := os.Mkdir(beta, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	t.Setenv("PATH", stubBin+string(os.PathListSeparator)+pathWithoutObsidian(os.Getenv("PATH")))
+	t.Setenv(stubEnvActive, "1")
+	t.Setenv(stubEnvCase, caseDir)
+	t.Setenv(stubEnvLog, filepath.Join(t.TempDir(), "obsidian-argv.log"))
+	assertObsidianResolves(t, stubBin)
+
+	var out strings.Builder
+	code, err := RunHealth(&out, HealthOptions{VaultDir: vaultDir, VaultName: "knowledge", GOOS: "darwin"})
+	if err != nil {
+		t.Fatalf("RunHealth: %v", err)
+	}
+	if code != 1 {
+		t.Errorf("exit = %d, want 1", code)
+	}
+	for _, want := range []string{"FAIL: Backlog integrity: cannot read beta/11-tasks.md: ", "\nResults: "} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q\n%s", want, out.String())
+		}
+	}
+}

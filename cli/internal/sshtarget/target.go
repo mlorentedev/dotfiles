@@ -11,6 +11,7 @@ package sshtarget
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -18,7 +19,9 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"time"
 )
 
 // MeshCIDR is the tailnet's address range (CGNAT, as headscale allocates it).
@@ -64,6 +67,9 @@ type Paths struct {
 	UFWRules        string
 	UFWRules6       string
 	FirewallWitness string
+	// Record is what the step found before it first changed each resource
+	// (Record); "" keeps none.
+	Record string
 }
 
 // DefaultPaths are the locations on macOS and Linux.
@@ -80,6 +86,7 @@ func DefaultPaths(home string) Paths {
 		UFWRules:        "/etc/ufw/user.rules",
 		UFWRules6:       "/etc/ufw/user6.rules",
 		FirewallWitness: "/var/lib/dotf/workstation-firewall",
+		Record:          "/var/lib/dotf/workstation-target.json",
 	}
 }
 
@@ -96,11 +103,18 @@ func WindowsPaths(programData, home string) Paths {
 		AuthorizedKeys: winJoin(ssh, "administrators_authorized_keys"),
 		AdminKeys:      true,
 		ClientKey:      winJoin(home, ".ssh", "id_ed25519"),
+		Record:         winJoin(programData, "dotf", "workstation-target.json"),
 	}
 }
 
 // PathsFor are the locations on goos for the account whose home is home.
 func PathsFor(goos, home string) Paths {
+	if goos == "darwin" {
+		p := DefaultPaths(home)
+		// macOS keeps a daemon's state under /var/db; there is no /var/lib.
+		p.Record = "/var/db/dotf/workstation-target.json"
+		return p
+	}
 	if goos != "windows" {
 		return DefaultPaths(home)
 	}
@@ -199,6 +213,8 @@ type Target struct {
 	Root       Root
 	Run        Runner
 	Addrs      func() ([]net.IP, error)
+	Dotf       string           // the running build, written into the record
+	Now        func() time.Time // nil is time.Now
 }
 
 // Plan is what differs from the declared state, and whether an apply could
@@ -216,6 +232,8 @@ type Plan struct {
 	enabled    bool
 	prevDrop   []byte // nil when absent
 	prevKeys   []byte // nil when absent
+	record     []byte // the record to write, when resRecord is pending
+	prevRecord []byte // nil when absent
 }
 
 // Converged reports whether nothing differs.
@@ -228,6 +246,7 @@ const (
 	resService  = "sshd service"
 	resFirewall = "firewall"
 	resPower    = "power policy"
+	resRecord   = "state record"
 )
 
 // DropIn renders the drop-in for user.
@@ -302,7 +321,39 @@ func (t Target) Inspect() (Plan, error) {
 			p.Pending = append(p.Pending, resPower)
 		}
 	}
-	return p, nil
+	return p, t.inspectRecord(&p)
+}
+
+// inspectRecord makes the record pending, last, when it lacks an entry for a
+// resource: it is written from what this plan found, before any change.
+func (t Target) inspectRecord(p *Plan) error {
+	if t.Paths.Record == "" {
+		return nil
+	}
+	r, err := readRecord(t.Paths.Record)
+	if err != nil {
+		return err
+	}
+	if !r.fill(*p, func(res string) bool { return slices.Contains(p.Pending, res) }) {
+		return nil
+	}
+	if p.prevRecord, err = readOptional(t.Paths.Record); err != nil {
+		return err
+	}
+	now := time.Now
+	if t.Now != nil {
+		now = t.Now
+	}
+	if r.Dotf == "" {
+		r.Dotf = t.Dotf
+	}
+	r.Version, r.Written = RecordVersion, now().UTC()
+	if p.record, err = json.MarshalIndent(r, "", "  "); err != nil {
+		return err
+	}
+	p.record = append(p.record, '\n')
+	p.Pending = append(p.Pending, resRecord)
+	return nil
 }
 
 // Apply converges what p says differs, then proves the result. On any
@@ -384,6 +435,11 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 			if err != nil {
 				return err
 			}
+		case resRecord:
+			if err := writeRecord(t.Root, t.Paths.Record, p.record); err != nil {
+				return err
+			}
+			*undo = append(*undo, func() error { return t.restoreRoot(t.Paths.Record, p.prevRecord) })
 		}
 	}
 	return nil

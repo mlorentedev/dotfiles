@@ -14,10 +14,11 @@ import (
 // current and managed, removing it leaves nothing.
 type fakeBackend struct {
 	state              schedule.State
+	inspectErr         error
 	installs, removals int
 }
 
-func (f *fakeBackend) Inspect(schedule.Job) (schedule.State, error) { return f.state, nil }
+func (f *fakeBackend) Inspect(schedule.Job) (schedule.State, error) { return f.state, f.inspectErr }
 func (f *fakeBackend) Install(schedule.Job) error {
 	f.installs++
 	f.state = schedule.State{Present: true, Managed: true, Where: f.state.Where}
@@ -165,5 +166,46 @@ func TestNativeScheduler_PicksTheBackendOfTheRunsOS(t *testing.T) {
 				t.Errorf("%s: %+v", goos, b)
 			}
 		}
+	}
+}
+
+// A machine that never opted in is not failed by a scheduler dotf cannot
+// reach (OPS-053 review round 1, F1): a container or a server with no user
+// bus. The role is read first, and without it an unreachable scheduler is a
+// skip that names the error; nothing is installed or removed. With the role
+// the same error stays a failure, since the machine asked for the trigger.
+func TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler(t *testing.T) {
+	bus := errors.New("systemctl --user show: Failed to connect to bus")
+	for _, tc := range []struct {
+		name    string
+		step    func(*fakeBackend) selfDeploy
+		backend bool // a backend exists that could be written to
+	}{
+		{"inspect fails", func(f *fakeBackend) selfDeploy { f.inspectErr = bus; return f.step() }, true},
+		{"no backend", func(*fakeBackend) selfDeploy {
+			return selfDeploy{scheduler: func(Env) (schedule.Backend, error) { return nil, bus }}
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeBackend{}
+			r := tc.step(f)
+			e := selfDeployEnv(t, false)
+			for _, dry := range []bool{true, false} {
+				res, err := r.Reconcile(e, dry)
+				if err != nil || !strings.Contains(res.Skip, "Failed to connect to bus") || res.Changes != 0 {
+					t.Errorf("dryRun=%v: res = %+v, err = %v; want a skip naming the error", dry, res, err)
+				}
+			}
+			if err := r.Probe(e); err != nil {
+				t.Errorf("probe: %v", err)
+			}
+			if tc.backend && f.installs+f.removals != 0 {
+				t.Errorf("installs %d, removals %d: the backend was written", f.installs, f.removals)
+			}
+		})
+	}
+	f := &fakeBackend{inspectErr: bus}
+	if _, err := f.step().Reconcile(selfDeployEnv(t, true), true); err == nil {
+		t.Error("with the role, an unreachable scheduler must stay a failure")
 	}
 }

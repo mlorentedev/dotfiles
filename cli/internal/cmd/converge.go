@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -73,8 +74,11 @@ func newConvergeCmd() *cobra.Command {
 // last.json, which a plan or an --only run leaves alone. `dotf converge` and
 // `dotf update` both run through here.
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
+	if self, err := executable(); err == nil {
+		ensureSelfOnPath(self)
+	}
 	home := env.Home()
-	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS}
+	e := converge.Env{RepoRoot: repo, Home: home, DeployDir: env.DotfilesDir(home), GOOS: runtime.GOOS, Dotf: dotfVersion}
 	// Decided once, on the writer converge was handed: beginRunLog wraps it in
 	// the transcript tee, which is never a terminal, and the transcript strips
 	// colour, so one stream serves both (CLI-114).
@@ -108,6 +112,41 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 		return err
 	}
 	return saveConvergeReport(w, out, rl, rep, err, len(only) == 0)
+}
+
+// ensureSelfOnPath puts the directory of self, the running dotf, first on this
+// process's PATH unless PATH already resolves dotf to that same file. The
+// children converge starts look dotf up by name (compile-harness.sh's
+// `type -P dotf`), and a from-zero install.sh execs the binary it just placed
+// by absolute path, on a PATH a fresh Ubuntu has no ~/.local/bin on until the
+// next login (#2688). A PATH that resolves another dotf first gets self too:
+// the children run the binary that runs the converge. A binary not named dotf
+// is left off: its children could not find it by that name anyway.
+func ensureSelfOnPath(self string) {
+	if strings.TrimSuffix(strings.ToLower(filepath.Base(self)), ".exe") != "dotf" {
+		return
+	}
+	if found, err := exec.LookPath("dotf"); err == nil && sameFile(found, self) {
+		return
+	}
+	path := filepath.Dir(self)
+	if old := os.Getenv("PATH"); old != "" {
+		path += string(os.PathListSeparator) + old
+	}
+	_ = os.Setenv("PATH", path)
+}
+
+// executable is os.Executable, a seam for the converge tests.
+var executable = os.Executable
+
+// sameFile reports whether a and b name one file, through links and case.
+func sameFile(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	return err == nil && os.SameFile(fa, fb)
 }
 
 // beginRunLog opens the run's transcript and captures this process's output

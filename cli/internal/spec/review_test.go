@@ -617,6 +617,45 @@ func TestParseReviewAcceptsASpacedVerdict(t *testing.T) {
 	}
 }
 
+// A run the deadline or the wedge detector stopped may leave a provisional
+// review.md (CLI-094): the reviewer wrote it first and was cut off before it
+// signed a verdict. It must be refused, and by name, so the operator reads
+// "this run did not finish" instead of an unrecognized-verdict error. It is
+// refused before the reviewed_sha check because a provisional file has none.
+func TestParseReviewRefusesAPendingVerdictByName(t *testing.T) {
+	content := "---\n" +
+		"spec: \"CLI-094-x\"\n" +
+		"verdict: PENDING\n" +
+		"reviewer: \"nan/glm5.3-flash\"\n" +
+		"---\n\nfindings so far\n"
+	_, err := ParseReview(content)
+	if err == nil {
+		t.Fatal("a PENDING review must be refused")
+	}
+	for _, want := range []string{"provisional", "unsigned", "PENDING"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal must name %q, got: %v", want, err)
+		}
+	}
+	if strings.Contains(err.Error(), "unrecognized") {
+		t.Errorf("PENDING is a known verdict, not an unrecognized one: %v", err)
+	}
+}
+
+// The archive reads review.md through FindReview, so the refusal has to survive
+// that path: found is true and the error is the provisional one.
+func TestFindReviewRefusesAPendingReviewFile(t *testing.T) {
+	dir := t.TempDir()
+	body := "---\nspec: x\nverdict: PENDING\n---\n"
+	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, found, err := FindReview(dir)
+	if !found || err == nil || !strings.Contains(err.Error(), "provisional") {
+		t.Fatalf("found=%v err=%v, want found and a provisional refusal", found, err)
+	}
+}
+
 // SDD-042 writes a free-text reason into `review_bypass:`, so the reader must
 // honour the escapes the writer emits: in YAML a double-quoted scalar escapes
 // `"` and `\`, and a single-quoted one doubles `'`. Without this, a reason

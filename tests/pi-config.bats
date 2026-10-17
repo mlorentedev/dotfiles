@@ -123,14 +123,29 @@ setup() {
 # #843 / #2100: models.json is rendered with NAN_API_KEY into a 0600 file,
 # and on a box without pi that file is read by nothing -- the integration
 # image deployed it half-rendered ("NAN_API_KEY could not be resolved").
-# pi-compaction is deliberately NOT gated: it merges into the settings.json
-# setup seeds on every box (#1938), and verify-setup asserts the merge there.
 @test "pi's models.json is deployed only where pi is installed" {
     command -v jq >/dev/null || skip "jq not available"
     local entry
     entry="$(jq -c '.configs[] | select(.dst == "{HOME}/.pi/agent/models.json")' "$DOTFILES_DIR/ai/deploy.json")"
     [ -n "$entry" ]
     [ "$(printf '%s' "$entry" | jq -r '.requires')" = "pi" ]
+}
+
+# #2102: a file under ~/.pi is read by pi alone, so an entry that writes one on
+# a pi-less box leaves a file nobody reads (#843). pi-compaction is gated too:
+# the pi-settings converge step it merges into skips without pi
+# (TestPiSettings_SkipsWhilePiIsNotInstalled), so the two agree on one predicate.
+# A new ~/.pi entry has to say `requires: pi` or this fails.
+@test "every deploy entry under ~/.pi requires pi [#2102]" {
+    command -v jq >/dev/null || skip "jq not available"
+    local manifest="$DOTFILES_DIR/ai/deploy.json" total ungated
+    total="$(jq '[.configs[] | select(.dst | startswith("{HOME}/.pi/"))] | length' "$manifest")"
+    [ "$total" -ge 4 ]
+    ungated="$(jq -r '.configs[] | select(.dst | startswith("{HOME}/.pi/")) | select(.requires != "pi") | .name' "$manifest")"
+    if [ -n "$ungated" ]; then
+        printf 'deployed on a box without pi: %s\n' "$ungated"
+        return 1
+    fi
 }
 
 @test "ai/pi/settings.json omits the volatile lastChangelogVersion (seed-if-missing)" {

@@ -11,7 +11,7 @@
     "behavior": "AC2: on linux, the step writes both systemd units, reloads, and enables the timer; a second run is changed=0.",
     "verification": "cd cli && go test ./internal/schedule -run Systemd",
     "state": "implemented",
-    "evidence": "fake-runner tests; live changed=0 on Linux not proved (needs msi)"
+    "evidence": "fake-runner tests; live changed=0 on Linux not proved (needs msi); `dotf vm linux` run 2026-10-17 stopped at records-harness before the step (#2688), so still unproved live"
   },
   {
     "id": "OPS-053-self-deploy-trigger-f3",
@@ -22,10 +22,10 @@
   },
   {
     "id": "OPS-053-self-deploy-trigger-f4",
-    "behavior": "AC4: role absent, a trigger dotf wrote is removed and one it did not write is left in place with the adopt command named.",
+    "behavior": "AC4: role absent, a trigger dotf wrote is removed, one it did not write is left in place with the adopt command named, and an unreachable scheduler is a skip; on darwin every agent at the label is dotf's own.",
     "verification": "cd cli && go test ./internal/converge -run 'SelfDeploy_WithoutTheRole|SelfDeploy_OptedInAdopts'",
     "state": "implemented",
-    "evidence": "darwin removal exercised live 2026-10-17; systemd marker and schtasks digest read as unmanaged when absent (unit tests)"
+    "evidence": "darwin removal exercised live 2026-10-17; systemd marker and schtasks digest read as unmanaged when absent (unit tests); TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler red before the round-1 fix"
   },
   {
     "id": "OPS-053-self-deploy-trigger-f5",
@@ -37,9 +37,9 @@
   {
     "id": "OPS-053-self-deploy-trigger-f6",
     "behavior": "AC6: no self-deploy block remains in setup-linux.sh or setup-windows.ps1; their units and bats are gone; docs name the role.",
-    "verification": "! grep -n DOTFILES_AUTODEPLOY setup-linux.sh setup-windows.ps1",
+    "verification": "bats tests/guard-setup-no-self-deploy.bats",
     "state": "implemented",
-    "evidence": "setup-script blocks, systemd/dotfiles-selfupdate.* and their bats deleted"
+    "evidence": "setup-script blocks, systemd/dotfiles-selfupdate.* and their bats deleted; the bats guard fails if either setup script carries the block again (mutation checked)"
   },
   {
     "id": "OPS-053-self-deploy-trigger-f7",

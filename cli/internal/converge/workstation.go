@@ -39,6 +39,7 @@ func (r workstationTarget) target(e Env) (sshtarget.Target, error) {
 	}
 	t, err := sshtarget.New(e.RepoRoot, u, e.GOOS, r.paths(e.GOOS, e.Home), r.run, r.addrs)
 	t.Root = r.root
+	t.Dotf = e.Dotf
 	return t, err
 }
 

@@ -612,10 +612,10 @@ FIXTURE
     grep -q 'jqlang.jq' "$PS1_SCRIPT"
 }
 
-@test "parity: both OSes install gh (Linux through the catalog's apt row)" {
-    # setup-linux.sh's linux-amd64 download is gone (#2013 W2); the winget row
-    # leaves setup-windows.ps1 in the Windows batch (PLAT-001c P5b).
-    jq -e '.tools[] | select(.name == "gh" and .source.type == "system" and .source.apt == "gh" and .source.winget == "GitHub.cli")' "$DOTFILES_DIR/packages.json" >/dev/null
+@test "parity: both OSes install gh (Linux and macOS through mise)" {
+    # The apt row it had was below the floor `dotf pr` needs (#2136); the
+    # winget row leaves setup-windows.ps1 once mise runs on Windows (PLAT-001c).
+    grep -B1 '^GH_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
     grep -q 'GitHub.cli' "$PS1_SCRIPT"
 }
 
