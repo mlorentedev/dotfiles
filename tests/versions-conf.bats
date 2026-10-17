@@ -222,7 +222,9 @@ setup() {
 # `dotf tools sync` into a registry lookup that fails and doctor red, while CI,
 # which builds dotf from the tree, stays green (lesson 373). `last` is the
 # newest release without the table; raise it if a release ships first, and mark
-# the pin only once DOTF_VERSION is past it (DX-007, #2654).
+# the pin only once DOTF_VERSION is past it (DX-007, #2654). This guards the
+# first mark only: a later bump of ZSH_AUTOSUGGESTIONS_VERSION needs its sha256
+# in fileTools in a RELEASED dotf first, or the parse fails on every machine.
 @test "versions.conf marks no file tool while DOTF_VERSION predates the fileTools table" {
     run awk -v last="0.72.0" '
         function gt(a, b,   x, y, i) {

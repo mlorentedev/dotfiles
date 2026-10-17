@@ -481,4 +481,5 @@ tags: [lessons, index, dotfiles]
 | [460 - A claim is held by the checkout, not the process or the user](lesson-460-a-claim-is-held-by-the-checkout-not-the-process-or-the-user.md) | 2026-10-16 |
 | [461 - A post-condition that reads upstream turns upstream lag into a failure](lesson-461-a-post-condition-that-reads-upstream-turns-upstream-lag-into-a-failure.md) | 2026-10-16 |
 | [462 - A refusal with no reason named is a rule until the classifier is proven](lesson-462-a-refusal-with-no-reason-named-is-a-rule-until-the-classifier-is-proven.md) | 2026-10-16 |
+| [463 - Mise counts an install directory as the install, even without its file](lesson-463-mise-counts-an-install-directory-as-the-install-even-without-its-file.md) | 2026-10-16 |
 <!-- END GENERATED -->
