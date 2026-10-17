@@ -69,7 +69,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - only the differing keys are set, in one `pmset -c disksleep 0 autorestart 1`, `displaysleep` stays 15, and a second plan is clean: `TestPmsetSetsOnlyWhatDiffersOnACAndProvesIt`
   - a converged Mac runs nothing as root: `TestPmsetConvergedRunsNothingAsRoot`
   - the undo restores the values read before the apply, also after a failure part way: `TestPmsetUndoRestoresThePreviousValues`, `TestPmsetFailedApplyReturnsItsUndo`
-  - battery is never read into the plan nor set: `TestPmsetLeavesBatteryAlone`
+  - battery is never read into the plan nor set: battery alone differing runs nothing as root, and an AC key differing runs exactly `pmset -c disksleep 0`: `TestPmsetLeavesBatteryAlone` (round 1 of review found its first form vacuous, it never called `Apply`)
+  - the parser reads the macmini's `pmset -g custom` captured verbatim on 2026-10-17, padded columns and the multi-word `Sleep On Power Button` key included, to exactly the five profile keys: `TestParsePmsetReadsTheMacminiOutput`
   - a key the hardware does not report is skipped, the proof names what still differs, and output with no AC section is refused: `TestPmsetSkipsAKeyTheHardwareDoesNotReport`, `TestPmsetProofNamesWhatStillDiffers`, `TestPmsetRefusesOutputWithoutAnACSection`
   - the plan on darwin lists `power policy` (`TestWorkstationTarget_PlanNeedsNoRoot`, 5 changes); doctor reads pmset and never sets it (`TestCheckWorkstationTarget_ByStatus`)
 - Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --only workstation-target --plan`:
