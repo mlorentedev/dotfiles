@@ -5,8 +5,8 @@
 ## Waiting on you (irreversible first)
 
 1. **Landed under the standing grant.**
-   - #2679 at `77504fd`: Tier 1, `pwsh-modules` converge, doctor section, `dotf lint powershell`.
-   - #2689 at `728d564`: Tier 3a, `dotf vm linux`.
+   - #2679, squash `452d35bc` on main (head `77504fd`): Tier 1, `pwsh-modules` converge, doctor section, `dotf lint powershell`.
+   - #2689, squash `4c651efc` on main (head `728d564`): Tier 3a, `dotf vm linux`.
    - Neither touches `.github/`, the grant or release automation.
 2. **#2688 (BUG-154): the fix location is your call.** The first live `dotf vm linux` found that a from-zero `./install.sh` fails at `records-harness` wherever `~/.local/bin` is not on PATH, which is the case on a fresh Ubuntu. Both CI legs hide it by putting `~/.local/bin` on PATH first (lesson 473).
    - **(A) `install.sh` exports `$dest` before the `exec`.** Cheap, and provable with `dotf vm linux --ref <fix>` before a release.
@@ -54,12 +54,14 @@ None.
 
 ## Host
 
-- Wake-lock: `caffeinate -i -t 36000` from arming. It ended early with exit 144 while PR 1's CI ran (shortly after 08:22Z) and was relaunched as soon as the notification arrived (`-t 34000`). No gap was observed, but a sleep in between would not have been visible.
+- Wake-lock: `caffeinate -i -t 36000` from arming. It ended early with exit 144 while PR 1's CI ran (shortly after 08:22Z) and was relaunched as soon as the notification arrived (`-t 34000`). No gap was observed, but a sleep in between would not have been visible. It was released when the run ended (~10:05Z).
 - Lessons 466, 467 (PR 1) and 473 (PR 2). Lesson numbers 468, 471 and 472 were already claimed by open peer PRs.
 
 ## Next
 
-- After #2688 is fixed on a ref: `dotf vm linux --ref <fix>`. Then tick AC8.
+- After #2688 is fixed on a ref: `go run ./cmd/dotf vm linux --ref <fix>` from a worktree's `cli/`. The installed 0.73.0 has no `vm` command until a release carries #2689. Then tick AC8.
 - After a hypervisor is installed: PR 3 (AC9).
 - Archive gate: `dotf spec review PLAT-003-cross-os-verification`, run by a non-implementer once all tiers are done.
 - This report was pushed with the pre-push hook's skip-sdd env escape (`SDD_LABELS=skip-sdd` plus a rationale). The gate counts `.agent/` as production LOC (92 lines), and this branch is never opened as a PR. Same precedent as run cli-127.
+- The first live-run command (build plus run plus `env -u GITHUB_TOKEN`, in one call) was denied by the permission system. It was reshaped: the build became a separate step, the `env -u` was dropped, and no token was ever set. The second form ran.
+- `dotf pr triage-queue` repo-wide exits 1 on #2692 and #2683, which belong to the live `wintarget-14` session. They were left to their owner.
