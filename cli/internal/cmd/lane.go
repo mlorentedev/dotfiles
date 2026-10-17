@@ -29,7 +29,7 @@ func newLaneCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd(), newLaneClaimCmd(), newLaneReleaseCmd())
+	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd(), newLaneClaimCmd(), newLaneReleaseCmd(), newLaneClaimsCmd())
 	return c
 }
 

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -152,6 +153,37 @@ func (c Claimer) remoteSha(issue int) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// List reads every claim on the remote, ordered by issue number. A ref under
+// the claims namespace that is not a number is ignored: nothing here wrote it.
+func (c Claimer) List() ([]Claim, error) {
+	out, err := c.git("ls-remote", c.Remote, claimRefPrefix+"*")
+	if err != nil {
+		return nil, fmt.Errorf("ls-remote %s*: %w", claimRefPrefix, err)
+	}
+	var issues []int
+	for _, line := range strings.Split(out, "\n") {
+		_, name, ok := strings.Cut(strings.TrimSpace(line), "\t")
+		if !ok || !strings.HasPrefix(name, claimRefPrefix) {
+			continue
+		}
+		if n, err := strconv.Atoi(strings.TrimPrefix(name, claimRefPrefix)); err == nil && n > 0 {
+			issues = append(issues, n)
+		}
+	}
+	slices.Sort(issues)
+	var claims []Claim
+	for _, n := range issues {
+		cl, ok, err := c.Holder(n)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			claims = append(claims, cl)
+		}
+	}
+	return claims, nil
 }
 
 // Holder reads the claim on issue. The bool is false when nobody holds it.

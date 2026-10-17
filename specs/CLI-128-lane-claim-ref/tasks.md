@@ -38,9 +38,10 @@ created: "2026-10-16"
 
 ### PR 3: the decision on record
 
-- [ ] `lane status` shows a claim and its age (read-only, no new store).
-- [ ] [AC7] Amend ADR-050 decision 2 from "open" to the decided form, naming the forges the probe passed on; record any forge that refused.
-- [ ] Close #2551 with the evidence; answer the promotion candidates in `verification.md`.
+- [x] `lane claims [--json]` lists every claim with holder, age and an "issue closed, releasable" note (replaces "lane status shows a claim": status is one row per worktree and its JSON is a bare array, a claim has no worktree)
+- [x] [AC7] Probe GitHub and Gitea with `TestClaimRefFormOnARemote`; amend ADR-050 decision 2 from "open" to decided, naming both forges.
+- [x] Release on land or park is deliberately not automatic (see `verification.md`, decisions).
+- [ ] `dotf spec review CLI-128-lane-claim-ref` by a non-implementer, archive on PASS, close #2551 with the evidence.
 
 ## Machine-readable features
 

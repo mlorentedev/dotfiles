@@ -19,7 +19,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] AC4 -> `TestHandoffClaimsBeforeItStarts`, `TestHandoffSkipsToTheNextFreeItemOnALoss`, `TestHandoffStartsNothingWhenEveryItemIsClaimed`, `TestHandoffFailsClosedWhenTheClaimCannotBeTaken`, `TestHandoffDoesNotClaimAWorktreeThatExists`, `TestHandoffDryRunTakesNoClaimButSkipsAHeldItem`, `TestHandoffReleasesTheClaimWhenTheLaneDoesNotStart` (review finding: a start that creates no worktree must not leak the claim), `TestHandoffKeepsTheClaimOnceTheWorktreeExists` (CodeRabbit: after `Create` the next run skips the claim, so it must stay), `TestClaimIgnoresARefThatOnlyEndsLikeTheClaim` (`ls-remote` matches by tail)
 - [x] AC5 -> `TestLaneRelease` (real git, two checkouts), primitive `TestClaimRelease`
-- [ ] AC7 (forge probe) -> PR 3
+### PR 3 (the decision on record)
+
+- [x] AC7 -> `TestClaimRefFormOnARemote` passed on GitHub (`mlorentedev/dotfiles`, 6.9s) and on Gitea (`gitea.kubelab.live/personal/imagesensortool`, 14.9s), each followed by an empty `ls-remote 'refs/dotf/*'`; `gh run list --event push` shows no workflow for the ref. ADR-050 decision 2 amended from open to decided.
+- [x] `lane claims` shows every claim with its holder and age -> `TestClaimList`, `TestClaimRowsFlagsAClosedIssueAndLeavesAnUnreadableOneOpen`, `TestLaneClaimsListsWhatTheRemoteHolds`
 
 The forge probe is `TestClaimRefFormOnARemote`, opt-in through `DOTF_CLAIM_PROBE_REMOTE`; it passes against a local bare remote. A push of a probe ref to the real `origin` was refused by the harness, so GitHub and Gitea are still unprobed and AC7 stays open until the owner runs it.
 
@@ -35,6 +38,8 @@ The forge probe is `TestClaimRefFormOnARemote`, opt-in through `DOTF_CLAIM_PROBE
 - The claim time is read from the commit message, not the commit date, so a test (and a future caller) controls it; an unreadable time prints as unknown rather than blocking a release.
 - The holder is the checkout (`user@host:<worktree>`), not the process: a per-process nonce would make every `lane release` from a later invocation another holder's and force `--force`; a per-user id would make two same-user sessions one claimant.
 - `lane next` does not set the forge assignee: `Next` skips assigned issues, so a second invocation for the same item would start a second lane. A claim whose worktree already exists is not re-claimed (a second run is not a loss); a claim held by the same checkout from a run that died before creating the worktree fails closed and says `lane release`.
+- The probe ran against live repositories rather than a scratch one (the ADR said scratch): the ref number is one no queue holds, the test deletes it, and `ls-remote` was empty afterwards on both. The owner authorised the push to GitHub and named the Gitea host; the Gitea repository (`personal/imagesensortool`) was the one already configured on the machine.
+- Release on land is not automatic. A claim's job is to decide who starts an item; `Next` skips closed issues, so a claim left on a landed one blocks nothing. `lane claims` flags it and `release --force` clears it. An automatic release would need the sweeper (another checkout than the holder) to force-release, a second authority over the claim: left until the ref litter matters.
 - The empty tree is the constant SHA-1 id: SHA-256 repositories are out of scope until one exists in the fleet.
 
 ## Promotion candidates
@@ -42,7 +47,7 @@ The forge probe is `TestClaimRefFormOnARemote`, opt-in through `DOTF_CLAIM_PROBE
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-459-pushing-an-object-the-ref-already-points-at-is-not-a-refusal.md
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: pending PR 3, which amends ADR-050 decision 2 once the forge probe has run
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-050-one-lane-contract-for-every-repo-agent-and-forge.md
 - [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: single-repo mechanism, no second project uses it yet
 
 ## Archive checklist
