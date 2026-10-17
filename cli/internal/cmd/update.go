@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -39,7 +41,9 @@ at its pin) is logged and skipped with exit 0; a skip names a dotf that is off
 its pin.
 A real converge failure, or a pinned dotf that cannot be installed, is the ONLY
 non-zero exit, so the scheduler's last result (launchd's log, 'systemctl --user
-status dotfiles-selfupdate', the task's LastTaskResult) surfaces it.
+status dotfiles-selfupdate', the task's LastTaskResult) surfaces it. Every run,
+a skip included, records its outcome in <state dir>/update/last.json, which
+'dotf doctor' reads in its Self-deploy section.
 
 Env:
   DOTFILES_REPO_DIR              repo to update  (default: the env-contract path)
@@ -61,10 +65,24 @@ Env:
 			if err != nil {
 				c.PrintErrln("update:", err)
 			}
+			recordUpdate(c.ErrOrStderr(), out, err)
 			return err
 		},
 	}
 	return cmd
+}
+
+// recordUpdate keeps the run's outcome where doctor reads it. A record that
+// cannot be written is said and leaves the exit alone: update fails only when
+// the deploy broke, and doctor reads a missing record as no recent run.
+func recordUpdate(w io.Writer, out update.Outcome, runErr error) {
+	state, err := env.StateDir()
+	if err == nil {
+		err = update.WriteRecord(state, update.NewRecord(time.Now(), out, runErr))
+	}
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "warning: recording this run for doctor: %v\n", err)
+	}
 }
 
 // pinnedDotfVersion reads DOTF_VERSION from the checkout's versions.conf, the

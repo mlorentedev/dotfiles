@@ -25,9 +25,11 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
+	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
 // System abstracts the non-deterministic, process-global surfaces a check
@@ -154,6 +156,10 @@ type System struct {
 	// and a test address list; nil means /etc/ssh and the real interfaces.
 	SSHTargetPaths func(home string) sshtarget.Paths
 	MeshAddrs      func() ([]net.IP, error)
+	// Scheduler returns goos's native scheduler for the user whose home is
+	// home (update.NativeBackend in production), which checkSelfDeploy only
+	// inspects. nil skips the section, so a test never reaches the real one.
+	Scheduler func(goos, home string) (schedule.Backend, error)
 	// ProcessAlive reports whether pid names a live process (secrets.ProcessAlive
 	// in production: signal 0 on Unix, OpenProcess + GetExitCodeProcess on
 	// Windows). It is what lets the bw serve check tell "the daemon died" from
@@ -288,6 +294,9 @@ func realSystem() *System {
 		},
 		BWServeReadable: secrets.BWServeClient{}.Readable,
 		UserEnv:         userEnvReader(),
+		Scheduler: func(goos, home string) (schedule.Backend, error) {
+			return update.NativeBackend(goos, home, os.Getenv, os.Getuid(), schedule.Elevated)
+		},
 		BWServeLastSync: func() (time.Time, error) {
 			st, err := secrets.BWServeClient{}.StatusDetail()
 			return st.LastSync, err

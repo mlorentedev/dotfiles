@@ -41,9 +41,9 @@ created: "2026-10-17"
 
 ## PR C — last-run record and doctor (AC7)
 
-- [ ] [AC7] `update` writes `<StateDir>/update/last.json` {at, status, message, error} on every outcome; test with a temp StateDir
-- [ ] [AC7] doctor `Self-deploy` section: role, trigger state (the step's own inspect, read-only), last run; table-driven tests
-- [ ] Gates as above
+- [x] [AC7] `update` writes `<StateDir>/update/last.json` {at, status, message, error} on every outcome; test with a temp StateDir
+- [x] [AC7] doctor `Self-deploy` section: role, trigger state (the step's own inspect, read-only), last run; table-driven tests
+- [x] Gates as above
 
 ## Closing
 
