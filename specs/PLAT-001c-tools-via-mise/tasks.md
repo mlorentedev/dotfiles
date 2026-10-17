@@ -331,6 +331,18 @@ the fix in the converge, visible in its plan, rather than in a hand cleanup.
 - [x] Non-goals, by construction: a tool another project's tracked `mise.toml` requires is not in mise's prunable list; a superseded version of a pinned tool is left to the removal `mise upgrade` already scheduled
 - [x] Evidence on the Mac: plan named `powershell@7.5.11`, the apply removed it, the next plan has nothing to prune and `pwsh` no longer resolves (verification.md)
 
+### gh through mise (#2136)
+
+gh runs under `dotf pr`, `dotf forge` and the spec gates, and the catalog's
+apt row installed Ubuntu's 2.46.0, which lacks `gh pr checks --json`. W2's
+"neither is in mise" was wrong for gh: `mise registry gh` resolves to
+`aqua:cli/cli`.
+
+- [x] `GH_VERSION=2.102.0` under `# mise: cli`; the `system` entry leaves `packages.json` (one owner per tool, `tests/packages-json.bats`). Below the pin is drift in doctor's *Pinned CLIs (mise)*, as for every marked pin
+- [x] `GH_NO_UPDATE_NOTIFIER` in mise's `[env]`: gh's notice names the channel that installed it first (`brew upgrade gh`), a second gh outside the pin (`TestRenderMiseConfig_SilencesGhsUpdateNotice`, red before the map entry)
+- [x] `setup-windows.bats` gh parity reads the marker and the winget id, the jq and zoxide shape
+- [ ] Windows: the winget row stays in `setup-windows.ps1` until mise runs there; the P5b row above already tracks its removal
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
