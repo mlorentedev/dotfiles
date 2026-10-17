@@ -58,6 +58,32 @@ func TestDeploy_PathsRenderATOMLMergeSource(t *testing.T) {
 	}
 }
 
+// #2638: `dotf worktree add` follows a new WORKTREE_ROOT at once, while herdr
+// keeps the root rendered at deploy time. The plan re-renders the source with
+// the root in force now, so the stale destination reads as drift (which
+// `dotf doctor` reports) instead of as in sync.
+func TestDeploy_AWorktreeRootChangedAfterADeployIsDrift(t *testing.T) {
+	root := repoWithHerdrConfig(t, "[worktrees]\ndirectory = \"{WORKTREE_ROOT}\"\n")
+	home := t.TempDir()
+	writeHerdrDst(t, home, "onboarding = false\n")
+	if _, err := Deploy(herdrWithPaths(), root, home, worktreeRoot, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	moved := func(name string) string {
+		if name == "WORKTREE_ROOT" {
+			return "/r/moved"
+		}
+		return ""
+	}
+	p, err := PlanConfig(herdrWithPaths(), root, home, moved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Changed {
+		t.Error("herdr's rendered root is stale after WORKTREE_ROOT moved, and the plan reads it as in sync")
+	}
+}
+
 // Rendering re-encodes the source, so a value the source declared no interest
 // in must come back as it was read: an integer above 2^53 and a datetime.
 func TestExpandPaths_TOMLKeepsValuesItDoesNotRender(t *testing.T) {
