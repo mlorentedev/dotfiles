@@ -21,7 +21,7 @@ created: "2026-10-16"
 - `go test ./...` (cli): all packages ok
 - `golangci-lint run` (v2.12.2, the pin) over the four touched packages: 0 issues
 - all 7 `features.json` verification commands exit 0
-- `bats` over the files that mention lessons (doc paths, knowledge gate, agents-md, ci-path-filtering, twin retirement): 98 tests, none failing
+- `git grep -l lessons -- 'tests/*.bats' | xargs bats` (14 files): 228 tests, none failing, re-measured 2026-10-17 at 3fcaf22f (the earlier "98 tests" counted a hand-picked five files)
 - Not measured: the pre-commit `lessons-fmt` hook, which runs the installed 0.72 `dotf` and so fails on a tree with no index until a release carrying this change is installed (lesson 464). The deleting commit skipped that one hook; CI builds `dotf` from the checkout and is the gate.
 
 ## Decisions made during implementation
@@ -54,3 +54,11 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - Minor (`dotf lessons --help` still said "generated index"): fixed in the parent `Short`, pinned by `TestLessonsHelp_DoesNotPromiseACommittedIndex`.
 - Minor (four Closing boxes unticked while this file claims them): ticked in `tasks.md`.
 - Question (WIP override text, `status: draft`): left as recorded; the override is the owner's call and is named in the report.
+
+## Review round 2 (2026-10-17, nan/glm5.3-flash): FAIL, findings dispositioned
+
+- Major, REAL (`tests/ci-path-filtering.bats` red at the reviewed sha): the failure was `.agent/` from the autopilot arming commit, which sits on the review's own run branch and is not on main. It is not in the change. Round 3 is dispatched from a branch cut from main, so the arming commit is outside the reviewed scope. `.agent/` stays out of the HARNESS-041 list on purpose: the envelope is never merged.
+- Major, THEORETICAL (`TestIndex_OneTablePerDirectorySortedByNumber` is blind to the sort): added `TestIndex_SortsByNumberNotByFileName` with `lesson-1000` against `lesson-101`, whose file-name order inverts the numeric order. Mutation-checked: with the sort line deleted it fails.
+- Minor, REAL (`fmt` returned the stray-index error bare): wrapped like every other failure path (`lessons fmt: <err>`).
+- Minor, THEORETICAL (`newestLesson` drops I/O errors, so an unreadable `docs/lessons/` silences the staleness warning): ticketed as #2690, not fixed here.
+- Question (WIP override text, `status: draft`): unchanged, the owner's call.
