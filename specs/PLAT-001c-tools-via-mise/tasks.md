@@ -174,7 +174,8 @@ lazygit replaces Orca's diff viewer. Its install was done with the mise pins abo
 - [x] Second half, git-lfs (#2201): the converge step `git-lfs`, placed right after `git-config`
   - It runs `git lfs install --skip-repo` when a key of the lfs filter is absent from the effective global config: the last `--global` value, else the last `--system` one, so Git for Windows' system filter counts
   - `--skip-repo` keeps it from installing hooks into whatever repository the converge runs in; a test asserts the flag
-  - A key set to another value is left as it is and named, and nothing is installed while one differs, the absent keys included: measured with git-lfs 3.8.0, `git lfs install --skip-repo` over a differing `filter.lfs.smudge` exits 2, writes nothing and names `--force`, so running it would fail every converge. Doctor names `--force` and leaves the call to the owner
+  - A key the global config sets to another value is left as it is and named, and nothing is installed while one differs, the absent keys included: measured with git-lfs 3.8.0, `git lfs install --skip-repo` over a differing `filter.lfs.smudge` exits 2, writes nothing and names `--force`, so running it would fail every converge. Doctor names `--force` and leaves the call to the owner
+  - A system-scope value other than the stock one, with no global key, is absent: install exits 0 over it and the global key it writes is the one git reads (pr-agent on #2697)
   - No git-lfs on PATH is a skip naming `dotf tools install git-lfs`
   - Doctor's *Git LFS* section reads the same `gitconfig.InspectLFS`: a PASS with the filter in place, a WARN naming the converge step otherwise
 - [x] Docker on the Mac is Colima (owner, #2013 P5b): brew-only `system` entries for colima, docker, docker-compose and docker-buildx. On the Mac the dry-run plans install for all four

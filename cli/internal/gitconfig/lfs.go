@@ -23,9 +23,9 @@ type LFSState struct {
 	// Absent are the filter keys set in neither the global nor the system
 	// config: `git lfs install` writes them.
 	Absent []string
-	// Differ are the keys set to another value. They are left as they are:
-	// `git lfs install` refuses to overwrite them without --force, and a
-	// different filter is somebody's choice.
+	// Differ are the keys the global config sets to another value. They are
+	// left as they are: `git lfs install` refuses to overwrite them without
+	// --force, and a different filter is somebody's choice.
 	Differ []string
 }
 
@@ -44,34 +44,39 @@ func InspectLFS(run Runner) (LFSState, error) {
 		return st, nil
 	}
 	for _, k := range LFSFilter {
-		got, err := effectiveLFS(run, k.Key)
+		global, err := lastIn(run, "--global", k.Key)
 		if err != nil {
 			return st, err
 		}
-		switch got {
+		switch global {
 		case k.Value:
+			continue
 		case "":
-			st.Absent = append(st.Absent, k.Key)
 		default:
-			st.Differ = append(st.Differ, fmt.Sprintf("%s is %q, not %q", k.Key, got, k.Value))
+			st.Differ = append(st.Differ, fmt.Sprintf("%s is %q, not %q", k.Key, global, k.Value))
+			continue
+		}
+		system, err := lastIn(run, "--system", k.Key)
+		if err != nil {
+			return st, err
+		}
+		// A system value other than the stock one is absent, not different:
+		// measured with git-lfs 3.8.0, install exits 0 over it and writes the
+		// global key, which git reads after the system one (pr-agent on #2697).
+		if system != k.Value {
+			st.Absent = append(st.Absent, k.Key)
 		}
 	}
 	return st, nil
 }
 
-// effectiveLFS is key's last value in the global config, else in the system
-// config, "" when neither sets it.
-func effectiveLFS(run Runner, key string) (string, error) {
-	for _, scope := range []string{"--global", "--system"} {
-		vals, err := getAllIn(run, scope, key)
-		if err != nil {
-			return "", err
-		}
-		if len(vals) > 0 {
-			return vals[len(vals)-1], nil
-		}
+// lastIn is key's last value in the given scope's config, "" when unset.
+func lastIn(run Runner, scope, key string) (string, error) {
+	vals, err := getAllIn(run, scope, key)
+	if err != nil || len(vals) == 0 {
+		return "", err
 	}
-	return "", nil
+	return vals[len(vals)-1], nil
 }
 
 // InstallLFS writes the filter through git-lfs itself. --skip-repo keeps it out

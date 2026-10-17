@@ -91,6 +91,8 @@ func TestInspectLFS_ByState(t *testing.T) {
 			return m
 		}()}, differ: 1},
 		{name: "global overrides a differing system value", f: &fakeLFS{installed: true, global: lfsKeys(), system: map[string][]string{"filter.lfs.required": {"false"}}}},
+		// install exits 0 over it and the global key wins (measured, pr-agent on #2697).
+		{name: "a differing system value with no global one is absent", f: &fakeLFS{installed: true, global: map[string][]string{}, system: map[string][]string{"filter.lfs.smudge": {"admin-smudge %f"}}}, absent: 4},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			st, err := InspectLFS(tt.f.run)
