@@ -328,7 +328,7 @@ func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skill
 	fmt.Fprintf(&b, "- As your first action, before you explore, write a provisional `specs/%s/%s`:\n"+
 		"  frontmatter with `verdict: PENDING` and `reviewer: %s`, then the findings so far.\n"+
 		"  Keep refining it as you verify, and replace it with your real verdict at the end.\n"+
-		"  A run that is stopped (the time cap, a stalled tool call) writes no verdict, so\n"+
+		"  A run that is stopped (the time cap) writes no verdict, so\n"+
 		"  that provisional file is all it leaves behind; `dotf spec archive` refuses it by name.\n", specID, slot.Review, reviewerID)
 	if slot.Name == SecondSigner.Name {
 		fmt.Fprintf(&b, "- You are the SECOND signer, of a different vendor than the first. Do NOT read\n"+
