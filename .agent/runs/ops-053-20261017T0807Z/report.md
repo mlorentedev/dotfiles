@@ -15,8 +15,8 @@ Waiting on a human: the OPS-053 independent review and archive, then one release
 2. **OPS-053 archive gate:** run `dotf spec review OPS-053-self-deploy-trigger` (the reviewer must not be me), then `dotf spec archive` on PASS. That frees the `--over-wip-limit` override. #2502 stays open until then.
 3. **The Mac's self-deploy, after the next release is installed:** `dotf env role add self-deploy`, then `dotf converge --only self-deploy`. **Not before the release:** an unreleased role in the real `machine.json` breaks every installed `dotf converge` on the machine. That happened during this run and was rolled back within the hour (lesson 468).
 4. **The Mac's lfs filter:** `dotf converge --only git-lfs --plan` on the real HOME reports `1 to change`. **Until a release carrying #2697 is installed and converged, an LFS clone on this Mac still checks out pointers.** The first converge with that release writes the filter; nothing to do by hand.
-6. **#2699, close it, never merge it:** a draft PR that only carries this report. `skip-sdd` was needed because the pre-push gate counts `.agent/` as production (#2698).
 5. **Live `changed=0` on Linux and Windows** for self-deploy and git-lfs needs msi and the work-lab box. Here they are covered by unit tests plus `GOOS=windows go vet ./...` only, as each PR says.
+6. **#2699, close it, never merge it:** a draft PR that only carries this report. `skip-sdd` was needed because the pre-push gate counts `.agent/` as production (#2698).
 
 ## 2. Parked, with the question restated
 
