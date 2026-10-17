@@ -108,6 +108,11 @@ func (f *fakeFileMise) run(name string, args ...string) ([]byte, error) {
 			return nil, err
 		}
 		f.unpacked = true
+		latest := filepath.Join(f.root, "latest")
+		_ = os.Remove(latest)
+		if err := os.Symlink(f.version, latest); err != nil {
+			return nil, err
+		}
 		return nil, os.WriteFile(filepath.Join(dir, "zsh-autosuggestions.zsh"), []byte("# plugin\n"), 0o644)
 	case name == "mise" && len(args) == 3 && args[0] == "ls" && args[1] == "--prunable":
 		out := "{"
@@ -224,5 +229,30 @@ func TestSync_RepairsAFileToolWhoseFileWasDeleted(t *testing.T) {
 	again, err := s.Apply(pins)
 	if err != nil || again.Pending() || f.forced != 1 {
 		t.Errorf("second run: pending=%v err=%v forced=%d, want changed=0", again.Pending(), err, f.forced)
+	}
+}
+
+// .zshrc sources <root>/latest/<file>; the sync must verify that path, or a
+// removed or dangling `latest` leaves the sync satisfied and the shell without
+// the plugin.
+func TestSync_ADanglingLatestLinkIsRepairedNotAccepted(t *testing.T) {
+	skipOnWindows(t)
+	pins := []MiseTool{{"zsh-autosuggestions", "0.7.1"}}
+	f := &fakeFileMise{root: t.TempDir(), version: "0.7.1"}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run}
+	if _, err := s.Apply(pins); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(f.root, "latest")); err != nil {
+		t.Fatal(err)
+	}
+	if s.runsAtPin(pins[0]) {
+		t.Fatal("a missing latest link counted as installed")
+	}
+	if _, err := s.Apply(pins); err != nil {
+		t.Fatal(err)
+	}
+	if f.forced != 1 || !s.runsAtPin(pins[0]) {
+		t.Errorf("forced=%d installed=%v, want one repair and a working link", f.forced, s.runsAtPin(pins[0]))
 	}
 }

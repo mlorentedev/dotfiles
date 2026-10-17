@@ -132,7 +132,8 @@ func (s MiseSync) reinstallEmptyFileTools(tools []MiseTool) error {
 }
 
 // fileToolInstalled asks mise where the pinned version is installed and looks
-// for the file there. `mise which` finds executables only, and an install
+// for the file there, and for the same file through `latest`, which is the
+// path .zshrc sources. `mise which` finds executables only, and an install
 // directory that exists proves nothing about what a half-finished unpack left.
 func (s MiseSync) fileToolInstalled(t MiseTool) bool {
 	run := s.Stdout
@@ -147,6 +148,13 @@ func (s MiseSync) fileToolInstalled(t MiseTool) bool {
 	if dir == "" || filepath.Base(dir) != t.Version {
 		return false
 	}
-	fi, err := os.Stat(filepath.Join(dir, fileTools[t.Name].File))
+	file := fileTools[t.Name].File
+	if fi, err := os.Stat(filepath.Join(dir, file)); err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	// The shell sources <install root>/latest/<file> (no `mise` process at
+	// startup), so that path must resolve too: a missing or dangling `latest`
+	// would leave the sync satisfied and the plugin never loaded.
+	fi, err := os.Stat(filepath.Join(filepath.Dir(dir), "latest", file))
 	return err == nil && fi.Mode().IsRegular()
 }

@@ -26,7 +26,8 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 - Live, built `dotf tools sync` against a `versions.conf` marking the plugin: first run `installed: zsh-autosuggestions`, second `nothing to do`; after deleting the file the next run repaired it and the one after reported nothing to do.
 - Latency (medians of 20 `zsh -ic exit`, two rounds): main 44.6 / 44.5 ms; branch without the plugin 43.6 / 44.0 ms; branch with the plugin sourced 45.0 / 44.5 ms.
 - The rc builds the plugin path with the precedence `MiseShimsDir` uses (`MISE_DATA_DIR`, then `XDG_DATA_HOME/mise`, then `~/.local/share/mise`); on this Mac `mise where age` is under `~/.local/share/mise/installs`, so the two agree. `tests/zshrc-guards.bats` 17/17 also in `ubuntu:24.04` as a non-root user.
-- Not measured: live prune through the converge (`dotf tools sync` does not set `Prune`; the unit test covers it), a Linux host (the table and the rc use no macOS-only call), Windows (compiled and vetted with `GOOS=windows`, the skip is by `runtime.GOOS`), the suggestions appearing in a live terminal.
+- Live prune (mise 2026.10.3, scratch dirs): with the plugin no longer in the config, `mise ls --prunable --json` lists `http:zsh-autosuggestions` and `mise prune --yes --tools http:zsh-autosuggestions` removed `installs/http-zsh-autosuggestions` and its cache; this is the spec `orphanTools` builds. The sync verifies `<root>/latest/<file>` too, the path `.zshrc` sources: with `latest` deleted the next sync repaired it, the one after reported nothing to do.
+- Not measured: the prune through the converge itself (`dotf tools sync` does not set `Prune`), a Linux host (the table and the rc use no macOS-only call), Windows (compiled and vetted with `GOOS=windows`, the skip is by `runtime.GOOS`), the suggestions appearing in a live terminal.
 
 ## Test status
 
