@@ -30,7 +30,7 @@ Note on what the transcript records: `durationMs` is per tool call and there are
 - [ ] AC2 a growing or briefly silent transcript is never stopped: pending
 - [ ] AC3 prompt asks for a provisional `review.md`: pending
 - [ ] AC4 stopped run reports kept or not rewritten, exits non-zero: pending
-- [ ] AC5 `dotf spec archive` refuses PENDING by name: pending
+- [x] AC5 `dotf spec archive` refuses PENDING by name: `cd cli && go test ./internal/spec/ -run 'TestParseReviewRefusesAPendingVerdictByName|TestFindReviewRefusesAPendingReviewFile' -count=1` exits 0; both tests failed before the change (the message said "unrecognized verdict"). Archive reads review.md through `FindReview`, which the second test covers.
 - [x] AC6 measurement and N recorded above
 
 ## Promotions

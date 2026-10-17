@@ -20,8 +20,8 @@ created: "2026-10-17"
 ## Implementation
 
 - [x] [AC6] Measure the longest legitimate tool call in the surviving local transcripts (`durationMs` on `tool_execution_end` events), pick `N`, record both in `verification.md` (done 2026-10-17: 96.9s, N = 10 minutes). Every wedge-watcher task below depends on this one.
-- [ ] [P] [AC5] Write failing test: `dotf spec archive` on a `review.md` with `verdict: PENDING` names a provisional, unsigned record
-- [ ] [AC5] Teach the review parser a PENDING verdict that always refuses, with that wording
+- [x] [P] [AC5] Write failing test: `dotf spec archive` on a `review.md` with `verdict: PENDING` names a provisional, unsigned record
+- [x] [AC5] Teach the review parser a PENDING verdict that always refuses, with that wording
 - [ ] [P] [AC3] Write failing test: `ReviewPromptIn` asks both signers for a provisional `review.md` with `verdict: PENDING` first
 - [ ] [AC3] Add the write-first instruction to `ReviewPromptIn`
 - [ ] [AC1] [AC2] (after task 1) Write failing tests with a fake runner: silent transcript is stopped at the stall timeout (exit not 124, stderr names the last tool call); a growing transcript, and one silent for 97s, are never stopped
