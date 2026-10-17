@@ -49,8 +49,10 @@ type Job struct {
 	// RunAtLoad runs the job when launchd loads it, which is every login.
 	// launchd only: a timer job leaves it false, or loading it would run it.
 	RunAtLoad bool
-	// Env is the environment launchd hands the job, which otherwise gets a
-	// bare PATH. launchd only.
+	// Env is set in the job's environment: launchd's EnvironmentVariables
+	// (the job otherwise gets a bare PATH) and systemd's Environment= lines.
+	// The Task Scheduler has no per-task environment, so a task gets the
+	// user's persistent one and Env is not rendered there (#2696).
 	Env []EnvVar
 	// Log is where launchd sends the job's stdout and stderr. launchd only:
 	// systemd writes the journal, and the Task Scheduler keeps the result.
@@ -60,8 +62,8 @@ type Job struct {
 // Clock is a local time of day.
 type Clock struct{ Hour, Minute int }
 
-// EnvVar is one variable of a launchd job's environment, kept in order so the
-// rendered plist is stable.
+// EnvVar is one variable of a job's environment, kept in order so the
+// rendered definition is stable.
 type EnvVar struct{ Name, Value string }
 
 // State is what a backend found for a job.

@@ -53,6 +53,9 @@ PR A (darwin), PR B (linux, windows, twin deletion) and PR C (last-run record, d
 - PR C: the trigger carries `XDG_STATE_HOME` as it carries `XDG_CONFIG_HOME`; without it a shell that
   exports one would have doctor read a record the job never writes. A machine that exports it sees a
   one-time `changed=1` on the next converge.
+- PR C: the Windows task does not carry `Job.Env` (Task Scheduler has no per-task environment), so
+  there a session-only `XDG_CONFIG_HOME` or `XDG_STATE_HOME` does not reach the run; a value
+  persisted at user scope does. Found in review, filed as #2696 with three options.
 - PR C: the native scheduler builder moved to `update.NativeBackend`, so the step and doctor address
   the same scheduler. It cannot live in `schedule`: `env` imports `schedule`, and the builder needs
   `env.ExecLaunchctl`.
