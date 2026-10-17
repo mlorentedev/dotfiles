@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 12d9203f0381208e
+generated_sha: 90ea404e00ff329d
 id: insights-skill
 type: skill
 status: active
@@ -28,7 +28,7 @@ Quick, read-only audit of the Neural Hive knowledge loop and vault structural he
 
 ### Step 1 -- MEMORY.md Health
 
-- Read the project's MEMORY.md at `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (resolve `$VAULT_PATH` with `dotf env path VAULT_PATH`)
+- Read the project's MEMORY.md at `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (keep `$VAULT_PATH` if already set and non-empty; otherwise assign it from `dotf env path VAULT_PATH`, and stop and ask the user if that is empty)
 - Report: line count, Last Crystallized date, days since last crystallization
 - Flag: lines > 150 -> WARNING, Last Crystallized > 14 days -> WARNING
 
