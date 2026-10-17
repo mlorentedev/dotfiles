@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: 9982757a207c2757
+generated_sha: 728260a0f6872943
 id: new-ticket-skill
 type: skill
 status: active
@@ -90,7 +90,12 @@ for L in $(printf '%s' "$LABELS" | tr ',' ' '); do
   gh label list --repo "$REPO" --json name -q '.[].name' | grep -qx "$L" \
     || gh label create "$L" --repo "$REPO" --color "<color-from-table>" --description "<desc-from-table>"
 done
-URL=$(gh issue create --repo "$REPO" --title "$AREA-$NNN: $TITLE" --body "$BODY" --label "$LABELS")
+# `dotf forge` reads the repository from the cwd's origin (run it inside the home repo's
+# checkout) and takes the body from a file, never an argument: prose in a command line is
+# what the permission deny globs trip on. It prints the issue URL.
+BODY_FILE=$(mktemp); printf '%s\n' "$BODY" > "$BODY_FILE"
+LABEL_FLAGS=""; for L in $(printf '%s' "$LABELS" | tr ',' ' '); do LABEL_FLAGS="$LABEL_FLAGS --label $L"; done
+URL=$(cd "<home-repo checkout>" && dotf forge issue create --title "$AREA-$NNN: $TITLE" --body-file "$BODY_FILE" $LABEL_FLAGS)
 
 # 2. Put it on the board (idempotent — returns the existing item if already added)
 ITEM=$(gh project item-add "$PROJECT_NUM" --owner "$OWNER" --url "$URL" --format json \
@@ -254,7 +259,7 @@ NNN is **zero-padded to 3 digits** to match the convention (`HARNESS-016`, `OPS-
 
 `scan → create` is not atomic: on 2026-07-07 three parallel sessions filing tickets minutes apart produced three duplicate IDs (TOOL-017 ×2, DOCS-001 ×2, then TOOL-020 ×2 during remediation). Harden every create:
 
-1. **Re-scan immediately before `gh issue create`** — at create time, not minutes earlier when the proposal was computed.
+1. **Re-scan immediately before `dotf forge issue create`** — at create time, not minutes earlier when the proposal was computed.
 2. **Scan the board's `ID` field too, not only the home repo's issue titles** — a concurrent session may have claimed `AREA-NNN` from another repo or before its issue lands in your scan window. **The paginated REST title scan above is the authoritative one.** The board `ID` scan is a cross-repo supplement and **must not be done with `gh project item-list`**: it reads the oldest N of a 3311-item board and reports a maximum far below the truth. Measured 2026-09-08 — `--limit 1000` returned `HARNESS-111` as the highest board `ID` while HARNESS-120…134 already existed, i.e. it would have proposed an id **23 numbers deep into occupied space**, and only the REST title scan caught it. Reading the board whole instead trips the GraphQL secondary rate limit. So: run the REST title scan across the bitácora repos (`gh api --paginate repos/<owner>/<repo>/issues`), and if a cross-repo claim is still a live worry, say the scan was title-only rather than reaching for a listing that answers wrongly. **A truncated board scan is worse than none, because it answers.**
 3. **Verify right after creating** — re-run the scan; if a duplicate raced in, renumber immediately.
 

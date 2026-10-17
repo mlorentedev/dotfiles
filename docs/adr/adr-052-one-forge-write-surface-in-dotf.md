@@ -33,7 +33,7 @@ Agents reached forges through whatever was at hand: `gh` with the prose on the c
 ## Consequences
 
 - The classifier's answer to a `dotf forge` write to Gitea is unmeasured at the time of writing. The first PR records it on #2635 before any allow rule is added; the dev-binary result is evidence, and the binding measurement is repeated once with the released binary.
-- ADR-048's deploy can only add. Reverting #2629 therefore removes the entry from the template but not from machines that already hold it; removing it there is an owner action, recorded in the PR that does it.
+- ADR-048's deploy can only add. Reverting #2629 therefore removes the entry from the template but not from machines that already hold it; removing it there is an owner action, recorded in the PR that does it. Amended with PR 4: the revert is not part of it. `gh issue create` still serves the GitHub tickets that predate the skills' move, so #2629 stays until the owner decides, and the allow set is added beside it.
 - ADR-048's deny intents are rendered into each harness's syntax. The secret-exposure deny must match the command position, not any substring, or the renderer spreads BUG-152 to every harness (#2634).
 
 ## Alternatives rejected
