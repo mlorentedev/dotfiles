@@ -30,7 +30,8 @@
     "            does not carry is a file nobody reads (#843), and the integration",
     "            guard asserts ~/.copilot never appears without copilot (#1312).",
     "  paths     native | slash: render the {VAR} tokens found inside the source's",
-    "            JSON string values (the same tokens dst uses) and write each such",
+    "            JSON string values, and TOML ones from version 6 (the same tokens",
+    "            dst uses), and write each such",
     "            string with the OS separator (native) or with / (slash), before",
     "            the strategy runs. Which form a tool accepts is a measured fact",
     "            about the tool: Copilot wrote backslash trustedFolders into its own",
@@ -42,8 +43,13 @@
     "            which every dotf since 0.65 reads (#1843 B1). The bash and",
     "            readline rc files are its first entries: the Windows shell is",
     "            pwsh, whose profile setup-windows.ps1 deploys (#2013 P7).",
+    "  listKeys  {dotted list path: identity field}, on a merge entry: an element",
+    "            of that list is matched to the destination's by the field and",
+    "            replaced in its slot, instead of being added beside an edited copy.",
+    "            Needs version 5 (#2455).",
     "",
-    "version 4 (#1843 B1): platforms. Version 3 (AI-042): paths changes what an",
+    "Version 6 (CLI-118): paths on a TOML source. Version 5 (#2455): listKeys.",
+    "Version 4 (#1843 B1): platforms. Version 3 (AI-042): paths changes what an",
     "entry's CONTENT means. Version 2",
     "(AI-039): strategy and requires change what an entry MEANS, so a",
     "dotf that predates them refuses this file instead of deploying every entry",
@@ -95,7 +101,7 @@
     "0.68.0 refuses a TOML merge with 'source is not a JSON object' instead of",
     "replacing the file."
   ],
-  "version": 4,
+  "version": 6,
   "configs": [
     {
       "name": "opencode-tui",
@@ -338,6 +344,8 @@
       "render": false,
       "mode": "0644",
       "strategy": "merge",
+      "paths": "native",
+      "listKeys": {"keys.command": "key"},
       "requires": "herdr"
     },
     {

@@ -56,12 +56,13 @@ setup() {
     [ "$status" -eq 0 ] || { echo "copilot trustedFolders lacks $want"; false; }
 }
 
-@test "WORKTREE_ROOT and herdr's worktrees.directory name the same root (#2503)" {
+@test "herdr's worktrees.directory is rendered from WORKTREE_ROOT (#2503)" {
     # dotf worktree add places checkouts under WORKTREE_ROOT; herdr under its
-    # [worktrees] directory. Until deploy renders one from the other, they are
-    # kept equal here, or the two tools create worktrees in different trees.
-    run jq -r '.env_vars[] | select(.name == "WORKTREE_ROOT") | .default.linux' "$REPO/env-contract.json"
-    root="${output/#\$HOME/\~}"
-    run grep -E "^directory[[:space:]]*=[[:space:]]*\"$root\"\$" "$SRC"
-    [ "$status" -eq 0 ] || { echo "herdr directory is not \"$root\""; false; }
+    # [worktrees] directory. Deploy renders the token, so the two tools cannot
+    # create worktrees in different trees; without paths the token would reach
+    # herdr verbatim.
+    run grep -E '^directory[[:space:]]*=[[:space:]]*"\{WORKTREE_ROOT\}"$' "$SRC"
+    [ "$status" -eq 0 ] || { echo "herdr directory is not \"{WORKTREE_ROOT}\""; false; }
+    run jq -r '.configs[] | select(.name == "herdr") | .paths' "$REPO/ai/deploy.json"
+    [ "$output" = "native" ] || { echo "herdr entry renders no paths: $output"; false; }
 }
