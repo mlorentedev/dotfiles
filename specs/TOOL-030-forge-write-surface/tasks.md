@@ -40,6 +40,7 @@ created: "2026-10-16"
 - [x] [AC2] Test that no `merge` or `close` verb is registered, walking the whole tree
 - [x] `--board` for GitHub Project fields (PR 2c), on `issue create` only. GitHub only, and not part of `Backend`: an optional `BoardWriter` the GitHub backend satisfies, so a Gitea origin gets a stated refusal. The project is declared per host under `boards` in `forge/hosts.json`, never guessed. Field and option ids are resolved from the live board at run time, as the `new-ticket` skill does, never pasted
 - [x] A `--board` run that cannot proceed (Gitea origin, undeclared board, unknown option, missing `--type`) exits with ERROR/WHY/FIX and writes nothing, not even the issue; resolution happens before the create. A failed card placement names the created issue and says not to create it again
+- [x] f1 and f2 in `features.json` named tests that never existed (they were written before the code); both now run the real `cmd` tests and exit 0, as do f3 and f4. A verification that names a missing test passes `-run` vacuously, so each entry must be re-run, not just read
 - [ ] Every verb PR records that its verbs are unmeasured against the classifier; the released-binary measurement stays before PR 4
 
 **PR 3: the guard**
