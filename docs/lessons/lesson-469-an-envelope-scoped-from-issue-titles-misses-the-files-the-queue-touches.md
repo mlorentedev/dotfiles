@@ -1,5 +1,5 @@
 ---
-id: "lesson-465-an-envelope-scoped-from-issue-titles-misses-the-files-the-queue-touches"
+id: "lesson-469-an-envelope-scoped-from-issue-titles-misses-the-files-the-queue-touches"
 type: lesson
 status: active
 title: "An envelope scoped from issue titles misses the files the queue touches"

@@ -1,5 +1,5 @@
 ---
-id: "lesson-466-a-second-reader-of-a-generated-file-breaks-on-the-first-new-value-shape"
+id: "lesson-470-a-second-reader-of-a-generated-file-breaks-on-the-first-new-value-shape"
 type: lesson
 status: active
 title: "A second reader of a generated file breaks on the first new value shape"
