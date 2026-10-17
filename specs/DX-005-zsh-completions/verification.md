@@ -7,7 +7,7 @@ created: "2026-10-16"
 
 ## Evidence
 
-PR 1 (`.zshrc` + `shell-completions`). Autosuggestions is PR 2, not covered here.
+PR 1 (`.zshrc` + `shell-completions`) is AC1-AC5. PR 2 (zsh-autosuggestions, #2654) is AC6, below.
 
 - [x] AC1 (dump rule) -> `tests/zshrc-guards.bats`: "a fresh dump is trusted…", "a dump older than a day is rebuilt…", "a completion newer than a fresh dump rebuilds it…". Mutation check: forcing `compinit -C` fails the last two; starting `_zcfull` empty fails the aged-dump test.
 - [x] AC2 (fpath) -> "~/.zsh/completions leads fpath and fpath holds no duplicate", "the Homebrew block runs before compinit…".
@@ -18,6 +18,16 @@ PR 1 (`.zshrc` + `shell-completions`). Autosuggestions is PR 2, not covered here
 PATH order: `print -l $path` under a clean `PATH=/usr/bin:/bin:/usr/sbin:/sbin` and an empty `HOMEBREW_PREFIX`, main `.zshrc` versus this branch: identical (73 entries, `/opt/homebrew/bin` at 47 in both), so moving the brew block did not reorder PATH.
 
 End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[herdr]=1`, and `~/.zsh/completions` first on `fpath`.
+
+### PR 2 (AC6)
+
+- [x] AC6 -> `go test ./internal/tools` (parse rejects a version with no digest and `latest`; render pins URL and sha256; install, second sync `changed=0`; a deleted file is repaired with `mise install --force`; an older version on disk is missing; the pinned plugin is not an orphan and an unpinned one is; `BinaryPins`); `bats tests/zshrc-guards.bats -f plugin` (4 tests); `bats tests/versions-conf.bats` (premature mark fails: mutation check).
+- Measured with mise 2026.10.3 in a scratch `MISE_DATA_DIR`/`MISE_CONFIG_DIR`: `mise ls --json` lists the plugin as `http:zsh-autosuggestions` (the short name is not in the registry, so the orphan check maps it back); a wrong `checksum` is rejected by mise; `mise install` treats an install directory without the file as installed, so only `--force` repairs it; `mise where http:zsh-autosuggestions` answers the install dir.
+- Live, built `dotf tools sync` against a `versions.conf` marking the plugin: first run `installed: zsh-autosuggestions`, second `nothing to do`; after deleting the file the next run repaired it and the one after reported nothing to do.
+- Latency (medians of 20 `zsh -ic exit`, two rounds): main 44.6 / 44.5 ms; branch without the plugin 43.6 / 44.0 ms; branch with the plugin sourced 45.0 / 44.5 ms.
+- The rc builds the plugin path with the precedence `MiseShimsDir` uses (`MISE_DATA_DIR`, then `XDG_DATA_HOME/mise`, then `~/.local/share/mise`); on this Mac `mise where age` is under `~/.local/share/mise/installs`, so the two agree. `tests/zshrc-guards.bats` 17/17 also in `ubuntu:24.04` as a non-root user.
+- Live prune (mise 2026.10.3, scratch dirs): with the plugin no longer in the config, `mise ls --prunable --json` lists `http:zsh-autosuggestions` and `mise prune --yes --tools http:zsh-autosuggestions` removed `installs/http-zsh-autosuggestions` and its cache; this is the spec `orphanTools` builds. The sync verifies `<root>/latest/<file>` too, the path `.zshrc` sources: with `latest` deleted the next sync repaired it, the one after reported nothing to do.
+- Not measured: the prune through the converge itself (`dotf tools sync` does not set `Prune`), a Linux host (the table and the rc use no macOS-only call), Windows (compiled and vetted with `GOOS=windows`, the skip is by `runtime.GOOS`), the suggestions appearing in a live terminal.
 
 ## Test status
 

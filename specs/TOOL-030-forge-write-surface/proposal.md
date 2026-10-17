@@ -31,6 +31,19 @@ A `dotf forge` write surface for agents, forge-neutral:
 - A per-harness guard: one bats `@test` per harness config (claude, agy, opencode, copilot, pi) asserting `dotf` is not denied in that harness's dialect, so the dialects cannot drift apart silently.
 - The `new-ticket`, `pr-review-triage` and `autopilot` skills call `dotf forge` instead of carrying `gh` recipes.
 
+### Verb semantics (decided while building PR 2)
+
+- `issue create` takes `--title`, `--body-file` and repeated `--label <name>`. The caller computes any `AREA-NNN` id; `dotf forge` does not scan for the next number, because that scan (REST pagination, spec-folder cross-check, the concurrency re-scan) is the `new-ticket` skill's logic and belongs in its own change.
+- Labels are names on the command line. GitHub accepts names; Gitea wants IDs, so the Gitea backend lists the repository's labels and maps them, and an unknown name fails with ERROR/WHY/FIX instead of opening an unlabelled issue. Organisation-level Gitea labels are not looked up.
+- `issue edit` replaces the title and/or the body and sends only the fields named. It has no state flag, so it cannot close.
+- `pr comment` is `issue comment` under another name: a pull request is an issue on both forges, so it adds no backend method.
+- A 2xx whose body cannot be read is success with an empty URL, never an error: the write exists, and an error invites a retry that writes it twice.
+- `pr create` takes `--title`, `--body-file`, a required `--base` and `--head` defaulting to the checked-out branch. The base is never defaulted: which branch a pull request targets is a decision, and a wrong guess opens a pull request against the wrong line. Heads are branches of the same repository; cross-fork heads are out of scope.
+- `--draft` is a GitHub field. Gitea marks a draft with a title prefix the instance configures, so `pr create --draft` on Gitea fails with ERROR/WHY/FIX before any request instead of guessing the prefix.
+- `pr edit` is `issue edit` under the pr name, as `pr comment` is `issue comment`: a pull request is an issue on both forges, so title and body change through the issue endpoint.
+- `issue create --board` places the new issue on the project declared for the host in `forge/hosts.json` and sets Status (default Backlog), Priority (default P2), Type (required: the kind of work is a decision) and the optional ID text field. The board is resolved first, so a refusal writes nothing; if the card cannot be placed after the issue exists, the error names the issue and says not to create it again, because a retry would duplicate it. It is a separate optional interface rather than part of `Backend`, so a Gitea origin fails with a stated message instead of ignoring the flag. It has not been run against the live board: the field shapes were read live, the writes are covered by a fake `gh`.
+- `--title` is the one argument that still carries prose on the command line, so it can still reach a deny glob. Bodies, where the long prose lives, cannot.
+
 ## Out of scope
 
 - Merge, close, branch protection (`dotf forge protection` and `dotf pr land` keep those).

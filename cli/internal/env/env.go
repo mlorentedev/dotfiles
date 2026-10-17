@@ -17,10 +17,12 @@ package env
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"sync"
 )
 
 // contract is the minimal view of env-contract.json this package needs: the
@@ -247,8 +249,27 @@ func DotfilesCheckout() string {
 			return filepath.Dir(git)
 		}
 	}
-	root, _ := checkoutFromEnv()
+	root, err := checkoutFromEnv()
+	if err != nil {
+		warnRejectedOnce(err)
+	}
 	return root
+}
+
+// rejectedOut is where a rejected DOTFILES_REPO_DIR is reported; a test swaps it.
+var rejectedOut io.Writer = os.Stderr
+
+var rejectedWarned sync.Map
+
+// warnRejectedOnce tells the operator, once per process and per message, that
+// DOTFILES_REPO_DIR was ignored. A read still falls back to the deployed copy
+// (ADR-030), but silently: DOTFILES_REPO_DIR=/typo dotf secrets show X read the
+// deployed copy with no hint, while the writers already named the variable (#2631).
+func warnRejectedOnce(err error) {
+	if _, seen := rejectedWarned.LoadOrStore(err.Error(), true); seen {
+		return
+	}
+	_, _ = fmt.Fprintf(rejectedOut, "dotf: ignoring %v; reading the deployed copy instead\n", err)
 }
 
 // checkoutFromEnv is DOTFILES_REPO_DIR when it names a dotfiles checkout. Unset

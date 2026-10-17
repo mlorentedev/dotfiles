@@ -26,5 +26,12 @@
     "verification": "see verification.md (medians of 20 runs, before and after)",
     "state": "passing",
     "evidence": "medians of 20 runs: main 44.4/45.5 ms, branch 44.2/44.7 ms; see verification.md, 2026-10-16"
+  },
+  {
+    "id": "DX-005-zsh-completions-f5",
+    "behavior": "AC6: a file tool installs through mise's http backend at a pinned digest, is verified by its file, repaired, never pruned while pinned, skipped on Windows; .zshrc sources it after compinit only when present",
+    "verification": "cd cli && go test ./internal/tools -run 'FileTool|SyncInstallsAFile|Repairs|DoesNotPrune|Binary' && bats tests/zshrc-guards.bats -f plugin",
+    "state": "passing",
+    "evidence": "go test ./internal/tools ./internal/doctor ./internal/converge ./internal/cmd ok; bats zshrc-guards 17/17; live sync in a scratch MISE_DATA_DIR: installed, then 'nothing to do', repaired a deleted file; 2026-10-16"
   }
 ]

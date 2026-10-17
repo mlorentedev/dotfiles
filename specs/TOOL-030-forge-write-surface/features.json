@@ -2,14 +2,14 @@
   {
     "id": "TOOL-030-forge-write-surface-f1",
     "behavior": "a body is read only from --body-file or stdin and issue create opens an issue with no body text on the command line",
-    "verification": "cd cli && o=$(mktemp) && go test ./internal/forgewrite/ -run '^(TestIssueCreateReadsBodyFromFile|TestBodyIsNeverAnArgument)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestIssueCreateReadsBodyFromFile ' \"$o\" && grep -q -- '^--- PASS: TestBodyIsNeverAnArgument ' \"$o\"",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/cmd/ -run '^(TestForgeIssueCreateSendsTitleBodyAndLabels|TestForgeIssueCreateNeedsATitleAndABody|TestBodyIsNeverAnArgument|TestForgeIssueCommentReadsBodyFromFile)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestForgeIssueCreateSendsTitleBodyAndLabels ' \"$o\" && grep -q -- '^--- PASS: TestForgeIssueCreateNeedsATitleAndABody ' \"$o\" && grep -q -- '^--- PASS: TestBodyIsNeverAnArgument ' \"$o\" && grep -q -- '^--- PASS: TestForgeIssueCommentReadsBodyFromFile ' \"$o\"",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "TOOL-030-forge-write-surface-f2",
     "behavior": "issue comment, issue edit, pr create, pr comment and pr edit work through the forge interface, and no merge or close verb exists",
-    "verification": "cd cli && o=$(mktemp) && go test ./internal/forgewrite/ -run '^(TestVerbsCoverIssueAndPR|TestNoMergeOrCloseVerb)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestVerbsCoverIssueAndPR ' \"$o\" && grep -q -- '^--- PASS: TestNoMergeOrCloseVerb ' \"$o\"",
+    "verification": "cd cli && o=$(mktemp) && go test ./internal/cmd/ -run '^(TestForgeIssueEditChangesOnlyWhatIsNamed|TestForgePRCommentUsesTheCommentEndpoint|TestForgePRCreateSendsHeadBaseAndBody|TestForgePREditIsTheIssueEdit|TestForgeHasNoMergeOrCloseCommand)$' -count=1 -v > \"$o\" 2>&1 && grep -q -- '^--- PASS: TestForgeIssueEditChangesOnlyWhatIsNamed ' \"$o\" && grep -q -- '^--- PASS: TestForgePRCommentUsesTheCommentEndpoint ' \"$o\" && grep -q -- '^--- PASS: TestForgePRCreateSendsHeadBaseAndBody ' \"$o\" && grep -q -- '^--- PASS: TestForgePREditIsTheIssueEdit ' \"$o\" && grep -q -- '^--- PASS: TestForgeHasNoMergeOrCloseCommand ' \"$o\"",
     "state": "pending",
     "evidence": ""
   },
@@ -31,8 +31,8 @@
     "id": "TOOL-030-forge-write-surface-f5",
     "behavior": "a bats guard has one test per harness config and fails when dotf is denied in that harness's dialect",
     "verification": "bats tests/harness-permits-dotf.bats",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "bats tests/harness-permits-dotf.bats: 10/10 under bash 5 and zsh, 2026-10-17, with the opencode \"*\" default counted as a bash deny"
   },
   {
     "id": "TOOL-030-forge-write-surface-f6",

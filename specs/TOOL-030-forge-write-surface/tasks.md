@@ -32,12 +32,16 @@ created: "2026-10-16"
 - [x] [AC4] Add the Gitea REST backend. The token is read through the internal `cli/internal/secrets` resolver, never by running `dotf secrets show`. Test with a fake token that a 4xx, a 5xx and a malformed response leave it out of stdout, stderr and every `error.Error()`
 - [x] [AC1] Register `dotf forge issue comment` next to `protection` in `cli/internal/cmd/forge.go`. One verb only; `issue create` moves to PR 2 because it drags labels and the NNN convention
 - [x] Write the ADR for the contract (ADR-052) (one write surface, bodies from files, no merge or close, Gitea through dotf rather than `tea`)
-- [ ] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635
+- [x] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635. Recorded as `classifier-result: allowed dotf forge issue comment` with its caveats (dev binary, one verb); repeated with the released binary before PR 4
 
-**PR 2: the remaining verbs**
-- [ ] [P] [AC1] [AC2] `issue create` (labels and ID convention), `issue edit`, `pr create`, `pr comment`, `pr edit`, each with a failing test first
-- [ ] [AC2] Test that no `merge` or `close` verb is registered
-- [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
+**PR 2: the remaining verbs** (split three ways at build time, each under the size guideline: 2a landed as #2655, 2b is `pr create` and `pr edit`, 2c is `--board`)
+- [x] [P] [AC1] [AC2] `issue create`, `issue edit` and `pr comment`, each with a test. `--label` takes names (Gitea maps them to IDs and refuses an unknown one); the caller computes any AREA-NNN title, `dotf forge` does not scan for the next number. `pr comment` is the `issue comment` endpoint on both forges, so it adds no backend method
+- [x] [P] [AC1] [AC2] `pr create` and `pr edit`, each with a test. `pr edit` is `issue edit` under the pr name (same endpoint on both forges); `pr create` takes `--base` as required and `--head` defaulting to the current branch
+- [x] [AC2] Test that no `merge` or `close` verb is registered, walking the whole tree
+- [x] `--board` for GitHub Project fields (PR 2c), on `issue create` only. GitHub only, and not part of `Backend`: an optional `BoardWriter` the GitHub backend satisfies, so a Gitea origin gets a stated refusal. The project is declared per host under `boards` in `forge/hosts.json`, never guessed. Field and option ids are resolved from the live board at run time, as the `new-ticket` skill does, never pasted
+- [x] A `--board` run that cannot proceed (Gitea origin, undeclared board, unknown option, missing `--type`) exits with ERROR/WHY/FIX and writes nothing, not even the issue; resolution happens before the create. A failed card placement names the created issue and says not to create it again
+- [x] f1 and f2 in `features.json` named tests that never existed (they were written before the code); both now run the real `cmd` tests and exit 0, as do f3 and f4. A verification that names a missing test passes `-run` vacuously, so each entry must be re-run, not just read
+- [ ] Every verb PR records that its verbs are unmeasured against the classifier; the released-binary measurement stays before PR 4
 
 **PR 3: the guard**
 - [x] [AC5] Extend ADR-048's session-level allow lists (`harness/capability-map.json` and its leaves) with `dotf forge` and let that guard assert it, one case per harness, instead of a second file; if ADR-048's renderer is not there yet, a `tests/harness-permits-dotf.bats` stands in and is folded into it later. Passes under bash 3.2 and zsh Delivered as the stand-in: `harness/capability-map.json` has no session-level section yet (ADR-048 decision 3 is unbuilt), so `tests/harness-permits-dotf.bats` ships now (#2651) and is folded into the map guard when that lands.

@@ -42,7 +42,9 @@ RC_TOOLS="mv"
 # loaded, since the rc runs brew by absolute path and a PATH cannot hide it;
 # LOAD_RC_BREW="" unsets it for the brew test.
 load_rc() {
-    env -i HOME="$SANDBOX/home" ZDOTDIR="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" \
+    # LOAD_RC_ENV: extra NAME=value words for the scrubbed environment (no spaces).
+    # shellcheck disable=SC2086
+    env -i HOME="$SANDBOX/home" ZDOTDIR="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" $LOAD_RC_ENV \
         PATH="$SANDBOX/bin:$SANDBOX/sysbin" TERM=dumb \
         HOMEBREW_PREFIX="${LOAD_RC_BREW-$SANDBOX/brew-loaded}" \
         "$ZSH_BIN" -f -c '. "$1"; eval "$2"' _ "$REPO/.zshrc" "$1" 2>"$SANDBOX/stderr" || return
@@ -202,4 +204,45 @@ add_foo_completion() {
     run load_rc 'zstyle -L ":completion:*" menu'
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"menu select"* ]] || false
+}
+
+# DX-007: the plugin mise installs is sourced from mise's data dir, after
+# compinit, and its absence costs nothing and prints nothing.
+plugin_stub() {
+    stub_dir="$1/installs/http-zsh-autosuggestions/latest"
+    mkdir -p "$stub_dir"
+    printf 'ZAS_LOADED=1\nZAS_AFTER_COMPINIT=${+_comps}\n' > "$stub_dir/zsh-autosuggestions.zsh"
+}
+
+@test "zsh-autosuggestions is sourced from mise's default data dir, after compinit (plugin)" {
+    plugin_stub "$SANDBOX/home/.local/share/mise"
+    run load_rc 'print -r -- "loaded=${ZAS_LOADED-no} after=${ZAS_AFTER_COMPINIT-no}"'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [ "$output" = "loaded=1 after=1" ] || { echo "$output"; false; }
+}
+
+@test "MISE_DATA_DIR and XDG_DATA_HOME move where the plugin is looked for (plugin)" {
+    plugin_stub "$SANDBOX/elsewhere/mise"
+    LOAD_RC_ENV="MISE_DATA_DIR=$SANDBOX/elsewhere/mise" run load_rc 'print -r -- "loaded=${ZAS_LOADED-no}"'
+    [ "$output" = "loaded=1" ] || { echo "MISE_DATA_DIR: $output"; false; }
+    plugin_stub "$SANDBOX/xdg/mise"
+    LOAD_RC_ENV="XDG_DATA_HOME=$SANDBOX/xdg" run load_rc 'print -r -- "loaded=${ZAS_LOADED-no}"'
+    [ "$output" = "loaded=1" ] || { echo "XDG_DATA_HOME: $output"; false; }
+}
+
+@test "an rc without the plugin loads clean and sources nothing (plugin)" {
+    run load_rc 'print -r -- "loaded=${ZAS_LOADED-no}"'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [ "$output" = "loaded=no" ] || false
+}
+
+@test "a plugin another loader already defined is not sourced twice (plugin)" {
+    plugin_stub "$SANDBOX/home/.local/share/mise"
+    # The probe runs after the rc, so define the function in a wrapper rc.
+    printf '_zsh_autosuggest_start() { :; }\n. "%s/.zshrc"\n' "$REPO" > "$SANDBOX/wrap.zsh"
+    env -i HOME="$SANDBOX/home" ZDOTDIR="$SANDBOX/home" DOTFILES_DIR="$SANDBOX/dotfiles" \
+        PATH="$SANDBOX/bin:$SANDBOX/sysbin" TERM=dumb HOMEBREW_PREFIX="$SANDBOX/brew-loaded" \
+        "$ZSH_BIN" -f -c '. "$1"; print -r -- "loaded=${ZAS_LOADED-no}"' _ "$SANDBOX/wrap.zsh" > "$SANDBOX/out" 2>"$SANDBOX/err"
+    [ ! -s "$SANDBOX/err" ] || { cat "$SANDBOX/err"; false; }
+    [ "$(cat "$SANDBOX/out")" = "loaded=no" ] || { cat "$SANDBOX/out"; false; }
 }

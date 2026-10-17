@@ -218,7 +218,8 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 // a link this fix made.
 func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *Report, fix bool) {
 	args := []string{"bin-paths", "--bin-names"}
-	for _, p := range pins {
+	// Not the file tools: mise has no executables to list for a zsh plugin.
+	for _, p := range tools.BinaryPins(pins) {
 		args = append(args, p.Name+"@"+p.Version)
 	}
 	out, err := sys.CommandStdoutDir(home, "mise", args...)
