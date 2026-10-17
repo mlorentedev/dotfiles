@@ -81,6 +81,27 @@ func TestWorktreeAddRefusesBeforeCreatingWhenHerdrIsDown(t *testing.T) {
 	}
 }
 
+// A prompt file that trims to nothing used to start the agent and send no
+// prompt, reporting only "Started": the agent then idled with no task (#2638).
+func TestWorktreeAddRefusesAnEmptyPromptFileBeforeCreating(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	prompt := filepath.Join(t.TempDir(), "prompt.md")
+	if err := os.WriteFile(prompt, []byte(" \n\t\r\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	calls := fakeHerdrRunner(t, herdrAnswers(true), map[string]bool{"agent get": true})
+	_, err := executeWorktree(t, "add", "demo", "--repo", repo, "--agent", "claude", "--prompt-file", prompt)
+	if err == nil || !strings.Contains(err.Error(), "is empty") {
+		t.Fatalf("want a refusal naming the empty prompt file, got %v", err)
+	}
+	if _, err := os.Stat(rootWorktree("demo")); !os.IsNotExist(err) {
+		t.Errorf("the worktree was created before the refusal (stat err %v)", err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("herdr was called before the refusal: %q", *calls)
+	}
+}
+
 func TestWorktreeAddRefusesAPromptWithoutAnAgent(t *testing.T) {
 	repo := worktreeTestRepo(t)
 	if _, err := executeWorktree(t, "add", "demo", "--repo", repo, "--prompt-file", "x"); err == nil || !strings.Contains(err.Error(), "--agent") {
