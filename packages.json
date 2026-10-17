@@ -240,6 +240,15 @@
       }
     },
     {
+      "name": "lima",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "lima",
+        "command": "limactl"
+      }
+    },
+    {
       "name": "docker",
       "profile": "full",
       "source": {
