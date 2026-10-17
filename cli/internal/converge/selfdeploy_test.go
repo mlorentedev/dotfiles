@@ -29,9 +29,13 @@ func (f *fakeBackend) Remove(schedule.Job) error {
 	return nil
 }
 
+// selfDeployEnv is a scratch machine: XDG_CONFIG_HOME wins over the home in
+// MachinePath, so without the override every test shares the runner's
+// machine.json, and the opted-in tests declare the role for the others.
 func selfDeployEnv(t *testing.T, optIn bool) Env {
 	t.Helper()
 	home := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	if optIn {
 		if _, err := env.SetMachineRole(env.MachinePath(home), env.RoleSelfDeploy, true); err != nil {
 			t.Fatal(err)
@@ -147,8 +151,9 @@ func TestNativeScheduler_PicksTheBackendOfTheRunsOS(t *testing.T) {
 		t.Errorf("darwin: %#v, %v", b, err)
 	}
 	for _, goos := range []string{"linux", "windows"} {
-		r := selfDeploy{scheduler: s}
-		if res, err := r.Reconcile(Env{Home: t.TempDir(), GOOS: goos}, true); err != nil || res.Skip == "" {
+		r, e := selfDeploy{scheduler: s}, selfDeployEnv(t, true)
+		e.GOOS = goos
+		if res, err := r.Reconcile(e, true); err != nil || res.Skip == "" {
 			t.Errorf("%s: %+v, %v; want a skip", goos, res, err)
 		}
 	}
