@@ -118,58 +118,68 @@ func handoffIssue(o Options, b Backend, issue Issue) (out Outcome, lost string, 
 		out, err = noBackend(o, out, p)
 		return out, "", err
 	}
-	wt, found, err := b.Find(o.Parent, out.Branch)
+	wt, found, err := findLane(o, b, issue, out.Branch)
 	if err != nil {
 		return out, "", err
-	}
-	if found {
-		if err := sameIssue(wt, issue, out.Branch); err != nil {
-			return out, "", err
-		}
 	}
 	if found && wt.Open {
 		out, err = shown(o, b, wt, out, p)
 		return out, "", err
 	}
-	// A worktree that exists was claimed when it was started, and a second run
-	// must not read that claim as a loss. A new one is claimed first, so the
-	// loser of a race starts nothing.
-	if !found {
-		if lost, err := claim(o, issue); err != nil || lost != "" {
-			return out, lost, err
-		}
+	if lost, err := claim(o, issue, found); err != nil || lost != "" {
+		return out, lost, err
 	}
 	if o.DryRun {
 		out.Commands = []string{"(write the prompt to " + PromptFile + " in the new worktree)", "(" + describe(found) + " " + out.Branch + ")", p.exec(PromptFile)}
 		out.Note = p.note
 		return out, "", nil
 	}
-	st, err := start(o, b, wt, found, out.Branch, out.Issue)
-	if err != nil {
-		// The claim was taken for a lane that has no worktree: give it back, or
-		// every later run skips an issue nobody is working on.
-		if !found && o.Claims != nil && !o.DryRun {
-			if rerr := o.Claims.Release(issue.Number, false); rerr != nil {
-				err = errors.Join(err, fmt.Errorf("lane: the claim on #%d could not be released (run `dotf lane release %d`): %w", issue.Number, issue.Number, rerr))
-			}
-		}
-		return out, "", err
-	}
-	// Past this point the worktree exists and the next run finds it, which
-	// skips the claim: keep it, or a live worktree would run with nobody
-	// holding the issue and a second checkout could win it.
-	if err := typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p); err != nil {
+	if err := startLane(o, b, wt, found, out, p); err != nil {
 		return out, "", err
 	}
 	out.Started, out.Note = true, p.note
 	return out, "", nil
 }
 
+// findLane asks the backend for the branch's worktree and refuses one the lane
+// started for another issue.
+func findLane(o Options, b Backend, issue Issue, branch string) (Worktree, bool, error) {
+	wt, found, err := b.Find(o.Parent, branch)
+	if err != nil || !found {
+		return wt, found, err
+	}
+	return wt, true, sameIssue(wt, issue, branch)
+}
+
+// startLane starts the branch's worktree and types the successor into it. A
+// new lane's claim is given back when no worktree came of it, and kept once one
+// exists.
+func startLane(o Options, b Backend, wt Worktree, found bool, out Outcome, p plan) error {
+	st, err := start(o, b, wt, found, out.Branch, out.Issue)
+	if err != nil {
+		// The claim was taken for a lane that has no worktree: give it back, or
+		// every later run skips an issue nobody is working on.
+		if !found && o.Claims != nil {
+			if rerr := o.Claims.Release(out.Issue.Number, false); rerr != nil {
+				err = errors.Join(err, fmt.Errorf("lane: the claim on #%d could not be released (run `dotf lane release %d`): %w", out.Issue.Number, out.Issue.Number, rerr))
+			}
+		}
+		return err
+	}
+	// Past this point the worktree exists and the next run finds it, which
+	// skips the claim: keep it, or a live worktree would run with nobody
+	// holding the issue and a second checkout could win it.
+	return typeSuccessor(o, b, st.Worktree.Path, st.Pane, out, p)
+}
+
 // claim takes the claim on issue, or says who holds it. A dry run only looks.
 // An error means the claim could not be read or taken, and nothing may start:
 // a claim in an unknown state is the race the claim exists to prevent.
-func claim(o Options, issue Issue) (lost string, err error) {
-	if o.Claims == nil {
+func claim(o Options, issue Issue, found bool) (lost string, err error) {
+	// A worktree that exists was claimed when it was started, and a second run
+	// must not read that claim as a loss. A new one is claimed first, so the
+	// loser of a race starts nothing.
+	if o.Claims == nil || found {
 		return "", nil
 	}
 	if o.DryRun {

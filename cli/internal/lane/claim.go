@@ -169,15 +169,11 @@ func (c Claimer) remoteSha(issue int) (string, error) {
 	return "", nil
 }
 
-// List reads every claim on the remote, ordered by issue number. A ref under
-// the claims namespace that is not a number is ignored: nothing here wrote it.
-func (c Claimer) List() ([]Claim, error) {
-	out, err := c.git("ls-remote", c.Remote, claimRefPrefix+"*")
-	if err != nil {
-		return nil, fmt.Errorf("ls-remote %s*: %w", claimRefPrefix, err)
-	}
+// claimIssues is the issue numbers of the claim refs in an ls-remote answer. A
+// ref under the namespace that is not a number is ignored: nothing here wrote it.
+func claimIssues(lsRemote string) []int {
 	var issues []int
-	for _, line := range strings.Split(out, "\n") {
+	for _, line := range strings.Split(lsRemote, "\n") {
 		_, name, ok := strings.Cut(strings.TrimSpace(line), "\t")
 		if !ok || !strings.HasPrefix(name, claimRefPrefix) {
 			continue
@@ -186,6 +182,16 @@ func (c Claimer) List() ([]Claim, error) {
 			issues = append(issues, n)
 		}
 	}
+	return issues
+}
+
+// List reads every claim on the remote, ordered by issue number.
+func (c Claimer) List() ([]Claim, error) {
+	out, err := c.git("ls-remote", c.Remote, claimRefPrefix+"*")
+	if err != nil {
+		return nil, fmt.Errorf("ls-remote %s*: %w", claimRefPrefix, err)
+	}
+	issues := claimIssues(out)
 	slices.Sort(issues)
 	if len(issues) == 0 {
 		return nil, nil
