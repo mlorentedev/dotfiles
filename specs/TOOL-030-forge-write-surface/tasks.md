@@ -32,11 +32,12 @@ created: "2026-10-16"
 - [x] [AC4] Add the Gitea REST backend. The token is read through the internal `cli/internal/secrets` resolver, never by running `dotf secrets show`. Test with a fake token that a 4xx, a 5xx and a malformed response leave it out of stdout, stderr and every `error.Error()`
 - [x] [AC1] Register `dotf forge issue comment` next to `protection` in `cli/internal/cmd/forge.go`. One verb only; `issue create` moves to PR 2 because it drags labels and the NNN convention
 - [x] Write the ADR for the contract (ADR-052) (one write surface, bodies from files, no merge or close, Gitea through dotf rather than `tea`)
-- [ ] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635
+- [x] [AC6] Measure the classifier (protocol in the proposal) and record it on #2635. Recorded as `classifier-result: allowed dotf forge issue comment` with its caveats (dev binary, one verb); repeated with the released binary before PR 4
 
 **PR 2: the remaining verbs**
-- [ ] [P] [AC1] [AC2] `issue create` (labels and ID convention), `issue edit`, `pr create`, `pr comment`, `pr edit`, each with a failing test first
-- [ ] [AC2] Test that no `merge` or `close` verb is registered
+- [x] [P] [AC1] [AC2] `issue create`, `issue edit` and `pr comment`, each with a test. `--label` takes names (Gitea maps them to IDs and refuses an unknown one); the caller computes any AREA-NNN title, `dotf forge` does not scan for the next number. `pr comment` is the `issue comment` endpoint on both forges, so it adds no backend method
+- [ ] [P] [AC1] [AC2] `pr create` and `pr edit`, each with a test first (next PR)
+- [x] [AC2] Test that no `merge` or `close` verb is registered, walking the whole tree
 - [ ] `--board` for GitHub Project fields, degrading with a stated message on Gitea
 
 **PR 3: the guard**
