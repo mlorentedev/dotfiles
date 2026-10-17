@@ -74,3 +74,12 @@ func TestSpecDeadlineReportsAProvisionalReviewKeptAtTheCap(t *testing.T) {
 		t.Errorf("stderr does not say the provisional review was kept:\n%s", stderr)
 	}
 }
+
+// A negative stall timeout is a typo, not "off": the wrapper refuses it, as
+// `spec review` does, so a mistyped value cannot silently drop the protection.
+func TestSpecDeadlineRefusesANegativeStallTimeout(t *testing.T) {
+	_, _, err := execute(t, "spec", "deadline", "10s", "--stall-timeout", "-5m", "--", "sh", "-c", "exit 0")
+	if err == nil || !strings.Contains(err.Error(), "stall-timeout") {
+		t.Errorf("want a refusal naming --stall-timeout, got %v", err)
+	}
+}

@@ -447,6 +447,9 @@ says whether review.md holds a provisional record or was not rewritten.`,
 			if err != nil || limit <= 0 {
 				return fmt.Errorf("deadline %q: want a positive duration such as 45m", args[0])
 			}
+			if stall < 0 {
+				return fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", stall)
+			}
 			res, err := spec.RunWithLimits(spec.Limits{Deadline: limit, StallTimeout: stall, Transcript: transcript},
 				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
 			if err != nil {
