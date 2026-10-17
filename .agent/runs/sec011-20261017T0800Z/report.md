@@ -15,7 +15,7 @@
   - Reviewed twice by pr-agent. The triage is on the PR.
   - The row stays `[ ]` until you run the attended apply on the macmini. Then run it a second time and check it reports `changed=0`.
   - It reaches the installed `dotf` only once the release that includes it is cut (release-please PR #2680 is yours).
-- #2692, `31df521`: the "mesh does not come back after an unattended reboot" note, in the plan and as a WARN in doctor. This merge closed #2374.
+- #2692, `89ca70ce` (squash of `31df521`): the "mesh does not come back after an unattended reboot" note, in the plan and as a WARN in doctor. This merge closed #2374.
   - #2374 was closed by a read-only measurement on msi: Ubuntu's override sets `sleep-inactive-ac-timeout = 0`, the type is `'nothing'`, and there have been 0 suspends on AC since 2026-10-13.
   - The runbook names the step change that a GNOME without that override would need.
 
