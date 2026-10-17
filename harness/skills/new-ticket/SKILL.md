@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/new-ticket/SKILL.md
-generated_sha: 728260a0f6872943
+generated_sha: 3706e0fa56945e76
 id: new-ticket-skill
 type: skill
 status: active
@@ -94,8 +94,11 @@ done
 # checkout) and takes the body from a file, never an argument: prose in a command line is
 # what the permission deny globs trip on. It prints the issue URL.
 BODY_FILE=$(mktemp); printf '%s\n' "$BODY" > "$BODY_FILE"
-LABEL_FLAGS=""; for L in $(printf '%s' "$LABELS" | tr ',' ' '); do LABEL_FLAGS="$LABEL_FLAGS --label $L"; done
-URL=$(cd "<home-repo checkout>" && dotf forge issue create --title "$AREA-$NNN: $TITLE" --body-file "$BODY_FILE" $LABEL_FLAGS)
+# An array, not a string: zsh does not word-split an unquoted $var, so a string of flags
+# would reach dotf as ONE argument. The ${a[@]+"${a[@]}"} form survives bash 3.2 under set -u.
+LABEL_FLAGS=()
+for L in $(printf '%s' "$LABELS" | tr ',' ' '); do LABEL_FLAGS+=(--label "$L"); done
+URL=$(cd "<home-repo checkout>" && dotf forge issue create --title "$AREA-$NNN: $TITLE" --body-file "$BODY_FILE" ${LABEL_FLAGS[@]+"${LABEL_FLAGS[@]}"})
 
 # 2. Put it on the board (idempotent — returns the existing item if already added)
 ITEM=$(gh project item-add "$PROJECT_NUM" --owner "$OWNER" --url "$URL" --format json \

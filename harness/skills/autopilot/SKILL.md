@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 4cdbc1e35c42d31e
+generated_sha: 60d40c58088bd959
 id: autopilot-skill
 type: skill
 status: active
@@ -129,7 +129,7 @@ A ticket is pilot-eligible only if ALL hold:
 - **Atomic Claim:** Self-assign the ticket to lease it:
   ```bash
   gh issue edit "$ISSUE_NUM" --add-assignee "@me"
-  printf '%s\n' "Picked up in autonomous pilot mode. Branch: feat/<slug>" > "$CLAIM_FILE"
+  CLAIM_FILE=$(mktemp); printf '%s\n' "Picked up in autonomous pilot mode. Branch: feat/<slug>" > "$CLAIM_FILE"
   dotf forge issue comment "$ISSUE_NUM" --body-file "$CLAIM_FILE"
   ```
   *Note:* Self-assignment updates the Bitácora status machine to `In Progress`.
@@ -197,6 +197,7 @@ Push the branch and open a draft PR:
 git push -u origin "$BRANCH"
 
 # The body goes in a file: `dotf forge` takes no body argument (ADR-052).
+PR_BODY_FILE=$(mktemp)
 cat > "$PR_BODY_FILE" <<EOF
 Closes #${ISSUE_NUM}
 
@@ -252,7 +253,7 @@ dotf agent auto --task "Decide <the fork> for #${ISSUE_NUM}. Options: <A> / <B>.
 - **Park the Ticket Cleanly:**
   1. One comment, in `pattern-agent-oriented-errors` form — ERROR / WHY / FIX — carrying **two** options and their consequences. A park is a *question*, not a status:
      ```bash
-     printf '%s\n' "ERROR: <symptom>. WHY: <root cause>. FIX: (A) <option + consequence> / (B) <option + consequence>." > "$PARK_FILE"
+     PARK_FILE=$(mktemp); printf '%s\n' "ERROR: <symptom>. WHY: <root cause>. FIX: (A) <option + consequence> / (B) <option + consequence>." > "$PARK_FILE"
      dotf forge issue comment "$ISSUE_NUM" --body-file "$PARK_FILE"
      ```
   2. Set Bitácora Status `Blocked`: the board is the one park signal (ADR-018), and nothing reads a label. One command, with gh resolving the project, field and option by name at runtime, so no id is pasted anywhere (SSOT for the field set: `00_meta/runbooks/bitacora-project-setup.md` §5). Check its exit status: a park that did not land is not a park.

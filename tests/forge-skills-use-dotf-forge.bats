@@ -17,6 +17,17 @@ setup() {
     if grep -q 'gh issue create --repo' "$SKILLS/new-ticket/SKILL.md"; then false; fi
 }
 
+@test "new-ticket passes its label flags as an array, which zsh does not word-split from a string" {
+    grep -q 'LABEL_FLAGS=()' "$SKILLS/new-ticket/SKILL.md" || false
+    if grep -qE 'LABEL_FLAGS=""|[^"{]\$LABEL_FLAGS' "$SKILLS/new-ticket/SKILL.md"; then false; fi
+}
+
+@test "autopilot assigns every temp file it hands to dotf forge" {
+    for v in CLAIM_FILE PR_BODY_FILE PARK_FILE; do
+        grep -q "$v=\$(mktemp)" "$SKILLS/autopilot/SKILL.md" || { printf '%s is used and never assigned\n' "$v" >&2; false; }
+    done
+}
+
 @test "pr-review-triage posts the triage record with dotf forge" {
     grep -q 'dotf forge pr comment' "$SKILLS/pr-review-triage/SKILL.md" || false
     if grep -q 'gh pr comment' "$SKILLS/pr-review-triage/SKILL.md"; then false; fi
