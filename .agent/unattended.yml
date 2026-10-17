@@ -1,0 +1,42 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "pilot-r5-20261017T0755Z"
+armed_by: manu
+armed_at: 2026-10-17T07:55:00Z
+expires_at: 2026-10-17T17:55:00Z
+objective: "Archive CLI-131 after an independent review, then land the CLI-123 lane children #2552 and #2617 and the dotfiles part of #2659, each merged only under the standing grant."
+scope:
+  write_paths:
+    - "cli/internal/lane/**"
+    - "cli/internal/prland/**"
+    - "cli/internal/worktree/**"
+    - "cli/internal/lessons/**"
+    - "cli/internal/initrepo/**"
+    - "cli/internal/cmd/lane*.go"
+    - "cli/internal/cmd/lessons*.go"
+    - "cli/internal/cmd/initrepo*.go"
+    - "cli/internal/cmd/worktree*.go"
+    - "cli/internal/agent/**"
+    - ".dotf/lane-prompt.md"
+    - "specs/**"
+    - "docs/lessons/**"
+    - "docs/adr/**"
+    - "docs/runbooks/**"
+    - "tests/**"
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml", "versions.conf", "release-please-config.json", ".release-please-manifest.json"]
+  max_files: 20
+  max_loc: 400
+allowed_commands: [dotf, gh, git, go, golangci-lint, tmux, caffeinate]
+queue:
+  source: bitacora
+  filter: "in order: dotf spec review CLI-131-lessons-index-on-read and archive on PASS (#2554); then #2552, #2617, #2659 (only the parts outside .github/workflows and the vault); #2553 is prepared and left open (authority widening, owner lands). Then unassigned Backlog bug/chore items whose paths fit write_paths and that no peer holds. Nothing else from the Backlog."
+  max_items: 8
+budget:
+  max_iterations: 10
+  max_minutes_per_iteration: 50
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
