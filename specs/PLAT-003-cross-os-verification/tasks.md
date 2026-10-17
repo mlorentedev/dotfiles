@@ -33,9 +33,13 @@ created: "2026-10-17"
 - [ ] [AC8] Live run green: blocked on #2688 (BUG-154, `install.sh` leaves `~/.local/bin` off PATH, found by this run); re-run `dotf vm linux --ref <fix>`
 - [x] Lesson 473; `lima` catalog entry
 
-## PR 3 — Tier 3b, Windows 11 ARM VM (after the owner installs a hypervisor)
+## PR 3 — Tier 3b, Windows 11 ARM VM
 
-- [ ] [AC9] Revert to `clean-base`, run `setup-windows.ps1` from a clone, assert `changed=0` on the second run
+- [x] Hypervisor chosen by the owner: QEMU driven by `dotf` (ADR-053)
+- [x] [AC10] `qemu` and `swtpm` catalog entries; on the Mac: plan → apply → plan `0 to change`
+- [ ] Owner: the Spanish Windows 11 Arm64 ISO at `~/.local/state/dotfiles/vm/windows/win11-arm64.iso`
+- [ ] [AC9] Failing tests with a fake QEMU and guest agent, then `dotf vm windows`: build `clean-base` unattended, revert, copy a `git archive` of the ref in, run `install.ps1`, converge again, assert `changed` 0
+- [ ] [AC9] Live run on the Mac; then #2683 (powercfg) and #2672 (sshd) verified in the guest, evidence on those PRs and #2356
 
 ## Closing
 

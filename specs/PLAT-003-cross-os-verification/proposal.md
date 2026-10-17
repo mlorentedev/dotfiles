@@ -27,12 +27,13 @@ Three tiers, one PR each, in this order. Tier 2 is deferred.
   - `dotf doctor` gains a PowerShell section: `pwsh` absent where the catalog names a manager for this OS fails; a marked module not importable at its pin warns, naming `dotf converge --only pwsh-modules`.
   - `dotf lint powershell` runs PSScriptAnalyzer at the pin over the checkout's `.ps1`/`.psm1` files with CI's settings file and severities, and exits 1 on any finding. A Go test reads `ci.yml` and fails when the job's parameters drift from the command's.
 - **Tier 3a — Lima Linux VM (PR 2).** `dotf vm linux` boots a declarative Lima template embedded in `dotf`: Ubuntu 24.04 under systemd, in Lima's plain mode with no mount at all, so the guest `$HOME` is guest-local and no host directory, credential or working tree reaches it. The guest clones a pushed ref from GitHub and runs `./install.sh`, then `dotf converge` a second time, which is the Linux bootstrap on main and what `from-zero.yml` checks (the issue's brief said `setup-linux.sh`, which `install.sh` replaced). Started on demand, deleted after. It certifies the `dotf` release the ref pins, not a build of the tree: `from-zero` covers the tree's binary. `lima` gets an explicit catalog entry rather than arriving as `colima`'s dependency.
-- **Tier 3b — Windows 11 ARM VM (PR 3).** A `clean-base` snapshot, reverted before each run, exercising `setup-windows.ps1` and asserting `changed=0` on the second run. It needs a hypervisor (VMware Fusion or UTM); installing one is the owner's step, and this PR does not start before it exists.
+- **Tier 3b — Windows 11 ARM VM (PR 3).** `dotf vm windows` runs a Windows 11 Arm64 guest on QEMU (ADR-053: the issue's VMware Fusion has no unattended install any more, and the owner chose the open-source hypervisor that is the same on every host). `dotf` defines the guest itself (HVF, UEFI, `swtpm`, the QEMU guest agent), reverts its disk to a `clean-base` snapshot before each run, copies a `git archive` of the ref in (never a mount of the working tree), and runs the Windows from-zero path of ADR-045: `install.ps1`, then a second `dotf converge` that must report `changed` 0. The issue's brief said `setup-windows.ps1`, which `install.ps1` replaced as the entrypoint, as `install.sh` replaced `setup-linux.sh` in Tier 3a. `qemu` and `swtpm` are Homebrew catalog entries; the Windows ISO is the owner's download (Microsoft's Spanish multi-edition Arm64 ISO, the language of the owner's Windows machines), verified against Microsoft's published SHA256. The guest is unactivated unless the owner provides a licence; no key enters a snapshot.
 - **Tier 2 — ARM runners in CI (deferred, no PR in this spec).** `ubuntu-24.04-arm` in dotfiles and `windows-11-arm` in ts-bridge. Deferred: it changes `.github/workflows/` (owner-lands) and the CI duration ceilings of #2246.
 
 ## Out of scope
 
-- Installing a hypervisor, and the Tailscale three-node mesh (ts-bridge QA-013), which rides on Tier 3b.
+- The Tailscale three-node mesh (ts-bridge QA-013), which rides on Tier 3b.
+- `dotf vm windows` on a Linux or Windows host: QEMU runs there too, but only the macOS host is built and the catalog entries are Homebrew-only (ADR-053).
 - Wiring `dotf lint powershell` into the pre-commit hook, and switching CI's `lint-powershell` job to call it. The hook runs the installed `dotf` (lesson 463) and the job is a workflow edit; both wait for the release that carries the command. Ticketed from PR 1.
 - Provisioning `pwsh` on Linux machines.
 
@@ -59,9 +60,10 @@ Tier 3a (PR 2):
 - [ ] AC7: the Lima template boots Ubuntu 24.04 with systemd as PID 1, the guest `$HOME` is not a host mount, and no host credential directory is mounted.
 - [ ] AC8: inside the guest, a clone of the ref converges with `./install.sh` and no step fails, and a second `dotf converge` changes nothing (`last.json`: `result` ok, `changed` 0), as `from-zero.yml` asserts.
 
-Tier 3b (PR 3, after the owner installs a hypervisor):
+Tier 3b (PR 3):
 
-- [ ] AC9: one command reverts the Windows VM to `clean-base`, runs `setup-windows.ps1` from a clone, and asserts `changed=0` on a second run; no credential file persists in the snapshot.
+- [ ] AC9: one command reverts the Windows guest to `clean-base`, copies in a `git archive` of the ref, runs `install.ps1` and then `dotf converge` again; the first run ends with no failed step and the second reports `changed` 0. No credential file persists in the image or a snapshot, and the guest mounts no host directory.
+- [ ] AC10: on the Mac, `dotf converge --only tools` plans `qemu` and `swtpm`, applies them, and a second plan reports 0 changes.
 
 ## References
 

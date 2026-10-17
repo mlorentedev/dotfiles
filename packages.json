@@ -249,6 +249,24 @@
       }
     },
     {
+      "name": "qemu",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "qemu",
+        "command": "qemu-system-aarch64"
+      }
+    },
+    {
+      "name": "swtpm",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "swtpm",
+        "command": "swtpm"
+      }
+    },
+    {
       "name": "docker",
       "profile": "full",
       "source": {
