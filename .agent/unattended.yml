@@ -1,0 +1,28 @@
+version: 1
+run_id: "plat003-20261017T0803Z"
+armed_by: manu
+armed_at: 2026-10-17T08:03:10Z
+expires_at: 2026-10-17T18:03:10Z
+objective: "Land PLAT-003 Tier 1: pwsh, PSScriptAnalyzer and Pester converged by dotf at the versions.conf pins, asserted by dotf doctor, with a local lint-powershell matching CI."
+worktree: /Users/manu/Projects/worktrees/dotfiles/feat-cross-os-verification
+branch: feat/cross-os-verification
+scope:
+  write_paths: ["cli/**", "packages.json", "versions.conf", "specs/**", "docs/**", "tests/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "setup-*.sh", "setup-*.ps1"]
+  max_files: 20
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, pwsh, limactl, mise]
+queue:
+  source: bitacora
+  filter: "#2344 only (PLAT-003): PR 1 Tier 1, then PR 2 Lima template if time allows; PR 3 Windows VM is the owner's"
+  max_items: 2
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+  wip_override: "PLAT-003 only, owner-authorised 2026-10-17"
