@@ -62,3 +62,4 @@ None.
 - After #2688 is fixed on a ref: `dotf vm linux --ref <fix>`. Then tick AC8.
 - After a hypervisor is installed: PR 3 (AC9).
 - Archive gate: `dotf spec review PLAT-003-cross-os-verification`, run by a non-implementer once all tiers are done.
+- This report was pushed with the pre-push hook's skip-sdd env escape (`SDD_LABELS=skip-sdd` plus a rationale). The gate counts `.agent/` as production LOC (92 lines), and this branch is never opened as a PR. Same precedent as run cli-127.
