@@ -26,7 +26,7 @@ After this PR a new shell:
 
 ## Out of scope
 
-- zsh-autosuggestions: a new dependency whose pin and install mechanism (mise backend vs package manager) is undecided. Second PR under this spec.
+- Marking the plugin's pin in `versions.conf` in the PR that adds the Go support: a released `dotf` would read the mark as a registry tool and fail every machine's sync (see Risks). The mark is its own one-line PR after a release.
 - Linuxbrew (`/home/linuxbrew/.linuxbrew`): the brew block only knows the two macOS prefixes today and widening it changes Linux PATH order. Filed separately if wanted.
 - bash completions and PowerShell: the step is zsh-only (linux, darwin).
 
@@ -34,6 +34,7 @@ After this PR a new shell:
 
 - The `compinit` ordering changes for every machine, so the sandboxed bats (`tests/zshrc-guards.bats`) must stay green and must prove the stale-dump rule on both sides.
 - Moving the brew block earlier keeps it ahead of the later PATH prepends, so PATH order is unchanged.
+- zsh-autosuggestions installs through mise's `http:` backend (no registry entry, no release asset): a table in `cli/internal/tools/mise_files.go` carries each version's archive URL and sha256, `ParseMisePins` rejects a version with no digest, and the sync checks the plugin file itself. Windows skips it. A pin named in `versions.conf` before a released `dotf` carries the table breaks that machine's sync, so `tests/versions-conf.bats` holds the order (floor 0.72.0).
 - The step runs `dotf completion zsh` from PATH: it writes the completions of the `dotf` it finds, which is the pinned release.
 
 ## Acceptance criteria
@@ -43,6 +44,7 @@ After this PR a new shell:
 - [x] AC3: `menu select` is set.
 - [x] AC4: `dotf converge --only shell-completions` writes `_dotf` and `_herdr`, a second run reports `changed=0`, and a tool absent from PATH is skipped by name.
 - [x] AC5: startup of `zsh -ic exit` does not regress by more than 10 ms against the pre-change median.
+- [x] AC6: a pin whose name is in the file-tool table installs through mise's http backend at a pinned digest, is verified by its file, is repaired when the file is gone, is not pruned as an orphan, is skipped on Windows, and a second sync reports `changed=0`; `.zshrc` sources it after `compinit` only when the file is there.
 
 ## References
 
