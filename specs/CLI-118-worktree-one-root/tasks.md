@@ -55,6 +55,7 @@ TDD order: each box is a failing test first, then the code that turns it green. 
 
 - [x] (PR 7a, reader) `expandPaths` renders TOML string values behind `paths:`, allowed on a TOML source from manifest version 6 only (a 0.71.0 reader refuses it per entry, so the entry must read as a newer schema). Five mutations killed.
 - [x] Trust lists: Copilot `{WORKTREE_ROOT}/*/*`, agy `{WORKTREE_ROOT}` itself (agy does not read the glob, #2533); #2504's test and the exact-list assertions updated. JSON entries already render `paths`, and `WORKTREE_ROOT` resolves to its default when unset (measured: `dotf env path WORKTREE_ROOT` on 0.71.0), so this needs no fleet floor.
+- [x] herdr's `[worktrees] directory` rendered from `{WORKTREE_ROOT}` (`paths: native`, manifest version 6) by #2582, landed after 0.72.0 (the first release that reads version 6) was installed, so no 0.71.0 reader is handed the entry.
 - [x] AGENTS.md §9; vault `00_meta/skills/using-git-worktrees` and `handoff` (knowledge `f9f68924`), records refreshed with `compile-harness.sh --refresh`.
 - [x] ADR-032 dispatch clarification; lesson for the herdr path rule (lesson 436 already records it).
 - [x] Doc drift found in passing: `done_proc_other.go:8`, `sweep_proc_other.go:26` and `done`'s Long text still say Linux-only after #2293.

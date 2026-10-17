@@ -2,9 +2,9 @@
   {
     "id": "CLI-118-worktree-one-root-root",
     "behavior": "WORKTREE_ROOT is declared once and rendered into herdr, agy and Copilot configs",
-    "verification": "bats tests/herdr-config.bats",
-    "state": "pending",
-    "evidence": ""
+    "verification": "bats tests/herdr-config.bats && cd cli && go test ./internal/deploy/ -run 'TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys'",
+    "state": "passing",
+    "evidence": "herdr-config.bats tests 5-6 (#2580, #2582); TestDeploy_TheShippedHerdrEntryKeepsHerdrsOwnKeys renders a non-default root into herdr"
   },
   {
     "id": "CLI-118-worktree-one-root-path",
@@ -17,42 +17,42 @@
     "id": "CLI-118-worktree-one-root-branch",
     "behavior": "add refuses a branch that is not <type>/<kebab-slug> or carries a phase token",
     "verification": "cd cli && go test ./internal/worktree/ -run 'TestValidateBranch'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestValidateBranch, TestAddRefusesAnInvalidBranchBeforeCreatingAnything, TestPlanningTokensMatchTheEnforcedRule (PR 2)"
   },
   {
     "id": "CLI-118-worktree-one-root-agent",
     "behavior": "add --agent opens the worktree in herdr, starts the agent and submits the prompt, without waiting",
     "verification": "cd cli && go test ./internal/herdr/ -run 'TestLaunch'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestLaunchOpensStartsAndPromptsWithoutWaiting, TestLaunchFailsOnANotReadyOrBlockedAgent, TestPreflightNamesTheStateItRefuses (PR 6), against a fake herdr"
   },
   {
     "id": "CLI-118-worktree-one-root-adopt",
     "behavior": "unadopted worktrees are listed, adopt writes the lease, sweep reaps only adopted ones",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'TestAdopt|TestClassifyUnadopted'",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestAdopt|TestClassify|TestSweepReapsAnAdoptedWorktreeOnly'",
+    "state": "passing",
+    "evidence": "TestAdoptWritesALeaseOnce, TestAdoptRefusesWhatIsNotALinkedWorktree, TestSweepReapsAnAdoptedWorktreeOnly (PR 4a)"
   },
   {
     "id": "CLI-118-worktree-one-root-done",
     "behavior": "done resolves slugs under the root and deletes the branch only after a verified landing",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'TestDoneDeletesLandedBranch|TestResolveDoneSlug'",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestDone' && go test ./internal/cmd/ -run 'TestWorktreeDone'",
+    "state": "passing",
+    "evidence": "TestDoneDeletesALandedBranch, TestDoneDeletesASquashLandedBranch, TestDoneKeepsAnUnlandedBranchEvenWithForce (PR 4b); TestWorktreeDoneTakesTheSlugAddWasGiven (PR 1)"
   },
   {
     "id": "CLI-118-worktree-one-root-live",
     "behavior": "no command removes a worktree holding the caller or a recent session",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'TestRecentSession'",
-    "state": "pending",
-    "evidence": ""
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestRecentSession|TestRecentHarnessSession|TestDoneRefuses|TestSweepSkips'",
+    "state": "passing",
+    "evidence": "TestRecentSession, TestRecentHarnessSession, TestDoneRefusesARecentSessionUnlessIgnored, TestSweepSkipsAWorktreeWithARecentSession (PR 3, #2569)"
   },
   {
     "id": "CLI-118-worktree-one-root-migrate",
     "behavior": "migrate moves legacy siblings with git worktree move and is idempotent",
     "verification": "cd cli && go test ./internal/worktree/ -run 'TestMigrate'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "TestMigrateDryRunPlansWithoutMoving, TestMigrateMovesAndASecondRunHasNothingToDo, TestMigrateSkipsWhatItMustNotMove (PR 5)"
   }
 ]
