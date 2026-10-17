@@ -18,13 +18,19 @@ const Marker = "# Managed by dotf converge: edits are overwritten."
 // Persistent runs a slot missed while the machine was off at the next boot;
 // RandomizedDelaySec spreads machines that share the same remote.
 func SystemdUnits(job Job) (service, timer []byte) {
+	// systemd expands %-specifiers in every one of these settings, so each %
+	// the job carries is doubled wherever it reaches a unit; the argv and the
+	// Environment values are also quoted where they need it.
+	percent := strings.NewReplacer("%", "%%")
 	argv := append([]string{job.Program}, job.Args...)
 	for i, a := range argv {
+		a = percent.Replace(a)
 		if strings.ContainsAny(a, " \t\"\\") {
-			argv[i] = `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(a) + `"`
+			a = `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(a) + `"`
 		}
+		argv[i] = a
 	}
-	// Quoted for systemd, and % doubled: unit files expand %-specifiers.
+	description := percent.Replace(job.Description)
 	quote := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "%", "%%")
 	var env strings.Builder
 	for _, v := range job.Env {
@@ -32,7 +38,7 @@ func SystemdUnits(job Job) (service, timer []byte) {
 	}
 	service = []byte(Marker + `
 [Unit]
-Description=` + job.Description + `
+Description=` + description + `
 
 [Service]
 Type=oneshot
@@ -44,7 +50,7 @@ Type=oneshot
 	}
 	timer = []byte(Marker + `
 [Unit]
-Description=` + job.Description + `
+Description=` + description + `
 
 [Timer]
 OnCalendar=` + onCalendar + `
