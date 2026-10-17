@@ -1,7 +1,7 @@
 // Package schedule renders a job a machine runs on a timetable into the native
-// scheduler of each OS, and installs, inspects and removes it there (OPS-053):
-// a launchd agent on darwin. The systemd user timer and the Scheduled Task
-// follow, ported from the setup scripts. One Job declares the command once; each backend owns only how its
+// scheduler of each OS, and installs, inspects and removes it there: a launchd
+// agent on darwin, a systemd user timer on linux, a Scheduled Task on windows
+// (OPS-053). One Job declares the command once; each backend owns only how its
 // scheduler spells it. It is the seed of the scheduling table of #2013 D5.
 //
 // The package imports no other dotf package, so env can render its login agent
@@ -68,9 +68,10 @@ type EnvVar struct{ Name, Value string }
 type State struct {
 	// Present: a trigger exists under the job's name.
 	Present bool
-	// Managed: dotf wrote it, so dotf may replace or remove it. A trigger it
-	// did not write (a setup script's, before OPS-053) is never removed by a
-	// caller that did not opt in.
+	// Managed: it carries the marker this package writes, so dotf may replace
+	// or remove it. A trigger without one was installed by something else (a
+	// setup script before OPS-053) and is never removed by a caller that did
+	// not opt in.
 	Managed bool
 	// Pending lists what Install would do; empty means the trigger is current.
 	Pending []string
@@ -101,13 +102,26 @@ type Runners struct {
 	Launchctl Runner
 	UID       int    // names the gui/<UID> domain the launchd agent loads into
 	AgentsDir string // ~/Library/LaunchAgents
+
+	Systemctl Runner // runs `systemctl --user <args>`
+	UnitDir   string // the systemd user unit dir
+
+	Schtasks Runner
+	TaskUser string      // the account the task runs as
+	Elevated func() bool // whether the caller can register an S4U task
+	TempDir  string      // where the task XML is staged for schtasks
 }
 
 // For returns goos's backend, or ErrUnsupported when the OS has none or its
 // runner is not wired.
 func For(goos string, r Runners) (Backend, error) {
-	if goos == "darwin" && r.Launchctl != nil {
+	switch {
+	case goos == "darwin" && r.Launchctl != nil:
 		return Launchd{Run: r.Launchctl, UID: r.UID, Dir: r.AgentsDir}, nil
+	case goos == "linux" && r.Systemctl != nil:
+		return Systemd{Run: r.Systemctl, Dir: r.UnitDir}, nil
+	case goos == "windows" && r.Schtasks != nil:
+		return Schtasks{Run: r.Schtasks, User: r.TaskUser, Elevated: r.Elevated, TempDir: r.TempDir}, nil
 	}
 	return nil, fmt.Errorf("%s: %w", goos, ErrUnsupported)
 }

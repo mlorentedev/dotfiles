@@ -27,15 +27,29 @@ type selfDeploy struct {
 func (selfDeploy) Name() string        { return "self-deploy" }
 func (selfDeploy) Platforms() []string { return []string{"darwin", "linux", "windows"} }
 
-// NativeScheduler is the production scheduler: the real launchctl, addressed
-// for the run's home; uid names the launchd domain. Linux and Windows have no
-// backend yet, and the step skips there.
-func NativeScheduler(uid int) func(Env) (schedule.Backend, error) {
+// NativeScheduler is the production scheduler: the real launchctl, systemctl
+// --user and schtasks, addressed for the run's home. uid names the launchd
+// domain; elevated decides a task's logon type.
+func NativeScheduler(uid int, elevated func() bool) func(Env) (schedule.Backend, error) {
 	return func(e Env) (schedule.Backend, error) {
+		config := os.Getenv("XDG_CONFIG_HOME")
+		if config == "" {
+			config = filepath.Join(e.Home, ".config")
+		}
+		user := os.Getenv("USERNAME")
+		if d := os.Getenv("USERDOMAIN"); d != "" && user != "" {
+			user = d + `\` + user
+		}
 		return schedule.For(e.GOOS, schedule.Runners{
 			Launchctl: schedule.Runner(env.ExecLaunchctl),
 			UID:       uid,
 			AgentsDir: filepath.Join(e.Home, "Library", "LaunchAgents"),
+			Systemctl: schedule.Exec("systemctl", "--user"),
+			UnitDir:   filepath.Join(config, "systemd", "user"),
+			Schtasks:  schedule.Exec("schtasks"),
+			TaskUser:  user,
+			Elevated:  elevated,
+			TempDir:   os.TempDir(),
 		})
 	}
 }
