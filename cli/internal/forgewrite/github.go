@@ -16,20 +16,38 @@ type GitHub struct{ Run GHRunner }
 
 // CommentIssue implements Backend.
 func (g GitHub) CommentIssue(ctx context.Context, r Repo, number int, body string) (string, error) {
-	payload, err := json.Marshal(map[string]string{"body": body})
+	return g.writeURL(ctx, "POST", fmt.Sprintf("repos/%s/%s/issues/%d/comments", r.Owner, r.Name, number), map[string]string{"body": body})
+}
+
+// CreateIssue implements Backend. GitHub takes label names directly.
+func (g GitHub) CreateIssue(ctx context.Context, r Repo, in NewIssue) (string, error) {
+	payload := map[string]any{"title": in.Title, "body": in.Body}
+	if len(in.Labels) > 0 {
+		payload["labels"] = in.Labels
+	}
+	return g.writeURL(ctx, "POST", fmt.Sprintf("repos/%s/%s/issues", r.Owner, r.Name), payload)
+}
+
+// EditIssue implements Backend.
+func (g GitHub) EditIssue(ctx context.Context, r Repo, number int, in IssueEdit) (string, error) {
+	return g.writeURL(ctx, "PATCH", fmt.Sprintf("repos/%s/%s/issues/%d", r.Owner, r.Name, number), editPayload(in))
+}
+
+// writeURL sends a JSON write through `gh api` with the payload on stdin and
+// returns the html_url of the result. gh exiting 0 means the write exists; an
+// unreadable body must not read as a failure that a retry would duplicate.
+func (g GitHub) writeURL(ctx context.Context, method, endpoint string, payload any) (string, error) {
+	data, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
-	endpoint := fmt.Sprintf("repos/%s/%s/issues/%d/comments", r.Owner, r.Name, number)
-	out, err := g.Run(ctx, payload, "api", "-X", "POST", endpoint, "--input", "-")
+	out, err := g.Run(ctx, data, "api", "-X", method, endpoint, "--input", "-")
 	if err != nil {
-		return "", fmt.Errorf("gh api POST %s: %w", endpoint, err)
+		return "", fmt.Errorf("gh api %s %s: %w", method, endpoint, err)
 	}
 	var resp struct {
 		HTMLURL string `json:"html_url"`
 	}
-	// gh exited 0, so the comment exists; an unreadable body must not read as
-	// a failure that a retry would turn into a duplicate.
 	_ = json.Unmarshal(out, &resp)
 	return resp.HTMLURL, nil
 }

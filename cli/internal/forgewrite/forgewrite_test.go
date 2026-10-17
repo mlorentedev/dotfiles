@@ -144,15 +144,32 @@ func TestGiteaTokenNeverLeaks(t *testing.T) {
 		"500":       {BaseURL: echo(500, "boom ").URL},
 		"transport": {BaseURL: closedURL},
 	}
+	title := "t"
+	verbs := map[string]func(Gitea) error{
+		"comment": func(g Gitea) error {
+			_, err := g.CommentIssue(context.Background(), Repo{"h", "o", "n"}, 1, "b")
+			return err
+		},
+		"create": func(g Gitea) error {
+			_, err := g.CreateIssue(context.Background(), Repo{"h", "o", "n"}, NewIssue{Title: "t", Body: "b", Labels: []string{"bug"}})
+			return err
+		},
+		"edit": func(g Gitea) error {
+			_, err := g.EditIssue(context.Background(), Repo{"h", "o", "n"}, 1, IssueEdit{Title: &title})
+			return err
+		},
+	}
 	for name, g := range cases {
 		g.Token = func() (string, error) { return fakeToken, nil }
-		_, err := g.CommentIssue(context.Background(), Repo{"h", "o", "n"}, 1, "b")
-		if err == nil {
-			t.Errorf("%s: want an error", name)
-			continue
-		}
-		if strings.Contains(err.Error(), fakeToken) {
-			t.Errorf("%s: the error carries the token: %v", name, err)
+		for verb, call := range verbs {
+			err := call(g)
+			if err == nil {
+				t.Errorf("%s/%s: want an error", name, verb)
+				continue
+			}
+			if strings.Contains(err.Error(), fakeToken) {
+				t.Errorf("%s/%s: the error carries the token: %v", name, verb, err)
+			}
 		}
 	}
 

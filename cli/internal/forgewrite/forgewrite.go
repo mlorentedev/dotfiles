@@ -26,6 +26,25 @@ type Backend interface {
 	// CommentIssue posts body on issue or pull request number and returns the
 	// comment's URL. A pull request is an issue on both supported forges.
 	CommentIssue(ctx context.Context, r Repo, number int, body string) (string, error)
+	// CreateIssue opens an issue and returns its URL.
+	CreateIssue(ctx context.Context, r Repo, in NewIssue) (string, error)
+	// EditIssue changes the title and/or body of an issue or pull request and
+	// returns its URL. It never changes state: there is no close.
+	EditIssue(ctx context.Context, r Repo, number int, in IssueEdit) (string, error)
+}
+
+// NewIssue is what an agent supplies to open an issue. The caller computes the
+// title, including any AREA-NNN convention; dotf forge does not guess it.
+type NewIssue struct {
+	Title  string
+	Body   string
+	Labels []string // names; each backend maps them to what its API wants
+}
+
+// IssueEdit names the fields to change; a nil field is left alone.
+type IssueEdit struct {
+	Title *string
+	Body  *string
 }
 
 // Kind is a forge family.
