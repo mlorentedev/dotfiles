@@ -314,7 +314,9 @@ prints `'nothing'`, or `sleep-inactive-ac-timeout` prints `0`. Measured on msi
 `0`, and no `Suspending system` in the journal since the lid policy landed on
 2026-10-13 ([#2374](https://github.com/mlorentedev/dotfiles/issues/2374)).
 A GNOME without that override (Fedora, upstream GNOME) suspends an idle session
-on AC: set the type to `'nothing'` there by hand before it becomes a target.
+on AC, and the step does not converge it: such a machine needs that resource
+added to the step (the `ConditionACPower=false` drop-in #2374 sketches) before
+it becomes a target.
 
 **macOS:** the same converge step sets the AC profile `sleep 0`, `disksleep 0`,
 `womp 1`, `autorestart 1` and `powernap 1` with one `pmset -c`, and only the keys
