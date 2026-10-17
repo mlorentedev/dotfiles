@@ -8,7 +8,7 @@
   },
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f2",
-    "behavior": "a growing transcript is never stopped by the stall detector",
+    "behavior": "a growing transcript, and one silent for less than N, is never stopped by the stall detector",
     "verification": "cd cli && go test ./internal/spec/ -run 'TestStall.*Growing' -count=1",
     "state": "pending",
     "evidence": ""
@@ -37,7 +37,7 @@
   {
     "id": "CLI-094-stopped-review-leaves-a-record-f6",
     "behavior": "verification.md records the measured gap and the chosen N",
-    "verification": "grep -qE 'longest legitimate gap' specs/CLI-094-stopped-review-leaves-a-record/verification.md && grep -qE 'stall timeout N' specs/CLI-094-stopped-review-leaves-a-record/verification.md",
+    "verification": "grep -qE 'longest legitimate tool call: [0-9]+(\\.[0-9]+)?s' specs/CLI-094-stopped-review-leaves-a-record/verification.md && grep -qE 'stall timeout N: [0-9]+ minutes' specs/CLI-094-stopped-review-leaves-a-record/verification.md",
     "state": "pending",
     "evidence": ""
   }
