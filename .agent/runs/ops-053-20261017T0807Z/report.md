@@ -14,7 +14,8 @@ Waiting on a human: the OPS-053 independent review and archive, then one release
    - #2697 `099961b5`: PLAT-001c / #2201, the `git-lfs` converge step and a doctor *Git LFS* section. Closes #2201. Its review fix (`2001e284`) was **not re-reviewed** by pr-agent (below its 3-commit threshold), which the triage discloses.
 2. **OPS-053 archive gate:** run `dotf spec review OPS-053-self-deploy-trigger` (the reviewer must not be me), then `dotf spec archive` on PASS. That frees the `--over-wip-limit` override. #2502 stays open until then.
 3. **The Mac's self-deploy, after the next release is installed:** `dotf env role add self-deploy`, then `dotf converge --only self-deploy`. **Not before the release:** an unreleased role in the real `machine.json` breaks every installed `dotf converge` on the machine. That happened during this run and was rolled back within the hour (lesson 468).
-4. **The Mac's lfs filter:** `dotf converge --only git-lfs --plan` on the real HOME reports `1 to change`. The first converge with a release that carries the step writes it. Nothing to do by hand.
+4. **The Mac's lfs filter:** `dotf converge --only git-lfs --plan` on the real HOME reports `1 to change`. **Until a release carrying #2697 is installed and converged, an LFS clone on this Mac still checks out pointers.** The first converge with that release writes the filter; nothing to do by hand.
+6. **#2699, close it, never merge it:** a draft PR that only carries this report. `skip-sdd` was needed because the pre-push gate counts `.agent/` as production (#2698).
 5. **Live `changed=0` on Linux and Windows** for self-deploy and git-lfs needs msi and the work-lab box. Here they are covered by unit tests plus `GOOS=windows go vet ./...` only, as each PR says.
 
 ## 2. Parked, with the question restated
@@ -28,6 +29,7 @@ Waiting on a human: the OPS-053 independent review and archive, then one release
 ## 4. Filed while working (debt recorded, not work invented)
 
 - #2685: env-persist reads any `launchctl print` failure as an unloaded agent.
+- #2698: the pre-push spec-gate counts `.agent/runs/*.md` as production code, so a run branch cannot push its report. 16 earlier run branches carry 68 to 138 such lines with no PR, and how they passed is not established.
 - #2696: the Windows self-deploy task drops `Job.Env`, so a session-only XDG home never reaches the 03:00 run. Options on the issue; A is recommended.
 
 ## 5. Done but unmerged
