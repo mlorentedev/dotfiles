@@ -1,6 +1,6 @@
 # Run pilot-r5-20261017T0755Z
 
-**Verdict:** ended `window-closing` after 1 long iteration, about 10h: 3 done and merged under the grant (#2666, #2668, #2674) plus #2687 and #2691, 1 prepared and still open (#2701, CLI-131 archive), 1 parked (#2552), 0 irreversible actions awaiting you. Question this answers: what is waiting on a human? **#2701 only, and it is reversible** (a spec-only archive diff).
+**Verdict:** ended `window-closing` after 1 long iteration, about 10h: 6 merged under the grant (#2666, #2668, #2674, #2687, #2691, #2701), 0 prepared and open, 1 parked (#2552), 0 irreversible actions awaiting you. Question this answers: what is waiting on a human? **Nothing irreversible.** CLI-131 is archived and #2554 closed; the open items are owner decisions.
 
 ## Waiting on you, irreversible first
 
@@ -13,11 +13,11 @@ Nothing irreversible is pending. Landed this run, all under the standing grant w
 | #2674 | CLI-131 round-1 fixes: `lessons --help` text, 4 Closing boxes, re-measured evidence | grant |
 | #2687 | lessons 471 and 472 | grant, PR-Agent triaged |
 | #2691 | sort-order test for the index, wrapped stray-index error, evidence | grant, PR-Agent triaged |
+| #2701 | archive of CLI-131 with the round files, `Closes #2554`, landed at 17:46Z before the envelope expired | grant, PR-Agent triaged (3 declined with reasons) |
 
 #2656 (CLI-131 itself) was landed by **you**, not by the grant.
 
-Open for a decision:
-- **#2701**: archives CLI-131 after a PASS WITH GAPS (round 3). It carries `Closes #2554`. If the envelope expired before CI settled (17:55Z), land it by hand or with a new run; it needs no code review beyond the triage already on the PR.
+Open for a decision: nothing is waiting on a merge. Owner-lands: #2659 (skill records, `repo-hygiene.yml`), #2664.
 
 ## Parked, with the question restated
 
@@ -26,7 +26,7 @@ Open for a decision:
 
 ## Done but unmerged
 
-- #2701 above.
+- None.
 
 ## Evidence index
 
@@ -62,4 +62,4 @@ Window covered. The first `caffeinate` died at once (backgrounded with `&` insid
 
 ## Next action
 
-Land #2701, then accept ADR-050 so the next run can take #2552.
+Accept ADR-050 so the next run can take #2552.
