@@ -8,6 +8,9 @@
 
 setup() {
     SKILLS="$BATS_TEST_DIRNAME/../harness/skills"
+    # A renamed directory must fail loudly: grep on a missing path exits 2, which the
+    # `|| true` below would otherwise read as "no unconditional mention".
+    [ -d "$SKILLS" ] || false
 }
 
 @test "every skill line that names dotf lessons fmt carries the repo-format condition" {
