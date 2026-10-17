@@ -1,7 +1,7 @@
 ---
 id: "CLI-131-lessons-index-on-read"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-16"
 issue: "mlorentedev/dotfiles#2554"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
