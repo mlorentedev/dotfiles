@@ -64,6 +64,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - The replaced bats tests evaluated the shell sync block on fixtures and grepped the PowerShell one; their properties (seed only when absent, model list replaced, other keys and the mode kept, a non-object file refused) are the Go tests of PR 14 in `internal/pi` and `internal/converge`
 - Not run here: the apply on a scratch HOME. The live runs are CI's `integration` job (a plain `setup-linux.sh`) and `test-windows` (`setup-windows.ps1` end to end, then doctor), both on this PR, and from-zero, which the `pisettings.go` comment change triggers
 
+- Test suite (PR 7e Windows half, macOS arm64, 2026-10-17, rebased on `cdf425af`): `go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> ok, every package; `golangci-lint cache clean && golangci-lint run` (pinned 2.12.2) -> 0 issues; `GOOS=windows golangci-lint run ./internal/sshtarget/... ./internal/converge/... ./internal/doctor/...` -> 0 issues
+- What the unit tests prove on the Windows half, all against injected runners (nothing here ran on Windows):
+  - elevation is read from the token's integrity SID, not from a localized group name: `TestElevatedReadyReadsTheIntegrityLevelSID`
+  - `administrators_authorized_keys` carries its Administrators+SYSTEM ACL before the rename, and a root that cannot set it is refused: `TestElevatedInstallAdminOnlySetsTheACLBeforeTheRename`, `TestAdminKeysRefuseARootThatCannotSetTheirACL`, `TestAFileRootWritesTheKeysAdminOnlyAndTheDropInItself`
+  - the service is read from `sc.exe` state numbers, missing OpenSSH names the capability, and only a running sshd is reloaded: `TestWindowsServiceReadsSCNumbersNotNames`, `TestWindowsServiceNamesTheCapabilityWhenSSHDIsMissing`, `TestWindowsServiceReloadsOnlyARunningSSHD`
+  - the firewall rule is narrowed to the mesh and undone, created narrow when missing, left alone when converged, and anything that still exposes port 22 is refused: `TestWindowsFirewallNarrowsTheCapabilityRuleAndUndoesIt`, `TestWindowsFirewallCreatesAMissingRuleNarrow`, `TestWindowsFirewallConvergedChangesNothing`, `TestWindowsFirewallRefusesWhatWouldStillExposePort22`, `TestMeshOnly`
+  - paths live under `%ProgramData%\ssh` and the account drops its machine prefix: `TestWindowsPathsUseTheCapabilityTree`, `TestWindowsAccount`
+- Not proven yet, and what closes the row: on the work-lab box (never the corporate one), whether Win32-OpenSSH honours `Include`; whether the plan reads `administrators_authorized_keys` unelevated; `--plan`, an elevated apply, a second apply reporting `changed=0`, `ssh` from the Mac over the mesh, and a LAN connect to port 22 that times out
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
