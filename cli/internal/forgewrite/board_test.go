@@ -109,7 +109,7 @@ func TestPlaceOnBoardReportsAFailedFieldWrite(t *testing.T) {
 		return nil, errors.New("boom")
 	}}
 	err := g.PlaceOnBoard(context.Background(), BoardPlan{Board: testBoard, ProjectID: "P", Edits: []BoardEdit{{FieldID: "F", OptionID: "O"}}}, "u")
-	if err == nil || !strings.Contains(err.Error(), "boom") {
+	if err == nil || !strings.Contains(err.Error(), "boom") || !strings.Contains(err.Error(), "ITEM_1") || !strings.Contains(err.Error(), "0 of 1") {
 		t.Fatalf("got %v", err)
 	}
 }

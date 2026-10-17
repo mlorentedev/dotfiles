@@ -327,7 +327,11 @@ func newForgeIssueCreateCmd() *cobra.Command {
 				if url == "" {
 					return fmt.Errorf("ERROR: the issue was created but the forge returned no URL. WHY: the board needs the URL to add the card. FIX: add the issue to the board by hand; do not run create again")
 				}
-				if err := bw.PlaceOnBoard(ctx, plan, url); err != nil {
+				// The issue exists now; placing it gets its own time budget, so a slow
+				// create cannot leave the card with none.
+				pctx, pcancel := context.WithTimeout(c.Context(), forgeWriteTimeout)
+				defer pcancel()
+				if err := bw.PlaceOnBoard(pctx, plan, url); err != nil {
 					return fmt.Errorf("ERROR: the issue was created at %s but placing it on the board failed: %v. WHY: the board write is a separate step. FIX: do not run create again; add the card to the board and set its fields", url, err)
 				}
 			}

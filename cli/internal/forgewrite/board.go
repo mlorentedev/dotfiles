@@ -147,8 +147,9 @@ func selectEdit(fields []boardField, field, value string, b Board) (BoardEdit, e
 	return BoardEdit{}, fmt.Errorf("ERROR: the board has no %s field. WHY: project %d of %s does not define it. FIX: check forge/hosts.json points at the right project", field, b.Number, b.Owner)
 }
 
-// PlaceOnBoard implements BoardWriter. item-add is idempotent on gh's side, so
-// a retry after a failed field write does not add a second card.
+// PlaceOnBoard implements BoardWriter. GitHub's addProjectV2ItemById returns
+// the existing card when the issue is already on the board, so adding it again
+// after a failed field write does not create a second card.
 func (g GitHub) PlaceOnBoard(ctx context.Context, plan BoardPlan, url string) error {
 	num := strconv.Itoa(plan.Board.Number)
 	var item struct {
@@ -160,7 +161,7 @@ func (g GitHub) PlaceOnBoard(ctx context.Context, plan BoardPlan, url string) er
 	if item.ID == "" {
 		return fmt.Errorf("gh project item-add returned no item id for %s", url)
 	}
-	for _, e := range plan.Edits {
+	for i, e := range plan.Edits {
 		args := []string{"project", "item-edit", "--id", item.ID, "--project-id", plan.ProjectID, "--field-id", e.FieldID}
 		if e.OptionID != "" {
 			args = append(args, "--single-select-option-id", e.OptionID)
@@ -168,7 +169,7 @@ func (g GitHub) PlaceOnBoard(ctx context.Context, plan BoardPlan, url string) er
 			args = append(args, "--text", e.Text)
 		}
 		if _, err := g.Run(ctx, nil, args...); err != nil {
-			return fmt.Errorf("gh project item-edit: %w", err)
+			return fmt.Errorf("the card %s was added but only %d of %d fields were set (gh project item-edit: %w)", item.ID, i, len(plan.Edits), err)
 		}
 	}
 	return nil
