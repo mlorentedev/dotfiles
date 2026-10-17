@@ -64,9 +64,12 @@ func runLintPowerShell(stdout, stderr io.Writer, repo string) error {
 		return err
 	}
 	files, err := lintFiles(repo)
-	if err != nil || len(files) == 0 {
-		_, _ = fmt.Fprintln(stdout, "No PowerShell files to analyze.")
+	if err != nil {
 		return err
+	}
+	if len(files) == 0 {
+		_, _ = fmt.Fprintln(stdout, "No PowerShell files to analyze.")
+		return nil
 	}
 	if _, err := exec.LookPath(pwsh.Command); err != nil {
 		return withExitCode(2, errors.New("pwsh is not on PATH: run `dotf converge --only tools`"))

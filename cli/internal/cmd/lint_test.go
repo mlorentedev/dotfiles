@@ -61,3 +61,20 @@ func TestAnalyzerPin(t *testing.T) {
 		t.Error("an unmarked analyzer pin must be an error: nothing would install it")
 	}
 }
+
+// A git failure is an error, never "nothing to lint": the empty-result message
+// on a failed listing would read as a clean tree.
+func TestLintPowerShell_AFailedListingIsNotAnEmptyTree(t *testing.T) {
+	repo := t.TempDir() // not a git repository: `git ls-files` fails
+	if err := os.WriteFile(filepath.Join(repo, "versions.conf"), []byte("# pwsh-module: PSScriptAnalyzer\nPSSCRIPTANALYZER_VERSION=1.25.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb strings.Builder
+	err := runLintPowerShell(&out, &errb, repo)
+	if err == nil {
+		t.Fatal("a failed git listing must be an error")
+	}
+	if strings.Contains(out.String(), "No PowerShell files") {
+		t.Errorf("a failed listing was reported as an empty tree: %q", out.String())
+	}
+}
