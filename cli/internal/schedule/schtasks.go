@@ -105,14 +105,22 @@ type taskState struct {
 	present, managed, stale, upgrade bool
 }
 
-// read queries the task. schtasks exits non-zero for a task that does not
-// exist, and its stdout cannot tell that apart from a refused query, so any
-// failure reads as absent: an install then fails loudly on the same refusal,
-// and a removal has nothing to remove.
-func (s Schtasks) read(job Job) taskState {
+// read queries the task. `/Query /TN` exits non-zero both for a task that
+// does not exist and for a query it refused, and only its localised stderr
+// tells them apart, so absence is read from the task list instead: a list
+// that does not name the task is an absent task, and any failure is an error,
+// never "nothing to remove".
+func (s Schtasks) read(job Job) (taskState, error) {
+	list, err := s.Run("/Query", "/FO", "CSV", "/NH")
+	if err != nil {
+		return taskState{}, fmt.Errorf("schtasks /Query: %w", err)
+	}
+	if !listsTask(decodeText([]byte(list)), job.Names.Task) {
+		return taskState{}, nil
+	}
 	out, err := s.Run("/Query", "/TN", job.Names.Task, "/XML")
 	if err != nil {
-		return taskState{}
+		return taskState{}, fmt.Errorf("schtasks /Query /TN %s: %w", job.Names.Task, err)
 	}
 	text := decodeText([]byte(out))
 	st := taskState{present: true}
@@ -124,11 +132,25 @@ func (s Schtasks) read(job Job) taskState {
 	if l := logonRe.FindStringSubmatch(text); s.logon() == LogonS4U && (l == nil || l[1] != LogonS4U) {
 		st.upgrade = true
 	}
-	return st
+	return st, nil
+}
+
+// listsTask reports whether a `/Query /FO CSV /NH` listing names the task in
+// the root folder. The first field is the task's path, which is not localised.
+func listsTask(list, name string) bool {
+	for _, line := range strings.Split(list, "\n") {
+		if first, _, _ := strings.Cut(strings.TrimSpace(line), ","); first == `"\`+name+`"` {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Schtasks) Inspect(job Job) (State, error) {
-	st := s.read(job)
+	st, err := s.read(job)
+	if err != nil {
+		return State{}, err
+	}
 	out := State{Present: st.present, Managed: st.managed, Where: `task \` + job.Names.Task}
 	switch {
 	case !st.present || st.stale:
@@ -142,7 +164,10 @@ func (s Schtasks) Inspect(job Job) (State, error) {
 // Install registers the task from XML staged in TempDir. schtasks reads task
 // XML as UTF-16, so the file is written in it, with a byte-order mark.
 func (s Schtasks) Install(job Job) error {
-	st := s.read(job)
+	st, err := s.read(job)
+	if err != nil {
+		return err
+	}
 	if st.present && !st.stale && !st.upgrade {
 		return nil
 	}
@@ -167,8 +192,9 @@ func (s Schtasks) Install(job Job) error {
 
 // Remove deletes the task.
 func (s Schtasks) Remove(job Job) error {
-	if !s.read(job).present {
-		return nil
+	st, err := s.read(job)
+	if err != nil || !st.present {
+		return err
 	}
 	if _, err := s.Run("/Delete", "/TN", job.Names.Task, "/F"); err != nil {
 		return fmt.Errorf("schtasks /Delete %s: %w", job.Names.Task, err)

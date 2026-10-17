@@ -104,7 +104,9 @@ Get-ScheduledTask -TaskName DotfilesSelfUpdate
 Get-ScheduledTaskInfo -TaskName DotfilesSelfUpdate   # LastRunTime / LastTaskResult
 ```
 
-Run it once by hand with `dotf update` (safe; it no-ops on a clean, current repo).
+Run it once by hand with `dotf update`. On a clean, current checkout it changes nothing, unless the
+installed `dotf` is not the checkout's `DOTF_VERSION` pin: then it runs the installer, which
+installs the pin and converges.
 
 ## Diagnose
 

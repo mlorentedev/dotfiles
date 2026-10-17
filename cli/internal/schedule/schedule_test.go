@@ -278,6 +278,7 @@ var errNotFound = exitStatus(1)
 // handed back UTF-16 with a byte-order mark, as schtasks prints it.
 type fakeSchtasks struct {
 	tasks map[string]string
+	fail  bool // the scheduler refuses every query
 	calls []string
 }
 
@@ -285,6 +286,16 @@ func (f *fakeSchtasks) run(args ...string) (string, error) {
 	f.calls = append(f.calls, strings.Join(args, " "))
 	switch args[0] {
 	case "/Query":
+		if f.fail {
+			return "", exitStatus(1)
+		}
+		if args[1] == "/FO" {
+			var b strings.Builder
+			for name := range f.tasks {
+				b.WriteString(`"\` + name + `","N/A","Ready"` + "\r\n")
+			}
+			return b.String(), nil
+		}
 		x, ok := f.tasks[args[2]]
 		if !ok {
 			return "", errNotFound
@@ -340,8 +351,8 @@ func TestSchtasks_InstallThenCurrentThenRemove(t *testing.T) {
 		t.Fatalf("after install: %+v", s)
 	}
 	st.calls = nil
-	if err := b.Install(job); err != nil || len(st.calls) != 1 {
-		t.Errorf("a second install must only query, ran %q (%v)", st.calls, err)
+	if err := b.Install(job); err != nil || len(st.calls) != 2 {
+		t.Errorf("a second install must only list and query, ran %q (%v)", st.calls, err)
 	}
 
 	elevated = true
@@ -370,6 +381,36 @@ func TestSchtasks_InstallThenCurrentThenRemove(t *testing.T) {
 }
 
 // The task setup-windows.ps1 registered carries no digest.
+// A refused query is an error, not an absent task: read as absence, opt-out
+// would report the task removed while it still runs daily.
+func TestSchtasks_ARefusedQueryIsNotAnAbsentTask(t *testing.T) {
+	st := &fakeSchtasks{tasks: map[string]string{}}
+	b := Schtasks{Run: st.run, User: `HOST\me`, TempDir: t.TempDir()}
+	if err := b.Install(testJob()); err != nil {
+		t.Fatal(err)
+	}
+	st.fail = true
+	if _, err := b.Inspect(testJob()); err == nil {
+		t.Error("inspect must fail when the scheduler refuses the query")
+	}
+	if err := b.Remove(testJob()); err == nil {
+		t.Error("remove must fail when the scheduler refuses the query")
+	}
+	if _, ok := st.tasks["ExampleJob"]; !ok {
+		t.Error("the task must survive a failed remove")
+	}
+}
+
+func TestListsTask_MatchesTheRootFolderPathOnly(t *testing.T) {
+	list := "\"\\Other\",\"N/A\",\"Ready\"\r\n\"\\Sub\\ExampleJob\",\"N/A\",\"Ready\"\r\n"
+	if listsTask(list, "ExampleJob") {
+		t.Error("a task of the same name in another folder is not this one")
+	}
+	if !listsTask(list+"\"\\ExampleJob\",\"N/A\",\"Ready\"\r\n", "ExampleJob") {
+		t.Error("the root-folder task must be found")
+	}
+}
+
 func TestSchtasks_TaskWithoutTheDigestIsUnmanaged(t *testing.T) {
 	st := &fakeSchtasks{tasks: map[string]string{"ExampleJob": "<Task><RegistrationInfo><Description>dotfiles self-deploy</Description></RegistrationInfo></Task>"}}
 	s, err := Schtasks{Run: st.run, TempDir: t.TempDir()}.Inspect(testJob())
