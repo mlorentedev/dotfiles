@@ -70,11 +70,11 @@ setup() {
 @test "pi's sidebar entry carries the session title row (#2646)" {
     # pi 1.2.0 sets the terminal title itself, so herdr's terminal_title_stripped
     # is the session name; without this row a pi pane shows the default rows only.
-    command -v herdr >/dev/null 2>&1 || skip "herdr is not on PATH (mise installs it: dotf tools sync)"
-    run grep -E '^pi[[:space:]]*=' "$SRC"
-    [ "$status" -eq 0 ] || false
-    run sed -n '/^\[ui\.sidebar\.agents\.rows_by_agent\]/,/^\[/p' "$SRC"
-    [[ "$output" == *'"terminal_title_stripped"'* ]] || false
+    # Static on purpose: it needs no herdr binary, so it runs on every runner.
+    run sed -n '/^\[ui\.sidebar\.agents\.rows_by_agent\]/,/^\[worktrees\]/p' "$SRC"
+    pi_block=$(printf '%s\n' "$output" | sed -n '/^pi[[:space:]]*=[[:space:]]*\[/,/^\]/p')
+    [ -n "$pi_block" ] || { echo "no pi = [...] block under rows_by_agent"; false; }
+    [[ "$pi_block" == *'"terminal_title_stripped"'* ]] || { echo "$pi_block"; false; }
 }
 
 @test "herdr config check validates rows_by_agent tokens, so the row above cannot rot" {
