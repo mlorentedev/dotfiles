@@ -1,0 +1,28 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "debt-20261017T1907Z"
+armed_by: manu
+armed_at: 2026-10-17T19:07:00Z
+expires_at: 2026-10-17T22:07:00Z
+objective: "Split _report_adjacent_issues in scripts/check-spec-gate.sh under the 40-line function rule (#2709) as a pure behaviour-preserving change, and land it."
+scope:
+  write_paths:
+    - "scripts/check-spec-gate.sh"
+    - "tests/**"
+  frozen_paths: [".github/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml"]
+  max_files: 4
+  max_loc: 100
+allowed_commands: [dotf, gh, git, bats, shellcheck, caffeinate]
+queue:
+  source: bitacora
+  filter: "exactly #2709 (owner instruction 2026-10-17, relayed by dotfiles-20 with the owner's authorisation, in the user turn). Nothing else."
+  max_items: 1
+budget:
+  max_iterations: 3
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
