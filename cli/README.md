@@ -64,7 +64,8 @@ absent and fast-forwarded when its upstream is ahead, under the same rule as
 reported skipped). Records come next: the harness mirror, then the agents'
 instruction files, so no agent runs before its instructions exist. Then the
 tools, then every `ai/deploy.json` config that applies to this machine
-(`configs-deploy`, the loop behind `dotf deploy`), then the hooks each
+(`configs-deploy`, the loop behind `dotf deploy`), then the zsh completions of
+`dotf` and `herdr` written to `~/.zsh/completions` (`shell-completions`), then the hooks each
 harness's settings file declares (`records-bind`, the engine behind
 `dotf harness bind`), then the git config, and on
 macOS the launchd environment (`env-persist`). On Linux and Windows the setup

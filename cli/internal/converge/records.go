@@ -75,6 +75,9 @@ type Options struct {
 	// HerdrRun runs herdr for its agent integrations; unset, that half of
 	// agent-extensions is skipped.
 	HerdrRun tools.Runner
+	// CompletionRun runs a tool's `completion zsh` and returns its stdout;
+	// ExecStdout in production. Unset, the shell-completions step is skipped.
+	CompletionRun tools.Runner
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
 	RunSetup func(Env) error
@@ -103,6 +106,7 @@ func Registry(o Options) []Reconciler {
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
+		shellCompletions{run: o.CompletionRun, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath, resolve: o.ResolvePath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},

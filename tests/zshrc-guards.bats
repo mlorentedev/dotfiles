@@ -125,3 +125,81 @@ load_rc() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"-C $SANDBOX/bin/terraform" ]] || false
 }
+
+# DX-005: the dump rule. compinit -C trusts the dump and never scans fpath, so a
+# completion added after it is invisible until a full run rebuilds it. COMPDIR
+# holds a `foo` completion that is told apart by _comps[foo]: 1 when compinit
+# scanned it, 0 when it trusted a dump that predates it.
+comp_setup() {
+    COMPDIR="$SANDBOX/home/.zsh/completions"
+    DUMP="$SANDBOX/home/.zcompdump"
+    mkdir -p "$COMPDIR"
+    run load_rc 'true'              # no dump yet: a full run writes one
+    [ "$status" -eq 0 ] || false
+    [ -s "$DUMP" ] || false
+}
+
+add_foo_completion() {
+    printf '#compdef foo\n_foo() { :; }\n' > "$COMPDIR/_foo"
+}
+
+@test "a fresh dump is trusted: a completion older than it is not scanned (dump)" {
+    comp_setup
+    add_foo_completion
+    touch -t 202001010000 "$COMPDIR/_foo"
+    run load_rc 'print -r -- "foo=${+_comps[foo]}"'
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "foo=0" ] || false
+}
+
+@test "a dump older than a day is rebuilt (dump)" {
+    comp_setup
+    add_foo_completion
+    touch -t 202001010000 "$COMPDIR/_foo" "$DUMP"
+    run load_rc 'print -r -- "foo=${+_comps[foo]}"'
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "foo=1" ] || false
+}
+
+@test "an insecure completion directory neither prompts nor blocks the rebuild (dump)" {
+    # Stock Debian and Ubuntu (and GitHub's runners) have a group-writable
+    # site-functions on fpath; a plain compinit warns on stderr and asks.
+    comp_setup
+    chmod 777 "$COMPDIR"
+    add_foo_completion
+    touch -t 202001010000 "$DUMP"
+    run load_rc 'print -r -- "foo=${+_comps[foo]}"'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [ "$output" = "foo=1" ] || false
+}
+
+@test "a completion newer than a fresh dump rebuilds it (dump)" {
+    comp_setup
+    sleep 1
+    add_foo_completion
+    run load_rc 'print -r -- "foo=${+_comps[foo]}"'
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "foo=1" ] || false
+}
+
+@test "~/.zsh/completions leads fpath and fpath holds no duplicate (fpath)" {
+    mkdir -p "$SANDBOX/home/.zsh/completions"
+    run load_rc 'print -rl -- $fpath'
+    [ "$status" -eq 0 ] || false
+    [ "${lines[0]}" = "$SANDBOX/home/.zsh/completions" ] || false
+    dups=$(printf '%s\n' "${lines[@]}" | sort | uniq -d)
+    [ -z "$dups" ] || { echo "duplicate fpath entries: $dups"; false; }
+}
+
+@test "the Homebrew block runs before compinit, so its site-functions are in the dump (fpath)" {
+    brew_line=$(grep -n 'shellenv' "$REPO/.zshrc" | head -1 | cut -d: -f1)
+    compinit_line=$(grep -n '^[[:space:]]*if \[\[ -n "\$_zcfull" \]\]' "$REPO/.zshrc" | head -1 | cut -d: -f1)
+    [ -n "$brew_line" ] && [ -n "$compinit_line" ] || false
+    [ "$brew_line" -lt "$compinit_line" ] || false
+}
+
+@test "completion menus are selectable (menu)" {
+    run load_rc 'zstyle -L ":completion:*" menu'
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"menu select"* ]] || false
+}

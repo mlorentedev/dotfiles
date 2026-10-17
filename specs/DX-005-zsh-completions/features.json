@@ -1,0 +1,30 @@
+[
+  {
+    "id": "DX-005-zsh-completions-f1",
+    "behavior": "AC1: a stale or older-than-completions dump is rebuilt; a fresh one is trusted",
+    "verification": "bats tests/zshrc-guards.bats -f 'dump'",
+    "state": "passing",
+    "evidence": "bats tests/zshrc-guards.bats 13/13 on macOS and ubuntu:24.04 non-root, 2026-10-16"
+  },
+  {
+    "id": "DX-005-zsh-completions-f2",
+    "behavior": "AC2 and AC3: brew site-functions and ~/.zsh/completions on fpath once, before compinit; menu select set",
+    "verification": "bats tests/zshrc-guards.bats -f 'fpath|menu'",
+    "state": "passing",
+    "evidence": "bats tests/zshrc-guards.bats 13/13 (fpath, brew-before-compinit, menu), 2026-10-16"
+  },
+  {
+    "id": "DX-005-zsh-completions-f3",
+    "behavior": "AC4: the shell-completions step writes _dotf and _herdr, is idempotent, and skips a missing tool by name",
+    "verification": "cd cli && go test ./internal/converge -run ShellCompletions",
+    "state": "passing",
+    "evidence": "go test ./internal/converge -run ShellCompletions; live converge: 1 changed, then 0 changed, 2026-10-16"
+  },
+  {
+    "id": "DX-005-zsh-completions-f4",
+    "behavior": "AC5: startup latency within 10 ms of the baseline",
+    "verification": "see verification.md (medians of 20 runs, before and after)",
+    "state": "passing",
+    "evidence": "medians of 20 runs: main 44.4/45.5 ms, branch 44.2/44.7 ms; see verification.md, 2026-10-16"
+  }
+]

@@ -3,6 +3,24 @@
 [[ -n "${DOTFILES_PROFILE:-}" ]] && zmodload zsh/zprof
 
 # ==========================
+#       COMPLETION PATHS
+# ==========================
+# Everything compinit should know sits on fpath BEFORE it runs: Homebrew's
+# site-functions come from its shellenv, so that runs here, ahead of compinit
+# (Apple Silicon or Intel; a nested shell inherits HOMEBREW_PREFIX and the
+# fpath it built, so it does not run brew again), then the completions
+# `dotf converge` writes for dotf and herdr (DX-005). typeset -U drops the
+# duplicate a login shell's own shellenv leaves.
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
+    done
+    unset _brew
+fi
+[[ -d "$HOME/.zsh/completions" ]] && fpath=("$HOME/.zsh/completions" $fpath)
+typeset -U fpath
+
+# ==========================
 #       OH MY ZSH SETUP
 # ==========================
 export ZSH="$HOME/.oh-my-zsh"
@@ -11,14 +29,29 @@ plugins=(git)
 
 # Load Oh My Zsh when it is installed; without it, initialise completion
 # directly, so a machine that has not run setup still gets a working shell
-# (#2013 W6).
+# (#2013 W6). A full compinit audits every completion file; -C skips that and
+# trusts the dump, which is the fast path. The full run happens when the dump
+# is missing or a day old, or when a completion in ~/.zsh/completions is newer
+# than it, so a new _tool shows up without waiting. The glob qualifiers need no
+# EXTENDED_GLOB.
 if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
     source "$ZSH/oh-my-zsh.sh"
 else
-    autoload -Uz compinit && compinit -C
+    autoload -Uz compinit
+    _zcd="${ZDOTDIR:-$HOME}/.zcompdump"
+    _zcfull=1
+    for _zc in "$_zcd"(N.mh-24); do _zcfull=; done
+    for _zc in "$HOME"/.zsh/completions/_*(N.e:'[[ $REPLY -nt $_zcd ]]':); do _zcfull=1; break; done
+    # -u on the full run: Debian and Ubuntu ship /usr/local/share/zsh/site-functions
+    # group-writable, so compaudit would ask "Ignore insecure directories?" on
+    # every rebuild. -C already trusted every file; -u keeps that and rebuilds.
+    if [[ -n "$_zcfull" ]]; then compinit -u; else compinit -C; fi
+    unset _zcd _zcfull _zc
 fi
 # Case-insensitive, partial-word completion.
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+# Arrow-key menu on a second TAB.
+zstyle ':completion:*' menu select
 
 # ==========================
 #       ENVIRONMENT
@@ -125,15 +158,7 @@ unset -f _dotfiles_home
 # Start with system paths or current path
 # export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Homebrew (macOS): its shellenv when brew is installed, Apple Silicon or Intel,
-# and not already loaded. A nested shell inherits HOMEBREW_PREFIX with the PATH
-# shellenv built, so it does not run brew again.
-if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
-    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-        [[ -x "$_brew" ]] && eval "$("$_brew" shellenv)" && break
-    done
-    unset _brew
-fi
+# Homebrew's shellenv runs at the top of this file, ahead of compinit.
 
 # Prepend Tool Paths (priority over system), for the homes that exist
 [[ -n "${JAVA_HOME:-}" ]] && export PATH="$JAVA_HOME/bin:$PATH"
