@@ -115,7 +115,8 @@ installs the pin and converges.
 Every `dotf update`, a skip included, writes `<state dir>/update/last.json` (`$XDG_STATE_HOME/dotfiles`,
 else `~/.local/state/dotfiles`). Doctor's `Self-deploy` section reads it: **FAIL** when the last run
 failed, **WARN** when there is none yet, when it is older than three days, or when it skipped for a
-reason that recurs every night (dirty, diverged, no upstream).
+reason that recurs every night (`dirty`, `diverged`, `no-upstream`, `not-a-repo`, `ff-failed`; the list is
+`stuckStatuses` in `cli/internal/update/record.go`).
 
 | Symptom | Likely cause | Action |
 |---|---|---|

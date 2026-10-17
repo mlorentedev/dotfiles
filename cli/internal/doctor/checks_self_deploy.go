@@ -30,27 +30,33 @@ func checkSelfDeploy(sys *System, rep *Report) {
 	if sys.Scheduler == nil {
 		return
 	}
-	backend, err := sys.Scheduler(sys.GOOS, sys.home())
+	home := sys.home()
+	backend, err := sys.Scheduler(sys.GOOS, home)
 	if errors.Is(err, schedule.ErrUnsupported) {
 		return // no scheduler on this OS: the step does not run here either
 	}
 	rep.Section("Self-deploy")
-	if err != nil {
-		rep.Warn("cannot reach the scheduler: " + err.Error())
-		return
-	}
-	home := sys.home()
-	roles, err := envpkg.LoadMachineRoles(envpkg.MachinePath(home))
-	if err != nil {
-		rep.Warn(err.Error())
+	roles, rerr := envpkg.LoadMachineRoles(envpkg.MachinePath(home))
+	if rerr != nil {
+		rep.Warn(rerr.Error())
 		return
 	}
 	optedIn := slices.Contains(roles, envpkg.RoleSelfDeploy)
-	st, err := backend.Inspect(update.Trigger(sys.GOOS, home, sys.Getenv))
-	switch {
-	case err != nil:
-		rep.Warn("cannot read the self-deploy trigger: " + err.Error())
+	var st schedule.State
+	if err == nil {
+		st, err = backend.Inspect(update.Trigger(sys.GOOS, home, sys.Getenv))
+	}
+	if err != nil {
+		// A host with no user scheduler to reach (a container, a server with
+		// no user bus) has nothing to warn about until it opts in.
+		if optedIn {
+			rep.Warn("cannot read the self-deploy trigger: " + err.Error())
+		} else {
+			rep.Skip("this machine has not opted in (" + selfDeployOptIn + "); its scheduler could not be read either: " + err.Error())
+		}
 		return
+	}
+	switch {
 	case !optedIn && !st.Present:
 		rep.Skip("this machine has not opted in (" + selfDeployOptIn + ")")
 		return

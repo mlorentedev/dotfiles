@@ -56,6 +56,7 @@ func TestCheckSelfDeploy_ByState(t *testing.T) {
 		{name: "opted in, no trigger → WARN naming the converge", optIn: true, state: schedule.State{Where: where, Pending: []string{"write the agent"}}, want: StatusWarn, needle: "dotf converge --only self-deploy"},
 		{name: "opted in, an unmarked trigger → WARN naming the converge", optIn: true, state: schedule.State{Present: true, Where: where, Pending: []string{"adopt"}}, want: StatusWarn, needle: "dotf converge --only self-deploy"},
 		{name: "scheduler unreadable → WARN", optIn: true, inspect: errors.New("launchctl print: exit 5"), want: StatusWarn, needle: "launchctl print: exit 5"},
+		{name: "not opted in, scheduler unreadable → SKIP naming the opt-in", inspect: errors.New("no user bus"), want: StatusSkip, needle: "dotf env role add self-deploy"},
 		{name: "opted in, no run recorded → WARN naming the first run", optIn: true, state: current, want: StatusWarn, needle: "no run recorded yet"},
 		{name: "last run failed → FAIL with its error", optIn: true, state: current, record: run(time.Hour, "converge-failed", errors.New("converge: exit 1")), want: StatusFail, needle: "converge: exit 1"},
 		{name: "last run older than three days → WARN", optIn: true, state: current, record: run(4*24*time.Hour, "updated", nil), want: StatusWarn, needle: "4 days ago"},
@@ -133,10 +134,16 @@ func TestCheckSelfDeploy_UnreadableRolesWarn(t *testing.T) {
 	}
 }
 
-// A scheduler that exists but cannot be reached is said; only an OS with none
-// has no section.
+// A scheduler that exists but cannot be reached is said once the machine opted
+// in; only an OS with none has no section.
 func TestCheckSelfDeploy_AnUnreachableSchedulerWarns(t *testing.T) {
-	s := newSys(map[string]string{"HOME": t.TempDir()}, nil, nil)
+	home := t.TempDir()
+	config := filepath.Join(home, ".config")
+	t.Setenv("XDG_CONFIG_HOME", config)
+	if _, err := envpkg.SetMachineRole(envpkg.MachinePath(home), envpkg.RoleSelfDeploy, true); err != nil {
+		t.Fatal(err)
+	}
+	s := newSys(map[string]string{"HOME": home, "XDG_CONFIG_HOME": config}, nil, nil)
 	s.GOOS = "linux"
 	s.Scheduler = func(string, string) (schedule.Backend, error) { return nil, errors.New("no user bus") }
 	var buf bytes.Buffer
