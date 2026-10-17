@@ -246,6 +246,15 @@ func TestForgePRCreateNeverGuessesTheBase(t *testing.T) {
 	}
 }
 
+// Cross-fork heads are out of scope, so the scope line is a guard, not a hope.
+func TestForgePRCreateRefusesACrossForkHead(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	_, err := runForge(t, "pr", "create", "--title", "t", "--base", "main", "--head", "fork:branch", "--body-file", writeBody(t, "b"))
+	if err == nil || !strings.Contains(err.Error(), "FIX:") || len(rec.calls) != 0 {
+		t.Errorf("err=%v calls=%v", err, rec.calls)
+	}
+}
+
 func TestForgePREditIsTheIssueEdit(t *testing.T) {
 	rec := stubForgeWrite(t, "https://github.com/o/n.git")
 	if _, err := runForge(t, "pr", "edit", "6", "--title", "retitled"); err != nil {

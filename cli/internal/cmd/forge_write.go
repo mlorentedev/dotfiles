@@ -178,8 +178,11 @@ func newForgeCommentCmd(what string) *cobra.Command {
 var forgeWriteBranch = func() (string, error) {
 	out, err := exec.Command("git", "symbolic-ref", "--short", "-q", "HEAD").Output()
 	name := strings.TrimSpace(string(out))
-	if err != nil || name == "" {
+	if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
 		return "", fmt.Errorf("ERROR: no branch is checked out. WHY: --head defaults to the current branch and HEAD is detached. FIX: pass --head <branch>")
+	}
+	if err != nil {
+		return "", fmt.Errorf("ERROR: could not read the current branch: %v. WHY: --head defaults to the current branch. FIX: run it from a git checkout, or pass --head <branch>", err)
 	}
 	return name, nil
 }
@@ -202,6 +205,9 @@ func newForgePRCreateCmd() *cobra.Command {
 			}
 			if strings.TrimSpace(base) == "" {
 				return fmt.Errorf("ERROR: no base branch. WHY: dotf forge does not guess which branch the pull request targets. FIX: pass --base <branch>")
+			}
+			if strings.Contains(head, ":") {
+				return fmt.Errorf("ERROR: --head %q names a branch of another repository. WHY: dotf forge opens pull requests from a branch of the same repository only. FIX: pass a plain branch name", head)
 			}
 			body, err := readForgeBody(bodyFile)
 			if err != nil {
