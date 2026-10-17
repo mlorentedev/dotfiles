@@ -25,7 +25,11 @@
   - `e1e11251` applies one finding: a missing sshd is now read from sc.exe's exit code, not from its output.
   - One finding was declined with evidence: `net.ParseCIDR` rejects dotted masks.
   - It closes only with acceptance on the work-lab box. The open conditions are in `verification.md`, row 214.
-  - It touches `cli/internal/converge/records.go`, as #2682 (self-deploy) does. Whoever lands second rebases.
+  - Once #2675, #2692 and #2682 (self-deploy) had landed, #2672 had conflicts. `ca0ee7f5` merges main into it, no force push:
+    - `records.go` keeps both `selfDeploy` and `sshtarget.PathsFor`;
+    - `verification.md` keeps both evidence blocks.
+  - #2683 got the same in `393991d2`: `PowerFor` now declares both `Pmset` and `Powercfg`.
+  - Both branches pass build, vet (both GOOS), `go test ./...` and lint after the merge. Merge `main` again before the lab session.
 - #2683: the Windows power policy through `powercfg` (standby, hibernate, lid action; AC only). Stacked on #2672 and triaged.
   - `500dc172` tightens the index parser.
   - The lidless-box question is left for the lab: skipping a missing setting needs powercfg's localized answer, measured first.
@@ -69,6 +73,8 @@ The rollback line is in the runbook: `pmset -c disksleep 10 autorestart 0`, the 
 | #2692 land | `dotf pr triage-queue --pr 2692` then `dotf pr land 2692` | 0, `[MERGED] #2692 at 31df521` |
 | pf merged with main (#2681) | build, vet (both GOOS), `go test ./...`, lint | 0 / 0 issues |
 | #2374 | `gh api repos/.../issues/2374` | `closed / completed` |
+
+Repo-wide `dotf pr triage-queue`, run at 10:15Z: exit 1. The only PR it lists is #2693 (a peer's self-deploy PR, CodeRabbit not yet triaged). It is not this run's to dispose of, and none of this run's PRs is listed.
 
 Review triage comments:
 - #2672: 6232223332
