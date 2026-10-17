@@ -43,3 +43,7 @@ The orchestrator implements nothing and merges nothing. Each session lands only 
 ## Events
 
 - 08:10Z armed. Wake-lock: pilot-r5's `caffeinate -i -t 36000` covers the Mac until about 17:53Z.
+- 08:15Z briefs sent to all six sessions with idle subscriptions; 16 refill tickets reserved by assign plus comment.
+- 08:20Z to 09:00Z every run declined the refill as sent: a peer's relay of the owner's word cannot widen a committed envelope (correct per the autopilot skill). The owner then chose relay through `herdr agent prompt`, but the answer arrived after the runs had ended.
+- The runs coordinated their own landing order; one out-of-order land (#2682 before #2672) left a one-line rebase that sec011 absorbed by merging main.
+- 18:04Z all six runs ended (queue-empty or goal-reached). Orchestrator disarmed.
