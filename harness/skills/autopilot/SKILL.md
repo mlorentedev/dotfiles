@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 6c1b4a2270a5ee35
+generated_sha: 60d40c58088bd959
 id: autopilot-skill
 type: skill
 status: active
@@ -129,7 +129,8 @@ A ticket is pilot-eligible only if ALL hold:
 - **Atomic Claim:** Self-assign the ticket to lease it:
   ```bash
   gh issue edit "$ISSUE_NUM" --add-assignee "@me"
-  gh issue comment "$ISSUE_NUM" --body "Picked up in autonomous pilot mode. Branch: feat/<slug>"
+  CLAIM_FILE=$(mktemp); printf '%s\n' "Picked up in autonomous pilot mode. Branch: feat/<slug>" > "$CLAIM_FILE"
+  dotf forge issue comment "$ISSUE_NUM" --body-file "$CLAIM_FILE"
   ```
   *Note:* Self-assignment updates the Bitácora status machine to `In Progress`.
 - **One Ticket at a Time:** Never multitask across multiple tickets in parallel within the same session.
@@ -195,8 +196,10 @@ Push the branch and open a draft PR:
 ```bash
 git push -u origin "$BRANCH"
 
-PR_URL=$(gh pr create --draft --title "feat(<scope>): <short-description>" \
-  --body "Closes #${ISSUE_NUM}
+# The body goes in a file: `dotf forge` takes no body argument (ADR-052).
+PR_BODY_FILE=$(mktemp)
+cat > "$PR_BODY_FILE" <<EOF
+Closes #${ISSUE_NUM}
 
 ## Summary
 <description>
@@ -210,7 +213,10 @@ $(make verify 2>&1 | tail -15)
 ## Knowledge
 - Lesson: docs/lessons/lesson-<num>-<slug>.md
 - ADR: none: <reason>
-- Runbook: none: <reason>")
+- Runbook: none: <reason>
+EOF
+
+PR_URL=$(dotf forge pr create --draft --base main --title "feat(<scope>): <short-description>" --body-file "$PR_BODY_FILE")
 
 PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 echo "Opened PR #${PR_NUM} at ${PR_URL}"
@@ -247,7 +253,8 @@ dotf agent auto --task "Decide <the fork> for #${ISSUE_NUM}. Options: <A> / <B>.
 - **Park the Ticket Cleanly:**
   1. One comment, in `pattern-agent-oriented-errors` form — ERROR / WHY / FIX — carrying **two** options and their consequences. A park is a *question*, not a status:
      ```bash
-     gh issue comment "$ISSUE_NUM" --body "ERROR: <symptom>. WHY: <root cause>. FIX: (A) <option + consequence> / (B) <option + consequence>."
+     PARK_FILE=$(mktemp); printf '%s\n' "ERROR: <symptom>. WHY: <root cause>. FIX: (A) <option + consequence> / (B) <option + consequence>." > "$PARK_FILE"
+     dotf forge issue comment "$ISSUE_NUM" --body-file "$PARK_FILE"
      ```
   2. Set Bitácora Status `Blocked`: the board is the one park signal (ADR-018), and nothing reads a label. One command, with gh resolving the project, field and option by name at runtime, so no id is pasted anywhere (SSOT for the field set: `00_meta/runbooks/bitacora-project-setup.md` §5). Check its exit status: a park that did not land is not a park.
      ```bash
