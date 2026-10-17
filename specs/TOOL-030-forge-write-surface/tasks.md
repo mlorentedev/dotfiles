@@ -22,8 +22,8 @@ created: "2026-10-16"
 > Four PRs, sequenced. PR 1 measures before anything widens authority.
 
 **PR 0: `tea` for the human, on every OS**
-- [ ] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one)
-- [ ] Add `tea` to `packages.json` and a catalog test; `dotf tools sync` twice reports `changed=0`
+- [x] [P] Verify the package id per manager (brew, apt, winget) by installing it, not by recalling it; record any manager that does not package it and what `dotf tools` does there (a stated skip, never a silent one). Measured 2026-10-17: brew `tea` is Gitea's CLI (installed, 0.16.0); winget `Gitea.tea` is in winget-pkgs (0.16.0), with the install unmeasured until the Windows session; apt's `tea` is a graphical text editor (msi), so Linux names no package and `dotf tools install` prints `tea is not installed on linux by this catalog; skipping`.
+- [x] Add `tea` to `packages.json` and a catalog test; `dotf tools sync` twice reports `changed=0`. The catalog installs system entries with `dotf tools install` (`tools sync` is mise's): the first run installed through brew, the second printed `tea already installed; skipping`. Test: `TestTheRepoCatalogDeclaresGiteaTeaWithoutApt` (mutation: adding `apt: tea` fails it).
 - [ ] Log in from the secrets store through `dotf secrets run`, token never printed (shares the registry entry PR 1 adds for the kubelab Gitea)
 
 **PR 1: the interface and the measurement (no allow rules)**
