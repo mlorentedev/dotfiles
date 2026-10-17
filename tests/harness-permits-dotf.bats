@@ -105,14 +105,17 @@ assert_nothing_denied() {
 @test "envelope: every allowed command has a probe here" {
     local line cmds c
     line="$(grep -m1 '^[[:space:]]*allowed_commands:' "$REPO/harness/skills/autopilot/SKILL.md")" || false
-    cmds="$(printf '%s' "$line" | sed -E 's/^[^[]*\[//; s/\].*$//; s/,/ /g')"
+    cmds="$(printf '%s' "$line" | sed -E 's/^[^[]*\[//; s/\].*$//' | tr ',' '\n' | tr -d ' ')"
     [ -n "$cmds" ] || false
-    for c in $cmds; do
+    while IFS= read -r c; do
+        [ -n "$c" ] || continue
         probes | grep -q "^$c " || {
             printf 'allowed_commands names %s but probes() has no invocation of it\n' "$c" >&2
             return 1
         }
-    done
+    done <<EOF
+$cmds
+EOF
 }
 
 @test "matcher: a deny of dotf is seen in the claude dialect (the guard is not vacuous)" {
@@ -148,18 +151,60 @@ assert_nothing_denied() {
     assert_nothing_denied "$denied" "ai/agy/settings.json"
 }
 
+# Counts the `deny` values a session-level opencode permission puts on bash,
+# whichever form the file uses: `"permission": "deny"`, `{"bash": "deny"}` or the
+# pattern object `{"bash": {"dotf *": "deny"}}`. The file is JSONC with
+# full-line comments only, which is how it is kept. A file that cannot be read
+# or parsed is an error, never a count of zero.
+opencode_bash_denies() {
+    local stripped
+    [ -f "$1" ] || { echo "no such file: $1" >&2; return 2; }
+    stripped="$(grep -vE '^[[:space:]]*//' "$1")" || { echo "nothing left of $1 after comments" >&2; return 2; }
+    printf '%s\n' "$stripped" | jq -er '
+        [ (.permission? // empty)
+          | (if type == "string" then . elif type == "object" then (.bash? // empty) else empty end)
+          | (if type == "object" then .[] else . end)
+          | select(. == "deny") ] | length'
+}
+
+# Prints the keys of the JSON object in $1 that match the extended regex $2,
+# minus any named in $3. Reading the file is checked on its own: a pipe from jq
+# into grep would report grep's status, so a missing file read as "no keys".
+config_keys_matching() {
+    local all
+    all="$(jq -r 'keys[]' "$1")" || { echo "cannot read $1" >&2; return 2; }
+    [ -n "$all" ] || { echo "$1 has no keys" >&2; return 2; }
+    printf '%s\n' "$all" | grep -iE "$2" | grep -vx "${3:-^$}" || true
+}
+
+@test "matcher: opencode's deny forms are all counted, and an unreadable file is an error" {
+    local f="$PROBE_DIR/oc.jsonc"
+    printf '%s' '{"permission":"deny"}' >"$f"
+    [ "$(opencode_bash_denies "$f")" -eq 1 ]
+    printf '%s' '{"permission":{"bash":"deny"}}' >"$f"
+    [ "$(opencode_bash_denies "$f")" -eq 1 ]
+    printf '%s' '{"permission":{"bash":{"*":"deny","git *":"allow"}}}' >"$f"
+    [ "$(opencode_bash_denies "$f")" -eq 1 ]
+    printf '%s' '{"permission":{"edit":"deny","bash":"allow"}}' >"$f"
+    [ "$(opencode_bash_denies "$f")" -eq 0 ]
+    run opencode_bash_denies "$PROBE_DIR/absent.jsonc"
+    [ "$status" -eq 2 ]
+    run config_keys_matching "$PROBE_DIR/absent.json" 'permission'
+    [ "$status" -eq 2 ]
+}
+
 @test "opencode: the session level denies no bash (only the plan agent does)" {
-    local f="$REPO/ai/opencode/opencode.jsonc" bash_rule
-    # The file is JSONC: full-line comments only, which is how it is kept.
-    bash_rule="$(grep -vE '^[[:space:]]*//' "$f" | jq -r '(.permission // {}) | if type == "object" then (.bash // "unset") else . end')" || false
-    case "$bash_rule" in
-        deny) echo "opencode.jsonc denies bash at the session level" >&2; false ;;
-    esac
+    local n
+    n="$(opencode_bash_denies "$REPO/ai/opencode/opencode.jsonc")" || false
+    if [ "$n" -ne 0 ]; then
+        echo "ai/opencode/opencode.jsonc denies bash at the session level" >&2
+        return 1
+    fi
 }
 
 @test "copilot: config.json persists no command deny (those are per-session --deny-tool)" {
     local keys
-    keys="$(jq -r 'keys[]' "$REPO/ai/copilot/config.json" | grep -iE 'den(y|ied)|permission|tool' | grep -vx 'deniedUrls')" || keys=""
+    keys="$(config_keys_matching "$REPO/ai/copilot/config.json" 'den(y|ied)|permission|tool' deniedUrls)" || false
     if [ -n "$keys" ]; then
         printf 'ai/copilot/config.json grew a permission key; probe it here first:\n%s\n' "$keys" >&2
         return 1
@@ -168,7 +213,7 @@ assert_nothing_denied() {
 
 @test "pi: settings.json has no permission model to deny with" {
     local keys
-    keys="$(jq -r 'keys[]' "$REPO/ai/pi/settings.json" | grep -iE 'den(y|ied)|permission|allow')" || keys=""
+    keys="$(config_keys_matching "$REPO/ai/pi/settings.json" 'den(y|ied)|permission|allow')" || false
     if [ -n "$keys" ]; then
         printf 'ai/pi/settings.json grew a permission key; probe it here first:\n%s\n' "$keys" >&2
         return 1
