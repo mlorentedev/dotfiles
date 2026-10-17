@@ -89,7 +89,9 @@ Mac was **asleep** when it wakes, and skips one missed while it was **powered of
 ## Verify it is active
 
 ```bash
+dotf doctor                                       # [Self-deploy]: role, trigger and last run
 dotf converge --plan --only self-deploy           # 0 changes when the trigger is current
+cat ~/.local/state/dotfiles/update/last.json      # the last run: at, status, message, error
 # macOS
 launchctl print gui/$(id -u)/com.github.mlorentedev.dotf.self-deploy
 tail ~/Library/Logs/dotf-self-deploy.log          # the last runs' output
@@ -110,8 +112,16 @@ installs the pin and converges.
 
 ## Diagnose
 
+Every `dotf update`, a skip included, writes `<state dir>/update/last.json` (`$XDG_STATE_HOME/dotfiles`,
+else `~/.local/state/dotfiles`). Doctor's `Self-deploy` section reads it: **FAIL** when the last run
+failed, **WARN** when there is none yet, when it is older than three days, or when it skipped for a
+reason that recurs every night (`dirty`, `diverged`, `no-upstream`, `not-a-repo`, `ff-failed`; the list is
+`stuckStatuses` in `cli/internal/update/record.go`).
+
 | Symptom | Likely cause | Action |
 |---|---|---|
+| doctor: `no run recorded yet` | the trigger was just installed | none: the first run is at 03:00; `dotf update` runs one now |
+| doctor: `has not run since` (older than three days) | the machine was off, or the scheduler lost the trigger | `dotf converge --only self-deploy`, then the per-OS commands above |
 | `[skip] Dirty worktree` in the journal | uncommitted changes in the repo | commit or stash; the timer resumes next slot |
 | `ahead of origin/main ... nothing to deploy` | local commits not pushed yet; `origin/main` has nothing new | none: push when ready; the timer deploys what the upstream holds |
 | `[skip] ... diverged ... (non fast-forward)` | local and `origin/main` both have commits the other lacks | reconcile your branch (rebase or merge); non-ff is never auto-resolved |

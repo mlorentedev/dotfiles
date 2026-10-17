@@ -44,8 +44,8 @@
   {
     "id": "OPS-053-self-deploy-trigger-f7",
     "behavior": "AC7: dotf update writes its last-run record and doctor reports the role, the trigger state and the last run.",
-    "verification": "cd cli && go test ./internal/update ./internal/doctor -run SelfDeploy",
-    "state": "pending",
-    "evidence": "third PR"
+    "verification": "cd cli && go test ./internal/update ./internal/doctor ./internal/cmd -run 'Record|SelfDeploy|Trigger|ConvergesAfterAFastForward'",
+    "state": "implemented",
+    "evidence": "unit tests; live record write and doctor section on the macmini 2026-10-17 against a scratch clone and scratch XDG homes (verification.md)"
   }
 ]
