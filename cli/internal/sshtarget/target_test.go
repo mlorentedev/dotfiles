@@ -81,6 +81,9 @@ func (m *machine) Run(argv ...string) ([]byte, error) {
 	m.rootCalls = append(m.rootCalls, strings.Join(argv, " "))
 	switch argv[0] {
 	case "install":
+		if argv[1] == "-d" {
+			return nil, os.MkdirAll(argv[len(argv)-1], 0o755)
+		}
 		data, err := os.ReadFile(argv[len(argv)-2])
 		if err != nil {
 			return nil, err

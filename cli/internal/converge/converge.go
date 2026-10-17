@@ -18,6 +18,7 @@ type Env struct {
 	Home      string
 	DeployDir string // where the checkout's records are mirrored ($DOTFILES_DIR)
 	GOOS      string
+	Dotf      string // the running build's version
 }
 
 // Result is what one Reconcile call did, or under a plan would do.

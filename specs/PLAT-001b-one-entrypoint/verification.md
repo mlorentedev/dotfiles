@@ -97,6 +97,18 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - paths live under `%ProgramData%\ssh` and the account drops its machine prefix: `TestWindowsPathsUseTheCapabilityTree`, `TestWindowsAccount`
 - Not proven yet, and what closes the row: on the work-lab box (never the corporate one), whether Win32-OpenSSH honours `Include`; whether the plan reads `administrators_authorized_keys` unelevated; `--plan`, an elevated apply, a second apply reporting `changed=0`, `ssh` from the Mac over the mesh, and a LAN connect to port 22 that times out
 
+- SEC-014 PR 1, the record (#2388, macOS arm64, 2026-10-17): `go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> ok; `golangci-lint run ./...` (2.12.2) and `GOOS=windows golangci-lint run` on sshtarget and converge -> 0 issues. What the tests prove, against the fake macOS node:
+  - a fresh machine records the key, drop-in and listener as `created`, the record is the last resource, and the next plan is converged without root: `TestRecordWritesWhatTheFirstApplyCreated`
+  - a drop-in with other content is kept byte for byte as `replaced`: `TestRecordKeepsTheDropInItReplaced`
+  - a machine converged before the record plans only `state record`, writes it with every entry `unknown` (the fake template carries no marker), and runs nothing as root but the two `install` calls: `TestRecordMarksWhatAConvergedMachineAlreadyHadUnknown`
+  - entries are written once, and a failed proof removes the record it wrote with the rest of the run: `TestRecordEntriesAreWrittenOnce`, `TestRecordIsUndoneWithAFailedApply` (review of #2716: it now asserts the record was written before the undo, so dropping the write fails it)
+  - a later entry keeps the stamp of the build that first wrote the record: `TestRecordKeepsTheBuildThatFirstWroteIt`
+  - a drop-in that opens with the step's marker, from this build or an earlier one, is recorded as `created`, never as content to restore, and the checkout's template keeps the marker (review of #2716): `TestRecordTakesADropInWithTheMarkerAsTheStepsOwn`, `TestTheDropInTemplateOpensWithTheMarker`
+  - a malformed record, or one of a later version, stops the plan naming the file: `TestInspectRefusesARecordItCannotRead`; the path per OS: `TestRecordPathPerOS`
+  - six mutations caught: an entry rewritten on every apply, a converged drop-in recorded as `created`, a later version accepted, the record write dropped, the build stamp overwritten, and the marker rule dropped
+- Live on the macmini, read-only (2026-10-17), `go run ./cmd/dotf converge --plan --only workstation-target --repo ~/Projects/dotfiles` from this branch, on the machine converged an hour earlier with 0.74.0: `[CHANGE] workstation-target   14ms  to apply as root: state record; then proves: ...` / `1 to change`; `/var/db/dotf` does not exist yet, which `writeRecord`'s `install -d` creates
+- Not proven yet: the live write on the macmini, which needs the owner at the sudo prompt once this is released (`1 changed`, then `0 changed`, then `cat /var/db/dotf/workstation-target.json`, readable without root, shows the key and listener `unknown` and the drop-in `created`, since it carries the marker)
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
