@@ -89,11 +89,13 @@ func TestIdempotent_NamesTheStepsThatChanged(t *testing.T) {
 // fakeLima answers like a clean guest whose converges report the given
 // changes, and records each call with what it read on stdin.
 type fakeLima struct {
-	changed  []int // the report's change count after each converge
-	runs     int
-	calls    []string
-	stdins   []string
-	failNext string // a call starting with this fails
+	changed   []int // the report's change count after each converge
+	runs      int
+	calls     []string
+	stdins    []string
+	failNext  string // a call starting with this fails
+	silentRun int    // this converge (1-based) writes no report
+	report    bool   // a report exists in the guest
 }
 
 func (f *fakeLima) run(stdin io.Reader, stdout, _ io.Writer, args ...string) error {
@@ -117,7 +119,15 @@ func (f *fakeLima) run(stdin io.Reader, stdout, _ io.Writer, args ...string) err
 		_, _ = io.WriteString(stdout, "/ ext4\n")
 	case strings.Contains(call, " bash -c "):
 		f.runs++
+		if f.runs != f.silentRun {
+			f.report = true // a silent run leaves the previous report in place
+		}
+	case strings.Contains(call, " rm -f "):
+		f.report = false
 	case strings.Contains(call, " cat "):
+		if !f.report {
+			return errors.New("cat: no such file")
+		}
 		_, _ = fmt.Fprintf(stdout, `{"result":"ok","changed":%d,"entries":[{"name":"tools","status":"ok","changes":%d}]}`, f.changed[f.runs-1], f.changed[f.runs-1])
 	}
 	return nil
@@ -186,5 +196,27 @@ func TestVerify_RefusesARefThatIsNotAName(t *testing.T) {
 		if err := Verify(f.run, Options{Ref: ref, Name: "n", Out: io.Discard}); err == nil || len(f.calls) != 0 {
 			t.Errorf("ref %q: err %v after %d call(s)", ref, err, len(f.calls))
 		}
+	}
+}
+
+// A start that fails partway (an image download, provisioning) can leave an
+// instance and its disk behind: the delete must run anyway.
+func TestVerify_AFailedStartStillDeletes(t *testing.T) {
+	f := &fakeLima{failNext: "start "}
+	if err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard}); err == nil {
+		t.Fatal("a failed start must fail the run")
+	}
+	if last := f.calls[len(f.calls)-1]; last != "delete --force n" {
+		t.Errorf("a failed start must still delete the guest, got %q", last)
+	}
+}
+
+// Each converge is judged on the report it wrote: the previous run's report
+// is removed first, so a run that writes none cannot pass on stale data.
+func TestVerify_AConvergeThatWritesNoReportFails(t *testing.T) {
+	f := &fakeLima{changed: []int{0, 0}, silentRun: 2}
+	err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard})
+	if err == nil || !strings.Contains(err.Error(), "left no report") {
+		t.Fatalf("a second converge that wrote no report must fail, got %v", err)
 	}
 }

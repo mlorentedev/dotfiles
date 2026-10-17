@@ -70,10 +70,8 @@ func Verify(l Limactl, o Options) (err error) {
 		return err
 	}
 
-	step(o.Out, "boot %s (Ubuntu 24.04, nothing shared with the host)", o.Name)
-	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl.Name()); err != nil {
-		return fmt.Errorf("limactl start: %w", err)
-	}
+	// Registered before the start: a start that fails partway (an image
+	// download, provisioning) can leave the instance and its disk behind.
 	defer func() {
 		if o.Keep {
 			step(o.Out, "kept: limactl shell %s; remove with limactl delete --force %s", o.Name, o.Name)
@@ -83,6 +81,10 @@ func Verify(l Limactl, o Options) (err error) {
 			err = errors.Join(err, fmt.Errorf("limactl delete %s: %w", o.Name, derr))
 		}
 	}()
+	step(o.Out, "boot %s (Ubuntu 24.04, nothing shared with the host)", o.Name)
+	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl.Name()); err != nil {
+		return fmt.Errorf("limactl start: %w", err)
+	}
 
 	capture := func(args ...string) (string, error) {
 		var out bytes.Buffer
@@ -121,6 +123,11 @@ func Verify(l Limactl, o Options) (err error) {
 	report := home + "/.local/state/dotfiles/converge/last.json"
 	run := func(label string, check func(converge.RunReport) error, args ...string) error {
 		step(o.Out, "%s", label)
+		// Judge this run on its own report: a run that writes none must not
+		// pass on the previous one's.
+		if _, err := capture("rm", "-f", report); err != nil {
+			return err
+		}
 		cmd := append([]string{"shell", "--workdir", repo, o.Name, "--", "bash", "-c", withToken, "_"}, args...)
 		runErr := l(strings.NewReader(o.Token+"\n"), o.Out, o.Out, cmd...)
 		raw, rerr := capture("cat", report)
