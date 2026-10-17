@@ -92,6 +92,9 @@ func TestWorkstationTarget_PlanNeedsNoRoot(t *testing.T) {
 	if !strings.Contains(res.Detail, "firewall not managed on darwin yet") {
 		t.Errorf("the plan does not name the firewall it leaves alone: %q", res.Detail)
 	}
+	if !strings.Contains(res.Detail, "only once someone logs in") {
+		t.Errorf("the plan does not say the mesh needs a login after a reboot: %q", res.Detail)
+	}
 }
 
 func TestWorkstationTarget_ApplyWithoutATerminalIsSkippedWithThePlan(t *testing.T) {

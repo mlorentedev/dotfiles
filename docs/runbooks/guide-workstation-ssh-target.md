@@ -105,6 +105,13 @@ screen until someone types the password. Pick one for each Mac and record it:
   a person at the unlock screen.
 - **Attended:** keep the app. The Mac is reachable only while a user is logged in.
 
+The `workstation-target` step does not switch variants; it reports which one
+runs. Its plan, and `dotf doctor` as a WARN, say so while the mesh would not
+come back after an unattended reboot: on macOS while `launchctl print
+system/com.tailscale.tailscaled` finds no daemon, on Linux while `systemctl
+is-enabled tailscaled` is not `enabled`. On `macmini` the WARN stays by
+decision (attended, #2356 2026-10-13).
+
 **Windows** (elevated PowerShell, after installing Tailscale):
 
 ```powershell
@@ -296,10 +303,20 @@ logind could not reload (until then it still reports the old value):
 `busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandleLidSwitchExternalPower`
 prints `s "ignore"`.
 
-A GNOME desktop has its own idle suspend, which logind does not govern:
+A GNOME desktop has its own idle suspend, which logind does not govern. On
+Ubuntu it is off on AC out of the box: GNOME's schema default is `'suspend'`,
+but the `ubuntu-settings` package overrides `sleep-inactive-ac-timeout` to `0`
+(`/usr/share/glib-2.0/schemas/10_ubuntu-settings.gschema.override`), and a zero
+timeout never fires. Check both keys:
 `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type`
-must print `'nothing'` (it does on msi). Converging it is
-[#2374](https://github.com/mlorentedev/dotfiles/issues/2374).
+prints `'nothing'`, or `sleep-inactive-ac-timeout` prints `0`. Measured on msi
+(Ubuntu 26.04.1, 2026-10-17): `'nothing'` in the user's dconf, the override at
+`0`, and no `Suspending system` in the journal since the lid policy landed on
+2026-10-13 ([#2374](https://github.com/mlorentedev/dotfiles/issues/2374)).
+A GNOME without that override (Fedora, upstream GNOME) suspends an idle session
+on AC, and the step does not converge it: such a machine needs that resource
+added to the step (the `ConditionACPower=false` drop-in #2374 sketches) before
+it becomes a target.
 
 **macOS:** the same converge step sets the AC profile `sleep 0`, `disksleep 0`,
 `womp 1`, `autorestart 1` and `powernap 1` with one `pmset -c`, and only the keys
