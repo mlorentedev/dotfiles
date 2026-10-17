@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 994ad9da78f2871b
+generated_sha: f77de9668ecb8354
 id: autopilot-skill
 type: skill
 status: active
@@ -124,7 +124,7 @@ A ticket is pilot-eligible only if ALL hold:
   ```
   *Verified live 2026-10-14:* `gh project item-list` exposes `status`, `priority`, `type`, `repository` (full URL) and `content.{number,title,type,url}`. A query written against `.repo` selects nothing, silently, in every repository — the run then ends `queue-empty` at minute zero and reports it honestly.
 - **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit** — `dotf spec init` refuses (ADR-043); a refusal is a stop, not a retry.
-- **When the eligible set is empty, the run ENDS — it does not widen.** Not another repo, not another status, not past `Priority`; and never `gh issue create` / `dotf spec init` to manufacture work: a run rewarded for motion produces motion. It ends with `reason: queue-empty` and says so.
+- **When the eligible set is empty, the run ENDS — it does not widen.** Not another repo, not another status, not past `Priority`; and never `gh issue create` / `dotf spec init` to manufacture work *for the queue*: a run rewarded for motion produces motion. This does not forbid filing a defect or follow-up **found while working an item** (detect→ticket, `new-ticket` non-interactive mode): that is debt recorded, not work invented, and the run must file it rather than drop it. It ends with `reason: queue-empty` and says so.
 - **No Path Contention:** Check open PRs and branches (`gh pr list --state open`, `git branch -r`) to ensure no peer session is editing the same files/subsystems.
 - **Atomic Claim:** Self-assign the ticket to lease it:
   ```bash
