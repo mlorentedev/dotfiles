@@ -193,6 +193,57 @@ func TestToolsSync_AnOutdatedLatestToolIsAnUpgrade(t *testing.T) {
 	}
 }
 
+// #2526: an upgrade upstream has not caught up with (a release still inside
+// mise's minimum_release_age) neither fails the apply nor the probe. The step
+// names the tool as behind, so the report says why it is not current.
+func TestToolsSync_ALatestToolUpstreamHasNotReleasedIsBehindNotFailed(t *testing.T) {
+	repo := t.TempDir()
+	writeFixture(t, repo, map[string]string{"versions.conf": "# mise: latest\nJQ_VERSION=1.8.2\n"})
+	env := Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
+	upgrades, outdates := 0, 0
+	run := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && args[0] == "install":
+			return nil, nil
+		case name == "mise" && args[0] == "upgrade":
+			upgrades++ // exits 0 and installs nothing newer
+			return nil, nil
+		case name == "/bin/jq":
+			return []byte("jq-1.8.2"), nil
+		}
+		return nil, errors.New("unexpected: " + name + " " + strings.Join(args, " "))
+	}
+	stdout := func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "mise" && args[0] == "which":
+			return []byte("/bin/jq\n"), nil
+		case name == "mise" && args[0] == "outdated":
+			outdates++
+			return []byte(`{"jq": {"requested": "latest", "current": "1.8.2", "latest": "1.8.3"}}`), nil
+		case name == "mise" && args[0] == "ls":
+			return []byte("{}"), nil
+		case name == "/bin/jq":
+			return run(name, args...)
+		}
+		return nil, errors.New("unexpected: " + name + " " + strings.Join(args, " "))
+	}
+	r := toolsSync{run: run, stdout: stdout, has: func(string) bool { return true }, getenv: func(string) string { return "" }}
+	res, err := r.Reconcile(env, false)
+	if err != nil || upgrades != 1 {
+		t.Fatalf("apply: want one upgrade and no error, got %d, %v", upgrades, err)
+	}
+	if !strings.Contains(res.Detail, "still behind their newest release, retried next run: jq") || strings.Contains(res.Detail, "upgraded") {
+		t.Errorf("detail must name jq as behind, not as upgraded: %q", res.Detail)
+	}
+	asked := outdates
+	if err := r.Probe(env); err != nil {
+		t.Fatalf("probe: a release upstream is not this machine's drift: %v", err)
+	}
+	if outdates != asked {
+		t.Errorf("the probe must not ask mise outdated, asked %d more time(s)", outdates-asked)
+	}
+}
+
 // #2375: an install no pin asks for is drift the plan names, the probe
 // reports and an apply removes, once: the second plan has nothing to prune.
 func TestToolsSync_PlansReportsAndPrunesAnOrphanedInstall(t *testing.T) {

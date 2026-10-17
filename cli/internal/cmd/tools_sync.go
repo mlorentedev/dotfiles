@@ -122,8 +122,11 @@ func printSyncResult(w io.Writer, s tools.MiseSync, pins []tools.MiseTool, p too
 	if len(p.Missing) > 0 {
 		_, _ = fmt.Fprintf(w, "installed: %s\n", strings.Join(p.Missing, ", "))
 	}
-	if len(p.Outdated) > 0 {
-		_, _ = fmt.Fprintf(w, "upgraded to their newest release: %s\n", strings.Join(p.Outdated, ", "))
+	if up := p.Upgraded(); len(up) > 0 {
+		_, _ = fmt.Fprintf(w, "upgraded to their newest release: %s\n", strings.Join(up, ", "))
+	}
+	if len(p.Behind) > 0 {
+		_, _ = fmt.Fprintf(w, "still behind their newest release, retried next run: %s\n", strings.Join(p.Behind, ", "))
 	}
 	if len(p.MissingPackages) > 0 {
 		_, _ = fmt.Fprintf(w, "installed python packages: %s\n", strings.Join(p.MissingPackages, ", "))

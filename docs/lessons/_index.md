@@ -479,4 +479,5 @@ tags: [lessons, index, dotfiles]
 | [458 - A Go reader that predicts an awk reader cannot use bufio.Scanner](lesson-458-a-go-reader-that-predicts-an-awk-reader-cannot-use-bufio-scanner.md) | 2026-10-16 |
 | [459 - Pushing an object the ref already points at is not a refusal](lesson-459-pushing-an-object-the-ref-already-points-at-is-not-a-refusal.md) | 2026-10-16 |
 | [460 - A claim is held by the checkout, not the process or the user](lesson-460-a-claim-is-held-by-the-checkout-not-the-process-or-the-user.md) | 2026-10-16 |
+| [461 - A post-condition that reads upstream turns upstream lag into a failure](lesson-461-a-post-condition-that-reads-upstream-turns-upstream-lag-into-a-failure.md) | 2026-10-16 |
 <!-- END GENERATED -->
