@@ -18,7 +18,7 @@ var errLessonsDrift = errors.New("lessons fmt: files are not in their canonical 
 func newLessonsCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:          "lessons",
-		Short:        "Keep a repository's lessons in one format with a generated index",
+		Short:        "Keep a repository's lessons in one format and render their index",
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
@@ -105,6 +105,7 @@ func newLessonsFmtCmd() *cobra.Command {
 			}
 			stray, err := lessons.StrayIndexes(d)
 			if err != nil {
+				c.PrintErrln("lessons fmt:", err)
 				return err
 			}
 			w := c.OutOrStdout()

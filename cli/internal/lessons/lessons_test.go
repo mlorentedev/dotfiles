@@ -238,6 +238,26 @@ func TestIndex_OneTablePerDirectorySortedByNumber(t *testing.T) {
 	}
 }
 
+// Alphabetical order and numeric order agree while every number is three digits,
+// and os.ReadDir returns names alphabetically, so a render that forgot to sort
+// would still pass the fixture above. A four-digit number is the first to tell
+// them apart: "lesson-1000" sorts before "lesson-101" by name.
+func TestIndex_SortsByNumberNotByFileName(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"lesson-1000-a.md": shapes["recent"],
+		"lesson-101-b.md":  shapes["inline"],
+	})
+	out, err := Index(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(out)
+	small, big := strings.Index(got, "| [101 - "), strings.Index(got, "| [1000 - ")
+	if small < 0 || big < 0 || big < small {
+		t.Errorf("rows missing or sorted by file name, not number:\n%s", got)
+	}
+}
+
 func TestIndex_EscapesAPipeInATitleAndRefusesAnUnreadableLesson(t *testing.T) {
 	piped := strings.Replace(shapes["recent"], "# A checksum proves the bytes", "# A | B", 1)
 	piped = strings.Replace(piped, `title: "A checksum proves the bytes"`, `title: "A | B"`, 1)

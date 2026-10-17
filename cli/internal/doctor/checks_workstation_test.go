@@ -30,6 +30,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 		want    Status
 		needle  string
 		section bool
+		noMesh  bool // tailscaled is neither a launchd daemon nor an enabled unit
 	}{
 		{name: "an OS the step does not run on → no section", goos: "plan9", optIn: true, addrs: mesh, section: false},
 		{name: "windows, the capability's defaults → WARN naming the firewall", goos: "windows", optIn: true, addrs: mesh, want: StatusWarn, needle: "differs from the declared state: firewall", section: true},
@@ -62,6 +63,16 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 		{name: "a directive read before the drop-in → WARN", goos: "darwin", optIn: true, addrs: mesh, want: StatusWarn, needle: "sets PasswordAuthentication before the drop-in", section: true,
 			state: func(t *testing.T, p sshtarget.Paths, _ string) {
 				writeFile(t, p.SSHDConfig, "PasswordAuthentication yes\nInclude "+filepath.Dir(p.DropIn)+"/*\n")
+			}},
+		{name: "linux, converged, tailscaled disabled → WARN naming the reboot", goos: "linux", optIn: true, addrs: mesh, want: StatusWarn, needle: "tailscaled is disabled under systemd", section: true, noMesh: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeConverged(t, p, user)
+			}},
+		{name: "darwin, converged, tailscale as the app → WARN naming the login", goos: "darwin", optIn: true, addrs: mesh, want: StatusWarn, needle: "only once someone logs in", section: true, noMesh: true,
+			state: func(t *testing.T, p sshtarget.Paths, user string) {
+				writeFile(t, p.AuthorizedKeys, "ssh-ed25519 AAAAOwner manu@msi\n")
+				writeFile(t, p.HostKey, "ssh-ed25519 AAAAHost root@macmini\n")
+				writeFile(t, p.DropIn, "AllowUsers "+user+"@"+sshtarget.MeshCIDR+"\nPasswordAuthentication no\n")
 			}},
 		{name: "converged → PASS", goos: "darwin", optIn: true, addrs: mesh, want: StatusPass, needle: "as declared for the mesh address 100.64.0.15", section: true,
 			state: func(t *testing.T, p sshtarget.Paths, user string) {
@@ -110,6 +121,8 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			s.MeshAddrs = func() ([]net.IP, error) { return tc.addrs, nil }
 			s.CommandOutput = func(name string, args ...string) (string, error) {
 				switch {
+				case tc.noMesh && strings.Contains(strings.Join(args, " "), "tailscale"):
+					return "disabled\n", errors.New("exit status 1")
 				case name == "sc.exe" && loaded:
 					return "        START_TYPE         : 2   AUTO_START\n        STATE              : 4  RUNNING\n", nil
 				case name == "sc.exe":
@@ -126,6 +139,11 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				case name == "systemctl" && args[0] == "list-unit-files":
 					return "ssh.service enabled enabled\nssh.socket enabled enabled\n", nil
 				case name == "systemctl" && (args[0] == "is-enabled" || args[0] == "is-active"):
+				case name == "pmset" && len(args) == 2 && args[0] == "-g" && args[1] == "custom":
+					if loaded {
+						return "AC Power:\n sleep 0\n disksleep 0\n womp 1\n autorestart 1\n powernap 1\n", nil
+					}
+					return "AC Power:\n sleep 0\n disksleep 10\n womp 1\n autorestart 0\n powernap 1\n", nil
 				default:
 					t.Fatalf("doctor ran %s %v; it must only read", name, args)
 				}

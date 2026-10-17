@@ -134,6 +134,7 @@ func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]n
 	}
 	t.Power = PowerFor(goos, run, paths)
 	t.Firewall, t.FirewallNote = FirewallFor(goos, run, paths)
+	t.MeshAtBoot = MeshAtBootFor(goos, run)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
 	}
@@ -193,23 +194,28 @@ type Target struct {
 	// says why, so a plan never reads converged in silence.
 	Firewall     Firewall
 	FirewallNote string
-	Root         Root
-	Run          Runner
-	Addrs        func() ([]net.IP, error)
+	// MeshAtBoot is MeshAtBootFor's reader; nil where the target reads none.
+	MeshAtBoot func() string
+	Root       Root
+	Run        Runner
+	Addrs      func() ([]net.IP, error)
 }
 
 // Plan is what differs from the declared state, and whether an apply could
 // proceed.
 type Plan struct {
-	Pending  []string // resource names, in apply order
-	Notes    []string // what the target does not manage here, and why
-	Mesh     net.IP
-	LAN      net.IP // nil when the node has no LAN address to test from
-	dropIn   []byte
-	key      []byte
-	enabled  bool
-	prevDrop []byte // nil when absent
-	prevKeys []byte // nil when absent
+	Pending []string // resource names, in apply order
+	Notes   []string // what the target does not manage here, and why
+	// MeshAtBoot says why the node may stay off the mesh after a reboot
+	// nobody attends; "" when the mesh service starts at boot.
+	MeshAtBoot string
+	Mesh       net.IP
+	LAN        net.IP // nil when the node has no LAN address to test from
+	dropIn     []byte
+	key        []byte
+	enabled    bool
+	prevDrop   []byte // nil when absent
+	prevKeys   []byte // nil when absent
 }
 
 // Converged reports whether nothing differs.
@@ -240,6 +246,9 @@ func (t Target) Inspect() (Plan, error) {
 	}
 	if err := t.checkInclude(); err != nil {
 		return p, err
+	}
+	if t.MeshAtBoot != nil {
+		p.MeshAtBoot = t.MeshAtBoot()
 	}
 	p.key = bytes.TrimSpace(t.Key)
 	if len(p.key) == 0 {
