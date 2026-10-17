@@ -1,0 +1,25 @@
+version: 1
+run_id: "night-20261017T0750Z"
+armed_by: manu
+armed_at: 2026-10-17T07:50:00Z
+expires_at: 2026-10-17T17:50:00Z
+objective: "Drain the owner-released queue: DX-005 zsh-autosuggestions follow-up then its review and archive, #2517, #2543, then #2642 and #2402 if each is a small fix with an obvious cause; land every PR this run opens under the grant and triage every reviewer."
+scope:
+  write_paths: ["versions.conf", "packages.json", "specs/DX-005-zsh-completions/**", "cli/internal/tools/**", "cli/internal/harness/**", "cli/internal/env/**", "cli/internal/converge/bind*.go", "cli/internal/cmd/harness_bind*.go", "cli/internal/doctor/checks_hook_binding*.go", "harness/bind*.json", "cli/internal/spec/**", "cli/internal/deploy/**", "ai/deploy.json", "tests/versions-conf.bats", "tests/zshrc-guards.bats", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", ".agent/runs/night-20261017T0750Z/**"]
+  frozen_paths: [".github/**", ".agent/unattended.yml", "scripts/**", "**/AGENTS.md", "setup-*", "secrets/**", "cli/internal/lane/**", "cli/internal/prland/**", "cli/internal/forgewrite/**", "cli/internal/cmd/forge*.go", "forge/**", "specs/CLI-131-lessons-index-on-read/**", "specs/TOOL-030-forge-write-surface/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, make, bats, shellcheck, golangci-lint, jq]
+queue:
+  source: bitacora
+  filter: "#2645 (DX-005 follow-up, review, archive), #2517 (closes #2469), #2543, #2642, #2402 (owner released #2517 and #2543 2026-10-17; CLI-131 left to its peer session)"
+  max_items: 5
+budget:
+  max_iterations: 10
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
