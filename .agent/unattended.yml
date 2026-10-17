@@ -1,0 +1,25 @@
+version: 1
+run_id: "orch-20261017T0810Z"
+armed_by: manu
+armed_at: 2026-10-17T08:10:00Z
+expires_at: 2026-10-17T19:30:00Z
+objective: "Orchestrate the open dotfiles Claude sessions overnight: keep their ticket claims disjoint, keep their PRs triaged and landing one at a time, and refill any session whose queue empties with a related ticket."
+scope:
+  write_paths: [".agent/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "cli/**", "scripts/**", "setup-*"]
+  max_files: 4
+  max_loc: 0
+allowed_commands: [dotf, gh, git, herdr]
+queue:
+  source: bitacora
+  filter: "No implementation. Reserve refill tickets for the six runs (tool030, night, pilot-r5, sec011, plat003, OPS-053) by assign plus comment; resolve claim overlaps; nudge idle sessions."
+  max_items: 0
+budget:
+  max_iterations: 40
+  max_minutes_per_iteration: 15
+  max_consecutive_failures: 3
+authority:
+  merge: never
+  push: true
+  open_pr: false
+  advisor_tier: top
