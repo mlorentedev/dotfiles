@@ -3,6 +3,7 @@ package lessons
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -252,6 +253,21 @@ func TestIndex_EscapesAPipeInATitleAndRefusesAnUnreadableLesson(t *testing.T) {
 	dup := writeTree(t, map[string]string{"lesson-001-a.md": shapes["recent"], "category/lesson-001-b.md": shapes["recent"]})
 	if _, err := Index(dup); err == nil || !strings.Contains(err.Error(), "used twice") {
 		t.Errorf("a number used twice across directories was rendered: %v", err)
+	}
+}
+
+func TestIndex_ReportsAnUnreadableCategoryDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a directory cannot be made unreadable here")
+	}
+	dir := writeTree(t, map[string]string{"lesson-001-a.md": shapes["recent"], "category/lesson-002-b.md": shapes["inline"]})
+	locked := filepath.Join(dir, "category")
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if _, err := Index(dir); err == nil {
+		t.Error("an unreadable category directory dropped its lessons from the index without an error")
 	}
 }
 

@@ -353,13 +353,21 @@ func lessonDirs(dir string) ([]string, error) {
 // and the changes that would rewrite them, and records each number in seen,
 // failing when one is used twice.
 func readDir(dir string, seen map[int]string) ([]Lesson, []Change, error) {
-	files, err := filepath.Glob(filepath.Join(dir, "lesson-*.md"))
+	// os.ReadDir, not filepath.Glob: Glob drops an I/O error (an unreadable
+	// category directory) and returns no matches, so its lessons would vanish
+	// from the index without a word.
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 	var changes []Change
 	var all []Lesson
-	for _, f := range files {
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasPrefix(name, "lesson-") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		f := filepath.Join(dir, name)
 		raw, err := os.ReadFile(f) //nolint:gosec // the repository's own docs
 		if err != nil {
 			return nil, nil, err
