@@ -23,7 +23,16 @@ type fakeProc struct {
 }
 
 func (p *fakeProc) Done() <-chan error { return p.done }
-func (p *fakeProc) Kill() error        { p.killed = true; return nil }
+
+// Kill ends the process as a signal would: Done reports it.
+func (p *fakeProc) Kill() error {
+	p.killed = true
+	select {
+	case p.done <- errors.New("signal: killed"):
+	default:
+	}
+	return nil
+}
 
 // fakeHost plays QEMU: the install exits on its own (the guest shut itself
 // down) unless installHangs, and the check boot's agent answers ver and
@@ -38,6 +47,7 @@ type fakeHost struct {
 	imgs   [][]string
 	procs  []*fakeProc
 	qmp    []string
+	keys   []string
 	agent  *fakeAgent
 }
 
@@ -107,11 +117,19 @@ func (h *fakeHost) serveQMP(conn net.Conn) {
 			return
 		}
 		var req struct {
-			Execute string `json:"execute"`
+			Execute   string `json:"execute"`
+			Arguments struct {
+				Keys []struct {
+					Data string `json:"data"`
+				} `json:"keys"`
+			} `json:"arguments"`
 		}
 		_ = json.Unmarshal(line, &req)
 		h.mu.Lock()
 		h.qmp = append(h.qmp, req.Execute)
+		for _, k := range req.Arguments.Keys {
+			h.keys = append(h.keys, k.Data)
+		}
 		h.mu.Unlock()
 		_, _ = w.WriteString(`{"return": {}}` + "\n")
 		_ = w.Flush()
@@ -184,6 +202,14 @@ func TestBuild_InstallsChecksAndSealsCleanBase(t *testing.T) {
 	}
 	if h.count("send-key") < 2 {
 		t.Errorf("pressed %d keys at the ISO's prompt", h.count("send-key"))
+	}
+	// Setup's window takes focus within the key window, its Cancel button
+	// focused: Enter or Space there asks to quit the install (measured live).
+	for _, k := range h.keys {
+		if k == "ret" || k == "spc" || k == "kp_enter" {
+			t.Errorf("pressed %q, which activates Setup's focused Cancel button", k)
+			break
+		}
 	}
 	if !strings.Contains(strings.Join(h.agent.seen, " "), "guest-shutdown") {
 		t.Error("the check boot did not power the guest off")

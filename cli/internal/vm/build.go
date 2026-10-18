@@ -147,6 +147,11 @@ func install(h Host, o BuildOptions, log io.Writer) error {
 	}
 }
 
+// bootKey answers the ISO's prompt and is inert in Setup, whose window opens
+// within the key window with its Cancel button focused: Enter or Space there
+// asks to quit the install, an arrow key moves nothing on a lone button.
+const bootKey = "down"
+
 // pressKeys answers the Windows ISO's "press any key to boot from CD" prompt,
 // which a headless guest otherwise lets time out into an empty disk.
 func pressKeys(h Host, o BuildOptions, p Process) error {
@@ -162,7 +167,7 @@ func pressKeys(h Host, o BuildOptions, p Process) error {
 	defer func() { _ = q.Close() }()
 	stop := time.After(o.BootKeys)
 	for {
-		if err := q.PressKey("ret"); err != nil {
+		if err := q.PressKey(bootKey); err != nil {
 			return err
 		}
 		select {
