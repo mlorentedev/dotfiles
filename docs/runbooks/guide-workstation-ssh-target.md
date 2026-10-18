@@ -270,6 +270,19 @@ outlives the timer fails the run rather than reading converged: the disarm
 checks that the kill succeeded and that the anchor is still loaded. A failure
 flushes only this anchor; nothing ever runs `pfctl -d`.
 
+pf counts who enabled it: each `pfctl -E` takes a reference and prints its
+token, and pf turns off only once every token is released (`pfctl -X`). Right
+after its `-E`, the apply records the token, with the boot it was taken in
+(`kern.bootsessionuuid`), in `/var/db/dotf/pf-token`, before the proof runs. A
+failure flushes the anchor and then releases that token. The timer releases the
+tokens the file names for the running boot. A commit keeps only the new one and
+releases the ones that earlier runs took in the same boot. A token from an
+earlier boot is never released: references end at reboot, and the number may
+belong to another holder. The LaunchDaemon's own references, one at each boot
+and one at each apply's `bootstrap`, are not recorded yet (#2790). They keep pf
+enabled until the reboot after the job is removed. Check:
+`sudo pfctl -s References` lists the recorded token.
+
 A self-connection crosses `lo0`, so the Mac proves that pf is enabled and holds
 the anchor, not what the LAN sees: run the negative check below from another
 LAN host. Check: `sudo pfctl -a com.apple/150.dotf-ssh -s rules` lists the
