@@ -274,6 +274,28 @@ func TestLessonsStaleness(t *testing.T) {
 			t.Errorf("want empty, got %q", got)
 		}
 	})
+
+	// An unreadable docs/lessons/ is not "no lessons": falling back to
+	// docs/lessons.md, or to nothing, hides why the check went quiet.
+	for _, rel := range []string{"", "category"} {
+		t.Run("an unreadable lessons directory is named, not skipped: "+filepath.Join("docs", "lessons", rel), func(t *testing.T) {
+			if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+				t.Skip("directory permissions do not deny reads here")
+			}
+			dir := t.TempDir()
+			dated(t, dir, filepath.Join("category", "lesson-001-a.md"), now)
+			mustWrite(t, filepath.Join(dir, "docs", "lessons.md"), "fallback\n")
+			locked := filepath.Join(dir, "docs", "lessons", rel)
+			if err := os.Chmod(locked, 0o000); err != nil {
+				t.Fatalf("chmod: %v", err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(locked, 0o755) }) //nolint:gosec // restores a test directory so TempDir can remove it
+			got := lessonsStaleness(dir, 14, now)
+			if !strings.HasPrefix(got, "\n[lessons] could not read docs/lessons/") || !strings.Contains(got, "permission denied") {
+				t.Errorf("got %q", got)
+			}
+		})
+	}
 }
 
 // --- Brief assembly ----------------------------------------------------------
