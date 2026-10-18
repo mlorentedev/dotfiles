@@ -749,7 +749,16 @@ func (h *healthRun) section7Backlog() {
 		return
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(vd, "10_projects", "*", "11-tasks.md"))
+	matches, unreadable, err := childFiles(filepath.Join(vd, "10_projects"), "11-tasks.md")
+	if err != nil {
+		h.fail("Backlog integrity: cannot read 10_projects: %v", err)
+		return
+	}
+	// A task file that could not be checked is still checked, so the read
+	// error is named per file below rather than taken for an absent backlog.
+	for _, pe := range unreadable {
+		matches = append(matches, pe.Path)
+	}
 	sort.Strings(matches)
 
 	if len(matches) == 0 {

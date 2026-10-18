@@ -351,3 +351,39 @@ func TestDottedRepoNameEncodesLikeClaudeAndDecodes(t *testing.T) {
 		t.Fatalf("decodePath(%q) = %q, want %q", key, got, proj)
 	}
 }
+
+// TestCrystallizeAllReportsAnUnreadableProjectsDir: filepath.Glob read an
+// unreadable ~/.claude/projects as "no MEMORY.md files", and one unreadable
+// project as absent from the count (#2797). The first is an error; the second
+// is a skip the summary counts.
+func TestCrystallizeAllReportsAnUnreadableProjectsDir(t *testing.T) {
+	t.Run("the projects dir", func(t *testing.T) {
+		home := t.TempDir()
+		projects := filepath.Join(home, ".claude", "projects")
+		if err := os.MkdirAll(filepath.Join(projects, "-x", "memory"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		lockDir(t, projects)
+		var buf bytes.Buffer
+		err := CrystallizeAll(&buf, home, "2026-10-18")
+		if err == nil || !strings.Contains(err.Error(), projects) {
+			t.Fatalf("want an error naming %s, got %v\n%s", projects, err, buf.String())
+		}
+	})
+	t.Run("one project in it", func(t *testing.T) {
+		home := t.TempDir()
+		locked := filepath.Join(home, ".claude", "projects", "-locked")
+		if err := os.MkdirAll(filepath.Join(locked, "memory"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		lockDir(t, locked)
+		var buf bytes.Buffer
+		if err := CrystallizeAll(&buf, home, "2026-10-18"); err != nil {
+			t.Fatal(err)
+		}
+		out := buf.String()
+		if !strings.Contains(out, "[WARNING] [-locked] cannot be read") || !strings.Contains(out, "Processed 0 / 1 projects (1 skipped)") {
+			t.Errorf("want the unreadable project warned and counted as skipped\n%s", out)
+		}
+	})
+}

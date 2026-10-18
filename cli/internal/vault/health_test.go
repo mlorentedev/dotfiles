@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -315,4 +316,47 @@ func TestSection7BacklogNoTasksSkips(t *testing.T) {
 	if !strings.Contains(buf.String(), "SKIP: Backlog integrity - no 10_projects/*/11-tasks.md found") {
 		t.Errorf("output = %q, want the no-files skip line", buf.String())
 	}
+}
+
+// lockDir makes dir unreadable for the rest of the test. filepath.Glob read
+// such a directory as holding nothing (#2797).
+func lockDir(t *testing.T, dir string) {
+	t.Helper()
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not deny reads here")
+	}
+	if err := os.Chmod(dir, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) }) //nolint:gosec // restores a test directory so TempDir can remove it
+}
+
+// TestSection7BacklogFailsOverAnUnreadableProjectsTree: "no 11-tasks.md found"
+// over a permission error is a skip that hides the error; it is a failure.
+func TestSection7BacklogFailsOverAnUnreadableProjectsTree(t *testing.T) {
+	t.Run("10_projects itself", func(t *testing.T) {
+		vaultDir := t.TempDir()
+		writeTasks(t, vaultDir, "beta", "- [ ] **B-1** b\n")
+		lockDir(t, filepath.Join(vaultDir, "10_projects"))
+		var buf bytes.Buffer
+		h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
+		h.section7Backlog()
+		if h.failed != 1 || h.skipped != 0 || !strings.Contains(buf.String(), "FAIL: Backlog integrity: cannot read 10_projects: ") {
+			t.Errorf("failed:%d skipped:%d, want the unreadable tree failed\n%s", h.failed, h.skipped, buf.String())
+		}
+	})
+	t.Run("one project of it", func(t *testing.T) {
+		vaultDir := t.TempDir()
+		writeTasks(t, vaultDir, "alpha", "- [ ] **A-1** a\n")
+		writeTasks(t, vaultDir, "beta", "- [ ] **B-1** b\n- [x] **B-1** b\n")
+		lockDir(t, filepath.Join(vaultDir, "10_projects", "alpha"))
+		var buf bytes.Buffer
+		h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
+		h.section7Backlog()
+		out := buf.String()
+		if !strings.Contains(out, "FAIL: Backlog integrity: cannot read alpha/11-tasks.md: ") ||
+			!strings.Contains(out, "FAIL: Backlog drift in beta/11-tasks.md") {
+			t.Errorf("want the unreadable project named and the next one still checked\n%s", out)
+		}
+	})
 }

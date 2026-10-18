@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 )
 
 // checkSkillRecordsAgainstVault compares each committed harness record with the
@@ -37,10 +40,13 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 		return
 	}
 
-	var stale, unstamped []string
+	var stale, unstamped, unread []string
 	checked := 0
 	for _, kind := range []struct{ sub, file string }{{"skills", "SKILL.md"}, {"agents", "AGENT.md"}} {
-		records, _ := filepath.Glob(filepath.Join(repo, "harness", kind.sub, "*", kind.file))
+		records, err := recordFiles(filepath.Join(repo, "harness", kind.sub), kind.file)
+		if err != nil {
+			unread = append(unread, fmt.Sprintf("harness/%s (%v)", kind.sub, err))
+		}
 		for _, rec := range records {
 			name := kind.sub + "/" + filepath.Base(filepath.Dir(rec))
 			from, sha := recordProvenance(rec)
@@ -61,6 +67,9 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 		}
 	}
 
+	if len(unread) > 0 {
+		rep.Warn(fmt.Sprintf("cannot read %s, so those records were not compared with the vault", strings.Join(unread, ", ")))
+	}
 	if len(unstamped) > 0 {
 		sort.Strings(unstamped)
 		rep.Warn(fmt.Sprintf("%d committed harness record(s) carry no generated_from/generated_sha, so they cannot be compared with the vault: %s "+
@@ -73,9 +82,36 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 			"if the records are, pull the vault", len(stale), strings.Join(stale, ", ")))
 		return
 	}
-	if checked > 0 && len(unstamped) == 0 {
+	if checked > 0 && len(unstamped) == 0 && len(unread) == 0 {
 		rep.Pass(fmt.Sprintf("%d committed records match their vault source", checked))
 	}
+}
+
+// recordFiles is filepath.Glob(dir/*/file) without its blind spot: Glob drops
+// I/O errors, so an unreadable records directory read as holding none and the
+// check passed over it (#2797). A dir that does not exist holds no records;
+// any other failure to read it, or to check one of its entries, is returned.
+func recordFiles(dir, file string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var found []string
+	var errs []error
+	for _, e := range entries {
+		p := filepath.Join(dir, e.Name(), file)
+		switch _, err := os.Lstat(p); {
+		case err == nil:
+			found = append(found, p)
+		case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
+		default:
+			errs = append(errs, err)
+		}
+	}
+	return found, errors.Join(errs...)
 }
 
 // recordProvenance reads generated_from and generated_sha from a record's
