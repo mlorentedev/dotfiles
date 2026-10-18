@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
@@ -34,8 +35,12 @@ type envPersistState struct {
 	drift       []env.ResolvedVar
 	retired     []string
 	markerStale bool
-	inLogin     bool // getenv/setenv reach the login session (not tmux/herdr's Background)
+	session     string // the launchd session this process is in (managername)
 }
+
+// inLogin reports whether getenv and setenv reach the login session, which a
+// shell under herdr or tmux (Background) or ssh (StandardIO) does not.
+func (s envPersistState) inLogin() bool { return s.session == env.LoginSession }
 
 func (s envPersistState) changes() int {
 	n := len(s.drift) + len(s.retired)
@@ -74,12 +79,12 @@ func (r envPersist) inspect(e Env) (envPersistState, error) {
 		return st, err
 	}
 	st.plistStale = !bytes.Equal(have, env.LaunchAgentPlist(e.Home))
-	// `launchctl print` exits non-zero (113) for a service launchd does not know.
-	_, err = r.launchctl("print", r.service())
-	st.loaded = err == nil
+	if st.loaded, err = schedule.LaunchdLoaded(schedule.Runner(r.launchctl), r.service()); err != nil {
+		return st, err
+	}
 
 	store := r.store()
-	if st.inLogin, err = store.InLoginSession(); err != nil {
+	if st.session, err = store.Session(); err != nil {
 		return st, err
 	}
 	if st.drift, err = env.Drift(vars, store); err != nil {
@@ -101,11 +106,13 @@ func (r envPersist) Reconcile(e Env, dryRun bool) (Result, error) {
 		return Result{}, err
 	}
 	res := Result{Changes: st.changes(), Detail: envPersistDetail(st, dryRun)}
-	if res.Changes > 0 && !st.inLogin {
+	if res.Changes > 0 && !st.inLogin() {
 		// A write from here lands in the caller's own domain, which no GUI app
-		// reads (#2507): report the drift, change nothing.
+		// reads (#2507): report the drift, change nothing. The session is named
+		// because a herdr or tmux pane is a terminal to the reader (#2714).
 		return Result{Skip: "the login session differs (" + envPersistDetail(st, true) +
-			"), and this process cannot reach it: run dotf converge from a login terminal, or log in again"}, nil
+			"), and this shell is in launchd's " + st.session + " session (herdr, tmux or ssh), which no GUI app reads: " +
+			"run dotf converge in a new Terminal or Ghostty window outside herdr and tmux, or log in again"}, nil
 	}
 	if dryRun || res.Changes == 0 {
 		return res, nil

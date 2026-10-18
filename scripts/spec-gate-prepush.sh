@@ -19,7 +19,8 @@
 # context" is simply the ordinary state before a PR exists (first push of a
 # branch), so any failure to resolve one — no `gh`, no `jq`, unauthenticated,
 # no PR open yet for this branch — falls THROUGH to running check-spec-gate.sh
-# with nothing set, i.e. today's exact behaviour. Once a PR exists for the
+# with nothing set, i.e. today's exact behaviour. A lookup that FAILS (rate limit,
+# offline) additionally prints one line naming the failure (#2710). Once a PR exists for the
 # branch, local pre-push becomes as strict as CI: archive-on-merge and the
 # label-gated skips now apply locally too, not only after push.
 #
@@ -66,13 +67,32 @@ branch=${PRE_COMMIT_REMOTE_BRANCH:-$(git branch --show-current 2>/dev/null || tr
 branch=${branch#refs/heads/}
 [ -n "$branch" ] || _run_gate "$@"
 
-# `.[0] // empty`: no open PR prints nothing, which is the fall-through below.
-if ! meta=$(gh pr list --head "$branch" --state open --limit 1 \
-        --json labels,body,author --jq '.[0] // empty' 2>/dev/null) || [ -z "$meta" ]; then
-    # No open PR for this branch yet, or the developer is unauthenticated. Both
-    # are the ordinary local baseline, not an error this wrapper reports on.
+# REST, not `gh pr list`: that is GraphQL, and parallel sessions exhaust its
+# shared quota on busy nights (#2710). REST draws on the core quota instead.
+# `head=` needs the owner qualifier; the branch is URI-encoded so a `/` or `&`
+# in its name cannot change the query. `.[0] // empty` prints nothing when no
+# open PR matches (REST answers `[]` with exit 0), which is the fall-through
+# below. The expression maps the REST shape (`user`) to the one read further down.
+head_ref=$(jq -rn --arg b "$branch" '$b | @uri')
+errf=$(mktemp)
+if meta=$(gh api "repos/{owner}/{repo}/pulls?head={owner}:${head_ref}&state=open&per_page=1" \
+        --jq '.[0] // empty | {labels: [.labels[] | {name}], body, author: {login: .user.login}}' 2>"$errf"); then
+    rc=0
+else
+    rc=$?
+fi
+reason=$(head -n 1 "$errf" | tr -d '\r')
+rm -f "$errf"
+if [ "$rc" -ne 0 ]; then
+    # A failed lookup is not "no PR": say so, then gate as before. Silence here
+    # let the gate tell the author to open a PR already open, and the discoverable
+    # fix was --no-verify (#2710).
+    printf "spec-gate: could not resolve this branch's PR (%s); gating without its labels\n" \
+        "${reason:-gh exited $rc}" >&2
     _run_gate "$@"
 fi
+# No open PR for this branch yet: the ordinary local baseline, not an error.
+[ -n "$meta" ] || _run_gate "$@"
 
 # `// ""` on both scalars: gh returns JSON null for an empty body, and the
 # literal string "null" reaching the gate would match headings and label
