@@ -1,7 +1,7 @@
 ---
 id: "OPS-053-self-deploy-trigger"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-17"
 issue: "mlorentedev/dotfiles#2502"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, self-deploy, converge, launchd, systemd, scheduled-task]

@@ -112,15 +112,19 @@ the first converge did not succeed (result failed; failed: records-harness)
 exit status 1
 ```
 
+## Archive decision
+
+Archived on the round-2 verdict, **PASS-WITH-GAPS** at `12818876` (nan/mimo-v2.6-flash, `review.md`). The owner chose option A on #2502 (2026-10-17) and accepted the gaps, which stay open in #2727: no live Linux or Windows `changed=0` until a release carrying #2721 is pinned, no test for `selfDeployWhen`, and the stale F2 row above.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-468-a-machine-role-written-by-an-unreleased-dotf-breaks-the-released-one.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-019-self-deploy-fast-forward-only.md
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] New pattern candidate for `00_meta/patterns/`? no: the scheduling seam is specific to `dotf`; the cross-project rule it rests on (a strict reader makes a new value a breaking change for older binaries) is lesson 468, in this repo.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/OPS-053-self-deploy-trigger/` -> `specs/archive/OPS-053-self-deploy-trigger/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/OPS-053-self-deploy-trigger/` -> `specs/archive/OPS-053-self-deploy-trigger/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
