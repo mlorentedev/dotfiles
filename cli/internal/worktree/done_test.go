@@ -297,6 +297,56 @@ func TestDonePreservesGitignoredLocalFiles(t *testing.T) {
 	}
 }
 
+// #2750: a merged worktree whose only leftovers are what a repo's test or
+// bootstrap target regenerates (a lockfile, coverage reports, test caches) is
+// removed without --force. Refusing it taught --force as the default and so
+// disarmed the refusal for the file that IS work, which still stops it.
+func TestDoneRemovesAWorktreeHoldingOnlyRegenerableOutput(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	if err := os.WriteFile(filepath.Join(repoDir, ".gitignore"), []byte(".env\npoetry.lock\ncoverage.xml\n.coverage\n.coverage.*\nhtmlcov/\n.pytest_cache/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"-C", repoDir, "add", ".gitignore"}, {"-C", repoDir, "commit", "-m", "add gitignore"}, {"-C", wtDir, "merge", "main"}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	for _, rel := range []string{"poetry.lock", "coverage.xml", ".coverage", ".coverage.host.42", "htmlcov/index.html", ".pytest_cache/v/cache/nodeids"} {
+		p := filepath.Join(wtDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("regenerated\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := filepath.Join(wtDir, ".env")
+	if err := os.WriteFile(env, []byte("SECRET=x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath}
+
+	_, err := Done(opts)
+	if err == nil || !strings.Contains(err.Error(), ".env") {
+		t.Fatalf("a .env beside the regenerable files must still stop done, got: %v", err)
+	}
+	for _, name := range []string{"poetry.lock", "coverage.xml", "htmlcov", ".pytest_cache"} {
+		if strings.Contains(err.Error(), name) {
+			t.Errorf("the refusal must name only the .env, got: %v", err)
+		}
+	}
+
+	if err := os.Remove(env); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Done(opts); err != nil {
+		t.Fatalf("regenerable output alone must not need --force, got: %v", err)
+	}
+	if _, statErr := os.Stat(wtDir); !os.IsNotExist(statErr) {
+		t.Errorf("expected the worktree to be removed")
+	}
+}
+
 // #1653 AC2: done refuses a worktree that holds the caller's working directory,
 // and --force does not lift it. --force is about uncommitted changes, and it is
 // routine; the removal it would allow here strands the caller, and a Claude Code

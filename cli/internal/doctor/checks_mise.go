@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -83,7 +84,34 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 	} else if len(orphans) > 0 {
 		rep.Warn(fmt.Sprintf("%d mise install(s) asked for by no pin, each behind a shim that cannot run: %s (run: dotf converge --only tools, which prunes them)", len(orphans), strings.Join(orphans, ", ")))
 	}
-	checkShadowingCopies(sys, home, pins, rep, fix)
+	checkShadowingCopies(sys, home, pins, all.Latest, rep, fix)
+}
+
+// pointsInto reports whether link's own target lies inside dir. The first hop
+// is read, not the resolved chain: mise's shims are themselves links to the
+// mise binary, which lives outside its data dir. The target is read whether or
+// not it exists: a link --fix made stays mise's after mise drops its shim.
+// The target's parent is also compared canonicalised, because macOS reaches
+// the same file through a symlinked prefix (/var is /private/var).
+func pointsInto(link, dir string) bool {
+	target, err := os.Readlink(link)
+	if err != nil {
+		return false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(link), target)
+	}
+	if within(target, dir) {
+		return true
+	}
+	parent, err := filepath.EvalSymlinks(filepath.Dir(target))
+	canon, cerr := filepath.EvalSymlinks(dir)
+	return err == nil && cerr == nil && within(filepath.Join(parent, filepath.Base(target)), canon)
+}
+
+func within(p, dir string) bool {
+	rel, err := filepath.Rel(dir, filepath.Clean(p))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // shellProbes are the non-interactive shells whose startup PATH decides what
@@ -214,13 +242,22 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 // The fix replaces each copy with a link to mise's shim rather than deleting
 // it: a consumer that relied on ~/.local/bin keeps finding the tool, now at its
 // pin. It runs only after every pin is proven to run through mise, and only
-// links to a shim that exists. A symlink is never touched: it is deliberate, or
-// a link this fix made.
-func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *Report, fix bool) {
+// links to a shim that exists. A symlink is never touched. One into mise's data
+// dir is mise's, or a link this fix made. One that points elsewhere, or
+// nowhere, shadows the pin as a copy does: pi's installer left
+// ~/.local/bin/pi -> ~/.pi/agent/bin/pi (#2462). It is reported in both modes,
+// because only the retire step (TOOL-028) can say who made it.
+func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, latest []string, rep *Report, fix bool) {
 	args := []string{"bin-paths", "--bin-names"}
-	// Not the file tools: mise has no executables to list for a zsh plugin.
+	// Not the file tools: mise has no executables to list for a zsh plugin. A
+	// latest pin goes by name: its version is a floor, and mise lists nothing
+	// for a version it did not install (#2462).
 	for _, p := range tools.BinaryPins(pins) {
-		args = append(args, p.Name+"@"+p.Version)
+		if slices.Contains(latest, p.Name) {
+			args = append(args, p.Name)
+		} else {
+			args = append(args, p.Name+"@"+p.Version)
+		}
 	}
 	out, err := sys.CommandStdoutDir(home, "mise", args...)
 	if err != nil {
@@ -228,8 +265,9 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 		return
 	}
 	localBin := filepath.Join(home, ".local", "bin")
+	shims := tools.MiseShimsDir(home, sys.GOOS, sys.Getenv)
 	seen := map[string]bool{}
-	var copies, odd []string
+	var copies, odd, foreign []string
 	for _, name := range strings.Fields(out) {
 		if seen[name] {
 			continue
@@ -241,12 +279,24 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 			odd = append(odd, name)
 			continue
 		}
-		if fi, err := os.Lstat(filepath.Join(localBin, name)); err == nil && fi.Mode().IsRegular() {
+		dst := filepath.Join(localBin, name)
+		fi, err := os.Lstat(dst)
+		switch {
+		case err != nil:
+		case fi.Mode().IsRegular():
 			copies = append(copies, name)
+		case fi.Mode()&os.ModeSymlink != 0 && !pointsInto(dst, filepath.Dir(shims)):
+			target, _ := os.Readlink(dst)
+			foreign = append(foreign, dst+" -> "+target)
 		}
 	}
 	if len(odd) > 0 {
 		rep.Warn("mise bin-paths --bin-names printed entries that are not file names, left alone: " + strings.Join(odd, ", "))
+	}
+	if len(foreign) > 0 {
+		sort.Strings(foreign)
+		rep.Warn(fmt.Sprintf("%d link(s) in %s shadow mise's pinned CLIs and point outside mise: %s (left alone: remove each once nothing needs it)",
+			len(foreign), localBin, strings.Join(foreign, ", ")))
 	}
 	if len(copies) == 0 {
 		return
@@ -261,7 +311,6 @@ func checkShadowingCopies(sys *System, home string, pins []tools.MiseTool, rep *
 			len(copies), localBin, strings.Join(paths, ", ")))
 		return
 	}
-	shims := tools.MiseShimsDir(home, sys.GOOS, sys.Getenv)
 	for _, name := range copies {
 		dst := filepath.Join(localBin, name)
 		shim := filepath.Join(shims, name)

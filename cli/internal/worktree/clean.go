@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -37,6 +38,17 @@ var disposableDirNames = map[string]bool{
 	"htmlcov":           true,
 	".terraform":        true,
 	".terragrunt-cache": true,
+}
+
+// disposableFileNames are files a repo's test or bootstrap target regenerates,
+// matched by base name at any depth, as disposableDirNames are. Only ignored
+// paths reach this list, so a lockfile a repo tracks is never in it (#2750).
+var disposableFileNames = map[string]bool{
+	"coverage.out":  true,
+	"coverage.html": true,
+	"coverage.xml":  true,
+	".coverage":     true,
+	"poetry.lock":   true,
 }
 
 func isDisposableBinaryOrLog(path string) bool {
@@ -82,7 +94,8 @@ func isDisposableExactPath(relPath string) bool {
 	if clean == "" || clean == MetadataFileName || clean == ".DS_Store" || clean == "Thumbs.db" {
 		return true
 	}
-	if clean == "coverage.out" || clean == "coverage.html" || clean == ".coverage" {
+	// .coverage.<host>.<pid> is coverage.py's parallel-mode data file.
+	if base := path.Base(clean); disposableFileNames[base] || strings.HasPrefix(base, ".coverage.") {
 		return true
 	}
 	if isDisposableBinaryOrLog(clean) {

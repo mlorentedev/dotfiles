@@ -1,14 +1,17 @@
 package converge
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // gitAt runs git in dir with a fixed identity and returns trimmed stdout.
@@ -145,15 +148,127 @@ func TestCheckout_RefusesARepositoryThatIsNotDotfiles(t *testing.T) {
 	}
 }
 
-// From zero without git there is nothing the run can do; the failure names
-// the fix on the OS where git is most often missing.
+// From zero without git, and no manager dotf can install it with, the
+// failure names the command that installs it on each OS (#2734).
 func TestCheckout_NoGitFromZeroFailsWithTheFix(t *testing.T) {
-	f := newCheckoutFixture(t)
-	f.step.has = func(string) bool { return false }
-	f.env.GOOS = "darwin"
+	for goos, want := range map[string]string{
+		"darwin":  "xcode-select --install",
+		"linux":   "sudo apt-get install -y git",
+		"windows": "winget install --id Git.Git -e",
+	} {
+		t.Run(goos, func(t *testing.T) {
+			f := newCheckoutFixture(t)
+			f.step.has = func(string) bool { return false }
+			f.env.GOOS = goos
 
-	if _, err := f.step.Reconcile(f.env, true); err == nil || !strings.Contains(err.Error(), "xcode-select --install") {
-		t.Fatalf("want the Command Line Tools hint, got %v", err)
+			if _, err := f.step.Reconcile(f.env, true); err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("want the hint %q, got %v", want, err)
+			}
+		})
+	}
+}
+
+// gitInstaller is the OS manager as the checkout step sees it: it plans git
+// as plan says and counts its installs.
+type gitInstaller struct {
+	plan     tools.PlanAction
+	installs *int
+	fail     error // returned by Install when set
+}
+
+func (g gitInstaller) Plan(t tools.Tool) tools.Plan {
+	return tools.Plan{Name: t.Name, Action: g.plan}
+}
+
+func (g gitInstaller) Install(t tools.Tool) (tools.Result, error) {
+	if t.Name != "git" || t.Source.Winget != "Git.Git" {
+		return tools.Skipped, errors.New("unexpected install of " + t.Name)
+	}
+	*g.installs++
+	if g.fail != nil {
+		return tools.Skipped, g.fail
+	}
+	return tools.Installed, nil
+}
+
+// noGitUntilInstalled is a has that finds git only once it is installed and
+// its directory is on this process's PATH.
+func noGitUntilInstalled(dir string, installs *int) func(string) bool {
+	return func(name string) bool {
+		return name == "git" && *installs > 0 && slices.Contains(filepath.SplitList(os.Getenv("PATH")), dir)
+	}
+}
+
+// A clean Windows has no git, so from zero the step installs it through the
+// OS manager, reaches the directory it lands in, and clones in the same run.
+// A plan names the install and runs nothing (#2734).
+func TestCheckout_NoGitFromZeroInstallsItThroughTheOSManager(t *testing.T) {
+	f := newCheckoutFixture(t)
+	t.Setenv("PATH", os.Getenv("PATH"))
+	installs, dir := 0, filepath.Join(t.TempDir(), "Git", "cmd")
+	f.env.GOOS = "windows"
+	f.step.has = noGitUntilInstalled(dir, &installs)
+	f.step.installer = gitInstaller{plan: tools.PlanInstall, installs: &installs}
+	f.step.registered = func() ([]string, error) { return []string{dir}, nil }
+
+	plan, err := f.step.Reconcile(f.env, true)
+	if err != nil || !strings.Contains(plan.Detail, "install git") || installs != 0 {
+		t.Fatalf("plan = %+v, %v (%d installs); want the install named and none run", plan, err, installs)
+	}
+	res, err := f.step.Reconcile(f.env, false)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if installs != 1 || !strings.Contains(res.Detail, "installed git") || !strings.Contains(res.Detail, "cloned") {
+		t.Errorf("apply = %+v after %d installs; want git installed once and the checkout cloned", res, installs)
+	}
+	if err := f.step.Probe(f.env); err != nil {
+		t.Errorf("probe after the clone: %v", err)
+	}
+}
+
+// An install that leaves git out of reach is a failure that says so, not a
+// clone attempted without git.
+func TestCheckout_AnInstalledGitItCannotReachFails(t *testing.T) {
+	f := newCheckoutFixture(t)
+	t.Setenv("PATH", os.Getenv("PATH"))
+	installs := 0
+	f.env.GOOS = "windows"
+	f.step.has = noGitUntilInstalled(filepath.Join(t.TempDir(), "elsewhere"), &installs)
+	f.step.installer = gitInstaller{plan: tools.PlanInstall, installs: &installs}
+	f.step.registered = func() ([]string, error) { return []string{filepath.Join(t.TempDir(), "Git", "cmd")}, nil }
+
+	if _, err := f.step.Reconcile(f.env, false); err == nil || !strings.Contains(err.Error(), "installed git, but neither") {
+		t.Fatalf("want the unreachable install named, got %v", err)
+	}
+}
+
+// A failed install reports the manager's error and no hint: the hint would
+// name the same install that just failed.
+func TestCheckout_AFailedGitInstallNamesItsCauseNotTheHint(t *testing.T) {
+	f := newCheckoutFixture(t)
+	installs := 0
+	f.env.GOOS = "windows"
+	f.step.has = func(string) bool { return false }
+	f.step.installer = gitInstaller{plan: tools.PlanInstall, installs: &installs, fail: errors.New("winget exited 1")}
+
+	_, err := f.step.Reconcile(f.env, false)
+	if err == nil || !strings.Contains(err.Error(), "winget exited 1") || strings.Contains(err.Error(), "winget install --id") {
+		t.Fatalf("want the install's error without the hint, got %v", err)
+	}
+}
+
+// Where the manager cannot install git (no winget; apt behind sudo), the step
+// fails with the hint, as it did before it could install git.
+func TestCheckout_NoGitAndNoUsableManagerFailsWithTheFix(t *testing.T) {
+	f := newCheckoutFixture(t)
+	installs := 0
+	f.env.GOOS = "windows"
+	f.step.has = func(string) bool { return false }
+	f.step.installer = gitInstaller{plan: tools.PlanMissingManager, installs: &installs}
+
+	if _, err := f.step.Reconcile(f.env, false); err == nil || !strings.Contains(err.Error(), "winget install --id Git.Git -e") || installs != 0 {
+		t.Fatalf("want the hint and no install, got %v (%d installs)", err, installs)
 	}
 }
 
@@ -161,5 +276,44 @@ func TestCheckout_SkippedWithoutARunner(t *testing.T) {
 	res, err := checkout{}.Reconcile(Env{RepoRoot: t.TempDir()}, false)
 	if err != nil || res.Skip == "" {
 		t.Fatalf("no runner must skip, got %+v, %v", res, err)
+	}
+}
+
+// The catalog declares git too, so the tools step installs it where the
+// checkout already exists and never needed a clone (a copied tree, the test
+// guest). Both name the same package, or the two paths install different gits.
+func TestShippedCatalog_DeclaresTheGitTheCheckoutInstalls(t *testing.T) {
+	entries, err := loadCatalog(Env{RepoRoot: filepath.Join("..", "..", "..")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name == "git" {
+			if e.Source.Winget != gitTool.Source.Winget || !e.SupportsOS("windows") {
+				t.Errorf("catalog git = %+v, want winget %q", e.Source, gitTool.Source.Winget)
+			}
+			return
+		}
+	}
+	t.Fatal("packages.json declares no git")
+}
+
+// A shell opened before git was installed keeps a PATH without it: the
+// second converge in the test guest's session skipped the fast-forward with
+// "git is not on PATH". The step reaches the PATH git's installer registered,
+// as the clone path does.
+func TestCheckout_AnExistingCheckoutReachesARegisteredGit(t *testing.T) {
+	f := newCheckoutFixture(t)
+	if _, err := f.step.Reconcile(f.env, false); err != nil {
+		t.Fatalf("clone: %v", err)
+	}
+	t.Setenv("PATH", os.Getenv("PATH"))
+	installs, dir := 1, filepath.Join(t.TempDir(), "Git", "cmd")
+	f.step.has = noGitUntilInstalled(dir, &installs)
+	f.step.registered = func() ([]string, error) { return []string{dir}, nil }
+
+	res, err := f.step.Reconcile(f.env, false)
+	if err != nil || res.Skip != "" {
+		t.Fatalf("second run = %+v, %v; want the fast-forward checked, not skipped", res, err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
@@ -27,7 +28,19 @@ type checkout struct {
 	run gitconfig.Runner // gitconfig.ExecRunner in production
 	url string
 	has func(name string) bool
+	// installer installs git where the OS manager can (gitTool); nil leaves a
+	// missing git to the hint. registered reads the PATH its installer
+	// registers, which this process's PATH, read before the install, lacks.
+	installer  CatalogInstaller
+	registered func() ([]string, error)
 }
+
+// gitTool is git through the OS package manager. packages.json declares the
+// same package for the tools step; it is defined here too because this step
+// runs before any checkout exists to read the catalog from. Only winget names it: dotf never asks for
+// a sudo password, and macOS's git comes with the Command Line Tools, so on
+// those the plan is unsupported and the failure names the command instead.
+var gitTool = tools.Tool{Name: "git", Source: tools.Source{Type: "system", Winget: "Git.Git"}}
 
 func (checkout) Name() string        { return "checkout" }
 func (checkout) Platforms() []string { return nil }
@@ -44,6 +57,11 @@ func (c checkout) Reconcile(e Env, dryRun bool) (Result, error) {
 		return c.clone(e, dryRun)
 	}
 	if err := isDotfilesCheckout(e.RepoRoot); err != nil {
+		return Result{}, err
+	}
+	// A git installed after this process started (by an earlier run, in a
+	// shell opened before it) is on the PATH its installer registered.
+	if err := reachDirs(nil, c.registered); err != nil {
 		return Result{}, err
 	}
 	if !c.has("git") {
@@ -65,8 +83,21 @@ func (c checkout) clone(e Env, dryRun bool) (Result, error) {
 		Detail:  "clone " + c.url + " into " + e.RepoRoot,
 		Gate:    "waits for checkout: not cloned yet",
 	}
+	installed := ""
 	if !c.has("git") {
-		return res, fmt.Errorf("git is not on PATH, so %s cannot be cloned%s", e.RepoRoot, gitHint(e.GOOS))
+		if !c.canInstallGit() {
+			return res, fmt.Errorf("git is not on PATH, so %s cannot be cloned%s", e.RepoRoot, gitHint(e.GOOS))
+		}
+		if dryRun {
+			res.Detail = "install git (" + gitTool.Source.Winget + "), then " + res.Detail
+			return res, nil
+		}
+		// No hint here: it would name the install that just failed, and the
+		// manager's own error is the cause.
+		if err := c.installGit(); err != nil {
+			return res, fmt.Errorf("%w, so %s cannot be cloned", err, e.RepoRoot)
+		}
+		installed = "installed git, then "
 	}
 	if dryRun {
 		return res, nil
@@ -74,8 +105,29 @@ func (c checkout) clone(e Env, dryRun bool) (Result, error) {
 	if _, err := c.run("git", "clone", "--quiet", c.url, e.RepoRoot); err != nil {
 		return res, fmt.Errorf("git clone %s: %w%s", c.url, withStderr(err), gitHint(e.GOOS))
 	}
-	res.Detail = "cloned " + c.url + " into " + e.RepoRoot
+	res.Detail = installed + "cloned " + c.url + " into " + e.RepoRoot
 	return res, nil
+}
+
+// canInstallGit reports whether the OS manager would install git here.
+func (c checkout) canInstallGit() bool {
+	return c.installer != nil && c.installer.Plan(gitTool).Action == tools.PlanInstall
+}
+
+// installGit installs git through the OS manager and reaches the PATH its
+// installer registered, wherever it installed, so the clone that follows
+// finds it.
+func (c checkout) installGit() error {
+	if _, err := c.installer.Install(gitTool); err != nil {
+		return fmt.Errorf("installing git: %w", err)
+	}
+	if err := reachDirs(nil, c.registered); err != nil {
+		return err
+	}
+	if !c.has("git") {
+		return errors.New("installed git, but neither this process's PATH nor the one its installer registered holds it")
+	}
+	return nil
 }
 
 // syncResult reads a Sync or Assess outcome as a step result. Only an
@@ -152,8 +204,13 @@ func lastLineOf(s string) string {
 // gitHint names how to get git where a fresh machine lacks it. On macOS the
 // /usr/bin/git shim exists before the Command Line Tools do, and fails.
 func gitHint(goos string) string {
-	if goos == "darwin" {
+	switch goos {
+	case "darwin":
 		return " (on macOS, install the Command Line Tools: xcode-select --install)"
+	case "linux":
+		return " (install it: sudo apt-get install -y git)"
+	case "windows":
+		return " (install it: winget install --id Git.Git -e)"
 	}
 	return ""
 }

@@ -153,13 +153,18 @@ func (r toolsSync) syncHalf(env Env, entries []tools.Tool, dryRun bool) (Result,
 // ~/.local/bin or mise's shims yet, and a Windows installer names its
 // directory only in the registry, for the next process.
 func (r toolsSync) reach() error {
-	dirs := r.bins
-	if r.registered != nil {
-		reg, err := r.registered()
+	return reachDirs(r.bins, r.registered)
+}
+
+// reachDirs appends to this process's PATH each of dirs, then each directory
+// an installer registered, that PATH lacks, after the caller's own entries.
+func reachDirs(dirs []string, registered func() ([]string, error)) error {
+	if registered != nil {
+		reg, err := registered()
 		if err != nil {
 			return fmt.Errorf("reading the PATH installers registered: %w", err)
 		}
-		dirs = append(slices.Clone(r.bins), reg...)
+		dirs = append(slices.Clone(dirs), reg...)
 	}
 	path := os.Getenv("PATH")
 	have := map[string]bool{}

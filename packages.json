@@ -160,6 +160,16 @@
       }
     },
     {
+      "name": "git",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "git",
+        "winget": "Git.Git",
+        "command": "git"
+      }
+    },
+    {
       "name": "git-lfs",
       "profile": "full",
       "source": {
@@ -244,6 +254,15 @@
         "type": "system",
         "brew": "lima",
         "command": "limactl"
+      }
+    },
+    {
+      "name": "qemu",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "qemu",
+        "command": "qemu-system-aarch64"
       }
     },
     {

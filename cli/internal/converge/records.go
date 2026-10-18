@@ -38,8 +38,9 @@ type Options struct {
 	ToolsBinDirs []string
 	// RegisteredPath reads the PATH installers registered for the next
 	// process (env.RegisteredPath: the registry on Windows, nothing
-	// elsewhere). The tools step reaches it too, so a tool an installer
-	// placed outside ToolsBinDirs runs in the same run. Unset: none.
+	// elsewhere). The tools and checkout steps reach it after they install,
+	// so a tool an installer placed outside ToolsBinDirs, or the git the
+	// checkout step installs, runs in the same run. Unset: none.
 	RegisteredPath func() ([]string, error)
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the checkout and git-config steps are skipped.
@@ -112,7 +113,7 @@ func Registry(o Options) []Reconciler {
 		addrs = sshtarget.InterfaceAddrs
 	}
 	return []Reconciler{
-		checkout{run: o.GitRun, url: url, has: onPath},
+		checkout{run: o.GitRun, url: url, has: onPath, installer: o.ToolsCatalog, registered: o.RegisteredPath},
 		recordsMirror{},
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
