@@ -304,6 +304,28 @@ func TestInspectRefusesANodeOutsideTheMesh(t *testing.T) {
 	}
 }
 
+// Without the OpenSSH server there is no sshd_config, and the plan names the
+// server, through the service probe where it knows the fix (#2758, measured
+// on a Windows guest without the capability).
+func TestInspectNamesAMissingServerBeforeReadingItsConfig(t *testing.T) {
+	m := newMachine(t)
+	if err := os.Remove(m.paths.SSHDConfig); err != nil {
+		t.Fatal(err)
+	}
+	tg := m.target()
+	r := &recorder{answers: map[string]answer{"sc.exe qc": {out: "[SC] OpenService FAILED 1060:", err: exitErr(1060)}}}
+	tg.Service = WindowsService{Run: r.run}
+	if _, err := tg.Inspect(); err == nil || !strings.Contains(err.Error(), "Add-WindowsCapability -Online -Name OpenSSH.Server") {
+		t.Fatalf("Inspect = %v, want the capability named", err)
+	}
+	// A service that answers, with the config still missing: the server is
+	// named, not the failed read.
+	_, err := m.target().Inspect()
+	if err == nil || !strings.Contains(err.Error(), "install the OpenSSH server") || strings.Contains(err.Error(), "read ") {
+		t.Fatalf("Inspect = %v, want the missing server named", err)
+	}
+}
+
 func TestInspectRefusesAConfigThatSkipsTheDropInDir(t *testing.T) {
 	m := newMachine(t)
 	m.write(m.paths.SSHDConfig, "UsePAM yes\n")

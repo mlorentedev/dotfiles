@@ -583,6 +583,14 @@ func splitAddrs(ips []net.IP) (mesh, lan net.IP) {
 // plan and the probe both see a config that undoes the drop-in.
 func (t Target) checkInclude() error {
 	conf, err := os.ReadFile(t.Paths.SSHDConfig)
+	if errors.Is(err, os.ErrNotExist) {
+		// No config means no OpenSSH server. Its service probe names the
+		// fix where it knows one, as Windows' does with the capability.
+		if _, serr := t.Service.Enabled(); serr != nil {
+			return serr
+		}
+		return fmt.Errorf("no %s: install the OpenSSH server first", t.Paths.SSHDConfig)
+	}
 	if err != nil {
 		return fmt.Errorf("read %s: %w", t.Paths.SSHDConfig, err)
 	}
