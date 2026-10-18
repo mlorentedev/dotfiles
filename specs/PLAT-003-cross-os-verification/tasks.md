@@ -30,8 +30,9 @@ created: "2026-10-17"
 - [x] [AC7] Declarative Lima template embedded in `dotf` (plain mode, `mounts: []`, base the image alone, no forwarded agent or host keys); a test pins each and seven mutations fail the suite
 - [x] [AC7] `dotf vm linux`: boot, check systemd is PID 1 and no host directory is mounted, clone a pushed ref, converge twice, delete the guest (even on failure) unless `--keep`; GITHUB_TOKEN only on stdin
 - [x] [AC7] Live run on the Mac: isolation checked in the guest
-- [ ] [AC8] Live run green: blocked on #2688 (BUG-154, `install.sh` leaves `~/.local/bin` off PATH, found by this run); re-run `dotf vm linux --ref <fix>`
-  - #2688 is fixed in Go (option B, owner); the re-run waits for the `dotf` release that carries it
+- [x] [AC8] Live run green: was blocked on #2688 (BUG-154, `install.sh` leaves `~/.local/bin` off PATH, found by this run); re-run `dotf vm linux --ref <fix>`
+  - #2688 is fixed in Go (option B, owner), and the fix shipped in 0.75.0
+  - 2026-10-18: `dotf vm linux --ref v0.75.0` converged with no failed step, and the second converge changed nothing (verification.md)
 - [x] Lesson 473; `lima` catalog entry
 
 ## PR 3 — Tier 3b, Windows 11 ARM VM
