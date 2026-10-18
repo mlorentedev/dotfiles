@@ -445,3 +445,48 @@ func TestGuestRun_DecodesNativeOutputAsUTF8(t *testing.T) {
 		t.Error("guestrun.ps1 sets the console's encoding after it starts install.ps1")
 	}
 }
+
+// --dotf converges with a source build instead of the release the ref pins:
+// the binary reaches the guest beside the archive, and a run without it copies
+// nothing more.
+func TestRun_CopiesADotfBuildIntoTheGuest(t *testing.T) {
+	o := sealedBase(t)
+	o.Dotf = filepath.Join(t.TempDir(), "dotf.exe")
+	if err := os.WriteFile(o.Dotf, []byte("MZ dev build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatalf("%v\n%s", err, o.Out)
+	}
+	if string(g.files[guestWork+`\dotf.exe`]) != "MZ dev build" {
+		t.Error("the dotf build did not reach the guest")
+	}
+
+	o = sealedBase(t)
+	g = newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatalf("%v\n%s", err, o.Out)
+	}
+	if _, ok := g.files[guestWork+`\dotf.exe`]; ok {
+		t.Error("a run without --dotf copied a dotf into the guest")
+	}
+}
+
+// install.ps1 keeps a dotf on PATH that reports "dev" and replaces any other,
+// so the copied build must be in ~\.local\bin, the dir step two runs, and on
+// PATH before install.ps1 starts.
+func TestGuestRun_PutsADotfBuildOnPATHBeforeInstall(t *testing.T) {
+	code := codeLines(string(guestRunScript))
+	install := strings.Index(code, "& powershell.exe")
+	for _, want := range []string{"Copy-Item -Path $dev -Destination (Join-Path $bin 'dotf.exe')", `$env:PATH = "$bin;$env:PATH"`} {
+		at := strings.Index(code, want)
+		if at < 0 {
+			t.Errorf("guestrun.ps1 lacks %q", want)
+			continue
+		}
+		if at > install {
+			t.Errorf("guestrun.ps1 runs %q after it starts install.ps1", want)
+		}
+	}
+}

@@ -29,6 +29,16 @@ try {
     # "$_" keeps their text and drops the record decoration. The default
     # ErrorActionPreference (Continue) lets a warning on stderr pass, where
     # Stop would end the step on it.
+    # A dotf source build the host copied in (--dotf) goes where step two runs
+    # dotf from, and on PATH: install.ps1 keeps a dotf on PATH that reports
+    # "dev", so the run converges with the build, not the pinned release.
+    $dev = Join-Path $work 'dotf.exe'
+    if ($Step -eq 'first' -and (Test-Path $dev)) {
+        $bin = Join-Path $env:USERPROFILE '.local\bin'
+        New-Item -ItemType Directory -Force -Path $bin -ErrorAction Stop | Out-Null
+        Copy-Item -Path $dev -Destination (Join-Path $bin 'dotf.exe') -Force -ErrorAction Stop
+        $env:PATH = "$bin;$env:PATH"
+    }
     if ($Step -eq 'first') {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'install.ps1') 2>&1 |
             ForEach-Object { "$_" } | Out-File -FilePath $log -Encoding utf8

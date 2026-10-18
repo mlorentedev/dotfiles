@@ -73,3 +73,18 @@ func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
 		}
 	}
 }
+
+// A --dotf that names no file is a usage error, refused before any guest
+// boots or any host check runs.
+func TestVMWindows_RefusesADotfThatIsNotAFile(t *testing.T) {
+	for _, path := range []string{filepath.Join(t.TempDir(), "absent.exe"), t.TempDir()} {
+		c := newVMWindowsCmd()
+		c.SetArgs([]string{"--dotf", path})
+		c.SetOut(io.Discard)
+		c.SetErr(io.Discard)
+		err := c.Execute()
+		if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "not a file") {
+			t.Errorf("--dotf %s: got %v (exit %d), want a usage error", path, err, ExitCode(err))
+		}
+	}
+}
