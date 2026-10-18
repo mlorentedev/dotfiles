@@ -23,3 +23,10 @@ Cold start: `dotf doctor --quick` 21 passed, 0 failed; `gh auth status` ok; `dot
 | 10:54 | #2770 | self-triage posted (issuecomment-6248976662: merge content disclosed, pr-agent did not re-review); triage-queue --pr exit 0; no path overlap; `dotf pr land` → MERGED `5e3f383d`. #2754 closed/Done |
 | 11:00 | #2775 | pr-agent 2 THEORETICAL findings both applied in `81096247`: cache only a non-empty pin (an early empty answer no longer freezes), install-time test `TestInstallUvTool_AsksThePinUntilItAnswers` (2 mutations killed); misplaced installUvTool doc comment fixed |
 | 11:02 | housekeeping | worktrees fix-windows-git-bootstrap and fix-windows-uv-wait removed (`dotf worktree done`) |
+| 11:15 | #2780 | attestation re-evaluated to attested after pr-agent's review; self-triage (issuecomment-6249116878); landed. #2764 closed |
+| 11:25 | #2781 | pr-agent 2 findings applied (`115ef3e3`): probe error wrapped with the missing path; installed-service-but-no-config no longer asks to install. Body re-patched |
+| 11:30 | #2782 | pr-agent no findings; self-triage; landed `9a3fe8d8`. #2765 closed |
+| 11:33 | #2783 | pr-agent 2 harness findings declined (body has both sections, label present), part-2 non-compliance by design (parked); self-triage; land waited on another session's `pr land 2779` lock, then MERGED. #2763 stays open (part 2 Blocked) |
+| 11:36 | #2781 | merged main (conflict in target_test.go: both sides added tests; kept both) `034c0daa`, pushed |
+| 11:45 | #2775 | self-triage; landed `81096247`. #2769 closed |
+| 11:47 | #2772 | merged main `9aebb0ae`; body updated with the AC9 run; marked ready |
