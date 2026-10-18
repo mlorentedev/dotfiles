@@ -30,3 +30,6 @@ Cold start: `dotf doctor --quick` 21 passed, 0 failed; `gh auth status` ok; `dot
 | 11:36 | #2781 | merged main (conflict in target_test.go: both sides added tests; kept both) `034c0daa`, pushed |
 | 11:45 | #2775 | self-triage; landed `81096247`. #2769 closed |
 | 11:47 | #2772 | merged main `9aebb0ae`; body updated with the AC9 run; marked ready |
+| 11:50–15:30 | run | **paused ~3h40m: the session hit its claude.ai usage limit** and resumed when it reset. No work ran in the gap; the wake-lock held |
+| 15:31 | #2772 | pr-agent 3 findings applied in `9379264d`: `--dotf` must be a windows/arm64 PE (debug/pe), exit 2 before boot; `guestrun.ps1` fails a step whose dotf hash differs from the build; AC9 evidence pinned to tree `29af6ab2` and the merge commits of #2770/#2775. 2 mutations killed |
+| 15:34 | #2781 | CI green at `272943bf`; self-triage (issuecomment-6251759764); `dotf pr land` → MERGED. #2758 closed; worktree removed |
