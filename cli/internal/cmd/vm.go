@@ -112,7 +112,17 @@ func archiveRef(ref string) (string, error) {
 	if strings.HasPrefix(ref, "-") {
 		return "", fmt.Errorf("ref %q is not a branch, tag or commit name", ref)
 	}
-	if out, err := exec.Command("git", "cat-file", "-e", ref+":install.ps1").CombinedOutput(); err != nil {
+	// From a subdirectory, git archive takes only that subdirectory's tree.
+	top, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "", errors.New("run from the dotfiles repository: it is the archive's source")
+	}
+	git := func(args ...string) ([]byte, error) {
+		c := exec.Command("git", args...)
+		c.Dir = strings.TrimSpace(string(top))
+		return c.CombinedOutput()
+	}
+	if out, err := git("cat-file", "-e", ref+":install.ps1"); err != nil {
 		return "", fmt.Errorf("%s has no install.ps1 (run from the dotfiles repository, with a committed ref): %s", ref, strings.TrimSpace(string(out)))
 	}
 	f, err := os.CreateTemp("", "dotf-vm-*.zip")
@@ -120,7 +130,7 @@ func archiveRef(ref string) (string, error) {
 		return "", err
 	}
 	_ = f.Close()
-	if out, err := exec.Command("git", "archive", "--format=zip", "--prefix=dotfiles/", "-o", f.Name(), ref).CombinedOutput(); err != nil {
+	if out, err := git("archive", "--format=zip", "--prefix=dotfiles/", "-o", f.Name(), ref); err != nil {
 		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("git archive %s: %w: %s", ref, err, strings.TrimSpace(string(out)))
 	}

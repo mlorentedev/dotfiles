@@ -34,7 +34,12 @@ func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
 	git("commit", "-q", "-m", "c")
 	write("install.ps1", "edited")
 	write("secret.txt", "untracked")
-	t.Chdir(repo)
+	// dotf runs from cli/, a subdirectory, where a bare git archive takes
+	// only that subdirectory.
+	if err := os.Mkdir(filepath.Join(repo, "cli"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(repo, "cli"))
 
 	zp, err := archiveRef("HEAD")
 	if err != nil {
