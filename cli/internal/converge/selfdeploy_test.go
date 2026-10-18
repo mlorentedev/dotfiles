@@ -2,12 +2,14 @@ package converge
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
+	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
 // fakeBackend is a scheduler holding one trigger: installing it makes it
@@ -207,5 +209,30 @@ func TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler(t *testing.
 	f := &fakeBackend{inspectErr: bus}
 	if _, err := f.step().Reconcile(selfDeployEnv(t, true), true); err == nil {
 		t.Error("with the role, an unreachable scheduler must stay a failure")
+	}
+}
+
+// The OK detail names the slot the job carries rather than a literal 03:00, so
+// moving the trigger moves the report (OPS-053 review round 1, F7a; #2727).
+func TestSelfDeploy_TheDetailNamesTheJobsSlot(t *testing.T) {
+	for _, tc := range []struct {
+		daily *schedule.Clock
+		want  string
+	}{
+		{&schedule.Clock{Hour: 4, Minute: 15}, "daily at 04:15"},
+		{&schedule.Clock{Hour: 23, Minute: 5}, "daily at 23:05"},
+		{nil, "daily"},
+	} {
+		if got := selfDeployWhen(schedule.Job{Daily: tc.daily}); got != tc.want {
+			t.Errorf("selfDeployWhen(%+v) = %q, want %q", tc.daily, got, tc.want)
+		}
+	}
+
+	f := &fakeBackend{state: managed}
+	e := selfDeployEnv(t, true)
+	res, err := f.step().Reconcile(e, false)
+	want := "dotf update " + selfDeployWhen(update.Trigger(e.GOOS, e.Home, os.Getenv)) + " from " + managed.Where
+	if err != nil || res.Changes != 0 || res.Detail != want {
+		t.Errorf("converged: %+v, %v; want detail %q", res, err, want)
 	}
 }
