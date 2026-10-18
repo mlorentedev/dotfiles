@@ -35,15 +35,15 @@ func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
 	if err := r.reach(); err != nil {
 		return Result{}, err
 	}
-	if r.catalog == nil && r.unavailable() != "" {
-		return Result{Skip: r.unavailable()}, nil
-	}
 	entries, err := r.entries(env)
 	if err != nil {
 		return Result{}, err
 	}
+	if r.catalog == nil && r.unavailable(entries, env.GOOS) != "" {
+		return Result{Skip: r.unavailable(entries, env.GOOS)}, nil
+	}
 	cat := r.walk(entries, !dryRun)
-	res, serr := r.syncHalf(env, dryRun)
+	res, serr := r.syncHalf(env, entries, dryRun)
 	if !dryRun {
 		cat.then(r.walk(cat.retry(), true))
 	}
@@ -75,11 +75,11 @@ func (r toolsSync) Probe(env Env) error {
 		return err
 	}
 	if r.catalog != nil {
-		if lost := unreachable(left, provided(entries, pins, env.GOOS), !r.has("mise")); len(lost) > 0 {
-			return fmt.Errorf("installed by this machine's tools but not on PATH: %s", strings.Join(lost, ", "))
+		if lost := unreachable(left, provided(entries, pins, env.GOOS, r.has("mise")), !r.has("mise")); len(lost) > 0 {
+			return fmt.Errorf("this machine's tool layer provides these, but they are not on PATH: %s", strings.Join(lost, ", "))
 		}
 	}
-	if r.unavailable() != "" {
+	if r.unavailable(entries, env.GOOS) != "" {
 		return nil
 	}
 	// The probe checks this machine, not upstream: a Latest tool still behind
@@ -116,8 +116,8 @@ func (r toolsSync) walk(entries []tools.Tool, apply bool) catalogPass {
 // syncHalf plans or applies the mise sync. mise absent after the first
 // catalog pass is a note, not a failure: the catalog probe already fails when
 // mise was due to be installed and was not.
-func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
-	if skip := r.unavailable(); skip != "" {
+func (r toolsSync) syncHalf(env Env, entries []tools.Tool, dryRun bool) (Result, error) {
+	if skip := r.unavailable(entries, env.GOOS); skip != "" {
 		return Result{Detail: skip}, nil
 	}
 	s, pins, err := r.sync(env)
@@ -160,9 +160,13 @@ func (r toolsSync) reach() error {
 	return os.Setenv("PATH", path)
 }
 
-// unavailable names what the mise half lacks on this machine, or "".
-func (r toolsSync) unavailable() string {
+// unavailable names what the mise half lacks on this machine, or "". The
+// remedy is named only where it works: with the catalog wired, it must
+// install mise on this OS, or `dotf tools install mise` would skip it.
+func (r toolsSync) unavailable(entries []tools.Tool, goos string) string {
 	switch {
+	case !r.has("mise") && r.catalog != nil && !installsMise(entries, goos):
+		return "mise is not on PATH, and this OS's catalog does not install it: the pinned CLIs are not synced here"
 	case !r.has("mise"):
 		return "mise is not on PATH; `dotf tools install mise` installs it"
 	case r.run == nil || r.stdout == nil:

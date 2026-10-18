@@ -30,6 +30,7 @@ type machine struct {
 	present map[string]bool
 	fail    map[string]error
 	offPath map[string]bool // installed where this process's PATH does not reach
+	goos    string          // "" installs every entry, as on an OS each supports
 	log     []string
 }
 
@@ -45,6 +46,8 @@ func (c fakeCatalog) Plan(t tools.Tool) tools.Plan {
 	switch {
 	case c.m.present[t.Name]:
 		p.Action = tools.PlanSkip
+	case c.m.goos != "" && !t.SupportsOS(c.m.goos):
+		p.Action, p.Note = tools.PlanUnsupported, "not installed on "+c.m.goos+" by this catalog"
 	case t.Source.Type == "system":
 		p.Action, p.Manager, p.Package = tools.PlanNeedsSudo, "apt", t.Source.Apt
 		if t.Source.Cask != "" {
@@ -185,6 +188,31 @@ func TestToolsCatalog_AManagerItInstalledButCannotReachFailsTheProbe(t *testing.
 				t.Errorf("probe: want %q named as unreachable, got %v", tc.want, err)
 			}
 		})
+	}
+}
+
+// On an OS whose catalog does not install mise (Windows), the mise pins are
+// not this machine's tools: uv, which a uv-tool entry waits on, arrives from
+// elsewhere later in the run (#2754). The wait is reported, the probe holds,
+// and the skip names no command that would skip too.
+func TestToolsCatalog_AManagerOnlyMiseProvidesIsAWaitWhereMiseIsNotInstalled(t *testing.T) {
+	r, env, m := freshMachine(t)
+	env.GOOS, m.goos = "windows", "windows"
+	writeFixture(t, env.RepoRoot, map[string]string{"packages.json": strings.Replace(catalogFixture,
+		`"checksums": "SHASUMS256.txt"}`, `"checksums": "SHASUMS256.txt", "platforms": ["linux", "darwin"]}`, 1)})
+
+	res, err := r.Reconcile(env, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Detail, "waiting on a manager: hive (uv)") {
+		t.Errorf("apply detail lacks the wait on uv: %s", res.Detail)
+	}
+	if strings.Contains(res.Detail, "dotf tools install mise") {
+		t.Errorf("the detail names a command that skips mise on this OS: %s", res.Detail)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Errorf("probe: want the wait on uv accepted, got %v", err)
 	}
 }
 
