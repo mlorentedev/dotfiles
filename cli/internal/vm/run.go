@@ -84,11 +84,7 @@ func Run(h Host, o RunOptions) (err error) {
 			step(o.Out, "kept: the guest is still running; `dotf vm windows stop` stops it")
 			return
 		}
-		_ = p.Kill()
-		select {
-		case <-p.Done():
-		case <-time.After(30 * time.Second):
-		}
+		kill(p)
 	}()
 	q, err := agent(h, l, o.Agent, p)
 	if err != nil {

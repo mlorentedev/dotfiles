@@ -257,6 +257,9 @@ func TestBuild_RefusesACleanBaseWithSSHD(t *testing.T) {
 	if !h.procs[1].killed {
 		t.Error("the check boot's QEMU was left running")
 	}
+	if len(h.procs[1].done) != 0 {
+		t.Error("Build returned before the check boot's QEMU exited")
+	}
 }
 
 // A headless install that stops leaves nothing but its screen to diagnose.
@@ -270,6 +273,10 @@ func TestBuild_AnInstallThatHangsLeavesAScreenshot(t *testing.T) {
 	}
 	if h.count("screendump") != 1 || !h.procs[0].killed {
 		t.Errorf("screendumps %d, killed %v", h.count("screendump"), h.procs[0].killed)
+	}
+	// A rebuild right after must not meet a dying QEMU on the disk.
+	if len(h.procs[0].done) != 0 {
+		t.Error("Build returned before the killed QEMU exited")
 	}
 	assertNoBase(t, o.Machine.Layout)
 }

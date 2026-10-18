@@ -134,7 +134,7 @@ func install(h Host, o BuildOptions, log io.Writer) error {
 		return err
 	}
 	if err := pressKeys(h, o, p); err != nil {
-		_ = p.Kill()
+		kill(p)
 		return err
 	}
 	select {
@@ -145,8 +145,18 @@ func install(h Host, o BuildOptions, log io.Writer) error {
 		return nil
 	case <-time.After(o.Install):
 		shot := screenshot(h, m.Layout)
-		_ = p.Kill()
+		kill(p)
 		return fmt.Errorf("the install did not finish in %s; %s. In the guest, C:\\Windows\\Temp\\dotf-firstlogon.log holds the first logon's transcript", o.Install, shot)
+	}
+}
+
+// kill ends QEMU and waits, bounded, for it to exit, so the next command
+// never meets a dying QEMU that still holds the disk.
+func kill(p Process) {
+	_ = p.Kill()
+	select {
+	case <-p.Done():
+	case <-time.After(30 * time.Second):
 	}
 }
 
@@ -210,7 +220,7 @@ func checkBoot(h Host, o BuildOptions, log io.Writer) (err error) {
 	}
 	defer func() {
 		if err != nil {
-			_ = p.Kill()
+			kill(p)
 		}
 	}()
 	q, err := agent(h, m.Layout, o.Agent, p)
