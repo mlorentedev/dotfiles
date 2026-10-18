@@ -69,31 +69,12 @@ and suggests matching patterns and skills to load.`,
 
 			var paths []string
 			if diffMode {
-				var diffContent string
-				if len(args) > 0 {
-					data, err := os.ReadFile(args[0])
-					if err != nil {
-						return err
-					}
-					diffContent = string(data)
-				} else {
-					data, err := io.ReadAll(cmd.InOrStdin())
-					if err != nil {
-						return fmt.Errorf("read diff from stdin: %w", err)
-					}
-					diffContent = string(data)
+				paths, err = suggestDiffPaths(cmd, args)
+				if err != nil {
+					return err
 				}
-				paths = harness.ExtractPathsFromDiff(diffContent)
 			} else {
-				if len(args) == 0 && prompt == "" {
-					if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-						if data, err := io.ReadAll(cmd.InOrStdin()); err == nil && len(data) > 0 {
-							paths = harness.ExtractPathsFromDiff(string(data))
-						}
-					}
-				} else {
-					paths = args
-				}
+				paths = suggestPaths(cmd, args, prompt)
 			}
 
 			sugg := harness.SuggestWithDeps(cfg.Triggers, prompt, paths,
@@ -104,26 +85,7 @@ and suggests matching patterns and skills to load.`,
 				enc.SetIndent("", "  ")
 				return enc.Encode(sugg)
 			}
-
-			out := cmd.OutOrStdout()
-			if len(sugg.Patterns) > 0 {
-				_, _ = fmt.Fprintln(out, "Patterns:")
-				for _, p := range sugg.Patterns {
-					_, _ = fmt.Fprintf(out, "  - %s\n", p)
-				}
-			}
-			if len(sugg.Skills) > 0 {
-				if len(sugg.Patterns) > 0 {
-					_, _ = fmt.Fprintln(out)
-				}
-				_, _ = fmt.Fprintln(out, "Skills:")
-				for _, s := range sugg.Skills {
-					_, _ = fmt.Fprintf(out, "  - %s\n", s)
-				}
-			}
-			if len(sugg.Patterns) == 0 && len(sugg.Skills) == 0 {
-				_, _ = fmt.Fprintln(out, "No matching patterns or skills found.")
-			}
+			printSuggestion(cmd.OutOrStdout(), sugg)
 			return nil
 		},
 	}
@@ -136,6 +98,59 @@ and suggests matching patterns and skills to load.`,
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "",
 		"root containing harness/agents and harness/triggers.json (default: the deploy dir, else the checkout)")
 	return cmd
+}
+
+// suggestDiffPaths reads a unified diff from the file named first, or from
+// stdin, and returns the paths it touches.
+func suggestDiffPaths(cmd *cobra.Command, args []string) ([]string, error) {
+	if len(args) > 0 {
+		data, err := os.ReadFile(args[0])
+		if err != nil {
+			return nil, err
+		}
+		return harness.ExtractPathsFromDiff(string(data)), nil
+	}
+	data, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return nil, fmt.Errorf("read diff from stdin: %w", err)
+	}
+	return harness.ExtractPathsFromDiff(string(data)), nil
+}
+
+// suggestPaths returns the paths given as arguments. With neither paths nor a
+// prompt, a diff piped on stdin stands in for them; a terminal is not read.
+func suggestPaths(cmd *cobra.Command, args []string, prompt string) []string {
+	if len(args) > 0 || prompt != "" {
+		return args
+	}
+	if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
+		if data, err := io.ReadAll(cmd.InOrStdin()); err == nil && len(data) > 0 {
+			return harness.ExtractPathsFromDiff(string(data))
+		}
+	}
+	return nil
+}
+
+// printSuggestion writes the suggestion as two lists, or says nothing matched.
+func printSuggestion(out io.Writer, sugg harness.Suggestion) {
+	if len(sugg.Patterns) > 0 {
+		_, _ = fmt.Fprintln(out, "Patterns:")
+		for _, p := range sugg.Patterns {
+			_, _ = fmt.Fprintf(out, "  - %s\n", p)
+		}
+	}
+	if len(sugg.Skills) > 0 {
+		if len(sugg.Patterns) > 0 {
+			_, _ = fmt.Fprintln(out)
+		}
+		_, _ = fmt.Fprintln(out, "Skills:")
+		for _, s := range sugg.Skills {
+			_, _ = fmt.Fprintf(out, "  - %s\n", s)
+		}
+	}
+	if len(sugg.Patterns) == 0 && len(sugg.Skills) == 0 {
+		_, _ = fmt.Fprintln(out, "No matching patterns or skills found.")
+	}
 }
 
 func newHarnessTriggersCmd() *cobra.Command {
