@@ -73,6 +73,10 @@ func TestTrigger_PassesTheXDGHomesAsFlagsOnWindows(t *testing.T) {
 	if len(job.Env) != 0 {
 		t.Errorf("a windows job carries no environment, got %v", job.Env)
 	}
+	root := func(k string) string { return map[string]string{"XDG_STATE_HOME": `E:\`, "XDG_CONFIG_HOME": `F:/`}[k] }
+	if got := Trigger("windows", `C:\Users\me`, root).Args; strings.Join(got, "|") != `update|--config-home|F:\|--state-home|E:\` {
+		t.Errorf("a drive root keeps its separator, since E: alone is relative: %q", got)
+	}
 	if got := Trigger("windows", `C:\Users\me`, noEnv).Args; strings.Join(got, " ") != "update" {
 		t.Errorf("unset homes add no flags: %q", got)
 	}

@@ -55,12 +55,22 @@ func Trigger(goos, home string, getenv func(string) string) schedule.Job {
 		switch {
 		case v == "":
 		case goos == "windows":
-			// A trailing separator would escape the quote TaskXML closes a
-			// value with spaces in.
-			job.Args = append(job.Args, h.flag, strings.TrimRight(v, `\/`))
+			job.Args = append(job.Args, h.flag, windowsFlagPath(v))
 		default:
 			job.Env = append(job.Env, schedule.EnvVar{Name: h.env, Value: v})
 		}
 	}
 	return job
+}
+
+// windowsFlagPath drops a trailing separator, which would escape the quote
+// TaskXML closes a value with spaces in. A drive root keeps its separator:
+// C: alone names the drive's current directory, not an absolute path, and a
+// root has no space to quote.
+func windowsFlagPath(v string) string {
+	t := strings.TrimRight(v, `\/`)
+	if strings.HasSuffix(t, ":") {
+		return t + `\`
+	}
+	return t
 }

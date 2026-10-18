@@ -49,7 +49,8 @@ a skip included, records its outcome in <state dir>/update/last.json, which
 --config-home and --state-home set XDG_CONFIG_HOME and XDG_STATE_HOME for the
 run and everything it starts. The Windows Scheduled Task passes them, because a
 task has no per-action environment; launchd and systemd set the variables
-themselves.
+themselves. A relative one is refused before the run starts: it exits non-zero
+and records nothing, since the state dir it names is the one in doubt.
 
 Env:
   DOTFILES_REPO_DIR              repo to update  (default: the env-contract path)
