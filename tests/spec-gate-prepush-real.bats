@@ -3,13 +3,14 @@
 #
 # The stub suite proves what we ASKED `gh` to do. It cannot prove that `gh`
 # accepts it -- and the likeliest way scripts/spec-gate-prepush.sh breaks in
-# production is a --json field name that is wrong or renamed upstream, which a
-# stub answering any invocation will never surface. That is the BUG-055 shape
+# production is a flag that is wrong or renamed upstream, which a stub
+# answering any invocation will never surface. That is the BUG-055 shape
 # exactly: 15 green cases over a branch the real tool rejected.
 #
-# `gh pr list --json <fields>` validates field names locally, BEFORE it
-# resolves a repository or a branch's PR, so the contract can be pinned with
-# the real binary and no token, no network and no live PR.
+# `gh api` rejects an unknown flag locally, BEFORE it resolves a repository, so
+# the contract can be pinned with the real binary and no live PR. (The lookup
+# moved from `gh pr list --json` to REST in #2710; there are no field names left
+# to validate offline.)
 
 # A real-dependency suite that quietly skips is a green proving nothing
 # (BUG-055, #807). So a missing precondition is FATAL under CI -- where the
@@ -52,20 +53,21 @@ teardown() {
     rm -rf "$OUTSIDE"
 }
 
-@test "real gh accepts every flag and --json field the adapter asks for" {
+@test "real gh accepts every flag the adapter's REST lookup uses" {
     cd "$OUTSIDE" || return 1
-    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author --jq '.[0] // empty'
-    # It must fail (there is no repo here) but NOT because of the field names.
+    run gh api 'repos/{owner}/{repo}/pulls?head={owner}:some-branch&state=open&per_page=1' \
+        --jq '.[0] // empty | {labels: [.labels[] | {name}], body, author: {login: .user.login}}'
+    # It must fail (there is no repo here) but NOT because gh rejected a flag.
     [ "$status" -ne 0 ]
-    [[ "$output" != *"Unknown JSON field"* ]] || false
+    [[ "$output" != *"unknown flag"* ]] || false
+    [[ "$output" != *"unknown command"* ]] || false
 }
 
-@test "the field check is a detector, not a tautology" {
+@test "the flag check is a detector, not a tautology" {
     cd "$OUTSIDE" || return 1
-    run gh pr list --head some-branch --state open --limit 1 --json labels,body,author,notAFieldName --jq '.[0] // empty'
+    run gh api 'repos/{owner}/{repo}/pulls' --notaflag
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Unknown JSON field"* ]] || false
-    [[ "$output" == *"notAFieldName"* ]] || false
+    [[ "$output" == *"unknown flag"* ]] || false
 }
 
 @test "a real gh failure falls through to the gate instead of failing closed" {

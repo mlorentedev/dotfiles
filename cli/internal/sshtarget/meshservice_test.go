@@ -21,9 +21,20 @@ func TestMeshAtBootOnDarwinReadsTheTailscaledDaemon(t *testing.T) {
 	if note := MeshAtBootFor("darwin", answering(t, probe, "state = running\n", nil))(); note != "" {
 		t.Errorf("a loaded tailscaled daemon → %q, want no note", note)
 	}
-	note := MeshAtBootFor("darwin", answering(t, probe, "Could not find service", errors.New("exit status 113")))()
+	note := MeshAtBootFor("darwin", answering(t, probe, "Could not find service", exitErr(113)))()
 	if !strings.Contains(note, "only once someone logs in") || !strings.Contains(note, "FileVault") {
 		t.Errorf("the app without the daemon → %q, want it to say a reboot needs a login", note)
+	}
+	// A print that failed for another reason read nothing: the note says so
+	// and asserts no state (#2731).
+	for name, failure := range map[string]error{
+		"another exit status": exitErr(5),
+		"no exit status":      errors.New("launchctl: no such file or directory"),
+	} {
+		note := MeshAtBootFor("darwin", answering(t, probe, "Bad request.", failure))()
+		if strings.Contains(note, "runs as the app") || !strings.Contains(note, "could not read") || !strings.Contains(note, "system/com.tailscale.tailscaled") {
+			t.Errorf("%s → %q, want a note that the read failed, naming the service", name, note)
+		}
 	}
 }
 

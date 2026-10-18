@@ -90,11 +90,17 @@ func (l Launchd) read(job Job) (launchdState, error) {
 // launchd does not know.
 const launchdUnknown = 113
 
-// loaded reports whether launchd knows the job. Only launchdUnknown means it
-// does not: reading any other failure as "not loaded" would delete the plist
-// of a running agent on opt-out and leave it running.
+// loaded reports whether launchd knows the job.
 func (l Launchd) loaded(job Job) (bool, error) {
-	_, err := l.Run("print", l.service(job))
+	return LaunchdLoaded(l.Run, l.service(job))
+}
+
+// LaunchdLoaded reports whether launchd knows service, through run
+// (`launchctl`). Only launchdUnknown means it does not: reading any other
+// failure as "not loaded" would delete the plist of a running agent on
+// opt-out and leave it running, or bootstrap over a loaded label.
+func LaunchdLoaded(run Runner, service string) (bool, error) {
+	_, err := run("print", service)
 	var exit interface{ ExitCode() int }
 	switch {
 	case err == nil:
@@ -102,7 +108,7 @@ func (l Launchd) loaded(job Job) (bool, error) {
 	case errors.As(err, &exit) && exit.ExitCode() == launchdUnknown:
 		return false, nil
 	}
-	return false, fmt.Errorf("launchctl print %s: %w", l.service(job), err)
+	return false, fmt.Errorf("launchctl print %s: %w", service, err)
 }
 
 func (l Launchd) Inspect(job Job) (State, error) {
