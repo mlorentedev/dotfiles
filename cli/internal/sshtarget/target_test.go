@@ -304,6 +304,29 @@ func TestInspectRefusesANodeOutsideTheMesh(t *testing.T) {
 	}
 }
 
+// Without the OpenSSH server there is no sshd_config, and the plan names the
+// server, through the service probe where it knows the fix (#2758, measured
+// on a Windows guest without the capability).
+func TestInspectNamesAMissingServerBeforeReadingItsConfig(t *testing.T) {
+	m := newMachine(t)
+	if err := os.Remove(m.paths.SSHDConfig); err != nil {
+		t.Fatal(err)
+	}
+	tg := m.target()
+	r := &recorder{answers: map[string]answer{"sc.exe qc": {out: "[SC] OpenService FAILED 1060:", err: exitErr(1060)}}}
+	tg.Service = WindowsService{Run: r.run}
+	_, err := tg.Inspect()
+	if err == nil || !strings.Contains(err.Error(), "Add-WindowsCapability -Online -Name OpenSSH.Server") || !strings.Contains(err.Error(), m.paths.SSHDConfig) {
+		t.Fatalf("Inspect = %v, want the capability and the missing config named", err)
+	}
+	// A service that exists, with the config still missing: never an install
+	// of what is installed, and never the bare failed read.
+	_, err = m.target().Inspect()
+	if err == nil || !strings.Contains(err.Error(), "service is installed") || strings.Contains(err.Error(), "install the OpenSSH") || strings.Contains(err.Error(), "read ") {
+		t.Fatalf("Inspect = %v, want the missing config named for an installed server", err)
+	}
+}
+
 // Win32-OpenSSH reads only a relative Include: it prefixes any other form with
 // its own directory and matches nothing, and `sshd -t` still passes. These are
 // the forms measured ignored on OpenSSH_for_Windows_9.5p2 (#2763).
