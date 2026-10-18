@@ -212,17 +212,6 @@ func finishRunLog(w io.Writer, rl *converge.RunLog) {
 	}
 }
 
-// toolsBinDirs are where the tool layer places what it installs: mise's
-// shims, the catalog's install dir and, on Windows, winget's Links dir, where
-// the catalog's portable packages (uv) land.
-func toolsBinDirs(home, dest string) []string {
-	dirs := []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest}
-	if links := tools.WingetLinksDir(home, runtime.GOOS, os.Getenv); links != "" {
-		dirs = append(dirs, links)
-	}
-	return dirs
-}
-
 // convergeOptions wires the registry's side effects; tests replace it.
 var convergeOptions = func() converge.Options {
 	home := env.Home()
@@ -233,25 +222,26 @@ var convergeOptions = func() converge.Options {
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		// Install progress goes to stderr, apart from the report on stdout.
-		ToolsCatalog:  toolsInstaller(dest, os.Stderr),
-		ToolsBinDirs:  toolsBinDirs(home, dest),
-		GitRun:        gitconfig.ExecRunner,
-		GitStoredAuth: gitconfig.StoredLoginRunner,
-		CloneURL:      os.Getenv("DOTFILES_REPO"),
-		RenderConfigs: strictDeployRenderer,
-		ResolvePath:   env.ResolvePath,
-		Launchctl:     env.ExecLaunchctl,
-		UID:           os.Getuid(),
-		SSHRoot:       sshtarget.RootFor(runtime.GOOS, identityTerminal),
-		UserRun:       sshtarget.Exec,
-		Claude:        claudeSyncer,
-		AgyPaths:      agyPaths,
-		HerdrRun:      tools.ExecRunner,
-		PwshRun:       tools.ExecRunner,
-		CompletionRun: converge.ExecStdout,
-		Scheduler:     converge.NativeScheduler(os.Getuid(), schedule.Elevated),
-		RunSetup:      converge.ExecSetup,
-		DotfPath:      harness.ResolveDotfPath,
+		ToolsCatalog:   toolsInstaller(dest, os.Stderr),
+		ToolsBinDirs:   []string{tools.MiseShimsDir(home, runtime.GOOS, os.Getenv), dest},
+		RegisteredPath: env.RegisteredPath,
+		GitRun:         gitconfig.ExecRunner,
+		GitStoredAuth:  gitconfig.StoredLoginRunner,
+		CloneURL:       os.Getenv("DOTFILES_REPO"),
+		RenderConfigs:  strictDeployRenderer,
+		ResolvePath:    env.ResolvePath,
+		Launchctl:      env.ExecLaunchctl,
+		UID:            os.Getuid(),
+		SSHRoot:        sshtarget.RootFor(runtime.GOOS, identityTerminal),
+		UserRun:        sshtarget.Exec,
+		Claude:         claudeSyncer,
+		AgyPaths:       agyPaths,
+		HerdrRun:       tools.ExecRunner,
+		PwshRun:        tools.ExecRunner,
+		CompletionRun:  converge.ExecStdout,
+		Scheduler:      converge.NativeScheduler(os.Getuid(), schedule.Elevated),
+		RunSetup:       converge.ExecSetup,
+		DotfPath:       harness.ResolveDotfPath,
 	}
 }
 

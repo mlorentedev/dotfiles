@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -24,8 +25,9 @@ type toolsSync struct {
 	run, stdout tools.Runner      // tools.HomeRunners in production
 	has         func(string) bool // is a command on PATH
 	getenv      func(string) string
-	catalog     CatalogInstaller // nil: the catalog half is not wired
-	bins        []string         // where the tool layer places binaries; see reach
+	catalog     CatalogInstaller         // nil: the catalog half is not wired
+	bins        []string                 // where the tool layer places binaries; see reach
+	registered  func() ([]string, error) // the PATH installers registered; nil: none
 }
 
 func (toolsSync) Name() string        { return "tools" }
@@ -45,7 +47,14 @@ func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
 	cat := r.walk(entries, !dryRun)
 	res, serr := r.syncHalf(env, entries, dryRun)
 	if !dryRun {
-		cat.then(r.walk(cat.retry(), true))
+		// An install in the first pass may have registered its directory
+		// (winget's uv on Windows): reach it before the entries that waited
+		// on it are retried.
+		if err := r.reach(); err != nil {
+			serr = errors.Join(serr, err)
+		} else {
+			cat.then(r.walk(cat.retry(), true))
+		}
 	}
 	res.Changes += len(cat.changed)
 	res.Detail = joinDetail(cat.detail(dryRun), res.Detail)
@@ -137,17 +146,27 @@ func (r toolsSync) syncHalf(env Env, entries []tools.Tool, dryRun bool) (Result,
 }
 
 // reach appends to this process's PATH each directory the tool layer places
-// binaries in that PATH lacks, keeping the caller's own entries first. Every
-// lookup after it, in this step and in the steps that follow, then finds what
-// the step installed: the hourly `dotf update` runs with a minimal PATH, and
-// a fresh machine has no rc that adds ~/.local/bin or mise's shims yet.
+// binaries in that PATH lacks, then each one an installer registered, keeping
+// the caller's own entries first. Every lookup after it, in this step and in
+// the steps that follow, then finds what the step installed: the hourly `dotf
+// update` runs with a minimal PATH, a fresh machine has no rc that adds
+// ~/.local/bin or mise's shims yet, and a Windows installer names its
+// directory only in the registry, for the next process.
 func (r toolsSync) reach() error {
+	dirs := r.bins
+	if r.registered != nil {
+		reg, err := r.registered()
+		if err != nil {
+			return fmt.Errorf("reading the PATH installers registered: %w", err)
+		}
+		dirs = append(slices.Clone(r.bins), reg...)
+	}
 	path := os.Getenv("PATH")
 	have := map[string]bool{}
 	for _, dir := range filepath.SplitList(path) {
 		have[dir] = true
 	}
-	for _, dir := range r.bins {
+	for _, dir := range dirs {
 		if have[dir] {
 			continue
 		}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -29,12 +30,18 @@ type machine struct {
 	path    map[string]bool
 	present map[string]bool
 	fail    map[string]error
-	offPath map[string]bool // installed where this process's PATH does not reach
-	goos    string          // "" installs every entry, as on an OS each supports
+	offPath map[string]bool   // installed where this process's PATH does not reach
+	lands   map[string]string // installed into this dir: reached once it is on PATH
+	goos    string            // "" installs every entry, as on an OS each supports
 	log     []string
 }
 
-func (m *machine) has(name string) bool { return m.path[name] }
+func (m *machine) has(name string) bool {
+	if dir := m.lands[name]; dir != "" {
+		return m.present[name] && slices.Contains(filepath.SplitList(os.Getenv("PATH")), dir)
+	}
+	return m.path[name]
+}
 
 // fakeCatalog classifies an entry the way tools.Installer does, from the
 // machine's state, and installs by marking it present (mise lands on PATH).
@@ -48,12 +55,14 @@ func (c fakeCatalog) Plan(t tools.Tool) tools.Plan {
 		p.Action = tools.PlanSkip
 	case c.m.goos != "" && !t.SupportsOS(c.m.goos):
 		p.Action, p.Note = tools.PlanUnsupported, "not installed on "+c.m.goos+" by this catalog"
+	case c.m.goos == "windows" && t.Source.Winget != "":
+		p.Action = tools.PlanInstall
 	case t.Source.Type == "system":
 		p.Action, p.Manager, p.Package = tools.PlanNeedsSudo, "apt", t.Source.Apt
 		if t.Source.Cask != "" {
 			p.Manager, p.Package = "brew-cask", t.Source.Cask
 		}
-	case manager != "" && !c.m.path[manager]:
+	case manager != "" && !c.m.has(manager):
 		p.Action, p.Note = tools.PlanMissingManager, "waits on "+manager
 	default:
 		p.Action = tools.PlanInstall
@@ -216,6 +225,48 @@ func TestToolsCatalog_AManagerOnlyMiseProvidesIsAWaitWhereMiseIsNotInstalled(t *
 	}
 }
 
+// On Windows the catalog installs uv through winget, which registers its
+// directory in the user's PATH for the next process and links nothing (no
+// symlink right): the run reaches it before the retry, so the uv tools that
+// waited on it install in the same run (#2754, measured on the test guest).
+func TestToolsCatalog_ARegisteredDirIsReachedBeforeTheRetry(t *testing.T) {
+	r, env, m := freshMachine(t)
+	env.GOOS, m.goos = "windows", "windows"
+	writeFixture(t, env.RepoRoot, map[string]string{"packages.json": `{"tools": [
+  {"name": "hive", "version": "4.2.2", "source": {"type": "uv-tool", "package": "hive-vault"}},
+  {"name": "uv", "source": {"type": "system", "winget": "astral-sh.uv", "command": "uv"}}
+]}`})
+	t.Setenv("PATH", os.Getenv("PATH"))
+	dir := filepath.Join(t.TempDir(), "astral-sh.uv")
+	m.lands = map[string]string{"uv": dir}
+	r.registered = func() ([]string, error) {
+		if m.present["uv"] {
+			return []string{dir}, nil
+		}
+		return nil, nil
+	}
+
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(m.log, ", "); got != "install uv, install hive" {
+		t.Errorf("apply: %s; want uv, then hive in the same run", got)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Errorf("probe: %v", err)
+	}
+}
+
+// A registry that cannot be read fails the step, rather than reporting the
+// tools it holds as waiting.
+func TestTools_AnUnreadableRegisteredPathFailsTheStep(t *testing.T) {
+	r, env, _ := freshMachine(t)
+	r.registered = func() ([]string, error) { return nil, errors.New("access denied") }
+	if _, err := r.Reconcile(env, true); err == nil || !strings.Contains(err.Error(), "access denied") {
+		t.Errorf("want the registry error, got %v", err)
+	}
+}
+
 // An entry Install refuses fails the plan, as it fails `dotf tools install
 // --dry-run`: a converge plan must not promise what the apply refuses.
 func TestToolsCatalog_ARefusedEntryFailsThePlan(t *testing.T) {
@@ -273,10 +324,14 @@ func TestTools_ReachesWhereTheToolLayerPlacesWhateverTheCallersPath(t *testing.T
 }
 
 func TestRegistry_HandsTheToolLayerDirsToTheToolsStep(t *testing.T) {
-	for _, rec := range Registry(Options{ToolsBinDirs: []string{"/shims", "/bin"}}) {
+	registered := func() ([]string, error) { return []string{"/registered"}, nil }
+	for _, rec := range Registry(Options{ToolsBinDirs: []string{"/shims", "/bin"}, RegisteredPath: registered}) {
 		if ts, ok := rec.(toolsSync); ok {
 			if strings.Join(ts.bins, "|") != "/shims|/bin" {
 				t.Errorf("tools step bins = %v", ts.bins)
+			}
+			if ts.registered == nil {
+				t.Error("the tools step does not read the registered PATH")
 			}
 			return
 		}

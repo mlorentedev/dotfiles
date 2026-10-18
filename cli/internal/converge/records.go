@@ -36,6 +36,11 @@ type Options struct {
 	// process's PATH lacks on it, so what it installs it can reach whatever
 	// PATH its caller had.
 	ToolsBinDirs []string
+	// RegisteredPath reads the PATH installers registered for the next
+	// process (env.RegisteredPath: the registry on Windows, nothing
+	// elsewhere). The tools step reaches it too, so a tool an installer
+	// placed outside ToolsBinDirs runs in the same run. Unset: none.
+	RegisteredPath func() ([]string, error)
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the checkout and git-config steps are skipped.
 	GitRun gitconfig.Runner
@@ -111,7 +116,7 @@ func Registry(o Options) []Reconciler {
 		recordsMirror{},
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
-		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
+		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs, registered: o.RegisteredPath},
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
