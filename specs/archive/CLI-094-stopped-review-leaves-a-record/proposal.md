@@ -1,7 +1,7 @@
 ---
 id: "CLI-094-stopped-review-leaves-a-record"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-17"
 issue: "mlorentedev/dotfiles#1975"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

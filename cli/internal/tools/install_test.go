@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -822,12 +823,42 @@ func TestCopiesOnPath(t *testing.T) {
 func TestInstallUvTool_RunsOnThePinnedPython(t *testing.T) {
 	var rec []string
 	in := newNpmInstaller("", &rec, nil)
-	in.Python = "3.13"
+	in.Python = func() string { return "3.13" }
 	if _, err := in.Install(hiveTool()); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 	if want := "uv tool install --force --refresh-package hive-vault --python 3.13 hive-vault==4.2.2"; len(rec) != 1 || rec[0] != want {
 		t.Errorf("Run = %v, want %q", rec, want)
+	}
+}
+
+// The pin is asked when a uv tool installs, not when the installer is built,
+// and asked again until it answers: an empty answer from before versions.conf
+// existed never shadows the pin (#2769). Once read, it is not read again.
+func TestInstallUvTool_AsksThePinUntilItAnswers(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	asked, pin := 0, ""
+	in.Python = func() string { asked++; return pin }
+	if asked != 0 {
+		t.Fatalf("the pin was read %d times before any install", asked)
+	}
+	// Each install is below the next pin, so all three run.
+	for i, p := range []string{"", "3.13", "3.13"} {
+		pin = p
+		tool := hiveTool()
+		tool.Version = fmt.Sprintf("4.2.%d", 2+i)
+		if _, err := in.Install(tool); err != nil {
+			t.Fatalf("Install: %v", err)
+		}
+	}
+	want := []string{
+		"uv tool install --force --refresh-package hive-vault hive-vault==4.2.2",
+		"uv tool install --force --refresh-package hive-vault --python 3.13 hive-vault==4.2.3",
+		"uv tool install --force --refresh-package hive-vault --python 3.13 hive-vault==4.2.4",
+	}
+	if !slices.Equal(rec, want) || asked != 2 {
+		t.Errorf("Run = %v after %d reads, want %v after 2", rec, asked, want)
 	}
 }
 
