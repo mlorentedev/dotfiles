@@ -64,7 +64,7 @@ had accepted the grant at all, so the same command would merge in a repository w
 ## Amendment 2026-10-17: the exclusions are enforced (kubelab#2431)
 
 Decisions 1 and 5 were only partly mechanical. `dotf pr land` read whether the file existed and ignored its body: the
-`excluded:` list was never applied, and a PR that changed the grant landed like any other. Lesson-476 records how.
+`excluded:` list was never applied, and a PR that changed the grant landed like any other. Lesson-483 records how.
 
 - **`excluded:` is read from the base branch and applied.** Three kinds are understood. `release-please` is the
   existing branch check, which stays hardcoded whatever the file says. `branch:<prefix>` forfeits the merge when the

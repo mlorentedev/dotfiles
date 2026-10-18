@@ -19,7 +19,9 @@ type fakeLaunchctl struct {
 	loaded     bool
 	calls      []string
 	failBoot   error
+	failPrint  error // a print of the agent that fails other than with 113
 	background bool
+	session    string // what managername answers when background; Background if empty
 }
 
 func newFakeLaunchctl() *fakeLaunchctl { return &fakeLaunchctl{vars: map[string]string{}} }
@@ -32,6 +34,9 @@ func (f *fakeLaunchctl) run(args ...string) (string, error) {
 	switch args[0] {
 	case "managername":
 		if f.background {
+			if f.session != "" {
+				return f.session + "\n", nil
+			}
 			return "Background\n", nil
 		}
 		return "Aqua\n", nil
@@ -54,8 +59,11 @@ func (f *fakeLaunchctl) run(args ...string) (string, error) {
 			b.WriteString("\t}\n}\n")
 			return b.String(), nil
 		}
+		if f.failPrint != nil {
+			return "", f.failPrint
+		}
 		if !f.loaded {
-			return "", errors.New("exit status 113")
+			return "", gitExit(113) // launchd does not know the service
 		}
 	case "bootstrap":
 		if f.failBoot != nil {
@@ -248,7 +256,7 @@ func TestEnvPersist_FromBackgroundSkipsADriftItCannotFix(t *testing.T) {
 	if res.Skip == "" || res.Changes != 0 {
 		t.Fatalf("want a skip, got %+v", res)
 	}
-	for _, want := range []string{"VAULT_PATH", "login terminal"} {
+	for _, want := range []string{"VAULT_PATH", "Background session", "outside herdr and tmux"} {
 		if !strings.Contains(res.Skip, want) {
 			t.Errorf("skip %q must name %q", res.Skip, want)
 		}
@@ -258,5 +266,48 @@ func TestEnvPersist_FromBackgroundSkipsADriftItCannotFix(t *testing.T) {
 	}
 	if _, err := os.Stat(env.LaunchAgentPath(e.Home)); err == nil {
 		t.Error("the plist must not be written from Background either")
+	}
+}
+
+// Only exit 113 means launchd does not know the agent (#2685). Any other
+// failure of `launchctl print` is a state nobody read: reading it as "not
+// loaded" would bootstrap over a loaded label, or report a change that is not
+// one. The step fails instead, and writes nothing.
+func TestEnvPersist_AFailedPrintIsNotAnUnloadedAgent(t *testing.T) {
+	e := envPersistEnv(t)
+	lc := newFakeLaunchctl()
+	lc.failPrint = errors.New("Could not find domain for port identifier")
+	r := envPersist{launchctl: lc.run, uid: 501}
+	for _, dry := range []bool{true, false} {
+		if _, err := r.Reconcile(e, dry); err == nil || !strings.Contains(err.Error(), "launchctl print") {
+			t.Errorf("dryRun=%v: err = %v, want the failed print", dry, err)
+		}
+	}
+	if err := r.Probe(e); err == nil {
+		t.Error("probe: a failed print must not pass")
+	}
+	if n := lc.called("bootstrap") + lc.called("bootout") + lc.called("setenv"); n != 0 {
+		t.Errorf("nothing may be written over an unread agent state, calls: %v", lc.calls)
+	}
+}
+
+// The skip names the session the shell is in (#2714): to the person reading
+// it a herdr or tmux pane is a terminal, so "a login terminal" named nothing
+// they could tell apart from where they already were.
+func TestEnvPersist_TheSkipNamesTheSessionItGot(t *testing.T) {
+	e := envPersistEnv(t)
+	lc := newFakeLaunchctl()
+	lc.background, lc.session = true, "StandardIO"
+	res, err := envPersist{launchctl: lc.run, uid: 501}.Reconcile(e, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"launchd's StandardIO session", "new Terminal or Ghostty window"} {
+		if !strings.Contains(res.Skip, want) {
+			t.Errorf("skip %q must name %q", res.Skip, want)
+		}
+	}
+	if strings.Contains(res.Skip, "login terminal") {
+		t.Errorf("skip %q still sends the reader to a login terminal", res.Skip)
 	}
 }

@@ -53,6 +53,7 @@ func newConvergeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" {
 				repo = convergeCheckout(env.Home())
+				noteOtherCheckout(cmd.OutOrStdout(), repo)
 			}
 			err := runConverge(cmd.OutOrStdout(), repo, plan, only)
 			// The identity converge cannot produce: walked on a terminal,
@@ -64,7 +65,7 @@ func newConvergeCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&plan, "plan", false, "report what would change and write nothing")
-	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout to converge from")
+	cmd.Flags().StringVar(&repo, "repo", "", "dotfiles checkout to converge from (default: the declared DOTFILES_REPO_DIR)")
 	cmd.Flags().StringSliceVar(&only, "only", nil, "run only these reconcilers (comma-separated names)")
 	return cmd
 }
@@ -244,19 +245,40 @@ var convergeOptions = func() converge.Options {
 }
 
 // convergeCheckout is the checkout a run converges from when --repo names
-// none: the dotfiles checkout the working directory is in (another project's
-// repository does not count), else the declared location
-// (DOTFILES_REPO_DIR, machine.json, the contract), else the default. The last
-// two may not exist yet: the checkout step clones them, which is how a machine
-// from zero gets one.
+// none: the declared location (DOTFILES_REPO_DIR, machine.json, the contract)
+// when it is a dotfiles checkout, the one the checkout step fast-forwards and `dotf update`
+// applies; else the dotfiles checkout the working directory is in (another
+// project's repository does not count); else the declared location or the
+// default. The last two may not exist yet: the checkout step clones them,
+// which is how a machine from zero gets one.
+//
+// The declared checkout wins over the cwd's because converge writes
+// machine-global state: run from a worktree, usually a feature branch behind
+// main, the cwd's pins replaced the machine's and pruned a tool main pins
+// (#2711). Converging a branch is `--repo <worktree>`.
 func convergeCheckout(home string) string {
+	declared := env.ResolvePath("DOTFILES_REPO_DIR")
+	if declared != "" && env.IsDotfilesCheckout(declared) {
+		return declared
+	}
 	if r := env.RepoDir(); r != "" && env.IsDotfilesCheckout(r) {
 		return r
 	}
-	if r := env.ResolvePath("DOTFILES_REPO_DIR"); r != "" {
-		return r
+	if declared != "" {
+		return declared
 	}
 	return env.DefaultCheckoutDir(home)
+}
+
+// noteOtherCheckout says which tree a run converges when the working directory
+// is in another dotfiles checkout, so a run from a worktree cannot be mistaken
+// for a converge of that worktree.
+func noteOtherCheckout(w io.Writer, repo string) {
+	cwd := env.RepoDir()
+	if cwd == "" || !env.IsDotfilesCheckout(cwd) || sameFile(cwd, repo) {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "converging %s, the declared checkout, not %s (the working directory's): --repo %s converges that one\n", repo, cwd, cwd)
 }
 
 var convergeTag = map[converge.Status]string{

@@ -320,3 +320,42 @@ func TestWriteLandResult_ALandedMergePrintsItsWarning(t *testing.T) {
 		}
 	}
 }
+
+// A red review-attestation with a pr-agent run still running on the head is a
+// verdict on its way (#2724): land waits for it up to --verdict-wait, says on
+// stderr what it waits for, and a refusal after the budget says how long.
+func TestPrLand_VerdictWaitBoundsTheWaitForAnInFlightAttestation(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	saved := prLandOptions
+	var slept time.Duration
+	prLandOptions = func(repo string, _ registryLoader) prland.Options {
+		return prland.Options{
+			Repo: repo,
+			Run: func(_ context.Context, args ...string) ([]byte, error) {
+				switch line := strings.Join(args, " "); {
+				case strings.HasPrefix(line, "pr view"):
+					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"CLEAN"}`), nil
+				case strings.HasPrefix(line, "run list"):
+					return []byte(`[{"status":"in_progress"}]`), nil
+				case args[0] == "api":
+					return apiContents(args[1]), nil
+				}
+				return []byte(`[{"name":"review-attestation","bucket":"fail"}]`), nil
+			},
+			Untriaged: func(context.Context) ([]int, error) { return nil, nil },
+			Sleep:     func(d time.Duration) { slept += d },
+		}
+	}
+	t.Cleanup(func() { prLandOptions = saved })
+
+	stdout, stderr, err := execute(t, "pr", "land", "30", "--repo", "o/r", "--verdict-wait", "1m")
+	if err == nil {
+		t.Fatal("a refusal exited 0")
+	}
+	if slept != time.Minute || !strings.Contains(stdout, "waited 1m0s for the review-attestation verdict") {
+		t.Errorf("slept %s, output:\n%s", slept, stdout)
+	}
+	if !strings.Contains(stderr, "waiting for the review-attestation verdict: a pr-agent run is still running on abc1234") {
+		t.Errorf("stderr must name what land waits for:\n%s", stderr)
+	}
+}

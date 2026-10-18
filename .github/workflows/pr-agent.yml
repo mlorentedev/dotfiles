@@ -57,8 +57,14 @@ permissions:
 
 jobs:
   review:
-    # issue_comment fires on issues too; and skip draft PRs, which are by
-    # definition not asking to be read yet.
+    # issue_comment fires on issues too. Draft PRs are skipped too, being by
+    # definition not asking to be read yet, but NOT here: the `reviewable` step
+    # decides that from the live PR. The event payload's `draft` is a snapshot
+    # from when the event was queued, and a run that skipped on it could kill a
+    # review: a PR opened as a draft and marked ready at once yields an `opened`
+    # run (draft: true) and a `ready_for_review` run (draft: false) in one
+    # concurrency group, GitHub does not order them, and when `opened` is the
+    # one that survives, the stale flag skipped the only run left (#2591).
     #
     # The issue_comment half is gated on the commenter's association, and that gate
     # is load-bearing rather than defensive. This repository is PUBLIC: any account
@@ -130,7 +136,7 @@ jobs:
     # a human typing `/review` on a Dependabot PR is asking on purpose, that run
     # is triggered by the human, and its secrets are present.
     if: >
-      (github.event_name == 'pull_request' && github.event.pull_request.draft == false
+      (github.event_name == 'pull_request'
         && github.actor != 'dependabot[bot]'
         && github.event.pull_request.head.repo.fork == false
         && !startsWith(github.event.pull_request.head.ref, 'release-please--')) ||
@@ -222,6 +228,11 @@ jobs:
       # its review from `ready_for_review`. Only a definite answer skips:
       # if the read fails, the review runs, as before. Only `pull_request`
       # runs skip, because a human typing /review on a merged PR means it.
+      #
+      # This read is also the only draft gate (#2591): the job `if` above no longer
+      # looks at the payload's `draft`, so a draft costs one short run that ends
+      # here, and a PR marked ready is reviewed by whichever run survives the
+      # concurrency cancel.
       - name: Skip when PR-Agent would receive an empty diff
         id: reviewable
         if: steps.credential.outcome == 'success'
@@ -238,7 +249,7 @@ jobs:
               2>/dev/null) || pr_state=""
             case "$pr_state" in
               merged|closed|draft)
-                echo "::notice::PR #${PR_NUMBER} became ${pr_state} while this review waited in the queue; not reviewing it."
+                echo "::notice::PR #${PR_NUMBER} is ${pr_state} now (read from the API, not the event payload); not reviewing it."
                 echo "reviewable=false" >> "$GITHUB_OUTPUT"
                 exit 0
                 ;;

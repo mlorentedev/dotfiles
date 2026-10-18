@@ -1,5 +1,5 @@
 ---
-id: "lesson-476-a-grant-list-no-code-reads-is-a-promise-not-a-rule"
+id: "lesson-483-a-grant-list-no-code-reads-is-a-promise-not-a-rule"
 type: lesson
 status: active
 title: "A grant list no code reads is a promise, not a rule"

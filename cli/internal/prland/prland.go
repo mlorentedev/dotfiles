@@ -163,6 +163,12 @@ type Options struct {
 	// UnknownWait bounds how long --wait waits for GitHub to compute the merge
 	// state of a PR whose checks are all green; 0 means DefaultUnknownWait.
 	UnknownWait time.Duration
+	// VerdictWait bounds how long Land waits for a review-attestation verdict
+	// it has reason to expect before it refuses on a red one (verdict.go); 0
+	// means DefaultVerdictWait and a negative value does not wait.
+	VerdictWait time.Duration
+	// Notify, when set, is told what Land is waiting for.
+	Notify func(string)
 }
 
 // Result is what Land did.
@@ -188,6 +194,10 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	if err != nil {
 		return Result{Number: number}, err
 	}
+	f, verdict, err := awaitVerdict(ctx, gh, o, number, f)
+	if err != nil {
+		return Result{Number: number}, err
+	}
 	g, err := readGrant(ctx, o, f.BaseRef)
 	if err != nil {
 		return Result{Number: number}, err
@@ -196,7 +206,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		f.GrantDeclared, f.Excluded = g.declared, g.excluded
 		return Decide(f)
 	}
-	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: decide(f)}
+	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: append(decide(f), verdict.reasons(f)...)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
 	updates := 0
