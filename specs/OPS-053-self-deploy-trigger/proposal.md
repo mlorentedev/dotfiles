@@ -41,7 +41,12 @@ whether the last unattended run worked.
 - Everything the step writes carries an ownership marker. With the role absent, the step removes
   a marked trigger (the opt-out after `dotf env role rm self-deploy`) and never touches an unmarked
   one: a trigger a setup script installed before this change is reported, with the command that
-  adopts it, instead of being removed.
+  adopts it, instead of being removed. The rule binds where a setup script once wrote a trigger,
+  linux and windows. On darwin none ever did, so every agent at the step's label is read as dotf's
+  own and removed on opt-out (review round 1, F4).
+- The role is read before the scheduler is reached: a machine without the role never fails the
+  step on a scheduler dotf cannot reach (no systemd user bus); it is a skip naming the error, and
+  nothing is installed or removed (review round 1, F1).
 - The per-OS rendering lives in one stdlib-only package (`internal/schedule`): a `Job` plus three
   renderers and three backends behind injected runners. It is the seed of the scheduling table of
   #2013 D5 / #1843 B8; `dotf schedule` itself is not built here.
@@ -91,8 +96,10 @@ whether the last unattended run worked.
   type; a second run is `changed=0` (marker digest equal). Unit tests with a fake runner;
   `GOOS=windows go vet ./...` clean.
 - [ ] **AC4** Role absent: a marked trigger is removed, an unmarked one is left in place and
-  reported with the adopt command, and no trigger at all is a skip naming the opt-in. Unit tests
-  per OS.
+  reported with the adopt command, no trigger at all is a skip naming the opt-in, and a scheduler
+  that cannot be reached is a skip naming the error. Unit tests on the step, and per backend on
+  linux and windows for the unmarked read. On darwin `Managed` is constant (no setup script wrote
+  an agent there), so the unmarked case is not producible and only removal and skip apply.
 - [ ] **AC5** env-persist's plist is byte-identical to the pre-change renderer (golden test).
 - [ ] **AC6** No self-deploy block remains in `setup-linux.sh` or `setup-windows.ps1`
   (`git grep -n 'DOTFILES_AUTODEPLOY\|DotfilesSelfUpdate\|dotfiles-selfupdate' -- setup-linux.sh setup-windows.ps1`

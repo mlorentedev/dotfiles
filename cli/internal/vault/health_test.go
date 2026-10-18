@@ -221,53 +221,82 @@ func TestFrontmatterCountsOneMatchPerFileNotPerLine(t *testing.T) {
 	}
 }
 
-// TestSection7BacklogRunsWithoutAShell pins #492's port: section 7 needs no
-// dotfiles checkout and no bash. A vault whose tasks file drifts is reported
-// with the check's own detail, and the run stops there as the shell did
-// (#1314).
-func TestSection7BacklogRunsWithoutAShell(t *testing.T) {
-	vaultDir := t.TempDir()
-	tasksDir := filepath.Join(vaultDir, "10_projects", "demo")
-	if err := os.MkdirAll(tasksDir, 0o755); err != nil {
+// writeTasks writes 10_projects/<project>/11-tasks.md under vaultDir.
+func writeTasks(t *testing.T, vaultDir, project, body string) {
+	t.Helper()
+	dir := filepath.Join(vaultDir, "10_projects", project)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tasksDir, "11-tasks.md"), []byte("- [ ] **X-1** a\n- [x] **X-1** a\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "11-tasks.md"), []byte(body), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
+}
+
+// TestSection7BacklogRunsWithoutAShell pins #492's port: section 7 needs no
+// dotfiles checkout and no bash. A drifting tasks file is reported with the
+// check's own detail, and the run goes on (#1314): every later file is still
+// checked, and the stale-merged pass still runs. The shell stopped at the
+// first drift, so a second broken file was never named.
+func TestSection7BacklogRunsWithoutAShell(t *testing.T) {
+	vaultDir := t.TempDir()
+	writeTasks(t, vaultDir, "alpha", "- [ ] **A-1** a\n- [x] **A-1** a\n")
+	writeTasks(t, vaultDir, "beta", "- [ ] **B-1** b\n- [x] **B-1** b\n")
+	// gamma's G-1 is an archived spec whose tick is still open: the advisory pass's finding.
+	writeTasks(t, vaultDir, "gamma", "- [ ] **G-1** shipped\n")
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, "Projects", "gamma", "specs", "archive", "G-1"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	t.Setenv("HOME", home)
 	t.Setenv("PATH", t.TempDir())
 
 	var buf bytes.Buffer
 	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
-	code, aborted := h.section7Backlog()
+	h.section7Backlog()
 
-	if !aborted || code != 1 {
-		t.Fatalf("section7Backlog() = (%d, %v), want (1, true): drift ends the run", code, aborted)
+	out := buf.String()
+	for _, want := range []string{
+		"FAIL: Backlog drift in alpha/11-tasks.md",
+		"CONTRADICTION: A-1 — 2 entries, marked BOTH open and done",
+		"FAIL: Backlog drift in beta/11-tasks.md",
+		"CONTRADICTION: B-1 — 2 entries, marked BOTH open and done",
+		"WARN: Stale-merged ticks in gamma/11-tasks.md",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q\n%s", want, out)
+		}
 	}
-	if !strings.Contains(buf.String(), "FAIL: Backlog drift in demo/11-tasks.md") ||
-		!strings.Contains(buf.String(), "CONTRADICTION: X-1 — 2 entries, marked BOTH open and done") {
-		t.Errorf("output = %q, want the drift FAIL and its detail", buf.String())
+	if h.failed != 2 {
+		t.Errorf("failed = %d, want one per drifting file", h.failed)
+	}
+	if strings.Contains(out, "task file(s) clean") {
+		t.Errorf("a clean PASS beside drift\n%s", out)
 	}
 }
 
 // TestSection7BacklogNamesAnUnreadableTasksFile: the script exited 2 with
 // nothing on stdout, which read as drift with no detail. The port names the
-// file and the error, and still stops the run with the script's exit 2.
+// file and the error, and checks the next file instead of stopping (#1314).
 func TestSection7BacklogNamesAnUnreadableTasksFile(t *testing.T) {
 	vaultDir := t.TempDir()
 	// A directory where the file should be: unreadable as a file on every OS.
-	if err := os.MkdirAll(filepath.Join(vaultDir, "10_projects", "demo", "11-tasks.md"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(vaultDir, "10_projects", "alpha", "11-tasks.md"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
+	writeTasks(t, vaultDir, "beta", "- [ ] **B-1** b\n- [x] **B-1** b\n")
 
 	var buf bytes.Buffer
 	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
-	code, aborted := h.section7Backlog()
+	h.section7Backlog()
 
-	if !aborted || code != 2 {
-		t.Fatalf("section7Backlog() = (%d, %v), want (2, true)", code, aborted)
+	out := buf.String()
+	if !strings.Contains(out, "FAIL: Backlog integrity: cannot read alpha/11-tasks.md: ") ||
+		!strings.Contains(out, "FAIL: Backlog drift in beta/11-tasks.md") {
+		t.Errorf("want the unreadable file named and the next one still checked\n%s", out)
 	}
-	if !strings.Contains(buf.String(), "FAIL: Backlog integrity: cannot read demo/11-tasks.md: ") {
-		t.Errorf("output = %q, want the unreadable file named with its error", buf.String())
+	if h.failed != 2 {
+		t.Errorf("failed = %d, want 2", h.failed)
 	}
 }
 
@@ -278,11 +307,8 @@ func TestSection7BacklogNoTasksSkips(t *testing.T) {
 
 	var buf bytes.Buffer
 	h := &healthRun{w: &buf, opts: HealthOptions{VaultDir: vaultDir}}
-	code, aborted := h.section7Backlog()
+	h.section7Backlog()
 
-	if aborted || code != 0 {
-		t.Fatalf("section7Backlog() = (%d, %v), want (0, false)", code, aborted)
-	}
 	if h.failed != 0 || h.skipped != 1 {
 		t.Errorf("counters = failed:%d skipped:%d, want failed:0 skipped:1", h.failed, h.skipped)
 	}

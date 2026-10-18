@@ -139,36 +139,99 @@ _write_849_feed() {
     [[ "$output" != *"Adjacent open issues"* ]] || false
 }
 
-@test "adjacency: with no flag the output is byte-identical to the previous version" {
+@test "adjacency: with no flag the output matches the stored golden" {
     # Characterization test (#672): adding --adjacency-issues support did not
     # silently change the script's existing offline output when the flag goes
-    # unused. #854/BUG-061 later added a documented local escape hatch
-    # (SDD_PR_BODY) to the LOC-gate failure message -- an intentional, in-scope
-    # change to this exact path, not a regression -- so that block is stripped
-    # from both sides before comparing; everything else must still match
-    # origin/main byte for byte.
-    if ! git -C "$BATS_TEST_DIRNAME/.." rev-parse --verify origin/main >/dev/null 2>&1; then
-        skip "origin/main not fetched in this environment"
-    fi
+    # unused. The golden was captured from the pre-change script on this exact
+    # fixture; it is a file, not origin/main, so the test cannot skip itself in
+    # a shallow clone and does not move when main does (#2303). The documented
+    # SDD_PR_BODY escape hatch (#854/BUG-061) is stripped from the live output:
+    # it is an intentional, in-scope addition to this path, not a regression.
     _replay_851_diff
-    git -C "$BATS_TEST_DIRNAME/.." show origin/main:scripts/check-spec-gate.sh > "$REPO_FIXTURE/baseline.sh"
-    chmod +x "$REPO_FIXTURE/baseline.sh"
-
-    SDD_PR_BODY="Closes #850" \
-        run "$REPO_FIXTURE/baseline.sh" --base-ref main --head-ref feature --explain
-    local baseline_output="$output" baseline_status="$status"
-
     SDD_PR_BODY="Closes #850" \
         run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
-    [ "$status" -eq "$baseline_status" ]
+    local stripped
+    stripped=$(printf '%s\n' "$output" \
+        | sed '/^       If this already archived a spec/,/^       be set by hand for a one-off check/d' | cat -s)
+    [ "$stripped" = "$(cat "$BATS_TEST_DIRNAME/fixtures/spec-gate/no-adjacency-flag.golden")" ]
+}
 
-    _strip_escape_hatch() {
-        sed '/^       If this already archived a spec/,/^       be set by hand for a one-off check/d' | cat -s
-    }
-    local stripped_current stripped_baseline
-    stripped_current=$(printf '%s\n' "$output" | _strip_escape_hatch)
-    stripped_baseline=$(printf '%s\n' "$baseline_output" | _strip_escape_hatch)
-    [ "$stripped_current" = "$stripped_baseline" ]
+@test "adjacency: a generic basename in a subdirectory does not drag in the backlog" {
+    mkdir -p build
+    printf 'line %d\n' {1..60} > build/Makefile
+    _commit "nested Makefile"
+    printf '%s\t%s\n' 444 'DX-001: the Makefile is slow to start' > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" != *"444"* ]] || false
+}
+
+@test "adjacency: a basename inside a longer word is not a match" {
+    # `scripts/config` must not flag an issue that only says "configuration".
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/config
+    _commit "config"
+    {
+        printf '%s\t%s\n' 555 'OPS-002: the configuration of the runner is wrong'
+        printf '%s\t%s\n' 556 'OPS-003: the config file is read twice'
+    } > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" != *"555"* ]] || false
+    [[ "$output" == *"556"* ]] || false
+}
+
+@test "adjacency: a dot in a basename matches only a dot" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/a.b.sh
+    _commit "dotted name"
+    printf '%s\t%s\n' 666 'BUG-1: aXb.sh fails' > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" != *"666"* ]] || false
+}
+
+@test "adjacency: an issue citing the source path of a renamed file is reported" {
+    # HARNESS-178: a rename lists the file under both names, so an issue that
+    # still cites the old path surfaces.
+    git checkout -q main
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/old-name.sh
+    _commit "old name on main"
+    git checkout -q feature
+    git reset -q --hard main
+    git mv scripts/old-name.sh scripts/new-name.sh
+    _commit "rename"
+    printf '%s\t%s\n' 777 'BUG-2: scripts/old-name.sh drops the last line' > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"777"* ]] || false
+}
+
+@test "adjacency: a percent sign in a path is escaped in the CI annotation" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > 'scripts/100%.sh'
+    _commit "percent"
+    printf '%s\t%s\n' 888 'BUG-3: scripts/100%.sh breaks' > feed.tsv
+    GITHUB_ACTIONS=true SDD_PR_BODY="Closes #850" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"::warning title=Adjacent open issues::#888 (scripts/100%25.sh)"* ]] || false
+}
+
+@test "adjacency: a pipe in a path is escaped in the step-summary table" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > 'scripts/a|b.sh'
+    _commit "pipe"
+    printf '%s\t%s\n' 999 'BUG-4: scripts/a|b.sh breaks' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF '| #999 | `scripts/a\|b.sh` |' "$REPO_FIXTURE/summary.md"
 }
 
 @test "adjacency: --help documents the flag" {

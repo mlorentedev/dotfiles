@@ -146,8 +146,8 @@ func TestPowerForDeclaresAPolicyPerOS(t *testing.T) {
 	if _, ok := PowerFor("darwin", nil, Paths{}).(Pmset); !ok {
 		t.Error("darwin declares the pmset profile")
 	}
-	if p := PowerFor("windows", nil, Paths{}); p != nil {
-		t.Errorf("windows → %T; powercfg is not declared yet", p)
+	if _, ok := PowerFor("windows", nil, Paths{}).(Powercfg); !ok {
+		t.Error("windows declares the powercfg profile")
 	}
 }
 

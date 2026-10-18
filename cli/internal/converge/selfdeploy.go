@@ -50,20 +50,32 @@ func (r selfDeploy) inspect(e Env) (selfDeployView, error) {
 	if r.scheduler == nil {
 		return selfDeployView{skip: "no scheduler runner is wired into this registry"}, nil
 	}
+	// The role is read before the scheduler is reached: a machine that never
+	// opted in must not fail on a scheduler dotf cannot reach, such as a
+	// container with no systemd user bus (OPS-053 review round 1, F1).
+	roles, err := env.LoadMachineRoles(env.MachinePath(e.Home))
+	if err != nil {
+		return selfDeployView{}, err
+	}
+	optedIn := slices.Contains(roles, env.RoleSelfDeploy)
+	unreachable := func(err error) (selfDeployView, error) {
+		if optedIn {
+			return selfDeployView{}, err
+		}
+		return selfDeployView{skip: "the scheduler is unreachable and this machine is not opted in (" + selfDeployOptIn + "): " + err.Error()}, nil
+	}
 	b, err := r.scheduler(e)
 	if errors.Is(err, schedule.ErrUnsupported) {
 		return selfDeployView{skip: err.Error()}, nil
 	}
 	if err != nil {
-		return selfDeployView{}, err
+		return unreachable(err)
 	}
-	roles, err := env.LoadMachineRoles(env.MachinePath(e.Home))
-	if err != nil {
-		return selfDeployView{}, err
+	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home, os.Getenv), optedIn: optedIn}
+	if v.state, err = b.Inspect(v.job); err != nil {
+		return unreachable(err)
 	}
-	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home, os.Getenv), optedIn: slices.Contains(roles, env.RoleSelfDeploy)}
-	v.state, err = b.Inspect(v.job)
-	return v, err
+	return v, nil
 }
 
 func (r selfDeploy) Reconcile(e Env, dryRun bool) (Result, error) {
@@ -75,7 +87,7 @@ func (r selfDeploy) Reconcile(e Env, dryRun bool) (Result, error) {
 		return selfDeployOptedOut(v, dryRun)
 	}
 	if v.state.Current() {
-		return Result{Detail: "daily dotf update at 03:00 from " + v.state.Where}, nil
+		return Result{Detail: "dotf update " + selfDeployWhen(v.job) + " from " + v.state.Where}, nil
 	}
 	verb := "applied: "
 	if dryRun {
@@ -118,4 +130,13 @@ func (r selfDeploy) Probe(e Env) error {
 		return fmt.Errorf("%s is still installed although the machine does not declare the %s role", st.Where, env.RoleSelfDeploy)
 	}
 	return nil
+}
+
+// selfDeployWhen names the job's slot from the job itself, so the detail
+// cannot drift from the trigger it reports (OPS-053 review round 1, F7).
+func selfDeployWhen(job schedule.Job) string {
+	if c := job.Daily; c != nil {
+		return fmt.Sprintf("daily at %02d:%02d", c.Hour, c.Minute)
+	}
+	return "daily"
 }

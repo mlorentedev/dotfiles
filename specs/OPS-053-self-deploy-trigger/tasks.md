@@ -45,8 +45,18 @@ created: "2026-10-17"
 - [x] [AC7] doctor `Self-deploy` section: role, trigger state (the step's own inspect, read-only), last run; table-driven tests
 - [x] Gates as above
 
+## Review round 1 fixes (FAIL at `9f596c94`, `review.md`)
+
+- [x] [F1] Role read before the scheduler; `TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler`, red first
+- [x] [F3] `%` doubled in the systemd `ExecStart` and `Description`; `TestSystemdUnits_DoublesPercentEverywhereTheJobReaches`, red first
+- [x] [F2] `dotf vm linux` run; it stopped before the step (#2688), recorded in `verification.md`
+- [x] [F5] `tests/guard-setup-no-self-deploy.bats`; provenance of the deleted bats in `verification.md`
+- [x] [F6] Registrar fork ticketed (#2715); the Env half is #2696
+- [x] [F4] AC4 restated for darwin in `proposal.md` and `features.json`
+- [x] [F7a] The OK detail reads the slot from the job
+
 ## Closing
 
-- [ ] Every acceptance criterion covered by a test, mapped in `features.json`
-- [ ] `verification.md` filled in
-- [ ] Independent review: `dotf spec review OPS-053-self-deploy-trigger` (not this session)
+- [x] Every acceptance criterion covered by a test, mapped in `features.json`
+- [x] `verification.md` filled in
+- [ ] Independent review: `dotf spec review OPS-053-self-deploy-trigger` (not this session). Round 1 FAIL; round 2 runs after this fix round lands

@@ -32,6 +32,10 @@ const (
 	VerdictPass         Verdict = "PASS"
 	VerdictPassWithGaps Verdict = "PASS-WITH-GAPS"
 	VerdictFail         Verdict = "FAIL"
+	// VerdictPending marks a provisional review.md: the reviewer wrote it first
+	// (CLI-094) and the run was stopped before it signed. It is never a passing
+	// verdict and the gate refuses it by name.
+	VerdictPending Verdict = "PENDING"
 )
 
 // Blocks reports whether this verdict must stop an archive. Anything that is
@@ -170,6 +174,9 @@ func parseReviewAs(content, name string) (Review, error) {
 	}
 	if r.Verdict == "" {
 		return r, fmt.Errorf("%s has no `verdict:` field in its frontmatter", name)
+	}
+	if r.Verdict == VerdictPending {
+		return r, fmt.Errorf("%s is a provisional, unsigned record (verdict: PENDING): the run that wrote it was stopped before it signed a verdict, so it cannot be archived; run the review again", name)
 	}
 	if r.Verdict != VerdictPass && r.Verdict != VerdictPassWithGaps && r.Verdict != VerdictFail {
 		return r, fmt.Errorf("%s has an unrecognized verdict %q (want PASS, PASS-WITH-GAPS or FAIL)", name, r.Verdict)

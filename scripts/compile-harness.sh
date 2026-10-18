@@ -864,9 +864,31 @@ EOF
     printf '[refresh] OK\n'
 }
 
+# HARNESS-153 (#1712): the deploy targets are one per machine and the records
+# one per worktree, so the last deploy wins. A checkout whose base predates
+# origin/main's last harness/ change renders back the skills main retired, and
+# its prune removes the ones main added since. Warn and name that commit.
+# Fail-open and offline: a root that is not a git checkout (the ~/.dotfiles
+# deploy dir), a clone without origin/main, or an ancestry git cannot answer
+# (a shallow clone) skips the check instead of blocking the deploy.
+warn_if_behind_main() {
+    local ref=origin/main last rc=0
+    type -P git >/dev/null 2>&1 || return 0
+    [ -e "$REPO_ROOT/.git" ] || return 0
+    git -C "$REPO_ROOT" rev-parse -q --verify "$ref^{commit}" >/dev/null || return 0
+    last="$(git -C "$REPO_ROOT" log -1 --format=%h "$ref" -- harness/)" || return 0
+    [ -n "$last" ] || return 0
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$last" HEAD || rc=$?
+    [ "$rc" -eq 1 ] || return 0
+    printf '[deploy] WARN: this checkout lacks %s, the last harness/ change on %s ("%s").\n' \
+        "$last" "$ref" "$(git -C "$REPO_ROOT" log -1 --format=%s "$last")" >&2
+    printf '        Every session on this machine shares these targets: rebase onto %s, or deploy from main.\n' "$ref" >&2
+}
+
 # --- deploy (offline): render committed records to per-agent $HOME paths ---
 do_deploy() {
     require_tools
+    warn_if_behind_main
     # Instruction files FIRST (HARNESS-058/#828): deploy_skills injects the
     # copilot catalog and deploy_agents injects the AGENT-PRESENCE region into
     # these SAME files below. A full-file copy after either would wipe out what

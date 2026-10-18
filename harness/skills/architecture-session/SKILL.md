@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: 1b0929bdd943bd80
+generated_sha: e061b20c5634342a
 id: architecture-session-skill
 type: skill
 status: active
@@ -184,7 +184,7 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 2. **Update the plan** of record. If a `plan-*.md` motivated this session, patch it: append a "Decision recorded" line linking the new ADR, and update the "Next steps" section if the decision changes it.
 3. **Index:** the repo `docs/adr/` self-indexes (GitHub renders the directory) — no separate index file to patch. (Legacy vault-only project: patch the project `_index.md`.)
 4. **Update task tracking** if the decision creates, closes, or reshapes tasks. Open or update GitHub issues via `gh`.
-5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons/`**; then run `dotf lessons fmt`, which normalises the file and regenerates `_index.md` (never edit the index table by hand). Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
+5. **Capture a lesson** (optional) via `mcp__hive__capture_lesson` if the discussion surfaced a non-obvious insight that future sessions should not re-derive. Project lessons go to the **repo `docs/lessons/`**; then format it with `dotf lessons fmt` only where the repo uses dotf's lesson format; a repo with its own lesson formatter (named in its `docs/lessons/_format.md` or its pre-commit hooks) uses that one, because `dotf lessons fmt` rewrites every lesson in the tree (577 files in kubelab, #2470). No index table is committed in a repo that uses dotf's format: `dotf lessons index` renders it. Cross-project methodology lessons are promoted to a `00_meta/patterns/` pattern.
 
 **Blocking rule.** Phase E does not exit until at least the ADR file is written. The user CANNOT defer the write to "later" -- per `pattern-decision-persistence` "Anti-Patterns", `I'll update the vault later` = the decision is lost.
 

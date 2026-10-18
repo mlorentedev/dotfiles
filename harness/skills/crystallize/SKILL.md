@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: 08f5a589f64b675e
+generated_sha: 174486ee6b1f2af3
 id: crystallize-skill
 type: skill
 status: active
@@ -23,7 +23,7 @@ Full maintenance ritual for the Neural Hive knowledge loop. Run when `/insights`
 ### Step 1 — Audit State
 - Read the project's MEMORY.md at `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (keep `$VAULT_PATH` if already set and non-empty; otherwise assign it from `dotf env path VAULT_PATH`, and stop and ask the user if that is empty)
 - Note: line count, Last Crystallized date, days elapsed since last run
-- Read the repo's `docs/lessons/` and `docs/lessons/_index.md` for current **project** lesson state (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/patterns/` for cross-project state
+- Read the repo's `docs/lessons/` (and `dotf lessons index` for the table, where the repo uses dotf's format) for current **project** lesson state (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/patterns/` for cross-project state
 
 ### Step 2 — Mine Recent Activity
 There is no observation store; the continuity layer is the vault (see [[pattern-dual-memory]]). Mine the window since the last crystallization:
@@ -44,7 +44,7 @@ awk -v s="<Last Crystallized>" 'FNR==1{d=""} /^> Updated: /{d=$3} /^\*\*Decision
 - These become new lesson candidates
 
 ### Step 4 — Vault Update
-- For each gap, write a **project** lesson to the repo's `docs/lessons/lesson-NNN-<slug>.md` with the standard frontmatter, then run `dotf lessons fmt` to regenerate `docs/lessons/_index.md` (a genuinely **cross-project** lesson goes to `00_meta/patterns/`):
+- For each gap, write a **project** lesson to the repo's `docs/lessons/lesson-NNN-<slug>.md` with the standard frontmatter, then format it with `dotf lessons fmt` only where the repo uses dotf's lesson format; a repo with its own lesson formatter (named in its `docs/lessons/_format.md` or its pre-commit hooks) uses that one, because `dotf lessons fmt` rewrites every lesson in the tree (577 files in kubelab, #2470) (a genuinely **cross-project** lesson goes to `00_meta/patterns/`):
 
 ```markdown
 ---

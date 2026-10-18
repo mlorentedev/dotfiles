@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 90ea404e00ff329d
+generated_sha: 4ba24d3ca2ab6e9d
 id: insights-skill
 type: skill
 status: active
@@ -81,7 +81,7 @@ awk -v s="$SINCE" 'FNR==1{d=""} /^> Updated: /{d=$3} /^\*\*Decisions:\*\*/ && d>
 
 ### Step 5 -- Vault Gap Analysis (full mode)
 
-- Read the repo's `docs/lessons/` (and `docs/lessons/_index.md`) (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
+- Read the repo's `docs/lessons/` (and `dotf lessons index` for the table, where the repo uses dotf's format) (project lessons live in the repo — see [[pattern-knowledge-placement]]); read `$VAULT_PATH/00_meta/` for cross-project
 - Identify project-specific fixes and decisions named in session journals or handoff blocks that are NOT documented in the repo's lessons. Skip cross-project or methodology items already captured in `00_meta/` (patterns, lessons).
 - List each gap: source (journal or thread), type, title
 

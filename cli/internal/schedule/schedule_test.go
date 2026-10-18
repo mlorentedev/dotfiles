@@ -205,6 +205,25 @@ func TestSystemdUnits_RenderTheJob(t *testing.T) {
 	}
 }
 
+// systemd expands %-specifiers in ExecStart and Description too, not only in
+// Environment= (OPS-053 review round 1, F3): a home holding `%h` ran another
+// path. Each `%` is doubled wherever the job's text reaches a unit.
+func TestSystemdUnits_DoublesPercentEverywhereTheJobReaches(t *testing.T) {
+	job := testJob()
+	job.Program = "/home/m%h/.local/bin/dotf"
+	job.Args = []string{"update", "--note=100%"}
+	job.Description = "dotf update at 100%"
+	svc, tmr := SystemdUnits(job)
+	for _, want := range []string{"ExecStart=/home/m%%h/.local/bin/dotf update --note=100%%\n", "Description=dotf update at 100%%\n"} {
+		if !strings.Contains(string(svc), want) {
+			t.Errorf("service lacks %q:\n%s", want, svc)
+		}
+	}
+	if !strings.Contains(string(tmr), "Description=dotf update at 100%%\n") {
+		t.Errorf("timer lacks the escaped description:\n%s", tmr)
+	}
+}
+
 // A manager dotf cannot reach is an error, not a disabled timer: read as one,
 // opt-out would delete the units of a running timer.
 func TestSystemd_AnUnreachableManagerIsNotAnAbsentTimer(t *testing.T) {

@@ -164,6 +164,15 @@ func TestRenderMiseConfig_SilencesPisUpdateCheck(t *testing.T) {
 	}
 }
 
+// gh has no updater either, but its notice names the channel that installed
+// it before mise did (`brew upgrade gh`), a second gh outside the pin (#2136).
+func TestRenderMiseConfig_SilencesGhsUpdateNotice(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"gh", "2.102.0"}}, ""))
+	if !strings.Contains(out, "\n[env]\nGH_NO_UPDATE_NOTIFIER = \"1\"\n") {
+		t.Errorf("want GH_NO_UPDATE_NOTIFIER = \"1\" under [env] when mise manages gh:\n%s", out)
+	}
+}
+
 // fakeMise answers `mise which <tool>` for the tools in installed, and
 // `<path> --version` with the version installed records; `mise install` marks
 // every pending tool installed at its pin.

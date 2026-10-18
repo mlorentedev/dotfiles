@@ -52,6 +52,9 @@ func convergeFixture(t *testing.T) (repo, home string) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DOTFILES_DIR", "")
+	// converge puts its own directory on PATH for its children (#2688);
+	// registering PATH here restores it after every fixture test.
+	t.Setenv("PATH", os.Getenv("PATH"))
 	return repo, home
 }
 

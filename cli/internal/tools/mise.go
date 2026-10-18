@@ -245,9 +245,12 @@ var attestedBackend = map[string]string{
 // D9). mise sets [env] under `mise activate` and in its shims, so the setting
 // reaches every copy mise runs and no other. pi has no updater, but its startup
 // check tells the user to run `pi update`, which installs a second pi outside
-// mise; PI_SKIP_VERSION_CHECK is the switch pi 1.2.0 reads.
+// mise; PI_SKIP_VERSION_CHECK is the switch pi 1.2.0 reads. gh's notice names
+// the channel that installed it before mise (`brew upgrade gh`), so following
+// it leaves a second gh outside the pin (#2136).
 var ownUpdaterOff = map[string]string{
 	"claude": `DISABLE_AUTOUPDATER = "1"`,
+	"gh":     `GH_NO_UPDATE_NOTIFIER = "1"`,
 	"pi":     `PI_SKIP_VERSION_CHECK = "1"`,
 }
 

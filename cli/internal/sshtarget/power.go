@@ -24,6 +24,8 @@ func PowerFor(goos string, run Runner, paths Paths) Power {
 		return Logind{Run: run, DropIn: paths.LogindDropIn}
 	case "darwin":
 		return Pmset{Run: run}
+	case "windows":
+		return Powercfg{Run: run}
 	}
 	return nil
 }

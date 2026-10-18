@@ -469,6 +469,15 @@ _adjacency_candidate_files() {
     return 0
 }
 
+# True when $2 occurs in $1 as a whole word: not inside a longer run of
+# letters, digits or underscores. A changed `ssh/config` must not flag an issue
+# that says "configuration". $2 is escaped, so its dots match only dots.
+_contains_word() {
+    local esc
+    esc=$(printf '%s' "$2" | sed 's/[][\.*^$+?(){}|/]/\\&/g')
+    printf '%s\n' "$1" | grep -qE "(^|[^A-Za-z0-9_])${esc}([^A-Za-z0-9_]|\$)"
+}
+
 # "<number><TAB><matched-path><TAB><haystack>" per adjacent issue.
 #
 # Matches over UNSTRIPPED title+body, unlike _closing_issue_numbers, and the
@@ -493,12 +502,36 @@ _adjacent_open_issues() {
             fi
             base="${file_path##*/}"
             case " $ADJACENCY_GENERIC_BASENAMES " in *" $base "*) continue ;; esac
-            if [[ "$haystack" == *"$base"* ]]; then
+            if _contains_word "$haystack" "$base"; then
                 printf '%s\t%s\t%s\n' "$num" "$base" "$haystack"
                 break
             fi
         done <<< "$files"
     done < "$feed"
+    return 0
+}
+
+# The CI-only half of the report: a workflow annotation and a step-summary table.
+# Split out of _report_adjacent_issues to keep it under the 40-line function rule
+# (#2709); #2407 ports this script to Go, so the split is deliberately minimal.
+_emit_adjacency_ci_artifacts() {
+    local rows="$1" num file_path haystack
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        printf '::warning title=Adjacent open issues::%s\n' \
+            "$(printf '%s' "$rows" | awk -F'\t' '{printf "#%s (%s) ", $1, $2}' | sed 's/%/%25/g')"
+    fi
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+            printf '\n### Adjacent open issues (advisory)\n\n'
+            printf '| Issue | Names | Title |\n|---|---|---|\n'
+            while IFS=$'\t' read -r num file_path haystack; do
+                if [[ -z "$num" ]]; then continue; fi
+                # shellcheck disable=SC2016  # backticks are markdown code spans
+                # for the step-summary table, not command substitution.
+                printf '| #%s | `%s` | %.88s |\n' "$num" "${file_path//|/\\|}" "${haystack//|/\\|}"
+            done <<< "$rows"
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
     return 0
 }
 
@@ -509,7 +542,9 @@ _report_adjacent_issues() {
     if [[ -z "$ADJACENCY_ISSUES" || ! -r "$ADJACENCY_ISSUES" ]]; then return 0; fi
 
     local files closed rows num file_path haystack
-    files=$(git diff --name-only "${BASE_REF}...${HEAD_REF}" 2>/dev/null) || return 0
+    # --no-renames lists a moved file under both names, so an issue that still
+    # cites the old path is surfaced (HARNESS-178).
+    files=$(git diff --name-only --no-renames "${BASE_REF}...${HEAD_REF}" 2>/dev/null) || return 0
     files=$(_adjacency_candidate_files "$files")
     if [[ -z "$files" ]]; then return 0; fi
     closed=$(_closing_issue_numbers "$(_repo_slug)" "$SDD_PR_BODY" | sort -u || true)
@@ -526,22 +561,7 @@ _report_adjacent_issues() {
     printf '       change does not cover. Fold it in, or record why it is separate,\n'
     printf '       before merging (HARNESS-063).\n'
 
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-        printf '::warning title=Adjacent open issues::%s\n' \
-            "$(printf '%s' "$rows" | awk -F'\t' '{printf "#%s (%s) ", $1, $2}')"
-    fi
-    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-        {
-            printf '\n### Adjacent open issues (advisory)\n\n'
-            printf '| Issue | Names | Title |\n|---|---|---|\n'
-            while IFS=$'\t' read -r num file_path haystack; do
-                if [[ -z "$num" ]]; then continue; fi
-                # shellcheck disable=SC2016  # backticks are markdown code spans
-                # for the step-summary table, not command substitution.
-                printf '| #%s | `%s` | %.88s |\n' "$num" "$file_path" "$haystack"
-            done <<< "$rows"
-        } >> "$GITHUB_STEP_SUMMARY"
-    fi
+    _emit_adjacency_ci_artifacts "$rows"
     return 0
 }
 

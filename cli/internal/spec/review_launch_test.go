@@ -345,6 +345,38 @@ func TestReviewPromptKeepsTheReviewerInsideTheRepository(t *testing.T) {
 	}
 }
 
+// The time budget is advice and the cap discards the round (#2448): a reviewer
+// that was still collecting evidence when the cap fired left no verdict and a
+// review.md byte-identical to the previous round's. The prompt asks for a
+// provisional record first, so a stopped run leaves something clearly unsigned
+// instead of nothing; the archive gate refuses it by name (VerdictPending).
+func TestReviewPromptAsksForAProvisionalReviewFirst(t *testing.T) {
+	for name, tc := range map[string]struct {
+		slot ReviewSlot
+		file string
+	}{
+		"first signer":  {FirstSigner, FirstSigner.Review},
+		"second signer": {SecondSigner, SecondSigner.Review},
+	} {
+		p := ReviewPromptIn(tc.slot, "AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md", "basebasebase")
+		for _, want := range []string{
+			"provisional",
+			"verdict: PENDING",
+			"specs/AI-001-x/" + tc.file,
+			"before you explore",
+		} {
+			if !strings.Contains(p, want) {
+				t.Errorf("%s: the prompt must carry %q", name, want)
+			}
+		}
+		// The provisional file is written first and replaced by the real
+		// verdict, so the existing instruction to overwrite must still stand.
+		if !strings.Contains(p, "overwriting what is there") {
+			t.Errorf("%s: the final verdict must still overwrite the provisional file", name)
+		}
+	}
+}
+
 // The two runners take their prompt differently, and getting agy's wrong does
 // not fail loudly — it produces a reviewer that greets you.
 //
