@@ -196,6 +196,17 @@ _both() { run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" "$@"; }
     [ "$status" -eq 0 ]
 }
 
+@test "counts a report nested deeper than .agent/runs/<id>/ (#2698)" {
+    # `*` in a case pattern also matches `/`, so the exclusion must be pinned to
+    # exactly one directory component (pr-agent/CodeRabbit on #2730).
+    mkdir -p .agent/runs/run-1/nested
+    printf 'line %d\n' {1..120} > .agent/runs/run-1/nested/report.md
+    _commit "nested report"
+    _both --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Discipline Gate"* ]] || false
+}
+
 @test "still counts the run envelope and other files under .agent/ (#2698)" {
     mkdir -p .agent/runs/run-20261017T0807Z
     printf 'line %d\n' {1..60} > .agent/unattended.yml
