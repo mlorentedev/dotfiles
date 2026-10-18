@@ -184,6 +184,29 @@ _both() { run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" "$@"; }
     [ "$status" -eq 0 ]
 }
 
+# #2698: an autopilot run branch has to push its disarm report, which is prose of
+# the same class as docs/*.md. Only the report is excluded, never the envelope:
+# .agent/unattended.yml is the run's authority file (a PR touching it is never
+# merged), so it stays counted. Not a broad .agent/** glob (#686/C25).
+@test "excludes an autopilot run report from LOC count (#2698)" {
+    mkdir -p .agent/runs/run-20261017T0807Z
+    printf 'line %d\n' {1..120} > .agent/runs/run-20261017T0807Z/report.md
+    _commit "run report only"
+    _both --base-ref main --head-ref feature
+    [ "$status" -eq 0 ]
+}
+
+@test "still counts the run envelope and other files under .agent/ (#2698)" {
+    mkdir -p .agent/runs/run-20261017T0807Z
+    printf 'line %d\n' {1..60} > .agent/unattended.yml
+    printf 'line %d\n' {1..60} > .agent/runs/run-20261017T0807Z/notes.sh
+    _commit "envelope and a script under .agent"
+    _both --base-ref main --head-ref feature --explain
+    [ "$status" -eq 1 ]
+    [[ "$output" == *".agent/unattended.yml"* ]] || false
+    [[ "$output" == *".agent/runs/run-20261017T0807Z/notes.sh"* ]] || false
+}
+
 @test "excludes docs/**/*.md from LOC count (doc-only ADR/lesson/runbook)" {
     mkdir -p docs/adr
     printf 'line %d\n' {1..200} > docs/adr/adr-999-example.md

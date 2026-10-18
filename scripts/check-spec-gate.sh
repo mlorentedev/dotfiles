@@ -571,6 +571,7 @@ _excluded() {
     case "$file_path" in
         docs/*.md) return 0 ;;   # doc-only (ADRs, lessons, runbooks): prose, not production
         tests/*|specs/archive/*) return 0 ;;
+        .agent/runs/*/report.md) return 0 ;;   # autopilot disarm report: prose; the envelope stays counted (#2698)
         # No broad *generated* glob (#686/C25): it excluded any path merely
         # CONTAINING "generated" (e.g. a hand-written internal/generated_names.go)
         # — a silent bypass. Zero generated files exist in-tree today; when a real
