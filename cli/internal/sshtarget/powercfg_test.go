@@ -40,8 +40,11 @@ type fakeWin struct {
 	ac, dc         map[string]uint64
 	failAt         string
 	failAfterWrite bool
-	activated      int
-	rootCalls      []string
+	// hidden settings are the ones `/q` leaves out, as a machine without a
+	// lid hides LIDACTION: `/q` prints only the scheme header, `/qh` all of it.
+	hidden    map[string]bool
+	activated int
+	rootCalls []string
 }
 
 func newFakeWin(t *testing.T, lang string) *fakeWin {
@@ -53,8 +56,11 @@ func newFakeWin(t *testing.T, lang string) *fakeWin {
 }
 
 func (w *fakeWin) user(argv ...string) ([]byte, error) {
-	if len(argv) != 5 || argv[0] != "powercfg" || argv[1] != "/q" || argv[2] != "SCHEME_CURRENT" {
+	if len(argv) != 5 || argv[0] != "powercfg" || (argv[1] != "/q" && argv[1] != "/qh") || argv[2] != "SCHEME_CURRENT" {
 		w.t.Fatalf("unexpected user command %v", argv)
+	}
+	if argv[1] == "/q" && w.hidden[argv[4]] {
+		return []byte("Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)\r\n  GUID Alias: SCHEME_BALANCED\r\n\r\n"), nil
 	}
 	return []byte(powercfgQ(w.lang, argv[4], w.ac[argv[4]], w.dc[argv[4]])), nil
 }
@@ -184,6 +190,23 @@ func TestPowercfgProofNamesWhatStillDiffers(t *testing.T) {
 	err := (Powercfg{Run: w.user}).Prove()
 	if err == nil || !strings.Contains(err.Error(), "LIDACTION 0x1 (want 0x0)") {
 		t.Fatalf("Prove = %v, want it to name LIDACTION", err)
+	}
+}
+
+// A machine without a lid hides LIDACTION, and `/q` leaves hidden settings out
+// (#2764, measured in the PLAT-003 Windows guest). It is still read and set.
+func TestPowercfgReadsAHiddenLidSetting(t *testing.T) {
+	w := newFakeWin(t, "en")
+	w.hidden = map[string]bool{"LIDACTION": true}
+	p := Powercfg{Run: w.user}
+	if _, err := p.Apply(w); err != nil {
+		t.Fatalf("Apply on a lidless machine = %v", err)
+	}
+	if err := p.Prove(); err != nil {
+		t.Fatalf("Prove = %v", err)
+	}
+	if w.ac["LIDACTION"] != 0 {
+		t.Fatalf("LIDACTION AC = %d, want 0", w.ac["LIDACTION"])
 	}
 }
 
