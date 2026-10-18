@@ -105,6 +105,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Re-run after #2672 squash-merged and `main` was merged into #2683 (`59f2a26a`, macOS arm64, 2026-10-17): `go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> ok, 46 packages; `golangci-lint run ./...` (2.12.2, the `versions.conf` pin) and `GOOS=windows golangci-lint run` on sshtarget, converge and doctor -> 0 issues. The doctor test keeps the `powercfg /q` answers beside main's sc.exe and PowerShell cases, so the Windows rows still read a converged power profile.
 - Not proven yet, and what closes the row: on the work-lab box (never the corporate one), whether Win32-OpenSSH honours `Include`; whether the plan reads `administrators_authorized_keys` unelevated; `--plan`, an elevated apply, a second apply reporting `changed=0`, `ssh` from the Mac over the mesh, and a LAN connect to port 22 that times out
 
+- Test suite (PR 7d, pf draft, on main after #2692, 2026-10-17): Go build, vet, `GOOS=windows` vet, `go test ./...` -> ok; `golangci-lint run` -> 0 issues. Nothing loaded pf: every test uses injected runners, and the live read was the plan only
+- What the pf tests prove:
+  - the timer is armed before the anchor loads, Apply never disarms it, Commit does, and a second plan is clean: `TestPFLoadsTheAnchorBehindATimerAndCommitDisarmsIt`
+  - the pass rule matches the mesh address as destination, loopback stays open, nothing reaches beyond port 22: `TestPFRulesMatchTheDestinationAndBlockOnlyPort22`
+  - the LaunchDaemon loads only its anchor (`-a`) at boot: `TestPFLaunchDaemonLoadsOnlyItsAnchor`
+  - a session that arrived on the LAN is refused with no root command run; mesh, loopback and local sessions proceed: `TestPFRefusesASessionTheAnchorWouldCut`
+  - the undo, after a success or a load pf did not take, flushes only our anchor, removes both files, boots the job out and disarms the timer, and never runs `pfctl -d`: `TestPFFailedLoadFlushesOnlyItsAnchor`
+  - the timer flushes the anchor and disables the job, and never switches pf off: `TestPFTimerFlushesTheAnchorAndDisablesTheJob`
+  - Target commits the firewall only after the whole proof passes: `TestApplyCommitsTheFirewallOnlyAfterTheProofPasses`
+- Live on the macmini, plan only, against a scratch `XDG_CONFIG_HOME` holding the real `machine.json` with only the `ssh-target` role: `to apply as root: firewall, power policy; then proves: sshd accepts the key from 100.64.0.15, refused from 10.0.0.130; tailscale runs as the app ...`
 - SEC-014 PR 1, the record (#2388, macOS arm64, 2026-10-17): `go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> ok; `golangci-lint run ./...` (2.12.2) and `GOOS=windows golangci-lint run` on sshtarget and converge -> 0 issues. What the tests prove, against the fake macOS node:
   - a fresh machine records the key, drop-in and listener as `created`, the record is the last resource, and the next plan is converged without root: `TestRecordWritesWhatTheFirstApplyCreated`
   - a drop-in with other content is kept byte for byte as `replaced`: `TestRecordKeepsTheDropInItReplaced`

@@ -92,11 +92,8 @@ func TestWorkstationTarget_PlanNeedsNoRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Changes != 5 || !strings.HasPrefix(res.Detail, "to apply as root: authorized key, host keys, sshd drop-in, sshd service, power policy") {
+	if res.Changes != 6 || !strings.HasPrefix(res.Detail, "to apply as root: firewall, authorized key, host keys, sshd drop-in, sshd service, power policy") {
 		t.Fatalf("plan = %+v", res)
-	}
-	if !strings.Contains(res.Detail, "firewall not managed on darwin yet") {
-		t.Errorf("the plan does not name the firewall it leaves alone: %q", res.Detail)
 	}
 	if !strings.Contains(res.Detail, "only once someone logs in") {
 		t.Errorf("the plan does not say the mesh needs a login after a reboot: %q", res.Detail)
