@@ -12,7 +12,7 @@ created: "2026-10-18"
 **Context:** `dotf converge --only workstation-target` hardens sshd with a drop-in (key only, `AllowUsers <user>@100.64.0.0/10`). Before writing it, `checkInclude` requires the main `sshd_config` to `Include` the drop-in's directory; after writing it, the step runs `sshd -t`. The PLAT-003 Windows test guest (#2737) was the first run of the Windows half against a real Win32-OpenSSH.
 
 **Problem:** Measured on 2026-10-18 with OpenSSH_for_Windows_9.5p2:
-- The form `checkInclude` accepts on Windows, `Include C:\ProgramData\ssh\sshd_config.d/*.conf`, is one sshd does not read. It does not treat `C:\` as absolute: `sshd -ddd -t` logs `new include __PROGRAMDATA__\\ssh/C:\\ProgramData\\ssh\\sshd_config.d/*.conf`, then `no match`. Three other absolute spellings behaved the same; only the relative `sshd_config.d/*.conf` was honoured.
+- The form `checkInclude` accepts on Windows, `Include C:\ProgramData\ssh\sshd_config.d/*.conf`, is one sshd does not read. It does not treat `C:\` as absolute: `sshd -ddd -t` logs `new include __PROGRAMDATA__\\ssh/C:\\ProgramData\\ssh\\sshd_config.d/*.conf`, then `no match`. The other forms tried (`C:/…`, `__PROGRAMDATA__/…`, and one file named in full) were ignored too; only the relative `sshd_config.d/*.conf` was honoured.
 - An Include that matches nothing is valid, so `sshd -t` passed. `sshd -T` still printed `passwordauthentication yes` and no `allowusers`.
 - The step's error, `… does not include C:\ProgramData\ssh\sshd_config.d/`, told the owner to write exactly the ignored form. Filed as #2763.
 
