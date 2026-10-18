@@ -1,18 +1,18 @@
 version: 1
-run_id: "orch2-20261017T2045Z"
+run_id: "orch3-20261018T1045Z"
 armed_by: manu
-armed_at: 2026-10-17T20:45:00Z
-expires_at: 2026-10-18T08:45:00Z
-objective: "Keep the open dotfiles Claude sessions working overnight: refill each idle session with a disjoint set of related bug or debt tickets, keep their PRs conflict-free and triaged, and log every relay."
+armed_at: 2026-10-18T10:45:00Z
+expires_at: 2026-10-18T18:45:00Z
+objective: "Ship release 0.75.0 (#2720) and activate self-deploy on the Mac, then keep the open dotfiles sessions working without collisions: relay the post-release work, refill idle sessions, and make sure every open PR is triaged by its owner or, if orphaned, by this run."
 scope:
   write_paths: [".agent/**"]
   frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "cli/**", "scripts/**", "setup-*"]
   max_files: 4
   max_loc: 0
-allowed_commands: [dotf, gh, git, herdr]
+allowed_commands: [dotf, gh, git, herdr, caffeinate]
 queue:
   source: bitacora
-  filter: "No implementation. Refill idle sessions from open bug/chore/tech-debt tickets that need no spec slot, no Windows box and no owner choice; one subsystem per session; nudge sessions whose PRs conflict or sit untriaged."
+  filter: "No implementation by this run. Refill idle sessions from open bug/chore/tech-debt tickets that need no spec slot, no Windows box and no owner choice; one subsystem per session; nudge sessions whose PRs conflict, sit red or untriaged."
   max_items: 0
 budget:
   max_iterations: 40
@@ -23,3 +23,7 @@ authority:
   push: true
   open_pr: false
   advisor_tier: top
+  # Owner's explicit, specific grants at arming (2026-10-18 ~10:30Z). Nothing beyond these.
+  explicit:
+    - "Fix the red CI on release PR #2720 (rerun a flake; no code change under this envelope) and merge #2720 with --match-head-commit once every required check is green."
+    - "After the v0.75.0 assets publish: activate self-deploy on this Mac only (dotf env role add self-deploy; dotf converge --only self-deploy), verified with changed=0 on a second run. Not msi."
