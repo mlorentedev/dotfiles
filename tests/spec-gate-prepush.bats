@@ -58,7 +58,7 @@ STUB
 #!/usr/bin/env bash
 printf 'GH_ARGS=[%s]\n' "$*" >> "$GH_LOG"
 if [[ "${STUB_GH_RC:-0}" -ne 0 ]]; then
-    printf 'no pull requests found for branch\n' >&2
+    printf '%s\n' "${STUB_GH_ERR:-no pull requests found for branch}" >&2
     exit "$STUB_GH_RC"
 fi
 printf '%s' "$STUB_PR_JSON"
@@ -94,7 +94,12 @@ teardown() {
     # PR of the upstream branch a stacked branch tracked (#1473).
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 0 ]
-    grep -qF 'GH_ARGS=[pr list --head feat/under-test --state open --limit 1 --json labels,body,author' "$GH_LOG"
+    # REST (core quota), not `gh pr list` (GraphQL): parallel sessions exhaust the
+    # shared GraphQL quota on busy nights, and a failed lookup used to read as
+    # "no PR" (#2710). The branch is URI-encoded and the head is owner-qualified.
+    grep -qF 'GH_ARGS=[api repos/{owner}/{repo}/pulls?head={owner}:feat%2Funder-test&state=open&per_page=1 --jq' "$GH_LOG"
+    run grep -c 'pr list' "$GH_LOG"
+    [ "$output" -eq 0 ]
     run grep -c 'pr view' "$GH_LOG"
     [ "$output" -eq 0 ]
 }
@@ -105,7 +110,7 @@ teardown() {
     cd "$FIX/repo" || return 1
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 0 ]
-    grep -qF -- '--head feat/from-checkout ' "$GH_LOG"
+    grep -qF -- 'head={owner}:feat%2Ffrom-checkout&' "$GH_LOG"
 }
 
 @test "spec-gate-prepush: no branch to name (detached HEAD) falls through without asking gh" {
@@ -137,7 +142,24 @@ teardown() {
     grep -qF 'ARGS=[--base-ref origin/main --head-ref HEAD --explain --adjacency-issues /tmp/adjacency.tsv]' "$GATE_LOG"
 }
 
-@test "spec-gate-prepush: no PR for this branch falls through, gate still runs with no PR context" {
+@test "spec-gate-prepush: a failed lookup says so, instead of reading as no PR (#2710)" {
+    # A rate-limited or offline `gh` used to fall through in silence, and the
+    # gate then told the author to open the PR they had already opened.
+    export STUB_GH_RC=1 STUB_GH_ERR='gh: API rate limit already exceeded for user ID 1.'
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"spec-gate: could not resolve this branch's PR (gh: API rate limit already exceeded for user ID 1.); gating without its labels"* ]] || false
+    grep -qF 'SDD_LABELS=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: an empty answer (no open PR) stays silent" {
+    export STUB_PR_JSON=''
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"could not resolve"* ]] || false
+}
+
+@test "spec-gate-prepush: a failed lookup falls through, gate still runs with no PR context" {
     export STUB_GH_RC=1
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD
     [ "$status" -eq 0 ]
@@ -173,7 +195,7 @@ STUB
     grep -qF 'SDD_LABELS=[<unset>]' "$GATE_LOG"
 }
 
-@test "spec-gate-prepush: the --jq expression picks the first PR and prints nothing for none" {
+@test "spec-gate-prepush: the --jq expression picks the first PR, maps REST to the shape the adapter reads, and prints nothing for none" {
     # The stub gh ignores its arguments, and real gh cannot run the query
     # offline, so the expression the adapter hands to --jq is read from the
     # script itself and evaluated here. A typo in it would otherwise make every
@@ -181,7 +203,8 @@ STUB
     expr=$(sed -n "s/.*--jq '\([^']*\)'.*/\1/p" "$SCRIPTS_DIR/spec-gate-prepush.sh")
     [ "$(printf '%s\n' "$expr" | grep -c .)" -eq 1 ]
     [ -z "$(printf '[]' | jq -r "$expr")" ]
-    [ "$(printf '[{"body":"first"},{"body":"second"}]' | jq -c "$expr")" = '{"body":"first"}' ]
+    rest='[{"body":"first","labels":[{"name":"skip-sdd","id":7}],"user":{"login":"manu"}},{"body":"second","labels":[],"user":{"login":"x"}}]'
+    [ "$(printf '%s' "$rest" | jq -c "$expr")" = '{"labels":[{"name":"skip-sdd"}],"body":"first","author":{"login":"manu"}}' ]
 }
 
 @test "spec-gate-prepush: a null body and no labels become empty, not the string null" {
