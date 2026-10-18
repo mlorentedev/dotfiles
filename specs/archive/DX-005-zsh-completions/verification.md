@@ -38,7 +38,7 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 
 ## Decisions made during implementation
 
-- The step compares content, not mtime, and runs each tool's own `completion zsh`; a stdout-only runner (`ExecStdout`) keeps a tool's stderr warning out of the file.
+- The step compares content, not mtime, and runs each tool's own `completion zsh`; a stdout-only runner (`ExecStdout`) keeps a tool's stderr warning out of the file, pinned by `TestExecStdout_KeepsAToolsStderrOutOfTheCompletion`.
 - The rc, not the step, owns dump freshness: a completion newer than the dump forces a full `compinit`, so the step needs no knowledge of `~/.zcompdump` or `ZDOTDIR`.
 - The full `compinit` runs with `-u`: stock Debian/Ubuntu ship a group-writable site-functions, and a plain run aborts non-interactively ("initialization aborted"), which failed CI on the first push. `-C` already trusted every file, so `-u` keeps the previous trust level.
 - Linuxbrew prefix left out of the brew block (out of scope, changes Linux PATH order).
@@ -53,7 +53,7 @@ End to end: a shell with the written files reports `_comps[dotf]=1`, `_comps[her
 
 Review `review.md` (nan/glm5.3-flash, PASS-WITH-GAPS on `9b9e99f0`):
 
-- Finding 1, `ExecStdout` stderr exclusion untested: ticketed as #2686, root cause and fix there. The claim under *Decisions* holds by code read only until that test lands.
+- Finding 1, `ExecStdout` stderr exclusion untested: ticketed as #2686 and closed by `TestExecStdout_KeepsAToolsStderrOutOfTheCompletion` in `cli/internal/converge/shellcompletions_test.go`, which runs `ExecStdout` against a real child writing to both streams.
 - Finding 2, the dump rule governs only the non-oh-my-zsh branch: declined. No machine this repo provisions runs oh-my-zsh. On an omz machine its own policy applies, and completions are not lost, only deferred to omz's next full run.
 - Finding 3, `compinit -u` on every full rebuild: declined, already recorded under *Decisions*. `-C` trusted every file before, so the trust level is unchanged. Revisit together with the completion-directory policy if it ever changes.
 - Question, review range carries other specs' merged work: no action. The launcher resolves the base from the spec's first commit, and the reviewer confirmed it found no cross-feature interaction.
