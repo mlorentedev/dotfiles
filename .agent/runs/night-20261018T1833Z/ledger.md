@@ -10,3 +10,8 @@ Armed 18:33Z, expires 02:33Z. Wake-lock: `caffeinate -i -s -t 28800`, on AC powe
 | 18:53 | #2760 | #2795 opened (plan, Apply, converge, doctor and lesson 490). Split from the `tools sync --dry-run` print to stay within max_files 8; the second PR closes the issue |
 | 18:59 | #2690 | #2798 opened (`os.ReadDir`, lesson 491); follow-up #2797 filed (other `filepath.Glob` sites) |
 | 19:03 | #2759 | Parked with A/B (forge read surface is a CLI-123 placement); board Blocked. Message-only half may ship as `Refs #2759` |
+| 19:08–20:31 | host | No session activity: the claude.ai usage limit paused the run for about 80 minutes. The background waits ran on (GraphQL secondary rate limit 19:06–19:17Z) |
+| 20:35 | #2760 | #2795 landed at `18725e2` (pr-agent: no major issues; CodeRabbit: limit notice only). PR 2 opened as #2805 |
+| 20:40 | #2690 | #2798 landed at `1d21211` after waiting on another session's land lock (PID 35302). pr-agent finding applied: the PR body named the run as author |
+| 20:45 | attribution | Rewrote six claim, park and triage comments, plus the body of #2797, to drop the run name. Root cause filed as #2806 (the skill's claim template) |
+| — | #2749 | Neither land waited on a verdict (the attestation was already green); no live evidence yet |
