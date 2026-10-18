@@ -1,0 +1,28 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "orch4-20261018T0300Z"
+armed_by: manu
+armed_at: 2026-10-18T03:00:00Z
+expires_at: 2026-10-18T13:00:00Z
+objective: "Option A of #2724: dotf pr land waits, bounded and with a message naming what it waits for, for an in-flight review-attestation verdict before it refuses."
+scope:
+  write_paths:
+    - "cli/**"
+    - "docs/lessons/**"
+  frozen_paths: [".github/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml"]
+  max_files: 8
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, caffeinate]
+queue:
+  source: bitacora
+  filter: "exactly #2724 option A (owner decision 2026-10-18, relayed by dotfiles-20 with the owner's authorisation, in the user turn). Nothing else."
+  max_items: 1
+budget:
+  max_iterations: 4
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
