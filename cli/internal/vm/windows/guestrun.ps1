@@ -50,7 +50,9 @@ try {
     $code = $LASTEXITCODE
     # Nothing else asserts that the build is what converged: had install.ps1
     # replaced it with a release, the run would judge the release.
-    if ((Test-Path $dev) -and (Get-FileHash -Path $dev).Hash -ne (Get-FileHash -Path $installed).Hash) {
+    # A build the step removed fails too, whatever the error preference.
+    if ((Test-Path $dev) -and (-not (Test-Path $installed) -or
+            (Get-FileHash -Path $dev).Hash -ne (Get-FileHash -Path $installed).Hash)) {
         "the dotf in $bin is not the --dotf build: the step did not run the build" |
             Out-File -FilePath $log -Encoding utf8 -Append
         $code = 1

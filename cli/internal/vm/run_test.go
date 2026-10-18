@@ -507,4 +507,7 @@ func TestGuestRun_FailsAStepThatDidNotRunTheDotfBuild(t *testing.T) {
 	if !strings.Contains(code[check:], "$code = 1") {
 		t.Error("a mismatch does not fail the step")
 	}
+	if gone := strings.Index(code, "-not (Test-Path $installed) -or"); gone < run || gone > check {
+		t.Error("a step that removed the build does not fail on its own condition")
+	}
 }
