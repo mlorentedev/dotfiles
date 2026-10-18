@@ -32,3 +32,66 @@ setup() {
     run "$SCRIPTS_DIR/check-bats-names.sh" "$DOTFILES_DIR/tests/"
     [ "$status" -eq 0 ]
 }
+
+# lint-powershell (#2678): the hook runs the pinned `dotf lint powershell`,
+# which exits 2 where pwsh is absent, so the skip lives in the hook's entry.
+# Read through pre-commit's own model (YAML, then shlex on `entry`), so the
+# test runs the command pre-commit would run, not a copy of it.
+lint_powershell_hook() {
+    python3 - "$DOTFILES_DIR/.pre-commit-config.yaml" "$1" <<'PY'
+import shlex, sys, yaml
+hooks = [h for r in yaml.safe_load(open(sys.argv[1]))["repos"] for h in r["hooks"]]
+h = next(h for h in hooks if h["id"] == "lint-powershell")
+field = sys.argv[2]
+if field == "argv":
+    for a in shlex.split(h["entry"]):
+        print(a)
+else:
+    print(h.get(field))
+PY
+}
+
+# Runs the hook's entry with only $STUBS on PATH: a runner image that ships
+# pwsh in /usr/bin (GitHub's ubuntu does) cannot leak into the no-pwsh case.
+run_lint_powershell_hook() {
+    local script
+    script="$(lint_powershell_hook argv | sed -n 3p)"
+    [[ "$(lint_powershell_hook argv | sed -n 1,2p | tr '\n' ' ')" == "sh -c " ]] || false
+    run env PATH="$STUBS" /bin/sh -c "$script"
+}
+
+stub() {
+    printf '#!/bin/sh\n%s\n' "$2" > "$STUBS/$1"
+    chmod +x "$STUBS/$1"
+}
+
+@test "lint-powershell is a pre-commit hook on .ps1/.psm1 that takes no filenames [#2678]" {
+    [[ "$(lint_powershell_hook language)" == "system" ]] || false
+    [[ "$(lint_powershell_hook pass_filenames)" == "False" ]] || false
+    [[ "$(lint_powershell_hook stages)" == "['pre-commit']" ]] || false
+    files="$(lint_powershell_hook files)"
+    for p in setup-windows.ps1 powershell/profile.ps1 powershell/Mod.psm1; do
+        [[ "$p" =~ $files ]] || false
+    done
+    for p in setup-linux.sh docs/x.ps1.md; do
+        [[ ! "$p" =~ $files ]] || false
+    done
+}
+
+@test "lint-powershell skips with a message where pwsh is absent, and never runs dotf [#2678]" {
+    STUBS="$(mktemp -d)"
+    stub dotf 'echo called >"$0.log"; exit 2'
+    run_lint_powershell_hook
+    [[ "$status" -eq 0 ]] || false
+    [[ "$output" == *pwsh* ]] || false
+    [[ ! -e "$STUBS/dotf.log" ]] || false
+}
+
+@test "lint-powershell runs dotf lint powershell where pwsh is present and keeps its exit code [#2678]" {
+    STUBS="$(mktemp -d)"
+    stub pwsh 'exit 0'
+    stub dotf 'echo "$*" >"$0.log"; exit 1'
+    run_lint_powershell_hook
+    [[ "$status" -eq 1 ]] || false
+    [[ "$(cat "$STUBS/dotf.log")" == "lint powershell" ]] || false
+}
