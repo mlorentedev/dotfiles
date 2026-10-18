@@ -165,12 +165,17 @@ func (f *PF) Apply(root Root) (func() error, error) {
 	}
 	undos = append(undos, func() error { return restoreRoot(root, f.Anchor, prevAnchor) })
 	out, err := root.Run(pfctl, "-E", "-a", PFAnchor, "-f", f.Anchor)
+	tok := pfTokenLine.FindSubmatch(out)
 	if err != nil {
+		// -E takes its reference before -f loads the rules: a load that fails
+		// still holds one, released here since nothing else would name it.
+		if tok != nil {
+			_, _ = root.Run(pfctl, "-X", string(tok[1]))
+		}
 		return undo, fmt.Errorf("pfctl -E -a %s: %w: %s", PFAnchor, err, bytes.TrimSpace(out))
 	}
 	// Flush only our anchor, then release our reference: pf stays enabled for
 	// every other holder. Never `pfctl -d`.
-	tok := pfTokenLine.FindSubmatch(out)
 	recorded := false
 	if tok != nil {
 		undos = append(undos, func() error {
@@ -337,10 +342,12 @@ func (f *PF) arm(root Root) error {
 // pfTimer is the timer's script. It reads Token when it fires, so it releases
 // the reference Apply took after it was armed, and only those of the boot it
 // runs in: a run killed before Apply rewrote the file leaves older lines.
+// Without a boot id it releases nothing and keeps the file, for the next
+// converge to release.
 // It holds no single quote, since arm wraps it in them.
 func pfTimer(token string) string {
 	return fmt.Sprintf(`sleep %d; %s -a %s -F all; `+
-		`b=$(%s -n kern.bootsessionuuid); if [ -f %s ]; then while read -r t tb; do [ "$tb" = "$b" ] && %s -X "$t"; done < %s; fi; rm -f %s; `+
+		`b=$(%s -n kern.bootsessionuuid) && [ -n "$b" ] && [ -f %s ] && { while read -r t tb; do [ "$tb" = "$b" ] && %s -X "$t"; done < %s; rm -f %s; }; `+
 		`launchctl bootout %s; launchctl disable %s`,
 		pfConfirmSec, pfctl, PFAnchor, sysctl, token, pfctl, token, token, pfLaunchd, pfLaunchd)
 }

@@ -26,6 +26,7 @@ type pfMac struct {
 	jobLoaded   bool
 	failLoad    bool // `pfctl -E -a … -f` succeeds but pf holds nothing
 	noToken     bool // `pfctl -E` prints no token
+	rejectRules bool // `pfctl -E` takes a reference, then `-f` fails
 	token       string
 	boot        string          // kern.bootsessionuuid
 	next        int             // the token the next `pfctl -E` takes
@@ -98,6 +99,10 @@ func (m *pfMac) Run(argv ...string) ([]byte, error) {
 		m.held[tok] = true
 		if m.noToken {
 			return []byte("pf enabled\n"), nil
+		}
+		if m.rejectRules {
+			m.loaded = false
+			return []byte("pf enabled\nToken : " + tok + "\n/etc/pf.anchors/dotf:3: syntax error\n"), exitErr(1)
 		}
 		return []byte("pf enabled\nToken : " + tok + "\n"), nil
 	case len(argv) == 3 && argv[0] == pfctl && argv[1] == "-X":
@@ -448,6 +453,24 @@ func TestPFFailsWhenTheTokenCannotBeRead(t *testing.T) {
 	}
 }
 
+// -E takes its reference before -f loads the rules, so a load that fails
+// still holds one: Apply releases it before it reports the failure (#2791
+// review).
+func TestPFReleasesTheReferenceOfARejectedLoad(t *testing.T) {
+	m := newPFMac(t)
+	m.rejectRules = true
+	undo, err := m.pf("").Apply(m)
+	if err == nil {
+		t.Fatal("Apply took rules pfctl rejected")
+	}
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.held) != 0 {
+		t.Errorf("a rejected load left references %v held", m.held)
+	}
+}
+
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -502,6 +525,45 @@ func TestPFTimerReleasesOnlyThisBootsReferences(t *testing.T) {
 	}
 	if _, err := os.Stat(token); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("the token file survived the timer: %v", err)
+	}
+}
+
+// A timer that cannot read the boot id cannot tell which lines are its boot's:
+// it releases nothing and keeps the file, so the next converge can (#2791
+// review).
+func TestPFTimerWithoutABootIDKeepsTheFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the timer is a POSIX sh script; it runs on macOS only")
+	}
+	d := t.TempDir()
+	log := filepath.Join(d, "calls")
+	stub := func(name, body string) string {
+		p := filepath.Join(d, name)
+		if err := os.WriteFile(p, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	token := filepath.Join(d, "pf-token")
+	writeTokenFile(t, token, "1001 BOOT-1\n")
+	for name, body := range map[string]string{"fails": "exit 1", "prints nothing": "true"} {
+		script := strings.NewReplacer(
+			"sleep 120", "sleep 0",
+			pfctl, stub("pfctl", `echo "pfctl $*" >> `+log),
+			sysctl, stub("sysctl", body),
+		).Replace(pfTimer(token))
+		stub("launchctl", "true")
+		cmd := exec.Command("/bin/sh", "-c", script)
+		cmd.Env = append(os.Environ(), "PATH="+d+":/usr/bin:/bin")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("sysctl %s: timer: %v: %s", name, err, out)
+		}
+		if got := readFile(t, token); got != "1001 BOOT-1\n" {
+			t.Errorf("sysctl %s: token file = %q, want it kept", name, got)
+		}
+		if strings.Contains(readFile(t, log), "-X") {
+			t.Errorf("sysctl %s: the timer released a reference without a boot id", name)
+		}
 	}
 }
 
