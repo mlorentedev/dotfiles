@@ -53,6 +53,21 @@ func TestConvergeCheckout_TheCwdCheckoutWinsWhileTheDeclaredOneIsAbsent(t *testi
 	}
 }
 
+// A declared path that exists but is no dotfiles checkout (emptied, replaced)
+// must not beat a real one in the cwd: `--only tools` skips the checkout step
+// that would refuse it, and the tools step would read its pins from nothing.
+func TestConvergeCheckout_ADeclaredPathThatIsNoCheckoutDoesNotWin(t *testing.T) {
+	_, home := convergeFixture(t)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir())
+	cwd := dotfilesTree(t, filepath.Join(t.TempDir(), "clone"))
+	t.Chdir(cwd)
+
+	if got := convergeCheckout(home); !sameFile(got, cwd) {
+		t.Errorf("convergeCheckout() = %q, want the checkout the cwd is in %q", got, cwd)
+	}
+}
+
 // The choice is visible: run from another checkout, converge names the tree
 // it converges and how to converge the other one.
 func TestConverge_NamesTheTreeWhenTheCwdIsAnotherCheckout(t *testing.T) {

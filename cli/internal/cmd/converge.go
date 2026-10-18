@@ -246,7 +246,7 @@ var convergeOptions = func() converge.Options {
 
 // convergeCheckout is the checkout a run converges from when --repo names
 // none: the declared location (DOTFILES_REPO_DIR, machine.json, the contract)
-// when it exists, the one the checkout step fast-forwards and `dotf update`
+// when it is a dotfiles checkout, the one the checkout step fast-forwards and `dotf update`
 // applies; else the dotfiles checkout the working directory is in (another
 // project's repository does not count); else the declared location or the
 // default. The last two may not exist yet: the checkout step clones them,
@@ -258,7 +258,7 @@ var convergeOptions = func() converge.Options {
 // (#2711). Converging a branch is `--repo <worktree>`.
 func convergeCheckout(home string) string {
 	declared := env.ResolvePath("DOTFILES_REPO_DIR")
-	if declared != "" && dirExists(declared) {
+	if declared != "" && env.IsDotfilesCheckout(declared) {
 		return declared
 	}
 	if r := env.RepoDir(); r != "" && env.IsDotfilesCheckout(r) {

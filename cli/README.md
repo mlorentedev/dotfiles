@@ -79,7 +79,7 @@ cannot call each other in a loop.
 `dotf update` runs the same converge after a clean fast-forward, and only then.
 
 Without `--repo`, the checkout is the declared `DOTFILES_REPO_DIR` when it
-exists, the one `dotf update` fast-forwards and applies; else the dotfiles
+is a dotfiles checkout, the one `dotf update` fast-forwards and applies; else the dotfiles
 checkout the working directory is in (the clone `./install.sh` runs from on a
 machine whose declared path does not exist yet); else the declared path or
 `~/Projects/dotfiles`, which the checkout step clones. The declared checkout
