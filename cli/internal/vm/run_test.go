@@ -431,3 +431,17 @@ func TestStop_QuitsTheGuestAndRemovesTheOverlay(t *testing.T) {
 		t.Errorf("a second stop: %v", err)
 	}
 }
+
+// Windows PowerShell decodes native output with the console's OEM code page:
+// a live run printed dotf's "→" as "ΓåÆ". The console must be UTF-8 before
+// either step starts its child.
+func TestGuestRun_DecodesNativeOutputAsUTF8(t *testing.T) {
+	code := codeLines(string(guestRunScript))
+	enc := strings.Index(code, "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8")
+	if enc < 0 {
+		t.Fatal("guestrun.ps1 leaves the console on its OEM code page")
+	}
+	if first := strings.Index(code, "& powershell.exe"); first < enc {
+		t.Error("guestrun.ps1 sets the console's encoding after it starts install.ps1")
+	}
+}

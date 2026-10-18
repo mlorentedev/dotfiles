@@ -15,6 +15,10 @@ $work = 'C:\Users\Public\dotf'
 $repo = Join-Path $env:USERPROFILE 'Projects\dotfiles'
 $log = Join-Path $work "$Step.log"
 $code = 1
+# Windows PowerShell decodes a native command's output with the console's
+# code page (OEM 437 here), which turns dotf's UTF-8 into mojibake. Setting it
+# on the console reaches the child powershell.exe that runs install.ps1 too.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 try {
     if ($Step -eq 'first') {
         Expand-Archive -Path (Join-Path $work 'src.zip') -DestinationPath (Split-Path $repo) -Force -ErrorAction Stop
