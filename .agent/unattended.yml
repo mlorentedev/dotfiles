@@ -1,0 +1,33 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "cli094-20261018T1035Z"
+armed_by: manu
+armed_at: 2026-10-18T10:35:00Z
+expires_at: 2026-10-18T18:35:00Z
+objective: "Archive spec CLI-094 on its signed PASS-WITH-GAPS review so #1975 and #2448 close, file the follow-ups its gaps name, then verify the 0.75.0 release and stop."
+scope:
+  write_paths:
+    - "specs/CLI-094-stopped-review-leaves-a-record/**"
+    - "specs/archive/CLI-094-stopped-review-leaves-a-record/**"
+    - "docs/lessons/**"
+    - "docs/runbooks/**"
+    - "cli/internal/spec/**"
+    - "cli/internal/cmd/spec*.go"
+    - "tests/**"
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml", "versions.conf", "release-please-config.json", ".release-please-manifest.json"]
+  max_files: 20
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, tmux, caffeinate]
+queue:
+  source: bitacora
+  filter: "CLI-094 archive (closes #1975 and #2448), the follow-up tickets its F1/F2 gaps name, then the read-only check that 0.75.0 published and carries #2743. The Backlog holds no other item this run may take: it is old epics and chores, and WIP is over its limit. Peer-owned post-release steps (PLAT-003 AC8, SEC-014 PR 2, #2727) are not claimed."
+  max_items: 3
+budget:
+  max_iterations: 4
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
