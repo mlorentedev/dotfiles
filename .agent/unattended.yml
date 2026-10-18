@@ -1,0 +1,25 @@
+version: 1
+run_id: "dropped-20261018T0440Z"
+armed_by: manu
+armed_at: 2026-10-18T04:40:00Z
+expires_at: 2026-10-18T09:00:00Z
+objective: "Make the tools step's dry-run plan name the tools a mise config write drops, as 'dropped from the mise config (pruned on apply): X, Y' (#2744, owner picked option A)."
+scope:
+  write_paths: ["cli/internal/tools/mise.go", "cli/internal/tools/mise_test.go", "cli/internal/converge/tools.go", "cli/internal/converge/tools_test.go", "docs/lessons/**", ".agent/runs/dropped-20261018T0440Z/**"]
+  frozen_paths: [".github/**", ".agent/unattended.yml", "setup-*", "harness/**", "secrets/**", "**/AGENTS.md", "specs/**", "versions.conf", "cli/internal/lane/**", "cli/internal/prland/**", "cli/internal/forgewrite/**", "cli/internal/cmd/forge*.go", "forge/**"]
+  max_files: 4
+  max_loc: 150
+allowed_commands: [dotf, gh, git, go, golangci-lint, jq]
+queue:
+  source: bitacora
+  filter: "#2744 only, option A. Owner instruction received 2026-10-18T04:36Z in this session's user channel (relayed through dotfiles-20 with the owner's explicit authorisation). Nothing else after it."
+  max_items: 1
+budget:
+  max_iterations: 2
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
