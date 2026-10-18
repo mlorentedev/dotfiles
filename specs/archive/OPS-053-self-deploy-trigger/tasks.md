@@ -59,4 +59,4 @@ created: "2026-10-17"
 
 - [x] Every acceptance criterion covered by a test, mapped in `features.json`
 - [x] `verification.md` filled in
-- [ ] Independent review: `dotf spec review OPS-053-self-deploy-trigger` (not this session). Round 1 FAIL; round 2 runs after this fix round lands
+- [x] Independent review: `dotf spec review OPS-053-self-deploy-trigger` (not this session). Round 1 FAIL; round 2 runs after this fix round lands

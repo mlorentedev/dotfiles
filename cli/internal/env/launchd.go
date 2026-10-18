@@ -47,15 +47,27 @@ type LaunchdUserEnv struct {
 // ErrOutsideLoginSession is returned by Set and Delete when the caller is not in
 // the login session, where a write would land in a domain no GUI app reads.
 var ErrOutsideLoginSession = errors.New("this process is not in the login session's launchd domain " +
-	"(under tmux or herdr it is Background); run from a login terminal, or log in again so the login agent re-applies it")
+	"(under herdr or tmux it is Background, over ssh StandardIO); run it in a new window of the terminal app itself, " +
+	"outside herdr and tmux, or log in again so the login agent re-applies it")
+
+// LoginSession is the launchd session of the user's GUI login, the one every
+// app launched from the Dock reads.
+const LoginSession = "Aqua"
+
+// Session names the launchd session this process is in: LoginSession for a
+// window of a terminal app, Background under herdr or tmux, StandardIO over ssh.
+func (s LaunchdUserEnv) Session() (string, error) {
+	out, err := s.Run("managername")
+	if err != nil {
+		return "", fmt.Errorf("launchctl managername: %w", err)
+	}
+	return strings.TrimSpace(out), nil
+}
 
 // InLoginSession reports whether getenv and setenv reach the login session.
 func (s LaunchdUserEnv) InLoginSession() (bool, error) {
-	out, err := s.Run("managername")
-	if err != nil {
-		return false, fmt.Errorf("launchctl managername: %w", err)
-	}
-	return strings.TrimSpace(out) == "Aqua", nil
+	session, err := s.Session()
+	return session == LoginSession, err
 }
 
 // Get reads name. `launchctl getenv` exits 0 and prints nothing for an unset
