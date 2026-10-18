@@ -21,7 +21,11 @@ func MeshAtBootFor(goos string, run Runner) func() string {
 	switch goos {
 	case "darwin":
 		return func() string {
-			if _, err := run("launchctl", "print", tailscaledLabel); err == nil {
+			loaded, err := launchdLoaded(run, tailscaledLabel)
+			switch {
+			case err != nil:
+				return fmt.Sprintf("could not read whether the tailscaled system daemon is loaded, so whether the node rejoins the mesh after a reboot is unknown: %v", err)
+			case loaded:
 				return ""
 			}
 			return "tailscale runs as the app, not the tailscaled system daemon: after a reboot the node rejoins the mesh only once someone logs in (and unlocks FileVault)"

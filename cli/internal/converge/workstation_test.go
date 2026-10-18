@@ -1,7 +1,6 @@
 package converge
 
 import (
-	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,6 +10,13 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 )
+
+// launchdUnknown is `launchctl print`'s failure for a service launchd does not
+// know: exit 113, the one failure that reads as "not loaded" (#2731).
+type launchdUnknown struct{}
+
+func (launchdUnknown) Error() string { return "exit status 113" }
+func (launchdUnknown) ExitCode() int { return 113 }
 
 // noRoot is a Root that must not be reached, or that has no terminal.
 type noRoot struct {
@@ -50,7 +56,7 @@ func workstationFixture(t *testing.T, root sshtarget.Root) (workstationTarget, E
 			if strings.Join(argv, " ") == "pmset -g custom" {
 				return []byte("AC Power:\n sleep 0\n disksleep 10\n womp 1\n autorestart 0\n powernap 1\n"), nil
 			}
-			return nil, errors.New("exit status 113")
+			return []byte("Could not find service"), launchdUnknown{}
 		},
 		addrs: func() ([]net.IP, error) { return []net.IP{net.ParseIP("100.64.0.15")}, nil },
 		paths: func(string, string) sshtarget.Paths { return paths },
