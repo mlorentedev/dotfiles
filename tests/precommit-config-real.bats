@@ -11,14 +11,17 @@
 # fails is a failure: tests/lib/dotf-bin.bash). GitHub's ubuntu runners ship
 # pwsh but not PSScriptAnalyzer, so CI sees the "analyzer not at its pin" exit 2
 # and a box with the analyzer sees the probe's finding (exit 1). Both must fail
-# the hook, and neither may take the no-pwsh skip. Where pwsh or pre-commit is
-# absent, the test skips: that box is the stubbed suite's case.
+# the hook, and neither may take the no-pwsh skip. Where pre-commit is absent,
+# or pwsh is outside a job that promises it (tests/lib/pwsh.bash), the test
+# skips: that box is the stubbed suite's case.
 
 load 'lib/dotf-bin'
+load 'lib/pwsh'
 
 setup() {
     command -v pre-commit >/dev/null 2>&1 || skip "pre-commit not installed"
-    command -v pwsh >/dev/null 2>&1 || skip "pwsh not installed: the hook skips here, which precommit-config.bats pins"
+    # A box without pwsh is the stubbed suite's case: the hook skips there.
+    require_pwsh
     REPO="$BATS_TEST_DIRNAME/.."
     dotf_bin_resolve "${BATS_FILE_TMPDIR:-/tmp/bats_pcr_$$}/bin/dotf"
     WORK="$(mktemp -d)"

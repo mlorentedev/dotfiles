@@ -71,10 +71,10 @@ stub() {
     [[ "$(lint_powershell_hook stages)" == "['pre-commit']" ]] || false
     files="$(lint_powershell_hook files)"
     for p in setup-windows.ps1 powershell/profile.ps1 powershell/Mod.psm1; do
-        printf '%s\n' "$p" | grep -Eq "$files" || false
+        [[ "$p" =~ $files ]] || false
     done
     for p in setup-linux.sh docs/x.ps1.md; do
-        ! printf '%s\n' "$p" | grep -Eq "$files" || false
+        [[ ! "$p" =~ $files ]] || false
     done
 }
 
