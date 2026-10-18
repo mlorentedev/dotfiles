@@ -19,3 +19,4 @@ Not relayed: #2724 (A/B unpicked; A is .github), #2727 (waits on #2502 A/B), #26
 - 00:53Z owner chose A on #2502 (commented); archive of OPS-053 relayed to feat-self-deploy-trigger after #2733, before #2714.
 - 00:54Z self-deploy: #2728 already merged (94395d4c); #2714 ships with #2685 in #2733; then the archive PR. Filed #2731 (sshtarget launchctl), relayed to wintarget as its refill, plus a reminder to land #2713.
 - 01:06Z wintarget: #2731 fixed in draft #2738, stacked on #2733; owner-lands (two test files outside its envelope, lesson 469). #2713 and #2683 already merged.
+- 01:08Z owner asked for a PR sweep: reminders relayed to the owning panes (#2729 untriaged and wrongly ready, #2737 conflicts, #2733/#2732/#2730/#2735/#2738 triage on pr-agent's review; CodeRabbit rate-limited). #2736 has no live dotfiles session (Refs kubelab#2431), CI still running, nothing to triage yet. #2720 release is the owner's.
