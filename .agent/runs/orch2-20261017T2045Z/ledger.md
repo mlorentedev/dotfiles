@@ -32,3 +32,4 @@ Not relayed: #2724 (A/B unpicked; A is .github), #2727 (waits on #2502 A/B), #26
 - 03:23Z night session run strayidx done: #2739 landed (closes #2700; merged by the owner account at 03:19:40Z while its own land refused on UNKNOWN). Symlink-fix commit unreviewed, disclosed. No eligible refill left for it (#2744 needs an option pick, #2634 is permission config).
 - 03:29Z review-cli-119 run orch4 done: #2749 landed (closes #2724); #2747 merged by the owner. #2736 warned to rebase (prland.go changed). Orchestrator wake-lock alive (PID 46035).
 - 03:33Z cross-os: #2751 landed (lesson 478 to 480), fmt --check OK on main; class ticketed as #2752 (A renumber in pr land / B land-time number plus post-merge check). Session stopped.
+- 04:03Z owner asked for a red-CI sweep: #2743 (feat-2550-lane-reconcile, w16), #2736 (kubelab session w3, conflicts after #2749), #2681 (wintarget), #2737 (vm-windows) told to merge main, fix and renumber lessons. #2720 is green and clean.
