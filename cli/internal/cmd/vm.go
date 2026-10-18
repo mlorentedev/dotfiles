@@ -275,5 +275,10 @@ func windowsArm64(path string) error {
 	if f.Machine != pe.IMAGE_FILE_MACHINE_ARM64 {
 		return fmt.Errorf("--dotf %s: built for PE machine %#x, not Windows Arm64 (GOOS=windows GOARCH=arm64)", path, f.Machine)
 	}
+	// An object file or a truncated image has the machine but no PE32+
+	// optional header, or lacks the flag that marks it runnable.
+	if _, ok := f.OptionalHeader.(*pe.OptionalHeader64); !ok || f.Characteristics&pe.IMAGE_FILE_EXECUTABLE_IMAGE == 0 {
+		return fmt.Errorf("--dotf %s: an Arm64 PE but not a Windows Arm64 executable image", path)
+	}
 	return nil
 }
