@@ -231,10 +231,23 @@ sys.exit(0 if 'ci:mlorentedev/dotfiles' in n['consumers'] else 1)
 "
 }
 
-@test "pr-agent: draft PRs are skipped" {
+@test "pr-agent: the draft decision re-reads the live PR, never the event payload (#2591)" {
     # A draft is by definition not asking to be read yet; reviewing it spends
-    # inference on a change the author has not finished making.
-    grep -q 'draft == false' "$WF"
+    # inference on a change the author has not finished making. But the payload is
+    # a snapshot from when the event was queued, and GitHub does not order the
+    # `opened` (draft) and `ready_for_review` runs: the first cancels the second
+    # in their shared concurrency group, then skips itself on its stale
+    # `draft == true`, so a PR marked ready at once was never reviewed. The job
+    # gate therefore must not read the payload's draft flag, and the `reviewable`
+    # step, which asks the API, is what skips a draft.
+    run python3 - "$WF" <<'PY'
+import sys, yaml
+job = yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]
+step = next(s for s in job["steps"] if s.get("id") == "reviewable")
+assert "pull_request.draft" not in job["if"], "the job gate decides from the event payload's draft flag"
+assert 'pulls/${PR_NUMBER}' in step["run"] and ".draft" in step["run"], "the reviewable step no longer reads draft from the API"
+PY
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
 @test "pr-agent: a comment cannot cancel an in-flight review" {
