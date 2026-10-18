@@ -18,6 +18,7 @@ import (
 )
 
 func newUpdateCmd() *cobra.Command {
+	var homes updateHomes
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Self-deploy: fast-forward the dotfiles repo and converge from it (opt-in, scheduler-invoked)",
@@ -45,6 +46,12 @@ status dotfiles-selfupdate', the task's LastTaskResult) surfaces it. Every run,
 a skip included, records its outcome in <state dir>/update/last.json, which
 'dotf doctor' reads in its Self-deploy section.
 
+--config-home and --state-home set XDG_CONFIG_HOME and XDG_STATE_HOME for the
+run and everything it starts. The Windows Scheduled Task passes them, because a
+task has no per-action environment; launchd and systemd set the variables
+themselves. A relative one is refused before the run starts: it exits non-zero
+and records nothing, since the state dir it names is the one in doubt.
+
 Env:
   DOTFILES_REPO_DIR              repo to update  (default: the env-contract path)
   DOTFILES_SELFUPDATE_SETUP_CMD  setup command converge runs last (default:
@@ -54,6 +61,9 @@ Env:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := homes.apply(); err != nil {
+				return err
+			}
 			repo := repoForUpdate()
 			out, err := update.Run(update.Config{Repo: repo, Version: dotfVersion}, update.Deps{
 				Git:      gitRunner(repo),
@@ -69,7 +79,31 @@ Env:
 			return err
 		},
 	}
+	cmd.Flags().StringVar(&homes.config, "config-home", "", "absolute XDG_CONFIG_HOME for this run (the Windows task passes it)")
+	cmd.Flags().StringVar(&homes.state, "state-home", "", "absolute XDG_STATE_HOME for this run (the Windows task passes it)")
 	return cmd
+}
+
+// updateHomes are the XDG homes a scheduler hands `dotf update` as flags.
+type updateHomes struct{ config, state string }
+
+// apply exports each home given, before anything resolves machine.json or the
+// state dir, so the converge and the installer the run starts inherit it. A
+// relative one is refused: env ignores a relative XDG_STATE_HOME, and the run
+// would quietly use another home.
+func (h updateHomes) apply() error {
+	for _, v := range []struct{ flag, env, dir string }{{"--config-home", "XDG_CONFIG_HOME", h.config}, {"--state-home", "XDG_STATE_HOME", h.state}} {
+		if v.dir == "" {
+			continue
+		}
+		if !filepath.IsAbs(v.dir) {
+			return fmt.Errorf("%s %q: want an absolute path", v.flag, v.dir)
+		}
+		if err := os.Setenv(v.env, v.dir); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // recordUpdate keeps the run's outcome where doctor reads it. A record that

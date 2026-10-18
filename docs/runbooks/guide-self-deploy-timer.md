@@ -50,6 +50,11 @@ native trigger, the same daily `~/.local/bin/dotf update` at 03:00 on every OS:
 | Linux | systemd user timer `dotfiles-selfupdate.timer` + oneshot service | `~/.config/systemd/user/` |
 | Windows | Scheduled Task `DotfilesSelfUpdate` (S4U when converge runs elevated, InteractiveToken otherwise) | Task Scheduler root |
 
+The trigger carries the `XDG_CONFIG_HOME` and `XDG_STATE_HOME` of the converge that installed it. Without them the 03:00
+run would read another `machine.json` and remove itself, or write its record where doctor does not look. launchd and
+systemd put them in the job's environment. A Scheduled Task has no per-action environment, so on Windows they are
+`dotf update --config-home <dir> --state-home <dir>` arguments, and changing either re-registers the task (#2696).
+
 ```bash
 # Enable (any OS)
 dotf env role add self-deploy
