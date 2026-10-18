@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -30,15 +29,15 @@ type checkout struct {
 	url string
 	has func(name string) bool
 	// installer installs git where the OS manager can (gitTool); nil leaves a
-	// missing git to the hint. gitDirs are where that install places git,
-	// which this process's PATH, read before the install, does not reach.
-	installer CatalogInstaller
-	gitDirs   []string
+	// missing git to the hint. registered reads the PATH its installer
+	// registers, which this process's PATH, read before the install, lacks.
+	installer  CatalogInstaller
+	registered func() ([]string, error)
 }
 
-// gitTool is git through the OS package manager. It is defined here, not in
-// packages.json, because the step that needs it runs before any checkout
-// exists to read the catalog from. Only winget names it: dotf never asks for
+// gitTool is git through the OS package manager. packages.json declares the
+// same package for the tools step; it is defined here too because this step
+// runs before any checkout exists to read the catalog from. Only winget names it: dotf never asks for
 // a sudo password, and macOS's git comes with the Command Line Tools, so on
 // those the plan is unsupported and the failure names the command instead.
 var gitTool = tools.Tool{Name: "git", Source: tools.Source{Type: "system", Winget: "Git.Git"}}
@@ -58,6 +57,11 @@ func (c checkout) Reconcile(e Env, dryRun bool) (Result, error) {
 		return c.clone(e, dryRun)
 	}
 	if err := isDotfilesCheckout(e.RepoRoot); err != nil {
+		return Result{}, err
+	}
+	// A git installed after this process started (by an earlier run, in a
+	// shell opened before it) is on the PATH its installer registered.
+	if err := reachDirs(nil, c.registered); err != nil {
 		return Result{}, err
 	}
 	if !c.has("git") {
@@ -105,39 +109,23 @@ func (c checkout) clone(e Env, dryRun bool) (Result, error) {
 	return res, nil
 }
 
-// GitBinDirs are where winget's Git.Git places git.exe: Program Files for the
-// machine-scope installer it runs by default, LocalAppData for a user-scope
-// one. Elsewhere the step installs no git, so there are none.
-func GitBinDirs(goos string, getenv func(string) string) []string {
-	if goos != "windows" {
-		return nil
-	}
-	var dirs []string
-	if p := getenv("ProgramFiles"); p != "" {
-		dirs = append(dirs, filepath.Join(p, "Git", "cmd"))
-	}
-	if l := getenv("LOCALAPPDATA"); l != "" {
-		dirs = append(dirs, filepath.Join(l, "Programs", "Git", "cmd"))
-	}
-	return dirs
-}
-
 // canInstallGit reports whether the OS manager would install git here.
 func (c checkout) canInstallGit() bool {
 	return c.installer != nil && c.installer.Plan(gitTool).Action == tools.PlanInstall
 }
 
-// installGit installs git through the OS manager and puts where it lands on
-// this process's PATH, so the clone that follows finds it.
+// installGit installs git through the OS manager and reaches the PATH its
+// installer registered, wherever it installed, so the clone that follows
+// finds it.
 func (c checkout) installGit() error {
 	if _, err := c.installer.Install(gitTool); err != nil {
 		return fmt.Errorf("installing git: %w", err)
 	}
-	if err := appendToPath(c.gitDirs); err != nil {
+	if err := reachDirs(nil, c.registered); err != nil {
 		return err
 	}
 	if !c.has("git") {
-		return fmt.Errorf("installed git, but it is not on PATH (looked in %s)", strings.Join(c.gitDirs, ", "))
+		return errors.New("installed git, but neither this process's PATH nor the one its installer registered holds it")
 	}
 	return nil
 }

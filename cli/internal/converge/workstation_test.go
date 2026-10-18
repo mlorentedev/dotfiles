@@ -1,6 +1,7 @@
 package converge
 
 import (
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -116,6 +117,28 @@ func TestWorkstationTarget_ApplyWithoutRootIsSkippedWithThePlan(t *testing.T) {
 		if !strings.Contains(res.Skip, why) || !strings.Contains(res.Skip, "to apply as root") {
 			t.Fatalf("Reconcile = %+v; want a skip naming %q and carrying the plan", res, why)
 		}
+	}
+}
+
+// A failed apply names what it planned, never a proof that did not run nor
+// changes it kept (#2765: the guest's detail claimed both).
+func TestWorkstationTarget_AFailedApplyClaimsNothingItDidNotDo(t *testing.T) {
+	r, e := workstationFixture(t, noRoot{t: t, ready: errors.New("sudo: 3 incorrect password attempts")})
+	if _, err := env.SetMachineRole(env.MachinePath(e.Home), env.RoleSSHTarget, true); err != nil {
+		t.Fatal(err)
+	}
+	res, err := r.Reconcile(e, false)
+	if err == nil {
+		t.Fatal("Reconcile succeeded with a root that refused")
+	}
+	// The runner prints the detail of a step that kept changes, then the
+	// error; Apply undid everything, so neither may claim work or a proof.
+	line := res.Detail + "; " + err.Error()
+	if res.Changes != 0 || strings.Contains(line, "applied") || strings.Contains(line, "accepts the key") {
+		t.Fatalf("a failed apply claimed work or a proof: %d changes, %q", res.Changes, line)
+	}
+	if !strings.Contains(err.Error(), "planned as root: firewall, authorized key") || !strings.Contains(err.Error(), "incorrect password") {
+		t.Fatalf("a failed apply does not name what it planned and what failed: %v", err)
 	}
 }
 

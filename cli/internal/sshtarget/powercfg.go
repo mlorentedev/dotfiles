@@ -25,7 +25,7 @@ var PowercfgProfile = []PowercfgSetting{
 	{"SUB_BUTTONS", "LIDACTION", 0},
 }
 
-// Powercfg is the power policy on Windows. It reads `powercfg /q` without
+// Powercfg is the power policy on Windows. It reads `powercfg /qh` without
 // elevation and writes the AC index of the active scheme, then activates the
 // scheme again so the change takes effect.
 type Powercfg struct {
@@ -99,22 +99,24 @@ func (p Powercfg) pending() ([]PowercfgSetting, map[string]uint64, error) {
 	return pending, cur, nil
 }
 
-// read is the AC index of s in the active scheme.
+// read is the AC index of s in the active scheme. It queries with `/qh`,
+// which includes hidden settings: a machine without a lid hides LIDACTION,
+// and `/q` then prints only the scheme header (#2764).
 func (p Powercfg) read(s PowercfgSetting) (uint64, error) {
-	out, err := p.Run("powercfg", "/q", "SCHEME_CURRENT", s.Sub, s.Setting)
+	out, err := p.Run("powercfg", "/qh", "SCHEME_CURRENT", s.Sub, s.Setting)
 	if err != nil {
-		return 0, fmt.Errorf("powercfg /q SCHEME_CURRENT %s %s: %w: %s", s.Sub, s.Setting, err, bytes.TrimSpace(out))
+		return 0, fmt.Errorf("powercfg /qh SCHEME_CURRENT %s %s: %w: %s", s.Sub, s.Setting, err, bytes.TrimSpace(out))
 	}
 	ac, err := parsePowercfgAC(out)
 	if err != nil {
-		return 0, fmt.Errorf("powercfg /q SCHEME_CURRENT %s %s: %w", s.Sub, s.Setting, err)
+		return 0, fmt.Errorf("powercfg /qh SCHEME_CURRENT %s %s: %w", s.Sub, s.Setting, err)
 	}
 	return ac, nil
 }
 
 var powercfgHex = regexp.MustCompile(`:\s*0x([0-9a-fA-F]+)\s*$`)
 
-// parsePowercfgAC reads the AC index of one setting from `powercfg /q`. The
+// parsePowercfgAC reads the AC index of one setting from `powercfg /qh`. The
 // labels are in the system's language, so it reads none of them: the current
 // AC and DC indexes are always the last two lines, AC first, each ending in a
 // hexadecimal value. A range setting prints its minimum, maximum and increment

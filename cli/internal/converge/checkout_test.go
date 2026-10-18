@@ -209,7 +209,7 @@ func TestCheckout_NoGitFromZeroInstallsItThroughTheOSManager(t *testing.T) {
 	f.env.GOOS = "windows"
 	f.step.has = noGitUntilInstalled(dir, &installs)
 	f.step.installer = gitInstaller{plan: tools.PlanInstall, installs: &installs}
-	f.step.gitDirs = []string{dir}
+	f.step.registered = func() ([]string, error) { return []string{dir}, nil }
 
 	plan, err := f.step.Reconcile(f.env, true)
 	if err != nil || !strings.Contains(plan.Detail, "install git") || installs != 0 {
@@ -236,9 +236,9 @@ func TestCheckout_AnInstalledGitItCannotReachFails(t *testing.T) {
 	f.env.GOOS = "windows"
 	f.step.has = noGitUntilInstalled(filepath.Join(t.TempDir(), "elsewhere"), &installs)
 	f.step.installer = gitInstaller{plan: tools.PlanInstall, installs: &installs}
-	f.step.gitDirs = []string{filepath.Join(t.TempDir(), "Git", "cmd")}
+	f.step.registered = func() ([]string, error) { return []string{filepath.Join(t.TempDir(), "Git", "cmd")}, nil }
 
-	if _, err := f.step.Reconcile(f.env, false); err == nil || !strings.Contains(err.Error(), "installed git, but it is not on PATH") {
+	if _, err := f.step.Reconcile(f.env, false); err == nil || !strings.Contains(err.Error(), "installed git, but neither") {
 		t.Fatalf("want the unreachable install named, got %v", err)
 	}
 }
@@ -272,21 +272,6 @@ func TestCheckout_NoGitAndNoUsableManagerFailsWithTheFix(t *testing.T) {
 	}
 }
 
-// winget's Git.Git lands in Program Files, or LocalAppData for a user-scope
-// install; no other OS installs git through this step.
-func TestGitBinDirs_NameWhereWingetPlacesGit(t *testing.T) {
-	getenv := func(k string) string {
-		return map[string]string{"ProgramFiles": "PF", "LOCALAPPDATA": "LA"}[k]
-	}
-	want := []string{filepath.Join("PF", "Git", "cmd"), filepath.Join("LA", "Programs", "Git", "cmd")}
-	if got := GitBinDirs("windows", getenv); !slices.Equal(got, want) {
-		t.Errorf("windows: %v, want %v", got, want)
-	}
-	if got := GitBinDirs("linux", getenv); got != nil {
-		t.Errorf("linux: %v, want none", got)
-	}
-}
-
 func TestCheckout_SkippedWithoutARunner(t *testing.T) {
 	res, err := checkout{}.Reconcile(Env{RepoRoot: t.TempDir()}, false)
 	if err != nil || res.Skip == "" {
@@ -311,4 +296,24 @@ func TestShippedCatalog_DeclaresTheGitTheCheckoutInstalls(t *testing.T) {
 		}
 	}
 	t.Fatal("packages.json declares no git")
+}
+
+// A shell opened before git was installed keeps a PATH without it: the
+// second converge in the test guest's session skipped the fast-forward with
+// "git is not on PATH". The step reaches the PATH git's installer registered,
+// as the clone path does.
+func TestCheckout_AnExistingCheckoutReachesARegisteredGit(t *testing.T) {
+	f := newCheckoutFixture(t)
+	if _, err := f.step.Reconcile(f.env, false); err != nil {
+		t.Fatalf("clone: %v", err)
+	}
+	t.Setenv("PATH", os.Getenv("PATH"))
+	installs, dir := 1, filepath.Join(t.TempDir(), "Git", "cmd")
+	f.step.has = noGitUntilInstalled(dir, &installs)
+	f.step.registered = func() ([]string, error) { return []string{dir}, nil }
+
+	res, err := f.step.Reconcile(f.env, false)
+	if err != nil || res.Skip != "" {
+		t.Fatalf("second run = %+v, %v; want the fast-forward checked, not skipped", res, err)
+	}
 }
