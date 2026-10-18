@@ -18,3 +18,6 @@ Armed 18:33Z, expires 02:33Z. Wake-lock: `caffeinate -i -s -t 28800`, on AC powe
 | 21:00 | #2760 | #2805 landed at `a5f03dc` and closed #2760. pr-agent raised two process findings: SDD declined (6 production lines), triage evidence pasted into the comment |
 | 21:00 | #2690 | Board said In Progress after the close; set to Done |
 | 21:10 | #2759 | #2809 opened: the message half (`Refs`), red→green test, live run over a Gitea origin |
+| 21:15 | #2759 | pr-agent on #2809: scp-origin concern applied as a table test (`164e22ac`); SDD and empty-host findings declined with reasons |
+| 21:30 | #2759 | #2809 landed at `164e22a` (`Refs`; the issue stays open and Blocked). No verdict wait on this land either |
+| 21:30 | run | Queue empty: #2797 was offered but is outside the committed filter (checked with dotfiles-20). Run ends |
