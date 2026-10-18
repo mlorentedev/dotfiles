@@ -94,6 +94,15 @@
       }
     },
     {
+      "name": "uv",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "winget": "astral-sh.uv",
+        "command": "uv"
+      }
+    },
+    {
       "name": "hive",
       "version": "4.4.1",
       "profile": "full",

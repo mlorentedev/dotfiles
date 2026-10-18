@@ -39,11 +39,19 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-$uv = Join-Path $env:USERPROFILE '.local\bin\uv.exe'
+# uv is wherever its channel put it: on PATH, uv's own installer's
+# ~\.local\bin (boxes set up before #2754), or winget's Links dir, where the
+# catalog's astral-sh.uv lands. The task's principal may not carry the user's
+# PATH, so the two directories are checked as well.
+$uv = @(
+    (Get-Command uv -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source),
+    (Join-Path $env:USERPROFILE '.local\bin\uv.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\uv.exe')
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 $toolsGlob = '*\uv\tools\hive-vault\*'
 
-if (-not (Test-Path $uv)) {
-    Write-Output "hive-upgrade: uv not found at $uv; nothing to do."
+if (-not $uv) {
+    Write-Output "hive-upgrade: uv not found on PATH, in ~\.local\bin or in winget's Links dir; nothing to do."
     exit 0
 }
 

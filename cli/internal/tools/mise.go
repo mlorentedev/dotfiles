@@ -300,6 +300,20 @@ func MiseShimsDir(home, goos string, getenv func(string) string) string {
 	return filepath.Join(home, ".local", "share", "mise", "shims")
 }
 
+// WingetLinksDir is where winget links the portable packages it installs
+// (uv, eza), or "" off Windows. winget puts it on the user's PATH for the next
+// shell, never on the PATH of the process that ran the install.
+func WingetLinksDir(home, goos string, getenv func(string) string) string {
+	if goos != "windows" {
+		return ""
+	}
+	local := getenv("LOCALAPPDATA")
+	if local == "" {
+		local = filepath.Join(home, "AppData", "Local")
+	}
+	return filepath.Join(local, "Microsoft", "WinGet", "Links")
+}
+
 // MiseSync converges the pinned CLIs through mise. It owns one file,
 // <ConfigDir>/conf.d/dotfiles.toml, and never touches the rest of the mise
 // config: a hand-written config.toml keeps working beside it.

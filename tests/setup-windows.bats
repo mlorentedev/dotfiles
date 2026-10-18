@@ -544,23 +544,30 @@ FIXTURE
     grep -qF '& $dotfPath pi packages apply --repo $DotfilesDir' <<<"$block"
 }
 
-@test "setup-windows.ps1 installs uv if missing" {
-    grep -q 'astral.sh/uv/install.ps1' "$PS1_SCRIPT"
+# uv on Windows is a packages.json entry (winget astral-sh.uv), so the tools
+# step provides it before the uv-tool entries need it (#2754).
+@test "setup-windows.ps1 gets uv from the catalog, not from uv's installer" {
+    refute_grep_fixed 'astral.sh/uv/install.ps1' "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name == "uv" and .source.type == "system" and .source.winget == "astral-sh.uv")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
 @test "setup-windows.ps1 has no poetry block: poetry is a packages.json uv-tool entry" {
     jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
-# A uv-tool entry installs only when uv is on PATH, so on a from-zero Windows box
-# poetry converges only if uv's installer runs before the catalog does.
-@test "setup-windows.ps1 installs uv before dotf tools install, so the uv-tool entries converge" {
-    local uv_line catalog_line
-    uv_line="$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
+# The uvx MCP servers are skipped while uv is absent, so the registration runs
+# after `dotf tools install`, which installs uv, and the session PATH is
+# refreshed between them (OPS-044, #2754).
+@test "setup-windows.ps1 registers MCP servers after dotf tools install puts uv on PATH" {
+    local catalog_line sync_line mcp_line
     catalog_line="$(grep -nE '^[[:space:]]+dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
-    [ -n "$uv_line" ]
+    sync_line="$(awk -v from="$catalog_line" 'NR > from && /^[[:space:]]+Sync-SessionPath[[:space:]]*$/ { print NR; exit }' "$PS1_SCRIPT")"
+    mcp_line="$(grep -n 'Registering Claude Code MCP servers' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
     [ -n "$catalog_line" ]
-    [ "$uv_line" -lt "$catalog_line" ]
+    [ -n "$sync_line" ]
+    [ -n "$mcp_line" ]
+    [ "$catalog_line" -lt "$sync_line" ]
+    [ "$sync_line" -lt "$mcp_line" ]
 }
 
 @test "Windows entrypoint owns tool convergence; legacy setup does not duplicate mise sync" {
@@ -578,10 +585,10 @@ FIXTURE
 
 # --- Cross-platform parity: developer tools ---
 
-@test "parity: both scripts provide uv (Linux through mise, Windows through its installer)" {
+@test "parity: both OSes get uv from dotf (Linux through mise, Windows through the catalog)" {
     grep -q '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh"
     grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
-    grep -q 'Installing uv' "$PS1_SCRIPT"
+    jq -e '.tools[] | select(.name == "uv" and .source.winget == "astral-sh.uv")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
 @test "parity: neither script installs poetry itself; the catalog does on every OS" {
@@ -992,8 +999,10 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     # population": the invariant is child-pwsh execution, not which installers
     # happen to exist, so this asserts the surviving one rather than counting
     # them. Any installer added later inherits the rule, not this test's silence.
-    grep -qF -- '-File $uvInstaller' "$PS1_SCRIPT"
-    run grep -F '& $uvInstaller' "$PS1_SCRIPT"
+    # uv's installer went too: the catalog installs uv through winget (#2754),
+    # so the survivor is Install-AgentBinary's.
+    grep -qF -- '-File $installer' "$PS1_SCRIPT"
+    run grep -F '& $installer' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]
 }
 
@@ -1004,8 +1013,10 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 # Code installed there (#1360). Ordering is asserted by line number of the
 # invocation. Linux has no such loop: the bare `dotf deploy` registers the
 # servers after `dotf tools sync` has installed uv.
+# uv now arrives through `dotf tools install` (winget astral-sh.uv, #2754),
+# so that call is the line the registration must follow.
 @test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
-    uv_line=$(grep -n 'astral.sh/uv/install.ps1' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    uv_line=$(grep -nE '^[[:space:]]+dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     # The executable invocation, never a comment naming it: the block's own
     # comments mention `claude mcp add` 40 lines above the call.
     mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)

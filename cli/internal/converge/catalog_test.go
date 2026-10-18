@@ -341,3 +341,31 @@ func TestRun_ACaskThatNeedsSudoDoesNotStopTheStepsAfterTools(t *testing.T) {
 		t.Errorf("tools detail %q lacks %q", rep.Entries[0].Detail, want)
 	}
 }
+
+// Every uv-tool entry in the shipped catalog waits on a uv this OS's own tool
+// layer provides, through the mise pins or a catalog entry. Windows had none,
+// so its uv came from legacy-setup, the last step, and `tools` never
+// converged in one run (#2754).
+func TestShippedCatalog_EveryOSProvidesTheUVItsUVToolsNeed(t *testing.T) {
+	repo := filepath.Join("..", "..", "..")
+	entries, err := loadCatalog(Env{RepoRoot: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(repo, "versions.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pins, err := tools.ParseMisePins(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		has := provided(entries, pins.Tools, goos, false)
+		for _, e := range entries {
+			if e.Source.Type == "uv-tool" && e.SupportsOS(goos) && !has["uv"] {
+				t.Errorf("%s: %s is a uv-tool entry, and nothing on %s provides uv", goos, e.Name, goos)
+			}
+		}
+	}
+}

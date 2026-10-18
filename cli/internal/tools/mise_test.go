@@ -1180,3 +1180,24 @@ func TestSync_PlanNamesTheToolsAConfigWriteDrops(t *testing.T) {
 		t.Errorf("a deployed config that does not parse: want an error naming it, got %v", err)
 	}
 }
+
+// winget links a portable package under LocalAppData; off Windows there is no
+// such directory to reach.
+func TestWingetLinksDir_IsUnderLocalAppDataOnWindowsOnly(t *testing.T) {
+	env := func(k string) string { return map[string]string{"LOCALAPPDATA": "LA"}[k] }
+	none := func(string) string { return "" }
+	for _, tc := range []struct {
+		goos   string
+		getenv func(string) string
+		want   string
+	}{
+		{"windows", env, filepath.Join("LA", "Microsoft", "WinGet", "Links")},
+		{"windows", none, filepath.Join("H", "AppData", "Local", "Microsoft", "WinGet", "Links")},
+		{"linux", env, ""},
+		{"darwin", env, ""},
+	} {
+		if got := WingetLinksDir("H", tc.goos, tc.getenv); got != tc.want {
+			t.Errorf("%s: %q, want %q", tc.goos, got, tc.want)
+		}
+	}
+}
