@@ -14,3 +14,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
   - selfdeploy: #2727 and #2696, with paths narrowed; the Mac activation was already done here.
 - 18:36Z: selfdeploy run narrowed to converge/selfdeploy*.go, cmd/update.go(+test), schedule/**, update/**. cross-os told the rest of cmd/ is free for #1719 (park if .golangci.yml is needed).
 - 18:44Z: owner ran workstation-target on macmini (0.75.0): 1 changed (firewall, state record), proofs passed; re-plan 0 to change. Posted on #2356 and #2388.
+- 18:46Z: wintarget opened draft #2791 (#2755); filed #2790 (RunAtLoad takes an unrecorded pf reference per bootstrap, options A/B, owner). Queued for the owner, not urgent.
