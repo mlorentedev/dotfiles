@@ -35,3 +35,4 @@ Not relayed: #2724 (A/B unpicked; A is .github), #2727 (waits on #2502 A/B), #26
 - 04:03Z owner asked for a red-CI sweep: #2743 (feat-2550-lane-reconcile, w16), #2736 (kubelab session w3, conflicts after #2749), #2681 (wintarget), #2737 (vm-windows) told to merge main, fix and renumber lessons. #2720 is green and clean.
 - 04:36Z: owner picked #2744 option A; relayed to wD:p1 (feat-worktree-one-root).
 - 04:40Z: #2356 pf measurements (owner, root) posted; all three confirm the design. #2681 found already merged (2179c8b4, 04:29Z). Relayed to w1E:p1 (wintarget).
+- 07:41Z: answered resume lead (TOOL-117 forge pool consult). #2750 (owner via fix-bug-sweep-0d) relayed to wD:p1.
