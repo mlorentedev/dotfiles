@@ -7,17 +7,16 @@ import (
 	"net"
 	"strconv"
 	"strings"
-
-	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 )
 
 // The pf pieces on macOS (owner decisions on #2356, 2026-10-13). The anchor is
 // a sub-anchor of the `anchor "com.apple/*"` that Apple's /etc/pf.conf already
 // evaluates, so pf.conf is never edited. Sub-anchors run in name order, and 150
 // sorts before 200.AirDrop and 250.ApplicationFirewall: a `pass quick` of
-// theirs can then never reopen port 22 before our block. Whether they hold
-// one, and whether the sub-anchor survives Apple's own `pfctl -f
-// /etc/pf.conf`, are two of the three root measurements the owner gated this on.
+// theirs can then never reopen port 22 before our block. Measured on macOS 27
+// (#2356, 2026-10-18): both held no rules with AirDrop idle, and the sub-anchor
+// survives Apple's own `pfctl -f /etc/pf.conf`. The order stays for an AirDrop
+// that is active.
 const (
 	PFAnchor     = "com.apple/150.dotf-ssh"
 	pfLabel      = "com.github.mlorentedev.dotf.pf-ssh"
@@ -100,14 +99,10 @@ func (f *PF) Differs() (bool, error) {
 	return !loaded, err
 }
 
-// jobLoaded asks launchd, without root, whether it knows the boot job. Only
-// `launchctl print`'s exit 113 means it does not; schedule.LaunchdLoaded owns
-// that reading (#2731).
+// jobLoaded asks launchd, without root, whether it knows the boot job, through
+// the reader sshd's own check uses (#2731).
 func (f *PF) jobLoaded() (bool, error) {
-	return schedule.LaunchdLoaded(func(args ...string) (string, error) {
-		out, err := f.Run(append([]string{"launchctl"}, args...)...)
-		return string(out), err
-	}, pfLaunchd)
+	return launchdLoaded(f.Run, pfLaunchd)
 }
 
 // Apply refuses before changing anything when the session it runs in would be
