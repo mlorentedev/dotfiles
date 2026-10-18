@@ -17,3 +17,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
 - 18:46Z: wintarget opened draft #2791 (#2755); filed #2790 (RunAtLoad takes an unrecorded pf reference per bootstrap, options A/B, owner). Queued for the owner, not urgent.
 - 19:46Z: orch5 landed #2802 (closes #2776; #2749 verdict wait fired live), parked #2761 and #2634, filed #2803. Refilled: #2803 (unheld packages only), #1906, #1750.
 - 20:31Z: orch5 declined the refill, correctly: the committed queue filter does not include it and a peer cannot widen it. orch5 closed queue-empty (report on chore/autopilot-orch5-r1). #2803, #1906 and #1750 stay unclaimed until the owner arms a new envelope.
+- 20:44Z: wintarget lane: #2791 (8b233338), #2799 (SEC-014 PR 2, c46aa55b), #2807 (companion). Land order 2791, 2799 (merge main, target.go conflict), 2807. sshtarget stays theirs.
