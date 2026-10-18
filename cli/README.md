@@ -78,11 +78,16 @@ cannot call each other in a loop.
 
 `dotf update` runs the same converge after a clean fast-forward, and only then.
 
-Without `--repo`, the checkout is the one the working directory is in, else the
-declared `DOTFILES_REPO_DIR`, else `~/Projects/dotfiles`: the working directory
-first, as `dotf deploy` and `dotf harness mirror` resolve it, whereas `dotf
-update` prefers the declared checkout. `DOTFILES_REPO` names another upstream to
-clone. When the checkout would change (a clone from zero, or a fast-forward),
+Without `--repo`, the checkout is the declared `DOTFILES_REPO_DIR` when it
+is a dotfiles checkout, the one `dotf update` fast-forwards and applies; else the dotfiles
+checkout the working directory is in (the clone `./install.sh` runs from on a
+machine whose declared path does not exist yet); else the declared path or
+`~/Projects/dotfiles`, which the checkout step clones. The declared checkout
+wins because converge writes machine-global state: run from a worktree, a
+branch's pins would replace the machine's. Run from another dotfiles
+checkout, converge names the tree it converges; `--repo <worktree>` converges
+a branch. `dotf deploy` and `dotf harness mirror` still resolve the working
+directory first. `DOTFILES_REPO` names another upstream to clone. When the checkout would change (a clone from zero, or a fast-forward),
 `--plan` shows that change and reports the steps after it as `waits for
 checkout`, because they would read the tree as it is before the change.
 
