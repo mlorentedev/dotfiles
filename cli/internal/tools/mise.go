@@ -337,6 +337,11 @@ type SyncPlan struct {
 	// one does not. Orphans cannot see them before the write, because the
 	// deployed config still references them (#2744).
 	Dropped []string
+	// UnparsableConfig is the path of a deployed config that does not parse.
+	// mise refuses every command over it, so a plan that finds it asks mise
+	// nothing and reports the rewrite as its one change: the write is the
+	// repair, and Apply installs against what it wrote (#2760).
+	UnparsableConfig string
 	// Behind names the Latest tools an Apply upgraded that mise still reports
 	// behind their newest release. That is upstream lag, not a fault here: mise
 	// skips a release younger than minimum_release_age (24h by default), and
@@ -390,22 +395,20 @@ func (s MiseSync) Plan(tools []MiseTool) (SyncPlan, error) {
 	return p, err
 }
 
+// miseTools is the [tools] table of a mise config.
+type miseTools struct {
+	Tools map[string]any `toml:"tools"`
+}
+
 // droppedTools returns the [tools] keys of the deployed config that the
-// rendered one lacks, sorted. A deployed config that does not parse is an
-// error naming its path: every mise command already fails on that file (#2744,
-// measured), so naming it here only says which file to fix.
-func (s MiseSync) droppedTools(have, rendered []byte) ([]string, error) {
-	var h, w struct {
-		Tools map[string]any `toml:"tools"`
-	}
-	if err := toml.Unmarshal(have, &h); err != nil {
-		return nil, fmt.Errorf("deployed mise config %s does not parse: %w", s.ConfigPath(), err)
-	}
+// rendered one lacks, sorted (#2744).
+func droppedTools(have miseTools, rendered []byte) ([]string, error) {
+	var w miseTools
 	if err := toml.Unmarshal(rendered, &w); err != nil {
 		return nil, fmt.Errorf("rendered mise config does not parse: %w", err)
 	}
 	var dropped []string
-	for name := range h.Tools {
+	for name := range have.Tools {
 		if _, ok := w.Tools[name]; !ok {
 			dropped = append(dropped, name)
 		}
@@ -421,10 +424,14 @@ func (s MiseSync) plan(tools []MiseTool) (p SyncPlan, unlisted, err error) {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return SyncPlan{}, nil, err
 	}
+	var deployed miseTools
+	if have != nil && toml.Unmarshal(have, &deployed) != nil {
+		return SyncPlan{ConfigChanged: true, UnparsableConfig: s.ConfigPath()}, nil, nil
+	}
 	rendered := s.render(tools)
 	p = SyncPlan{ConfigChanged: !bytes.Equal(have, rendered)}
 	if p.ConfigChanged && have != nil {
-		if p.Dropped, err = s.droppedTools(have, rendered); err != nil {
+		if p.Dropped, err = droppedTools(deployed, rendered); err != nil {
 			return SyncPlan{}, nil, err
 		}
 	}
