@@ -40,6 +40,19 @@ func (s WindowsService) Enabled() (bool, error) {
 	return start == scAutoStart && state == scRunning, nil
 }
 
+// Serving reports whether sshd runs now or starts at boot (see Systemd.Serving).
+func (s WindowsService) Serving() (bool, error) {
+	start, err := s.scField("qc", "START_TYPE")
+	if err != nil {
+		return false, err
+	}
+	state, err := s.scField("query", "STATE")
+	if err != nil {
+		return false, err
+	}
+	return start == scAutoStart || state == scRunning, nil
+}
+
 func (s WindowsService) running() (bool, error) {
 	state, err := s.scField("query", "STATE")
 	return state == scRunning, err

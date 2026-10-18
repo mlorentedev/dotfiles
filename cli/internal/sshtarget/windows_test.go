@@ -112,6 +112,20 @@ func TestWindowsServiceReadsSCNumbersNotNames(t *testing.T) {
 	}
 }
 
+func TestWindowsServiceServingIsRunningOrStartingAtBoot(t *testing.T) {
+	qcAuto, qcManual := "START_TYPE : 2 AUTO_START\n", "START_TYPE : 3 DEMAND_START\n"
+	running, stopped := "STATE : 4 RUNNING\n", "STATE : 1 STOPPED\n"
+	for _, tc := range []struct {
+		qc, query string
+		want      bool
+	}{{qcManual, running, true}, {qcAuto, stopped, true}, {qcManual, stopped, false}} {
+		r := &recorder{answers: map[string]answer{"sc.exe qc": {out: tc.qc}, "sc.exe query": {out: tc.query}}}
+		if got, err := (WindowsService{Run: r.run}).Serving(); err != nil || got != tc.want {
+			t.Errorf("%q %q: Serving() = %v, %v; want %v", tc.qc, tc.query, got, err, tc.want)
+		}
+	}
+}
+
 // exitErr is a failed command as exec reports it: an error with its exit code.
 type exitErr int
 

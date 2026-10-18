@@ -103,6 +103,20 @@ func TestSystemdEnabledNeedsBootAndNow(t *testing.T) {
 	}
 }
 
+// Serving is either half: an sshd that runs now, or that starts at the next
+// boot, would serve its stock config once the drop-in goes.
+func TestSystemdServingIsRunningOrStartingAtBoot(t *testing.T) {
+	for _, tc := range []struct {
+		enabled, active []string
+		want            bool
+	}{{[]string{"ssh.socket"}, nil, true}, {nil, []string{"ssh.service"}, true}, {nil, nil, false}} {
+		l := &linux{units: []string{"ssh.service", "ssh.socket"}, enabled: set(tc.enabled), active: set(tc.active)}
+		if got, err := (Systemd{Run: l.user}).Serving(); err != nil || got != tc.want {
+			t.Errorf("enabled %v, active %v: Serving() = %v, %v; want %v", tc.enabled, tc.active, got, err, tc.want)
+		}
+	}
+}
+
 // Enable turns on what the distribution starts sshd with, and Disable, the
 // undo, turns off the same unit, and the service the socket started.
 func TestSystemdEnableAndItsUndoUseTheSameUnit(t *testing.T) {

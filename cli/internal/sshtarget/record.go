@@ -32,7 +32,9 @@ type Record struct {
 // Prior is one resource as the step first found it.
 type Prior struct {
 	State string `json:"state"`
-	// Content is the drop-in that was there, when State is PriorReplaced.
+	// Content is the drop-in that was there, when State is PriorReplaced, and
+	// the key line the step wrote, when the key is PriorCreated: the repo's
+	// key may have been rotated by the time the role is removed.
 	Content string `json:"content,omitempty"`
 }
 
@@ -77,7 +79,7 @@ func (r *Record) fill(p Plan, pending func(string) bool) bool {
 			*e, added = &prior, true
 		}
 	}
-	set(&r.Key, onlyIf(pending(resKey), Prior{State: PriorCreated}))
+	set(&r.Key, onlyIf(pending(resKey), Prior{State: PriorCreated, Content: string(p.key)}))
 	switch {
 	case ownDropIn(p.prevDrop):
 		// A render of the step's own file, from this build or an earlier
