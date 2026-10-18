@@ -247,6 +247,17 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - From the macmini: `ssh -o BatchMode=yes msi true` over the mesh exits 0; `nc -z -w 5 10.0.0.9 22` over the LAN exits 1 after 75 s: macOS's `nc -w` bounds idle time, not the connect, so 75 s is the kernel's connect timeout. Re-run with the connect bounded, `nc -v -z -G 5 10.0.0.9 22` exits 1 after 5 s with `connectx to 10.0.0.9 port 22 (tcp) failed: Operation timed out`, not `Connection refused`: the packet is dropped. Port 9, which nothing listens on, answers the same way, as default deny incoming says it should.
   - `dotf doctor` on msi in a login shell: 190 passed, 0 failed, 2 warned (DR escrow age and persona `enforce:`, both tracked in the #2013 debt ledger). Run from a non-login ssh command it reports five tool-home variables as FAIL; those are unset because no profile was read. Doctor cannot tell that case from real drift, which is a reporting defect, recorded as D12 in the #2013 debt ledger.
 
+- #2755, the pf enable reference (2026-10-18, advisor's option A, delegated by the owner):
+  - The token goes in its own root file (`PFToken`, `/var/db/dotf/pf-token`), not in the state record #2716 wrote. The record is the last resource of the plan, so a run cut off mid-proof never writes it, and the timer must find the token at exactly that moment.
+  - Each line is `<token> <kern.bootsessionuuid>`. pf references are kernel state that ends at reboot, and a token's number can belong to another holder in a later boot, so only the running boot's tokens are released. The UUID is one word with no spaces, so the timer compares it with `[ "$tb" = "$b" ]`.
+  - Apply appends its line and keeps the earlier ones until Commit. An undo then puts back the file it found, along with the earlier references that file names, which stay held. Commit rewrites the file first, then releases. A failed rewrite fails the run, and its undo restores the old file.
+  - A release that fails in Commit is ignored: the reference is gone, or it ends at reboot. Telling these apart would mean parsing `pfctl -s References` or pfctl's error text, and neither is a contract. A release that fails in the undo is returned.
+  - `root.Run` is `CombinedOutput` (`sudo.go:31`), so `Token : N` is read even when pfctl prints it on stderr.
+  - The LaunchDaemon's own references are not covered: one at each boot, and one at each apply through `RunAtLoad` on `bootstrap`. They are filed as #2790 with two options.
+  - The macmini's live apply on 0.75.0 (2026-10-18, #2356) predates this change. Its reference stays unrecorded until the next reboot, because a converged host does not apply again.
+  - Evidence: `go test ./internal/sshtarget/ -run PF` passes 14 tests. `TestPFTimerReleasesOnlyThisBootsReferences` runs the timer's script against stub binaries.
+  - Seven mutations, all killed: no release in the undo, no file restore in the undo, a missing token tolerated, no rewrite in Commit, no release in Commit, no boot check in Commit, no boot check in the timer.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

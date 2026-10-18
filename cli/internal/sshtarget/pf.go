@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -22,8 +24,12 @@ const (
 	pfLabel      = "com.github.mlorentedev.dotf.pf-ssh"
 	pfLaunchd    = "system/" + pfLabel
 	pfctl        = "/sbin/pfctl"
+	sysctl       = "/usr/sbin/sysctl"
 	pfConfirmSec = 120
 )
+
+// pfTokenLine is the line `pfctl -E` prints for the enable reference it took.
+var pfTokenLine = regexp.MustCompile(`Token\s*:\s*(\d+)`)
 
 // PF is the firewall on macOS: an anchor that lets port 22 in on lo0 and to
 // the node's own mesh address only, and a LaunchDaemon that loads it at boot.
@@ -38,12 +44,14 @@ const (
 type PF struct {
 	Anchor  string // the anchor file, /etc/pf.anchors/dotf-ssh
 	Plist   string // the LaunchDaemon, /Library/LaunchDaemons/<pfLabel>.plist
+	Token   string // the enable references Apply took, one "token boot" per line
 	Run     Runner // launchctl as the user, for the root-free read
 	Mesh    func() (net.IP, error)
 	Session string // $SSH_CONNECTION of the applying process; "" when local
 	Sudoed  bool   // dotf itself runs under sudo, which strips $SSH_CONNECTION
 
 	timer string // pid of the armed commit-confirm timer, "" when none
+	taken string // the line Apply recorded in Token, "" when none
 }
 
 // PFRules renders the anchor for the node's mesh address.
@@ -138,6 +146,14 @@ func (f *PF) Apply(root Root) (func() error, error) {
 	if err != nil {
 		return undo, err
 	}
+	prevToken, err := readOptional(f.Token)
+	if err != nil {
+		return undo, err
+	}
+	boot, err := f.bootID()
+	if err != nil {
+		return undo, err
+	}
 
 	if err := f.arm(root); err != nil {
 		return undo, err
@@ -148,11 +164,30 @@ func (f *PF) Apply(root Root) (func() error, error) {
 		return undo, err
 	}
 	undos = append(undos, func() error { return restoreRoot(root, f.Anchor, prevAnchor) })
-	if err := asRoot(root, pfctl, "-E", "-a", PFAnchor, "-f", f.Anchor); err != nil {
+	out, err := root.Run(pfctl, "-E", "-a", PFAnchor, "-f", f.Anchor)
+	if err != nil {
+		return undo, fmt.Errorf("pfctl -E -a %s: %w: %s", PFAnchor, err, bytes.TrimSpace(out))
+	}
+	// Flush only our anchor, then release our reference: pf stays enabled for
+	// every other holder. Never `pfctl -d`.
+	tok := pfTokenLine.FindSubmatch(out)
+	if tok != nil {
+		undos = append(undos, func() error { return asRoot(root, pfctl, "-X", string(tok[1])) })
+	}
+	undos = append(undos, func() error { return asRoot(root, pfctl, "-a", PFAnchor, "-F", "all") })
+	if tok == nil {
+		return undo, fmt.Errorf("pfctl -E printed no token, so the pf enable reference it took cannot be released and holds pf enabled until the next reboot:\n%s", out)
+	}
+	// Recorded before the proof: a run cut off from here on is undone by the
+	// timer, which releases what this file names.
+	f.taken = string(tok[1]) + " " + boot + "\n"
+	if err := asRoot(root, "install", "-d", "-m", "0755", filepath.Dir(f.Token)); err != nil {
 		return undo, err
 	}
-	// Flush only our anchor: pf stays enabled for every other rule it holds.
-	undos = append(undos, func() error { return asRoot(root, pfctl, "-a", PFAnchor, "-F", "all") })
+	if err := installRoot(root, f.Token, append(append([]byte(nil), prevToken...), f.taken...)); err != nil {
+		return undo, err
+	}
+	undos = append(undos, func() error { return restoreRoot(root, f.Token, prevToken) })
 	if err := pfLoaded(root); err != nil {
 		return undo, err
 	}
@@ -201,7 +236,47 @@ func (f *PF) Commit(root Root) error {
 	if err := pfLoaded(root); err != nil {
 		return fmt.Errorf("the pf commit-confirm timer fired before the proof finished: %w", err)
 	}
+	return f.releaseEarlier(root)
+}
+
+// releaseEarlier leaves Token naming only the reference this run took, then
+// releases the ones earlier runs took in this boot. The file is rewritten
+// first: a failed rewrite fails the run, whose undo puts the old file back
+// with every reference it names still held. A token of an earlier boot is
+// dropped unreleased, since its number may be another holder's now.
+//
+// A release that fails is not an error: the reference is already gone, or
+// ends at the next reboot. Telling the two apart would mean parsing
+// `pfctl -s References` or the error text, neither of which is a contract.
+func (f *PF) releaseEarlier(root Root) error {
+	if f.taken == "" {
+		return nil
+	}
+	data, err := readOptional(f.Token)
+	if err != nil {
+		return err
+	}
+	if err := installRoot(root, f.Token, []byte(f.taken)); err != nil {
+		return err
+	}
+	boot := strings.Fields(f.taken)[1]
+	for _, line := range strings.Split(string(data), "\n") {
+		if fields := strings.Fields(line); len(fields) == 2 && fields[1] == boot && line+"\n" != f.taken {
+			_, _ = root.Run(pfctl, "-X", fields[0])
+		}
+	}
+	f.taken = ""
 	return nil
+}
+
+// bootID names the boot pf's references belong to; they end at reboot.
+func (f *PF) bootID() (string, error) {
+	out, err := f.Run(sysctl, "-n", "kern.bootsessionuuid")
+	id := strings.TrimSpace(string(out))
+	if err != nil || id == "" || strings.ContainsAny(id, " \t\n") {
+		return "", fmt.Errorf("sysctl -n kern.bootsessionuuid: %v: %q", err, id)
+	}
+	return id, nil
 }
 
 // Prove reads what it can without root: both files as rendered and the job
@@ -218,13 +293,13 @@ func (f *PF) Prove() error {
 }
 
 // arm starts, as root and detached from this process, the timer that flushes
-// the anchor after pfConfirmSec seconds and disables the LaunchDaemon, so the
-// next boot does not load it again. A run killed with its session, the one
-// case nothing else could undo, is undone by it: the worst it leaves is port
-// 22 fenced by sshd's AllowUsers alone, never a machine nobody can reach.
+// the anchor after pfConfirmSec seconds, releases the references Token names,
+// and disables the LaunchDaemon, so the next boot does not load it again. A
+// run killed with its session, the one case nothing else could undo, is undone
+// by it: the worst it leaves is port 22 fenced by sshd's AllowUsers alone,
+// never a machine nobody can reach.
 func (f *PF) arm(root Root) error {
-	script := fmt.Sprintf("nohup /bin/sh -c 'sleep %d; %s -a %s -F all; launchctl bootout %s; launchctl disable %s' >/dev/null 2>&1 & echo $!",
-		pfConfirmSec, pfctl, PFAnchor, pfLaunchd, pfLaunchd)
+	script := fmt.Sprintf("nohup /bin/sh -c '%s' >/dev/null 2>&1 & echo $!", pfTimer(f.Token))
 	out, err := root.Run("/bin/sh", "-c", script)
 	if err != nil {
 		return fmt.Errorf("arm the pf commit-confirm timer: %w: %s", err, bytes.TrimSpace(out))
@@ -235,6 +310,17 @@ func (f *PF) arm(root Root) error {
 	}
 	f.timer = pid
 	return nil
+}
+
+// pfTimer is the timer's script. It reads Token when it fires, so it releases
+// the reference Apply took after it was armed, and only those of the boot it
+// runs in: a run killed before Apply rewrote the file leaves older lines.
+// It holds no single quote, since arm wraps it in them.
+func pfTimer(token string) string {
+	return fmt.Sprintf(`sleep %d; %s -a %s -F all; `+
+		`b=$(%s -n kern.bootsessionuuid); if [ -f %s ]; then while read -r t tb; do [ "$tb" = "$b" ] && %s -X "$t"; done < %s; fi; rm -f %s; `+
+		`launchctl bootout %s; launchctl disable %s`,
+		pfConfirmSec, pfctl, PFAnchor, sysctl, token, pfctl, token, token, pfLaunchd, pfLaunchd)
 }
 
 func (f *PF) disarm(root Root) error {

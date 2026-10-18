@@ -4,8 +4,11 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -21,16 +24,22 @@ type pfMac struct {
 	loaded      bool // pf holds our anchor's rules
 	enabled     bool
 	jobLoaded   bool
-	failLoad    bool  // `pfctl -E -a … -f` succeeds but pf holds nothing
-	printErr    error // what `launchctl print` fails with, when not nil
-	killErr     error // what killing the timer fails with, when not nil
+	failLoad    bool // `pfctl -E -a … -f` succeeds but pf holds nothing
+	noToken     bool // `pfctl -E` prints no token
+	token       string
+	boot        string          // kern.bootsessionuuid
+	next        int             // the token the next `pfctl -E` takes
+	held        map[string]bool // pf's enable references, by token
+	printErr    error           // what `launchctl print` fails with, when not nil
+	killErr     error           // what killing the timer fails with, when not nil
 	timerKilled bool
 	rootCalls   []string
 }
 
 func newPFMac(t *testing.T) *pfMac {
 	d := t.TempDir()
-	return &pfMac{t: t, anchor: filepath.Join(d, "dotf-ssh"), plist: filepath.Join(d, "pf-ssh.plist")}
+	return &pfMac{t: t, anchor: filepath.Join(d, "dotf-ssh"), plist: filepath.Join(d, "pf-ssh.plist"),
+		token: filepath.Join(d, "db", "pf-token"), boot: "BOOT-1", next: 1001, held: map[string]bool{}}
 }
 
 func (m *pfMac) pf(session string) *PF {
@@ -38,11 +47,14 @@ func (m *pfMac) pf(session string) *PF {
 }
 
 func (m *pfMac) pfAs(session string, sudoed bool) *PF {
-	return &PF{Anchor: m.anchor, Plist: m.plist, Run: m.user, Session: session, Sudoed: sudoed,
+	return &PF{Anchor: m.anchor, Plist: m.plist, Token: m.token, Run: m.user, Session: session, Sudoed: sudoed,
 		Mesh: func() (net.IP, error) { return pfMesh, nil }}
 }
 
 func (m *pfMac) user(argv ...string) ([]byte, error) {
+	if slices.Equal(argv, []string{sysctl, "-n", "kern.bootsessionuuid"}) {
+		return []byte(m.boot + "\n"), nil
+	}
 	if slices.Equal(argv, []string{"launchctl", "print", pfLaunchd}) {
 		if m.printErr != nil {
 			return []byte("Bad request."), m.printErr
@@ -62,6 +74,8 @@ func (m *pfMac) Run(argv ...string) ([]byte, error) {
 	call := strings.Join(argv, " ")
 	m.rootCalls = append(m.rootCalls, call)
 	switch {
+	case argv[0] == "install" && argv[1] == "-d":
+		return nil, os.MkdirAll(argv[len(argv)-1], 0o755)
 	case argv[0] == "install":
 		data, err := os.ReadFile(argv[len(argv)-2])
 		if err != nil {
@@ -79,6 +93,19 @@ func (m *pfMac) Run(argv ...string) ([]byte, error) {
 		m.timerKilled = true
 	case call == pfctl+" -E -a "+PFAnchor+" -f "+m.anchor:
 		m.enabled, m.loaded = true, !m.failLoad
+		tok := strconv.Itoa(m.next)
+		m.next++
+		m.held[tok] = true
+		if m.noToken {
+			return []byte("pf enabled\n"), nil
+		}
+		return []byte("pf enabled\nToken : " + tok + "\n"), nil
+	case len(argv) == 3 && argv[0] == pfctl && argv[1] == "-X":
+		if !m.held[argv[2]] {
+			return []byte("pfctl: DIOCSTOPREF: Invalid argument"), exitErr(1)
+		}
+		delete(m.held, argv[2])
+		m.enabled = len(m.held) > 0
 	case call == pfctl+" -a "+PFAnchor+" -F all":
 		m.loaded = false
 	case call == pfctl+" -s info":
@@ -291,10 +318,10 @@ func checkPFUndone(t *testing.T, m *pfMac) {
 			t.Errorf("the undo ran %q, which reaches beyond our anchor", c)
 		}
 	}
-	if m.loaded || m.jobLoaded || !m.timerKilled {
-		t.Errorf("after the undo: anchor loaded %v, job loaded %v, timer killed %v", m.loaded, m.jobLoaded, m.timerKilled)
+	if m.loaded || m.jobLoaded || !m.timerKilled || len(m.held) != 0 {
+		t.Errorf("after the undo: anchor loaded %v, job loaded %v, timer killed %v, references held %v", m.loaded, m.jobLoaded, m.timerKilled, m.held)
 	}
-	for _, p := range []string{m.anchor, m.plist} {
+	for _, p := range []string{m.anchor, m.plist, m.token} {
 		if _, err := os.Stat(p); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%s survived the undo: %v", p, err)
 		}
@@ -316,5 +343,164 @@ func TestPFTimerFlushesTheAnchorAndDisablesTheJob(t *testing.T) {
 	}
 	if strings.Contains(script, "pfctl -d") {
 		t.Errorf("the timer switches pf off: %q", script)
+	}
+	timer := pfTimer(m.token)
+	for _, want := range []string{"kern.bootsessionuuid", pfctl + ` -X "$t"`, "< " + m.token, "rm -f " + m.token} {
+		if !strings.Contains(timer, want) {
+			t.Errorf("the timer %q does not run %q", timer, want)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		return
+	}
+	if out, err := exec.Command("/bin/sh", "-n", "-c", timer).CombinedOutput(); err != nil {
+		t.Errorf("the timer does not parse: %v: %s", err, out)
+	}
+}
+
+// Apply records the reference its `pfctl -E` takes, with the boot it was taken
+// in, before the proof: the undo, the timer and the retirement release it from
+// that file (#2755). A second apply in the same boot releases the first one
+// once it commits, so the step holds one reference, not one per run.
+func TestPFRecordsAndReleasesItsEnableReference(t *testing.T) {
+	m := newPFMac(t)
+	f := m.pf("")
+	if _, err := f.Apply(m); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, m.token); got != "1001 BOOT-1\n" {
+		t.Fatalf("token file after Apply = %q, want the reference and its boot", got)
+	}
+	rec := slices.IndexFunc(m.rootCalls, func(c string) bool { return strings.HasPrefix(c, "install -m") && strings.HasSuffix(c, " "+m.token) })
+	if load, proof := m.index(pfctl+" -E"), m.index(pfctl+" -s info"); rec < load || rec > proof {
+		t.Fatalf("the token must be recorded right after -E, before the proof: %q", m.rootCalls)
+	}
+	if err := f.Commit(m); err != nil {
+		t.Fatal(err)
+	}
+
+	f = m.pf("")
+	if _, err := f.Apply(m); err != nil {
+		t.Fatal(err)
+	}
+	if !m.held["1001"] || !m.held["1002"] {
+		t.Fatalf("before Commit both references must stay held, for the undo: %v", m.held)
+	}
+	if err := f.Commit(m); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, m.token); got != "1002 BOOT-1\n" || m.held["1001"] || !m.held["1002"] {
+		t.Errorf("after the second Commit: token file %q, references held %v; want only 1002", got, m.held)
+	}
+}
+
+// A token from an earlier boot names nothing of ours: pf's references end at
+// reboot, and the same number can be another holder's now. It is dropped from
+// the file and never released.
+func TestPFNeverReleasesATokenFromAnEarlierBoot(t *testing.T) {
+	m := newPFMac(t)
+	writeTokenFile(t, m.token, "1001 BOOT-0\n")
+	m.held["1001"], m.next = true, 1002 // another holder's, in this boot
+	f := m.pf("")
+	if _, err := f.Apply(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Commit(m); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, m.token); got != "1002 BOOT-1\n" || !m.held["1001"] {
+		t.Errorf("token file %q, references held %v; want 1001 untouched and only 1002 recorded", got, m.held)
+	}
+}
+
+// The undo of a re-apply releases the reference it took and puts the file back,
+// so the reference the earlier run took stays held and recorded.
+func TestPFUndoKeepsTheEarlierRunsReference(t *testing.T) {
+	m := newPFMac(t)
+	writeTokenFile(t, m.token, "1001 BOOT-1\n")
+	m.held["1001"], m.next = true, 1002
+	undo, err := m.pf("").Apply(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, m.token); got != "1001 BOOT-1\n" || !m.held["1001"] || m.held["1002"] {
+		t.Errorf("after the undo: token file %q, references held %v; want only 1001", got, m.held)
+	}
+}
+
+// A `pfctl -E` whose token cannot be read took a reference nothing can release:
+// the apply fails, its undo flushes the anchor, and the error says what is left.
+func TestPFFailsWhenTheTokenCannotBeRead(t *testing.T) {
+	m := newPFMac(t)
+	m.noToken = true
+	undo, err := m.pf("").Apply(m)
+	if err == nil || !strings.Contains(err.Error(), "until the next reboot") {
+		t.Fatalf("Apply = %v, want the unreleasable reference reported", err)
+	}
+	if err := undo(); err != nil {
+		t.Fatal(err)
+	}
+	if m.loaded {
+		t.Error("the undo left the anchor loaded")
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func writeTokenFile(t *testing.T, path, data string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The timer's release runs for real against stubs: it releases this boot's
+// references, never an earlier boot's, and removes the file.
+func TestPFTimerReleasesOnlyThisBootsReferences(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the timer is a POSIX sh script; it runs on macOS only")
+	}
+	d := t.TempDir()
+	log := filepath.Join(d, "calls")
+	stub := func(name, body string) string {
+		p := filepath.Join(d, name)
+		if err := os.WriteFile(p, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	token := filepath.Join(d, "pf-token")
+	writeTokenFile(t, token, "1000 BOOT-0\n1001 BOOT-1\n1002 BOOT-1\n")
+	script := strings.NewReplacer(
+		"sleep 120", "sleep 0",
+		pfctl, stub("pfctl", `echo "pfctl $*" >> `+log),
+		sysctl, stub("sysctl", "echo BOOT-1"),
+	).Replace(pfTimer(token))
+	stub("launchctl", `echo "launchctl $*" >> `+log)
+	cmd := exec.Command("/bin/sh", "-c", script)
+	cmd.Env = append(os.Environ(), "PATH="+d+":/usr/bin:/bin")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("timer: %v: %s", err, out)
+	}
+	want := "pfctl -a " + PFAnchor + " -F all\npfctl -X 1001\npfctl -X 1002\n" +
+		"launchctl bootout " + pfLaunchd + "\nlaunchctl disable " + pfLaunchd + "\n"
+	if got := readFile(t, log); got != want {
+		t.Errorf("the timer ran\n%s\nwant\n%s", got, want)
+	}
+	if _, err := os.Stat(token); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the token file survived the timer: %v", err)
 	}
 }
