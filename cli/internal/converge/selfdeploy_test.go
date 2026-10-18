@@ -2,14 +2,12 @@ package converge
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
-	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
 // fakeBackend is a scheduler holding one trigger: installing it makes it
@@ -228,11 +226,13 @@ func TestSelfDeploy_TheDetailNamesTheJobsSlot(t *testing.T) {
 		}
 	}
 
+	// The converged detail at a slot other than the trigger's 03:00, so a
+	// literal in Reconcile cannot pass for reading the job.
 	f := &fakeBackend{state: managed}
-	e := selfDeployEnv(t, true)
-	res, err := f.step().Reconcile(e, false)
-	want := "dotf update " + selfDeployWhen(update.Trigger(e.GOOS, e.Home, os.Getenv)) + " from " + managed.Where
-	if err != nil || res.Changes != 0 || res.Detail != want {
+	r := f.step()
+	r.trigger = func(Env) schedule.Job { return schedule.Job{Daily: &schedule.Clock{Hour: 4, Minute: 15}} }
+	res, err := r.Reconcile(selfDeployEnv(t, true), false)
+	if want := "dotf update daily at 04:15 from " + managed.Where; err != nil || res.Changes != 0 || res.Detail != want {
 		t.Errorf("converged: %+v, %v; want detail %q", res, err, want)
 	}
 }

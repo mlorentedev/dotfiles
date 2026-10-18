@@ -114,7 +114,7 @@ exit status 1
 
 ## Archive decision
 
-Archived on the round-2 verdict, **PASS-WITH-GAPS** at `12818876` (nan/mimo-v2.6-flash, `review.md`). The owner chose option A on #2502 (2026-10-17) and accepted the gaps, which stay open in #2727: no live Linux or Windows `changed=0` until a release carrying #2721 is pinned, no test for `selfDeployWhen`, and the stale F2 row above.
+Archived on the round-2 verdict, **PASS-WITH-GAPS** at `12818876` (nan/mimo-v2.6-flash, `review.md`). The owner chose option A on #2502 (2026-10-17) and accepted the gaps, which were then tracked in #2727 and closed after the archive (see *Live Linux proof on 0.75.0* below): no live Linux or Windows `changed=0` until a release carrying #2721 is pinned, no test for `selfDeployWhen`, and the stale F2 row above.
 
 ## Live Linux proof on 0.75.0 (#2727)
 
