@@ -1,5 +1,5 @@
 ---
-id: "lesson-478-a-list-taken-before-the-write-that-changes-it-is-stale-by-construction"
+id: "lesson-480-a-list-taken-before-the-write-that-changes-it-is-stale-by-construction"
 type: lesson
 status: active
 title: "A list taken before the write that changes it is stale by construction"
