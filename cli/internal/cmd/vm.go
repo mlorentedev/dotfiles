@@ -50,11 +50,11 @@ func newVMWindowsBuildCmd() *cobra.Command {
 			"The Windows ISO is the English (United States) multi-edition Arm64 ISO from\n" +
 			"microsoft.com/software-download/windows11arm64. Microsoft's download API\n" +
 			"refuses automation, so pass the file a browser downloaded, or its 24-hour\n" +
-			"link, with --iso. Either is verified against the SHA256 Microsoft publishes\n" +
-			"before anything boots from it. virtio-win is downloaded and verified the\n" +
+			"link, with --iso. Either is verified against the ISO's pinned SHA256 before\n" +
+			"anything boots from it. virtio-win is downloaded and verified the\n" +
 			"same way. The guest has no TPM and no credential: a local account with no\n" +
 			"password, unactivated.",
-		Example:      "  dotf vm windows build --iso ~/Downloads/Win11_25H2_English_Arm64.iso",
+		Example:      "  dotf vm windows build --iso ~/Downloads/Windows11_Client_arm64_en-us_26300_9457.iso",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {

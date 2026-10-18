@@ -20,14 +20,20 @@ type Medium struct {
 	SHA256 string
 }
 
-// WindowsISO is Microsoft's multi-edition Windows 11 Arm64 ISO in English
-// (United States), the language of the owner's Windows machines. Microsoft's download API
-// refuses automation (lesson 477), so the owner supplies the file or the
-// 24-hour link. The hash is the one microsoft.com/software-download/windows11arm64
-// publishes for "English 64-bit"; a new Windows release changes it.
+// WindowsISO is Microsoft's multi-edition Windows 11 Arm64 ISO, version 26H2
+// (build 26300), in English (United States), the language of the owner's
+// Windows machines. Microsoft's download API refuses automation (lesson 477),
+// so the owner supplies the file or the 24-hour link.
+//
+// The hash is the file's, measured 2026-10-18 on the ISO the page served for
+// "English": volume label CCCOMA_A64FRE_EN-US_DV9 (consumer, Arm64, en-US).
+// It is in the SHA256 table microsoft.com/software-download/windows11arm64
+// publishes, but under "Arabic 64-bit": that table's language labels do not
+// match its files, so a pin is checked against the file's own label, never
+// read from the row. A new Windows release changes it.
 var WindowsISO = Medium{
-	Name:   "Windows 11 Arm64 multi-edition ISO (English, United States)",
-	SHA256: "dbf606ceb4ce1390f9f21ad1d96331848bc6b701cbab0012785881a1a1c0ec63",
+	Name:   "Windows 11 Arm64 26H2 multi-edition ISO (English, United States)",
+	SHA256: "8992f2d2cfd2fa647e579e9eb31fc21f34da8333c29b6170fde17d2ed6623e9c",
 }
 
 // VirtioWin carries the ARM64 network and serial drivers and the guest agent.
