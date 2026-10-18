@@ -41,7 +41,7 @@ func TestTrigger_CarriesTheXDGHomesOfTheInstallingRun(t *testing.T) {
 	getenv := func(k string) string {
 		return map[string]string{"XDG_CONFIG_HOME": "/srv/cfg", "XDG_STATE_HOME": "/srv/state"}[k]
 	}
-	for _, goos := range []string{"darwin", "linux", "windows"} {
+	for _, goos := range []string{"darwin", "linux"} {
 		env := Trigger(goos, "/home/me", getenv).Env
 		got := map[string]string{}
 		for _, v := range env {
@@ -57,3 +57,27 @@ func TestTrigger_CarriesTheXDGHomesOfTheInstallingRun(t *testing.T) {
 }
 
 func noEnv(string) string { return "" }
+
+// A Scheduled Task has no per-action environment, so on windows the XDG homes
+// travel as `dotf update` flags, which the task's digest covers (#2696). A
+// trailing separator is dropped: before a closing quote it would escape it.
+func TestTrigger_PassesTheXDGHomesAsFlagsOnWindows(t *testing.T) {
+	getenv := func(k string) string {
+		return map[string]string{"XDG_CONFIG_HOME": `D:\My Config\`, "XDG_STATE_HOME": `D:\state`}[k]
+	}
+	job := Trigger("windows", `C:\Users\me`, getenv)
+	want := []string{"update", "--config-home", `D:\My Config`, "--state-home", `D:\state`}
+	if strings.Join(job.Args, "|") != strings.Join(want, "|") {
+		t.Errorf("args %q, want %q", job.Args, want)
+	}
+	if len(job.Env) != 0 {
+		t.Errorf("a windows job carries no environment, got %v", job.Env)
+	}
+	root := func(k string) string { return map[string]string{"XDG_STATE_HOME": `E:\`, "XDG_CONFIG_HOME": `F:/`}[k] }
+	if got := Trigger("windows", `C:\Users\me`, root).Args; strings.Join(got, "|") != `update|--config-home|F:\|--state-home|E:\` {
+		t.Errorf("a drive root keeps its separator, since E: alone is relative: %q", got)
+	}
+	if got := Trigger("windows", `C:\Users\me`, noEnv).Args; strings.Join(got, " ") != "update" {
+		t.Errorf("unset homes add no flags: %q", got)
+	}
+}

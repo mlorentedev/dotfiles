@@ -95,6 +95,12 @@ func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {
 	for _, pkg := range s.PythonPackages {
 		_, _ = fmt.Fprintf(w, "  python package %s %s (%s)\n", pkg.Name, pkg.Version, s.PythonPackagesPath())
 	}
+	if p.UnparsableConfig != "" {
+		// mise answers no command over that file, so what to install is
+		// known only once the write has repaired it.
+		_, _ = fmt.Fprintf(w, "%s does not parse: the sync rewrites it, then installs what is missing\n", p.UnparsableConfig)
+		return nil
+	}
 	if len(p.Missing) == 0 && len(p.MissingPackages) == 0 && len(p.Outdated) == 0 {
 		_, _ = fmt.Fprintf(w, "%d tool(s) at their pin; nothing to install\n", len(pins))
 		return nil

@@ -54,17 +54,9 @@ func newSecretsProbeCmd() *cobra.Command {
 			if count < 1 {
 				return fmt.Errorf("--count must be at least 1, got %d", count)
 			}
-			reg, err := loadRegistry()
+			s, err := probeTarget(args[0])
 			if err != nil {
 				return err
-			}
-			s := reg.Lookup(args[0])
-			if s == nil {
-				return fmt.Errorf("secret %q is not in the registry", args[0])
-			}
-			if s.Backend != secrets.BackendBW || s.BW == nil || s.BW.Item == "" {
-				return fmt.Errorf("secret %q does not resolve through bw serve (backend %q) — nothing to probe",
-					s.ID, s.Backend)
 			}
 
 			// One client for every iteration. Not a performance choice: --count
@@ -96,31 +88,8 @@ func newSecretsProbeCmd() *cobra.Command {
 
 			statuses := map[int]int{}
 			for i := 0; i < count; i++ {
-				res, probeErr := client.Probe(http.MethodGet, path)
-				if probeErr != nil && res.Status == 0 {
-					// Transport failure: nothing was answered, so there is no report
-					// to shape. Surfaced immediately rather than counted, because a
-					// dead daemon is not a data point about the daemon's replies.
-					return probeErr
-				}
-				statuses[res.Status]++
-				// Print the full report for a single probe, and — when --raw is
-				// set — for every FAILING attempt of a multi-probe run.
-				//
-				// The earlier shape printed nothing but the distribution once
-				// count > 1, which silently made --raw a no-op in the exact
-				// combination where it earns its keep: --raw --count N is how you
-				// catch an intermittent fault's body without staring at a terminal
-				// waiting to get lucky. A flag that quietly does nothing is worse
-				// than one that refuses.
-				if count == 1 || (raw && !secrets.Is2xx(res.Status)) {
-					if count > 1 {
-						_, _ = fmt.Fprintf(cmd.OutOrStdout(), "attempt %d:\n", i+1)
-					}
-					_, _ = fmt.Fprint(cmd.OutOrStdout(), secrets.ShapeProbe(res, raw).String())
-				}
-				if probeErr != nil {
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "attempt %d: %v\n", i+1, probeErr)
+				if err := probeAttempt(cmd, client, path, i, count, raw, statuses); err != nil {
+					return err
 				}
 			}
 
@@ -133,6 +102,56 @@ func newSecretsProbeCmd() *cobra.Command {
 	c.Flags().BoolVar(&raw, "raw", false, "echo the response body for NON-2xx replies only, capped")
 	c.Flags().IntVar(&count, "count", 1, "probe N times and report the distribution of outcomes")
 	return c
+}
+
+// probeTarget returns the registry entry for id, refusing one that does not
+// resolve through bw serve: there is nothing there to probe.
+func probeTarget(id string) (*secrets.Secret, error) {
+	reg, err := loadRegistry()
+	if err != nil {
+		return nil, err
+	}
+	s := reg.Lookup(id)
+	if s == nil {
+		return nil, fmt.Errorf("secret %q is not in the registry", id)
+	}
+	if s.Backend != secrets.BackendBW || s.BW == nil || s.BW.Item == "" {
+		return nil, fmt.Errorf("secret %q does not resolve through bw serve (backend %q) — nothing to probe",
+			s.ID, s.Backend)
+	}
+	return s, nil
+}
+
+// probeAttempt issues attempt i of count, counts its status and reports it.
+// Only a transport failure is returned: it ends the run.
+func probeAttempt(cmd *cobra.Command, client secrets.BWServeClient, path string, i, count int, raw bool, statuses map[int]int) error {
+	res, probeErr := client.Probe(http.MethodGet, path)
+	if probeErr != nil && res.Status == 0 {
+		// Transport failure: nothing was answered, so there is no report
+		// to shape. Surfaced immediately rather than counted, because a
+		// dead daemon is not a data point about the daemon's replies.
+		return probeErr
+	}
+	statuses[res.Status]++
+	// Print the full report for a single probe, and — when --raw is
+	// set — for every FAILING attempt of a multi-probe run.
+	//
+	// The earlier shape printed nothing but the distribution once
+	// count > 1, which silently made --raw a no-op in the exact
+	// combination where it earns its keep: --raw --count N is how you
+	// catch an intermittent fault's body without staring at a terminal
+	// waiting to get lucky. A flag that quietly does nothing is worse
+	// than one that refuses.
+	if count == 1 || (raw && !secrets.Is2xx(res.Status)) {
+		if count > 1 {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "attempt %d:\n", i+1)
+		}
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), secrets.ShapeProbe(res, raw).String())
+	}
+	if probeErr != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "attempt %d: %v\n", i+1, probeErr)
+	}
+	return nil
 }
 
 // printDistribution renders the outcome spread for --count. Statuses only: this

@@ -21,6 +21,7 @@ import (
 // its self-deploy at the first converge after it.
 type selfDeploy struct {
 	scheduler func(Env) (schedule.Backend, error) // NativeScheduler in production
+	trigger   func(Env) schedule.Job              // nil: update.Trigger for the run's OS and home
 }
 
 func (selfDeploy) Name() string        { return "self-deploy" }
@@ -71,7 +72,11 @@ func (r selfDeploy) inspect(e Env) (selfDeployView, error) {
 	if err != nil {
 		return unreachable(err)
 	}
-	v := selfDeployView{backend: b, job: update.Trigger(e.GOOS, e.Home, os.Getenv), optedIn: optedIn}
+	job := update.Trigger(e.GOOS, e.Home, os.Getenv)
+	if r.trigger != nil {
+		job = r.trigger(e)
+	}
+	v := selfDeployView{backend: b, job: job, optedIn: optedIn}
 	if v.state, err = b.Inspect(v.job); err != nil {
 		return unreachable(err)
 	}

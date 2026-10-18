@@ -73,6 +73,7 @@ type Paths struct {
 	FirewallWitness string
 	PFAnchor        string // the pf anchor file on macOS
 	PFPlist         string // the LaunchDaemon that loads it at boot
+	PFToken         string // the pf enable references the step holds
 	// Record is what the step found before it first changed each resource
 	// (Record); "" keeps none.
 	Record string
@@ -94,6 +95,7 @@ func DefaultPaths(home string) Paths {
 		FirewallWitness: "/var/lib/dotf/workstation-firewall",
 		PFAnchor:        "/etc/pf.anchors/dotf-ssh",
 		PFPlist:         "/Library/LaunchDaemons/" + pfLabel + ".plist",
+		PFToken:         "/var/lib/dotf/pf-token",
 		Record:          "/var/lib/dotf/workstation-target.json",
 	}
 }
@@ -122,6 +124,7 @@ func PathsFor(goos, home string) Paths {
 		p := DefaultPaths(home)
 		// macOS keeps a daemon's state under /var/db; there is no /var/lib.
 		p.Record = "/var/db/dotf/workstation-target.json"
+		p.PFToken = "/var/db/dotf/pf-token"
 		return p
 	}
 	if goos != "windows" {
@@ -150,13 +153,14 @@ const (
 // owner's key and the drop-in template, with goos's service manager. Root is
 // left for the caller, because only an apply needs it and doctor never applies.
 func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
-	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs}
+	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs,
+		Session: os.Getenv("SSH_CONNECTION"), Sudoed: os.Getenv("SUDO_USER") != ""}
 	var err error
 	if t.Service, err = ServiceFor(goos, run, paths); err != nil {
 		return t, err
 	}
 	t.Power = PowerFor(goos, run, paths)
-	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, os.Getenv("SSH_CONNECTION"), os.Getenv("SUDO_USER") != "")
+	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, t.Session, t.Sudoed)
 	t.MeshAtBoot = MeshAtBootFor(goos, run)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
@@ -223,6 +227,8 @@ type Target struct {
 	Run        Runner
 	Addrs      func() ([]net.IP, error)
 	Dotf       string           // the running build, written into the record
+	Session    string           // $SSH_CONNECTION of the running process; "" when local
+	Sudoed     bool             // dotf itself runs under sudo, which strips $SSH_CONNECTION
 	Now        func() time.Time // nil is time.Now
 }
 

@@ -33,7 +33,7 @@ func FirewallFor(goos string, paths Paths, run Runner, addrs func() ([]net.IP, e
 		return WindowsFirewall{Run: run}, ""
 	}
 	if goos == "darwin" {
-		return &PF{Anchor: paths.PFAnchor, Plist: paths.PFPlist, Run: run, Session: session, Sudoed: sudoed,
+		return &PF{Anchor: paths.PFAnchor, Plist: paths.PFPlist, Token: paths.PFToken, Run: run, Session: session, Sudoed: sudoed,
 			Mesh: func() (net.IP, error) {
 				ips, err := addrs()
 				if err != nil {
