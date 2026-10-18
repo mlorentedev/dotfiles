@@ -242,16 +242,26 @@ func Index(dir string) ([]byte, error) {
 // nothing regenerates, so --check reports it rather than let it go stale in
 // silence. It walks the whole tree, not lessonDirs, because a stray index is
 // wrong wherever it sits (#2700); a directory it cannot read is an error, not
-// an absence.
+// an absence. WalkDir does not follow a symlinked root, so the root is resolved
+// first and every path is reported under dir as given.
 func StrayIndexes(dir string) ([]string, error) {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, err
+	}
 	var out []string
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && d.Name() == "_index.md" {
-			out = append(out, p)
+		if d.IsDir() || d.Name() != "_index.md" {
+			return nil
 		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		out = append(out, filepath.Join(dir, rel))
 		return nil
 	})
 	if err != nil {
