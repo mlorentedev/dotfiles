@@ -504,3 +504,36 @@ func TestPFTimerReleasesOnlyThisBootsReferences(t *testing.T) {
 		t.Errorf("the token file survived the timer: %v", err)
 	}
 }
+
+// A timer that fired during the proof released every reference of this boot
+// the file named, and removed the file. The undo then neither releases again
+// nor puts back a file naming references nobody holds.
+func TestPFUndoAfterTheTimerFiredLeavesItsWork(t *testing.T) {
+	m := newPFMac(t)
+	writeTokenFile(t, m.token, "1001 BOOT-1\n")
+	m.held["1001"], m.next = true, 1002
+	f := m.pf("")
+	undo, err := f.Apply(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// What the timer's script does when it fires.
+	m.loaded, m.held = false, map[string]bool{}
+	if err := os.Remove(m.token); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Commit(m); err == nil {
+		t.Fatal("Commit passed after the timer fired")
+	}
+	if err := undo(); err != nil {
+		t.Fatalf("undo after the timer fired = %v, want nothing left for it to do", err)
+	}
+	if !gonePF(m.token) {
+		t.Errorf("the undo put back a token file naming released references: %q", readFile(t, m.token))
+	}
+}
+
+func gonePF(path string) bool {
+	_, err := os.Stat(path)
+	return errors.Is(err, os.ErrNotExist)
+}

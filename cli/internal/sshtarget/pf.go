@@ -171,8 +171,25 @@ func (f *PF) Apply(root Root) (func() error, error) {
 	// Flush only our anchor, then release our reference: pf stays enabled for
 	// every other holder. Never `pfctl -d`.
 	tok := pfTokenLine.FindSubmatch(out)
+	recorded := false
 	if tok != nil {
-		undos = append(undos, func() error { return asRoot(root, pfctl, "-X", string(tok[1])) })
+		undos = append(undos, func() error {
+			if recorded {
+				cur, err := readOptional(f.Token)
+				if err != nil {
+					return err
+				}
+				if cur == nil {
+					// The timer fired: it released every reference of this
+					// boot the file named, and removed the file.
+					return nil
+				}
+			}
+			if err := asRoot(root, pfctl, "-X", string(tok[1])); err != nil || !recorded {
+				return err
+			}
+			return restoreRoot(root, f.Token, prevToken)
+		})
 	}
 	undos = append(undos, func() error { return asRoot(root, pfctl, "-a", PFAnchor, "-F", "all") })
 	if tok == nil {
@@ -187,7 +204,7 @@ func (f *PF) Apply(root Root) (func() error, error) {
 	if err := installRoot(root, f.Token, append(append([]byte(nil), prevToken...), f.taken...)); err != nil {
 		return undo, err
 	}
-	undos = append(undos, func() error { return restoreRoot(root, f.Token, prevToken) })
+	recorded = true
 	if err := pfLoaded(root); err != nil {
 		return undo, err
 	}
@@ -244,6 +261,11 @@ func (f *PF) Commit(root Root) error {
 // first: a failed rewrite fails the run, whose undo puts the old file back
 // with every reference it names still held. A token of an earlier boot is
 // dropped unreleased, since its number may be another holder's now.
+//
+// A run killed between the rewrite and the last release leaves those
+// references held and unnamed until the next reboot. The other order would
+// leave the file naming released references, whose numbers another holder
+// may get in this boot, and a later release would drop that holder's.
 //
 // A release that fails is not an error: the reference is already gone, or
 // ends at the next reboot. Telling the two apart would mean parsing
