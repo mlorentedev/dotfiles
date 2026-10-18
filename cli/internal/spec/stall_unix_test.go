@@ -4,6 +4,7 @@ package spec
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,5 +104,30 @@ func TestRunWithLimitsCountsAMissingTranscriptAsSilence(t *testing.T) {
 	}
 	if res.Stop != StopStall {
 		t.Errorf("stop=%v, want a stall", res.Stop)
+	}
+}
+
+// CLI-094 round 1: the production pipeline is `spec deadline` piped into the
+// transcript sink, and the detector reads the file the sink writes. The earlier
+// tests pre-wrote the transcript and so never exercised that hand-off, which is
+// where a buffering sink left the file empty and the wedge unnamed.
+func TestRunWithLimitsNamesTheWedgedCallThroughARealSink(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "review-transcript.jsonl")
+	pr, pw := io.Pipe()
+	sunk := make(chan error, 1)
+	go func() { sunk <- SinkTranscript(pr, io.Discard, path) }()
+
+	event := `{"type":"tool_execution_start","toolName":"bash","args":{"command":"find ~/Projects"}}`
+	res, err := RunWithLimits(Limits{Deadline: time.Minute, StallTimeout: 600 * time.Millisecond, Transcript: path},
+		[]string{"sh", "-c", "echo '" + event + "'; sleep 60"}, nil, pw, &bytes.Buffer{})
+	_ = pw.Close()
+	if serr := <-sunk; serr != nil {
+		t.Fatal(serr)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Stop != StopStall || res.LastCall != "bash: find ~/Projects" {
+		t.Errorf("stop=%v LastCall=%q, want a stall naming the call the sink stored", res.Stop, res.LastCall)
 	}
 }

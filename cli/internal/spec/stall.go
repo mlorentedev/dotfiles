@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -144,23 +145,24 @@ func boundedLine(s string) string {
 	return string([]rune(s)[:lastCallWidth]) + "…"
 }
 
-// StoppedRunRecord says what a run the launcher stopped left in review.md
+// StoppedRunRecord says what a run the launcher stopped left in its review file
 // (CLI-094, #2448). The launcher moves the previous round away before it
 // starts, so the file is absent, a provisional record the reviewer wrote first,
 // or a verdict it signed before the stop. Without this line, a stopped run and
 // a run that never began look the same on disk.
 func StoppedRunRecord(reviewPath string) string {
+	name := filepath.Base(reviewPath)
 	raw, err := os.ReadFile(reviewPath)
 	if err != nil {
-		return "review.md was not rewritten by this run: nothing is on disk to archive"
+		return name + " was not rewritten by this run: nothing is on disk to archive"
 	}
 	r, perr := ParseReview(string(raw))
 	switch {
 	case r.Verdict == VerdictPending:
-		return "provisional review.md kept (verdict PENDING): the findings so far, unsigned; `dotf spec archive` refuses it"
+		return "provisional " + name + " kept (verdict PENDING): the findings so far, unsigned; `dotf spec archive` refuses it"
 	case perr == nil:
-		return fmt.Sprintf("review.md holds the verdict %s, written before the run was stopped", r.Verdict)
+		return fmt.Sprintf("%s holds the verdict %s, written before the run was stopped", name, r.Verdict)
 	default:
-		return fmt.Sprintf("review.md exists but cannot be read as a review (%v)", perr)
+		return fmt.Sprintf("%s exists but cannot be read as a review (%v)", name, perr)
 	}
 }

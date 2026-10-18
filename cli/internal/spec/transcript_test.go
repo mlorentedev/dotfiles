@@ -2,10 +2,12 @@ package spec
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The sink has two jobs that pull in opposite directions: the pane must see
@@ -98,5 +100,54 @@ func TestTmuxWrapFallsBackToTeeWithoutASink(t *testing.T) {
 	fallback := TmuxWrap("s", "/repo", []string{"pi"}, "/tmp/t.jsonl", nil)
 	if !strings.Contains(fallback[len(fallback)-1], "tee ") {
 		t.Errorf("without a sink the pipeline must still store the transcript:\n%s", fallback[len(fallback)-1])
+	}
+}
+
+// CLI-094 round 1: the stall detector and the last-call line read the file the
+// sink writes, WHILE the reviewer runs. A sink that holds events in a 4 KB
+// buffer until EOF leaves that file empty, so a wedge names no call and a
+// healthy run with sparse output looks silent. An event on the stream must be
+// on disk before the next one arrives.
+func TestSinkTranscriptStoresAnEventBeforeTheStreamEnds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.jsonl")
+	pr, pw := io.Pipe()
+	done := make(chan error, 1)
+	go func() { done <- SinkTranscript(pr, io.Discard, path) }()
+
+	event := `{"type":"tool_execution_start","toolName":"bash","args":{"command":"sleep 99"}}` + "\n"
+	if _, err := io.WriteString(pw, event); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	var got []byte
+	for time.Now().Before(deadline) {
+		got, _ = os.ReadFile(path)
+		if len(got) > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if string(got) != event {
+		t.Errorf("the event is not on disk while the stream is still open: %q", got)
+	}
+	_ = pw.Close()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// CLI-094: the last-call line is read from tool_execution_* events, so the sink
+// must keep them. Only the partial frames on the way to a message are dropped;
+// a tool's progress updates are the events a wedged call leaves behind.
+func TestSinkKeepsToolExecutionEventsThatNameTheLastCall(t *testing.T) {
+	for _, typ := range []string{"tool_execution_start", "tool_execution_update", "tool_execution_end"} {
+		if isIncrementalFrame([]byte(`{"type":"` + typ + `"}`)) {
+			t.Errorf("%s must be stored: the stall detector names the last call from it", typ)
+		}
+	}
+	for _, typ := range []string{"message_update", "text_delta"} {
+		if !isIncrementalFrame([]byte(`{"type":"` + typ + `"}`)) {
+			t.Errorf("%s is a partial frame and must not be stored", typ)
+		}
 	}
 }
