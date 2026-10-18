@@ -268,9 +268,8 @@ func TestToolsSync_DryRunNamesAToolTheConfigWriteDrops(t *testing.T) {
 	}
 
 	writeFixture(t, filepath.Dir(deployed), map[string]string{"dotfiles.toml": "[tools\n"})
-	plan, err = r.Reconcile(env, true)
-	if err != nil || !strings.Contains(plan.Detail, "does not parse, so what the write drops is unknown") {
-		t.Errorf("plan over an unparseable config: want the unknown named, got %+v, %v", plan, err)
+	if _, err = r.Reconcile(env, true); err == nil || !strings.Contains(err.Error(), "does not parse") {
+		t.Errorf("plan over an unparseable config: want an error naming it, got %v", err)
 	}
 }
 

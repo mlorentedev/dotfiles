@@ -335,11 +335,8 @@ type SyncPlan struct {
 	Orphans         []string // installs no pin asks for, as tool@version (Prune only)
 	// Dropped names the tools the deployed config asks for and the rendered
 	// one does not. Orphans cannot see them before the write, because the
-	// deployed config still references them (#2744). DroppedUnknown says the
-	// deployed config does not parse, so what the write drops is unknown; it
-	// never fails the plan, since Apply's write is what repairs that file.
-	Dropped        []string
-	DroppedUnknown bool
+	// deployed config still references them (#2744).
+	Dropped []string
 	// Behind names the Latest tools an Apply upgraded that mise still reports
 	// behind their newest release. That is upstream lag, not a fault here: mise
 	// skips a release younger than minimum_release_age (24h by default), and
@@ -393,22 +390,28 @@ func (s MiseSync) Plan(tools []MiseTool) (SyncPlan, error) {
 	return p, err
 }
 
-// droppedTools returns the [tools] keys of have that want lacks, sorted, and
-// whether either file failed to parse.
-func droppedTools(have, want []byte) (dropped []string, unknown bool) {
+// droppedTools returns the [tools] keys of the deployed config that the
+// rendered one lacks, sorted. A deployed config that does not parse is an
+// error naming its path: every mise command already fails on that file (#2744,
+// measured), so naming it here only says which file to fix.
+func (s MiseSync) droppedTools(have, rendered []byte) ([]string, error) {
 	var h, w struct {
 		Tools map[string]any `toml:"tools"`
 	}
-	if toml.Unmarshal(have, &h) != nil || toml.Unmarshal(want, &w) != nil {
-		return nil, true
+	if err := toml.Unmarshal(have, &h); err != nil {
+		return nil, fmt.Errorf("deployed mise config %s does not parse: %w", s.ConfigPath(), err)
 	}
+	if err := toml.Unmarshal(rendered, &w); err != nil {
+		return nil, fmt.Errorf("rendered mise config does not parse: %w", err)
+	}
+	var dropped []string
 	for name := range h.Tools {
 		if _, ok := w.Tools[name]; !ok {
 			dropped = append(dropped, name)
 		}
 	}
 	sort.Strings(dropped)
-	return dropped, false
+	return dropped, nil
 }
 
 // plan is Plan with a failed orphan listing returned on its own, so that Apply
@@ -421,7 +424,9 @@ func (s MiseSync) plan(tools []MiseTool) (p SyncPlan, unlisted, err error) {
 	rendered := s.render(tools)
 	p = SyncPlan{ConfigChanged: !bytes.Equal(have, rendered)}
 	if p.ConfigChanged && have != nil {
-		p.Dropped, p.DroppedUnknown = droppedTools(have, rendered)
+		if p.Dropped, err = s.droppedTools(have, rendered); err != nil {
+			return SyncPlan{}, nil, err
+		}
 	}
 	if len(s.PythonPackages) > 0 {
 		pkgs, err := os.ReadFile(s.PythonPackagesPath())

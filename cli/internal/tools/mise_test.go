@@ -1164,17 +1164,19 @@ func TestSync_PlanNamesTheToolsAConfigWriteDrops(t *testing.T) {
 
 	deployed := RenderMiseConfig(append([]MiseTool{{"gh", "2.80.0"}}, kept...), "")
 	p, err := write(t, deployed).Plan(kept)
-	if err != nil || !p.ConfigChanged || strings.Join(p.Dropped, ",") != "gh" || p.DroppedUnknown {
+	if err != nil || !p.ConfigChanged || strings.Join(p.Dropped, ",") != "gh" {
 		t.Errorf("a config that loses gh: want Dropped [gh], got %+v, %v", p, err)
 	}
 
 	p, err = write(t, nil).Plan(kept)
-	if err != nil || len(p.Dropped) != 0 || p.DroppedUnknown {
+	if err != nil || len(p.Dropped) != 0 {
 		t.Errorf("no deployed config: nothing is dropped, got %+v, %v", p, err)
 	}
 
-	p, err = write(t, []byte("[tools\ngh = ")).Plan(kept)
-	if err != nil || len(p.Dropped) != 0 || !p.DroppedUnknown {
-		t.Errorf("a deployed config that does not parse: want DroppedUnknown and no error, got %+v, %v", p, err)
+	// Real mise refuses every command over such a file (`mise ls`, `outdated`
+	// and `ls --prunable` all exit 1), so the plan says which file it is.
+	broken := write(t, []byte("[tools\ngh = "))
+	if _, err = broken.Plan(kept); err == nil || !strings.Contains(err.Error(), broken.ConfigPath()+" does not parse") {
+		t.Errorf("a deployed config that does not parse: want an error naming it, got %v", err)
 	}
 }
