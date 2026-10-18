@@ -7,6 +7,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 )
 
 // The pf pieces on macOS (owner decisions on #2356, 2026-10-13). The anchor is
@@ -40,6 +42,7 @@ type PF struct {
 	Run     Runner // launchctl as the user, for the root-free read
 	Mesh    func() (net.IP, error)
 	Session string // $SSH_CONNECTION of the applying process; "" when local
+	Sudoed  bool   // dotf itself runs under sudo, which strips $SSH_CONNECTION
 
 	timer string // pid of the armed commit-confirm timer, "" when none
 }
@@ -93,8 +96,18 @@ func (f *PF) Differs() (bool, error) {
 			return true, nil
 		}
 	}
-	_, err = f.Run("launchctl", "print", pfLaunchd)
-	return err != nil, nil
+	loaded, err := f.jobLoaded()
+	return !loaded, err
+}
+
+// jobLoaded asks launchd, without root, whether it knows the boot job. Only
+// `launchctl print`'s exit 113 means it does not; schedule.LaunchdLoaded owns
+// that reading (#2731).
+func (f *PF) jobLoaded() (bool, error) {
+	return schedule.LaunchdLoaded(func(args ...string) (string, error) {
+		out, err := f.Run(append([]string{"launchctl"}, args...)...)
+		return string(out), err
+	}, pfLaunchd)
 }
 
 // Apply refuses before changing anything when the session it runs in would be
@@ -115,7 +128,7 @@ func (f *PF) Apply(root Root) (func() error, error) {
 	if err != nil {
 		return undo, err
 	}
-	if err := refuseCutSession(f.Session, mesh); err != nil {
+	if err := refuseCutSession(f.Session, f.Sudoed, mesh); err != nil {
 		return undo, err
 	}
 	prevAnchor, err := readOptional(f.Anchor)
@@ -126,8 +139,10 @@ func (f *PF) Apply(root Root) (func() error, error) {
 	if err != nil {
 		return undo, err
 	}
-	_, lerr := f.Run("launchctl", "print", pfLaunchd)
-	wasLoaded := lerr == nil
+	wasLoaded, err := f.jobLoaded()
+	if err != nil {
+		return undo, err
+	}
 
 	if err := f.arm(root); err != nil {
 		return undo, err
@@ -175,7 +190,24 @@ func (f *PF) Apply(root Root) (func() error, error) {
 }
 
 // Commit disarms the timer; Target calls it once the whole proof has passed.
-func (f *PF) Commit(root Root) error { return f.disarm(root) }
+// The timer flushes the anchor before anything else, so a kill that fails, or
+// an anchor gone once the kill succeeded, means the proof outlived the timer:
+// port 22 is unfenced and the run did not converge. Nothing bounds the proof
+// in advance (ssh's ConnectTimeout bounds the connect, not the handshake), so
+// Commit reads the outcome instead.
+func (f *PF) Commit(root Root) error {
+	if f.timer == "" {
+		return nil
+	}
+	if out, err := root.Run("kill", f.timer); err != nil {
+		return fmt.Errorf("the pf commit-confirm timer %s could not be stopped, so it fired before the proof finished or still will: %w: %s", f.timer, err, bytes.TrimSpace(out))
+	}
+	f.timer = ""
+	if err := pfLoaded(root); err != nil {
+		return fmt.Errorf("the pf commit-confirm timer fired before the proof finished: %w", err)
+	}
+	return nil
+}
 
 // Prove reads what it can without root: both files as rendered and the job
 // loaded. The anchor's rules and pf's switch were read as root by Apply.
@@ -244,13 +276,26 @@ func pfLoaded(root Root) error {
 // address the anchor blocks: loading it would cut the session, and on a
 // machine reached only over ssh, the owner with it. $SSH_CONNECTION is
 // "client-ip client-port server-ip server-port".
-func refuseCutSession(session string, mesh net.IP) error {
-	f := strings.Fields(session)
-	if len(f) != 4 {
+//
+// A session the guard cannot read is refused, never waved through: sudo strips
+// the variable, and an address that does not parse (a link-local one with its
+// %zone among them) says nothing about where the session arrived.
+func refuseCutSession(session string, sudoed bool, mesh net.IP) error {
+	if session == "" {
+		if sudoed {
+			return errors.New("dotf runs under sudo, which strips $SSH_CONNECTION, so whether the pf anchor would cut this session is unknown: run dotf as your user; it asks for sudo itself")
+		}
 		return nil
 	}
-	server := net.ParseIP(f[2])
-	if server == nil || server.IsLoopback() || server.Equal(mesh) {
+	f := strings.Fields(session)
+	var server net.IP
+	if len(f) == 4 {
+		server = net.ParseIP(f[2])
+	}
+	if server == nil {
+		return fmt.Errorf("could not parse the server address in $SSH_CONNECTION %q, so whether the pf anchor would cut this session is unknown: run the converge from the mesh (ssh to %s) or at the machine", session, mesh)
+	}
+	if server.IsLoopback() || server.Equal(mesh) {
 		return nil
 	}
 	return fmt.Errorf("this session arrived on %s, which the pf anchor closes to port 22: run the converge from the mesh (ssh to %s) or at the machine", server, mesh)

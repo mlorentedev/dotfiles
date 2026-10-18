@@ -26,12 +26,14 @@ const MeshInterface = "tailscale0"
 
 // FirewallFor is the firewall the target manages on goos, with a note naming
 // why there is none: a plan says so rather than reading converged.
-func FirewallFor(goos string, paths Paths, run Runner, addrs func() ([]net.IP, error), session string) (Firewall, string) {
+// session is the applying process's $SSH_CONNECTION and sudoed whether dotf
+// itself runs under sudo, which strips it; pf refuses a session it cannot read.
+func FirewallFor(goos string, paths Paths, run Runner, addrs func() ([]net.IP, error), session string, sudoed bool) (Firewall, string) {
 	if goos == "windows" {
 		return WindowsFirewall{Run: run}, ""
 	}
 	if goos == "darwin" {
-		return &PF{Anchor: paths.PFAnchor, Plist: paths.PFPlist, Run: run, Session: session,
+		return &PF{Anchor: paths.PFAnchor, Plist: paths.PFPlist, Run: run, Session: session, Sudoed: sudoed,
 			Mesh: func() (net.IP, error) {
 				ips, err := addrs()
 				if err != nil {

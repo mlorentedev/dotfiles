@@ -21,7 +21,9 @@ type pfMac struct {
 	loaded      bool // pf holds our anchor's rules
 	enabled     bool
 	jobLoaded   bool
-	failLoad    bool // `pfctl -E -a … -f` succeeds but pf holds nothing
+	failLoad    bool  // `pfctl -E -a … -f` succeeds but pf holds nothing
+	printErr    error // what `launchctl print` fails with, when not nil
+	killErr     error // what killing the timer fails with, when not nil
 	timerKilled bool
 	rootCalls   []string
 }
@@ -32,16 +34,23 @@ func newPFMac(t *testing.T) *pfMac {
 }
 
 func (m *pfMac) pf(session string) *PF {
-	return &PF{Anchor: m.anchor, Plist: m.plist, Run: m.user, Session: session,
+	return m.pfAs(session, false)
+}
+
+func (m *pfMac) pfAs(session string, sudoed bool) *PF {
+	return &PF{Anchor: m.anchor, Plist: m.plist, Run: m.user, Session: session, Sudoed: sudoed,
 		Mesh: func() (net.IP, error) { return pfMesh, nil }}
 }
 
 func (m *pfMac) user(argv ...string) ([]byte, error) {
 	if slices.Equal(argv, []string{"launchctl", "print", pfLaunchd}) {
+		if m.printErr != nil {
+			return []byte("Bad request."), m.printErr
+		}
 		if m.jobLoaded {
 			return nil, nil
 		}
-		return []byte("Could not find service"), errors.New("exit status 113")
+		return []byte("Could not find service"), exitErr(113)
 	}
 	m.t.Fatalf("unexpected user command %v", argv)
 	return nil, nil
@@ -64,6 +73,9 @@ func (m *pfMac) Run(argv ...string) ([]byte, error) {
 	case argv[0] == "/bin/sh":
 		return []byte("4242\n"), nil
 	case call == "kill 4242":
+		if m.killErr != nil {
+			return []byte("kill: 4242: No such process"), m.killErr
+		}
 		m.timerKilled = true
 	case call == pfctl+" -E -a "+PFAnchor+" -f "+m.anchor:
 		m.enabled, m.loaded = true, !m.failLoad
@@ -169,6 +181,80 @@ func TestPFRefusesASessionTheAnchorWouldCut(t *testing.T) {
 		m := newPFMac(t)
 		if _, err := m.pf(session).Apply(m); err != nil {
 			t.Errorf("session %q: Apply = %v, want it to proceed", session, err)
+		}
+	}
+}
+
+// A session the guard cannot read is refused, never waved through: a server
+// address that does not parse, a variable of the wrong shape, and a dotf run
+// under sudo, which strips $SSH_CONNECTION.
+func TestPFRefusesASessionItCannotRead(t *testing.T) {
+	for _, tc := range []struct {
+		session string
+		sudoed  bool
+		want    string
+	}{
+		{"10.0.0.20 51234 fe80::1%en0 22", false, "could not parse"},
+		{"10.0.0.20 51234", false, "could not parse"},
+		{"", true, "under sudo"},
+	} {
+		m := newPFMac(t)
+		_, err := m.pfAs(tc.session, tc.sudoed).Apply(m)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("session %q, sudo %v: Apply = %v, want a refusal saying %q", tc.session, tc.sudoed, err, tc.want)
+		}
+		if len(m.rootCalls) != 0 {
+			t.Errorf("session %q, sudo %v: the refusal ran %q as root", tc.session, tc.sudoed, m.rootCalls)
+		}
+	}
+	m := newPFMac(t)
+	if _, err := m.pfAs("100.64.0.9 51234 100.64.0.15 22", true).Apply(m); err != nil {
+		t.Errorf("a sudo that kept $SSH_CONNECTION: Apply = %v, want it to proceed", err)
+	}
+}
+
+// A launchd that cannot be read is an error, never a job that is not loaded:
+// read as unloaded, a converged Mac would plan pf forever, and Apply's undo
+// would boot out a job that was loaded (#2731).
+func TestPFStopsWhenLaunchdCannotBeRead(t *testing.T) {
+	m := newPFMac(t)
+	f := m.pf("")
+	if _, err := f.Apply(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Commit(m); err != nil {
+		t.Fatal(err)
+	}
+	m.printErr, m.rootCalls = exitErr(5), nil
+	if d, err := f.Differs(); err == nil || !strings.Contains(err.Error(), pfLaunchd) {
+		t.Errorf("Differs() = %v, %v; want an error naming %s", d, err, pfLaunchd)
+	}
+	if _, err := f.Apply(m); err == nil || !strings.Contains(err.Error(), pfLaunchd) {
+		t.Errorf("Apply = %v; want an error naming %s", err, pfLaunchd)
+	}
+	if len(m.rootCalls) != 0 {
+		t.Errorf("a failed read ran %q as root", m.rootCalls)
+	}
+}
+
+// Commit keeps the anchor only when it stopped a timer that had not fired. The
+// timer flushes the anchor first, so a kill that fails, or an anchor gone once
+// the kill succeeded, means the proof outlived the timer and port 22 is
+// unfenced: the run did not converge, and Target undoes it.
+func TestPFCommitFailsWhenTheTimerFiredFirst(t *testing.T) {
+	for name, fire := range map[string]func(m *pfMac){
+		"the timer is gone": func(m *pfMac) { m.killErr, m.loaded, m.jobLoaded = exitErr(1), false, false },
+		"it was flushing":   func(m *pfMac) { m.loaded = false },
+		"sudo refused kill": func(m *pfMac) { m.killErr = exitErr(1) },
+	} {
+		m := newPFMac(t)
+		f := m.pf("")
+		if _, err := f.Apply(m); err != nil {
+			t.Fatal(err)
+		}
+		fire(m)
+		if err := f.Commit(m); err == nil || !strings.Contains(err.Error(), "before the proof finished") {
+			t.Errorf("%s: Commit = %v, want the fired timer reported", name, err)
 		}
 	}
 }

@@ -151,7 +151,7 @@ func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]n
 		return t, err
 	}
 	t.Power = PowerFor(goos, run, paths)
-	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, os.Getenv("SSH_CONNECTION"))
+	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, os.Getenv("SSH_CONNECTION"), os.Getenv("SUDO_USER") != "")
 	t.MeshAtBoot = MeshAtBootFor(goos, run)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err

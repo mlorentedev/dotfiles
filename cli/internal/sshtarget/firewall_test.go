@@ -283,19 +283,19 @@ func TestUFWUndoKeepsAMeshRuleThatWasThereBefore(t *testing.T) {
 func TestFirewallForManagesUFWOnlyWhereItIsInstalled(t *testing.T) {
 	d := t.TempDir()
 	paths := Paths{UFWConf: filepath.Join(d, "ufw.conf")}
-	if f, note := FirewallFor("linux", paths, nil, nil, ""); f != nil || !strings.Contains(note, "ufw") {
+	if f, note := FirewallFor("linux", paths, nil, nil, "", false); f != nil || !strings.Contains(note, "ufw") {
 		t.Errorf("no ufw.conf: FirewallFor = %v, %q; want nil and a note naming ufw", f, note)
 	}
 	if err := os.WriteFile(paths.UFWConf, []byte("ENABLED=no\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if f, note := FirewallFor("linux", paths, nil, nil, ""); f == nil || note != "" {
+	if f, note := FirewallFor("linux", paths, nil, nil, "", false); f == nil || note != "" {
 		t.Errorf("with ufw.conf: FirewallFor = %v, %q; want UFW and no note", f, note)
 	}
-	if f, note := FirewallFor("darwin", paths, nil, nil, ""); f == nil || note != "" {
+	if f, note := FirewallFor("darwin", paths, nil, nil, "", false); f == nil || note != "" {
 		t.Errorf("darwin: FirewallFor = %v, %q; want pf and no note", f, note)
 	}
-	if f, note := FirewallFor("windows", paths, nil, nil, ""); !isType[WindowsFirewall](f) || note != "" {
+	if f, note := FirewallFor("windows", paths, nil, nil, "", false); !isType[WindowsFirewall](f) || note != "" {
 		t.Errorf("windows: FirewallFor = %v, %q; want WindowsFirewall and no note", f, note)
 	}
 }

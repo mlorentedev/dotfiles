@@ -259,11 +259,16 @@ changes. The anchor is `com.apple/150.dotf-ssh`, sorting before Apple's
 Apple's main ruleset).
 
 The apply refuses when its own ssh session arrived on an address the anchor
-closes (run it over the mesh, or at the machine). Before loading, it arms a
-root timer that, after 120 s, flushes the anchor and disables the job; the
-timer is disarmed only once the whole proof has passed, so a run cut off with
-its session leaves port 22 fenced by `AllowUsers` alone, never a Mac nobody can
-reach. A failure flushes only this anchor; nothing ever runs `pfctl -d`.
+closes (run it over the mesh, or at the machine). It also refuses a session it
+cannot read: an `$SSH_CONNECTION` whose server address does not parse, and
+`sudo dotf …`, since sudo strips that variable. Run dotf as your user; it asks
+for sudo itself. Before loading, it arms a root timer that, after 120 s,
+flushes the anchor and disables the job; the timer is disarmed only once the
+whole proof has passed, so a run cut off with its session leaves port 22
+fenced by `AllowUsers` alone, never a Mac nobody can reach. A proof that
+outlives the timer fails the run rather than reading converged: the disarm
+checks that the kill succeeded and that the anchor is still loaded. A failure
+flushes only this anchor; nothing ever runs `pfctl -d`.
 
 A self-connection crosses `lo0`, so the Mac proves that pf is enabled and holds
 the anchor, not what the LAN sees: run the negative check below from another
