@@ -22,6 +22,14 @@ func testJob() Job {
 	}
 }
 
+// taskJob is testJob as the windows backend takes it: a Scheduled Task has no
+// per-action environment, so update.Trigger gives a windows job none.
+func taskJob() Job {
+	j := testJob()
+	j.Env = nil
+	return j
+}
+
 // exitStatus is a failed command's exit, as *exec.ExitError reports it.
 type exitStatus int
 
@@ -357,7 +365,7 @@ func TestSchtasks_InstallThenCurrentThenRemove(t *testing.T) {
 	st := &fakeSchtasks{tasks: map[string]string{}}
 	elevated := false
 	b := Schtasks{Run: st.run, User: `HOST\me`, Elevated: func() bool { return elevated }, TempDir: t.TempDir()}
-	job := testJob()
+	job := taskJob()
 
 	if err := b.Install(job); err != nil {
 		t.Fatal(err)
@@ -405,14 +413,14 @@ func TestSchtasks_InstallThenCurrentThenRemove(t *testing.T) {
 func TestSchtasks_ARefusedQueryIsNotAnAbsentTask(t *testing.T) {
 	st := &fakeSchtasks{tasks: map[string]string{}}
 	b := Schtasks{Run: st.run, User: `HOST\me`, TempDir: t.TempDir()}
-	if err := b.Install(testJob()); err != nil {
+	if err := b.Install(taskJob()); err != nil {
 		t.Fatal(err)
 	}
 	st.fail = true
-	if _, err := b.Inspect(testJob()); err == nil {
+	if _, err := b.Inspect(taskJob()); err == nil {
 		t.Error("inspect must fail when the scheduler refuses the query")
 	}
-	if err := b.Remove(testJob()); err == nil {
+	if err := b.Remove(taskJob()); err == nil {
 		t.Error("remove must fail when the scheduler refuses the query")
 	}
 	if _, ok := st.tasks["ExampleJob"]; !ok {
@@ -432,7 +440,7 @@ func TestListsTask_MatchesTheRootFolderPathOnly(t *testing.T) {
 
 func TestSchtasks_TaskWithoutTheDigestIsUnmanaged(t *testing.T) {
 	st := &fakeSchtasks{tasks: map[string]string{"ExampleJob": "<Task><RegistrationInfo><Description>dotfiles self-deploy</Description></RegistrationInfo></Task>"}}
-	s, err := Schtasks{Run: st.run, TempDir: t.TempDir()}.Inspect(testJob())
+	s, err := Schtasks{Run: st.run, TempDir: t.TempDir()}.Inspect(taskJob())
 	if err != nil || !s.Present || s.Managed || s.Current() {
 		t.Errorf("legacy task: %+v, %v", s, err)
 	}
@@ -461,4 +469,23 @@ func typeName(b Backend) string {
 		return "schedule.Schtasks"
 	}
 	return "<nil>"
+}
+
+// A job with an environment is refused rather than registered without it:
+// Task Scheduler XML has no per-action environment, and a value dropped there
+// sends the 03:00 run to another machine.json (#2696).
+func TestSchtasks_RefusesAJobWithAnEnvironment(t *testing.T) {
+	st := &fakeSchtasks{tasks: map[string]string{}}
+	b := Schtasks{Run: st.run, User: `HOST\me`, TempDir: t.TempDir()}
+	job := taskJob()
+	job.Env = []EnvVar{{Name: "XDG_CONFIG_HOME", Value: `D:\cfg`}}
+	if _, err := b.Inspect(job); err == nil || !strings.Contains(err.Error(), "XDG_CONFIG_HOME") {
+		t.Errorf("inspect: %v, want a refusal naming the variable", err)
+	}
+	if err := b.Install(job); err == nil {
+		t.Error("install must refuse a job whose environment the task would drop")
+	}
+	if len(st.tasks) != 0 {
+		t.Errorf("nothing may be registered: %v", st.tasks)
+	}
 }

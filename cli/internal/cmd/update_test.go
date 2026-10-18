@@ -169,3 +169,28 @@ func TestRecordUpdate_KeepsTheFailureAndNeverFailsTheRun(t *testing.T) {
 		t.Errorf("an unwritable record went unsaid: %q", w.String())
 	}
 }
+
+// The Windows task hands `dotf update` the installing run's XDG homes as flags,
+// since a Scheduled Task has no per-action environment (#2696). The flags set
+// them for the whole run, so its machine.json, its last-run record and the
+// converge it starts all read the homes the task names.
+func TestUpdate_TheHomeFlagsSetTheRunsXDGHomes(t *testing.T) {
+	t.Setenv("DOTFILES_REPO_DIR", t.TempDir()) // not a git repo: a recorded skip
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	state, cfg := t.TempDir(), t.TempDir()
+
+	if _, _, err := execute(t, "update", "--state-home", state, "--config-home", cfg); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if r, err := update.ReadRecord(filepath.Join(state, "dotfiles")); err != nil || r.Status != "not-a-repo" {
+		t.Errorf("the record belongs under --state-home: %+v, %v", r, err)
+	}
+	if got := os.Getenv("XDG_CONFIG_HOME"); got != cfg {
+		t.Errorf("XDG_CONFIG_HOME = %q, want the --config-home %q", got, cfg)
+	}
+
+	if _, _, err := execute(t, "update", "--state-home", "relative"); err == nil || !strings.Contains(err.Error(), "absolute") {
+		t.Errorf("a relative home must be refused before the run: %v", err)
+	}
+}
