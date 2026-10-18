@@ -1,0 +1,31 @@
+# Arming envelope for the pins run. Owner instruction 2026-10-18, relayed by
+# session dotfiles-20 with explicit authorisation (orchestrator refill
+# orch2-20261017T2045Z): queue exactly #2711 then #2677; park with two options
+# anything needing a spec slot (WIP 13/10, no override), a Windows box, a
+# .github change or an owner choice. Nothing else after the queue.
+version: 1
+run_id: "pins-20261018T0050Z"
+armed_by: manu
+armed_at: 2026-10-18T00:50:00Z
+expires_at: 2026-10-18T11:50:00Z
+objective: "Land #2711 (converge defaults to the declared checkout, not the cwd worktree) and #2677 (a mise prune that leaves a file tool installed), or park each with two options."
+scope:
+  write_paths: ["cli/**", "docs/lessons/**", "docs/runbooks/**", "specs/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "setup-*.sh", "setup-*.ps1", "install.sh", "install.ps1", "versions.conf", "packages.json"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, mise, jq]
+queue:
+  source: bitacora
+  filter: "#2711, #2677 (in this order, nothing else)"
+  max_items: 2
+budget:
+  max_iterations: 4
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+  spec_init: never
