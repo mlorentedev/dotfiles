@@ -36,10 +36,12 @@ created: "2026-10-17"
 ## PR 3 — Tier 3b, Windows 11 ARM VM
 
 - [x] Hypervisor chosen by the owner: QEMU driven by `dotf` (ADR-053)
-- [x] [AC10] `qemu` and `swtpm` catalog entries; on the Mac: plan → apply → plan `0 to change`
+- [x] [AC10] `qemu` catalog entry; on the Mac: plan → apply → plan `0 to change`. `swtpm` was declared, then removed: HVF cannot attach a TPM (ADR-053)
 - [ ] Owner: the Spanish Windows 11 Arm64 ISO at `~/.local/state/dotfiles/vm/windows/win11-arm64.iso`
-- [ ] [AC9] Failing tests with a fake QEMU and guest agent, then `dotf vm windows`: build `clean-base` unattended, revert, copy a `git archive` of the ref in, run `install.ps1`, converge again, assert `changed` 0
-- [ ] [AC9] Live run on the Mac; then #2683 (powercfg) and #2672 (sshd) verified in the guest, evidence on those PRs and #2356
+- [x] [AC9] QEMU argv builder (shares nothing with the host, install media read-only, socket paths within the macOS limit) and guest-agent client (sync, exec, file read and write), tested against a fake agent; argv validated against QEMU 11.1.2
+- [ ] PR 3a — `dotf vm windows build`: acquire and verify the ISO (`--iso` or `--iso-url`) and virtio-win against pins in `versions.conf`; embedded `autounattend.xml` (LabConfig bypass, ARM64 virtio drivers, Pro with no key, passwordless local account, guest agent, no device encryption, shut down at the end); QMP client; unattended install; capture `clean-base` (qcow2 internal snapshot plus a copy of the UEFI variables)
+- [ ] PR 3b — `dotf vm windows`: revert, start headless, push a `git archive` of the ref through the guest agent, run `install.ps1`, converge again, read `last.json` (`Converged`, `Idempotent`), stop unless `--keep`
+- [ ] [AC9] Live run on the Mac; then #2683 (powercfg) and #2672 (sshd) verified in the guest, evidence on those PRs and #2356; BUG-155 (#2734) measured
 
 ## Closing
 
