@@ -256,8 +256,51 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - Probe takes the retirement path when the role is absent. Without that, every retirement run would fail its post-condition with the apply plan's "still differs".
   - Expected on the live hosts: the macmini and msi were converged before the record existed, so their key and listener are `unknown`. The retirement removes nothing there and holds the drop-in until the owner decides about sshd.
   - The firewall and power policy are not retired: #2794 (the pf pieces, `PFToken` from #2755, UFW, Windows rules).
-  - Evidence: `go test ./internal/sshtarget/ ./internal/converge/ -run 'Retire|Workstation'` passes 16 tests (7 retirement tests in sshtarget, 9 workstation tests in converge).
-  - Twelve mutations, all killed: no hold, the record removed while held, `unknown` undone, no refusal, a refusal always, no refusal under sudo, a `replaced` drop-in removed, all key lines dropped, the listener not counted as off, a failure ignored, Probe ignoring the retirement, no skip without a terminal.
+  - The #2799 review led to three more changes. The retirement removes the key line the record names, when it names one, so a rotated repo key cannot hide it. A record without that line, where no line holds the repo's key, is named in the plan. The hold and the stop ask whether sshd serves at all (runs now **or** starts at boot), through an optional `Serving`, rather than `Enabled` (both at once). The record writing the key line, and `Serving` on systemd and Windows, ride in a companion PR, keeping this one inside its file budget; until it lands, the retirement falls back to the repo key and to `Enabled`, which is this PR's first behaviour.
+  - Evidence, `go test ./internal/sshtarget/ ./internal/converge/ -count=1 -run 'Retire|WorkstationTarget' -v` on the triage head:
+
+    ```
+    --- PASS: TestRetireUndoesWhatTheStepCreated (0.00s)
+    --- PASS: TestRetireRestoresTheDropInItReplaced (0.00s)
+    --- PASS: TestRetireLeavesWhatItCannotTellIsItsOwn (0.00s)
+    --- PASS: TestRetireHoldsTheDropInWhileAListenerItDidNotStartRuns (0.00s)
+    --- PASS: TestRetireRefusesToStopTheListenerItRunsOver (0.00s)
+    --- PASS: TestRetireKeepsTheRecordWhenAStepFails (0.00s)
+    --- PASS: TestRetireRemovesTheKeyItWroteAfterARotation (0.00s)
+    --- PASS: TestRetireWithoutARecordIsNothing (0.00s)
+    --- PASS: TestRetireAsksWhetherSSHDServesAtAll (0.00s)
+    ok  	github.com/mlorentedev/dotfiles/cli/internal/sshtarget	0.095s
+    --- PASS: TestWorkstationTarget_SkipsAMachineThatHasNotOptedIn (0.00s)
+    --- PASS: TestWorkstationTarget_PlanNeedsNoRoot (0.00s)
+    --- PASS: TestWorkstationTarget_ApplyWithoutRootIsSkippedWithThePlan (0.00s)
+    --- PASS: TestWorkstationTarget_AFailedApplyClaimsNothingItDidNotDo (0.00s)
+    --- PASS: TestWorkstationTarget_IsSkippedWithoutRunners (0.00s)
+    --- PASS: TestWorkstationTarget_ANodeOffTheMeshIsSkipped (0.00s)
+    --- PASS: TestWorkstationTarget_PlansTheRetirementWithoutRoot (0.00s)
+    --- PASS: TestWorkstationTarget_RetirementWithoutRootIsSkippedWithThePlan (0.00s)
+    --- PASS: TestWorkstationTarget_ProbeChecksTheRetirement (0.00s)
+    ok  	github.com/mlorentedev/dotfiles/cli/internal/converge	0.089s
+    ```
+
+  - Mutations, each applied alone, then `go test ./internal/sshtarget/ ./internal/converge/`:
+
+    ```
+    no-hold KILLED
+    record-even-when-held KILLED
+    undo-unknown KILLED
+    no-refusal KILLED
+    refuse-always KILLED
+    no-sudo-refusal KILLED
+    replaced-removed KILLED
+    keys-all-dropped KILLED
+    listener-not-off-first KILLED
+    continue-on-failure KILLED
+    probe-ignores-retire KILLED
+    retire-no-skip-on-terminal KILLED
+    key-ignores-record-content KILLED
+    no-unfound-key-note KILLED
+    hold-on-enabled KILLED
+    ```
 
 ## Promotion candidates
 

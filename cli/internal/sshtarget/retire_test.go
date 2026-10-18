@@ -176,6 +176,29 @@ func TestRetireKeepsTheRecordWhenAStepFails(t *testing.T) {
 	}
 }
 
+// The record names the key line the step wrote: a repo key rotated since then
+// does not hide it. A record without it, and no line holding the repo's key,
+// is named rather than read as done.
+func TestRetireRemovesTheKeyItWroteAfterARotation(t *testing.T) {
+	m := retiring(t, &Prior{State: PriorCreated, Content: testKey}, created, created)
+	tg := m.target()
+	tg.Key = []byte("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIRotated manu@msi\n")
+	if err := tg.Retire(inspectRetire(t, m, tg)); err != nil {
+		t.Fatal(err)
+	}
+	if keys := fileText(t, m.paths.AuthorizedKeys); keys != otherKey+"\n" {
+		t.Errorf("authorized_keys = %q, want the line the step wrote removed", keys)
+	}
+
+	m = retiring(t, created, created, created)
+	tg = m.target()
+	tg.Key = []byte("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIRotated manu@msi\n")
+	r := inspectRetire(t, m, tg)
+	if slices.Contains(r.Pending, "authorized key") || !slices.ContainsFunc(r.Notes, func(n string) bool { return strings.Contains(n, "check "+m.paths.AuthorizedKeys) }) {
+		t.Errorf("pending %v, notes %q; want the unfound key named", r.Pending, r.Notes)
+	}
+}
+
 func TestRetireWithoutARecordIsNothing(t *testing.T) {
 	m := newMachine(t)
 	m.paths.Record = filepath.Join(t.TempDir(), "workstation-target.json")
@@ -192,4 +215,29 @@ func fileText(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+// halfOn is an sshd that runs without starting at boot, or the reverse: not
+// Enabled, which wants both, and yet Serving.
+type halfOn struct{ Launchd }
+
+func (halfOn) Enabled() (bool, error) { return false, nil }
+func (halfOn) Serving() (bool, error) { return true, nil }
+
+// The hold and the stop ask whether sshd serves at all, now or at the next
+// boot, not Enabled's "both" (#2799 review): either way the stock config
+// would serve once the drop-in goes.
+func TestRetireAsksWhetherSSHDServesAtAll(t *testing.T) {
+	m := retiring(t, unknown, created, unknown)
+	tg := m.target()
+	tg.Service = halfOn{}
+	if r := inspectRetire(t, m, tg); !r.Converged() {
+		t.Errorf("pending %v; want the drop-in held under an sshd that serves", r.Pending)
+	}
+	m = retiring(t, unknown, unknown, created)
+	tg = m.target()
+	tg.Service = halfOn{}
+	if r := inspectRetire(t, m, tg); !slices.Contains(r.Pending, "sshd service") {
+		t.Errorf("pending %v; want the listener stopped", r.Pending)
+	}
 }

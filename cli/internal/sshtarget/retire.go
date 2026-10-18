@@ -49,7 +49,7 @@ func (t Target) InspectRetire() (Retirement, error) {
 		return p != nil && p.State != PriorUnknown
 	}
 
-	listening, err := t.Service.Enabled()
+	listening, err := serving(t.Service)
 	if err != nil {
 		return r, err
 	}
@@ -83,8 +83,17 @@ func (t Target) InspectRetire() (Retirement, error) {
 		if err != nil {
 			return r, err
 		}
-		if hasKey(keys, bytes.TrimSpace(t.Key)) {
-			r.Pending, r.keys = append(r.Pending, resKey), withoutKey(keys, bytes.TrimSpace(t.Key))
+		key := bytes.TrimSpace(t.Key)
+		if rec.Key.Content != "" {
+			key = []byte(rec.Key.Content)
+		}
+		switch {
+		case hasKey(keys, key):
+			r.Pending, r.keys = append(r.Pending, resKey), withoutKey(keys, key)
+		case rec.Key.Content == "":
+			// A record of a build that did not keep the line, and the repo's
+			// key in no line: rotated since, or removed by the owner.
+			r.Notes = append(r.Notes, resKey+": no line holds the repo's key, and the record does not say which key the step wrote: check "+t.Paths.AuthorizedKeys)
 		}
 	}
 	// A held entry needs the record to be undone later; an unknown one never
@@ -129,6 +138,15 @@ func (t Target) Retire(r Retirement) error {
 		}
 	}
 	return nil
+}
+
+// serving asks whether sshd runs now or starts at boot, where the service can
+// tell the two apart from Enabled's "both"; launchd's loaded job is both.
+func serving(s Service) (bool, error) {
+	if v, ok := s.(interface{ Serving() (bool, error) }); ok {
+		return v.Serving()
+	}
+	return s.Enabled()
 }
 
 // withoutKey is keys with every line that authorizes key taken out, the

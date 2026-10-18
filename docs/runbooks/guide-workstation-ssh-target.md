@@ -433,11 +433,12 @@ undoes only what the record says it created, in this order:
 3. The mesh key's lines in `authorized_keys` when `created`. The file's other lines stay byte for byte.
 4. The record, last.
 
-A second run reports `nothing left to retire`. The retirement also behaves as follows:
+A second run finds no record and skips the step, as on a machine that never opted in: nothing is left that the step can tell is its own. The retirement also behaves as follows:
 
 - It refuses over ssh, or under sudo, when it has to stop sshd, since that would cut the session.
 - It leaves and names every `unknown` entry: that resource was in place before the record and may be yours.
-- It holds a `created` or `replaced` drop-in while an sshd it did not start keeps listening. Without the drop-in, that sshd would run its stock config, which allows passwords. The record is kept with it: turn sshd off yourself, then converge again.
+- It removes the key line the record names, so a repo key rotated since the apply does not hide it. A record written before it kept that line, with no line holding the repo's key, is named in the plan rather than read as done.
+- It holds a `created` or `replaced` drop-in while an sshd it did not start runs, or would start at the next boot. Without the drop-in, that sshd would run its stock config, which allows passwords. The record is kept with it: turn sshd off yourself, then converge again.
 - A run that fails part way keeps the record, and the next run resumes.
 
 The record (`/var/lib/dotf/workstation-target.json` on Linux,
