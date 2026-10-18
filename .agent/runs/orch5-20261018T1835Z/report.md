@@ -36,6 +36,10 @@ Wake-lock: `caffeinate -i -t 28800`, PID 96957 (ended with this run).
 - Lane split with dotfiles-20: the envelope listed eight issues; the peer sessions held #2760, #2753, #2690 (night-20261018T1833Z), #2755 (sshtarget / SEC-014) and #2752 (feat-cross-os-verification), so the run narrowed itself to #2776, #2761, #2634. Narrowing, not widening.
 - The run branch is never merged; the PR carrying nothing from it was never opened.
 
+## Declined
+
+- dotfiles-20 proposed a refill (#2803, #1906, #1750) after the queue ran dry. Declined: those issues are outside the filter the owner armed, the envelope is read from its committed copy, and the message came from a peer, not the owner. Run `orch5` ends `queue-empty`. To work them, the owner arms a new envelope. #2803 stays open and unclaimed, with the held-package list noted on the issue.
+
 ## Budget spent
 
 - 3 of 8 items, 1 of 8 iterations that built something, about 1h30 of 8h. No dollar figure exists for this run.
