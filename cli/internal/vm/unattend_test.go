@@ -134,19 +134,36 @@ func TestFirstLogon_InstallsTheAgentThenShutsDown(t *testing.T) {
 	if !strings.Contains(x, `firstlogon.ps1`) {
 		t.Error("FirstLogonCommands does not run firstlogon.ps1")
 	}
-	for _, want := range []string{`'NetKVM', 'vioserial'`, `\w11\ARM64\*.inf`, `guest-agent\qemu-ga-x86_64.msi`, `Set-Service -Name 'QEMU-GA' -StartupType Automatic`} {
+	for _, want := range []string{`'NetKVM', 'vioserial'`, `\w11\ARM64\*.inf`, `guest-agent\qemu-ga-x86_64.msi`, `-d --retry-path`, `-StartupType Automatic`} {
 		if !strings.Contains(ps, want) {
 			t.Errorf("firstlogon.ps1 lacks %q", want)
 		}
+	}
+	// The agent's MSI registers a VSS provider in COM+, which fails on Arm64
+	// (error 1722, measured 2026-10-18) and rolls the whole install back; so
+	// do `qemu-ga -s install` and msiexec /i. An administrative install
+	// extracts the files without running that action.
+	code := codeLines(ps)
+	if !strings.Contains(code, `'/a'`) || strings.Contains(code, `'/i'`) || strings.Contains(code, "-s install") {
+		t.Error("firstlogon.ps1 must extract the agent (msiexec /a) and create its service, never run the MSI's install")
 	}
 	lines := strings.Split(strings.TrimSpace(ps), "\n")
 	last := strings.TrimSpace(lines[len(lines)-1])
 	if last != "& shutdown.exe /s /f /t 0" {
 		t.Errorf("firstlogon.ps1 ends with %q, want a full shutdown", last)
 	}
-	for _, l := range lines {
-		if l = strings.TrimSpace(l); !strings.HasPrefix(l, "#") && strings.Contains(l, "/hybrid") {
-			t.Errorf("firstlogon.ps1 makes a hybrid shutdown: %s", l)
+	if strings.Contains(code, "/hybrid") {
+		t.Error("firstlogon.ps1 makes a hybrid shutdown")
+	}
+}
+
+// codeLines is a PowerShell script without its comment lines.
+func codeLines(ps string) string {
+	var code []string
+	for _, l := range strings.Split(ps, "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(l), "#") {
+			code = append(code, l)
 		}
 	}
+	return strings.Join(code, "\n")
 }
