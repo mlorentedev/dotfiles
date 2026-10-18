@@ -1,10 +1,10 @@
 # Run night-cross-os-20261018T1834Z
 
-**Verdict:** run night-cross-os-20261018T1834Z ended `queue-empty` at about 21:30Z, after about 3h. 6 items: 4 done, 2 parked plus one half-parked (#2678's CI half). 4 PRs merged, 0 unmerged. Nothing irreversible is waiting on you: no release, tag or publish was touched, and nothing under `.github/**` changed.
+**Verdict:** run night-cross-os-20261018T1834Z ended `queue-empty` at about 21:30Z, after about 3h, with 1 of 6 items and about 5h of the envelope unused. 5 items: 3 done (PLAT-003 AC8, #1719, #2678's pre-commit half), 2 parked (#2752, #2250), plus #2678's CI half parked. 4 PRs merged, 0 unmerged. Nothing irreversible is waiting on you: no release, tag or publish was touched, and nothing under `.github/**` changed.
 
 ## Waiting on you
 
-1. **PLAT-003 archive.** Every acceptance criterion is met (AC8 landed in #2789). Launch `dotf spec review PLAT-003-cross-os-verification` from a worktree; the archive needs an independent reviewer. `features.json` still marks f7 and f8 `pending`; it was not touched.
+1. **PLAT-003 archive.** Every acceptance criterion is met (AC8 landed in #2789). Launch `dotf spec review PLAT-003-cross-os-verification` from a worktree; the archive needs an independent reviewer. `features.json` marks every feature `pending`, which is correct: `state` and `evidence` are written by the harness after a review (`cli/internal/spec/contract_digest.go:51-54`), so an agent does not tick them by hand.
 2. **#2752 parked** (issuecomment-6253778551, board Blocked). Your pick was A (land renumbers a colliding lesson). A needs a spec (well over 50 LOC; WIP 13 of 10) and widens land's authority, so it is yours to land.
    - (A) Spec it once a slot frees; you land it.
    - (B) `dotf pr land` refuses when the PR adds a lesson whose number is taken on the base, and names the next free number. About 30-40 LOC; narrows authority, so it can land under the grant. Recommended.
