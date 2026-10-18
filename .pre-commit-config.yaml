@@ -75,6 +75,25 @@ repos:
         files: ^docs/lessons/
         stages: [pre-commit]
 
+      # PLAT-003 (#2678): CI's lint-powershell job, run locally by the installed
+      # dotf (DOTF_VERSION). It analyzes the whole tree a commit would ship, so
+      # it takes no filenames. That release exits 2 where pwsh is absent (a
+      # Linux box without it), and the skip is this hook's policy, not the
+      # command's, so it lives in the entry; with pwsh present, a finding (1)
+      # and an analyzer missing at its pin (2) both fail the commit. Where pwsh
+      # is present, a host without dotf fails this hook rather than skipping it,
+      # as lessons-fmt does; without pwsh the hook skips before it reaches dotf.
+      # A pwsh that is on PATH but cannot run (a mise shim with no version) is a
+      # broken install, not an absent one: dotf reports it and the commit fails.
+      - id: lint-powershell
+        name: Lint PowerShell (dotf lint powershell, as CI's lint-powershell)
+        entry: >-
+          sh -c 'command -v pwsh >/dev/null 2>&1 || { echo "pwsh is not on PATH: skipping lint-powershell (CI runs it)"; exit 0; }; exec dotf lint powershell'
+        language: system
+        pass_filenames: false
+        files: \.(ps1|psm1)$
+        stages: [pre-commit]
+
       - id: sdd-spec-gate
         name: SDD spec-gate (Tier 4)
         # BUG-061: routed through the prepush adapter, not check-spec-gate.sh

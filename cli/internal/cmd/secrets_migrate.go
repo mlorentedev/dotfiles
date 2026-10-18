@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -45,15 +46,7 @@ func newSecretsMigrateCmd() *cobra.Command {
 			loader := secretLoader()
 
 			if s.Backend == "bw" { // idempotent short-circuit: already migrated
-				item, field, _, err := s.BWTarget("")
-				if err != nil {
-					return err
-				}
-				if vErr := loader.Verify(secrets.Entry{Var: id, Backend: "bw", Item: item, Field: field}); vErr != nil {
-					return fmt.Errorf("%q is already bw but does not resolve: %w", id, vErr)
-				}
-				_, _ = fmt.Fprintf(out, "already bw (verified)  %s\n", id)
-				return nil
+				return verifyAlreadyBW(out, loader, s, id)
 			}
 
 			if err := migrateGuard(reg, s); err != nil {
@@ -79,13 +72,8 @@ func newSecretsMigrateCmd() *cobra.Command {
 			}
 
 			// Parity gate — re-read bw and compare; abort BEFORE the registry flip.
-			back, err := bwRead().Field(item, field)
-			if err != nil {
-				return fmt.Errorf("parity read-back of %s/%s failed (registry NOT flipped): %w", item, field, err)
-			}
-			if normalizeValue(back, isFile) != value {
-				return fmt.Errorf("parity mismatch for %q: bw read-back differs from the age value (age %d bytes, bw %d) — registry NOT flipped",
-					id, len(value), len(normalizeValue(back, isFile)))
+			if err := checkParity(id, item, field, value, isFile); err != nil {
+				return err
 			}
 
 			// Flip the registry — the last mutation. The target is the entry's
@@ -111,6 +99,34 @@ func newSecretsMigrateCmd() *cobra.Command {
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "report the intended write + registry flip without writing")
 	c.Flags().BoolVarP(&assumeYes, "yes", "y", false, "create the absent Bitwarden item during the write")
 	return c
+}
+
+// verifyAlreadyBW re-verifies a secret that is already on bw and leaves it
+// alone, which is what makes migrate idempotent.
+func verifyAlreadyBW(out io.Writer, loader *secrets.Loader, s *secrets.Secret, id string) error {
+	item, field, _, err := s.BWTarget("")
+	if err != nil {
+		return err
+	}
+	if vErr := loader.Verify(secrets.Entry{Var: id, Backend: "bw", Item: item, Field: field}); vErr != nil {
+		return fmt.Errorf("%q is already bw but does not resolve: %w", id, vErr)
+	}
+	_, _ = fmt.Fprintf(out, "already bw (verified)  %s\n", id)
+	return nil
+}
+
+// checkParity re-reads what was written to bw and compares it with the age
+// value. It runs before the registry flip, so a mismatch leaves the secret on age.
+func checkParity(id, item, field, value string, isFile bool) error {
+	back, err := bwRead().Field(item, field)
+	if err != nil {
+		return fmt.Errorf("parity read-back of %s/%s failed (registry NOT flipped): %w", item, field, err)
+	}
+	if normalizeValue(back, isFile) != value {
+		return fmt.Errorf("parity mismatch for %q: bw read-back differs from the age value (age %d bytes, bw %d) — registry NOT flipped",
+			id, len(value), len(normalizeValue(back, isFile)))
+	}
+	return nil
 }
 
 // migrateGuard refuses the shapes C4 does not handle, each with a specific reason and no

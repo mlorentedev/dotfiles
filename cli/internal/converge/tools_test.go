@@ -267,9 +267,15 @@ func TestToolsSync_DryRunNamesAToolTheConfigWriteDrops(t *testing.T) {
 		t.Errorf("apply: the dry-run line belongs to the plan only, got %+v, %v", applied, err)
 	}
 
+	// #2760: the file the step owns blocks no plan; the dry run names the
+	// repair and the apply makes it.
 	writeFixture(t, filepath.Dir(deployed), map[string]string{"dotfiles.toml": "[tools\n"})
-	if _, err = r.Reconcile(env, true); err == nil || !strings.Contains(err.Error(), "does not parse") {
-		t.Errorf("plan over an unparseable config: want an error naming it, got %v", err)
+	plan, err = r.Reconcile(env, true)
+	if err != nil || plan.Changes == 0 || !strings.Contains(plan.Detail, deployed+" does not parse (rewritten on apply)") {
+		t.Errorf("plan over an unparseable config: want the repair named, got %+v, %v", plan, err)
+	}
+	if applied, err = r.Reconcile(env, false); err != nil || strings.Contains(applied.Detail, "does not parse") {
+		t.Errorf("apply over an unparseable config: want it rewritten, got %+v, %v", applied, err)
 	}
 }
 

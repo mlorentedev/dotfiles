@@ -167,21 +167,9 @@ after the first review, into review-second.md. A member that declares
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id := args[0]
-			if err := spec.ValidateID(id); err != nil {
-				return err
-			}
-
-			cwd, err := os.Getwd()
+			repoRoot, specDir, err := existingSpecDir(id)
 			if err != nil {
 				return err
-			}
-			repoRoot, err := spec.RepoRoot(cwd)
-			if err != nil {
-				return err
-			}
-			specDir := filepath.Join(repoRoot, "specs", id)
-			if info, statErr := os.Stat(specDir); statErr != nil || !info.IsDir() {
-				return fmt.Errorf("spec not found: %s", specDir)
 			}
 
 			entries, err := spec.LoadReviewerPoolEntries(repoRoot)
@@ -194,27 +182,9 @@ after the first review, into review-second.md. A member that declares
 			}
 
 			skill := spec.ReviewerSkillPath(chosen.Runner)
-			// The base the reviewer will diff against. Refusing when it cannot be
-			// resolved, or when it IS the head, is the point: a review with an
-			// empty diff does not fail, it quietly becomes a reading of the spec
-			// folder and reports findings with no execution behind them. That is
-			// worse than no review, because it arrives wearing a verdict.
-			baseSHA := resolveReviewBase(repoRoot, specDir)
-			headSHA := headSHAOf(repoRoot)
-			if baseSHA == "" {
-				return fmt.Errorf("cannot resolve a review base for specs/%s. One of:\n"+
-					"  - no commit adds that folder: commit the spec first;\n"+
-					"  - it was first added, under this or an earlier name, in the repository's root\n"+
-					"    commit, so there is no commit before the work to diff against;\n"+
-					"  - it was renamed in a way that cannot be traced back to where it began, or created\n"+
-					"    in the same commit that deleted another spec folder holding the same file names,\n"+
-					"    which looks the same as a move git did not pair and is refused for that reason.\n"+
-					"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
-					"call that a review", id)
-			}
-			if baseSHA == headSHA {
-				return fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
-					"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
+			baseSHA, headSHA, err := reviewRange(repoRoot, specDir, id)
+			if err != nil {
+				return err
 			}
 
 			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
@@ -224,16 +194,7 @@ after the first review, into review-second.md. A member that declares
 				return err
 			}
 			session := slot.Session(id)
-			useTmux := !foreground
-			if useTmux {
-				if _, lookErr := lookPath("tmux"); lookErr != nil {
-					// Not a failure: tmux is Linux-only and dotf is
-					// cross-platform. Degrade loudly rather than silently, so
-					// nobody waits for a session that was never created.
-					cmd.Printf("[INFO] tmux not found — running in the foreground; the session is not detachable\n")
-					useTmux = false
-				}
-			}
+			useTmux := !foreground && tmuxAvailable(cmd)
 
 			cmd.Printf("Reviewer:   %s (%s, %s)\n", chosen.ID, chosen.Runner, how)
 			cmd.Printf("Spec:       specs/%s\n", id)
@@ -271,41 +232,12 @@ after the first review, into review-second.md. A member that declares
 			// launched without one spends a review that can never archive.
 			// Refusing here costs nothing yet. So does an ignored request: it is
 			// written, and lost on every checkout but this one.
-			if requestIgnored(repoRoot, specDir, slot) {
-				return fmt.Errorf("git ignores specs/%s/%s, so the review would not archive from any other checkout\n"+
-					"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
-					id, slot.Request, slot.Request)
-			}
-			// A re-review used to overwrite the round the author's dispositions
-			// answer (#2264). Keep it under a round number instead; the slot then
-			// holds no verdict, so a run that ends without writing one leaves
-			// nothing to archive rather than the previous round's. If the request
-			// cannot be written, nothing has started: the previous round goes
-			// back, so a verdict that was still valid stays archivable.
-			kept, undoRotation, err := spec.RotateReviewRound(specDir, slot)
-			if err != nil {
-				return fmt.Errorf("could not keep the previous round's %s before the new one overwrites it: %w", slot.Review, err)
-			}
-			if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, chosen.ID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
-				return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
-					"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
-					errors.Join(err, undoRotation()), slot.Request)
-			}
-			if kept != "" {
-				cmd.Printf("Kept:       the previous verdict as %s\n", kept)
+			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, baseSHA, fallbackReason); err != nil {
+				return err
 			}
 
 			if useTmux {
-				cmd.Printf("Session:    %s\n\n", session)
-				if err := runCommand(repoRoot, launch); err != nil {
-					return fmt.Errorf("starting the tmux session: %w", err)
-				}
-				if err := confirmLaunched(slot, session, transcript, id, chosen, entries); err != nil {
-					return err
-				}
-				cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
-				cmd.Printf("When it finishes, %s carries the verdict and archive reads it.\n", slot.Review)
-				return nil
+				return launchDetached(cmd, repoRoot, launch, slot, session, transcript, id, chosen, entries)
 			}
 
 			cmd.Printf("\n")
@@ -329,6 +261,117 @@ after the first review, into review-second.md. A member that declares
 	cmd.Flags().DurationVar(&stallTimeout, "stall-timeout", spec.DefaultStallTimeout,
 		"stop the reviewer when its transcript has not changed for this long, instead of waiting for --timeout; 0 turns it off")
 	return cmd
+}
+
+// specRepoRoot validates a spec id and returns the root of the repository
+// holding the working directory.
+func specRepoRoot(id string) (string, error) {
+	if err := spec.ValidateID(id); err != nil {
+		return "", err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return spec.RepoRoot(cwd)
+}
+
+// existingSpecDir is specRepoRoot for a command that needs specs/<id>/ to exist.
+func existingSpecDir(id string) (repoRoot, specDir string, err error) {
+	repoRoot, err = specRepoRoot(id)
+	if err != nil {
+		return "", "", err
+	}
+	specDir = filepath.Join(repoRoot, "specs", id)
+	if info, statErr := os.Stat(specDir); statErr != nil || !info.IsDir() {
+		return "", "", fmt.Errorf("spec not found: %s", specDir)
+	}
+	return repoRoot, specDir, nil
+}
+
+// reviewRange returns the base the reviewer will diff against, and HEAD.
+// Refusing when the base cannot be resolved, or when it IS the head, is the
+// point: a review with an empty diff does not fail, it quietly becomes a
+// reading of the spec folder and reports findings with no execution behind
+// them. That is worse than no review, because it arrives wearing a verdict.
+func reviewRange(repoRoot, specDir, id string) (baseSHA, headSHA string, err error) {
+	baseSHA = resolveReviewBase(repoRoot, specDir)
+	headSHA = headSHAOf(repoRoot)
+	if baseSHA == "" {
+		return "", "", fmt.Errorf("cannot resolve a review base for specs/%s. One of:\n"+
+			"  - no commit adds that folder: commit the spec first;\n"+
+			"  - it was first added, under this or an earlier name, in the repository's root\n"+
+			"    commit, so there is no commit before the work to diff against;\n"+
+			"  - it was renamed in a way that cannot be traced back to where it began, or created\n"+
+			"    in the same commit that deleted another spec folder holding the same file names,\n"+
+			"    which looks the same as a move git did not pair and is refused for that reason.\n"+
+			"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
+			"call that a review", id)
+	}
+	if baseSHA == headSHA {
+		return "", "", fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
+			"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
+	}
+	return baseSHA, headSHA, nil
+}
+
+// tmuxAvailable reports whether a detached session can be started. Its absence
+// is not a failure: tmux is Linux-only and dotf is cross-platform. Degrade
+// loudly rather than silently, so nobody waits for a session that was never
+// created.
+func tmuxAvailable(cmd *cobra.Command) bool {
+	if _, err := lookPath("tmux"); err != nil {
+		cmd.Printf("[INFO] tmux not found — running in the foreground; the session is not detachable\n")
+		return false
+	}
+	return true
+}
+
+// recordReviewRequest writes the review request before the reviewer starts, so
+// that `spec archive` can later check the verdict against it. The reasons it
+// must happen first, and must refuse the launch, are on its call site.
+func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot spec.ReviewSlot, headSHA, reviewerID, baseSHA, fallbackReason string) error {
+	if requestIgnored(repoRoot, specDir, slot) {
+		return fmt.Errorf("git ignores specs/%s/%s, so the review would not archive from any other checkout\n"+
+			"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
+			id, slot.Request, slot.Request)
+	}
+	// A re-review used to overwrite the round the author's dispositions
+	// answer (#2264). Keep it under a round number instead; the slot then
+	// holds no verdict, so a run that ends without writing one leaves
+	// nothing to archive rather than the previous round's. If the request
+	// cannot be written, nothing has started: the previous round goes
+	// back, so a verdict that was still valid stays archivable.
+	kept, undoRotation, err := spec.RotateReviewRound(specDir, slot)
+	if err != nil {
+		return fmt.Errorf("could not keep the previous round's %s before the new one overwrites it: %w", slot.Review, err)
+	}
+	if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, reviewerID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
+		return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
+			"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
+			errors.Join(err, undoRotation()), slot.Request)
+	}
+	if kept != "" {
+		cmd.Printf("Kept:       the previous verdict as %s\n", kept)
+	}
+	return nil
+}
+
+// launchDetached starts the review in its tmux session and confirms the
+// runner came up. A detached launch can only report that the runner STARTED;
+// how it ends is read later, from the slot's verdict.
+func launchDetached(cmd *cobra.Command, repoRoot string, launch []string, slot spec.ReviewSlot, session, transcript, id string,
+	chosen spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
+	cmd.Printf("Session:    %s\n\n", session)
+	if err := runCommand(repoRoot, launch); err != nil {
+		return fmt.Errorf("starting the tmux session: %w", err)
+	}
+	if err := confirmLaunched(slot, session, transcript, id, chosen, entries); err != nil {
+		return err
+	}
+	cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
+	cmd.Printf("When it finishes, %s carries the verdict and archive reads it.\n", slot.Review)
+	return nil
 }
 
 // chooseForLaunch resolves which signature this launch gives and which pool
@@ -613,73 +656,23 @@ agent) or by hand. Do not skip the Why.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id := args[0]
-			if err := spec.ValidateID(id); err != nil {
-				return err
-			}
-
-			cwd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			repoRoot, err := spec.RepoRoot(cwd)
+			repoRoot, err := specRepoRoot(id)
 			if err != nil {
 				return err
 			}
 
 			reason := strings.TrimSpace(overWIP)
-			active, err := spec.ActiveSpecs(repoRoot)
+			active, limit, err := checkWIPLimit(repoRoot, reason)
 			if err != nil {
 				return err
-			}
-			limit, err := spec.WIPLimit(repoRoot)
-			if err != nil {
-				return err
-			}
-			if active >= limit && reason == "" {
-				return fmt.Errorf("%d active specs, and the limit is %d: finish before starting.\n"+
-					"Archive the finished ones (dotf spec review, then dotf spec archive), or abandon a\n"+
-					"stalled one (dotf spec archive <id> --abandoned). To start anyway, pass\n"+
-					"--over-wip-limit \"<reason>\"; the reason is recorded in the new proposal", active, limit)
 			}
 
 			var issueTitle, repoSlug string
 			if !forceNoGate {
-				if issueNum == 0 {
-					return fmt.Errorf("no work-gate given: pass --issue <number>.\n" +
-						// ADR-018
-						"Every spec is downstream of an OPEN GitHub issue on the\n" +
-						"bitácora Project. Options: (a) open/find the issue, re-run with --issue;\n" +
-						"(b) re-run with --force-no-gate (NOT RECOMMENDED)")
-				}
-				// Resolve the repo that hosts the work-gate issue (HARNESS-023):
-				// explicit --bitacora-repo, then DOTF_BITACORA_REPO, else the
-				// current repo's origin slug. Used for BOTH the gate check and the
-				// proposal's issue: frontmatter, so a cross-repo gate (e.g. a
-				// kubelab spec gated by a knowledge issue) resolves correctly
-				// instead of silently checking the current repo.
-				repoSlug = bitacoraRepo
-				if repoSlug == "" {
-					repoSlug = os.Getenv("DOTF_BITACORA_REPO")
-				}
-				if repoSlug == "" {
-					if s, e := initrepo.OriginRepo(repoRoot); e == nil {
-						repoSlug = s
-					}
-				}
-				if repoSlug == "" {
-					return fmt.Errorf("cannot determine the repo hosting issue #%d: no "+
-						"--bitacora-repo, no DOTF_BITACORA_REPO, and no origin remote in %s.\n"+
-						"Pass --bitacora-repo owner/repo (e.g. mlorentedev/knowledge) or set "+
-						"DOTF_BITACORA_REPO", issueNum, repoRoot)
-				}
-				if !initrepo.ValidRepoSlug(repoSlug) {
-					return fmt.Errorf("invalid bitácora repo %q: want owner/name", repoSlug)
-				}
-				issueTitle, err = spec.Gate(issueNum, repoSlug)
+				repoSlug, issueTitle, err = checkWorkGate(cmd, repoRoot, issueNum, bitacoraRepo)
 				if err != nil {
 					return err
 				}
-				cmd.Printf("[INFO] Work-gate OK: %s#%d is open — %s\n", repoSlug, issueNum, issueTitle)
 			}
 
 			date := now().Format("2006-01-02")
@@ -690,17 +683,8 @@ agent) or by hand. Do not skip the Why.`,
 			if err != nil {
 				return err
 			}
-			switch {
-			case active >= limit:
-				if err := spec.RecordWIPOverride(repoRoot, id, reason, active, limit, date); err != nil {
-					// The folder is new (Scaffold refuses an existing one), so removing it
-					// lets a retry run instead of hitting "already exists" with no record.
-					_ = os.RemoveAll(filepath.Join(repoRoot, "specs", id))
-					return fmt.Errorf("recording the WIP override: %w; specs/%s was removed, retry", err, id)
-				}
-				cmd.PrintErrf("[WARN] %d active specs, limit %d: started over the WIP limit, reason recorded in proposal.md\n", active, limit)
-			case reason != "":
-				cmd.PrintErrf("[WARN] %d active specs, below the limit of %d: --over-wip-limit was not needed, and nothing was recorded\n", active, limit)
+			if err := settleWIPOverride(cmd, repoRoot, id, reason, active, limit, date); err != nil {
+				return err
 			}
 
 			cmd.Printf("\n[OK] Created: specs/%s\n", id)
@@ -719,6 +703,91 @@ agent) or by hand. Do not skip the Why.`,
 	cmd.Flags().StringVar(&overWIP, "over-wip-limit", "", "start a spec although the repository is at its WIP limit; the reason is recorded in proposal.md")
 	cmd.Flags().BoolVar(&forceNoGate, "force-no-gate", false, "skip the open-issue work-gate (NOT RECOMMENDED — the gate is the SSOT)")
 	return cmd
+}
+
+// checkWIPLimit counts the active specs against the repository's limit, and
+// refuses a new one at the limit unless --over-wip-limit gave a reason.
+func checkWIPLimit(repoRoot, reason string) (active, limit int, err error) {
+	active, err = spec.ActiveSpecs(repoRoot)
+	if err != nil {
+		return 0, 0, err
+	}
+	limit, err = spec.WIPLimit(repoRoot)
+	if err != nil {
+		return 0, 0, err
+	}
+	if active >= limit && reason == "" {
+		return 0, 0, fmt.Errorf("%d active specs, and the limit is %d: finish before starting.\n"+
+			"Archive the finished ones (dotf spec review, then dotf spec archive), or abandon a\n"+
+			"stalled one (dotf spec archive <id> --abandoned). To start anyway, pass\n"+
+			"--over-wip-limit \"<reason>\"; the reason is recorded in the new proposal", active, limit)
+	}
+	return active, limit, nil
+}
+
+// checkWorkGate verifies that the issue gating a new spec is open, and returns
+// the repo hosting it and its title.
+func checkWorkGate(cmd *cobra.Command, repoRoot string, issueNum int, bitacoraRepo string) (repoSlug, issueTitle string, err error) {
+	if issueNum == 0 {
+		return "", "", fmt.Errorf("no work-gate given: pass --issue <number>.\n" +
+			// ADR-018
+			"Every spec is downstream of an OPEN GitHub issue on the\n" +
+			"bitácora Project. Options: (a) open/find the issue, re-run with --issue;\n" +
+			"(b) re-run with --force-no-gate (NOT RECOMMENDED)")
+	}
+	repoSlug = workGateRepo(repoRoot, bitacoraRepo)
+	if repoSlug == "" {
+		return "", "", fmt.Errorf("cannot determine the repo hosting issue #%d: no "+
+			"--bitacora-repo, no DOTF_BITACORA_REPO, and no origin remote in %s.\n"+
+			"Pass --bitacora-repo owner/repo (e.g. mlorentedev/knowledge) or set "+
+			"DOTF_BITACORA_REPO", issueNum, repoRoot)
+	}
+	if !initrepo.ValidRepoSlug(repoSlug) {
+		return "", "", fmt.Errorf("invalid bitácora repo %q: want owner/name", repoSlug)
+	}
+	issueTitle, err = spec.Gate(issueNum, repoSlug)
+	if err != nil {
+		return "", "", err
+	}
+	cmd.Printf("[INFO] Work-gate OK: %s#%d is open — %s\n", repoSlug, issueNum, issueTitle)
+	return repoSlug, issueTitle, nil
+}
+
+// workGateRepo resolves the repo that hosts the work-gate issue (HARNESS-023):
+// explicit --bitacora-repo, then DOTF_BITACORA_REPO, else the current repo's
+// origin slug, or "" when none is set. Used for BOTH the gate check and the
+// proposal's issue: frontmatter, so a cross-repo gate (e.g. a kubelab spec
+// gated by a knowledge issue) resolves correctly instead of silently checking
+// the current repo.
+func workGateRepo(repoRoot, bitacoraRepo string) string {
+	if bitacoraRepo != "" {
+		return bitacoraRepo
+	}
+	if env := os.Getenv("DOTF_BITACORA_REPO"); env != "" {
+		return env
+	}
+	if s, err := initrepo.OriginRepo(repoRoot); err == nil {
+		return s
+	}
+	return ""
+}
+
+// settleWIPOverride records the reason a spec started over the WIP limit, and
+// says when --over-wip-limit was given but not needed.
+func settleWIPOverride(cmd *cobra.Command, repoRoot, id, reason string, active, limit int, date string) error {
+	switch {
+	case active >= limit:
+		if err := spec.RecordWIPOverride(repoRoot, id, reason, active, limit, date); err != nil {
+			// The folder is new (Scaffold refuses an existing one), so removing it
+			// lets a retry run instead of hitting "already exists" with no record.
+			_ = os.RemoveAll(filepath.Join(repoRoot, "specs", id))
+			return fmt.Errorf("recording the WIP override: %w; specs/%s was removed, retry", err, id)
+		}
+		cmd.PrintErrf("[WARN] %d active specs, limit %d: started over the WIP limit, reason recorded in proposal.md\n", active, limit)
+	case reason != "":
+		cmd.PrintErrf("[WARN] %d active specs, below the limit of %d: --over-wip-limit was not needed, and nothing was recorded\n", active, limit)
+	}
+	return nil
 }
 
 func newSpecArchiveCmd() *cobra.Command {

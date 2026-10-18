@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/forgewrite"
 )
 
 type GitRunner interface {
@@ -134,6 +136,9 @@ func ghMergedPRHeads(repoRoot, branch string) ([]string, error) {
 	if out, err := exec.Command("git", "-C", repoRoot, "config", "--get", "remote.origin.url").Output(); err == nil {
 		if slug := ParseGitHubSlug(string(out)); slug != "" {
 			args = append(args, "--repo", slug)
+		} else if r, perr := forgewrite.ParseOrigin(string(out)); perr == nil && r.Host != "github.com" {
+			// gh can only fail here, and its bare exit status would not say why (#2759).
+			return nil, fmt.Errorf("origin is on %s, and this check asks GitHub only (gh): a squash merge there is not detected", r.Host)
 		}
 	}
 	cmd := exec.Command("gh", args...)

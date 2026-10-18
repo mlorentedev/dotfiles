@@ -71,3 +71,29 @@ func TestToolsSync_InstallsAndASecondRunReportsNothingToDo(t *testing.T) {
 		t.Errorf("second run should be a no-op:\n%s", stdout)
 	}
 }
+
+// #2760: over a deployed config that does not parse, mise answers nothing, so
+// a dry run cannot know what is installed. It names the rewrite instead of
+// claiming nothing is left to install, and an apply then repairs the file.
+func TestToolsSync_RepairsADeployedConfigThatDoesNotParse(t *testing.T) {
+	repo, cfgDir := syncFixture(t)
+	deployed := filepath.Join(cfgDir, "conf.d", "dotfiles.toml")
+	if err := os.MkdirAll(filepath.Dir(deployed), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(deployed, []byte("[tools\njq = "), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	versions := filepath.Join(repo, "versions.conf")
+
+	stdout, _, err := execute(t, "tools", "sync", "--dry-run", "--versions", versions)
+	if err != nil || !strings.Contains(stdout, "does not parse") || strings.Contains(stdout, "nothing to install") {
+		t.Fatalf("dry run: want the rewrite named, got %v\n%s", err, stdout)
+	}
+	if _, _, err := execute(t, "tools", "sync", "--versions", versions); err != nil {
+		t.Fatalf("apply must repair the file it owns: %v", err)
+	}
+	if stdout, _, err = execute(t, "tools", "sync", "--versions", versions); err != nil || !strings.Contains(stdout, "nothing to do") {
+		t.Errorf("the next run must have nothing to do, got %v\n%s", err, stdout)
+	}
+}

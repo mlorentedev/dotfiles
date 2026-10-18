@@ -28,6 +28,7 @@ package mem
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -249,7 +250,12 @@ func dirHasDraftTag(dir string) bool {
 // mtime stands for it: the newest lesson does.
 func lessonsStaleness(cwd string, staleDays int, now time.Time) string {
 	targetName := "docs/lessons/"
-	newest, found := newestLesson(filepath.Join(cwd, "docs", "lessons"))
+	newest, found, err := newestLesson(filepath.Join(cwd, "docs", "lessons"))
+	if err != nil {
+		// Session start never blocks, so the failure is a line of the brief;
+		// read as "no lessons", it would fall back and the check would go quiet.
+		return fmt.Sprintf("\n[lessons] could not read docs/lessons/, so its staleness was not checked: %v", err)
+	}
 	if !found {
 		targetName = "docs/lessons.md"
 		info, err := os.Stat(filepath.Join(cwd, "docs", "lessons.md"))
@@ -265,22 +271,60 @@ func lessonsStaleness(cwd string, staleDays int, now time.Time) string {
 }
 
 // newestLesson returns the latest mtime of a lesson-*.md file directly in dir or
-// in a first-level category directory of it.
-func newestLesson(dir string) (time.Time, bool) {
+// in a first-level category directory of it. A dir that does not exist holds no
+// lessons; any other failure to read it, or a category in it, is returned rather
+// than read as absence, which filepath.Glob would do (it drops I/O errors).
+func newestLesson(dir string) (time.Time, bool, error) {
 	var newest time.Time
 	found := false
-	for _, pattern := range []string{"lesson-*.md", filepath.Join("*", "lesson-*.md")} {
-		files, err := filepath.Glob(filepath.Join(dir, pattern))
+	top, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return newest, false, nil
+	}
+	if err != nil {
+		return newest, false, err
+	}
+	for _, e := range top {
+		path := filepath.Join(dir, e.Name())
+		info, err := os.Stat(path) // follows a symlinked category, as the glob did
+		if errors.Is(err, fs.ErrNotExist) {
+			continue // a dangling link
+		}
 		if err != nil {
+			return newest, false, err
+		}
+		if !info.IsDir() {
+			if isLessonFile(e.Name()) && (!found || info.ModTime().After(newest)) {
+				newest, found = info.ModTime(), true
+			}
 			continue
 		}
-		for _, f := range files {
-			if info, err := os.Stat(f); err == nil && !info.IsDir() && (!found || info.ModTime().After(newest)) {
-				newest, found = info.ModTime(), true
+		sub, err := os.ReadDir(path)
+		if err != nil {
+			return newest, false, err
+		}
+		for _, s := range sub {
+			if !isLessonFile(s.Name()) {
+				continue
+			}
+			si, err := os.Stat(filepath.Join(path, s.Name()))
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return newest, false, err
+			}
+			if !si.IsDir() && (!found || si.ModTime().After(newest)) {
+				newest, found = si.ModTime(), true
 			}
 		}
 	}
-	return newest, found
+	return newest, found, nil
+}
+
+func isLessonFile(name string) bool {
+	ok, _ := filepath.Match("lesson-*.md", name) // the pattern is constant and valid
+	return ok
 }
 
 // vaultBaseline is the defensive check that every 00_meta/skills/<n>/ has a

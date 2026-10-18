@@ -105,12 +105,22 @@ type taskState struct {
 	present, managed, stale, upgrade bool
 }
 
-// read queries the task. `/Query /TN` exits non-zero both for a task that
+// read refuses a job with an environment first: the XML has nowhere to put
+// it, and registering the task without it is the silent drop of #2696.
+//
+// It then queries the task. `/Query /TN` exits non-zero both for a task that
 // does not exist and for a query it refused, and only its localised stderr
 // tells them apart, so absence is read from the task list instead: a list
 // that does not name the task is an absent task, and any failure is an error,
 // never "nothing to remove".
 func (s Schtasks) read(job Job) (taskState, error) {
+	if len(job.Env) > 0 {
+		names := make([]string, len(job.Env))
+		for i, v := range job.Env {
+			names[i] = v.Name
+		}
+		return taskState{}, fmt.Errorf("task %s: a Scheduled Task has no per-action environment, so %s would be dropped: pass it as arguments", job.Names.Task, strings.Join(names, ", "))
+	}
 	list, err := s.Run("/Query", "/FO", "CSV", "/NH")
 	if err != nil {
 		return taskState{}, fmt.Errorf("schtasks /Query: %w", err)

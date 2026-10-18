@@ -73,6 +73,7 @@ type Paths struct {
 	FirewallWitness string
 	PFAnchor        string // the pf anchor file on macOS
 	PFPlist         string // the LaunchDaemon that loads it at boot
+	PFToken         string // the pf enable references the step holds
 	// Record is what the step found before it first changed each resource
 	// (Record); "" keeps none.
 	Record string
@@ -94,6 +95,7 @@ func DefaultPaths(home string) Paths {
 		FirewallWitness: "/var/lib/dotf/workstation-firewall",
 		PFAnchor:        "/etc/pf.anchors/dotf-ssh",
 		PFPlist:         "/Library/LaunchDaemons/" + pfLabel + ".plist",
+		PFToken:         "/var/lib/dotf/pf-token",
 		Record:          "/var/lib/dotf/workstation-target.json",
 	}
 }
@@ -122,6 +124,7 @@ func PathsFor(goos, home string) Paths {
 		p := DefaultPaths(home)
 		// macOS keeps a daemon's state under /var/db; there is no /var/lib.
 		p.Record = "/var/db/dotf/workstation-target.json"
+		p.PFToken = "/var/db/dotf/pf-token"
 		return p
 	}
 	if goos != "windows" {

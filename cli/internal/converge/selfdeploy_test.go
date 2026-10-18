@@ -209,3 +209,30 @@ func TestSelfDeploy_WithoutTheRoleNeverFailsOnAnUnreachableScheduler(t *testing.
 		t.Error("with the role, an unreachable scheduler must stay a failure")
 	}
 }
+
+// The OK detail names the slot the job carries rather than a literal 03:00, so
+// moving the trigger moves the report (OPS-053 review round 1, F7a; #2727).
+func TestSelfDeploy_TheDetailNamesTheJobsSlot(t *testing.T) {
+	for _, tc := range []struct {
+		daily *schedule.Clock
+		want  string
+	}{
+		{&schedule.Clock{Hour: 4, Minute: 15}, "daily at 04:15"},
+		{&schedule.Clock{Hour: 23, Minute: 5}, "daily at 23:05"},
+		{nil, "daily"},
+	} {
+		if got := selfDeployWhen(schedule.Job{Daily: tc.daily}); got != tc.want {
+			t.Errorf("selfDeployWhen(%+v) = %q, want %q", tc.daily, got, tc.want)
+		}
+	}
+
+	// The converged detail at a slot other than the trigger's 03:00, so a
+	// literal in Reconcile cannot pass for reading the job.
+	f := &fakeBackend{state: managed}
+	r := f.step()
+	r.trigger = func(Env) schedule.Job { return schedule.Job{Daily: &schedule.Clock{Hour: 4, Minute: 15}} }
+	res, err := r.Reconcile(selfDeployEnv(t, true), false)
+	if want := "dotf update daily at 04:15 from " + managed.Where; err != nil || res.Changes != 0 || res.Detail != want {
+		t.Errorf("converged: %+v, %v; want detail %q", res, err, want)
+	}
+}

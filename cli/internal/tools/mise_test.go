@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 const versionsFixture = `# versions.conf
@@ -204,9 +206,19 @@ type fakeMise struct {
 	listFailsFrom int
 	// listFailsAt, when > 0, makes only that call of the listing fail.
 	listFailsAt int
+	// calls counts every mise command, refused or not.
+	calls int
 }
 
 func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
+	if name == "mise" {
+		f.calls++
+		// Real mise refuses every command over a config at cfg that does not
+		// parse (measured: `ls`, `outdated`, `ls --prunable` all exit 1).
+		if body, err := os.ReadFile(f.cfg); err == nil && toml.Unmarshal(body, &map[string]any{}) != nil {
+			return []byte("mise ERROR Error loading settings file " + f.cfg + ": TOML parse error"), errors.New("exit status 1")
+		}
+	}
 	switch {
 	case name == "mise" && len(args) >= 2 && args[0] == "outdated" && args[1] == "--json":
 		f.outdates++
@@ -1173,10 +1185,43 @@ func TestSync_PlanNamesTheToolsAConfigWriteDrops(t *testing.T) {
 		t.Errorf("no deployed config: nothing is dropped, got %+v, %v", p, err)
 	}
 
-	// Real mise refuses every command over such a file (`mise ls`, `outdated`
-	// and `ls --prunable` all exit 1), so the plan says which file it is.
-	broken := write(t, []byte("[tools\ngh = "))
-	if _, err = broken.Plan(kept); err == nil || !strings.Contains(err.Error(), broken.ConfigPath()+" does not parse") {
-		t.Errorf("a deployed config that does not parse: want an error naming it, got %v", err)
+}
+
+// #2760: real mise refuses every command over a deployed config that does not
+// parse, so a plan that asks mise anything cannot get past the file the sync
+// owns and would rewrite. The plan reports the rewrite as its one change and
+// asks mise nothing; Apply writes the rendered config, installs against it,
+// and the next plan has nothing to do.
+func TestSync_RepairsADeployedConfigThatDoesNotParse(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}, {"jq", "1.8.2"}}
+	s := MiseSync{ConfigDir: t.TempDir()}
+	f := &fakeMise{installed: map[string]string{}, pending: tools, cfg: s.ConfigPath(), prunable: map[string][]string{}}
+	s.Run, s.Prune = f.run, true
+	if err := os.MkdirAll(filepath.Dir(s.ConfigPath()), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(s.ConfigPath(), []byte("[tools\ngh = "), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := s.Plan(tools)
+	if err != nil || !p.ConfigChanged || p.UnparsableConfig != s.ConfigPath() {
+		t.Fatalf("plan: want the rewrite as its change, got %+v, %v", p, err)
+	}
+	if f.calls != 0 {
+		t.Errorf("plan: mise refuses every command over that file, want none asked, got %d", f.calls)
+	}
+
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatalf("apply must repair the file it owns: %v", err)
+	}
+	if body, _ := os.ReadFile(s.ConfigPath()); string(body) != string(s.render(tools)) {
+		t.Errorf("apply: want the rendered config, got %q", body)
+	}
+	if f.installs == 0 {
+		t.Errorf("apply: want mise install against the repaired config")
+	}
+	if again, err := s.Plan(tools); err != nil || again.Pending() || again.UnparsableConfig != "" {
+		t.Errorf("the next plan must have nothing to do, got %+v, %v", again, err)
 	}
 }

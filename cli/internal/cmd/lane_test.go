@@ -59,6 +59,28 @@ func TestLaneNext_ARepositoryUnderAPathWithASpaceHandsTheLaneOver(t *testing.T) 
 
 func laneNextDryRun(t *testing.T, top string) {
 	t.Helper()
+	writeLaneFixture(t, top)
+	var asked []string
+	prev := laneRun
+	laneRun = dryRunLaneRun(top, &asked)
+	t.Cleanup(func() { laneRun = prev })
+	root := New("test", "test")
+	var out strings.Builder
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"lane", "next", "--dry-run"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "next: #5 BUG-5: the first -> fix/the-first (claude)") {
+		t.Errorf("output:\n%s", out.String())
+	}
+	assertDryRunAsked(t, asked)
+}
+
+// writeLaneFixture writes a lane queueing #5 and #6 under top.
+func writeLaneFixture(t *testing.T, top string) {
+	t.Helper()
 	if err := os.MkdirAll(filepath.Join(top, ".dotf"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +92,14 @@ func laneNextDryRun(t *testing.T, top string) {
 			t.Fatal(err)
 		}
 	}
-	var asked []string
-	prev := laneRun
-	laneRun = func(name string, args ...string) (string, error) {
+}
+
+// dryRunLaneRun answers what a dry `lane next` in top asks, with #5 open and
+// unclaimed, and records every command line in asked.
+func dryRunLaneRun(top string, asked *[]string) func(string, ...string) (string, error) {
+	return func(name string, args ...string) (string, error) {
 		line := name + " " + strings.Join(args, " ")
-		asked = append(asked, line)
+		*asked = append(*asked, line)
 		switch {
 		case strings.HasPrefix(line, "git rev-parse --show-toplevel"):
 			return top + "\n", nil
@@ -91,18 +116,12 @@ func laneNextDryRun(t *testing.T, top string) {
 		}
 		return "", errors.New("unexpected: " + line)
 	}
-	t.Cleanup(func() { laneRun = prev })
-	root := New("test", "test")
-	var out strings.Builder
-	root.SetOut(&out)
-	root.SetErr(&out)
-	root.SetArgs([]string{"lane", "next", "--dry-run"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("%v\n%s", err, out.String())
-	}
-	if !strings.Contains(out.String(), "next: #5 BUG-5: the first -> fix/the-first (claude)") {
-		t.Errorf("output:\n%s", out.String())
-	}
+}
+
+// assertDryRunAsked checks what a dry run asked: the claim on #5, and nothing
+// that creates, runs, fetches or pushes.
+func assertDryRunAsked(t *testing.T, asked []string) {
+	t.Helper()
 	// The claim store is wired into `lane next`: a dry run asks the remote
 	// whether #5 is held. Dropping the wiring leaves every other assertion here
 	// green, so this one is the guard (lesson 457).

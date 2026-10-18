@@ -301,6 +301,16 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
     no-unfound-key-note KILLED
     hold-on-enabled KILLED
     ```
+- #2755, the pf enable reference (2026-10-18, advisor's option A, delegated by the owner):
+  - The token goes in its own root file (`PFToken`, `/var/db/dotf/pf-token`), not in the state record #2716 wrote. The record is the last resource of the plan, so a run cut off mid-proof never writes it, and the timer must find the token at exactly that moment.
+  - Each line is `<token> <kern.bootsessionuuid>`. pf references are kernel state that ends at reboot, and a token's number can belong to another holder in a later boot, so only the running boot's tokens are released. The UUID is one word with no spaces, so the timer compares it with `[ "$tb" = "$b" ]`.
+  - Apply appends its line and keeps the earlier ones until Commit. An undo then puts back the file it found, along with the earlier references that file names, which stay held. Commit rewrites the file first, then releases. A failed rewrite fails the run, and its undo restores the old file.
+  - A release that fails in Commit is ignored: the reference is gone, or it ends at reboot. Telling these apart would mean parsing `pfctl -s References` or pfctl's error text, and neither is a contract. A release that fails in the undo is returned.
+  - `root.Run` is `CombinedOutput` (`sudo.go:31`), so `Token : N` is read even when pfctl prints it on stderr.
+  - The LaunchDaemon's own references are not covered: one at each boot, and one at each apply through `RunAtLoad` on `bootstrap`. They are filed as #2790 with two options.
+  - The macmini's live apply on 0.75.0 (2026-10-18, #2356) predates this change. Its reference stays unrecorded until the next reboot, because a converged host does not apply again.
+  - Evidence: `go test ./internal/sshtarget/ -run PF` passes 14 tests. `TestPFTimerReleasesOnlyThisBootsReferences` runs the timer's script against stub binaries.
+  - Seven mutations, all killed: no release in the undo, no file restore in the undo, a missing token tolerated, no rewrite in Commit, no release in Commit, no boot check in Commit, no boot check in the timer.
 
 ## Promotion candidates
 

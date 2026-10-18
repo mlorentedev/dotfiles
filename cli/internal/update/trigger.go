@@ -28,6 +28,10 @@ var TriggerNames = schedule.Names{
 // find no self-deploy role, and remove itself at its first converge; without
 // XDG_STATE_HOME it would write its last-run record where doctor does not
 // look, and every run would read as none.
+//
+// launchd and systemd carry the homes in the job's environment. A Scheduled
+// Task has none, so on windows they are `dotf update` flags (#2696), which the
+// task's digest covers like any argument.
 func Trigger(goos, home string, getenv func(string) string) schedule.Job {
 	job := schedule.Job{
 		Names:       TriggerNames,
@@ -46,10 +50,27 @@ func Trigger(goos, home string, getenv func(string) string) schedule.Job {
 		job.Env = []schedule.EnvVar{{Name: "PATH", Value: bin + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"}}
 		job.Log = path.Join(home, "Library", "Logs", "dotf-self-deploy.log")
 	}
-	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME"} {
-		if v := getenv(name); v != "" {
-			job.Env = append(job.Env, schedule.EnvVar{Name: name, Value: v})
+	for _, h := range []struct{ env, flag string }{{"XDG_CONFIG_HOME", "--config-home"}, {"XDG_STATE_HOME", "--state-home"}} {
+		v := getenv(h.env)
+		switch {
+		case v == "":
+		case goos == "windows":
+			job.Args = append(job.Args, h.flag, windowsFlagPath(v))
+		default:
+			job.Env = append(job.Env, schedule.EnvVar{Name: h.env, Value: v})
 		}
 	}
 	return job
+}
+
+// windowsFlagPath drops a trailing separator, which would escape the quote
+// TaskXML closes a value with spaces in. A drive root keeps its separator:
+// C: alone names the drive's current directory, not an absolute path, and a
+// root has no space to quote.
+func windowsFlagPath(v string) string {
+	t := strings.TrimRight(v, `\/`)
+	if strings.HasSuffix(t, ":") {
+		return t + `\`
+	}
+	return t
 }
