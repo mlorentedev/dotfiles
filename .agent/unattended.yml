@@ -1,27 +1,31 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
 version: 1
-run_id: "vh1314-20261017T1821Z"
+run_id: "orch3-20261018T0235Z"
 armed_by: manu
-armed_at: 2026-10-17T18:21:00Z
-expires_at: 2026-10-18T04:21:00Z
-objective: "dotf vault health reports every drifting 11-tasks.md, runs the stale-merged pass and prints its footer (#1314), landed under the merge grant."
-worktree: /Users/manu/Projects/worktrees/dotfiles/fix-issue-1314-vault-health-drift
-branch: fix/issue-1314-vault-health-drift
+armed_at: 2026-10-18T02:35:00Z
+expires_at: 2026-10-18T12:35:00Z
+objective: "Make the review pipeline decide from live PR state: #2591 (review job re-reads isDraft from the API, option B) then #2724 (find why review-attestation stayed red on #2718, then fix the miswire). Both PRs are owner-lands."
 scope:
-  write_paths: ["cli/**", "tests/**", "docs/**"]
-  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "scripts/**", "setup-*.sh", "setup-*.ps1"]
-  max_files: 12
-  max_loc: 300
-allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck]
+  write_paths:
+    - ".github/workflows/pr-agent.yml"
+    - ".github/workflows/review-attestation.yml"
+    - "scripts/pr-agent-*.sh"
+    - "tests/**"
+    - "docs/lessons/**"
+  frozen_paths: [".github/merge-grant.yml", ".github/CODEOWNERS", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml"]
+  max_files: 8
+  max_loc: 200
+allowed_commands: [dotf, gh, git, bats, shellcheck, caffeinate, actionlint, go]
 queue:
   source: bitacora
-  filter: "exactly #1314 (owner, relayed by dotfiles-20, 2026-10-17)"
-  max_items: 1
+  filter: "exactly #2591 then #2724, in that order (owner instruction 2026-10-18, relayed by dotfiles-20 with the owner's authorisation, in the user turn). Plus one comment on #1756 linking #2730's unreviewed final head. Nothing else."
+  max_items: 2
 budget:
-  max_iterations: 4
+  max_iterations: 6
   max_minutes_per_iteration: 90
   max_consecutive_failures: 2
 authority:
-  merge: standing-grant
+  merge: never
   push: true
   open_pr: true
   advisor_tier: top
