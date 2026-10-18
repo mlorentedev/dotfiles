@@ -309,8 +309,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - `root.Run` is `CombinedOutput` (`sudo.go:31`), so `Token : N` is read even when pfctl prints it on stderr.
   - The LaunchDaemon's own references are not covered: one at each boot, and one at each apply through `RunAtLoad` on `bootstrap`. They are filed as #2790 with two options.
   - The macmini's live apply on 0.75.0 (2026-10-18, #2356) predates this change. Its reference stays unrecorded until the next reboot, because a converged host does not apply again.
-  - Evidence: `go test ./internal/sshtarget/ -run PF` passes 14 tests. `TestPFTimerReleasesOnlyThisBootsReferences` runs the timer's script against stub binaries.
-  - Seven mutations, all killed: no release in the undo, no file restore in the undo, a missing token tolerated, no rewrite in Commit, no release in Commit, no boot check in Commit, no boot check in the timer.
+  - Evidence: `go test ./internal/sshtarget/ -run PF` passes 17 tests at #2791's landing (`8b233338`). `TestPFTimerReleasesOnlyThisBootsReferences` runs the timer's script against stub binaries.
+  - Ten mutations, all killed: no release in the undo, no file restore in the undo, a missing token tolerated, no rewrite in Commit, no release in Commit, no boot check in Commit, no boot check in the timer, and from the review, the undo ignoring a fired timer, a rejected load's reference not released, and the timer releasing without a boot id.
 
 ## Promotion candidates
 
