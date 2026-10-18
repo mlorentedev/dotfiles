@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -21,17 +22,24 @@ import (
 type fakeProc struct {
 	done   chan error
 	killed bool
+	exited atomic.Bool
 }
 
 func (p *fakeProc) Done() <-chan error { return p.done }
 
+// exit ends the process: Done reports err, and its QMP socket goes away.
+func (p *fakeProc) exit(err error) {
+	p.exited.Store(true)
+	select {
+	case p.done <- err:
+	default:
+	}
+}
+
 // Kill ends the process as a signal would: Done reports it.
 func (p *fakeProc) Kill() error {
 	p.killed = true
-	select {
-	case p.done <- errors.New("signal: killed"):
-	default:
-	}
+	p.exit(errors.New("signal: killed"))
 	return nil
 }
 
@@ -57,7 +65,7 @@ func (h *fakeHost) Start(args []string, _ io.Writer) (Process, error) {
 	defer h.mu.Unlock()
 	p := &fakeProc{done: make(chan error, 1)}
 	if len(h.starts) == 0 && !h.installHangs {
-		go func() { time.Sleep(50 * time.Millisecond); p.done <- nil }()
+		go func() { time.Sleep(50 * time.Millisecond); p.exit(nil) }()
 	}
 	h.starts = append(h.starts, args)
 	h.procs = append(h.procs, p)
@@ -76,6 +84,13 @@ func (h *fakeHost) Dial(socket string) (net.Conn, error) {
 	host, guest := net.Pipe()
 	h.t.Cleanup(func() { _ = host.Close(); _ = guest.Close() })
 	if strings.HasSuffix(socket, "qmp.sock") {
+		// Like a real socket, nothing answers unless a QEMU is up.
+		h.mu.Lock()
+		up := len(h.procs) > 0 && !h.procs[len(h.procs)-1].exited.Load()
+		h.mu.Unlock()
+		if !up {
+			return nil, errors.New("connect: no such file or directory")
+		}
 		go h.serveQMP(guest)
 		return host, nil
 	}
@@ -101,7 +116,7 @@ func (h *fakeHost) Dial(socket string) (net.Conn, error) {
 			}
 			return map[string]any{"exited": true, "exitcode": h.sshdExit}
 		},
-		"guest-shutdown": func(json.RawMessage) any { p.done <- nil; return map[string]any{} },
+		"guest-shutdown": func(json.RawMessage) any { p.exit(nil); return map[string]any{} },
 	}}
 	go h.agent.serve(guest)
 	return host, nil
@@ -309,6 +324,20 @@ func stateDir(t *testing.T) string {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
+}
+
+// --rebuild would delete clean-base from under a guest a run kept.
+func TestBuild_RefusesWhileAGuestRuns(t *testing.T) {
+	o := buildOptions(t)
+	o.Rebuild = true
+	g := newFakeGuest(t, okStep, nothingStep)
+	g.running = true
+	if err := Build(g, o); err == nil || !strings.Contains(err.Error(), "dotf vm windows stop") {
+		t.Fatalf("want a running guest refused, got %v", err)
+	}
+	if len(g.starts)+len(g.imgs) != 0 {
+		t.Error("a build started over a running guest")
+	}
 }
 
 func assertNoBase(t *testing.T, l Layout) {

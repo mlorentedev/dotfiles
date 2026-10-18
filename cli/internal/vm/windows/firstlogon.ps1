@@ -33,6 +33,12 @@ $exe = (Get-ChildItem -Path $dir -Recurse -Filter 'qemu-ga.exe' | Select-Object 
 if (-not $exe) { throw "qemu-ga.exe not found under $dir" }
 New-Service -Name 'QEMU-GA' -DisplayName 'QEMU Guest Agent' -StartupType Automatic -BinaryPathName "`"$exe`" -d --retry-path" | Out-Null
 
+# A run's converge stands in for an owner who answers Yes to every UAC
+# prompt: an installer that elevates (Docker Desktop, the AWS CLI's MSI)
+# otherwise waits on a prompt nobody sees and fails. The admin account
+# elevates without asking; the guest holds no credential to protect.
+Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'ConsentPromptBehaviorAdmin' -Value 0
+
 Stop-Transcript
 # /s without /hybrid: a full shutdown, so clean-base holds no hibernated kernel.
 & shutdown.exe /s /f /t 0

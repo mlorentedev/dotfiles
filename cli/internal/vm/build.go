@@ -50,6 +50,9 @@ type BuildOptions struct {
 // read-only clean-base is a complete one, so a second Build changes nothing.
 func Build(h Host, o BuildOptions) (err error) {
 	l := o.Machine.Layout
+	if running(h, l) {
+		return errors.New("a Windows guest is running: `dotf vm windows stop` stops it")
+	}
 	if done, err := baseBuilt(l, o.Rebuild); err != nil || done {
 		if done {
 			step(o.Out, "clean-base is built at %s; --rebuild replaces it", l.BaseDisk())

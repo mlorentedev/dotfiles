@@ -144,6 +144,12 @@ func TestFirstLogon_InstallsTheAgentThenShutsDown(t *testing.T) {
 	// do `qemu-ga -s install` and msiexec /i. An administrative install
 	// extracts the files without running that action.
 	code := codeLines(ps)
+	// A run's converge stands in for an owner who answers every UAC prompt:
+	// winget installers that elevate (Docker Desktop, AWS CLI) otherwise wait
+	// on a prompt no one sees and fail (measured 2026-10-18).
+	if !strings.Contains(code, `ConsentPromptBehaviorAdmin`) || !strings.Contains(code, `-Value 0`) {
+		t.Error("firstlogon.ps1 does not let the admin account elevate without a prompt")
+	}
 	if !strings.Contains(code, `'/a'`) || strings.Contains(code, `'/i'`) || strings.Contains(code, "-s install") {
 		t.Error("firstlogon.ps1 must extract the agent (msiexec /a) and create its service, never run the MSI's install")
 	}
