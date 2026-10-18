@@ -955,8 +955,9 @@ deploy_skills() {
         # (Copilot, per BUG-003's explicit "no auto-install" policy) only gets
         # its config deployed once it is genuinely present -- the same
         # detect-and-act rule setup-linux.sh already applies to Copilot's
-        # instructions.md. Tools this repo DOES install (opencode, agy, pi)
-        # have no requires_command and deploy unconditionally, same as before.
+        # instructions.md. pi is gated too although mise installs it: a file
+        # under ~/.pi is read by pi alone (#2102). opencode and agy have no
+        # requires_command and deploy unconditionally.
         if [[ -n "$requires" ]] && ! command -v "$requires" >/dev/null 2>&1; then
             printf '[deploy] skill target %s skipped: %s not on PATH\n' "$agent" "$requires"
             continue

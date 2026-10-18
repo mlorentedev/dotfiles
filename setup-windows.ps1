@@ -1420,8 +1420,8 @@ function Deploy-SkillRecord {
         # BUG-003's explicit "no auto-install" policy) only gets its config
         # deployed once genuinely present, mirroring the same gate on the Linux
         # engine and the existing detect-and-act rule for Copilot's
-        # instructions.md. Tools this repo DOES install have no requires_command
-        # and deploy unconditionally, same as before.
+        # instructions.md. pi is gated too: a file under ~/.pi is read by pi
+        # alone (#2102). Other tools this repo installs deploy unconditionally.
         #
         # .PSObject.Properties guard, not $d.requires_command directly: utils.ps1
         # sets Set-StrictMode Latest, and most deploy entries have no
