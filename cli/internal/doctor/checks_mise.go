@@ -89,13 +89,11 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 
 // pointsInto reports whether link's own target lies inside dir. The first hop
 // is read, not the resolved chain: mise's shims are themselves links to the
-// mise binary, which lives outside its data dir. A broken link points nowhere.
+// mise binary, which lives outside its data dir. The target is read whether or
+// not it exists: a link --fix made stays mise's after mise drops its shim.
 // The target's parent is also compared canonicalised, because macOS reaches
 // the same file through a symlinked prefix (/var is /private/var).
 func pointsInto(link, dir string) bool {
-	if _, err := os.Stat(link); err != nil {
-		return false
-	}
 	target, err := os.Readlink(link)
 	if err != nil {
 		return false

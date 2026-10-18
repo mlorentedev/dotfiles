@@ -212,6 +212,29 @@ func TestCheckMiseTools_ALinkInLocalBinPointingOutsideMiseWarnsAndIsKept(t *test
 	}
 }
 
+// A link --fix made stays mise's after mise drops the shim it names (an
+// uninstall, a reshim): its target still lies in mise's data dir, and calling
+// it "outside mise" would contradict the path the WARN prints.
+func TestCheckMiseTools_ABrokenLinkIntoMiseIsMiseAndNotWarned(t *testing.T) {
+	s, cfg, home := shadowFixture(t)
+	bin := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".local", "share", "mise", "shims"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(home, ".local", "share", "mise", "shims", "jq"), filepath.Join(bin, "jq")); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 0 || rep.Warnings() != 0 {
+		t.Fatalf("a dangling link into mise's data dir is mise's\n%s", b.String())
+	}
+}
+
 // A `# mise: latest` pin's version is a floor, not what mise installed (pi was
 // pinned 1.2.0 with 1.3.0 installed), and `mise bin-paths name@floor` answers
 // "missing" with nothing listed. So the check was blind to every latest pin,
