@@ -42,6 +42,10 @@ type Options struct {
 	// GitStoredAuth asks gh for its stored login, without the environment's
 	// tokens; gitconfig.StoredLoginRunner in production. Unset means GitRun.
 	GitStoredAuth gitconfig.Runner
+	// GitBinDirs are where an OS-manager install of git lands
+	// (GitBinDirs in production); the checkout step reaches them after it
+	// installs git, so a clean machine clones in the same run.
+	GitBinDirs []string
 	// CloneURL is what the checkout step clones when the checkout is absent;
 	// empty means DefaultCloneURL.
 	CloneURL string
@@ -107,7 +111,7 @@ func Registry(o Options) []Reconciler {
 		addrs = sshtarget.InterfaceAddrs
 	}
 	return []Reconciler{
-		checkout{run: o.GitRun, url: url, has: onPath},
+		checkout{run: o.GitRun, url: url, has: onPath, installer: o.ToolsCatalog, gitDirs: o.GitBinDirs},
 		recordsMirror{},
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
