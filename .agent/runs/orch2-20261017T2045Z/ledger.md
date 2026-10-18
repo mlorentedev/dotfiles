@@ -15,3 +15,4 @@ The orchestrator implements nothing and merges nothing.
 Not relayed: #2724 (A/B unpicked; A is .github), #2727 (waits on #2502 A/B), #2696/#2715/#2637 (need Windows), #2678 (.github), #2704 (vault skill), #2659 (owner-assigned, part .github).
 
 ## Events
+- 00:49Z refill relayed to the four panes in the table (herdr agent prompt, owner-labelled).
