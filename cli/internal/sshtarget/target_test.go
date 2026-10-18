@@ -304,6 +304,43 @@ func TestInspectRefusesANodeOutsideTheMesh(t *testing.T) {
 	}
 }
 
+// Win32-OpenSSH reads only a relative Include: it prefixes any other form with
+// its own directory and matches nothing, and `sshd -t` still passes. These are
+// the forms measured ignored on OpenSSH_for_Windows_9.5p2 (#2763).
+func TestInspectOnWindowsRefusesAnIncludeSSHDIgnores(t *testing.T) {
+	for _, form := range []string{
+		"{dir}/*.conf",
+		`C:\ProgramData\ssh\sshd_config.d\*.conf`,
+		"C:/ProgramData/ssh/sshd_config.d/*.conf",
+		"__PROGRAMDATA__/ssh/sshd_config.d/*.conf",
+		`C:\ProgramData\ssh\sshd_config.d/01-workstation.conf`,
+	} {
+		m := newMachine(t)
+		m.paths.RelativeInclude = true
+		m.write(m.paths.SSHDConfig, "Include "+strings.ReplaceAll(form, "{dir}", filepath.Dir(m.paths.DropIn))+"\n")
+		if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "Include sshd_config.d/*.conf") {
+			t.Errorf("%s: Inspect = %v, want the relative form named", form, err)
+		}
+	}
+}
+
+// sshd resolves a relative Include against its own directory, on every OS, so
+// the drop-ins it reaches before ours are read from there, not from the cwd.
+func TestInspectReadsARelativeInclude(t *testing.T) {
+	for _, windows := range []bool{false, true} {
+		m := newMachine(t)
+		m.paths.RelativeInclude = windows
+		m.write(m.paths.SSHDConfig, "Include sshd_config.d/*.conf\n")
+		if _, err := m.target().Inspect(); err != nil {
+			t.Fatalf("windows=%v: Inspect = %v, want the relative Include accepted", windows, err)
+		}
+		m.write(filepath.Join(filepath.Dir(m.paths.DropIn), "00-early.conf"), "PasswordAuthentication yes\n")
+		if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "00-early.conf sets PasswordAuthentication") {
+			t.Fatalf("windows=%v: Inspect = %v, want the earlier drop-in found through the relative Include", windows, err)
+		}
+	}
+}
+
 func TestInspectRefusesAConfigThatSkipsTheDropInDir(t *testing.T) {
 	m := newMachine(t)
 	m.write(m.paths.SSHDConfig, "UsePAM yes\n")
