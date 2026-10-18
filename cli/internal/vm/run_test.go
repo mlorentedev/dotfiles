@@ -479,7 +479,7 @@ func TestRun_CopiesADotfBuildIntoTheGuest(t *testing.T) {
 func TestGuestRun_PutsADotfBuildOnPATHBeforeInstall(t *testing.T) {
 	code := codeLines(string(guestRunScript))
 	install := strings.Index(code, "& powershell.exe")
-	for _, want := range []string{"Copy-Item -Path $dev -Destination (Join-Path $bin 'dotf.exe')", `$env:PATH = "$bin;$env:PATH"`} {
+	for _, want := range []string{"Copy-Item -Path $dev -Destination $installed", `$env:PATH = "$bin;$env:PATH"`} {
 		at := strings.Index(code, want)
 		if at < 0 {
 			t.Errorf("guestrun.ps1 lacks %q", want)
@@ -488,5 +488,23 @@ func TestGuestRun_PutsADotfBuildOnPATHBeforeInstall(t *testing.T) {
 		if at > install {
 			t.Errorf("guestrun.ps1 runs %q after it starts install.ps1", want)
 		}
+	}
+}
+
+// install.ps1 keeps a dotf that reports "dev", but nothing else asserts that
+// the build is what converged: each step compares the binary it ran with the
+// copy the host put in, after the run, and a step whose binary differs fails.
+func TestGuestRun_FailsAStepThatDidNotRunTheDotfBuild(t *testing.T) {
+	code := codeLines(string(guestRunScript))
+	run := strings.Index(code, "$code = $LASTEXITCODE")
+	check := strings.Index(code, "(Get-FileHash -Path $dev).Hash -ne (Get-FileHash -Path $installed).Hash")
+	if check < 0 {
+		t.Fatal("guestrun.ps1 never compares the dotf that ran with the --dotf build")
+	}
+	if check < run {
+		t.Error("guestrun.ps1 compares the binaries before the step has run")
+	}
+	if !strings.Contains(code[check:], "$code = 1") {
+		t.Error("a mismatch does not fail the step")
 	}
 }

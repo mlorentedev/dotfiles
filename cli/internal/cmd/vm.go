@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"debug/pe"
 	"errors"
 	"fmt"
 	"io"
@@ -53,6 +54,9 @@ func newVMWindowsCmd() *cobra.Command {
 			if dotf != "" {
 				if fi, err := os.Stat(dotf); err != nil || !fi.Mode().IsRegular() {
 					return withExitCode(2, fmt.Errorf("--dotf %s: not a file", dotf))
+				}
+				if err := windowsArm64(dotf); err != nil {
+					return withExitCode(2, err)
 				}
 			}
 			host, firmware, _, layout, err := windowsGuest()
@@ -256,4 +260,20 @@ func execLimactl(stdin io.Reader, stdout, stderr io.Writer, args ...string) erro
 	c := exec.Command("limactl", args...)
 	c.Stdin, c.Stdout, c.Stderr = stdin, stdout, stderr
 	return c.Run()
+}
+
+// windowsArm64 refuses a --dotf the guest would not run as the box does: the
+// guest is Windows on Arm64, whose release is the windows/arm64 build. An x64
+// build would converge under emulation and test a binary no Arm64 box gets;
+// anything else would fail only after the install, minutes into the run.
+func windowsArm64(path string) error {
+	f, err := pe.Open(path)
+	if err != nil {
+		return fmt.Errorf("--dotf %s: not a Windows Arm64 executable: %w", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	if f.Machine != pe.IMAGE_FILE_MACHINE_ARM64 {
+		return fmt.Errorf("--dotf %s: built for PE machine %#x, not Windows Arm64 (GOOS=windows GOARCH=arm64)", path, f.Machine)
+	}
+	return nil
 }

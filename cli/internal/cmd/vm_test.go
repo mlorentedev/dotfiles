@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"archive/zip"
+	"debug/pe"
+	"encoding/binary"
 	"io"
 	"os"
 	"os/exec"
@@ -86,5 +88,45 @@ func TestVMWindows_RefusesADotfThatIsNotAFile(t *testing.T) {
 		if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "not a file") {
 			t.Errorf("--dotf %s: got %v (exit %d), want a usage error", path, err, ExitCode(err))
 		}
+	}
+}
+
+// writePE writes the smallest file debug/pe accepts: a DOS stub pointing at a
+// PE signature and a file header for machine, with no sections. debug/pe
+// reads a 96-byte DOS header, so the signature sits past it.
+func writePE(t *testing.T, machine uint16) string {
+	t.Helper()
+	b := make([]byte, 0x80+4+20)
+	copy(b, "MZ")
+	binary.LittleEndian.PutUint32(b[0x3c:], 0x80)
+	copy(b[0x80:], "PE\x00\x00")
+	binary.LittleEndian.PutUint16(b[0x84:], machine)
+	path := filepath.Join(t.TempDir(), "dotf.exe")
+	if err := os.WriteFile(path, b, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The guest is Windows on Arm64: a --dotf built for anything else, or no
+// Windows executable at all, is refused before a guest boots, not found out
+// after the install has run.
+func TestVMWindows_RefusesADotfTheGuestCannotRun(t *testing.T) {
+	text := filepath.Join(t.TempDir(), "dotf.exe")
+	if err := os.WriteFile(text, []byte("MZ dev build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{text, writePE(t, pe.IMAGE_FILE_MACHINE_AMD64)} {
+		c := newVMWindowsCmd()
+		c.SetArgs([]string{"--dotf", path})
+		c.SetOut(io.Discard)
+		c.SetErr(io.Discard)
+		err := c.Execute()
+		if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "Windows Arm64") {
+			t.Errorf("--dotf %s: got %v (exit %d), want a usage error naming Windows Arm64", path, err, ExitCode(err))
+		}
+	}
+	if err := windowsArm64(writePE(t, pe.IMAGE_FILE_MACHINE_ARM64)); err != nil {
+		t.Errorf("an Arm64 PE was refused: %v", err)
 	}
 }
