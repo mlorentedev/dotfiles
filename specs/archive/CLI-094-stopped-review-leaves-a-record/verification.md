@@ -5,7 +5,7 @@ created: "2026-10-17"
 
 # Verification - CLI-094-stopped-review-leaves-a-record
 
-> Implementation complete (2026-10-17); the independent archive review is pending, so nothing here is a verdict.
+> Implementation complete (2026-10-17). The independent archive review is recorded below (round 1 FAIL, round 2 PASS-WITH-GAPS); the verdict is the signed `review.md`, not this file.
 
 ## Measurement for the stall timeout (AC6)
 
