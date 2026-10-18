@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"slices"
 	"strings"
 
@@ -52,7 +53,7 @@ func (r workstationTarget) Reconcile(e Env, dryRun bool) (Result, error) {
 		return Result{}, err
 	}
 	if !slices.Contains(roles, env.RoleSSHTarget) {
-		return Result{Skip: "this machine has not opted in (dotf env role add " + env.RoleSSHTarget + ")"}, nil
+		return r.retire(e, dryRun)
 	}
 	t, err := r.target(e)
 	if err != nil {
@@ -82,11 +83,69 @@ func (r workstationTarget) Reconcile(e Env, dryRun bool) (Result, error) {
 	return res, nil
 }
 
-// Probe re-inspects, then asks sshd again from both addresses: a later change
-// to the machine that reopens SSH fails the next converge.
-func (r workstationTarget) Probe(e Env) error {
+// retire undoes, on a machine whose role was removed, what the step's record
+// says it created (SEC-014, #2388). Without a record there is nothing the
+// step can tell is its own, and the step is skipped as before.
+func (r workstationTarget) retire(e Env, dryRun bool) (Result, error) {
+	skip := Result{Skip: "this machine has not opted in (dotf env role add " + env.RoleSSHTarget + ")"}
+	if rec := r.paths(e.GOOS, e.Home).Record; rec == "" {
+		return skip, nil
+	} else if _, err := os.Stat(rec); errors.Is(err, os.ErrNotExist) {
+		return skip, nil
+	}
 	t, err := r.target(e)
 	if err != nil {
+		return Result{}, err
+	}
+	p, err := t.InspectRetire()
+	if err != nil {
+		return Result{}, err
+	}
+	res := Result{Changes: len(p.Pending), Detail: retireDetail(p, dryRun)}
+	if dryRun {
+		return res, nil
+	}
+	err = t.Retire(p)
+	if errors.Is(err, sshtarget.ErrNoTerminal) || errors.Is(err, sshtarget.ErrNotElevated) {
+		return Result{Skip: err.Error() + "; " + retireDetail(p, true)}, nil
+	}
+	if err != nil {
+		return Result{}, fmt.Errorf("planned to retire as root: %s; %w", strings.Join(p.Pending, ", "), err)
+	}
+	return res, nil
+}
+
+func retireDetail(p sshtarget.Retirement, dryRun bool) string {
+	d := "retired"
+	switch {
+	case p.Converged():
+		d = "nothing left to retire"
+	case dryRun:
+		d = "to retire as root: " + strings.Join(p.Pending, ", ")
+	}
+	for _, n := range append(p.Notes, "the firewall and power policy stay (#2794)") {
+		d += "; " + n
+	}
+	return d
+}
+
+// Probe re-inspects, then asks sshd again from both addresses: a later change
+// to the machine that reopens SSH fails the next converge. On a machine whose
+// role was removed, it holds the retirement to its plan instead.
+func (r workstationTarget) Probe(e Env) error {
+	roles, err := env.LoadMachineRoles(env.MachinePath(e.Home))
+	if err != nil {
+		return err
+	}
+	t, err := r.target(e)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(roles, env.RoleSSHTarget) {
+		p, err := t.InspectRetire()
+		if err == nil && !p.Converged() {
+			err = fmt.Errorf("still to retire: %s", strings.Join(p.Pending, ", "))
+		}
 		return err
 	}
 	p, err := t.Inspect()
