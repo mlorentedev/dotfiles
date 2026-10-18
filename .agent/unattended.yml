@@ -1,0 +1,27 @@
+version: 1
+run_id: "orch2-2731-20261018T0057Z"
+armed_by: manu   # relayed by session dotfiles-20 (orchestrator run orch2-20261017T2045Z) with the owner's explicit authorisation
+armed_at: 2026-10-18T00:57:00Z
+expires_at: 2026-10-18T12:57:00Z
+objective: "Land #2731: sshtarget reads only launchctl exit 113 as an unloaded sshd or tailscaled, through schedule.LaunchdLoaded."
+scope:
+  write_paths: ["cli/internal/sshtarget/**", "specs/PLAT-001b-one-entrypoint/**", ".agent/runs/orch2-2731-20261018T0057Z/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "cli/internal/converge/**", "cli/internal/env/**", "cli/internal/schedule/**", ".agent/unattended.yml"]
+  max_files: 6
+  max_loc: 150
+allowed_commands: [dotf, gh, git, go, golangci-lint, launchctl]
+queue:
+  source: explicit
+  filter: "#2731"
+  max_items: 1
+budget:
+  max_iterations: 3
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+notes:
+  - "Stacked on #2733 (fix/envpersist-launchctl-print-and-session at 2479163a), which adds schedule.LaunchdLoaded. Lands only after #2733 merges and main is merged in."
