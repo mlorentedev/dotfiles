@@ -52,6 +52,10 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		rep.Fail("mise plan: " + err.Error())
 		return
 	}
+	if p.UnparsableConfig != "" && !fix {
+		rep.Fail(p.UnparsableConfig + " does not parse, so mise runs no command over it (run: dotf tools sync, which rewrites it)")
+		return
+	}
 	if fix && (p.ConfigChanged || len(p.Missing) > 0 || len(p.MissingPackages) > 0) {
 		// The fix is the sync itself, the one owner of mise's config and
 		// installs; checkPython only re-probes what it leaves behind.

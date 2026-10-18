@@ -235,7 +235,10 @@ func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
 		verb, up = "to install", "to upgrade"
 	}
 	parts := []string{}
-	if p.ConfigChanged {
+	switch {
+	case dryRun && p.UnparsableConfig != "":
+		parts = append(parts, p.UnparsableConfig+" does not parse (rewritten on apply)")
+	case p.ConfigChanged:
 		parts = append(parts, "mise config to write")
 	}
 	// Apply names what it pruned after the write; before it, only the config

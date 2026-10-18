@@ -541,3 +541,22 @@ func TestCheckMiseTools_AnInstallNoPinAsksForWarnsNamingTheConverge(t *testing.T
 		}
 	}
 }
+
+// #2760: a deployed config that does not parse is not a WARN beside a PASS.
+// Every mise command fails over it, so no pin can be said to run. Doctor
+// fails, names the file, and gives the command that rewrites it.
+func TestCheckMiseTools_ADeployedConfigThatDoesNotParseFailsWithTheRemedy(t *testing.T) {
+	s, cfg := miseFixture(t, "darwin", "1.2.1", false)
+	deployed := filepath.Join(s.Getenv("HOME"), ".config", "mise", "conf.d", "dotfiles.toml")
+	writeFile(t, deployed, "[tools\njq = ")
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	out := b.String()
+	if rep.Failures() != 1 || !strings.Contains(out, deployed+" does not parse") || !strings.Contains(out, "dotf tools sync") {
+		t.Fatalf("want one FAIL naming the file and the remedy\n%s", out)
+	}
+	if strings.Contains(out, "at their pin through mise") {
+		t.Errorf("no pin can be said to run over that file\n%s", out)
+	}
+}
