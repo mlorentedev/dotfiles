@@ -160,3 +160,49 @@ func TestWorkstationTarget_ANodeOffTheMeshIsSkipped(t *testing.T) {
 		t.Fatalf("Reconcile = %+v, %v; want a skip naming the mesh", res, err)
 	}
 }
+
+// retiringFixture is a machine whose role was removed and whose record the
+// step left: every entry unknown, so a run removes the record alone.
+func retiringFixture(t *testing.T, root sshtarget.Root) (workstationTarget, Env, string) {
+	t.Helper()
+	r, e := workstationFixture(t, root)
+	paths := r.paths("darwin", e.Home)
+	paths.Record = filepath.Join(t.TempDir(), "workstation-target.json")
+	r.paths = func(string, string) sshtarget.Paths { return paths }
+	writeFile(t, paths.Record, `{"version":1,"authorized_key":{"state":"unknown"},"sshd_drop_in":{"state":"unknown"},"sshd_listener":{"state":"unknown"}}`)
+	return r, e, paths.Record
+}
+
+func TestWorkstationTarget_PlansTheRetirementWithoutRoot(t *testing.T) {
+	r, e, _ := retiringFixture(t, noRoot{t: t})
+	res, err := r.Reconcile(e, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Changes != 1 || !strings.HasPrefix(res.Detail, "to retire as root: state record") || !strings.Contains(res.Detail, "sshd service: left") {
+		t.Fatalf("plan = %+v", res)
+	}
+}
+
+func TestWorkstationTarget_RetirementWithoutRootIsSkippedWithThePlan(t *testing.T) {
+	r, e, _ := retiringFixture(t, noRoot{t: t, ready: sshtarget.ErrNoTerminal})
+	res, err := r.Reconcile(e, false)
+	if err != nil || !strings.Contains(res.Skip, "to retire as root: state record") {
+		t.Fatalf("Reconcile = %+v, %v; want a skip carrying the retirement plan", res, err)
+	}
+}
+
+// Probe holds the retirement to what it planned: a record still there with
+// work pending fails it, none passes.
+func TestWorkstationTarget_ProbeChecksTheRetirement(t *testing.T) {
+	r, e, record := retiringFixture(t, noRoot{t: t})
+	if err := r.Probe(e); err == nil || !strings.Contains(err.Error(), "state record") {
+		t.Errorf("Probe = %v, want the pending record named", err)
+	}
+	if err := os.Remove(record); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Probe(e); err != nil {
+		t.Errorf("Probe after the record went = %v", err)
+	}
+}

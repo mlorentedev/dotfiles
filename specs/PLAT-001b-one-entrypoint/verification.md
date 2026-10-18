@@ -247,6 +247,18 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - From the macmini: `ssh -o BatchMode=yes msi true` over the mesh exits 0; `nc -z -w 5 10.0.0.9 22` over the LAN exits 1 after 75 s: macOS's `nc -w` bounds idle time, not the connect, so 75 s is the kernel's connect timeout. Re-run with the connect bounded, `nc -v -z -G 5 10.0.0.9 22` exits 1 after 5 s with `connectx to 10.0.0.9 port 22 (tcp) failed: Operation timed out`, not `Connection refused`: the packet is dropped. Port 9, which nothing listens on, answers the same way, as default deny incoming says it should.
   - `dotf doctor` on msi in a login shell: 190 passed, 0 failed, 2 warned (DR escrow age and persona `enforce:`, both tracked in the #2013 debt ledger). Run from a non-login ssh command it reports five tool-home variables as FAIL; those are unset because no profile was read. Doctor cannot tell that case from real drift, which is a reporting defect, recorded as D12 in the #2013 debt ledger.
 
+- SEC-014 PR 2, the retirement (#2388, 2026-10-18, autopilot run sec014-20261018T1835Z):
+  - The drop-in is held while an sshd the step did not start keeps listening. This applies to `created` and `replaced` alike, and the record is kept with it. #2388 names the defect: without the drop-in, sshd runs its stock config, passwords included. The row's own order rule says the drop-in goes only after the listener is off. Restoring a `replaced` drop-in under a running listener would still change the config of a daemon the step does not own, so one rule covers both states.
+  - The record goes once nothing is held, even when `unknown` entries are left. The record can never tell more about them, and keeping it would plan a change forever.
+  - The refusal over ssh (`$SSH_CONNECTION` set, or sudo stripped it) covers only a run that has to stop sshd. A run that only removes the record, or holds the drop-in, changes nothing sshd serves.
+  - A failed step stops the run and keeps the record. Nothing already undone is put back, since putting it back would reopen what the run closed. The next run re-plans from the machine and resumes.
+  - The key's lines are taken out of `authorized_keys`, and every other line stays byte for byte. The file is never deleted, because `created` means the key was absent, not the file.
+  - Probe takes the retirement path when the role is absent. Without that, every retirement run would fail its post-condition with the apply plan's "still differs".
+  - Expected on the live hosts: the macmini and msi were converged before the record existed, so their key and listener are `unknown`. The retirement removes nothing there and holds the drop-in until the owner decides about sshd.
+  - The firewall and power policy are not retired: #2794 (the pf pieces, `PFToken` from #2755, UFW, Windows rules).
+  - Evidence: `go test ./internal/sshtarget/ ./internal/converge/ -run 'Retire|Workstation'` passes 16 tests (7 retirement tests in sshtarget, 9 workstation tests in converge).
+  - Twelve mutations, all killed: no hold, the record removed while held, `unknown` undone, no refusal, a refusal always, no refusal under sudo, a `replaced` drop-in removed, all key lines dropped, the listener not counted as off, a failure ignored, Probe ignoring the retirement, no skip without a terminal.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

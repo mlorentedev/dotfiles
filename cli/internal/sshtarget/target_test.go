@@ -34,6 +34,7 @@ type machine struct {
 	printErr   error  // what `launchctl print` fails with, when not nil
 	rootCalls  []string
 	forbidRoot bool
+	failRoot   string // a root command that fails
 }
 
 func newMachine(t *testing.T) *machine {
@@ -81,6 +82,9 @@ func (m *machine) Run(argv ...string) ([]byte, error) {
 		m.t.Fatalf("ran as root: %v", argv)
 	}
 	m.rootCalls = append(m.rootCalls, strings.Join(argv, " "))
+	if m.failRoot != "" && strings.Join(argv, " ") == m.failRoot {
+		return []byte("Operation not permitted"), errors.New("exit status 1")
+	}
 	switch argv[0] {
 	case "install":
 		if argv[1] == "-d" {
@@ -106,6 +110,10 @@ func (m *machine) Run(argv ...string) ([]byte, error) {
 		}
 	}
 	return nil, nil
+}
+
+func (m *machine) index(call string) int {
+	return slices.IndexFunc(m.rootCalls, func(c string) bool { return strings.HasPrefix(c, call) })
 }
 
 // user runs launchctl print and the ssh probe as the user.

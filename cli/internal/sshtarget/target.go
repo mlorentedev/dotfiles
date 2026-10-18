@@ -150,13 +150,14 @@ const (
 // owner's key and the drop-in template, with goos's service manager. Root is
 // left for the caller, because only an apply needs it and doctor never applies.
 func New(repoRoot, user, goos string, paths Paths, run Runner, addrs func() ([]net.IP, error)) (Target, error) {
-	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs}
+	t := Target{User: user, Paths: paths, Run: run, Addrs: addrs,
+		Session: os.Getenv("SSH_CONNECTION"), Sudoed: os.Getenv("SUDO_USER") != ""}
 	var err error
 	if t.Service, err = ServiceFor(goos, run, paths); err != nil {
 		return t, err
 	}
 	t.Power = PowerFor(goos, run, paths)
-	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, os.Getenv("SSH_CONNECTION"), os.Getenv("SUDO_USER") != "")
+	t.Firewall, t.FirewallNote = FirewallFor(goos, paths, run, addrs, t.Session, t.Sudoed)
 	t.MeshAtBoot = MeshAtBootFor(goos, run)
 	if t.Key, err = os.ReadFile(filepath.Join(repoRoot, KeyFile)); err != nil {
 		return t, err
@@ -223,6 +224,8 @@ type Target struct {
 	Run        Runner
 	Addrs      func() ([]net.IP, error)
 	Dotf       string           // the running build, written into the record
+	Session    string           // $SSH_CONNECTION of the running process; "" when local
+	Sudoed     bool             // dotf itself runs under sudo, which strips $SSH_CONNECTION
 	Now        func() time.Time // nil is time.Now
 }
 

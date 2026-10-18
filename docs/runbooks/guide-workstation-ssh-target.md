@@ -414,19 +414,44 @@ that fixes it.
 ## Rollback
 
 A converge run whose apply or proof fails undoes its own changes, in reverse
-order, and says so. The host keys it generated stay. To retire a machine as a
-target, `dotf env role rm ssh-target`, then remove what the step wrote (there
-is no converge undo for a role removal yet). For the hand steps, restore the
-dated backups taken in the preflight, then:
+order, and says so. The host keys it generated stay.
 
-- **Every OS, first:** read the step's record, which says what the machine had before the role (SEC-014, #2388), and keep it open while you work: `cat /var/lib/dotf/workstation-target.json` on Linux, `cat /var/db/dotf/workstation-target.json` on macOS, `Get-Content $env:ProgramData\dotf\workstation-target.json` on Windows. An entry `created` is the step's own to remove, `replaced` holds the drop-in to put back, `unknown` was there before the record and is yours to judge. The per-OS steps below follow the entries, not the other way round:
-  - **`sshd_listener`:** stop and disable the listener only when it is `created`. When it is `unknown` and you keep it, sshd goes on serving after the drop-in goes, on the stock config, which allows passwords: put your own hardening in place first.
-  - **`sshd_drop_in`:** remove the drop-in only when it is `created`. When it is `replaced`, write its `content` back over the same path instead of removing it, for example `jq -r .sshd_drop_in.content <record> | sudo tee /etc/ssh/sshd_config.d/01-workstation.conf >/dev/null` (the record is user-readable). When it is `unknown`, leave the file and decide by reading it.
-  - **`authorized_key`:** remove the mesh key line from `~/.ssh/authorized_keys` only when it is `created`.
-  - **No record:** the machine was converged before the record existed, or was hardened by hand. Use the preflight backups and the conditions each step states.
+To retire a machine as a target, remove the role and converge, at the machine
+and as your user:
 
-- **Linux:** if `sshd_listener` is `created` (without a record: if the machine served no ssh before it became a target), stop the listener first, so sshd never runs on the stock config (which allows passwords) once the drop-in is gone. This mirrors the step's own rollback (`sshtarget.Systemd.Disable`): `sudo systemctl disable --now ssh.socket && sudo systemctl stop ssh.service` where sshd is socket-activated (Ubuntu 22.10 and later), else `sudo systemctl disable --now ssh` (`sshd` on Fedora and Arch). Then `sudo rm /etc/systemd/logind.conf.d/50-workstation.conf`, and the sshd drop-in as its entry says (`sudo rm /etc/ssh/sshd_config.d/01-workstation.conf` when `created`); if sshd stays enabled, `sudo sshd -t && sudo systemctl reload ssh`; `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp` (and `sudo ufw disable` if ufw was off before the target); and `sudo rm /var/lib/dotf/workstation-firewall`.
+```bash
+dotf env role rm ssh-target
+dotf converge --only workstation-target --plan   # what it would retire
+dotf converge --only workstation-target
+```
+
+With the role gone and the step's record present (SEC-014, #2388), the step
+undoes only what the record says it created, in this order:
+
+1. sshd's listener when `sshd_listener` is `created`: off, and persisted off (`launchctl bootout` and `disable` on macOS, `systemctl disable --now` on Linux, the capability's own default on Windows, Manual and stopped).
+2. The drop-in: removed when `created`, its `content` written back when `replaced`.
+3. The mesh key's lines in `authorized_keys` when `created`. The file's other lines stay byte for byte.
+4. The record, last.
+
+A second run reports `nothing left to retire`. The retirement also behaves as follows:
+
+- It refuses over ssh, or under sudo, when it has to stop sshd, since that would cut the session.
+- It leaves and names every `unknown` entry: that resource was in place before the record and may be yours.
+- It holds a `created` or `replaced` drop-in while an sshd it did not start keeps listening. Without the drop-in, that sshd would run its stock config, which allows passwords. The record is kept with it: turn sshd off yourself, then converge again.
+- A run that fails part way keeps the record, and the next run resumes.
+
+The record (`/var/lib/dotf/workstation-target.json` on Linux,
+`/var/db/dotf/workstation-target.json` on macOS,
+`%ProgramData%\dotf\workstation-target.json` on Windows) is readable without
+root. On the macmini and msi, converged before the record existed, the key and
+listener are `unknown`. There the retirement holds the drop-in until you decide
+about sshd.
+
+Not retired yet (#2794): the firewall and the power policy. Leaving the
+firewall keeps port 22 closed off the mesh. After the converge, by hand:
+
+- **Linux:** `sudo ufw delete allow in on tailscale0 to any port 22 proto tcp` (and `sudo ufw disable` if ufw was off before the target), `sudo rm /var/lib/dotf/workstation-firewall`, and `sudo rm /etc/systemd/logind.conf.d/50-workstation.conf`.
 - **Linux, a node set up by hand before the converge step:** the earlier version of this runbook masked the sleep targets, which the step neither writes nor removes. `systemctl is-enabled suspend.target` prints `masked` on such a node, and it then never suspends, on battery included. `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target` restores the distribution's behaviour; the logind drop-in keeps the lid policy.
-- **macOS:** if `sshd_listener` is `created` (without a record: if Remote Login was off before the target), stop Remote Login first, for the same reason: `sudo launchctl bootout system/com.openssh.sshd && sudo launchctl disable system/com.openssh.sshd`. `bootout` alone only stops the running job, so Remote Login returns at the next boot; `disable` persists the off state, as the step's own rollback does (`sshtarget.Launchd.Disable`). Then the sshd drop-in as its entry says (`sudo rm /etc/ssh/sshd_config.d/01-workstation.conf` when `created`) and `sudo pfctl -a com.apple/250.KubelabSSH -F all`. The power profile is not security-relevant and may stay; to return to the defaults, `sudo pmset -c disksleep 10 autorestart 0` (the values the macmini had before the step).
-- **Windows:** restore `sshd_config`, `sshd -t`, `Restart-Service sshd`. To retire the target where `sshd_listener` is `created`, run `Stop-Service sshd; Set-Service sshd -StartupType Disabled` (a stop alone returns at the next boot) and `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP`.
-- **Every OS, last:** remove the record, once nothing left to restore depends on it: `sudo rm /var/lib/dotf/workstation-target.json` on Linux, `sudo rm /var/db/dotf/workstation-target.json` on macOS, `Remove-Item $env:ProgramData\dotf\workstation-target.json` elevated on Windows. A record left behind after a hand retirement describes a machine that no longer exists, and a later role add would keep its entries, since they are written once.
+- **macOS:** `sudo pfctl -a com.apple/150.dotf-ssh -F all`, then `sudo launchctl bootout system/com.github.mlorentedev.dotf.pf-ssh && sudo launchctl disable system/com.github.mlorentedev.dotf.pf-ssh`, then `sudo rm /Library/LaunchDaemons/com.github.mlorentedev.dotf.pf-ssh.plist /etc/pf.anchors/dotf-ssh`. A Mac from the hand era holds `com.apple/250.KubelabSSH` instead: `sudo pfctl -a com.apple/250.KubelabSSH -F all`. The power profile is not security-relevant and may stay; to return to the defaults, `sudo pmset -c disksleep 10 autorestart 0` (the values the macmini had before the step).
+- **Windows:** `Disable-NetFirewallRule -Name OpenSSH-Server-In-TCP`.
+- **No record:** the machine was hardened by hand, and the converge retires nothing. Restore the dated backups taken in the preflight. Stop the listener before removing the drop-in, so sshd never runs on the stock config: `sudo launchctl bootout system/com.openssh.sshd && sudo launchctl disable system/com.openssh.sshd` on macOS; `sudo systemctl disable --now ssh.socket && sudo systemctl stop ssh.service` on Linux where sshd is socket-activated, else `sudo systemctl disable --now ssh`; `Stop-Service sshd; Set-Service sshd -StartupType Disabled` on Windows. A Windows box hardened by hand also gets its `sshd_config` restored, then `sshd -t` and `Restart-Service sshd` where sshd stays.
