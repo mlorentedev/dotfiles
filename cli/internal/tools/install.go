@@ -164,11 +164,18 @@ type Installer struct {
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
 	AppExists func(bundle string) bool
-	// Python is the Python series uv-tool entries run on ("3.13"), from
-	// versions.conf's PYTHON_VERSION (PythonSeries). Empty lets uv pick, which
-	// is the newest interpreter it finds: on a runner image with 3.15 that was
-	// one ansible-core cannot import on (BUG-138).
-	Python string
+	// Python returns the Python series uv-tool entries run on ("3.13"), from
+	// versions.conf's PYTHON_VERSION (PythonSeries). It is asked at the first
+	// uv-tool install, not when the Installer is built: converge builds it
+	// before its checkout step clones and records-mirror writes the deploy
+	// dir that file is read from (#2769). Nil, or "", lets uv pick, which is
+	// the newest interpreter it finds: on a runner image with 3.15 that was
+	// one ansible-core cannot import on (BUG-138), and on Windows Arm64 one
+	// pyyaml has no wheel for.
+	Python func() string
+	// python caches Python's answer, asked once (pythonAsked).
+	python      string
+	pythonAsked bool
 	// PathCopies lists every file on PATH that would run as name, in PATH order,
 	// so the first is the one that answers. Nil means a scan of $PATH; tests
 	// inject the machine's answer.
@@ -467,6 +474,15 @@ func (in *Installer) npmPrefixArgs() []string {
 // uv 0.9.29), so one argv covers install and upgrade. The reconcile policy is
 // the shared one, so a version the user upgraded to on purpose is never rolled
 // back: hive's upgrades are opt-in (hive ADR-020), and the pin is a floor.
+// pythonSeries is Python's answer, asked once: a missing pin warns once per
+// run, not once per uv tool.
+func (in *Installer) pythonSeries() string {
+	if !in.pythonAsked && in.Python != nil {
+		in.python, in.pythonAsked = in.Python(), true
+	}
+	return in.python
+}
+
 func (in *Installer) installUvTool(t Tool) (Result, error) {
 	pkg := t.Source.Package // non-empty: Install's refusal check
 	action := decideAction(in.current(t), t.Version)
@@ -485,8 +501,8 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	// minutes after its release otherwise fails with "no version of <pkg>==<v>"
 	// on a machine whose uv cache still holds the index from before it.
 	args := []string{"tool", "install", "--force", "--refresh-package", pkg}
-	if in.Python != "" {
-		args = append(args, "--python", in.Python)
+	if py := in.pythonSeries(); py != "" {
+		args = append(args, "--python", py)
 	}
 	args = append(args, pkg+"=="+t.Version)
 	if err := in.Run("uv", args...); err != nil {

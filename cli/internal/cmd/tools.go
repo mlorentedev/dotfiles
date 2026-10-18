@@ -76,7 +76,9 @@ func newToolsInstallCmd() *cobra.Command {
 // share, so a tool installed by hand runs on the same Python as one converge
 // installed.
 func toolsInstaller(dest string, out io.Writer) *tools.Installer {
-	return &tools.Installer{Dest: dest, Out: out, Python: pinnedPython(env.ResolveVersionsPath(), out)}
+	return &tools.Installer{Dest: dest, Out: out, Python: func() string {
+		return pinnedPython(env.ResolveVersionsPath(), out)
+	}}
 }
 
 // pinnedPython is the Python series the versions.conf at path pins, which

@@ -822,7 +822,7 @@ func TestCopiesOnPath(t *testing.T) {
 func TestInstallUvTool_RunsOnThePinnedPython(t *testing.T) {
 	var rec []string
 	in := newNpmInstaller("", &rec, nil)
-	in.Python = "3.13"
+	in.Python = func() string { return "3.13" }
 	if _, err := in.Install(hiveTool()); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
