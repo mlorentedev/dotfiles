@@ -263,8 +263,6 @@ after the first review, into review-second.md. A member that declares
 	return cmd
 }
 
-// chooseForLaunch resolves which signature this launch gives and which pool
-// member gives it, and says how the member was picked for the launch line.
 // specRepoRoot validates a spec id and returns the root of the repository
 // holding the working directory.
 func specRepoRoot(id string) (string, error) {
@@ -376,6 +374,8 @@ func launchDetached(cmd *cobra.Command, repoRoot string, launch []string, slot s
 	return nil
 }
 
+// chooseForLaunch resolves which signature this launch gives and which pool
+// member gives it, and says how the member was picked for the launch line.
 func chooseForLaunch(specDir string, entries []spec.ReviewerEntry, reviewer, fallbackReason string, second bool) (spec.ReviewSlot, spec.ReviewerEntry, string, error) {
 	choice := spec.ReviewerChoice{Slot: spec.FirstSigner, Want: reviewer, FallbackReason: fallbackReason}
 	if second {

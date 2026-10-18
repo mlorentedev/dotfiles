@@ -104,9 +104,6 @@ func newSecretsProbeCmd() *cobra.Command {
 	return c
 }
 
-// printDistribution renders the outcome spread for --count. Statuses only: this
-// is the artifact an intermittent backend fault needs and nobody could produce
-// safely before.
 // probeTarget returns the registry entry for id, refusing one that does not
 // resolve through bw serve: there is nothing there to probe.
 func probeTarget(id string) (*secrets.Secret, error) {
@@ -157,6 +154,9 @@ func probeAttempt(cmd *cobra.Command, client secrets.BWServeClient, path string,
 	return nil
 }
 
+// printDistribution renders the outcome spread for --count. Statuses only: this
+// is the artifact an intermittent backend fault needs and nobody could produce
+// safely before.
 func printDistribution(cmd *cobra.Command, statuses map[int]int, total int) {
 	codes := make([]int, 0, len(statuses))
 	for code := range statuses {
