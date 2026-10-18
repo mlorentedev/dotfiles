@@ -47,6 +47,9 @@ func TestQEMUArgs_ShareNothingWithTheHost(t *testing.T) {
 // The agent channel is the host's only way in, and the guest needs the
 // devices Windows 11 on Arm boots with: UEFI from read-only firmware, an NVMe
 // disk Windows has a driver for, USB input, and HVF acceleration.
+// fp spells a host path as Layout does on this OS.
+func fp(p string) string { return filepath.FromSlash(p) }
+
 func TestQEMUArgs_BootWindowsOnArm(t *testing.T) {
 	args, err := testMachine("/s").Args()
 	if err != nil {
@@ -56,11 +59,11 @@ func TestQEMUArgs_BootWindowsOnArm(t *testing.T) {
 	for _, want := range []string{
 		"-accel hvf", "-cpu host", "virt,gic-version=3",
 		"if=pflash,format=raw,unit=0,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd,readonly=on",
-		"if=pflash,format=raw,unit=1,file=/s/run-vars.fd",
-		"nvme,drive=disk0", "file=/s/run.qcow2,format=qcow2",
+		"if=pflash,format=raw,unit=1,file=" + fp("/s/run-vars.fd"),
+		"nvme,drive=disk0", "file=" + fp("/s/run.qcow2") + ",format=qcow2",
 		"virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
-		"socket,id=qga0,path=/s/run/qga.sock,server=on,wait=off",
-		"-qmp unix:/s/run/qmp.sock,server=on,wait=off",
+		"socket,id=qga0,path=" + fp("/s/run/qga.sock") + ",server=on,wait=off",
+		"-qmp unix:" + fp("/s/run/qmp.sock") + ",server=on,wait=off",
 		"-smbios type=1,uuid=" + guestUUID,
 	} {
 		if !strings.Contains(joined, want) {
@@ -91,7 +94,7 @@ func TestQEMUArgs_ARunNeverWritesCleanBase(t *testing.T) {
 			t.Fatal(err)
 		}
 		j := strings.Join(args, " ")
-		for _, want := range []string{"file=/s/clean-base.qcow2,format=qcow2", "unit=1,file=/s/clean-base-vars.fd"} {
+		for _, want := range []string{"file=" + fp("/s/clean-base.qcow2") + ",format=qcow2", "unit=1,file=" + fp("/s/clean-base-vars.fd")} {
 			if !strings.Contains(j, want) {
 				t.Errorf("the build's argv lacks %q", want)
 			}
@@ -123,9 +126,9 @@ func TestQEMUArgs_InstallMediaAreReadOnly(t *testing.T) {
 	}
 	joined := strings.Join(args, " ")
 	for _, want := range []string{
-		"file=/s/media/windows.iso,media=cdrom,readonly=on",
-		"file=/s/media/virtio-win.iso,media=cdrom,readonly=on",
-		"file=fat:ro:/s/media/unattend,readonly=on",
+		"file=" + fp("/s/media/windows.iso") + ",media=cdrom,readonly=on",
+		"file=" + fp("/s/media/virtio-win.iso") + ",media=cdrom,readonly=on",
+		"file=fat:ro:" + fp("/s/media/unattend") + ",readonly=on",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("argv lacks %q", want)

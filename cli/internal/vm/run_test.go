@@ -212,11 +212,7 @@ var (
 // sealedBase lays out a finished build: a read-only clean-base.
 func sealedBase(t *testing.T) RunOptions {
 	t.Helper()
-	dir, err := os.MkdirTemp("/tmp", "dvm") // short: unix socket paths
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	dir := stateDir(t)
 	l := Layout{Dir: filepath.Join(dir, "win")}
 	if err := os.MkdirAll(l.Dir, 0o755); err != nil {
 		t.Fatal(err)

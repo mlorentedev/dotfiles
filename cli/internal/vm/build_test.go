@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -155,11 +156,7 @@ func buildOptions(t *testing.T) BuildOptions {
 		_, _ = w.Write(map[string][]byte{"/win.iso": iso, "/virtio.iso": virtio}[r.URL.Path])
 	}))
 	t.Cleanup(srv.Close)
-	dir, err := os.MkdirTemp("/tmp", "dvm") // short: unix socket paths
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	dir := stateDir(t)
 	vars := filepath.Join(dir, "template-vars.fd")
 	if err := os.WriteFile(vars, []byte("vars"), 0o644); err != nil {
 		t.Fatal(err)
@@ -295,6 +292,23 @@ func TestBuild_AWrongISOStopsBeforeQEMU(t *testing.T) {
 	if len(h.starts)+len(h.imgs) != 0 {
 		t.Error("QEMU or qemu-img ran with an unverified ISO")
 	}
+}
+
+// stateDir is a guest state dir for one test. On macOS it lies under /tmp:
+// the default $TMPDIR there is long enough to push the guest's sockets past
+// sun_path. Elsewhere the default temp dir is short enough.
+func stateDir(t *testing.T) string {
+	t.Helper()
+	base := ""
+	if runtime.GOOS == "darwin" {
+		base = "/tmp"
+	}
+	dir, err := os.MkdirTemp(base, "dvm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
 }
 
 func assertNoBase(t *testing.T, l Layout) {
