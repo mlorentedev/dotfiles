@@ -5,7 +5,7 @@ created: "2026-10-17"
 
 # Verification - CLI-094-stopped-review-leaves-a-record
 
-> Implementation complete (2026-10-17); the independent archive review is pending, so nothing here is a verdict.
+> Implementation complete (2026-10-17). The independent archive review is recorded below (round 1 FAIL, round 2 PASS-WITH-GAPS); the verdict is the signed `review.md`, not this file.
 
 ## Measurement for the stall timeout (AC6)
 
@@ -36,8 +36,17 @@ Note on what the transcript records: `durationMs` is per tool call and there are
 ## Archive review
 
 - Round 1 (agy/gemini-3.8-flash-high, 2026-10-17): FAIL. Blocker: `SinkTranscript` flushed only at EOF, so the file the detector reads stayed empty while a reviewer ran (fixed: flush per event, with a test through the real sink). Minor, fixed: `StoppedRunRecord` named `review.md` for the second signer's `review-second.md`. Minor, accepted: `LastToolCall` reads pi's event shape only, so an agy stall is stopped but names no call (the proposal now says so; the stall check itself only watches the file). Minor, fixed: acceptance boxes in `proposal.md` ticked.
-- The round was a live run of the detector and the write-first prompt on agy. File times: launched 14:51, `review.md` last written 14:58 (about 7 minutes, under both the 10-minute stall timeout and the 45-minute cap). The FAIL itself is kept as `review-round1.md` by the round-2 review branch, so a reader can check it there; this PR does not carry it.
+- The round was a live run of the detector and the write-first prompt on agy. File times: launched 14:51, `review.md` last written 14:58 (about 7 minutes, under both the 10-minute stall timeout and the 45-minute cap). The FAIL itself is kept as `review-round1.md` next to the round-2 `review.md`, in this folder.
+- Round 2 (nan/mimo-v2.6-flash, 2026-10-17, reviewed `57d7351f`): PASS-WITH-GAPS. The round-1 blocker is fixed, mutation-killed and reproduced live through the real sink. Dispositions:
+  - F1 (Major, theoretical): the watcher measures growth of the filtered transcript, so a model message that streams longer than N with no settled event would be stopped. Not blocking: `--stall-timeout 0` is the documented escape and the measurement above already commits to revisiting N. Tracked in #2777 (record a timestamp per settled event, measure the real inter-event gaps, then revisit N).
+  - F2 (Minor): in the default detached mode the stop lines land only in `<transcript>.stderr`, as the time-cap message always did. Accepted for this spec because `dotf spec archive` refuses a PENDING review by name regardless; surfacing it in the pane is #2778.
+  - F3 (Minor): `LastToolCall` names a call for pi only. Accepted and documented in the proposal.
+  - F4 (Minor): the ticked "no scope creep" box holds per commit (the spec's five commits touch only its own files and one lesson), not against the base the launcher resolved, which spans about 25 unrelated PRs merged in the same window. `tasks.md` is part of the closed contract set and stays as it is.
+  - Question (exit 125 from a runner is indistinguishable from a stall stop): no observed case, surfaced only.
+- The signed `review.md` (round 2) and `review-round1.md` are committed with the archive, with their request files.
 
-## Promotions
+## Promotion candidates
 
-None yet.
+- [x] Lesson for `10_projects/dotfiles/90-lessons.md`? yes: docs/lessons/lesson-482-a-test-that-pre-writes-an-artifact-never-runs-the-producer-that-must-write-it.md
+- [x] ADR-worthy decision for `10_projects/dotfiles/30-architecture/adr-XXX.md`? no: the stall timeout and the stop record are a launcher behaviour inside the existing review contract; the open question on N is tracked in #2777.
+- [x] New pattern candidate for `00_meta/patterns/`? no: the lesson is project-level and has not recurred in a second project.

@@ -378,41 +378,93 @@ if (Test-Path $claudeMdSource) {
 # skill's targets[].
 Ensure-Directory "$ClaudeHome\skills"
 
-# uv (provides uvx) is installed HERE, before the MCP registration below,
-# because hive-vault and pdf-modifier are `uvx` servers: registered after
-# the installer (its old place, section 4) a clean box's first run skipped
-# both with "prerequisite 'uv' not found" and only the second run
-# converged -- measured on the CI runner the day Claude Code first installed
-# there (OPS-044, #1361). Linux gets uv from mise (`dotf tools sync`), and
-# poetry is a packages.json uv-tool entry that `dotf tools install` converges.
-# Install uv (Python package manager -- provides uvx)
-$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-if (-not $uvCmd) {
-    Write-Info "Installing uv..."
-    try {
-        $uvInstaller = Join-Path $env:TEMP "uv-install.ps1"
-        Invoke-RestMethod https://astral.sh/uv/install.ps1 -OutFile $uvInstaller
-        # A child process, never dot-sourced or run in this session: a remote
-        # installer may rewrite $env:PATH/PATHEXT for its own shell, and the
-        # runner lost npm right after these two (TEST-003/#1298).
-        & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $uvInstaller 2>$null
-        Remove-Item -Path $uvInstaller -Force -ErrorAction SilentlyContinue
-        # Refresh PATH for current session
-        $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
-        $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
-        if ($uvCmd) {
-            Write-Success "uv installed"
-        } else {
-            Write-Warn "uv installation failed"
-        }
-    } catch {
-        Write-Warn "Failed to install uv: $_"
+# dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
+# (user-space, no admin) - the PowerShell twin of setup-linux.sh sourcing
+# install.sh. goreleaser already publishes the Windows zip, so nothing is
+# compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
+# automatically. The preflight of every dotf step below, as on Linux: setup
+# cannot finish without it, so a failure stops here (#2013 W4).
+$installDotfScript = Join-Path $PSScriptRoot 'install.ps1'
+if (Test-Path $installDotfScript) {
+    . $installDotfScript
+    if (-not (Install-Dotf)) {
+        Write-Err "dotf installation failed -- see the error above; setup cannot continue without it"
+        exit 1
     }
 } else {
-    Write-Info "uv already installed"
+    Write-Err "install.ps1 not found -- run setup from the root of a dotfiles checkout"
+    exit 1
+}
+
+# ============================================================================
+# DEPLOY SECRETS SYSTEM (early: before the opencode/agy config blocks below that
+# substitute secrets at deploy time, and after dotf is installed above so the
+# deploy-time fetch can read the registry). Cross-OS parity with setup-linux.sh,
+# whose sensitive/registry deploy is likewise early.
+# ============================================================================
+Write-Info "Setting up secrets system..."
+
+# Preflight: warn if age identity key is missing. Without it `dotf secrets` can't
+# decrypt, so $env:NAN_API_KEY / OPENROUTER_API_KEY / etc. resolve empty --
+# opencode + agy then 401 with no clear cause. Non-fatal: encrypted files still
+# deploy so a key imported later works without re-running setup.
+$ageKey = if ($env:AGE_KEY_PATH) { $env:AGE_KEY_PATH } else { Join-Path $env:USERPROFILE '.config\age\key.txt' }
+if (-not (Test-Path -LiteralPath $ageKey)) {
+    Write-Warn "age identity key not found at $ageKey"
+    Write-Warn "  Encrypted secrets will deploy but won't decrypt on demand."
+    Write-Warn "  To enable: place your age identity at `$env:USERPROFILE\.config\age\key.txt"
+    Write-Warn "  (or set `$env:AGE_KEY_PATH). Generate: age-keygen -o `$HOME\.config\age\key.txt"
+    Write-Warn "  See: docs/runbooks/guide-secrets-governance.md#protocol--first-machine-age-key--ssh"
+}
+
+$sensitiveSource = "$DotfilesDir\sensitive"
+$sensitiveDest = "$DotfilesDest\sensitive"
+if (Test-Path $sensitiveSource) {
+    Ensure-Directory $sensitiveDest
+    # The var->file mapping moved to secrets/registry.yaml (deployed below); sensitive/
+    # holds the encrypted .age blobs and, under dr/, the Bitwarden DR escrow.
+    # Recursive, like setup-linux.sh's `cp -rf sensitive/*`: the top-level-only
+    # copy this used to be never mirrored dr/, and doctor reported total-loss risk
+    # over an escrow sitting in the checkout (WIN-011/#1292).
+    Copy-Item -Path (Join-Path $sensitiveSource '*') -Destination $sensitiveDest -Recurse -Force
+    $ageCount = (Get-ChildItem -Path $sensitiveDest -Filter '*.age' -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+    Write-Success "Deployed $ageCount encrypted secret files (sensitive/ mirrored recursively)"
+} else {
+    Write-Warn "Sensitive directory not found at $sensitiveSource"
+}
+
+# Deploy the secrets registry (ADR-028 section 2 mapping SSOT). dotf secrets reads it
+# from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
+# and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
+$registrySource = "$DotfilesDir\secrets\registry.yaml"
+if (Test-Path -LiteralPath $registrySource) {
+    Ensure-Directory "$DotfilesDest\secrets"
+    Copy-Item $registrySource "$DotfilesDest\secrets\" -Force
+    Write-Success "Deployed secrets/registry.yaml"
+} else {
+    Write-Warn "secrets/registry.yaml not found at $registrySource"
+}
+
+# Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
+# tools (currently sops) into ~/.local/bin via dotf - the same deterministic pattern
+# as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
+# offline box or a single failed download must not abort setup (parity with the
+# Install-Dotf warning above). Guarded on dotf being on PATH, mirroring the env
+# blocks below.
+if (Get-Command dotf -ErrorAction SilentlyContinue) {
+    dotf tools install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "dotf tools install failed (continuing; re-run 'dotf tools install')"
+    }
+    # The catalog installs uv through winget (astral-sh.uv, #2754), which puts
+    # its directory on the user PATH only; the MCP block below needs uvx here.
+    Sync-SessionPath
 }
 
 # Register MCP servers (requires Claude Code CLI, Node.js, uv for the uvx servers)
+# It runs after `dotf tools install`, which installs uv: registered before uv,
+# a clean box's first run skipped the uvx servers with "prerequisite 'uv' not
+# found" and only the second converged (OPS-044, #1361).
 # Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
 # `claude mcp get` is used to skip already-registered entries, and `add` errors
 # are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
@@ -492,86 +544,6 @@ if (-not ($claudeCmd -and $npxCmd)) {
         Write-Success "MCP servers: $mcpAdded added, $mcpSkipped already present, $mcpFailed failed"
     } catch {
         Write-Warn "Failed to register MCP servers: $_"
-    }
-}
-
-# dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
-# (user-space, no admin) - the PowerShell twin of setup-linux.sh sourcing
-# install.sh. goreleaser already publishes the Windows zip, so nothing is
-# compiled. Makes the `dotf env path` / `dotf env generate` steps below resolve
-# automatically. The preflight of every dotf step below, as on Linux: setup
-# cannot finish without it, so a failure stops here (#2013 W4).
-$installDotfScript = Join-Path $PSScriptRoot 'install.ps1'
-if (Test-Path $installDotfScript) {
-    . $installDotfScript
-    if (-not (Install-Dotf)) {
-        Write-Err "dotf installation failed -- see the error above; setup cannot continue without it"
-        exit 1
-    }
-} else {
-    Write-Err "install.ps1 not found -- run setup from the root of a dotfiles checkout"
-    exit 1
-}
-
-# ============================================================================
-# DEPLOY SECRETS SYSTEM (early: before the opencode/agy config blocks below that
-# substitute secrets at deploy time, and after dotf is installed above so the
-# deploy-time fetch can read the registry). Cross-OS parity with setup-linux.sh,
-# whose sensitive/registry deploy is likewise early.
-# ============================================================================
-Write-Info "Setting up secrets system..."
-
-# Preflight: warn if age identity key is missing. Without it `dotf secrets` can't
-# decrypt, so $env:NAN_API_KEY / OPENROUTER_API_KEY / etc. resolve empty --
-# opencode + agy then 401 with no clear cause. Non-fatal: encrypted files still
-# deploy so a key imported later works without re-running setup.
-$ageKey = if ($env:AGE_KEY_PATH) { $env:AGE_KEY_PATH } else { Join-Path $env:USERPROFILE '.config\age\key.txt' }
-if (-not (Test-Path -LiteralPath $ageKey)) {
-    Write-Warn "age identity key not found at $ageKey"
-    Write-Warn "  Encrypted secrets will deploy but won't decrypt on demand."
-    Write-Warn "  To enable: place your age identity at `$env:USERPROFILE\.config\age\key.txt"
-    Write-Warn "  (or set `$env:AGE_KEY_PATH). Generate: age-keygen -o `$HOME\.config\age\key.txt"
-    Write-Warn "  See: docs/runbooks/guide-secrets-governance.md#protocol--first-machine-age-key--ssh"
-}
-
-$sensitiveSource = "$DotfilesDir\sensitive"
-$sensitiveDest = "$DotfilesDest\sensitive"
-if (Test-Path $sensitiveSource) {
-    Ensure-Directory $sensitiveDest
-    # The var->file mapping moved to secrets/registry.yaml (deployed below); sensitive/
-    # holds the encrypted .age blobs and, under dr/, the Bitwarden DR escrow.
-    # Recursive, like setup-linux.sh's `cp -rf sensitive/*`: the top-level-only
-    # copy this used to be never mirrored dr/, and doctor reported total-loss risk
-    # over an escrow sitting in the checkout (WIN-011/#1292).
-    Copy-Item -Path (Join-Path $sensitiveSource '*') -Destination $sensitiveDest -Recurse -Force
-    $ageCount = (Get-ChildItem -Path $sensitiveDest -Filter '*.age' -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
-    Write-Success "Deployed $ageCount encrypted secret files (sensitive/ mirrored recursively)"
-} else {
-    Write-Warn "Sensitive directory not found at $sensitiveSource"
-}
-
-# Deploy the secrets registry (ADR-028 section 2 mapping SSOT). dotf secrets reads it
-# from $DotfilesDest\secrets\registry.yaml; without it `dotf secrets {ls,show,run}`
-# and the AI-CLI wrappers fail. Mirrors the sensitive/ deploy above.
-$registrySource = "$DotfilesDir\secrets\registry.yaml"
-if (Test-Path -LiteralPath $registrySource) {
-    Ensure-Directory "$DotfilesDest\secrets"
-    Copy-Item $registrySource "$DotfilesDest\secrets\" -Force
-    Write-Success "Deployed secrets/registry.yaml"
-} else {
-    Write-Warn "secrets/registry.yaml not found at $registrySource"
-}
-
-# Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
-# tools (currently sops) into ~/.local/bin via dotf - the same deterministic pattern
-# as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
-# offline box or a single failed download must not abort setup (parity with the
-# Install-Dotf warning above). Guarded on dotf being on PATH, mirroring the env
-# blocks below.
-if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    dotf tools install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warn "dotf tools install failed (continuing; re-run 'dotf tools install')"
     }
 }
 
@@ -661,7 +633,6 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
     # deployed from the dotfiles SSOT. Cadence matches Linux: every 15 min.
     # Self-healing: re-register when the action OR the S4U principal drift, so a
     # box that still has the old Interactive (windowed) task gets repaired.
-    $hiveUvExe = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
     $hiveUpgradeTask = "DotfilesHiveUpgrade"
     $hiveUpgradeSrc = Join-Path $DotfilesDir "windows\hive-upgrade.ps1"
     $hiveUpgradeDst = Join-Path $ClaudeHome "scripts\hive-upgrade.ps1"
@@ -700,8 +671,8 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
             if ($script:HiveTaskLogonType -ne 'S4U') {
                 Write-Info "not elevated: windowless S4U registration unavailable; using Interactive logon with -WindowStyle Hidden"
             }
-            if (-not (Test-Path $hiveUvExe)) {
-                Write-Warn "hive-upgrade task registered but uv not found at $hiveUvExe"
+            if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+                Write-Warn "hive-upgrade task registered but uv is not on PATH"
             }
         } catch {
             Write-Warn "Could not register hive-upgrade task (non-fatal; setup still upgrades hive each run): $_"

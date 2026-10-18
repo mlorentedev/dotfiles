@@ -49,10 +49,14 @@ type Root interface {
 // Paths are the files the target reads and writes. Tests point them at a
 // temporary tree.
 type Paths struct {
-	SSHDConfig     string // the main config, which must include DropIn's dir
-	DropIn         string
-	HostKey        string // the ed25519 host public key
-	AuthorizedKeys string
+	SSHDConfig string // the main config, which must include DropIn's dir
+	DropIn     string
+	// RelativeInclude says sshd reads only a relative Include, resolved
+	// against SSHDConfig's directory: Win32-OpenSSH prefixes any other form
+	// with that directory and matches nothing (#2763).
+	RelativeInclude bool
+	HostKey         string // the ed25519 host public key
+	AuthorizedKeys  string
 	// AdminKeys says AuthorizedKeys is a root-owned file that only
 	// administrators may read: Windows' administrators_authorized_keys,
 	// which sshd reads for every member of Administrators instead of the
@@ -101,13 +105,14 @@ func DefaultPaths(home string) Paths {
 func WindowsPaths(programData, home string) Paths {
 	ssh := winJoin(programData, "ssh")
 	return Paths{
-		SSHDConfig:     winJoin(ssh, "sshd_config"),
-		DropIn:         winJoin(ssh, "sshd_config.d", "01-workstation.conf"),
-		HostKey:        winJoin(ssh, "ssh_host_ed25519_key.pub"),
-		AuthorizedKeys: winJoin(ssh, "administrators_authorized_keys"),
-		AdminKeys:      true,
-		ClientKey:      winJoin(home, ".ssh", "id_ed25519"),
-		Record:         winJoin(programData, "dotf", "workstation-target.json"),
+		SSHDConfig:      winJoin(ssh, "sshd_config"),
+		DropIn:          winJoin(ssh, "sshd_config.d", "01-workstation.conf"),
+		RelativeInclude: true,
+		HostKey:         winJoin(ssh, "ssh_host_ed25519_key.pub"),
+		AuthorizedKeys:  winJoin(ssh, "administrators_authorized_keys"),
+		AdminKeys:       true,
+		ClientKey:       winJoin(home, ".ssh", "id_ed25519"),
+		Record:          winJoin(programData, "dotf", "workstation-target.json"),
 	}
 }
 
@@ -607,15 +612,44 @@ func (t Target) checkInclude() error {
 			continue
 		}
 		for _, pattern := range f[1:] {
-			if strings.HasPrefix(pattern, dir+"/") {
+			if resolved, ok := t.includes(pattern, dir); ok {
 				if len(first) > 0 {
 					return shadowed(t.Paths.SSHDConfig+" above its Include", first)
 				}
-				return t.checkEarlierDropIns(pattern, ours)
+				return t.checkEarlierDropIns(resolved, ours)
 			}
 		}
 	}
+	if t.Paths.RelativeInclude {
+		rel, err := filepath.Rel(filepath.Dir(t.Paths.SSHDConfig), dir)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("%s does not include the drop-in dir in the form sshd reads, `Include %s/*.conf`; an absolute Include is ignored: the drop-in would never be read",
+			t.Paths.SSHDConfig, filepath.ToSlash(rel))
+	}
 	return fmt.Errorf("%s does not include %s/: the drop-in would never be read", t.Paths.SSHDConfig, dir)
+}
+
+// includes resolves an Include pattern as sshd does, a relative one against
+// the main config's directory, and says whether it reaches the drop-in dir.
+// Where sshd reads only a relative Include, any other form reaches nothing.
+func (t Target) includes(pattern, dir string) (string, bool) {
+	slash := func(p string) string { return strings.ReplaceAll(p, `\`, "/") }
+	absolute := filepath.IsAbs(pattern)
+	if t.Paths.RelativeInclude {
+		p := slash(pattern)
+		absolute = strings.HasPrefix(p, "/") || strings.HasPrefix(strings.ToUpper(p), "__PROGRAMDATA__") ||
+			(len(p) > 1 && p[1] == ':')
+		if absolute {
+			return "", false
+		}
+	}
+	resolved := pattern
+	if !absolute {
+		resolved = filepath.Join(filepath.Dir(t.Paths.SSHDConfig), pattern)
+	}
+	return resolved, strings.HasPrefix(slash(resolved), slash(dir)+"/")
 }
 
 // checkEarlierDropIns reads the drop-ins the Include reaches before ours:
