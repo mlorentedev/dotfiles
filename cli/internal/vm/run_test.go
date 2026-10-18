@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -59,8 +61,13 @@ func (g *fakeGuest) Start(args []string, _ io.Writer) (Process, error) {
 	return p, nil
 }
 
+// Img creates a run's overlay, the only image a run makes; anything else is
+// refused rather than written to wherever its last argument points.
 func (g *fakeGuest) Img(args ...string) error {
 	g.imgs = append(g.imgs, args)
+	if !slices.Contains(args, "-b") {
+		return fmt.Errorf("fake qemu-img: not an overlay: %v", args)
+	}
 	return os.WriteFile(args[len(args)-1], []byte("overlay"), 0o644)
 }
 
