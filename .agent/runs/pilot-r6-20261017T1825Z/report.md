@@ -48,3 +48,12 @@ Window covered by `caffeinate -i -t 36000`. The run ended early, so no suspend w
 ## Next action
 
 Free one WIP slot and open one spec covering #1975-A and #2448-A.
+
+## Addendum, 2026-10-18: what happened after the run ended
+
+The run's park was superseded by an owner-authorised chain (relayed by session dotfiles-20): spec CLI-094 covered #1975-A and #2448-A and landed in three increments (#2712 spec, #2719 PENDING refusal, #2722 write-first prompt, #2726 stall watcher and stop record). Round 1 of the independent review failed on a real blocker (the transcript sink buffered until EOF, so the watched file stayed empty; fixed in #2743 with lesson 482). Round 2 passed with gaps and CLI-094 was archived in #2779, closing #1975 and #2448. The follow-ups are #2777 (measure inter-event gaps before trusting the 10m stall timeout) and #2778 (stop lines reach only the `.stderr` side file). Report of that arc: `.agent/runs/cli094-20261018T1035Z/report.md` on chore/autopilot-cli094-20261018.
+
+Corrections and lessons for this run itself:
+- The wake-lock died three times (a `caffeinate` started with `&` dies with the tool call; `run_in_background` survives). A power cut then killed the tmux server and the scratchpad; the round-1 `review.md` was intact in the review worktree, so my first "lost" wording was wrong.
+- `dotf pr land` waited about 20 minutes on the shared GraphQL budget at times; REST (`gh api`) did not.
+- The run authored and triaged its own PRs and only PR-Agent reviewed them; that was disclosed in each triage comment.
