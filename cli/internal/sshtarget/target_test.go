@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -30,6 +31,7 @@ type machine struct {
 	sshdT      error // what `sshd -t` returns
 	accepts    func(addr string) bool
 	unreached  string // an address ssh times out on before reaching sshd
+	printErr   error  // what `launchctl print` fails with, when not nil
 	rootCalls  []string
 	forbidRoot bool
 }
@@ -110,6 +112,9 @@ func (m *machine) Run(argv ...string) ([]byte, error) {
 func (m *machine) user(argv ...string) ([]byte, error) {
 	switch argv[0] {
 	case "launchctl":
+		if m.printErr != nil {
+			return []byte("Bad request."), m.printErr
+		}
 		if m.loaded {
 			return nil, nil
 		}
@@ -150,6 +155,21 @@ func TestInspectPlansEveryResourceWithoutRoot(t *testing.T) {
 	}
 	if !p.Mesh.Equal(meshIP) || !p.LAN.Equal(lanIP) {
 		t.Errorf("addresses = %v, %v; want %v, %v", p.Mesh, p.LAN, meshIP, lanIP)
+	}
+}
+
+// A print that fails for another reason than an unknown service stops the plan:
+// planning a root bootstrap over a service that was never read is #2731.
+func TestInspectStopsWhenLaunchdCannotBeRead(t *testing.T) {
+	m := newMachine(t)
+	m.forbidRoot = true
+	m.printErr = exitErr(5)
+	p, err := m.target().Inspect()
+	if err == nil || !strings.Contains(err.Error(), launchdLabel) {
+		t.Fatalf("Inspect = %v, %v; want an error naming %s", p.Pending, err, launchdLabel)
+	}
+	if slices.Contains(p.Pending, "sshd service") {
+		t.Errorf("planned the sshd service over a failed read: %v", p.Pending)
 	}
 }
 
