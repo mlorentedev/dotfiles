@@ -20,3 +20,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
 - 20:44Z: wintarget lane: #2791 (8b233338), #2799 (SEC-014 PR 2, c46aa55b), #2807 (companion). Land order 2791, 2799 (merge main, target.go conflict), 2807. sshtarget stays theirs.
 - 21:03Z: night run landed #2795, #2805, #2798 (#2753, #2760, #2690); #2759 parked A/B, #2809 in CI; next #2797 (doctor/checks_skill_records, memlink, vault/*), cleared, with a reminder to check its own filter.
 - 21:03Z: night run declined #2797 (outside its committed filter); it ends queue-empty after #2809. #2797 and #2806 wait for the owner.
+- 21:23Z: selfdeploy run ended queue-empty, 3/3 done: #2787 (closes #2727), #2808 (closes #2696). Filed #2792. Released converge/selfdeploy*, cmd/update*. Report on chore/autopilot-selfdeploy-run (never merge).
