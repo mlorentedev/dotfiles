@@ -15,3 +15,6 @@ Armed 18:33Z, expires 02:33Z. Wake-lock: `caffeinate -i -s -t 28800`, on AC powe
 | 20:40 | #2690 | #2798 landed at `1d21211` after waiting on another session's land lock (PID 35302). pr-agent finding applied: the PR body named the run as author |
 | 20:45 | attribution | Rewrote six claim, park and triage comments, plus the body of #2797, to drop the run name. Root cause filed as #2806 (the skill's claim template) |
 | — | #2749 | Neither land waited on a verdict (the attestation was already green); no live evidence yet |
+| 21:00 | #2760 | #2805 landed at `a5f03dc` and closed #2760. pr-agent raised two process findings: SDD declined (6 production lines), triage evidence pasted into the comment |
+| 21:00 | #2690 | Board said In Progress after the close; set to Done |
+| 21:10 | #2759 | #2809 opened: the message half (`Refs`), red→green test, live run over a Gitea origin |
