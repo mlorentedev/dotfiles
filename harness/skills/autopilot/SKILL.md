@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: dad72ddad5eb26d5
+generated_sha: da95f19a047826e5
 id: autopilot-skill
 type: skill
 status: active
@@ -129,10 +129,11 @@ A ticket is pilot-eligible only if ALL hold:
 - **Atomic Claim:** Self-assign the ticket to lease it:
   ```bash
   gh issue edit "$ISSUE_NUM" --add-assignee "@me"
-  CLAIM_FILE=$(mktemp); printf '%s\n' "Picked up in autonomous pilot mode. Branch: feat/<slug>" > "$CLAIM_FILE"
+  CLAIM_FILE=$(mktemp); printf '%s\n' "Picked up. Branch: feat/<slug>" > "$CLAIM_FILE"
   dotf forge issue comment "$ISSUE_NUM" --body-file "$CLAIM_FILE"
   ```
   *Note:* Self-assignment updates the Bitácora status machine to `In Progress`.
+  *No attribution on GitHub:* the claim, park and triage comments, PR bodies and commit messages never name a run, an agent, an autopilot mode or a run id. The harness override requires every GitHub artifact to read as human-authored. The run id belongs only on the run branch's report, which is not a GitHub message (dotfiles#2806).
 - **One Ticket at a Time:** Never multitask across multiple tickets in parallel within the same session.
 
 ---
@@ -280,6 +281,8 @@ An agent may merge a PR **it opened** ONLY when all six conditions hold on the *
 | 5 | **Grant in Force** | The operator authorized pilot mode AND the repository carries `.github/merge-grant.yml` on its base branch. |
 | 6 | **Scope Unchanged** | Head SHA matches the reviewed commit. No unreviewed commits injected during conflict resolution. |
 
+**Self-triage disclosure, without attribution.** When the PR's author also triages it, the `## Review triage` comment says so in exactly those terms: "the PR author did this triage". It never names a run, an agent or a mode (dotfiles#2806). Disclosure is about independence, not about who or what the author is.
+
 ### Landing Execution:
 
 ```bash
@@ -406,7 +409,7 @@ verdict to pending — absence must be red.
 | "The envelope is mine, so I can widen it for this one item" | A privilege the subject can widen is not a privilege. The fence reads the *committed* copy, and a mutated envelope halts the run. |
 | "I'll arm without a wake-lock, it'll be fine" | The dominant absence is a closing laptop lid. No lock, no covered window — and the report must say the window was not covered. |
 | "Nothing eligible in the queue, so I'll file the ticket I think we need" | The empty set ends the run. A loop rewarded for motion produces motion. |
-| "It's my own PR, so I'll triage my own reviewer findings and land it" | Permitted under the grant, and it must be **disclosed**: the triage comment states it was authored by the run. Disclosure is not independence — say which one you are. |
+| "It's my own PR, so I'll triage my own reviewer findings and land it" | Permitted under the grant, and it must be **disclosed**: the triage comment states that the PR author did the triage, never naming a run or an agent (§5). Disclosure is not independence — say which one you are. |
 | "I'll park it by moving the board card" | `dotf ticket` does not exist. Park with a comment carrying two options, then set the board Status to `Blocked` with `gh project item-edit --field Status --value Blocked`. |
 
 ---
