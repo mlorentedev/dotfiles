@@ -3,6 +3,7 @@ package converge
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -113,5 +114,38 @@ func TestShellCompletions_AnEmptyOrFailingCompletionIsAnError(t *testing.T) {
 	}
 	if _, err := completionsStep(nil, "dotf").Reconcile(env, false); err == nil || !strings.Contains(err.Error(), "dotf completion zsh") {
 		t.Errorf("failing completion: err=%v", err)
+	}
+}
+
+// TestExecStdoutHelperProcess is not a test: re-exec'd with the env var set, it
+// writes one line to each stream, the way a tool prints a deprecation warning
+// beside its completion script.
+func TestExecStdoutHelperProcess(t *testing.T) {
+	if os.Getenv("DOTF_EXECSTDOUT_HELPER") != "1" {
+		return
+	}
+	_, _ = os.Stdout.WriteString("#compdef dotf\n")
+	_, _ = os.Stderr.WriteString("warning: deprecated flag\n")
+	os.Exit(0)
+}
+
+// #2686: every other test injects a fake runner, so this is the one that runs
+// ExecStdout against a real child. Appending stderr would write the tool's
+// warning into the file compinit loads.
+func TestExecStdout_KeepsAToolsStderrOutOfTheCompletion(t *testing.T) {
+	t.Setenv("DOTF_EXECSTDOUT_HELPER", "1")
+	args := []string{"-test.run=^TestExecStdoutHelperProcess$"}
+
+	both, err := exec.Command(os.Args[0], args...).CombinedOutput() //nolint:gosec // the test binary itself
+	if err != nil || !strings.Contains(string(both), "warning: deprecated flag") {
+		t.Fatalf("helper must write to stderr for this test to mean anything: err=%v out=%q", err, both)
+	}
+
+	out, err := ExecStdout(os.Args[0], args...)
+	if err != nil {
+		t.Fatalf("ExecStdout: %v", err)
+	}
+	if string(out) != "#compdef dotf\n" {
+		t.Errorf("ExecStdout returned %q, want stdout alone", out)
 	}
 }
