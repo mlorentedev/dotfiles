@@ -16,3 +16,7 @@ Cold start: `dotf doctor --quick` 21 passed, 0 failed; `gh auth status` ok; `dot
 | 10:42 | #2775 | merged main (`9bd38b27`), go test/vet/lint ok, pushed, marked ready (<50 prod LOC, no spec gate) |
 | 10:45 | #2772 | merged main, ticked PR 3c + AC9, evidence in verification.md (`8760e4fa`), pushed; stays draft until #2770/#2775 land |
 | 10:50 | #2764 | claimed; TDD red with the guest's error → `/qh`; PR #2780 ready. Guest probes after this were DENIED by the auto-mode classifier ([Security Weaken]); no further guest commands |
+| 10:52 | #2780 | knowledge-gate red: the Runbook line named a path the PR does not change; body reworded via REST |
+| 10:55 | #2758 | claimed; TDD red (raw read error) → probe the service when sshd_config is missing; mutation killed; PR #2781 |
+| 11:05 | #2765 | claimed; TDD red ×2 → Windows firewall refusal surfaces at plan; failed apply returns 0 changes + `planned as root: …; <err>`; PR #2782 |
+| 11:20 | #2763 | advisor: ship part 1 (Include form), park part 2 (sshd -T proof). Part 1 TDD red, 2 mutations killed, PR #2783 (Refs, skip-sdd + rationale). Part 2 parked: ERROR/WHY/FIX comment, board Blocked (verified) |
