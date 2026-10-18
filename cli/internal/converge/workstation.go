@@ -73,7 +73,13 @@ func (r workstationTarget) Reconcile(e Env, dryRun bool) (Result, error) {
 	if errors.Is(err, sshtarget.ErrNoTerminal) || errors.Is(err, sshtarget.ErrNotElevated) {
 		return Result{Skip: err.Error() + "; " + workstationDetail(p, true)}, nil
 	}
-	return res, err
+	if err != nil {
+		// Apply undoes what it changed, so nothing is kept and the line is the
+		// error alone: the plan it tried, then what failed and whether the undo
+		// ran. Never a change kept or a proof that did not run (#2765).
+		return Result{}, fmt.Errorf("planned as root: %s; %w", strings.Join(p.Pending, ", "), err)
+	}
+	return res, nil
 }
 
 // Probe re-inspects, then asks sshd again from both addresses: a later change

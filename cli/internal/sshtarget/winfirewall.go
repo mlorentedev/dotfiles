@@ -154,12 +154,17 @@ func (s fwState) converged() bool {
 	return s.Exists && s.Enabled == "True" && s.Action == "Allow" && meshOnly(s.Remote, s.Iface)
 }
 
+// Differs reports a refusal as the error it is: the plan reads every input
+// Apply's refusal does, so it says so before an apply is tried (#2765).
 func (w WindowsFirewall) Differs() (bool, error) {
 	s, err := w.state()
 	if err != nil {
 		return false, err
 	}
-	return !s.converged() || s.refusal() != nil, nil
+	if err := s.refusal(); err != nil {
+		return false, err
+	}
+	return !s.converged(), nil
 }
 
 // Apply narrows the sshd rule to the mesh, or creates it narrow when the
