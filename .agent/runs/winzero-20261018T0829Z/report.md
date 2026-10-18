@@ -1,6 +1,6 @@
 # Run report — winzero-20261018T0829Z
 
-**Verdict:** run winzero-20261018T0829Z ended queue-empty at 16:11Z after 8 items / 7h42m of window (about 3h40m of it lost to two usage-limit pauses) — 8 done, 1 parked, 7 merged by this run, 0 unmerged.
+**Verdict:** run winzero-20261018T0829Z ended queue-empty at 16:11Z after 8 items / 7h42m of window — 7 done, 1 split (#2763: part 1 landed, part 2 parked), 7 merged by this run, 0 unmerged.
 The objective is met: a clean Windows 11 guest converged from zero and the second converge changed nothing (PLAT-003 AC9, recorded in `specs/PLAT-003-cross-os-verification/verification.md` and on #2344). Nothing irreversible waits on you beyond the merges below, which are already on main.
 
 ## Waiting on you — irreversible first
@@ -39,6 +39,8 @@ The objective is met: a clean Windows 11 guest converged from zero and the secon
 - **Guest commands were denied** by the auto-mode classifier after 10:50Z. #2780's `/qh` and #2772's hash check were therefore not re-run in the guest: `/qh` rests on the earlier guest measurement (a measurement build of main with `/qh` worked), the hash check on its unit test and two killed mutations.
 - **A unit test booted the real guest twice, by accident (about 15:45Z).** The red phase of a new `--dotf` refusal test (an Arm64 PE that is no executable image) ran the command past the missing check. On this Mac it found the sealed `clean-base`, booted a throwaway overlay, copied the few-byte fixture in, and failed in `install.ps1` after about 85 s. QEMU exited and the overlay was removed (checked: no `qemu-system` process). No credential or host directory reaches the guest, by construction. The refusal tests now point dotf's state at an empty directory, so a regression fails in under a second (#2772, lesson 489).
 - **Two usage-limit pauses** (08:29–10:31Z and about 11:50–15:30Z). The wake-lock held; no work ran in the gaps.
+
+- **For the PLAT-003 archive review:** `verification.md`'s AC9 bullet mentions the post-step hash check inside the live-run paragraph, but that check came after the run and never ran in a guest (the #2772 body says so; the spec does not).
 
 ## Evidence index
 
