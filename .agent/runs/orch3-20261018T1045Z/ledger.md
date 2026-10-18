@@ -15,3 +15,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
 - 18:36Z: selfdeploy run narrowed to converge/selfdeploy*.go, cmd/update.go(+test), schedule/**, update/**. cross-os told the rest of cmd/ is free for #1719 (park if .golangci.yml is needed).
 - 18:44Z: owner ran workstation-target on macmini (0.75.0): 1 changed (firewall, state record), proofs passed; re-plan 0 to change. Posted on #2356 and #2388.
 - 18:46Z: wintarget opened draft #2791 (#2755); filed #2790 (RunAtLoad takes an unrecorded pf reference per bootstrap, options A/B, owner). Queued for the owner, not urgent.
+- 19:46Z: orch5 landed #2802 (closes #2776; #2749 verdict wait fired live), parked #2761 and #2634, filed #2803. Refilled: #2803 (unheld packages only), #1906, #1750.
