@@ -1,0 +1,33 @@
+# Arming envelope for the night cross-os run. Owner instruction 2026-10-18
+# ~18:30Z ("armar un autopilot de 8h"), queue chosen in this session:
+# PLAT-003 AC8, #2678 (pre-commit half), #2752 option A (prepared, never
+# landed: it widens dotf pr land's authority, so the owner lands it), then
+# whatever session dotfiles-20 assigns. Park with two options anything that
+# needs a spec slot (WIP over limit, no override), a Windows box, a .github
+# change or an owner choice.
+version: 1
+run_id: "night-cross-os-20261018T1834Z"
+armed_by: manu
+armed_at: 2026-10-18T18:34:00Z
+expires_at: 2026-10-19T02:34:00Z
+objective: "Close PLAT-003 AC8 and #2678's pre-commit half, prepare #2752 option A for the owner, then work dotfiles-20's assignments, landing or parking each."
+scope:
+  write_paths: ["cli/**", "docs/lessons/**", "docs/runbooks/**", "specs/**", "tests/**", ".pre-commit-config.yaml"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "setup-*.sh", "setup-*.ps1", "install.sh", "install.ps1", "versions.conf", "packages.json"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, mise, jq, limactl, pwsh, bats, shellcheck, pre-commit]
+queue:
+  source: bitacora
+  filter: "PLAT-003 AC8 (#2344), #2678 (pre-commit half), #2752 (option A, never landed by the run), then tickets session dotfiles-20 assigns by message (each named in the report)"
+  max_items: 6
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+  spec_init: never
