@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/gitconfig"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
@@ -27,7 +29,19 @@ type checkout struct {
 	run gitconfig.Runner // gitconfig.ExecRunner in production
 	url string
 	has func(name string) bool
+	// installer installs git where the OS manager can (gitTool); nil leaves a
+	// missing git to the hint. gitDirs are where that install places git,
+	// which this process's PATH, read before the install, does not reach.
+	installer CatalogInstaller
+	gitDirs   []string
 }
+
+// gitTool is git through the OS package manager. It is defined here, not in
+// packages.json, because the step that needs it runs before any checkout
+// exists to read the catalog from. Only winget names it: dotf never asks for
+// a sudo password, and macOS's git comes with the Command Line Tools, so on
+// those the plan is unsupported and the failure names the command instead.
+var gitTool = tools.Tool{Name: "git", Source: tools.Source{Type: "system", Winget: "Git.Git"}}
 
 func (checkout) Name() string        { return "checkout" }
 func (checkout) Platforms() []string { return nil }
@@ -65,8 +79,21 @@ func (c checkout) clone(e Env, dryRun bool) (Result, error) {
 		Detail:  "clone " + c.url + " into " + e.RepoRoot,
 		Gate:    "waits for checkout: not cloned yet",
 	}
+	installed := ""
 	if !c.has("git") {
-		return res, fmt.Errorf("git is not on PATH, so %s cannot be cloned%s", e.RepoRoot, gitHint(e.GOOS))
+		if !c.canInstallGit() {
+			return res, fmt.Errorf("git is not on PATH, so %s cannot be cloned%s", e.RepoRoot, gitHint(e.GOOS))
+		}
+		if dryRun {
+			res.Detail = "install git (" + gitTool.Source.Winget + "), then " + res.Detail
+			return res, nil
+		}
+		// No hint here: it would name the install that just failed, and the
+		// manager's own error is the cause.
+		if err := c.installGit(); err != nil {
+			return res, fmt.Errorf("%w, so %s cannot be cloned", err, e.RepoRoot)
+		}
+		installed = "installed git, then "
 	}
 	if dryRun {
 		return res, nil
@@ -74,8 +101,45 @@ func (c checkout) clone(e Env, dryRun bool) (Result, error) {
 	if _, err := c.run("git", "clone", "--quiet", c.url, e.RepoRoot); err != nil {
 		return res, fmt.Errorf("git clone %s: %w%s", c.url, withStderr(err), gitHint(e.GOOS))
 	}
-	res.Detail = "cloned " + c.url + " into " + e.RepoRoot
+	res.Detail = installed + "cloned " + c.url + " into " + e.RepoRoot
 	return res, nil
+}
+
+// GitBinDirs are where winget's Git.Git places git.exe: Program Files for the
+// machine-scope installer it runs by default, LocalAppData for a user-scope
+// one. Elsewhere the step installs no git, so there are none.
+func GitBinDirs(goos string, getenv func(string) string) []string {
+	if goos != "windows" {
+		return nil
+	}
+	var dirs []string
+	if p := getenv("ProgramFiles"); p != "" {
+		dirs = append(dirs, filepath.Join(p, "Git", "cmd"))
+	}
+	if l := getenv("LOCALAPPDATA"); l != "" {
+		dirs = append(dirs, filepath.Join(l, "Programs", "Git", "cmd"))
+	}
+	return dirs
+}
+
+// canInstallGit reports whether the OS manager would install git here.
+func (c checkout) canInstallGit() bool {
+	return c.installer != nil && c.installer.Plan(gitTool).Action == tools.PlanInstall
+}
+
+// installGit installs git through the OS manager and puts where it lands on
+// this process's PATH, so the clone that follows finds it.
+func (c checkout) installGit() error {
+	if _, err := c.installer.Install(gitTool); err != nil {
+		return fmt.Errorf("installing git: %w", err)
+	}
+	if err := appendToPath(c.gitDirs); err != nil {
+		return err
+	}
+	if !c.has("git") {
+		return fmt.Errorf("installed git, but it is not on PATH (looked in %s)", strings.Join(c.gitDirs, ", "))
+	}
+	return nil
 }
 
 // syncResult reads a Sync or Assess outcome as a step result. Only an
@@ -152,8 +216,13 @@ func lastLineOf(s string) string {
 // gitHint names how to get git where a fresh machine lacks it. On macOS the
 // /usr/bin/git shim exists before the Command Line Tools do, and fails.
 func gitHint(goos string) string {
-	if goos == "darwin" {
+	switch goos {
+	case "darwin":
 		return " (on macOS, install the Command Line Tools: xcode-select --install)"
+	case "linux":
+		return " (install it: sudo apt-get install -y git)"
+	case "windows":
+		return " (install it: winget install --id Git.Git -e)"
 	}
 	return ""
 }

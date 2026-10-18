@@ -151,6 +151,16 @@
       }
     },
     {
+      "name": "git",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "apt": "git",
+        "winget": "Git.Git",
+        "command": "git"
+      }
+    },
+    {
       "name": "git-lfs",
       "profile": "full",
       "source": {
