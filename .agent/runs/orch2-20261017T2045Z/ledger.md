@@ -36,3 +36,4 @@ Not relayed: #2724 (A/B unpicked; A is .github), #2727 (waits on #2502 A/B), #26
 - 04:36Z: owner picked #2744 option A; relayed to wD:p1 (feat-worktree-one-root).
 - 04:40Z: #2356 pf measurements (owner, root) posted; all three confirm the design. #2681 found already merged (2179c8b4, 04:29Z). Relayed to w1E:p1 (wintarget).
 - 07:41Z: answered resume lead (TOOL-117 forge pool consult). #2750 (owner via fix-bug-sweep-0d) relayed to wD:p1.
+- 07:49Z: owner decided TOOL-117 shape (draw in dotf, one reader); recorded on kubelab#2295; step 1 (#2468 + #1957) relayed to resume lead.
