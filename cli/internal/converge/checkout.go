@@ -88,8 +88,10 @@ func (c checkout) clone(e Env, dryRun bool) (Result, error) {
 			res.Detail = "install git (" + gitTool.Source.Winget + "), then " + res.Detail
 			return res, nil
 		}
+		// No hint here: it would name the install that just failed, and the
+		// manager's own error is the cause.
 		if err := c.installGit(); err != nil {
-			return res, fmt.Errorf("%w, so %s cannot be cloned%s", err, e.RepoRoot, gitHint(e.GOOS))
+			return res, fmt.Errorf("%w, so %s cannot be cloned", err, e.RepoRoot)
 		}
 		installed = "installed git, then "
 	}

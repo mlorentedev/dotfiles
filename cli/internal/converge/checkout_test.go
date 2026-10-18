@@ -173,6 +173,7 @@ func TestCheckout_NoGitFromZeroFailsWithTheFix(t *testing.T) {
 type gitInstaller struct {
 	plan     tools.PlanAction
 	installs *int
+	fail     error // returned by Install when set
 }
 
 func (g gitInstaller) Plan(t tools.Tool) tools.Plan {
@@ -184,6 +185,9 @@ func (g gitInstaller) Install(t tools.Tool) (tools.Result, error) {
 		return tools.Skipped, errors.New("unexpected install of " + t.Name)
 	}
 	*g.installs++
+	if g.fail != nil {
+		return tools.Skipped, g.fail
+	}
 	return tools.Installed, nil
 }
 
@@ -236,6 +240,21 @@ func TestCheckout_AnInstalledGitItCannotReachFails(t *testing.T) {
 
 	if _, err := f.step.Reconcile(f.env, false); err == nil || !strings.Contains(err.Error(), "installed git, but it is not on PATH") {
 		t.Fatalf("want the unreachable install named, got %v", err)
+	}
+}
+
+// A failed install reports the manager's error and no hint: the hint would
+// name the same install that just failed.
+func TestCheckout_AFailedGitInstallNamesItsCauseNotTheHint(t *testing.T) {
+	f := newCheckoutFixture(t)
+	installs := 0
+	f.env.GOOS = "windows"
+	f.step.has = func(string) bool { return false }
+	f.step.installer = gitInstaller{plan: tools.PlanInstall, installs: &installs, fail: errors.New("winget exited 1")}
+
+	_, err := f.step.Reconcile(f.env, false)
+	if err == nil || !strings.Contains(err.Error(), "winget exited 1") || strings.Contains(err.Error(), "winget install --id") {
+		t.Fatalf("want the install's error without the hint, got %v", err)
 	}
 }
 
