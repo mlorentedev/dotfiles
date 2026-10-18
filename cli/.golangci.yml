@@ -17,9 +17,9 @@ linters:
           msg: read System.GOOS, the target-OS seam, so tests can run every branch
     gocyclo:
       # HARNESS-150. The largest function in internal/cmd today is
-      # newSpecReviewCmd at 22, so anything that grows past it fails lint. The
-      # line only moves down, one extraction at a time.
-      min-complexity: 22
+      # newHarnessSuggestCmd at 21, so anything that grows past it fails lint.
+      # The line only moves down, one extraction at a time (#1719 takes it to 15).
+      min-complexity: 21
   exclusions:
     rules:
       # Scoped to internal/cmd, where the command closures grow. Other packages
