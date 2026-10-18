@@ -113,7 +113,7 @@ func (m *machine) user(argv ...string) ([]byte, error) {
 		if m.loaded {
 			return nil, nil
 		}
-		return nil, errors.New("exit status 113")
+		return []byte("Could not find service"), exitErr(113)
 	case "ssh":
 		target := argv[len(argv)-2]
 		addr := target[strings.Index(target, "@")+1:]
