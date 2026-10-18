@@ -210,6 +210,11 @@ func syncDetail(p tools.SyncPlan, total int, dryRun bool) string {
 	if p.ConfigChanged {
 		parts = append(parts, "mise config to write")
 	}
+	// Apply names what it pruned after the write; before it, only the config
+	// diff can say what the write will drop (#2744).
+	if dryRun && len(p.Dropped) > 0 {
+		parts = append(parts, "dropped from the mise config (pruned on apply): "+strings.Join(p.Dropped, ", "))
+	}
 	if len(p.Missing) > 0 {
 		parts = append(parts, verb+": "+strings.Join(p.Missing, ", "))
 	}

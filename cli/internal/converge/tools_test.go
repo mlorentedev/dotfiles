@@ -248,6 +248,31 @@ func TestToolsSync_ALatestToolUpstreamHasNotReleasedIsBehindNotFailed(t *testing
 	}
 }
 
+// #2744: a dry run names the tool the config write drops, which mise cannot
+// list as prunable until the write. The apply's own line is the post-write
+// prune listing, so it does not repeat the name.
+func TestToolsSync_DryRunNamesAToolTheConfigWriteDrops(t *testing.T) {
+	env := toolsEnv(t)
+	run, stdout, _ := fakeMise()
+	r := toolsSync{run: run, stdout: stdout, has: func(string) bool { return true }, getenv: func(string) string { return "" }}
+	deployed := filepath.Join(miseConfig(env), "conf.d", "dotfiles.toml")
+	writeFixture(t, filepath.Dir(deployed), map[string]string{"dotfiles.toml": "[tools]\ngh = \"2.80.0\"\njq = \"1.8.2\"\n"})
+
+	plan, err := r.Reconcile(env, true)
+	if err != nil || !strings.Contains(plan.Detail, "dropped from the mise config (pruned on apply): gh") {
+		t.Fatalf("plan: want gh named as dropped, got %+v, %v", plan, err)
+	}
+	applied, err := r.Reconcile(env, false)
+	if err != nil || strings.Contains(applied.Detail, "dropped from the mise config") {
+		t.Errorf("apply: the dry-run line belongs to the plan only, got %+v, %v", applied, err)
+	}
+
+	writeFixture(t, filepath.Dir(deployed), map[string]string{"dotfiles.toml": "[tools\n"})
+	if _, err = r.Reconcile(env, true); err == nil || !strings.Contains(err.Error(), "does not parse") {
+		t.Errorf("plan over an unparseable config: want an error naming it, got %v", err)
+	}
+}
+
 // #2375: an install no pin asks for is drift the plan names, the probe
 // reports and an apply removes, once: the second plan has nothing to prune.
 func TestToolsSync_PlansReportsAndPrunesAnOrphanedInstall(t *testing.T) {
