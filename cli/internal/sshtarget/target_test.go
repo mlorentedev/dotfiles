@@ -315,14 +315,15 @@ func TestInspectNamesAMissingServerBeforeReadingItsConfig(t *testing.T) {
 	tg := m.target()
 	r := &recorder{answers: map[string]answer{"sc.exe qc": {out: "[SC] OpenService FAILED 1060:", err: exitErr(1060)}}}
 	tg.Service = WindowsService{Run: r.run}
-	if _, err := tg.Inspect(); err == nil || !strings.Contains(err.Error(), "Add-WindowsCapability -Online -Name OpenSSH.Server") {
-		t.Fatalf("Inspect = %v, want the capability named", err)
+	_, err := tg.Inspect()
+	if err == nil || !strings.Contains(err.Error(), "Add-WindowsCapability -Online -Name OpenSSH.Server") || !strings.Contains(err.Error(), m.paths.SSHDConfig) {
+		t.Fatalf("Inspect = %v, want the capability and the missing config named", err)
 	}
-	// A service that answers, with the config still missing: the server is
-	// named, not the failed read.
-	_, err := m.target().Inspect()
-	if err == nil || !strings.Contains(err.Error(), "install the OpenSSH server") || strings.Contains(err.Error(), "read ") {
-		t.Fatalf("Inspect = %v, want the missing server named", err)
+	// A service that exists, with the config still missing: never an install
+	// of what is installed, and never the bare failed read.
+	_, err = m.target().Inspect()
+	if err == nil || !strings.Contains(err.Error(), "service is installed") || strings.Contains(err.Error(), "install the OpenSSH") || strings.Contains(err.Error(), "read ") {
+		t.Fatalf("Inspect = %v, want the missing config named for an installed server", err)
 	}
 }
 
