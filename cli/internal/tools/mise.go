@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // MiseMarker marks the versions.conf pin on the next line as a CLI that
@@ -331,6 +333,13 @@ type SyncPlan struct {
 	MissingPackages []string // python packages mise's Python lacks at their pin
 	Outdated        []string // Latest tools installed with a newer release available
 	Orphans         []string // installs no pin asks for, as tool@version (Prune only)
+	// Dropped names the tools the deployed config asks for and the rendered
+	// one does not. Orphans cannot see them before the write, because the
+	// deployed config still references them (#2744). DroppedUnknown says the
+	// deployed config does not parse, so what the write drops is unknown; it
+	// never fails the plan, since Apply's write is what repairs that file.
+	Dropped        []string
+	DroppedUnknown bool
 	// Behind names the Latest tools an Apply upgraded that mise still reports
 	// behind their newest release. That is upstream lag, not a fault here: mise
 	// skips a release younger than minimum_release_age (24h by default), and
@@ -384,6 +393,24 @@ func (s MiseSync) Plan(tools []MiseTool) (SyncPlan, error) {
 	return p, err
 }
 
+// droppedTools returns the [tools] keys of have that want lacks, sorted, and
+// whether either file failed to parse.
+func droppedTools(have, want []byte) (dropped []string, unknown bool) {
+	var h, w struct {
+		Tools map[string]any `toml:"tools"`
+	}
+	if toml.Unmarshal(have, &h) != nil || toml.Unmarshal(want, &w) != nil {
+		return nil, true
+	}
+	for name := range h.Tools {
+		if _, ok := w.Tools[name]; !ok {
+			dropped = append(dropped, name)
+		}
+	}
+	sort.Strings(dropped)
+	return dropped, false
+}
+
 // plan is Plan with a failed orphan listing returned on its own, so that Apply
 // still installs and upgrades when only the prune cannot run.
 func (s MiseSync) plan(tools []MiseTool) (p SyncPlan, unlisted, err error) {
@@ -391,7 +418,11 @@ func (s MiseSync) plan(tools []MiseTool) (p SyncPlan, unlisted, err error) {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return SyncPlan{}, nil, err
 	}
-	p = SyncPlan{ConfigChanged: !bytes.Equal(have, s.render(tools))}
+	rendered := s.render(tools)
+	p = SyncPlan{ConfigChanged: !bytes.Equal(have, rendered)}
+	if p.ConfigChanged && have != nil {
+		p.Dropped, p.DroppedUnknown = droppedTools(have, rendered)
+	}
 	if len(s.PythonPackages) > 0 {
 		pkgs, err := os.ReadFile(s.PythonPackagesPath())
 		if err != nil && !errors.Is(err, os.ErrNotExist) {

@@ -1142,3 +1142,39 @@ func TestSync_DoesNotPruneUnlessAsked(t *testing.T) {
 		t.Errorf("want no prune query and no prune, got orphans %v, %d queries, prunes %v", p.Orphans, f.listPrune, f.prunes)
 	}
 }
+
+// #2744: before the write, `mise ls --prunable` cannot see a tool the new
+// config drops, because the deployed config still asks for it. The plan reads
+// both configs' [tools] tables instead, so a dry run can name the prune.
+func TestSync_PlanNamesTheToolsAConfigWriteDrops(t *testing.T) {
+	kept := []MiseTool{{"age", "1.3.1"}, {"jq", "1.8.2"}}
+	write := func(t *testing.T, body []byte) MiseSync {
+		t.Helper()
+		s := MiseSync{ConfigDir: t.TempDir(), Run: (&fakeMise{installed: map[string]string{}}).run}
+		if body != nil {
+			if err := os.MkdirAll(filepath.Dir(s.ConfigPath()), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(s.ConfigPath(), body, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return s
+	}
+
+	deployed := RenderMiseConfig(append([]MiseTool{{"gh", "2.80.0"}}, kept...), "")
+	p, err := write(t, deployed).Plan(kept)
+	if err != nil || !p.ConfigChanged || strings.Join(p.Dropped, ",") != "gh" || p.DroppedUnknown {
+		t.Errorf("a config that loses gh: want Dropped [gh], got %+v, %v", p, err)
+	}
+
+	p, err = write(t, nil).Plan(kept)
+	if err != nil || len(p.Dropped) != 0 || p.DroppedUnknown {
+		t.Errorf("no deployed config: nothing is dropped, got %+v, %v", p, err)
+	}
+
+	p, err = write(t, []byte("[tools\ngh = ")).Plan(kept)
+	if err != nil || len(p.Dropped) != 0 || !p.DroppedUnknown {
+		t.Errorf("a deployed config that does not parse: want DroppedUnknown and no error, got %+v, %v", p, err)
+	}
+}
