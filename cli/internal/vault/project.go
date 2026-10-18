@@ -1,11 +1,15 @@
 package vault
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 )
 
 // projectEntryFiles maps an embedded template to its path under the personal-
@@ -67,7 +71,11 @@ func WriteProjectEntry(opts ProjectEntryOptions) (ProjectResult, error) {
 	// already tracked; a second entry named after the directory would split
 	// its memory and context in two (#2115).
 	url := withoutCredentials(originURL(opts.RepoRoot))
-	if slug := trackedSlug(opts.VaultPath, url); slug != "" && slug != repo {
+	slug, err := trackedSlug(opts.VaultPath, url)
+	if err != nil {
+		return res, err
+	}
+	if slug != "" && slug != repo {
 		res.Action = "skipped"
 		res.Reason = "repository already tracked as 10_projects/" + slug + " (repo_url " + normalizeRepoURL(url) + ")"
 		res.EntryDir = filepath.Join(opts.VaultPath, "10_projects", slug)
@@ -156,24 +164,62 @@ func withoutCredentials(u string) string {
 
 // trackedSlug is the 10_projects/<slug> whose context.md repo_url names the
 // same repository as url, or "" when none does, url is empty, or two entries
-// claim it (an ambiguity is not resolved by guessing).
-func trackedSlug(vaultPath, url string) string {
+// claim it (an ambiguity is not resolved by guessing). An entry it cannot read
+// is an error, not a "no": that entry may be the one tracking the repository.
+func trackedSlug(vaultPath, url string) (string, error) {
 	want := normalizeRepoURL(url)
 	if want == "" {
-		return ""
+		return "", nil
 	}
-	contexts, _ := filepath.Glob(filepath.Join(vaultPath, "10_projects", "*", "context.md"))
+	contexts, unreadable, err := childFiles(filepath.Join(vaultPath, "10_projects"), "context.md")
+	if err != nil {
+		return "", fmt.Errorf("cannot tell whether the vault already tracks %s: %w", want, err)
+	}
+	if len(unreadable) > 0 {
+		return "", fmt.Errorf("cannot tell whether the vault already tracks %s: %w", want, unreadable[0])
+	}
 	match := ""
 	for _, ctx := range contexts {
 		if normalizeRepoURL(frontmatterValue(ctx, "repo_url")) != want {
 			continue
 		}
 		if match != "" {
-			return ""
+			return "", nil
 		}
 		match = filepath.Base(filepath.Dir(ctx))
 	}
-	return match
+	return match, nil
+}
+
+// childFiles is filepath.Glob(root/*/rel) without its blind spot: Glob drops
+// I/O errors, so an unreadable root or entry read as holding nothing (#2797).
+// It returns the paths that exist (a directory there counts, as with Glob),
+// sorted, the entries whose path could not be checked, and an error when root
+// itself cannot be read. A root that does not exist holds nothing.
+func childFiles(root, rel string) (found []string, unreadable []*fs.PathError, err error) {
+	entries, err := os.ReadDir(root)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, e := range entries {
+		p := filepath.Join(root, e.Name(), rel)
+		_, err := os.Lstat(p)
+		var pe *fs.PathError
+		switch {
+		case err == nil:
+			found = append(found, p)
+		case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
+			// not a project, or a project without the file
+		case errors.As(err, &pe):
+			unreadable = append(unreadable, pe)
+		default:
+			unreadable = append(unreadable, &fs.PathError{Op: "lstat", Path: p, Err: err})
+		}
+	}
+	return found, unreadable, nil
 }
 
 // normalizeRepoURL reduces the SSH, scp-like and HTTPS spellings of one

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -106,4 +107,33 @@ func TestCheckSkillRecordsAgainstVault(t *testing.T) {
 			t.Fatalf("want a skip without a vault\n%s", out)
 		}
 	})
+}
+
+// TestCheckSkillRecordsNamesAnUnreadableRecordsDir: filepath.Glob read an
+// unreadable harness/skills/ as holding no records, so the check passed over
+// it in silence (#2797).
+func TestCheckSkillRecordsNamesAnUnreadableRecordsDir(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not deny reads here")
+	}
+	repo, vault := t.TempDir(), t.TempDir()
+	const src = "00_meta/agents/definitions/builder/AGENT.md"
+	writeRecord(t, repo, "harness/agents/builder/AGENT.md", src, writeSource(t, vault, src, "a1\n"))
+	writeRecord(t, repo, "harness/skills/teardown/SKILL.md", "00_meta/skills/teardown/SKILL.md", "0123456789abcdef")
+	locked := filepath.Join(repo, "harness", "skills")
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) }) //nolint:gosec // restores a test directory so TempDir can remove it
+
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkSkillRecordsAgainstVault(newSys(map[string]string{"DOTFILES_REPO_DIR": repo, "VAULT_PATH": vault}, nil, nil), rep)
+	out := buf.String()
+	if rep.Warnings() != 1 || !strings.Contains(out, "cannot read harness/skills") {
+		t.Errorf("want one warning naming the unreadable records dir, got %d\n%s", rep.Warnings(), out)
+	}
+	if strings.Contains(out, "match their vault source") {
+		t.Errorf("a partial read must not report a clean pass\n%s", out)
+	}
 }

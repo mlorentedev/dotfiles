@@ -171,3 +171,21 @@ func TestOriginURLIsEmptyInsideAnotherRepository(t *testing.T) {
 		t.Errorf("originURL(nested) = %q, want \"\": the directory is not the repository", got)
 	}
 }
+
+// TestWriteProjectEntryRefusesWhenAnEntryCannotBeRead: an unreadable vault
+// project might be the one that tracks this repository, so writing a second
+// entry on that guess would split its memory in two (#2797, #2115).
+func TestWriteProjectEntryRefusesWhenAnEntryCannotBeRead(t *testing.T) {
+	vault := t.TempDir()
+	trackProject(t, vault, "homelab", "https://github.com/owner/kubelab")
+	lockDir(t, filepath.Join(vault, "10_projects", "homelab"))
+	root := repoWithOrigin(t, "kubelab-checkout", "git@github.com:owner/kubelab.git")
+
+	_, err := WriteProjectEntry(ProjectEntryOptions{VaultPath: vault, RepoRoot: root, Date: "2026-10-18"})
+	if err == nil || !strings.Contains(err.Error(), "homelab") {
+		t.Fatalf("want an error naming the unreadable entry, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(vault, "10_projects", "kubelab-checkout")); statErr == nil {
+		t.Error("an entry was written while the vault could not say whether it already tracks the repository")
+	}
+}

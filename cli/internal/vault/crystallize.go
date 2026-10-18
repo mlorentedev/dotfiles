@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
@@ -384,10 +383,20 @@ func CrystallizeAll(w io.Writer, home, today string) error {
 	emit(w, "[INFO] Discovering all projects in %s...\n", projectsDir)
 	emit(w, "\n")
 
-	matches, _ := filepath.Glob(filepath.Join(projectsDir, "*", "memory", "MEMORY.md"))
-	sort.Strings(matches)
+	matches, unreadable, err := childFiles(projectsDir, filepath.Join("memory", "MEMORY.md"))
+	if err != nil {
+		return fmt.Errorf("discovering projects: %w", err)
+	}
 
 	found, skipped := 0, 0
+	// A project that cannot be read is a refusal like any other: counted as
+	// found and skipped, so the summary never reads a partial run as complete.
+	for _, pe := range unreadable {
+		found++
+		skipped++
+		emit(w, "[WARNING] [%s] cannot be read (%v) — skipping\n", filepath.Base(filepath.Dir(filepath.Dir(pe.Path))), pe.Err)
+		emit(w, "\n")
+	}
 	for _, memoryFile := range matches {
 		if st, err := os.Stat(memoryFile); err != nil || st.IsDir() {
 			continue
