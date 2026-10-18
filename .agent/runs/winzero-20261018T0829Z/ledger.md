@@ -12,3 +12,7 @@ Cold start: `dotf doctor --quick` 21 passed, 0 failed; `gh auth status` ok; `dot
 | 10:35 | #2734 | repro in kept guest: git uninstalled, repo moved aside → `installed git, then cloned …`, `1 changed … 0 failed`. Same-shell second run skipped the fast-forward (stale PATH) → fixed in #2770 |
 | 10:36 | #2771 | found merged by mlorentedev at 08:33:33Z (`273c0701`, head `0ff8037e`), not by this run. CodeRabbit finding 3 carried into #2770 |
 | 10:45 | #2770 | merged main (`24c418e8`): GitBinDirs → registered PATH; reach before fast-forward; mutation killed; go test/vet/lint ok; bats 3 files exit 0 |
+| 10:40 | #2770 | live in kept guest: build of `24c418e8`, shell with no Git dir on PATH → `[ OK ] checkout … already current (origin/main)` (was `[SKIP] git is not on PATH`) |
+| 10:42 | #2775 | merged main (`9bd38b27`), go test/vet/lint ok, pushed, marked ready (<50 prod LOC, no spec gate) |
+| 10:45 | #2772 | merged main, ticked PR 3c + AC9, evidence in verification.md (`8760e4fa`), pushed; stays draft until #2770/#2775 land |
+| 10:50 | #2764 | claimed; TDD red with the guest's error → `/qh`; PR #2780 ready. Guest probes after this were DENIED by the auto-mode classifier ([Security Weaken]); no further guest commands |
