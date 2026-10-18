@@ -9,6 +9,7 @@ package lessons
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -236,19 +237,25 @@ func Index(dir string) ([]byte, error) {
 	return []byte(out.String()), nil
 }
 
-// StrayIndexes names every committed _index.md under dir. fmt no longer reads
-// or writes one: a repository that still commits it holds a table nothing
-// regenerates, so --check reports it rather than let it go stale in silence.
+// StrayIndexes names every committed _index.md under dir, at any depth. fmt no
+// longer reads or writes one: a repository that still commits it holds a table
+// nothing regenerates, so --check reports it rather than let it go stale in
+// silence. It walks the whole tree, not lessonDirs, because a stray index is
+// wrong wherever it sits (#2700); a directory it cannot read is an error, not
+// an absence.
 func StrayIndexes(dir string) ([]string, error) {
-	dirs, err := lessonDirs(dir)
-	if err != nil {
-		return nil, err
-	}
 	var out []string
-	for _, d := range dirs {
-		if p := filepath.Join(d, "_index.md"); fileExists(p) {
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && d.Name() == "_index.md" {
 			out = append(out, p)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -328,11 +335,6 @@ func danglingLinks(root string, lessons map[int]string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
-}
-
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
 }
 
 func lessonDirs(dir string) ([]string, error) {

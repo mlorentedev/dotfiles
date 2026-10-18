@@ -291,15 +291,36 @@ func TestIndex_ReportsAnUnreadableCategoryDirectory(t *testing.T) {
 	}
 }
 
+func TestStrayIndexes_ReportsAnUnreadableDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a directory cannot be made unreadable here")
+	}
+	dir := writeTree(t, map[string]string{"lesson-001-a.md": shapes["recent"], "category/sub/_index.md": "# Sub\n"})
+	locked := filepath.Join(dir, "category")
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if got, err := StrayIndexes(dir); err == nil {
+		t.Errorf("an unreadable directory was reported as holding no index: %v", got)
+	}
+}
+
 func TestStrayIndexes_NamesACommittedIndexAtAnyLevel(t *testing.T) {
 	dir := writeTree(t, map[string]string{
 		"_index.md":                "# Index\n",
 		"lesson-001-a.md":          shapes["recent"],
 		"category/_index.md":       "# Category\n",
 		"category/lesson-002-b.md": shapes["inline"],
+		"category/sub/_index.md":   "# Sub\n", // #2700: below the first category level
 	})
 	got, err := StrayIndexes(dir)
-	if err != nil || len(got) != 2 {
-		t.Fatalf("want both indexes named, got %v (err %v)", got, err)
+	want := []string{
+		filepath.Join(dir, "_index.md"),
+		filepath.Join(dir, "category", "_index.md"),
+		filepath.Join(dir, "category", "sub", "_index.md"),
+	}
+	if err != nil || strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("want every index named, root first:\n%v\ngot %v (err %v)", want, got, err)
 	}
 }
