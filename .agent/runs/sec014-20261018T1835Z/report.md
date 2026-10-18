@@ -1,6 +1,6 @@
 # Run sec014-20261018T1835Z
 
-**Verdict:** ended `queue-empty` at about 22:55Z, after 2 items in about 4h20 of the 8h envelope. 2 items done, 0 parked, 3 PRs merged, 0 unmerged. Waiting on you: one acceptance on a host, two A/B decisions and one question. Nothing irreversible was published: no release was cut, and every change in this run sits behind the next release.
+**Verdict:** ended `queue-empty` at about 22:55Z, after 2 items in about 4h20 of the 8h envelope. 2 items done, 0 parked, 3 PRs merged, 0 unmerged. Irreversible: three merges landed on main (#2791, #2799, #2807), all behind the next release; no release was cut. Waiting on you: one acceptance on a host, two decisions and one question.
 
 ## Waiting on you
 
@@ -36,7 +36,8 @@ All three landed under the merge grant: CI green on the head, `dotf pr triage-qu
 
 - Every write stayed inside `write_paths`. #2807 counts as part of item 2 (#2388), not a third item; it was split to respect `max_files: 10`.
 - No root command was run and no converge was run on this host. No lesson was added: no new failure class, and the design notes are in `verification.md`.
-- Host: `caffeinate -s -i -t 28800` held the wake lock for the whole window.
+- Host: `caffeinate -s -i -t 28800` covered the run and stays up until the envelope expires (02:35Z).
+- Evidence at close: `dotf pr triage-queue` (repo-wide) exited 0, `[OK] no reviewer output is awaiting a disposition`.
 
 ## Next action
 
