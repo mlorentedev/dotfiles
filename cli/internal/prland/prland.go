@@ -7,6 +7,7 @@ package prland
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // Facts is what Decide needs, read from GitHub for one head commit.
@@ -29,6 +32,13 @@ type Facts struct {
 	// GrantDeclared is whether the base branch carries GrantFile, the
 	// repository's opt-in to the standing merge grant.
 	GrantDeclared bool
+	// Excluded is the grant's `excluded:` list, read from the base branch
+	// with the grant itself.
+	Excluded []string
+	// Files is every path the PR changes; FilesComplete is false when gh
+	// returned fewer paths than the PR changes, so a path may be missing.
+	Files         []string
+	FilesComplete bool
 	// UnknownFor is how long --wait waited on an UNKNOWN merge state with
 	// every check green, so a refusal can say that waiting was tried.
 	UnknownFor time.Duration
@@ -51,6 +61,16 @@ const releasePrefix = "release-please--"
 // itself the merge.
 const GrantFile = ".github/merge-grant.yml"
 
+// The exclusion kinds that take an argument. A branch prefix only ever
+// forfeits the merge: anyone who can push a branch can choose its name, so a
+// name never grants anything (pattern-git-workflow §9). A path excludes every
+// PR that changes it, whatever its branch is called, so it also catches a
+// promotion opened on a branch nobody named for it.
+const (
+	branchExclusion = "branch:"
+	pathExclusion   = "path:" // an exact path, or a directory when it ends in "/"
+)
+
 // Decide returns every reason the PR cannot land; none means it can.
 func Decide(f Facts) []string {
 	var r []string
@@ -62,6 +82,12 @@ func Decide(f Facts) []string {
 	}
 	if strings.HasPrefix(f.HeadRef, releasePrefix) {
 		r = append(r, "release-please PRs are merged by the owner")
+	}
+	r = append(r, excludedReasons(f, f.Excluded)...)
+	if !f.FilesComplete {
+		r = append(r, "the PR's file list could not be read whole, so it may change "+GrantFile)
+	} else if slices.Contains(f.Files, GrantFile) {
+		r = append(r, "the PR changes "+GrantFile+": a PR that changes the grant is never merged under it")
 	}
 	if len(f.Checks) == 0 {
 		r = append(r, "no checks reported")
@@ -82,6 +108,34 @@ func Decide(f Facts) []string {
 	}
 	if !f.GrantDeclared {
 		r = append(r, "the repository has not opted in to the standing merge grant ("+GrantFile+" on "+f.BaseRef+"): the owner merges this PR")
+	}
+	return r
+}
+
+// excludedReasons applies the grant's exclusions to the head branch. An
+// exclusion of a kind this package does not know refuses the merge rather
+// than being skipped: a grant that says more than its actor reads would be a
+// promise nothing keeps.
+func excludedReasons(f Facts, excluded []string) []string {
+	var r []string
+	for _, e := range excluded {
+		switch {
+		case e == "release-please":
+			// Decide checks releasePrefix whatever the grant says.
+		case strings.HasPrefix(e, branchExclusion) && len(e) > len(branchExclusion):
+			if p := strings.TrimPrefix(e, branchExclusion); strings.HasPrefix(f.HeadRef, p) {
+				r = append(r, "the grant excludes branches starting "+p+": the owner merges this PR")
+			}
+		case strings.HasPrefix(e, pathExclusion) && len(e) > len(pathExclusion):
+			p := strings.TrimPrefix(e, pathExclusion)
+			if i := slices.IndexFunc(f.Files, func(file string) bool {
+				return file == p || strings.HasSuffix(p, "/") && strings.HasPrefix(file, p)
+			}); i >= 0 {
+				r = append(r, "the grant excludes PRs that change "+p+" ("+f.Files[i]+"): the owner merges this PR")
+			}
+		default:
+			r = append(r, fmt.Sprintf("the grant declares an exclusion this version does not understand (%q): the owner merges this PR", e))
+		}
 	}
 	return r
 }
@@ -129,12 +183,12 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	if err != nil {
 		return Result{Number: number}, err
 	}
-	granted, err := grantDeclared(ctx, o, f.BaseRef)
+	g, err := readGrant(ctx, o, f.BaseRef)
 	if err != nil {
 		return Result{Number: number}, err
 	}
 	decide := func(f Facts) []string {
-		f.GrantDeclared = granted
+		f.GrantDeclared, f.Excluded = g.declared, g.excluded
 		return Decide(f)
 	}
 	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: decide(f)}
@@ -184,28 +238,57 @@ func Blockers(ctx context.Context, o Options, number int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if f.GrantDeclared, err = grantDeclared(ctx, o, f.BaseRef); err != nil {
+	g, err := readGrant(ctx, o, f.BaseRef)
+	if err != nil {
 		return nil, err
 	}
+	f.GrantDeclared, f.Excluded = g.declared, g.excluded
 	return Decide(f), nil
 }
 
-// grantDeclared reports whether base carries GrantFile. Only a 404 means it
-// does not; any other failure is an error, because an unanswered question
-// must not read as either answer.
-func grantDeclared(ctx context.Context, o Options, base string) (bool, error) {
+// baseGrant is what the base branch declares in GrantFile.
+type baseGrant struct {
+	declared bool
+	excluded []string
+}
+
+// readGrant reads GrantFile on base. Only a 404 means it is not declared; any
+// other failure, a file that does not decode included, is an error, because
+// an unanswered question must not read as either answer.
+func readGrant(ctx context.Context, o Options, base string) (baseGrant, error) {
 	repo := o.Repo
 	if repo == "" {
 		repo = "{owner}/{repo}" // gh api fills these from the current repository
 	}
-	_, err := o.Run(ctx, "api", "repos/"+repo+"/contents/"+GrantFile+"?ref="+base)
+	out, err := o.Run(ctx, "api", "repos/"+repo+"/contents/"+GrantFile+"?ref="+base)
 	switch {
 	case err == nil:
-		return true, nil
 	case strings.Contains(err.Error(), "HTTP 404"):
-		return false, nil
+		return baseGrant{}, nil
+	default:
+		return baseGrant{}, fmt.Errorf("read %s on %s: %w", GrantFile, base, err)
 	}
-	return false, fmt.Errorf("read %s on %s: %w", GrantFile, base, err)
+	var file struct {
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+	}
+	if err := json.Unmarshal(out, &file); err != nil {
+		return baseGrant{}, fmt.Errorf("read %s on %s: %w", GrantFile, base, err)
+	}
+	if file.Encoding != "base64" {
+		return baseGrant{}, fmt.Errorf("read %s on %s: content encoding %q, want base64", GrantFile, base, file.Encoding)
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(file.Content, "\n", ""))
+	if err != nil {
+		return baseGrant{}, fmt.Errorf("decode %s on %s: %w", GrantFile, base, err)
+	}
+	var doc struct {
+		Excluded []string `yaml:"excluded"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return baseGrant{}, fmt.Errorf("parse %s on %s: %w", GrantFile, base, err)
+	}
+	return baseGrant{declared: true, excluded: doc.Excluded}, nil
 }
 
 // settle reads the facts and, when wait is set, keeps pausing and re-reading
@@ -398,7 +481,7 @@ func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) (
 }
 
 func readView(gh ghFunc, n string) (Facts, error) {
-	out, err := gh("pr", "view", n, "--json", "state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus")
+	out, err := gh("pr", "view", n, "--json", "state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,files,changedFiles")
 	if err != nil {
 		return Facts{}, fmt.Errorf("gh pr view: %w", err)
 	}
@@ -409,11 +492,21 @@ func readView(gh ghFunc, n string) (Facts, error) {
 		HeadRef    string `json:"headRefName"`
 		BaseRef    string `json:"baseRefName"`
 		MergeState string `json:"mergeStateStatus"`
+		Files      []struct {
+			Path string `json:"path"`
+		} `json:"files"`
+		ChangedFiles int `json:"changedFiles"`
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return Facts{}, fmt.Errorf("gh pr view: %w", err)
 	}
-	return Facts{State: v.State, IsDraft: v.IsDraft, HeadSHA: v.HeadSHA, HeadRef: v.HeadRef, BaseRef: v.BaseRef, MergeState: v.MergeState}, nil
+	f := Facts{State: v.State, IsDraft: v.IsDraft, HeadSHA: v.HeadSHA, HeadRef: v.HeadRef, BaseRef: v.BaseRef, MergeState: v.MergeState}
+	for _, p := range v.Files {
+		f.Files = append(f.Files, p.Path)
+	}
+	// gh reads at most 100 paths; a longer list is not proof of absence.
+	f.FilesComplete = len(f.Files) >= v.ChangedFiles
+	return f, nil
 }
 
 func retargetDependents(gh ghFunc, head, base string) ([]int, error) {

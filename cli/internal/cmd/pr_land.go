@@ -63,6 +63,10 @@ func newPrLandCmd() *cobra.Command {
 
   - the PR is open, not a draft, and not a release-please PR (releases are
     cut by a human);
+  - the base branch carries .github/merge-grant.yml, the PR does not change
+    it, and no entry of its excluded: list matches: release-please,
+    branch:<prefix> (the head branch) or path:<file or dir/> (a changed path);
+    an entry of any other kind refuses;
   - every check passed or was skipped;
   - its merge state is CLEAN: up to date with its base, with no conflicts;
   - the triage queue does not list it: reviewer output has been dispositioned.

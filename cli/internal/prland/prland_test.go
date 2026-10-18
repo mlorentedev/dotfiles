@@ -2,6 +2,8 @@ package prland
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -13,6 +15,9 @@ func readyFacts() Facts {
 		State: "OPEN", HeadSHA: "abc123", HeadRef: "feat/x", BaseRef: "main", MergeState: "CLEAN",
 		Checks:        []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}},
 		GrantDeclared: true,
+		Excluded:      []string{"release-please"},
+		Files:         []string{"cli/x.go"},
+		FilesComplete: true,
 	}
 }
 
@@ -37,6 +42,20 @@ func TestDecide_NamesEveryConditionThatFails(t *testing.T) {
 		"closed":            {func(f *Facts) { f.State = "CLOSED" }, "not open"},
 		"release-please PR": {func(f *Facts) { f.HeadRef = "release-please--branches--main" }, "release-please"},
 		"no merge grant":    {func(f *Facts) { f.GrantDeclared = false }, GrantFile},
+		"excluded branch": {func(f *Facts) {
+			f.Excluded, f.HeadRef = append(f.Excluded, "branch:deploy/"), "deploy/errors-1.2.1"
+		}, "deploy/"},
+		"unknown exclusion": {func(f *Facts) { f.Excluded = append(f.Excluded, "label:hold") }, `"label:hold"`},
+		"bare branch kind":  {func(f *Facts) { f.Excluded = append(f.Excluded, "branch:") }, `"branch:"`},
+		"bare path kind":    {func(f *Facts) { f.Excluded = append(f.Excluded, "path:") }, `"path:"`},
+		"excluded path": {func(f *Facts) {
+			f.Excluded, f.Files = append(f.Excluded, "path:infra/k8s/base/kustomization.yaml"), append(f.Files, "infra/k8s/base/kustomization.yaml")
+		}, "change infra/k8s/base/kustomization.yaml"},
+		"excluded directory": {func(f *Facts) {
+			f.Excluded, f.Files = append(f.Excluded, "path:infra/k8s/overlays/prod/"), append(f.Files, "infra/k8s/overlays/prod/patches.yaml")
+		}, "(infra/k8s/overlays/prod/patches.yaml)"},
+		"changes the grant": {func(f *Facts) { f.Files = append(f.Files, GrantFile) }, "changes " + GrantFile},
+		"partial file list": {func(f *Facts) { f.FilesComplete = false }, "could not be read whole"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -60,6 +79,7 @@ type fakeGH struct {
 	calls     []string // every mutating call, in order
 	views     int
 	noGrant   bool   // the base branch has no grant file
+	grantYAML string // the grant's content; "" means grantFixture
 	grantRef  string // the contents path the grant was read from
 }
 
@@ -86,17 +106,113 @@ func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
 		return nil, nil
 	case strings.HasPrefix(line, "api "):
 		g.grantRef = line
-		return grantAnswer(g.noGrant)
+		return grantAnswer(g.noGrant, g.grantYAML)
 	}
 	return nil, errors.New("unexpected gh call: " + line)
 }
 
-// grantAnswer is what `gh api .../contents/<GrantFile>` says.
-func grantAnswer(absent bool) ([]byte, error) {
+// grantFixture is a grant with the exclusion every repository declares.
+const grantFixture = "grant: prs-the-agent-opened\nexcluded:\n  - release-please  # the owner's\n"
+
+// grantAnswer is what `gh api .../contents/<GrantFile>` says: the content
+// base64-encoded and wrapped at 60 columns, as the API sends it.
+func grantAnswer(absent bool, content string) ([]byte, error) {
 	if absent {
 		return []byte(`{"message":"Not Found","status":"404"}`), errors.New("gh: Not Found (HTTP 404)")
 	}
-	return []byte(`{"type":"file"}`), nil
+	if content == "" {
+		content = grantFixture
+	}
+	enc := base64.StdEncoding.EncodeToString([]byte(content))
+	var wrapped strings.Builder
+	for len(enc) > 60 {
+		wrapped.WriteString(enc[:60] + "\n")
+		enc = enc[60:]
+	}
+	wrapped.WriteString(enc)
+	return json.Marshal(map[string]string{"type": "file", "encoding": "base64", "content": wrapped.String()})
+}
+
+// The exclusions are read from the base branch's grant, so a grant that
+// excludes a prefix refuses a PR on that prefix through Land, not only Decide.
+func TestLand_RefusesABranchTheGrantExcludes(t *testing.T) {
+	view := strings.Replace(readyView, `"headRefName":"feat/x"`, `"headRefName":"deploy/errors-1.2.1"`, 1)
+	if view == readyView {
+		t.Fatal("readyView no longer names feat/x; update this test")
+	}
+	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`, grantYAML: grantFixture + "  - branch:deploy/\n"}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Merged || len(g.calls) != 0 || !strings.Contains(strings.Join(res.Reasons, ";"), "deploy/") {
+		t.Errorf("want a refusal naming deploy/ and no mutation, got %+v, calls %v", res, g.calls)
+	}
+}
+
+func TestLand_RefusesAPRThatChangesTheGrant(t *testing.T) {
+	view := strings.TrimSuffix(strings.TrimSpace(readyView), "}") + `,"files":[{"path":"` + GrantFile + `"}],"changedFiles":1}`
+	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Merged || len(g.calls) != 0 || !strings.Contains(strings.Join(res.Reasons, ";"), "changes "+GrantFile) {
+		t.Errorf("want a refusal naming the grant change and no mutation, got %+v, calls %v", res, g.calls)
+	}
+}
+
+// gh reads at most 100 paths, so a PR that changes more cannot prove it
+// leaves the grant alone.
+func TestLand_RefusesWhenTheFileListIsTruncated(t *testing.T) {
+	view := strings.TrimSuffix(strings.TrimSpace(readyView), "}") + `,"files":[{"path":"a.go"}],"changedFiles":101}`
+	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Merged || !strings.Contains(strings.Join(res.Reasons, ";"), "could not be read whole") {
+		t.Errorf("want a refusal for the truncated list, got %+v", res)
+	}
+}
+
+// A grant that does not decode is an unanswered question, never "no
+// exclusions".
+func TestLand_AnUndecodableGrantIsAnError(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`, grantYAML: "excluded: [unclosed\n"}
+	if _, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30); err == nil || !strings.Contains(err.Error(), GrantFile) {
+		t.Errorf("want an error naming %s, got %v", GrantFile, err)
+	}
+	if len(g.calls) != 0 {
+		t.Errorf("an unreadable grant mutated: %v", g.calls)
+	}
+}
+
+// The granting side never reads the branch name: whatever the head is
+// called, a base without the grant refuses. Matching a name may only forfeit
+// the merge, because anyone who can push a branch chooses its name.
+// An exclusion that matches nothing forfeits nothing: a path is a whole path
+// or a directory, never a string prefix of a sibling file.
+func TestDecide_AnExclusionThatMatchesNothingLeavesThePRReady(t *testing.T) {
+	f := readyFacts()
+	f.Excluded = append(f.Excluded, "branch:deploy/", "path:infra/k8s/base/kustomization.yaml", "path:cli/x")
+	f.Files = []string{"cli/x.go", "infra/k8s/base/kustomization.yaml.bak"}
+	if r := Decide(f); len(r) != 0 {
+		t.Errorf("want no reasons, got %v", r)
+	}
+}
+
+func TestDecide_NoBranchNameGrantsTheMerge(t *testing.T) {
+	for _, head := range []string{"feat/x", "deploy/x", "promote/prod-x", "release-please--x", "merge-grant", "main", ""} {
+		f := readyFacts()
+		f.HeadRef, f.GrantDeclared = head, false
+		if len(Decide(f)) == 0 {
+			t.Errorf("head %q lands without the grant", head)
+		}
+	}
 }
 
 // The grant is read from the base branch, never the head: a PR cannot opt its
@@ -262,6 +378,8 @@ func TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead(t *testing.T) {
 			return []byte(greenChecks), nil
 		case strings.HasPrefix(line, "pr list"):
 			return []byte(`[]`), nil
+		case strings.HasPrefix(line, "api "):
+			return grantAnswer(false, "")
 		case strings.HasPrefix(line, "pr merge"):
 			calls = append(calls, line)
 		}
@@ -302,6 +420,8 @@ func TestLand_UpdateBranchUpdatesAgainWhenTheBaseMovesDuringTheWait(t *testing.T
 			return []byte(greenChecks), nil
 		case strings.HasPrefix(line, "pr list"):
 			return []byte(`[]`), nil
+		case strings.HasPrefix(line, "api "):
+			return grantAnswer(false, "")
 		case strings.HasPrefix(line, "pr merge"):
 			calls = append(calls, line)
 		}
@@ -332,6 +452,8 @@ func TestLand_UpdateBranchGivesUpAfterMaxUpdates(t *testing.T) {
 			updates++
 		case strings.HasPrefix(line, "pr checks") && strings.Contains(line, "--json"):
 			return []byte(greenChecks), nil
+		case strings.HasPrefix(line, "api "):
+			return grantAnswer(false, "")
 		case strings.HasPrefix(line, "pr merge"):
 			t.Error("merged a PR that is still behind")
 		}
@@ -375,7 +497,7 @@ func failingMergeGH(restoreFails bool) (Runner, *[]string) {
 			calls = append(calls, line)
 			return nil, errors.New("head branch was modified")
 		case strings.HasPrefix(line, "api "):
-			return grantAnswer(false)
+			return grantAnswer(false, "")
 		case strings.HasPrefix(line, "pr edit"):
 			calls = append(calls, line)
 			if restoreFails && strings.HasSuffix(line, "--base feat/x") {
