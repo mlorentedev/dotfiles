@@ -36,16 +36,18 @@ type Options struct {
 	// process's PATH lacks on it, so what it installs it can reach whatever
 	// PATH its caller had.
 	ToolsBinDirs []string
+	// RegisteredPath reads the PATH installers registered for the next
+	// process (env.RegisteredPath: the registry on Windows, nothing
+	// elsewhere). The tools and checkout steps reach it after they install,
+	// so a tool an installer placed outside ToolsBinDirs, or the git the
+	// checkout step installs, runs in the same run. Unset: none.
+	RegisteredPath func() ([]string, error)
 	// GitRun runs git and gh and returns stdout; gitconfig.ExecRunner in
 	// production. Unset, the checkout and git-config steps are skipped.
 	GitRun gitconfig.Runner
 	// GitStoredAuth asks gh for its stored login, without the environment's
 	// tokens; gitconfig.StoredLoginRunner in production. Unset means GitRun.
 	GitStoredAuth gitconfig.Runner
-	// GitBinDirs are where an OS-manager install of git lands
-	// (GitBinDirs in production); the checkout step reaches them after it
-	// installs git, so a clean machine clones in the same run.
-	GitBinDirs []string
 	// CloneURL is what the checkout step clones when the checkout is absent;
 	// empty means DefaultCloneURL.
 	CloneURL string
@@ -111,11 +113,11 @@ func Registry(o Options) []Reconciler {
 		addrs = sshtarget.InterfaceAddrs
 	}
 	return []Reconciler{
-		checkout{run: o.GitRun, url: url, has: onPath, installer: o.ToolsCatalog, gitDirs: o.GitBinDirs},
+		checkout{run: o.GitRun, url: url, has: onPath, installer: o.ToolsCatalog, registered: o.RegisteredPath},
 		recordsMirror{},
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
-		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs},
+		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs, registered: o.RegisteredPath},
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},

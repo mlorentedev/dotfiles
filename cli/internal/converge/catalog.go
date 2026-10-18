@@ -141,16 +141,32 @@ func unreachable(p catalogPass, provided map[string]bool, miseMissing bool) []st
 	return out
 }
 
-// provided is every tool name this OS's tool layer installs.
-func provided(entries []tools.Tool, pins []tools.MiseTool, goos string) map[string]bool {
+// provided is every tool name this OS's tool layer installs. The mise pins
+// count only where mise runs: on PATH, or installed by this OS's catalog. On
+// Windows the catalog does not install mise, so uv comes from elsewhere later
+// in the run, and a uv-tool entry waiting on it is a wait, not a lost tool.
+func provided(entries []tools.Tool, pins []tools.MiseTool, goos string, miseOnPath bool) map[string]bool {
 	names := map[string]bool{}
 	for _, t := range entries {
 		if t.SupportsOS(goos) {
 			names[t.Name] = true
 		}
 	}
+	if !names["mise"] && !miseOnPath {
+		return names
+	}
 	for _, t := range pins {
 		names[t.Name] = true
 	}
 	return names
+}
+
+// installsMise reports whether this OS's catalog installs mise.
+func installsMise(entries []tools.Tool, goos string) bool {
+	for _, t := range entries {
+		if t.Name == "mise" && t.SupportsOS(goos) {
+			return true
+		}
+	}
+	return false
 }

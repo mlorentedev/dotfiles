@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -24,8 +25,9 @@ type toolsSync struct {
 	run, stdout tools.Runner      // tools.HomeRunners in production
 	has         func(string) bool // is a command on PATH
 	getenv      func(string) string
-	catalog     CatalogInstaller // nil: the catalog half is not wired
-	bins        []string         // where the tool layer places binaries; see reach
+	catalog     CatalogInstaller         // nil: the catalog half is not wired
+	bins        []string                 // where the tool layer places binaries; see reach
+	registered  func() ([]string, error) // the PATH installers registered; nil: none
 }
 
 func (toolsSync) Name() string        { return "tools" }
@@ -35,17 +37,24 @@ func (r toolsSync) Reconcile(env Env, dryRun bool) (Result, error) {
 	if err := r.reach(); err != nil {
 		return Result{}, err
 	}
-	if r.catalog == nil && r.unavailable() != "" {
-		return Result{Skip: r.unavailable()}, nil
-	}
 	entries, err := r.entries(env)
 	if err != nil {
 		return Result{}, err
 	}
+	if r.catalog == nil && r.unavailable(entries, env.GOOS) != "" {
+		return Result{Skip: r.unavailable(entries, env.GOOS)}, nil
+	}
 	cat := r.walk(entries, !dryRun)
-	res, serr := r.syncHalf(env, dryRun)
+	res, serr := r.syncHalf(env, entries, dryRun)
 	if !dryRun {
-		cat.then(r.walk(cat.retry(), true))
+		// An install in the first pass may have registered its directory
+		// (winget's uv on Windows): reach it before the entries that waited
+		// on it are retried.
+		if err := r.reach(); err != nil {
+			serr = errors.Join(serr, err)
+		} else {
+			cat.then(r.walk(cat.retry(), true))
+		}
 	}
 	res.Changes += len(cat.changed)
 	res.Detail = joinDetail(cat.detail(dryRun), res.Detail)
@@ -75,11 +84,11 @@ func (r toolsSync) Probe(env Env) error {
 		return err
 	}
 	if r.catalog != nil {
-		if lost := unreachable(left, provided(entries, pins, env.GOOS), !r.has("mise")); len(lost) > 0 {
-			return fmt.Errorf("installed by this machine's tools but not on PATH: %s", strings.Join(lost, ", "))
+		if lost := unreachable(left, provided(entries, pins, env.GOOS, r.has("mise")), !r.has("mise")); len(lost) > 0 {
+			return fmt.Errorf("this machine's tool layer provides these, but they are not on PATH: %s", strings.Join(lost, ", "))
 		}
 	}
-	if r.unavailable() != "" {
+	if r.unavailable(entries, env.GOOS) != "" {
 		return nil
 	}
 	// The probe checks this machine, not upstream: a Latest tool still behind
@@ -116,8 +125,8 @@ func (r toolsSync) walk(entries []tools.Tool, apply bool) catalogPass {
 // syncHalf plans or applies the mise sync. mise absent after the first
 // catalog pass is a note, not a failure: the catalog probe already fails when
 // mise was due to be installed and was not.
-func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
-	if skip := r.unavailable(); skip != "" {
+func (r toolsSync) syncHalf(env Env, entries []tools.Tool, dryRun bool) (Result, error) {
+	if skip := r.unavailable(entries, env.GOOS); skip != "" {
 		return Result{Detail: skip}, nil
 	}
 	s, pins, err := r.sync(env)
@@ -137,17 +146,26 @@ func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
 }
 
 // reach appends to this process's PATH each directory the tool layer places
-// binaries in that PATH lacks, keeping the caller's own entries first. Every
-// lookup after it, in this step and in the steps that follow, then finds what
-// the step installed: the hourly `dotf update` runs with a minimal PATH, and
-// a fresh machine has no rc that adds ~/.local/bin or mise's shims yet.
+// binaries in that PATH lacks, then each one an installer registered, keeping
+// the caller's own entries first. Every lookup after it, in this step and in
+// the steps that follow, then finds what the step installed: the hourly `dotf
+// update` runs with a minimal PATH, a fresh machine has no rc that adds
+// ~/.local/bin or mise's shims yet, and a Windows installer names its
+// directory only in the registry, for the next process.
 func (r toolsSync) reach() error {
-	return appendToPath(r.bins)
+	return reachDirs(r.bins, r.registered)
 }
 
-// appendToPath appends each of dirs this process's PATH lacks, after the
-// caller's own entries.
-func appendToPath(dirs []string) error {
+// reachDirs appends to this process's PATH each of dirs, then each directory
+// an installer registered, that PATH lacks, after the caller's own entries.
+func reachDirs(dirs []string, registered func() ([]string, error)) error {
+	if registered != nil {
+		reg, err := registered()
+		if err != nil {
+			return fmt.Errorf("reading the PATH installers registered: %w", err)
+		}
+		dirs = append(slices.Clone(dirs), reg...)
+	}
 	path := os.Getenv("PATH")
 	have := map[string]bool{}
 	for _, dir := range filepath.SplitList(path) {
@@ -166,9 +184,13 @@ func appendToPath(dirs []string) error {
 	return os.Setenv("PATH", path)
 }
 
-// unavailable names what the mise half lacks on this machine, or "".
-func (r toolsSync) unavailable() string {
+// unavailable names what the mise half lacks on this machine, or "". The
+// remedy is named only where it works: with the catalog wired, it must
+// install mise on this OS, or `dotf tools install mise` would skip it.
+func (r toolsSync) unavailable(entries []tools.Tool, goos string) string {
 	switch {
+	case !r.has("mise") && r.catalog != nil && !installsMise(entries, goos):
+		return "mise is not on PATH, and this OS's catalog does not install it: the pinned CLIs are not synced here"
 	case !r.has("mise"):
 		return "mise is not on PATH; `dotf tools install mise` installs it"
 	case r.run == nil || r.stdout == nil:

@@ -35,20 +35,37 @@ mise_catalog_excludes_windows() {
          end))' "$CATALOG" >/dev/null
 }
 
-# A CLI has one owner. One that versions.conf marks for mise (`# mise: cli`) and
-# packages.json also lists is installed twice on a fresh box: setup's first
+# A CLI has one owner on each OS. One that versions.conf marks for mise
+# (`# mise: cli`) and packages.json also lists for an OS where the catalog
+# installs mise is installed twice on a fresh box: setup's first
 # `dotf tools install` runs before `dotf tools sync`, so the catalog put an
 # unpinned OS copy of zoxide on PATH before mise placed the pinned one (#2195).
-@test "no packages.json tool is also a CLI versions.conf marks for mise" {
+# Where the catalog does not install mise (Windows), the catalog is the only
+# owner, which is how uv reaches Windows (winget astral-sh.uv, #2754).
+@test "no packages.json tool is also a CLI versions.conf marks for mise, on an OS where mise runs" {
     local marked both
     marked="$(awk '
         m && /^[A-Z0-9_]+_VERSION=/ {
             n = $0; sub(/_VERSION=.*/, "", n); n = tolower(n); gsub(/_/, "-", n); print n
         }
 
-        { m = ($0 == "# mise: cli") }' "$BATS_TEST_DIRNAME/../versions.conf" | sort)"
+        { m = ($0 == "# mise: cli") }' "$BATS_TEST_DIRNAME/../versions.conf")"
     [ -n "$marked" ]
-    both="$(jq -r '.tools[].name' "$CATALOG" | sort | comm -12 - <(printf '%s\n' "$marked"))"
+    # An entry's OSes: its platforms, else for a system entry the OSes whose
+    # manager it names, else all three. A name owned twice is one whose OSes
+    # meet the OSes the catalog installs mise on.
+    both="$(jq -r --arg marked "$marked" '
+        def oses: if .source.platforms then .source.platforms
+            elif .source.type == "system" then
+                [(if .source.apt then "linux" else empty end),
+                 (if .source.brew or .source.cask then "darwin" else empty end),
+                 (if .source.winget then "windows" else empty end)]
+            else ["linux", "darwin", "windows"] end;
+        ([.tools[] | select(.name == "mise") | oses] | add // []) as $mise
+        | ($marked | split("\n")) as $pinned
+        | .tools[] | select(.name as $n | $pinned | index($n))
+        | select([oses[] | select(. as $o | $mise | index($o))] | length > 0)
+        | .name' "$CATALOG")"
     [ -z "$both" ] || { echo "owned by both mise and packages.json: $both"; false; }
 }
 
