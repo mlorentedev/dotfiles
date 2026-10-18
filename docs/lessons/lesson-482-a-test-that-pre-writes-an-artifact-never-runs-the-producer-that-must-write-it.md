@@ -1,5 +1,5 @@
 ---
-id: "lesson-476-a-test-that-pre-writes-an-artifact-never-runs-the-producer-that-must-write-it"
+id: "lesson-482-a-test-that-pre-writes-an-artifact-never-runs-the-producer-that-must-write-it"
 type: lesson
 status: active
 title: "A test that pre-writes an artifact never runs the producer that must write it"
