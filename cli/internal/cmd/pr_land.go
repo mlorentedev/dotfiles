@@ -55,6 +55,7 @@ func newPrLandCmd() *cobra.Command {
 		repo, registry string
 		wait, update   bool
 		unknownWait    time.Duration
+		verdictWait    time.Duration
 	)
 	cmd := &cobra.Command{
 		Use:   "land <number> [<number>...]",
@@ -75,7 +76,11 @@ GitHub closes a PR whose base branch is deleted. The merge is a squash with
 --wait waits for the checks before reading them, and then for GitHub to compute
 the merge state of a PR whose checks are all green: that state can stay UNKNOWN
 for many minutes after a push, so it has its own budget (--unknown-wait, 20m by
-default). --update-branch handles the
+default). A red review-attestation is not final while its verdict is on the
+way: a pr-agent run still queued or running on the head, or a comment or review
+newer than the status, make land wait for it (--verdict-wait, 10m by default, a
+negative value does not wait) and say on stderr what it waits for. The verdict
+takes minutes to appear after the review does. --update-branch handles the
 one condition that time alone cannot fix: when BEHIND is the only reason
 against the PR, it merges the base into the branch (a merge, not a rebase, so
 the reviewer's push gate does not re-review), waits for the new CI and decides
@@ -111,6 +116,8 @@ with a note.`,
 			}
 			o := prLandOptions(repo, reviewerRegistry(repo, registry))
 			o.Wait, o.UpdateBranch, o.UnknownWait = wait, update, unknownWait
+			o.VerdictWait = verdictWait
+			o.Notify = func(m string) { c.PrintErrln(m) }
 			release, err := lockLand(c, o)
 			if err != nil {
 				c.PrintErrln("pr land:", err)
@@ -132,6 +139,7 @@ with a note.`,
 	addReviewerRegistryFlag(cmd, &registry)
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the checks before reading them")
 	cmd.Flags().DurationVar(&unknownWait, "unknown-wait", prland.DefaultUnknownWait, "with --wait, how long to wait for GitHub to compute the merge state of a PR whose checks are all green")
+	cmd.Flags().DurationVar(&verdictWait, "verdict-wait", prland.DefaultVerdictWait, "how long to wait for a review-attestation verdict that is still on its way before refusing on a red one; negative does not wait")
 	cmd.Flags().BoolVar(&update, "update-branch", false, "when BEHIND is the only failing condition, merge the base in, wait for CI and decide again")
 	return cmd
 }
