@@ -1,0 +1,29 @@
+# Written at arming, committed on the run's branch. The run reads this file from the committed copy only.
+version: 1
+run_id: "orch2-20261018T0049Z"
+armed_by: manu
+armed_at: 2026-10-18T00:49:00Z
+expires_at: 2026-10-18T10:49:00Z
+objective: "Fix the spec-gate's two reported defects minimally, in order: #2698 (run report counted as production code) then #2710 (pre-push reads a failed PR lookup as no PR); land each under the grant. #2407 ports this script to Go."
+scope:
+  write_paths:
+    - "scripts/check-spec-gate.sh"
+    - "scripts/spec-gate-prepush.sh"
+    - "tests/**"
+  frozen_paths: [".github/**", "**/AGENTS.md", ".agent/**", ".pre-commit-config.yaml"]
+  max_files: 6
+  max_loc: 150
+allowed_commands: [dotf, gh, git, bats, shellcheck, caffeinate]
+queue:
+  source: bitacora
+  filter: "exactly #2698 then #2710, in that order (owner instruction 2026-10-17, relayed by dotfiles-20 with the owner's authorisation, in the user turn). Nothing else."
+  max_items: 2
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
