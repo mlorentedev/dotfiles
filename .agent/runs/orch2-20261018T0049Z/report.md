@@ -14,7 +14,7 @@
 None. The queue held two items and both fitted the envelope.
 
 ## Evidence index
-Full command output is in the PR bodies and `## Review triage` comments of #2730 and #2740 (the Definition-of-Done evidence was pasted there this session). Per item: the new tests failed before the fix and passed after; the spec-gate and pre-push bats suites ran in bash and zsh; shellcheck was clean. `dotf pr land` printed `[MERGED]` for both.
+Full command output (exit codes, bats and shellcheck results) is in the `## Verification` and `## Review triage` sections of #2730 and #2740, pasted there this session. Per item: the new tests failed before the fix and passed after; the spec-gate and pre-push bats suites ran in bash and zsh; shellcheck was clean. `dotf pr land` printed `[MERGED]` for both.
 
 ## Reviewers
 - #2730: pr-agent and CodeRabbit. One finding applied, others declined with reasons. pr-agent's step "Decide whether this push is reviewed" skipped the small post-triage push; disclosed in the triage.
@@ -30,7 +30,7 @@ Full command output is in the PR bodies and `## Review triage` comments of #2730
 2 of 2 queue items. Waiting dominated: the GitHub GraphQL limit shared with other sessions (`dotf pr land` and `gh pr ready` failed on it; REST reads and `dotf forge` worked) and CI queueing.
 
 ## Host
-A wake-lock (`caffeinate -i -t 36000`) was started at arming. A power cut interrupted the session; a new one was started on resume and released at close. Whether the host stayed awake between arming and the outage was not measured.
+A wake-lock (`caffeinate -i -t 36000`) was started at arming. A power cut interrupted the session. At close, a `caffeinate -i -t 36000` process 3m46s old was running and was released; whether this session started it after the outage was not established, nor whether the host stayed awake before it.
 
 ## Next action
 None for this run. Remove the worktree `chore-autopilot-orch2-r1`; never merge this branch.
