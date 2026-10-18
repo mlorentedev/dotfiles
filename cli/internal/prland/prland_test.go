@@ -80,6 +80,7 @@ type fakeGH struct {
 	views     int
 	noGrant   bool   // the base branch has no grant file
 	grantYAML string // the grant's content; "" means grantFixture
+	files     string // the files endpoint's answer; "" means oneFile
 	grantRef  string // the contents path the grant was read from
 }
 
@@ -104,11 +105,31 @@ func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
 	case strings.HasPrefix(line, "pr edit"), strings.HasPrefix(line, "pr merge"):
 		g.calls = append(g.calls, line)
 		return nil, nil
+	case strings.HasPrefix(line, "api ") && strings.Contains(line, "/pulls/"):
+		return filesAnswer(g.files)
 	case strings.HasPrefix(line, "api "):
 		g.grantRef = line
 		return grantAnswer(g.noGrant, g.grantYAML)
 	}
 	return nil, errors.New("unexpected gh call: " + line)
+}
+
+// oneFile is the files endpoint's answer for a PR that changes one file.
+const oneFile = `{"filename":"cli/x.go","previous_filename":null}`
+
+func filesAnswer(files string) ([]byte, error) {
+	if files == "" {
+		files = oneFile
+	}
+	return []byte(files), nil
+}
+
+// apiAnswer answers both `gh api` reads Land makes for a ready PR.
+func apiAnswer(line string) ([]byte, error) {
+	if strings.Contains(line, "/pulls/") {
+		return filesAnswer("")
+	}
+	return grantAnswer(false, "")
 }
 
 // grantFixture is a grant with the exclusion every repository declares.
@@ -152,22 +173,47 @@ func TestLand_RefusesABranchTheGrantExcludes(t *testing.T) {
 }
 
 func TestLand_RefusesAPRThatChangesTheGrant(t *testing.T) {
-	view := strings.TrimSuffix(strings.TrimSpace(readyView), "}") + `,"files":[{"path":"` + GrantFile + `"}],"changedFiles":1}`
-	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}
+	cases := map[string]string{
+		"edits it":          `{"filename":"` + GrantFile + `","previous_filename":null}`,
+		"renames it away":   `{"filename":".github/merge-grant.yaml","previous_filename":"` + GrantFile + `"}`,
+		"is one of several": oneFile + "\n" + `{"filename":"` + GrantFile + `","previous_filename":null}`,
+	}
+	for name, files := range cases {
+		t.Run(name, func(t *testing.T) {
+			g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`, files: files}
 
+			res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Merged || len(g.calls) != 0 || !strings.Contains(strings.Join(res.Reasons, ";"), "changes "+GrantFile) {
+				t.Errorf("want a refusal naming the grant change and no mutation, got %+v, calls %v", res, g.calls)
+			}
+		})
+	}
+}
+
+// A renamed file is a change to the path it left, so a path exclusion holds
+// whichever way the file moved.
+func TestLand_APathExclusionCatchesARenameAway(t *testing.T) {
+	g := &fakeGH{
+		view: readyView, checks: greenChecks, deps: `[]`,
+		grantYAML: grantFixture + "  - path:infra/k8s/base/kustomization.yaml\n",
+		files:     `{"filename":"infra/k8s/base/kustomization.yml","previous_filename":"infra/k8s/base/kustomization.yaml"}`,
+	}
 	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Merged || len(g.calls) != 0 || !strings.Contains(strings.Join(res.Reasons, ";"), "changes "+GrantFile) {
-		t.Errorf("want a refusal naming the grant change and no mutation, got %+v, calls %v", res, g.calls)
+	if res.Merged || !strings.Contains(strings.Join(res.Reasons, ";"), "change infra/k8s/base/kustomization.yaml") {
+		t.Errorf("want a refusal for the renamed excluded path, got %+v", res)
 	}
 }
 
-// gh reads at most 100 paths, so a PR that changes more cannot prove it
-// leaves the grant alone.
+// The files endpoint lists at most 3000 files, so a PR that changes more
+// cannot prove it leaves the grant alone.
 func TestLand_RefusesWhenTheFileListIsTruncated(t *testing.T) {
-	view := strings.TrimSuffix(strings.TrimSpace(readyView), "}") + `,"files":[{"path":"a.go"}],"changedFiles":101}`
+	view := strings.TrimSuffix(strings.TrimSpace(readyView), "}") + `,"changedFiles":101}`
 	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}
 
 	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
@@ -379,7 +425,7 @@ func TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead(t *testing.T) {
 		case strings.HasPrefix(line, "pr list"):
 			return []byte(`[]`), nil
 		case strings.HasPrefix(line, "api "):
-			return grantAnswer(false, "")
+			return apiAnswer(line)
 		case strings.HasPrefix(line, "pr merge"):
 			calls = append(calls, line)
 		}
@@ -421,7 +467,7 @@ func TestLand_UpdateBranchUpdatesAgainWhenTheBaseMovesDuringTheWait(t *testing.T
 		case strings.HasPrefix(line, "pr list"):
 			return []byte(`[]`), nil
 		case strings.HasPrefix(line, "api "):
-			return grantAnswer(false, "")
+			return apiAnswer(line)
 		case strings.HasPrefix(line, "pr merge"):
 			calls = append(calls, line)
 		}
@@ -453,7 +499,7 @@ func TestLand_UpdateBranchGivesUpAfterMaxUpdates(t *testing.T) {
 		case strings.HasPrefix(line, "pr checks") && strings.Contains(line, "--json"):
 			return []byte(greenChecks), nil
 		case strings.HasPrefix(line, "api "):
-			return grantAnswer(false, "")
+			return apiAnswer(line)
 		case strings.HasPrefix(line, "pr merge"):
 			t.Error("merged a PR that is still behind")
 		}
@@ -497,7 +543,7 @@ func failingMergeGH(restoreFails bool) (Runner, *[]string) {
 			calls = append(calls, line)
 			return nil, errors.New("head branch was modified")
 		case strings.HasPrefix(line, "api "):
-			return grantAnswer(false, "")
+			return apiAnswer(line)
 		case strings.HasPrefix(line, "pr edit"):
 			calls = append(calls, line)
 			if restoreFails && strings.HasSuffix(line, "--base feat/x") {

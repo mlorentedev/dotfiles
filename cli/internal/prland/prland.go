@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -35,10 +36,14 @@ type Facts struct {
 	// Excluded is the grant's `excluded:` list, read from the base branch
 	// with the grant itself.
 	Excluded []string
-	// Files is every path the PR changes; FilesComplete is false when gh
-	// returned fewer paths than the PR changes, so a path may be missing.
+	// Files is every path the PR changes, a renamed file's old path
+	// included; FilesComplete is false when GitHub listed fewer files than
+	// the PR changes, so a path may be missing.
 	Files         []string
 	FilesComplete bool
+	// changedFiles is GitHub's count of the files the PR changes, the
+	// figure Files is checked against.
+	changedFiles int
 	// UnknownFor is how long --wait waited on an UNKNOWN merge state with
 	// every check green, so a refusal can say that waiting was tried.
 	UnknownFor time.Duration
@@ -246,6 +251,14 @@ func Blockers(ctx context.Context, o Options, number int) ([]string, error) {
 	return Decide(f), nil
 }
 
+// apiRepo names the repository in a `gh api` path, which takes no -R flag.
+func apiRepo(o Options) string {
+	if o.Repo == "" {
+		return "{owner}/{repo}" // gh api fills these from the current repository
+	}
+	return o.Repo
+}
+
 // baseGrant is what the base branch declares in GrantFile.
 type baseGrant struct {
 	declared bool
@@ -256,11 +269,7 @@ type baseGrant struct {
 // other failure, a file that does not decode included, is an error, because
 // an unanswered question must not read as either answer.
 func readGrant(ctx context.Context, o Options, base string) (baseGrant, error) {
-	repo := o.Repo
-	if repo == "" {
-		repo = "{owner}/{repo}" // gh api fills these from the current repository
-	}
-	out, err := o.Run(ctx, "api", "repos/"+repo+"/contents/"+GrantFile+"?ref="+base)
+	out, err := o.Run(ctx, "api", "repos/"+apiRepo(o)+"/contents/"+GrantFile+"?ref="+base)
 	switch {
 	case err == nil:
 	case strings.Contains(err.Error(), "HTTP 404"):
@@ -302,7 +311,7 @@ func settle(ctx context.Context, gh ghFunc, o Options, number int, wait bool) (F
 	if budget <= 0 {
 		budget = DefaultUnknownWait
 	}
-	f, err := readFacts(ctx, gh, o.Untriaged, number)
+	f, err := readFacts(ctx, gh, o, number)
 	rounds, uncomputedFor := 0, time.Duration(0)
 	for wait && err == nil && unsettled(f) {
 		// Two budgets, because the two waits fail differently. Checks finish
@@ -326,7 +335,7 @@ func settle(ctx context.Context, gh ghFunc, o Options, number int, wait bool) (F
 		}
 		sleep(pause)
 		_, _ = gh("pr", "checks", strconv.Itoa(number), "--watch", "--interval", "30") // the facts below decide
-		f, err = readFacts(ctx, gh, o.Untriaged, number)
+		f, err = readFacts(ctx, gh, o, number)
 	}
 	if f.MergeState == "UNKNOWN" {
 		f.UnknownFor = uncomputedFor
@@ -449,12 +458,18 @@ func ghRemedy(err error) string {
 	return ""
 }
 
-func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) ([]int, error), number int) (Facts, error) {
+func readFacts(ctx context.Context, gh ghFunc, o Options, number int) (Facts, error) {
 	n := strconv.Itoa(number)
 	f, err := readView(gh, n)
 	if err != nil {
 		return f, err
 	}
+	changed, err := readChangedFiles(ctx, o, number)
+	if err != nil {
+		return f, err
+	}
+	f.Files = changed.paths
+	f.FilesComplete = changed.listed >= f.changedFiles
 	// gh exits non-zero while a check fails or is pending, and still prints
 	// the JSON; only an output that does not parse is an error.
 	out, runErr := gh("pr", "checks", n, "--json", "name,bucket")
@@ -472,7 +487,7 @@ func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) (
 	} else if err := json.Unmarshal(out, &f.Checks); err != nil {
 		return f, fmt.Errorf("gh pr checks: %v (%w)", runErr, err)
 	}
-	pending, err := untriaged(ctx)
+	pending, err := o.Untriaged(ctx)
 	if err != nil {
 		return f, fmt.Errorf("triage queue: %w", err)
 	}
@@ -481,32 +496,59 @@ func readFacts(ctx context.Context, gh ghFunc, untriaged func(context.Context) (
 }
 
 func readView(gh ghFunc, n string) (Facts, error) {
-	out, err := gh("pr", "view", n, "--json", "state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,files,changedFiles")
+	out, err := gh("pr", "view", n, "--json", "state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,changedFiles")
 	if err != nil {
 		return Facts{}, fmt.Errorf("gh pr view: %w", err)
 	}
 	var v struct {
-		State      string `json:"state"`
-		IsDraft    bool   `json:"isDraft"`
-		HeadSHA    string `json:"headRefOid"`
-		HeadRef    string `json:"headRefName"`
-		BaseRef    string `json:"baseRefName"`
-		MergeState string `json:"mergeStateStatus"`
-		Files      []struct {
-			Path string `json:"path"`
-		} `json:"files"`
-		ChangedFiles int `json:"changedFiles"`
+		State        string `json:"state"`
+		IsDraft      bool   `json:"isDraft"`
+		HeadSHA      string `json:"headRefOid"`
+		HeadRef      string `json:"headRefName"`
+		BaseRef      string `json:"baseRefName"`
+		MergeState   string `json:"mergeStateStatus"`
+		ChangedFiles int    `json:"changedFiles"`
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return Facts{}, fmt.Errorf("gh pr view: %w", err)
 	}
-	f := Facts{State: v.State, IsDraft: v.IsDraft, HeadSHA: v.HeadSHA, HeadRef: v.HeadRef, BaseRef: v.BaseRef, MergeState: v.MergeState}
-	for _, p := range v.Files {
-		f.Files = append(f.Files, p.Path)
+	return Facts{State: v.State, IsDraft: v.IsDraft, HeadSHA: v.HeadSHA, HeadRef: v.HeadRef, BaseRef: v.BaseRef, MergeState: v.MergeState, changedFiles: v.ChangedFiles}, nil
+}
+
+// changedFiles is what the pull request files endpoint lists.
+type changedFiles struct {
+	paths  []string // every filename, and every renamed file's old name
+	listed int      // files listed, which counts a rename once
+}
+
+// readChangedFiles lists the PR's files through the REST endpoint, not `gh pr
+// view --json files`: GraphQL names only a renamed file's new path, so a PR
+// that renamed the grant away would read as leaving it alone. REST names the
+// old path too (previous_filename) and pages up to 3000 files.
+func readChangedFiles(ctx context.Context, o Options, number int) (changedFiles, error) {
+	out, err := o.Run(ctx, "api", "repos/"+apiRepo(o)+"/pulls/"+strconv.Itoa(number)+"/files",
+		"--paginate", "--jq", ".[] | {filename, previous_filename}")
+	if err != nil {
+		return changedFiles{}, fmt.Errorf("list the files of #%d: %w", number, err)
 	}
-	// gh reads at most 100 paths; a longer list is not proof of absence.
-	f.FilesComplete = len(f.Files) >= v.ChangedFiles
-	return f, nil
+	var c changedFiles
+	dec := json.NewDecoder(bytes.NewReader(out))
+	for {
+		var file struct {
+			Filename string `json:"filename"`
+			Previous string `json:"previous_filename"`
+		}
+		if err := dec.Decode(&file); errors.Is(err, io.EOF) {
+			return c, nil
+		} else if err != nil {
+			return changedFiles{}, fmt.Errorf("list the files of #%d: %w", number, err)
+		}
+		c.listed++
+		c.paths = append(c.paths, file.Filename)
+		if file.Previous != "" {
+			c.paths = append(c.paths, file.Previous)
+		}
+	}
 }
 
 func retargetDependents(gh ghFunc, head, base string) ([]int, error) {
