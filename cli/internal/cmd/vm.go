@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"debug/pe"
 	"errors"
 	"fmt"
 	"io"
@@ -28,7 +29,7 @@ func newVMCmd() *cobra.Command {
 }
 
 func newVMWindowsCmd() *cobra.Command {
-	var ref string
+	var ref, dotf string
 	var keep bool
 	var cpus, memory int
 	w := &cobra.Command{
@@ -40,12 +41,24 @@ func newVMWindowsCmd() *cobra.Command {
 			"no failed step and the second must change nothing. The copy is discarded at\n" +
 			"the end unless --keep, so every run starts from the same clean-base.\n\n" +
 			"The guest converges with the dotf release the ref's versions.conf pins, not a\n" +
-			"build of this tree. Only committed content reaches the guest: no host\n" +
-			"directory is shared with it, and no credential is passed in.",
-		Example:      "  dotf vm windows --ref feat/my-branch\n  dotf vm windows --keep",
+			"build of this tree, unless --dotf names a Windows Arm64 source build to use\n" +
+			"instead (install.ps1 keeps a dotf that reports \"dev\"): that tests a change to\n" +
+			"dotf before a release carries it. Only committed content and that file reach\n" +
+			"the guest: no host directory is shared with it, and no credential is passed in.",
+		Example: "  dotf vm windows --ref feat/my-branch\n  dotf vm windows --keep\n" +
+			"  GOOS=windows GOARCH=arm64 go build -o /tmp/dotf.exe ./cmd/dotf\n" +
+			"  dotf vm windows --ref feat/my-branch --dotf /tmp/dotf.exe",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if dotf != "" {
+				if fi, err := os.Stat(dotf); err != nil || !fi.Mode().IsRegular() {
+					return withExitCode(2, fmt.Errorf("--dotf %s: not a file", dotf))
+				}
+				if err := windowsArm64(dotf); err != nil {
+					return withExitCode(2, err)
+				}
+			}
 			host, firmware, _, layout, err := windowsGuest()
 			if err != nil {
 				return err
@@ -58,6 +71,7 @@ func newVMWindowsCmd() *cobra.Command {
 			return vm.Run(host, vm.RunOptions{
 				Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
 				Source:  src,
+				Dotf:    dotf,
 				Keep:    keep,
 				Agent:   10 * time.Minute,
 				Step:    time.Hour,
@@ -68,6 +82,7 @@ func newVMWindowsCmd() *cobra.Command {
 	}
 	w.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
 	w.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
+	w.Flags().StringVar(&dotf, "dotf", "", "a dotf.exe source build (windows/arm64) to converge with instead of the pinned release")
 	w.Flags().IntVar(&cpus, "cpus", 4, "virtual CPUs")
 	w.Flags().IntVar(&memory, "memory", 8192, "memory in MiB")
 	w.AddCommand(newVMWindowsBuildCmd(), newVMWindowsStopCmd())
@@ -245,4 +260,25 @@ func execLimactl(stdin io.Reader, stdout, stderr io.Writer, args ...string) erro
 	c := exec.Command("limactl", args...)
 	c.Stdin, c.Stdout, c.Stderr = stdin, stdout, stderr
 	return c.Run()
+}
+
+// windowsArm64 refuses a --dotf the guest would not run as the box does: the
+// guest is Windows on Arm64, whose release is the windows/arm64 build. An x64
+// build would converge under emulation and test a binary no Arm64 box gets;
+// anything else would fail only after the install, minutes into the run.
+func windowsArm64(path string) error {
+	f, err := pe.Open(path)
+	if err != nil {
+		return fmt.Errorf("--dotf %s: not a Windows Arm64 executable: %w", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	if f.Machine != pe.IMAGE_FILE_MACHINE_ARM64 {
+		return fmt.Errorf("--dotf %s: built for PE machine %#x, not Windows Arm64 (GOOS=windows GOARCH=arm64)", path, f.Machine)
+	}
+	// An object file or a truncated image has the machine but no PE32+
+	// optional header, or lacks the flag that marks it runnable.
+	if _, ok := f.OptionalHeader.(*pe.OptionalHeader64); !ok || f.Characteristics&pe.IMAGE_FILE_EXECUTABLE_IMAGE == 0 {
+		return fmt.Errorf("--dotf %s: an Arm64 PE but not a Windows Arm64 executable image", path)
+	}
+	return nil
 }

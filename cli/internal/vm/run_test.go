@@ -445,3 +445,69 @@ func TestGuestRun_DecodesNativeOutputAsUTF8(t *testing.T) {
 		t.Error("guestrun.ps1 sets the console's encoding after it starts install.ps1")
 	}
 }
+
+// --dotf converges with a source build instead of the release the ref pins:
+// the binary reaches the guest beside the archive, and a run without it copies
+// nothing more.
+func TestRun_CopiesADotfBuildIntoTheGuest(t *testing.T) {
+	o := sealedBase(t)
+	o.Dotf = filepath.Join(t.TempDir(), "dotf.exe")
+	if err := os.WriteFile(o.Dotf, []byte("MZ dev build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatalf("%v\n%s", err, o.Out)
+	}
+	if string(g.files[guestWork+`\dotf.exe`]) != "MZ dev build" {
+		t.Error("the dotf build did not reach the guest")
+	}
+
+	o = sealedBase(t)
+	g = newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatalf("%v\n%s", err, o.Out)
+	}
+	if _, ok := g.files[guestWork+`\dotf.exe`]; ok {
+		t.Error("a run without --dotf copied a dotf into the guest")
+	}
+}
+
+// install.ps1 keeps a dotf on PATH that reports "dev" and replaces any other,
+// so the copied build must be in ~\.local\bin, the dir step two runs, and on
+// PATH before install.ps1 starts.
+func TestGuestRun_PutsADotfBuildOnPATHBeforeInstall(t *testing.T) {
+	code := codeLines(string(guestRunScript))
+	install := strings.Index(code, "& powershell.exe")
+	for _, want := range []string{"Copy-Item -Path $dev -Destination $installed", `$env:PATH = "$bin;$env:PATH"`} {
+		at := strings.Index(code, want)
+		if at < 0 {
+			t.Errorf("guestrun.ps1 lacks %q", want)
+			continue
+		}
+		if at > install {
+			t.Errorf("guestrun.ps1 runs %q after it starts install.ps1", want)
+		}
+	}
+}
+
+// install.ps1 keeps a dotf that reports "dev", but nothing else asserts that
+// the build is what converged: each step compares the binary it ran with the
+// copy the host put in, after the run, and a step whose binary differs fails.
+func TestGuestRun_FailsAStepThatDidNotRunTheDotfBuild(t *testing.T) {
+	code := codeLines(string(guestRunScript))
+	run := strings.Index(code, "$code = $LASTEXITCODE")
+	check := strings.Index(code, "(Get-FileHash -Path $dev).Hash -ne (Get-FileHash -Path $installed).Hash")
+	if check < 0 {
+		t.Fatal("guestrun.ps1 never compares the dotf that ran with the --dotf build")
+	}
+	if check < run {
+		t.Error("guestrun.ps1 compares the binaries before the step has run")
+	}
+	if !strings.Contains(code[check:], "$code = 1") {
+		t.Error("a mismatch does not fail the step")
+	}
+	if gone := strings.Index(code, "-not (Test-Path $installed) -or"); gone < run || gone > check {
+		t.Error("a step that removed the build does not fail on its own condition")
+	}
+}

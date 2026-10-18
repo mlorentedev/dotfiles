@@ -29,14 +29,34 @@ try {
     # "$_" keeps their text and drops the record decoration. The default
     # ErrorActionPreference (Continue) lets a warning on stderr pass, where
     # Stop would end the step on it.
+    # A dotf source build the host copied in (--dotf) goes where step two runs
+    # dotf from, and on PATH: install.ps1 keeps a dotf on PATH that reports
+    # "dev", so the run converges with the build, not the pinned release.
+    $dev = Join-Path $work 'dotf.exe'
+    $bin = Join-Path $env:USERPROFILE '.local\bin'
+    $installed = Join-Path $bin 'dotf.exe'
+    if ($Step -eq 'first' -and (Test-Path $dev)) {
+        New-Item -ItemType Directory -Force -Path $bin -ErrorAction Stop | Out-Null
+        Copy-Item -Path $dev -Destination $installed -Force -ErrorAction Stop
+        $env:PATH = "$bin;$env:PATH"
+    }
     if ($Step -eq 'first') {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'install.ps1') 2>&1 |
             ForEach-Object { "$_" } | Out-File -FilePath $log -Encoding utf8
     } else {
-        & (Join-Path $env:USERPROFILE '.local\bin\dotf.exe') converge 2>&1 |
+        & $installed converge 2>&1 |
             ForEach-Object { "$_" } | Out-File -FilePath $log -Encoding utf8
     }
     $code = $LASTEXITCODE
+    # Nothing else asserts that the build is what converged: had install.ps1
+    # replaced it with a release, the run would judge the release.
+    # A build the step removed fails too, whatever the error preference.
+    if ((Test-Path $dev) -and (-not (Test-Path $installed) -or
+            (Get-FileHash -Path $dev).Hash -ne (Get-FileHash -Path $installed).Hash)) {
+        "the dotf in $bin is not the --dotf build: the step did not run the build" |
+            Out-File -FilePath $log -Encoding utf8 -Append
+        $code = 1
+    }
 } catch {
     "$_" | Out-File -FilePath $log -Encoding utf8 -Append
 } finally {

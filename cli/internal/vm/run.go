@@ -31,6 +31,7 @@ const (
 type RunOptions struct {
 	Machine Machine
 	Source  string        // a zip of the ref to converge (git archive), copied into the guest
+	Dotf    string        // a dotf.exe source build to converge with; "" uses the release the ref pins
 	Keep    bool          // leave the guest running for inspection
 	Agent   time.Duration // until the guest agent answers and the test user is logged on
 	Step    time.Duration // one converge
@@ -110,6 +111,9 @@ func Run(h Host, o RunOptions) (err error) {
 	if err := q.WriteFile(guestWork+`\guestrun.ps1`, bytes.NewReader(guestRunScript)); err != nil {
 		return fmt.Errorf("copy guestrun.ps1 in: %w", err)
 	}
+	if err := copyDotf(q, o); err != nil {
+		return err
+	}
 
 	if err := runStep(q, o, "first", "first converge: install.ps1 from the ref", Converged); err != nil {
 		return err
@@ -118,6 +122,25 @@ func Run(h Host, o RunOptions) (err error) {
 		return err
 	}
 	step(o.Out, "converged, and the second run changed nothing")
+	return nil
+}
+
+// copyDotf copies a dotf source build in, where guestrun.ps1 puts it on PATH
+// before install.ps1, which keeps a dotf that reports "dev". It lets a run
+// test a change to dotf before a release carries it.
+func copyDotf(q *QGA, o RunOptions) error {
+	if o.Dotf == "" {
+		return nil
+	}
+	step(o.Out, "copy the dotf build %s in", o.Dotf)
+	f, err := os.Open(o.Dotf)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	if err := q.WriteFile(guestWork+`\dotf.exe`, f); err != nil {
+		return fmt.Errorf("copy the dotf build in: %w", err)
+	}
 	return nil
 }
 
