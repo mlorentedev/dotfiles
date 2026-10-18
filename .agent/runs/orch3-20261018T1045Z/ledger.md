@@ -12,3 +12,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
   - sec014 (wintarget): #2755, then SEC-014 PR 2, on sshtarget and converge/workstation.go.
   - cross-os: AC8, #2678, #2752 (prepare only), then #1719 and #2250.
   - selfdeploy: #2727 and #2696, with paths narrowed; the Mac activation was already done here.
+- 18:36Z: selfdeploy run narrowed to converge/selfdeploy*.go, cmd/update.go(+test), schedule/**, update/**. cross-os told the rest of cmd/ is free for #1719 (park if .golangci.yml is needed).
