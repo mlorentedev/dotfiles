@@ -1,10 +1,10 @@
 # Run cli094-20261018T1035Z
 
-**Verdict:** run cli094-20261018T1035Z ended `queue-empty` after 1 iteration, about 1h: 2 done (the CLI-094 archive #2779 merged; two follow-up tickets filed), 0 parked, 1 merged, 0 unmerged. Question this answers: what is waiting on a human? **One thing: the release PR #2720. Nothing irreversible.**
+**Verdict:** run cli094-20261018T1035Z ended `queue-empty` after 1 iteration, about 1h: 2 done (the CLI-094 archive #2779 merged; two follow-up tickets filed), 0 parked, 1 merged, 0 unmerged. Question this answers: what is waiting on a human? **Nothing. Nothing irreversible.** (Update 18:34Z: the owner cut v0.75.0, which contains #2743 and #2779; the release item below is resolved.)
 
 ## Waiting on you, irreversible first
 
-- **Release 0.75.0 is not cut.** The latest GitHub release is `v0.74.0`, there is no `v0.75*` tag, and release PR #2720 (`chore(main): release 0.75.0`) is still open with merge state UNKNOWN. Cutting a release is excluded from the standing grant, so I did not touch it. Until it merges, these peer-owned steps stay blocked: PLAT-003 AC8 (#2344), SEC-014 PR 2, `dotf env role add self-deploy` plus converge on the Mac, #2727.
+- **Resolved at 18:34Z: v0.75.0 is out and carries #2743 and #2779.** At the time of the run: release 0.75.0 was not cut. The latest GitHub release is `v0.74.0`, there is no `v0.75*` tag, and release PR #2720 (`chore(main): release 0.75.0`) is still open with merge state UNKNOWN. Cutting a release is excluded from the standing grant, so I did not touch it. Until it merges, these peer-owned steps stay blocked: PLAT-003 AC8 (#2344), SEC-014 PR 2, `dotf env role add self-deploy` plus converge on the Mac, #2727.
 - Landed under the grant (reversible): **#2779** at `0318f7f8`, which archives CLI-094 and closes #1975 and #2448.
 
 ## Parked, with the question restated
