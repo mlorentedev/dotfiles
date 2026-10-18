@@ -79,6 +79,28 @@ func (s Systemd) Enabled() (bool, error) {
 	return false, nil
 }
 
+// Serving reports whether sshd runs now or starts at boot through either unit.
+// The retirement holds the drop-in while it does: either way, sshd would serve
+// its stock config once the drop-in goes.
+func (s Systemd) Serving() (bool, error) {
+	service, socket, err := s.units()
+	if err != nil {
+		return false, err
+	}
+	for _, u := range []string{socket, service} {
+		if u == "" {
+			continue
+		}
+		if _, enabled := s.Run("systemctl", "is-enabled", "--quiet", u); enabled == nil {
+			return true, nil
+		}
+		if _, active := s.Run("systemctl", "is-active", "--quiet", u); active == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (Systemd) HostKeys(root Root) error {
 	return asRoot(root, "ssh-keygen", "-A")
 }

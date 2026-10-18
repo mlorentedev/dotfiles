@@ -63,8 +63,12 @@ func TestRecordWritesWhatTheFirstApplyCreated(t *testing.T) {
 		t.Errorf("header = %d %q %v", r.Version, r.Dotf, r.Written)
 	}
 	for name, got := range map[string]*Prior{"key": r.Key, "drop-in": r.DropIn, "listener": r.Listener} {
-		if got == nil || got.State != PriorCreated || got.Content != "" {
-			t.Errorf("%s = %+v, want created", name, got)
+		want := ""
+		if name == "key" {
+			want = testKey // the line it wrote, so a rotated repo key cannot hide it (#2799)
+		}
+		if got == nil || got.State != PriorCreated || got.Content != want {
+			t.Errorf("%s = %+v, want created with %q", name, got, want)
 		}
 	}
 	m.forbidRoot = true
