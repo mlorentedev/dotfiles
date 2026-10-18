@@ -293,3 +293,22 @@ func TestCheckout_SkippedWithoutARunner(t *testing.T) {
 		t.Fatalf("no runner must skip, got %+v, %v", res, err)
 	}
 }
+
+// The catalog declares git too, so the tools step installs it where the
+// checkout already exists and never needed a clone (a copied tree, the test
+// guest). Both name the same package, or the two paths install different gits.
+func TestShippedCatalog_DeclaresTheGitTheCheckoutInstalls(t *testing.T) {
+	entries, err := loadCatalog(Env{RepoRoot: filepath.Join("..", "..", "..")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name == "git" {
+			if e.Source.Winget != gitTool.Source.Winget || !e.SupportsOS("windows") {
+				t.Errorf("catalog git = %+v, want winget %q", e.Source, gitTool.Source.Winget)
+			}
+			return
+		}
+	}
+	t.Fatal("packages.json declares no git")
+}
