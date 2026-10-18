@@ -109,3 +109,19 @@ func TestStoppedRunRecordDoesNotClaimAnUnreadableFile(t *testing.T) {
 		t.Errorf("it must still name the file: %q", got)
 	}
 }
+
+// CLI-094 round 1: the second signer writes review-second.md, and a stop of its
+// run must not claim anything about review.md, the first signer's verdict.
+func TestStoppedRunRecordNamesTheFileItWasAskedAbout(t *testing.T) {
+	dir := t.TempDir()
+	second := filepath.Join(dir, "review-second.md")
+	if got := StoppedRunRecord(second); !strings.Contains(got, "review-second.md was not rewritten") || strings.Contains(got, " review.md") {
+		t.Errorf("absent second file: %q", got)
+	}
+	if err := os.WriteFile(second, []byte("---\nverdict: PENDING\nreviewer: agy\n---\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := StoppedRunRecord(second); !strings.Contains(got, "provisional review-second.md kept (verdict PENDING)") {
+		t.Errorf("pending second file: %q", got)
+	}
+}

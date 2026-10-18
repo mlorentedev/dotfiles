@@ -21,7 +21,7 @@ wip_override: "Owner granted one override 2026-10-17 for one spec covering #1975
 
 ## What
 
-- **Wedge detection (#1975, option 2).** While a reviewer runs, the launcher watches its transcript. If the file has not grown for `N` while the process group is alive, the launcher stops the group through the same path the cap uses, with an exit status of its own (not 124) and a stderr line that names the last tool call in the transcript (`tool_execution_update` command), instead of waiting for the cap. `N` is a launcher constant, 10 minutes, with a `--stall-timeout` override. It is larger than the longest legitimate single tool call measured in the surviving transcripts (97s, see `verification.md`) by a factor of six, and it still stops the wedge that cost #1975 at minute 10 instead of minute 45.
+- **Wedge detection (#1975, option 2).** While a reviewer runs, the launcher watches its transcript. If the file has not grown for `N` while the process group is alive, the launcher stops the group through the same path the cap uses, with an exit status of its own (not 124) and a stderr line that names the last tool call in the transcript (`tool_execution_update` command, in pi's event shape; another runner's stream gets no such line), instead of waiting for the cap. `N` is a launcher constant, 10 minutes, with a `--stall-timeout` override. It is larger than the longest legitimate single tool call measured in the surviving transcripts (97s, see `verification.md`) by a factor of six, and it still stops the wedge that cost #1975 at minute 10 instead of minute 45.
 - **Write-first (#2448, option 2).** The reviewer prompt asks for a provisional `specs/<id>/review.md` in its first moves (frontmatter with `verdict: PENDING`, findings so far) and to refine it. The launcher, when a run is stopped by the cap or by the wedge detector, says which of two things is on disk: "provisional review.md kept (verdict PENDING)" or "review.md was not rewritten by this run". It exits non-zero in both.
 - **PENDING is a named, refused verdict.** `dotf spec archive` reads `verdict: PENDING` as an unsigned, provisional record and refuses it with that wording, instead of the generic "unrecognized verdict" error.
 
@@ -43,12 +43,12 @@ wip_override: "Owner granted one override 2026-10-17 for one spec covering #1975
 
 ## Acceptance criteria
 
-- [ ] A fake runner that stays alive and writes nothing to its transcript is stopped after the stall timeout, not the cap; the exit status is not 124 and stderr names the last tool call recorded in the transcript.
-- [ ] A fake runner that keeps writing transcript events is never stopped by the stall detector, however long it runs; and one whose transcript is silent for longer than the longest measured legitimate tool call (97s) but shorter than `N` is not stopped either.
-- [ ] The reviewer prompt asks, for both signers, for a provisional `review.md` with `verdict: PENDING` before exploring.
-- [ ] When a run is stopped (cap or wedge) the launcher prints whether a provisional `review.md` was kept or the file was not rewritten, and exits non-zero in both cases.
-- [ ] `dotf spec archive` refuses a `review.md` with `verdict: PENDING` and says it is a provisional, unsigned record.
-- [ ] `verification.md` records the measured longest legitimate tool call, in seconds, and the stall timeout `N`, in minutes, chosen from it.
+- [x] A fake runner that stays alive and writes nothing to its transcript is stopped after the stall timeout, not the cap; the exit status is not 124 and stderr names the last tool call recorded in the transcript.
+- [x] A fake runner that keeps writing transcript events is never stopped by the stall detector, however long it runs; and one whose transcript is silent for longer than the longest measured legitimate tool call (97s) but shorter than `N` is not stopped either.
+- [x] The reviewer prompt asks, for both signers, for a provisional `review.md` with `verdict: PENDING` before exploring.
+- [x] When a run is stopped (cap or wedge) the launcher prints whether a provisional `review.md` was kept or the file was not rewritten, and exits non-zero in both cases.
+- [x] `dotf spec archive` refuses a `review.md` with `verdict: PENDING` and says it is a provisional, unsigned record.
+- [x] `verification.md` records the measured longest legitimate tool call, in seconds, and the stall timeout `N`, in minutes, chosen from it.
 
 ## References
 

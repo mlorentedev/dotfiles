@@ -76,7 +76,14 @@ func SinkTranscript(in io.Reader, out io.Writer, path string) (err error) {
 				return fmt.Errorf("passing the reviewer stream through: %w", err)
 			}
 			if storeErr == nil && !isIncrementalFrame([]byte(strings.TrimRight(line, "\n"))) {
+				// Flushed per event, not left to the 4 KB buffer: the stall
+				// detector and its last-call line read this file while the
+				// reviewer is still running (CLI-094). Events are settled
+				// messages and tool results, a few per minute, so the cost is
+				// one write each.
 				if _, err := w.WriteString(line); err != nil {
+					storeErr = err
+				} else if err := w.Flush(); err != nil {
 					storeErr = err
 				}
 			}
