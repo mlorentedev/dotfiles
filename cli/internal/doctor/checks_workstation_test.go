@@ -12,6 +12,13 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
 )
 
+// launchdUnknown is `launchctl print`'s failure for a service launchd does not
+// know: exit 113, the one failure that reads as "not loaded" (#2731).
+type launchdUnknown struct{}
+
+func (launchdUnknown) Error() string { return "exit status 113" }
+func (launchdUnknown) ExitCode() int { return 113 }
+
 const workstationTemplate = "AllowUsers {user}@{mesh}\nPasswordAuthentication no\n"
 
 // The doctor check (#2356, PLAT-001b PR 7d) runs the converge step's plan with
@@ -121,6 +128,8 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 			s.MeshAddrs = func() ([]net.IP, error) { return tc.addrs, nil }
 			s.CommandOutput = func(name string, args ...string) (string, error) {
 				switch {
+				case tc.noMesh && name == "launchctl" && strings.Contains(strings.Join(args, " "), "tailscale"):
+					return "Could not find service", launchdUnknown{}
 				case tc.noMesh && strings.Contains(strings.Join(args, " "), "tailscale"):
 					return "disabled\n", errors.New("exit status 1")
 				case name == "sc.exe" && loaded:
@@ -150,7 +159,7 @@ func TestCheckWorkstationTarget_ByStatus(t *testing.T) {
 				if loaded {
 					return "", nil
 				}
-				return "", errors.New("exit status 113")
+				return "Could not find service", launchdUnknown{}
 			}
 			var buf bytes.Buffer
 			checkWorkstationTarget(s, &Config{}, capture(&buf))

@@ -190,14 +190,20 @@ type fakeMise struct {
 	// prunable is each tool's installed versions no tracked config requires,
 	// as `mise ls --prunable --json` reports them; `mise prune` removes the
 	// tools it names.
-	prunable  map[string][]string
-	listPrune int
-	prunes    [][]string
-	listFails bool // `mise ls --prunable` exits non-zero
+	prunable map[string][]string
+	// keptByConfig is installs the config at cfg still asks for: prunable
+	// only once a write drops the tool from it, as mise counts a tracked
+	// config's requests (#2677).
+	keptByConfig map[string][]string
+	listPrune    int
+	prunes       [][]string
+	listFails    bool // `mise ls --prunable` exits non-zero
 	// listFailsFrom, when > 0, makes the listing exit non-zero from that
 	// call on: the first plan sees the orphans, the check after the prune
 	// cannot.
 	listFailsFrom int
+	// listFailsAt, when > 0, makes only that call of the listing fail.
+	listFailsAt int
 }
 
 func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
@@ -220,11 +226,20 @@ func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
 		return nil, nil
 	case name == "mise" && len(args) == 3 && args[0] == "ls" && args[1] == "--prunable" && args[2] == "--json":
 		f.listPrune++
-		if f.listFails || (f.listFailsFrom > 0 && f.listPrune >= f.listFailsFrom) {
+		if f.listFails || (f.listFailsFrom > 0 && f.listPrune >= f.listFailsFrom) || f.listPrune == f.listFailsAt {
 			return []byte("mise ERROR failed to read a tracked config"), errors.New("exit status 1")
 		}
 		report := map[string][]map[string]any{}
 		for tool, versions := range f.prunable {
+			for _, v := range versions {
+				report[tool] = append(report[tool], map[string]any{"version": v, "installed": true, "active": false})
+			}
+		}
+		body, _ := os.ReadFile(f.cfg)
+		for tool, versions := range f.keptByConfig {
+			if strings.Contains(string(body), `"`+tool+`"`) {
+				continue
+			}
 			for _, v := range versions {
 				report[tool] = append(report[tool], map[string]any{"version": v, "installed": true, "active": false})
 			}
@@ -234,6 +249,7 @@ func (f *fakeMise) run(name string, args ...string) ([]byte, error) {
 		f.prunes = append(f.prunes, args[3:])
 		for _, tool := range args[3:] {
 			delete(f.prunable, tool)
+			delete(f.keptByConfig, tool)
 		}
 		return nil, nil
 	case name == "mise" && len(args) == 2 && args[0] == "which":
@@ -1005,6 +1021,49 @@ func TestSync_PrunesAnInstallNoPinAsksForAndIsIdempotent(t *testing.T) {
 	}
 	if again.Pending() || len(f.prunes) != 1 {
 		t.Errorf("second run: want nothing to do and no second prune, got %+v after %v", again, f.prunes)
+	}
+}
+
+// The config write itself makes orphans: an install the deployed config still
+// asked for is not prunable before the write, and is once the write drops it.
+// Listed only before the write, it was left installed and failed the check
+// after the prune (#2677, measured with http:zsh-autosuggestions).
+func TestSync_PrunesWhatTheConfigWriteLeftUnasked(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	cfgDir := t.TempDir()
+	cfg := filepath.Join(cfgDir, "conf.d", "dotfiles.toml")
+	if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg, []byte("[tools]\nage = \"1.3.1\"\n\"http:zsh-autosuggestions\" = { version = \"0.7.1\" }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeMise{installed: map[string]string{"age": "1.3.1"}, pending: tools, cfg: cfg,
+		keptByConfig: map[string][]string{"http:zsh-autosuggestions": {"0.7.1"}}}
+	s := MiseSync{ConfigDir: cfgDir, Run: f.run, Prune: true}
+
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if want := [][]string{{"http:zsh-autosuggestions"}}; !reflect.DeepEqual(f.prunes, want) {
+		t.Errorf("prunes = %v, want the install the write left unasked %v", f.prunes, want)
+	}
+}
+
+// A run whose first listing failed prunes nothing ("nothing pruned"); a
+// listing that answers after the config write must not prune behind that.
+func TestSync_PrunesNothingAfterTheFirstListingFailed(t *testing.T) {
+	tools := []MiseTool{{"age", "1.3.1"}}
+	f := &fakeMise{installed: map[string]string{}, pending: tools,
+		prunable: map[string][]string{"powershell": {"7.5.11"}}, listFailsAt: 1}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run, Prune: true}
+
+	_, err := s.Apply(tools)
+	if len(f.prunes) != 0 {
+		t.Errorf("pruned after a failed listing: %v", f.prunes)
+	}
+	if err == nil {
+		t.Error("want the run to fail while an orphan is left")
 	}
 }
 
