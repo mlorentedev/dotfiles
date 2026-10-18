@@ -1,5 +1,5 @@
 ---
-id: "lesson-477-a-vendor-gate-that-rejects-automation-is-an-input-boundary"
+id: "lesson-481-a-vendor-gate-that-rejects-automation-is-an-input-boundary"
 type: lesson
 status: active
 title: "A vendor gate that rejects automation is an input boundary"

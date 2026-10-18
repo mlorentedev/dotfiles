@@ -22,7 +22,7 @@ type Medium struct {
 
 // WindowsISO is Microsoft's multi-edition Windows 11 Arm64 ISO, version 26H2
 // (build 26300), in English (United States), the language of the owner's
-// Windows machines. Microsoft's download API refuses automation (lesson 477),
+// Windows machines. Microsoft's download API refuses automation (lesson 481),
 // so the owner supplies the file or the 24-hour link.
 //
 // The hash is the file's, measured 2026-10-18 on the ISO the page served for
