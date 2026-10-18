@@ -218,8 +218,10 @@ func TestWindowsFirewallRefusesWhatWouldStillExposePort22(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := fwRecorder(state)
 			w := WindowsFirewall{Run: r.run}
-			if differs, _ := w.Differs(); !differs {
-				t.Error("an exposed port 22 must read as pending")
+			// The plan reads every input the refusal does, so it reports the
+			// refusal rather than a change the apply will refuse (#2765).
+			if differs, err := w.Differs(); err == nil || !strings.Contains(err.Error(), "nothing was changed") {
+				t.Errorf("Differs() = %v, %v; want the refusal", differs, err)
 			}
 			if _, err := w.Apply(r); err == nil || !strings.Contains(err.Error(), "nothing was changed") {
 				t.Fatalf("Apply() = %v, want a refusal", err)
