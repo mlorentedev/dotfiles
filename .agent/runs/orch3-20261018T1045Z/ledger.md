@@ -22,3 +22,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
 - 21:03Z: night run declined #2797 (outside its committed filter); it ends queue-empty after #2809. #2797 and #2806 wait for the owner.
 - 21:23Z: selfdeploy run ended queue-empty, 3/3 done: #2787 (closes #2727), #2808 (closes #2696). Filed #2792. Released converge/selfdeploy*, cmd/update*. Report on chore/autopilot-selfdeploy-run (never merge).
 - 21:27Z: cross-os run ended queue-empty ~21:30Z: landed #2793, #2796, #2800 (closes #1719); #2789 (AC8) merged by owner 19:18Z. Parked: #2752 (B), #2250 (B), #2678 CI half (A). Lessons 490/491 taken by #2795/#2798, it used 492. Freed prland, cmd, .pre-commit-config.yaml.
+- 21:30Z: night run ended queue-empty 21:30Z; all lanes released. Filed #2785, #2797, #2806. Triage queue: #2807, #2799 (wintarget lane, in progress).
