@@ -24,3 +24,4 @@ Armed 2026-10-18T10:45Z by the owner (going to sleep, 8h). Wake-lock: own caffei
 - 21:27Z: cross-os run ended queue-empty ~21:30Z: landed #2793, #2796, #2800 (closes #1719); #2789 (AC8) merged by owner 19:18Z. Parked: #2752 (B), #2250 (B), #2678 CI half (A). Lessons 490/491 taken by #2795/#2798, it used 492. Freed prland, cmd, .pre-commit-config.yaml.
 - 21:30Z: night run ended queue-empty 21:30Z; all lanes released. Filed #2785, #2797, #2806. Triage queue: #2807, #2799 (wintarget lane, in progress).
 - 22:47Z: owner said "repartelos": relayed verbatim. orch5 gets #2803, #1906, #1750; feat-worktree-one-root gets #2797, #2806. New envelopes, expiring by 02:35Z.
+- 22:47Z: both sessions refused to arm on a relayed "repartelos" (correct: arming is the owner's act in-session; feat-worktree-one-root's permission layer denied the write). Owner handed paste-ready prompts. #2806 lives in the vault skill only.
