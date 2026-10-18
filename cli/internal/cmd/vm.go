@@ -28,12 +28,103 @@ func newVMCmd() *cobra.Command {
 }
 
 func newVMWindowsCmd() *cobra.Command {
+	var ref string
+	var keep bool
+	var cpus, memory int
 	w := &cobra.Command{
 		Use:   "windows",
-		Short: "A Windows 11 Arm64 test guest on QEMU",
+		Short: "Converge a clean Windows 11 Arm64 guest from a committed ref, twice",
+		Long: "windows boots a throwaway copy of the guest's clean-base (`dotf vm windows\n" +
+			"build` makes it), copies in a git archive of --ref, and runs its install.ps1\n" +
+			"as the guest's user, then `dotf converge` again: the first run must end with\n" +
+			"no failed step and the second must change nothing. The copy is discarded at\n" +
+			"the end unless --keep, so every run starts from the same clean-base.\n\n" +
+			"The guest converges with the dotf release the ref's versions.conf pins, not a\n" +
+			"build of this tree. Only committed content reaches the guest: no host\n" +
+			"directory is shared with it, and no credential is passed in.",
+		Example:      "  dotf vm windows --ref feat/my-branch\n  dotf vm windows --keep",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			host, firmware, _, layout, err := windowsGuest()
+			if err != nil {
+				return err
+			}
+			src, err := archiveRef(ref)
+			if err != nil {
+				return withExitCode(2, err)
+			}
+			defer func() { _ = os.Remove(src) }()
+			return vm.Run(host, vm.RunOptions{
+				Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
+				Source:  src,
+				Keep:    keep,
+				Agent:   10 * time.Minute,
+				Step:    time.Hour,
+				Poll:    5 * time.Second,
+				Out:     cmd.OutOrStdout(),
+			})
+		},
 	}
-	w.AddCommand(newVMWindowsBuildCmd())
+	w.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
+	w.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
+	w.Flags().IntVar(&cpus, "cpus", 4, "virtual CPUs")
+	w.Flags().IntVar(&memory, "memory", 8192, "memory in MiB")
+	w.AddCommand(newVMWindowsBuildCmd(), newVMWindowsStopCmd())
 	return w
+}
+
+func newVMWindowsStopCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "stop",
+		Short:        "Stop a guest that `dotf vm windows --keep` left running",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			host, _, _, layout, err := windowsGuest()
+			if err != nil {
+				return err
+			}
+			return vm.Stop(host, layout, cmd.OutOrStdout())
+		},
+	}
+}
+
+// windowsGuest resolves QEMU and the guest's state directory on the one host
+// the guest runs on.
+func windowsGuest() (host vm.ExecHost, firmware, vars string, l vm.Layout, err error) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		return host, "", "", l, withExitCode(2, errors.New("the Windows guest runs on a macOS Arm64 host only"))
+	}
+	if host, firmware, vars, err = vm.FindQEMU(); err != nil {
+		return host, "", "", l, withExitCode(2, err)
+	}
+	state, err := env.StateDir()
+	if err != nil {
+		return host, "", "", l, err
+	}
+	return host, firmware, vars, vm.Layout{Dir: filepath.Join(state, "vm", "windows")}, nil
+}
+
+// archiveRef writes a zip of ref's tree, under dotfiles/, from the repository
+// of the working directory: committed content only, never the working tree.
+func archiveRef(ref string) (string, error) {
+	if strings.HasPrefix(ref, "-") {
+		return "", fmt.Errorf("ref %q is not a branch, tag or commit name", ref)
+	}
+	if out, err := exec.Command("git", "cat-file", "-e", ref+":install.ps1").CombinedOutput(); err != nil {
+		return "", fmt.Errorf("%s has no install.ps1 (run from the dotfiles repository, with a committed ref): %s", ref, strings.TrimSpace(string(out)))
+	}
+	f, err := os.CreateTemp("", "dotf-vm-*.zip")
+	if err != nil {
+		return "", err
+	}
+	_ = f.Close()
+	if out, err := exec.Command("git", "archive", "--format=zip", "--prefix=dotfiles/", "-o", f.Name(), ref).CombinedOutput(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", fmt.Errorf("git archive %s: %w: %s", ref, err, strings.TrimSpace(string(out)))
+	}
+	return f.Name(), nil
 }
 
 func newVMWindowsBuildCmd() *cobra.Command {
@@ -58,20 +149,13 @@ func newVMWindowsBuildCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
-				return withExitCode(2, errors.New("the Windows guest runs on a macOS Arm64 host only"))
-			}
-			host, firmware, vars, err := vm.FindQEMU()
-			if err != nil {
-				return withExitCode(2, err)
-			}
-			state, err := env.StateDir()
+			host, firmware, vars, layout, err := windowsGuest()
 			if err != nil {
 				return err
 			}
 			return vm.Build(host, vm.BuildOptions{
 				Machine: vm.Machine{
-					Layout:   vm.Layout{Dir: filepath.Join(state, "vm", "windows")},
+					Layout:   layout,
 					Firmware: firmware,
 					CPUs:     cpus,
 					MemoryMB: memory,

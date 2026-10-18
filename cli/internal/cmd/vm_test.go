@@ -1,0 +1,70 @@
+package cmd
+
+import (
+	"archive/zip"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// The guest gets committed content only: an edit in the working tree, staged
+// or not, must not reach it.
+func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
+	repo := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
+		c.Dir = repo
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	write := func(name, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(repo, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "-q")
+	write("install.ps1", "committed")
+	git("add", "install.ps1")
+	git("commit", "-q", "-m", "c")
+	write("install.ps1", "edited")
+	write("secret.txt", "untracked")
+	t.Chdir(repo)
+
+	zp, err := archiveRef("HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(zp) })
+	z, err := zip.OpenReader(zp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = z.Close() }()
+	var names []string
+	for _, f := range z.File {
+		names = append(names, f.Name)
+		if f.Name == "dotfiles/install.ps1" {
+			r, _ := f.Open()
+			b, _ := io.ReadAll(r)
+			_ = r.Close()
+			if string(b) != "committed" {
+				t.Errorf("the archive holds the working tree's install.ps1: %q", b)
+			}
+		}
+	}
+	if got := strings.Join(names, " "); got != "dotfiles/ dotfiles/install.ps1" {
+		t.Errorf("archive entries: %s", got)
+	}
+
+	for _, bad := range []string{"--output=/tmp/x", "no-such-ref"} {
+		if _, err := archiveRef(bad); err == nil {
+			t.Errorf("archiveRef(%q) succeeded", bad)
+		}
+	}
+}
