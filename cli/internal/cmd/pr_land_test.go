@@ -14,6 +14,17 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
 )
 
+// grantContents is the contents API's answer for a grant that opts in.
+const grantContents = `{"type":"file","encoding":"base64","content":"Z3JhbnQ6IHBycy10aGUtYWdlbnQtb3BlbmVkCmV4Y2x1ZGVkOgogIC0gcmVsZWFzZS1wbGVhc2UK"}`
+
+// apiContents answers the two `gh api` reads: the PR's files, and the grant.
+func apiContents(path string) []byte {
+	if strings.Contains(path, "/pulls/") {
+		return []byte(`{"filename":"cli/x.go","previous_filename":null}`)
+	}
+	return []byte(grantContents)
+}
+
 func TestPrLand_ARefusalListsTheReasonsAndExitsNonZero(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	saved := prLandOptions
@@ -21,6 +32,9 @@ func TestPrLand_ARefusalListsTheReasonsAndExitsNonZero(t *testing.T) {
 		return prland.Options{
 			Repo: repo,
 			Run: func(_ context.Context, args ...string) ([]byte, error) {
+				if args[0] == "api" {
+					return apiContents(args[1]), nil
+				}
 				if args[1] == "view" {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"BEHIND"}`), nil
 				}
@@ -94,7 +108,7 @@ func (q *queueFake) options(repo string, _ registryLoader) prland.Options {
 				q.merges = append(q.merges, f[2])
 				return nil, nil
 			case strings.HasPrefix(line, "api "):
-				return []byte(`{"type":"file"}`), nil // the repository opts in
+				return apiContents(line), nil // the repository opts in
 			}
 			return nil, errors.New("unexpected gh call: " + line)
 		},
@@ -268,6 +282,9 @@ func TestPrLand_UnknownWaitBoundsTheWaitOnAnUncomputedMergeState(t *testing.T) {
 		return prland.Options{
 			Repo: repo,
 			Run: func(_ context.Context, args ...string) ([]byte, error) {
+				if args[0] == "api" {
+					return apiContents(args[1]), nil
+				}
 				if args[1] == "view" {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"UNKNOWN"}`), nil
 				}
@@ -320,6 +337,8 @@ func TestPrLand_VerdictWaitBoundsTheWaitForAnInFlightAttestation(t *testing.T) {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"CLEAN"}`), nil
 				case strings.HasPrefix(line, "run list"):
 					return []byte(`[{"status":"in_progress"}]`), nil
+				case args[0] == "api":
+					return apiContents(args[1]), nil
 				}
 				return []byte(`[{"name":"review-attestation","bucket":"fail"}]`), nil
 			},

@@ -93,7 +93,7 @@ func awaitVerdict(ctx context.Context, gh ghFunc, o Options, number int, f Facts
 		w.What = what
 		unknownFor := f.UnknownFor
 		var err2 error
-		if f, err2 = readFacts(ctx, gh, o.Untriaged, number); err2 != nil {
+		if f, err2 = readFacts(ctx, gh, o, number); err2 != nil {
 			return f, w, err2
 		}
 		f.UnknownFor = unknownFor
