@@ -457,7 +457,7 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
         Write-Warn "dotf tools install failed (continuing; re-run 'dotf tools install')"
     }
     # The catalog installs uv through winget (astral-sh.uv, #2754), which puts
-    # its Links dir on the user PATH only; the MCP block below needs uvx here.
+    # its directory on the user PATH only; the MCP block below needs uvx here.
     Sync-SessionPath
 }
 
