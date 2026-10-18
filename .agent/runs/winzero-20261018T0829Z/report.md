@@ -24,9 +24,9 @@ The objective is met: a clean Windows 11 guest converged from zero and the secon
 | PR | Closes | What |
 |---|---|---|
 | #2770 `5e3f383d` | #2754, #2734 | winget's registered PATH reaches a portable package (uv, git) where symlinks are not allowed; checkout reaches git before the fast-forward. Lesson 488 |
-| #2775 `81096247` | #2769 | the Python pin is read at install time and only a non-empty answer is cached. Lesson 487 |
-| #2780 `ed4ea519` | #2764 | `powercfg /qh` reads the hidden lid setting on a lidless machine |
-| #2782 `9a3fe8d8` | #2765 | a Windows firewall refusal surfaces at plan time; a failed apply claims no work it did not do |
+| #2775 `ea6dd255` | #2769 | the Python pin is read at install time and only a non-empty answer is cached. Lesson 487 |
+| #2780 `82d87231` | #2764 | `powercfg /qh` reads the hidden lid setting on a lidless machine |
+| #2782 `a43d91d6` | #2765 | a Windows firewall refusal surfaces at plan time; a failed apply claims no work it did not do |
 | #2783 `95daf08a` | #2763 (part 1, Refs) | only the relative `Include sshd_config.d/*.conf` that Win32-OpenSSH reads is accepted |
 | #2781 `291cc5ad` | #2758 | a missing `sshd_config` is explained (sshd writes it at first start) instead of a raw read error |
 | #2772 `a436d19c` | PLAT-003 PR 3c, AC9 | `dotf vm windows --dotf <build>` converges with a source build; refuses a non-Arm64 or non-executable build before boot; a step whose dotf differs from the build fails. Lesson 489 |
