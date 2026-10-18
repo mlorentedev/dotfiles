@@ -17,3 +17,4 @@ Not relayed: #2724 (A/B unpicked; A is .github), #2727 (waits on #2502 A/B), #26
 ## Events
 - 00:49Z refill relayed to the four panes in the table (herdr agent prompt, owner-labelled).
 - 00:53Z owner chose A on #2502 (commented); archive of OPS-053 relayed to feat-self-deploy-trigger after #2733, before #2714.
+- 00:54Z self-deploy: #2728 already merged (94395d4c); #2714 ships with #2685 in #2733; then the archive PR. Filed #2731 (sshtarget launchctl), relayed to wintarget as its refill, plus a reminder to land #2713.
