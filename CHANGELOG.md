@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.75.0](https://github.com/mlorentedev/dotfiles/compare/v0.74.0...v0.75.0) (2026-10-18)
+
+
+### Features
+
+* **doctor:** report ~/.local/bin copies that shadow a system entry ([#2725](https://github.com/mlorentedev/dotfiles/issues/2725)) ([39a3289](https://github.com/mlorentedev/dotfiles/commit/39a3289cb347d2d9b15bfd6a13bc61d8a330f03e)), closes [#2320](https://github.com/mlorentedev/dotfiles/issues/2320)
+* **prland:** wait for an in-flight review-attestation verdict before refusing ([#2749](https://github.com/mlorentedev/dotfiles/issues/2749)) ([3275541](https://github.com/mlorentedev/dotfiles/commit/327554144c940e99e4a6b19c8b6175cf5157334d))
+* **spec:** ask the reviewer for a provisional review before it explores ([#2722](https://github.com/mlorentedev/dotfiles/issues/2722)) ([e2d366a](https://github.com/mlorentedev/dotfiles/commit/e2d366a8afd40c555be332961862531b6be4036c))
+* **spec:** stop a reviewer whose transcript stalls and say what review.md holds ([#2726](https://github.com/mlorentedev/dotfiles/issues/2726)) ([eadb884](https://github.com/mlorentedev/dotfiles/commit/eadb884d814e787e39696c6353552ad5737832bd))
+* **sshtarget:** fence port 22 on macOS with a pf anchor behind a commit-confirm timer ([#2681](https://github.com/mlorentedev/dotfiles/issues/2681)) ([2179c8b](https://github.com/mlorentedev/dotfiles/commit/2179c8b4c1cf8da8605a9d5a6fea090d7bd41abd)), closes [#2356](https://github.com/mlorentedev/dotfiles/issues/2356)
+* **sshtarget:** keep a Windows SSH target awake on AC power with powercfg ([#2683](https://github.com/mlorentedev/dotfiles/issues/2683)) ([aecc1ae](https://github.com/mlorentedev/dotfiles/commit/aecc1ae752c199a4e69bfb168c7bb2862624e785)), closes [#2356](https://github.com/mlorentedev/dotfiles/issues/2356)
+* **sshtarget:** record what the workstation target found before it changed it ([#2716](https://github.com/mlorentedev/dotfiles/issues/2716)) ([a2264db](https://github.com/mlorentedev/dotfiles/commit/a2264db5260bddfeea8b51f1010c7a9e85fc3b16))
+* **tools:** pin gh through mise on Linux and macOS ([#2708](https://github.com/mlorentedev/dotfiles/issues/2708)) ([f178fc6](https://github.com/mlorentedev/dotfiles/commit/f178fc628999ad4fd7c4ad424a01d85e39abd9f3)), closes [#2136](https://github.com/mlorentedev/dotfiles/issues/2136)
+* **vm:** converge the Windows guest with a dotf source build ([#2772](https://github.com/mlorentedev/dotfiles/issues/2772)) ([a436d19](https://github.com/mlorentedev/dotfiles/commit/a436d19cc3159b79ac4f2327020703e3b3016f8e))
+* **vm:** run a Windows 11 Arm64 test guest on QEMU ([#2737](https://github.com/mlorentedev/dotfiles/issues/2737)) ([11c3c8c](https://github.com/mlorentedev/dotfiles/commit/11c3c8cdaba75a08ac9b49b6aa6ec15ec222fd53))
+
+
+### Bug Fixes
+
+* **converge:** default to the declared checkout, not the cwd worktree ([#2735](https://github.com/mlorentedev/dotfiles/issues/2735)) ([b99729e](https://github.com/mlorentedev/dotfiles/commit/b99729e33534ac5b2d33303dc4a61ba54e265254))
+* **converge:** install git through winget when a clean Windows lacks it ([#2771](https://github.com/mlorentedev/dotfiles/issues/2771)) ([273c070](https://github.com/mlorentedev/dotfiles/commit/273c07016cd49db93ec6973de086ce9c34a8ff83))
+* **converge:** put the running dotf first on its children's PATH ([#2721](https://github.com/mlorentedev/dotfiles/issues/2721)) ([dc1e7d9](https://github.com/mlorentedev/dotfiles/commit/dc1e7d9baf0ac2b38a928bb99bc2b15054f369e9)), closes [#2688](https://github.com/mlorentedev/dotfiles/issues/2688)
+* **converge:** read only launchctl exit 113 as an unloaded env-persist agent, name the session in its skip ([#2733](https://github.com/mlorentedev/dotfiles/issues/2733)) ([5c8e230](https://github.com/mlorentedev/dotfiles/commit/5c8e230ff5c5d29d28e2460c909db75f60543814)), closes [#2685](https://github.com/mlorentedev/dotfiles/issues/2685) [#2714](https://github.com/mlorentedev/dotfiles/issues/2714)
+* **converge:** report a firewall refusal at plan time and no unrun work on failure ([#2782](https://github.com/mlorentedev/dotfiles/issues/2782)) ([a43d91d](https://github.com/mlorentedev/dotfiles/commit/a43d91d6628d6e8e8c080811160a8abed52d371e))
+* **converge:** skip self-deploy on an unreachable scheduler without the role, escape % in systemd units ([#2717](https://github.com/mlorentedev/dotfiles/issues/2717)) ([1281887](https://github.com/mlorentedev/dotfiles/commit/12818876a31f4b4fe0287519f89b0f4897d6178e)), closes [#2502](https://github.com/mlorentedev/dotfiles/issues/2502)
+* **converge:** treat uv as a wait where the catalog does not install mise ([#2770](https://github.com/mlorentedev/dotfiles/issues/2770)) ([5e3f383](https://github.com/mlorentedev/dotfiles/commit/5e3f383da012bf4eeaedd1e936d76090763752de))
+* **doctor:** report links in ~/.local/bin that shadow a mise pin from outside mise ([#2768](https://github.com/mlorentedev/dotfiles/issues/2768)) ([17cc489](https://github.com/mlorentedev/dotfiles/commit/17cc489012f2361ae19e50e05a82ddae0c85610d))
+* **harness:** gate the harness manifest's pi targets on pi ([#2762](https://github.com/mlorentedev/dotfiles/issues/2762)) ([e55f523](https://github.com/mlorentedev/dotfiles/commit/e55f5239ee5604b03a117bf11e4eb6d079505173)), closes [#2102](https://github.com/mlorentedev/dotfiles/issues/2102)
+* **harness:** warn when a deploy's checkout lacks main's last harness change ([#2723](https://github.com/mlorentedev/dotfiles/issues/2723)) ([84bc390](https://github.com/mlorentedev/dotfiles/commit/84bc39009814ffd9a1c71e9c771d40edba685d9e)), closes [#1712](https://github.com/mlorentedev/dotfiles/issues/1712)
+* **lessons:** name a committed _index.md at any depth ([#2739](https://github.com/mlorentedev/dotfiles/issues/2739)) ([8b7ced6](https://github.com/mlorentedev/dotfiles/commit/8b7ced696f044974692bd7335c67165181d6f01d))
+* **pr-agent:** decide a draft from the live PR, not the event payload ([#2747](https://github.com/mlorentedev/dotfiles/issues/2747)) ([53dfe41](https://github.com/mlorentedev/dotfiles/commit/53dfe411b9496c21c6c6660bb8e803b479c57d78)), closes [#2591](https://github.com/mlorentedev/dotfiles/issues/2591)
+* **prland:** enforce the grant's exclusions and refuse PRs that change it ([#2736](https://github.com/mlorentedev/dotfiles/issues/2736)) ([ecd8cc8](https://github.com/mlorentedev/dotfiles/commit/ecd8cc8b7a4a558941b764c73d162a07e0c404f0))
+* **spec-gate:** do not count an autopilot run report as production code ([#2730](https://github.com/mlorentedev/dotfiles/issues/2730)) ([136861a](https://github.com/mlorentedev/dotfiles/commit/136861a317ba5ac29787dc7072656c3d30030388))
+* **spec-gate:** look the pre-push PR up over REST and report a failed lookup ([#2740](https://github.com/mlorentedev/dotfiles/issues/2740)) ([08efc2c](https://github.com/mlorentedev/dotfiles/commit/08efc2c3c61332a9e29189ac915a8d53335d9251)), closes [#2710](https://github.com/mlorentedev/dotfiles/issues/2710)
+* **spec-gate:** match adjacent issues on whole words and escape report output ([#2706](https://github.com/mlorentedev/dotfiles/issues/2706)) ([633b72e](https://github.com/mlorentedev/dotfiles/commit/633b72ea60c2fe901d9cb8e4259a87f11b3ca735)), closes [#2303](https://github.com/mlorentedev/dotfiles/issues/2303)
+* **spec:** flush the transcript sink per event so the stall detector sees it ([#2743](https://github.com/mlorentedev/dotfiles/issues/2743)) ([57d7351](https://github.com/mlorentedev/dotfiles/commit/57d7351f9b334be68e8f5a85c1d03043f8733eab))
+* **spec:** refuse a provisional PENDING review by name ([#2719](https://github.com/mlorentedev/dotfiles/issues/2719)) ([6f0f1df](https://github.com/mlorentedev/dotfiles/commit/6f0f1dfea5f12e383632429c259fc45cbbd7a08f))
+* **spec:** tell the reviewer the archive gate's implementation is out of scope ([#2702](https://github.com/mlorentedev/dotfiles/issues/2702)) ([e5d47d3](https://github.com/mlorentedev/dotfiles/commit/e5d47d3647553ca599fe3d05f2c5c06e98aff778))
+* **sshtarget:** accept only the relative Include Win32-OpenSSH reads ([#2783](https://github.com/mlorentedev/dotfiles/issues/2783)) ([95daf08](https://github.com/mlorentedev/dotfiles/commit/95daf08a3df79f0637c1dc201de517459f32b760))
+* **sshtarget:** name a missing OpenSSH server before reading its config ([#2781](https://github.com/mlorentedev/dotfiles/issues/2781)) ([291cc5a](https://github.com/mlorentedev/dotfiles/commit/291cc5ad4e00cca4b24b991df14e028c5fe7c695))
+* **sshtarget:** read only launchctl exit 113 as an unloaded sshd or tailscaled ([#2738](https://github.com/mlorentedev/dotfiles/issues/2738)) ([3ed1497](https://github.com/mlorentedev/dotfiles/commit/3ed1497b01bf5bdb3e5ccd01450df3d7c4dfb500)), closes [#2731](https://github.com/mlorentedev/dotfiles/issues/2731)
+* **sshtarget:** read powercfg settings with /qh so a lidless machine plans ([#2780](https://github.com/mlorentedev/dotfiles/issues/2780)) ([82d8723](https://github.com/mlorentedev/dotfiles/commit/82d8723185fa334889e737c9dc58dd532c8ec830))
+* **tools:** list the orphans again after the mise config write ([#2742](https://github.com/mlorentedev/dotfiles/issues/2742)) ([d18ccf0](https://github.com/mlorentedev/dotfiles/commit/d18ccf0fd215a91ab1e8cd23e36450cf4b540d5f)), closes [#2677](https://github.com/mlorentedev/dotfiles/issues/2677)
+* **tools:** name the tools a mise config write drops in the dry-run plan ([#2757](https://github.com/mlorentedev/dotfiles/issues/2757)) ([2add40c](https://github.com/mlorentedev/dotfiles/commit/2add40ca6b0c9ea99690809b71795df8e92e5616)), closes [#2744](https://github.com/mlorentedev/dotfiles/issues/2744)
+* **tools:** read the Python pin when a uv tool installs ([#2775](https://github.com/mlorentedev/dotfiles/issues/2775)) ([ea6dd25](https://github.com/mlorentedev/dotfiles/commit/ea6dd2558eebaf5be68ea42b600951247767e78c))
+* **vault:** report every drifting tasks file in vault health ([#2705](https://github.com/mlorentedev/dotfiles/issues/2705)) ([f13d0b6](https://github.com/mlorentedev/dotfiles/commit/f13d0b606a6818ec617b2c5deff203c692f090e5)), closes [#1314](https://github.com/mlorentedev/dotfiles/issues/1314)
+* **worktree:** count ignored lockfiles and coverage reports as build output ([#2774](https://github.com/mlorentedev/dotfiles/issues/2774)) ([3b0ef44](https://github.com/mlorentedev/dotfiles/commit/3b0ef44ba30371ff171d9667ed0eb0fdec538d18)), closes [#2750](https://github.com/mlorentedev/dotfiles/issues/2750)
+
 ## [0.74.0](https://github.com/mlorentedev/dotfiles/compare/v0.73.0...v0.74.0) (2026-10-17)
 
 
