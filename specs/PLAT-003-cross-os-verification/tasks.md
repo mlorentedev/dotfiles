@@ -34,9 +34,15 @@ created: "2026-10-17"
   - #2688 is fixed in Go (option B, owner); the re-run waits for the `dotf` release that carries it
 - [x] Lesson 473; `lima` catalog entry
 
-## PR 3 — Tier 3b, Windows 11 ARM VM (after the owner installs a hypervisor)
+## PR 3 — Tier 3b, Windows 11 ARM VM
 
-- [ ] [AC9] Revert to `clean-base`, run `setup-windows.ps1` from a clone, assert `changed=0` on the second run
+- [x] Hypervisor chosen by the owner: QEMU driven by `dotf` (ADR-053)
+- [x] [AC10] `qemu` catalog entry; on the Mac: plan → apply → plan `0 to change`. `swtpm` was declared, then removed: HVF cannot attach a TPM (ADR-053)
+- [x] Owner: the English (United States) Windows 11 Arm64 ISO, downloaded in a browser; the build takes it with `--iso`
+- [x] [AC9] QEMU argv builder (shares nothing with the host, install media read-only, socket paths within the macOS limit) and guest-agent client (sync, exec, file read and write), tested against a fake agent; argv validated against QEMU 11.1.2
+- [x] PR 3a — `dotf vm windows build`: acquire and verify the ISO (`--iso`, a file or a download link) and virtio-win against SHA256 pins in the `vm` package (`versions.conf` holds semver values only); embedded `autounattend.xml` (LabConfig bypass, ARM64 virtio drivers, Pro selected by its published KMS client key, passwordless local account, guest agent, no device encryption, shut down at the end); QMP client; unattended install, answering the ISO's boot prompt with an arrow key (Enter reaches Setup's focused Cancel button, measured); a check boot (agent answers, no sshd); `clean-base` sealed read-only, disk and UEFI variables
+- [x] PR 3b — `dotf vm windows`: boot a throwaway qcow2 overlay of `clean-base` (refused while a guest runs, or without a sealed base), wait for the agent and the autologon, copy in a `git archive` of `--ref` (committed content only) and `guestrun.ps1` through the guest agent, run `install.ps1` then `dotf converge` as the guest user through a scheduled task, judge each on its own `last.json` (`Converged`, `Idempotent`), discard the overlay unless `--keep`; `dotf vm windows stop` ends a kept guest. No `GITHUB_TOKEN` reaches the guest in this version
+- [ ] [AC9] Live run on the Mac; then #2683 (powercfg) and #2672 (sshd) verified in the guest, evidence on those PRs and #2356; BUG-155 (#2734) measured. Done except the run itself: the clean build and the run work, and the first converge fails in `tools` on a clean Windows (#2754), so AC9 waits for that fix. Guest findings filed: #2758, #2763, #2764, #2765
 
 ## Closing
 

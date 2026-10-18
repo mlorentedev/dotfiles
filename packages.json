@@ -238,6 +238,15 @@
       }
     },
     {
+      "name": "qemu",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "brew": "qemu",
+        "command": "qemu-system-aarch64"
+      }
+    },
+    {
       "name": "docker",
       "profile": "full",
       "source": {
