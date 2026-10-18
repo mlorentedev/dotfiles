@@ -20,11 +20,11 @@ func TestToolsInstallers_RunUvToolsOnThePinnedPython(t *testing.T) {
 	if want == "" {
 		t.Fatal("this checkout's versions.conf pins no Python for mise")
 	}
-	if got := toolsInstaller(t.TempDir(), io.Discard).Python; got != want {
+	if got := toolsInstaller(t.TempDir(), io.Discard).Python(); got != want {
 		t.Errorf("tools install runs uv tools on %q, want %q", got, want)
 	}
 	in, ok := convergeOptions().ToolsCatalog.(*tools.Installer)
-	if !ok || in.Python != want {
+	if !ok || in.Python() != want {
 		t.Errorf("converge's catalog installer = %#v, want Python %q", convergeOptions().ToolsCatalog, want)
 	}
 }
@@ -45,5 +45,33 @@ func TestPinnedPython_SaysWhenItHasNoPin(t *testing.T) {
 		if !strings.Contains(out.String(), "[WARN] no Python series read from "+path) {
 			t.Errorf("a missing pin in %s went unsaid: %q", path, out.String())
 		}
+	}
+}
+
+// converge builds its installer before the checkout step clones and
+// records-mirror writes the deploy dir, so the pin is read when a uv tool
+// installs, not when the installer is built: on a clean Windows the eager
+// read found no versions.conf, uv picked 3.15, and pre-commit's pyyaml had
+// no wheel to install (#2769).
+func TestToolsInstaller_ReadsThePinWhenAUvToolInstalls(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DOTFILES_REPO_DIR", "")
+	deploy := filepath.Join(home, "deploy")
+	t.Setenv("DOTFILES_DIR", deploy)
+	t.Chdir(home)
+	var out bytes.Buffer
+	in := toolsInstaller(t.TempDir(), &out)
+
+	if err := os.MkdirAll(deploy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	conf := "# mise: cli\nPYTHON_VERSION=3.13.16\n"
+	if err := os.WriteFile(filepath.Join(deploy, "versions.conf"), []byte(conf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := in.Python(); got != "3.13" {
+		t.Errorf("Python() = %q after versions.conf appeared, want 3.13 (out: %q)", got, out.String())
 	}
 }
