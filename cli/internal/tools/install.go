@@ -173,9 +173,8 @@ type Installer struct {
 	// one ansible-core cannot import on (BUG-138), and on Windows Arm64 one
 	// pyyaml has no wheel for.
 	Python func() string
-	// python caches Python's answer, asked once (pythonAsked).
-	python      string
-	pythonAsked bool
+	// python caches Python's first non-empty answer.
+	python string
 	// PathCopies lists every file on PATH that would run as name, in PATH order,
 	// so the first is the one that answers. Nil means a scan of $PATH; tests
 	// inject the machine's answer.
@@ -468,21 +467,22 @@ func (in *Installer) npmPrefixArgs() []string {
 	return []string{"install", "-g", "--prefix", filepath.Dir(in.Dest)}
 }
 
+// pythonSeries is Python's answer at install time. Only a pin is kept: a
+// missing one is asked again by the next uv tool, so a pin that appears later
+// in the run is never shadowed by an earlier empty answer.
+func (in *Installer) pythonSeries() string {
+	if in.python == "" && in.Python != nil {
+		in.python = in.Python()
+	}
+	return in.python
+}
+
 // installUvTool provisions a PyPI-distributed tool (source.type "uv-tool") with
 // `uv tool install <package>==<version>`. uv replaces an installed version that
 // differs from the pin and exits 0 when the pin is already there (measured,
 // uv 0.9.29), so one argv covers install and upgrade. The reconcile policy is
 // the shared one, so a version the user upgraded to on purpose is never rolled
 // back: hive's upgrades are opt-in (hive ADR-020), and the pin is a floor.
-// pythonSeries is Python's answer, asked once: a missing pin warns once per
-// run, not once per uv tool.
-func (in *Installer) pythonSeries() string {
-	if !in.pythonAsked && in.Python != nil {
-		in.python, in.pythonAsked = in.Python(), true
-	}
-	return in.python
-}
-
 func (in *Installer) installUvTool(t Tool) (Result, error) {
 	pkg := t.Source.Package // non-empty: Install's refusal check
 	action := decideAction(in.current(t), t.Version)
