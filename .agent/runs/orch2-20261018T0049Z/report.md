@@ -30,7 +30,7 @@ Full command output is in the PR bodies and `## Review triage` comments of #2730
 2 of 2 queue items. Waiting dominated: the GitHub GraphQL limit shared with other sessions (`dotf pr land` and `gh pr ready` failed on it; REST reads and `dotf forge` worked) and CI queueing.
 
 ## Host
-`caffeinate -i -t 36000` was started at arming; the power cut killed it, so the window was not covered after the outage.
+A wake-lock (`caffeinate -i -t 36000`) was started at arming. A power cut interrupted the session; a new one was started on resume and released at close. Whether the host stayed awake between arming and the outage was not measured.
 
 ## Next action
 None for this run. Remove the worktree `chore-autopilot-orch2-r1`; never merge this branch.
