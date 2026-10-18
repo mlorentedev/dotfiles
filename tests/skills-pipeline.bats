@@ -75,7 +75,12 @@ SHIM
     chmod +x "$shim/dotf"
     export PATH="$shim:$PATH"
 
-    deploy_shared clean "$PATH"
+    # pi's targets require pi too (#2102), and a CI runner has none: the clean
+    # home is a box where pi is installed, so it gets a fake `pi` on PATH.
+    mkdir -p "$BATS_FILE_TMPDIR/pistub"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$BATS_FILE_TMPDIR/pistub/pi"
+    chmod +x "$BATS_FILE_TMPDIR/pistub/pi"
+    deploy_shared clean "$BATS_FILE_TMPDIR/pistub:$PATH"
     # The copilot skill target has a manifest-declared requires_command (BUG-771:
     # native skills must not create ~/.copilot on a box that never installed
     # Copilot). The copilot home needs a fake `copilot` on PATH; the BUG-771
@@ -198,7 +203,7 @@ path_without_copilot() {
     printf -- '---\nname: userskill\n---\nuser-installed\n' \
         > "$FAKEHOME/.agents/skills/userskill/SKILL.md"
     ln -s "$FAKEHOME/.agents/skills/userskill" "$FAKEHOME/.pi/agent/skills/userskill"
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    run env HOME="$FAKEHOME" PATH="$BATS_FILE_TMPDIR/pistub:$PATH" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     [ -L "$FAKEHOME/.pi/agent/skills/userskill" ]
     [ -f "$FAKEHOME/.pi/agent/skills/userskill/SKILL.md" ]

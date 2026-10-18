@@ -562,7 +562,7 @@ func checkDeployedDoctrine(sys *System, cfg *Config, rep *Report) {
 var deployedInstructionTargets = []struct{ agent, homeRel, repoRel, requiresCommand string }{
 	{"claude", ".claude/CLAUDE.md", "ai/claude/CLAUDE.md", ""},
 	{"opencode", ".config/opencode/AGENTS.md", "AGENTS.md", ""},
-	{"pi", ".pi/agent/AGENTS.md", "AGENTS.md", ""},
+	{"pi", ".pi/agent/AGENTS.md", "AGENTS.md", "pi"},
 	{"copilot", ".copilot/copilot-instructions.md", "ai/copilot/copilot-instructions.md", "copilot"},
 }
 

@@ -125,7 +125,8 @@
       {
         "agent": "pi",
         "render": "skill",
-        "dir": ".pi/agent/skills"
+        "dir": ".pi/agent/skills",
+        "requires_command": "pi"
       }
     ],
     "catalog": {
@@ -186,7 +187,8 @@
       {
         "agent": "pi",
         "file": ".pi/agent/AGENTS.md",
-        "source": "AGENTS.md"
+        "source": "AGENTS.md",
+        "requires_command": "pi"
       },
       {
         "agent": "copilot",
@@ -285,6 +287,7 @@
       {
         "agent": "pi",
         "file": ".pi/agent/extensions/dotfiles-gate.ts",
+        "requires_command": "pi",
         "format": "ts-extension",
         "emit": false,
         "events": {

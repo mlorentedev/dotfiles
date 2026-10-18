@@ -338,3 +338,19 @@ assert_absent() {
 # CLI-018: the "missing age identity is optional for pi models.json" assertion
 # lived in healthcheck.ps1; it now lives in go test (TestCheckOpenCode pi
 # models.json branch) after the .ps1 was retired.
+
+# #2102: the harness manifest writes under ~/.pi too (skills, AGENTS.md, the
+# gate extension), and `dotf harness instructions` wrote ~/.pi/agent/AGENTS.md
+# on a box without pi because its target named no requires_command. Every
+# consumer of the manifest skips a target whose requires_command is absent.
+@test "every harness manifest target under ~/.pi requires pi [#2102]" {
+    command -v jq >/dev/null || skip "jq not available"
+    local manifest="$DOTFILES_DIR/harness/manifest.json" total ungated
+    total="$(jq '[.. | objects | select((.file // .dir // "") | type == "string" and startswith(".pi/"))] | length' "$manifest")"
+    [ "$total" -ge 3 ]
+    ungated="$(jq -r '.. | objects | select((.file // .dir // "") | type == "string" and startswith(".pi/")) | select(.requires_command != "pi") | (.file // .dir)' "$manifest")"
+    if [ -n "$ungated" ]; then
+        printf 'written on a box without pi: %s\n' "$ungated"
+        return 1
+    fi
+}

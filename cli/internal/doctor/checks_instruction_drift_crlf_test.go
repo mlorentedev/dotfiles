@@ -24,7 +24,7 @@ func TestCheckInstructionDrift_CRLFDeployedCopyIsNotDrift(t *testing.T) {
 		}
 		writeFile(t, filepath.Join(home, tgt.homeRel), deployed)
 	}
-	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot"}, nil)
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot", "pi"}, nil)
 
 	var buf bytes.Buffer
 	rep := capture(&buf)
@@ -49,7 +49,7 @@ func TestCheckInstructionDrift_TrailingNewlinesAreNotDrift(t *testing.T) {
 		writeFile(t, filepath.Join(repo, tgt.repoRel), body+"\n")
 		writeFile(t, filepath.Join(home, tgt.homeRel), body)
 	}
-	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot"}, nil)
+	sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot", "pi"}, nil)
 
 	var buf bytes.Buffer
 	rep := capture(&buf)

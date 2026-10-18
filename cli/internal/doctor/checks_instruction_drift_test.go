@@ -28,12 +28,12 @@ func TestCheckInstructionDrift(t *testing.T) {
 		writeFile(t, filepath.Join(home, homeRel), content)
 	}
 
-	t.Run("matching content -> pass (copilot absent, 3 of 4 checked)", func(t *testing.T) {
+	t.Run("matching content -> pass (copilot and pi absent, 2 of 4 checked)", func(t *testing.T) {
 		repo, home := setup(t)
 		for _, tgt := range deployedInstructionTargets {
 			writeBoth(t, repo, home, tgt.repoRel, tgt.homeRel, "same content for "+tgt.repoRel+"\n")
 		}
-		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil) // "copilot" NOT on PATH
+		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, nil, nil) // neither "copilot" nor "pi" on PATH
 
 		var buf bytes.Buffer
 		rep := capture(&buf)
@@ -42,17 +42,17 @@ func TestCheckInstructionDrift(t *testing.T) {
 		if rep.Failures() != 0 {
 			t.Fatalf("matching content should pass\n%s", buf.String())
 		}
-		if !strings.Contains(buf.String(), "match their repo source (3 checked)") {
-			t.Errorf("expected the 3-checked pass line (copilot gated out)\n%s", buf.String())
+		if !strings.Contains(buf.String(), "match their repo source (2 checked)") {
+			t.Errorf("expected the 2-checked pass line (copilot and pi gated out)\n%s", buf.String())
 		}
 	})
 
-	t.Run("matching content -> pass (copilot present, all 4 checked)", func(t *testing.T) {
+	t.Run("matching content -> pass (copilot and pi present, all 4 checked)", func(t *testing.T) {
 		repo, home := setup(t)
 		for _, tgt := range deployedInstructionTargets {
 			writeBoth(t, repo, home, tgt.repoRel, tgt.homeRel, "same content for "+tgt.repoRel+"\n")
 		}
-		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot"}, nil)
+		sys := newSys(map[string]string{"HOME": home, "DOTFILES_REPO_DIR": repo}, []string{"copilot", "pi"}, nil)
 
 		var buf bytes.Buffer
 		rep := capture(&buf)
@@ -62,7 +62,7 @@ func TestCheckInstructionDrift(t *testing.T) {
 			t.Fatalf("matching content should pass\n%s", buf.String())
 		}
 		if !strings.Contains(buf.String(), "match their repo source (4 checked)") {
-			t.Errorf("expected the 4-checked pass line (copilot on PATH)\n%s", buf.String())
+			t.Errorf("expected the 4-checked pass line (copilot and pi on PATH)\n%s", buf.String())
 		}
 	})
 
