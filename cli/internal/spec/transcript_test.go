@@ -135,3 +135,19 @@ func TestSinkTranscriptStoresAnEventBeforeTheStreamEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// CLI-094: the last-call line is read from tool_execution_* events, so the sink
+// must keep them. Only the partial frames on the way to a message are dropped;
+// a tool's progress updates are the events a wedged call leaves behind.
+func TestSinkKeepsToolExecutionEventsThatNameTheLastCall(t *testing.T) {
+	for _, typ := range []string{"tool_execution_start", "tool_execution_update", "tool_execution_end"} {
+		if isIncrementalFrame([]byte(`{"type":"` + typ + `"}`)) {
+			t.Errorf("%s must be stored: the stall detector names the last call from it", typ)
+		}
+	}
+	for _, typ := range []string{"message_update", "text_delta"} {
+		if !isIncrementalFrame([]byte(`{"type":"` + typ + `"}`)) {
+			t.Errorf("%s is a partial frame and must not be stored", typ)
+		}
+	}
+}

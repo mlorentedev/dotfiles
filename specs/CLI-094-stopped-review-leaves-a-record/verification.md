@@ -36,7 +36,7 @@ Note on what the transcript records: `durationMs` is per tool call and there are
 ## Archive review
 
 - Round 1 (agy/gemini-3.8-flash-high, 2026-10-17): FAIL. Blocker: `SinkTranscript` flushed only at EOF, so the file the detector reads stayed empty while a reviewer ran (fixed: flush per event, with a test through the real sink). Minor, fixed: `StoppedRunRecord` named `review.md` for the second signer's `review-second.md`. Minor, accepted: `LastToolCall` reads pi's event shape only, so an agy stall is stopped but names no call (the proposal now says so; the stall check itself only watches the file). Minor, fixed: acceptance boxes in `proposal.md` ticked.
-- The round was a live run of the detector and the write-first prompt on agy: it wrote `review.md` and ended in 7 minutes, so neither the stall nor the cap fired.
+- The round was a live run of the detector and the write-first prompt on agy. File times: launched 14:51, `review.md` last written 14:58 (about 7 minutes, under both the 10-minute stall timeout and the 45-minute cap). The FAIL itself is kept as `review-round1.md` by the round-2 review branch, so a reader can check it there; this PR does not carry it.
 
 ## Promotions
 
