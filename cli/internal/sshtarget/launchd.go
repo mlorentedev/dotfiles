@@ -3,6 +3,8 @@ package sshtarget
 import (
 	"bytes"
 	"fmt"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 )
 
 // Launchd is sshd on macOS: launchd's com.openssh.sshd, socket-activated, so
@@ -17,11 +19,21 @@ const (
 	launchdPlist = "/System/Library/LaunchDaemons/ssh.plist"
 )
 
-// Enabled reports whether launchd has loaded sshd. `launchctl print` exits
-// non-zero (113) for a service it does not know, and needs no root to ask.
+// Enabled reports whether launchd has loaded sshd, without root. A print that
+// fails for another reason than an unknown service is an error, never "not
+// loaded": the step would bootstrap as root a service it never read.
 func (l Launchd) Enabled() (bool, error) {
-	_, err := l.Run("launchctl", "print", launchdLabel)
-	return err == nil, nil
+	return launchdLoaded(l.Run, launchdLabel)
+}
+
+// launchdLoaded asks launchd, through run, whether it knows service.
+// schedule.LaunchdLoaded owns the reading: only `launchctl print`'s exit 113
+// means it does not (#2731).
+func launchdLoaded(run Runner, service string) (bool, error) {
+	return schedule.LaunchdLoaded(func(args ...string) (string, error) {
+		out, err := run(append([]string{"launchctl"}, args...)...)
+		return string(out), err
+	}, service)
 }
 
 // HostKeys creates the host keys macOS would otherwise create at the first

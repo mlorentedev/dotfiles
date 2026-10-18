@@ -589,6 +589,16 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 			return p, err
 		}
 	}
+	if p.ConfigChanged && s.Prune && unlisted == nil {
+		// The write is what drops a tool the deployed config still asked
+		// for: listed only before it, the install stayed and failed the
+		// check after the prune (#2677). A listing that fails here keeps the
+		// earlier orphans, which are still orphans of the same pins, and the
+		// check after the prune reports the failure.
+		if again, lerr := s.Orphans(tools); lerr == nil {
+			p.Orphans = again
+		}
+	}
 	if len(p.Outdated) > 0 {
 		// upgrade also schedules the version it replaced for removal (mise
 		// 2026.10.3 lists it as "pruned in 1d"), so an agent does not pile up
