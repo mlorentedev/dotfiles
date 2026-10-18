@@ -211,3 +211,11 @@ func (q *QGA) open(path, mode string) (int, error) {
 	err := q.call("guest-file-open", map[string]string{"path": path, "mode": mode}, &h)
 	return h, err
 }
+
+// Shutdown asks the guest to power off. The agent sends no reply, because
+// the guest goes away; the caller waits for QEMU to exit instead.
+func (q *QGA) Shutdown() error {
+	return q.send("guest-shutdown", map[string]string{"mode": "powerdown"})
+}
+
+func (q *QGA) Close() error { return q.conn.Close() }

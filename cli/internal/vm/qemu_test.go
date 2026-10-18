@@ -56,8 +56,8 @@ func TestQEMUArgs_BootWindowsOnArm(t *testing.T) {
 	for _, want := range []string{
 		"-accel hvf", "-cpu host", "virt,gic-version=3",
 		"if=pflash,format=raw,unit=0,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd,readonly=on",
-		"if=pflash,format=raw,unit=1,file=/s/efivars.fd",
-		"nvme,drive=disk0", "file=/s/disk.qcow2,format=qcow2",
+		"if=pflash,format=raw,unit=1,file=/s/run-vars.fd",
+		"nvme,drive=disk0", "file=/s/run.qcow2,format=qcow2",
 		"virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
 		"socket,id=qga0,path=/s/run/qga.sock,server=on,wait=off",
 		"-qmp unix:/s/run/qmp.sock,server=on,wait=off",
@@ -71,6 +71,46 @@ func TestQEMUArgs_BootWindowsOnArm(t *testing.T) {
 	// a TPM here makes QEMU exit before the guest boots.
 	if strings.Contains(joined, "-tpmdev") {
 		t.Error("the guest must have no TPM device under HVF")
+	}
+}
+
+// A run boots a per-run overlay over clean-base and a copy of its UEFI
+// variables; only the build boots clean-base itself. clean-base is then never
+// opened writable by a run, so nothing a run does can persist in it.
+func TestQEMUArgs_ARunNeverWritesCleanBase(t *testing.T) {
+	run, err := testMachine("/s").Args()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j := strings.Join(run, " "); strings.Contains(j, "clean-base") {
+		t.Errorf("a run's argv names clean-base: %s", j)
+	}
+	for _, m := range []Machine{withBase(testMachine("/s")), withInstall(testMachine("/s"))} {
+		args, err := m.Args()
+		if err != nil {
+			t.Fatal(err)
+		}
+		j := strings.Join(args, " ")
+		for _, want := range []string{"file=/s/clean-base.qcow2,format=qcow2", "unit=1,file=/s/clean-base-vars.fd"} {
+			if !strings.Contains(j, want) {
+				t.Errorf("the build's argv lacks %q", want)
+			}
+		}
+	}
+}
+
+// The install boots from the Windows ISO; every reboot after it falls through
+// to the disk, because nothing presses a key at the CD's prompt then.
+func TestQEMUArgs_InstallBootsTheISOFirst(t *testing.T) {
+	args, err := withInstall(testMachine("/s")).Args()
+	if err != nil {
+		t.Fatal(err)
+	}
+	j := strings.Join(args, " ")
+	for _, want := range []string{"usb-storage,drive=cd0,removable=on,bootindex=0", "nvme,drive=disk0,serial=dotf0,bootindex=1"} {
+		if !strings.Contains(j, want) {
+			t.Errorf("argv lacks %q", want)
+		}
 	}
 }
 
@@ -98,6 +138,11 @@ func TestQEMUArgs_RefusesASocketPathTooLong(t *testing.T) {
 	if _, err := testMachine("/" + strings.Repeat("d", 100)).Args(); err == nil || !strings.Contains(err.Error(), "socket") {
 		t.Fatalf("want an error naming the socket path, got %v", err)
 	}
+}
+
+func withBase(m Machine) Machine {
+	m.Base = true
+	return m
 }
 
 func withInstall(m Machine) Machine {
