@@ -34,6 +34,11 @@ func newRepoWithSpec(t *testing.T, id string) (repoRoot, wantBase string) {
 	t.Helper()
 	repoRoot = t.TempDir()
 	git(t, repoRoot, "init", "-q", "-b", "main")
+	// A commit can fork `git maintenance run --auto` or a detached gc that keeps
+	// writing into .git after the test returns, so t.TempDir's RemoveAll finds
+	// the directory not empty and fails a test whose assertions passed.
+	git(t, repoRoot, "config", "gc.auto", "0")
+	git(t, repoRoot, "config", "maintenance.auto", "false")
 
 	if err := os.WriteFile(filepath.Join(repoRoot, "README.md"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -349,5 +354,16 @@ func TestResolveReviewBaseIgnoresFilesMovedInFromOutsideTheSpecsRoot(t *testing.
 
 	if got := ResolveReviewBase(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x")); got != wantBase {
 		t.Errorf("ResolveReviewBase = %q, want %q (the spec was created in that commit)", got, wantBase)
+	}
+}
+
+// The fixture must not leave a background git process behind: one that is still
+// writing into .git when t.TempDir is removed fails the test on cleanup.
+func TestNewRepoWithSpecDisablesBackgroundMaintenance(t *testing.T) {
+	repoRoot, _ := newRepoWithSpec(t, "FIX-001")
+	for key, want := range map[string]string{"gc.auto": "0", "maintenance.auto": "false"} {
+		if got := trim(git(t, repoRoot, "config", "--get", key)); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
 	}
 }
