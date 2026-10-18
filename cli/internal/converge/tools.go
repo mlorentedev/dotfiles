@@ -142,12 +142,18 @@ func (r toolsSync) syncHalf(env Env, dryRun bool) (Result, error) {
 // the step installed: the hourly `dotf update` runs with a minimal PATH, and
 // a fresh machine has no rc that adds ~/.local/bin or mise's shims yet.
 func (r toolsSync) reach() error {
+	return appendToPath(r.bins)
+}
+
+// appendToPath appends each of dirs this process's PATH lacks, after the
+// caller's own entries.
+func appendToPath(dirs []string) error {
 	path := os.Getenv("PATH")
 	have := map[string]bool{}
 	for _, dir := range filepath.SplitList(path) {
 		have[dir] = true
 	}
-	for _, dir := range r.bins {
+	for _, dir := range dirs {
 		if have[dir] {
 			continue
 		}

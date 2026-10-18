@@ -109,7 +109,8 @@ setup() {
 
 teardown() { cd / || true; rm -rf "$FAKEHOME"; }
 
-# path_without_copilot: $PATH with every directory holding a `copilot` removed.
+# path_without <cmd> [path]: the path (default $PATH) with every directory
+# holding a <cmd> removed.
 #
 # The absence test used to assume the absence -- its comment read "this PATH has
 # no copilot on it (true of this test suite's own environment already)", which is
@@ -125,12 +126,12 @@ teardown() { cd / || true; rm -rf "$FAKEHOME"; }
 # once. Not named `path`: in zsh that identifier is tied to $PATH itself, and
 # assigning a string to it wipes the command search path (see the prohibited
 # pattern table in .claude/CLAUDE.md).
-path_without_copilot() {
+path_without() {
     _pwc_out=""
     _pwc_ifs="$IFS"; IFS=":"
-    for _pwc_dir in $PATH; do
+    for _pwc_dir in ${2:-$PATH}; do
         [ -n "$_pwc_dir" ] || continue
-        [ -x "$_pwc_dir/copilot" ] && continue
+        [ -x "$_pwc_dir/$1" ] && continue
         _pwc_out="${_pwc_out:+$_pwc_out:}$_pwc_dir"
     done
     IFS="$_pwc_ifs"
@@ -234,13 +235,15 @@ path_without_copilot() {
     [ -f "$SHARED/.copilot/skills/systematic-debugging/root-cause-tracing.md" ]
 }
 
-@test "BUG-771: copilot native skills are not deployed when the copilot binary is absent" {
+# #2102 shares this deploy (the file's deploy budget): pi's manifest targets are
+# gated the same way, so the end-to-end proof is the same box without pi.
+@test "BUG-771 and #2102: nothing is deployed for copilot or pi when their binaries are absent" {
     # No copilot stub here, and the absence is MADE TRUE rather than assumed:
     # this is the class of box the gate exists for (setup-linux.sh never
     # auto-installs Copilot), but the developer running the suite may well have
     # it. Asserting "the gate fires when the binary is absent" against a PATH
     # that still carries the binary tests the opposite of the intent.
-    nocopilot="$(path_without_copilot)"
+    nocopilot="$(path_without pi "$(path_without copilot)")"
 
     # Fail loudly if the fixture did not achieve the absence, instead of
     # quietly re-testing the present-binary path and reporting a pass.
@@ -251,10 +254,12 @@ path_without_copilot() {
     # ones stop being read. `run -127` would silence it by pinning an exact
     # code, which is worse -- `command -v` answers 1 or 127 depending on the sh.
     run ! env PATH="$nocopilot" sh -c 'command -v copilot'
+    run ! env PATH="$nocopilot" sh -c 'command -v pi'
 
     run env HOME="$FAKEHOME" PATH="$nocopilot" "$SCRIPT" --deploy
     [ "$status" -eq 0 ]
     [ ! -e "$FAKEHOME/.copilot/skills" ]
+    [ ! -e "$FAKEHOME/.pi" ]
     # The catalog injection is a separate, un-gated feature (it only edits an
     # already-present instructions.md) and must be unaffected.
     grep -qF -- '**spec**' "$FAKEHOME/.copilot/copilot-instructions.md"

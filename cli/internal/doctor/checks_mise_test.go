@@ -129,7 +129,10 @@ func TestCheckMiseTools_FixReplacesACopyWithALinkToMiseShim(t *testing.T) {
 	bin := filepath.Join(home, ".local", "bin")
 	shim := filepath.Join(home, ".local", "share", "mise", "shims", "jq")
 	writeFile(t, shim, "#!/bin/sh\n")
-	if err := os.Symlink("/m/age", filepath.Join(bin, "age")); err != nil {
+	// A link into mise's own data dir is mise's, so it is left alone silently.
+	installed := filepath.Join(home, ".local", "share", "mise", "installs", "age", "1.2.1", "bin", "age")
+	writeFile(t, installed, "#!/bin/sh\n")
+	if err := os.Symlink(installed, filepath.Join(bin, "age")); err != nil {
 		t.Fatal(err)
 	}
 	var b bytes.Buffer
@@ -141,7 +144,7 @@ func TestCheckMiseTools_FixReplacesACopyWithALinkToMiseShim(t *testing.T) {
 	if got, err := os.Readlink(filepath.Join(bin, "jq")); err != nil || got != shim {
 		t.Errorf("~/.local/bin/jq must now link to mise's shim %q, got %q (%v)", shim, got, err)
 	}
-	if got, _ := os.Readlink(filepath.Join(bin, "age")); got != filepath.FromSlash("/m/age") {
+	if got, _ := os.Readlink(filepath.Join(bin, "age")); got != installed {
 		t.Errorf("a symlink that was already there must be left alone, got %q", got)
 	}
 	if fi, err := os.Lstat(filepath.Join(bin, "dotf")); err != nil || !fi.Mode().IsRegular() {
@@ -153,6 +156,106 @@ func TestCheckMiseTools_FixReplacesACopyWithALinkToMiseShim(t *testing.T) {
 	checkMiseTools(s, cfg, rep, true)
 	if rep.Warnings() != 0 || strings.Contains(b.String(), "replaced") {
 		t.Errorf("second run must be clean\n%s", b.String())
+	}
+}
+
+// #2462: pi's own installer left ~/.local/bin/pi -> ../../.pi/agent/bin/pi, a
+// link no pin governs, and the regular-file check skipped every symlink. A link
+// that resolves outside mise's data dir, or nowhere, shadows the pin just as a
+// copy does. It is reported in both modes and never replaced: whether the
+// repo made it is the retire step's question (TOOL-028).
+func TestCheckMiseTools_ALinkInLocalBinPointingOutsideMiseWarnsAndIsKept(t *testing.T) {
+	for _, fix := range []bool{false, true} {
+		s, cfg, home := shadowFixture(t)
+		bin := filepath.Join(home, ".local", "bin")
+		if err := os.MkdirAll(bin, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		foreign := filepath.Join(home, ".pi", "agent", "bin", "jq")
+		writeFile(t, foreign, "#!/bin/sh\n")
+		writeFile(t, filepath.Join(home, ".local", "share", "mise", "shims", "jq"), "#!/bin/sh\n")
+		if err := os.Symlink(foreign, filepath.Join(bin, "jq")); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(home, "gone"), filepath.Join(bin, "age")); err != nil {
+			t.Fatal(err)
+		}
+		// A link to mise's shim is mise's, although a shim is itself a link to
+		// the mise binary outside the data dir (measured on macOS: bats, uv).
+		mise := filepath.Join(home, "opt", "mise")
+		writeFile(t, mise, "#!/bin/sh\n")
+		shim := filepath.Join(home, ".local", "share", "mise", "shims", "age-keygen")
+		if err := os.Symlink(mise, shim); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(shim, filepath.Join(bin, "age-keygen")); err != nil {
+			t.Fatal(err)
+		}
+		var b bytes.Buffer
+		rep := capture(&b)
+		checkMiseTools(s, cfg, rep, fix)
+		out := b.String()
+		if rep.Failures() != 0 || rep.Warnings() != 1 {
+			t.Fatalf("fix=%v: want one WARN\n%s", fix, out)
+		}
+		for _, want := range []string{filepath.Join(bin, "jq") + " -> " + foreign, filepath.Join(bin, "age") + " -> " + filepath.Join(home, "gone")} {
+			if !strings.Contains(out, want) {
+				t.Errorf("fix=%v: WARN must name %q\n%s", fix, want, out)
+			}
+		}
+		if strings.Contains(out, "age-keygen") {
+			t.Errorf("fix=%v: a link to mise's shim is not a shadow\n%s", fix, out)
+		}
+		if got, _ := os.Readlink(filepath.Join(bin, "jq")); got != foreign {
+			t.Errorf("fix=%v: a link outside mise must be left alone, got %q", fix, got)
+		}
+	}
+}
+
+// A link --fix made stays mise's after mise drops the shim it names (an
+// uninstall, a reshim): its target still lies in mise's data dir, and calling
+// it "outside mise" would contradict the path the WARN prints.
+func TestCheckMiseTools_ABrokenLinkIntoMiseIsMiseAndNotWarned(t *testing.T) {
+	s, cfg, home := shadowFixture(t)
+	bin := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".local", "share", "mise", "shims"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(home, ".local", "share", "mise", "shims", "jq"), filepath.Join(bin, "jq")); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 0 || rep.Warnings() != 0 {
+		t.Fatalf("a dangling link into mise's data dir is mise's\n%s", b.String())
+	}
+}
+
+// A `# mise: latest` pin's version is a floor, not what mise installed (pi was
+// pinned 1.2.0 with 1.3.0 installed), and `mise bin-paths name@floor` answers
+// "missing" with nothing listed. So the check was blind to every latest pin,
+// pi included. A latest pin is asked for by name, which mise resolves itself.
+func TestCheckShadowingCopies_AsksForALatestPinByName(t *testing.T) {
+	s, _, home := shadowFixture(t, "jq")
+	s.CommandStdoutDir = func(dir, name string, args ...string) (string, error) {
+		switch strings.Join(args, " ") {
+		case "bin-paths --bin-names age@1.2.1 jq":
+			return "age\njq\n", nil
+		case "bin-paths --bin-names age@1.2.1 jq@1.7.1":
+			return "age\n", nil // mise WARNs "missing: jq@1.7.1"
+		}
+		return "", errors.New("unexpected: " + strings.Join(args, " "))
+	}
+	pins := []tools.MiseTool{{Name: "age", Version: "1.2.1"}, {Name: "jq", Version: "1.7.1"}}
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkShadowingCopies(s, home, pins, []string{"jq"}, rep, false)
+	if rep.Warnings() != 1 || !strings.Contains(b.String(), filepath.Join(home, ".local", "bin", "jq")) {
+		t.Errorf("want one WARN naming the jq copy\n%s", b.String())
 	}
 }
 
