@@ -60,3 +60,24 @@ had accepted the grant at all, so the same command would merge in a repository w
 - Opting another repository in is a one-file diff the owner merges, reviewed like any other authority change.
 - The no-auto-merge rule is unchanged: `allow_auto_merge` stays `false` and every merge is a deliberate act on a
   checked head commit. The grant removes the per-PR question, not the checks.
+
+## Amendment 2026-10-17: the exclusions are enforced (kubelab#2431)
+
+Decisions 1 and 5 were only partly mechanical. `dotf pr land` read whether the file existed and ignored its body: the
+`excluded:` list was never applied, and a PR that changed the grant landed like any other. Lesson-476 records how.
+
+- **`excluded:` is read from the base branch and applied.** Three kinds are understood. `release-please` is the
+  existing branch check, which stays hardcoded whatever the file says. `branch:<prefix>` forfeits the merge when the
+  head branch starts with the prefix. `path:<file>` or `path:<dir>/` forfeits it when the PR changes that path,
+  whatever its branch is called. A path is the content match: it still catches a promotion opened on a branch nobody
+  named for one.
+- **Fail closed.** An entry of any other kind refuses, rather than being skipped, and so does a file that does not
+  decode. A grant that says more than its actor reads is a promise nothing keeps.
+- **Decision 5 is now enforced by the tool.** `land` refuses any PR whose changed files include
+  `.github/merge-grant.yml`. It also refuses a PR whose file list gh truncated at 100 paths, because a partial list
+  cannot prove the grant file is absent from it.
+- **A name only forfeits.** Branch matching appears only on the excluding side. A test asserts that no head-branch
+  name lands a PR on a base without the grant.
+
+Decision 4 is out of date: kubelab opted in later (kubelab#2397). Its grant's exclusions are decided in kubelab, in a
+PR that changes the grant, so only the owner merges it.
