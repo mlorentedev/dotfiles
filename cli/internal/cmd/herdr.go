@@ -150,10 +150,13 @@ func newHerdrExplorerCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := herdrLookPath("yazi"); err != nil {
-				return errors.New("yazi is not on PATH: run `dotf tools sync` (YAZI_VERSION in versions.conf pins it)")
+			if ratio <= 0 || ratio >= 1 {
+				return fmt.Errorf("--ratio must be greater than 0 and less than 1, got %v: herdr refuses a split outside that range or renders one too thin to toggle", ratio)
 			}
-			open, err := explorerPane(ctx.tab)
+			if _, err := herdrLookPath("yazi"); err != nil {
+				return errors.New("yazi is not on PATH: run `dotf tools sync` (YAZI_VERSION in versions.conf pins it; a machine whose deployed copy of versions.conf predates the pin needs setup to refresh it)")
+			}
+			open, err := explorerPane(ctx.tab, ctx.pane)
 			if err != nil {
 				return err
 			}
@@ -169,7 +172,10 @@ func newHerdrExplorerCmd() *cobra.Command {
 				return err
 			}
 			if _, err := herdrRun("pane", "run", id, "yazi"); err != nil {
-				return err
+				// Failing to start yazi in the pane just made is the same outcome
+				// AC4 refuses: an empty pane left behind. Take it back.
+				_, _ = herdrRun("pane", "close", id)
+				return fmt.Errorf("start yazi in %s (the empty pane was closed): %w", id, err)
 			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "opened the explorer in %s at %s\n", id, ctx.cwd)
 			return nil
@@ -183,7 +189,13 @@ func newHerdrExplorerCmd() *cobra.Command {
 // does. It detects the foreground process rather than a pane label: a label is
 // ours to set and hers to lose (any rename clears it), while yazi holds the
 // foreground for as long as it runs.
-func explorerPane(tab string) (string, error) {
+//
+// Two things it refuses to guess about. The invoking pane is excluded, because
+// someone who runs yazi by hand in the pane they then press the key in would
+// otherwise have that pane closed under them. More than one yazi left in the tab
+// is reported rather than closed: the toggle cannot tell ours from theirs, and
+// closing the wrong pane is worse than not toggling.
+func explorerPane(tab, invoking string) (string, error) {
 	out, err := herdrRun("pane", "list")
 	if err != nil {
 		return "", err
@@ -192,8 +204,9 @@ func explorerPane(tab string) (string, error) {
 	if err := json.Unmarshal(out, &list); err != nil {
 		return "", fmt.Errorf("parse `herdr pane list`: %w", err)
 	}
+	var found []string
 	for _, p := range list.Result.Panes {
-		if p.TabID != tab {
+		if p.TabID != tab || p.PaneID == invoking {
 			continue
 		}
 		runs, err := paneRunsYazi(p.PaneID)
@@ -201,10 +214,17 @@ func explorerPane(tab string) (string, error) {
 			return "", err
 		}
 		if runs {
-			return p.PaneID, nil
+			found = append(found, p.PaneID)
 		}
 	}
-	return "", nil
+	switch len(found) {
+	case 0:
+		return "", nil
+	case 1:
+		return found[0], nil
+	default:
+		return "", fmt.Errorf("more than one pane in this tab is running yazi (%s): close the ones you did not expect and try again", strings.Join(found, ", "))
+	}
 }
 
 func paneRunsYazi(pane string) (bool, error) {

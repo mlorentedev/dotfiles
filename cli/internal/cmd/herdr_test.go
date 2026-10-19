@@ -96,22 +96,25 @@ func TestHerdrExplorerOpensOnTheRightWhenNoneIsOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("explorer: %v\n%s", err, out)
 	}
-	if len(*calls) != 4 {
-		t.Fatalf("want list, process-info, split, run; got %d calls: %+v", len(*calls), *calls)
+	// The invoking pane is the only one listed, and it is never a candidate, so
+	// there is nothing to inspect: list, split, run.
+	if len(*calls) != 3 {
+		t.Fatalf("want list, split, run; got %d calls: %+v", len(*calls), *calls)
 	}
-	split := strings.Join((*calls)[2].args, " ")
+	split := strings.Join((*calls)[1].args, " ")
 	for _, want := range []string{"pane split", "--pane w1:p1", "--direction right", "--cwd /repo/wt", "--ratio 0.30"} {
 		if !strings.Contains(split, want) {
 			t.Fatalf("split argv %q missing %q", split, want)
 		}
 	}
-	if got := strings.Join((*calls)[3].args, " "); got != "pane run w1:p2 yazi" {
+	if got := strings.Join((*calls)[2].args, " "); got != "pane run w1:p2 yazi" {
 		t.Fatalf("want yazi started in the new pane, got %q", got)
 	}
 }
 
 // The toggle is the whole reason the command exists: a second press must not
-// leave two explorers eating the tab.
+// leave two explorers eating the tab. The invoking pane is skipped, so the pane
+// closed is the other one.
 func TestHerdrExplorerClosesTheOneAlreadyRunning(t *testing.T) {
 	herdrPaneEnv(t, "w1:p1", "w1:t1", "/repo/wt")
 	calls := stubHerdr(t, map[string]string{
@@ -124,13 +127,96 @@ func TestHerdrExplorerClosesTheOneAlreadyRunning(t *testing.T) {
 		t.Fatalf("toggle closed: %v\n%s", err, out)
 	}
 	if len(*calls) != 3 {
-		t.Fatalf("want list, one process-info for the tab's first pane, close; got %+v", *calls)
+		t.Fatalf("want list, one process-info, close; got %+v", *calls)
 	}
-	if got := strings.Join((*calls)[2].args, " "); got != "pane close w1:p1" {
-		t.Fatalf("want the running explorer closed, got %q", got)
+	if got := strings.Join((*calls)[2].args, " "); got != "pane close w1:p2" {
+		t.Fatalf("want the other pane closed, got %q", got)
 	}
 	if !strings.Contains(out, "closed the explorer") {
 		t.Fatalf("a toggle that closed something must say so: %q", out)
+	}
+}
+
+// Someone who runs yazi by hand in the pane they then press the key in must not
+// have that pane — shell or agent included — closed under them.
+func TestHerdrExplorerNeverClosesThePaneItWasRunFrom(t *testing.T) {
+	herdrPaneEnv(t, "w1:p1", "w1:t1", "/repo/wt")
+	calls := stubHerdr(t, map[string]string{
+		"pane list":         `{"result":{"panes":[{"pane_id":"w1:p1","tab_id":"w1:t1"}]}}`,
+		"pane split":        `{"result":{"pane":{"pane_id":"w1:p2"}}}`,
+		"pane run":          `{"result":{"type":"ok"}}`,
+		"pane process-info": `{"result":{"process_info":{"foreground_processes":[{"name":"yazi"}]}}}`,
+	})
+	if _, err := runHerdrExplorer(t); err != nil {
+		t.Fatalf("explorer: %v", err)
+	}
+	for _, c := range *calls {
+		if len(c.args) > 2 && c.args[1] == "close" && c.args[2] == "w1:p1" {
+			t.Fatalf("the invoking pane was closed: %+v", c.args)
+		}
+	}
+}
+
+// Two yazi panes in the returned set cannot be told apart, so the toggle says so
+// instead of closing one of them.
+func TestHerdrExplorerRefusesToGuessBetweenTwoExplorers(t *testing.T) {
+	herdrPaneEnv(t, "w1:p1", "w1:t1", "/repo/wt")
+	calls := stubHerdr(t, map[string]string{
+		"pane list":         `{"result":{"panes":[{"pane_id":"w1:p2","tab_id":"w1:t1"},{"pane_id":"w1:p3","tab_id":"w1:t1"}]}}`,
+		"pane process-info": `{"result":{"process_info":{"foreground_processes":[{"name":"yazi"}]}}}`,
+	})
+	_, err := runHerdrExplorer(t)
+	if err == nil || !strings.Contains(err.Error(), "more than one pane") {
+		t.Fatalf("want the ambiguity reported, got %v", err)
+	}
+	for _, c := range *calls {
+		if len(c.args) > 1 && c.args[1] == "close" {
+			t.Fatalf("nothing may be closed while the choice is ambiguous: %+v", c.args)
+		}
+	}
+}
+
+// A split that could not be filled is the empty pane AC4 refuses; it must not be
+// left on screen.
+func TestHerdrExplorerClosesThePaneWhenYaziFailsToStart(t *testing.T) {
+	herdrPaneEnv(t, "w1:p1", "w1:t1", "/repo/wt")
+	var closed string
+	calls := stubHerdr(t, map[string]string{
+		"pane list":         herdrOnePaneList,
+		"pane process-info": `{"result":{"process_info":{"foreground_processes":[{"name":"zsh"}]}}}`,
+		"pane split":        `{"result":{"pane":{"pane_id":"w1:p2"}}}`,
+		"pane close":        `{"result":{"type":"ok"}}`,
+	})
+	origRun := herdrRun
+	t.Cleanup(func() { herdrRun = origRun })
+	inner := herdrRun
+	herdrRun = func(args ...string) ([]byte, error) {
+		if len(args) > 1 && args[1] == "run" {
+			return nil, errors.New("pane is gone")
+		}
+		if len(args) > 2 && args[1] == "close" {
+			closed = args[2]
+		}
+		return inner(args...)
+	}
+	_, err := runHerdrExplorer(t)
+	if err == nil || !strings.Contains(err.Error(), "empty pane was closed") {
+		t.Fatalf("want the failure reported with its cleanup, got %v", err)
+	}
+	if closed != "w1:p2" {
+		t.Fatalf("want the split taken back, closed=%q calls=%+v", closed, *calls)
+	}
+}
+
+// herdr's split ratio is a fraction of the tab; 0, 1 and outside that range have
+// no pane to toggle back.
+func TestHerdrExplorerRejectsAnImpossibleRatio(t *testing.T) {
+	for _, bad := range []string{"0", "1", "1.5", "-0.2"} {
+		herdrPaneEnv(t, "w1:p1", "w1:t1", "/repo/wt")
+		stubHerdr(t, map[string]string{})
+		if _, err := runHerdrExplorer(t, "--ratio", bad); err == nil || !strings.Contains(err.Error(), "--ratio") {
+			t.Fatalf("--ratio %s must be refused, got %v", bad, err)
+		}
 	}
 }
 
@@ -179,7 +265,7 @@ func TestHerdrExplorerHonoursTheRatioFlag(t *testing.T) {
 	if _, err := runHerdrExplorer(t, "--ratio", "0.45"); err != nil {
 		t.Fatalf("explorer: %v", err)
 	}
-	if got := strings.Join((*calls)[2].args, " "); !strings.HasSuffix(got, "--ratio 0.45") {
+	if got := strings.Join((*calls)[1].args, " "); !strings.HasSuffix(got, "--ratio 0.45") {
 		t.Fatalf("want --ratio 0.45 in %q", got)
 	}
 }
