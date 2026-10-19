@@ -32,13 +32,29 @@ setup() {
 # of them and pi on that shell loses NaN with no config change to review.
 @test "the pi wrapper hands NAN_API_KEY to pi through dotf secrets run, on every shell" {
     for f in .zshrc .bashrc; do
-        grep -qE '^[[:space:]]*pi\(\) \{ dotf secrets run --only [A-Z_,]*NAN_API_KEY[A-Z_,]* -- pi "\$@"; \}' "$DOTFILES_DIR/$f" \
+        grep -qE '^[[:space:]]*pi\(\) \{ HERDR_AGENT=pi dotf secrets run --only [A-Z_,]*NAN_API_KEY[A-Z_,]* -- pi "\$@"; \}' "$DOTFILES_DIR/$f" \
             || { echo "$f: no pi wrapper injecting NAN_API_KEY"; return 1; }
     done
     grep -qE '^[[:space:]]*function pi \{' "$DOTFILES_DIR/powershell/profile.ps1" \
         || { echo "profile.ps1: no pi wrapper"; return 1; }
     grep -qE '^[[:space:]]*\$env_b64 = \(dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- powershell -NoProfile -Command "\[Convert\]::ToBase64String' "$DOTFILES_DIR/powershell/profile.ps1" \
         || { echo "profile.ps1: pi wrapper does not extract NAN_API_KEY through secrets run"; return 1; }
+}
+
+# #2813: herdr identifies an agent by the FOREGROUND process of the pane terminal,
+# and the wrapper makes that process dotf (dotf gives the agent its own pty).
+# HERDR_AGENT names the agent for herdr's process detection, so its VALUE is the
+# contract: a copy-paste that leaves HERDR_AGENT=pi on opencode's wrapper
+# mislabels every opencode pane as pi, and nothing else in the repo would catch
+# it. The whole line is compared, not the variable alone, because a swap passes
+# any check that looks for each token separately.
+@test "each wrapper names its own agent in HERDR_AGENT, on every shell" {
+    for f in .zshrc .bashrc; do
+        grep -qF 'pi() { HERDR_AGENT=pi dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "$@"; }' "$DOTFILES_DIR/$f" \
+            || { echo "$f: the pi wrapper does not declare HERDR_AGENT=pi (herdr reports agent: null)"; return 1; }
+        grep -qF 'opencode() { HERDR_AGENT=opencode dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode "$@"; }' "$DOTFILES_DIR/$f" \
+            || { echo "$f: the opencode wrapper does not declare HERDR_AGENT=opencode"; return 1; }
+    done
 }
 
 # AI-046 AC3. A NaN model defined here replaces the package's model with the
