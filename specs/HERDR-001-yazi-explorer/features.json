@@ -29,8 +29,8 @@
   },
   {
     "id": "HERDR-001-yazi-explorer-f5",
-    "behavior": "yazi is provisioned by a mise pin, so every OS installs it through dotf tools sync",
-    "verification": "grep -E '^YAZI_VERSION=[0-9]+\\.[0-9]+' versions.conf",
+    "behavior": "yazi is provisioned by a mise pin, and the pin reaches the rendered mise config from the checkout",
+    "verification": "dotf tools sync --dry-run | grep -qE 'yazi 26\\.9\\.1'",
     "state": "pending",
     "evidence": ""
   },

@@ -20,7 +20,7 @@ this session, on herdr 0.9.3, macOS arm64.
 ## Test status
 
 - `cd cli && go vet ./... && go test ./...` → clean (no failures in any package).
-- `bats tests/herdr-config.bats tests/pi-config.bats tests/versions-conf.bats` → 62 ok, 0 failures.
+- `bats tests/herdr-config.bats tests/pi-config.bats tests/versions-conf.bats` → 63 ok, 0 failures.
 - `bats tests/bashrc-guards.bats tests/zshrc-guards.bats tests/shell-profile.bats tests/shell-wrapper-dedup.bats tests/opencode.bats tests/secrets-only-scope.bats tests/stub-real-pairing.bats tests/versions-no-hardcode.bats` → 101 ok, 0 failures.
 - Manual smoke test: the docked explorer opened and toggled closed in the owner's live session; all scratch panes were closed, workspace `w10` is back to `w10:p1`.
 - No regressions: yes. One collateral fix was needed: the `herdr config check`

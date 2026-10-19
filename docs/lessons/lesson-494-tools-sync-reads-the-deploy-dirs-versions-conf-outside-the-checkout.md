@@ -3,7 +3,7 @@ id: "lesson-494-tools-sync-reads-the-deploy-dirs-versions-conf-outside-the-check
 type: lesson
 status: active
 title: "tools sync reads the deploy dir's versions.conf outside the checkout"
-created: "2026-10-19"
+created: "2026-10-18"
 ---
 
 # tools sync reads the deploy dir's versions.conf outside the checkout

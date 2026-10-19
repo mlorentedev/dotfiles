@@ -3,7 +3,7 @@ id: "lesson-493-a-wrapper-hides-the-foreground-process-so-name-the-agent-for-the
 type: lesson
 status: active
 title: "A wrapper hides the foreground process, so name the agent for the inspector"
-created: "2026-10-19"
+created: "2026-10-18"
 ---
 
 # A wrapper hides the foreground process, so name the agent for the inspector

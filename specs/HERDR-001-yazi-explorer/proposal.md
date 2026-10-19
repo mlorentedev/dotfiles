@@ -62,12 +62,12 @@ sidebar still calls `unknown`.
 
 ## Acceptance criteria
 
-- [ ] `herdr config check` accepts `ai/herdr/config.toml` and the deployed copy.
-- [ ] `dotf herdr explorer` splits the active pane to the right and runs yazi in that pane's directory.
-- [ ] A second `dotf herdr explorer` in the same tab closes that pane and opens nothing.
-- [ ] A machine without yazi gets a refusal naming `dotf tools sync`, not an empty pane.
-- [ ] `YAZI_VERSION` reaches the rendered mise config from the checkout, and a second `dotf tools sync` reports nothing to do.
-- [ ] `HERDR_AGENT` is declared per wrapper with its own value on both shells, and herdr reports the pane as that agent.
+- [x] `herdr config check` accepts `ai/herdr/config.toml` and the deployed copy.
+- [x] `dotf herdr explorer` splits the active pane to the right and runs yazi in that pane's directory.
+- [x] A second `dotf herdr explorer` in the same tab closes that pane and opens nothing.
+- [x] A machine without yazi gets a refusal naming `dotf tools sync`, not an empty pane.
+- [x] `YAZI_VERSION` reaches the rendered mise config from the checkout, and a second `dotf tools sync` reports nothing to do.
+- [x] `HERDR_AGENT` is declared per wrapper with its own value on both shells, and herdr reports the pane as that agent.
 
 ## References
 

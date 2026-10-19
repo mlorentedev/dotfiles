@@ -117,7 +117,7 @@ setup() {
     # once a release carries `dotf herdr explorer`. Remove this test with it.
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
     [ "$dotf_pin" = "0.75.0" ] || skip "DOTF_VERSION=$dotf_pin: check whether the explorer binding can land now"
-    run grep -F 'dotf herdr explorer' "$SRC"
+    run grep -E "^command[[:space:]]*=[[:space:]]*['\"]dotf herdr explorer" "$SRC"
     [ "$status" -ne 0 ] || { echo "the binding names a subcommand DOTF_VERSION=$dotf_pin does not carry"; false; }
 }
 

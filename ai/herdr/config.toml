@@ -30,9 +30,9 @@ height = "90%"
 
 # The worktree's files on demand (HERDR-001): yazi over the focused pane, in its
 # directory. Nothing here installs yazi -- YAZI_VERSION in versions.conf does,
-# through `dotf tools sync`. Command is the bare binary on purpose: unlike the
-# docked binding below, it needs no dotf subcommand, so it is safe to deploy on
-# a machine whose DOTF_VERSION predates this feature.
+# through `dotf tools sync`. Command is the bare binary on purpose: it needs no
+# dotf subcommand, so it is safe to deploy on a machine whose DOTF_VERSION
+# predates the docked toggle that `dotf herdr explorer` will provide.
 [[keys.command]]
 key = "prefix+e"
 type = "popup"

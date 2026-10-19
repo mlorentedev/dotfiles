@@ -3,7 +3,7 @@ id: "lesson-495-a-heredoc-inside-a-command-substitution-still-runs-its-backticks
 type: lesson
 status: active
 title: "A heredoc inside a command substitution still runs its backticks"
-created: "2026-10-19"
+created: "2026-10-18"
 ---
 
 # A heredoc inside a command substitution still runs its backticks
