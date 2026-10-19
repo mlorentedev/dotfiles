@@ -28,6 +28,26 @@ description = "lazygit in this pane's repository"
 width = "90%"
 height = "90%"
 
+# The worktree's files on demand (HERDR-001): yazi over the focused pane, in its
+# directory. Nothing here installs yazi -- YAZI_VERSION in versions.conf does,
+# through `dotf tools sync`. Command is the bare binary on purpose: unlike the
+# docked binding below, it needs no dotf subcommand, so it is safe to deploy on
+# a machine whose DOTF_VERSION predates this feature.
+[[keys.command]]
+key = "prefix+e"
+type = "popup"
+command = "yazi"
+description = "yazi over this pane: browse this worktree"
+width = "90%"
+height = "90%"
+
+[ui]
+# Attention queue instead of grouping: an agent that is blocked or done floats to
+# the top of the sidebar, which is the question this panel answers (who needs me
+# now). Revert to grouping with agent_panel_sort = "spaces"; one key, no other
+# setting depends on it.
+agent_panel_sort = "priority"
+
 [ui.sidebar.agents.rows_by_agent]
 # pi's sidebar entry carries the session title on its own row, as Claude's does.
 # pi 1.2.0 sets the terminal title itself (π - <session> - <cwd>, from

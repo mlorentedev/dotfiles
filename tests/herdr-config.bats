@@ -20,7 +20,10 @@ setup() {
 @test "herdr config check rejects a binding it does not know, so the test above can fail" {
     command -v herdr >/dev/null 2>&1 || skip "herdr is not on PATH (mise installs it: dotf tools sync)"
     bad="$BATS_TEST_TMPDIR/config.toml"
-    { cat "$SRC"; printf '\n[ui]\nno_such_key = 1\n'; } > "$bad"
+    # A table this file does not already define: appending a second [ui] would be
+    # a duplicate-table parse error, and the test would pass on the wrong
+    # message (it did, once [ui] arrived for agent_panel_sort).
+    { cat "$SRC"; printf '\n[terminal]\nno_such_key = 1\n'; } > "$bad"
     run env HERDR_CONFIG_PATH="$bad" herdr config check
     [ "$status" -ne 0 ] || false
     [[ "$output" == *"no_such_key"* ]] || false
@@ -84,4 +87,45 @@ setup() {
     run env HERDR_CONFIG_PATH="$bad" herdr config check
     [ "$status" -ne 0 ] || false
     [[ "$output" == *"no_such_token"* ]] || false
+}
+
+@test "the agent panel answers who needs me first, not who was opened first" {
+    # One key, no other setting depends on it; revert to grouping by deleting it.
+    run grep -E '^agent_panel_sort[[:space:]]*=[[:space:]]*"priority"$' "$SRC"
+    [ "$status" -eq 0 ] || { echo "ui.agent_panel_sort is not priority: $output"; false; }
+}
+
+@test "prefix+e opens a file explorer over the focused pane" {
+    # Static: the binding is what a person presses, and it can rot without the
+    # binary noticing (herdr ignores an unknown key silently).
+    block=$(grep -A5 'key = "prefix+e"' "$SRC")
+    [[ "$block" == *'type = "popup"'* ]] || { echo "prefix+e is not a popup: $block"; false; }
+    [[ "$block" == *'command = "yazi"'* ]] || { echo "prefix+e does not run yazi: $block"; false; }
+}
+
+@test "the explorer's yazi comes from a pin, so a new machine provisions it (#2814)" {
+    # A binding that runs a tool nobody provisions is a key that fails on a
+    # fresh box. mise, not a hand install, is the provisioning path on every OS.
+    run grep -E '^YAZI_VERSION=[0-9]+\.[0-9]+' "$REPO/versions.conf"
+    [ "$status" -eq 0 ] || { echo "versions.conf pins no YAZI_VERSION, so the prefix+e popup has no provisioner"; false; }
+}
+
+@test "no binding calls a dotf subcommand the pinned release does not have (#2814)" {
+    # DOTF_VERSION is what a NEW machine installs; CI builds the tree. A binding
+    # naming a tree-only subcommand deploys cleanly here and fails on every other
+    # machine (lesson 373), so the docked explorer binding lands in a follow-up PR
+    # once a release carries `dotf herdr explorer`. Remove this test with it.
+    dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
+    [ "$dotf_pin" = "0.75.0" ] || skip "DOTF_VERSION=$dotf_pin: check whether the explorer binding can land now"
+    run grep -F 'dotf herdr explorer' "$SRC"
+    [ "$status" -ne 0 ] || { echo "the binding names a subcommand DOTF_VERSION=$dotf_pin does not carry"; false; }
+}
+
+@test "dotf herdr explorer exists and names its provisioner" {
+    # The target of the follow-up binding. go run keeps it tied to the tree, so a
+    # rename here cannot leave a binding pointing at nothing.
+    command -v go >/dev/null 2>&1 || skip "Go toolchain not on PATH"
+    run bash -c "cd '$REPO/cli' && go run ./cmd/dotf herdr explorer --help"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [[ "$output" == *"YAZI_VERSION"* ]] || { echo "$output"; false; }
 }
