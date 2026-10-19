@@ -484,7 +484,7 @@ jobs:
         if: "!cancelled() && steps.route.outputs.first == 'anthropic'"
         timeout-minutes: 8
         continue-on-error: true
-        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        uses: The-PR-Agent/pr-agent@981344be2755e303df501e18e3f60b848a188a80  # v0.48.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The only inference credential this step holds; NaN's is not here.
@@ -564,7 +564,7 @@ jobs:
         # sha (an annotated tag returns a tag object: dereference it via git/tags).
         # The tag is not repeated here because Dependabot rewrites only the line
         # below, and a copy in this comment drifted from v0.42.0 to v0.45.0 unseen.
-        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        uses: The-PR-Agent/pr-agent@981344be2755e303df501e18e3f60b848a188a80  # v0.48.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
@@ -706,7 +706,7 @@ jobs:
         if: "!cancelled() && steps.published_after_nan.outputs.published == 'false'"
         timeout-minutes: 8
         continue-on-error: true
-        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        uses: The-PR-Agent/pr-agent@981344be2755e303df501e18e3f60b848a188a80  # v0.48.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The only inference credential this step holds; NaN's is not here.
