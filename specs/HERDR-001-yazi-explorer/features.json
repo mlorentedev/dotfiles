@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HERDR-001-yazi-explorer-f1",
+    "behavior": "herdr accepts the explorer bindings and the sidebar ordering, on the source config and on the deployed copy",
+    "verification": "bats tests/herdr-config.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERDR-001-yazi-explorer-f2",
+    "behavior": "dotf herdr explorer splits the active pane to the right, at that pane's directory and ratio, and runs yazi in the new pane",
+    "verification": "cd cli && go test ./internal/cmd -run TestHerdrExplorerOpensOnTheRightWhenNoneIsOpen",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERDR-001-yazi-explorer-f3",
+    "behavior": "a second invocation in the same tab closes the running explorer and opens nothing; another tab's explorer is left alone",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestHerdrExplorerClosesTheOneAlreadyRunning|TestHerdrExplorerIgnoresOtherTabsExplorer'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERDR-001-yazi-explorer-f4",
+    "behavior": "a machine without yazi gets a refusal that names the provisioner instead of an empty pane",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestHerdrExplorerRefusesWithoutYazi|TestHerdrExplorerRefusesOutsideHerdr'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERDR-001-yazi-explorer-f5",
+    "behavior": "yazi is provisioned by a mise pin, and the pin reaches the rendered mise config from the checkout",
+    "verification": "dotf tools sync --dry-run | grep -qE 'yazi 26\\.9\\.1'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HERDR-001-yazi-explorer-f6",
+    "behavior": "each shell wrapper names its own agent in HERDR_AGENT, so herdr detects a wrapped pane instead of reporting agent: null",
+    "verification": "bats tests/pi-config.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

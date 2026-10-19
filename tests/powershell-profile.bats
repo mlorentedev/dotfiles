@@ -81,7 +81,7 @@ setup() {
 @test "parity: neither .bashrc nor profile.ps1 auto-loads secrets; both wrap the AI CLIs" {
     refute_grep 'source .*load-secrets\.sh' "$DOTFILES_DIR/.bashrc"
     refute_grep 'load-secrets\.ps1' "$PROFILE_SCRIPT"
-    grep -qE 'opencode\(\) \{ dotf secrets run' "$DOTFILES_DIR/.bashrc"
+    grep -qE 'opencode\(\) \{ HERDR_AGENT=opencode dotf secrets run' "$DOTFILES_DIR/.bashrc"
     grep -qE 'function opencode \{' "$PROFILE_SCRIPT"
 }
 

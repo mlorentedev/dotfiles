@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: 49c478eb28a75163
+generated_sha: 1ae2d00e2343129c
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -133,7 +133,10 @@ Selection; nothing retries one with the other.
 
 With herdr running, `dotf worktree add … --agent <harness> --prompt-file <f>` opens it in
 a herdr pane and starts the agent there. Never start a second herdr server on a box that
-has one: talk to the live one, or skip `--agent`.
+has one: talk to the live one, or skip `--agent`. For panes, agent detection and
+keybindings themselves, see [[00_meta/skills/herdr/SKILL|herdr]] — an agent launched
+through a wrapper that allocates its own pty is invisible to herdr's sidebar until the
+wrapper names it with `HERDR_AGENT`.
 
 ### 2. Run project setup (auto-detect)
 

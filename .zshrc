@@ -140,8 +140,18 @@ if command -v dotf >/dev/null 2>&1 || [ -x "$HOME/.local/bin/dotf" ]; then
     # unknown one, so a stale name does not degrade the launch, it prevents it.
     # OLLAMA_API_KEY was listed for a provider slot whose registry entry was
     # never created, and opencode had stopped starting on both shells as a result.
-    opencode() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode "$@"; }
-    pi() { dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "$@"; }
+    # herdr identifies an agent by the FOREGROUND process of the pane terminal,
+    # and the wrapper makes that process `dotf`: `dotf secrets run` hands the
+    # agent its own pty, so the pane shows a `dotf secrets run -- ...` process
+    # and herdr reports agent: null (#2813). HERDR_AGENT names the agent for
+    # herdr's process detection. It goes ON THE COMMAND, never in an `export`
+    # and never inside dotf: herdr reads the environment the foreground process
+    # was EXEC'd with (Linux /proc/PID/environ, macOS KERN_PROCARGS2), so a
+    # variable set after exec is invisible to it, and an export would mislabel
+    # every later command in this shell. Each value is herdr's canonical agent
+    # id, which is also the key rows_by_agent uses in ai/herdr/config.toml.
+    opencode() { HERDR_AGENT=opencode dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode "$@"; }
+    pi() { HERDR_AGENT=pi dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "$@"; }
     # agy is deliberately NOT wrapped. It authenticates with its own stored
     # credentials and reads no variable this registry exposes — verified against
     # both its settings files and the strings of the binary itself. Wrapping it

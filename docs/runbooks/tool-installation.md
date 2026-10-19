@@ -16,7 +16,7 @@ How the tools this repository depends on reach a machine, and how to add one. No
 
 | Tool class | Channel | Declared in | Converged by |
 |---|---|---|---|
-| Pinned single-binary CLIs (actionlint, age, bat, bats, cloudflared, delta, direnv, fd, fzf, golangci-lint, hadolint, herdr, jq, kubectx, kubens, lazygit, mkcert, shellcheck, shfmt, stern, terraform, tflint, trivy, uv, yq, zoxide) and Python and Node; Go, Java and Maven in Wave 3 | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: Windows CLI activation follows a release carrying its bats/direnv reader (#2013) |
+| Pinned single-binary CLIs (actionlint, age, bat, bats, cloudflared, delta, direnv, fd, fzf, golangci-lint, hadolint, herdr, jq, kubectx, kubens, lazygit, mkcert, shellcheck, shfmt, stern, terraform, tflint, trivy, uv, yazi, yq, zoxide) and Python and Node; Go, Java and Maven in Wave 3 | mise | `versions.conf`, lines marked `# mise: cli` | `dotf tools sync`: Windows CLI activation follows a release carrying its bats/direnv reader (#2013) |
 | The two bootstrap binaries (`dotf` and mise), plus sops | GitHub release, sha256-verified | `packages.json` | `dotf tools install` |
 | Node-distributed CLIs and agents (opencode, copilot, bw, pi) | npm global | `packages.json` | `dotf tools install` |
 | PyPI tools (hive, ansible, ansible-lint) | `uv tool` | `packages.json` | `dotf tools install` |
