@@ -110,15 +110,35 @@ setup() {
     [ "$status" -eq 0 ] || { echo "versions.conf pins no YAZI_VERSION, so the prefix+e popup has no provisioner"; false; }
 }
 
-@test "no binding calls a dotf subcommand the pinned release does not have (#2814)" {
-    # DOTF_VERSION is what a NEW machine installs; CI builds the tree. A binding
-    # naming a tree-only subcommand deploys cleanly here and fails on every other
-    # machine (lesson 373), so the docked explorer binding lands in a follow-up PR
-    # once a release carries `dotf herdr explorer`. Remove this test with it.
+# _pin_ge <a> <b>: true when dotted version a is at or above b.
+_pin_ge() {
+    awk -v a="$1" -v b="$2" 'BEGIN{
+        split(a, x, "."); split(b, y, ".")
+        for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) exit (x[i] + 0 > y[i] + 0 ? 0 : 1)
+        exit 0
+    }'
+}
+
+@test "a binding never names a dotf subcommand the pinned release does not have (#2814)" {
+    # DOTF_VERSION is what a NEW machine installs; CI builds the tree, so a
+    # binding naming a tree-only subcommand deploys cleanly here and fails on
+    # every other machine (lesson 373). floor is the first release that carries
+    # `dotf herdr explorer`: raise it in the follow-up PR that adds the binding,
+    # never before. Both halves fail rather than skip, because a skip is a guard
+    # that stopped guarding (#2815 review).
+    floor="0.76.0"
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
-    [ "$dotf_pin" = "0.75.0" ] || skip "DOTF_VERSION=$dotf_pin: check whether the explorer binding can land now"
+    [ -n "$dotf_pin" ] || { echo "versions.conf has no DOTF_VERSION"; false; }
     run grep -E "^command[[:space:]]*=[[:space:]]*['\"]dotf herdr explorer" "$SRC"
-    [ "$status" -ne 0 ] || { echo "the binding names a subcommand DOTF_VERSION=$dotf_pin does not carry"; false; }
+    if [ "$status" -eq 0 ]; then
+        _pin_ge "$dotf_pin" "$floor" \
+            || { echo "the binding names dotf herdr explorer, but DOTF_VERSION=$dotf_pin predates the release carrying it ($floor)"; false; }
+        return 0
+    fi
+    if _pin_ge "$dotf_pin" "$floor"; then
+        echo "DOTF_VERSION=$dotf_pin is at or past $floor, so the release carries the subcommand: land the docked binding and delete this guard"
+        false
+    fi
 }
 
 @test "dotf herdr explorer exists and names its provisioner" {
