@@ -64,6 +64,20 @@ PR 1 (Tier 1), measured on the macmini (darwin-arm64) on 2026-10-17 with a branc
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-053-the-windows-test-guest-runs-on-qemu-driven-by-dotf.md (Tier 3b's hypervisor and driver). The pwsh channel follows ADR-044 and PLAT-001c's system source
 - [ ] New pattern candidate for `00_meta/patterns/`? no: both lessons are this repo's machinery
 
+## Review triage
+
+Archive review by `agy/gemini-3.8-flash-high` on 2026-10-19 at `ec7d6c8e`: PASS-WITH-GAPS. Each finding was checked against the code before its disposition.
+
+| # | Finding | Disposition |
+|---|---------|-------------|
+| 1 | `QGA.Run` polls `guest-exec-status` with no overall budget (Major, THEORETICAL) | Ticketed: #2820. Real in the code: `q.Timeout` bounds each I/O, not the poll, so a live agent reporting a process that never exits hangs the run. The converge steps go through the bounded `waitExit`; the exposure is the short commands. Not fixed here, so the archive carries no unreviewed code. |
+| 2 | `features.json` has no entries for AC9 and AC10 (Minor) | Declined. It is in the contract set, so editing it stales this review, and every entry is `state: pending` with empty evidence: the manifest was never this spec's record. AC9 and AC10 evidence is above. |
+| 3 | Line 39 cites `test/` instead of `tests/` (Minor) | Declined: the line names the bats files without any path, and no `test/` path exists anywhere in this file. The wrong path was in the command the reviewer typed. |
+| 4 | `DOTF_PWSH_LINT_FILES` could exceed the Windows environment limit (Minor, THEORETICAL) | Declined: 28 files take about 1 KB of the 32,767-character limit, and the size grows linearly; it would take roughly 900 PowerShell files. |
+| 5 | `dotf vm linux --ref` needs a pushed ref; `dotf vm windows` copies the committed tree (Minor) | Ticketed on #2788, which has the same root cause (the guest fetches the ref by name): option (C) copies a `git archive` in with `limactl copy`, as the Windows harness does. |
+
+`tasks.md`'s two closing boxes stay unticked on purpose: `tasks.md` is in the contract set, and ticking them would stale the review that is the second of them.
+
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
