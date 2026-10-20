@@ -24,11 +24,14 @@ var (
 // machine is a fake macOS node: files under a temp root, launchd's state, and
 // an sshd whose answer to the probe the test sets.
 type machine struct {
-	t          *testing.T
-	paths      Paths
-	loaded     bool
-	ready      error // what Root.Ready returns
-	sshdT      error // what `sshd -t` returns
+	t      *testing.T
+	paths  Paths
+	loaded bool
+	ready  error // what Root.Ready returns
+	sshdT  error // what `sshd -t` returns
+	// effective is what `sshd -T` prints; nil prints the installed drop-in, as
+	// a sshd that read it would.
+	effective  func() []byte
 	accepts    func(addr string) bool
 	unreached  string // an address ssh times out on before reaching sshd
 	printErr   error  // what `launchctl print` fails with, when not nil
@@ -100,6 +103,13 @@ func (m *machine) Run(argv ...string) ([]byte, error) {
 	case "ssh-keygen":
 		m.write(m.paths.HostKey, hostKey+"\n")
 	case "/usr/sbin/sshd":
+		if argv[1] == "-T" {
+			if m.effective != nil {
+				return m.effective(), nil
+			}
+			dropIn, _ := os.ReadFile(m.paths.DropIn)
+			return dropIn, nil
+		}
 		return []byte("bad option"), m.sshdT
 	case "launchctl":
 		switch argv[1] {

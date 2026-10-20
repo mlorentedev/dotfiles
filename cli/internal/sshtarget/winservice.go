@@ -114,6 +114,15 @@ func (s WindowsService) Validate(root Root) error {
 	return asRoot(root, "sshd", "-t", "-f", s.Config)
 }
 
+// Effective is `sshd -T` on the same config Validate checks.
+func (s WindowsService) Effective(root Root) ([]byte, error) {
+	out, err := root.Run("sshd", "-T", "-f", s.Config)
+	if err != nil {
+		return nil, fmt.Errorf("sshd -T -f %s: %w: %s", s.Config, err, bytes.TrimSpace(out))
+	}
+	return out, nil
+}
+
 // powershell runs a fixed script as root. The scripts are this package's own
 // constants and quoted values, never input.
 func powershell(root Root, script string) error {

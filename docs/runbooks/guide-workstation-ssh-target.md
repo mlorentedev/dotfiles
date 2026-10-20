@@ -155,7 +155,11 @@ even with the right key.
 
 **Linux and macOS:** one converge step does this section, idempotently: the
 authorized key, the host keys, the drop-in (validated with `sshd -t` before
-sshd listens) and the sshd service. It then proves the result from the node
+sshd listens) and the sshd service. Right after the drop-in is validated it
+reads `sshd -T` as root and fails, undoing the run, when `authenticationmethods`,
+`passwordauthentication`, `kbdinteractiveauthentication`, `permitrootlogin` or
+`allowusers` is not the drop-in's: `sshd -t` accepts an `Include` that matches
+no file, `sshd -T` does not (#2763). A converged re-run does not repeat it. It then proves the result from the node
 itself: sshd must accept the owner's key from the mesh address and refuse it
 from the LAN address, or the run's changes are undone and the run fails
 (ADR-045 amendment 2026-10-12).

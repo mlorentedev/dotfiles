@@ -207,6 +207,9 @@ type Service interface {
 	Disable(root Root) error  // the undo of Enable
 	Reload(root Root) error   // makes a running sshd read a changed drop-in
 	Validate(root Root) error // `sshd -t` on the installed config
+	// Effective is `sshd -T` on the installed config: the values sshd would
+	// run with. Validate proves the file parses, Effective that it was read.
+	Effective(root Root) ([]byte, error)
 }
 
 // Target is one machine's SSH posture.
@@ -431,6 +434,9 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 			if err := t.Service.Validate(t.Root); err != nil {
 				return fmt.Errorf("sshd rejects the new drop-in: %w", err)
 			}
+			if err := t.proveEffective(p.dropIn); err != nil {
+				return err
+			}
 			if p.enabled {
 				if err := t.Service.Reload(t.Root); err != nil {
 					return err
@@ -465,6 +471,20 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 		}
 	}
 	return nil
+}
+
+// proveEffective reads sshd's dump right after the drop-in is installed and
+// fails when it does not carry the drop-in's values. It runs in the apply, where
+// root is ready, and not in Prove: Prove also runs on a converged plan and in
+// the post-condition of a headless converge, which has no root to ask for. The
+// dump does not depend on the connecting address (the drop-in has no Match
+// block, measured on OpenSSH 10.3p1), so one dump covers the mesh and the LAN.
+func (t Target) proveEffective(dropIn []byte) error {
+	out, err := t.Service.Effective(t.Root)
+	if err != nil {
+		return fmt.Errorf("read sshd's effective config: %w", err)
+	}
+	return checkEffective(dropIn, out, t.Paths.DropIn)
 }
 
 // Prove asks sshd, through the mesh address, whether it accepts the owner's

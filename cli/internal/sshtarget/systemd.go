@@ -147,17 +147,30 @@ func (s Systemd) Reload(root Root) error {
 const privsepDir = "/run/sshd"
 
 func (Systemd) Validate(root Root) error {
-	out, err := root.Run("/usr/sbin/sshd", "-t")
+	_, err := sshdRun(root, "-t")
+	return err
+}
+
+// Effective is `sshd -T`, which loads the config as `-t` does and so needs
+// the same directory.
+func (Systemd) Effective(root Root) ([]byte, error) {
+	return sshdRun(root, "-T")
+}
+
+// sshdRun runs sshd with one flag as root, creating privsepDir when sshd
+// reports it missing.
+func sshdRun(root Root, flag string) ([]byte, error) {
+	out, err := root.Run("/usr/sbin/sshd", flag)
 	if err != nil && bytes.Contains(out, []byte("Missing privilege separation directory")) {
 		if err := asRoot(root, "install", "-d", "-m", "0755", privsepDir); err != nil {
-			return err
+			return nil, err
 		}
-		out, err = root.Run("/usr/sbin/sshd", "-t")
+		out, err = root.Run("/usr/sbin/sshd", flag)
 	}
 	if err != nil {
-		return fmt.Errorf("/usr/sbin/sshd -t: %w: %s", err, bytes.TrimSpace(out))
+		return nil, fmt.Errorf("/usr/sbin/sshd %s: %w: %s", flag, err, bytes.TrimSpace(out))
 	}
-	return nil
+	return out, nil
 }
 
 // ServiceFor is sshd's service manager on goos.
