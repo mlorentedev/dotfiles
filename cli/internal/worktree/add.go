@@ -32,6 +32,12 @@ type AddRunner interface {
 	WorktreeAdd(repo, target, branch, base string) error
 	// DefaultBase fetches origin and returns its default branch ref.
 	DefaultBase(repo string) (string, error)
+	// ExistingBranch reports whether branch exists, locally (remote "") or
+	// only on origin (remote "origin").
+	ExistingBranch(repo, branch string) (remote string, exists bool)
+	// WorktreeAttach checks out an existing branch at target. With remote set,
+	// it creates the local branch of the same name tracking remote's.
+	WorktreeAttach(repo, target, branch, remote string) error
 }
 
 type RealAddRunner struct{}
@@ -70,6 +76,37 @@ func (r *RealAddRunner) WorktreeAdd(repo, target, branch, base string) error {
 
 	cmd := exec.Command("git", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git worktree add failed (%w): %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (r *RealAddRunner) ExistingBranch(repo, branch string) (string, bool) {
+	if firstRef(repo, []string{"refs/heads/" + branch}) != "" {
+		return "", true
+	}
+	// Fetch only this branch. origin saying it has no such branch is the
+	// answer, even over a stale remote ref; an unreachable origin leaves the
+	// last-fetched ref as the best one.
+	// LC_ALL=C: the message is matched, and git translates it.
+	fetch := exec.Command("git", "-C", repo, "fetch", "--quiet", "origin", "refs/heads/"+branch+":refs/remotes/origin/"+branch)
+	fetch.Env = append(os.Environ(), "LC_ALL=C")
+	out, err := fetch.CombinedOutput()
+	if err != nil && strings.Contains(string(out), "couldn't find remote ref") {
+		return "", false
+	}
+	if firstRef(repo, []string{"refs/remotes/origin/" + branch}) != "" {
+		return "origin", true
+	}
+	return "", false
+}
+
+func (r *RealAddRunner) WorktreeAttach(repo, target, branch, remote string) error {
+	args := []string{"-C", repo, "worktree", "add", target, branch}
+	if remote != "" {
+		args = []string{"-C", repo, "worktree", "add", "--track", "-b", branch, target, remote + "/" + branch}
+	}
+	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree add failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
@@ -169,8 +206,17 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 	}
 
 	branchName, ttl, creator := resolveAddDefaults(opts)
-	if err := ValidateBranch(branchName); err != nil {
-		return nil, err
+	// A branch that already exists is attached under its own name: the shape
+	// rule gates the branches add creates, and a bot's release or dependabot
+	// branch is not one of them (#2822). Only the directory is slugified.
+	remote, exists := runner.ExistingBranch(opts.RepoRoot, branchName)
+	if exists && opts.BaseRef != "" {
+		return nil, fmt.Errorf("branch %q already exists, so add attaches to it and --base %s does not apply: drop --base, or name a new branch", branchName, opts.BaseRef)
+	}
+	if !exists {
+		if err := ValidateBranch(branchName); err != nil {
+			return nil, err
+		}
 	}
 	targetPath := resolveTargetPath(opts, branchName)
 	if err := ValidateIsolation(opts.RepoRoot, targetPath); err != nil {
@@ -186,14 +232,11 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		_, _ = fmt.Fprintln(os.Stderr, warn)
 	}
 
-	base := opts.BaseRef
-	if base == "" {
-		var err error
-		if base, err = runner.DefaultBase(opts.RepoRoot); err != nil {
+	if exists {
+		if err := runner.WorktreeAttach(opts.RepoRoot, targetPath, branchName, remote); err != nil {
 			return nil, err
 		}
-	}
-	if err := runner.WorktreeAdd(opts.RepoRoot, targetPath, branchName, base); err != nil {
+	} else if err := createBranch(opts, runner, targetPath, branchName); err != nil {
 		return nil, err
 	}
 
@@ -216,6 +259,18 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		Metadata: &meta,
 		State:    StateActive,
 	}, nil
+}
+
+// createBranch starts branch from opts.BaseRef, or from origin's default branch.
+func createBranch(opts AddOptions, runner AddRunner, target, branch string) error {
+	base := opts.BaseRef
+	if base == "" {
+		var err error
+		if base, err = runner.DefaultBase(opts.RepoRoot); err != nil {
+			return err
+		}
+	}
+	return runner.WorktreeAdd(opts.RepoRoot, target, branch, base)
 }
 
 // Add creates a new worktree using RealAddRunner.

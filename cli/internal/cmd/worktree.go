@@ -267,8 +267,11 @@ func newWorktreeAddCmd() *cobra.Command {
 <WORKTREE_ROOT>/<repo>/<branch-slug>: the layout herdr creates, so a worktree made by
 either tool is found by the other. The branch defaults to feat/<slug>, so add foo
 creates <WORKTREE_ROOT>/<repo>/feat-foo. --path overrides the location.
-The branch must be <type>/<kebab-slug> with no phase or milestone token, and
-starts from origin's default branch unless --base names another.
+A new branch must be <type>/<kebab-slug> with no phase or milestone token, and
+starts from origin's default branch unless --base names another. A branch that
+already exists, locally or on origin, is checked out under its own name (one only
+on origin tracks it), whatever its shape: a release or dependabot branch. Only its
+directory is slugified, and --base is refused for it.
 It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
 adds it to .git/info/exclude.
 

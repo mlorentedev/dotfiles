@@ -25,7 +25,8 @@ var planningWord = regexp.MustCompile(`(?:^|-)(` + strings.Join(PlanningTokens, 
 // with "/" as "-", so either name finds the worktree.
 //
 // It gates creation only. migrate, adopt and done act on branches that already
-// exist, and must not refuse one for a name it was given before this rule.
+// exist, and so does add when the branch is already there (a release or
+// dependabot branch): none of them refuses a name it did not choose.
 func ValidateBranch(branch string) error {
 	if !branchShape.MatchString(branch) {
 		return fmt.Errorf("branch %q is not <type>/<kebab-slug> (lowercase type, \"/\", lowercase words joined by \"-\")", branch)
