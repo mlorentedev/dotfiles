@@ -120,9 +120,25 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 }
 
 type MockAddRunner struct {
-	OnWorktreeAdd  func(repo, target, branch, base string) error
-	OnDefaultBase  func(repo string) (string, error)
-	DefaultBaseRan bool
+	OnWorktreeAdd    func(repo, target, branch, base string) error
+	OnDefaultBase    func(repo string) (string, error)
+	OnExistingBranch func(repo, branch string) (remote string, exists bool)
+	OnWorktreeAttach func(repo, target, branch, remote string) error
+	DefaultBaseRan   bool
+}
+
+func (m *MockAddRunner) ExistingBranch(repo, branch string) (string, bool) {
+	if m.OnExistingBranch != nil {
+		return m.OnExistingBranch(repo, branch)
+	}
+	return "", false
+}
+
+func (m *MockAddRunner) WorktreeAttach(repo, target, branch, remote string) error {
+	if m.OnWorktreeAttach != nil {
+		return m.OnWorktreeAttach(repo, target, branch, remote)
+	}
+	return os.MkdirAll(target, 0o755)
 }
 
 func (m *MockAddRunner) DefaultBase(repo string) (string, error) {
