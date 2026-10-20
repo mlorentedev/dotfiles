@@ -1,7 +1,9 @@
-// Package forgewrite is the one write surface agents use to talk to a forge:
-// comment on an issue or pull request today, more verbs later. It exists so a
-// body never rides on a command line, where a permission glob can match its
-// prose, and so one set of rules covers every forge (TOOL-030, ADR-050).
+// Package forgewrite is the one surface agents use to talk to a forge: the
+// writes (comment, issue and pull request create and edit), and the one read
+// that must work on every forge, which pull requests of a branch landed
+// (ADR-052, amended for #2759). It exists so a body never rides on a command
+// line, where a permission glob can match its prose, and so one set of rules
+// covers every forge (TOOL-030, ADR-050).
 //
 // It has no merge and no close verb on purpose: merging stays `dotf pr land`
 // behind the merge grant, and closing stays with the owner.
@@ -20,9 +22,14 @@ type Repo struct{ Host, Owner, Name string }
 
 func (r Repo) String() string { return r.Host + "/" + r.Owner + "/" + r.Name }
 
-// Backend writes to one kind of forge. A third forge is a new Backend and one
+// Backend talks to one kind of forge. A third forge is a new Backend and one
 // Kind, with no change to the verbs.
 type Backend interface {
+	// LandedHeads returns the head commit of every merged pull request whose
+	// head is branch in r itself, never a fork's branch of the same name. It
+	// only reads. A forge that cannot answer in full is an error, never an
+	// empty list: an empty list reads as "never landed".
+	LandedHeads(ctx context.Context, r Repo, branch string) ([]string, error)
 	// CommentIssue posts body on issue or pull request number and returns the
 	// comment's URL. A pull request is an issue on both supported forges.
 	CommentIssue(ctx context.Context, r Repo, number int, body string) (string, error)
@@ -147,7 +154,7 @@ func Select(r Repo, hosts Hosts) (Kind, Host, error) {
 	if h, ok := hosts[r.Host]; ok {
 		return h.Kind, h, nil
 	}
-	return "", Host{}, fmt.Errorf("ERROR: no write backend for %s. WHY: only github.com and the hosts declared in forge/hosts.json are written to. FIX: add %q to forge/hosts.json with its kind and registry secret", r, r.Host)
+	return "", Host{}, fmt.Errorf("ERROR: no forge backend for %s. WHY: only github.com and the hosts declared in forge/hosts.json are reached. FIX: add %q to forge/hosts.json with its kind and registry secret", r, r.Host)
 }
 
 // redact removes a secret from text before it leaves the package, so no error

@@ -22,6 +22,9 @@ type DoneOptions struct {
 	// Force does not override it.
 	Sessions            SessionStores
 	IgnoreRecentSession bool
+	// LandedHeads answers which merged pull requests had a branch as their
+	// head, on the forge the origin names. nil asks GitHub through gh.
+	LandedHeads LandedHeads
 }
 
 // DoneResult reports what happened to the worktree's branch.
@@ -57,7 +60,7 @@ func Done(opts DoneOptions) (DoneResult, error) {
 	if err := checkUncommittedChanges(absWT, opts.Force); err != nil {
 		return DoneResult{}, err
 	}
-	if err := checkUnpushedCommits(absRepo, absWT, opts.Force); err != nil {
+	if err := checkUnpushedCommits(absRepo, absWT, opts.Force, opts.landedHeads()); err != nil {
 		return DoneResult{}, err
 	}
 	// Last before removal, so a session that wrote during the checks above
@@ -68,7 +71,7 @@ func Done(opts DoneOptions) (DoneResult, error) {
 		}
 	}
 	// Read before removal: the answer needs the worktree's HEAD.
-	branch, tip, landed, why := branchLanding(absRepo, absWT)
+	branch, tip, landed, why := branchLanding(absRepo, absWT, opts.landedHeads())
 	if err := removeWorktree(absRepo, absWT, opts.Force); err != nil {
 		return DoneResult{}, err
 	}
@@ -86,7 +89,7 @@ func Done(opts DoneOptions) (DoneResult, error) {
 
 // branchLanding reads the worktree's branch and tip, and whether that tip has
 // landed. A detached HEAD has no branch to delete; neither has main or master.
-func branchLanding(absRepo, absWT string) (branch, tip string, landed bool, why string) {
+func branchLanding(absRepo, absWT string, heads LandedHeads) (branch, tip string, landed bool, why string) {
 	out, err := exec.Command("git", "-C", absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	if err != nil {
 		return "", "", false, ""
@@ -102,12 +105,20 @@ func branchLanding(absRepo, absWT string) (branch, tip string, landed bool, why 
 	if base := resolveBaseRef(absRepo); base != "" && exec.Command("git", "-C", absRepo, "merge-base", "--is-ancestor", tip, base).Run() == nil {
 		return branch, tip, true, ""
 	}
-	if ok, err := landedInMergedPR(absWT, branch, tip); ok {
+	if ok, err := landedInMergedPR(absWT, branch, tip, heads); ok {
 		return branch, tip, true, ""
 	} else if err != nil {
 		return branch, tip, false, fmt.Sprintf("could not check for a merged pull request: %v", err)
 	}
 	return branch, tip, false, "not landed: neither an ancestor of the base nor the head of a merged pull request"
+}
+
+// landedHeads is the caller's forge reader, or GitHub through gh without one.
+func (o DoneOptions) landedHeads() LandedHeads {
+	if o.LandedHeads != nil {
+		return o.LandedHeads
+	}
+	return mergedPRHeads
 }
 
 func validateDoneOptions(opts DoneOptions) (string, string, error) {
@@ -205,7 +216,7 @@ func checkUncommittedChanges(absWT string, force bool) error {
 	return nil
 }
 
-func checkUnpushedCommits(absRepo, absWT string, force bool) error {
+func checkUnpushedCommits(absRepo, absWT string, force bool, heads LandedHeads) error {
 	if force {
 		return nil
 	}
@@ -237,7 +248,7 @@ func checkUnpushedCommits(absRepo, absWT string, force bool) error {
 	}
 	// Ahead of the base is also what a squash-merged branch looks like once
 	// GitHub deleted its remote: ask whether the work landed (#1608).
-	landed, landErr := landedOnMergedPR(absWT)
+	landed, landErr := landedOnMergedPR(absWT, heads)
 	if landed {
 		return nil
 	}
@@ -250,7 +261,7 @@ func checkUnpushedCommits(absRepo, absWT string, force bool) error {
 
 // landedOnMergedPR asks landedInMergedPR about the worktree's own branch and
 // tip. A detached HEAD names no pull request and answers no.
-func landedOnMergedPR(absWT string) (bool, error) {
+func landedOnMergedPR(absWT string, heads LandedHeads) (bool, error) {
 	branch, err := exec.Command("git", "-C", absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	if err != nil {
 		return false, nil //nolint:nilerr // detached: no branch, no pull request
@@ -259,7 +270,7 @@ func landedOnMergedPR(absWT string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return landedInMergedPR(absWT, strings.TrimSpace(string(branch)), strings.TrimSpace(string(tip)))
+	return landedInMergedPR(absWT, strings.TrimSpace(string(branch)), strings.TrimSpace(string(tip)), heads)
 }
 
 func countRevList(dir, revRange string) (int, error) {

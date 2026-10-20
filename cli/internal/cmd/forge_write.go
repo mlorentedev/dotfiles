@@ -51,6 +51,27 @@ var forgeWriteBackend = func(r forgewrite.Repo) (forgewrite.Backend, error) {
 	return forgewrite.Gitea{BaseURL: api, Token: func() (string, error) { return forgeToken(host.Secret) }}, nil
 }
 
+// forgeLandedHeads asks the forge repoRoot's origin names which merged pull
+// requests had branch as their head: worktree done's answer for a squash merge
+// on any declared forge, not on GitHub only (#2759).
+func forgeLandedHeads(repoRoot, branch string) ([]string, error) {
+	out, err := exec.Command("git", "-C", repoRoot, "remote", "get-url", "origin").Output()
+	if err != nil {
+		return nil, fmt.Errorf("no origin remote to ask: %w", err)
+	}
+	repo, err := forgewrite.ParseOrigin(string(out))
+	if err != nil {
+		return nil, err
+	}
+	backend, err := forgeWriteBackend(repo)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), forgeWriteTimeout)
+	defer cancel()
+	return backend.LandedHeads(ctx, repo, branch)
+}
+
 func runGH(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
 	c := exec.CommandContext(ctx, "gh", args...)
 	c.Stdin = strings.NewReader(string(stdin))

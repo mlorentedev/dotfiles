@@ -22,6 +22,14 @@ type commentRecorder struct {
 	newPR  forgewrite.NewPR
 	edit   forgewrite.IssueEdit
 	calls  []string
+	branch string   // asked by LandedHeads
+	landed []string // what LandedHeads answers
+}
+
+func (r *commentRecorder) LandedHeads(_ context.Context, repo forgewrite.Repo, branch string) ([]string, error) {
+	r.repo, r.branch = repo, branch
+	r.calls = append(r.calls, "landed")
+	return r.landed, nil
 }
 
 func (r *commentRecorder) CreateIssue(_ context.Context, repo forgewrite.Repo, in forgewrite.NewIssue) (string, error) {

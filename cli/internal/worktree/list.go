@@ -123,13 +123,17 @@ func queryGHPRMerged(repoRoot, branch string) bool {
 	if err != nil {
 		return false
 	}
-	landed, _ := landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)))
+	landed, _ := landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)), mergedPRHeads)
 	return landed
 }
 
-// mergedPRHeads returns the head commit of every merged pull request whose head
-// branch is branch. A variable so tests answer without reaching GitHub.
-var mergedPRHeads = ghMergedPRHeads
+// LandedHeads returns the head commit of every merged pull request whose head
+// is branch, in the repository at repoRoot.
+type LandedHeads func(repoRoot, branch string) ([]string, error)
+
+// mergedPRHeads asks GitHub through gh: the reader when the caller names no
+// forge. A variable so tests answer without reaching GitHub.
+var mergedPRHeads LandedHeads = ghMergedPRHeads
 
 func ghMergedPRHeads(repoRoot, branch string) ([]string, error) {
 	args := []string{"pr", "list", "--head", branch, "--state", "merged", "--json", "headRefOid", "--jq", ".[].headRefOid"}
@@ -157,8 +161,8 @@ func ghMergedPRHeads(repoRoot, branch string) ([]string, error) {
 // checkout behind its PR head (the PR took a rebase or a merge of main from
 // elsewhere) has nothing unpushed, while a commit made after the merge is in
 // no merged head and still reads as unpushed.
-func landedInMergedPR(repoRoot, branch, tip string) (bool, error) {
-	heads, err := mergedPRHeads(repoRoot, branch)
+func landedInMergedPR(repoRoot, branch, tip string, landedHeads LandedHeads) (bool, error) {
+	heads, err := landedHeads(repoRoot, branch)
 	if err != nil {
 		return false, err
 	}
