@@ -95,10 +95,13 @@ func (r *RealAddRunner) ExistingBranch(repo, branch string) (string, bool) {
 	if err != nil && strings.Contains(string(out), "couldn't find remote ref") {
 		return "", false
 	}
-	if firstRef(repo, []string{"refs/remotes/origin/" + branch}) != "" {
-		return "origin", true
+	if firstRef(repo, []string{"refs/remotes/origin/" + branch}) == "" {
+		return "", false
 	}
-	return "", false
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: git fetch origin %s failed, attaching to the last-fetched origin/%s: %s\n", branch, branch, strings.TrimSpace(string(out)))
+	}
+	return "origin", true
 }
 
 func (r *RealAddRunner) WorktreeAttach(repo, target, branch, remote string) error {
