@@ -80,7 +80,7 @@ Archive review by `agy/gemini-3.8-flash-high` on 2026-10-19 at `ec7d6c8e`: PASS-
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/PLAT-003-cross-os-verification/` -> `specs/archive/PLAT-003-cross-os-verification/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/PLAT-003-cross-os-verification/` -> `specs/archive/PLAT-003-cross-os-verification/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
