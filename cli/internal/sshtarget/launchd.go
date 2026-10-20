@@ -63,6 +63,15 @@ func (Launchd) Validate(root Root) error {
 	return asRoot(root, "/usr/sbin/sshd", "-t")
 }
 
+// Effective is `sshd -T`.
+func (Launchd) Effective(root Root) ([]byte, error) {
+	out, err := root.Run("/usr/sbin/sshd", "-T")
+	if err != nil {
+		return nil, fmt.Errorf("/usr/sbin/sshd -T: %w: %s", err, bytes.TrimSpace(out))
+	}
+	return out, nil
+}
+
 func asRoot(root Root, argv ...string) error {
 	out, err := root.Run(argv...)
 	if err != nil {
