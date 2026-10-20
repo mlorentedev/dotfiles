@@ -87,6 +87,17 @@ func TestCheckEffectiveIgnoresCase(t *testing.T) {
 	}
 }
 
+// sshd reads `Keyword=value` in a config file and prints it as `keyword value`.
+func TestCheckEffectiveReadsTheEqualsFormOfTheDropIn(t *testing.T) {
+	dropIn := []byte("AllowUsers=dotf@100.64.0.0/10\nPasswordAuthentication=no\n")
+	if err := checkEffective(dropIn, []byte("passwordauthentication no\nallowusers dotf@100.64.0.0/10\n"), "d"); err != nil {
+		t.Error(err)
+	}
+	if err := checkEffective(dropIn, []byte("passwordauthentication yes\nallowusers dotf@100.64.0.0/10\n"), "d"); err == nil {
+		t.Error("a dump that disagrees with the equals form passed")
+	}
+}
+
 // The proof runs in the apply, where root is ready, right after the drop-in
 // is validated, and a dump that disagrees undoes the whole run.
 func TestApplyFailsAndUndoesWhenSSHDDidNotReadTheDropIn(t *testing.T) {

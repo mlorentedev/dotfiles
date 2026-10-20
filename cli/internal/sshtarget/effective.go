@@ -50,7 +50,12 @@ func dumpFields(b []byte) map[string][]string {
 	out := map[string][]string{}
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	for sc.Scan() {
-		f := strings.Fields(sc.Text())
+		line := strings.TrimSpace(sc.Text())
+		// sshd also reads `Keyword=value`; the dump never prints it.
+		if i := strings.IndexAny(line, " \t="); i > 0 && line[i] == '=' {
+			line = line[:i] + " " + line[i+1:]
+		}
+		f := strings.Fields(line)
 		if len(f) < 2 || strings.HasPrefix(f[0], "#") {
 			continue
 		}
