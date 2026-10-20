@@ -1,5 +1,5 @@
 ---
-id: "lesson-496-gitea-names-a-deleted-head-branch-only-in-its-label"
+id: "lesson-497-gitea-names-a-deleted-head-branch-only-in-its-label"
 type: lesson
 status: active
 title: "Gitea names a deleted head branch only in its label"
