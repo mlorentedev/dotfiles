@@ -24,8 +24,10 @@ const maxErrBody = 300
 // maxLabelPages bounds the label lookup so a misbehaving server cannot loop it.
 const maxLabelPages = 20
 
-// giteaPullsPage is the page size of the closed-PR listing, and maxPullPages
-// bounds it: the newest 500 closed pull requests are read, newest close first.
+// giteaPullsPage is the page size the closed-PR listing asks for, and
+// maxPullPages bounds it, newest close first. The server may answer with fewer
+// rows per page ([api] MAX_RESPONSE_ITEMS clamps limit), so only an empty page
+// ends the listing; a short one does not.
 const (
 	giteaPullsPage = 50
 	maxPullPages   = 10
@@ -100,12 +102,12 @@ func (g Gitea) LandedHeads(ctx context.Context, r Repo, branch string) ([]string
 				heads = append(heads, p.Head.SHA)
 			}
 		}
-		if len(pulls) < giteaPullsPage {
+		if len(pulls) == 0 {
 			return heads, nil
 		}
 	}
 	if len(heads) == 0 {
-		return nil, fmt.Errorf("no merged pull request for %s among the newest %d closed ones of %s, and the listing goes on: an older one may exist", branch, maxPullPages*giteaPullsPage, r)
+		return nil, fmt.Errorf("no merged pull request for %s in the newest %d pages of closed ones of %s, and the listing goes on: an older one may exist", branch, maxPullPages, r)
 	}
 	return heads, nil
 }

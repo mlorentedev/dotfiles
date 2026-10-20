@@ -69,8 +69,20 @@ func TestGiteaLandedHeadsReadsPastTheFirstPage(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(heads, []string{"aaa"}) {
 		t.Fatalf("heads = %v, err %v; want [aaa] from page 2", heads, err)
 	}
-	if len(*asked) != 2 {
-		t.Fatalf("asked %d pages, want 2 (a short page ends the listing)", len(*asked))
+	if len(*asked) != 3 {
+		t.Fatalf("asked %d pages, want 3 (only the empty page 3 ends the listing)", len(*asked))
+	}
+}
+
+// A server whose MAX_RESPONSE_ITEMS is below the asked limit answers every
+// page short. Stopping at the first short page would read "never landed" for
+// a branch whose pull request is on page 2.
+func TestGiteaLandedHeadsReadsOnWhenTheServerClampsThePage(t *testing.T) {
+	short := []string{giteaPR("other", "x", true, 1)}
+	srv, _ := giteaPulls(t, short, []string{giteaPR("fix/x", "aaa", true, 1)})
+	heads, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
+	if err != nil || !reflect.DeepEqual(heads, []string{"aaa"}) {
+		t.Fatalf("heads = %v, err %v; want [aaa] from the second short page", heads, err)
 	}
 }
 
@@ -87,7 +99,7 @@ func TestGiteaLandedHeadsRefusesACutOffListing(t *testing.T) {
 	}
 	srv, _ := giteaPulls(t, pages...)
 	_, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
-	if err == nil || !strings.Contains(err.Error(), "newest") {
+	if err == nil || !strings.Contains(err.Error(), "newest 10 pages") {
 		t.Fatalf("want an error naming the cut-off listing, got %v", err)
 	}
 }
