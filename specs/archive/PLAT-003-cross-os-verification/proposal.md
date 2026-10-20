@@ -1,7 +1,7 @@
 ---
 id: "PLAT-003-cross-os-verification"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-17"
 issue: "mlorentedev/dotfiles#2344"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -71,3 +71,5 @@ Tier 3b (PR 3):
 - ADR-044 (pinned CLIs through mise), ADR-045 (converge registry), ADR-028 (secrets), ADR-020 (Go layer).
 - PLAT-001c (system source type, P5a/P5b); lesson 463 (a hook runs the installed `dotf`).
 - Research: `10_projects/knowledge/research/2026-10-11-cross-platform-vm-testing-synthesis.md` (vault).
+
+<!-- archived 2026-10-19 — PR: https://github.com/mlorentedev/dotfiles/pull/2821 -->
