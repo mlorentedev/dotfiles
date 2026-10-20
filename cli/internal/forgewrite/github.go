@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strings"
 )
 
 // GHRunner runs `gh` with stdin and returns its stdout; a seam so tests never
@@ -56,4 +58,39 @@ func (g GitHub) writeURL(ctx context.Context, method, endpoint string, payload a
 func (g GitHub) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
 	return g.writeURL(ctx, "POST", fmt.Sprintf("repos/%s/%s/pulls", r.Owner, r.Name),
 		map[string]any{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base, "draft": in.Draft})
+}
+
+// LandedHeads implements Backend. It reads the REST endpoint, as lane.REST
+// does, not `gh pr list`: that is GraphQL, whose quota a fleet of worktrees
+// drains. head=owner:branch keeps a fork's branch of the same name out.
+func (g GitHub) LandedHeads(ctx context.Context, r Repo, branch string) ([]string, error) {
+	endpoint := fmt.Sprintf("repos/%s/%s/pulls?state=closed&per_page=100&head=%s:%s", r.Owner, r.Name, r.Owner, queryBranch(branch))
+	out, err := g.Run(ctx, nil, "api", endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("gh api %s: %w", endpoint, err)
+	}
+	var pulls []struct {
+		MergedAt *string `json:"merged_at"`
+		Head     struct {
+			SHA string `json:"sha"`
+		} `json:"head"`
+	}
+	if err := json.Unmarshal(out, &pulls); err != nil {
+		return nil, fmt.Errorf("gh api %s: unreadable answer: %w", endpoint, err)
+	}
+	var heads []string
+	for _, p := range pulls {
+		if p.MergedAt != nil {
+			heads = append(heads, p.Head.SHA)
+		}
+	}
+	return heads, nil
+}
+
+// queryBranch encodes a branch for a query string, as lane.queryBranch does
+// (forgewrite cannot import lane). git accepts & # and { in a ref name; left
+// raw, the first adds a parameter, the second cuts the query, and gh reads the
+// third as a placeholder. The slash stays: it is legal in a query.
+func queryBranch(branch string) string {
+	return strings.ReplaceAll(url.QueryEscape(branch), "%2F", "/")
 }

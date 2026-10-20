@@ -24,6 +24,13 @@ const maxErrBody = 300
 // maxLabelPages bounds the label lookup so a misbehaving server cannot loop it.
 const maxLabelPages = 20
 
+// giteaPullsPage is the page size of the closed-PR listing, and maxPullPages
+// bounds it: the newest 500 closed pull requests are read, newest close first.
+const (
+	giteaPullsPage = 50
+	maxPullPages   = 10
+)
+
 // CommentIssue implements Backend.
 func (g Gitea) CommentIssue(ctx context.Context, r Repo, number int, body string) (string, error) {
 	return g.writeURL(ctx, http.MethodPost, g.repoPath(r, fmt.Sprintf("issues/%d/comments", number)), map[string]string{"body": body})
@@ -58,6 +65,49 @@ func (g Gitea) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
 	}
 	return g.writeURL(ctx, http.MethodPost, g.repoPath(r, "pulls"),
 		map[string]string{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
+}
+
+// LandedHeads implements Backend. Gitea 1.25's pull list has no head filter,
+// so the closed pull requests are read newest close first and matched here:
+// merged, from this repository and not a fork, with branch as their head
+// label. Not the head ref: once the branch is deleted, which a squash merge
+// usually leaves, Gitea reports the ref as refs/pull/<n>/head and names the
+// branch only in the label. Every merge closes its pull request, so a recent
+// one is on the first pages.
+func (g Gitea) LandedHeads(ctx context.Context, r Repo, branch string) ([]string, error) {
+	var heads []string
+	for page := 1; page <= maxPullPages; page++ {
+		raw, err := g.do(ctx, http.MethodGet, g.repoPath(r, fmt.Sprintf("pulls?state=closed&sort=recentclose&limit=%d&page=%d", giteaPullsPage, page)), nil)
+		if err != nil {
+			return nil, err
+		}
+		var pulls []struct {
+			Merged bool `json:"merged"`
+			Head   struct {
+				Label  string `json:"label"`
+				SHA    string `json:"sha"`
+				RepoID int64  `json:"repo_id"`
+			} `json:"head"`
+			Base struct {
+				RepoID int64 `json:"repo_id"`
+			} `json:"base"`
+		}
+		if err := json.Unmarshal(raw, &pulls); err != nil {
+			return nil, fmt.Errorf("gitea pull request list for %s was not readable", r)
+		}
+		for _, p := range pulls {
+			if p.Merged && p.Head.Label == branch && p.Head.RepoID == p.Base.RepoID {
+				heads = append(heads, p.Head.SHA)
+			}
+		}
+		if len(pulls) < giteaPullsPage {
+			return heads, nil
+		}
+	}
+	if len(heads) == 0 {
+		return nil, fmt.Errorf("no merged pull request for %s among the newest %d closed ones of %s, and the listing goes on: an older one may exist", branch, maxPullPages*giteaPullsPage, r)
+	}
+	return heads, nil
 }
 
 func (g Gitea) repoPath(r Repo, tail string) string {

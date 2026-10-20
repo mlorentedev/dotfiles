@@ -158,3 +158,33 @@ func TestDoneSaysWhenAMergedHeadCannotBeFetched(t *testing.T) {
 		t.Fatalf("want a refusal naming the failed fetch, got %v", err)
 	}
 }
+
+// #2759: the caller hands done the forge the origin names. Its answer decides,
+// and gh, which reaches GitHub only, is never asked.
+func TestDoneAsksTheLandedHeadsTheCallerHandsIt(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	tip := commitFile(t, wtDir, "work.txt")
+	stubMergedPRHeads(t, nil, errors.New("gh must not be asked"))
+	var asked string
+	res, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath,
+		LandedHeads: func(_, branch string) ([]string, error) { asked = branch; return []string{tip}, nil }})
+	if err != nil {
+		t.Fatalf("a branch the forge says landed must be removable: %v", err)
+	}
+	if asked == "" || res.DeletedBranch != asked {
+		t.Fatalf("asked %q, result %+v: want the branch asked about deleted", asked, res)
+	}
+}
+
+func TestDoneKeepsTheBranchWhenTheForgeCannotAnswer(t *testing.T) {
+	repoDir, wtDir, lockPath := setupTestGitRepoAndWorktree(t)
+	commitFile(t, wtDir, "work.txt")
+	res, err := Done(DoneOptions{RepoRoot: repoDir, WorktreePath: wtDir, LockPath: lockPath, Force: true,
+		LandedHeads: func(string, string) ([]string, error) { return nil, errors.New("no forge backend for gitea.example") }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.KeptBranch == "" || !strings.Contains(res.KeptReason, "no forge backend for gitea.example") {
+		t.Fatalf("result %+v: want the branch kept, naming why the forge could not answer", res)
+	}
+}

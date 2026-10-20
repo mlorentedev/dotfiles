@@ -636,6 +636,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 				Force:               force,
 				Sessions:            sessionStores(),
 				IgnoreRecentSession: ignoreRecentSession,
+				LandedHeads:         forgeLandedHeads,
 			}
 
 			res, err := worktree.Done(opts)
