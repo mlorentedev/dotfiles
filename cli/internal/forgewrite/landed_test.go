@@ -86,20 +86,21 @@ func TestGiteaLandedHeadsReadsOnWhenTheServerClampsThePage(t *testing.T) {
 	}
 }
 
-// Past the page cap with nothing found is a question nobody answered: "no
-// merged pull request" would tell done the branch never landed.
+// Past the page cap the answer is partial, even with a match: an older pull
+// request of the branch may hold the tip, and done would read "not landed".
 func TestGiteaLandedHeadsRefusesACutOffListing(t *testing.T) {
 	full := make([]string, giteaPullsPage)
 	for i := range full {
 		full[i] = giteaPR("other", "x", true, 1)
 	}
+	full[0] = giteaPR("fix/x", "aaa", true, 1)
 	pages := make([][]string, maxPullPages)
 	for i := range pages {
 		pages[i] = full
 	}
 	srv, _ := giteaPulls(t, pages...)
 	_, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
-	if err == nil || !strings.Contains(err.Error(), "newest 10 pages") {
+	if err == nil || !strings.Contains(err.Error(), "past 10 pages") {
 		t.Fatalf("want an error naming the cut-off listing, got %v", err)
 	}
 }
@@ -120,18 +121,24 @@ func TestGitHubLandedHeadsAsksRESTForTheBranchAndKeepsMergedOnly(t *testing.T) {
 	var got []string
 	g := GitHub{Run: func(_ context.Context, _ []byte, args ...string) ([]byte, error) {
 		got = args
-		return []byte(`[{"merged_at":"2026-10-18T00:00:00Z","head":{"sha":"aaa"}},{"merged_at":null,"head":{"sha":"bbb"}}]`), nil
+		// two pages, as --paginate prints them
+		return []byte(`[{"merged_at":"2026-10-18T00:00:00Z","head":{"sha":"aaa","repo":{"full_name":"O/n"}}},` +
+			`{"merged_at":null,"head":{"sha":"bbb","repo":{"full_name":"o/n"}}}]` +
+			`[{"merged_at":"2026-10-18T00:00:00Z","head":{"sha":"ccc","repo":{"full_name":"o/n-fork"}}},` +
+			`{"merged_at":"2026-10-18T00:00:00Z","head":{"sha":"ddd","repo":null}},` +
+			`{"merged_at":"2026-10-18T00:00:00Z","head":{"sha":"eee","repo":{"full_name":"o/n"}}}]`), nil
 	}}
 	heads, err := g.LandedHeads(context.Background(), Repo{Host: "github.com", Owner: "o", Name: "n"}, "fix/a&b#2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(heads, []string{"aaa"}) {
-		t.Fatalf("heads = %v, want [aaa]", heads)
+	// bbb never merged, ccc is the owner's fork, ddd's repository is gone
+	if !reflect.DeepEqual(heads, []string{"aaa", "eee"}) {
+		t.Fatalf("heads = %v, want [aaa eee]", heads)
 	}
 	// REST, not `gh pr list` (GraphQL); the branch is escaped so & and # stay
 	// part of it, and the slash stays as it is.
-	want := []string{"api", "repos/o/n/pulls?state=closed&per_page=100&head=o:fix/a%26b%232"}
+	want := []string{"api", "--paginate", "repos/o/n/pulls?state=closed&per_page=100&head=o:fix/a%26b%232"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("gh %v, want %v", got, want)
 	}

@@ -106,10 +106,7 @@ func (g Gitea) LandedHeads(ctx context.Context, r Repo, branch string) ([]string
 			return heads, nil
 		}
 	}
-	if len(heads) == 0 {
-		return nil, fmt.Errorf("no merged pull request for %s in the newest %d pages of closed ones of %s, and the listing goes on: an older one may exist", branch, maxPullPages, r)
-	}
-	return heads, nil
+	return nil, fmt.Errorf("the closed pull requests of %s go on past %d pages, so an older one with %s as its head may be unread", r, maxPullPages, branch)
 }
 
 func (g Gitea) repoPath(r Repo, tail string) string {
