@@ -216,7 +216,8 @@ jobs:
       # list (`.gitignore`, `.lock`, images) and an exact lockfile list. A
       # `.gitignore`-only PR (#1977) and lockfile-only dependabot bumps hit the
       # same empty diff (#1417). Both lists are read from upstream at PR_AGENT_REF,
-      # which a test pins to the action's own SHA, so nothing here is a copy that
+      # the contract's `audited_ref`: the commit the pinned image was built from,
+      # which a test binds to the image digest, so nothing here is a copy that
       # can drift. If either read fails, that list is empty: the skip narrows and
       # never widens.
       #
@@ -255,15 +256,11 @@ jobs:
                 ;;
             esac
           fi
-          workflow=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/pr-agent.yml?ref=${WORKFLOW_SHA}" \
-            --jq '.content' | base64 -d) || {
-              echo "::error::cannot read the executing PR-Agent workflow"
-              exit 1
-            }
-          PR_AGENT_REF=$(printf '%s\n' "$workflow" \
-            | sed -n 's|^[[:space:]]*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' | sort -u)
+          contract="harness/pr-agent-upstream-contract.json"
+          PR_AGENT_REF=$(gh api "repos/${GITHUB_REPOSITORY}/contents/${contract}?ref=${WORKFLOW_SHA}" \
+            --jq '.content' | base64 -d | jq -r '.audited_ref') || PR_AGENT_REF=""
           if [[ ! "$PR_AGENT_REF" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::the executing workflow must have one pinned PR-Agent action"
+            echo "::error::cannot read the audited PR-Agent commit from the executing contract"
             exit 1
           fi
           CFG=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.pr_agent.toml?ref=${DEFAULT_BRANCH}" \
@@ -484,7 +481,7 @@ jobs:
         if: "!cancelled() && steps.route.outputs.first == 'anthropic'"
         timeout-minutes: 8
         continue-on-error: true
-        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        uses: docker://pragent/pr-agent@sha256:80edef71baa3df28c129d858d4b53784abfc14704c235efb32b6c461d5399a6d  # v0.48.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The only inference credential this step holds; NaN's is not here.
@@ -555,16 +552,17 @@ jobs:
         # the last attempt that ran. An ambiguous failure never runs a second Action.
         timeout-minutes: 12
         continue-on-error: true
-        # Pinned by COMMIT, not by tag. A tag is mutable and belongs to upstream:
-        # whoever can move it decides what runs here, and what runs here holds
-        # NAN_API_KEY and `pull-requests: write`. This repository is PUBLIC, so that
-        # is not a theoretical actor. Verify a bump against the API rather than
-        # trusting the annotation, with <tag> the trailing `# vX.Y.Z`:
-        # `gh api repos/The-PR-Agent/pr-agent/git/ref/tags/<tag>` must return this
-        # sha (an annotated tag returns a tag object: dereference it via git/tags).
-        # The tag is not repeated here because Dependabot rewrites only the line
-        # below, and a copy in this comment drifted from v0.42.0 to v0.45.0 unseen.
-        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        # Pinned by IMAGE DIGEST, not by action commit (#2830). The action at any
+        # commit is a wrapper whose Dockerfile is `FROM pragent/pr-agent:github_action`,
+        # a rolling Docker Hub tag: a commit pin froze the wrapper while the code
+        # that holds NAN_API_KEY and `pull-requests: write` moved under it. This
+        # repository is PUBLIC, so whoever can push that tag is not a theoretical
+        # actor. The digest is the code that runs; the commit it was built from is
+        # `audited_ref` in harness/pr-agent-upstream-contract.json, read from the
+        # image's build attestation (`gh attestation verify`, network leg of
+        # tests/pr-agent-config.bats), never typed in. The trailing `# vX.Y.Z` is
+        # the release that attestation names.
+        uses: docker://pragent/pr-agent@sha256:80edef71baa3df28c129d858d4b53784abfc14704c235efb32b6c461d5399a6d  # v0.48.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NaN is OpenAI-compatible, so LiteLLM reaches it through the OpenAI
@@ -706,7 +704,7 @@ jobs:
         if: "!cancelled() && steps.published_after_nan.outputs.published == 'false'"
         timeout-minutes: 8
         continue-on-error: true
-        uses: The-PR-Agent/pr-agent@8e5a9295973b24af4b70cafd0b660a230811ef9e  # v0.47.0
+        uses: docker://pragent/pr-agent@sha256:80edef71baa3df28c129d858d4b53784abfc14704c235efb32b6c461d5399a6d  # v0.48.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The only inference credential this step holds; NaN's is not here.

@@ -1,16 +1,17 @@
 {
-  "audited_ref": "8e5a9295973b24af4b70cafd0b660a230811ef9e",
+  "image_digest": "sha256:80edef71baa3df28c129d858d4b53784abfc14704c235efb32b6c461d5399a6d",
+  "audited_ref": "981344be2755e303df501e18e3f60b848a188a80",
   "files": {
-    "action.yaml": "b84a27c7dfb56db597520134e13fb1ee6409874f",
-    "pr_agent/agent/pr_agent.py": "5570b0d920f3780716589bf91e82bd126746a66a",
-    "pr_agent/algo/ai_handlers/litellm_ai_handler.py": "c054647f43692f80dee89cd0c0b113424ed86959",
+    "action.yaml": "5df13e7d026abfd9319b8d6f983f6f28cd0f4546",
+    "pr_agent/agent/pr_agent.py": "03d271d7a85053a1cb7595e8f05d09f13d2ae379",
+    "pr_agent/algo/ai_handlers/litellm_ai_handler.py": "e37eea65df1208bd5e1b808e4883efed48164f88",
     "pr_agent/algo/comment_identity.py": "819a3cd08a6c286376f5f2579561df66e143fb87",
-    "pr_agent/algo/file_filter.py": "4f675e95cdda2291aad1ade889e0e105a301a961",
-    "pr_agent/algo/inline_comment_dedup.py": "72504124dc547b3c2ea7add36e32973d949a0b86",
-    "pr_agent/algo/review_finding_state.py": "768ecafe88794b200d59805a48ce213c73ff3a69",
-    "pr_agent/git_providers/github_provider.py": "e0937f73819539ec387ebe412dc5555d720cce95",
-    "pr_agent/servers/github_action_runner.py": "19a73d6bbd645d2ca29f75c86ac585cb067defd6",
-    "pr_agent/settings/configuration.toml": "1274e1f943f90ba946b0047e9b8b5aa357eba71c",
-    "pr_agent/tools/pr_reviewer.py": "1caa6acd28f155aad920963e0c8f390ec5d6a147"
+    "pr_agent/algo/file_filter.py": "09eaadf7007e8f9f9e70a1622b59df0033bf719b",
+    "pr_agent/algo/inline_comment_dedup.py": "6a6426f63bf477bca1f0a6eeb09386cf83d5643d",
+    "pr_agent/algo/review_finding_state.py": "62b5e93908724ba8ad49559d84e7d42ee56dfe94",
+    "pr_agent/git_providers/github_provider.py": "512077ccd97c9f79e92edd728c03ee8118ced3aa",
+    "pr_agent/servers/github_action_runner.py": "f675ed8e5ac4db5a9c14aa463c22cdfc311b1b72",
+    "pr_agent/settings/configuration.toml": "a671240ed62b67246f6dffeee89e1b0f15f12036",
+    "pr_agent/tools/pr_reviewer.py": "d9033d41210856cd5fbdf1170db4c0653a3ff26d"
   }
 }
