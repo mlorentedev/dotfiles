@@ -37,9 +37,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson: yes. `docs/lessons/lesson-502-a-workflow-run-from-a-comment-triggered-run-has-lost-its-pull-request.md`: a comment-triggered run's `workflow_run` names the default branch, so the producer must hand the PR forward.
-- [x] ADR: no. The one ordering decision lives in the header of `review-attestation.yml`, beside what it constrains (AC6).
-- [x] Pattern: no. This spec already fed `pattern-verification-fails-toward-unproven` (its fourth arrival); no second pattern.
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-502-a-workflow-run-from-a-comment-triggered-run-has-lost-its-pull-request.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the one ordering decision lives in the header of review-attestation.yml, beside what it constrains (AC6)
+- [x] New pattern candidate for `00_meta/patterns/`? no: this spec already fed pattern-verification-fails-toward-unproven as its fourth arrival; nothing new recurs across projects
 
 ## Archive checklist
 
