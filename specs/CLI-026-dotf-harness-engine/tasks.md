@@ -32,6 +32,7 @@ created: "2026-06-21"
 - [ ] `deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`
 - [ ] `setup-windows.ps1` calls `dotf harness skills`; delete `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their Pester/bats parity tests
 - [ ] Note the skills half fixed on #1733
+- [ ] `doctor`'s `recordTargets` (`checks_agent_tiers.go`) mirrors the shell's substring match on purpose (`TestRecordTargetsAgreesWithTheRender`); switch it and its test to `harness.SkillTargetsAgent` in the slice that moves the agent render to Go (slice 4), so the check keeps predicting the render
 
 ## Slice 4 — agents and doctrine (AC4)
 
