@@ -1,5 +1,5 @@
-// Package vm converges a throwaway virtual machine from a clone of a pushed
-// ref and checks the result: Linux behaviour verified from a Mac, without a
+// Package vm converges a throwaway virtual machine from a git archive of a
+// committed ref and checks the result: Linux behaviour verified from a Mac, without a
 // Linux box or a CI round trip.
 package vm
 
@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
@@ -22,23 +21,18 @@ import (
 //go:embed linux.yaml
 var LinuxTemplate []byte
 
-// RepoURL is what the guest clones. The repository is public, so the clone
-// needs no credential.
-const RepoURL = "https://github.com/mlorentedev/dotfiles.git"
-
 // Limactl runs `limactl args...`. A nil stdin reads nothing.
 type Limactl func(stdin io.Reader, stdout, stderr io.Writer, args ...string) error
 
 // Options is one verification run.
 type Options struct {
-	Ref   string    // branch, tag or commit to clone; must be pushed
-	Name  string    // the Lima instance, unique per run
-	Keep  bool      // leave the instance running for inspection
-	Token string    // GITHUB_TOKEN for the guest's downloads; it reaches the guest on stdin only
-	Out   io.Writer // progress and the guest's output
+	Ref    string    // the committed ref Source was archived from, for the log
+	Source string    // a tar.gz of Ref's tree under dotfiles/ (git archive --prefix=dotfiles/)
+	Name   string    // the Lima instance, unique per run
+	Keep   bool      // leave the instance running for inspection
+	Token  string    // GITHUB_TOKEN for the guest's downloads; it reaches the guest on stdin only
+	Out    io.Writer // progress and the guest's output
 }
-
-var refRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 
 // hostShares are the filesystem types through which a guest sees a host
 // directory: Lima's virtiofs, 9p and sshfs mounts, and network shares.
@@ -51,11 +45,11 @@ var hostShares = map[string]bool{"virtiofs": true, "9p": true, "fuse.sshfs": tru
 const withToken = `IFS= read -r t || true; if [ -n "$t" ]; then export GITHUB_TOKEN="$t"; fi; unset t; export DOTFILES_REPO_DIR="$PWD"; exec "$@"`
 
 // Verify boots the guest, checks it shares nothing with the host, converges a
-// clone of o.Ref with install.sh, and converges again: the first run must end
-// with no failed step and the second must change nothing.
+// copy of o.Source with install.sh, and converges again: the first run must
+// end with no failed step and the second must change nothing.
 func Verify(l Limactl, o Options) (err error) {
-	if !refRE.MatchString(o.Ref) {
-		return fmt.Errorf("ref %q is not a branch, tag or commit name", o.Ref)
+	if o.Source == "" {
+		return errors.New("no source archive to converge")
 	}
 	tmpl, err := os.CreateTemp("", "dotf-vm-*.yaml")
 	if err != nil {
@@ -108,15 +102,21 @@ func Verify(l Limactl, o Options) (err error) {
 	}
 	step(o.Out, "isolated: systemd is PID 1, no host directory mounted, HOME=%s", home)
 
+	// limactl copy goes over ssh, so plain mode's no-mount isolation holds.
+	// The archive extracts to dotfiles/ under ~/Projects.
 	repo := home + "/Projects/dotfiles"
-	step(o.Out, "clone %s at %s", RepoURL, o.Ref)
+	archive := home + "/dotf-src.tar.gz"
+	step(o.Out, "copy a git archive of %s into the guest", o.Ref)
+	if err := l(nil, o.Out, o.Out, "copy", o.Source, o.Name+":"+archive); err != nil {
+		return fmt.Errorf("limactl copy: %w", err)
+	}
 	for _, args := range [][]string{
-		{"git", "clone", "--quiet", RepoURL, repo},
-		{"git", "-C", repo, "fetch", "--quiet", "origin", o.Ref},
-		{"git", "-C", repo, "checkout", "--quiet", "--detach", "FETCH_HEAD"},
+		{"mkdir", "-p", home + "/Projects"},
+		{"tar", "-xzf", archive, "-C", home + "/Projects"},
+		{"rm", "-f", archive},
 	} {
 		if _, err := capture(args...); err != nil {
-			return fmt.Errorf("%s: %w", strings.Join(args[:2], " "), err)
+			return fmt.Errorf("%s: %w", strings.Join(args, " "), err)
 		}
 	}
 

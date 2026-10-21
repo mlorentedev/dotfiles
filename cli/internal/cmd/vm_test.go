@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"debug/pe"
 	"encoding/binary"
 	"io"
@@ -12,9 +14,12 @@ import (
 	"testing"
 )
 
-// The guest gets committed content only: an edit in the working tree, staged
-// or not, must not reach it.
-func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
+// archiveRepo makes a repository whose committed install.ps1 and install.sh
+// differ from the working tree's, with an untracked file beside them, and
+// runs the test from its cli/ subdirectory, where dotf runs and where a bare
+// git archive would take only that subdirectory.
+func archiveRepo(t *testing.T) {
+	t.Helper()
 	repo := t.TempDir()
 	git := func(args ...string) {
 		t.Helper()
@@ -32,18 +37,23 @@ func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
 	}
 	git("init", "-q")
 	write("install.ps1", "committed")
-	git("add", "install.ps1")
+	write("install.sh", "committed")
+	git("add", "install.ps1", "install.sh")
 	git("commit", "-q", "-m", "c")
 	write("install.ps1", "edited")
+	write("install.sh", "edited")
 	write("secret.txt", "untracked")
-	// dotf runs from cli/, a subdirectory, where a bare git archive takes
-	// only that subdirectory.
 	if err := os.Mkdir(filepath.Join(repo, "cli"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(filepath.Join(repo, "cli"))
+}
 
-	zp, err := archiveRef("HEAD")
+// The guest gets committed content only: an edit in the working tree, staged
+// or not, must not reach it.
+func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
+	archiveRepo(t)
+	zp, err := archiveRef("HEAD", "zip", "install.ps1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,14 +75,65 @@ func TestArchiveRef_TakesTheCommittedTreeOnly(t *testing.T) {
 			}
 		}
 	}
-	if got := strings.Join(names, " "); got != "dotfiles/ dotfiles/install.ps1" {
+	if got := strings.Join(names, " "); got != "dotfiles/ dotfiles/install.ps1 dotfiles/install.sh" {
 		t.Errorf("archive entries: %s", got)
 	}
 
 	for _, bad := range []string{"--output=/tmp/x", "no-such-ref"} {
-		if _, err := archiveRef(bad); err == nil {
+		if _, err := archiveRef(bad, "zip", "install.ps1"); err == nil {
 			t.Errorf("archiveRef(%q) succeeded", bad)
 		}
+	}
+}
+
+// The Linux guest gets the same committed tree as a tar.gz, which its tar
+// extracts with no extra package, and any ref the host resolves works: an
+// abbreviated or unpushed commit included (#2788).
+func TestArchiveRef_TarGzForTheLinuxGuest(t *testing.T) {
+	archiveRepo(t)
+	short, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := archiveRef(strings.TrimSpace(string(short)), "tar.gz", "install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tp) })
+	f, err := os.Open(tp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("not a gzip stream: %v", err)
+	}
+	tr := tar.NewReader(gz)
+	var names []string
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Typeflag == tar.TypeXGlobalHeader {
+			continue // git archive's commit id
+		}
+		names = append(names, h.Name)
+		if h.Name == "dotfiles/install.sh" {
+			if b, _ := io.ReadAll(tr); string(b) != "committed" {
+				t.Errorf("the archive holds the working tree's install.sh: %q", b)
+			}
+		}
+	}
+	if got := strings.Join(names, " "); got != "dotfiles/ dotfiles/install.ps1 dotfiles/install.sh" {
+		t.Errorf("archive entries: %s", got)
+	}
+	if _, err := archiveRef("HEAD", "tar.gz", "no-such-entry.sh"); err == nil {
+		t.Error("a ref without the entry script was archived")
 	}
 }
 

@@ -136,7 +136,7 @@ func (f *fakeLima) run(stdin io.Reader, stdout, _ io.Writer, args ...string) err
 func TestVerify_ConvergesTwiceAndDeletesTheGuest(t *testing.T) {
 	f := &fakeLima{changed: []int{12, 0}}
 	var out strings.Builder
-	if err := Verify(f.run, Options{Ref: "feat/x", Name: "dotf-linux-1", Token: "s3cr3t", Out: &out}); err != nil {
+	if err := Verify(f.run, Options{Ref: "feat/x", Source: "/tmp/src.tar.gz", Name: "dotf-linux-1", Token: "s3cr3t", Out: &out}); err != nil {
 		t.Fatalf("Verify: %v\n%s", err, out.String())
 	}
 	if !strings.HasPrefix(f.calls[0], "start --tty=false --name dotf-linux-1 ") {
@@ -165,11 +165,26 @@ func TestVerify_ConvergesTwiceAndDeletesTheGuest(t *testing.T) {
 	if converges != 2 {
 		t.Errorf("want 2 converges, got %d", converges)
 	}
+	// The ref reaches the guest as the host's git archive, not as a clone:
+	// any committed ref works, pushed or not, and the guest needs no network
+	// for its checkout.
+	copied := false
+	for _, c := range f.calls {
+		if strings.Contains(c, "git ") {
+			t.Errorf("the guest ran git: %q", c)
+		}
+		if c == "copy /tmp/src.tar.gz dotf-linux-1:/home/manu.linux/dotf-src.tar.gz" {
+			copied = true
+		}
+	}
+	if !copied {
+		t.Errorf("the archive was not copied into the guest's home: %q", f.calls)
+	}
 }
 
 func TestVerify_ASecondRunWithChangesFailsAndStillDeletes(t *testing.T) {
 	f := &fakeLima{changed: []int{12, 1}}
-	err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard})
+	err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard})
 	if err == nil || !strings.Contains(err.Error(), "second converge changed 1") {
 		t.Fatalf("want the second run's change reported, got %v", err)
 	}
@@ -179,9 +194,9 @@ func TestVerify_ASecondRunWithChangesFailsAndStillDeletes(t *testing.T) {
 }
 
 func TestVerify_KeepLeavesTheGuest(t *testing.T) {
-	f := &fakeLima{changed: []int{1, 0}, failNext: "shell n -- git clone"}
-	if err := Verify(f.run, Options{Ref: "main", Name: "n", Keep: true, Out: io.Discard}); err == nil {
-		t.Fatal("a failed clone must fail the run")
+	f := &fakeLima{changed: []int{1, 0}, failNext: "copy "}
+	if err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Keep: true, Out: io.Discard}); err == nil {
+		t.Fatal("a failed copy must fail the run")
 	}
 	for _, c := range f.calls {
 		if strings.HasPrefix(c, "delete") {
@@ -190,12 +205,10 @@ func TestVerify_KeepLeavesTheGuest(t *testing.T) {
 	}
 }
 
-func TestVerify_RefusesARefThatIsNotAName(t *testing.T) {
-	for _, ref := range []string{"", "-u", "main;id", "a b", "$(id)"} {
-		f := &fakeLima{}
-		if err := Verify(f.run, Options{Ref: ref, Name: "n", Out: io.Discard}); err == nil || len(f.calls) != 0 {
-			t.Errorf("ref %q: err %v after %d call(s)", ref, err, len(f.calls))
-		}
+func TestVerify_RefusesARunWithNoSource(t *testing.T) {
+	f := &fakeLima{}
+	if err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard}); err == nil || len(f.calls) != 0 {
+		t.Errorf("no source: err %v after %d call(s)", err, len(f.calls))
 	}
 }
 
@@ -203,7 +216,7 @@ func TestVerify_RefusesARefThatIsNotAName(t *testing.T) {
 // instance and its disk behind: the delete must run anyway.
 func TestVerify_AFailedStartStillDeletes(t *testing.T) {
 	f := &fakeLima{failNext: "start "}
-	if err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard}); err == nil {
+	if err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard}); err == nil {
 		t.Fatal("a failed start must fail the run")
 	}
 	if last := f.calls[len(f.calls)-1]; last != "delete --force n" {
@@ -215,7 +228,7 @@ func TestVerify_AFailedStartStillDeletes(t *testing.T) {
 // is removed first, so a run that writes none cannot pass on stale data.
 func TestVerify_AConvergeThatWritesNoReportFails(t *testing.T) {
 	f := &fakeLima{changed: []int{0, 0}, silentRun: 2}
-	err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard})
+	err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard})
 	if err == nil || !strings.Contains(err.Error(), "left no report") {
 		t.Fatalf("a second converge that wrote no report must fail, got %v", err)
 	}
