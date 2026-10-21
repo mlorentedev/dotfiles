@@ -63,7 +63,8 @@ func readBaseLessons(ctx context.Context, o Options, base string) (map[int]strin
 		return nil, fmt.Errorf("list the lessons on %s: %w", base, err)
 	}
 	taken := map[int]string{}
-	for _, p := range strings.Fields(string(out)) {
+	// --jq prints each path raw on its own line, so a name keeps any space in it.
+	for _, p := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		if p == "truncated" {
 			return nil, fmt.Errorf("list the lessons on %s: the listing is truncated", base)
 		}

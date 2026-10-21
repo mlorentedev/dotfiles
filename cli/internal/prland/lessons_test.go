@@ -78,6 +78,12 @@ func TestLand_RefusesALessonWhoseNumberTheBaseTook(t *testing.T) {
 			files: `{"filename":"docs/lessons/lesson-497-b.md","previous_filename":null,"status":"added"}`},
 		tree: "lesson-001-x.md\nlesson-497-a.md\n_index.md\n",
 	}
+	spaced := *g
+	spaced.tree = "lesson-497-a name with spaces.md\n"
+	if res, err := Land(context.Background(), Options{Run: spaced.run, Untriaged: noneUntriaged}, 30); err != nil ||
+		!strings.Contains(strings.Join(res.Reasons, ";"), "docs/lessons/lesson-497-a name with spaces.md") {
+		t.Errorf("a base lesson whose name has spaces must hold its number whole, got %+v, %v", res, err)
+	}
 	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
 	if err != nil {
 		t.Fatal(err)
