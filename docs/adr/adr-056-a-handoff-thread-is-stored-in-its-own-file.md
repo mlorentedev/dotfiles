@@ -1,5 +1,5 @@
 ---
-id: "ADR-055-a-handoff-thread-is-stored-in-its-own-file"
+id: "ADR-056-a-handoff-thread-is-stored-in-its-own-file"
 type: adr
 status: accepted
 owner: manu
@@ -11,7 +11,7 @@ tags: [architecture, decision, memory, handoff]
 created: "2026-10-21"
 ---
 
-# ADR-055: A handoff thread is stored in its own file
+# ADR-056: A handoff thread is stored in its own file
 
 ## Context
 

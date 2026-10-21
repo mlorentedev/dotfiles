@@ -17,7 +17,7 @@ import (
 // loaded").
 const MemoryByteBudget = 25_000
 
-// threadsDir holds one file per thread beside MEMORY.md (MEMORY-008, ADR-055).
+// threadsDir holds one file per thread beside MEMORY.md (MEMORY-008, ADR-056).
 // The file is the thread; its entry in MEMORY.md is derived from it.
 const threadsDir = "threads"
 

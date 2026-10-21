@@ -50,14 +50,14 @@ Each slice PR fills its own section below and nothing else.
 
 ## Slice 2 evidence
 
-- The store is in `cli/internal/mem/thread_store.go`, and the design is in ADR-055.
+- The store is in `cli/internal/mem/thread_store.go`, and the design is in ADR-056.
   - `StoreThreadAs` writes the body to `memory/threads/<key>.md` and puts the derived entry (Updated, the first line of the Next action, the Awaiting Manu count, Journal, pointer) under the heading in `MEMORY.md`. Tests: `TestStoreThreadWritesTheBodyToItsFileAndADerivedEntry`, `TestTheDerivedEntryCutsALongNextAction` (entry at most 350 B).
   - Ownership and forks are shared with `WriteThreadAs` through `threadOwner`. Test: `TestStoreThreadForksAroundAnotherAgentsEntry`.
   - Migration on the next write: `TestStoreThreadMovesAnInlineBlockAndLeavesTheOthersByteIdentical`.
   - Key to file: `TestThreadFileNames`. The one live key with a `/` (ts-bridge `fix/ux355-init-headscale-control-plane`, 74 thread headings checked across the vault) maps to `fix-ux355-init-headscale-control-plane.md`. Collisions: `TestCheckThreadFileRefusesAFileAnotherKeyHolds`. A pointer in a body is refused: `TestStoreThreadRefusesAPointerInTheBody`.
 - `handoff-write` writes the thread file first, then `MEMORY.md`, under the existing lock. A new file takes `MEMORY.md`'s mode. Tests: `TestMemHandoffWriteStoresTheThreadInItsOwnFile`, `TestMemHandoffWriteDryRunStoresNothing`.
 - **Budget (#1477):** `CheckMemoryBudget` refuses only a write that grows the file past 25,000 B, and names the three oldest threads. Tests: `TestCheckMemoryBudget`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`.
-- **Found along the way: `session-end` reads the thread too.** Its fallback journal archives the block from `MEMORY.md`, so after the store it would have archived the entry. It now reads through `threadText`. Test: `TestSessionEndArchivesTheStoredThreadNotItsEntry`. Lesson 502.
+- **Found along the way: `session-end` reads the thread too.** Its fallback journal archives the block from `MEMORY.md`, so after the store it would have archived the entry. It now reads through `threadText`. Test: `TestSessionEndArchivesTheStoredThreadNotItsEntry`. Lesson 505.
 - **Probe on a copy of the real dotfiles `MEMORY.md`** (2026-10-20, a throwaway test, not committed). Each of its 8 threads was written again with a `Verify` line and two `Awaiting Manu` items:
 
   | | Bytes |
@@ -86,7 +86,7 @@ Each slice PR fills its own section below and nothing else.
 ## Decisions made during implementation
 
 - Slice 2: the AC4 fixture is synthetic, shaped like the real file. Copying the vault's `MEMORY.md` into a public repository would publish it. The real file was probed instead, and the probe's figures are recorded above.
-- Slice 2: a write that keeps or shrinks a file already over the budget is allowed, so that file can still be brought back under (ADR-055 §7).
+- Slice 2: a write that keeps or shrinks a file already over the budget is allowed, so that file can still be brought back under (ADR-056 §7).
 
 ## Promotion candidates
 

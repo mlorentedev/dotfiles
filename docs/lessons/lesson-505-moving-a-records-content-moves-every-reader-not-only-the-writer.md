@@ -1,5 +1,5 @@
 ---
-id: "lesson-502-moving-a-records-content-moves-every-reader-not-only-the-writer"
+id: "lesson-505-moving-a-records-content-moves-every-reader-not-only-the-writer"
 type: lesson
 status: active
 title: "Moving a record's content moves every reader, not only the writer"

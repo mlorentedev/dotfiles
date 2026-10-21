@@ -405,7 +405,7 @@ var linkExemptions = []struct {
 	// Session journals: a chronological record, not a linked note.
 	{"sessions", true, []linkCheck{checkOrphans, checkDeadEnds}},
 	// Agent memory files: read by the agent, never linked to, and they link out
-	// only by accident: a handoff thread's file (ADR-055) is a record, not a note.
+	// only by accident: a handoff thread's file (ADR-056) is a record, not a note.
 	{"memory", true, []linkCheck{checkOrphans, checkDeadEnds}},
 }
 
