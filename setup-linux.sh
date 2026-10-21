@@ -478,9 +478,8 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
     # CLI-042 AC7: the NaN credential reaches the daemon through
     # `dotf secrets run`, never through a file. `hive service install` above owns
     # hive.service and exposes no flag to change its ExecStart, so the override
-    # is a systemd DROP-IN. That also makes it survive the next re-install --
-    # which the hive-upgrade.timer can trigger every 15 minutes, and which would
-    # silently clobber a competing hive.service shipped from this repo.
+    # is a systemd DROP-IN. That also makes it survive the next re-install,
+    # which would silently clobber a competing hive.service shipped from this repo.
     if command -v systemctl >/dev/null 2>&1; then
         HIVE_DROPIN_SRC="$CURRENT_DIR/systemd/hive.service.d/10-dotf-secrets.conf"
         HIVE_DROPIN_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/hive.service.d"
@@ -521,30 +520,6 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
         log_success "Provisioned hive daemon vault path via environment.d ($HIVE_VAULT_RESOLVED)"
     fi
 
-    # AI-023 / hive#176: the upgrade policy that FEEDS the daemon's
-    # restart-on-upgrade. Deploy the --user timer + oneshot from the repo's
-    # systemd/ SSOT and enable the timer (every 15 min). Same version gate as the
-    # service above -- daemon + its feeder install together or not at all.
-    if command -v systemctl >/dev/null 2>&1; then
-        SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-        ensure_directory "$SYSTEMD_USER_DIR"
-        if cp -f "$CURRENT_DIR/systemd/hive-upgrade.service" "$SYSTEMD_USER_DIR/" \
-            && cp -f "$CURRENT_DIR/systemd/hive-upgrade.timer" "$SYSTEMD_USER_DIR/"; then
-            systemctl --user daemon-reload >/dev/null 2>&1 || true
-            if systemctl --user enable --now hive-upgrade.timer >/dev/null 2>&1; then
-                log_success "Enabled hive-upgrade.timer (every 15 min, systemd --user)"
-                # A removal of the legacy 'uv tool upgrade hive-vault' crontab
-                # line ran here until OPS-040, retiring it once the timer owned
-                # upgrade policy. Probed absent from `crontab -l` before removal.
-            else
-                log_warning "hive-upgrade.timer enable failed (non-fatal; setup still upgrades hive each run)"
-            fi
-        else
-            log_warning "Could not deploy hive-upgrade units to $SYSTEMD_USER_DIR (non-fatal)"
-        fi
-    else
-        log_warning "systemctl not found; skipping hive-upgrade.timer (setup still upgrades hive each run)"
-    fi
 elif command -v hive >/dev/null 2>&1; then
     log_warning "hive ${hive_ver:-<unknown>} predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 fi
