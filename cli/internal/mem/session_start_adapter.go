@@ -34,6 +34,7 @@ const ClaudeJSONMinBytes = 10240
 // is hermetically testable; the command wiring resolves them from the env-contract.
 type ClaudeContextInput struct {
 	Cwd          string          // hook stdin .cwd
+	Source       string          // hook stdin .source: startup, resume, clear, compact or fork
 	Vault        string          // KNOWLEDGE_VAULT (VAULT_PATH)
 	VaultHealth  VaultHealthFunc // nil skips the vault health section
 	Home         string          // $HOME — roots ~/.claude/projects/<encoded>/memory
@@ -48,7 +49,7 @@ type ClaudeContextInput struct {
 }
 
 // ClaudeContext assembles the additionalContext string in claude-session-start.sh's
-// exact order: [sdd] reminder, doctor-drift, (.git: hive + specs + lessons), prepend
+// exact order, behind the handoff resume block when there is one: [sdd] reminder, doctor-drift, (.git: hive + specs + lessons), prepend
 // vault headline, vault-health, auto-memory link, knowledge-health, vault-baseline,
 // memory-temperature, claude.json-size.
 func ClaudeContext(in ClaudeContextInput) string {
@@ -89,6 +90,15 @@ func ClaudeContext(in ClaudeContextInput) string {
 		cfg.threshold("memory_temp_hot_days", 7), cfg.threshold("memory_temp_warm_days", 30),
 		cfg.threshold("memory_temp_cold_days", 60), in.Now)
 	ctx += claudeJSONSize(in.ClaudeJSON, cfg.threshold("claude_json_min_bytes", ClaudeJSONMinBytes))
+
+	// The resume block goes first: after a clear or a compact it is the one
+	// thing the session must read before anything else (MEMORY-008 AC3).
+	if cfg.injectorEnabled(resumeInjector) && in.Vault != "" {
+		memory, _ := ProjectMemory(in.Vault, in.Cwd)
+		if r := sessionResume(in.Source, memory, ThreadKey(in.Cwd), "claude"); r != "" {
+			ctx = r + "\n" + ctx
+		}
+	}
 
 	return ctx
 }

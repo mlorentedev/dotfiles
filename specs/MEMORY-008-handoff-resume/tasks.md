@@ -37,9 +37,9 @@ created: "2026-09-25"
 
 ## Slice 4 - SessionStart by source (depends on slice 3)
 
-- [ ] [AC3] Failing golden tests, one fixture per `source`: `startup`, `clear` and `compact` begin with the full resume; `resume` and `fork` get one line
-- [ ] [AC3] `runClaudeHook` parses `source` and `session_id` (only `cwd` today) and passes them to the session-start context
-- [ ] [AC3] A flag in `session-start-config.json` turns the injection off, with a test
+- [x] [AC3] Failing golden tests, one fixture per `source`: `startup`, `clear` and `compact` begin with the full resume; `resume` and `fork` get one line
+- [x] [AC3] `runClaudeHook` parses `source` (only `cwd` today) and passes it to the session-start context; `session_id` is not parsed, because nothing reads it (verification.md, slice 4)
+- [x] [AC3] A flag in `session-start-config.json` turns the injection off, with a test
 
 ## Slice 5 - skills and doctrine (depends on slice 3)
 
