@@ -10,7 +10,8 @@
    - (B) Archive or abandon one finished spec, then a plain `spec init`.
 
    The design is on the issue. Advisor ruling: B rather than skip-sdd, because skip-sdd would hide the override ADR-043 wants on record.
-3. **#2818, lane half: A or B.** Parked Blocked. `lane.PRSource.PRFor` needs open, draft and closed states, not only landed heads.
+3. **The handoff index is over its read cap: run `/crystallize`.** After this run's write, `MEMORY.md` is 28,448 bytes; the cap is 24.4KB. This thread starts at byte 14,664, so it is visible. Everything from `feat-herdr-explorer-binding` onward, the blocks of four other sessions, is not read at session start. Other writers' blocks were not trimmed unattended. #2852 (draft, another session: one file per thread, plus a refusal past the budget) is the structural fix, so do not file a duplicate.
+4. **#2818, lane half: A or B.** Parked Blocked. `lane.PRSource.PRFor` needs open, draft and closed states, not only landed heads.
    - (A) A second method on `forgewrite.Backend`.
    - (B) A reader owned by lane that wraps the Backend.
 
@@ -27,7 +28,8 @@
   - Reviewed by pr-agent, at head `fe6b8dce`.
   - Finding `14b3ce3efffd`: ticketed as #2873 (list and sweep do not say why the forge could not answer). Finding `7d4faf9886e5`: declined (the Knowledge section exists).
   - The PR author did the triage. CodeRabbit did not review (free limit reached).
-- **#2860 closed as superseded.** Another session opened #2861 for #2824 four minutes after this run claimed it, and #2861 merged first (`4c48ee33`). Main's fix is equivalent or broader. Local branch `fix/spec-archive-provenance-digest` was kept by `worktree done` (not landed); delete it when convenient.
+  - **spec-gate fired** at exactly its 50-LOC threshold. The 50 lines include doc comments; 38 changed lines are code. The PR went in under `skip-sdd`, with a rationale in its body (internal plumbing of the existing `forgeLandedHeads` reader, no public contract change). The advisor's A ruling had assumed the gate would not fire. This was a judgment call, and it is disclosed here.
+- **#2860 closed as superseded.** Another session opened #2861 for #2824 four minutes after this run claimed it, and #2861 merged first (`4c48ee33`). Main's fix is equivalent or broader. `fix/spec-archive-provenance-digest` still exists locally (kept by `worktree done`, not landed) and on origin (`528c8ad2`); delete both when convenient. #2824 is CLOSED and Done on the board.
 
 ## Filed (found while working)
 
@@ -46,6 +48,8 @@
 | #2865 | `dotf pr triage-queue --pr 2865 && dotf pr land 2865` | `[MERGED] #2865 at fe6b8dc` |
 | #2860 | `go test ./internal/spec/` (with the read-back fix) | ok; mutation of the `--pr` write fails the test |
 
+| DoD §5 | `dotf pr triage-queue` (repo-wide) at 16:45Z | exit 1: #2871 and #2852, both other sessions' PRs, not dispositioned here |
+
 Full outputs are in the PR triage comments (#2865 issuecomment-6320872425, #2860 issuecomment-6321243566).
 
 ## Budget spent
@@ -62,6 +66,10 @@ Covered. `caffeinate -i -t 25200` was held from 14:40Z, for 7h.
 
 The PR-Agent job on #2860 pulled `pragent/pr-agent@sha256:80edef71…`. This is the digest pin from #2832, working in CI.
 
+## Still running after the report
+
+The release watch (background) runs until about 21:40Z. If it fires, `dotf update` runs and this report's Done section is amended with the version and the converge result.
+
 ## Next action
 
-Merge #2853 when its CI is green. Then answer A or B on #2837 and on #2818.
+Merge #2853 when its CI is green. Then run `/crystallize`, then answer A or B on #2837 and on #2818.
