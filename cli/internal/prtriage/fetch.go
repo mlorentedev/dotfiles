@@ -209,10 +209,34 @@ func pendingOf(ctx context.Context, run ghRunner, base string, wire []restPR, re
 		return nil, err
 	}
 	pending := Queue(prs, reg)
-	if len(reg.Exempt.Signatures) == 0 {
-		return pending, nil
+	if len(reg.Exempt.Signatures) > 0 {
+		if pending, err = withoutExempt(ctx, run, base, pending, reg); err != nil {
+			return nil, err
+		}
 	}
-	return withoutExempt(ctx, run, base, pending, reg)
+	return withFindings(ctx, run, base, pending, reg), nil
+}
+
+// withFindings attaches each pending PR's unclassified inline findings
+// (TOOL-017 AC3). Like the file list, they are read only for a PR the queue
+// reports, and only when the registry asks some reviewer for a class.
+//
+// A read failure marks the PR FindingsUnread and keeps it listed: the findings
+// are a report on top of a verdict already computed, so losing them must make
+// the answer say "unknown", never drop the PR or the rest of the queue.
+func withFindings(ctx context.Context, run ghRunner, base string, pending []Status, reg Registry) []Status {
+	if len(reg.Classification.Reviewers) == 0 {
+		return pending
+	}
+	for i, st := range pending {
+		inline, err := fetchInline(ctx, run, base, st.PR.Number)
+		if err != nil {
+			pending[i].FindingsUnread = true
+			continue
+		}
+		pending[i].Unclassified = UnclassifiedFindings(st.PR, inline, reg)
+	}
+	return pending
 }
 
 // withoutExempt drops a pending PR whose diff is an exempt signature. The file
@@ -368,6 +392,42 @@ func fetchReviews(ctx context.Context, run ghRunner, base string, number int) ([
 		reviews = append(reviews, Comment{Author: w.User.Login, Body: w.Body, CreatedAt: w.SubmittedAt})
 	}
 	return reviews, nil
+}
+
+// restInline is one item of `GET /repos/{owner}/{repo}/pulls/{n}/comments`.
+// Line is null on a comment whose line left the diff; it reads as 0.
+type restInline struct {
+	restComment
+	Path        string `json:"path"`
+	Line        int    `json:"line"`
+	InReplyToID int64  `json:"in_reply_to_id"`
+}
+
+// fetchInline reads one pull request's inline review comments, the findings a
+// reviewer anchors to a file and line. A reply is conversation about a finding,
+// not a finding, so it is skipped. A full page is an error: a finding past it
+// would go unreported.
+func fetchInline(ctx context.Context, run ghRunner, base string, number int) ([]Comment, error) {
+	out, err := run(ctx, "api", fmt.Sprintf("%s/pulls/%d/comments?per_page=%d", base, number, commentLimit))
+	if err != nil {
+		return nil, fmt.Errorf("gh api inline comments for #%d: %w", number, err)
+	}
+	var wire []restInline
+	if err := json.Unmarshal(out, &wire); err != nil {
+		return nil, fmt.Errorf("parse inline comments for #%d: %w", number, err)
+	}
+	if len(wire) >= commentLimit {
+		return nil, fmt.Errorf("pull request #%d returned %d inline comments (a full page)", number, commentLimit)
+	}
+	inline := make([]Comment, 0, len(wire))
+	for _, w := range wire {
+		if w.InReplyToID != 0 {
+			continue
+		}
+		inline = append(inline, Comment{Author: w.User.Login, Body: w.Body,
+			CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt, Path: w.Path, Line: w.Line})
+	}
+	return inline, nil
 }
 
 // repoBase renders the REST path prefix. An empty repo yields gh's own

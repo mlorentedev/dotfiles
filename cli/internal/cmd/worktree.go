@@ -218,9 +218,9 @@ func newWorktreeListCmd() *cobra.Command {
 			var infos []worktree.Info
 			if allRepos {
 				parentDir := filepath.Dir(root)
-				infos, err = worktree.ListAll(parentDir)
+				infos, err = worktree.ListAll(parentDir, forgeLandedHeads)
 			} else {
-				infos, err = worktree.List(root)
+				infos, err = worktree.List(root, forgeLandedHeads)
 			}
 			if err != nil {
 				return fmt.Errorf("listing worktrees: %w", err)
@@ -400,9 +400,10 @@ clean git status, confirmed merged PR, and minimum age.`,
 			}
 
 			opts := worktree.SweepOptions{
-				RepoRoot: root,
-				DryRun:   dryRun,
-				Sessions: sessionStores(),
+				RepoRoot:    root,
+				DryRun:      dryRun,
+				Sessions:    sessionStores(),
+				LandedHeads: forgeLandedHeads,
 			}
 
 			report, err := worktree.Sweep(opts)

@@ -53,6 +53,11 @@ var listCheckbox = regexp.MustCompile(`(?m)^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\]`)
 // progress, not contract, so they are blanked before digesting.
 var harnessFeatureFields = []string{"state", "evidence"}
 
+// archiveProvenance is the line `dotf spec archive --pr` appends to the
+// archived proposal, with the line breaks it adds, anchored at the end of the
+// file where the archive writes it (#2824).
+var archiveProvenance = regexp.MustCompile(`\n<!-- archived [^\n]+ — PR: [^\n]+ -->\n\z`)
+
 // normaliseContract folds exactly these kinds of bookkeeping, and nothing else:
 //
 //   - line endings, so a Windows checkout (`* text=auto`, no eol for .md) does
@@ -62,7 +67,9 @@ var harnessFeatureFields = []string{"state", "evidence"}
 //     (#998 part 2);
 //   - the harness-owned fields of features.json;
 //   - the frontmatter's lifecycle `status:`, which the archive itself writes
-//     (HARNESS-151), when foldStatus is set.
+//     (HARNESS-151), when foldStatus is set;
+//   - the provenance line `archive --pr` appends in the same pass (#2824). Both
+//     digest forms fold it: no review predates an archive of its own spec.
 //
 // A reworded criterion, a new task or a changed feature behavior still moves
 // the digest; the tests pin both halves.
@@ -78,6 +85,7 @@ func normaliseContract(name string, data []byte, foldStatus bool) []byte {
 	if foldStatus {
 		data = []byte(setStatus(string(data), "-"))
 	}
+	data = archiveProvenance.ReplaceAll(data, nil)
 	return listCheckbox.ReplaceAll(data, []byte("${1}[ ]"))
 }
 

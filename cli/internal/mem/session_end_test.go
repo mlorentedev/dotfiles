@@ -381,6 +381,30 @@ func TestSessionEndArchivesOnlyItsOwnThread(t *testing.T) {
 	}
 }
 
+// MEMORY-008: a stored thread's entry is a summary, so the fallback journal
+// archives the thread file it points at, not the entry.
+func TestSessionEndArchivesTheStoredThreadNotItsEntry(t *testing.T) {
+	vault := t.TempDir()
+	writeMemory(t, vault, "# M\n\n## Session Handoff\n\n### thread: feat-a (writer: claude)\n\n"+
+		"**Next action:** step.<br>\n[full thread](threads/feat-a.md)\n")
+	threads := filepath.Join(vault, "10_projects", "proj", "memory", "threads")
+	if err := os.MkdirAll(threads, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	full := "### thread: feat-a (writer: claude)\n\n**Decisions:** only in the file.\n**Next action:** step.\n"
+	if err := os.WriteFile(filepath.Join(threads, "feat-a.md"), []byte(full), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := json.Marshal(map[string]string{"cwd": gitFixture(t, "proj", "wt", "feat/a"), "session_id": "s"})
+	written, err := SessionEnd(payload, vault, fixedNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readFileT(t, written); !strings.Contains(got, "only in the file") || strings.Contains(got, "[full thread]") {
+		t.Errorf("the journal archived the entry, not the thread file:\n%s", got)
+	}
+}
+
 // A second session ending on the same thread and day keeps the first record:
 // scoping the block did not loosen O_EXCL's refusal to replace one (#1620).
 func TestSessionEndThreadScopedArchiveKeepsNoOverwrite(t *testing.T) {

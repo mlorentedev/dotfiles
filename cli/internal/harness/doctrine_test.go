@@ -54,8 +54,8 @@ func TestInjectDoctrine(t *testing.T) {
 			"top\nB\np1\np2\n<!-- END HARNESS GENERATED -->\ntail\n"},
 		{"a file with no region gets one appended after a blank line",
 			"top\n", "top\n\nB\np1\np2\n<!-- END HARNESS GENERATED -->\n"},
-		{"a BEGIN without an END is no region", "<!-- BEGIN HARNESS GENERATED -->\n",
-			"<!-- BEGIN HARNESS GENERATED -->\n\nB\np1\np2\n<!-- END HARNESS GENERATED -->\n"},
+		{"an END without a BEGIN is no region", "top\n<!-- END HARNESS GENERATED -->\n",
+			"top\n<!-- END HARNESS GENERATED -->\n\nB\np1\np2\n<!-- END HARNESS GENERATED -->\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -66,10 +66,17 @@ func TestInjectDoctrine(t *testing.T) {
 	}
 }
 
-func TestInjectDoctrine_RefusesAnENDLineWithATail(t *testing.T) {
-	file := "<!-- BEGIN HARNESS GENERATED -->\nold\n<!-- END HARNESS GENERATED --> x\nthe user's tail\n"
-	if _, err := injectDoctrine(file, "B", "p\n"); err == nil {
-		t.Error("an END line with a tail was accepted, which drops the rest of the file")
+func TestInjectDoctrine_RefusesWhatWouldLoseTheUsersLines(t *testing.T) {
+	for name, file := range map[string]string{
+		"an END line with a tail": "<!-- BEGIN HARNESS GENERATED -->\nold\n<!-- END HARNESS GENERATED --> x\nthe user's tail\n",
+		"a BEGIN no END closes":   "top\n<!-- BEGIN HARNESS GENERATED -->\nuser notes\n",
+		"a BEGIN inside a region": "<!-- BEGIN HARNESS GENERATED -->\nnotes\n<!-- BEGIN HARNESS GENERATED -->\nold\n<!-- END HARNESS GENERATED -->\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := injectDoctrine(file, "B", "p\n"); err == nil {
+				t.Error("accepted a file whose next run would drop the user's lines")
+			}
+		})
 	}
 }
 

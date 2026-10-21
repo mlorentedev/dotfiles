@@ -84,6 +84,9 @@ type SweepOptions struct {
 	// session there under SessionWindow old. It has no override; done
 	// --ignore-recent-session is the deliberate path.
 	Sessions SessionStores
+	// LandedHeads answers which merged pull requests had a branch as their
+	// head (#2818). Nil asks GitHub through gh.
+	LandedHeads LandedHeads
 }
 
 // SessionSkip is a worktree sweep left alone for a harness session, with
@@ -306,5 +309,9 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 }
 
 func Sweep(opts SweepOptions) (*SweepReport, error) {
-	return SweepWithRunner(opts, &RealSweepRunner{}, time.Now())
+	return SweepWithRunner(opts, realSweepRunner(opts), time.Now())
+}
+
+func realSweepRunner(opts SweepOptions) *RealSweepRunner {
+	return &RealSweepRunner{RealGitRunner: RealGitRunner{LandedHeads: opts.LandedHeads}}
 }

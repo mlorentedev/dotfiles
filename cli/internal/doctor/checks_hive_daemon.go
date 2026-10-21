@@ -37,7 +37,7 @@ func checkHiveDaemonAnswers(sys *System, cfg *Config, rep *Report) {
 
 	if _, err := sys.LookPath("hive"); err != nil {
 		rep.Fail("mcp-servers.json registers hive as `hive client`, but `hive` is not on PATH, " +
-			"so the hive MCP server fails to start in every agent. Fix: `dotf tools install hive`, which installs the catalog pin.")
+			"so the hive MCP server fails to start in every agent. " + hiveInstallRemedy(sys.GOOS))
 		return
 	}
 
@@ -107,6 +107,18 @@ func hiveDaemonState(stdout string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// hiveInstallRemedy names the install that owns hive on this OS. The catalog
+// entry is POSIX-only (packages.json), so on Windows `dotf tools install hive`
+// skips; there hive builds its own layout and PATH launcher (hive ADR-019), and
+// the launcher reaches a shell opened after it, not the one that ran it (#2856).
+func hiveInstallRemedy(goos string) string {
+	if goos == "windows" {
+		return "Fix: `uvx --from hive-vault hive self-upgrade`, which builds hive's own install and launcher, " +
+			"then open a new shell so the launcher is on PATH."
+	}
+	return "Fix: `dotf tools install hive`, which installs the catalog pin."
 }
 
 // hiveDaemonRemedy names the fix for the supervisor this OS has. darwin has

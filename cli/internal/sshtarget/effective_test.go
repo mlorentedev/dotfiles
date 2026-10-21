@@ -36,6 +36,7 @@ func sshdDump(t *testing.T, name string) []byte {
 var platforms = []string{
 	"macos-10.3p1",  // macOS, OpenSSH 10.3p1
 	"ubuntu-10.2p1", // msi, Ubuntu, OpenSSH 10.2p1
+	"ubuntu-8.9p1",  // Ubuntu 22.04 in a throwaway container, OpenSSH 8.9p1 (1:8.9p1-3ubuntu0.18)
 }
 
 func TestCheckEffectiveTellsADropInThatWasReadFromOneThatWasNot(t *testing.T) {
