@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsmode"
 )
 
 // Skill deploy statuses.
@@ -193,8 +195,11 @@ func syncAuxFiles(src, dst string, dryRun bool) (bool, error) {
 
 // writeIfChanged writes content with mode perm unless p already holds exactly
 // that, and reports whether it wrote. A symlink at p is replaced, not followed.
+// The mode is compared as far as the OS expresses it (fsmode.Needs): Windows
+// reports 0666 for any writable file, so a full comparison would rewrite every
+// output on every run there.
 func writeIfChanged(p string, content []byte, perm fs.FileMode, dryRun bool) (bool, error) {
-	if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm() == perm {
+	if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() && !modeNeeded(p, perm) {
 		if current, err := os.ReadFile(p); err == nil && bytes.Equal(current, content) { //nolint:gosec // an output under home
 			return false, nil
 		}
@@ -212,6 +217,13 @@ func writeIfChanged(p string, content []byte, perm fs.FileMode, dryRun bool) (bo
 		return false, err
 	}
 	return true, os.Chmod(p, perm)
+}
+
+// modeNeeded reports whether p's mode differs from perm; an unreadable mode
+// counts as differing, so the write goes ahead.
+func modeNeeded(p string, perm fs.FileMode) bool {
+	needs, err := fsmode.Needs(p, perm)
+	return err != nil || needs
 }
 
 // pruneSkills removes target t's generated outputs whose record is gone or no

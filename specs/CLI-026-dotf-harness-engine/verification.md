@@ -28,6 +28,7 @@ created: "2026-06-21"
 - Slice 1: the copilot catalog moved to its own slice to keep slice 1 under the executable-line cap (about 293 lines).
 - Slice 1: a record whose frontmatter is not valid YAML is now an error for that record (reported after the rest deploy); the shell never parsed it. Every committed record parses (`TestSkillTargetsAgent_EveryCommittedRecordParses`).
 - Slice 1: an explicit empty or null `targets:` deploys to nobody, as the shell's substring match did.
+- Slice 1: the mode comparison goes through `fsmode.Needs`. Windows reports 0666 for any writable file, so a full comparison rewrote every output on every run there; caught by `TestDeploySkills_FreshThenConverged` on the Windows CI leg.
 
 ## Promotion candidates
 
