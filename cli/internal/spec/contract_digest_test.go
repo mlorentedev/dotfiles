@@ -189,6 +189,13 @@ func TestArchiveWithPRURLKeepsTheLaunchDigests(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Archive: %v", name, err)
 		}
+		// The premise: the archive did write the line, so the empty diff below
+		// is the fold's work and not an absent line's.
+		eol := lineEnding(proposal)
+		want := eol + "<!-- archived 2026-10-19 — PR: https://example.test/pull/2821 -->" + eol
+		if got := mustRead(t, filepath.Join(target, "proposal.md")); !strings.HasSuffix(got, want) {
+			t.Fatalf("%s: the archived proposal does not end with the provenance line:\n%q", name, got)
+		}
 		if moved := changedContracts(target, launched); len(moved) != 0 {
 			t.Errorf("%s: the archive's own provenance line staled the review: %v", name, moved)
 		}
