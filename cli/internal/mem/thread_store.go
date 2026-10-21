@@ -25,6 +25,15 @@ const threadsDir = "threads"
 // The thread file holds the rest.
 const entryNextActionMax = 160
 
+// entryUpdatedMax and entryJournalMax cap the other two quoted fields, so no
+// field, however long, rebuilds the block the store exists to shrink. Caps are
+// in characters; with every field at its cap, ASCII text and a key of up to 30
+// characters, an entry is at most 450 B.
+const (
+	entryUpdatedMax = 24
+	entryJournalMax = 72
+)
+
 // threadFileSafe is what a thread file may be named: journalUnsafe's class,
 // never opening with a dot, so no key can name a path outside threads/.
 const threadFileSafe = `[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*`
@@ -54,6 +63,9 @@ type StoredThread struct {
 // as it is: a reader follows a pointer only where an entry carries one. This
 // write replaces the block with an entry, and leaves every other thread alone.
 func StoreThreadAs(content, memoryPath, threadKey, agent, body string) (StoredThread, error) {
+	if err := checkThreadKey(threadKey); err != nil {
+		return StoredThread{}, err
+	}
 	key, kept, stamp, err := threadOwner(content, threadKey, agent)
 	if err != nil {
 		return StoredThread{}, err
@@ -94,7 +106,7 @@ func deriveEntry(body, pointer string) string {
 	th := ParseThread(body)
 	var out []string
 	if v, ok := th.Get("Updated"); ok {
-		out = append(out, "> Updated: "+entryLine(v, 0)+"<br>")
+		out = append(out, "> Updated: "+entryLine(v, entryUpdatedMax)+"<br>")
 	}
 	if v, ok := th.Get("Next action"); ok && strings.TrimSpace(v) != "" {
 		out = append(out, "**Next action:** "+entryLine(v, entryNextActionMax)+"<br>")
@@ -103,7 +115,7 @@ func deriveEntry(body, pointer string) string {
 		out = append(out, fmt.Sprintf("**Awaiting Manu:** %d, see the thread<br>", countItems(v)))
 	}
 	if v, ok := th.Get("Journal"); ok {
-		out = append(out, "Journal: "+entryLine(v, 0))
+		out = append(out, "Journal: "+entryLine(v, entryJournalMax))
 	}
 	return strings.Join(append(out, "[full thread]("+pointer+")"), "\n")
 }
@@ -187,7 +199,7 @@ func CheckMemoryBudget(before, after string) error {
 		oldest = oldest[:3]
 	}
 	return fmt.Errorf("this write takes MEMORY.md to %d bytes, past the %d a session start reads, so the newest thread would be the one cut off; "+
-		"move the oldest threads to archive/ first (%s), then write again", len(after), MemoryByteBudget, strings.Join(oldest, ", "))
+		"archive the oldest threads first (%s): move each one's threads/<file>.md to archive/ and delete its entry from MEMORY.md, then write again", len(after), MemoryByteBudget, strings.Join(oldest, ", "))
 }
 
 // threadsOldestFirst lists the section's thread keys by their Updated date,

@@ -66,6 +66,31 @@ func TestTheDerivedEntryCutsALongNextAction(t *testing.T) {
 	}
 }
 
+// Every quoted field is capped, not only the Next action: a long Updated or
+// Journal line must not rebuild the block the entry replaces. With every field
+// at its cap, the entry is at most 450 B.
+func TestTheDerivedEntryCapsEveryQuotedField(t *testing.T) {
+	long := strings.Repeat("x", 600)
+	body := "> Updated: " + long + "<br>\n**Next action:** " + long + "<br>\n**Awaiting Manu:**\n- a\n- b\nJournal: sessions/" + long + ".md"
+	res, err := StoreThreadAs("## Session Handoff\n", "MEMORY.md", "feat-x", "claude", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := strings.TrimPrefix(res.Content, "## Session Handoff\n")
+	if len(entry) > 450 {
+		t.Errorf("the entry is %d bytes, want at most 450:\n%s", len(entry), entry)
+	}
+}
+
+// The store refuses a key with whitespace, as the inline writer does: a
+// heading is matched by its first word, so such a key would append a copy on
+// every write.
+func TestStoreRefusesAKeyWithWhitespace(t *testing.T) {
+	if _, err := StoreThreadAs("## Session Handoff\n", "MEMORY.md", "a b", "claude", "**Next action:** x"); err == nil {
+		t.Fatal("a key with whitespace was accepted")
+	}
+}
+
 // AC4: the shape of dotfiles' MEMORY.md as measured on 2026-10-20 (12,010 bytes
 // before the handoff section, eight threads of the sizes below, 23,423 bytes in
 // all). Inline, the Verify and Awaiting Manu fields push it past the budget;

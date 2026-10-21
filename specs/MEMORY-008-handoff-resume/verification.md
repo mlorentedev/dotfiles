@@ -51,7 +51,7 @@ Each slice PR fills its own section below and nothing else.
 ## Slice 2 evidence
 
 - The store is in `cli/internal/mem/thread_store.go`, and the design is in ADR-056.
-  - `StoreThreadAs` writes the body to `memory/threads/<key>.md` and puts the derived entry (Updated, the first line of the Next action, the Awaiting Manu count, Journal, pointer) under the heading in `MEMORY.md`. Tests: `TestStoreThreadWritesTheBodyToItsFileAndADerivedEntry`, `TestTheDerivedEntryCutsALongNextAction` (entry at most 350 B).
+  - `StoreThreadAs` writes the body to `memory/threads/<key>.md` and puts the derived entry (Updated, the first line of the Next action, the Awaiting Manu count, Journal, pointer) under the heading in `MEMORY.md`. Tests: `TestStoreThreadWritesTheBodyToItsFileAndADerivedEntry`, `TestTheDerivedEntryCutsALongNextAction` (entry at most 350 B), `TestTheDerivedEntryCapsEveryQuotedField` (every quoted field at its cap: at most 450 B).
   - Ownership and forks are shared with `WriteThreadAs` through `threadOwner`. Test: `TestStoreThreadForksAroundAnotherAgentsEntry`.
   - Migration on the next write: `TestStoreThreadMovesAnInlineBlockAndLeavesTheOthersByteIdentical`.
   - Key to file: `TestThreadFileNames`. The one live key with a `/` (ts-bridge `fix/ux355-init-headscale-control-plane`, 74 thread headings checked across the vault) maps to `fix-ux355-init-headscale-control-plane.md`. Collisions: `TestCheckThreadFileRefusesAFileAnotherKeyHolds`. A pointer in a body is refused: `TestStoreThreadRefusesAPointerInTheBody`.

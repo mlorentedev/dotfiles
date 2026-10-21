@@ -163,19 +163,27 @@ func journalWriter(line, self string) string {
 
 // writeThread is WriteThread with a stamp after the key in the heading it writes.
 func writeThread(content, threadKey, stamp, body string) (string, bool, error) {
-	if strings.TrimSpace(threadKey) == "" {
-		return "", false, fmt.Errorf("thread key is empty — a handoff with no thread is the shared slot this replaces")
+	if err := checkThreadKey(threadKey); err != nil {
+		return "", false, err
 	}
-	if strings.ContainsFunc(threadKey, unicode.IsSpace) {
-		// A heading is matched by its first word, so a key with whitespace would
-		// never find its own block again and every write would append a copy.
-		return "", false, fmt.Errorf("thread key %q contains whitespace; a thread key is one word, like a branch name", threadKey)
-	}
-
 	if err := checkBodyStructure(body); err != nil {
 		return "", false, err
 	}
 	return placeThread(content, threadKey, stamp, body)
+}
+
+// checkThreadKey refuses a key no block could be found under again. Both
+// writers run it: the inline one and the store.
+func checkThreadKey(threadKey string) error {
+	if strings.TrimSpace(threadKey) == "" {
+		return fmt.Errorf("thread key is empty — a handoff with no thread is the shared slot this replaces")
+	}
+	if strings.ContainsFunc(threadKey, unicode.IsSpace) {
+		// A heading is matched by its first word, so a key with whitespace would
+		// never find its own block again and every write would append a copy.
+		return fmt.Errorf("thread key %q contains whitespace; a thread key is one word, like a branch name", threadKey)
+	}
+	return nil
 }
 
 // placeThread is writeThread past the checks on what the caller sent, so a
