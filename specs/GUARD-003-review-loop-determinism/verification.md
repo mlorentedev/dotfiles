@@ -283,3 +283,10 @@ status on #2855's head, 15:10:47: success
 Before #2848, the same chain answered `no open pull request for fd0be466` (39365734960, 2026-10-20). The PR identity now reaches the gate from the run being judged.
 
 The run was **cancelled** at 15:01:03 without publishing a review. It was not cancelled by this change. CodeRabbit's comment at 14:59:41 started a `pr-agent` run that was skipped at the job `if:`, but it entered the same workflow-level concurrency group, `pr-agent-2855-issue_comment`, which cancels in progress. That defect is ticketed as GUARD-022 (#2867). The gate's half is unaffected, which is what T12 tests: the cancelled run still uploaded its artifact (it is the first step) and still completed, and the gate admits `cancelled` on purpose.
+
+## Closing checks, 2026-10-21 (on `17b59ddb`)
+
+- `shellcheck scripts/check-review-attestation.sh`: exit 0. `bash -n`: exit 0.
+- `bats tests/check-review-attestation.bats tests/review-attestation-workflow.bats`: 83/83 ok.
+- AC3's failure mode, observed: with the classifier's final `exit 1` (line 437) mutated to `exit 0`, so that every declined or pending verdict passes, `check-review-attestation.bats` fails 21 cases. The mutation was confirmed applied by checksum and then reverted. AC1, AC2 and AC4 are covered live (above), and AC5 and T11 by their mutation tables.
+- PRs referencing this spec folder: #1056, #1185, #2209, #2848, #2855.

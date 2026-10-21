@@ -87,13 +87,13 @@ What genuinely blocks:
 
 ## Closing
 
-- [ ] Every acceptance criterion covered by a verification command whose failure
+- [x] Every acceptance criterion covered by a verification command whose failure
       mode has been observed
-- [ ] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
-- [ ] Tests pass (`bats tests/check-review-attestation.bats`)
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in with output produced in the session, not recalled
-- [ ] PR opened referencing this spec folder
+- [x] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
+- [x] Tests pass (`bats tests/check-review-attestation.bats`)
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in with output produced in the session, not recalled
+- [x] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review GUARD-003-review-loop-determinism`)
 
 ## A note on this spec's own surface
