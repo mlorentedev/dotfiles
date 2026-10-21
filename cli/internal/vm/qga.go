@@ -27,7 +27,7 @@ type QGA struct {
 	r       *bufio.Reader
 	Timeout time.Duration // per reply; zero waits forever
 	Poll    time.Duration // between guest-exec-status calls
-	Wait    time.Duration // per Run, until the process exits; zero waits forever
+	Wait    time.Duration // per Run, until the process exits; zero waits forever. Checked between polls, so a Run can outlast it by one reply (Timeout) and one Poll
 }
 
 var syncID atomic.Int64
