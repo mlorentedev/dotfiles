@@ -189,6 +189,42 @@ func TestQGA_WriteAndReadAFile(t *testing.T) {
 	}
 }
 
+// A live agent reporting a process that never exits must not hang the host
+// either: Timeout bounds each reply, Wait bounds the whole process (#2820).
+func TestQGA_RunGivesUpOnAProcessThatNeverExits(t *testing.T) {
+	q := newFakeQGA(t, &fakeAgent{handlers: map[string]func(json.RawMessage) any{
+		"guest-exec":        func(json.RawMessage) any { return map[string]int{"pid": 42} },
+		"guest-exec-status": func(json.RawMessage) any { return map[string]bool{"exited": false} },
+	}})
+	q.Poll = time.Millisecond
+	q.Wait = 50 * time.Millisecond
+	done := make(chan error, 1)
+	go func() {
+		_, err := q.Run("powershell.exe", []string{"-NoProfile", "-Command", "Get-CimInstance Win32_ComputerSystem"})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("want an error from a process that never exits")
+		}
+		if !strings.Contains(err.Error(), "powershell.exe") || !strings.Contains(err.Error(), "42") {
+			t.Errorf("the error should name the command and its pid: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run still polling after 5s with Wait = 50ms")
+	}
+}
+
+// Every caller gets the bound without setting it: zero would wait forever.
+func TestNewQGA_BoundsEveryRun(t *testing.T) {
+	host, guest := net.Pipe()
+	defer func() { _ = host.Close(); _ = guest.Close() }()
+	if q := NewQGA(host); q.Wait <= 0 {
+		t.Errorf("NewQGA left Wait at %s, so Run polls a hung process forever", q.Wait)
+	}
+}
+
 // A guest that stops answering must not hang the host forever.
 func TestQGA_ASilentAgentTimesOut(t *testing.T) {
 	host, guest := net.Pipe()

@@ -27,13 +27,14 @@ type QGA struct {
 	r       *bufio.Reader
 	Timeout time.Duration // per reply; zero waits forever
 	Poll    time.Duration // between guest-exec-status calls
+	Wait    time.Duration // per Run, until the process exits; zero waits forever. Checked between polls, so a Run can outlast it by one reply (Timeout) and one Poll
 }
 
 var syncID atomic.Int64
 
 // NewQGA wraps a connection to the agent's channel.
 func NewQGA(conn net.Conn) *QGA {
-	return &QGA{conn: conn, r: bufio.NewReader(conn), Timeout: time.Minute, Poll: time.Second}
+	return &QGA{conn: conn, r: bufio.NewReader(conn), Timeout: time.Minute, Poll: time.Second, Wait: 5 * time.Minute}
 }
 
 type qgaReply struct {
@@ -135,6 +136,9 @@ func (q *QGA) Run(path string, args []string) (ExecResult, error) {
 	if err := q.call("guest-exec", map[string]any{"path": path, "arg": args, "capture-output": true}, &started); err != nil {
 		return ExecResult{}, err
 	}
+	// Timeout bounds each reply, so a live agent reporting a process that
+	// never exits would otherwise keep this loop polling forever.
+	deadline := time.Now().Add(q.Wait)
 	for {
 		var st struct {
 			Exited   bool   `json:"exited"`
@@ -149,6 +153,9 @@ func (q *QGA) Run(path string, args []string) (ExecResult, error) {
 			out, oerr := base64.StdEncoding.DecodeString(st.OutData)
 			errOut, eerr := base64.StdEncoding.DecodeString(st.ErrData)
 			return ExecResult{ExitCode: st.ExitCode, Stdout: out, Stderr: errOut}, errors.Join(oerr, eerr)
+		}
+		if q.Wait > 0 && time.Now().After(deadline) {
+			return ExecResult{}, fmt.Errorf("%s (pid %d) did not exit within %s", path, started.PID, q.Wait)
 		}
 		time.Sleep(q.Poll)
 	}
