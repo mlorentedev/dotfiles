@@ -235,8 +235,10 @@ Spend the budget on what static analysis cannot see:
 Shell must run under bash AND zsh; see the prohibited-pattern table in
 .claude/CLAUDE.md before flagging or accepting shell constructs.
 
-Classify each finding by whether it is REAL, THEORETICAL or SPECULATIVE, and say
-which. A finding without that gradation is hard to action.
+Classify each finding as REAL, THEORETICAL or SPECULATIVE. State the class as
+the first line of its issue_content, alone on that line and spelled exactly
+"Class: REAL", "Class: THEORETICAL" or "Class: SPECULATIVE". The triage reads
+only that line; a finding without it goes to a human unclassified.
 
 Rules to avoid false positives and ensure high-precision determinism:
 - Do NOT flag import paths or package names as broken or non-existent if CI compilation/tests pass; trust the project manifests (e.g. go.mod).
