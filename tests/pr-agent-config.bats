@@ -869,7 +869,8 @@ print('PR_AGENT_REF' not in filter_step['env'])
     local contract="$REPO/harness/pr-agent-upstream-contract.json" digest file_path audited
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
     for file_path in action.yaml pr_agent/settings/configuration.toml \
-        pr_agent/agent/pr_agent.py pr_agent/algo/comment_identity.py \
+        pr_agent/agent/pr_agent.py pr_agent/agent/request_policy.py \
+        pr_agent/algo/comment_identity.py pr_agent/config_loader.py \
         pr_agent/algo/file_filter.py pr_agent/algo/inline_comment_dedup.py \
         pr_agent/algo/review_finding_state.py \
         pr_agent/git_providers/github_provider.py pr_agent/servers/github_action_runner.py \
@@ -1238,8 +1239,10 @@ print(all(a in nt and a.split('/', 1)[1] in nt for a in allowed),
 # diff (the owner chose parity over Haiku's 100,000-token price step, 2026-10-08).
 nan = by['pr_agent']['env']
 print(e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'] == nan['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
-# LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short.
-print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'])
+# LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short,
+# and a model its map knows gets the map's ceiling: PR-Agent's own cap must say the same.
+print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'] if e.get('CONFIG__MAX_OUTPUT_TOKENS') == e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']
+      else 'CONFIG__MAX_OUTPUT_TOKENS differs from DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS')
 # The worst review the caps allow, per allowed model, at its highest prices per
 # million tokens (in, out) with Claude's tokenizer ~30% larger, stays under the
 # ceiling. Haiku 5.5: its rates above 100,000 prompt tokens. Sonnet 5.5: no

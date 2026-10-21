@@ -80,10 +80,13 @@ jobs:
     # `ignore_pr_source_branches = ["^release-please--"]` and the reviewer went
     # on reviewing release PRs anyway: measured on #1085, whose head ref is
     # `release-please--branches--main` and which carries a `## PR Reviewer Guide`
-    # comment posted at 07:36:44. Upstream applies that key on its webhook path;
-    # the Action entrypoint takes its settings from the env below, so the line
-    # read like a decision and asserted nothing — the same shape as the
-    # `synchronize`-in-`pr_actions` trap documented further down.
+    # comment posted at 07:36:44. Upstream applied that key on its webhook path
+    # only; the Action entrypoint took its settings from the env below, so the
+    # line read like a decision and asserted nothing — the same shape as the
+    # `synchronize`-in-`pr_actions` trap documented further down. v0.48.0
+    # enforces the `ignore_pr_*` keys on the Action too (`request_policy.py`),
+    # and a skip there publishes nothing, which the publication guard reports
+    # red. This `if` stays: it never starts the job at all.
     #
     # A workflow-level `if` cannot be ignored by the tool it gates. The cost of
     # the old arrangement was not cosmetic: every release PR spent inference
@@ -449,10 +452,13 @@ jobs:
       #   PR-Agent's tokenizer counts about 30% fewer tokens than Claude's, so a
       #   diff past roughly 75,000 of PR-Agent's crosses 100,000 and pays the
       #   higher prices for that request.
-      # - The OUTPUT is capped at 40,000 tokens. LiteLLM sends 4,096 for a Claude
-      #   model it does not know (DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS), and the
-      #   model's thinking counts toward the cap, so a review could be cut short
-      #   and published as nothing. At 32,000 Haiku's p90 answer was 30,600
+      # - The OUTPUT is capped at 40,000 tokens, at both layers that supply a
+      #   default (lesson 371). LiteLLM sends 4,096 for a Claude model it does
+      #   not know (DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS), and the model's thinking
+      #   counts toward the cap, so a review could be cut short and published as
+      #   nothing. A model its bundled map DOES know gets the map's ceiling
+      #   instead (128,000 for these), which is why PR-Agent's own
+      #   `max_output_tokens` sets the same cap explicitly (#2830). At 32,000 Haiku's p90 answer was 30,600
       #   tokens and the cap cut 5 of 11 runs (#2458). 40,000 is the highest
       #   round cap under both ceilings: worst case, a 260,000-token prompt
       #   with a full answer, is about $0.23 a review on Haiku and $0.92 on
@@ -464,7 +470,8 @@ jobs:
       #   its built-in pattern does not match these ids, hence the override
       #   list, which names every allowed model. Measured with LiteLLM 1.103.0,
       #   the version PR-Agent v0.47.0 pins: both reach the API unchanged and the
-      #   answer carries a thinking block.
+      #   answer carries a thinking block. v0.48.0 ships LiteLLM 1.105.0; the
+      #   settings still exist there (#2830 audit), not yet re-measured.
       # - TEMPERATURE is never sent: Haiku 5.5 answers 400 to any non-default
       #   value, and PR-Agent sends 0.2 unless the model is listed here. Both
       #   allowed models are listed, so neither depends on accepting it.
@@ -499,6 +506,7 @@ jobs:
           CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
           CONFIG__AI_TIMEOUT: "360"
           DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "40000"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           CONFIG__OUTPUT_RUN_DETAILS: "true"
@@ -722,6 +730,7 @@ jobs:
           CONFIG__REASONING_EFFORT: ${{ steps.route.outputs.anthropic_effort }}
           CONFIG__AI_TIMEOUT: "360"
           DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS: "40000"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
           # Below: identical to the NaN attempt's review settings (a test checks it).
           CONFIG__PUBLISH_OUTPUT_PROGRESS: false
           CONFIG__OUTPUT_RUN_DETAILS: "true"
