@@ -92,6 +92,10 @@ cannot be read or is not open.`,
 					_, _ = fmt.Fprintf(c.OutOrStdout(), "         %s\n", line)
 				}
 			}
+			if len(reg.Classification.Reviewers) == 0 {
+				_, _ = fmt.Fprintln(c.OutOrStdout(),
+					"\nNote: finding classes were not checked: the registry names no classifying reviewer (classification.reviewers).")
+			}
 			_, _ = fmt.Fprintf(c.OutOrStdout(),
 				"\nDisposition them with the pr-review-triage skill, which records its table\n"+
 					"on the PR under %q. Nothing here applies anything.\n", marker)

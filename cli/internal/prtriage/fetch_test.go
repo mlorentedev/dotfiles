@@ -671,3 +671,43 @@ func TestFetchMarksUnreadInlineFindings(t *testing.T) {
 		t.Fatalf("got %+v, want PR #10 listed with FindingsUnread and no findings", got)
 	}
 }
+
+// A full page of inline comments cannot be told apart from a truncated one, so
+// its findings are unread, never "none unclassified". Same rule as the
+// conversation and the reviews, which refuse a full page outright.
+func TestFetchMarksAFullPageOfInlineFindingsUnread(t *testing.T) {
+	var page strings.Builder
+	page.WriteString("[")
+	for i := range commentLimit {
+		if i > 0 {
+			page.WriteString(",")
+		}
+		fmt.Fprintf(&page, `{"id":%d,"user":{"login":"github-actions[bot]"},"body":"Class: REAL","path":"a.go","line":1,"created_at":"2026-09-02T10:00:01Z"}`, i+1)
+	}
+	page.WriteString("]")
+	responses := map[string]string{"/pulls/10/comments": page.String()}
+	for k, v := range reviewedPR10 {
+		responses[k] = v
+	}
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || !got[0].FindingsUnread {
+		t.Fatalf("got %+v, want PR #10 listed with FindingsUnread", got)
+	}
+}
+
+// The registry key is spelled `reviewers` under `classification`. A typo in
+// either side would leave the report silently inert with every other test
+// green, so the JSON spelling is pinned here.
+func TestParseRegistryReadsTheClassifyingReviewers(t *testing.T) {
+	r, err := ParseRegistry([]byte(`{"triage":{"marker":"## Review triage"},
+	  "classification":{"prefix":"Class: ","classes":["REAL"],"reviewers":["github-actions"]}}`), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Classification.Reviewers) != 1 || r.Classification.Reviewers[0] != "github-actions" {
+		t.Fatalf("Classification.Reviewers = %v, want [github-actions]", r.Classification.Reviewers)
+	}
+}

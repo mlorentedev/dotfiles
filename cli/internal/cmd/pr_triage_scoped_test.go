@@ -112,3 +112,14 @@ func TestPrTriageQueue_NamesUnclassifiedFindings(t *testing.T) {
 		})
 	}
 }
+
+// A registry that names no classifying reviewer says so under a non-empty
+// queue: silence there would read as "every finding is classified".
+func TestPrTriageQueue_SaysWhenClassesAreNotChecked(t *testing.T) {
+	st := prtriage.Status{PR: prtriage.PR{Number: 42, Title: "mine"}, Pending: true, Reason: "github-actions reviewed, never triaged"}
+	stubTriageFetch(t, func(int) ([]prtriage.Status, error) { return []prtriage.Status{st}, nil })
+	stdout, _, _ := execute(t, "pr", "triage-queue", "--repo", "o/r", "--registry", validRegistry(t), "--pr", "42")
+	if !strings.Contains(stdout, "finding classes were not checked") {
+		t.Errorf("stdout = %q, want the not-checked note", stdout)
+	}
+}
