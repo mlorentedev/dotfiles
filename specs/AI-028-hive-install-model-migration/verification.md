@@ -48,7 +48,7 @@ The run is green while the doctor fails: the converge has no step that owns hive
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [x] AC1 (loud-vs-quiet) -> `tests/hive-upgrade-timer.bats`: `hive-upgrade.ps1 is loud and non-zero when no install is found`, `... stays silent when the install is already current`, `... reports an unreachable PyPI without failing the tick`, `... does not collapse no-install into the already-current guard`. Suite green 33/33; script ASCII-clean. B5/B6 flip once the SSOT is deployed (see the deploy caveat below).
+- [x] AC1 (loud-vs-quiet) -> `tests/hive-upgrade-timer.bats`: `hive-upgrade.ps1 is loud and non-zero when no install is found`, `... stays silent when the install is already current`, `... reports an unreachable PyPI without failing the tick`, `... does not collapse no-install into the already-current guard`. Suite green 33/33; script ASCII-clean. B5/B6 flip once the SSOT is deployed (see the deploy caveat below). *Superseded 2026-10-21:* PR5 (#2857) deletes the script and this suite, so this line is history: it proves #796 at the time, and nothing replaces it, because AC9 removes what AC1 tested.
 - [ ] AC2 (bootstrap, rewritten 2026-10-21) -> a guest run on PR6's ref where V2, V4 and V5 flip, and the second converge changes nothing
 - AC3 -> *withdrawn 2026-10-21* (hive ADR-020); AC9 replaces it
 - [ ] AC4 (no uv install or `uv tool list` inference on Windows; no silent skip, rewritten 2026-10-21) -> the setup gate half is `016bf1a8` (#1311); the rest flips V3 on PR6's ref
