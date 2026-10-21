@@ -41,6 +41,17 @@ var (
 // first, as the vault's frontmatter rule requires. Other keys keep their order.
 var leadingKeys = []string{"id", "type", "status", "title", "created"}
 
+// FileNumber returns the number a lesson file name declares, and whether name
+// is a lesson file (lesson-NNN-<slug>.md) at all.
+func FileNumber(name string) (int, bool) {
+	m := fileRE.FindStringSubmatch(name)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	return n, err == nil
+}
+
 // Normalize returns the lesson's canonical form and what it declares:
 // frontmatter with id (the file name), type, status, title and created, an H1
 // equal to the title, and the date in one place. The body is left as written.

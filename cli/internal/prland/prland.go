@@ -41,6 +41,12 @@ type Facts struct {
 	// the PR changes, so a path may be missing.
 	Files         []string
 	FilesComplete bool
+	// Freed is every path the PR deletes or renames away: once it lands, a
+	// lesson there no longer holds its number.
+	Freed []string
+	// BaseLessons maps each lesson number the base holds to its path. It is
+	// read only when the PR touches a lesson file, and is nil otherwise.
+	BaseLessons map[int]string
 	// changedFiles is GitHub's count of the files the PR changes, the
 	// figure Files is checked against.
 	changedFiles int
@@ -94,6 +100,7 @@ func Decide(f Facts) []string {
 	} else if slices.Contains(f.Files, GrantFile) {
 		r = append(r, "the PR changes "+GrantFile+": a PR that changes the grant is never merged under it")
 	}
+	r = append(r, lessonReasons(f)...)
 	if len(f.Checks) == 0 {
 		r = append(r, "no checks reported")
 	}
@@ -480,6 +487,12 @@ func readFacts(ctx context.Context, gh ghFunc, o Options, number int) (Facts, er
 	}
 	f.Files = changed.paths
 	f.FilesComplete = changed.listed >= f.changedFiles
+	f.Freed = changed.freed
+	if slices.ContainsFunc(f.Files, f.bringsLesson) {
+		if f.BaseLessons, err = readBaseLessons(ctx, o, f.BaseRef); err != nil {
+			return f, err
+		}
+	}
 	// gh exits non-zero while a check fails or is pending, and still prints
 	// the JSON; only an output that does not parse is an error.
 	out, runErr := gh("pr", "checks", n, "--json", "name,bucket")
@@ -528,6 +541,7 @@ func readView(gh ghFunc, n string) (Facts, error) {
 // changedFiles is what the pull request files endpoint lists.
 type changedFiles struct {
 	paths  []string // every filename, and every renamed file's old name
+	freed  []string // every removed file, and every renamed file's old name
 	listed int      // files listed, which counts a rename once
 }
 
@@ -537,7 +551,7 @@ type changedFiles struct {
 // old path too (previous_filename) and pages up to 3000 files.
 func readChangedFiles(ctx context.Context, o Options, number int) (changedFiles, error) {
 	out, err := o.Run(ctx, "api", "repos/"+apiRepo(o)+"/pulls/"+strconv.Itoa(number)+"/files",
-		"--paginate", "--jq", ".[] | {filename, previous_filename}")
+		"--paginate", "--jq", ".[] | {filename, previous_filename, status}")
 	if err != nil {
 		return changedFiles{}, fmt.Errorf("list the files of #%d: %w", number, err)
 	}
@@ -547,6 +561,7 @@ func readChangedFiles(ctx context.Context, o Options, number int) (changedFiles,
 		var file struct {
 			Filename string `json:"filename"`
 			Previous string `json:"previous_filename"`
+			Status   string `json:"status"`
 		}
 		if err := dec.Decode(&file); errors.Is(err, io.EOF) {
 			return c, nil
@@ -555,8 +570,12 @@ func readChangedFiles(ctx context.Context, o Options, number int) (changedFiles,
 		}
 		c.listed++
 		c.paths = append(c.paths, file.Filename)
+		if file.Status == "removed" {
+			c.freed = append(c.freed, file.Filename)
+		}
 		if file.Previous != "" {
 			c.paths = append(c.paths, file.Previous)
+			c.freed = append(c.freed, file.Previous)
 		}
 	}
 }
