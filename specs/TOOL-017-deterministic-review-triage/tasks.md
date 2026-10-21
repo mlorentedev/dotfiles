@@ -32,7 +32,8 @@ created: "2026-08-18"
 - [x] `[AC2]` red-direction: adding a reviewer to the registry changes triage behaviour with no code edit
 - [x] `[AC3]` extract a finding's class from a declared marker; absent marker → `unclassified`
 - [x] `[AC3]` red-direction: a finding whose class appears only in prose is `unclassified`, not parsed
-- [ ] `[AC3]` consume `Classify` where findings are read: an unclassified finding is surfaced for a human (next slice)
+- [x] `[AC3]` consume `Classify` where findings are read: `dotf pr triage-queue` names a pending PR's inline findings without a declared class (report only, the verdict is unchanged)
+- [ ] `[AC3]` declare the classifying reviewers in the registry (`classification.reviewers`, e.g. `["github-actions"]`); until then the consumer reports nothing. `harness/` is owner-landed
 - [ ] `[AC4]` gate `apply` on a successful reproduction for REAL findings
 - [ ] `[AC6]` record a refuted REAL finding with its evidence, distinct from a skip
 - [x] `[AC1]` ~~trigger from the reviewer-finished signal (GUARD-003's `workflow_run`)~~ superseded: the pull-based `dotf pr triage-queue` (#1057, #1101), accepted by the owner on #1062 (2026-10-10)

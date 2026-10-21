@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 	"github.com/spf13/cobra"
@@ -87,6 +88,9 @@ cannot be read or is not open.`,
 				_, _ = fmt.Fprintf(c.OutOrStdout(), "  #%-5d %s\n         %s, %s\n         %s\n",
 					st.PR.Number, st.PR.Title, st.Reason,
 					st.At.Local().Format("2006-01-02 15:04"), st.PR.URL)
+				if line := findingsLine(st); line != "" {
+					_, _ = fmt.Fprintf(c.OutOrStdout(), "         %s\n", line)
+				}
 			}
 			_, _ = fmt.Fprintf(c.OutOrStdout(),
 				"\nDisposition them with the pr-review-triage skill, which records its table\n"+
@@ -98,6 +102,31 @@ cannot be read or is not open.`,
 	cmd.Flags().IntVar(&pr, "pr", 0, "only this pull request's reviewer output decides the exit status")
 	addReviewerRegistryFlag(cmd, &registry)
 	return cmd
+}
+
+// findingsLine names a pending PR's inline findings that carry no declared
+// class (TOOL-017 AC3), or says they could not be read. Empty when neither.
+func findingsLine(st prtriage.Status) string {
+	if st.FindingsUnread {
+		return "inline findings could not be read: their classes are unknown"
+	}
+	if len(st.Unclassified) == 0 {
+		return ""
+	}
+	const shown = 5
+	where := make([]string, 0, shown)
+	for _, f := range st.Unclassified {
+		if len(where) == shown {
+			where = append(where, fmt.Sprintf("and %d more", len(st.Unclassified)-shown))
+			break
+		}
+		if f.Line > 0 {
+			where = append(where, fmt.Sprintf("%s:%d", f.Path, f.Line))
+		} else {
+			where = append(where, f.Path)
+		}
+	}
+	return fmt.Sprintf("%d finding(s) without a declared class: %s", len(st.Unclassified), strings.Join(where, ", "))
 }
 
 // fetchTriageQueue asks the repo-wide question, or with --pr the one-PR one.
