@@ -66,7 +66,11 @@ Covered. `caffeinate -i -t 25200` was held from 14:40Z, for 7h.
 
 The PR-Agent job on #2860 pulled `pragent/pr-agent@sha256:80edef71…`. This is the digest pin from #2832, working in CI.
 
-## Still running after the report
+## After the report (21:44Z)
+
+The release watch ended at about 21:40Z without an install, because #2853 was still unmerged. #2853's head `539af3a1` was blocked by three cancelled duplicate runs (spec-gate, knowledge-gate, attestation). They were re-run, all went green, and the PR is now `clean`. Merge it with `--match-head-commit 539af3a1`, or check that head in the UI. The 0.77.0 install on this Mac must now be asked for.
+
+## Superseded: the watch note
 
 The release watch (background) runs until about 21:40Z. If it fires, `dotf update` runs and this report's Done section is amended with the version and the converge result.
 
