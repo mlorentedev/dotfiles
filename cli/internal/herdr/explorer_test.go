@@ -199,16 +199,44 @@ func TestToggleExplorerRefusesToCloseAStrangersYazi(t *testing.T) {
 	}
 }
 
-// The pane the command was typed into is never a candidate, labelled or not.
-func TestToggleExplorerNeverTouchesTheInvokingPane(t *testing.T) {
+// The explorer is a pane people work in, so the key is pressed from inside it as
+// often as from beside it. The label, not the pane's identity, says it is ours:
+// pressing again must close it, not dock a second one (round 2 review).
+func TestToggleExplorerClosesItselfWhenPressedFromInside(t *testing.T) {
 	srv := explorerServer(map[string]fakeAnswer{
-		"herdr pane list": {out: `{"result":{"panes":[{"pane_id":"w1:p1","tab_id":"w1:t1","label":"files"}]}}`},
+		"herdr pane list": {out: `{"result":{"panes":[` +
+			`{"pane_id":"w1:p1","tab_id":"w1:t1"},` +
+			`{"pane_id":"w1:p2","tab_id":"w1:t1","label":"files"}]}}`},
+		"herdr pane process-info --pane w1:p1": {out: `{"result":{"process_info":{"foreground_processes":[{"name":"zsh"}]}}}`},
+	})
+	line, err := ToggleExplorer(srv.run, PaneContext{Pane: "w1:p2", Cwd: "/repo/wt"}, 0.3)
+	if err != nil {
+		t.Fatalf("toggle: %v", err)
+	}
+	if !srv.called("herdr pane close w1:p2") || !strings.Contains(line, "closed the explorer") {
+		t.Fatalf("want the focused explorer closed, got %q calls=%v", line, srv.joined())
+	}
+	for _, c := range srv.joined() {
+		if strings.HasPrefix(c, "herdr pane split") {
+			t.Fatalf("a second explorer was docked: %v", srv.joined())
+		}
+	}
+}
+
+// The pane the command was typed into is never a candidate unless it IS the
+// explorer: someone who runs yazi by hand where they press the key keeps it.
+func TestToggleExplorerNeverTouchesAnUnlabelledInvokingPane(t *testing.T) {
+	srv := explorerServer(map[string]fakeAnswer{
+		"herdr pane list": {out: `{"result":{"panes":[{"pane_id":"w1:p1","tab_id":"w1:t1"}]}}`},
 	})
 	if _, err := ToggleExplorer(srv.run, PaneContext{Pane: "w1:p1", Cwd: "/repo/wt"}, 0.3); err != nil {
 		t.Fatalf("toggle: %v", err)
 	}
 	if srv.called("herdr pane close w1:p1") {
 		t.Fatalf("the invoking pane was closed: %v", srv.joined())
+	}
+	if !srv.called("herdr pane run w1:p2 yazi") {
+		t.Fatalf("want the explorer docked beside it: %v", srv.joined())
 	}
 }
 
