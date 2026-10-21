@@ -30,10 +30,10 @@ created: "2026-09-25"
 
 ## Slice 3 - `dotf mem resume` (depends on slice 2)
 
-- [ ] [AC1] Failing golden test: `resume --format prompt` and `--format context` on a fixture thread; two runs are byte-identical
-- [ ] [AC1] Implement `dotf mem resume` as a pure render of the thread file
-- [ ] [AC2] Failing test, then implementation: `Verify` and `Awaiting Manu` both render; a `Verify` command outside the read-only allowlist is marked unverified
-- [ ] [AC2] Failing test, then implementation: a working directory that names no single thread for this agent lists the candidates and picks none
+- [x] [AC1] Failing golden test: `resume --format prompt` and `--format context` on a fixture thread; two runs are byte-identical
+- [x] [AC1] Implement `dotf mem resume` as a pure render of the thread file
+- [x] [AC2] Failing test, then implementation: `Verify` and `Awaiting Manu` both render; a `Verify` command outside the read-only allowlist is marked unverified
+- [x] [AC2] Failing test, then implementation: a working directory that names no single thread for this agent lists the candidates and picks none
 
 ## Slice 4 - SessionStart by source (depends on slice 3)
 
