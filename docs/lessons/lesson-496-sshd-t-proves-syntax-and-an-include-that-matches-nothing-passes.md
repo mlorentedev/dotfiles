@@ -35,7 +35,12 @@ and without `-C`), so one dump covers the mesh and the LAN.
 
 `checkEffective` (`cli/internal/sshtarget/effective.go`) reads the dump after
 the drop-in is installed and fails the apply, undoing it, when a proven
-directive is not the drop-in's. The tests pin it against two dumps measured
-with `sshd -T -f` on macOS, one that read the drop-in and one that did not.
-The 8.9p1 (Ubuntu 22.04) and Windows 9.5p2 dumps are not fixtures yet: they are
-unmeasured here, not transcribed.
+directive is not the drop-in's. The tests pin it against a pair of dumps per
+platform, measured with `sshd -T -f` as an unprivileged user over a scratch host
+key: one config whose `Include` reads the drop-in and one whose `Include`
+matches nothing. The platforms are macOS (OpenSSH 10.3p1), Ubuntu on msi
+(10.2p1) and Ubuntu 22.04 in a throwaway container (8.9p1). The 8.9p1 dump
+prints sshd's default `PermitRootLogin` as `without-password`, the pre-7.0 name
+of `prohibit-password`; the proof compares the drop-in's `no`, so it is
+unaffected. The Windows 9.5p2 dump is not a fixture yet: it is unmeasured here,
+not transcribed.
