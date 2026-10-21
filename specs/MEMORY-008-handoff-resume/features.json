@@ -22,8 +22,8 @@
   },
   {
     "id": "MEMORY-008-handoff-resume-f4",
-    "behavior": "A fixture copy of the real dotfiles MEMORY.md stays at or under 25,000 bytes after the new fields are added, and a write that would cross the budget fails instead of truncating",
-    "verification": "out=$(cd cli && go test ./internal/mem -run '^(TestTheRealDotfilesMemoryStaysUnderBudgetWithTheNewFields|TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget)$' -count=1 -v) && [ \"$(printf '%s\\n' \"$out\" | grep -c '^--- PASS: ')\" -eq 2 ]",
+    "behavior": "A fixture shaped like the real dotfiles MEMORY.md stays at or under 25,000 bytes after the new fields are added, and a write that would cross the budget fails instead of truncating",
+    "verification": "out=$(cd cli && go test ./internal/mem ./internal/cmd -run '^(TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields|TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget)$' -count=1 -v) && [ \"$(printf '%s\\n' \"$out\" | grep -c '^--- PASS: ')\" -eq 2 ]",
     "state": "pending",
     "evidence": ""
   },

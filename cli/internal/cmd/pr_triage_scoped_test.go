@@ -83,3 +83,43 @@ func TestPrTriageQueue_PRMustBeAPositiveNumber(t *testing.T) {
 		t.Errorf("fetched %v for an invalid --pr", *asked)
 	}
 }
+
+// TOOL-017 AC3: a pending PR names its findings that carry no declared class,
+// and says so when they could not be read, rather than printing nothing.
+func TestPrTriageQueue_NamesUnclassifiedFindings(t *testing.T) {
+	pending := prtriage.Status{PR: prtriage.PR{Number: 42, Title: "mine"}, Pending: true, Reason: "github-actions reviewed, never triaged"}
+	findings := pending
+	findings.Unclassified = []prtriage.Comment{{Path: "a.go", Line: 3}, {Path: "b.go"}}
+	unread := pending
+	unread.FindingsUnread = true
+	for _, tc := range []struct {
+		name string
+		st   prtriage.Status
+		want string
+	}{
+		{"findings", findings, "2 finding(s) without a declared class: a.go:3, b.go"},
+		{"unread", unread, "inline findings could not be read"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stubTriageFetch(t, func(int) ([]prtriage.Status, error) { return []prtriage.Status{tc.st}, nil })
+			stdout, _, err := execute(t, "pr", "triage-queue", "--repo", "o/r", "--registry", validRegistry(t), "--pr", "42")
+			if !errors.Is(err, errPending) {
+				t.Errorf("err = %v, want errPending", err)
+			}
+			if !strings.Contains(stdout, tc.want) {
+				t.Errorf("stdout = %q, want it to contain %q", stdout, tc.want)
+			}
+		})
+	}
+}
+
+// A registry that names no classifying reviewer says so under a non-empty
+// queue: silence there would read as "every finding is classified".
+func TestPrTriageQueue_SaysWhenClassesAreNotChecked(t *testing.T) {
+	st := prtriage.Status{PR: prtriage.PR{Number: 42, Title: "mine"}, Pending: true, Reason: "github-actions reviewed, never triaged"}
+	stubTriageFetch(t, func(int) ([]prtriage.Status, error) { return []prtriage.Status{st}, nil })
+	stdout, _, _ := execute(t, "pr", "triage-queue", "--repo", "o/r", "--registry", validRegistry(t), "--pr", "42")
+	if !strings.Contains(stdout, "finding classes were not checked") {
+		t.Errorf("stdout = %q, want the not-checked note", stdout)
+	}
+}

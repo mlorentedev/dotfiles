@@ -7,10 +7,10 @@ created: "2026-09-25"
 
 ## Evidence
 
-- [ ] AC1 -> slice 3: `TestResumeIsAPureRenderOfTheThreadFile`
-- [ ] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
-- [ ] AC3 -> slice 4: `TestSessionStartResumeBySource`
-- [ ] AC4 -> slice 2: `TestTheRealDotfilesMemoryStaysUnderBudgetWithTheNewFields`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`
+- [x] AC1 -> slice 3: `TestResumeIsAPureRenderOfTheThreadFile`
+- [x] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
+- [x] AC3 -> slice 4: `TestSessionStartResumeBySource`
+- [x] AC4 -> slice 2: `TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`
 - [ ] AC5 -> slice 5: the `handoff` and `catchup` records
 - [ ] AC6 -> slice 5: the compiled doctrine, `--check` and the 8,000-character budget test
 
@@ -50,7 +50,54 @@ Each slice PR fills its own section below and nothing else.
 
 ## Slice 2 evidence
 
+- The store is in `cli/internal/mem/thread_store.go`, and the design is in ADR-056.
+  - `StoreThreadAs` writes the body to `memory/threads/<key>.md` and puts the derived entry (Updated, the first line of the Next action, the Awaiting Manu count, Journal, pointer) under the heading in `MEMORY.md`. Tests: `TestStoreThreadWritesTheBodyToItsFileAndADerivedEntry`, `TestTheDerivedEntryCutsALongNextAction` (entry at most 350 B), `TestTheDerivedEntryCapsEveryQuotedField` (every quoted field at its cap: at most 450 B).
+  - Ownership and forks are shared with `WriteThreadAs` through `threadOwner`. Test: `TestStoreThreadForksAroundAnotherAgentsEntry`.
+  - Migration on the next write: `TestStoreThreadMovesAnInlineBlockAndLeavesTheOthersByteIdentical`.
+  - Key to file: `TestThreadFileNames`. The one live key with a `/` (ts-bridge `fix/ux355-init-headscale-control-plane`, 74 thread headings checked across the vault) maps to `fix-ux355-init-headscale-control-plane.md`. Collisions: `TestCheckThreadFileRefusesAFileAnotherKeyHolds`. A pointer in a body is refused: `TestStoreThreadRefusesAPointerInTheBody`.
+- `handoff-write` writes the thread file first, then `MEMORY.md`, under the existing lock. A new file takes `MEMORY.md`'s mode. Tests: `TestMemHandoffWriteStoresTheThreadInItsOwnFile`, `TestMemHandoffWriteDryRunStoresNothing`.
+- **Budget (#1477):** `CheckMemoryBudget` refuses only a write that grows the file past 25,000 B, and names the three oldest threads. Tests: `TestCheckMemoryBudget`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`.
+- **Found along the way: `session-end` reads the thread too.** Its fallback journal archives the block from `MEMORY.md`, so after the store it would have archived the entry. It now reads through `threadText`. Test: `TestSessionEndArchivesTheStoredThreadNotItsEntry`. Lesson 507.
+- **Probe on a copy of the real dotfiles `MEMORY.md`** (2026-10-20, a throwaway test, not committed). Each of its 8 threads was written again with a `Verify` line and two `Awaiting Manu` items:
+
+  | | Bytes |
+  |---|---|
+  | as it is | 23,423 |
+  | inline, with the fields | 24,488 |
+  | stored, with the fields | 14,516 |
+  | budget | 25,000 |
+
+- **Mutation checks**, each reverted:
+
+  | Mutation | Tests that went red |
+  |---|---|
+  | budget check off | `TestCheckMemoryBudget`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget` |
+  | over-budget writes that shrink also refused | `TestCheckMemoryBudget` |
+  | collision check off | `TestCheckThreadFileRefusesAFileAnotherKeyHolds` |
+  | Next action not cut | `TestTheDerivedEntryCutsALongNextAction` |
+  | resolver ignores the pointer | `TestThreadTextFollowsThePointer`, `TestSessionEndArchivesTheStoredThreadNotItsEntry` |
+
 ## Slice 3 evidence
+
+- `dotf mem resume [--thread K] [--agent A] [--format prompt|context] [--memory PATH]` in `cli/internal/cmd/mem_resume.go`. The render is in `cli/internal/mem/resume.go`.
+  - `RenderResume` is pure: `TestResumeIsAPureRenderOfTheThreadFile` renders a fixture twice per format and compares both renders with `testdata/resume/{context,prompt}.golden`. An unknown format is refused.
+  - Next action, Verify and Awaiting Manu render first. Verify commands are listed one per line, and one outside the read-only allowlist is marked unverified (`TestResumeRendersVerifyAndAwaiting`). The allowlist matches on a word boundary, and any chaining, pipe, redirection or substitution fails it (`TestReadOnlyCommand`).
+  - `SelectThread` takes the agent's fork of the key, then the key unless another agent's stamp is on it. Otherwise it picks none and returns every thread key (`TestResumeListsCandidatesWhenTheThreadIsAmbiguous`). The command lists those keys, each with its `--thread` flag (`TestMemResumeListsCandidates`).
+  - `ThreadText` reads the stored file when the entry points at one, and the inline block otherwise. It also returns the source path (`TestThreadTextForKey`). Round trip through the command: `TestMemResumeRendersWhatHandoffWriteStored`.
+- `--memory` defaults to the checkout project's vault `MEMORY.md`, through `mem.ProjectMemory`. That helper was lifted out of `session-end`, which resolved the same path inline, so the layout is derived in one place.
+- The read-only allowlist leaves out generic file readers (`cat`, `grep`, `head` and the like), because they take any path and `cat <secrets file>` would render as safe. It also leaves out subcommands that have a writing form (`git branch`, `git fetch`, `go build`). A line break counts as shell control, and an argument that writes a file (`--output`, `-o`) fails the check (review of #2880).
+- **Live run** on a copy of the real dotfiles `MEMORY.md` (inline blocks, 2026-10-21). `--thread feat-plat003-close@macmini --agent claude` rendered that thread's Next action. `--thread nope` listed all 8 threads.
+- **Mutation checks**, each reverted:
+
+  | Mutation | Test that went red |
+  |---|---|
+  | chaining allowed | `TestReadOnlyCommand` |
+  | prefix without a word boundary | `TestReadOnlyCommand` |
+  | another agent's thread chosen | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
+  | this agent's fork ignored | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
+  | Verify not rendered first | `TestResumeIsAPureRenderOfTheThreadFile` |
+
+  The first attempt at the "another agent's thread" mutation did not compile. The harness printed no failing test, which read as a surviving mutant (lesson 508).
 
 ## Slice 4 evidence
 
@@ -58,7 +105,8 @@ Each slice PR fills its own section below and nothing else.
 
 ## Decisions made during implementation
 
--
+- Slice 2: the AC4 fixture is synthetic, shaped like the real file. Copying the vault's `MEMORY.md` into a public repository would publish it. The real file was probed instead, and the probe's figures are recorded above.
+- Slice 2: a write that keeps or shrinks a file already over the budget is allowed, so that file can still be brought back under (ADR-056 §7).
 
 ## Promotion candidates
 
@@ -72,3 +120,25 @@ Each slice PR fills its own section below and nothing else.
 - [ ] Folder moved: `specs/MEMORY-008-handoff-resume/` -> `specs/archive/MEMORY-008-handoff-resume/`
 - [ ] Bitácora board ticket moved to Done / closed with the closing PR (ADR-018)
 - [ ] Promotions above executed
+
+## Slice 4 evidence
+
+- `ClaudeContext` takes the hook's `source` (`ClaudeContextInput.Source`, parsed by `hookFromPayload` in `cli/internal/cmd/mem.go`). It puts `sessionResume` (`cli/internal/mem/session_start_resume.go`) ahead of the rest of the brief.
+  - `startup`, `clear` and `compact` get the full `dotf mem resume --format context` block, because those sessions lost the conversation. `resume` and `fork` kept it, so they get one line naming the thread and the command. An unknown or missing source gets the line too.
+  - The thread is chosen by `SelectThread` for the agent `claude`, so another agent's thread or an absent memory adds nothing (`TestSessionStartResumeInjectsNothingThatIsNotThisAgents`).
+  - One golden per source: `testdata/session_start_resume/<source>.golden` (`TestSessionStartResumeBySource`). The same test checks that a compacted `ClaudeContext` begins with the block.
+  - The `handoff_resume` injector flag turns the block off (`TestSessionStartResumeCanBeTurnedOff`). Like every injector, an absent flag means on.
+- **Mutation checks**, each reverted. All 5 were caught by a failing test, with no build failures:
+
+  | Mutation | Test that went red |
+  |---|---|
+  | compact gets one line | `TestSessionStartResumeBySource` |
+  | resume and fork get the full block | `TestSessionStartResumeBySource` |
+  | agent ignored | `TestSessionStartResumeInjectsNothingThatIsNotThisAgents` |
+  | block appended, not first | `TestSessionStartResumeBySource` |
+  | flag ignored | `TestSessionStartResumeCanBeTurnedOff` |
+
+- **Decisions:**
+  - `startup` gets the full block. tasks.md lists it with `clear` and `compact`; AC3 names only the last two. A fresh session has no conversation either.
+  - `session_id` is not parsed. Nothing reads it, and a field with no reader is dead weight.
+  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up ticket.

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/catchup/SKILL.md
-generated_sha: 22af7bc0655ee758
+generated_sha: fe16e625c7bd6795
 id: catchup-skill
 type: skill
 status: active
@@ -47,7 +47,7 @@ paths: ["**/MEMORY.md", "**/context.md", "docs/adr/**"]
    session that reads a peer's thread as its own inherits a next action that was
    never its.
 1. Resolve target repo from working directory or explicit parameter.
-2. Read `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (target the `## Session Handoff` block at EOF).
+2. Read `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (target the `## Session Handoff` block at EOF). A sub-block that ends in `[full thread](threads/<file>.md)` is a derived entry: read the fields from that file, beside `MEMORY.md` (dotfiles ADR-056).
 3. Extract:
    - `Last task` (commits, PRs touched)
    - `Decisions` (architectural rulings)

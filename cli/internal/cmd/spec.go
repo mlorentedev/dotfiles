@@ -34,6 +34,7 @@ func newSpecCmd() *cobra.Command {
 	cmd.AddCommand(newSpecReviewCmd())
 	cmd.AddCommand(newSpecArchiveCmd())
 	cmd.AddCommand(newSpecAuditCmd())
+	cmd.AddCommand(newSpecDigestCmd())
 	cmd.AddCommand(newSpecTranscriptSinkCmd())
 	cmd.AddCommand(newSpecDeadlineCmd())
 	return cmd

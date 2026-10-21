@@ -67,7 +67,7 @@ func deployHarness(cmd *cobra.Command, repoRoot, home string, dryRun bool) error
 	agents, agentsErr := harness.DeployAgents(repoRoot, home, dryRun)
 	reportAgentOutcomes(w, ew, agents, dryRun)
 	if agentsErr != nil {
-		_, _ = fmt.Fprintln(ew, "[deploy] presence and doctrine NOT written: an agent record failed (see below)")
+		_, _ = fmt.Fprintln(ew, "[deploy] presence and doctrine NOT written: the agents surface failed; its error follows")
 		return errors.Join(append(errs, agentsErr)...)
 	}
 

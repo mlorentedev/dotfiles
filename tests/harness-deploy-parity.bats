@@ -15,6 +15,7 @@
 # deleted.
 
 load 'lib/dotf-bin'
+load 'lib/refute'
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -63,5 +64,6 @@ deploy_both() {
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" | tail -20; false; }
     printf '%s\n' "$output" | grep -q '^\[deploy\] skills: 0 deployed, '
     printf '%s\n' "$output" | grep -q '^\[deploy\] agents: 0 deployed, '
-    ! printf '%s\n' "$output" | grep -E '^\[deploy\] (instructions|catalog|doctrine|presence) ->'
+    printf '%s\n' "$output" >"$BATS_TEST_TMPDIR/second-run"
+    refute_grep '^\[deploy\] (instructions|catalog|doctrine|presence) ->' "$BATS_TEST_TMPDIR/second-run"
 }
