@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.76.0](https://github.com/mlorentedev/dotfiles/compare/v0.75.0...v0.76.0) (2026-10-21)
+
+
+### Features
+
+* **converge:** retire the workstation target when its role is removed ([#2799](https://github.com/mlorentedev/dotfiles/issues/2799)) ([60dde72](https://github.com/mlorentedev/dotfiles/commit/60dde720a4d609b4914d0f7c5a44928566b0cd8d))
+* **herdr:** detect wrapped agents, and a yazi explorer on demand ([#2815](https://github.com/mlorentedev/dotfiles/issues/2815)) ([11614b9](https://github.com/mlorentedev/dotfiles/commit/11614b9b95e3c626f2ab7b2a72ff7ff4ee3a493f))
+* **hooks:** run dotf lint powershell from pre-commit, skipping where pwsh is absent ([#2793](https://github.com/mlorentedev/dotfiles/issues/2793)) ([a73599e](https://github.com/mlorentedev/dotfiles/commit/a73599e9a06372f2b52983701afc193a9c4b3398)), closes [#2678](https://github.com/mlorentedev/dotfiles/issues/2678)
+* **sshtarget:** prove the sshd drop-in is in effect, not only valid ([#2823](https://github.com/mlorentedev/dotfiles/issues/2823)) ([f410e75](https://github.com/mlorentedev/dotfiles/commit/f410e750337844ce3996121861a03cb3dc278e14))
+* **sshtarget:** record the key line the step wrote and say whether sshd serves at all ([#2807](https://github.com/mlorentedev/dotfiles/issues/2807)) ([8516806](https://github.com/mlorentedev/dotfiles/commit/8516806f728cf0da40944db5962a2213ff8d0e2f))
+
+
+### Bug Fixes
+
+* **herdr:** stop the [#2814](https://github.com/mlorentedev/dotfiles/issues/2814) guard from deadlocking the release PR ([#2827](https://github.com/mlorentedev/dotfiles/issues/2827)) ([0b3b2ff](https://github.com/mlorentedev/dotfiles/commit/0b3b2ff8c7f3ee9e39355d837b3b9a119b645f24))
+* **mem:** name an unreadable docs/lessons in the session brief ([#2798](https://github.com/mlorentedev/dotfiles/issues/2798)) ([a4737b8](https://github.com/mlorentedev/dotfiles/commit/a4737b8bef70a436e2ec4cba94f3c4b4e9199c53)), closes [#2690](https://github.com/mlorentedev/dotfiles/issues/2690) [#2690](https://github.com/mlorentedev/dotfiles/issues/2690)
+* **pr-agent:** pin the reviewer image by digest, not the wrapper commit ([#2832](https://github.com/mlorentedev/dotfiles/issues/2832)) ([1529210](https://github.com/mlorentedev/dotfiles/commit/152921065fd5813abfc3c6f99da6d76c36a87d9a))
+* **prland:** refuse a PR whose lesson number the base already holds ([#2833](https://github.com/mlorentedev/dotfiles/issues/2833)) ([2440e62](https://github.com/mlorentedev/dotfiles/commit/2440e629909ba2809fd3a34f7eecc95ef6fa9e9c))
+* **skills:** drop run attribution from the autopilot claim and triage templates ([#2810](https://github.com/mlorentedev/dotfiles/issues/2810)) ([57b5a8e](https://github.com/mlorentedev/dotfiles/commit/57b5a8e8fb9fa755cc021a1dfcfb785c9279305c)), closes [#2806](https://github.com/mlorentedev/dotfiles/issues/2806)
+* **sshtarget:** record and release the pf enable reference the apply takes ([#2791](https://github.com/mlorentedev/dotfiles/issues/2791)) ([94c10c2](https://github.com/mlorentedev/dotfiles/commit/94c10c2fd8b27586c9d8dcb9e7b08b84314fa2ff))
+* **tools:** name an unparseable mise config in the sync dry run ([#2805](https://github.com/mlorentedev/dotfiles/issues/2805)) ([f2800ff](https://github.com/mlorentedev/dotfiles/commit/f2800ff022ce41813a4146ed37809b678d9b1f30)), closes [#2760](https://github.com/mlorentedev/dotfiles/issues/2760) [#2760](https://github.com/mlorentedev/dotfiles/issues/2760)
+* **tools:** repair a deployed mise config that does not parse ([#2795](https://github.com/mlorentedev/dotfiles/issues/2795)) ([9e10ea1](https://github.com/mlorentedev/dotfiles/commit/9e10ea1c98acbeab6b19e0db1e38e1fca8f69b31)), closes [#2760](https://github.com/mlorentedev/dotfiles/issues/2760) [#2760](https://github.com/mlorentedev/dotfiles/issues/2760)
+* **update:** pass the XDG homes to the Windows task as flags ([#2808](https://github.com/mlorentedev/dotfiles/issues/2808)) ([cc9e4bf](https://github.com/mlorentedev/dotfiles/commit/cc9e4bf800fbcde12a1ee96d88d39cb0f8bff2d5))
+* **vault:** stop reading an unreadable directory as empty ([#2811](https://github.com/mlorentedev/dotfiles/issues/2811)) ([ec7d6c8](https://github.com/mlorentedev/dotfiles/commit/ec7d6c8eeeabb485ad7983cc29a9a4c07a04e736)), closes [#2797](https://github.com/mlorentedev/dotfiles/issues/2797) [#2797](https://github.com/mlorentedev/dotfiles/issues/2797)
+* **vm:** bound how long the guest agent waits for one process to exit ([#2831](https://github.com/mlorentedev/dotfiles/issues/2831)) ([40850e9](https://github.com/mlorentedev/dotfiles/commit/40850e901168895e7e9ce50dc06d4885d97837eb))
+* **vm:** converge the Linux guest from a git archive of any committed ref ([#2840](https://github.com/mlorentedev/dotfiles/issues/2840)) ([856f49f](https://github.com/mlorentedev/dotfiles/commit/856f49fc31c19300d8f5318ad92086c29c72cce3))
+* **worktree:** attach add to a branch that already exists ([#2825](https://github.com/mlorentedev/dotfiles/issues/2825)) ([fd0be46](https://github.com/mlorentedev/dotfiles/commit/fd0be466fd21e547dfc028da8cafbe044413be60))
+* **worktree:** detect a squash merge on a Gitea origin ([#2819](https://github.com/mlorentedev/dotfiles/issues/2819)) ([e68f8ac](https://github.com/mlorentedev/dotfiles/commit/e68f8acb3ed75191d6553d5ebeea19e4900cc501))
+* **worktree:** name the forge when the merged-PR check cannot ask it ([#2809](https://github.com/mlorentedev/dotfiles/issues/2809)) ([e129031](https://github.com/mlorentedev/dotfiles/commit/e129031072d78b81a7affc19a4a3153387274664))
+
 ## [0.75.0](https://github.com/mlorentedev/dotfiles/compare/v0.74.0...v0.75.0) (2026-10-18)
 
 
