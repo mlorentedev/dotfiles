@@ -33,6 +33,7 @@ pattern triggers, and workflow integrations.`,
 	cmd.AddCommand(newHarnessRefreshCmd())
 	cmd.AddCommand(newHarnessPresenceCmd())
 	cmd.AddCommand(newHarnessInstructionsCmd())
+	cmd.AddCommand(newHarnessSkillsCmd())
 	cmd.AddCommand(newHarnessCanaryCmd())
 	return cmd
 }
