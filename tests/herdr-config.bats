@@ -123,22 +123,20 @@ _pin_ge() {
     # DOTF_VERSION is what a NEW machine installs; CI builds the tree, so a
     # binding naming a tree-only subcommand deploys cleanly here and fails on
     # every other machine (lesson 373). floor is the first release that carries
-    # `dotf herdr explorer`: raise it in the follow-up PR that adds the binding,
-    # never before. Both halves fail rather than skip, because a skip is a guard
-    # that stopped guarding (#2815 review).
+    # `dotf herdr explorer`.
+    #
+    # One half only, on purpose (lesson 498). The reverse half ("the pin is at or
+    # past floor, so the binding must exist") coupled two changes that cannot
+    # land together: release-please raises the pin on its own trigger, so the
+    # release PR went red for a binding that could not land before it.
     floor="0.76.0"
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
     [ -n "$dotf_pin" ] || { echo "versions.conf has no DOTF_VERSION"; false; }
     run grep -E "^command[[:space:]]*=[[:space:]]*['\"]dotf herdr explorer" "$SRC"
-    if [ "$status" -eq 0 ]; then
-        _pin_ge "$dotf_pin" "$floor" \
-            || { echo "the binding names dotf herdr explorer, but DOTF_VERSION=$dotf_pin predates the release carrying it ($floor)"; false; }
-        return 0
-    fi
-    if _pin_ge "$dotf_pin" "$floor"; then
-        echo "DOTF_VERSION=$dotf_pin is at or past $floor, so the release carries the subcommand: land the docked binding and delete this guard"
-        false
-    fi
+    # grep exits 1 for "no binding" and 2 for an unreadable $SRC: only 1 is absence.
+    [ "$status" -le 1 ] || { echo "grep could not read $SRC (exit $status)"; false; }
+    [ "$status" -ne 0 ] || _pin_ge "$dotf_pin" "$floor" \
+        || { echo "the binding names dotf herdr explorer, but DOTF_VERSION=$dotf_pin predates the release carrying it ($floor)"; false; }
 }
 
 @test "dotf herdr explorer exists and names its provisioner" {
