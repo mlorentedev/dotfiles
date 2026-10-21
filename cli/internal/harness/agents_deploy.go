@@ -138,9 +138,10 @@ var blockCapabilities = regexp.MustCompile(`^capabilities:[[:space:]]*$`)
 
 // capabilityLine is the harness-native capability line for the record's
 // inline `capabilities: [...]`, or "" when it declares none. The block form is
-// refused: rendering no line for an allow-list field grants the harness's whole
-// default tool set instead of denying it. The unsupported capabilities the
-// harness drops are returned so the caller can say so.
+// refused, and so is an empty list: rendering no line for an allow-list field
+// grants the harness's whole default tool set instead of denying it. The
+// unsupported capabilities the harness drops are returned so the caller can say
+// so.
 func (r *agentResolver) capabilityLine(record []byte, agent string) (line string, unsupported []string, err error) {
 	caps := skillField(record, "capabilities")
 	if caps == "" {
@@ -152,7 +153,8 @@ func (r *agentResolver) capabilityLine(record []byte, agent string) (line string
 	}
 	caps = strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(caps, "["), "]"), " ", "")
 	if caps == "" {
-		return "", nil, nil
+		return "", nil, errors.New("declares an empty `capabilities: []`, which the render cannot express: " +
+			"no capability line would GRANT the full default tool set, not deny it; drop the field or name what the agent needs")
 	}
 	if r.caps == nil && r.capErr == nil {
 		r.caps, r.capErr = LoadCapabilityMap(r.repoRoot)
