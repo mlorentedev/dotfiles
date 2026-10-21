@@ -170,6 +170,9 @@ func TestCheckThreadFileRefusesAFileAnotherKeyHolds(t *testing.T) {
 	if err := CheckThreadFile(held, "fix-x"); err == nil || !strings.Contains(err.Error(), "fix/x") {
 		t.Errorf("fix-x over fix/x's file: %v, want a refusal naming fix/x", err)
 	}
+	if err := CheckThreadFile(append([]byte("\n\n"), held...), "fix-x"); err == nil {
+		t.Error("a leading blank line hid the heading, and fix-x took fix/x's file")
+	}
 	if err := CheckThreadFile(held, "fix/x"); err != nil {
 		t.Errorf("the key's own file: %v", err)
 	}

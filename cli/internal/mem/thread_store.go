@@ -137,8 +137,11 @@ func countItems(v string) int {
 // CheckThreadFile refuses a write over a thread file another key holds. fix/x
 // and fix-x name one file, and the file's own heading says whose it is.
 func CheckThreadFile(existing []byte, key string) error {
-	first, _, _ := strings.Cut(string(existing), "\n")
-	if held, ok := threadHeadingKey(first); ok && held != key {
+	lines := trimBlankEdges(strings.Split(string(existing), "\n"))
+	if len(lines) == 0 {
+		return nil
+	}
+	if held, ok := threadHeadingKey(lines[0]); ok && held != key {
 		return fmt.Errorf("thread %q would be stored in the file thread %q holds; pass --thread with a key that names a file of its own", key, held)
 	}
 	return nil
