@@ -20,7 +20,7 @@ created: "2026-06-21"
 - [x] Tests: render per kind, awk line semantics, CRLF → LF bytes, `targets:` forms, deploy/converge/dry-run/symlink/prune/unmanaged/bad record
 - [x] `cli/internal/harness/skills.go` (manifest, targets, render) and `skills_deploy.go` (deploy, aux files, prune)
 - [x] `cli/internal/cmd/harness_skills.go`
-- [x] Lesson 502: the prompt render's fence counter
+- [x] Lesson 504: the prompt render's fence counter
 
 ## Slice 2 — the copilot skill catalog (AC3)
 

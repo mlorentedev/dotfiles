@@ -32,7 +32,7 @@ created: "2026-06-21"
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons.md`? yes: `docs/lessons/lesson-502-a-fence-counter-that-never-stops-counting-eats-the-body.md`
+- [ ] Lesson for the repo's `docs/lessons.md`? yes: `docs/lessons/lesson-504-a-fence-counter-that-never-stops-counting-eats-the-body.md`
 - [ ] ADR-worthy decision? <to answer at archive>
 - [ ] New pattern candidate for `00_meta/patterns/`? <to answer at archive>
 

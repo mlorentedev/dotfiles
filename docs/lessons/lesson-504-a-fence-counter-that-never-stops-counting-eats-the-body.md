@@ -1,5 +1,5 @@
 ---
-id: "lesson-502-a-fence-counter-that-never-stops-counting-eats-the-body"
+id: "lesson-504-a-fence-counter-that-never-stops-counting-eats-the-body"
 type: lesson
 status: active
 title: "A fence counter that never stops counting eats the body"
