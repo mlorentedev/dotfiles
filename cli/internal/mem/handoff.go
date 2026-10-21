@@ -81,19 +81,29 @@ var writerStamp = regexp.MustCompile(`\(writer: ([^()\s]+)\)`)
 // case this cannot protect, and the stamp closes it for every block written from
 // now on. With no agent this is WriteThread, byte for byte.
 func WriteThreadAs(content, threadKey, agent, body string) (ThreadWrite, error) {
+	key, kept, stamp, err := threadOwner(content, threadKey, agent)
+	if err != nil {
+		return ThreadWrite{}, err
+	}
+	out, changed, err := writeThread(content, key, stamp, body)
+	return ThreadWrite{Content: out, Key: key, Kept: kept, Changed: changed}, err
+}
+
+// threadOwner decides where agent's write of threadKey goes: the key itself, or
+// its fork when another agent wrote the block, and the stamp the heading
+// carries. With no agent it is the key as given and no stamp.
+func threadOwner(content, threadKey, agent string) (key, kept, stamp string, err error) {
 	if agent == "" {
-		out, changed, err := WriteThread(content, threadKey, body)
-		return ThreadWrite{Content: out, Key: threadKey, Changed: changed}, err
+		return threadKey, "", "", nil
 	}
 	if !writerName.MatchString(agent) {
-		return ThreadWrite{}, fmt.Errorf("agent %q: a writer is one lower-case word, such as claude or pi, because the heading's stamp is read back", agent)
+		return "", "", "", fmt.Errorf("agent %q: a writer is one lower-case word, such as claude or pi, because the heading's stamp is read back", agent)
 	}
-	key, kept := threadKey, ""
+	key = threadKey
 	if w := threadWriter(content, threadKey, agent); w != "" && w != agent {
 		key, kept = threadKey+"+"+agent, w
 	}
-	out, changed, err := writeThread(content, key, " (writer: "+agent+")", body)
-	return ThreadWrite{Content: out, Key: key, Kept: kept, Changed: changed}, err
+	return key, kept, " (writer: " + agent + ")", nil
 }
 
 // threadWriter names the agent that wrote key's block: its heading's stamp, or
@@ -165,7 +175,12 @@ func writeThread(content, threadKey, stamp, body string) (string, bool, error) {
 	if err := checkBodyStructure(body); err != nil {
 		return "", false, err
 	}
+	return placeThread(content, threadKey, stamp, body)
+}
 
+// placeThread is writeThread past the checks on what the caller sent, so a
+// derived entry, whose pointer line a body may not carry, is placed the same way.
+func placeThread(content, threadKey, stamp, body string) (string, bool, error) {
 	lines := strings.Split(content, "\n")
 	start, end := handoffSection(lines)
 	if start < 0 {
@@ -235,6 +250,9 @@ func checkBodyStructure(body string) error {
 		}
 		if strings.HasPrefix(line, "## ") {
 			return fmt.Errorf("handoff body line %d is a level-2 heading (%q): it would end the handoff section, leaving the rest of the body outside it. Use ### or bold text instead", i+1, line)
+		}
+		if threadPointer.MatchString(strings.TrimSpace(line)) {
+			return fmt.Errorf("handoff body line %d is a thread-file pointer (%q): the next read would follow it instead of this body. Reword it", i+1, line)
 		}
 	}
 	return nil
