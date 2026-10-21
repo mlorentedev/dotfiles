@@ -63,7 +63,7 @@ func newVMWindowsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			src, err := archiveRef(ref)
+			src, err := archiveRef(ref, "zip", "install.ps1")
 			if err != nil {
 				return withExitCode(2, err)
 			}
@@ -121,9 +121,11 @@ func windowsGuest() (host vm.ExecHost, firmware, vars string, l vm.Layout, err e
 	return host, firmware, vars, vm.Layout{Dir: filepath.Join(state, "vm", "windows")}, nil
 }
 
-// archiveRef writes a zip of ref's tree, under dotfiles/, from the repository
-// of the working directory: committed content only, never the working tree.
-func archiveRef(ref string) (string, error) {
+// archiveRef writes an archive of ref's tree in format (zip or tar.gz), under
+// dotfiles/, from the repository of the working directory: committed content
+// only, never the working tree. entry is the install script the guest runs,
+// checked before anything is written.
+func archiveRef(ref, format, entry string) (string, error) {
 	if strings.HasPrefix(ref, "-") {
 		return "", fmt.Errorf("ref %q is not a branch, tag or commit name", ref)
 	}
@@ -137,15 +139,15 @@ func archiveRef(ref string) (string, error) {
 		c.Dir = strings.TrimSpace(string(top))
 		return c.CombinedOutput()
 	}
-	if out, err := git("cat-file", "-e", ref+":install.ps1"); err != nil {
-		return "", fmt.Errorf("%s has no install.ps1 (run from the dotfiles repository, with a committed ref): %s", ref, strings.TrimSpace(string(out)))
+	if out, err := git("cat-file", "-e", ref+":"+entry); err != nil {
+		return "", fmt.Errorf("%s has no %s (run from the dotfiles repository, with a committed ref): %s", ref, entry, strings.TrimSpace(string(out)))
 	}
-	f, err := os.CreateTemp("", "dotf-vm-*.zip")
+	f, err := os.CreateTemp("", "dotf-vm-*."+format)
 	if err != nil {
 		return "", err
 	}
 	_ = f.Close()
-	if out, err := git("archive", "--format=zip", "--prefix=dotfiles/", "-o", f.Name(), ref); err != nil {
+	if out, err := git("archive", "--format="+format, "--prefix=dotfiles/", "-o", f.Name(), ref); err != nil {
 		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("git archive %s: %w: %s", ref, err, strings.TrimSpace(string(out)))
 	}
@@ -223,17 +225,17 @@ func newVMLinuxCmd() *cobra.Command {
 	var keep bool
 	cmd := &cobra.Command{
 		Use:   "linux",
-		Short: "Converge a clean Ubuntu 24.04 Lima guest from a pushed ref, twice",
+		Short: "Converge a clean Ubuntu 24.04 Lima guest from a committed ref, twice",
 		Long: "linux boots a throwaway Lima guest (Ubuntu 24.04, systemd) that shares no\n" +
-			"directory with the host, checks that, clones --ref from GitHub, runs\n" +
+			"directory with the host, checks that, copies in a git archive of --ref, runs\n" +
 			"./install.sh, then `dotf converge` again: the first run must end with no\n" +
 			"failed step and the second must change nothing. The guest is deleted at\n" +
 			"the end unless --keep.\n\n" +
 			"The guest converges with the dotf release the ref's versions.conf pins,\n" +
-			"not a build of this tree. The ref must be pushed: the host working tree\n" +
-			"never reaches the guest. GITHUB_TOKEN, when set (run under `dotf secrets\n" +
-			"run --` to set it), reaches the guest's converges on stdin, for mise's\n" +
-			"downloads, and is never written into the guest.",
+			"not a build of this tree. Any committed ref works, pushed or not; the\n" +
+			"host working tree never reaches the guest. GITHUB_TOKEN, when set (run\n" +
+			"under `dotf secrets run --` to set it), reaches the guest's converges on\n" +
+			"stdin, for mise's downloads, and is never written into the guest.",
 		Example:      "  dotf vm linux --ref feat/my-branch\n  dotf secrets run -- dotf vm linux",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
@@ -241,17 +243,22 @@ func newVMLinuxCmd() *cobra.Command {
 			if _, err := exec.LookPath("limactl"); err != nil {
 				return withExitCode(2, errors.New("limactl is not on PATH: run `dotf converge --only tools`"))
 			}
-			out := cmd.OutOrStdout()
+			src, err := archiveRef(ref, "tar.gz", "install.sh")
+			if err != nil {
+				return withExitCode(2, err)
+			}
+			defer func() { _ = os.Remove(src) }()
 			return vm.Verify(execLimactl, vm.Options{
-				Ref:   ref,
-				Name:  fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
-				Keep:  keep,
-				Token: os.Getenv("GITHUB_TOKEN"),
-				Out:   out,
+				Ref:    ref,
+				Source: src,
+				Name:   fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
+				Keep:   keep,
+				Token:  os.Getenv("GITHUB_TOKEN"),
+				Out:    cmd.OutOrStdout(),
 			})
 		},
 	}
-	cmd.Flags().StringVar(&ref, "ref", "main", "pushed branch, tag or commit to converge")
+	cmd.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
 	cmd.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
 	return cmd
 }
