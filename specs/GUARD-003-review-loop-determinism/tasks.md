@@ -82,7 +82,7 @@ What genuinely blocks:
       `pr-agent`'s `issue_comment` path uploads the PR number as the
       `reviewed-pr` artifact and the gate reads it for that event only. Its
       re-evaluations are grouped by run id, not by main's SHA.
-- [ ] T12. [AC1] [AC4] Verify T11 live after merge: `/review` on an open PR, and
+- [x] T12. [AC1] [AC4] Verify T11 live after merge: `/review` on an open PR, and
       the gate's `workflow_run` log says `re-evaluating PR #<that PR>`.
 
 ## Closing

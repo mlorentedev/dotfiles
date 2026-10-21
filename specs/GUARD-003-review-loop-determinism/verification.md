@@ -15,7 +15,7 @@ otherwise.
 - [x] AC1 -> attestation run 39540679532 (`workflow_run`), 2026-10-21: `re-evaluating PR #2844 because the reviewer finished`, then `[OK] attested`, with no human action. The `/review` path is AC4's T11/T12.
 - [x] AC2 -> statuses on `9be46c48` (PR #2844): `03:46:44 failure [FAIL] pending`, then `03:49:37` and `03:49:53 success [OK] attested`. Test `every path still publishes the verdict as a commit status [AC2]`.
 - [x] AC3 -> tests `every non-pull_request path still fails [#1041]` and `AC3: a PR with no reviewer output is pending, not declined`.
-- [ ] AC4 -> automatic path: run 39540679532 resolved #2844 from its head SHA, and test `a pull_request reviewer run still resolves by head SHA [AC4]`. `/review` path: T11 (#1128) here; live proof is T12, owed after merge.
+- [x] AC4 -> automatic path: run 39540679532 resolved #2844 from its head SHA, and test `a pull_request reviewer run still resolves by head SHA [AC4]`. `/review` path: T11 (#1128, merged in #2848), proven live by T12 below.
 - [x] AC5 -> `tests/review-attestation-workflow.bats` AC1 cases, observed failing on their mutations (table below, 2026-08-18).
 - [x] AC6 -> the adoption order in the header of `review-attestation.yml`; `review-attestation` is a required check on `main` (branch protection read 2026-10-21).
 - [x] AC7-AC9 -> `dotf pr triage-queue` (`cli/internal/prtriage`), with the marker read from `harness/review-attestation.json` (`triage.marker`).
@@ -268,3 +268,18 @@ The artifact's member name was measured, not assumed: the same
 `upload-artifact@v7.0.2` uploading one file from under `runner.temp`
 (`bats-junit`, artifact 12319770034) stores it at its bare basename,
 `report.xml`, so the gate reads `pr-number`.
+
+## T12: the /review path, live, 2026-10-21
+
+#2848 merged as `0ad7ac21`. The owner commented `/review` on #2855 at 14:44:17.
+
+```
+pr-agent 39619480456   event=issue_comment  head_sha=4c92cfc4 (main)  -> artifact 12355890181 "reviewed-pr"
+review-attestation 39621973877 (workflow_run)  -> "re-evaluating PR #2855 because the reviewer finished"
+                                                -> "[OK] attested — reviewed by: coderabbitai, github-actions"
+status on #2855's head, 15:10:47: success
+```
+
+Before #2848, the same chain answered `no open pull request for fd0be466` (39365734960, 2026-10-20). The PR identity now reaches the gate from the run being judged.
+
+The run was **cancelled** at 15:01:03 without publishing a review. It was not cancelled by this change. CodeRabbit's comment at 14:59:41 started a `pr-agent` run that was skipped at the job `if:`, but it entered the same workflow-level concurrency group, `pr-agent-2855-issue_comment`, which cancels in progress. That defect is ticketed as GUARD-022 (#2867). The gate's half is unaffected, which is what T12 tests: the cancelled run still uploaded its artifact (it is the first step) and still completed, and the gate admits `cancelled` on purpose.
