@@ -37,8 +37,10 @@ const generatedMarker = "generated: true"
 // target under home, then prunes the generated outputs whose record is gone or
 // no longer targets that agent. An output that already holds its render is not
 // rewritten, so a converged machine reports every output current. A symlink at
-// an output is replaced by a copy (BUG-100). An unmarked output shadowing a
-// record is reported, never removed: it may be hand-authored. A record that
+// an output is replaced by a copy (BUG-100). An output a record targets is
+// overwritten with its render whether or not it carries the marker, as the
+// shell did: that path belongs to the record. An unmarked copy of a record
+// that does not target the agent is reported, never removed. A record that
 // cannot be read is an error, reported after every other output is deployed.
 // This is the Go form of compile-harness.sh's deploy_skills and deploy_prune,
 // minus the copilot catalog.

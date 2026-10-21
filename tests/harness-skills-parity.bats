@@ -46,6 +46,11 @@ deploy_both() {
 @test "skills parity: prompts differ from the oracle only by the body rules it dropped" {
     deploy_both
     local f name differ=0
+    # The same prompt files on both sides, and some: the loop below walks the
+    # bash side only, and the first test excludes prompts from its diff.
+    run diff <(ls "$BATS_TEST_TMPDIR/bash/.gemini/prompts") <(ls "$BATS_TEST_TMPDIR/go/.gemini/prompts")
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output"; false; }
+    [ -n "$(ls "$BATS_TEST_TMPDIR/bash/.gemini/prompts")" ]
     for f in "$BATS_TEST_TMPDIR/bash/.gemini/prompts/"*.md; do
         name="$(basename "$f")"
         if ! diff <(grep -vx -- '---' "$f") <(grep -vx -- '---' "$BATS_TEST_TMPDIR/go/.gemini/prompts/$name") >/dev/null; then

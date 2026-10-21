@@ -111,7 +111,7 @@ func SkillTargetsAgent(record []byte, agent string) (bool, error) {
 		return false, fmt.Errorf("targets is neither a name nor a list of names")
 	}
 	for _, n := range names {
-		if strings.EqualFold(strings.TrimSpace(n), agent) {
+		if strings.TrimSpace(n) == agent {
 			return true, nil
 		}
 	}

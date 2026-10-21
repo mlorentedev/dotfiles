@@ -82,6 +82,7 @@ func TestSkillTargetsAgent(t *testing.T) {
 		{"inline list names copilot, not pi (#1733)", "targets: [copilot]", "pi", false, false},
 		{"block list is read", "targets:\n  - opencode\n  - agy", "agy", true, false},
 		{"a single name", "targets: claude", "claude", true, false},
+		{"names are case-sensitive, as the shell's match was", "targets: [Claude]", "claude", false, false},
 		{"an empty list is nobody", "targets: []", "claude", false, false},
 		{"a null value is nobody", "targets:", "claude", false, false},
 		{"a non-name entry is an error", "targets: [{a: b}]", "claude", false, true},
