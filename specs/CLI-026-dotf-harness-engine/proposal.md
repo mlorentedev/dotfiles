@@ -59,6 +59,8 @@ End state: one engine, invoked identically on every OS; `scripts/compile-harness
   - outputs are written only when they differ, so a converged run reports `0 deployed`;
   - records are walked in byte order of their names, not the locale's collation (glibc and macOS order hyphenated names differently, which matters for the catalog) nor the shell glob's (`*/` sorts `a-b/` before `a/`, lesson 505);
   - an END marker line with anything after the marker is refused as unmarked (the shell validated it, then dropped the rest of the file).
+  - an agent record whose model tier or capabilities cannot be resolved is an error for that record, and its previous output is kept (the shell rendered it with no `model:` line and a warning when `dotf` was absent or too old).
+  - an empty inline `capabilities: []` is refused like the block form (the shell rendered no capability line, which grants the harness's whole default tool set).
 - **Line endings: normalize in Go.** CRLF is read as LF and every output is LF, so a CRLF checkout renders the same bytes and sha as an LF one.
 - **Cutover: Go first, then rewire.** A verb lands alongside the bash function it replaces; the rewire (shell delegates, PowerShell twin deleted) follows once a release carries the verb, since setup calls the pinned `dotf` (#1814 class).
 
