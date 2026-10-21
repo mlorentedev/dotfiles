@@ -2,6 +2,7 @@ package prtriage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -594,5 +595,119 @@ func TestFetchFailsWhenReviewsCannotBeRead(t *testing.T) {
 
 	if _, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry()); err == nil {
 		t.Fatal("fetchWith returned a queue; an unreadable reviews endpoint must fail it")
+	}
+}
+
+// classifyingRegistry asks github-actions for a declared class (TOOL-017 AC3).
+func classifyingRegistry() Registry {
+	r := testRegistry()
+	r.Classification.Prefix = "Class: "
+	r.Classification.Classes = []string{"REAL", "THEORETICAL", "SPECULATIVE"}
+	r.Classification.Reviewers = []string{"github-actions"}
+	return r
+}
+
+var reviewedPR10 = map[string]string{
+	"/pulls": `[{"number":10,"title":"a reviewed PR","html_url":"https://github.com/o/r/pull/10"}]`,
+	"/issues/10/comments": `[{"user":{"login":"github-actions[bot]"},
+	                          "body":"## PR Reviewer Guide\nfindings here",
+	                          "created_at":"2026-09-02T10:00:00Z"}]`,
+}
+
+// The inline findings live on pulls/N/comments, which the verdict never needed
+// and so never read. A declared class is only checkable there. Replies are not
+// findings, so they are skipped.
+func TestFetchReportsUnclassifiedInlineFindings(t *testing.T) {
+	responses := map[string]string{
+		"/pulls/10/comments": `[
+		  {"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"a.go","line":4,"created_at":"2026-09-02T10:00:01Z"},
+		  {"id":2,"user":{"login":"github-actions[bot]"},"body":"**B**\n\nREAL: prose","path":"b.go","line":9,"created_at":"2026-09-02T10:00:01Z"},
+		  {"id":3,"in_reply_to_id":2,"user":{"login":"github-actions[bot]"},"body":"a reply","path":"b.go","line":9,"created_at":"2026-09-02T10:05:00Z"}]`,
+	}
+	for k, v := range reviewedPR10 {
+		responses[k] = v
+	}
+	fake := &fakeGH{responses: responses}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("queue length = %d, want 1", len(got))
+	}
+	u := got[0].Unclassified
+	if len(u) != 1 || u[0].Path != "b.go" || u[0].Line != 9 {
+		t.Fatalf("Unclassified = %+v, want exactly b.go:9", u)
+	}
+	if got[0].FindingsUnread {
+		t.Error("FindingsUnread set although the inline comments were read")
+	}
+}
+
+// A registry that asks no reviewer for a class costs no request: the
+// session-start probe runs under a deadline.
+func TestFetchReadsNoInlineFindingsWithoutADeclaration(t *testing.T) {
+	fake := &fakeGH{responses: reviewedPR10}
+	if _, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry()); err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	for _, req := range fake.seen() {
+		if strings.Contains(req, "/pulls/10/comments") {
+			t.Fatalf("read inline comments with no classifying reviewer declared: %q", req)
+		}
+	}
+}
+
+// Findings that cannot be read are named as unread, never reported as none.
+// The PR stays listed: the classes are a report, and losing them must not
+// drop the verdict.
+func TestFetchMarksUnreadInlineFindings(t *testing.T) {
+	fake := &fakeGH{responses: reviewedPR10, errs: map[string]error{"/pulls/10/comments": errors.New("boom")}}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || !got[0].FindingsUnread || got[0].Unclassified != nil {
+		t.Fatalf("got %+v, want PR #10 listed with FindingsUnread and no findings", got)
+	}
+}
+
+// A full page of inline comments cannot be told apart from a truncated one, so
+// its findings are unread, never "none unclassified". Same rule as the
+// conversation and the reviews, which refuse a full page outright.
+func TestFetchMarksAFullPageOfInlineFindingsUnread(t *testing.T) {
+	var page strings.Builder
+	page.WriteString("[")
+	for i := range commentLimit {
+		if i > 0 {
+			page.WriteString(",")
+		}
+		fmt.Fprintf(&page, `{"id":%d,"user":{"login":"github-actions[bot]"},"body":"Class: REAL","path":"a.go","line":1,"created_at":"2026-09-02T10:00:01Z"}`, i+1)
+	}
+	page.WriteString("]")
+	responses := map[string]string{"/pulls/10/comments": page.String()}
+	for k, v := range reviewedPR10 {
+		responses[k] = v
+	}
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || !got[0].FindingsUnread {
+		t.Fatalf("got %+v, want PR #10 listed with FindingsUnread", got)
+	}
+}
+
+// The registry key is spelled `reviewers` under `classification`. A typo in
+// either side would leave the report silently inert with every other test
+// green, so the JSON spelling is pinned here.
+func TestParseRegistryReadsTheClassifyingReviewers(t *testing.T) {
+	r, err := ParseRegistry([]byte(`{"triage":{"marker":"## Review triage"},
+	  "classification":{"prefix":"Class: ","classes":["REAL"],"reviewers":["github-actions"]}}`), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Classification.Reviewers) != 1 || r.Classification.Reviewers[0] != "github-actions" {
+		t.Fatalf("Classification.Reviewers = %v, want [github-actions]", r.Classification.Reviewers)
 	}
 }

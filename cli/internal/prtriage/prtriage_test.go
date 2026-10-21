@@ -292,3 +292,35 @@ func TestTheRealRegistryDeclaresTheClassificationMarker(t *testing.T) {
 		t.Fatalf("the shipped registry does not classify its own REAL line: got %q", got)
 	}
 }
+
+// TOOL-017 AC3, the consumer: a finding the registry's classifying reviewers
+// left without a declared class is reported, so a human sees it. Only findings
+// newer than the last triage count, because older ones were already disposed.
+func TestUnclassifiedFindings(t *testing.T) {
+	r := reg()
+	r.Classification.Prefix = "Class: "
+	r.Classification.Classes = []string{"REAL", "THEORETICAL", "SPECULATIVE"}
+	r.Classification.Reviewers = []string{"github-actions"}
+	triage := Comment{Author: "mlorentedev", Body: "## Review triage\n| ... |", CreatedAt: at(10)}
+	inline := []Comment{
+		{Author: "github-actions[bot]", Body: "**A**\n\nClass: REAL\nx", Path: "a.go", Line: 1, CreatedAt: at(20)},
+		{Author: "github-actions[bot]", Body: "**B**\n\nREAL: prose only", Path: "b.go", Line: 2, CreatedAt: at(20)},
+		{Author: "github-actions[bot]", Body: "**C**\n\nno class", Path: "c.go", Line: 3, CreatedAt: at(5)},
+		{Author: "coderabbitai[bot]", Body: "🟠 Major", Path: "d.go", Line: 4, CreatedAt: at(20)},
+	}
+
+	got := UnclassifiedFindings(PR{Comments: []Comment{triage}}, inline, r)
+	if len(got) != 1 || got[0].Path != "b.go" {
+		t.Fatalf("got %+v, want only b.go: a.go is classified, c.go predates the triage, "+
+			"and coderabbitai is not a reviewer the registry asks for a class", got)
+	}
+
+	if got := UnclassifiedFindings(PR{}, inline, r); len(got) != 2 {
+		t.Errorf("with no triage recorded, every unclassified finding counts: got %d, want 2 (b.go, c.go)", len(got))
+	}
+
+	r.Classification.Reviewers = nil
+	if got := UnclassifiedFindings(PR{}, inline, r); got != nil {
+		t.Errorf("a registry that asks no reviewer for a class reports nothing: got %+v", got)
+	}
+}

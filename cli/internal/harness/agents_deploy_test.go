@@ -86,12 +86,13 @@ func TestDeployAgents_RendersWithResolvedLinesThenConverges(t *testing.T) {
 
 func TestDeployAgents_ABadRecordFailsAloneAndKeepsItsOutput(t *testing.T) {
 	block := strings.Replace(agentRecord, "capabilities: [read, search]", "capabilities:\n  - read", 1)
+	empty := strings.Replace(agentRecord, "capabilities: [read, search]", "capabilities: [ ]", 1)
 	badTier := strings.Replace(agentRecord, "model: mid", "model: nonesuch", 1)
-	repo, home := agentsRepo(t, map[string]string{"a-good": agentRecord, "block": block, "tier": badTier})
+	repo, home := agentsRepo(t, map[string]string{"a-good": agentRecord, "block": block, "empty": empty, "tier": badTier})
 	previous := filepath.Join(home, ".claude", "agents", "tier.md")
 	writeFile(t, previous, "previous definition\n")
 	out, err := DeployAgents(repo, home, false)
-	if err == nil || !strings.Contains(err.Error(), "block style") || !strings.Contains(err.Error(), "nonesuch") {
+	if err == nil || !strings.Contains(err.Error(), "block style") || !strings.Contains(err.Error(), "agent empty") || !strings.Contains(err.Error(), "nonesuch") {
 		t.Fatalf("error: %v", err)
 	}
 	if countStatus(out, SkillDeployed) != 1 {
@@ -102,6 +103,9 @@ func TestDeployAgents_ABadRecordFailsAloneAndKeepsItsOutput(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, ".claude", "agents", "block.md")); err == nil {
 		t.Error("a record declaring block capabilities was deployed without its allow-list")
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "agents", "empty.md")); err == nil {
+		t.Error("a record declaring an empty allow-list was deployed with the default tool set")
 	}
 }
 

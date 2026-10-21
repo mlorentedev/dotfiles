@@ -582,3 +582,12 @@ func TestReviewPromptTellsTheReviewerWhoItIs(t *testing.T) {
 		t.Error("the identity must come before the mechanical constraints")
 	}
 }
+
+// The prompt names the command that prints the normalised digests, so a
+// reviewer verifies review-request.json with it instead of with sha256sum (#2684).
+func TestReviewPromptNamesTheDigestCommand(t *testing.T) {
+	p := ReviewPrompt("X-001-y", "/repo", "nan/model", "opencode", "/skill.md", "base")
+	if !strings.Contains(p, "dotf spec digest X-001-y") {
+		t.Errorf("the prompt does not name the digest command:\n%s", p)
+	}
+}
