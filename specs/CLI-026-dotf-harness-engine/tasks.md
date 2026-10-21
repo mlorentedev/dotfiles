@@ -24,8 +24,9 @@ created: "2026-06-21"
 
 ## Slice 2 — the copilot skill catalog (AC3)
 
-- [ ] Failing test: catalog region rendered and replaced in place, sha over the bullets, byte-order record walk
-- [ ] Implement in `skills` (reuse `regions.go`'s catalog kind); extend the oracle with a seeded `.copilot/copilot-instructions.md` on both sides
+- [x] Failing test: catalog region rendered and replaced in place, sha over the bullets, byte-order record walk
+- [x] Implement in `skills` (`skills_catalog.go`, the `regions.go` marker constants); extend the oracle with a seeded `.copilot/copilot-instructions.md` on both sides
+- [x] Lesson 505: a directory glob sorts by the slash
 
 ## Slice 3 — rewire skills (part of AC8; needs a release carrying slices 1–2)
 

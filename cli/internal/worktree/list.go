@@ -37,6 +37,10 @@ func (d Dirt) Any() bool {
 }
 
 type RealGitRunner struct {
+	// LandedHeads answers which merged pull requests had a branch as their
+	// head, from the forge the origin names (#2818). Nil asks GitHub through gh.
+	LandedHeads LandedHeads
+
 	prCacheMu sync.Mutex
 	prCache   map[string]bool
 }
@@ -104,7 +108,7 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 		return true, nil
 	}
 
-	merged := queryGHPRMerged(repoRoot, branch)
+	merged := queryPRMerged(repoRoot, branch, r.landedHeads())
 	r.cachePRResult(branch, merged)
 	return merged, nil
 }
@@ -118,12 +122,21 @@ func isBranchAncestor(repoRoot, branch string) bool {
 	return ancestorCmd.Run() == nil
 }
 
-func queryGHPRMerged(repoRoot, branch string) bool {
+func (r *RealGitRunner) landedHeads() LandedHeads {
+	if r.LandedHeads != nil {
+		return r.LandedHeads
+	}
+	return mergedPRHeads
+}
+
+// queryPRMerged reads a reader's error as not merged: list then under-reports
+// and sweep keeps the worktree, never the reverse.
+func queryPRMerged(repoRoot, branch string, heads LandedHeads) bool {
 	tip, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", branch+"^{commit}").Output()
 	if err != nil {
 		return false
 	}
-	landed, _ := landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)), mergedPRHeads)
+	landed, _ := landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)), heads)
 	return landed
 }
 
@@ -340,13 +353,14 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 	return list, nil
 }
 
-// List scans all worktrees for a repository using RealGitRunner.
-func List(repoRoot string) ([]Info, error) {
-	return ListWithRunner(repoRoot, &RealGitRunner{}, time.Now())
+// List scans all worktrees for a repository using RealGitRunner, asking heads
+// whether a branch landed in a merged pull request (nil: GitHub through gh).
+func List(repoRoot string, heads LandedHeads) ([]Info, error) {
+	return ListWithRunner(repoRoot, &RealGitRunner{LandedHeads: heads}, time.Now())
 }
 
 // ListAll scans all sibling repositories in parentDir and collects their worktrees.
-func ListAll(parentDir string) ([]Info, error) {
+func ListAll(parentDir string, heads LandedHeads) ([]Info, error) {
 	entries, err := os.ReadDir(parentDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading directory %s: %w", parentDir, err)
@@ -371,7 +385,7 @@ func ListAll(parentDir string) ([]Info, error) {
 			continue
 		}
 
-		infos, err := List(candidate)
+		infos, err := List(candidate, heads)
 		if err != nil {
 			continue
 		}
