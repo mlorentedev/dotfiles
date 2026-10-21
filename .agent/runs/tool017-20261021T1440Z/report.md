@@ -46,3 +46,7 @@ Covered: `caffeinate -i -t 28800` held from 14:39Z.
 ## Next action
 
 Answer A/B for AC4-AC6 and AC7 on #1062, and land the `classification.reviewers` line.
+
+## Memory
+
+The vault MEMORY.md is 27KB, past the 24.4KB read cap, so this run's handoff block is invisible at session start until a /crystallize. The run branch and #1062 carry the record.
