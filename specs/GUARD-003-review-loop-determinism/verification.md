@@ -9,9 +9,16 @@ created: "2026-08-18"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+Re-measured 2026-10-21 on `origin/main` at `856f49fc`, except where a line says
+otherwise.
+
+- [x] AC1 -> attestation run 39540679532 (`workflow_run`), 2026-10-21: `re-evaluating PR #2844 because the reviewer finished`, then `[OK] attested`, with no human action. The `/review` path is AC4's T11/T12.
+- [x] AC2 -> statuses on `9be46c48` (PR #2844): `03:46:44 failure [FAIL] pending`, then `03:49:37` and `03:49:53 success [OK] attested`. Test `every path still publishes the verdict as a commit status [AC2]`.
+- [x] AC3 -> tests `every non-pull_request path still fails [#1041]` and `AC3: a PR with no reviewer output is pending, not declined`.
+- [ ] AC4 -> automatic path: run 39540679532 resolved #2844 from its head SHA, and test `a pull_request reviewer run still resolves by head SHA [AC4]`. `/review` path: T11 (#1128) here; live proof is T12, owed after merge.
+- [x] AC5 -> `tests/review-attestation-workflow.bats` AC1 cases, observed failing on their mutations (table below, 2026-08-18).
+- [x] AC6 -> the adoption order in the header of `review-attestation.yml`; `review-attestation` is a required check on `main` (branch protection read 2026-10-21).
+- [x] AC7-AC9 -> `dotf pr triage-queue` (`cli/internal/prtriage`), with the marker read from `harness/review-attestation.json` (`triage.marker`).
 
 ## Test status
 
@@ -30,9 +37,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson: yes. `docs/lessons/lesson-502-a-workflow-run-from-a-comment-triggered-run-has-lost-its-pull-request.md`: a comment-triggered run's `workflow_run` names the default branch, so the producer must hand the PR forward.
+- [x] ADR: no. The one ordering decision lives in the header of `review-attestation.yml`, beside what it constrains (AC6).
+- [x] Pattern: no. This spec already fed `pattern-verification-fails-toward-unproven` (its fourth arrival); no second pattern.
 
 ## Archive checklist
 
@@ -207,3 +214,57 @@ $ $TMPDIR/dotf-exempt pr triage-queue       # this branch
 [OK] no reviewer output is awaiting a disposition
 exit 0
 ```
+
+
+## T11: a review asked for with /review (#1128), 2026-10-21
+
+The defect, live on 2026-10-20: slash run 39365425846 on an open PR finished at
+03:42:53, and attestation 39365734960 answered `no open pull request for
+fd0be466`, which is main's SHA. On 2026-10-21 one more defect turned up in the
+same path. Every comment-triggered reviewer run, skipped ones included,
+completes with main's SHA, so they all shared one concurrency group, and
+attestation run 39539977021 was cancelled by the next one.
+
+The guards in `tests/review-attestation-workflow.bats` run the gate's real
+`Resolve the pull request` step under a stub `gh`. They were observed red before
+the change: 12, 13, 18, 19 and 20 failed. Case 13 resolved PR #99 by SHA, which
+is the guess the fix must never make. Case 21 was added afterwards: once each
+comment-triggered run has its own group, a skipped reviewer run (every
+non-slash comment makes one) would run the gate to a skip, so the job no longer
+admits those. All 21 pass after the change, under bash 5,
+zsh and macOS `/bin/bash` 3.2. `actionlint` is clean on both workflows.
+
+Each mutation was checked by checksum before and after, and then reverted:
+
+| mutation | landed | failed |
+|---|---|---|
+| numeric validation removed | yes | 14 |
+| open-state check removed | yes | 15 |
+| artifact trusted on every event | yes | 16 |
+| issue_comment branch dropped | yes | 12, 13 |
+| group loses the run id | yes | 18 |
+| `actions: read` removed | yes | 19 |
+| upload no longer limited to issue_comment | yes | 20 |
+| job admits skipped reviewer runs again | yes | 21 |
+| run id moved after `head_sha` in the group's `\|\|` chain | yes | 18 |
+| gate stops selecting the artifact by name (name left in a comment) | yes | 20 |
+| gate reads a different member | yes | 12, 14, 15, 20 |
+| producer writes the number to a path the upload does not publish | yes | 20 |
+| upload tolerates a missing file | yes | 20 |
+| control: a pattern that does not exist | no | none (correctly not counted) |
+
+Cases 14 and 15 also pass on the old code, which never reads an artifact. The
+mutations are what show they are not vacuous on the new code.
+
+The last five rows came from the review of #2848. PR-Agent found the group and
+artifact-name guards satisfiable by a substring, and CodeRabbit found that the
+member name was unguarded. Each guard was tightened and then observed failing on
+its mutation.
+
+**T12 is owed after merge.** `workflow_run` fires only for the copy of the
+workflow on the default branch, so this PR cannot exercise its own fix.
+
+The artifact's member name was measured, not assumed: the same
+`upload-artifact@v7.0.2` uploading one file from under `runner.temp`
+(`bats-junit`, artifact 12319770034) stores it at its bare basename,
+`report.xml`, so the gate reads `pr-number`.
