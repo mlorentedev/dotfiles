@@ -173,12 +173,17 @@ func TestReviewFreshnessAcceptsBothDigestForms(t *testing.T) {
 
 // The provenance comment `archive --pr` appends is bookkeeping, like the status
 // it rewrites in the same pass (#2824): a review must still match the spec it
-// archived, whatever the proposal's line endings.
+// archived, whatever the proposal's line endings and whether it ends in one.
 func TestContractDigestIgnoresTheArchiveProvenance(t *testing.T) {
-	for _, eol := range []string{"\n", "\r\n"} {
+	proposal := "---\nstatus: verifying\n---\n\n- [ ] **AC1** — refuses\n"
+	for name, body := range map[string]string{
+		"LF":                  proposal,
+		"CRLF":                strings.ReplaceAll(proposal, "\n", "\r\n"),
+		"no final line break": strings.TrimSuffix(proposal, "\n"),
+	} {
 		root := t.TempDir()
 		dir := writeSpec(t, root, "AI-001-x", map[string]string{
-			"proposal.md": strings.ReplaceAll("---\nstatus: verifying\n---\n\n- [ ] **AC1** — refuses\n", "\n", eol),
+			"proposal.md": body,
 			"review.md":   passingReview("AI-001-x"),
 		})
 		before := ContractDigests(dir)
@@ -187,7 +192,7 @@ func TestContractDigestIgnoresTheArchiveProvenance(t *testing.T) {
 			t.Fatalf("Archive: %v", err)
 		}
 		if moved := changedContracts(target, before); len(moved) != 0 {
-			t.Errorf("eol=%q: the archive's own provenance line staled the review: %v", eol, moved)
+			t.Errorf("%s: the archive's own provenance line staled the review: %v", name, moved)
 		}
 	}
 }
