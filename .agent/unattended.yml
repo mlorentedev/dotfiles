@@ -1,0 +1,29 @@
+version: 1
+run_id: "memory008-20261021T1440Z"
+armed_by: manu   # owner in-session 2026-10-21: "monta un autopilot ... tareas relacionadas a este asunto (MEMORY-008) ... consulta el advisor donde tengas dudas y aplica su recomendacion"
+armed_at: 2026-10-21T14:40:00Z
+expires_at: 2026-10-21T20:40:00Z
+objective: "Advance MEMORY-008 (#1689): land slice 2 (#2852), then slices 3 and 4 of specs/MEMORY-008-handoff-resume/tasks.md, each as its own PR."
+scope:
+  write_paths: ["cli/internal/mem/**", "cli/internal/cmd/mem*.go", "cli/internal/vault/health*.go", "tests/golden/vault-health/**", "harness/skills/catchup/SKILL.md", "specs/MEMORY-008-handoff-resume/**", "docs/adr/adr-055-*", "docs/lessons/**", ".agent/runs/memory008-20261021T1440Z/**"]
+  frozen_paths: [".github/**", "harness/enforced/**", "harness/agents/**", "**/AGENTS.md", ".agent/unattended.yml", "versions.conf", "setup-*.sh", "setup-*.ps1"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck]
+queue:
+  source: explicit
+  filter: "#2852 (slice 2) land; slice 3 dotf mem resume; slice 4 SessionStart by source. Slice 5 (doctrine in harness/enforced, vault skills) is owner-gated: prepare notes only."
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+notes:
+  - "harness/skills/catchup/SKILL.md is in scope only for the one-sentence pointer the owner chose for #2852 (vault 487b2241)."
+  - "PR branches come from origin/main, never from this run branch. The report stays on this branch; no report-carrier PR."
+  - "Each slice opens only after the slice it depends on has merged (tasks.md)."
