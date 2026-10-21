@@ -28,29 +28,47 @@ func sshdDump(t *testing.T, name string) []byte {
 	return b
 }
 
-// The two dumps are measured: OpenSSH 10.3p1 on macOS, `sshd -T -f` over a
-// config whose Include reads the drop-in, and over one whose Include matches
-// no file. The second is #2763: `sshd -t` passes it, the dump shows the
-// defaults.
+// platforms are the sshd builds a dump was measured on: `sshd -T -f` over a
+// config whose Include reads the drop-in (effective), and over one whose
+// Include matches no file (ignored). The second is #2763: `sshd -t` passes it,
+// the dump shows the defaults. Each was run as the user with a scratch host
+// key, so no root and no change to the machine.
+var platforms = []string{
+	"macos-10.3p1",  // macOS, OpenSSH 10.3p1
+	"ubuntu-10.2p1", // msi, Ubuntu, OpenSSH 10.2p1
+}
+
 func TestCheckEffectiveTellsADropInThatWasReadFromOneThatWasNot(t *testing.T) {
 	dropIn := realDropIn(t)
-	if err := checkEffective(dropIn, sshdDump(t, "sshd-T-macos-10.3p1-effective.txt"), "/etc/ssh/sshd_config.d/01-workstation.conf"); err != nil {
-		t.Errorf("a dump that carries the drop-in failed: %v", err)
-	}
-	err := checkEffective(dropIn, sshdDump(t, "sshd-T-macos-10.3p1-ignored.txt"), "/etc/ssh/sshd_config.d/01-workstation.conf")
-	if err == nil {
-		t.Fatal("a dump of sshd's defaults passed")
-	}
-	for _, want := range []string{"authenticationmethods any", "publickey", "did not read the drop-in /etc/ssh/sshd_config.d/01-workstation.conf"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not name %q", err, want)
-		}
+	for _, plat := range platforms {
+		t.Run(plat, func(t *testing.T) {
+			if err := checkEffective(dropIn, sshdDump(t, "sshd-T-"+plat+"-effective.txt"), "/etc/ssh/sshd_config.d/01-workstation.conf"); err != nil {
+				t.Errorf("a dump that carries the drop-in failed: %v", err)
+			}
+			err := checkEffective(dropIn, sshdDump(t, "sshd-T-"+plat+"-ignored.txt"), "/etc/ssh/sshd_config.d/01-workstation.conf")
+			if err == nil {
+				t.Fatal("a dump of sshd's defaults passed")
+			}
+			for _, want := range []string{"authenticationmethods any", "publickey", "did not read the drop-in /etc/ssh/sshd_config.d/01-workstation.conf"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
+			}
+		})
 	}
 }
 
 func TestCheckEffectiveNamesEachDirectiveItChecks(t *testing.T) {
 	dropIn := realDropIn(t)
-	good := string(sshdDump(t, "sshd-T-macos-10.3p1-effective.txt"))
+	for _, plat := range platforms {
+		t.Run(plat, func(t *testing.T) {
+			namesEachDirective(t, dropIn, string(sshdDump(t, "sshd-T-"+plat+"-effective.txt")))
+		})
+	}
+}
+
+func namesEachDirective(t *testing.T, dropIn []byte, good string) {
+	t.Helper()
 	for _, c := range []struct{ line, with, want string }{
 		{"passwordauthentication no", "passwordauthentication yes", "passwordauthentication yes"},
 		{"kbdinteractiveauthentication no", "kbdinteractiveauthentication yes", "kbdinteractiveauthentication yes"},
