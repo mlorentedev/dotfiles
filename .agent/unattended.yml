@@ -1,0 +1,37 @@
+# .agent/unattended.yml - written at arming, committed on the run's branch
+version: 1
+run_id: "ai028-20261021t1440z"
+armed_by: manu
+armed_at: 2026-10-21T14:40:00Z
+expires_at: 2026-10-21T20:40:00Z
+objective: "Advance the re-scoped AI-028 (Windows hive install) with every item that needs no owner decision, and leave the rest as explicit questions."
+scope:
+  write_paths:
+    - "specs/AI-028-hive-install-model-migration/**"
+    - "cli/internal/doctor/**"
+    - "docs/lessons/**"
+    - "docs/troubleshooting/hive-*"
+    - ".agent/runs/**"
+    # I4, draft PR only (never merged by this run): deletion of the auto-upgrade timers
+    - "systemd/hive-upgrade.*"
+    - "windows/hive-upgrade.ps1"
+    - "tests/hive-upgrade-timer.bats"
+    - "setup-linux.sh"
+    - "setup-windows.ps1"
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "packages.json", "mcp-servers.json", ".agent/unattended.yml"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, bats, shellcheck, golangci-lint]
+queue:
+  source: bitacora
+  filter: "AI-028 (#791) re-scope: I2 diagnose on VM, I1 spec re-scope PR, I3 doctor Windows hint, I4 timer retirement (draft), I5 owner-only"
+  max_items: 5
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant   # I1 and I3 only; I4 stays a draft for the owner
+  push: true
+  open_pr: true
+  advisor_tier: top
