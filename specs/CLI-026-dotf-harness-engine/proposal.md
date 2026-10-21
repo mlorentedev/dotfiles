@@ -47,7 +47,7 @@ End state: one engine, invoked identically on every OS; `scripts/compile-harness
 - **Records ↔ deployed-dir drift** — CLI-019 / #488 (`dotf doctor`), the downstream half.
 - Changing the `harness/manifest.json` schema, the slugify rules or the `BEGIN/END HARNESS` block format.
 - The vault SSOT content itself.
-- Removing auxiliary files a record no longer carries from a deployed skill directory: neither twin does it today.
+- Removing auxiliary files a record no longer carries from a deployed skill directory: neither twin does it today (#2851, after slice 3).
 
 ## Decisions
 
