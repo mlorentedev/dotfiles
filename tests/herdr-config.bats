@@ -133,6 +133,8 @@ _pin_ge() {
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
     [ -n "$dotf_pin" ] || { echo "versions.conf has no DOTF_VERSION"; false; }
     run grep -E "^command[[:space:]]*=[[:space:]]*['\"]dotf herdr explorer" "$SRC"
+    # grep exits 1 for "no binding" and 2 for an unreadable $SRC: only 1 is absence.
+    [ "$status" -le 1 ] || { echo "grep could not read $SRC (exit $status)"; false; }
     [ "$status" -ne 0 ] || _pin_ge "$dotf_pin" "$floor" \
         || { echo "the binding names dotf herdr explorer, but DOTF_VERSION=$dotf_pin predates the release carrying it ($floor)"; false; }
 }
