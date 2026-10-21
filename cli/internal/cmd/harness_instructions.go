@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os/exec"
 
 	"github.com/spf13/cobra"
@@ -43,19 +44,7 @@ func newHarnessInstructionsCmd() *cobra.Command {
 			}
 			has := func(name string) bool { _, err := exec.LookPath(name); return err == nil }
 			outcomes, err := harness.DeployInstructions(repoRoot, home, has, dryRun)
-			w := cmd.OutOrStdout()
-			for _, o := range outcomes {
-				switch {
-				case o.Status == "skipped":
-					_, _ = fmt.Fprintf(w, "[deploy] instructions target %s skipped: %s\n", o.Agent, o.Reason)
-				case o.Status == "current":
-					_, _ = fmt.Fprintf(w, "[deploy] instructions current: %s\n", o.File)
-				case dryRun:
-					_, _ = fmt.Fprintf(w, "[deploy] instructions would deploy -> %s\n", o.File)
-				default:
-					_, _ = fmt.Fprintf(w, "[deploy] instructions -> %s\n", o.File)
-				}
-			}
+			reportInstructionOutcomes(cmd.OutOrStdout(), outcomes, dryRun)
 			return err
 		},
 	}
@@ -63,4 +52,20 @@ func newHarnessInstructionsCmd() *cobra.Command {
 	cmd.Flags().StringVar(&home, "home", "", "directory the manifest's files are relative to (default: the user's home)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would be deployed and write nothing")
 	return cmd
+}
+
+// reportInstructionOutcomes prints one line per instruction file.
+func reportInstructionOutcomes(w io.Writer, outcomes []harness.InstructionOutcome, dryRun bool) {
+	for _, o := range outcomes {
+		switch {
+		case o.Status == "skipped":
+			_, _ = fmt.Fprintf(w, "[deploy] instructions target %s skipped: %s\n", o.Agent, o.Reason)
+		case o.Status == "current":
+			_, _ = fmt.Fprintf(w, "[deploy] instructions current: %s\n", o.File)
+		case dryRun:
+			_, _ = fmt.Fprintf(w, "[deploy] instructions would deploy -> %s\n", o.File)
+		default:
+			_, _ = fmt.Fprintf(w, "[deploy] instructions -> %s\n", o.File)
+		}
+	}
 }

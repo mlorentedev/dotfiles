@@ -36,6 +36,7 @@ pattern triggers, and workflow integrations.`,
 	cmd.AddCommand(newHarnessSkillsCmd())
 	cmd.AddCommand(newHarnessAgentsCmd())
 	cmd.AddCommand(newHarnessDoctrineCmd())
+	cmd.AddCommand(newHarnessDeployCmd())
 	cmd.AddCommand(newHarnessCanaryCmd())
 	return cmd
 }
