@@ -70,7 +70,10 @@ func newPrLandCmd() *cobra.Command {
     an entry of any other kind refuses;
   - every check passed or was skipped;
   - its merge state is CLEAN: up to date with its base, with no conflicts;
-  - the triage queue does not list it: reviewer output has been dispositioned.
+  - the triage queue does not list it: reviewer output has been dispositioned;
+  - no lesson it adds under docs/lessons/ takes a number another lesson
+    already holds on the base. Each PR's CI checks lesson numbers against the
+    base it ran on, so two PRs taking the same number both pass.
 
 The head is read again before the merge, and a head that moved is a refusal.
 Every PR based on this one's branch is pointed at its base first, because
