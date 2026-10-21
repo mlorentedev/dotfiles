@@ -31,7 +31,7 @@ Measured 2026-10-20 on the vault: dotfiles' `MEMORY.md` is 23,423 B with eight t
 
 ## Consequences
 
-- Every project's `memory/` gains a `threads/` directory. `vault health` already exempts `memory/` from the orphan check, and the pointer is a link, so the thread files are not orphans.
+- Every project's `memory/` gains a `threads/` directory. `vault health` already exempted `memory/` from the orphan check. A thread file has no outgoing links, so `memory/` is now exempt from the dead-end check too, on the same ground: memory files are read by agents, not linked.
 - Readers that need the full thread go through one resolver (`threadText` in `cli/internal/mem`). `session-end` archives the thread file, not the entry. `dotf mem resume` (MEMORY-008 slice 3) will use the same resolver.
 - An agent reading `MEMORY.md` by hand, such as `/catchup` before slice 5, sees the entry and has to follow the pointer. The pointer is a plain markdown link so that it can.
 - `WriteThreadAs` still writes inline blocks. `handoff-write` no longer calls it. Its ownership rule now lives in `threadOwner`, which both writers share.
