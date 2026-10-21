@@ -323,3 +323,14 @@ if not pub or 'github.event.issue.number' not in str(pub[0].get('env', {})):
 " "$PRA" "$WF"
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
+
+# A comment that is not a slash command still starts a pr-agent run, which skips.
+# Grouped by run id, each of those would run the gate to a skip of its own.
+@test "review-attestation: a skipped reviewer run is not re-evaluated [#1128]" {
+    run wf_query "
+cond = ' '.join(str(d['jobs']['attestation'].get('if', '')).split())
+if \"github.event.workflow_run.conclusion != 'skipped'\" not in cond:
+    print('job if: admits skipped reviewer runs'); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}

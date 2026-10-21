@@ -228,7 +228,10 @@ attestation run 39539977021 was cancelled by the next one.
 The guards in `tests/review-attestation-workflow.bats` run the gate's real
 `Resolve the pull request` step under a stub `gh`. They were observed red before
 the change: 12, 13, 18, 19 and 20 failed. Case 13 resolved PR #99 by SHA, which
-is the guess the fix must never make. All 20 pass after the change, under bash 5,
+is the guess the fix must never make. Case 21 was added afterwards: once each
+comment-triggered run has its own group, a skipped reviewer run (every
+non-slash comment makes one) would run the gate to a skip, so the job no longer
+admits those. All 21 pass after the change, under bash 5,
 zsh and macOS `/bin/bash` 3.2. `actionlint` is clean on both workflows.
 
 Each mutation was checked by checksum before and after, and then reverted:
@@ -242,6 +245,7 @@ Each mutation was checked by checksum before and after, and then reverted:
 | group loses the run id | yes | 18 |
 | `actions: read` removed | yes | 19 |
 | upload no longer limited to issue_comment | yes | 20 |
+| job admits skipped reviewer runs again | yes | 21 |
 | control: a pattern that does not exist | no | none (correctly not counted) |
 
 Cases 14 and 15 also pass on the old code, which never reads an artifact. The
@@ -249,3 +253,8 @@ mutations are what show they are not vacuous on the new code.
 
 **T12 is owed after merge.** `workflow_run` fires only for the copy of the
 workflow on the default branch, so this PR cannot exercise its own fix.
+
+The artifact's member name was measured, not assumed: the same
+`upload-artifact@v7.0.2` uploading one file from under `runner.temp`
+(`bats-junit`, artifact 12319770034) stores it at its bare basename,
+`report.xml`, so the gate reads `pr-number`.

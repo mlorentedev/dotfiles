@@ -110,8 +110,14 @@ permissions:
 jobs:
   attestation:
     # issue_comment fires on issues too; only pull requests have a review state
-    # to attest to.
-    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event.issue.pull_request || github.event_name == 'workflow_run'
+    # to attest to. A reviewer run that was skipped (every PR comment that is
+    # not a slash command makes one) produced no review, so it has nothing to
+    # re-evaluate; once its runs stopped sharing one group (#1128) each would
+    # otherwise run to a skip. A cancelled run is still admitted: it may have
+    # published before it was cancelled.
+    if: >
+      github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event.issue.pull_request ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
