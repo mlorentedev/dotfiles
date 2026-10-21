@@ -80,6 +80,27 @@ func TestCheckDrift_ACRLFRecordValidatesAsLF(t *testing.T) {
 	}
 }
 
+func TestCheckDrift_ACRLFTargetMatchesItsRender(t *testing.T) {
+	repo := checkRepo(t)
+	writeFile(t, filepath.Join(repo, "T.md"), "top\r\n"+GeneratedBeginPrefix+" (sha256:0) -->\r\nRule.\r\nwhy\r\n"+GeneratedEndMarker+"\r\ntail\r\n")
+	report, err := CheckDrift(repo)
+	if err != nil || HasDrift(report) {
+		t.Errorf("problems: %v, %v", problems(report), err)
+	}
+}
+
+func TestCheckDrift_ASchemaProblemNamesItsSchema(t *testing.T) {
+	repo := checkRepo(t)
+	writeFile(t, filepath.Join(repo, "a.json"), "{not json")
+	report, err := CheckDrift(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := strings.Join(problems(report), "\n"); !strings.Contains(p, "[ERROR] agent schema ") || !strings.Contains(p, "not valid JSON") {
+		t.Errorf("problems:\n%s", p)
+	}
+}
+
 func TestCheckDrift_AGapNamesTheIdAndTheSurface(t *testing.T) {
 	repo := checkRepo(t)
 	writeFile(t, filepath.Join(repo, "harness", "manifest.json"), `{"enforced":[{"id":"rule"}],

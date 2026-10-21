@@ -137,7 +137,7 @@ func checkTarget(repoRoot, file string, ids []string) CheckLine {
 	if err != nil {
 		return CheckLine{Problem: true, Text: fmt.Sprintf("[ERROR] %s: %v", path, err)}
 	}
-	lines := recordLines(raw)
+	lines := recordLines(normalizeLF(raw))
 	if msg := regionMarkerError(lines); msg != "" {
 		return CheckLine{Problem: true, Text: fmt.Sprintf("[ERROR] %s: %s", path, msg)}
 	}
@@ -208,7 +208,7 @@ func renderRegion(repoRoot string, ids []string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("missing source-of-record: harness/enforced/%s.md (run --refresh)", id)
 		}
-		b.Write(raw)
+		b.Write(normalizeLF(raw))
 	}
 	var out strings.Builder
 	for _, l := range strings.Split(strings.TrimRight(b.String(), "\n"), "\n") {
@@ -256,7 +256,7 @@ func checkRecords(repoRoot, file, recordDir, schema, noun, okNoun string) []Chec
 	schemaPath := filepath.Join(repoRoot, filepath.FromSlash(schema))
 	required, err := schemaRequired(schemaPath)
 	if err != nil {
-		return []CheckLine{{Problem: true, Text: fmt.Sprintf("[ERROR] skill schema not found: %s", schemaPath)}}
+		return []CheckLine{{Problem: true, Text: fmt.Sprintf("[ERROR] %s schema %s: %v", noun, schemaPath, err)}}
 	}
 	var out []CheckLine
 	for _, name := range names {
@@ -279,7 +279,7 @@ func schemaRequired(path string) ([]string, error) {
 		Required []string `json:"required"`
 	}
 	if err := json.Unmarshal(raw, &s); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("not valid JSON: %w", err)
 	}
 	return s.Required, nil
 }
