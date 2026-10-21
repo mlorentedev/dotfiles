@@ -72,6 +72,19 @@ $ LC_ALL=C grep -nP '[^\x00-\x7F]' windows/hive-upgrade.ps1
 
 > **Do not verify against the deployed copy.** `~/.claude/scripts/hive-upgrade.ps1` is deployed from `windows/hive-upgrade.ps1` by setup. Re-deploy (or invoke the SSOT directly) before treating B5 as flipped, or a stale copy will read as a pass.
 
+### PR5: the timer deletion (#2857), 2026-10-21
+
+```
+$ bats tests/hive-daemon-gate.bats
+ok 1 parity: both setups probe hive's version through dotf tools version, not uv tool list (AI-034, #791)
+ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+
+$ dotf lint powershell          -> exit 0
+$ bash -n setup-linux.sh; zsh -n setup-linux.sh   -> exit 0
+```
+
+The 703 bats tests in the files that reference a changed path (`git grep -l` over `tests/`) pass. This proves only the repo half of AC9: nothing installs a timer any more. The other half, a machine that already has one losing it, waits on the retire step, which is an owner decision. Until then a machine set up before this change keeps `hive-upgrade.timer` or `DotfilesHiveUpgrade`, now pointing at a script this repo no longer deploys.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
