@@ -7,8 +7,8 @@ created: "2026-09-25"
 
 ## Evidence
 
-- [ ] AC1 -> slice 3: `TestResumeIsAPureRenderOfTheThreadFile`
-- [ ] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
+- [x] AC1 -> slice 3: `TestResumeIsAPureRenderOfTheThreadFile`
+- [x] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
 - [ ] AC3 -> slice 4: `TestSessionStartResumeBySource`
 - [x] AC4 -> slice 2: `TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`
 - [ ] AC5 -> slice 5: the `handoff` and `catchup` records
@@ -78,6 +78,26 @@ Each slice PR fills its own section below and nothing else.
   | resolver ignores the pointer | `TestThreadTextFollowsThePointer`, `TestSessionEndArchivesTheStoredThreadNotItsEntry` |
 
 ## Slice 3 evidence
+
+- `dotf mem resume [--thread K] [--agent A] [--format prompt|context] [--memory PATH]` in `cli/internal/cmd/mem_resume.go`. The render is in `cli/internal/mem/resume.go`.
+  - `RenderResume` is pure: `TestResumeIsAPureRenderOfTheThreadFile` renders a fixture twice per format and compares both renders with `testdata/resume/{context,prompt}.golden`. An unknown format is refused.
+  - Next action, Verify and Awaiting Manu render first. Verify commands are listed one per line, and one outside the read-only allowlist is marked unverified (`TestResumeRendersVerifyAndAwaiting`). The allowlist matches on a word boundary, and any chaining, pipe, redirection or substitution fails it (`TestReadOnlyCommand`).
+  - `SelectThread` takes the agent's fork of the key, then the key unless another agent's stamp is on it. Otherwise it picks none and returns every thread key (`TestResumeListsCandidatesWhenTheThreadIsAmbiguous`). The command lists those keys, each with its `--thread` flag (`TestMemResumeListsCandidates`).
+  - `ThreadText` reads the stored file when the entry points at one, and the inline block otherwise. It also returns the source path (`TestThreadTextForKey`). Round trip through the command: `TestMemResumeRendersWhatHandoffWriteStored`.
+- `--memory` defaults to the checkout project's vault `MEMORY.md`, through `mem.ProjectMemory`. That helper was lifted out of `session-end`, which resolved the same path inline, so the layout is derived in one place.
+- The read-only allowlist leaves out generic file readers (`cat`, `grep`, `head` and the like). They take any path, so `cat <secrets file>` would render as safe.
+- **Live run** on a copy of the real dotfiles `MEMORY.md` (inline blocks, 2026-10-21). `--thread feat-plat003-close@macmini --agent claude` rendered that thread's Next action. `--thread nope` listed all 8 threads.
+- **Mutation checks**, each reverted:
+
+  | Mutation | Test that went red |
+  |---|---|
+  | chaining allowed | `TestReadOnlyCommand` |
+  | prefix without a word boundary | `TestReadOnlyCommand` |
+  | another agent's thread chosen | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
+  | this agent's fork ignored | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
+  | Verify not rendered first | `TestResumeIsAPureRenderOfTheThreadFile` |
+
+  The first attempt at the "another agent's thread" mutation did not compile. The harness printed no failing test, which read as a surviving mutant (lesson 508).
 
 ## Slice 4 evidence
 
