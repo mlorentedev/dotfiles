@@ -58,7 +58,8 @@ End state: one engine, invoked identically on every OS; `scripts/compile-harness
   - `targets:` is matched by exact name, inline or block (#1733, C21; no committed record declares `targets:` today, so no output changes);
   - outputs are written only when they differ, so a converged run reports `0 deployed`;
   - records are walked in byte order of their names, not the locale's collation (glibc and macOS order hyphenated names differently, which matters for the catalog) nor the shell glob's (`*/` sorts `a-b/` before `a/`, lesson 505);
-  - an END marker line with anything after the marker is refused as unmarked (the shell validated it, then dropped the rest of the file).
+  - an END marker line with anything after the marker is refused by every GENERATED-region writer: the catalog skips the file as unmarked, doctrine fails that target (the shell validated it, then dropped the rest of the file).
+  - a doctrine rules file with a BEGIN line no END closes, or a BEGIN inside an open region, fails that target (the shell appended a second region, and its next run dropped every line from the orphan BEGIN to the new END).
   - an agent record whose model tier or capabilities cannot be resolved is an error for that record, and its previous output is kept (the shell rendered it with no `model:` line and a warning when `dotf` was absent or too old).
   - an empty inline `capabilities: []` is refused like the block form (the shell rendered no capability line, which grants the harness's whole default tool set).
 - **Line endings: normalize in Go.** CRLF is read as LF and every output is LF, so a CRLF checkout renders the same bytes and sha as an LF one.
