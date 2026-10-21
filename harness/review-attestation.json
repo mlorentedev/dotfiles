@@ -123,5 +123,10 @@
   "triage": {
     "marker": "## Review triage",
     "why": "A heading, matched at the start of a line, because a disposition that lives in a chat message evaporates and the Definition of Done's Review item then rests on a claim nobody can check. Recording it on the PR makes it durable, reviewable and machine-readable at once."
+  },
+  "classification": {
+    "prefix": "Class: ",
+    "classes": ["REAL", "THEORETICAL", "SPECULATIVE"],
+    "why": "TOOL-017 AC3. A finding's class is read from a whole line equal to prefix + class, never parsed out of prose: measured 2026-10-20 on #2832, #2833 and #2839, PR-Agent wrote the gradation as a header suffix `(REAL)`, as the first word of the body `REAL.`, or not at all. A finding with no such line, or with two that disagree, is unclassified and goes to a human. .pr_agent.toml asks the reviewer for exactly these lines, and tests/pr-agent-config.bats fails if the two drift apart."
   }
 }

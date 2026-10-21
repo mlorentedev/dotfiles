@@ -32,7 +32,21 @@ type Registry struct {
 	Exempt struct {
 		Signatures []Signature `json:"signatures"`
 	} `json:"exempt"`
+	Classification Classification `json:"classification"`
 }
+
+// Classification declares the line a reviewer writes to state a finding's
+// class (TOOL-017 AC3): Prefix followed by one of Classes, alone on its line.
+// .pr_agent.toml asks the reviewer for exactly these lines; the registry, not
+// this package, is where they are declared.
+type Classification struct {
+	Prefix  string   `json:"prefix"`
+	Classes []string `json:"classes"`
+}
+
+// Unclassified is the class of a finding that carries no declared marker, or
+// two that disagree. It goes to a human; it never decays into a skip.
+const Unclassified = "unclassified"
 
 // Signature is a diff that carries nothing a review could act on, declared in
 // the registry and honoured by both consumers: the attestation gate reports it
@@ -239,6 +253,36 @@ func Evaluate(pr PR, reg Registry) Status {
 			Reason: fmt.Sprintf("%s reviewed again after the last triage", by)}
 	}
 	return Status{PR: pr, Reviewer: by, At: out.Spoken(), Reason: "triaged"}
+}
+
+// Classify returns the class body declares through reg's classification
+// marker: a line equal, after trimming, to Prefix + one of Classes. The class
+// is never read out of prose, so a body that only says "(REAL)" or opens with
+// "REAL." is Unclassified however plain it looks.
+func Classify(body string, reg Registry) string {
+	decl := reg.Classification
+	if strings.TrimSpace(decl.Prefix) == "" {
+		return Unclassified
+	}
+	found := ""
+	for line := range strings.SplitSeq(body, "\n") {
+		line = strings.TrimSpace(line)
+		for _, class := range decl.Classes {
+			if line != decl.Prefix+class {
+				continue
+			}
+			// Two classes that disagree are a conflict, not a choice: picking
+			// the first would let the order of the reviewer's blocks decide.
+			if found != "" && found != class {
+				return Unclassified
+			}
+			found = class
+		}
+	}
+	if found == "" {
+		return Unclassified
+	}
+	return found
 }
 
 // exemptAs returns the signature whose files are exactly the diff's: set
