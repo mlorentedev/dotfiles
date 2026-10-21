@@ -108,10 +108,14 @@ jobs:
             exit 1
           fi
           echo "version=v${GOLANGCI_LINT_VERSION}" >> "$GITHUB_OUTPUT"
+      # No lint cache (#2834). A cache main saved made every PR report four
+      # SA5011 findings that a clean run, here or locally, does not; the job
+      # takes about 15 s without it. Same class as lesson 353's local cache.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           working-directory: cli
           version: ${{ steps.golangci.outputs.version }}
+          skip-cache: true
 
   # The one required check from this workflow. It reports on every pull
   # request: green when every Go job passed, or was skipped because the diff

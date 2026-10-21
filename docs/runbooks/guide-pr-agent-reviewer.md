@@ -215,8 +215,8 @@ pins it and each of these settings:
 | `CONFIG__MODEL`, `CONFIG__MODEL_WEAK` | the route's `anthropic_model` | Haiku ($0.10 / $0.50 per MTok up to 100K prompt tokens) when drawn, Sonnet ($2 / $10, no price step) on the risk route. Every model id the toml pins gets an override, or a call to it would leave Anthropic for NaN |
 | `CONFIG__FALLBACK_MODELS` | `[]` | no chain: a failure ends the attempt, it never escalates to a pricier model |
 | `CONFIG__MAX_MODEL_TOKENS`, `CONFIG__CUSTOM_MODEL_MAX_TOKENS` | `200000` | the NaN attempt's cap, so every member reviews the same diff (owner's choice, 2026-10-08). With Claude's tokenizer counting about 30% more, a diff past ~75K of PR-Agent's tokens crosses the 100K price step and that request pays $0.50 / $2.50 |
-| `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS` | `32000` | LiteLLM's output cap for a Claude model it does not know. Its default, 4096, is shared with thinking and truncated reviews |
-| `CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING`, `CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE`, `CONFIG__REASONING_EFFORT` | `true`, both allowed models, the route's `anthropic_effort` | adaptive thinking at the member's effort from the pool (Haiku `high`, Sonnet `medium`). PR-Agent's built-in pattern matches neither id, so the override names both; measured with LiteLLM 1.103.0, `thinking` and `output_config` reach the API unchanged |
+| `DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS`, `CONFIG__MAX_OUTPUT_TOKENS` | `40000` | the output cap at both layers that supply one. LiteLLM's default for a Claude model it does not know, 4096, is shared with thinking and truncated reviews; a model its map knows gets the map's ceiling (128,000), so PR-Agent's `max_output_tokens` repeats the cap explicitly (#2830) |
+| `CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING`, `CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE`, `CONFIG__REASONING_EFFORT` | `true`, both allowed models, the route's `anthropic_effort` | adaptive thinking at the member's effort from the pool (Haiku and Sonnet both `medium`; at `high` Haiku's thinking used the whole output cap, #2458). PR-Agent's built-in pattern matches neither id, so the override names both; measured with LiteLLM 1.103.0, `thinking` and `output_config` reach the API unchanged |
 | `CONFIG__AI_TIMEOUT` | `360` | the call is not streamed, so this bounds the whole answer, thinking included; it ends inside the step's 8 minutes |
 | temperature | not sent (`CONFIG__NO_TEMPERATURE_MODELS`, both models) | Haiku 5.5 answers 400 to a non-default temperature, and PR-Agent's default is 0.2 |
 | step `timeout-minutes` | `8` | at most two attempts run; the job's 31 minutes cover the worst pair, the probes and the publication measurements |
@@ -261,15 +261,50 @@ concurrency group collapses a burst of pushes into one run.
 
 ## Updating the Action without drifting from its contract
 
-The workflow's `uses: The-PR-Agent/pr-agent@<sha>` is the runtime pin. The
-upstream filter reads that SHA from the executing workflow at
-`github.workflow_sha`; do not maintain a second `PR_AGENT_REF` value.
-`tests/pr-agent-config.bats` checks the pinned Action entrypoint, default
-configuration and review source files against
-`harness/pr-agent-upstream-contract.json`. An update that leaves those files
-unchanged needs no manifest edit. If one changes, inspect the upstream diff
-against the push gate and publication guard before approving the new blob SHA
-in the manifest. A failed API read fails the check; it is not an approval.
+The runtime pin is the image digest in each PR-Agent step's
+`uses: docker://pragent/pr-agent@sha256:<digest>` (ADR-054). Do not pin
+`The-PR-Agent/pr-agent@<sha>`: that commit is a wrapper whose Dockerfile pulls
+the rolling `pragent/pr-agent:github_action` tag, so the commit stays fixed while
+the code that runs moves (#2830).
+
+`harness/pr-agent-upstream-contract.json` holds three things:
+
+- `image_digest`: the same digest as the workflow. A hermetic test fails when
+  the two differ.
+- `audited_ref`: the commit the image was built from. Do not type it in. Read
+  it from the image's build attestation:
+
+  ```bash
+  gh attestation verify oci://index.docker.io/pragent/pr-agent@sha256:<digest> \
+    --repo The-PR-Agent/pr-agent \
+    --signer-workflow The-PR-Agent/pr-agent/.github/workflows/publish.yml \
+    --format json \
+    --jq '[.[].verificationResult.signature.certificate
+           | .sourceRepositoryDigest + " " + .sourceRepositoryRef] | unique | .[]'
+  ```
+
+  It must print one line with a `refs/tags/vX.Y.Z` ref. The upstream filter
+  step reads `audited_ref` from the contract at `github.workflow_sha`, so there
+  is no second `PR_AGENT_REF` value to maintain.
+- `files`: the blob SHA of each audited source at `audited_ref`.
+
+To bump:
+
+1. Read the digest of the release tag (`<version>-github_action`, not the
+   rolling `github_action`) from Docker Hub.
+2. Derive `audited_ref` from the attestation as above.
+3. Diff every contract file from the old `audited_ref` to the new one. Check
+   the diff against the push gate and the publication guard, then approve the
+   new blob SHAs.
+4. Change the digest and the trailing `# vX.Y.Z` on all three steps.
+
+A PR that moves the pin without the contract, from a person or a bot, fails
+the binding test.
+
+The network leg of `tests/pr-agent-config.bats` (`DOTF_TEST_NETWORK=1`, set by
+CI when the workflow, the contract or that test changes) re-runs the
+attestation check and compares every blob. A failed read fails the check; it is
+not an approval.
 
 `github_action_config.fail_on_tool_errors` is deliberately `true`. The Action
 does not identify whether a failed step was caused by the model or a tool, so
@@ -279,7 +314,7 @@ it can never publish a second Guide. The publication guard still fails if
 `/review` completes without publishing a Guide. Diagnose a red Action from its
 logs; do not re-enable a blind retry that can publish twice.
 
-Every PR-Agent step pins the same `uses:` SHA and repeats the same review
+Every PR-Agent step pins the same image digest and repeats the same review
 settings. `tests/pr-agent-config.bats` asserts both, so a pin bump moves the
 three steps together. When the pin moves, also re-check
 `pr_agent/algo/ai_handlers/litellm_ai_handler.py` in the contract: the Anthropic

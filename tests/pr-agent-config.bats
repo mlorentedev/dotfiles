@@ -123,25 +123,27 @@ sys.exit(0 if 'AGENTS.md' in files else 1)
     [ "$status" -eq 0 ]
 }
 
-@test "pr-agent: the workflow pins the action to an immutable commit, not a tag" {
+@test "pr-agent: the workflow pins the image to an immutable digest, not a tag" {
     # The old form of this test asserted `@v[0-9]` while its own title said "not a
     # moving ref" — and a tag IS a moving ref: it belongs to upstream, and whoever
     # can move it decides what runs in a job holding NAN_API_KEY and
     # `pull-requests: write`, on a PUBLIC repository. The test encoded the weaker
     # property its name disclaimed, which is why a tag pin survived review.
     #
-    # 40 hex characters, checked as such rather than by pattern-matching a version:
-    # the point is immutability, and only a commit id has it.
-    local ref
-    ref="$(grep -oE 'uses: The-PR-Agent/pr-agent@[0-9a-zA-Z._-]+' "$WF" | head -1 | cut -d@ -f2)"
-    [ -n "$ref" ] || { printf 'the workflow does not reference the action at all\n' >&2; return 1; }
-    if ! printf '%s' "$ref" | grep -qE '^[0-9a-f]{40}$'; then
-        printf 'action pinned to %q — expected a 40-character commit id\n' "$ref" >&2
-        return 1
-    fi
-    # The comment beside it must still say which release that commit is, or the pin
+    # The commit pin that replaced it had the same hole one level down (#2830):
+    # the action is a wrapper whose Dockerfile pulls the rolling
+    # `pragent/pr-agent:github_action` tag. Only the image digest names the code
+    # that runs, so no step may reference the action repository at all.
+    local digests
+    refute_grep 'uses: The-PR-Agent/pr-agent' "$WF"
+    refute_grep 'uses:.*pragent/pr-agent:' "$WF"
+    digests=$(sed -n 's|.*uses: docker://pragent/pr-agent@\(sha256:[0-9a-f]\{64\}\).*|\1|p' "$WF" | sort -u)
+    [ -n "$digests" ] || { printf 'no PR-Agent step is pinned to an image digest\n' >&2; return 1; }
+    [ "$(printf '%s\n' "$digests" | wc -l)" -eq 1 ] \
+        || { printf 'the PR-Agent steps pin different digests:\n%s\n' "$digests" >&2; return 1; }
+    # The comment beside it must still say which release that image is, or the pin
     # becomes unreadable and the next bump is made blind.
-    grep -qE '@[0-9a-f]{40}\s+# v[0-9]' "$WF"
+    grep -qE 'uses: docker://pragent/pr-agent@sha256:[0-9a-f]{64}[[:space:]]+# v[0-9]' "$WF"
 }
 
 @test "pr-agent: the comment trigger is gated on repository membership" {
@@ -487,7 +489,7 @@ if cfg.get('pr_reviewer', {}).get('inline_key_issues') is not True:
     sys.exit(1)
 wf = yaml.safe_load(open(sys.argv[2]))
 steps = [s for job in wf['jobs'].values() for s in job.get('steps', [])
-         if str(s.get('uses', '')).startswith('The-PR-Agent/pr-agent@')]
+         if str(s.get('uses', '')).startswith('docker://pragent/pr-agent@')]
 if not steps:
     print('no PR-Agent step found'); sys.exit(1)
 for s in steps:
@@ -839,24 +841,20 @@ _upstream_handler='def is_valid_file(filename, bad_extensions=None):
     [ "$output" = "2" ]
 }
 
-@test "pr-agent: the extension list is read at the same commit the action is pinned to (#1417)" {
-    local pins
-    pins=$(grep -o 'The-PR-Agent/pr-agent@[0-9a-f]\{40\}' "$WF" | sort -u)
-    # An empty $pins still prints one line, so the count alone passes with no pin.
-    [ -n "$pins" ] || { echo "the action is not pinned to a commit" >&2; false; }
-    [ "$(printf '%s\n' "$pins" | wc -l)" -eq 1 ]
+@test "pr-agent: the extension list is read at the commit the pinned image was built from (#1417)" {
     refute_grep '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
     grep -qF 'WORKFLOW_SHA: ${{ github.workflow_sha }}' "$WF"
 }
 
-@test "pr-agent: the filter derives its upstream ref from the executing action pin" {
+@test "pr-agent: the filter derives its upstream ref from the executing contract" {
     run python3 -c "
 import sys, yaml
 steps = yaml.safe_load(open(sys.argv[1]))['jobs']['review']['steps']
 filter_step = next(s for s in steps if s.get('id') == 'reviewable')
 print(filter_step['env'].get('WORKFLOW_SHA') == '\${{ github.workflow_sha }}')
 print('PR_AGENT_REF=' in filter_step['run'])
-print('The-PR-Agent/pr-agent@' in filter_step['run'])
+print('harness/pr-agent-upstream-contract.json' in filter_step['run'] and '/contents/\${contract}?ref=\${WORKFLOW_SHA}' in filter_step['run'])
+print('.audited_ref' in filter_step['run'])
 print('PR_AGENT_REF' not in filter_step['env'])
 " "$WF"
     [ "$status" -eq 0 ]
@@ -864,13 +862,15 @@ print('PR_AGENT_REF' not in filter_step['env'])
     [ "${lines[1]%$'\r'}" = "True" ]
     [ "${lines[2]%$'\r'}" = "True" ]
     [ "${lines[3]%$'\r'}" = "True" ]
+    [ "${lines[4]%$'\r'}" = "True" ]
 }
 
-@test "pr-agent: the audited upstream contract covers every source and is bound to the action pin" {
-    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref file_path audited
+@test "pr-agent: the audited upstream contract covers every source and is bound to the image pin" {
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" digest file_path audited
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
     for file_path in action.yaml pr_agent/settings/configuration.toml \
-        pr_agent/agent/pr_agent.py pr_agent/algo/comment_identity.py \
+        pr_agent/agent/pr_agent.py pr_agent/agent/request_policy.py \
+        pr_agent/algo/comment_identity.py pr_agent/config_loader.py \
         pr_agent/algo/file_filter.py pr_agent/algo/inline_comment_dedup.py \
         pr_agent/algo/review_finding_state.py \
         pr_agent/git_providers/github_provider.py pr_agent/servers/github_action_runner.py \
@@ -878,30 +878,52 @@ print('PR_AGENT_REF' not in filter_step['env'])
         jq -e --arg path "$file_path" '.files[$path] | test("^[0-9a-f]{40}$")' \
             "$contract" >/dev/null || { echo "missing audited source: $file_path" >&2; return 1; }
     done
-    ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
-    [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
-    audited=$(jq -r '.audited_ref' "$contract")
-    [ "$audited" = "$ref" ] || {
-        echo "action pin $ref is not the audited ref $audited: re-audit harness/pr-agent-upstream-contract.json" >&2
+    jq -e '.audited_ref | test("^[0-9a-f]{40}$")' "$contract" >/dev/null \
+        || { echo "the contract names no audited commit" >&2; false; }
+    digest=$(sed -n 's|.*uses: docker://pragent/pr-agent@\(sha256:[0-9a-f]\{64\}\).*|\1|p' "$WF" | sort -u)
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "image pin is not unique" >&2; false; }
+    audited=$(jq -r '.image_digest' "$contract")
+    [ "$audited" = "$digest" ] || {
+        echo "image pin $digest is not the audited image $audited: re-audit harness/pr-agent-upstream-contract.json" >&2
         false
     }
 }
 
-# The network leg (#2021). A blob SHA at an immutable commit cannot change, and
-# the test above binds the pin to the audited ref, so this comparison can only
-# find something on a diff that moves the pin or edits the contract. CI sets
-# DOTF_TEST_NETWORK=1 on exactly those PRs and on every push to main; the
-# default local run stays hermetic.
+# The network leg (#2021, #2830). A digest names immutable bytes and a blob SHA
+# at a commit cannot change, so this can only find something on a diff that
+# moves the pin or edits the contract. CI sets DOTF_TEST_NETWORK=1 on exactly
+# those PRs and on every push to main; the default local run stays hermetic.
+#
+# Two links, both read from upstream rather than typed in: the image's build
+# attestation must name `audited_ref` as the commit it was built from, by
+# upstream's release workflow on a release tag; and every audited file must
+# have its approved blob at that commit.
 @test "pr-agent: pinned upstream review contracts match their approved source identities" {
     [ "${DOTF_TEST_NETWORK:-}" = 1 ] \
         || skip "network leg: set DOTF_TEST_NETWORK=1 to compare the contract with upstream"
-    local contract="$REPO/harness/pr-agent-upstream-contract.json" ref file_path expected actual
+    local contract="$REPO/harness/pr-agent-upstream-contract.json" digest ref built file_path expected actual
     [ -s "$contract" ] || { echo "missing audited upstream contract" >&2; false; }
-    ref=$(sed -n 's|.*uses: The-PR-Agent/pr-agent@\([0-9a-f]\{40\}\).*|\1|p' "$WF" | sort -u)
-    [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "action pin is not unique" >&2; false; }
+    digest=$(jq -r '.image_digest' "$contract")
+    ref=$(jq -r '.audited_ref' "$contract")
+    [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "the contract names no audited commit" >&2; false; }
     if [ -n "${DOTF_TEST_GH_TOKEN:-}" ]; then
         export GH_TOKEN="$DOTF_TEST_GH_TOKEN"
     fi
+    built=$(gh attestation verify "oci://index.docker.io/pragent/pr-agent@$digest" \
+        --repo The-PR-Agent/pr-agent \
+        --signer-workflow The-PR-Agent/pr-agent/.github/workflows/publish.yml \
+        --format json \
+        --jq '[.[].verificationResult.signature.certificate | .sourceRepositoryDigest + " " + .sourceRepositoryRef] | unique | .[]') \
+        || { echo "cannot verify the build attestation of $digest" >&2; return 1; }
+    built=${built%$'\r'}
+    [ "$(printf '%s\n' "$built" | wc -l)" -eq 1 ] \
+        || { printf '%s carries attestations from more than one source:\n%s\n' "$digest" "$built" >&2; return 1; }
+    [ "${built%% *}" = "$ref" ] \
+        || { echo "$digest was built from '${built}', not the audited ref $ref" >&2; return 1; }
+    case "${built#* }" in
+        refs/tags/v*) ;;
+        *) echo "$digest was not built from a release tag: '${built}'" >&2; return 1 ;;
+    esac
     while IFS=$'\t' read -r file_path expected; do
         expected=${expected%$'\r'}
         actual=$(gh api "repos/The-PR-Agent/pr-agent/contents/$file_path?ref=$ref" --jq '.sha') \
@@ -1217,8 +1239,10 @@ print(all(a in nt and a.split('/', 1)[1] in nt for a in allowed),
 # diff (the owner chose parity over Haiku's 100,000-token price step, 2026-10-08).
 nan = by['pr_agent']['env']
 print(e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'] == nan['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
-# LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short.
-print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'])
+# LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short,
+# and a model its map knows gets the map's ceiling: PR-Agent's own cap must say the same.
+print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'] if e.get('CONFIG__MAX_OUTPUT_TOKENS') == e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']
+      else 'CONFIG__MAX_OUTPUT_TOKENS differs from DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS')
 # The worst review the caps allow, per allowed model, at its highest prices per
 # million tokens (in, out) with Claude's tokenizer ~30% larger, stays under the
 # ceiling. Haiku 5.5: its rates above 100,000 prompt tokens. Sonnet 5.5: no
