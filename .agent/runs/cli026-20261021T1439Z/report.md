@@ -18,6 +18,8 @@ Every PR landed with `dotf pr land` after a `## Review triage` comment by the PR
 ## Filed / recorded
 
 - #2866: a cancelled duplicate `spec-gate` run blocks the merge state with every check green.
+- #2884: the shell twin's three defects the reviews found (root cause: the parity oracles can only mirror the twin).
+- Vault MEMORY.md was 29.5KB, past the read cap: four finished threads moved to `archive/superseded-handoffs-2026-10-21.md` (now 24.4KB).
 - Progress comment on #495 with what remains.
 - Memory: a read-modify-PATCH of a PR body blanks it when the read runs outside the repo (happened on #2864, restored within a minute).
 
@@ -32,4 +34,4 @@ Every PR landed with `dotf pr land` after a `## Review triage` comment by the PR
 - Release PR #2853 (0.77.0), then a release that carries the five verbs.
 - After it: slice 3 and the slice 5 rewire (setup scripts, `records-harness` converge), and the slice 6 wiring (`ci.yml`, `dotf doctor`). Those paths were frozen for this run.
 - #2866: option A or B.
-- `compile-harness.sh` keeps the three fail-open/data-loss paths the reviews found until slice 7 deletes it; say if the shell should be patched sooner.
+- #2884: `compile-harness.sh` keeps the three fail-open/data-loss paths the reviews found; it closes with slice 7's deletion, or an earlier patch if the owner wants one.
