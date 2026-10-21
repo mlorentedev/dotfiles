@@ -43,7 +43,7 @@ created: "2026-06-21"
 
 ## Slice 5 — `dotf harness deploy` (AC4, AC8)
 
-- [ ] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell
+- [x] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell (`dotf harness deploy`, `tests/harness-deploy-parity.bats`)
 - [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -59,19 +60,7 @@ harness's base file is deployed elsewhere, and presence has nothing to join.`,
 			if err != nil {
 				return err
 			}
-			w, e := cmd.OutOrStdout(), cmd.ErrOrStderr()
-			for _, o := range outcomes {
-				switch o.Status {
-				case "injected":
-					_, _ = fmt.Fprintf(w, "[deploy] presence -> %s (%s)\n", o.File, o.Agent)
-				case "unchanged":
-					_, _ = fmt.Fprintf(w, "[deploy] presence current: %s (%s)\n", o.File, o.Agent)
-				case "absent":
-					_, _ = fmt.Fprintf(e, "[deploy] presence target absent, skipping: %s\n", o.File)
-				case "empty":
-					_, _ = fmt.Fprintf(e, "[deploy] no persona targets %s; no presence region for %s\n", o.Agent, o.File)
-				}
-			}
+			reportPresenceOutcomes(cmd.OutOrStdout(), cmd.ErrOrStderr(), outcomes)
 			return nil
 		},
 	}
@@ -79,4 +68,20 @@ harness's base file is deployed elsewhere, and presence has nothing to join.`,
 	cmd.Flags().StringVar(&home, "home", "", "directory the manifest's presence files are relative to (default: the user's home)")
 	cmd.Flags().StringVar(&render, "render", "", "print the roster block for this harness to stdout and write nothing (what --check compares against)")
 	return cmd
+}
+
+// reportPresenceOutcomes prints one line per presence target.
+func reportPresenceOutcomes(w, e io.Writer, outcomes []harness.PresenceOutcome) {
+	for _, o := range outcomes {
+		switch o.Status {
+		case "injected":
+			_, _ = fmt.Fprintf(w, "[deploy] presence -> %s (%s)\n", o.File, o.Agent)
+		case "unchanged":
+			_, _ = fmt.Fprintf(w, "[deploy] presence current: %s (%s)\n", o.File, o.Agent)
+		case "absent":
+			_, _ = fmt.Fprintf(e, "[deploy] presence target absent, skipping: %s\n", o.File)
+		case "empty":
+			_, _ = fmt.Fprintf(e, "[deploy] no persona targets %s; no presence region for %s\n", o.Agent, o.File)
+		}
+	}
 }

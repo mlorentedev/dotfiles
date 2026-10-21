@@ -13,7 +13,7 @@ created: "2026-06-21"
 - [ ] AC4 agents, doctrine, deploy -> slices 4–5
   - [x] agents -> `tests/harness-agents-parity.bats`: every agent file byte-identical to `compile-harness.sh --deploy` with the binary under test as the shell's resolver; a second run reports `0 deployed`. `TestDeployAgents_*` cover the resolved lines, a bad record failing alone with its previous output kept, the block-capabilities refusal, no-tier records and dry run
   - [x] doctrine -> `tests/harness-doctrine-parity.bats`: both rules files byte-identical to `compile-harness.sh --deploy` from three starting states (absent, a region among user lines with the legacy preamble, no region and no final newline); a second Go run reports both current. `TestCompactDoctrine_*`, `TestFoldToASCII`, `TestInjectDoctrine`, `TestMigratePreamble_ExactLineOnly`, `TestCapWarnings_NameWhoseContentBreached`, `TestDeployDoctrine_*`
-  - [ ] deploy
+  - [x] deploy -> `tests/harness-deploy-parity.bats`: the full committed manifest deployed by `compile-harness.sh --deploy` and `dotf harness deploy` into two HOMEs, byte-identical but for agy's prompts and the copilot file, which differs only by the catalog's bullet order; a second Go deploy writes nothing. `TestHarnessDeploy_*` cover convergence and a failed agent record stopping presence and doctrine
 - [ ] AC5 check -> slice 6
 - [ ] AC6 `--against-vault` -> slice 6
 - [ ] AC7 refresh in Go -> slice 7
@@ -26,6 +26,7 @@ created: "2026-06-21"
 - Slice 2, 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; parity bats 6/6 ok under bash and zsh; `golangci-lint` (pinned 2.12.2) 0 issues; `GOOS=windows go vet` clean.
 - Slice 4 (agents), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-agents-parity.bats` 2/2 under bash and zsh; `golangci-lint` 0 issues; `GOOS=windows go vet` clean. Real records: 7 deployed, then `0 deployed, 7 current`.
 - Slice 4 (doctrine), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-doctrine-parity.bats` 4/4; `golangci-lint` 0 issues; `GOOS=windows go vet` clean.
+- Slice 5 (deploy, Go half), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-deploy-parity.bats` 3/3 under bash and zsh; `golangci-lint` 0 issues; `GOOS=windows go vet` clean. Real checkout into an empty HOME: 4 instruction files, catalog, 204 skill outputs, 7 agents, 4 presence regions, 2 doctrine files, `[deploy] OK`.
 - Mutation check, slice 4 (doctrine): changing the payload heading fails 3 of the 4 oracle tests.
 - Mutation check, slice 4 (agents): keeping `kind:` in the render fails the oracle's byte diff.
 - Mutation check, slice 2: accepting an END line with a tail fails `TestReplaceCatalogRegion_RefusesBadMarkers/END_with_a_tail`; hashing anything but the bullets fails `TestDeploySkills_WritesTheCatalogIntoItsRegion`.
@@ -38,6 +39,8 @@ created: "2026-06-21"
 - Slice 1: a record whose frontmatter is not valid YAML is now an error for that record (reported after the rest deploy); the shell never parsed it. Every committed record parses (`TestSkillTargetsAgent_EveryCommittedRecordParses`).
 - Slice 1: an explicit empty or null `targets:` deploys to nobody, as the shell's substring match did.
 - Slice 4 (agents): the model and capability maps are read in process, so the shell's "dotf absent or too old" degrade (a render with no `model:` line and a warning) has no Go form: a tier that cannot be resolved is an error for that record. The shell's whitespace-in-model-id refusal is kept.
+- Slice 5: a failed agent record stops presence and doctrine, as the shell did (its `set -e` ended the run there); every other failure is collected and the run goes on. The exit code is 1 for any failure, where the shell used 2 for a failed instruction deploy; every caller treats non-zero alike. `--dry-run` previews every surface but presence, which has no preview mode, and says so.
+- Slice 5: the rewire of `setup-linux.sh`, `setup-windows.ps1` and the `records-harness` converge step waits for a release that carries the verb (#1814 class).
 - Slice 4 (doctrine): the roster comes from `harness.RenderPresence` in process, so the shell's "dotf absent, payload carries no roster" degrade has no Go form. The warnings (shadowing file, non-ASCII left after the fold, breached cap in characters or bytes) are returned per file and printed on stderr, in the shell's words.
 - Slice 4 (agents): the persona roster stays with `dotf harness presence`; `deploy` composes the two (slice 5).
 - Slice 2: the catalog's record order differs from the oracle's. The shell's `*/` glob sorted `test-driven-development/` before `test/` even under `LC_ALL=C` (the `/` is in the sort key); Go uses byte order of the names, as declared. The oracle compares the bullets as a set (lesson 505), so the cutover rewrites the deployed catalog once, in a new order.
