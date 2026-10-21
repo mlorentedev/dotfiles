@@ -27,6 +27,7 @@ created: "2026-06-21"
 - Slice 4 (agents), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-agents-parity.bats` 2/2 under bash and zsh; `golangci-lint` 0 issues; `GOOS=windows go vet` clean. Real records: 7 deployed, then `0 deployed, 7 current`.
 - Slice 4 (doctrine), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-doctrine-parity.bats` 4/4; `golangci-lint` 0 issues; `GOOS=windows go vet` clean.
 - Slice 5 (deploy, Go half), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-deploy-parity.bats` 3/3 under bash and zsh; `golangci-lint` 0 issues; `GOOS=windows go vet` clean. Real checkout into an empty HOME: 4 instruction files, catalog, 204 skill outputs, 7 agents, 4 presence regions, 2 doctrine files, `[deploy] OK`.
+- Mutation check, slice 5: running skills before instructions fails 2 of the 3 oracle tests (the catalog finds no instructions file to write into on a fresh HOME); leaving presence out fails 2 of the 3.
 - Mutation check, slice 4 (doctrine): changing the payload heading fails 3 of the 4 oracle tests.
 - Mutation check, slice 4 (agents): keeping `kind:` in the render fails the oracle's byte diff.
 - Mutation check, slice 2: accepting an END line with a tail fails `TestReplaceCatalogRegion_RefusesBadMarkers/END_with_a_tail`; hashing anything but the bullets fails `TestDeploySkills_WritesTheCatalogIntoItsRegion`.
