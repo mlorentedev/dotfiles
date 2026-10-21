@@ -57,7 +57,7 @@ Each slice PR fills its own section below and nothing else.
   - Key to file: `TestThreadFileNames`. The one live key with a `/` (ts-bridge `fix/ux355-init-headscale-control-plane`, 74 thread headings checked across the vault) maps to `fix-ux355-init-headscale-control-plane.md`. Collisions: `TestCheckThreadFileRefusesAFileAnotherKeyHolds`. A pointer in a body is refused: `TestStoreThreadRefusesAPointerInTheBody`.
 - `handoff-write` writes the thread file first, then `MEMORY.md`, under the existing lock. A new file takes `MEMORY.md`'s mode. Tests: `TestMemHandoffWriteStoresTheThreadInItsOwnFile`, `TestMemHandoffWriteDryRunStoresNothing`.
 - **Budget (#1477):** `CheckMemoryBudget` refuses only a write that grows the file past 25,000 B, and names the three oldest threads. Tests: `TestCheckMemoryBudget`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`.
-- **Found along the way: `session-end` reads the thread too.** Its fallback journal archives the block from `MEMORY.md`, so after the store it would have archived the entry. It now reads through `threadText`. Test: `TestSessionEndArchivesTheStoredThreadNotItsEntry`. Lesson 506.
+- **Found along the way: `session-end` reads the thread too.** Its fallback journal archives the block from `MEMORY.md`, so after the store it would have archived the entry. It now reads through `threadText`. Test: `TestSessionEndArchivesTheStoredThreadNotItsEntry`. Lesson 507.
 - **Probe on a copy of the real dotfiles `MEMORY.md`** (2026-10-20, a throwaway test, not committed). Each of its 8 threads was written again with a `Verify` line and two `Awaiting Manu` items:
 
   | | Bytes |
