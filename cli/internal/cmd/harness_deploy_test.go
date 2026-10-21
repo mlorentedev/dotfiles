@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
 // deployRepo is a checkout with the committed maps and enforced records, one
@@ -31,9 +33,17 @@ func deployRepo(t *testing.T, tier string) (repo, home string) {
 	}
 	write("harness/manifest.json", `{"vault_subpath":"00_meta/patterns",
 		"agents":{"vault_subpath":"v","record_dir":"harness/agents",
-			"deploy":[{"agent":"claude","render":"agent-md","dir":".claude/agents"}]},
+			"deploy":[{"agent":"claude","render":"agent-md","dir":".claude/agents"}],
+			"presence":[{"agent":"claude","file":".claude/CLAUDE.md"}]},
 		"doctrine":{"inject":["no-auto-merge"],"deploy":[{"agent":"agy","file":".gemini/GEMINI.md","char_cap":12000}]}}`)
 	write("harness/agents/demo/AGENT.md", "---\nname: demo\ndescription: d\nkind: invocable\nmodel: "+tier+"\n---\nbody\n")
+	instructions := filepath.Join(home, ".claude", "CLAUDE.md")
+	if err := os.MkdirAll(filepath.Dir(instructions), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(instructions, []byte("# rules\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return repo, home
 }
 
@@ -48,13 +58,16 @@ func TestHarnessDeploy_RunsEverySurfaceThenConverges(t *testing.T) {
 			t.Errorf("%s was not deployed", f)
 		}
 	}
+	if !hasPresence(t, home) {
+		t.Error("the presence region was not written")
+	}
 	stdout, _, err = execute(t, "harness", "deploy", "--repo-root", repo, "--home", home)
 	if err != nil || strings.Contains(stdout, " -> ") {
 		t.Errorf("a second run wrote something (%v):\n%s", err, stdout)
 	}
 }
 
-// A failed agent record stops presence and doctrine, which carry the roster
+// A failed agents surface stops presence and doctrine, which carry the roster
 // those records feed, as compile-harness.sh stopped them.
 func TestHarnessDeploy_AFailedAgentStopsTheRosterSurfaces(t *testing.T) {
 	repo, home := deployRepo(t, "nonesuch")
@@ -68,4 +81,16 @@ func TestHarnessDeploy_AFailedAgentStopsTheRosterSurfaces(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, ".gemini", "GEMINI.md")); err == nil {
 		t.Error("doctrine was written after an agent record failed")
 	}
+	if hasPresence(t, home) {
+		t.Error("presence was written after an agent record failed")
+	}
+}
+
+func hasPresence(t *testing.T, home string) bool {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(home, ".claude", "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Contains(string(raw), harness.PresenceBeginPrefix)
 }
