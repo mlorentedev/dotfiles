@@ -196,6 +196,41 @@ func TestHiveDaemon_RegisteredButNotInstalledFails(t *testing.T) {
 	}
 }
 
+// The not-installed fix names the install that owns hive on each OS. The
+// catalog entry is POSIX-only, so on Windows `dotf tools install hive` skips
+// and the doctor would keep failing behind a fix that does nothing (#2856);
+// there hive builds its own layout and launcher (hive ADR-019).
+func TestHiveDaemon_NotInstalledFixFollowsTheOS(t *testing.T) {
+	cases := []struct {
+		goos, want, never string
+	}{
+		{"linux", "`dotf tools install hive`", "self-upgrade"},
+		{"darwin", "`dotf tools install hive`", "self-upgrade"},
+		{"windows", "`uvx --from hive-vault hive self-upgrade`", "dotf tools install hive"},
+	}
+	for _, c := range cases {
+		t.Run(c.goos, func(t *testing.T) {
+			sys := &System{
+				GOOS:                 c.goos,
+				LookPath:             lookPathFor("uv"),
+				CommandOutputBounded: statusSeam("", "", errors.New("must not run")),
+			}
+
+			got := runHiveDaemon(sys, hiveServers(t, "hive client"))
+
+			if !strings.Contains(got, "`hive` is not on PATH") {
+				t.Fatalf("expected the not-installed failure, got: %s", got)
+			}
+			if !strings.Contains(got, c.want) {
+				t.Errorf("the fix on %s should name %s, got: %s", c.goos, c.want, got)
+			}
+			if strings.Contains(got, c.never) {
+				t.Errorf("the fix on %s must not name %q, got: %s", c.goos, c.never, got)
+			}
+		})
+	}
+}
+
 // Nothing launches `hive client` here, so there is no claim to check and the
 // section must not appear at all.
 func TestHiveDaemon_SilentWhenNoAgentLaunchesHiveClient(t *testing.T) {
