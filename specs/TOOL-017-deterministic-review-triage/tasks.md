@@ -25,6 +25,18 @@ created: "2026-08-18"
 
 > TDD order. The reproduction harness comes first, because every later task
 > depends on it and it is the piece most able to be silently vacuous.
+>
+> **Parked for the owner (2026-10-21, A/B on #1062).** Two decisions gate the
+> rest, and neither is taken unattended:
+> - AC4-AC6, what counts as a reproduction. (A) only a committed failing test or
+>   a command whose non-zero exit is recorded; anything else is "not reproduced"
+>   and goes to a human. (B) also accept a recorded manual or model-judged
+>   reproduction. Recommended: A, the only machine-checkable boundary.
+> - AC7, per-comment dispositions. (A) `dotf pr land` checks that every inline
+>   finding appears in the `## Review triage` table. (B) keep the PR-level gate
+>   and let the unclassified-findings report be the per-finding signal for now.
+>   Recommended: B, until the marker has a measured adoption window.
+>   Close-without-merge rides with (A): it widens `land`'s authority.
 
 - [ ] `[AC5]` reproduction harness: apply a mutation, **verify by checksum that it landed**, report `did-not-land` as a state distinct from `did-not-reproduce`
 - [ ] `[AC5]` red-direction: an invalid mutation must report `did-not-land`, never a clean result — the exact failure two sessions hit on 2026-08-17
