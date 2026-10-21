@@ -105,11 +105,13 @@ type processInfo struct {
 // ToggleExplorer closes the explorer when this tab has one, and opens it
 // otherwise. It returns a line describing what it did.
 //
-// Three rules, each of them a way of not guessing:
-//   - the invoking pane is never a candidate, so someone who runs yazi by hand
-//     in the pane they press the key in keeps it, agent included;
-//   - only a pane carrying ExplorerLabel is ours; another pane running yazi is
-//     named in an error instead of closed;
+// Four rules, each of them a way of not guessing:
+//   - a pane carrying ExplorerLabel is ours, the invoking pane included: the
+//     key is pressed from inside the explorer as often as from beside it, and
+//     the second press must close it, not dock another;
+//   - an unlabelled invoking pane is never a candidate, so someone who runs yazi
+//     by hand in the pane they press the key in keeps it, agent included;
+//   - another pane running yazi is named in an error instead of closed;
 //   - a labelled pane is closed even when yazi has already exited inside it,
 //     which is the empty pane a later press would otherwise stack beside.
 func ToggleExplorer(run tools.Runner, ctx PaneContext, ratio float64) (string, error) {
@@ -137,6 +139,11 @@ func ToggleExplorer(run tools.Runner, ctx PaneContext, ratio float64) (string, e
 	if len(strangers) > 0 {
 		return "", fmt.Errorf("a pane running yazi is not this explorer (%s): close it and try again, or open the explorer in another tab", strings.Join(strangers, ", "))
 	}
+	return openExplorer(run, ctx, ratio)
+}
+
+// openExplorer docks a new labelled pane on the right and starts yazi in it.
+func openExplorer(run tools.Runner, ctx PaneContext, ratio float64) (string, error) {
 	id, err := splitRight(run, ctx, ratio)
 	if err != nil {
 		return "", err
@@ -176,17 +183,18 @@ func currentTab(run tools.Runner, pane string) (string, []paneEntry, error) {
 }
 
 // classify splits the tab's panes into the explorers this command owns and
-// panes running yazi that it does not. The invoking pane is neither.
+// panes running yazi that it does not. The label decides ownership, so the
+// invoking pane is ours when it is the explorer; unlabelled, it is neither.
 func classify(run tools.Runner, panes []paneEntry, invoking, tab string) (ours, strangers []string, err error) {
 	for _, p := range panes {
-		if p.TabID != tab || p.PaneID == invoking {
+		if p.TabID != tab {
 			continue
 		}
 		if p.Label == ExplorerLabel {
 			ours = append(ours, p.PaneID)
 			continue
 		}
-		if p.Label != "" {
+		if p.PaneID == invoking || p.Label != "" {
 			continue
 		}
 		name, err := paneForeground(run, p.PaneID)

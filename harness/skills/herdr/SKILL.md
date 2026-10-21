@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/herdr/SKILL.md
-generated_sha: 1afbc2a5799e4a6d
+generated_sha: 912da44cb63988cf
 id: herdr-skill
 type: skill
 status: active
@@ -103,8 +103,12 @@ Consequences worth knowing:
   split, which needs `herdr pane split` or a plugin pane opened with
   `--placement split --direction right`.
 - A right-docked explorer is a shell command that calls the herdr CLI, or a
-  plugin pane. Toggle it by the pane's foreground process, not by a pane label:
-  any rename clears the label.
+  plugin pane. Toggle it by a label the command put on the
+  pane (`dotf herdr explorer` uses `files`), not by "a pane running yazi": the
+  foreground process is also true of a yazi you opened yourself, and closing that
+  one is worse than refusing. The label is the ownership token, so it also has to
+  be recognised on the invoking pane: the key is pressed from inside the explorer
+  as often as from beside it.
 - `herdr config check` validates a `config.toml` without a running server, and
   `HERDR_CONFIG_PATH` points it at a candidate file. It is the only cheap test
   for a binding — herdr silently ignores a key it does not know.
