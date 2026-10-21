@@ -28,11 +28,12 @@ description = "lazygit in this pane's repository"
 width = "90%"
 height = "90%"
 
-# The worktree's files on demand (HERDR-001): yazi over the focused pane, in its
-# directory. Nothing here installs yazi -- YAZI_VERSION in versions.conf does,
-# through `dotf tools sync`. Command is the bare binary on purpose: it needs no
-# dotf subcommand, so it is safe to deploy on a machine whose DOTF_VERSION
-# predates the docked toggle that `dotf herdr explorer` will provide.
+# The worktree's files (HERDR-001), two ways over one tool. prefix+e is yazi in a
+# popup over the focused pane, in its directory. prefix+shift+e is the same
+# explorer docked as a split on the right: `dotf herdr explorer` toggles it, so
+# pressing the key again closes it. Nothing here installs yazi -- YAZI_VERSION
+# in versions.conf does, through `dotf tools sync`. The docked key runs the
+# pinned dotf, so it needs a release that carries the subcommand (0.76.0).
 [[keys.command]]
 key = "prefix+e"
 type = "popup"
@@ -40,6 +41,12 @@ command = "yazi"
 description = "yazi over this pane: browse this worktree"
 width = "90%"
 height = "90%"
+
+[[keys.command]]
+key = "prefix+shift+e"
+type = "shell"
+command = "dotf herdr explorer"
+description = "yazi docked on the right of this pane (press again to close)"
 
 [ui]
 # Attention queue instead of grouping: an agent that is blocked or done floats to

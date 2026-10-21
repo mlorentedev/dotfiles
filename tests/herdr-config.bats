@@ -110,37 +110,22 @@ setup() {
     [ "$status" -eq 0 ] || { echo "versions.conf pins no YAZI_VERSION, so the prefix+e popup has no provisioner"; false; }
 }
 
-# _pin_ge <a> <b>: true when dotted version a is at or above b.
-_pin_ge() {
-    awk -v a="$1" -v b="$2" 'BEGIN{
-        split(a, x, "."); split(b, y, ".")
-        for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) exit (x[i] + 0 > y[i] + 0 ? 0 : 1)
-        exit 0
-    }'
-}
-
-@test "a binding never names a dotf subcommand the pinned release does not have (#2814)" {
-    # DOTF_VERSION is what a NEW machine installs; CI builds the tree, so a
-    # binding naming a tree-only subcommand deploys cleanly here and fails on
-    # every other machine (lesson 373). floor is the first release that carries
-    # `dotf herdr explorer`.
-    #
-    # One half only, on purpose (lesson 498). The reverse half ("the pin is at or
-    # past floor, so the binding must exist") coupled two changes that cannot
-    # land together: release-please raises the pin on its own trigger, so the
-    # release PR went red for a binding that could not land before it.
-    floor="0.76.0"
+@test "prefix+shift+e docks the explorer through the pinned dotf (#2814)" {
+    # The docked key runs `dotf`, so it needs a release that carries the
+    # subcommand. DOTF_VERSION is what a new machine installs: the key may only
+    # name `dotf herdr explorer` once that pin has reached the release that added
+    # it (0.76.0, lesson 373). Past it, the pin only moves forward.
+    block=$(grep -A6 'key = "prefix+shift+e"' "$SRC")
+    [[ "$block" == *'type = "shell"'* ]] || { echo "prefix+shift+e is not a shell command: $block"; false; }
+    [[ "$block" == *'command = "dotf herdr explorer"'* ]] || { echo "prefix+shift+e does not run dotf herdr explorer: $block"; false; }
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
     [ -n "$dotf_pin" ] || { echo "versions.conf has no DOTF_VERSION"; false; }
-    run grep -E "^command[[:space:]]*=[[:space:]]*['\"]dotf herdr explorer" "$SRC"
-    # grep exits 1 for "no binding" and 2 for an unreadable $SRC: only 1 is absence.
-    [ "$status" -le 1 ] || { echo "grep could not read $SRC (exit $status)"; false; }
-    [ "$status" -ne 0 ] || _pin_ge "$dotf_pin" "$floor" \
-        || { echo "the binding names dotf herdr explorer, but DOTF_VERSION=$dotf_pin predates the release carrying it ($floor)"; false; }
+    lowest=$(printf '%s\n0.76.0\n' "$dotf_pin" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)
+    [ "$lowest" = "0.76.0" ] || { echo "DOTF_VERSION=$dotf_pin predates the release carrying dotf herdr explorer (0.76.0)"; false; }
 }
 
 @test "dotf herdr explorer exists and names its provisioner" {
-    # The target of the follow-up binding. go run keeps it tied to the tree, so a
+    # The target of the prefix+shift+e binding. go run keeps it tied to the tree, so a
     # rename here cannot leave a binding pointing at nothing.
     command -v go >/dev/null 2>&1 || skip "Go toolchain not on PATH"
     run bash -c "cd '$REPO/cli' && go run ./cmd/dotf herdr explorer --help"

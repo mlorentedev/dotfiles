@@ -34,14 +34,14 @@ this session, on herdr 0.9.3, macOS arm64.
 - Windows. herdr there is preview, and the PowerShell profile is deliberately
   untouched: it runs the real binary in-process, so no hint is needed and the
   change would be unverified either way.
-- The docked binding, which does not exist yet by design (see below).
+- The docked binding in a live session after 0.76.0 is installed on the owner's machine.
 
 ## Decisions made during implementation
 
 - **The docked binding waits for a release.** A `[[keys.command]]` naming
   `dotf herdr explorer` deploys fine in CI (built from the tree) and fails on
   every new machine, whose `DOTF_VERSION` is `0.75.0` and has no such subcommand
-  (lesson 373). A test enforces the order until the follow-up lands.
+  (lesson 373). A test enforced the order until the binding landed with 0.76.0.
 - **Toggle detection by foreground process, not pane label.** `herdr pane rename`
   sets a label a later rename clears, and `pane list` only carries it when set;
   "the pane running yazi" is true for exactly as long as it is true.
@@ -55,6 +55,36 @@ this session, on herdr 0.9.3, macOS arm64.
   subcommand is OS- and agent-agnostic and stays under the repo's own CI.
 - **`agent_panel_sort = "priority"`** applied as its own one-key change, with a
   static test, because it is unrelated to the explorer and reversible alone.
+
+## Review dispositions (review.md, reviewed_sha fbfedfc3)
+
+The review ran before #2815 merged. Code findings were applied there and are
+named below by test; the later ones are dispositioned here.
+
+1. *Toggle picks the first yazi pane* -> **applied** in `11614b9b`: ownership is
+   the `files` label, the invoking pane is never a candidate, and another yazi is
+   named in an error, not closed. `TestToggleExplorerRefusesToCloseAStrangersYazi`,
+   `TestToggleExplorerNeverTouchesTheInvokingPane`.
+2. *`pane run` failure leaves an empty pane; instant-exit yazi stacks explorers*
+   -> **applied** in `11614b9b`: the split is closed on a `rename` or `run`
+   failure, and a labelled pane whose yazi has exited is closed by the next press.
+   `TestToggleExplorerTakesBackAPaneItCannotFill`,
+   `TestToggleExplorerClosesALabelledPaneWithYaziGone`. `--ratio` is validated:
+   `TestValidateExplorerRatio`.
+3. *Provisioning assumes a checkout* -> **applied, and already covered**: the
+   refusal names `dotf tools sync` and says a stale deployed `versions.conf`
+   needs setup to refresh it, and `dotf converge` mirrors `versions.conf` into
+   the deploy dir (`recordsMirror`, `cli/internal/converge/records.go`). Lesson
+   494 records the trap. **Declined**: a doctor check for a pin missing from the
+   file `sync` reads; the supported path (`converge`) refreshes that file on
+   every run, so the stale window closes without one.
+4. *`features.json` verified less than its criteria* -> **applied**: f2, f3 and f4
+   named tests that had moved to `internal/herdr`, so `go test -run` printed
+   "no tests to run" and passed; they now name the real tests. f1's command
+   (`bats tests/herdr-config.bats`) covers both bindings. f5 already checks the rendered config (`tools sync
+   --dry-run`).
+5. *AC6 sourced outside the scope; stale comment* -> **applied**: `tasks.md` says
+   AC6 landed in `216fa210`, and the config comment now describes both keys.
 
 ## Promotion candidates
 
