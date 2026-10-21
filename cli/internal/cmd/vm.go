@@ -19,6 +19,14 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/vm"
 )
 
+// archiveGap is what both guests cannot see, because each converges a git
+// archive rather than a clone (#2841; the fallback is ADR-030's).
+const archiveGap = "The archive has no .git, so after the install script dotf treats the tree\n" +
+	"as no checkout and reads the deployed copy, as a GUI app or a scheduled\n" +
+	"task does. No run sees a step write to the checkout, such as the\n" +
+	"registry, and doctor's DOTFILES_REPO_DIR \"not a git checkout\" row is\n" +
+	"expected in the guest."
+
 func newVMCmd() *cobra.Command {
 	v := &cobra.Command{
 		Use:   "vm",
@@ -44,7 +52,8 @@ func newVMWindowsCmd() *cobra.Command {
 			"build of this tree, unless --dotf names a Windows Arm64 source build to use\n" +
 			"instead (install.ps1 keeps a dotf that reports \"dev\"): that tests a change to\n" +
 			"dotf before a release carries it. Only committed content and that file reach\n" +
-			"the guest: no host directory is shared with it, and no credential is passed in.",
+			"the guest: no host directory is shared with it, and no credential is passed in.\n\n" +
+			archiveGap,
 		Example: "  dotf vm windows --ref feat/my-branch\n  dotf vm windows --keep\n" +
 			"  GOOS=windows GOARCH=arm64 go build -o /tmp/dotf.exe ./cmd/dotf\n" +
 			"  dotf vm windows --ref feat/my-branch --dotf /tmp/dotf.exe",
@@ -235,7 +244,8 @@ func newVMLinuxCmd() *cobra.Command {
 			"not a build of this tree. Any committed ref works, pushed or not; the\n" +
 			"host working tree never reaches the guest. GITHUB_TOKEN, when set (run\n" +
 			"under `dotf secrets run --` to set it), reaches the guest's converges on\n" +
-			"stdin, for mise's downloads, and is never written into the guest.",
+			"stdin, for mise's downloads, and is never written into the guest.\n\n" +
+			archiveGap,
 		Example:      "  dotf vm linux --ref feat/my-branch\n  dotf secrets run -- dotf vm linux",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
