@@ -23,6 +23,9 @@ Armed 2026-10-21T14:40Z, expires 20:40Z. A caffeinate wake-lock covered the wind
 
 ## Not done
 
+- **Scope exception:** the run wrote one path outside the envelope's write_paths: `tests/hive-daemon-gate.bats` (new; the envelope listed only `tests/hive-upgrade-timer.bats`). It exists only in the unmerged draft #2876, and nothing outside the envelope was merged.
+- #2857 and #791 are parked: an ERROR/WHY/FIX comment with options, and board Status Blocked (verified).
+
 - The stale timer mentions in `docs/architecture.md:27,29` and `systemd/hive.service.d/10-dotf-secrets.conf:8,58` are outside this run's write_paths. They are listed in #2876.
 - AC2, AC4 and AC9's retire half are blocked on the owner decisions above, so the spec stays `implementing`.
 
