@@ -12,8 +12,9 @@ scope:
     - "tests/herdr-config.bats"
     - "specs/HERDR-001-yazi-explorer/**"
     - "docs/lessons/**"
+    - "harness/skills/herdr/SKILL.md"
     - ".agent/runs/**"
-  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", ".pre-commit-config.yaml", "versions.conf", "setup-linux.sh"]
+  frozen_paths: [".github/**", "harness/agents/**", "harness/enforced/**", "**/AGENTS.md", ".agent/unattended.yml", ".pre-commit-config.yaml", "versions.conf", "setup-linux.sh"]
   max_files: 8
   max_loc: 300
 allowed_commands: [dotf, gh, git, go, golangci-lint, bats, jq, python3, herdr, caffeinate]
