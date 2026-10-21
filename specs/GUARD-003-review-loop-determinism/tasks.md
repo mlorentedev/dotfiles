@@ -99,9 +99,11 @@ What genuinely blocks:
 ## A note on this spec's own surface
 
 The trigger lands in `.github/workflows/review-attestation.yml`, which is
-GUARD-002's surface and currently unheld. It does **not** touch
-`.github/workflows/pr-agent.yml` — that is TOOL-013's, held elsewhere. The
-`workflow_run` trigger names the pr-agent workflow but is declared in the gate's
-own file, so the two lanes stay separate and no coordination is required beyond
-the workflow's name remaining stable. If that name changes, T1's guard fails,
-which is the intended behaviour.
+GUARD-002's surface. T11 also changes `.github/workflows/pr-agent.yml`
+(TOOL-013's surface, archived and unheld since): its `issue_comment` path uploads
+the `reviewed-pr` artifact with the member `pr-number`. The two files therefore
+share three names, not one: the workflow name the `workflow_run` trigger lists,
+the artifact name and the member. Renaming any of them makes the gate skip every
+`/review` silently, so each is guarded in `tests/review-attestation-workflow.bats`:
+T1's guard holds the workflow name, and the producer case holds the artifact name
+and the member against the resolve step that reads them.

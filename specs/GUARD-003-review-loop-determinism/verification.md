@@ -246,10 +246,20 @@ Each mutation was checked by checksum before and after, and then reverted:
 | `actions: read` removed | yes | 19 |
 | upload no longer limited to issue_comment | yes | 20 |
 | job admits skipped reviewer runs again | yes | 21 |
+| run id moved after `head_sha` in the group's `\|\|` chain | yes | 18 |
+| gate stops selecting the artifact by name (name left in a comment) | yes | 20 |
+| gate reads a different member | yes | 12, 14, 15, 20 |
+| producer writes the number to a path the upload does not publish | yes | 20 |
+| upload tolerates a missing file | yes | 20 |
 | control: a pattern that does not exist | no | none (correctly not counted) |
 
 Cases 14 and 15 also pass on the old code, which never reads an artifact. The
 mutations are what show they are not vacuous on the new code.
+
+The last five rows came from the review of #2848. PR-Agent found the group and
+artifact-name guards satisfiable by a substring, and CodeRabbit found that the
+member name was unguarded. Each guard was tightened and then observed failing on
+its mutation.
 
 **T12 is owed after merge.** `workflow_run` fires only for the copy of the
 workflow on the default branch, so this PR cannot exercise its own fix.

@@ -279,10 +279,16 @@ with zipfile.ZipFile(sys.argv[1], 'w') as z:
 # cancels in progress, and the triage comment that follows a /review cancels
 # its re-evaluation (39539977021, cancelled, 2026-10-21).
 @test "review-attestation: re-evaluations of two /review runs do not share a group [#1128]" {
+    # Ordered, not merely present: an id term placed after head_sha in the ||
+    # chain is never reached, and one not gated on the event splits every
+    # pull_request reviewer run too.
     run wf_query "
-group = str(d['concurrency']['group'])
-if 'workflow_run.id' not in group:
-    print('group has no per-run discriminator for issue_comment reviewer runs'); sys.exit(1)
+group = ' '.join(str(d['concurrency']['group']).split())
+term = \"github.event.workflow_run.event == 'issue_comment' && github.event.workflow_run.id\"
+if term not in group:
+    print('group has no per-run discriminator gated on issue_comment'); sys.exit(1)
+if group.index(term) > group.index('github.event.workflow_run.head_sha'):
+    print('the run id comes after head_sha, so the || chain never reaches it'); sys.exit(1)
 "
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
@@ -297,11 +303,11 @@ if d['permissions'].get('actions') != 'read':
 
 # The producer half. The upload runs only on issue_comment (the path whose
 # workflow file is the default branch's), carries the issue number through env,
-# runs before any step that can end the job, and both files name the artifact
-# the same way.
+# runs before any step that can end the job, and the gate's resolve step selects
+# that artifact by name and reads the member the upload stores.
 @test "pr-agent: the /review path publishes the PR number for the gate [#1128]" {
     run python3 -c "
-import sys, yaml
+import re, sys, yaml
 pra = yaml.safe_load(open(sys.argv[1]))
 wf = open(sys.argv[2]).read()
 steps = pra['jobs']['review']['steps']
@@ -313,13 +319,22 @@ up = up[0]
 if \"github.event_name == 'issue_comment'\" not in str(up.get('if', '')):
     sys.exit('the upload is not restricted to issue_comment')
 name = up['with']['name']
-if '\"' + name + '\"' not in wf:
-    sys.exit('review-attestation.yml does not read the artifact named ' + name)
+member = str(up['with']['path']).rsplit('/', 1)[-1]
+gate = yaml.safe_load(wf)
+resolve = [x for x in gate['jobs']['attestation']['steps'] if x.get('id') == 'pr'][0]['run']
+if 'select(.name == \"' + name + '\")' not in resolve:
+    sys.exit('the resolve step does not select the artifact named ' + name)
+if not re.search(r'unzip -p \S+ ' + re.escape(member) + r'(\s|$)', resolve):
+    sys.exit('the resolve step does not read the member ' + member + ' the upload stores')
 if steps.index(up) > ids.index('credential'):
     sys.exit('the upload runs after a step that can end the job')
 pub = [s for s in steps if s.get('id') == 'pr_number']
 if not pub or 'github.event.issue.number' not in str(pub[0].get('env', {})):
     sys.exit('the PR number does not come from github.event.issue.number via env')
+if '\"\$RUNNER_TEMP/' + member + '\"' not in str(pub[0].get('run', '')):
+    sys.exit('the number is not written to the file the upload publishes: ' + member)
+if up['with'].get('if-no-files-found') != 'error':
+    sys.exit('a missing file would upload nothing and the gate would skip silently')
 " "$PRA" "$WF"
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }

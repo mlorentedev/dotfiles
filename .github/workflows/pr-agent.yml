@@ -199,6 +199,7 @@ jobs:
         with:
           name: reviewed-pr
           path: ${{ runner.temp }}/pr-number
+          if-no-files-found: error
           retention-days: 1
       # PR-Agent swallows an authentication failure and exits green, so without
       # this step a missing secret surfaces only as "published no review" with a
