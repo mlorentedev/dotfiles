@@ -14,9 +14,12 @@
 # spent, this repo's normal state) the verdict freezes seconds after the PR
 # opens and nothing re-asks.
 
+load 'lib/refute'
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     WF="$REPO/.github/workflows/review-attestation.yml"
+    PRA="$REPO/.github/workflows/pr-agent.yml"
 }
 
 # Parses the workflow and answers one question, printing nothing on success.
@@ -158,4 +161,165 @@ if 'workflow_run.head_sha' not in group:
     for step in 1047 1041 1052; do
         grep -q "#$step" "$WF" || { printf 'adoption order does not name #%s\n' "$step" >&2; return 1; }
     done
+}
+
+# --- #1128: a review requested with /review --------------------------------
+#
+# A pr-agent run triggered by `issue_comment` is associated with the DEFAULT
+# BRANCH, so the workflow_run it completes carries main's SHA and an empty
+# pull_requests[]. Resolving by SHA finds no open PR and skips: correct, since a
+# run with nothing to judge must not publish, and useless, since the PR identity
+# was lost at the trigger. Measured live 2026-10-20: slash run 39365425846 on an
+# open PR, attestation 39365734960 "no open pull request for fd0be466".
+#
+# The fix carries the number from the run being judged, never infers it: the
+# issue_comment path of pr-agent uploads it as an artifact, and the gate reads
+# that artifact only for runs whose event is issue_comment. Those always execute
+# the default branch's pr-agent.yml, so the number comes from reviewed code.
+
+# Prints the `run:` body of the step with the given id in the given job.
+step_run() {
+    python3 -c "
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1]))
+for s in d['jobs'][sys.argv[2]]['steps']:
+    if s.get('id') == sys.argv[3]:
+        print(s['run']); break
+else:
+    sys.exit('no step with id ' + sys.argv[3])
+" "$1" "$2" "$3"
+}
+
+# Runs the gate's "Resolve the pull request" step under a stub gh. The stub
+# answers each endpoint from a STUB_* variable with the value the step's --jq
+# would have produced, so these cases test the step's control flow, not jq.
+resolve() {
+    local dir="$BATS_TEST_TMPDIR" script
+    mkdir -p "$dir/bin"
+    cat > "$dir/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$2" in
+  */commits/*/pulls)          printf '%s\n' "${STUB_SHA_PR:-}" ;;
+  */actions/runs/*/artifacts) printf '%s\n' "${STUB_ARTIFACT_ID:-}" ;;
+  */actions/artifacts/*/zip)  cat "$STUB_ZIP" ;;
+  */pulls/*)                  printf '%s\n' "${STUB_PR_STATE:-open}" ;;
+  *) echo "stub gh: unexpected call: $*" >&2; exit 64 ;;
+esac
+STUB
+    chmod +x "$dir/bin/gh"
+    script=$(step_run "$WF" attestation pr) || return 1
+    : > "$dir/out"
+    (cd "$dir" && PATH="$dir/bin:$PATH" GITHUB_OUTPUT="$dir/out" \
+        GITHUB_REPOSITORY=o/r bash -eo pipefail -c "$script")
+}
+
+# Builds the artifact's zip with the given pr-number content.
+make_zip() {
+    STUB_ZIP="$BATS_TEST_TMPDIR/fixture-artifact.zip"
+    python3 -c "
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], 'w') as z:
+    z.writestr('pr-number', sys.argv[2])
+" "$STUB_ZIP" "$1"
+    export STUB_ZIP
+}
+
+@test "review-attestation: a /review run re-evaluates the PR it was asked on [#1128]" {
+    make_zip $'2828\n'
+    DIRECT='' RUN_EVENT=issue_comment RUN_ID=1 RUN_SHA=mainsha STUB_ARTIFACT_ID=7 \
+        run resolve
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    grep -qx 'number=2828' "$BATS_TEST_TMPDIR/out" \
+        || { cat "$BATS_TEST_TMPDIR/out" >&2; false; }
+}
+
+@test "review-attestation: a /review run without the artifact skips, never guesses [#1128]" {
+    DIRECT='' RUN_EVENT=issue_comment RUN_ID=1 RUN_SHA=mainsha STUB_ARTIFACT_ID='' \
+        STUB_SHA_PR=99 run resolve
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    grep -qx 'skip=true' "$BATS_TEST_TMPDIR/out" || { cat "$BATS_TEST_TMPDIR/out" >&2; false; }
+    refute_grep '^number=' "$BATS_TEST_TMPDIR/out"
+}
+
+@test "review-attestation: a non-numeric artifact is refused [#1128]" {
+    make_zip '12; echo pwned'
+    DIRECT='' RUN_EVENT=issue_comment RUN_ID=1 RUN_SHA=mainsha STUB_ARTIFACT_ID=7 \
+        run resolve
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    grep -qx 'skip=true' "$BATS_TEST_TMPDIR/out" || { cat "$BATS_TEST_TMPDIR/out" >&2; false; }
+}
+
+@test "review-attestation: an artifact naming a closed PR is not attested [#1128]" {
+    make_zip '2828'
+    DIRECT='' RUN_EVENT=issue_comment RUN_ID=1 RUN_SHA=mainsha STUB_ARTIFACT_ID=7 \
+        STUB_PR_STATE=closed run resolve
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    grep -qx 'skip=true' "$BATS_TEST_TMPDIR/out" || { cat "$BATS_TEST_TMPDIR/out" >&2; false; }
+}
+
+# The automatic path must not start trusting an artifact: a pull_request run
+# executes the PR's own copy of pr-agent.yml, so whatever it uploads was written
+# by the change under review.
+@test "review-attestation: a pull_request reviewer run still resolves by head SHA [AC4]" {
+    make_zip '1'
+    DIRECT='' RUN_EVENT=pull_request RUN_ID=1 RUN_SHA=prsha STUB_ARTIFACT_ID=7 \
+        STUB_SHA_PR=2844 run resolve
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    grep -qx 'number=2844' "$BATS_TEST_TMPDIR/out" || { cat "$BATS_TEST_TMPDIR/out" >&2; false; }
+}
+
+@test "review-attestation: a direct trigger keeps its own number [AC4]" {
+    DIRECT=1234 RUN_EVENT='' RUN_ID='' RUN_SHA='' run resolve
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+    grep -qx 'number=1234' "$BATS_TEST_TMPDIR/out" || { cat "$BATS_TEST_TMPDIR/out" >&2; false; }
+}
+
+# Every issue_comment-triggered reviewer run, skipped ones included, completes
+# with main's SHA. Keyed on head_sha alone they share one group, `completed`
+# cancels in progress, and the triage comment that follows a /review cancels
+# its re-evaluation (39539977021, cancelled, 2026-10-21).
+@test "review-attestation: re-evaluations of two /review runs do not share a group [#1128]" {
+    run wf_query "
+group = str(d['concurrency']['group'])
+if 'workflow_run.id' not in group:
+    print('group has no per-run discriminator for issue_comment reviewer runs'); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+@test "review-attestation: the gate may read another run's artifacts [#1128]" {
+    run wf_query "
+if d['permissions'].get('actions') != 'read':
+    print('permissions lack actions: read; the artifact list is unreadable'); sys.exit(1)
+"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+# The producer half. The upload runs only on issue_comment (the path whose
+# workflow file is the default branch's), carries the issue number through env,
+# runs before any step that can end the job, and both files name the artifact
+# the same way.
+@test "pr-agent: the /review path publishes the PR number for the gate [#1128]" {
+    run python3 -c "
+import sys, yaml
+pra = yaml.safe_load(open(sys.argv[1]))
+wf = open(sys.argv[2]).read()
+steps = pra['jobs']['review']['steps']
+ids = [s.get('id') for s in steps]
+up = [s for s in steps if 'upload-artifact' in str(s.get('uses', ''))]
+if len(up) != 1:
+    sys.exit('expected one upload-artifact step, found %d' % len(up))
+up = up[0]
+if \"github.event_name == 'issue_comment'\" not in str(up.get('if', '')):
+    sys.exit('the upload is not restricted to issue_comment')
+name = up['with']['name']
+if '\"' + name + '\"' not in wf:
+    sys.exit('review-attestation.yml does not read the artifact named ' + name)
+if steps.index(up) > ids.index('credential'):
+    sys.exit('the upload runs after a step that can end the job')
+pub = [s for s in steps if s.get('id') == 'pr_number']
+if not pub or 'github.event.issue.number' not in str(pub[0].get('env', {})):
+    sys.exit('the PR number does not come from github.event.issue.number via env')
+" "$PRA" "$WF"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }

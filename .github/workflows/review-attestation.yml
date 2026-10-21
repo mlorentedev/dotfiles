@@ -86,12 +86,18 @@ concurrency:
   # into ONE group keyed on the empty string, and `completed` is not in the
   # exempt list below — so a reviewer finishing on one PR would cancel the
   # re-evaluation of another. That is the defect #1040 was, one workflow over.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.head_sha }}
+  # A reviewer run triggered by issue_comment (/review) completes with the
+  # DEFAULT branch's SHA, so head_sha alone puts every such run, skipped ones
+  # included, in one group, and the comment that follows a /review cancels its
+  # re-evaluation (#1128). Those runs are keyed on the run id instead.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || (github.event.workflow_run.event == 'issue_comment' && github.event.workflow_run.id) || github.event.workflow_run.head_sha }}
   cancel-in-progress: ${{ !contains(fromJSON('["labeled", "unlabeled", "edited", "created"]'), github.event.action) }}
 
 permissions:
   contents: read
   pull-requests: read
+  # Reads the `reviewed-pr` artifact a /review run of pr-agent leaves (#1128).
+  actions: read
   # Required by the issue_comment path, and it is not optional there. A run
   # triggered by issue_comment is associated with the DEFAULT BRANCH, not with
   # the PR's head commit, so its check-run never appears on the PR. Measured on
@@ -136,21 +142,48 @@ jobs:
       # noise at best. When none is open there is nothing to attest, which is a
       # normal outcome (pr-agent also runs on pushes to branches without a PR)
       # and is reported rather than failed.
+      #
+      # A /review run is the exception (#1128). It is triggered by
+      # issue_comment, so it carries the DEFAULT branch's SHA and the SHA lookup
+      # finds nothing: the PR identity is lost at the trigger. pr-agent's
+      # issue_comment path uploads the PR number as the `reviewed-pr` artifact,
+      # and only for that event is it read. An issue_comment run always executes
+      # the default branch's pr-agent.yml, so the number comes from reviewed
+      # code; a pull_request run executes the PR's own copy, so its artifacts
+      # are never trusted and it keeps resolving by head SHA. No artifact, or
+      # one that is not the number of an open PR, means nothing to attest.
       - name: Resolve the pull request
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
           DIRECT: ${{ github.event.pull_request.number || github.event.issue.number }}
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           if [ -n "$DIRECT" ]; then
             echo "number=$DIRECT" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          number=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RUN_SHA}/pulls" \
-                     --jq 'map(select(.state == "open")) | .[0].number // empty')
+          number=""
+          if [ "$RUN_EVENT" = "issue_comment" ]; then
+            artifact=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+                         --jq '[.artifacts[] | select(.name == "reviewed-pr")][0].id // empty')
+            if [ -n "$artifact" ]; then
+              gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact}/zip" > reviewed-pr.zip
+              number=$(unzip -p reviewed-pr.zip pr-number | tr -d '[:space:]')
+            fi
+            if ! printf '%s' "$number" | grep -qxE '[0-9]+'; then
+              number=""
+            elif [ "$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .state)" != "open" ]; then
+              number=""
+            fi
+          else
+            number=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RUN_SHA}/pulls" \
+                       --jq 'map(select(.state == "open")) | .[0].number // empty')
+          fi
           if [ -z "$number" ]; then
-            echo "no open pull request for ${RUN_SHA} — nothing to attest"
+            echo "no open pull request for ${RUN_EVENT} run ${RUN_ID} at ${RUN_SHA} — nothing to attest"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi

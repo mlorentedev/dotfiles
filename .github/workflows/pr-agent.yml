@@ -180,6 +180,26 @@ jobs:
       - name: Stamp run start
         id: start
         run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      # A /review run is triggered by issue_comment, so the workflow_run it
+      # completes carries the default branch's SHA and no pull request, and
+      # review-attestation cannot tell which PR to re-evaluate (#1128). The
+      # number travels as an artifact instead, which the gate reads only for
+      # issue_comment runs. Uploaded first, so a run that ends early or is
+      # cancelled mid-review still names its PR, and an upload under the same
+      # name later in the job cannot replace it.
+      - name: Record the pull request for the attestation gate
+        id: pr_number
+        if: github.event_name == 'issue_comment'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: printf '%s\n' "$PR_NUMBER" > "$RUNNER_TEMP/pr-number"
+      - name: Publish the pull request number
+        if: github.event_name == 'issue_comment'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reviewed-pr
+          path: ${{ runner.temp }}/pr-number
+          retention-days: 1
       # PR-Agent swallows an authentication failure and exits green, so without
       # this step a missing secret surfaces only as "published no review" with a
       # NaN-concurrency diagnosis that is wrong. Measured 2026-09-06 on the ten

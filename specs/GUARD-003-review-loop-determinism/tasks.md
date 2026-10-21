@@ -27,10 +27,10 @@ was disjoint from both and shipped first.
 
 What genuinely blocks:
 
-- [ ] B1. **#1047 merges** — the classifier learns to count comment-shaped review
+- [x] B1. **#1047 merges** (merged 2026-08-18) — the classifier learns to count comment-shaped review
       output. Until then there is no verdict worth re-evaluating. Held by another
       session.
-- [ ] B2. **#1041 ships** — the verdict lives on the revisable commit status
+- [x] B2. **#1041 ships** (closed 2026-08-18; the check-run half finished in #1185) — the verdict lives on the revisable commit status
       rather than a check-run frozen at creation. Making the gate required before
       this blocks every PR.
 
@@ -44,13 +44,13 @@ What genuinely blocks:
       from the run payload. A trigger that re-evaluates the wrong PR is worse
       than no trigger, so the recovery is the substance of this task, not the
       trigger line.
-- [ ] T3. [AC2] Confirm the re-evaluation writes the commit status and that the
+- [x] T3. [AC2] Confirm the re-evaluation writes the commit status and that the
       status carries the latest verdict. Depends on B2 having landed the status
       as the authoritative channel.
-- [ ] T4. [AC3] A declined or absent review still ends red after the trigger
+- [x] T4. [AC3] A declined or absent review still ends red after the trigger
       fires. Verified by fixture, not by reasoning — the trigger must not become
       a path to green.
-- [ ] T5. [AC1] Verify on a **live** PR: a PR-Agent run completing flips the gate
+- [x] T5. [AC1] Verify on a **live** PR: a PR-Agent run completing flips the gate
       with no human action and no manual re-run. Inspection does not satisfy AC1.
 - [x] T6. [AC6] Document the required-check adoption with its ordering
       constraint, in the gate's own workflow, so it travels with the thing it
@@ -76,6 +76,14 @@ What genuinely blocks:
       release PR, and the owner was asked for one triage comment per merge (five
       on #2168 in one night). Live, 2026-10-09: the released `dotf` lists #2168
       and this build clears it.
+
+- [x] T11. [AC1] [AC4] (#1128) A review asked for with `/review` re-evaluates
+      the PR it ran on. Its `workflow_run` carries the default branch's SHA, so
+      `pr-agent`'s `issue_comment` path uploads the PR number as the
+      `reviewed-pr` artifact and the gate reads it for that event only. Its
+      re-evaluations are grouped by run id, not by main's SHA.
+- [ ] T12. [AC1] [AC4] Verify T11 live after merge: `/review` on an open PR, and
+      the gate's `workflow_run` log says `re-evaluating PR #<that PR>`.
 
 ## Closing
 
