@@ -65,13 +65,13 @@ _step() { # $1 = event name
 @test "an open PR goes on to the empty-diff check" {
     STUB_PULL=open _step pull_request
     run ! grep -q 'reviewable=false' "$OUT"
-    grep -q 'contents/.github/workflows/pr-agent.yml' "$CALLS"
+    grep -q 'contents/harness/pr-agent-upstream-contract.json?ref=abc' "$CALLS"
 }
 
 @test "a failed state read does not skip: the review runs, as before" {
     STUB_PULL=fail _step pull_request
     run ! grep -q 'reviewable=false' "$OUT"
-    grep -q 'contents/.github/workflows/pr-agent.yml' "$CALLS"
+    grep -q 'contents/harness/pr-agent-upstream-contract.json?ref=abc' "$CALLS"
 }
 
 @test "a /review comment on a merged PR is not skipped: a human asked" {
