@@ -48,7 +48,8 @@ created: "2026-06-21"
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)
 
-- [ ] Offline drift check in Go; `ci.yml` and `dotf doctor`'s harness drift check call it on every OS
+- [x] Offline drift check in Go (`dotf harness check`, `tests/harness-check-parity.bats`)
+- [ ] `ci.yml` and `dotf doctor`'s harness drift check call it on every OS (after a release carries the verb)
 - [ ] `--against-vault` with a regression test (#1545)
 
 ## Slice 7 — `refresh` in Go and deletion (AC7, AC9)
