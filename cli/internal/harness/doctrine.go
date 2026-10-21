@@ -262,24 +262,33 @@ func migratePreamble(file string) string {
 
 // injectDoctrine replaces every line starting with the GENERATED prefix, and
 // what follows it up to the END marker, with begin, the payload and the END
-// marker, as the shell's awk did. A file without both a BEGIN line and an END
-// marker gets the region appended after one blank line. A line carrying the
-// END marker and anything else is refused, as the catalog refuses it: the
-// shell counted it as an END, never matched it, and dropped the rest of the
-// file.
+// marker, as the shell's awk did. A file with no BEGIN line gets the region
+// appended after one blank line. A BEGIN that no END closes is refused: the
+// shell appended a second region after it, and the next run then dropped every
+// line from the orphan BEGIN to the new END. A line carrying the END marker and
+// anything else is refused, as the catalog refuses it: the shell counted it as
+// an END, never matched it, and dropped the rest of the file.
 func injectDoctrine(file, begin, payload string) (string, error) {
 	lines := recordLines([]byte(file))
-	hasBegin, hasEnd := false, false
-	for _, l := range lines {
-		hasBegin = hasBegin || strings.HasPrefix(l, GeneratedBeginPrefix)
+	hasBegin, open := false, false
+	for i, l := range lines {
+		if strings.HasPrefix(l, GeneratedBeginPrefix) {
+			if open {
+				return "", fmt.Errorf("line %d opens a GENERATED region before the one above it is closed", i+1)
+			}
+			hasBegin, open = true, true
+		}
 		if strings.Contains(l, GeneratedEndMarker) {
 			if l != GeneratedEndMarker {
 				return "", fmt.Errorf("a line carries %s with more text around it: %q", GeneratedEndMarker, l)
 			}
-			hasEnd = true
+			open = false
 		}
 	}
-	if !hasBegin || !hasEnd {
+	if open {
+		return "", fmt.Errorf("a GENERATED region is opened and never closed by %s; the lines after it would be lost on the next run", GeneratedEndMarker)
+	}
+	if !hasBegin {
 		return file + "\n" + begin + "\n" + payload + GeneratedEndMarker + "\n", nil
 	}
 	var b strings.Builder
