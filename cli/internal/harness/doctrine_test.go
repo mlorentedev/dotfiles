@@ -59,10 +59,17 @@ func TestInjectDoctrine(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := injectDoctrine(tc.file, "B", "p1\np2\n"); got != tc.want {
+			if got, err := injectDoctrine(tc.file, "B", "p1\np2\n"); err != nil || got != tc.want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestInjectDoctrine_RefusesAnENDLineWithATail(t *testing.T) {
+	file := "<!-- BEGIN HARNESS GENERATED -->\nold\n<!-- END HARNESS GENERATED --> x\nthe user's tail\n"
+	if _, err := injectDoctrine(file, "B", "p\n"); err == nil {
+		t.Error("an END line with a tail was accepted, which drops the rest of the file")
 	}
 }
 

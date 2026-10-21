@@ -225,7 +225,10 @@ func deployDoctrineTarget(repoRoot, home, vaultSubpath, rules string, t Doctrine
 	}
 	begin := GeneratedBeginPrefix + " (sha256:" + PresenceSHA(payload) + ") -- vault " + vaultSubpath +
 		"; edit there + re-run setup, do NOT edit between markers -->"
-	want := injectDoctrine(migratePreamble(string(current)), begin, payload)
+	want, err := injectDoctrine(migratePreamble(string(current)), begin, payload)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
 	wrote, err := writeIfChanged(file, []byte(want), 0o644, dryRun)
 	if err != nil {
 		return nil, err
@@ -260,16 +263,24 @@ func migratePreamble(file string) string {
 // injectDoctrine replaces every line starting with the GENERATED prefix, and
 // what follows it up to the END marker, with begin, the payload and the END
 // marker, as the shell's awk did. A file without both a BEGIN line and an END
-// marker gets the region appended after one blank line.
-func injectDoctrine(file, begin, payload string) string {
+// marker gets the region appended after one blank line. A line carrying the
+// END marker and anything else is refused, as the catalog refuses it: the
+// shell counted it as an END, never matched it, and dropped the rest of the
+// file.
+func injectDoctrine(file, begin, payload string) (string, error) {
 	lines := recordLines([]byte(file))
 	hasBegin, hasEnd := false, false
 	for _, l := range lines {
 		hasBegin = hasBegin || strings.HasPrefix(l, GeneratedBeginPrefix)
-		hasEnd = hasEnd || strings.Contains(l, GeneratedEndMarker)
+		if strings.Contains(l, GeneratedEndMarker) {
+			if l != GeneratedEndMarker {
+				return "", fmt.Errorf("a line carries %s with more text around it: %q", GeneratedEndMarker, l)
+			}
+			hasEnd = true
+		}
 	}
 	if !hasBegin || !hasEnd {
-		return file + "\n" + begin + "\n" + payload + GeneratedEndMarker + "\n"
+		return file + "\n" + begin + "\n" + payload + GeneratedEndMarker + "\n", nil
 	}
 	var b strings.Builder
 	skip := false
@@ -289,7 +300,7 @@ func injectDoctrine(file, begin, payload string) string {
 			b.WriteString(l + "\n")
 		}
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 // capWarnings measures a capped rules file in both units, characters and
