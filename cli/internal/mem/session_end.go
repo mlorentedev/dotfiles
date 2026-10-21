@@ -108,7 +108,7 @@ func SessionEndAs(payload []byte, vaultPath, agent string, now time.Time) (strin
 	}
 
 	thread := ThreadKey(p.Cwd)
-	block := threadHandoffBlock(string(content), thread, agent)
+	block := threadText(threadHandoffBlock(string(content), thread, agent), filepath.Dir(memory))
 	if strings.TrimSpace(block) == "" {
 		return "", nil // trivial session -> no-op
 	}

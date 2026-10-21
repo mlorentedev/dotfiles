@@ -96,7 +96,8 @@ func TestMemHandoffWriteWithoutAgentSaysWhatItAlwaysSaid(t *testing.T) {
 	if errOut.Len() != 0 {
 		t.Errorf("stderr is not empty:\n%s", errOut.String())
 	}
-	if want := "wrote      thread \"master@msi\" in " + memory + "\n"; out.String() != want {
+	file := filepath.Join(filepath.Dir(memory), "threads", "master@msi.md")
+	if want := "wrote      thread \"master@msi\" in " + file + "\n"; out.String() != want {
 		t.Errorf("stdout = %q, want %q", out.String(), want)
 	}
 }

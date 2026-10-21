@@ -23,10 +23,10 @@ created: "2026-09-25"
 
 ## Slice 2 - per-thread store and derived index entry (depends on slice 1)
 
-- [ ] [AC4] Failing test: a fixture copy of the real dotfiles `MEMORY.md`, with `Verify` and `Awaiting Manu` added to every thread, stays at or under 25,000 B
-- [ ] [AC4] `handoff-write` writes `memory/threads/<key>.md` atomically (temp file and rename) and derives the capped index entry in `MEMORY.md`
-- [ ] [AC4] Failing test (`TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`), then implementation: a write that would push `MEMORY.md` past its byte budget fails loudly instead of truncating (#1477)
-- [ ] Failing test, then implementation: an old-format block is read as a thread and rewritten in the new shape on its next write, with every other thread byte-identical
+- [x] [AC4] Failing test: a fixture shaped like the real dotfiles `MEMORY.md` (its measured prefix and thread sizes), with `Verify` and `Awaiting Manu` added to every thread, stays at or under 25,000 B (`TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields`; a copy of the real file is probed in `verification.md`, since the repo is public and the vault is not)
+- [x] [AC4] `handoff-write` writes `memory/threads/<key>.md` atomically (temp file and rename) and derives the capped index entry in `MEMORY.md`
+- [x] [AC4] Failing test (`TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`), then implementation: a write that would push `MEMORY.md` past its byte budget fails loudly instead of truncating (#1477)
+- [x] Failing test, then implementation: an old-format block is read as a thread and rewritten in the new shape on its next write, with every other thread byte-identical
 
 ## Slice 3 - `dotf mem resume` (depends on slice 2)
 

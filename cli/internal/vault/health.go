@@ -404,8 +404,9 @@ var linkExemptions = []struct {
 	{"50_work/30-clients/", false, []linkCheck{checkDeadEnds}},
 	// Session journals: a chronological record, not a linked note.
 	{"sessions", true, []linkCheck{checkOrphans, checkDeadEnds}},
-	// Agent memory files: read by the agent, never linked to.
-	{"memory", true, []linkCheck{checkOrphans}},
+	// Agent memory files: read by the agent, never linked to, and they link out
+	// only by accident: a handoff thread's file (ADR-056) is a record, not a note.
+	{"memory", true, []linkCheck{checkOrphans, checkDeadEnds}},
 }
 
 // linkExempt reports whether the vault-relative path rel is left out of check.
