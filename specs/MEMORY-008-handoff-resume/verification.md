@@ -85,7 +85,7 @@ Each slice PR fills its own section below and nothing else.
   - `SelectThread` takes the agent's fork of the key, then the key unless another agent's stamp is on it. Otherwise it picks none and returns every thread key (`TestResumeListsCandidatesWhenTheThreadIsAmbiguous`). The command lists those keys, each with its `--thread` flag (`TestMemResumeListsCandidates`).
   - `ThreadText` reads the stored file when the entry points at one, and the inline block otherwise. It also returns the source path (`TestThreadTextForKey`). Round trip through the command: `TestMemResumeRendersWhatHandoffWriteStored`.
 - `--memory` defaults to the checkout project's vault `MEMORY.md`, through `mem.ProjectMemory`. That helper was lifted out of `session-end`, which resolved the same path inline, so the layout is derived in one place.
-- The read-only allowlist leaves out generic file readers (`cat`, `grep`, `head` and the like). They take any path, so `cat <secrets file>` would render as safe.
+- The read-only allowlist leaves out generic file readers (`cat`, `grep`, `head` and the like), because they take any path and `cat <secrets file>` would render as safe. It also leaves out subcommands that have a writing form (`git branch`, `git fetch`, `go build`). A line break counts as shell control, and an argument that writes a file (`--output`, `-o`) fails the check (review of #2880).
 - **Live run** on a copy of the real dotfiles `MEMORY.md` (inline blocks, 2026-10-21). `--thread feat-plat003-close@macmini --agent claude` rendered that thread's Next action. `--thread nope` listed all 8 threads.
 - **Mutation checks**, each reverted:
 

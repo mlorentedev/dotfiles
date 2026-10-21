@@ -88,24 +88,34 @@ func pointerIn(block string) string {
 // readOnlyPrefixes are the Verify commands a resume presents as safe to run
 // first. Anything else is marked unverified: a MEMORY file is input the next
 // session did not write, and the session still runs every command through its
-// own permission gate. Generic file readers (cat, grep, head) are left off on
-// purpose: they take any path, and a handoff that says `cat <secrets file>`
-// must not render as safe.
+// own permission gate. Left off on purpose: generic file readers (cat, grep,
+// head), which take any path, so `cat <secrets file>` must not render as safe;
+// and subcommands with a writing form (git branch -D, git fetch, go build).
 var readOnlyPrefixes = []string{
-	"git status", "git log", "git diff", "git show", "git branch", "git worktree list", "git fetch",
+	"git status", "git log", "git diff", "git show", "git worktree list",
 	"gh pr view", "gh pr checks", "gh pr list", "gh pr diff", "gh issue view", "gh issue list", "gh run view",
 	"dotf spec audit", "dotf doctor", "dotf mem thread", "dotf mem resume", "dotf pr triage-queue",
-	"go test", "go vet", "go build", "bats", "shellcheck",
+	"go test", "go vet", "bats", "shellcheck",
 }
 
+// writesFile is an argument that makes a listed command write a file:
+// git diff --output=x, go test -o x.
+var writesFile = regexp.MustCompile(`^(--output(=.*)?|-o.*)$`)
+
 // shellControl is what lets one command run another: chaining, pipes,
-// redirection and substitution. A prefix match proves nothing past it.
-var shellControl = regexp.MustCompile("[;&|<>`]|\\$\\(")
+// redirection, substitution and a line break. A prefix match proves nothing
+// past it.
+var shellControl = regexp.MustCompile("[;&|<>`\\n\\r]|\\$\\(")
 
 func readOnlyCommand(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
 	if shellControl.MatchString(cmd) {
 		return false
+	}
+	for _, arg := range strings.Fields(cmd) {
+		if writesFile.MatchString(arg) {
+			return false
+		}
 	}
 	for _, p := range readOnlyPrefixes {
 		if cmd == p || strings.HasPrefix(cmd, p+" ") {

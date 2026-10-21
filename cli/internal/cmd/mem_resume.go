@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -67,7 +68,14 @@ func runMemResume(cmd *cobra.Command, memoryPath, thread, agent, format string) 
 	}
 	chosen, candidates := mem.SelectThread(string(content), key, agent)
 	if chosen == "" {
-		return listCandidates(cmd, key, agent, candidates)
+		var carry string
+		if cmd.Flags().Changed("memory") {
+			carry += " --memory " + shellQuote(memoryPath)
+		}
+		if agent != "" {
+			carry += " --agent " + agent
+		}
+		return listCandidates(cmd, key, agent, carry, candidates)
 	}
 	text, source := mem.ThreadText(string(content), chosen, filepath.Dir(memoryPath))
 	out, err := mem.RenderResume(text, source, format)
@@ -91,7 +99,7 @@ func defaultMemoryPath(wd string) (string, error) {
 
 // listCandidates says no thread was chosen and lists the ones there are. Not an
 // error: a list is the answer when the working directory names no single thread.
-func listCandidates(cmd *cobra.Command, key, agent string, candidates []string) error {
+func listCandidates(cmd *cobra.Command, key, agent, carry string, candidates []string) error {
 	who := "this session"
 	if agent != "" {
 		who = agent
@@ -102,7 +110,13 @@ func listCandidates(cmd *cobra.Command, key, agent string, candidates []string) 
 		_, _ = fmt.Fprintln(out, "  (none)")
 	}
 	for _, c := range candidates {
-		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s\n", c)
+		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s%s\n", c, carry)
 	}
 	return nil
+}
+
+// shellQuote quotes a path for a command the user copies: a single-quoted
+// word, with any single quote inside it closed, escaped and reopened.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

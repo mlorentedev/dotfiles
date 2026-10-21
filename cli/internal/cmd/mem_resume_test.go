@@ -43,7 +43,7 @@ func TestMemResumeListsCandidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := runMemResumeT(t, "--memory", memory, "--thread", "feat-a", "--agent", "claude")
-	if !strings.Contains(out, "No single thread") || !strings.Contains(out, "dotf mem resume --thread feat-a") {
+	if !strings.Contains(out, "No single thread") || !strings.Contains(out, "dotf mem resume --thread feat-a --memory '"+memory+"' --agent claude\n") {
 		t.Errorf("want the candidates listed:\n%s", out)
 	}
 }
