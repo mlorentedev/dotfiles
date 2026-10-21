@@ -9,7 +9,7 @@ created: "2026-09-25"
 
 - [x] AC1 -> slice 3: `TestResumeIsAPureRenderOfTheThreadFile`
 - [x] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
-- [ ] AC3 -> slice 4: `TestSessionStartResumeBySource`
+- [x] AC3 -> slice 4: `TestSessionStartResumeBySource`
 - [x] AC4 -> slice 2: `TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`
 - [ ] AC5 -> slice 5: the `handoff` and `catchup` records
 - [ ] AC6 -> slice 5: the compiled doctrine, `--check` and the 8,000-character budget test
@@ -120,3 +120,25 @@ Each slice PR fills its own section below and nothing else.
 - [ ] Folder moved: `specs/MEMORY-008-handoff-resume/` -> `specs/archive/MEMORY-008-handoff-resume/`
 - [ ] Bitácora board ticket moved to Done / closed with the closing PR (ADR-018)
 - [ ] Promotions above executed
+
+## Slice 4 evidence
+
+- `ClaudeContext` takes the hook's `source` (`ClaudeContextInput.Source`, parsed by `hookFromPayload` in `cli/internal/cmd/mem.go`). It puts `sessionResume` (`cli/internal/mem/session_start_resume.go`) ahead of the rest of the brief.
+  - `startup`, `clear` and `compact` get the full `dotf mem resume --format context` block, because those sessions lost the conversation. `resume` and `fork` kept it, so they get one line naming the thread and the command. An unknown or missing source gets the line too.
+  - The thread is chosen by `SelectThread` for the agent `claude`, so another agent's thread or an absent memory adds nothing (`TestSessionStartResumeInjectsNothingThatIsNotThisAgents`).
+  - One golden per source: `testdata/session_start_resume/<source>.golden` (`TestSessionStartResumeBySource`). The same test checks that a compacted `ClaudeContext` begins with the block.
+  - The `handoff_resume` injector flag turns the block off (`TestSessionStartResumeCanBeTurnedOff`). Like every injector, an absent flag means on.
+- **Mutation checks**, each reverted. All 5 were caught by a failing test, with no build failures:
+
+  | Mutation | Test that went red |
+  |---|---|
+  | compact gets one line | `TestSessionStartResumeBySource` |
+  | resume and fork get the full block | `TestSessionStartResumeBySource` |
+  | agent ignored | `TestSessionStartResumeInjectsNothingThatIsNotThisAgents` |
+  | block appended, not first | `TestSessionStartResumeBySource` |
+  | flag ignored | `TestSessionStartResumeCanBeTurnedOff` |
+
+- **Decisions:**
+  - `startup` gets the full block. tasks.md lists it with `clear` and `compact`; AC3 names only the last two. A fresh session has no conversation either.
+  - `session_id` is not parsed. Nothing reads it, and a field with no reader is dead weight.
+  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up ticket.

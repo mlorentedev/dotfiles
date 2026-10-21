@@ -167,13 +167,15 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 // additionalContext envelope, resolving every path from the env-contract.
 func runClaudeHook(cmd *cobra.Command) error {
 	payload, _ := io.ReadAll(cmd.InOrStdin())
-	cwd := cwdFromPayload(payload)
+	hook := hookFromPayload(payload)
+	cwd := hook.Cwd
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
 	home := env.Home()
 	ctx := mem.ClaudeContext(mem.ClaudeContextInput{
 		Cwd:          cwd,
+		Source:       hook.Source,
 		Vault:        vault.ResolveVault(),
 		VaultHealth:  memVaultHealth,
 		Home:         home,
@@ -242,13 +244,17 @@ func memTriageQueue(cwd string) func() (string, error) {
 	}
 }
 
-// cwdFromPayload extracts the hook JSON's .cwd, or "" when absent/malformed.
-func cwdFromPayload(payload []byte) string {
-	var p struct {
-		Cwd string `json:"cwd"`
-	}
+// hookPayload is the part of the SessionStart hook JSON the brief reads.
+type hookPayload struct {
+	Cwd    string `json:"cwd"`
+	Source string `json:"source"`
+}
+
+// hookFromPayload parses the hook JSON; a field absent or malformed is "".
+func hookFromPayload(payload []byte) hookPayload {
+	var p hookPayload
 	_ = json.Unmarshal(payload, &p)
-	return p.Cwd
+	return p
 }
 
 // memRepoDir resolves the dotfiles checkout for mem's sibling-script and config
