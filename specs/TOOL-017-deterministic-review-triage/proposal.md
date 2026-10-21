@@ -1,7 +1,7 @@
 ---
 id: "TOOL-017-deterministic-review-triage"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-08-18"
 issue: "mlorentedev/dotfiles#1062"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

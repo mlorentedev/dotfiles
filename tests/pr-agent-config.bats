@@ -1342,3 +1342,27 @@ print(wf['concurrency']['cancel-in-progress'])
     # The per-PR supersession above stays as it was.
     [ "${lines[1]}" = "True" ]
 }
+
+# TOOL-017 AC3: the triage reads a finding's class from a declared line, never
+# from prose, and the registry declares that line. The reviewer must be asked
+# for exactly what the registry declares: every class, spelled prefix + class.
+# A class added to the registry and not to the instructions, or a prefix edited
+# in one file only, turns every finding unclassified with no error anywhere.
+@test "pr-agent: the reviewer is asked for every class marker the registry declares" {
+    run python3 - "$CFG" "$REPO/harness/review-attestation.json" <<'PY'
+import json, sys, tomllib
+
+cfg = tomllib.load(open(sys.argv[1], "rb"))
+instructions = cfg["pr_reviewer"]["extra_instructions"]
+decl = json.load(open(sys.argv[2])).get("classification") or {}
+prefix, classes = decl.get("prefix", ""), decl.get("classes", [])
+if not prefix.strip() or not classes:
+    print("the registry declares no classification prefix and classes")
+    sys.exit(1)
+missing = [f'"{prefix}{c}"' for c in classes if f'"{prefix}{c}"' not in instructions]
+if missing:
+    print("the instructions do not ask for: " + ", ".join(missing))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}

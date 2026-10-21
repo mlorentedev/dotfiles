@@ -237,3 +237,58 @@ func TestTheRealRegistryDeclaresTheReleaseSignature(t *testing.T) {
 		t.Fatalf("the queue reads exempt.signatures from the registry, and found none: %+v", r.Exempt)
 	}
 }
+
+// TOOL-017 AC3: a finding's class comes from a declared marker line, and
+// anything short of exactly one agreeing line is unclassified. The prose rows
+// are the shapes measured on #2832 and #2833: each states a class a reader can
+// see, and each must still come back unclassified, because prose drifts with
+// the model and the prompt while a declared line is a contract.
+func TestClassify(t *testing.T) {
+	r := reg()
+	r.Classification.Prefix = "Class: "
+	r.Classification.Classes = []string{"REAL", "THEORETICAL", "SPECULATIVE"}
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"declared line", "**Race Window**\n\nClass: REAL\nTwo lands race.", "REAL"},
+		{"declared line, indented", "**Header**\n  Class: SPECULATIVE  \nbody", "SPECULATIVE"},
+		{"the same class twice", "Class: THEORETICAL\nbody\nClass: THEORETICAL", "THEORETICAL"},
+		{"two classes disagree", "Class: REAL\nbody\nClass: SPECULATIVE", Unclassified},
+		{"header suffix only", "**Race Window (REAL)**\n\nTwo lands race.", Unclassified},
+		{"first word of the body only", "**Vacuous Test**\n\nREAL. The new test passes either way.", Unclassified},
+		{"marker inside prose", "This is not `Class: REAL` but a quote.", Unclassified},
+		{"an undeclared class", "Class: CRITICAL\nbody", Unclassified},
+		{"lower case", "class: real\nbody", Unclassified},
+		{"no marker at all", "**Check cannot fail**\n\nThe table is shared.", Unclassified},
+		{"empty body", "", Unclassified},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Classify(tc.body, r); got != tc.want {
+				t.Errorf("Classify(%q) = %q, want %q", tc.body, got, tc.want)
+			}
+		})
+	}
+}
+
+// A registry that declares no classification classifies nothing. An empty
+// prefix would otherwise make a bare "REAL" line a marker, which is prose.
+func TestClassify_WithoutADeclarationEverythingIsUnclassified(t *testing.T) {
+	for _, body := range []string{"Class: REAL", "REAL", ""} {
+		if got := Classify(body, reg()); got != Unclassified {
+			t.Errorf("Classify(%q) with no declaration = %q, want %q", body, got, Unclassified)
+		}
+	}
+}
+
+func TestTheRealRegistryDeclaresTheClassificationMarker(t *testing.T) {
+	r, err := LoadRegistry(filepath.Join("..", "..", "..", "harness", "review-attestation.json"))
+	if err != nil {
+		t.Fatalf("the shipped registry does not load: %v", err)
+	}
+	if got := Classify("Class: REAL", r); got != "REAL" {
+		t.Fatalf("the shipped registry does not classify its own REAL line: got %q", got)
+	}
+}

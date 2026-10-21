@@ -13,9 +13,9 @@ created: "2026-08-18"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/tool-017-deterministic-triage`
+- [x] Branch: one per slice instead of one long-lived branch; the first is `feat/review-finding-class-marker`
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [ ] **Open question resolved before implementation starts:** the classification
+- [x] **Open question resolved before implementation starts** (owner, #1062, 2026-08-19: the marker is emitted): the classification
       marker does not exist yet. Either `.pr_agent.toml` is asked to emit a stable
       one (TOOL-013's surface, coordinate with whoever holds it) or every finding
       is `unclassified` and every PR escalates — fail-closed but useless. This
@@ -28,14 +28,18 @@ created: "2026-08-18"
 
 - [ ] `[AC5]` reproduction harness: apply a mutation, **verify by checksum that it landed**, report `did-not-land` as a state distinct from `did-not-reproduce`
 - [ ] `[AC5]` red-direction: an invalid mutation must report `did-not-land`, never a clean result — the exact failure two sessions hit on 2026-08-17
-- [ ] `[AC2]` `[P]` read reviewer identity + notice markers from `harness/review-attestation.json`; no second copy of the distinction
-- [ ] `[AC2]` red-direction: adding a reviewer to the registry changes triage behaviour with no code edit
-- [ ] `[AC3]` extract a finding's class from a declared marker; absent marker → `unclassified`
-- [ ] `[AC3]` red-direction: a finding whose class appears only in prose is `unclassified`, not parsed
+- [x] `[AC2]` `[P]` read reviewer identity + notice markers from `harness/review-attestation.json`; no second copy of the distinction
+- [x] `[AC2]` red-direction: adding a reviewer to the registry changes triage behaviour with no code edit
+- [x] `[AC3]` extract a finding's class from a declared marker; absent marker → `unclassified`
+- [x] `[AC3]` red-direction: a finding whose class appears only in prose is `unclassified`, not parsed
+- [ ] `[AC3]` consume `Classify` where findings are read: an unclassified finding is surfaced for a human (next slice)
 - [ ] `[AC4]` gate `apply` on a successful reproduction for REAL findings
 - [ ] `[AC6]` record a refuted REAL finding with its evidence, distinct from a skip
-- [ ] `[AC1]` trigger from the reviewer-finished signal (GUARD-003's `workflow_run`)
+- [x] `[AC1]` ~~trigger from the reviewer-finished signal (GUARD-003's `workflow_run`)~~ superseded: the pull-based `dotf pr triage-queue` (#1057, #1101), accepted by the owner on #1062 (2026-10-10)
 - [ ] `[AC7]` closing guard: a PR with an undispositioned reviewer comment cannot close or merge
+      (partly in place: `dotf pr land` refuses a PR the triage queue lists,
+      `cli/internal/prland/prland.go:118`, at PR granularity. Still open:
+      per-comment dispositions and close-without-merge)
 - [ ] `[AC7]` red-direction: a PR with one undispositioned comment fails the guard
 - [ ] `[AC8]` every check above has a red-direction test — asserted, not assumed
 

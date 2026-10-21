@@ -9,9 +9,9 @@ created: "2026-08-18"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] Criterion 1 -> superseded by `dotf pr triage-queue` (#1057, #1101); owner accepted it on #1062, 2026-10-10
+- [x] Criterion 2 -> `cli/internal/prtriage/prtriage.go` reads `harness/review-attestation.json`; test `TestTheRealRegistryServesBothConsumers`
+- [ ] Criterion 3 -> declaration and reader landed (`Classify`, tests `TestClassify`, `TestTheRealRegistryDeclaresTheClassificationMarker`, bats `pr-agent: the reviewer is asked for every class marker the registry declares`); a consumer that escalates unclassified findings is still open
 
 ## Test status
 
@@ -23,8 +23,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
--
--
+- 2026-10-20, re-baseline: the spec was resumed rather than abandoned (owner). AC1 and AC2 were met outside the spec folder and are ticked with their evidence; AC7 is partly met by `dotf pr land` at PR granularity.
+- The class marker is declared in `harness/review-attestation.json` (`classification`), not in Go, so a class change is a registry edit (AC2's rule applied to AC3). A bats contract test ties `.pr_agent.toml` to it.
+- Measured before choosing the marker (2026-10-20): PR-Agent wrote the gradation as `**Header (REAL)**` (#2833), as the body's first word `REAL.` (#2832), or not at all (#2839). Hence a whole line `Class: <CLASS>`, matched exactly; two lines that disagree are a conflict and stay unclassified.
 
 ## Promotion candidates
 
