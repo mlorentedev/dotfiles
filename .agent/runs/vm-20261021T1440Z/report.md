@@ -8,10 +8,11 @@ End: queue-empty at 16:45Z, 3 of 3 items (2 landed, 1 parked).
 1. **#2792: A′ or B.** Parked, board Blocked. The ticket's option A cannot run before `install.sh`: the guest has no `dotf` yet, and `install.sh` takes no role input. ADR-055 (#2842, proposed today) recomposes `dotf vm linux` as session verbs. A′ adds a role step after install now; B waits for ADR-055's first PR. Recommended: B.
 2. **#2878** (`.github/**`, yours): the board workflow overwrites `Blocked`. A recommended.
 3. **#2874** (harness/**, yours to land): the adversarial-review skill should name `dotf spec digest` in its staleness step.
-4. **HERDR-001's f5 contract changed after its review.** `dotf spec digest HERDR-001-yazi-explorer` differs from the recorded request in `features.json`: f5's behavior and verification were rewritten after `reviewed_sha` fbfedfc. The spec is the herdr thread's; it needs a re-review before it archives.
+4. **HERDR-001's f5 contract changed after its review.** `dotf spec digest HERDR-001-yazi-explorer` differs from the recorded request in `features.json`: f5's behavior and verification were rewritten after `reviewed_sha` fbfedfc. The spec is the herdr thread's, and round 3 is already planned there. The archive gate reads the same digests, so it refuses until that review runs.
 5. **#2860** (another session's PR) duplicates #2861, which landed, and now conflicts. Close it or salvage the shared constant. The claim race behind it is recorded on #2553 (CLI-130).
 6. **`~/.config/dotfiles/machine.json` declares no machine identity**, so `dotf agent auto` refuses every non-local pool. The run used the native advisor.
-7. Carried from before the run: may `lane-status-ff` be deleted; a `/crystallize` of MEMORY.md (23.4KB, near the read cap); remove the worktree `feat-plat003-close` after this session.
+7. **The vault MEMORY.md is 28.4KB, over the 24.4KB read cap.** Sessions starting now load it truncated, and the guard-003 thread is the first one cut. Run `/crystallize` before anything else.
+8. Carried from before the run: may `lane-status-ff` be deleted; remove the worktree `feat-plat003-close` after this session.
 
 ## Parked
 
@@ -35,7 +36,7 @@ End: queue-empty at 16:45Z, 3 of 3 items (2 landed, 1 parked).
 
 ## Host
 
-`caffeinate -i -t 21600` held the Mac awake for the whole window.
+`caffeinate -i -t 21600` is still running and holds the Mac awake until about 20:40Z.
 
 ## Next action
 
