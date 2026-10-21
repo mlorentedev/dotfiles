@@ -71,6 +71,15 @@ func TestCheckDrift_EachKindOfDriftIsAProblem(t *testing.T) {
 	}
 }
 
+func TestCheckDrift_ACRLFRecordValidatesAsLF(t *testing.T) {
+	repo := checkRepo(t)
+	writeFile(t, filepath.Join(repo, "harness", "agents", "demo", "AGENT.md"), "---\r\nname: demo\r\nkind: invocable\r\n---\r\n")
+	report, err := CheckDrift(repo)
+	if err != nil || HasDrift(report) {
+		t.Errorf("problems: %v, %v", problems(report), err)
+	}
+}
+
 func TestCheckDrift_AGapNamesTheIdAndTheSurface(t *testing.T) {
 	repo := checkRepo(t)
 	writeFile(t, filepath.Join(repo, "harness", "manifest.json"), `{"enforced":[{"id":"rule"}],
