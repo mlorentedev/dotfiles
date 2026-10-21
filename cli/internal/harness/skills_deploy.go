@@ -92,16 +92,19 @@ func DeploySkills(repoRoot, home string, has func(string) bool, dryRun bool) ([]
 }
 
 // recordNames lists the record directories holding a SKILL.md, in byte order.
+func recordNames(recDir string) ([]string, error) { return recordNamesOf(recDir, "SKILL.md") }
+
+// recordNamesOf lists the directories of recDir holding file, in byte order.
 // The shell's glob sorted by the locale's collation, which orders hyphenated
 // names differently on glibc and on macOS.
-func recordNames(recDir string) ([]string, error) {
+func recordNamesOf(recDir, file string) ([]string, error) {
 	entries, err := os.ReadDir(recDir)
 	if err != nil {
-		return nil, fmt.Errorf("no skill records at %s: %w", recDir, err)
+		return nil, fmt.Errorf("no records at %s: %w", recDir, err)
 	}
 	var names []string
 	for _, e := range entries {
-		if fi, err := os.Stat(filepath.Join(recDir, e.Name(), "SKILL.md")); err == nil && fi.Mode().IsRegular() {
+		if fi, err := os.Stat(filepath.Join(recDir, e.Name(), file)); err == nil && fi.Mode().IsRegular() {
 			names = append(names, e.Name())
 		}
 	}

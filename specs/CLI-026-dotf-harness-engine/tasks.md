@@ -37,7 +37,7 @@ created: "2026-06-21"
 
 ## Slice 4 — agents and doctrine (AC4)
 
-- [ ] `dotf harness agents`: agent-md render with resolved model and capability lines; parity oracle
+- [x] `dotf harness agents`: agent-md render with resolved model and capability lines; parity oracle (`tests/harness-agents-parity.bats`)
 - [ ] `dotf harness doctrine`: compact payload, ASCII fold, char cap, shadow warning; parity oracle
 - [ ] Windows gains `agents.deploy` (#1387)
 
