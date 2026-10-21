@@ -141,3 +141,25 @@ func TestLand_APRWithoutALessonDoesNotReadTheBaseLessons(t *testing.T) {
 		t.Errorf("read the base lessons for a PR that touches none: %q", g.treeRead)
 	}
 }
+
+// A stacked PR's base is a branch with a slash in its name. The trees route
+// takes it as written (measured live on fix/pr-agent-image-digest), so the
+// lessons are read from that branch, not reported missing.
+func TestLand_ReadsTheLessonsOfASlashedBase(t *testing.T) {
+	view := strings.Replace(readyView, `"baseRefName":"main"`, `"baseRefName":"feat/base"`, 1)
+	if view == readyView {
+		t.Fatal("readyView no longer names main as its base; update this test")
+	}
+	g := &lessonGH{
+		fakeGH: fakeGH{view: view, checks: greenChecks, deps: `[]`,
+			files: `{"filename":"docs/lessons/lesson-497-b.md","previous_filename":null,"status":"added"}`},
+		tree: "lesson-497-a.md\n",
+	}
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(g.treeRead, "/git/trees/feat/base:docs/lessons") || !strings.Contains(strings.Join(res.Reasons, ";"), "on feat/base") {
+		t.Errorf("want the lessons read from feat/base and a refusal naming it, got read %q, %+v", g.treeRead, res)
+	}
+}
