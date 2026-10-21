@@ -23,10 +23,11 @@ const (
 
 // SkillOutcome is what DeploySkills did for one output.
 type SkillOutcome struct {
-	Agent  string
-	Path   string // absolute; for a skipped target, its directory
-	Status string
-	Reason string // why a target was skipped
+	Agent   string
+	Path    string // absolute; for a skipped target, its directory
+	Status  string
+	Reason  string // why a target was skipped
+	Catalog bool   // the copilot catalog region, not a skill output
 }
 
 // generatedMarker is the provenance every rendered output carries, and the only
@@ -42,8 +43,8 @@ const generatedMarker = "generated: true"
 // shell did: that path belongs to the record. An unmarked copy of a record
 // that does not target the agent is reported, never removed. A record that
 // cannot be read is an error, reported after every other output is deployed.
-// This is the Go form of compile-harness.sh's deploy_skills and deploy_prune,
-// minus the copilot catalog.
+// Last, the copilot catalog region is rewritten (skills_catalog.go). This is
+// the Go form of compile-harness.sh's deploy_skills and deploy_prune.
 func DeploySkills(repoRoot, home string, has func(string) bool, dryRun bool) ([]SkillOutcome, error) {
 	m, err := LoadSkills(filepath.Join(repoRoot, filepath.FromSlash(ManifestFile)))
 	if err != nil || m == nil {
@@ -79,6 +80,13 @@ func DeploySkills(repoRoot, home string, has func(string) bool, dryRun bool) ([]
 		if err != nil {
 			errs = append(errs, fmt.Errorf("prune %s: %w", t.Agent, err))
 		}
+	}
+	cat, err := deployCatalog(m, recDir, names, home, dryRun)
+	if cat != nil {
+		out = append(out, *cat)
+	}
+	if err != nil {
+		errs = append(errs, fmt.Errorf("catalog: %w", err))
 	}
 	return out, errors.Join(errs...)
 }

@@ -29,8 +29,9 @@ func newHarnessSkillsCmd() *cobra.Command {
 			"every harness. An output that already holds its render is not rewritten. A\n" +
 			"target whose requires_command is not on PATH is skipped. Generated outputs whose\n" +
 			"record is gone, or no longer targets that harness, are pruned; an unmarked copy\n" +
-			"of a managed skill is reported and kept. The copilot skill catalog is not\n" +
-			"written here yet.",
+			"of a managed skill is reported and kept. Last, the skills.catalog file (copilot's\n" +
+			"instructions) gets one bullet per record that targets its harness, written into\n" +
+			"its one GENERATED region; a file that is absent or has no such region is skipped.",
 		Example:      "  dotf harness skills --dry-run\n  dotf harness skills --repo-root /path/to/checkout",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
@@ -62,6 +63,10 @@ func reportSkillOutcomes(w, ew io.Writer, outcomes []harness.SkillOutcome, dryRu
 	verb := map[bool]string{false: "", true: "would be "}[dryRun]
 	counts := map[string]int{}
 	for _, o := range outcomes {
+		if o.Catalog {
+			reportCatalogOutcome(w, ew, o, verb)
+			continue
+		}
 		counts[o.Status]++
 		switch o.Status {
 		case harness.SkillDeployed:
@@ -76,4 +81,15 @@ func reportSkillOutcomes(w, ew io.Writer, outcomes []harness.SkillOutcome, dryRu
 	}
 	_, _ = fmt.Fprintf(w, "[deploy] skills: %d %sdeployed, %d current, %d %spruned\n",
 		counts[harness.SkillDeployed], verb, counts[harness.SkillCurrent], counts[harness.SkillPruned], verb)
+}
+
+// reportCatalogOutcome prints the catalog's line in the shell's words; it is
+// not counted with the skill outputs.
+func reportCatalogOutcome(w, ew io.Writer, o harness.SkillOutcome, verb string) {
+	switch o.Status {
+	case harness.SkillDeployed:
+		_, _ = fmt.Fprintf(w, "[deploy] catalog %s-> %s\n", verb, o.Path)
+	case harness.SkillSkipped:
+		_, _ = fmt.Fprintf(ew, "[deploy] %s, skipping: %s\n", o.Reason, o.Path)
+	}
 }
