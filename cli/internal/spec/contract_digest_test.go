@@ -3,6 +3,7 @@ package spec
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -167,5 +168,47 @@ func TestReviewFreshnessAcceptsBothDigestForms(t *testing.T) {
 		if moved := changedContracts(dir, recorded); len(moved) != 1 || moved[0] != "proposal.md" {
 			t.Errorf("a new criterion must stale a review recorded in the %s form, got %v", form, moved)
 		}
+	}
+}
+
+// #2824: `dotf spec archive --pr` appends a provenance comment to proposal.md
+// in the same pass as the status write, so it is lifecycle too. Without the fold,
+// every archive with --pr staled the review that permitted it.
+func TestArchiveWithPRURLKeepsTheLaunchDigests(t *testing.T) {
+	for name, proposal := range map[string]string{
+		"LF":   "---\nid: AI-001-x\nstatus: verifying\n---\n\n- [ ] **AC1** — refuses\n",
+		"CRLF": "---\r\nid: AI-001-x\r\nstatus: verifying\r\n---\r\n\r\n- [ ] **AC1** — refuses\r\n",
+	} {
+		root := t.TempDir()
+		writeSpec(t, root, "AI-001-x", map[string]string{
+			"proposal.md": proposal,
+			"review.md":   passingReview("AI-001-x"),
+		})
+		launched := ContractDigests(filepath.Join(root, "specs", "AI-001-x"))
+		target, err := Archive(root, "AI-001-x", ArchiveOptions{Date: "2026-10-19", PRURL: "https://example.test/pull/2821"})
+		if err != nil {
+			t.Fatalf("%s: Archive: %v", name, err)
+		}
+		if moved := changedContracts(target, launched); len(moved) != 0 {
+			t.Errorf("%s: the archive's own provenance line staled the review: %v", name, moved)
+		}
+	}
+}
+
+// The fold is the trailing line the archive writes, and nothing else: the same
+// comment inside the body, or a reworded criterion after the archive, is an edit.
+func TestContractDigestSeesProvenanceOutsideTheArchiveLine(t *testing.T) {
+	body := "---\nstatus: archived\n---\n\n- [ ] **AC1** — refuses\n"
+	line := "\n<!-- archived 2026-10-19 — PR: https://example.test/pull/1 -->\n"
+	base := digestOf(t, map[string]string{"proposal.md": body})
+	if got := digestOf(t, map[string]string{"proposal.md": body + line}); got["proposal.md"] != base["proposal.md"] {
+		t.Error("the archive's trailing provenance line moved the digest")
+	}
+	if got := digestOf(t, map[string]string{"proposal.md": line + body}); got["proposal.md"] == base["proposal.md"] {
+		t.Error("a provenance comment in the body was folded away")
+	}
+	reworded := strings.Replace(body, "refuses", "warns", 1) + line
+	if got := digestOf(t, map[string]string{"proposal.md": reworded}); got["proposal.md"] == base["proposal.md"] {
+		t.Error("a reworded criterion behind the provenance line did not move the digest")
 	}
 }

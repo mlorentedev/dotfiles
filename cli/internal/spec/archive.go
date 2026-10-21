@@ -352,7 +352,7 @@ func Archive(repoRoot, id string, opts ArchiveOptions) (target string, err error
 		}
 		if opts.PRURL != "" {
 			eol := lineEnding(out)
-			out += fmt.Sprintf("%s<!-- archived %s — PR: %s -->%s", eol, opts.Date, opts.PRURL, eol)
+			out += eol + fmt.Sprintf(provenanceLine, opts.Date, opts.PRURL) + eol
 		}
 		if err := os.WriteFile(proposal, []byte(out), 0o644); err != nil {
 			return target, fmt.Errorf("updating %s: %w", filepath.Base(proposal), err)

@@ -48,6 +48,13 @@ func contractDigests(specDir string, foldStatus bool) map[string]string {
 // ordered (`1.` / `1)`), at any depth.
 var listCheckbox = regexp.MustCompile(`(?m)^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\]`)
 
+// provenanceLine is the comment `dotf spec archive --pr` appends to the
+// archived proposal, and archiveProvenance matches it where the archive puts
+// it: alone on the last line, after a line break (#2824).
+const provenanceLine = "<!-- archived %s — PR: %s -->"
+
+var archiveProvenance = regexp.MustCompile(`\n<!-- archived \S+ — PR: \S+ -->\n\z`)
+
 // harnessFeatureFields are the features.json fields the harness writes after a
 // review (a feature's lifecycle state and the output that proved it). They are
 // progress, not contract, so they are blanked before digesting.
@@ -62,7 +69,8 @@ var harnessFeatureFields = []string{"state", "evidence"}
 //     (#998 part 2);
 //   - the harness-owned fields of features.json;
 //   - the frontmatter's lifecycle `status:`, which the archive itself writes
-//     (HARNESS-151), when foldStatus is set.
+//     (HARNESS-151), and the provenance line `archive --pr` appends in the same
+//     pass (#2824), when foldStatus is set.
 //
 // A reworded criterion, a new task or a changed feature behavior still moves
 // the digest; the tests pin both halves.
@@ -77,6 +85,7 @@ func normaliseContract(name string, data []byte, foldStatus bool) []byte {
 	// setStatus touches the first frontmatter block only; a body line is prose.
 	if foldStatus {
 		data = []byte(setStatus(string(data), "-"))
+		data = archiveProvenance.ReplaceAll(data, nil)
 	}
 	return listCheckbox.ReplaceAll(data, []byte("${1}[ ]"))
 }
