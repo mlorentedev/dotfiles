@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: e8b094c01dab7bdd
+generated_sha: c395319533983f7e
 id: handoff-skill
 type: skill
 status: active
@@ -297,4 +297,9 @@ Deliver the final handoff summary to the user using this standardized block:
 - **Bitácora Board:** Issue `#N` -> `<Status>`
 - **Worktree / Branch State:** Clean / Pruned (`<details>`)
 - **Next Action:** `<Concrete first step for next session>`
+- **Resume:** the next session runs `dotf mem resume`, which renders this thread
 ```
+
+Never hand-type a resume prompt: `dotf mem resume` prints it from the thread
+file, so the prompt and the record cannot disagree. A user who wants to paste
+one into a cold session runs it themselves.

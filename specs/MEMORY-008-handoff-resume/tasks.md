@@ -43,9 +43,9 @@ created: "2026-09-25"
 
 ## Slice 5 - skills and doctrine (depends on slice 3)
 
-- [ ] [AC5] Vault `handoff` skill: the chat summary points the next session at `dotf mem resume`, with no hand-typed prompt; records refreshed
-- [ ] [AC5] Vault `catchup` skill: step 1 runs `dotf mem resume` and its `Verify` commands, and an ambiguous thread is listed and asked about; records refreshed
-- [ ] [AC6] Fallback sentence in the compact doctrine's vault source; `--refresh`, `--check`, and the 8,000-character budget test pass
+- [x] [AC5] Vault `handoff` skill: the chat summary points the next session at `dotf mem resume`, with no hand-typed prompt; records refreshed
+- [x] [AC5] Vault `catchup` skill: step 1 runs `dotf mem resume` and its `Verify` commands, and an ambiguous thread is listed and asked about; records refreshed
+- [x] [AC6] Fallback sentence in the compact doctrine's vault source; `--refresh`, `--check`, and the 8,000-character budget test pass
 
 ## Closing
 
