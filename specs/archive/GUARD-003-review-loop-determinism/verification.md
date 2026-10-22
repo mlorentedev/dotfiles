@@ -22,16 +22,25 @@ otherwise.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: see "Closing checks" (bats 83/83, shellcheck and `bash -n` exit 0) and "T13 and T14" (`go test ./...` ok, golangci-lint 0 issues, bats 182/182). The round-2 review reproduced both at `a97495e8`: 46 Go packages ok, 83/83 bats.
+- Manual smoke test: the live runs in "T12" (the `/review` path reaching the gate) and "AC1" (the reviewer finishing wakes the gate).
+- No regressions in existing test suite: yes, none.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
+- The PR number crosses from `pr-agent` to the gate as an artifact, trusted only for `issue_comment` runs, which always execute the default branch's workflow (T11, lesson 502).
+- An absent `triage.standing` defaults to `OWNER, MEMBER, COLLABORATOR` instead of being refused, because thirteen repositories carry hand-ported registries (T13, lesson 509).
 
--
--
+## Round-2 review dispositions (PASS-WITH-GAPS)
+
+| Finding | Disposition |
+|---|---|
+| F1: `dotf spec digest` is missing from the released CLI | Resolved by release: #2875 (`d8d76274`) is on main and ships in 0.77.0 |
+| F2: a triage posted as a review body never counts | Ticketed: #2896 |
+| F3: the skill does not say who may write the record | Ticketed: #2896 |
+| F4: `merge-grant.yml` holds an unguarded spelling of the marker | Ticketed: #2896 |
+| F5: template stubs in this file | Applied: filled above |
+| F6: the review base predates ~2000 merges | Out of scope: #1551, with this spec's measurement |
 
 ## Promotion candidates
 
@@ -43,10 +52,10 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/GUARD-003-review-loop-determinism/` -> `specs/archive/GUARD-003-review-loop-determinism/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/GUARD-003-review-loop-determinism/` -> `specs/archive/GUARD-003-review-loop-determinism/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 
 ## Session evidence — the trigger (T1, T2)

@@ -246,14 +246,15 @@ func TestRecordsHarness_ARefreshedSourceRegionIsPlannedAndFailsTheProbe(t *testi
 
 // The production runner is the Go deploy, not a script: an apply on the real
 // checkout leaves every instruction file the probe asks for, and a second plan
-// finds nothing to change.
+// finds nothing to change. The plan asks PATH, as HarnessDeploy does, so the two
+// agree on which agents are installed on whatever machine runs the test.
 func TestRecordsHarness_TheGoDeployConvergesTheRealCheckout(t *testing.T) {
 	repo, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
 	env := Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
-	r := recordsHarness{run: HarnessDeploy, has: noCommands}
+	r := recordsHarness{run: HarnessDeploy, has: onPath}
 
 	if _, err := r.Reconcile(env, false); err != nil {
 		t.Fatal(err)
