@@ -1,0 +1,25 @@
+version: 1
+run_id: cli026-20261022T0734Z
+armed_by: manu
+armed_at: 2026-10-22T07:34:00Z
+expires_at: 2026-10-22T15:30:00Z
+objective: "Advance CLI-026 (#495): land the doctor drift-gate PR and the remaining slices that need no release (recordTargets on the Go predicate, --against-vault)."
+scope:
+  write_paths: ["cli/**", "tests/**", "specs/CLI-026-dotf-harness-engine/**", "docs/lessons/**", "scripts/compile-harness.sh"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "setup-linux.sh", "setup-windows.ps1"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, bats, golangci-lint, shellcheck, jq]
+queue:
+  source: bitacora
+  filter: "CLI-026 (#495) open tasks in specs/CLI-026-dotf-harness-engine/tasks.md that need no release, plus their own follow-up tickets"
+  max_items: 4
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
