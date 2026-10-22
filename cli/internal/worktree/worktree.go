@@ -63,11 +63,14 @@ type Info struct {
 	Dirty      bool   `json:"dirty"`
 	// IgnoredContent names what made a worktree with no tracked changes
 	// Dirty: ignored paths that are not known build output (#1607).
-	IgnoredContent []string       `json:"ignored_content,omitempty"`
-	PRMerged       bool           `json:"pr_merged"`
-	Metadata       *Metadata      `json:"metadata,omitempty"`
-	State          LifecycleState `json:"state"`
-	StateReason    string         `json:"state_reason,omitempty"`
+	IgnoredContent []string `json:"ignored_content,omitempty"`
+	PRMerged       bool     `json:"pr_merged"`
+	// PRMergedUnknown is why the forge could not say whether the branch
+	// landed. PRMerged is then false: the safe verdict, never "merged".
+	PRMergedUnknown string         `json:"pr_merged_unknown,omitempty"`
+	Metadata        *Metadata      `json:"metadata,omitempty"`
+	State           LifecycleState `json:"state"`
+	StateReason     string         `json:"state_reason,omitempty"`
 }
 
 // IsSubmoduleGitDir returns true if the gitdir path indicates a git submodule.
@@ -183,10 +186,14 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 	}
 
 	if !info.PRMerged {
-		if info.IsOrphan {
-			return StateOrphan, "upstream branch gone and PR not merged"
+		unknown := ""
+		if info.PRMergedUnknown != "" {
+			unknown = " (the forge could not be asked: " + info.PRMergedUnknown + ")"
 		}
-		return StateUnmerged, "PR not merged"
+		if info.IsOrphan {
+			return StateOrphan, "upstream branch gone and PR not merged" + unknown
+		}
+		return StateUnmerged, "PR not merged" + unknown
 	}
 
 	return StateReapable, "eligible for cleanup"
