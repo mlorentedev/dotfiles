@@ -55,7 +55,7 @@ Use `bw login`, not `bw unlock`, on a new machine or after a session expired: an
 **Step 3: GitHub.** The vault is a private repository, cloned through gh's credential helper, and converge's git-config step only wires that helper once gh holds a login. The walk runs `dotf converge --only git-config` just before it clones the vault for that reason.
 
 ```bash
-gh auth login
+gh auth login -s gist,read:org,read:project,repo,workflow
 dotf doctor --fix        # points git's credential helper at gh by absolute path
 ```
 
