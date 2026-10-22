@@ -1,5 +1,5 @@
-# Pester 5 wrapper for tests/copilot-native-skills-smoke.ps1: Deploy-SkillRecord
-# end to end into a scratch COPILOT_HOME (handoff rendered, auxiliary file kept,
+# Pester 5 wrapper for tests/copilot-native-skills-smoke.ps1: `dotf harness
+# skills` end to end into a scratch COPILOT_HOME (handoff rendered, auxiliary file kept,
 # claude-only skill filtered out, instructions file LF and BOM-free with the
 # catalog injected) plus `copilot skill list` discovery where the CLI can run.
 #
@@ -24,7 +24,7 @@ Describe 'copilot presence on a runner that declared it' -Skip:(-not $script:exp
     }
 }
 
-Describe 'copilot native skills (Deploy-SkillRecord end to end)' -Skip:(-not $script:hasCopilot) {
+Describe 'copilot native skills (dotf harness skills end to end)' -Skip:(-not $script:hasCopilot) {
 
     It 'deploys handoff with LF, no BOM, and the catalog injected' {
         $smoke = Join-Path $PSScriptRoot 'copilot-native-skills-smoke.ps1'

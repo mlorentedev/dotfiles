@@ -19,8 +19,8 @@ import (
 //
 // The plan and the probe read the instruction files: one that is missing, or
 // whose content outside the harness regions differs from its source, is a
-// change. Linux and darwin only until setup-windows.ps1 stops deploying these
-// files itself (CLI-026 slice 5); enabling Windows first would deploy twice.
+// change. It runs on every OS: setup-windows.ps1 and setup-linux.sh deploy
+// through the same harness.Deploy, as `dotf harness deploy`.
 type recordsHarness struct {
 	run func(Env) error   // the deploy; HarnessDeploy in production
 	has func(string) bool // is a command on PATH
@@ -31,7 +31,7 @@ func (recordsHarness) Name() string { return "records-harness" }
 // RevisitAfter re-runs the deploy after tools changed the machine: an agent
 // tools installs had no instruction files when this step first ran (#2013 D11).
 func (recordsHarness) RevisitAfter() string { return "tools" }
-func (recordsHarness) Platforms() []string  { return []string{"linux", "darwin"} }
+func (recordsHarness) Platforms() []string  { return []string{"linux", "darwin", "windows"} }
 
 func (r recordsHarness) Reconcile(env Env, dryRun bool) (Result, error) {
 	stale, err := r.staleInstructions(env)

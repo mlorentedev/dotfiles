@@ -7,60 +7,25 @@ $copilot = Get-Command copilot -ErrorAction Stop
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ("copilot-native-skills-{0}" -f [guid]::NewGuid().ToString('N'))
 $copilotHome = Join-Path $scratch '.copilot'
 $previousCopilotHome = $env:COPILOT_HOME
-$previousUserProfile = $env:USERPROFILE
 
 function Ensure-Directory {
     param([string]$Path)
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
-function Write-Info { param([string]$Message) $null = $Message }
-function Write-Success { param([string]$Message) $null = $Message }
 function Write-Warn { param([string]$Message) Write-Warning $Message }
 
-function Import-SetupFunction {
-    param(
-        [System.Management.Automation.Language.Ast]$Ast,
-        [string]$Name
-    )
-    $definition = $Ast.FindAll({
-        param($node)
-        $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
-    }, $true) | Where-Object Name -EQ $Name | Select-Object -First 1
-    if (-not $definition) {
-        throw "Function $Name not found in setup-windows.ps1"
+# The skills surface of `dotf harness deploy`, which setup-windows.ps1 runs.
+# The dotf on PATH is the one setup installed (or CI built from this tree).
+function Invoke-SkillDeploy {
+    param([string]$RepoRoot, [string]$TargetHome)
+    $out = & dotf harness skills --repo-root $RepoRoot --home $TargetHome 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotf harness skills failed:`n$($out -join "`n")"
     }
-    $scriptDefinition = $definition.Extent.Text -replace (
-        '^function\s+' + [regex]::Escape($Name)
-    ), "function script:$Name"
-    . ([scriptblock]::Create($scriptDefinition))
 }
 
 try {
-    $tokens = $null
-    $parseErrors = $null
-    $setupAst = [System.Management.Automation.Language.Parser]::ParseFile(
-        (Join-Path $repoRoot 'setup-windows.ps1'),
-        [ref]$tokens,
-        [ref]$parseErrors
-    )
-    if ($parseErrors.Count -gt 0) {
-        throw "setup-windows.ps1 failed to parse: $($parseErrors[0].Message)"
-    }
-    # Write-Utf8LfFile (and the console encoding block) live in utils.ps1, which
-    # setup-windows.ps1 dot-sources before Deploy-SkillRecord runs.
-    . (Join-Path $repoRoot 'scripts\utils.ps1')
-    foreach ($functionName in @(
-        'Test-SkillTargetsAgent',
-        'Get-SkillField',
-        'Test-SkillFrontmatterKeyKept',
-        'Convert-SkillRecord',
-        'Deploy-SkillRecord'
-    )) {
-        Import-SetupFunction -Ast $setupAst -Name $functionName
-    }
-
-    $env:USERPROFILE = $scratch
     $env:COPILOT_HOME = $copilotHome
     # The catalog is injected into an EXISTING deployed instructions file (the
     # base file is copied verbatim earlier in setup). Seed it from the repo
@@ -68,7 +33,7 @@ try {
     # doctor's drift check depends on (WIN-008/#1289).
     Ensure-Directory $copilotHome
     Copy-Item -LiteralPath (Join-Path $repoRoot 'ai\copilot\copilot-instructions.md') -Destination (Join-Path $copilotHome 'copilot-instructions.md') -Force
-    Deploy-SkillRecord -DotfilesDir $repoRoot
+    Invoke-SkillDeploy -RepoRoot $repoRoot -TargetHome $scratch
 
     $instructions = Join-Path $copilotHome 'copilot-instructions.md'
     $bytes = [System.IO.File]::ReadAllBytes($instructions)
@@ -111,9 +76,7 @@ try {
     # this fixture holds only one record, so deploying into the home the Copilot
     # discovery check reads below would delete handoff from it.
     $fixtureHome = Join-Path $scratch 'fixture-home'
-    $env:USERPROFILE = $fixtureHome
-    Deploy-SkillRecord -DotfilesDir $fixtureDir
-    $env:USERPROFILE = $scratch
+    Invoke-SkillDeploy -RepoRoot $fixtureDir -TargetHome $fixtureHome
     $claudeOnlyForClaude = Join-Path $fixtureHome '.claude\skills\claude-only\SKILL.md'
     $claudeOnlyForCopilot = Join-Path $fixtureHome '.copilot\skills\claude-only'
     if (-not (Test-Path -LiteralPath $claudeOnlyForClaude)) {
@@ -140,7 +103,6 @@ try {
 }
 finally {
     $env:COPILOT_HOME = $previousCopilotHome
-    $env:USERPROFILE = $previousUserProfile
     if (Test-Path -LiteralPath $scratch) {
         Remove-Item -LiteralPath $scratch -Recurse -Force
     }

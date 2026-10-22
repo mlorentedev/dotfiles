@@ -31,7 +31,7 @@ created: "2026-06-21"
 ## Slice 3 — rewire skills (part of AC8; needs a release carrying slices 1–2)
 
 - [x] ~~`deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`~~ superseded: no caller runs `compile-harness.sh --deploy` once the slice 5 rewire lands, and slice 7 deletes it
-- [ ] `setup-windows.ps1` calls `dotf harness skills`; delete `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their Pester/bats parity tests
+- [x] `setup-windows.ps1` calls `dotf harness deploy` (slice 5), which runs the skills surface; `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their bats parity tests deleted; the copilot smoke test runs `dotf harness skills`
 - [ ] Note the skills half fixed on #1733
 - [ ] `doctor`'s `recordTargets` (`checks_agent_tiers.go`) mirrors the shell's substring match on purpose (`TestRecordTargetsAgreesWithTheRender`); switch it and its test to `harness.SkillTargetsAgent` in the slice that moves the agent render to Go (slice 4), so the check keeps predicting the render
 
@@ -39,7 +39,7 @@ created: "2026-06-21"
 
 - [x] `dotf harness agents`: agent-md render with resolved model and capability lines; parity oracle (`tests/harness-agents-parity.bats`)
 - [x] `dotf harness doctrine`: compact payload, ASCII fold, char cap, shadow warning; parity oracle (`tests/harness-doctrine-parity.bats`)
-- [ ] Windows gains `agents.deploy` (#1387)
+- [x] Windows gains `agents.deploy` (#1387), through `dotf harness deploy` in `setup-windows.ps1`; live check pending (slice 5)
 
 ## Slice 5 — `dotf harness deploy` (AC4, AC8)
 
@@ -47,7 +47,9 @@ created: "2026-06-21"
 - [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
   - [x] `records-harness` calls `harness.Deploy` in process (`converge.HarnessDeploy`); `CompileHarnessDeploy` deleted
   - [x] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
-  - [ ] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
+  - [x] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
+  - [ ] Live acceptance on the work-lab Windows box after a release carries it: setup, then `dotf converge` reports `records-harness` changed=0, and `~/.claude/agents/` holds the seven personas (#1387)
+  - [ ] doctor's `instructionsRemedy` (`checks_deploy.go`) still tells Windows to re-run setup; switch it to `dotf converge` with slice 6's doctor wiring
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)
 

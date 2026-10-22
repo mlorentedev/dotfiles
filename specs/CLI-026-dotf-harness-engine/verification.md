@@ -47,8 +47,18 @@ created: "2026-06-21"
 - Every bats file that references `setup-linux.sh` or `compile-harness` (48 files, 667 tests) passes but `harness-doctrine-records.bats`'s real-vault refresh, which fails the same way on main: the vault's crystallize skill is ahead of its committed record.
 - The `integration` job is the behavioural check: its container builds dotf from the tree and runs setup-linux, then `verify-setup.bats` counts the deployed skills and commands.
 
+- Slice 5 rewire, Windows setup: `setup-windows.ps1` calls `& dotf harness deploy --repo-root $DotfilesDir` and stops on a non-zero exit; the script went from 1556 to 1277 lines.
+- Removed with it: `Deploy-SkillRecord` and its four helpers, the separate `dotf harness presence` call, and the hand copies of `CLAUDE.md`, opencode's and pi's `AGENTS.md` and `copilot-instructions.md`. Each of those files is an `agents.presence` entry the verb writes.
+- `tests/setup-fails-loudly.bats` gains the Windows row; `setup-windows.bats`, `antigravity.bats`, `copilot-config.bats` and `opencode.bats` assert the verb call and the absence of the removed code.
+- `tests/copilot-native-skills-smoke.ps1` deploys with `dotf harness skills --home <scratch>` instead of importing the PowerShell functions; its LF, BOM, filtering and discovery assertions are unchanged.
+- Every bats file referencing either setup script or `compile-harness` (725 tests) passes but the real-vault refresh noted above. `dotf lint powershell` clean; both PowerShell files parse with 0 errors; both are ASCII.
+- `records-harness` runs on Windows; `TestConverge_AStepsOutputPrecedesItsResultLine` now expects it first on every OS. Windows behaviour is held by `test-windows` and `test (windows-latest)`; the live run on the work-lab box is the open task above.
+
 ## Decisions made during implementation
 
+- Slice 5 rewire, Windows setup: the hand copies of the instruction files went in the same change as the skill renderer. Left in place they would be a second writer of files the verb owns, and the verb deploys them anyway.
+- Slice 5 rewire, Windows setup: `CLAUDE.md` is excluded from the bulk copy of `ai\claude` for the same reason; the bulk copy keeps the plugin JSON files it carried.
+- Slice 5 rewire, Windows setup: Windows now gets agent records and doctrine, which it never had (#1387). The deploy fails setup loudly, where `Deploy-SkillRecord` returned quietly and presence only warned.
 - Slice 5 rewire, Linux setup: `dotf` is called by name. Setup exports `~/.local/bin` onto PATH before `install_dotf`, and a failed install already stops setup, so no fallback lookup is needed at this line.
 - Slice 3's shell delegation is not done: it would change `compile-harness.sh --deploy`, which no caller runs after this rewire.
 - Slice 5 rewire, converge: the composition moved from the `deploy` command into `harness.Deploy`, which returns every surface's outcomes; the command prints from them and converge calls it in process.
