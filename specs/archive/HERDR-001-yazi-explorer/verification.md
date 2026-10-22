@@ -119,15 +119,15 @@ binding runs the pinned `dotf` and so waits for a release that carries them.
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: three —
-      `docs/lessons/lesson-493-a-wrapper-hides-the-foreground-process-so-name-the-agent-for-the-inspector.md`,
-      `docs/lessons/lesson-494-tools-sync-reads-the-deploy-dirs-versions-conf-outside-the-checkout.md`,
-      `docs/lessons/lesson-495-a-heredoc-inside-a-command-substitution-still-runs-its-backticks.md`
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-493-a-wrapper-hides-the-foreground-process-so-name-the-agent-for-the-inspector.md
+      (also 494 tools-sync reads the deploy dir's versions.conf, 495 a heredoc inside a
+      command substitution runs its backticks, 498 a guard must pass before and after a
+      bot bumps the value it reads, 503 a safety exclusion must not also exclude recognition)
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the design follows ADR-020
       (new tooling in Go) and lesson 373 (release ordering); no new decision was taken.
 - [x] New pattern candidate for `00_meta/patterns/`? no: one project, one tool.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HERDR-001-yazi-explorer/` -> `specs/archive/HERDR-001-yazi-explorer/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HERDR-001-yazi-explorer/` -> `specs/archive/HERDR-001-yazi-explorer/`

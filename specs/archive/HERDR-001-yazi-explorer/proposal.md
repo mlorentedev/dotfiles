@@ -1,7 +1,7 @@
 ---
 id: "HERDR-001-yazi-explorer"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-18"
 issue: "mlorentedev/dotfiles#2814"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
