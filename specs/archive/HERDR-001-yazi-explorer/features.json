@@ -9,21 +9,21 @@
   {
     "id": "HERDR-001-yazi-explorer-f2",
     "behavior": "dotf herdr explorer splits the active pane to the right, at that pane's directory and ratio, and runs yazi in the new pane",
-    "verification": "cd cli && go test ./internal/cmd -run TestHerdrExplorerOpensOnTheRightWhenNoneIsOpen",
+    "verification": "cd cli && go test ./internal/herdr -run TestToggleExplorerOpensWhenNoneIsOpen",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HERDR-001-yazi-explorer-f3",
     "behavior": "a second invocation in the same tab closes the running explorer and opens nothing; another tab's explorer is left alone",
-    "verification": "cd cli && go test ./internal/cmd -run 'TestHerdrExplorerClosesTheOneAlreadyRunning|TestHerdrExplorerIgnoresOtherTabsExplorer'",
+    "verification": "cd cli && go test ./internal/herdr -run 'TestToggleExplorerClosesTheExplorerInThePanesTab|TestToggleExplorerIgnoresAnotherTabsExplorer'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HERDR-001-yazi-explorer-f4",
     "behavior": "a machine without yazi gets a refusal that names the provisioner instead of an empty pane",
-    "verification": "cd cli && go test ./internal/cmd -run 'TestHerdrExplorerRefusesWithoutYazi|TestHerdrExplorerRefusesOutsideHerdr'",
+    "verification": "cd cli && go test ./internal/herdr -run 'TestToggleExplorerRefusesWithoutYazi|TestExplorerContextRefusesOutsideHerdr'",
     "state": "pending",
     "evidence": ""
   },
