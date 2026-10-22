@@ -81,6 +81,7 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 	writeAuditSpec(t, root, "A-001-open", frontmatter(`issue: "mlorentedev/dotfiles#1"`))
 	writeAuditSpec(t, root, "A-002-zombie", frontmatter(`issue: "mlorentedev/dotfiles#2"`))
 	writeAuditSpec(t, root, "A-003-gone", frontmatter(`issue: "mlorentedev/kubelab#611"`))
+	writeAuditSpec(t, root, "A-003b-gone-here", frontmatter(`issue: "mlorentedev/dotfiles#612"`))
 	writeAuditSpec(t, root, "A-004-pull", frontmatter(`issue: "#4"`))
 	writeAuditSpec(t, root, "A-005-prose", frontmatter(`status: draft`)+"\n- GH issue: [#5](https://github.com/mlorentedev/dotfiles/issues/5)\n")
 	writeAuditSpec(t, root, "A-006-unlinked", frontmatter(`status: draft`))
@@ -97,11 +98,12 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 	}
 
 	f := &fakeLookup{states: map[string]IssueState{
-		"mlorentedev/dotfiles#1":  StateOpen,
-		"mlorentedev/dotfiles#2":  StateClosed,
-		"mlorentedev/kubelab#611": StateNotFound,
-		"mlorentedev/dotfiles#4":  StateNotIssue,
-		"mlorentedev/dotfiles#5":  StateOpen,
+		"mlorentedev/dotfiles#1":   StateOpen,
+		"mlorentedev/dotfiles#2":   StateClosed,
+		"mlorentedev/kubelab#611":  StateNotFound,
+		"mlorentedev/dotfiles#612": StateNotFound,
+		"mlorentedev/dotfiles#4":   StateNotIssue,
+		"mlorentedev/dotfiles#5":   StateOpen,
 	}}
 	got, err := AuditIssueState(root, homeRepo, f.lookup)
 	if err != nil {
@@ -110,7 +112,8 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 	want := map[string]AuditSeverity{
 		"A-001-open":            SeverityOK,
 		"A-002-zombie":          SeverityFail,
-		"A-003-gone":            SeverityFail,
+		"A-003-gone":            SeverityUnanswerable,
+		"A-003b-gone-here":      SeverityFail,
 		"A-004-pull":            SeverityFail,
 		"A-005-prose":           SeverityWarn,
 		"A-006-unlinked":        SeverityWarn,
@@ -136,10 +139,24 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 			break
 		}
 	}
+	// A 404 from another repository is not "does not exist": the token may not
+	// see that repository (#1909), so the verdict is "not verified", never FAIL.
+	for _, fd := range got {
+		switch fd.SpecID {
+		case "A-003-gone":
+			if !strings.Contains(fd.Detail, "could not be verified") {
+				t.Errorf("cross-repo 404 detail = %q, want it to say the issue could not be verified", fd.Detail)
+			}
+		case "A-003b-gone-here":
+			if !strings.Contains(fd.Detail, "does not exist") {
+				t.Errorf("home-repo 404 detail = %q, want %q", fd.Detail, "does not exist")
+			}
+		}
+	}
 	// One lookup per distinct issue: A-002, A-008 and A-009 share #2, and the
 	// malformed and unlinked specs are never looked up.
-	if len(f.calls) != 5 {
-		t.Errorf("lookups = %v, want 5 distinct issues", f.calls)
+	if len(f.calls) != 6 {
+		t.Errorf("lookups = %v, want 6 distinct issues", f.calls)
 	}
 }
 
@@ -371,8 +388,8 @@ func TestExcuseArchivedZombies(t *testing.T) {
 						t.Errorf("zombie graded %s %q, want %s containing %q", fd.Severity, fd.Detail, tc.wantZombie, tc.wantDetail)
 					}
 				case "A-003-gone":
-					if fd.Severity != SeverityFail {
-						t.Errorf("a missing issue was excused: %s", fd.Severity)
+					if fd.Severity != SeverityUnanswerable {
+						t.Errorf("an issue that is not a zombie was excused: %s", fd.Severity)
 					}
 				}
 			}
