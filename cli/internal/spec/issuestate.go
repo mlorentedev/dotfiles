@@ -168,7 +168,7 @@ func AuditIssueState(repoRoot, homeRepo string, lookup IssueStateLookup) ([]Audi
 	states := lookupAll(findings, lookup)
 	for i := range findings {
 		if findings[i].Severity == "" {
-			grade(&findings[i], states[findings[i].Ref])
+			grade(&findings[i], states[findings[i].Ref], homeRepo)
 		}
 	}
 	return findings, nil
@@ -247,13 +247,19 @@ func lookupAll(findings []AuditFinding, lookup IssueStateLookup) map[IssueRef]lo
 	return results
 }
 
-func grade(f *AuditFinding, r lookupResult) {
+// grade turns one lookup into a verdict. A 404 is proof of absence only in the
+// repository the token is scoped to: GitHub answers 404 for a missing issue and
+// for a repository the token cannot see alike, so elsewhere it is "not verified"
+// (#1909), the verdict an unauthenticated run already gets.
+func grade(f *AuditFinding, r lookupResult, homeRepo string) {
 	switch {
 	case r.err != nil:
 		f.Severity, f.Detail = SeverityUnanswerable, fmt.Sprintf("%s could not be checked: %v", f.Ref, r.err)
 	case r.state == StateClosed:
 		f.Severity, f.Detail = SeverityFail, fmt.Sprintf("zombie: %s is CLOSED but the spec is still active", f.Ref)
 		f.zombie = true
+	case r.state == StateNotFound && !strings.EqualFold(f.Ref.Repo, homeRepo):
+		f.Severity, f.Detail = SeverityUnanswerable, fmt.Sprintf("%s could not be verified: GitHub answered 404, which is also what a repository this token cannot see answers", f.Ref)
 	case r.state == StateNotFound:
 		f.Severity, f.Detail = SeverityFail, fmt.Sprintf("unresolvable link: %s does not exist", f.Ref)
 	case r.state == StateNotIssue:
