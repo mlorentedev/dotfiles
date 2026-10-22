@@ -34,7 +34,7 @@ this session, on herdr 0.9.3, macOS arm64.
 - Windows. herdr there is preview, and the PowerShell profile is deliberately
   untouched: it runs the real binary in-process, so no hint is needed and the
   change would be unverified either way.
-- The docked binding in a live session after 0.76.0 is installed on the owner's machine.
+- The docked binding in a live session once the release carrying #2854 is installed on the owner's machine, and the deployed config merged by `dotf converge`.
 
 ## Decisions made during implementation
 
@@ -57,7 +57,7 @@ this session, on herdr 0.9.3, macOS arm64.
 - **`agent_panel_sort = "priority"`** applied as its own one-key change, with a
   static test, because it is unrelated to the explorer and reversible alone.
 
-## Review dispositions (review.md, reviewed_sha fbfedfc3)
+## Round 1 dispositions (review-round1.md, reviewed_sha fbfedfc3)
 
 The review ran before #2815 merged. Code findings were applied there and are
 named below by test; the later ones are dispositioned here.
@@ -86,6 +86,36 @@ named below by test; the later ones are dispositioned here.
    --dry-run`).
 5. *AC6 sourced outside the scope; stale comment* -> **applied**: `tasks.md` says
    AC6 landed in `216fa210`, and the config comment now describes both keys.
+
+## Round 2 dispositions (review.md, reviewed_sha 26c22bef, FAIL)
+
+All code findings landed in #2854 (`4c92cfc4`), ahead of this change, because the
+binding runs the pinned `dotf` and so waits for a release that carries them.
+
+1. *Blocker: the key pressed from inside the explorer opens a second one* ->
+   **applied**: a labelled invoking pane is `ours`, an unlabelled one is neither
+   `ours` nor a stranger. `TestToggleExplorerClosesItselfWhenPressedFromInside`,
+   `TestToggleExplorerNeverTouchesAnUnlabelledInvokingPane`; lesson 503. The live
+   re-check on a released binary is the owner's keyboard check on #2814.
+2. *Major: AC2/AC3/AC4 evidence names tests that no longer exist* -> **applied**:
+   the commands above run `./internal/herdr -run TestToggleExplorer…`.
+3. *Major: `harness/skills/herdr/SKILL.md` says to toggle by foreground process* ->
+   **applied**: it now says toggle by label, in the vault source and the rendered
+   record.
+4. *Minor: the deployed config lacks the binding* -> **open, by order**: the key
+   is inert on a machine until the release is installed and `dotf converge` (or
+   `dotf deploy herdr`) merges it. Listed under "Not verified".
+5. *Minor: the config-wide guard was deleted* -> **declined**: no source maps a
+   `dotf` subcommand to the release that added it, so a config-wide scan has
+   nothing to compare against; the per-binding test bites (the review mutated
+   `DOTF_VERSION` to 0.75.0 and it failed), and lesson 373 names the rule for the
+   next binding.
+6. *Minor: with two explorers the toggle closes `ours[0]`* -> **declined**: the
+   Blocker was the only way a keypress created a second explorer, and it is fixed.
+7. *Minor: `ToggleExplorer` over 40 lines* -> **applied**: `openExplorer` was
+   extracted; the function is 27 lines.
+8. *Minor: a pane the user renames `files` is taken as ours* -> **declined**:
+   surface only, the label is the documented token.
 
 ## Promotion candidates
 
