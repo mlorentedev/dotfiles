@@ -117,8 +117,8 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 
 // ensureSelfOnPath puts the directory of self, the running dotf, first on this
 // process's PATH unless PATH already resolves dotf to that same file. The
-// children converge starts look dotf up by name (compile-harness.sh's
-// `type -P dotf`), and a from-zero install.sh execs the binary it just placed
+// children converge starts look dotf up by name (the setup script's `dotf`
+// calls), and a from-zero install.sh execs the binary it just placed
 // by absolute path, on a PATH a fresh Ubuntu has no ~/.local/bin on until the
 // next login (#2688). A PATH that resolves another dotf first gets self too:
 // the children run the binary that runs the converge. A binary not named dotf
