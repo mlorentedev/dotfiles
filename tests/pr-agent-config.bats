@@ -8,6 +8,13 @@
 
 load 'lib/refute'
 
+# The workflow's concurrency group as GitHub reads it. The key spans several
+# lines (a folded scalar, #2867), so a grep for the `group:` line no longer
+# sees it.
+concurrency_group() {
+    python3 -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["concurrency"]["group"])' "$WF"
+}
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CFG="$REPO/.pr_agent.toml"
@@ -266,7 +273,10 @@ PY
     # Asserted on the group EXPRESSION rather than on behaviour, because nothing
     # here can run GitHub's scheduler. What it protects is the discriminator:
     # remove github.event_name from the key and the two event types collide again.
-    grep -qE '^\s*group:.*github\.event_name' "$WF"
+    # The name must be a PART of the key, not merely mentioned in it: since #2867
+    # the key also tests github.event_name to split comments out, so a bare grep
+    # passed with the discriminator deleted.
+    concurrency_group | tr -s ' \n' ' ' | grep -qE "github\.event\.issue\.number, github\.event_name,"
 }
 
 @test "pr-agent: both PR-number sources stay in the concurrency key" {
@@ -275,9 +285,33 @@ PY
     # without issue.number every slash-command run shares one group, without
     # pull_request.number every push does.
     local group
-    group=$(grep -E '^\s*group:' "$WF")
+    group=$(concurrency_group)
     printf '%s\n' "$group" | grep -q 'github.event.pull_request.number'
     printf '%s\n' "$group" | grep -q 'github.event.issue.number'
+}
+
+@test "pr-agent: a comment the job will skip cannot cancel a /review in flight (#2867)" {
+    # GitHub evaluates workflow-level concurrency BEFORE the job's if:. So a
+    # comment the job skips still joins the group, and cancel-in-progress kills
+    # whatever runs there. Measured on #2855: CodeRabbit's review comment
+    # (39621772110, skipped) cancelled the owner's /review (39619480456) with no
+    # review published. Only a comment that will actually run, a slash command
+    # from someone the job trusts, may share the group; any other gets its own,
+    # keyed on its id, and supersedes nothing.
+    run python3 - "$WF" <<'PY'
+import re, sys, yaml
+wf = yaml.safe_load(open(sys.argv[1]))
+group = wf["concurrency"]["group"]
+gate = wf["jobs"]["review"]["if"]
+assert "github.event.comment.id" in group, "comments are not split out of the shared group"
+term = re.sub(r"\s+", " ", group)
+assert "github.event_name == 'issue_comment'" in term, "the per-comment group is not limited to issue_comment"
+assert "startsWith(github.event.comment.body, '/')" in term, "a slash command no longer shares the group"
+lists = lambda s: re.findall(r"fromJSON\('(\[[^']*\])'\)\s*,\s*github\.event\.comment\.author_association", s)
+assert lists(term) and lists(gate), "the trusted-association test is missing from the group or the job gate"
+assert set(lists(term)) == set(lists(gate)), f"group trusts {lists(term)}, the job gate {lists(gate)}"
+PY
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
 @test "pr-agent: every event the workflow fires on is handled by something" {
