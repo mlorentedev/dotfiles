@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,6 +86,66 @@ func TestLessonsHelp_DoesNotPromiseACommittedIndex(t *testing.T) {
 	for _, phrase := range []string{"generated index", "committed index"} {
 		if strings.Contains(out.String(), phrase) {
 			t.Errorf("the lessons help still promises %q:\n%s", phrase, out.String())
+		}
+	}
+}
+
+// A tracked lesson moves with git mv, so the rename is staged as one; the
+// command names the ambiguous link it left and a second run changes nothing.
+func TestLessonsRenumber_MovesATrackedLessonWithGitMvAndIsIdempotent(t *testing.T) {
+	repo := t.TempDir()
+	dir := filepath.Join(repo, "docs", "lessons")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := func(title, extra string) string {
+		return "---\ntitle: \"" + title + "\"\ndate: \"2026-10-05\"\n---\n\n# " + title + "\n\n" + extra
+	}
+	for name, b := range map[string]string{
+		"lesson-497-mine.md":   body("Mine", ""),
+		"lesson-497-theirs.md": body("Theirs", ""),
+		"lesson-498-cites.md":  body("Cites", "[[lesson-497-mine]] and [[lesson-497]]\n"),
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(b), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}} {
+		if out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	src := filepath.Join(dir, "lesson-497-mine.md")
+
+	stdout, _, err := execute(t, "lessons", "renumber", src, "--next", "--dir", dir)
+	if err != nil {
+		t.Fatalf("renumber: %v\n%s", err, stdout)
+	}
+	for _, must := range []string{"lesson-499-mine.md", "lesson-498-cites.md links [[lesson-497]]"} {
+		if !strings.Contains(stdout, must) {
+			t.Errorf("output lacks %q:\n%s", must, stdout)
+		}
+	}
+	staged, err := exec.Command("git", "-C", repo, "diff", "--cached", "--name-status").Output()
+	if err != nil || !strings.Contains(string(staged), "lesson-499-mine.md") {
+		t.Errorf("the rename is not staged (git mv): %v\n%s", err, staged)
+	}
+
+	stdout, _, err = execute(t, "lessons", "renumber", src, "--next", "--dir", dir)
+	if err != nil || !strings.Contains(stdout, "already") {
+		t.Errorf("second run: err %v\n%s", err, stdout)
+	}
+}
+
+func TestLessonsRenumber_WantsExactlyOneOfNextAndTo(t *testing.T) {
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"lessons", "renumber", filepath.Join(dir, "lesson-001-a.md"), "--dir", dir},
+		{"lessons", "renumber", filepath.Join(dir, "lesson-001-a.md"), "--next", "--to", "5", "--dir", dir},
+		{"lessons", "renumber", filepath.Join(dir, "lesson-001-a.md"), "--to", "0", "--dir", dir},
+	} {
+		if _, _, err := execute(t, args...); err == nil {
+			t.Errorf("%v: accepted", args)
 		}
 	}
 }
