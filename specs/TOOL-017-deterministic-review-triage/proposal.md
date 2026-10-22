@@ -73,6 +73,7 @@ The REAL row is the whole spec. Every other row is bookkeeping.
 - [ ] A reproduction that does not land is reported as **did-not-land**, distinct from **did-not-reproduce**.
 - [ ] A refuted REAL finding is recorded as refuted with its evidence — not silently skipped, because the probe may still have found something real (#1059).
 - [ ] Every reviewer comment carries exactly one recorded disposition, and a PR cannot close or merge with one missing.
+  Re-scoped by the owner (#1062, 2026-10-21, option B): the gate is PR-level, `dotf pr land` refuses a PR with reviewer output newer than its last `## Review triage`; per-finding visibility comes from the unclassified-findings report. A per-row check and a close-without-merge guard are not built.
 - [ ] Every new check has a red-direction test that fails when the thing it guards is broken.
 
 ## References

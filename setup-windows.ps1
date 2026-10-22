@@ -165,36 +165,6 @@ function Backup-AndRestoreClaudeJson {
     }
 }
 
-# ADR-015 / dotfiles#230: single registration point for hive Scheduled Tasks so
-# they ALWAYS run with the strongest achievable principal. A task registered
-# without an explicit principal defaults to the Interactive logon type, which
-# runs in the user's desktop session and pops a console window every tick for a
-# powershell.exe action. An S4U principal ("run whether the user is logged on
-# or not", no stored password) runs the task in session 0 -- the non-interactive
-# session with no desktop -- so no window can appear. BUT registering an S4U
-# task requires an elevated caller: on a non-admin box Register-ScheduledTask
-# raises "Access is denied" as a NON-terminating error, which used to slip past
-# every call site's try/catch and print a false SUCCESS while a stale task
-# survived. So: compute the strongest achievable logon type once (elevated ->
-# S4U windowless; non-admin -> Interactive, where -WindowStyle Hidden on the
-# action softens the console flash), and register with -ErrorAction Stop so any
-# residual failure is terminating and the call-site catch reports the truth.
-$script:HiveTaskLogonType =
-    if (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { 'S4U' } else { 'Interactive' }
-function Register-HiveScheduledTask {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$TaskName,
-        [Parameter(Mandatory)]$Action,
-        [Parameter(Mandatory)]$Trigger,
-        [Parameter(Mandatory)]$Settings,
-        [Parameter(Mandatory)][string]$Description
-    )
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $script:HiveTaskLogonType -RunLevel Limited
-    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
-        -Settings $Settings -Principal $principal -Description $Description -Force -ErrorAction Stop | Out-Null
-}
-
 # ============================================================================
 # BANNER
 # ============================================================================
@@ -623,59 +593,6 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
             Write-Success "Provisioned hive daemon autostart via Startup folder (no-admin fallback)"
         } else {
             Write-Warn "hive-serve supervisor script not found at $hiveSupSrc"
-        }
-    }
-
-    # AI-023 / hive#176 / ADR-015: the upgrade policy that FEEDS the daemon's
-    # restart-on-upgrade. Windows cannot replace a running executable, so the task
-    # does NOT call `uv tool upgrade` directly -- it runs the orchestration script
-    # (only-if-newer -> defer-if-locked -> stop daemon -> upgrade -> start),
-    # deployed from the dotfiles SSOT. Cadence matches Linux: every 15 min.
-    # Self-healing: re-register when the action OR the S4U principal drift, so a
-    # box that still has the old Interactive (windowed) task gets repaired.
-    $hiveUpgradeTask = "DotfilesHiveUpgrade"
-    $hiveUpgradeSrc = Join-Path $DotfilesDir "windows\hive-upgrade.ps1"
-    $hiveUpgradeDst = Join-Path $ClaudeHome "scripts\hive-upgrade.ps1"
-    # -WindowStyle Hidden is belt-and-suspenders; the S4U principal applied by
-    # Register-HiveScheduledTask (session 0) is what actually guarantees no
-    # window when elevated. Non-admin boxes fall back to Interactive, where
-    # Hidden is the only mitigation (brief console flash possible).
-    $hiveUpgradeArg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$hiveUpgradeDst`""
-    if (Test-Path $hiveUpgradeSrc) {
-        Ensure-Directory (Split-Path $hiveUpgradeDst -Parent)
-        Copy-Item $hiveUpgradeSrc $hiveUpgradeDst -Force
-    } else {
-        Write-Warn "hive-upgrade orchestration script not found at $hiveUpgradeSrc"
-    }
-    $existingHiveTask = Get-ScheduledTask -TaskName $hiveUpgradeTask -ErrorAction SilentlyContinue
-    $existingHiveArg = $null
-    $existingHiveExe = $null
-    $existingHiveLogon = $null
-    if ($existingHiveTask -and $existingHiveTask.Actions -and $existingHiveTask.Actions[0]) {
-        $existingHiveArg = $existingHiveTask.Actions[0].Arguments
-        $existingHiveExe = $existingHiveTask.Actions[0].Execute
-        if ($existingHiveTask.Principal) { $existingHiveLogon = "$($existingHiveTask.Principal.LogonType)" }
-    }
-    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg) -and ($existingHiveLogon -eq $script:HiveTaskLogonType)) {
-        Write-Info "hive-upgrade task already correctly configured, skipping"
-    } else {
-        try {
-            $hiveAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $hiveUpgradeArg
-            $hiveTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-                -RepetitionInterval (New-TimeSpan -Minutes 15)
-            $hiveSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
-            Register-HiveScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
-                -Settings $hiveSettings `
-                -Description "hive-vault auto-upgrade every 15 min (ADR-015 orchestrated stop-before-upgrade; feeds hive serve restart-on-upgrade)"
-            Write-Success "Installed hive-upgrade task (15-min, $($script:HiveTaskLogonType) principal, v$hiveVer)"
-            if ($script:HiveTaskLogonType -ne 'S4U') {
-                Write-Info "not elevated: windowless S4U registration unavailable; using Interactive logon with -WindowStyle Hidden"
-            }
-            if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-                Write-Warn "hive-upgrade task registered but uv is not on PATH"
-            }
-        } catch {
-            Write-Warn "Could not register hive-upgrade task (non-fatal; setup still upgrades hive each run): $_"
         }
     }
 } elseif (Get-Command hive -ErrorAction SilentlyContinue) {
