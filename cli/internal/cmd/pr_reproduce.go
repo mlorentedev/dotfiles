@@ -36,8 +36,10 @@ is recorded; anything else, a model's judgement included, goes to a human.
                      or timed out: no verdict, never a reproduction
   did-not-land       --probe changed no file it names: the check is not run
 
---probe applies a patch for the run (a mutation that removes a fix, or a test
-that names the defect) and reverts it afterwards, whatever the check said. A
+--probe applies a mutation for the run (a patch that removes a fix) and
+reverts it afterwards, whatever the check said; a test that names a defect is
+committed and run without one. The patch names files from the repository
+root and may be applied from any directory below it. A
 probe lands only if a file it names changed bytes; one that did not is never
 read as a clean result. A probe that cannot be reverted is an error. Keep the
 patch outside the tree: an untracked file is a dirty tree.

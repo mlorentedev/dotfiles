@@ -55,6 +55,9 @@ type Options struct {
 // check's output is where it says why.
 const outputTail = 2048
 
+// waitDelay bounds how long the output of a killed check is still read.
+const waitDelay = 5 * time.Second
+
 // Result is one reproduction's record.
 type Result struct {
 	State   State
@@ -82,42 +85,48 @@ func Run(ctx context.Context, o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	// A patch names files from the root, so the probe is applied and its
+	// targets read there; the check alone runs in o.Dir.
+	top, err := git(ctx, o.Dir, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return Result{}, err
+	}
 
 	res := Result{Exit: -1, Head: head, Command: o.Command}
 	if o.Probe == "" {
 		res.Exit, res.State, res.Output = check(ctx, o)
 		return res, nil
 	}
-	return probed(ctx, o, res)
+	return probed(ctx, o, top, res)
 }
 
 // probed applies the probe, runs the check only if the probe changed a
 // file it names, and reverts it whatever happened. Landing is decided by
 // the targets' bytes, not by git apply's exit: an apply that succeeds and
 // changes no content (a mode-only patch) did not land either.
-func probed(ctx context.Context, o Options, res Result) (Result, error) {
+func probed(ctx context.Context, o Options, top string, res Result) (Result, error) {
 	if _, err := os.Stat(o.Probe); err != nil {
 		return res, fmt.Errorf("probe: %w", err)
 	}
-	targets, err := probeTargets(ctx, o.Dir, o.Probe)
+	targets, err := probeTargets(ctx, top, o.Probe)
 	if err != nil {
 		res.State, res.Output = DidNotLand, err.Error()
 		return res, nil
 	}
-	before := fingerprint(o.Dir, targets)
-	if _, err := git(ctx, o.Dir, "apply", o.Probe); err != nil {
+	before := fingerprint(top, targets)
+	if _, err := git(ctx, top, "apply", o.Probe); err != nil {
 		res.State, res.Output = DidNotLand, err.Error()
 		return res, nil
 	}
-	if maps.Equal(before, fingerprint(o.Dir, targets)) {
+	if maps.Equal(before, fingerprint(top, targets)) {
 		res.State = DidNotLand
 	} else {
 		res.Exit, res.State, res.Output = check(ctx, o)
 	}
 	// The revert must not inherit a check's timeout: a probe left applied
 	// is worse than any verdict.
-	_, revertErr := git(context.WithoutCancel(ctx), o.Dir, "apply", "-R", o.Probe)
-	if revertErr != nil || !maps.Equal(before, fingerprint(o.Dir, targets)) {
+	_, revertErr := git(context.WithoutCancel(ctx), top, "apply", "-R", o.Probe)
+	if revertErr != nil || !maps.Equal(before, fingerprint(top, targets)) {
 		return res, fmt.Errorf("%w: %s no longer match the commit %s (%v)", ErrNotReverted, strings.Join(targets, ", "), res.Head, revertErr)
 	}
 	return res, nil
@@ -170,6 +179,9 @@ func check(ctx context.Context, o Options) (int, State, string) {
 	cmd := exec.CommandContext(ctx, o.Command[0], o.Command[1:]...) //nolint:gosec // the check is the operator's own command
 	cmd.Dir = o.Dir
 	cmd.Stdout, cmd.Stderr = &out, &out
+	// Killing the check does not close a pipe a child of it inherited;
+	// without a bound, Wait would outlive the timeout by the child's life.
+	cmd.WaitDelay = waitDelay
 	started := cmd.Start() == nil
 	exit := -1
 	if started {

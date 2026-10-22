@@ -29,6 +29,11 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - 2026-10-21, consumer: an unclassified finding is REPORTED by `dotf pr triage-queue` and does not make a PR pending. Making it pending would change the land gate before the marker has a measured adoption window (the proposal's escalation risk). Live: the first review after #2845 (#2849, claude-haiku) emitted the marker on 2 of 2 inline findings.
 - The findings are read from `pulls/N/comments`: PR-Agent's COMMENTED review has an empty body, so the reviews endpoint the verdict reads carries no finding text (lesson 448, applied to the classifier). They are read only for a PR the queue reports, and only when the registry names a classifying reviewer, so the session-start probe pays nothing extra by default.
 - Which reviewers are asked for the marker is declared in the registry (`classification.reviewers`), not inferred: CodeRabbit's inline findings carry its own severity format and would all read as unclassified.
+- 2026-10-21, owner decisions on #1062: AC4-AC6 option A (a reproduction is a committed failing test or a recorded non-zero exit, never a model's judgement); AC7 option B (the PR-level gate stands). The registry now names `github-actions` as the one classifying reviewer.
+- 2026-10-21, AC5 (`dotf pr reproduce`): a check that never ran as designed (start failure, 126/127, a signal, a timeout) is `could-not-run`, a state of its own (owner), because its non-zero exit is not evidence of a defect. The command exits 1 for a row without a verdict (`could-not-run`, `did-not-land`), which keeps main.go's one exit contract.
+- `--probe` is a mutation, not an uncommitted test: under option A a test that names the defect is committed and run without a probe. The patch lives outside the tree, since an untracked file is a dirty tree and is refused.
+- The probe is applied, hashed and reverted from the repository root, because a patch names files from there. The first version hashed cwd-relative paths and reported a probe that had landed from `cli/` as `did-not-land` (lesson 512). `WaitDelay` bounds `Wait` after a timeout kill, because a child holding the output pipe outlives the kill.
+- The command applies nothing and decides nothing: a human pastes its row into `## Review triage`. Gating `apply` on it is AC4, the next slice.
 
 ## Promotion candidates
 
@@ -44,4 +49,3 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 - [ ] Folder moved: `specs/TOOL-017-deterministic-review-triage/` -> `specs/archive/TOOL-017-deterministic-review-triage/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
-- 2026-10-21, owner decisions on #1062: AC4-AC6 option A (a reproduction is a committed failing test or a recorded non-zero exit, never a model's judgement); AC7 option B (the PR-level gate stands). The registry now names `github-actions` as the one classifying reviewer.

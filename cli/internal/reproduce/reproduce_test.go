@@ -231,3 +231,38 @@ func TestRunFailsLoudlyWhenTheProbeCannotBeReverted(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNotReverted", err)
 	}
 }
+
+// A patch names files from the repository root, and the check runs where
+// it was asked to: a probe applied from a subdirectory lands, and the
+// check sees it from there.
+func TestRunWithAProbeFromASubdirectory(t *testing.T) {
+	dir := newRepo(t)
+	sub := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "b.txt"), []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "add", "sub/b.txt")
+	run(t, dir, "commit", "-q", "-m", "sub")
+	if err := os.WriteFile(filepath.Join(sub, "b.txt"), []byte("two\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	probe := filepath.Join(t.TempDir(), "probe.diff")
+	if err := os.WriteFile(probe, []byte(run(t, dir, "diff")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "checkout", "--", "sub/b.txt")
+
+	got, err := Run(context.Background(), Options{Dir: sub, Command: []string{"git", "grep", "-q", "one", "--", "b.txt"}, Probe: probe})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got.State != Reproduced {
+		t.Errorf("State = %q, want %q (output %q)", got.State, Reproduced, got.Output)
+	}
+	if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+		t.Errorf("the probe was not reverted:\n%s", st)
+	}
+}
