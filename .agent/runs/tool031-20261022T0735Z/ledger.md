@@ -6,3 +6,4 @@
 - 08:19Z test (windows-latest) red on #2941-#2943: jq on Windows writes CRLF so the bash script rejects its own allowlist ids; differential tests now skip on Windows (repo idiom). Pushed fa80b50c (#2941), merge 4944ce5d (#2942), preflight fix (#2943).
 - 08:39Z CI green on #2940-#2943 (review pending, cli-gate queued on #2943). Marked all four ready for review.
 - 09:05Z Reviews on #2940-#2943 queued in PR-Agent's one-at-a-time lane (queue: max) behind other sessions' PRs; draft-time runs cancelled by ready_for_review as designed. CodeRabbit: review limit reached on #2940.
+- 09:39Z PR-Agent reviewed #2940-#2942: applied embedded-pool fail-closed (44627074), corrected route output/exit contract text (tasks.md + #2942 body), differential fails in CI when tools missing (route+preflight). Triage posted on #2940-#2942, triage-queue exit 0 each. #2943 review pending; new heads re-queued.
