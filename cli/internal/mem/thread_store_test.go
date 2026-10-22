@@ -247,8 +247,9 @@ func TestCheckMemoryBudget(t *testing.T) {
 	if err == nil {
 		t.Fatal("a write that crosses the budget passed")
 	}
-	if !strings.Contains(err.Error(), "undated, old, new") {
-		t.Errorf("the refusal does not name the threads oldest first: %v", err)
+	msg := err.Error()
+	if o, n := strings.Index(msg, "  old (2026-09-01)"), strings.Index(msg, "  new (2026-10-21)"); o < 0 || n < 0 || o > n {
+		t.Errorf("the refusal does not name the dated threads oldest first:\n%s", msg)
 	}
 	// A write that shrinks or holds a file already past the budget must pass, or
 	// no file over it could ever be brought back under.
@@ -257,5 +258,40 @@ func TestCheckMemoryBudget(t *testing.T) {
 	}
 	if err := CheckMemoryBudget("", "small"); err != nil {
 		t.Errorf("a small write was refused: %v", err)
+	}
+}
+
+// #1477, measured on the real file: an undated thread is not "the oldest". The
+// pre-thread block and some live threads carry no Updated line, and the first
+// refusal named them first. Undated threads are listed apart and never
+// suggested, a Journal date stands in for a missing Updated line, and each
+// suggestion says how to archive that thread: a stored one by its file, an
+// inline one by its block.
+func TestTheBudgetRefusalSuggestsOnlyDatedThreadsAndHowToArchiveEach(t *testing.T) {
+	over := "## Session Handoff\n\n### thread: legacy-undated\n\n- a live parked item\n\n" +
+		"### thread: by-journal\n\n**Next action:** x<br>\nJournal: sessions/2026-08-02-dotfiles-claude-by-journal.md\n\n" +
+		"### thread: stored\n\n> Updated: 2026-09-01<br>\n[full thread](threads/stored.md)\n\n" +
+		"### thread: fresh\n\n> Updated: 2026-10-21<br>\n" + strings.Repeat("y", MemoryByteBudget)
+	err := CheckMemoryBudget("", over)
+	if err == nil {
+		t.Fatal("a write that crosses the budget passed")
+	}
+	msg := err.Error()
+	for _, want := range []string{
+		"\n  by-journal (2026-08-02): move its block from MEMORY.md to archive/",
+		"\n  stored (2026-09-01): move threads/stored.md to archive/ and delete its entry from MEMORY.md",
+		"\nUndated, so not suggested: legacy-undated",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("the refusal lacks %q:\n%s", want, msg)
+		}
+	}
+	if strings.Index(msg, "by-journal (") > strings.Index(msg, "stored (") {
+		t.Errorf("the dated threads are not oldest first:\n%s", msg)
+	}
+
+	none := "## Session Handoff\n\n### thread: a\n\nx\n" + strings.Repeat("y", MemoryByteBudget)
+	if err := CheckMemoryBudget("", none); err == nil || !strings.Contains(err.Error(), "No thread carries a date") {
+		t.Errorf("with no dated thread the refusal must say so and suggest none: %v", err)
 	}
 }
