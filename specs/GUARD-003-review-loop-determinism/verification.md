@@ -301,6 +301,8 @@ then restored:
 | registry drops COLLABORATOR | review-attestation.json | c59e029981e9 -> 5dda3e9eef5a | TheRealRegistryDeclaresTheDefaultStanding | exit 1 |
 | registry drops COLLABORATOR | review-attestation.json | c59e029981e9 -> 5dda3e9eef5a | bats: who may ask … record its triage | exit 1 |
 | runbook spells `## Review Triage` | release-dotf.md | aa706f1e51a5 -> fc0b297bc92c | bats: every writer … spells the registry's marker | exit 1 |
+| a drifted spelling next to a correct mention | guide-pr-agent-reviewer.md | cb8a2e79c92d -> 1b87f67b42b2 | same guard, tightened after PR-Agent's review of #2886 | exit 1 |
+| skill template loses its line-start heading | pr-review-triage/SKILL.md | c2d6bf794d85 -> d552af58a95d | same guard | exit 1 |
 
 Checks on the final tree: `go build ./...`, `go vet ./...`,
 `GOOS=windows go vet ./...` clean; `go test -count=1 ./...` all ok;

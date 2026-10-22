@@ -1373,16 +1373,31 @@ PY
     # their own copy. A copy that drifts makes every triage invisible to the
     # queue, with nothing failing.
     run python3 - "$REPO" <<'PY'
-import json, os, sys
+import json, os, re, sys
 
 repo = sys.argv[1]
 marker = json.load(open(os.path.join(repo, "harness/review-attestation.json")))["triage"]["marker"]
 writers = ["harness/skills/pr-review-triage/SKILL.md",
            "docs/runbooks/release-dotf.md",
            "docs/runbooks/guide-pr-agent-reviewer.md"]
-missing = [w for w in writers if marker not in open(os.path.join(repo, w)).read()]
-if missing:
-    print(f"{marker!r} is not in: " + ", ".join(missing))
+errors = []
+for w in writers:
+    text = open(os.path.join(repo, w)).read()
+    if marker not in text:
+        errors.append(f"{w}: never spells {marker!r}")
+    # A drifted spelling elsewhere in the same file, in any case, is the
+    # failure a presence check misses: the right string in one sentence,
+    # a wrong one in the instruction a person follows.
+    for m in re.finditer(r"##\s*review\s*triage", text, re.IGNORECASE):
+        if m.group(0) != marker:
+            errors.append(f"{w}: spells {m.group(0)!r}")
+# The skill carries the template a person copies, so it must hold the marker
+# where the queue matches it: at the start of a line.
+skill = open(os.path.join(repo, writers[0])).read().splitlines()
+if not any(line.strip().startswith(marker) for line in skill):
+    errors.append(f"{writers[0]}: no line starts with {marker!r}")
+if errors:
+    print("\n".join(errors))
     sys.exit(1)
 PY
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
