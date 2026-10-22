@@ -1,0 +1,86 @@
+package worktree
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+// heldIssueRunner lists one other worktree, on fix/held, whose lease for
+// issue 2824 expires at expires.
+func heldIssueRunner(t *testing.T, expires time.Time) (*MockAddRunner, string) {
+	t.Helper()
+	other := t.TempDir()
+	if err := SaveMetadata(other, Metadata{Issue: 2824, LeaseExpiresAt: expires}); err != nil {
+		t.Fatal(err)
+	}
+	porcelain := "worktree " + other + "\nHEAD abc\nbranch refs/heads/fix/held\n\n"
+	return &MockAddRunner{
+		OnWorktreeList: func(string) (string, error) { return porcelain, nil },
+		OnWorktreeAdd:  func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) },
+	}, other
+}
+
+func heldIssueOpts(t *testing.T, issue int) AddOptions {
+	return AddOptions{RepoRoot: filepath.Join(t.TempDir(), "repo"), WorktreeRoot: t.TempDir(), Slug: "second", Issue: issue}
+}
+
+func TestAddRefusesAnIssueALiveLeaseHolds(t *testing.T) {
+	now := time.Now()
+	runner, other := heldIssueRunner(t, now.Add(time.Hour))
+	_, err := AddWithRunner(heldIssueOpts(t, 2824), runner, now)
+	if err == nil {
+		t.Fatal("add took an issue another live worktree holds")
+	}
+	for _, want := range []string{other, "fix/held", "--share-issue"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal %q does not name %q", err, want)
+		}
+	}
+	if runner.DefaultBaseRan {
+		t.Error("add fetched before refusing")
+	}
+}
+
+func TestAddTakesAnIssueWhoseLeaseExpired(t *testing.T) {
+	now := time.Now()
+	runner, _ := heldIssueRunner(t, now.Add(-time.Minute))
+	if _, err := AddWithRunner(heldIssueOpts(t, 2824), runner, now); err != nil {
+		t.Fatalf("an expired lease blocked add: %v", err)
+	}
+}
+
+func TestAddSharesAHeldIssueWhenAsked(t *testing.T) {
+	now := time.Now()
+	runner, _ := heldIssueRunner(t, now.Add(time.Hour))
+	runner.OnWorktreeList = func(string) (string, error) { return "", errors.New("git worktree list failed") }
+	opts := heldIssueOpts(t, 2824)
+	opts.ShareIssue = true
+	if _, err := AddWithRunner(opts, runner, now); err != nil {
+		t.Fatalf("--share-issue did not let add proceed: %v", err)
+	}
+	if runner.WorktreeListRan {
+		t.Error("--share-issue still listed the worktrees")
+	}
+}
+
+func TestAddRefusesWhenItCannotCheckTheIssue(t *testing.T) {
+	runner := &MockAddRunner{OnWorktreeList: func(string) (string, error) { return "", errors.New("boom") }}
+	_, err := AddWithRunner(heldIssueOpts(t, 2824), runner, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "--share-issue") {
+		t.Fatalf("a failed list did not refuse with the override named: %v", err)
+	}
+}
+
+func TestAddWithoutAnIssueDoesNotScan(t *testing.T) {
+	runner, _ := heldIssueRunner(t, time.Now().Add(time.Hour))
+	if _, err := AddWithRunner(heldIssueOpts(t, 0), runner, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if runner.WorktreeListRan {
+		t.Error("add without --issue listed the worktrees")
+	}
+}

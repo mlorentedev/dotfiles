@@ -122,7 +122,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 uv tool list
 ```
 
-**Since 2026-08-07 the auto-upgrade timer detects it for you.** This failure
+**Historical (2026-08-07 to 2026-10-21): the auto-upgrade timer detected it.** The timer is retired (dotfiles#2857, hive ADR-020), and `dotf converge`'s `hive-upgrade-retire` step removes it; on a current machine `dotf doctor` reports a missing hive instead. This failure
 recurred on the maintainer's box and sat unnoticed for months, because
 `hive-upgrade.ps1` treated "no install found" and "already up to date" as the same
 silent `exit 0`. It now exits **non-zero** with a message when no install is
@@ -168,7 +168,7 @@ filed, link the `mlorentedev/hive` issue here.
 ## Related
 
 - Durable guard: **#574** (HARNESS-049) — `dotf doctor --fix` repairs the Hive venv.
-- Upgrade orchestration that prevents the locked-exe corruption on the happy path:
+- Upgrade orchestration that prevented the locked-exe corruption on the happy path, retired with the timer (dotfiles#2857):
   `windows/hive-upgrade.ps1` (only-if-newer → defer-if-locked → stop → upgrade → start).
 - Adjacent failure mode (same surface, different layer): [`hive-mcp-rejection-disconnect.md`](hive-mcp-rejection-disconnect.md) — per-conversation transport, not install integrity.
 - Lesson: [`../lessons.md`](../lessons.md) — 2026-06-29 entry on orphaned uv trampolines.

@@ -290,3 +290,44 @@ The run was **cancelled** at 15:01:03 without publishing a review. It was not ca
 - `bats tests/check-review-attestation.bats tests/review-attestation-workflow.bats`: 83/83 ok.
 - AC3's failure mode, observed: with the classifier's final `exit 1` (line 437) mutated to `exit 0`, so that every declined or pending verdict passes, `check-review-attestation.bats` fails 21 cases. The mutation was confirmed applied by checksum and then reverted. AC1, AC2 and AC4 are covered live (above), and AC5 and T11 by their mutation tables.
 - PRs referencing this spec folder: #1056, #1185, #2209, #2848, #2855.
+
+## T13 and T14: who may write the triage record (#2870)
+
+From the independent review's FAIL (F1, F2). A triage record counts only when
+its author's `author_association` is in `triage.standing`. The registry
+declares `OWNER, MEMBER, COLLABORATOR`, the set `pr-agent.yml` trusts to ask
+for a review. A ported registry without the key takes the same set from the
+code; an explicit empty list is refused (lesson 509).
+
+Live check that the predicate does not lock out the real writer: the
+`## Review triage` comment on #2855 (6319957885) reads `author_association`
+`OWNER`, and the `coderabbitai[bot]` and `github-actions[bot]` comments there
+read `NONE`.
+
+Red before the fix: `TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue`
+failed for `NONE`, `CONTRIBUTOR`, `FIRST_TIMER` and the empty association
+("a \"NONE\" triage record cleared the queue: triaged"), and
+`TestTheRealRegistryDeclaresTheDefaultStanding` failed on the registry without
+the key.
+
+Mutations, each checked to have changed the file (sha256 prefix before -> after),
+then restored:
+
+| Mutation | File | Checksum | Guard | Result |
+|---|---|---|---|---|
+| standing predicate removed from `lastTriage` | prtriage.go | 80b2f9598966 -> ccc3a964c7ff | AnUndeclaredAuthor test | exit 1 |
+| empty association counts as standing | prtriage.go | 80b2f9598966 -> c248f73b6aa8 | AnUndeclaredAuthor test | exit 1 |
+| fetch drops `author_association` | fetch.go | 48e77ffebc47 -> c3d77ecb4885 | package tests | exit 1 |
+| explicit empty `standing` accepted | prtriage.go | 80b2f9598966 -> b8c956e7949f | ParseRegistryStanding | exit 1 |
+| absent `standing` not defaulted | prtriage.go | 80b2f9598966 -> bc2fa8d71f00 | ParseRegistryStanding | exit 1 |
+| registry drops COLLABORATOR | review-attestation.json | c59e029981e9 -> 5dda3e9eef5a | TheRealRegistryDeclaresTheDefaultStanding | exit 1 |
+| registry drops COLLABORATOR | review-attestation.json | c59e029981e9 -> 5dda3e9eef5a | bats: who may ask … record its triage | exit 1 |
+| runbook spells `## Review Triage` | release-dotf.md | aa706f1e51a5 -> fc0b297bc92c | bats: every writer … spells the registry's marker | exit 1 |
+| a drifted spelling next to a correct mention | guide-pr-agent-reviewer.md | cb8a2e79c92d -> 1b87f67b42b2 | same guard, tightened after PR-Agent's review of #2886 | exit 1 |
+| skill template loses its line-start heading | pr-review-triage/SKILL.md | c2d6bf794d85 -> d552af58a95d | same guard | exit 1 |
+
+Checks on the final tree: `go build ./...`, `go vet ./...`,
+`GOOS=windows go vet ./...` clean; `go test -count=1 ./...` all ok;
+golangci-lint v2.12.2 (the pin, after `cache clean`) 0 issues; bats over
+check-review-attestation, dependabot-ci, pr-agent-config,
+pr-agent-publish-guard, triggers-registry and stub-real-pairing: 182/182.

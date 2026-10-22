@@ -90,7 +90,8 @@ type Options struct {
 	// ExecStdout in production. Unset, the shell-completions step is skipped.
 	CompletionRun tools.Runner
 	// Scheduler returns the native scheduler of a run's OS; NativeScheduler
-	// in production. Unset, the self-deploy step is skipped.
+	// in production. Unset, the self-deploy and hive-upgrade-retire steps are
+	// skipped.
 	Scheduler func(Env) (schedule.Backend, error)
 	// RunSetup runs the setup script of this OS; ExecSetup in production.
 	// Unset, the legacy-setup step is skipped.
@@ -128,6 +129,7 @@ func Registry(o Options) []Reconciler {
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID},
 		selfDeploy{scheduler: o.Scheduler},
+		hiveUpgradeRetire{scheduler: o.Scheduler},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.PathsFor, user: sshtarget.CurrentUser},
 		agentExtensions{claude: o.Claude, agyPaths: o.AgyPaths, herdr: o.HerdrRun, has: onPath},
 		legacySetup{run: o.RunSetup},

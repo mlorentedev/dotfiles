@@ -99,6 +99,7 @@ func (f *fakeGH) seen() []string {
 func testRegistry() Registry {
 	var r Registry
 	r.Triage.Marker = "## Review triage"
+	r.Triage.Standing = DefaultStanding
 	r.Reviewers = []Reviewer{
 		{Login: "coderabbitai", ReviewMarkers: []string{"No actionable comments were generated"}},
 		{Login: "github-actions", ReviewMarkers: []string{"## PR Reviewer Guide"}},
@@ -171,7 +172,7 @@ func TestFetchCarriesUpdatedAtFromTheWire(t *testing.T) {
 		                          "body":"## PR Reviewer Guide\nfirst, then more",
 		                          "created_at":"2026-09-02T10:00:00Z",
 		                          "updated_at":"2026-09-02T12:00:00Z"},
-		                         {"user":{"login":"manu"},
+		                         {"user":{"login":"manu"},"author_association":"OWNER",
 		                          "body":"## Review triage\ndispositioned",
 		                          "created_at":"2026-09-02T11:00:00Z",
 		                          "updated_at":"2026-09-02T11:00:00Z"}]`,
@@ -478,7 +479,7 @@ func TestFetchCountsAFormalReviewFiledAfterTheTriage(t *testing.T) {
 		"/pulls": `[{"number":2581,"title":"t","html_url":"u"}]`,
 		"/issues/2581/comments": `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nf",
 		                            "created_at":"2026-10-16T02:55:00Z"},
-		                           {"user":{"login":"mlorentedev"},"body":"## Review triage\nall declined",
+		                           {"user":{"login":"mlorentedev"},"author_association":"OWNER","body":"## Review triage\nall declined",
 		                            "created_at":"2026-10-16T03:04:46Z"}]`,
 		"/pulls/2581/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"COMMENTED",
 		                          "body":"**Actionable comments posted: 3**","submitted_at":"2026-10-16T03:19:14Z"}]`,
@@ -527,7 +528,7 @@ func TestFetchIgnoresDismissedAndPendingReviews(t *testing.T) {
 func TestFetchReviewTriagedAfterwardsIsClear(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
 		"/pulls": `[{"number":8,"title":"t","html_url":"u"}]`,
-		"/issues/8/comments": `[{"user":{"login":"mlorentedev"},"body":"## Review triage\napplied",
+		"/issues/8/comments": `[{"user":{"login":"mlorentedev"},"author_association":"OWNER","body":"## Review triage\napplied",
 		                         "created_at":"2026-10-16T03:30:00Z"}]`,
 		"/pulls/8/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"COMMENTED","body":"3 findings",
 		                       "submitted_at":"2026-10-16T03:19:14Z"}]`,
