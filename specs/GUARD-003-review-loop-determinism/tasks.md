@@ -82,18 +82,25 @@ What genuinely blocks:
       `pr-agent`'s `issue_comment` path uploads the PR number as the
       `reviewed-pr` artifact and the gate reads it for that event only. Its
       re-evaluations are grouped by run id, not by main's SHA.
-- [ ] T12. [AC1] [AC4] Verify T11 live after merge: `/review` on an open PR, and
+- [x] T12. [AC1] [AC4] Verify T11 live after merge: `/review` on an open PR, and
       the gate's `workflow_run` log says `re-evaluating PR #<that PR>`.
+- [ ] T13. [AC8] (#2870, review F1) Count a triage record only when its author
+      has standing to write it. Regression test
+      `TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue`, observed red before
+      the fix, with a checksum-verified mutation in `verification.md`.
+- [ ] T14. [AC9] (#2870, review F2) Guard the writer side: the heading in
+      `harness/skills/pr-review-triage/SKILL.md` equals
+      `harness/review-attestation.json` `triage.marker`.
 
 ## Closing
 
-- [ ] Every acceptance criterion covered by a verification command whose failure
+- [x] Every acceptance criterion covered by a verification command whose failure
       mode has been observed
-- [ ] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
-- [ ] Tests pass (`bats tests/check-review-attestation.bats`)
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in with output produced in the session, not recalled
-- [ ] PR opened referencing this spec folder
+- [x] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
+- [x] Tests pass (`bats tests/check-review-attestation.bats`)
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in with output produced in the session, not recalled
+- [x] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review GUARD-003-review-loop-determinism`)
 
 ## A note on this spec's own surface
