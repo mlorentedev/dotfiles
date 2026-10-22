@@ -51,7 +51,7 @@ created: "2026-06-21"
 - Removed with it: `Deploy-SkillRecord` and its four helpers, the separate `dotf harness presence` call, and the hand copies of `CLAUDE.md`, opencode's and pi's `AGENTS.md` and `copilot-instructions.md`. Each of those files is an `agents.presence` entry the verb writes.
 - `tests/setup-fails-loudly.bats` gains the Windows row; `setup-windows.bats`, `antigravity.bats`, `copilot-config.bats` and `opencode.bats` assert the verb call and the absence of the removed code.
 - `tests/copilot-native-skills-smoke.ps1` deploys with `dotf harness skills --home <scratch>` instead of importing the PowerShell functions; its LF, BOM, filtering and discovery assertions are unchanged.
-- Every bats file referencing either setup script or `compile-harness` (725 tests) passes but the real-vault refresh noted above. `dotf lint powershell` clean; both PowerShell files parse with 0 errors; both are ASCII.
+- The bats files referencing either setup script or `compile-harness`: 725 of 726 tests pass; the one failure is the real-vault refresh (#2913). `dotf lint powershell` clean; both PowerShell files parse with 0 errors; both are ASCII.
 - `records-harness` runs on Windows; `TestConverge_AStepsOutputPrecedesItsResultLine` now expects it first on every OS. Windows behaviour is held by `test-windows` and `test (windows-latest)`; the live run on the work-lab box is the open task above.
 
 ## Decisions made during implementation
