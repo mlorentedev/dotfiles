@@ -15,9 +15,13 @@ package reproduce
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -35,11 +39,16 @@ const (
 // ErrDirty refuses a tree with uncommitted changes.
 var ErrDirty = errors.New("the tree has uncommitted changes: a reproduction runs against committed code")
 
+// ErrNotReverted is a probe that could not be taken back out: the tree no
+// longer matches the commit the record names.
+var ErrNotReverted = errors.New("the probe could not be reverted")
+
 // Options describe one reproduction.
 type Options struct {
 	Dir     string        // repository root
 	Command []string      // the check; its exit decides the state
 	Timeout time.Duration // zero means no limit beyond ctx
+	Probe   string        // a patch applied for the run and reverted after it
 }
 
 // outputTail bounds the output a record carries: the end of a failing
@@ -74,6 +83,84 @@ func Run(ctx context.Context, o Options) (Result, error) {
 		return Result{}, err
 	}
 
+	res := Result{Exit: -1, Head: head, Command: o.Command}
+	if o.Probe == "" {
+		res.Exit, res.State, res.Output = check(ctx, o)
+		return res, nil
+	}
+	return probed(ctx, o, res)
+}
+
+// probed applies the probe, runs the check only if the probe changed a
+// file it names, and reverts it whatever happened. Landing is decided by
+// the targets' bytes, not by git apply's exit: an apply that succeeds and
+// changes no content (a mode-only patch) did not land either.
+func probed(ctx context.Context, o Options, res Result) (Result, error) {
+	if _, err := os.Stat(o.Probe); err != nil {
+		return res, fmt.Errorf("probe: %w", err)
+	}
+	targets, err := probeTargets(ctx, o.Dir, o.Probe)
+	if err != nil {
+		res.State, res.Output = DidNotLand, err.Error()
+		return res, nil
+	}
+	before := fingerprint(o.Dir, targets)
+	if _, err := git(ctx, o.Dir, "apply", o.Probe); err != nil {
+		res.State, res.Output = DidNotLand, err.Error()
+		return res, nil
+	}
+	if maps.Equal(before, fingerprint(o.Dir, targets)) {
+		res.State = DidNotLand
+	} else {
+		res.Exit, res.State, res.Output = check(ctx, o)
+	}
+	// The revert must not inherit a check's timeout: a probe left applied
+	// is worse than any verdict.
+	_, revertErr := git(context.WithoutCancel(ctx), o.Dir, "apply", "-R", o.Probe)
+	if revertErr != nil || !maps.Equal(before, fingerprint(o.Dir, targets)) {
+		return res, fmt.Errorf("%w: %s no longer match the commit %s (%v)", ErrNotReverted, strings.Join(targets, ", "), res.Head, revertErr)
+	}
+	return res, nil
+}
+
+// probeTargets lists the files a patch touches, both sides of a rename.
+// An empty or malformed patch is an error here, which the caller records
+// as did-not-land; a patch naming no file changes no bytes, and lands
+// nowhere by the same check.
+func probeTargets(ctx context.Context, dir, probe string) ([]string, error) {
+	out, err := git(ctx, dir, "apply", "--numstat", "-z", probe)
+	if err != nil {
+		return nil, err
+	}
+	var targets []string
+	for _, field := range strings.Split(out, "\x00") {
+		if i := strings.LastIndexByte(field, '\t'); i >= 0 {
+			field = field[i+1:]
+		}
+		if field != "" {
+			targets = append(targets, field)
+		}
+	}
+	return targets, nil
+}
+
+// fingerprint is each target's content hash; a missing file is its own
+// value, so a probe that creates or deletes a file lands too.
+func fingerprint(dir string, targets []string) map[string]string {
+	sums := make(map[string]string, len(targets))
+	for _, t := range targets {
+		b, err := os.ReadFile(filepath.Join(dir, t))
+		if err != nil {
+			sums[t] = "absent"
+			continue
+		}
+		sums[t] = fmt.Sprintf("%x", sha256.Sum256(b))
+	}
+	return sums
+}
+
+// check runs the command once and classifies its exit.
+func check(ctx context.Context, o Options) (int, State, string) {
 	if o.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, o.Timeout)
@@ -90,13 +177,7 @@ func Run(ctx context.Context, o Options) (Result, error) {
 		exit = cmd.ProcessState.ExitCode()
 	}
 	timedOut := errors.Is(ctx.Err(), context.DeadlineExceeded)
-	return Result{
-		State:   classify(exit, started, timedOut),
-		Exit:    exit,
-		Head:    head,
-		Command: o.Command,
-		Output:  tail(out.String(), outputTail),
-	}, nil
+	return exit, classify(exit, started, timedOut), tail(out.String(), outputTail)
 }
 
 // classify maps one run of the check to a state. Only a check that ran to

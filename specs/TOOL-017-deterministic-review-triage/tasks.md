@@ -38,15 +38,15 @@ created: "2026-08-18"
 
 - [x] `[AC5]` committed-test path: `dotf pr reproduce -- <cmd>` refuses a dirty tree (untracked included), records the HEAD it ran on, and classifies the exit as `reproduced`, `did-not-reproduce` or `could-not-run` (start failure, 126/127, signal, timeout: never a reproduction, owner #1062). It prints one row a human pastes into `## Review triage`; it applies nothing (`cli/internal/reproduce`)
 - [x] `[AC5]` red-direction for that path: six mutations of `reproduce.go` (timeout, 127, signal, dirty, untracked, recorded head), each confirmed landed by checksum, each killed
-- [ ] `[AC5]` reproduction harness: apply a mutation, **verify by checksum that it landed**, report `did-not-land` as a state distinct from `did-not-reproduce`
-- [ ] `[AC5]` red-direction: an invalid mutation must report `did-not-land`, never a clean result — the exact failure two sessions hit on 2026-08-17
+- [x] `[AC5]` reproduction harness: apply a mutation, **verify by checksum that it landed**, report `did-not-land` as a state distinct from `did-not-reproduce`. `dotf pr reproduce --probe <patch>`: landing is decided by the target files' bytes, not by `git apply`'s exit; the probe is reverted whatever the check said, and a revert that does not restore the bytes is an error
+- [x] `[AC5]` red-direction: an invalid mutation must report `did-not-land`, never a clean result — the exact failure two sessions hit on 2026-08-17. `TestRunWithAProbeThatDoesNotLand` (stale context, empty patch, mode-only patch); five mutations of the probe path, each landed by checksum, each killed; a sixth (empty target list) was equivalent and its guard was deleted
 - [x] `[AC2]` `[P]` read reviewer identity + notice markers from `harness/review-attestation.json`; no second copy of the distinction
 - [x] `[AC2]` red-direction: adding a reviewer to the registry changes triage behaviour with no code edit
 - [x] `[AC3]` extract a finding's class from a declared marker; absent marker → `unclassified`
 - [x] `[AC3]` red-direction: a finding whose class appears only in prose is `unclassified`, not parsed
 - [x] `[AC3]` consume `Classify` where findings are read: `dotf pr triage-queue` names a pending PR's inline findings without a declared class (report only, the verdict is unchanged)
 - [x] `[AC3]` declare the classifying reviewers in the registry: `classification.reviewers: ["github-actions"]`, pinned by `TestTheRealRegistryDeclaresTheClassificationMarker`
-- [ ] `[AC4]` gate `apply` on a successful reproduction for REAL findings
+- [ ] `[AC4]` gate `apply` on a successful reproduction for REAL findings — the next slice: `pr reproduce` decides nothing on its own; a human pastes its row today
 - [ ] `[AC6]` record a refuted REAL finding with its evidence, distinct from a skip
 - [x] `[AC1]` ~~trigger from the reviewer-finished signal (GUARD-003's `workflow_run`)~~ superseded: the pull-based `dotf pr triage-queue` (#1057, #1101), accepted by the owner on #1062 (2026-10-10)
 - [x] `[AC7]` closing guard, re-scoped to PR level by the owner (option B): `dotf pr land` refuses a PR the triage queue lists (`cli/internal/prland/prland.go:118`)

@@ -132,3 +132,102 @@ func TestRunTimesOutAsCouldNotRun(t *testing.T) {
 		t.Errorf("State = %q, want %q (exit %d)", got.State, CouldNotRun, got.Exit)
 	}
 }
+
+// probeFor writes a patch changing a.txt from "one" to body, outside the
+// repository, and leaves the tree clean.
+func probeFor(t *testing.T, dir, body string) string {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	patch := filepath.Join(t.TempDir(), "probe.diff")
+	if err := os.WriteFile(patch, []byte(run(t, dir, "diff")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "checkout", "--", "a.txt")
+	return patch
+}
+
+// The probe is applied for the run and reverted after it, whatever the
+// check says: the tree is left byte for byte as it was found.
+func TestRunWithAProbe(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		check []string
+		want  State
+	}{
+		{"the check fails under the probe", []string{"git", "grep", "-q", "one", "--", "a.txt"}, Reproduced},
+		{"the check passes under the probe", []string{"git", "grep", "-q", "two", "--", "a.txt"}, DidNotReproduce},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newRepo(t)
+			probe := probeFor(t, dir, "two\n")
+			got, err := Run(context.Background(), Options{Dir: dir, Command: tc.check, Probe: probe})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got.State != tc.want {
+				t.Errorf("State = %q, want %q (exit %d, output %q)", got.State, tc.want, got.Exit, got.Output)
+			}
+			if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+				t.Errorf("the probe was not reverted:\n%s", st)
+			}
+		})
+	}
+}
+
+// A probe that does not change the tree must never read as a clean
+// result: the check is not run at all, and the state says why.
+func TestRunWithAProbeThatDoesNotLand(t *testing.T) {
+	for name, patch := range map[string]func(t *testing.T, dir string) string{
+		"context does not match": func(t *testing.T, dir string) string {
+			p := probeFor(t, dir, "two\n")
+			if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("other\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			run(t, dir, "commit", "-q", "-am", "move on")
+			return p
+		},
+		"empty patch": func(t *testing.T, _ string) string {
+			p := filepath.Join(t.TempDir(), "empty.diff")
+			if err := os.WriteFile(p, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			return p
+		},
+		"mode-only patch": func(t *testing.T, _ string) string {
+			p := filepath.Join(t.TempDir(), "mode.diff")
+			body := "diff --git a/a.txt b/a.txt\nold mode 100644\nnew mode 100755\n"
+			if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			return p
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := newRepo(t)
+			probe := patch(t, dir)
+			got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"git", "status"}, Probe: probe})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got.State != DidNotLand {
+				t.Errorf("State = %q, want %q", got.State, DidNotLand)
+			}
+			if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+				t.Errorf("the tree was left changed:\n%s", st)
+			}
+		})
+	}
+}
+
+// A check that rewrites the probed file leaves a tree the probe cannot be
+// reverted from. That is an error, loud, never a result.
+func TestRunFailsLoudlyWhenTheProbeCannotBeReverted(t *testing.T) {
+	dir := newRepo(t)
+	probe := probeFor(t, dir, "two\n")
+	_, err := Run(context.Background(), Options{Dir: dir, Command: []string{"git", "checkout", "--", "a.txt"}, Probe: probe})
+	if !errors.Is(err, ErrNotReverted) {
+		t.Fatalf("err = %v, want ErrNotReverted", err)
+	}
+}
