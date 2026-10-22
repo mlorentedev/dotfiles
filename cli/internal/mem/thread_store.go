@@ -187,43 +187,82 @@ func threadText(block, memoryDir string) string {
 }
 
 // CheckMemoryBudget refuses a write that takes MEMORY.md past MemoryByteBudget,
-// naming the threads to archive, least recently updated first. Only a write
-// that grows the file is refused: one that shrinks or holds a file already past
-// the budget passes, or no such file could ever be brought back under it.
+// naming the threads to archive, least recently updated first, and how to
+// archive each. Only a write that grows the file is refused: one that shrinks or
+// holds a file already past the budget passes, or no such file could ever be
+// brought back under it.
+//
+// Only a thread with a date is suggested. One with none cannot be called old:
+// the pre-thread block and some live threads carry no Updated line, and naming
+// them first would archive work nobody had finished (#1477).
 func CheckMemoryBudget(before, after string) error {
 	if len(after) <= MemoryByteBudget || len(after) <= len(before) {
 		return nil
 	}
-	oldest := threadsOldestFirst(after)
-	if len(oldest) > 3 {
-		oldest = oldest[:3]
+	dated, undated := threadsByAge(after)
+	if len(dated) > 3 {
+		dated = dated[:3]
 	}
-	return fmt.Errorf("this write takes MEMORY.md to %d bytes, past the %d a session start reads, so the newest thread would be the one cut off; "+
-		"archive the oldest threads first (%s): move each one's threads/<file>.md to archive/ and delete its entry from MEMORY.md, then write again", len(after), MemoryByteBudget, strings.Join(oldest, ", "))
+	var b strings.Builder
+	fmt.Fprintf(&b, "this write takes MEMORY.md to %d bytes, past the %d a session start reads, so the newest thread would be the one cut off; archive threads first, then write again.", len(after), MemoryByteBudget)
+	if len(dated) == 0 {
+		b.WriteString(" No thread carries a date, so none is suggested: choose by hand.")
+	} else {
+		b.WriteString(" Least recently updated:")
+	}
+	for _, t := range dated {
+		if t.file != "" {
+			fmt.Fprintf(&b, "\n  %s (%s): move %s/%s to archive/ and delete its entry from MEMORY.md", t.key, t.date, threadsDir, t.file)
+		} else {
+			fmt.Fprintf(&b, "\n  %s (%s): move its block from MEMORY.md to archive/", t.key, t.date)
+		}
+	}
+	if len(undated) > 0 {
+		fmt.Fprintf(&b, "\nUndated, so not suggested: %s", strings.Join(undated, ", "))
+	}
+	return errors.New(b.String())
 }
 
-// threadsOldestFirst lists the section's thread keys by their Updated date,
-// oldest first; an undated thread counts as the oldest.
-func threadsOldestFirst(content string) []string {
+// threadAge is a thread's key, the date it was last known to change, and its
+// thread file when its entry points at one.
+type threadAge struct{ key, date, file string }
+
+// isoDate finds a YYYY-MM-DD date in a field.
+var isoDate = regexp.MustCompile(`\b(\d{4}-\d{2}-\d{2})\b`)
+
+// threadsByAge splits the section's threads into the dated ones, oldest first,
+// and the keys of the undated ones in file order. A thread's date is its
+// Updated line, or failing that the date its Journal file is named with.
+func threadsByAge(content string) ([]threadAge, []string) {
 	lines := strings.Split(content, "\n")
 	start, end := handoffSection(lines)
-	type dated struct{ key, date string }
-	var threads []dated
+	var dated []threadAge
+	var undated []string
 	for i := start + 1; start >= 0 && i < end; i++ {
 		key, ok := threadHeadingKey(lines[i])
 		if !ok {
 			continue
 		}
 		s, e := threadSpan(lines, start, end, key)
-		v, _ := ParseThread(strings.Join(lines[s:e], "\n")).Get("Updated")
-		threads = append(threads, dated{key, entryLine(v, 10)})
+		block := strings.Join(lines[s:e], "\n")
+		th := ParseThread(block)
+		var date string
+		for _, label := range []string{"Updated", "Journal"} {
+			if v, ok := th.Get(label); ok {
+				if m := isoDate.FindStringSubmatch(v); m != nil {
+					date = m[1]
+					break
+				}
+			}
+		}
+		if date == "" {
+			undated = append(undated, key)
+			continue
+		}
+		dated = append(dated, threadAge{key, date, pointerIn(block)})
 	}
-	sort.SliceStable(threads, func(a, b int) bool { return threads[a].date < threads[b].date })
-	keys := make([]string, len(threads))
-	for i, t := range threads {
-		keys[i] = t.key
-	}
-	return keys
+	sort.SliceStable(dated, func(a, b int) bool { return dated[a].date < dated[b].date })
+	return dated, undated
 }
 
 // ReplaceFile writes content over path through a temp file in the same

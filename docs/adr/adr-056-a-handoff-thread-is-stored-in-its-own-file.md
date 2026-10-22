@@ -27,7 +27,7 @@ Measured 2026-10-20 on the vault: dotfiles' `MEMORY.md` is 23,423 B with eight t
 4. **An inline block wins where it has no pointer.** Machines on a release from before the store keep writing full inline blocks, so a block without a pointer is the current thread, and any file under its key is stale. The new writer replaces the thread file on every write, so a stale file only ever sits under an inline block, where no reader looks for it.
 5. **The thread file is written first, then `MEMORY.md`, both under the existing handoff lock and through a temp file and rename.** A new thread file takes `MEMORY.md`'s mode.
 6. **A key maps to a file the way a branch does.** `/`, `\`, space and `:` become `-`. A name that could leave `threads/` (a leading dot, or a character outside `[A-Za-z0-9._@+-]`) is refused. Two keys that map to one file (`fix/x` and `fix-x`) are told apart by the file's own heading, and the second is refused.
-7. **A write that grows `MEMORY.md` past 25,000 B is refused** and names the three least recently updated threads to archive. A write that shrinks or holds a file already over the budget passes, so such a file can be brought back under.
+7. **A write that grows `MEMORY.md` past 25,000 B is refused** and names the three least recently updated threads to archive, with how to archive each: a stored thread by its file and its entry, an inline one by its block. A thread's date is its `Updated` line, else the date in its `Journal` path. A thread with neither is listed apart and never suggested, since no date is not evidence of age: the pre-thread block that holds the owner's parked items has none (#1477). A write that shrinks or holds a file already over the budget passes, so such a file can be brought back under.
 
 ## Consequences
 
