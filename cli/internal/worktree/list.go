@@ -108,7 +108,12 @@ func (r *RealGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 		return true, nil
 	}
 
-	merged := queryPRMerged(repoRoot, branch, r.landedHeads())
+	merged, err := queryPRMerged(repoRoot, branch, r.landedHeads())
+	if err != nil {
+		// Not cached: the next caller asks again rather than inheriting a
+		// question nobody answered.
+		return false, err
+	}
 	r.cachePRResult(branch, merged)
 	return merged, nil
 }
@@ -129,15 +134,15 @@ func (r *RealGitRunner) landedHeads() LandedHeads {
 	return mergedPRHeads
 }
 
-// queryPRMerged reads a reader's error as not merged: list then under-reports
-// and sweep keeps the worktree, never the reverse.
-func queryPRMerged(repoRoot, branch string, heads LandedHeads) bool {
+// queryPRMerged reads a reader's error as not merged, and returns it: list
+// then under-reports and sweep keeps the worktree, never the reverse, and
+// both can say why (#2873).
+func queryPRMerged(repoRoot, branch string, heads LandedHeads) (bool, error) {
 	tip, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", branch+"^{commit}").Output()
 	if err != nil {
-		return false
+		return false, nil
 	}
-	landed, _ := landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)), heads)
-	return landed
+	return landedInMergedPR(repoRoot, branch, strings.TrimSpace(string(tip)), heads)
 }
 
 // LandedHeads returns the head commit of every merged pull request whose head
@@ -247,6 +252,7 @@ type MockGitRunner struct {
 	IgnoredPaths    map[string][]string
 	DirtyErrors     map[string]error
 	MergedBranches  map[string]bool
+	MergeErrors     map[string]error
 	OrphanBranches  map[string]bool
 }
 
@@ -265,6 +271,9 @@ func (m *MockGitRunner) Dirt(worktreePath string) (Dirt, error) {
 }
 
 func (m *MockGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
+	if err := m.MergeErrors[branch]; err != nil {
+		return false, err
+	}
 	return m.MergedBranches[branch], nil
 }
 
@@ -322,7 +331,7 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			// Fail-closed: treat error in status check as dirty so it is never reaped (F2)
 			dirt = Dirt{Tracked: true}
 		}
-		merged, _ := runner.IsPRMerged(repoRoot, raw.Branch)
+		merged, mergeErr := runner.IsPRMerged(repoRoot, raw.Branch)
 		orphan, _ := runner.IsOrphan(repoRoot, raw.Branch)
 		meta, err := LoadMetadata(raw.Path)
 		if err != nil {
@@ -340,12 +349,15 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			IsCurrent:  isCurrent,
 			IsOrphan:   orphan,
 			Dirty:      dirt.Any(),
-			PRMerged:   merged,
+			PRMerged:   merged && mergeErr == nil,
 			Metadata:   meta,
 
 			IgnoredContent: dirt.Ignored,
 		}
 
+		if mergeErr != nil {
+			info.PRMergedUnknown = mergeErr.Error()
+		}
 		info.State, info.StateReason = Classify(info, now)
 		list = append(list, info)
 	}
