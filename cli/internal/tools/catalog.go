@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
@@ -79,9 +80,16 @@ type Source struct {
 	Command string `json:"command,omitempty"`
 	// Platforms lists the GOOS values the tool installs on; absent means all of
 	// them. A github-release tool gets this from its Asset map. Other sources
-	// need it to name a tool that belongs to one OS family: hive is a uv tool on
-	// POSIX, while on Windows hive owns its install layout (hive ADR-019).
+	// need it to name a tool that belongs to one OS family. A tool installed on
+	// every OS through a channel that differs by OS lists no platforms and names
+	// the odd OS in SelfInstall instead (hive: uv tool on POSIX, its own
+	// installer on Windows).
 	Platforms []string `json:"platforms,omitempty"`
+	// SelfInstall hands a uv-tool's install to the tool itself on the OSes it
+	// lists: dotf runs `uv tool run --from <package>==<version> <name> <args>`,
+	// and the tool lays itself out. hive does this on Windows, where it owns
+	// its install layout (hive ADR-019, ADR-036 amendment 2026-10-21).
+	SelfInstall *SelfInstall `json:"self_install,omitempty"`
 	// Asset maps GOOS -> a release-asset filename template. A per-OS map (not a
 	// single template) is required because release naming is irregular across OSes
 	// — e.g. sops is "sops-v{version}.linux.{goarch}" but "sops-v{version}.{goarch}.exe"
@@ -97,6 +105,47 @@ type Source struct {
 	// expand {version}. The installer (CLI-029 PR-B) downloads it and verifies the
 	// fetched asset against its entry.
 	Checksums string `json:"checksums"`
+}
+
+// SelfInstall is a source's self_install: the OSes it applies to and the
+// arguments the tool is run with there. Args expand {version} to the pin.
+type SelfInstall struct {
+	Platforms []string `json:"platforms"`
+	Args      []string `json:"args"`
+}
+
+// SelfInstalls reports whether the source installs itself on goos.
+func (s Source) SelfInstalls(goos string) bool {
+	return s.SelfInstall != nil && slices.Contains(s.SelfInstall.Platforms, goos)
+}
+
+// validateSelfInstall refuses a self_install that would install something
+// other than the pin, or nothing, without a word.
+func validateSelfInstall(t Tool) error {
+	si := t.Source.SelfInstall
+	if t.Source.Type != "uv-tool" {
+		return fmt.Errorf("tool %q: self_install is a uv-tool field, and this source is %q", t.Name, t.Source.Type)
+	}
+	if len(si.Platforms) == 0 {
+		return fmt.Errorf("tool %q: self_install lists no platforms", t.Name)
+	}
+	if p := platform.Unknown(si.Platforms); p != "" {
+		return fmt.Errorf("tool %q: self_install lists unknown platform %q (want linux, darwin or windows)", t.Name, p)
+	}
+	for _, goos := range si.Platforms {
+		if !platform.Supports(t.Source.Platforms, goos) {
+			return fmt.Errorf("tool %q: self_install lists %s, which the tool's platforms %v exclude", t.Name, goos, t.Source.Platforms)
+		}
+	}
+	if len(si.Args) == 0 {
+		return fmt.Errorf("tool %q: self_install declares no args", t.Name)
+	}
+	// Without the pin in its argv the tool installs whatever is newest: an
+	// unattended upgrade, which hive ADR-020 rules out.
+	if !slices.ContainsFunc(si.Args, func(a string) bool { return strings.Contains(a, "{version}") }) {
+		return fmt.Errorf("tool %q: self_install args %v never pass {version}, so the pin would not be what installs", t.Name, si.Args)
+	}
+	return nil
 }
 
 // Load reads and parses the catalog at path.
@@ -141,6 +190,11 @@ func Load(path string) (Catalog, error) {
 		}
 		if p := platform.Unknown(t.Source.Platforms); p != "" {
 			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q lists unknown platform %q (want linux, darwin or windows)", path, t.Name, p)
+		}
+		if t.Source.SelfInstall != nil {
+			if err := validateSelfInstall(t); err != nil {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: %w", path, err)
+			}
 		}
 		if t.Source.Type == "system" {
 			if err := validateSystem(t, rawKeys[i]); err != nil {

@@ -79,3 +79,15 @@ mise_catalog_excludes_windows() {
     DOTF_VERSION=0.69.0 run mise_catalog_excludes_windows "$fixture"
     [ "$status" -eq 1 ] || { echo "release pin bypassed the Windows catalog guard"; false; }
 }
+
+# A self_install without {version} installs whatever is newest: an unattended
+# upgrade (hive ADR-020). cli/internal/tools/catalog.go (validateSelfInstall)
+# is the authority; this is the shell-side mirror.
+@test "every packages.json self_install passes the pin and belongs to a uv tool" {
+    run jq -e '[.tools[] | select(.source.self_install)] as $s
+        | ($s | length) > 0
+        and all($s[]; .source.type == "uv-tool"
+            and (.source.self_install.platforms | length) > 0
+            and any(.source.self_install.args[]; contains("{version}")))' "$CATALOG"
+    [ "$status" -eq 0 ]
+}

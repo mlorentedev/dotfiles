@@ -137,10 +137,11 @@ func TestLoad_Platforms(t *testing.T) {
 	}
 }
 
-// The shipped catalog declares hive as a uv tool on POSIX only. On Windows hive
-// owns its install layout (hive ADR-019), so the catalog must never put a uv
-// copy there.
-func TestTheRepoCatalogDeclaresHiveForPosixOnly(t *testing.T) {
+// The shipped catalog declares hive as a uv tool on every OS, which hive
+// installs itself on Windows: there hive owns its install layout (hive
+// ADR-019), so the catalog must never put a uv copy there. A misspelt
+// self_install key is dropped by the decoder, and this is what notices.
+func TestTheRepoCatalogDeclaresHiveSelfInstalledOnWindows(t *testing.T) {
 	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -152,8 +153,10 @@ func TestTheRepoCatalogDeclaresHiveForPosixOnly(t *testing.T) {
 		if tool.Source.Type != "uv-tool" || tool.Source.Package != "hive-vault" {
 			t.Errorf("hive source = %+v, want uv-tool hive-vault", tool.Source)
 		}
-		if tool.SupportsOS("windows") || !tool.SupportsOS("linux") || !tool.SupportsOS("darwin") {
-			t.Errorf("hive platforms = %v, want linux and darwin only", tool.Source.Platforms)
+		for goos, self := range map[string]bool{"linux": false, "darwin": false, "windows": true} {
+			if !tool.SupportsOS(goos) || tool.Source.SelfInstalls(goos) != self {
+				t.Errorf("hive on %s: supported %v, self-installed %v; want supported, self-installed %v", goos, tool.SupportsOS(goos), tool.Source.SelfInstalls(goos), self)
+			}
 		}
 		return
 	}
@@ -393,4 +396,40 @@ func TestTheRepoCatalogDeclaresGiteaTeaWithoutApt(t *testing.T) {
 		return
 	}
 	t.Fatal("packages.json declares no tea entry")
+}
+
+// self_install hands a uv-tool's install to the tool itself on the OSes it
+// lists (hive self-upgrade on Windows, ADR-036 amendment 2026-10-21). Each
+// refusal is a catalog that would install something other than the pin, or
+// nothing, without saying so.
+func TestLoad_SelfInstall(t *testing.T) {
+	const ok = `{"tools":[{"name":"hive","version":"4.4.1","profile":"full","source":{"type":"uv-tool","package":"hive-vault","self_install":{"platforms":["windows"],"args":["self-upgrade","{version}"]}}}]}`
+	c, err := Load(writeCatalog(t, ok))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if si := c.Tools[0].Source.SelfInstall; si == nil || !c.Tools[0].Source.SelfInstalls("windows") || c.Tools[0].Source.SelfInstalls("linux") {
+		t.Fatalf("self_install = %+v, want it on windows only", si)
+	}
+	for name, tc := range map[string]struct{ from, to, want string }{
+		// An install with no version in it is an upgrade to whatever is newest:
+		// unattended, which hive ADR-020 rules out.
+		"no {version}":        {`"{version}"`, `"latest"`, "{version}"},
+		"no args":             {`"args":["self-upgrade","{version}"]`, `"args":[]`, "args"},
+		"a misspelt platform": {`["windows"]`, `["win"]`, "win"},
+		"no platform":         {`"platforms":["windows"],`, ``, "platforms"},
+		"not a uv tool":       {`"type":"uv-tool"`, `"type":"npm"`, "uv-tool"},
+		// The entry's own platforms exclude the OS, so the field never runs.
+		"an OS the tool skips": {`"package":"hive-vault",`, `"package":"hive-vault","platforms":["linux"],`, "windows"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			bad := strings.Replace(ok, tc.from, tc.to, 1)
+			if bad == ok {
+				t.Fatalf("the fixture has no %s", tc.from)
+			}
+			if _, err := Load(writeCatalog(t, bad)); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("Load = %v, want an error naming %q", err, tc.want)
+			}
+		})
+	}
 }
