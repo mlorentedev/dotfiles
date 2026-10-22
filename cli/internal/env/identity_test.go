@@ -133,3 +133,24 @@ func TestSetMachineIdentity_MalformedFileIsAnError(t *testing.T) {
 		t.Fatalf("SetMachineIdentity = %v, %v; want a parse error", changed, err)
 	}
 }
+
+// The policy reader trims the id, so a whitespace-only one is "undeclared" to
+// doctor, which prescribes the set verb. The verb must therefore accept it
+// without --replace, or the remedy doctor names would be refused.
+func TestSetMachineIdentity_WhitespaceOnlyIDCountsAsUndeclared(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machine.json")
+	if err := os.WriteFile(path, []byte(`{"machine": {"id": "  "}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := SetMachineIdentity(path, "macmini", false)
+	if err != nil || !changed {
+		t.Fatalf("SetMachineIdentity = %v, %v; want true, nil", changed, err)
+	}
+	p, err := LoadMachinePolicy(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Identified || p.ID != "macmini" {
+		t.Fatalf("policy = %+v, want identified as macmini", p)
+	}
+}

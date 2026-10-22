@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // identityLabel is what a machine id may be: a short label, free of whitespace,
@@ -40,6 +41,8 @@ func SetMachineIdentity(path, id string, replace bool) (bool, error) {
 			if err := json.Unmarshal(raw, &cur); err != nil {
 				return false, fmt.Errorf("parse machine.json machine.id (%s): %w", path, err)
 			}
+			// LoadMachinePolicy trims the id, so a blank one is undeclared there.
+			cur = strings.TrimSpace(cur)
 		}
 		switch {
 		case cur == id:
