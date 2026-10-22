@@ -1,0 +1,12 @@
+{
+  "reviewed_sha": "302a427bbaacba77dab4a7c21dbf579233115dff",
+  "reviewer": "nan/qwen3.8-flash",
+  "requested_at": "2026-10-22T05:31:05Z",
+  "review_digest_before": "",
+  "base_sha": "e1c5754c604c45fb8d236694bf7a2a916e80cfde",
+  "contract_digests": {
+    "features.json": "358ebb49f49edd8c45b9084848da1c8d01f6b4f27993811ac6f201005f2266c5",
+    "proposal.md": "297a6356b775ba0db4ced8680d648e883c058385722b726e007392fad4631888",
+    "tasks.md": "97e4977c133fb3e115f4ece614bb68eb4b808a485a440ecbfa1bc36e4438e87a"
+  }
+}

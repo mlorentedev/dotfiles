@@ -8,7 +8,7 @@
 **A comment is not a review; green checks are not the end of one.** A notice that no review ran (limit, quota) leaves the PR unreviewed. Tell them apart by content, not author: a review names files, lines or claims; a notice talks about the review itself. Proceeding unreviewed is allowed, proceeding silently is not: disclose it ("merged unreviewed, reviewer quota exhausted").
 
 - **`dotf pr triage-queue`**: run at session start and before reporting PR work complete, in a repository with a reviewer registry. A non-zero exit means pending work or an unanswerable queue: read it, never treat it as empty.
-- **`dotf mem resume`**: at session start, where no hook injected a resume block, run it and follow its Next action.
+- **`dotf mem resume --agent <agent>`**: at session start, where no hook injected a resume block, run it and follow its Next action; with no agent named it resumes only an unowned thread.
 - **`## Review triage` comment**: record the dispositions on the PR under that heading, even "CI green, no review findings"; unwritten reads as nobody having looked.
 - **Draft while iterating**: open the PR as a draft (`gh pr create --draft`) while you are still pushing to it, and mark it ready (`gh pr ready`) when it is. Reviewers skip drafts, so the review reads the finished change, not each intermediate push.
 

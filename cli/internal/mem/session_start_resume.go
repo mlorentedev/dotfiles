@@ -3,7 +3,6 @@ package mem
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // resumeInjector is the session-start-config.json flag that turns the resume
@@ -31,7 +30,7 @@ func sessionResume(source, memoryPath, key, agent string) string {
 	}
 	switch source {
 	case "startup", "clear", "compact":
-		text, src := ThreadText(content, thread, filepath.Dir(memoryPath))
+		text, src := ThreadText(content, thread, memoryPath)
 		if text == "" {
 			return ""
 		}

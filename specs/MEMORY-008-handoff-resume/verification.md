@@ -11,8 +11,8 @@ created: "2026-09-25"
 - [x] AC2 -> slices 1 and 3: `TestResumeRendersVerifyAndAwaiting`, `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`
 - [x] AC3 -> slice 4: `TestSessionStartResumeBySource`
 - [x] AC4 -> slice 2: `TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields`, `TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`
-- [ ] AC5 -> slice 5: the `handoff` and `catchup` records
-- [ ] AC6 -> slice 5: the compiled doctrine, `--check` and the 8,000-character budget test
+- [x] AC5 -> slice 5: the `handoff` and `catchup` records
+- [x] AC6 -> slice 5: the compiled doctrine, `--check` and the 8,000-character budget test
 
 Each slice PR fills its own section below and nothing else.
 
@@ -141,7 +141,7 @@ Each slice PR fills its own section below and nothing else.
 - **Decisions:**
   - `startup` gets the full block. tasks.md lists it with `clear` and `compact`; AC3 names only the last two. A fresh session has no conversation either.
   - `session_id` is not parsed. Nothing reads it, and a field with no reader is dead weight.
-  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up ticket.
+  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up: #2915.
 
 ### Refusal fix (#1477 follow-up): mutations
 
@@ -162,4 +162,32 @@ The first live refusal on the real file named `legacy-undated` first and told th
 - **Budget:** the capped agy surface measured 7,574 characters on main before this slice (the proposal's 7,798 was stale) and 7,691 after it, against the 8,000 budget.
 - `--check` exit 0 is evidence that the enforced regions match their records, not that the skill records are fresh: it passes on a tree whose skill records lag the vault (#1502). The freshness evidence for this slice's records is that they are byte-for-byte the `--refresh` output from `75d90a9a`, and f5 greps them.
 - `--refresh` also rewrote the `adversarial-review` and `crystallize` records from vault edits other sessions made; those are left out of this slice (#1502).
+
+### Review round 1 (FAIL) and its fixes
+
+The first independent review (`review-round-1.md`, at `302a427b`, nan/qwen3.8-flash) returned FAIL on two REAL Majors inside AC2. Every finding, with its fix:
+
+| Finding | Fix | Test |
+|---|---|---|
+| F-A: the read-only list rendered code runners' escape hatches as safe (`go test -exec=`, `--outputdir=`, `bats /tmp/x.bats`) | the four code runners pass only allowlisted flags, and positional arguments stay inside the checkout (lesson 513) | `TestReadOnlyCommand`: the three reproduced inputs plus `-toolexec`, `-vettool`, `-cpuprofile`, `--formatter`, `~`, `..`; controls `./...`, `-run '^X$'`, `--filter 'a b'` |
+| F-B: `SelectThread` read only the heading stamp, so a thread owned by its journal was handed to another agent | `SelectThread` reads ownership with `threadWriter`, as `threadOwner` does | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`: `feat-j` (journal names pi) |
+| F-C: with no `--agent`, an owned thread was handed to any caller | a caller that names no agent gets only a thread nobody owns; the hook always names `claude`, catchup passes `--agent`, and the doctrine fallback now reads `dotf mem resume --agent <agent>` (vault `552675d8`; agy surface 7,762 characters against 8,000) | same test: `feat-a` with no agent lists candidates |
+| F-D: the printed source was rebuilt as `Dir(memory)/MEMORY.md` | `ThreadText` takes the memory path and returns it for an inline block | `TestThreadTextForKey` reads through `memory2.md` |
+| F-E: the `handoff_resume` declaration was a verbal follow-up | filed as #2915 | n/a |
+| F-F: AC5 and AC6 unticked in the Evidence list | ticked | n/a |
+| F-G: a one-item list collapsed onto its label line | `writeField` treats a value starting `- ` as a list | `TestResumeRendersAOneItemListAsABlock` |
+| Speculative: the launcher's base gives a 750-commit range | not this change's contract; the review read the nine slice commits | n/a |
+| Question: does the `matcher: "*"` SessionStart group fire on `clear`/`compact` | Claude Code's SessionStart matcher filters on `source`, and `*` matches every source; a live `source=compact` payload is still to be observed | n/a |
+
+Mutations, each applied with `go vet` passing, all turn `go test ./internal/mem` red:
+
+| Mutation | Result |
+|---|---|
+| Ownership read from the stamp only | killed |
+| A caller with no agent gets an owned thread | killed |
+| Code runner arguments unchecked | killed |
+| A `..` segment allowed | killed |
+| An absolute path allowed | killed |
+| A one-item list glued to its label | killed |
+| Source rebuilt as `Dir(memory)/MEMORY.md` | killed |
 

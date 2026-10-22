@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -77,7 +76,7 @@ func runMemResume(cmd *cobra.Command, memoryPath, thread, agent, format string) 
 		}
 		return listCandidates(cmd, key, agent, carry, candidates)
 	}
-	text, source := mem.ThreadText(string(content), chosen, filepath.Dir(memoryPath))
+	text, source := mem.ThreadText(string(content), chosen, memoryPath)
 	out, err := mem.RenderResume(text, source, format)
 	if err != nil {
 		return err
