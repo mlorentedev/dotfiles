@@ -558,6 +558,8 @@ func TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit(t *testing.T
 	})
 }
 
+// hiveTool is a uv tool its platforms keep to POSIX, as packages.json declared
+// hive until ADR-036's 2026-10-21 amendment; it fixtures the platforms gate.
 func hiveTool() Tool {
 	return Tool{Name: "hive", Version: "4.2.2", Profile: "full", Source: Source{
 		Type: "uv-tool", Package: "hive-vault", Platforms: []string{"linux", "darwin"},
@@ -614,9 +616,8 @@ func TestInstallUvTool_Failures(t *testing.T) {
 	}
 }
 
-// A tool whose platforms exclude this OS is not a failure: hive is a uv tool on
-// POSIX only, and Windows installs it through hive's own layout (hive ADR-019).
-// Counting it as failed would turn every Windows `dotf tools install` red.
+// A tool whose platforms exclude this OS is not a failure: counting it as
+// failed would turn every `dotf tools install` on that OS red.
 func TestInstall_PlatformsGateIsASkipNotAFailure(t *testing.T) {
 	var rec []string
 	in := newNpmInstaller("", &rec, nil)
@@ -892,5 +893,114 @@ func TestPythonSeries(t *testing.T) {
 		if got := PythonSeries([]byte(tc.conf)); got != tc.want {
 			t.Errorf("PythonSeries(%q) = %q, want %q", tc.conf, got, tc.want)
 		}
+	}
+}
+
+// hiveSelfTool is the shipped hive entry: a uv tool that installs itself on
+// Windows, where hive owns its layout (hive ADR-019).
+func hiveSelfTool() Tool {
+	return Tool{Name: "hive", Version: "4.4.1", Profile: "full", Source: Source{
+		Type: "uv-tool", Package: "hive-vault",
+		SelfInstall: &SelfInstall{Platforms: []string{"windows"}, Args: []string{"self-upgrade", "{version}"}},
+	}}
+}
+
+// On a self_install OS the tool installs itself from an ephemeral uv run of
+// the pinned package; elsewhere it stays a `uv tool install`. The pin is a
+// floor on both, so a newer hive the user chose is never downgraded, which
+// `hive self-upgrade <older>` would otherwise do.
+func TestInstallUvTool_SelfInstall(t *testing.T) {
+	const self = "uv tool run --refresh-package hive-vault --from hive-vault==4.4.1 hive self-upgrade 4.4.1"
+	cases := []struct {
+		name, goos, current, want string
+		res                       Result
+	}{
+		{"windows, absent", "windows", "", self, Installed},
+		{"windows, below the pin", "windows", "4.3.0", self, Upgraded},
+		{"windows, at the pin", "windows", "4.4.1", "", Skipped},
+		{"windows, above the pin is never downgraded", "windows", "4.5.0", "", Skipped},
+		{"linux stays a uv tool", "linux", "", "uv tool install --force --refresh-package hive-vault hive-vault==4.4.1", Installed},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var rec []string
+			in := newNpmInstaller(tc.current, &rec, nil)
+			in.GOOS = tc.goos
+			res, err := in.Install(hiveSelfTool())
+			if err != nil || res != tc.res {
+				t.Fatalf("Install = %v, %v; want %v", res, err, tc.res)
+			}
+			if tc.want == "" && len(rec) != 0 || tc.want != "" && (len(rec) != 1 || rec[0] != tc.want) {
+				t.Errorf("Run = %v, want %q", rec, tc.want)
+			}
+		})
+	}
+}
+
+// The self install runs on the pinned Python, as a uv tool install does.
+func TestInstallUvTool_SelfInstallRunsOnThePinnedPython(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS, in.Python = "windows", func() string { return "3.13" }
+	if _, err := in.Install(hiveSelfTool()); err != nil {
+		t.Fatal(err)
+	}
+	if want := "uv tool run --refresh-package hive-vault --from hive-vault==4.4.1 --python 3.13 hive self-upgrade 4.4.1"; len(rec) != 1 || rec[0] != want {
+		t.Errorf("Run = %v, want %q", rec, want)
+	}
+}
+
+// hive puts its launcher dir on the per-user PATH, which the process that
+// runs dotf read before the install. Probing only the process PATH reads an
+// installed hive as absent: the run would fail its own post-check, and a
+// later run would `self-upgrade` a newer hive down to the pin.
+func TestInstallUvTool_SelfInstallProbesThePersistentPath(t *testing.T) {
+	dir := t.TempDir()
+	launcher := filepath.Join(dir, "hive.cmd")
+	probe := func(version string) Runner {
+		return func(name string, _ ...string) ([]byte, error) {
+			if name == launcher && version != "" {
+				return []byte("hive-vault " + version), nil
+			}
+			return nil, errors.New("not found")
+		}
+	}
+	newIn := func(version string, rec *[]string) *Installer {
+		return &Installer{
+			GOOS: "windows", GOARCH: "arm64", Out: io.Discard,
+			Probe:          probe(version),
+			HasCommand:     func(string) bool { return true },
+			PathCopies:     func(string) []string { return nil },
+			RegisteredPath: func() ([]string, error) { return []string{dir}, nil },
+			Run: func(name string, args ...string) error {
+				*rec = append(*rec, name+" "+strings.Join(args, " "))
+				return os.WriteFile(launcher, []byte("@echo off\r\n"), 0o644)
+			},
+		}
+	}
+
+	var rec []string
+	if res, err := newIn("4.4.1", &rec).Install(hiveSelfTool()); err != nil || res != Installed || len(rec) != 1 {
+		t.Fatalf("a fresh install = %v, %v, calls %v; want Installed after one run, verified on the persistent PATH", res, err, rec)
+	}
+	rec = nil
+	if res, err := newIn("4.5.0", &rec).Install(hiveSelfTool()); err != nil || res != Skipped || len(rec) != 0 {
+		t.Errorf("a newer hive on the persistent PATH = %v, %v, calls %v; want Skipped, never downgraded", res, err, rec)
+	}
+	if p := newIn("4.5.0", &rec).Plan(hiveSelfTool()); p.Installed != "4.5.0" || p.Action != PlanSkip {
+		t.Errorf("Plan = %+v, want the persistent-PATH version and a skip", p)
+	}
+}
+
+// A self install that exits 0 and leaves no hive anywhere names where it
+// looked, not uv's bin dir, which this install never uses.
+func TestInstallUvTool_SelfInstallThatPlacesNothingFails(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS = "windows"
+	in.CurrentVersion = func(string) string { return "" }
+	_, err := in.Install(hiveSelfTool())
+	if err == nil || !strings.Contains(err.Error(), "hive self-upgrade 4.4.1 exited 0") || !strings.Contains(err.Error(), "per-user PATH") {
+		t.Errorf("Install = %v, want the self install and the per-user PATH named", err)
 	}
 }

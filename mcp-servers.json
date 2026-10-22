@@ -17,8 +17,7 @@
       "name": "hive",
       "transport": "stdio",
       "args": "hive client",
-      "prerequisite_binary": "uv",
-      "prerequisite_command": "uv tool install --upgrade hive-vault"
+      "prerequisite_binary": "uv"
     },
     {
       "name": "pdf-modifier",

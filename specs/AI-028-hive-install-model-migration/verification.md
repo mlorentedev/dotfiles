@@ -72,6 +72,29 @@ $ LC_ALL=C grep -nP '[^\x00-\x7F]' windows/hive-upgrade.ps1
 
 > **Do not verify against the deployed copy.** `~/.claude/scripts/hive-upgrade.ps1` is deployed from `windows/hive-upgrade.ps1` by setup. Re-deploy (or invoke the SSOT directly) before treating B5 as flipped, or a stale copy will read as a pass.
 
+## PR6 evidence (2026-10-21)
+
+```
+$ go test ./internal/tools/ -run 'SelfInstall|TheRepoCatalogDeclaresHive' -v | grep -E '^--- '
+--- PASS: TestTheRepoCatalogDeclaresHiveSelfInstalledOnWindows
+--- PASS: TestLoad_SelfInstall
+--- PASS: TestInstallUvTool_SelfInstall
+--- PASS: TestInstallUvTool_SelfInstallRunsOnThePinnedPython
+--- PASS: TestInstallUvTool_SelfInstallProbesThePersistentPath
+--- PASS: TestInstallUvTool_SelfInstallThatPlacesNothingFails
+$ go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...   -> ok
+$ golangci-lint run   -> 0 issues
+
+# mutation: current() without the registered-PATH fallback
+--- FAIL: TestInstallUvTool_SelfInstallProbesThePersistentPath
+
+# mutation: packages.json self_install args "latest" instead of "{version}"
+$ jq -e '<the tests/packages-json.bats self_install filter>' mutated.json
+false        # exit 1
+```
+
+The tests run against a fake uv and a fake probe. Nothing here has run `hive self-upgrade` on Windows: that is AC2's guest run, gated on hive#515.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -85,7 +108,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
 - [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-159-a-guard-that-is-quiet-when-idle-and-quiet-when-bro.md (captured 2026-08-07, *"A guard that is quiet when idle and quiet when broken is not a guard"*; Baseline 2 shows the class again on the converge path)
-- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the mechanism and the upgrade policy are hive's decisions (hive ADR-015, ADR-019, ADR-020) and this repo consumes them. Re-ask if PR6's install shape turns out to be a new catalog source type, which is a decision of this repo's own
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes, for PR6: the catalog's `self_install` field is this repo's own contract, recorded as `docs/adr/adr-036-install-channels.md`'s 2026-10-21 amendment. The mechanism and the upgrade policy stay hive's (hive ADR-015, ADR-019, ADR-020)
 - [x] New pattern candidate for `00_meta/patterns/`? no: lesson-159 holds the insight, and a second instance inside the same spec is not a recurrence outside the incident
 
 ## Archive checklist
