@@ -234,12 +234,13 @@ func sealedBase(t *testing.T) RunOptions {
 		t.Fatal(err)
 	}
 	return RunOptions{
-		Machine: Machine{Layout: l, Firmware: "/fw/code.fd", CPUs: 2, MemoryMB: 4096},
-		Source:  src,
-		Agent:   2 * time.Second,
-		Step:    2 * time.Second,
-		Poll:    5 * time.Millisecond,
-		Out:     &bytes.Buffer{},
+		Machine:  Machine{Layout: l, Firmware: "/fw/code.fd", CPUs: 2, MemoryMB: 4096},
+		Source:   src,
+		Agent:    2 * time.Second,
+		Step:     2 * time.Second,
+		Poll:     5 * time.Millisecond,
+		Out:      &bytes.Buffer{},
+		Progress: &bytes.Buffer{},
 	}
 }
 
@@ -365,7 +366,7 @@ func TestRun_KeepLeavesTheGuestRunning(t *testing.T) {
 	if _, err := os.Stat(o.Machine.Layout.Disk()); err != nil {
 		t.Errorf("--keep removed the overlay: %v", err)
 	}
-	if !strings.Contains(o.Out.(*bytes.Buffer).String(), "dotf vm windows stop") {
+	if !strings.Contains(o.Progress.(*bytes.Buffer).String(), "dotf vm windows stop") {
 		t.Error("--keep does not say how to stop the guest")
 	}
 }
@@ -509,5 +510,21 @@ func TestGuestRun_FailsAStepThatDidNotRunTheDotfBuild(t *testing.T) {
 	}
 	if gone := strings.Index(code, "-not (Test-Path $installed) -or"); gone < run || gone > check {
 		t.Error("a step that removed the build does not fail on its own condition")
+	}
+}
+
+// Progress and the guest's output are two writers: the `==> ` lines never reach
+// the one a caller reads as the guest's (ADR-055 decision 9).
+func TestRun_ProgressIsNotTheGuestsOutput(t *testing.T) {
+	o := sealedBase(t)
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatal(err)
+	}
+	if got := o.Out.(*bytes.Buffer).String(); strings.Contains(got, "==> ") {
+		t.Errorf("progress reached the guest's output:\n%s", got)
+	}
+	if got := o.Progress.(*bytes.Buffer).String(); !strings.Contains(got, "==> converged, and the second run changed nothing") {
+		t.Errorf("progress is missing its lines:\n%s", got)
 	}
 }
