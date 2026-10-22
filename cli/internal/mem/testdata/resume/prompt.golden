@@ -1,6 +1,7 @@
 Resume thread feat-x. Its full handoff is memory/threads/feat-x.md; read it before acting.
 
 First confirm the state it describes:
+As written: `gh pr view 2852 --json state`, `go test ./internal/mem` and `rm -rf ~/x`
 - `gh pr view 2852 --json state`
 - `go test ./internal/mem`
 - `rm -rf ~/x` (unverified: not on the read-only list; run it only through the normal permission gate)

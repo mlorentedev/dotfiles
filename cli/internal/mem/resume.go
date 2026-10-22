@@ -163,10 +163,18 @@ func runnerArgsSafe(prefix string, args []string) bool {
 // inlineCode finds the backticked commands in a Verify field.
 var inlineCode = regexp.MustCompile("`([^`]+)`")
 
+// hasWords is text with a word in it, not just the commas between commands.
+var hasWords = regexp.MustCompile(`[[:alpha:]]`)
+
 // verifyLines renders each Verify command as a list item, marking the ones
 // outside the read-only allowlist. Prose with no command is kept as written.
 func verifyLines(v string) []string {
 	var out []string
+	// Prose beside the commands is part of the record (a caveat such as "not on
+	// mba"), so it is kept as written above the list, never dropped.
+	if prose := inlineCode.ReplaceAllString(v, ""); hasWords.MatchString(stripBreaks(prose)) && inlineCode.MatchString(v) {
+		out = append(out, "As written: "+entryLine(v, 0))
+	}
 	for _, m := range inlineCode.FindAllStringSubmatch(v, -1) {
 		line := "- `" + m[1] + "`"
 		if !readOnlyCommand(m[1]) {

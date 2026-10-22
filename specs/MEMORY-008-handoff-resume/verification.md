@@ -99,10 +99,6 @@ Each slice PR fills its own section below and nothing else.
 
   The first attempt at the "another agent's thread" mutation did not compile. The harness printed no failing test, which read as a surviving mutant (lesson 508).
 
-## Slice 4 evidence
-
-## Slice 5 evidence
-
 ## Decisions made during implementation
 
 - Slice 2: the AC4 fixture is synthetic, shaped like the real file. Copying the vault's `MEMORY.md` into a public repository would publish it. The real file was probed instead, and the probe's figures are recorded above.
@@ -190,4 +186,20 @@ Mutations, each applied with `go vet` passing, all turn `go test ./internal/mem`
 | An absolute path allowed | killed |
 | A one-item list glued to its label | killed |
 | Source rebuilt as `Dir(memory)/MEMORY.md` | killed |
+
+### Review round 2 (FAIL) and its fixes
+
+The second review (`review-round-2.md`, at `2e8777c6`, nan/deepseek-v4-flash) returned FAIL on one REAL Major. Every finding, with its disposition:
+
+| Finding | Disposition | Test |
+|---|---|---|
+| Major: `verifyLines` dropped a `Verify` field's prose whenever it also held a command, against `ParseThread`'s "no line is dropped" | **Applied.** A field with words beside its commands renders them first as `As written: <field>`, then the command list; a field of commands alone renders no prose line. The goldens gained that one line, because the fixture's field joins its commands with "and" | `TestResumeKeepsVerifyProseBesideTheCommands` (both formats; red before the fix) |
+| Minor: `handoff_resume` is not declared in `session-start-config.json` | **Ticketed** as #2915, with the reviewer's note that the bats count should follow the code | n/a |
+| Minor: empty Slice 4 and Slice 5 evidence headings before the filled ones | **Applied**: the empty pair is removed | n/a |
+| Question: the `*` matcher firing on `compact`/`clear` is unobserved live | **Kept open**: recorded here; the next real compaction in a session on a release carrying slice 4 is the observation, and a hook that does not fire gets a ticket | n/a |
+| Question: `source` matched verbatim | **Applied**: `normaliseSource` trims and lowercases it | `TestSessionStartResumeNormalisesTheSource` |
+| Speculative: the injected resume is uncapped | **Declined**: thread files are operator-written and the measured ones are small; MEMORY.md's budget is the bounded surface. Revisit if a resume block is ever observed crowding a compacted context | n/a |
+| Minor: `proposal.md` boxes unticked, "about 350 B" vs the 450 B worst case | **Carried** to the archive PR; the contract set is not edited between rounds | n/a |
+
+Mutations: dropping the `As written` line and dropping the lowercase both turn `go test ./internal/mem` red.
 
