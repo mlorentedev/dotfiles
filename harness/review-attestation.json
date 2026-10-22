@@ -122,6 +122,8 @@
   },
   "triage": {
     "marker": "## Review triage",
+    "standing": ["OWNER", "MEMBER", "COLLABORATOR"],
+    "standing_why": "Who may write the record (#2870). A triage comment is what takes a PR out of `dotf pr triage-queue`, so a marker from any commenter would clear the disposition step a merge is held to. These are GitHub author_association values, the same set .github/workflows/pr-agent.yml trusts to ask for a review; tests/pr-agent-config.bats fails if the two drift apart. The code defaults to this set when a ported copy of this file lacks the key, because a required key that a copy omits leaves the queue unanswerable there.",
     "why": "A heading, matched at the start of a line, because a disposition that lives in a chat message evaporates and the Definition of Done's Review item then rests on a claim nobody can check. Recording it on the PR makes it durable, reviewable and machine-readable at once."
   },
   "classification": {
