@@ -1,7 +1,7 @@
 ---
 id: "ADR-055-vm-guests-are-driven-through-session-verbs"
 type: adr
-status: proposed
+status: accepted
 owner: manu
 date: "2026-10-21"
 supersedes: []
@@ -36,11 +36,12 @@ Constraints that hold whatever the design (all measured or pinned by tests): no 
 7. **`--json` writes one record per call to stdout, whatever the outcome**, the shape of `agent.go` `emitRecord`:
    `{"version":1,"session":"…","os":"…","status":"ok|failed|busy|unsupported|no-session|timeout","exit":<guest exit code or null>,"stdout":"…","stderr":"…","truncated":false,"duration_ms":0}`.
    A consumer reads `status` and `exit`, never stderr and never the process code. `up` and `down` carry `session`, `status` and the paths the caller needs (`state_dir`). Empty lists are `[]`. `version` changes only when a field is removed or changes meaning.
-8. **Process exit codes keep their meaning** (`exit.go`): 0 success; 1 any failure, including a non-zero guest exit (the guest's own code is in `exit`, because the process code space is spoken for); 2 a refusal before any work (bad flag, `busy`, `unsupported`, host not supported); 3 no session or guest could serve the call. A timeout is 1, not 3, so a composer does not retry it elsewhere.
-9. **Progress goes to stderr.** The `==> ` lines move off stdout, so with `--json` stdout is exactly the record, and without it stdout is exactly the guest's output.
-10. **`run` becomes a composition of the verbs**: `up`, `cp` the source in, `exec` the converge twice, judge `last.json` (`Converged`, `Idempotent`), `down`. Its behaviour and flags do not change; the first PR proves it with the existing tests green and no edits to them.
+8. **Process exit codes keep their meaning** (`exit.go`). `status` describes the verb: `ok` means the command ran to completion and `exit` is its code, so a guest command that exits 1 is `status: ok, exit: 1`, and `failed` means dotf could not run it. The process exits 0 only when `status` is `ok` and `exit` is 0, so `&&` chains work and a JSON consumer reads the fields. The codes: 0 success; 1 any failure, including a non-zero guest exit (the guest's own code is in `exit`, because the process code space is spoken for); 2 a refusal before any work (bad flag, `busy`, `unsupported`, host not supported); 3 no session or guest could serve the call. A timeout is 1, not 3, so a composer does not retry it elsewhere.
+9. **Progress goes to stderr, for the verbs and for `run`.** The `==> ` lines move off stdout, so with `--json` stdout is exactly the record, and without it stdout is exactly the guest's output. `run` is composed of the verbs, so it writes progress where they do; routing it back to stdout would be a per-path twin of the same output.
+10. **`run` becomes a composition of the verbs**: `up`, `cp` the source in, `exec` the converge twice, judge `last.json` (`Converged`, `Idempotent`), `down`. Its flags, its lifecycle (the guest is discarded unless `--keep`), its two converges and its judgment do not change, and the tests that pin them stay as they are. The one deliberate change is the stream decision 9 names: a script that reads `==> ` lines from `run`'s stdout reads stderr after it, and a test that reads the progress writer follows the stream. The first PR says so in its description.
 11. **`clean-base` keeps no `sshd` (ADR-053 decision 3 is unchanged).** The first use of the guest is still proving that `dotf` installs `sshd` from nothing (#2672). A test that needs `sshd` in a session installs it with `exec --elevated` inside that session, which the overlay discards; it does not belong in the image. That leg tests the effective-config proof (#2763), not the from-zero install, and the PR says which one it covers.
 12. **Credentials keep their rule.** A token reaches a Linux session on `exec` stdin only, never in argv or on disk (ADR-028, lesson 144); a Windows session receives none. `down` leaves no credentialed disk because none was written.
+13. **What the guest prints is redacted for every value the call forwarded.** The guest's stdout and stderr, in the `--json` record and on plain stdout alike, pass through the same redaction `dotf secrets run` applies to a child's output (`redactWriter`, ADR-028), keyed on the values `exec` forwarded on stdin. A value the guest obtained elsewhere is unknown to dotf: keeping it out of its own output is the caller's responsibility, and the record is not scrubbed beyond what dotf forwarded.
 
 ## Consequences
 
@@ -49,6 +50,7 @@ Constraints that hold whatever the design (all measured or pinned by tests): no 
 - Windows `exec` runs through a scheduled task, polls `<step>.exit` and `<step>.log`, and is slower than Linux `limactl shell`. The record's `duration_ms` makes that visible; it is not hidden behind a different contract.
 - Windows `exec` has no stdin. A caller that needs to pass data writes it with `cp` first. The refusal is `unsupported` with exit 2, never a silent drop.
 - A new agent-facing verb needs an allow rule in each harness dialect, landed by the owner (ADR-048 clause 6). The PR that adds the verbs names the rules and does not widen the permission baseline itself.
+- A guest that echoes the token it was given yields a masked record. The PR that adds `exec` carries the test that proves it (the guard for the class decision 13 closes).
 - Every refusal test sets `XDG_STATE_HOME` to an empty temp dir (`noGuest(t)`, lesson 489), so a regression cannot boot a real guest on a machine that holds a `clean-base`.
 - The Windows guest still builds only on macOS Arm64. The contract is the same on a Linux host, and the Linux host is still the follow-up ADR-053 names.
 - Three PRs follow, each independent of the next: the verbs with `run` recomposed (no behaviour change), `--elevated` with a stand-in mesh address for the role (#2763 obstacles 1 and 3), and the Windows `sshd -T` fixture with the guest acceptance that closes #2763.
