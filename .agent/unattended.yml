@@ -1,0 +1,25 @@
+version: 1
+run_id: tickets-20261022T0735Z
+armed_by: manu
+armed_at: 2026-10-22T07:35:00Z
+expires_at: 2026-10-22T15:35:00Z
+objective: "Close the mechanical debt tickets filed in this line of work: the guard-no-gui pid-substring flake (#2872) and a dotf lessons renumber command (#2837)."
+scope:
+  write_paths: ["tests/**", "cli/internal/lessons/**", "cli/internal/cmd/**", "docs/lessons/**", ".agent/runs/tickets-20261022T0735Z/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "setup-*", "versions.conf", "powershell/**", ".agent/unattended.yml"]
+  max_files: 8
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, bats, shellcheck, golangci-lint]
+queue:
+  source: bitacora
+  filter: "dotfiles issues #2872, #2837 (debt from the spec-digest and lesson-collision work)"
+  max_items: 2
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
