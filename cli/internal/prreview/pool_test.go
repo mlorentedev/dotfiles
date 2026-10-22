@@ -14,7 +14,8 @@ import (
 func TestEmbeddedPoolEqualsTheRepoPool(t *testing.T) {
 	want, err := os.ReadFile(repoFile("harness", "reviewer-pool.json"))
 	if err != nil {
-		t.Skipf("harness/reviewer-pool.json is not here: %v", err)
+		// Fail, not skip: a test that skips when its source is gone checks nothing.
+		t.Fatalf("harness/reviewer-pool.json is not here: %v", err)
 	}
 	if !bytes.Equal(embeddedPool, want) {
 		t.Fatal("cli/internal/prreview/reviewer-pool.json differs from harness/reviewer-pool.json;" +
