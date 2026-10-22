@@ -43,9 +43,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons.md`? yes, written: lesson 512 (a landing check reads paths and content in the frame the patch wrote them), from AC5
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the decisions are the owner's rulings on #1062 (option A, the gate refuses, PR-level guard), recorded in this log and on the issue; none outlives the spec as an architectural choice
+- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. candidate, not yet: "a reviewer's class is a hypothesis; reproduce before apply" would apply to kubelab's PR-Agent too, but it has run in one repo only; decide at archive
 
 ## Archive checklist
 
