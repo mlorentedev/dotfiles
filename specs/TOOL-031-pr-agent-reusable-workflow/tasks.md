@@ -18,7 +18,7 @@ created: "2026-10-21"
 
 - [x] Branch `feat/pr-agent-reusable-workflow` in a dotfiles worktree. #2893 is claimed and In Progress.
 - [ ] `proposal.md` complete; owner reviews the `[AGENT-DRAFT]` criteria and R2
-- [ ] Comment on #2217 (CLI-101) and kubelab#2295 that TOOL-031 carries them
+- [x] Comment on #2217 (CLI-101) and kubelab#2295 that TOOL-031 carries them
 
 ## Implementation
 
