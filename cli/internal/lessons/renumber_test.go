@@ -168,6 +168,22 @@ func TestRenumber_RefusesWhatIsNotALessonOfTheTree(t *testing.T) {
 	}
 }
 
+// A lesson Normalize cannot read is refused before the move, so it is not
+// left at the new number with its old id and its links unrewritten.
+func TestRenumber_RefusesAnUnreadableLessonBeforeTheMove(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"lesson-001-a.md": "no heading, no date\n",
+		"lesson-002-b.md": lessonBody("B", "See [[lesson-001-a]].\n"),
+	})
+	before := snapshot(t, dir)
+	if _, err := Renumber(dir, filepath.Join(dir, "lesson-001-a.md"), 0, os.Rename); err == nil {
+		t.Fatal("renumbered a lesson with no H1 and no date")
+	}
+	if snapshot(t, dir) != before {
+		t.Error("a refused renumber changed the tree")
+	}
+}
+
 // snapshot renders every file under dir, path and content, for before/after
 // comparison.
 func snapshot(t *testing.T, dir string) string {

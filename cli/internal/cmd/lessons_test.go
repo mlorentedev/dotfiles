@@ -149,3 +149,21 @@ func TestLessonsRenumber_WantsExactlyOneOfNextAndTo(t *testing.T) {
 		}
 	}
 }
+
+// A relative --dir names the same lessons as the absolute file path: both are
+// made absolute before they are compared.
+func TestLessonsRenumber_AcceptsARelativeDir(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docs", "lessons")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "lesson-001-a.md"), []byte("---\ntitle: \"A\"\ndate: \"2026-10-05\"\n---\n\n# A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	stdout, _, err := execute(t, "lessons", "renumber", "docs/lessons/lesson-001-a.md", "--to", "7", "--dir", "docs/lessons")
+	if err != nil || !strings.Contains(stdout, "lesson-007-a.md") {
+		t.Fatalf("relative --dir: err %v\n%s", err, stdout)
+	}
+}

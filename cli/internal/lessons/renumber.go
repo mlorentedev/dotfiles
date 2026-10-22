@@ -56,14 +56,16 @@ func Renumber(dir, file string, to int, move func(from, to string) error) (Renum
 	if err != nil {
 		return Renumbered{}, err
 	}
+	// Normalised before the move: a lesson Normalize cannot read (no H1, no
+	// date) is refused with the tree untouched, not moved with its old id.
+	if _, rewrites[file], err = Normalize(filepath.Base(dest), rewrites[file]); err != nil {
+		return Renumbered{}, err
+	}
 	if err := move(file, dest); err != nil {
 		return Renumbered{}, err
 	}
 	for p, body := range rewrites {
 		if p == file {
-			if _, body, err = Normalize(filepath.Base(dest), body); err != nil {
-				return res, err
-			}
 			p = dest
 		} else {
 			res.Rewritten = append(res.Rewritten, p)

@@ -200,7 +200,11 @@ func newLessonsRenumberCmd() *cobra.Command {
 // directory, so a logical path (macOS /var) and a physical one (/private/var,
 // what git answers) name the same lesson. The file itself may already be gone.
 func canonicalPaths(dir, file string) (string, string, error) {
-	d, err := filepath.EvalSymlinks(dir)
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", "", err
+	}
+	d, err := filepath.EvalSymlinks(absDir)
 	if err != nil {
 		return "", "", err
 	}
