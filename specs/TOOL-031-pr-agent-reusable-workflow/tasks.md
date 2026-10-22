@@ -36,7 +36,7 @@ A1 is about 600 executable lines, so it ships as three PRs, each based on the pr
   - [x] [AC1] `Route`: the weighted draw, the risk route, the overrides and the refusals, with the bats cases ported (`route_test.go`).
   - [x] [AC1] A differential test: the script and `Route` on the same inputs and the same httptest server give identical outputs, warnings and probes.
 - **A1c: the command.**
-  - [ ] [AC1] `dotf pr route` (`--changed-lines`, `--labels`, `--pool`, `--json`, `--print-allowlist`), with the outputs appended to `--output` (default stdout; the workflow passes `$GITHUB_OUTPUT`, as it does to the script) and the step summary when `GITHUB_STEP_SUMMARY` is set. Exit 0 routed, 1 refused, 2 usage error, as the script.
+  - [x] [AC1] `dotf pr route` (`--changed-lines`, `--labels`, `--pool`, `--json`, `--print-allowlist`), with the outputs appended to `--output` (default stdout; the workflow passes `$GITHUB_OUTPUT`, as it does to the script) and the step summary when `GITHUB_STEP_SUMMARY` is set. Exit 0 routed, 1 refused, 2 usage error, as the script.
 
 ### A2 to A4. D: `preflight`, `guard`, `gate` (one PR each)
 
