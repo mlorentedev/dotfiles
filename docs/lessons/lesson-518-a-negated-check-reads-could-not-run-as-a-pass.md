@@ -1,5 +1,5 @@
 ---
-id: "lesson-514-a-negated-check-reads-could-not-run-as-a-pass"
+id: "lesson-518-a-negated-check-reads-could-not-run-as-a-pass"
 type: lesson
 status: active
 title: "A negated check reads could-not-run as a pass"
