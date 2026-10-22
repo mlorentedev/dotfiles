@@ -1,0 +1,72 @@
+[
+  {
+    "id": "PLAT-005-vm-session-verbs-f1",
+    "behavior": "`up --session` creates a Linux session; a second Windows `up` is `busy` with exit 2",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestSessionUp'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f2",
+    "behavior": "`exec` returns one JSON record, and the status, exit and process-code table holds",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecRecord'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f3",
+    "behavior": "`exec` forwards stdin on Linux and refuses it on Windows with `unsupported`",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecStdin'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f4",
+    "behavior": "`cp` moves files both ways through the channel and the isolation checks stay green",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestCopy|SharesNothing'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f5",
+    "behavior": "with `--json` stdout is exactly one record and progress is on stderr, for the verbs and `run`",
+    "verification": "go -C cli test ./internal/cmd/ -run 'TestVMProgressGoesToStderr'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f6",
+    "behavior": "`run` composed of the verbs; its existing tests pass unedited",
+    "verification": "go -C cli test ./internal/vm/ ./internal/cmd/ -run 'TestRun|TestVerify'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f7",
+    "behavior": "a guest that echoes the forwarded token yields a masked record and masked plain stdout",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecRedactsForwardedValues'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f8",
+    "behavior": "`exec --elevated` creates the Windows task with /rl highest and prefixes sudo on Linux",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecElevated'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f9",
+    "behavior": "every verb refusal test sets XDG_STATE_HOME and never reaches the hypervisor",
+    "verification": "go -C cli test ./internal/cmd/ -run 'TestVMVerbRefusals'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f10",
+    "behavior": "the Windows sshd -T fixture holds the proof and the guest acceptance converges twice at changed 0",
+    "verification": "go -C cli test ./internal/sshtarget/ -run 'CheckEffective'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
