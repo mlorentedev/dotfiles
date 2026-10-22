@@ -5,3 +5,4 @@ Armed 2026-10-22T07:34Z, expires 15:30Z. Wake-lock: `caffeinate -i -t 28800` sta
 - 07:40Z #2930 opened (progress to stderr), skip-sdd (spec exists); CI queued.
 - 07:55Z #2931 opened (redaction move), skip-sdd; CI queued.
 - #2842 claimed.
+- 08:40Z #2930 landed (`4dc0382`). test-macos had failed on my cmd test (no QEMU on the runner); fixed by letting `vm windows stop` need only the state dir. pr-agent: one REAL (evidence output, applied), one THEORETICAL (declined with the macOS job as evidence). Peer scan for #2930 printed nothing (zsh glob on the URL), so condition 1 was unevidenced for it; redone for #2931.
