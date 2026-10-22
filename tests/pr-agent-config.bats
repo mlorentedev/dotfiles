@@ -15,6 +15,39 @@ concurrency_group() {
     python3 -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["concurrency"]["group"])' "$WF"
 }
 
+# The arguments of the group's format() call, one JSON string per line, index 0
+# being the pattern. It fails when an argument has no placeholder in the
+# pattern: such an argument is still in the text, so a token check passes, but
+# it never reaches the key (#2887 review).
+concurrency_key_args() {
+    python3 - "$WF" <<'PY'
+import json, re, sys, yaml
+group = yaml.safe_load(open(sys.argv[1]))["concurrency"]["group"]
+m = re.fullmatch(r"\s*\$\{\{\s*format\((.*)\)\s*\}\}\s*", group, re.S)
+if not m:
+    sys.exit("the group is not a single format() expression")
+args, depth, quoted, cur = [], 0, False, ""
+for ch in m.group(1):
+    if ch == "'":
+        quoted = not quoted
+    elif not quoted and ch == "(":
+        depth += 1
+    elif not quoted and ch == ")":
+        depth -= 1
+    if ch == "," and depth == 0 and not quoted:
+        args.append(re.sub(r"\s+", " ", cur).strip()); cur = ""
+        continue
+    cur += ch
+args.append(re.sub(r"\s+", " ", cur).strip())
+used = {int(i) for i in re.findall(r"\{(\d+)\}", args[0])}
+unused = [a for i, a in enumerate(args[1:]) if i not in used]
+if unused:
+    sys.exit("arguments that never reach the key: " + "; ".join(unused))
+for a in args:
+    print(json.dumps(a))
+PY
+}
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CFG="$REPO/.pr_agent.toml"
@@ -276,7 +309,9 @@ PY
     # The name must be a PART of the key, not merely mentioned in it: since #2867
     # the key also tests github.event_name to split comments out, so a bare grep
     # passed with the discriminator deleted.
-    concurrency_group | tr -s ' \n' ' ' | grep -qE "github\.event\.issue\.number, github\.event_name,"
+    run concurrency_key_args
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    printf '%s\n' "$output" | grep -qx '"github.event_name"'
 }
 
 @test "pr-agent: both PR-number sources stay in the concurrency key" {
@@ -298,15 +333,24 @@ PY
     # review published. Only a comment that will actually run, a slash command
     # from someone the job trusts, may share the group; any other gets its own,
     # keyed on its id, and supersedes nothing.
-    run python3 - "$WF" <<'PY'
-import re, sys, yaml
-wf = yaml.safe_load(open(sys.argv[1]))
-group = wf["concurrency"]["group"]
-gate = wf["jobs"]["review"]["if"]
-assert "github.event.comment.id" in group, "comments are not split out of the shared group"
-term = re.sub(r"\s+", " ", group)
+    #
+    # Asserted on the format() argument that carries the comment id, and that
+    # argument must reach the key: a token anywhere in the group text proves
+    # nothing (#2887 review). The predicate deciding who shares the group must
+    # be the job gate's own: the same slash-command test and the same trusted
+    # associations.
+    run concurrency_key_args
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    run python3 - "$WF" "$output" <<'PY'
+import json, re, sys, yaml
+gate = re.sub(r"\s+", " ", yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]["if"])
+args = [json.loads(l) for l in sys.argv[2].splitlines()]
+split = [a for a in args[1:] if "github.event.comment.id" in a]
+assert len(split) == 1, "no single key argument carries the comment id"
+term = split[0]
 assert "github.event_name == 'issue_comment'" in term, "the per-comment group is not limited to issue_comment"
-assert "startsWith(github.event.comment.body, '/')" in term, "a slash command no longer shares the group"
+slash = lambda s: sorted(re.findall(r"startsWith\(github\.event\.comment\.body, '[^']*'\)", s))
+assert slash(term) and slash(term) == slash(gate), f"group shares on {slash(term)}, the job gate runs on {slash(gate)}"
 lists = lambda s: re.findall(r"fromJSON\('(\[[^']*\])'\)\s*,\s*github\.event\.comment\.author_association", s)
 assert lists(term) and lists(gate), "the trusted-association test is missing from the group or the job gate"
 assert set(lists(term)) == set(lists(gate)), f"group trusts {lists(term)}, the job gate {lists(gate)}"
