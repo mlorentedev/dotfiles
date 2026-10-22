@@ -81,6 +81,21 @@ type ReviewerEntry struct {
 	// give: first (the default), second or fallback. See review_slot.go.
 	Vendor string `json:"vendor,omitempty"`
 	Signs  string `json:"signs,omitempty"`
+	// PRAgent is the member's place in the CI review pool; nil for a member
+	// that does not review pull requests.
+	PRAgent *PRAgentBlock `json:"pr_agent,omitempty"`
+}
+
+// PRAgentBlock is a member's PR-Agent model, its weight in the CI draw and its
+// reasoning effort. `route: risk` members are never drawn: they review first
+// when a PR crosses the pool's pr_agent_risk. ForgeRank orders the members a
+// forge pod tries.
+type PRAgentBlock struct {
+	Model           string `json:"model"`
+	Weight          int    `json:"weight"`
+	Route           string `json:"route,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+	ForgeRank       int    `json:"forge_rank,omitempty"`
 }
 
 // ReviewerCommand builds the argv that runs one pooled reviewer non-interactively.
