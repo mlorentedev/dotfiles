@@ -85,6 +85,12 @@ $ go test ./internal/tools/ -run 'SelfInstall|TheRepoCatalogDeclaresHive' -v | g
 $ go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...   -> ok
 $ golangci-lint run   -> 0 issues
 
+# the argv against a real uv (Mac, ephemeral: nothing is installed)
+$ uv --version
+uv 0.12.18 (01cb90c1a 2026-09-22 aarch64-apple-darwin)
+$ uv tool run --refresh-package hive-vault --from hive-vault==4.4.1 --python 3.13 hive --version
+hive-vault 4.4.1        # exit 0
+
 # mutation: current() without the registered-PATH fallback
 --- FAIL: TestInstallUvTool_SelfInstallProbesThePersistentPath
 

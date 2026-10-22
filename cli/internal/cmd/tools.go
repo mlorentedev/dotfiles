@@ -227,6 +227,8 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 		return "(not in the catalog on this platform)"
 	case t.Source.Type == "npm":
 		return "npm:" + t.Source.Package
+	case t.Source.SelfInstalls(goos):
+		return "self:" + t.Source.Package
 	case t.Source.Type == "uv-tool":
 		return "uv:" + t.Source.Package
 	case t.Source.Type == "system":
