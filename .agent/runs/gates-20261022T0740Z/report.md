@@ -52,6 +52,7 @@ None.
 | #2952 | CI on `9aba0631` | 24 success, 3 skipped |
 | all | `go vet ./...`, `GOOS=windows go vet ./...`, golangci-lint (pin) | clean, 0 issues |
 | all | `dotf pr triage-queue --pr N` before each land | exit 0 |
+| DoD §5 | `dotf pr triage-queue` (repo-wide) at 11:37Z | exit 0, queue clear |
 
 ## Budget spent
 
