@@ -36,6 +36,8 @@ created: "2026-08-18"
 >   report is the per-finding signal until the marker's adoption is measured.
 >   A per-row check and a close-without-merge guard are not built.
 
+- [x] `[AC5]` committed-test path: `dotf pr reproduce -- <cmd>` refuses a dirty tree (untracked included), records the HEAD it ran on, and classifies the exit as `reproduced`, `did-not-reproduce` or `could-not-run` (start failure, 126/127, signal, timeout: never a reproduction, owner #1062). It prints one row a human pastes into `## Review triage`; it applies nothing (`cli/internal/reproduce`)
+- [x] `[AC5]` red-direction for that path: six mutations of `reproduce.go` (timeout, 127, signal, dirty, untracked, recorded head), each confirmed landed by checksum, each killed
 - [ ] `[AC5]` reproduction harness: apply a mutation, **verify by checksum that it landed**, report `did-not-land` as a state distinct from `did-not-reproduce`
 - [ ] `[AC5]` red-direction: an invalid mutation must report `did-not-land`, never a clean result — the exact failure two sessions hit on 2026-08-17
 - [x] `[AC2]` `[P]` read reviewer identity + notice markers from `harness/review-attestation.json`; no second copy of the distinction
