@@ -1,162 +1,176 @@
 ---
 spec: "GUARD-003-review-loop-determinism"
-verdict: "FAIL"
-reviewed_sha: "8be1f21a26922f66edf2ea6bd0aabc73cf868fd3"
-reviewer: "nan/deepseek-v4-flash"
+verdict: "PASS-WITH-GAPS"
+reviewed_sha: "a97495e8ff27f6b410121ef7497c7975d433d2c7"
+reviewer: "nan/qwen3.8-flash"
 date: "2026-10-21"
 ---
 
 ## Adversarial review
 
-**Scope**: `GUARD-003-review-loop-determinism` — the review-loop wake-up: the `workflow_run` trigger on
-`review-attestation.yml`, the `/review` (issue_comment) resolution path, and `dotf pr triage-queue`
-(`cli/internal/prtriage`). Reviewed at HEAD `8be1f21a`.
+**Scope**: `GUARD-003-review-loop-determinism` — round 2, re-review of the round-1 FAIL (F1 authorship
+of the triage record, F2 writer-side marker guard, F4 unticked ACs). HEAD `a97495e8`.
 
-The stated scope, `e608989e5437f6e465279c83ee09aa34b9aba8e5...HEAD`, is **3034 files / 262,196
-insertions**: that base is the parent of this spec's first commit (`1a5f3cf4`, 2026-08-17) and roughly
-2000 unrelated merges have landed between it and HEAD. The spec's own surface is 8 commits touching
-~15 files. I reviewed that surface — every file each GUARD-003 commit touches, at its HEAD state — and
-loaded the HEAD state of the two workflows and the registry rather than only the diff, because later
-work (e.g. #2209's exemption, the `pull_request` blanket check-run exemption in #1185) changes what the
-early commits mean. Recorded as F3: the base is not a reviewable unit for this spec, and anyone reading
-a PASS/FAIL here should know what was actually read.
-
-**Sources**: `specs/GUARD-003-review-loop-determinism/{proposal,tasks,verification}.md`; commits
-`1a5f3cf4` (spec + trigger), `1a29340f` (triage queue), `4b76defa` (check-run amendment), `0ad7ac21`
-(`/review` path, #2848), `af2d8dc5`/`17b59ddb`/`8be1f21a` (spec records);
-`.github/workflows/review-attestation.yml`, `.github/workflows/pr-agent.yml`,
+**Sources**: `specs/GUARD-003-review-loop-determinism/{proposal,tasks,verification}.md`,
+`review-round1.md` + `review-request-round1.json` (prior round), the diff `e608989e...HEAD` restricted to
+this spec's surface, `.github/workflows/{review-attestation,pr-agent}.yml`,
 `scripts/check-review-attestation.sh`, `harness/review-attestation.json`,
-`cli/internal/prtriage/{prtriage,fetch}.go`, `cli/internal/cmd/pr_land.go`,
-`tests/review-attestation-workflow.bats`, `tests/check-review-attestation.bats`.
+`harness/skills/pr-review-triage/SKILL.md`, `cli/internal/prtriage/{prtriage,fetch}.go` + tests,
+`cli/internal/cmd/{pr,pr_land}.go`, `cli/internal/prland/*`,
+`tests/{check-review-attestation,review-attestation-workflow,pr-agent-config}.bats`, live GitHub (read-only).
+
+**Freshness**: `contract_digests` in `review-request.json` (proposal `595d08fe…`, tasks `a69de830…`,
+features.json empty) match `dotf spec digest GUARD-003-review-loop-determinism` built from this tree —
+the contract has not moved since launch. `dotf spec digest` is **absent from the installed 0.76.0**
+(`Error: unknown command "digest" for "dotf spec"`), so the comparison ran on `go build ./cmd/dotf`
+(F1 below).
 
 ### Spec and task alignment
 
-- **T1/T2 (AC5, AC1, AC4)** — `workflow_run: workflows: [pr-agent], types: [completed]` is present, the
-  job `if:` admits it, and the resolve step recovers the PR by `workflow_run.head_sha` for the
-  `pull_request` path and by the `reviewed-pr` artifact for the `issue_comment` path. All three are
-  guarded by name (`tests/review-attestation-workflow.bats` cases 2, 3, 4, 16, 20).
-- **T3 (AC2)** — the verdict is published to the `review-attestation` **commit status**, and the step
-  that would freeze the check-run is exempted on the `pull_request` event only. Confirmed against the
-  live API, not the prose.
-- **T4 (AC3)** — non-`pull_request` paths still fail; named cases 8 (`every non-pull_request path still
-  fails [#1041]`) and 7 exist and pass.
-- **T5/T12 (AC1 live)** — reproduced from the actual run log: run `39621973877` is
-  `event=workflow_run`, `conclusion=success`, and prints `re-evaluating PR #2855 because the reviewer
-  finished` followed by `[OK] attested — reviewed by: coderabbitai, github-actions`.
-- **T6 (AC6)** — the adoption order is in the workflow header, and the required check is real: branch
-  protection's contexts are `["lint","lint-powershell","test","test-windows","review-attestation",
-  "cli-gate","spec-gate","changes","knowledge-gate","from-zero-gate"]`. The name required is the
-  **status** context; the check-run is named `attestation`, so the two cannot be confused in practice.
-- **T7/T8 (AC8, AC7, AC9)** — the marker is declared once, in `harness/review-attestation.json`
-  (`triage.marker = "## Review triage"`); the queue reads it and refuses an empty one; the queue lists
-  and never applies. The read side is genuinely single-sourced. The write side is not (F2), and the
-  record's *author* is not considered at all (F1).
-- **T10/T11** — delivered, with their own issues (#1196, #1128); both were outside this review's
-  adversarial focus except where they interact with the trigger's grouping, which they do correctly
-  (a `/review` run keys its group on the run id, so two such runs cannot cancel each other — case 18).
-- One task box is deliberately open (`Adversarial review passes before archive`) — correct as of this
-  review. All nine `proposal.md` acceptance criteria remain **unticked** (F4).
+- **T13 (round-1 F1, AC8)** — closed in `577fb05e`. `lastTriage` (`prtriage.go:255-260`) now requires
+  `hasLinePrefix(marker) && hasStanding(c, reg.Triage.Standing)`; `hasStanding` (`:267-279`) upper-cases
+  and trims both sides, and an unread association (`""`) is **not** standing — fail-closed in the loud
+  direction. `Comment.AuthorAssociation` is populated only on the conversation-comment path
+  (`fetch.go:362-366`), which is the channel the skill writes to (`dotf forge pr comment`).
+- **AC8's wording** was amended in the contract set: "*written by an account with standing to write it
+  (not any commenter)*" — round-1's requested contract change is present, which is what makes this
+  round's verdict attach to the right claim.
+- **T14 (round-1 F2, AC9)** — closed. `tests/pr-agent-config.bats:1370` "every writer of the triage
+  record spells the registry's marker" checks all three writer files for the registry string, rejects
+  any *drifted* `##\s*review\s*triage` spelling in the same file, and requires the marker at line start
+  in the skill template; `:1406` "who may ask for a review is who may record its triage" ties
+  `triage.standing` to the inline set at `pr-agent.yml:147`. Registry `standing_why` names both guards.
+- **AC1/AC4/AC5/AC6** — re-checked at HEAD, not inherited from round 1: the `workflow_run` trigger is
+  present and guarded (deleting it turns `review-attestation-workflow.bats` case 2 red, checksum-
+  verified); the `/review` artifact path is guarded by cases 80–83; shellcheck/`bash -n`/actionlint all
+  exit 0.
+- **Round-1 F4** — the nine AC boxes are ticked and `proposal.md` reads `status: verifying`; the one
+  open box in `tasks.md` is "Adversarial review passes before archive", which is correct while this
+  review is the thing being decided.
+- **Widening resistance** (the AGENTS "class declared in a file, with tests that fail if it widens"):
+  adding `"NONE"` to `triage.standing` turns **both** `TestTheRealRegistryDeclaresTheDefaultStanding`
+  and the bats drift guard red. `reviewerRegistry()` defaults to `prtriage.FetchRegistry`, which reads
+  the registry from the **default branch**, so a PR cannot widen its own standing by editing the file
+  in its own head — the base-pinning property #1019 established holds here too.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
 |----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | trust boundary — triage record authorship | `lastTriage` accepts **any** comment whose body has a line starting with the marker, from **any** author (`Author` is never inspected; the REST fetch stores it and nothing reads it). That record clears the PR from `dotf pr triage-queue`, and `pr land` treats "the triage queue does not list it" as one of its landing conditions (`pr_land.go` `Untriaged:` → `prtriage.FetchWithRegistry`). On this **public** repository any account can therefore clear a merge precondition by posting `## Review triage`, and the reviewer findings the queue exists to surface go unread. Same shape the gate already rejects on its own side: `pr-agent.yml` gates `issue_comment` on `author_association ∈ {OWNER, MEMBER, COLLABORATOR}`, and the gate counts reviewer output only from declared logins — the triage reader does neither. Consequence is bounded (the required `review-attestation` status still refuses an *unreviewed* PR), but the DoD "Review" item this spec set out to make checkable becomes forgeable by a stranger, which is the property the spec claims to have replaced. | Reproduced this session: a temporary `Evaluate` test with reviewer output at `t00` and a triage comment at `t10` authored `drive-by-stranger` returned `Pending=false`, `Reason="triaged"` (probe file removed after the run). Code: `cli/internal/prtriage/prtriage.go:210-233` (`lastTriage`), `cli/internal/prtriage/fetch.go:320-347` (author stored, never filtered), `cli/internal/cmd/pr_land.go:36-49`. | UNTESTED — every existing table case uses an owner author (`cli/internal/prtriage/prtriage_test.go:49,59,75,88,100`); no case asserts that an undeclared author does *not* clear the queue | **code + tests** (`Evaluate`/`lastTriage` gains an authorship predicate; add `TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue`, red before the fix) |
-| Minor | THEORETICAL | SSOT drift (AC9) | AC9 holds for *readers* only. The **writer** — `harness/skills/pr-review-triage/SKILL.md:62-63` — hardcodes `## Review triage`, as do `docs/runbooks/release-dotf.md:79` and `docs/runbooks/guide-pr-agent-reviewer.md:333,338`. Nothing ties the prose to `triage.marker`: changing the registry marker failed **no** test. The failure direction is loud, not green (the queue would list every PR as never triaged and `pr land` would refuse), so this is drift, not a bypass. | `go test -count=1 ./internal/prtriage/` → `ok` with `triage.marker` mutated to `## Review dispositions` (mutation confirmed by re-reading the file, then reverted) | UNTESTED — no guard compares the skill's heading with the registry | **tests** (a bats/golden guard asserting the skill's marker equals `triage.marker`, the same two-consumer guard AC9 asked for) |
-| Minor | REAL | review scope / base resolution | The launcher-resolved base predates ~2000 merges, so `base...HEAD` is not this spec's change (3034 files vs the spec's ~15) and cannot be reviewed as one unit. Not a defect in the change; recorded so the archive decision is made on a stated scope. `proposal.md` also still reads `status: draft`. | `git diff --stat e608989...HEAD` → `3034 files changed, 262196 insertions(+), 18993 deletions(-)`; `git log -1 --format=%p 1a5f3cf4` → `e608989e` | n/a (measurement) | **spec/vault** — out of scope here (the archive gate's implementation lives outside this repo); the launcher's base rule is the owner's call |
-| Minor | REAL | spec artifacts | All nine acceptance criteria in `proposal.md` are still `- [ ]` although `verification.md` maps each to evidence. A reader who trusts the checkboxes reads the spec as unimplemented. | `grep -n '^- \[ \] AC' specs/GUARD-003-review-loop-determinism/proposal.md` → AC1–AC9 unticked | n/a | **spec** (contract set — legitimate to edit on a FAIL round; it re-stales this review, and the next round re-measures) |
+| Minor | REAL | review-loop tooling (launcher prompt) | The launcher's own prompt instructs the reviewer to verify `contract_digests` with `dotf spec digest <id>`, but that subcommand exists only in this tree — the released CLI (`dotf 0.76.0`, what a reviewer has on a fresh box) has `archive/audit/init/review` and refuses with `unknown command "digest"`. A reviewer who does not think to build from source marks the digest check UNVERIFIED, so the freshness property this spec exists to add is untestable at the exact moment it is needed. Fix: print the digests into the prompt text the launcher already computed, or name the `go run ./cmd/dotf` fallback. | Ran both this session: installed `dotf spec digest …` → error; `go build ./cmd/dotf && ./dotf spec digest …` → the two matching digests above | UNTESTED — no test pins the prompt's command list to the released command set (`cli/internal/spec/review_launch.go:356`) | code (+tests); adjacent surface (#2875/SDD-042), so **ticket rather than block** |
+| Minor | THEORETICAL | channel asymmetry | A `## Review triage` recorded as a **submitted review body** rather than a conversation comment can never clear the queue: `lastTriage` iterates `pr.Comments` only, and `fetchReviews` (`fetch.go:390-396`) does not carry `author_association` at all (GitHub returns it there). Today the documented writer path is `dotf forge pr comment`, so the two channels agree; the gap opens the moment anyone dispositions through the review UI or a future writer uses that channel. Failure direction is loud (PR stuck in the queue, `pr land` refuses), never silent green | Code read + `gh api /pulls/2855/reviews` shape; live queue run shows the comment path working | UNTESTED — `TestEvaluate_*` cases feed triage only via `Comments`; no case feeds the `Reviews` channel | tests + docs |
+| Minor | THEORETICAL | writer-facing doctrine | `harness/skills/pr-review-triage/SKILL.md` §7 tells the agent *what* to write but not *who may write it*: a session whose `gh` is authenticated as a GitHub App posts with `author_association: NONE` (measured on #2855: `coderabbitai[bot]`/`github-actions[bot]` = NONE, `mlorentedev` = OWNER), so its triage record is invisible to the queue and `dotf pr land` will refuse that PR indefinitely with no message explaining why. The rule is documented in the registry (`standing_why`), which the person following the skill does not read | `gh api issues/2855/comments` this session (2× NONE, 2× OWNER); `hasStanding` returns false for NONE; skill text at `:174-193` | partially — `pr-agent: every writer … spells the registry's marker` guards the string, not the doctrine | docs (`harness/skills/…`, outside the contract set; `TestTheRealRegistryDeclaresTheDefaultStanding` already holds the value) |
+| Minor | SPECULATIVE | SSOT drift | `.github/merge-grant.yml:13` carries a fourth spelling of `## Review triage` (in a comment, describing the `reviewer-triaged` condition) and is **not** in T14's `writers` list, so a marker change leaves it stale while every guarded file passes. Behaviour is unaffected — `reviewer-triaged` is enforced through `Facts.Untriaged` → `prtriage.FetchWithRegistry`, no Go code hardcodes the string — so this is prose drift only | `grep -rn "## Review triage" --include=*.yml` → one hit, outside the guard's list; `cli/internal/prland/grant_test.go:54` shows the condition is checked by fact, not by string | guard exists (`pr-agent-config.bats:1370`) but omits this file | tests (add the file to the writers list, or drop the literal from the comment) |
+| Minor | REAL | spec artifacts | `verification.md` still carries unfilled template stubs — "Test status" reads `- Test suite: <command> -> <output / coverage %>` and `No regressions …: yes / no`, "Decisions made during implementation" is `-` twice — while the real evidence sits in the appended sections. A reader who stops at the template reads the spec as unverified. `verification.md` is outside the contract set, so this is fixable at any time | File read at HEAD | n/a | verification.md (post-review, free) |
+| Minor | REAL | review scope / base resolution | Carried from round 1 (its F3), still unfixed: the launcher-resolved base `e608989e` predates ~2,000 merges, so `base…HEAD` is `3083 files / 267,925 insertions` against a spec surface of `14 files / 4,235 insertions`. Not the author's defect; recorded so the archive decision knows what was actually read: **this review read the spec's own surface, at HEAD state, not the whole base diff** | `git diff --stat e608989e…HEAD` and the same restricted to the spec's 14 surface files, both this session | n/a (measurement) | out of scope (launcher base-resolution rule, gate implementation outside this repo) |
+
+**Round-1 findings, dispositioned**: F1 (REAL Major, authorship) — **fixed**, verified by mutation below.
+F2 (Minor, writer-side guard) — **fixed**, verified by mutation. F3 (Minor, scope) — **still open**,
+carried above. F4 (Minor, unticked ACs / `status: draft`) — **fixed** (ACs ticked, `status: verifying`).
+
+Nothing in the diff reintroduces F1's class: I looked for other marker-driven decisions that ignore
+authorship and found none — reviewer detection keys on declared logins (its own trust list), the
+`exempt.signatures` path keys on the diff file set (deliberately not on author or branch), and
+`pr land` consumes the queue rather than the comments.
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | C | AC1/AC2/AC4/AC5/AC6 reproduced from live logs, statuses, branch protection and mutation runs; AC7–AC9 hold on the read side, but the AC8 mechanism has one unhandled negative case — a triage record from an undeclared author (F1), reproduced. |
-| Verification       | A | Every claim I could reach reproduced exactly, including the numbers: 83/83 bats, `shellcheck`/`bash -n`/`actionlint` exit 0, the AC3 mutation producing precisely the claimed 21 failures, and the 2026-10-21 run log and status timestamps. Mutation landing is checked by checksum, which is the discipline this repo has been burned without. |
-| Scope              | B | Diff matches the proposal plus three documented follow-on tasks, each with its own issue; no creep inside the reviewed surface. The outsized base diff is the launcher's, not the author's (F3). |
-| Reliability        | B | Fail-closed on every path it does handle — unknown artifact, non-numeric number, closed PR, skipped reviewer run, unreadable registry, truncated comment page. The one gap is F1's trust boundary, counted under Correctness so it is not double-charged. |
-| Maintainability    | B | Small functions, low nesting, the whole rationale carried in comments at the point it constrains; the reader-side single-sourcing (`ParseRegistry` refusing an empty marker) is the right seam. Writer-side duplication is F2. |
-| Handoff-readiness  | B | `docs/lessons/lesson-502-a-workflow-run-from-a-comment-triggered-run-has-lost-its-pull-request.md` is present and the three promotion candidates are answered with reasons; the unticked ACs and `status: draft` (F4) are the gap. |
+| Correctness        | A | All nine ACs hold at HEAD; round-1's REAL Major is closed with a named test whose non-vacuity I demonstrated by mutation, and every residual gap I found fails loud rather than green. |
+| Verification       | A | Every claim I could reach reproduced exactly at HEAD — 83/83 bats, 46 Go packages ok, clean lints, the marker mutation failing with the guard's own diagnostics, the standing mutation failing two guards — and mutation landing is checksum-verified, which is the false-green AC5 names. |
+| Scope              | B | The 14-file surface matches the proposal plus documented follow-ons (T10–T14), each with its issue; the outsized base diff is the launcher's, not the author's (F6). |
+| Reliability        | B | Fail-closed on unread association, empty `standing`, absent `standing` (defaulted, not refused), full comment/review/inline pages, unreadable registry, non-numeric PR number; the gaps are channel/doc asymmetries (F2, F3), not silent greens. |
+| Maintainability    | B | `hasStanding` is 12 lines, `lastTriage` unchanged in shape, the doctrine carried as comments beside what it constrains; `DefaultStanding` is a package-level mutable slice (copied at use, so harmless today) and the guards are inline Python in bats, which works but is a second language in the suite. |
+| Handoff-readiness  | B | Lesson captured (`docs/lessons/…a-ported-copy-may-lack-must-default-not-refuse.md`), ACs and tasks ticked, promotion candidates answered; the stale template stubs in `verification.md` (F5) are the gap. |
 
 ### Verdict
-FAIL
 
-One **REAL Major** (F1). Its fix is small and its regression test is nameable, and the spec is not yet
-archived, so this is the cheapest round in which to close it. The three Minors are tracked, not
-blocking on their own; F1 alone decides this verdict.
+PASS WITH GAPS
 
-### Recommended next steps
-
-Contract set is **open** on a FAIL, so edits there are legitimate this round — and each one re-stales
-this review, which the next round re-measures.
-
-- **Fix F1 (code + tests).** Require the triage record's author to be someone with standing to write
-  it — the `author_association` precedent is already in this repo (`pr-agent.yml:147`: `OWNER`,
-  `MEMBER`, `COLLABORATOR`). Add the named regression test
-  `TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue`, observe it red before the fix, and record the
-  checksum-verified mutation in `verification.md`.
-- **Amend AC8 in `proposal.md`** to say *who* may write the record. Without it the next reader will
-  re-derive the same gap, and "a record exists" is not the same claim as "someone accountable made it".
-- **F2 (tests).** Guard the writer side: assert the `## Review triage` heading in
-  `harness/skills/pr-review-triage/SKILL.md` equals `harness/review-attestation.json → triage.marker`,
-  so the one-string-two-consumers claim is enforced in the direction that is currently a copy.
-- **F4 (spec).** Tick the AC boxes once the fix lands, alongside the closing checks.
-- **Do not archive yet.** `dotf spec archive` should be run only after a re-review of the fix passes;
-  the verification window is between the fix and the merge, and the reviewer for that round cannot be
-  this session.
+No Blocker and no open Major — round-1's single REAL Major (F1) is fixed, and the fix is guarded in both
+directions: an undeclared author cannot clear the queue, and widening `triage.standing` breaks two
+committed tests. Six Minors remain, none of which changes behaviour toward a silent green, so they are
+tracked with dispositions rather than blocking the archive. Per `cli/internal/spec/review.go:47-51`
+(`Blocks()` false for `PASS-WITH-GAPS`), this verdict satisfies the archive gate.
 
 ### Evidence reproduced in this session
 
 ```
-bats tests/review-attestation-workflow.bats            -> 21/21 ok (cases 1-21)
-bats tests/check-review-attestation.bats \
-     tests/review-attestation-workflow.bats            -> 83 ok
-shellcheck scripts/check-review-attestation.sh        -> exit 0
-bash -n scripts/check-review-attestation.sh           -> exit 0
-actionlint review-attestation.yml pr-agent.yml        -> exit 0
-go build ./... ; go test ./internal/prtriage/         -> ok
-(cd cli && go test -count=1 ./internal/prtriage/)     -> ok
+git rev-parse HEAD                                   -> a97495e8ff27f6b410121ef7497c7975d433d2c7
+go build ./... ; go vet ./...                        -> clean
+go test -count=1 ./... (cli)                         -> exit 0, 46 packages ok
+bats tests/check-review-attestation.bats tests/review-attestation-workflow.bats
+                                                     -> 83 ok (last: ok 83 … a skipped reviewer run is not re-evaluated)
+bats tests/pr-agent-config.bats -f triage            -> 2 ok (T14 writers guard + standing drift guard)
+shellcheck / bash -n scripts/check-review-attestation.sh -> exit 0 / exit 0
+actionlint review-attestation.yml pr-agent.yml       -> exit 0
+go build ./cmd/dotf -> spec digest GUARD-003-review-loop-determinism
+  proposal.md 595d08feca9776b0…  tasks.md a69de83046f0b70…  features.json ""   == review-request.json
+installed dotf 0.76.0 -> `dotf spec digest …`       -> Error: unknown command "digest" for "dotf spec"
 ```
 
-Mutations, each with the landing confirmed by `shasum` on the file before and after, then reverted
-(`git status --porcelain` clean apart from this review's own untracked files):
+Mutations, each confirmed landed by sha256 before/after and then restored (tree clean apart from this
+review's own files):
 
 ```
-workflow_run trigger deleted from review-attestation.yml
-  -> not ok 2 "re-evaluates when the pr-agent reviewer finishes [AC1]"
+lastTriage: drop "|| !hasStanding(c, reg.Triage.Standing)"   prtriage.go 80b2f9598966 -> 898fead59b20
+  -> TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue FAIL for NONE, CONTRIBUTOR, FIRST_TIMER, ""
+     ("a \"NONE\" triage record cleared the queue: triaged")
+  -> restored (80b2f9598966), package ok again.  Proves the regression test is not vacuous.
+
+review-attestation.yml: delete the workflow_run trigger block  aefe2b811455 -> 84a36b3fe355
+  -> not ok 2 "…re-evaluates when the pr-agent reviewer finishes [AC1]"
      # no workflow_run trigger: our own reviewer finishing wakes nothing
-  -> restored, no diff
+  -> restored (aefe2b811455).  AC5's guard is live at HEAD.
 
-artifact name reviewed-pr -> reviewed-pr-x in pr-agent.yml
-  -> not ok 20 "pr-agent: the /review path publishes the PR number for the gate [#1128]"
-  -> restored, no diff
+review-attestation.json: triage.marker -> "## Review dispositions"   c59e029981e9 -> 7219dc9ae934
+  -> not ok "every writer of the triage record spells the registry's marker", naming
+     release-dotf.md, guide-pr-agent-reviewer.md and "SKILL.md: no line starts with …"
+  -> restored (c59e029981e9).  Round-1 F2 is genuinely closed.
 
-classifier's final exit 1 (line 437) -> exit 0
-  -> bats tests/check-review-attestation.bats: 21 "not ok"  (verification.md claims 21)
-  -> restored, no diff
-
-triage.marker "## Review triage" -> "## Review dispositions" in the registry
-  -> go test -count=1 ./internal/prtriage/ still ok, no bats failure  (F2)
-  -> restored, no diff
+review-attestation.json: triage.standing += "NONE"                   c59e029981e9 -> (widened)
+  -> not ok "who may ask for a review is who may record its triage"
+     # workflow ['COLLABORATOR','MEMBER','OWNER'] != registry ['COLLABORATOR','MEMBER','NONE','OWNER']
+  -> AND TestTheRealRegistryDeclaresTheDefaultStanding FAIL
+  -> restored (c59e029981e9).  The widening is guarded on both sides.
 ```
 
-Live, read-only (no writes to GitHub):
+Live GitHub, read-only:
 
 ```
-gh run view 39621973877 --json event,conclusion,headSha
-  -> {"event":"workflow_run","conclusion":"success","headSha":"4c92cfc4..."}
-   log -> "re-evaluating PR #2855 because the reviewer finished"
-          "[OK] attested — reviewed by: coderabbitai, github-actions"
-gh api repos/mlorentedev/dotfiles/commits/9be46c48/statuses
-  -> 03:46:44 failure review-attestation [FAIL] pending — coderabbitai could not review (advisory)
-     03:49:37 success review-attestation [OK] attested ...
-     03:49:53 success review-attestation [OK] attested ...       (AC2's "latest verdict", not the first)
-gh api repos/mlorentedev/dotfiles/branches/main/protection --jq .required_status_checks.contexts
-  -> [..., "review-attestation", ...]                            (AC6)
+dotf pr triage-queue (built from this tree)
+  -> #2890 "coderabbitai reviewed again after the last triage, 2026-10-21 21:32"
+     #2876 "github-actions reviewed, never triaged"   + "Nothing here applies anything"
+     (a standing author's earlier record was counted, then a later review re-opened it:
+      both halves of AC8 observed on real data, and the command still lists only)
+gh api issues/2855/comments  -> one comment matching ^## Review triage: mlorentedev, OWNER
+                            -> associations on that PR: 2x NONE (the two bots), 2x OWNER
+     (the predicate does not lock out the real writer, and bot-authored records do not clear)
 ```
 
-F1's reproduction (temporary file `cli/internal/prtriage/zz_adv_test.go`, removed after the run):
+### Recommended next steps
 
-```
---- FAIL: TestAdv_UndeclaredAuthorClearsTheQueue (0.00s)
-    REPRODUCED: an undeclared author's triage cleared the queue (triaged)
-```
+The contract set (`proposal.md`, `tasks.md`, `features.json`) is **closed** by this verdict — nothing
+below asks for it, and editing it would stale this review. Each item is for the implementer to
+disposition in `verification.md` (applied / ticketed / declined with a reason) or carry into a
+follow-up ticket:
+
+- **F1 — ticket it** (`dotf spec digest` reachable from the released CLI, or digests printed in the
+  launch prompt). This is #2875/SDD-042's surface, not GUARD-003's, and the fix belongs with whoever
+  owns the launcher; until then a reviewer on an un-upgraded box should build from source rather than
+  mark the digest check UNVERIFIED.
+- **F2 + F3 — one docs/test change covers both**: add a `Reviews`-channel case to
+  `cli/internal/prtriage/prtriage_test.go` stating that a review body is *not* a triage record (so the
+  asymmetry becomes a specified behaviour instead of an accident of the read path), and say so in
+  `pr-review-triage/SKILL.md` §7 next to the standing rule.
+- **F4** — add `.github/merge-grant.yml` to the T14 guard's `writers` list, or delete the literal from
+  its comment; either closes the fourth-copy drift without touching behaviour.
+- **F5** — fill or delete the `verification.md` "Test status" / "Decisions" template stubs; the real
+  evidence is already in that file's appended sections.
+- **F6** — the base-resolution rule is the owner's call and outside this repo's reviewable scope;
+  nothing to apply here beyond stating what was read, which this review does.
+- **Then archive**: `dotf spec archive GUARD-003-review-loop-determinism` is **advisable** now — this
+  review is fresh against the launch digests and `PASS-WITH-GAPS` does not block. It becomes stale the
+  moment the contract set changes; a `tasks.md` tick for "Adversarial review passes before archive" is
+  a contract edit, so leave that tick to the archive step rather than writing it first.

@@ -1,12 +1,12 @@
 {
-  "reviewed_sha": "8be1f21a26922f66edf2ea6bd0aabc73cf868fd3",
-  "reviewer": "nan/deepseek-v4-flash",
-  "requested_at": "2026-10-21T15:13:25Z",
+  "reviewed_sha": "a97495e8ff27f6b410121ef7497c7975d433d2c7",
+  "reviewer": "nan/qwen3.8-flash",
+  "requested_at": "2026-10-22T03:29:43Z",
   "review_digest_before": "",
   "base_sha": "e608989e5437f6e465279c83ee09aa34b9aba8e5",
   "contract_digests": {
     "features.json": "",
-    "proposal.md": "f6fbb621839e74e5252996572dca4c9df9871639341abc1cfb2e2c5e67c63597",
-    "tasks.md": "24b1fe5902dd4ec454229cddae177cea850efb4765831bc7ec73fd365939a00c"
+    "proposal.md": "595d08feca9776b02722cbf016f4268fa4e14f96d05f044b9422254db7d55a9b",
+    "tasks.md": "a69de83046f0b70dd96c0a849f3b53cb795e3a8463bf2b99ee4c3bb5f944e0c4"
   }
 }
