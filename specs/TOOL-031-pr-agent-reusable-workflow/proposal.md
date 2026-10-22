@@ -38,6 +38,13 @@ The pool fixes this (AI-045 AC9, #1923: a preflight, a weighted draw, Haiku when
    - **Artifact.** The run uploads the artifact `pr-number` (file `pr-number.txt`) on every run, kubelab's contract. Each repository's attestation gate adopts it when that repository migrates.
 4. **hive is the pilot, in two PRs.** The first adds a caller pinned by SHA, next to the old job. After a week with both outputs, the second removes the old job. hive's `review` check is not required, so ADR-042 decision 6's protection steps are moot here; the evidence goes in `verification.md`. Two PRs are kept for the side-by-side comparison (owner decision, 2026-10-22).
 
+> **Superseded pending owner confirmation.** Three earlier records contradict this placement:
+> - kubelab#2295's owner decision of 2026-10-18 moves the draw into `dotf`, and deletes `pr-agent-route.sh` instead of copying it.
+> - CLI-101 (#2217) ports all four scripts to `dotf pr`.
+> - HARNESS-180 (#2439) keeps one pool in dotfiles and delivers checked copies of it.
+>
+> This section and B1/B2 in `tasks.md` are rewritten once the owner confirms.
+
 **Placement rule (owner question, 2026-10-22).** Reusable logic, and the data it reads at runtime, live in `ci-workflows`. Per-repository policy that a `dotf` command reads stays in the repository that applies it. `harness/reviewer-pool.json` mixes the two today:
 - `dotf` reads `id`, `runner`, `provider`, `model`, `role`, `secret_id`, `auth`, `vendor` and `signs` (`cli/internal/spec/review_launch.go:71-84`), and never `pr_agent`.
 - The CI scripts read only `.pr_agent.*` and `.pr_agent_risk` (`scripts/pr-agent-route.sh:126-145, 253`).
