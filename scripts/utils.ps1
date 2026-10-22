@@ -26,26 +26,6 @@ try {
     Write-Verbose "console encoding not set: $_"
 }
 
-# Write-Utf8LfFile: write CONTENT to PATH as UTF-8 without BOM and with LF line
-# endings, whatever the platform newline is. Set-Content joins with the platform
-# newline (CRLF here) and Windows PowerShell 5.1 adds a BOM, so a deployed .md
-# drifted from its LF repo source on every run and the doctor's drift check
-# could never clear (WIN-008/#1289). .gitattributes declares *.md eol=lf; the
-# deployed copy honours the same contract.
-function Write-Utf8LfFile {
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)][AllowEmptyString()][string]$Content
-    )
-    $text = $Content -replace "`r`n", "`n"
-    if (-not $text.EndsWith("`n")) { $text += "`n" }
-    $dir = Split-Path -Path $Path -Parent
-    if ($dir -and -not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-    [System.IO.File]::WriteAllText($Path, $text, (New-Object System.Text.UTF8Encoding($false)))
-}
-
 # Deploy-File: copy SRC to DST atomically + idempotently.
 # Parity with bash scripts/utils.sh deploy_file().
 #

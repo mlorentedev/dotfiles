@@ -264,7 +264,6 @@ PY
 
 @test "opencode's AGENTS.md is a harness presence entry, deployed by dotf harness deploy on every OS (CLI-026)" {
     [ "$(jq -r '.agents.presence[] | select(.agent=="opencode") | "\(.file) \(.source)"' "$DOTFILES_DIR/harness/manifest.json")" = ".config/opencode/AGENTS.md AGENTS.md" ]
-    grep -qF '& dotf harness deploy --repo-root $DotfilesDir' "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep_fixed "'.config\\opencode\\AGENTS.md'" "$DOTFILES_DIR/setup-windows.ps1"
 }
 

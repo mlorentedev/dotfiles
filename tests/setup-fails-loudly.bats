@@ -31,7 +31,7 @@ setup() {
 }
 
 @test "setup-windows.ps1 stops when dotf harness deploy fails" {
-    block="$(awk '/^& dotf harness deploy --repo-root \$DotfilesDir$/{f=1} f{print} f&&/^}$/{exit}' "$PS1")"
+    block="$(sed 's/\r$//' "$PS1" | awk '/^& dotf harness deploy --repo-root \$DotfilesDir$/{f=1} f{print} f&&/^}$/{exit}')"
     [ -n "$block" ] || false
     grep -qE '^    exit 1' <<<"$block"
     run grep -E 'Write-Warn' <<<"$block"

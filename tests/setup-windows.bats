@@ -366,7 +366,7 @@ refute_legacy_mise_sync() {
     # One Go implementation on every OS: the PowerShell renderer
     # (Deploy-SkillRecord and its helpers) and the hand copies of the
     # instruction files are gone, and so is the separate presence call.
-    grep -qE '^& dotf harness deploy --repo-root \$DotfilesDir$' "$PS1_SCRIPT"
+    grep -qE '^& dotf harness deploy --repo-root \$DotfilesDir[[:space:]]*$' "$PS1_SCRIPT"
     grep -qF 'dotf harness deploy --repo-root "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep '^function (Deploy-SkillRecord|Convert-SkillRecord|Test-SkillTargetsAgent|Get-SkillField|Test-SkillFrontmatterKeyKept)\b' "$PS1_SCRIPT"
     refute_grep_fixed '& dotf harness presence' "$PS1_SCRIPT"
