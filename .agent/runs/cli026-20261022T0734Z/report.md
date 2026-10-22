@@ -1,6 +1,6 @@
 # Run cli026-20261022T0734Z
 
-run cli026-20261022T0734Z: objective met (pending the last land, see below) after 3 items, ~2h. 3 done, 0 parked, 1 landed by this run (#2936), 1 landed by the owner (#2921), 1 open waiting on the owner (#2923), 1 open waiting on the land gate (#2945).
+run cli026-20261022T0734Z: objective met after 3 items, ~2h. 3 done, 0 parked, 2 landed by this run (#2936, #2945), 1 landed by the owner (#2921), 1 open waiting on the owner (#2923).
 
 Waiting on a human: the owner lands #2923, a `.github/**` change. Nothing irreversible is waiting.
 
@@ -20,7 +20,7 @@ None.
 |---|---|---|---|
 | doctor drift gate in Go on every OS (AC5, doctor half) | #2921 `88bbf5b4` | merged by the owner | go test doctor/harness/cmd ok; lint 0; `dotf doctor` "no drift" |
 | `--against-vault` (AC6, vault side of #1545) | #2936 `9ef4809` | merged under the grant | `TestHarnessCheck_AgainstVault*`; mutation fails the test; live run names 2 stale records |
-| doctor agent tiers on the Go predicates (#1733) | #2945 | see the session's final note | go test doctor/harness ok; lint 0; mutation fails 3 cases; live doctor "7 checked" |
+| doctor agent tiers on the Go predicates (#1733) | #2945 | landed `c4307d1`, PR-Agent triaged (no inline findings), CodeRabbit rate-limited | go test doctor/harness ok; lint 0; mutation fails 3 cases; live doctor "7 checked" |
 | ci.yml on `dotf harness check` (AC5, CI half) | #2923 | open, owner lands | green on all three OSes |
 
 Filed: none. Comments: #1733 (status), #1545 (vault side done, render side is slice 7).
