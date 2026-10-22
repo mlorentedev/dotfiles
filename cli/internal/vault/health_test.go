@@ -121,7 +121,8 @@ func TestLinkExemptPerCheck(t *testing.T) {
 		{"00_meta/templates/t.md", false, true, true},
 		{"20_certifications/lfs/n.md", false, true, false},
 		{"10_projects/p/sessions/2026-10-09.md", true, true, false},
-		{"10_projects/p/memory/feedback.md", true, false, false},
+		{"10_projects/p/memory/feedback.md", true, true, false},
+		{"10_projects/p/memory/threads/feat-x.md", true, true, false},
 		{"00_meta/templates.md", false, false, false},
 		{"50_work/20-products/x.md", false, true, false},
 		{"50_work/30-clients/acme/x.md", false, true, false},
@@ -142,7 +143,7 @@ func TestLinkExemptPerCheck(t *testing.T) {
 }
 
 func TestExemptZones(t *testing.T) {
-	if got, want := exemptZones(checkDeadEnds, "and"), "90_archive/, 00_meta/templates/, 20_certifications/, 50_work/20-products/, 50_work/30-clients/ and sessions/"; got != want {
+	if got, want := exemptZones(checkDeadEnds, "and"), "90_archive/, 00_meta/templates/, 20_certifications/, 50_work/20-products/, 50_work/30-clients/, sessions/ and memory/"; got != want {
 		t.Errorf("exemptZones(dead-ends) = %q, want %q", got, want)
 	}
 	if got, want := exemptZones(checkUnresolved, "or"), "90_archive/ or 00_meta/templates/"; got != want {

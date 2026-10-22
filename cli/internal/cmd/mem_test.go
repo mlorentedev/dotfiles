@@ -193,3 +193,15 @@ func TestMemVaultHealthRunsTheGoReportForTheDetectedVault(t *testing.T) {
 		}
 	}
 }
+
+// MEMORY-008 AC3: the hook reads source beside cwd, and a payload that is not
+// JSON yields empty fields rather than an error.
+func TestHookFromPayloadReadsSource(t *testing.T) {
+	got := hookFromPayload([]byte(`{"cwd":"/w","source":"compact","session_id":"s"}`))
+	if got.Cwd != "/w" || got.Source != "compact" {
+		t.Errorf("hookFromPayload = %+v, want cwd /w and source compact", got)
+	}
+	if got := hookFromPayload([]byte("not json")); got != (hookPayload{}) {
+		t.Errorf("malformed payload = %+v, want empty", got)
+	}
+}

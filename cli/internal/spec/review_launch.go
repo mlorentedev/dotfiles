@@ -353,6 +353,9 @@ func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skill
 	b.WriteString("- Do NOT modify `proposal.md`, `tasks.md` or `features.json`. Those are the contract\n" +
 		"  files a staleness check watches, so editing one would invalidate your own review the\n" +
 		"  moment you wrote it. If you believe one needs changing, say so as a finding instead.\n")
+	fmt.Fprintf(&b, "- To check the `contract_digests` in review-request.json, compare them with the output of\n"+
+		"  `dotf spec digest %s`, never with sha256sum: they are taken over a normalised form, so a\n"+
+		"  raw hash differs from them without the contract having changed.\n", specID)
 	b.WriteString("- Do not commit, push, or comment on the PR. Writing the review is the deliverable.\n")
 	// The archive gate's rules are implemented in the dotfiles checkout, which is
 	// not the repository under review. A reviewer verifying the gate goes looking

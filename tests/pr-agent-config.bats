@@ -8,6 +8,13 @@
 
 load 'lib/refute'
 
+# The workflow's concurrency group as GitHub reads it. The key spans several
+# lines (a folded scalar, #2867), so a grep for the `group:` line no longer
+# sees it.
+concurrency_group() {
+    python3 -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["concurrency"]["group"])' "$WF"
+}
+
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     CFG="$REPO/.pr_agent.toml"
@@ -266,7 +273,10 @@ PY
     # Asserted on the group EXPRESSION rather than on behaviour, because nothing
     # here can run GitHub's scheduler. What it protects is the discriminator:
     # remove github.event_name from the key and the two event types collide again.
-    grep -qE '^\s*group:.*github\.event_name' "$WF"
+    # The name must be a PART of the key, not merely mentioned in it: since #2867
+    # the key also tests github.event_name to split comments out, so a bare grep
+    # passed with the discriminator deleted.
+    concurrency_group | tr -s ' \n' ' ' | grep -qE "github\.event\.issue\.number, github\.event_name,"
 }
 
 @test "pr-agent: both PR-number sources stay in the concurrency key" {
@@ -275,9 +285,33 @@ PY
     # without issue.number every slash-command run shares one group, without
     # pull_request.number every push does.
     local group
-    group=$(grep -E '^\s*group:' "$WF")
+    group=$(concurrency_group)
     printf '%s\n' "$group" | grep -q 'github.event.pull_request.number'
     printf '%s\n' "$group" | grep -q 'github.event.issue.number'
+}
+
+@test "pr-agent: a comment the job will skip cannot cancel a /review in flight (#2867)" {
+    # GitHub evaluates workflow-level concurrency BEFORE the job's if:. So a
+    # comment the job skips still joins the group, and cancel-in-progress kills
+    # whatever runs there. Measured on #2855: CodeRabbit's review comment
+    # (39621772110, skipped) cancelled the owner's /review (39619480456) with no
+    # review published. Only a comment that will actually run, a slash command
+    # from someone the job trusts, may share the group; any other gets its own,
+    # keyed on its id, and supersedes nothing.
+    run python3 - "$WF" <<'PY'
+import re, sys, yaml
+wf = yaml.safe_load(open(sys.argv[1]))
+group = wf["concurrency"]["group"]
+gate = wf["jobs"]["review"]["if"]
+assert "github.event.comment.id" in group, "comments are not split out of the shared group"
+term = re.sub(r"\s+", " ", group)
+assert "github.event_name == 'issue_comment'" in term, "the per-comment group is not limited to issue_comment"
+assert "startsWith(github.event.comment.body, '/')" in term, "a slash command no longer shares the group"
+lists = lambda s: re.findall(r"fromJSON\('(\[[^']*\])'\)\s*,\s*github\.event\.comment\.author_association", s)
+assert lists(term) and lists(gate), "the trusted-association test is missing from the group or the job gate"
+assert set(lists(term)) == set(lists(gate)), f"group trusts {lists(term)}, the job gate {lists(gate)}"
+PY
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
 @test "pr-agent: every event the workflow fires on is handled by something" {
@@ -1362,6 +1396,63 @@ if not prefix.strip() or not classes:
 missing = [f'"{prefix}{c}"' for c in classes if f'"{prefix}{c}"' not in instructions]
 if missing:
     print("the instructions do not ask for: " + ", ".join(missing))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+@test "pr-agent: every writer of the triage record spells the registry's marker" {
+    # GUARD-003 review F2 (#2870). The queue reads triage.marker from the
+    # registry; the skill and runbooks that tell a person what to write carry
+    # their own copy. A copy that drifts makes every triage invisible to the
+    # queue, with nothing failing.
+    run python3 - "$REPO" <<'PY'
+import json, os, re, sys
+
+repo = sys.argv[1]
+marker = json.load(open(os.path.join(repo, "harness/review-attestation.json")))["triage"]["marker"]
+writers = ["harness/skills/pr-review-triage/SKILL.md",
+           "docs/runbooks/release-dotf.md",
+           "docs/runbooks/guide-pr-agent-reviewer.md"]
+errors = []
+for w in writers:
+    text = open(os.path.join(repo, w)).read()
+    if marker not in text:
+        errors.append(f"{w}: never spells {marker!r}")
+    # A drifted spelling elsewhere in the same file, in any case, is the
+    # failure a presence check misses: the right string in one sentence,
+    # a wrong one in the instruction a person follows.
+    for m in re.finditer(r"##\s*review\s*triage", text, re.IGNORECASE):
+        if m.group(0) != marker:
+            errors.append(f"{w}: spells {m.group(0)!r}")
+# The skill carries the template a person copies, so it must hold the marker
+# where the queue matches it: at the start of a line.
+skill = open(os.path.join(repo, writers[0])).read().splitlines()
+if not any(line.strip().startswith(marker) for line in skill):
+    errors.append(f"{writers[0]}: no line starts with {marker!r}")
+if errors:
+    print("\n".join(errors))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+@test "pr-agent: who may ask for a review is who may record its triage" {
+    # #2870. The workflow trusts a set of author associations to ask for a
+    # review with a slash command; the registry declares who may write the
+    # triage record. One set, two spellings, held together here.
+    run python3 - "$WF" "$REPO/harness/review-attestation.json" <<'PY'
+import json, re, sys
+
+wf = open(sys.argv[1]).read()
+m = re.search(r"fromJSON\('(\[[^']*\])'\), github\.event\.comment\.author_association\)", wf)
+if not m:
+    print("the workflow no longer gates slash commands on author_association")
+    sys.exit(1)
+asked = sorted(json.loads(m.group(1)))
+standing = sorted(json.load(open(sys.argv[2]))["triage"].get("standing") or [])
+if asked != standing:
+    print(f"workflow {asked} != registry triage.standing {standing}")
     sys.exit(1)
 PY
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }

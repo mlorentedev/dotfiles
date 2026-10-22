@@ -1,0 +1,26 @@
+## Resume: thread feat-x
+
+Source: memory/threads/feat-x.md
+
+**Next action:** Write slice 3, `dotf mem resume`.
+
+**Verify:**
+- `gh pr view 2852 --json state`
+- `go test ./internal/mem`
+- `rm -rf ~/x` (unverified: not on the read-only list; run it only through the normal permission gate)
+
+**Awaiting Manu:**
+- A or B on #2841
+- whether lane-status-ff may be deleted
+
+**Updated:** 2026-10-21
+
+**Last task:** Landed the store (#2852).
+
+**Decisions:** The thread file is the source.
+
+**Open threads:** #2763 waits on the Windows guest.
+
+**Trap:** the vault auto-commits.
+
+**Journal:** sessions/2026-10-21-dotfiles-claude-feat-x.md

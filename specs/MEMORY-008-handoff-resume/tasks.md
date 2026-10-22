@@ -23,23 +23,23 @@ created: "2026-09-25"
 
 ## Slice 2 - per-thread store and derived index entry (depends on slice 1)
 
-- [ ] [AC4] Failing test: a fixture copy of the real dotfiles `MEMORY.md`, with `Verify` and `Awaiting Manu` added to every thread, stays at or under 25,000 B
-- [ ] [AC4] `handoff-write` writes `memory/threads/<key>.md` atomically (temp file and rename) and derives the capped index entry in `MEMORY.md`
-- [ ] [AC4] Failing test (`TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`), then implementation: a write that would push `MEMORY.md` past its byte budget fails loudly instead of truncating (#1477)
-- [ ] Failing test, then implementation: an old-format block is read as a thread and rewritten in the new shape on its next write, with every other thread byte-identical
+- [x] [AC4] Failing test: a fixture shaped like the real dotfiles `MEMORY.md` (its measured prefix and thread sizes), with `Verify` and `Awaiting Manu` added to every thread, stays at or under 25,000 B (`TestAMemoryShapedLikeDotfilesStaysUnderBudgetWithTheNewFields`; a copy of the real file is probed in `verification.md`, since the repo is public and the vault is not)
+- [x] [AC4] `handoff-write` writes `memory/threads/<key>.md` atomically (temp file and rename) and derives the capped index entry in `MEMORY.md`
+- [x] [AC4] Failing test (`TestHandoffWriteRefusesAWriteThatCrossesTheByteBudget`), then implementation: a write that would push `MEMORY.md` past its byte budget fails loudly instead of truncating (#1477)
+- [x] Failing test, then implementation: an old-format block is read as a thread and rewritten in the new shape on its next write, with every other thread byte-identical
 
 ## Slice 3 - `dotf mem resume` (depends on slice 2)
 
-- [ ] [AC1] Failing golden test: `resume --format prompt` and `--format context` on a fixture thread; two runs are byte-identical
-- [ ] [AC1] Implement `dotf mem resume` as a pure render of the thread file
-- [ ] [AC2] Failing test, then implementation: `Verify` and `Awaiting Manu` both render; a `Verify` command outside the read-only allowlist is marked unverified
-- [ ] [AC2] Failing test, then implementation: a working directory that names no single thread for this agent lists the candidates and picks none
+- [x] [AC1] Failing golden test: `resume --format prompt` and `--format context` on a fixture thread; two runs are byte-identical
+- [x] [AC1] Implement `dotf mem resume` as a pure render of the thread file
+- [x] [AC2] Failing test, then implementation: `Verify` and `Awaiting Manu` both render; a `Verify` command outside the read-only allowlist is marked unverified
+- [x] [AC2] Failing test, then implementation: a working directory that names no single thread for this agent lists the candidates and picks none
 
 ## Slice 4 - SessionStart by source (depends on slice 3)
 
-- [ ] [AC3] Failing golden tests, one fixture per `source`: `startup`, `clear` and `compact` begin with the full resume; `resume` and `fork` get one line
-- [ ] [AC3] `runClaudeHook` parses `source` and `session_id` (only `cwd` today) and passes them to the session-start context
-- [ ] [AC3] A flag in `session-start-config.json` turns the injection off, with a test
+- [x] [AC3] Failing golden tests, one fixture per `source`: `startup`, `clear` and `compact` begin with the full resume; `resume` and `fork` get one line
+- [x] [AC3] `runClaudeHook` parses `source` (only `cwd` today) and passes it to the session-start context; `session_id` is not parsed, because nothing reads it (verification.md, slice 4)
+- [x] [AC3] A flag in `session-start-config.json` turns the injection off, with a test
 
 ## Slice 5 - skills and doctrine (depends on slice 3)
 

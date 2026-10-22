@@ -71,8 +71,9 @@ type restComment struct {
 	User struct {
 		Login string `json:"login"`
 	} `json:"user"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
+	AuthorAssociation string    `json:"author_association"`
+	Body              string    `json:"body"`
+	CreatedAt         time.Time `json:"created_at"`
 
 	// The field TOOL-019 (#1422) needed and could not reach. That issue
 	// concluded the fix was "not reachable through the current data source",
@@ -361,7 +362,8 @@ func fetchComments(ctx context.Context, run ghRunner, base string, number int) (
 	comments := make([]Comment, 0, len(wire))
 	for _, w := range wire {
 		comments = append(comments, Comment{
-			Author: w.User.Login, Body: w.Body, CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt,
+			Author: w.User.Login, AuthorAssociation: w.AuthorAssociation,
+			Body: w.Body, CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt,
 		})
 	}
 	return comments, nil

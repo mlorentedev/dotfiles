@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -31,6 +30,15 @@ func newMemHandoffWriteCmd() *cobra.Command {
 		Short: "Write this session's handoff thread, leaving other sessions' threads untouched",
 		Long: `handoff-write replaces one thread's sub-block under "## Session Handoff",
 reading the body from stdin. Every other thread is left byte-identical.
+
+The body is stored in the thread's own file, threads/<thread>.md beside
+MEMORY.md, and the sub-block becomes an entry derived from it: the Updated date,
+the first line of the Next action, how many items await Manu, the Journal line and
+a "[full thread](threads/<thread>.md)" pointer. A block an older release wrote
+inline stays readable and is moved to this shape on its next write. A write that
+would take MEMORY.md past 25,000 bytes, which is what a session start reads,
+fails and names the oldest threads to archive. --dry-run prints MEMORY.md and
+names the thread file on stderr, writing neither.
 
 A thread is a LINE OF WORK, and git already names it: the branch. So the key
 defaults to the current branch (e.g. feat-x), which means work resumed tomorrow on
@@ -108,11 +116,21 @@ func (w *handoffWrite) run(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("read %s: %w", w.memoryPath, err)
 	}
-	res, err := mem.WriteThreadAs(string(current), thread, w.agent, body)
+	res, err := mem.StoreThreadAs(string(current), w.memoryPath, thread, w.agent, body)
 	if err != nil {
 		return err
 	}
-	return w.publish(cmd, thread, string(current), res)
+	prev, err := mem.ReadThreadFile(res.File)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", res.File, err)
+	}
+	if err := mem.CheckThreadFile(prev, res.Key); err != nil {
+		return err
+	}
+	if err := mem.CheckMemoryBudget(string(current), res.Content); err != nil {
+		return err
+	}
+	return w.publish(cmd, thread, string(current), string(prev), res)
 }
 
 // readHandoffBody reads the thread body from stdin and refuses an empty one.
@@ -130,9 +148,9 @@ func readHandoffBody(cmd *cobra.Command) (string, error) {
 	return string(body), nil
 }
 
-// publish reports what the write did and, unless this is a dry run, replaces
-// the file.
-func (w *handoffWrite) publish(cmd *cobra.Command, thread, current string, res mem.ThreadWrite) error {
+// publish reports what the write did and, unless this is a dry run, writes the
+// thread file and then MEMORY.md.
+func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string, res mem.StoredThread) error {
 	// The one outcome where the handoff is not where its writer asked,
 	// so it is said every time, written or unchanged (#1690).
 	if res.Kept != "" {
@@ -143,7 +161,7 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current string, res m
 				mem.JournalName(now().Format("2006-01-02"), project, w.agent, res.Key))
 		}
 	}
-	if !res.Changed {
+	if !res.Changed && prev == res.FileBody {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
 		return nil
 	}
@@ -153,47 +171,33 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current string, res m
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "migrated   the un-threaded handoff block into thread %q\n", legacy)
 	}
 	if w.dryRun {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "thread     %s would hold %d bytes\n", res.File, len(res.FileBody))
 		_, _ = fmt.Fprint(cmd.OutOrStdout(), res.Content)
 		return nil
 	}
-	if err := replaceMemoryFile(w.memoryPath, res.Content); err != nil {
+	if err := w.write(res); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, w.memoryPath)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, res.File)
 	return nil
 }
 
-// replaceMemoryFile writes content over path through a temp file in the same
-// directory: a half-written MEMORY.md is the one outcome worse than a clobbered
-// one, and the file is read at the start of every session.
-//
-// The file keeps the mode it had. os.CreateTemp makes the temp file 0600, and
-// renaming it over MEMORY.md used to narrow every file this command wrote; a
-// file shared with other tools is not ours to re-permission, the rule harness
-// bind follows for settings files.
-func replaceMemoryFile(path, content string) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".handoff-*")
-	if err != nil {
-		return fmt.Errorf("stage the write: %w", err)
+// write replaces the thread file and then MEMORY.md. The file goes first: an
+// entry pointing at a file not yet written is the one order that reads as lost,
+// while a file ahead of its entry is the thread a reader follows anyway. A new
+// thread file takes MEMORY.md's mode, which the store is a part of.
+func (w *handoffWrite) write(res mem.StoredThread) error {
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(w.memoryPath); err == nil {
+		mode = fi.Mode().Perm()
 	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
-	if _, err := tmp.WriteString(content); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("stage the write: %w", err)
+	if err := mem.ReplaceFile(res.File, res.FileBody, mode); err != nil {
+		return err
 	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("stage the write: %w", err)
+	if !res.Changed {
+		return nil
 	}
-	if fi, err := os.Stat(path); err == nil {
-		if err := os.Chmod(tmpName, fi.Mode().Perm()); err != nil {
-			return fmt.Errorf("stage the write: %w", err)
-		}
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("replace %s: %w", path, err)
-	}
-	return nil
+	return mem.ReplaceFile(w.memoryPath, res.Content, mode)
 }
 
 // newMemThreadCmd prints this session's thread key and journal filename, so a

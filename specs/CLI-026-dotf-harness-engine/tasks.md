@@ -37,18 +37,22 @@ created: "2026-06-21"
 
 ## Slice 4 — agents and doctrine (AC4)
 
-- [ ] `dotf harness agents`: agent-md render with resolved model and capability lines; parity oracle
-- [ ] `dotf harness doctrine`: compact payload, ASCII fold, char cap, shadow warning; parity oracle
+- [x] `dotf harness agents`: agent-md render with resolved model and capability lines; parity oracle (`tests/harness-agents-parity.bats`)
+- [x] `dotf harness doctrine`: compact payload, ASCII fold, char cap, shadow warning; parity oracle (`tests/harness-doctrine-parity.bats`)
 - [ ] Windows gains `agents.deploy` (#1387)
 
 ## Slice 5 — `dotf harness deploy` (AC4, AC8)
 
-- [ ] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell
+- [x] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell (`dotf harness deploy`, `tests/harness-deploy-parity.bats`)
 - [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
+  - [ ] `converge/harness.go` `CompileHarnessDeploy` runs `dotf harness deploy` in process instead of `bash scripts/compile-harness.sh --deploy`; on Windows this gives the step agents and doctrine for the first time
+  - [ ] `setup-windows.ps1`: the `Deploy-SkillRecord` block and its helpers are deleted, replaced by the one `dotf harness deploy` call
+  - [ ] `setup-linux.sh`: whatever still calls the script for a deploy calls the verb
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)
 
-- [ ] Offline drift check in Go; `ci.yml` and `dotf doctor`'s harness drift check call it on every OS
+- [x] Offline drift check in Go (`dotf harness check`, `tests/harness-check-parity.bats`)
+- [ ] `ci.yml` and `dotf doctor`'s harness drift check call it on every OS (after a release carries the verb)
 - [ ] `--against-vault` with a regression test (#1545)
 
 ## Slice 7 — `refresh` in Go and deletion (AC7, AC9)

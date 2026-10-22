@@ -90,12 +90,7 @@ func SessionEndAs(payload []byte, vaultPath, agent string, now time.Time) (strin
 	// git is authoritative WHERE IT KNOWS; the basename stays as the fallback so
 	// a session outside any repository keeps working exactly as before. Fixing a
 	// defect must not quietly narrow who the function serves.
-	project := filepath.Base(p.Cwd)
-	if id, ok := RepoIdentity(p.Cwd); ok {
-		project = id.Project
-	}
-
-	memory := filepath.Join(vaultPath, "10_projects", project, "memory", "MEMORY.md")
+	memory, project := ProjectMemory(vaultPath, p.Cwd)
 	unlock, err := LockHandoffMemory(memory)
 	if err != nil {
 		return "", err
@@ -108,7 +103,7 @@ func SessionEndAs(payload []byte, vaultPath, agent string, now time.Time) (strin
 	}
 
 	thread := ThreadKey(p.Cwd)
-	block := threadHandoffBlock(string(content), thread, agent)
+	block := threadText(threadHandoffBlock(string(content), thread, agent), filepath.Dir(memory))
 	if strings.TrimSpace(block) == "" {
 		return "", nil // trivial session -> no-op
 	}
@@ -180,6 +175,18 @@ func SessionEndAs(payload []byte, vaultPath, agent string, now time.Time) (strin
 // handoff, and is archived whole as it always was. A line that opens with a
 // thread marker is structure, never content: handoff-write refuses one in a
 // body (MEMORY-014, #1928), so its presence decides the format.
+// ProjectMemory is the vault MEMORY.md of the project cwd belongs to, and that
+// project's name. The project is the repository (RepoIdentity), with cwd's
+// basename as the fallback outside one. Every reader resolves it here, so the
+// layout is derived once.
+func ProjectMemory(vaultPath, cwd string) (string, string) {
+	project := filepath.Base(cwd)
+	if id, ok := RepoIdentity(cwd); ok {
+		project = id.Project
+	}
+	return filepath.Join(vaultPath, "10_projects", project, "memory", "MEMORY.md"), project
+}
+
 func threadHandoffBlock(content, key, agent string) string {
 	lines := strings.Split(content, "\n")
 	start, end := handoffSection(lines)

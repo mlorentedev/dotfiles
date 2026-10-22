@@ -19,6 +19,7 @@ func reg() Registry {
 		{Login: "github-actions", ReviewMarkers: []string{"## PR Reviewer Guide"}},
 	}
 	r.Triage.Marker = "## Review triage"
+	r.Triage.Standing = DefaultStanding
 	return r
 }
 
@@ -46,7 +47,7 @@ func TestEvaluate(t *testing.T) {
 			name: "triaged after the review",
 			comments: []Comment{
 				{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings", CreatedAt: at(10)},
-				{Author: "manu", Body: "## Review triage\n| item | applied |", CreatedAt: at(20)},
+				{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\n| item | applied |", CreatedAt: at(20)},
 			},
 			pending: false,
 		},
@@ -56,7 +57,7 @@ func TestEvaluate(t *testing.T) {
 			name: "the reviewer spoke again after the triage",
 			comments: []Comment{
 				{Author: "github-actions", Body: "## PR Reviewer Guide\nfirst", CreatedAt: at(10)},
-				{Author: "manu", Body: "## Review triage\ndone", CreatedAt: at(20)},
+				{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\ndone", CreatedAt: at(20)},
 				{Author: "github-actions", Body: "## PR Reviewer Guide\nsecond", CreatedAt: at(30)},
 			},
 			pending: true,
@@ -72,7 +73,7 @@ func TestEvaluate(t *testing.T) {
 			comments: []Comment{
 				{Author: "github-actions", Body: "## PR Reviewer Guide\nfirst, then more",
 					CreatedAt: at(10), UpdatedAt: at(30)},
-				{Author: "manu", Body: "## Review triage\ndone", CreatedAt: at(20)},
+				{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\ndone", CreatedAt: at(20)},
 			},
 			pending: true,
 		},
@@ -85,7 +86,7 @@ func TestEvaluate(t *testing.T) {
 			comments: []Comment{
 				{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings",
 					CreatedAt: at(10), UpdatedAt: at(30)},
-				{Author: "manu", Body: "## Review triage\ndone (typo fixed later)",
+				{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\ndone (typo fixed later)",
 					CreatedAt: at(20), UpdatedAt: at(40)},
 			},
 			pending: true,
@@ -97,7 +98,7 @@ func TestEvaluate(t *testing.T) {
 			// package must never fail in.
 			name: "a never-edited comment (zero UpdatedAt) still counts as spoken",
 			comments: []Comment{
-				{Author: "manu", Body: "## Review triage\ndone", CreatedAt: at(20)},
+				{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\ndone", CreatedAt: at(20)},
 				{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings", CreatedAt: at(30)},
 			},
 			pending: true,
@@ -291,6 +292,21 @@ func TestTheRealRegistryDeclaresTheClassificationMarker(t *testing.T) {
 	if got := Classify("Class: REAL", r); got != "REAL" {
 		t.Fatalf("the shipped registry does not classify its own REAL line: got %q", got)
 	}
+	// The report is inert without a classifying reviewer, and a login that
+	// matches no declared reviewer is a typo that leaves it inert just as
+	// silently, with every other test green.
+	declared := map[string]bool{}
+	for _, rv := range r.Reviewers {
+		declared[normaliseLogin(rv.Login)] = true
+	}
+	if len(r.Classification.Reviewers) == 0 {
+		t.Fatal("the shipped registry names no classification.reviewers: unclassified findings are never reported")
+	}
+	for _, login := range r.Classification.Reviewers {
+		if !declared[normaliseLogin(login)] {
+			t.Errorf("classification.reviewers names %q, which is not a declared reviewer", login)
+		}
+	}
 }
 
 // TOOL-017 AC3, the consumer: a finding the registry's classifying reviewers
@@ -301,7 +317,7 @@ func TestUnclassifiedFindings(t *testing.T) {
 	r.Classification.Prefix = "Class: "
 	r.Classification.Classes = []string{"REAL", "THEORETICAL", "SPECULATIVE"}
 	r.Classification.Reviewers = []string{"github-actions"}
-	triage := Comment{Author: "mlorentedev", Body: "## Review triage\n| ... |", CreatedAt: at(10)}
+	triage := Comment{Author: "mlorentedev", AuthorAssociation: "OWNER", Body: "## Review triage\n| ... |", CreatedAt: at(10)}
 	inline := []Comment{
 		{Author: "github-actions[bot]", Body: "**A**\n\nClass: REAL\nx", Path: "a.go", Line: 1, CreatedAt: at(20)},
 		{Author: "github-actions[bot]", Body: "**B**\n\nREAL: prose only", Path: "b.go", Line: 2, CreatedAt: at(20)},
@@ -322,5 +338,66 @@ func TestUnclassifiedFindings(t *testing.T) {
 	r.Classification.Reviewers = nil
 	if got := UnclassifiedFindings(PR{}, inline, r); got != nil {
 		t.Errorf("a registry that asks no reviewer for a class reports nothing: got %+v", got)
+	}
+}
+
+// #2870, GUARD-003 review F1: the triage record is the one input that takes a
+// PR out of the queue, so who wrote it is part of what it claims. A marker from
+// an account without standing, or one whose association could not be read, is
+// a comment like any other, and the reviewer's output stays awaiting a
+// disposition.
+func TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue(t *testing.T) {
+	review := Comment{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings", CreatedAt: at(10)}
+	for _, assoc := range []string{"NONE", "CONTRIBUTOR", "FIRST_TIMER", ""} {
+		t.Run("association "+assoc, func(t *testing.T) {
+			pr := PR{Number: 1, Comments: []Comment{review,
+				{Author: "drive-by", AuthorAssociation: assoc, Body: "## Review triage\nall fine", CreatedAt: at(20)},
+			}}
+			if st := Evaluate(pr, reg()); !st.Pending {
+				t.Fatalf("a %q triage record cleared the queue: %s", assoc, st.Reason)
+			}
+		})
+	}
+	pr := PR{Number: 1, Comments: []Comment{review,
+		{Author: "maintainer", AuthorAssociation: "member", Body: "## Review triage\napplied", CreatedAt: at(20)},
+	}}
+	if st := Evaluate(pr, reg()); st.Pending {
+		t.Fatalf("a MEMBER's triage record (any case) must clear the queue: %s", st.Reason)
+	}
+}
+
+// The registry is hand-ported to every repository, so a copy without
+// triage.standing must still answer, with the default; an explicit empty list
+// is refused like an empty marker.
+func TestParseRegistryStanding(t *testing.T) {
+	r, err := ParseRegistry([]byte(`{"triage":{"marker":"## Review triage"}}`), "absent")
+	if err != nil {
+		t.Fatalf("a registry without triage.standing must parse: %v", err)
+	}
+	if strings.Join(r.Triage.Standing, ",") != strings.Join(DefaultStanding, ",") {
+		t.Fatalf("absent standing = %v, want the default %v", r.Triage.Standing, DefaultStanding)
+	}
+	if _, err := ParseRegistry([]byte(`{"triage":{"marker":"## Review triage","standing":[]}}`), "empty"); err == nil {
+		t.Fatal("want an error for an empty triage.standing, got nil")
+	}
+}
+
+// dotfiles declares its standing explicitly, and the code default exists for
+// copies that do not. Two spellings of one set drift unless something holds
+// them together.
+func TestTheRealRegistryDeclaresTheDefaultStanding(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "harness", "review-attestation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"standing"`) {
+		t.Fatal("harness/review-attestation.json does not declare triage.standing")
+	}
+	r, err := ParseRegistry(raw, "real")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(r.Triage.Standing, ",") != strings.Join(DefaultStanding, ",") {
+		t.Fatalf("registry standing %v differs from DefaultStanding %v", r.Triage.Standing, DefaultStanding)
 	}
 }

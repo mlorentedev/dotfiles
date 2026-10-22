@@ -28,6 +28,9 @@ type Registry struct {
 	Reviewers []Reviewer `json:"reviewers"`
 	Triage    struct {
 		Marker string `json:"marker"`
+		// Standing is the author associations whose triage record counts
+		// (#2870). Absent, it is DefaultStanding; see ParseRegistry.
+		Standing []string `json:"standing"`
 	} `json:"triage"`
 	Exempt struct {
 		Signatures []Signature `json:"signatures"`
@@ -72,10 +75,15 @@ type Reviewer struct {
 
 // Comment is one comment on a pull request, in the shape `gh` returns.
 type Comment struct {
-	Author    string    `json:"author"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Author string `json:"author"`
+	// AuthorAssociation is GitHub's author_association for the comment
+	// (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE, ...). Only a
+	// conversation comment carries it here; it decides whether a triage
+	// record counts (#2870).
+	AuthorAssociation string    `json:"authorAssociation,omitempty"`
+	Body              string    `json:"body"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 	// Path and Line locate an inline review comment; both are zero for a
 	// conversation comment or a review.
 	Path string `json:"path,omitempty"`
@@ -159,8 +167,24 @@ func ParseRegistry(raw []byte, source string) (Registry, error) {
 		// is the shape of failure this repo has spent a week cataloguing.
 		return r, fmt.Errorf("reviewer registry %s declares no triage.marker", source)
 	}
+	// An absent standing list is not an empty one. The registry is hand-ported
+	// to every repository, and a copy that lacks a key the code requires makes
+	// the queue unanswerable there for as long as nobody notices (kubelab
+	// measured exactly that for triage.marker). Unlike the marker, standing has
+	// a safe default, so an absent key takes it. An explicit empty list would
+	// let nobody clear the queue, which is a typo, not a policy.
+	if r.Triage.Standing == nil {
+		r.Triage.Standing = append([]string(nil), DefaultStanding...)
+	} else if len(r.Triage.Standing) == 0 {
+		return r, fmt.Errorf("reviewer registry %s declares an empty triage.standing", source)
+	}
 	return r, nil
 }
+
+// DefaultStanding is who may write a triage record when the registry does not
+// say: the associations GitHub gives the repository's owner and the people it
+// invited. pr-agent.yml trusts the same set to ask for a review.
+var DefaultStanding = []string{"OWNER", "MEMBER", "COLLABORATOR"}
 
 // normaliseLogin folds the two spellings GitHub's APIs use for the same actor:
 // GraphQL returns `github-actions`, REST returns `github-actions[bot]`. Matching
@@ -222,11 +246,15 @@ func hasMarker(body string, markers []string) bool {
 //
 // So edits make the queue louder and never quieter. Both errors are possible;
 // only one of them is safe, and it is the one that costs a re-read.
-func lastTriage(pr PR, marker string) (time.Time, bool) {
+//
+// The record must also come from an author with standing (#2870). Without it
+// any commenter could post the marker and clear the disposition step a merge
+// is held to.
+func lastTriage(pr PR, reg Registry) (time.Time, bool) {
 	var newest time.Time
 	found := false
 	for _, c := range pr.Comments {
-		if !hasLinePrefix(c.Body, marker) {
+		if !hasLinePrefix(c.Body, reg.Triage.Marker) || !hasStanding(c, reg.Triage.Standing) {
 			continue
 		}
 		if !found || c.CreatedAt.After(newest) {
@@ -234,6 +262,21 @@ func lastTriage(pr PR, marker string) (time.Time, bool) {
 		}
 	}
 	return newest, found
+}
+
+// hasStanding reports whether c's author association is one the registry lets
+// write a triage record. An association that could not be read is not one.
+func hasStanding(c Comment, standing []string) bool {
+	assoc := strings.ToUpper(strings.TrimSpace(c.AuthorAssociation))
+	if assoc == "" {
+		return false
+	}
+	for _, s := range standing {
+		if strings.ToUpper(strings.TrimSpace(s)) == assoc {
+			return true
+		}
+	}
+	return false
 }
 
 func hasLinePrefix(body, marker string) bool {
@@ -258,7 +301,7 @@ func Evaluate(pr PR, reg Registry) Status {
 	if !ok {
 		return Status{PR: pr, Reason: "no reviewer output yet"}
 	}
-	triaged, any := lastTriage(pr, reg.Triage.Marker)
+	triaged, any := lastTriage(pr, reg)
 	if !any {
 		return Status{PR: pr, Pending: true, Reviewer: by, At: out.Spoken(),
 			Reason: fmt.Sprintf("%s reviewed, never triaged", by)}
@@ -308,7 +351,7 @@ func UnclassifiedFindings(pr PR, inline []Comment, reg Registry) []Comment {
 	for _, login := range reg.Classification.Reviewers {
 		asked[normaliseLogin(login)] = true
 	}
-	triaged, any := lastTriage(pr, reg.Triage.Marker)
+	triaged, any := lastTriage(pr, reg)
 	var out []Comment
 	for _, c := range inline {
 		if !asked[normaliseLogin(c.Author)] || (any && !c.Spoken().After(triaged)) {
