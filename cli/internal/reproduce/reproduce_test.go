@@ -49,22 +49,20 @@ func TestClassify(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		exit    int
-		started bool
 		timeout bool
 		want    State
 	}{
-		{"did not start", -1, false, false, CouldNotRun},
-		{"not executable", 126, true, false, CouldNotRun},
-		{"not found by a shell", 127, true, false, CouldNotRun},
-		{"killed by a signal", -1, true, false, CouldNotRun},
-		{"timed out", 1, true, true, CouldNotRun},
-		{"passed", 0, true, false, DidNotReproduce},
-		{"failed", 1, true, false, Reproduced},
-		{"failed with 128", 128, true, false, Reproduced},
+		{"did not start, or killed by a signal", -1, false, CouldNotRun},
+		{"not executable", 126, false, CouldNotRun},
+		{"not found by a shell", 127, false, CouldNotRun},
+		{"timed out", 1, true, CouldNotRun},
+		{"passed", 0, false, DidNotReproduce},
+		{"failed", 1, false, Reproduced},
+		{"failed with 128", 128, false, Reproduced},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := classify(tc.exit, tc.started, tc.timeout); got != tc.want {
-				t.Errorf("classify(%d, started=%v, timeout=%v) = %q, want %q", tc.exit, tc.started, tc.timeout, got, tc.want)
+			if got := classify(tc.exit, tc.timeout, false); got != tc.want {
+				t.Errorf("classify(%d, timeout=%v) = %q, want %q", tc.exit, tc.timeout, got, tc.want)
 			}
 		})
 	}
@@ -308,5 +306,54 @@ func TestRunWithAProbeFromASubdirectory(t *testing.T) {
 	}
 	if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
 		t.Errorf("the probe was not reverted:\n%s", st)
+	}
+}
+
+// A claim that a guard misses something is a defect exactly when the
+// guard's own check passes. The harness inverts such a check itself, so a
+// check that never ran is still could-not-run and never a refutation:
+// `sh -c '! check'` turned a missing binary's 127 into a clean 0 (#2926).
+func TestClassifyAnInvertedCheck(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		exit    int
+		timeout bool
+		want    State
+	}{
+		{"the check passes: the defect exists", 0, false, Reproduced},
+		{"the check fails: the guard caught it", 1, false, DidNotReproduce},
+		{"did not start, or killed by a signal", -1, false, CouldNotRun},
+		{"not found by a shell", 127, false, CouldNotRun},
+		{"not executable", 126, false, CouldNotRun},
+		{"timed out", 0, true, CouldNotRun},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classify(tc.exit, tc.timeout, true); got != tc.want {
+				t.Errorf("classify(%d, timeout=%v, inverted) = %q, want %q", tc.exit, tc.timeout, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunWithAnInvertedCheck(t *testing.T) {
+	dir := newRepo(t)
+	for _, tc := range []struct {
+		name    string
+		command []string
+		want    State
+	}{
+		{"passes", []string{"git", "status"}, Reproduced},
+		{"fails", []string{"git", "rev-parse", "--verify", "-q", "refs/heads/no-such-branch"}, DidNotReproduce},
+		{"cannot start", []string{"tool017-no-such-binary"}, CouldNotRun},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := Run(context.Background(), Options{Dir: dir, Command: tc.command, DefectWhenPasses: true})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got.State != tc.want {
+				t.Errorf("State = %q, want %q (exit %d)", got.State, tc.want, got.Exit)
+			}
+		})
 	}
 }
