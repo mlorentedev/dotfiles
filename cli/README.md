@@ -39,7 +39,7 @@ replaces it with the pinned release.
 | `identity` | `restore` walks the identity converge cannot produce (age key, Bitwarden, GitHub login, vault) on a terminal, and prints what is left elsewhere |
 | `secrets` | Resolves secrets and injects them into one child process (`dotf secrets run -- <cmd>`) |
 | `spec` | Scaffolds, reviews and archives spec folders for spec-driven development |
-| `pr` | Pull-request review loop helpers: `triage-queue` lists unanswered reviewer output; `land` merges PRs, one at a time and in the order given, only when CI, triage and freshness hold on one head, under a per-repository lock |
+| `pr` | Pull-request review loop helpers: `triage-queue` lists unanswered reviewer output; `land` merges PRs, one at a time and in the order given, only when CI, triage and freshness hold on one head, under a per-repository lock; `preflight` finds the first model of PR-Agent's declared NaN chain that NaN answers, and exits 1 when none does |
 | `review` | Cross-model code review of a diff read from stdin |
 | `worktree` | Git worktree lifecycle and safe garbage collection |
 | `hooks` | Installs and dispatches global git hooks |

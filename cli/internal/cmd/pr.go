@@ -36,6 +36,7 @@ func newPrCmd() *cobra.Command {
 	pr.AddCommand(newTriageQueueCmd())
 	pr.AddCommand(newPrLandCmd())
 	pr.AddCommand(newPrReproduceCmd())
+	pr.AddCommand(newPrPreflightCmd())
 	return pr
 }
 
