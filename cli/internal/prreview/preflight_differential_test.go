@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,12 @@ type scriptRun struct {
 
 func requireScript(t *testing.T) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		// The script runs only on ubuntu runners, and jq on Windows ends each
+		// line with CRLF, so the script's output differs there for reasons of
+		// its own. The port is held to the script where the script runs.
+		t.Skip("the script runs only on Linux runners")
+	}
 	for _, tool := range []string{"bash", "jq", "curl"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("%s is not installed", tool)
