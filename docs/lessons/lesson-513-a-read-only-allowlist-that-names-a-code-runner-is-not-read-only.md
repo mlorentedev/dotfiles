@@ -27,16 +27,23 @@ to `bats` too, and nobody had applied it.
 
 ## Solution
 
-The four code runners now pass only an allowlist of their flags (`-run`, `-count`, `--filter`, ...), so
-`-exec`, `-toolexec`, `-vettool`, `--outputdir`, `-cpuprofile` and `--formatter` all render as unverified. Every
-positional argument must stay inside the checkout: no absolute path, no `~`, no `..` segment. The segment test
-matters, because `./...` contains `..` as a substring and is the most common argument of all. Each reproduced
-input is a red case in `TestReadOnlyCommand`, and the controls (`./...`, `-run '^X$'`, `--filter 'a b'`) keep
-the rule from over-tightening.
+The first fix allowlisted each code runner's flags and kept its paths inside the checkout. The next review defeated
+it twice: `go test ${IFS}-exec=/tmp/evil` reached the shell as `-exec=` because the check read the literal, and the
+listed commands without a flag list still took their writing and interactive flags (`dotf doctor --fix`,
+`gh pr view --web`). A quoted `'-exec=/tmp/x'` would have passed as well, since it does not begin with `-`. Each fix
+had defended the claim at a narrower point than the one the shell acts on.
+
+What closed it was making the claim only where it is decidable. A command renders as read-only only when it is a
+listed prefix followed by plain words: every character in `[A-Za-z0-9_./ -]`, no word starting with `-`, and no
+absolute path or `..` segment. A string of those characters contains nothing the shell interprets, so the shell
+splits it exactly where `strings.Fields` does, and the check reads what will run. Flags, quotes, `$`, `~`, `=` and
+`:` all render unverified, and the session's permission gate still runs them. The cost is real and accepted:
+`go test ./... -run X` and `gh pr view 1 --json state` no longer render as safe.
 
 ## Rule
 
-An allowlist of "safe" commands is an allowlist of command *shapes*. For a command that executes code chosen by
-its arguments (test runners, linters with plugin flags, interpreters), the name proves nothing: allowlist its
-flags, contain its paths, and test the escape hatch the reviewer would try first. When a command is excluded for
-a reason ("it takes any path"), check which listed commands share that reason.
+An allowlist of "safe" commands is an allowlist of command *shapes*, and a shape is only checkable where the
+checker and the shell agree on how to split it. Restrict the verified set to strings with no shell metacharacter,
+and refuse flags outright instead of listing the safe ones: every escape hatch three reviews found was a flag or a
+character the shell interprets. When each fix narrows the hole instead of closing it, stop patching and move the
+claim to where it can be decided.
