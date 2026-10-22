@@ -71,7 +71,10 @@ func Renumber(dir, file string, to int, move func(from, to string) error) (Renum
 			res.Rewritten = append(res.Rewritten, p)
 		}
 		if err := os.WriteFile(p, body, 0o644); err != nil { //nolint:gosec // docs, world-readable by design
-			return res, err
+			// The move is done and cannot be planned away: say so, and name the
+			// check that lists every link a partial write left behind.
+			return res, fmt.Errorf("%s was moved to %s, but writing %s failed: %w; "+
+				"`dotf lessons fmt --check` names every link still pointing at the old name", file, dest, p, err)
 		}
 	}
 	sort.Strings(res.Rewritten)

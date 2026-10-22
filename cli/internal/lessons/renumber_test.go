@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -181,6 +182,28 @@ func TestRenumber_RefusesAnUnreadableLessonBeforeTheMove(t *testing.T) {
 	}
 	if snapshot(t, dir) != before {
 		t.Error("a refused renumber changed the tree")
+	}
+}
+
+// A write that fails after the move cannot be undone by planning; the error
+// names the move and the check that finds the links left behind.
+func TestRenumber_AWriteFailureAfterTheMoveNamesTheRecovery(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only file does not refuse the write here")
+	}
+	dir := collided(t)
+	cites := filepath.Join(dir, "lesson-498-cites.md")
+	if err := os.Chmod(cites, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Renumber(dir, filepath.Join(dir, "lesson-497-mine.md"), 0, os.Rename)
+	if err == nil {
+		t.Fatal("a read-only citing lesson was written")
+	}
+	for _, must := range []string{"lesson-511-mine.md", "lesson-498-cites.md", "dotf lessons fmt --check"} {
+		if !strings.Contains(err.Error(), must) {
+			t.Errorf("error lacks %q: %v", must, err)
+		}
 	}
 }
 
