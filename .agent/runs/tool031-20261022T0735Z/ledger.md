@@ -5,3 +5,4 @@
 - 08:07Z A2 (dotf pr preflight) verified (48 pkgs ok, -race ok, bats 10/10, exec 225) and opened as draft #2943 on #2940. Script defects 6-9 added to #2928.
 - 08:19Z test (windows-latest) red on #2941-#2943: jq on Windows writes CRLF so the bash script rejects its own allowlist ids; differential tests now skip on Windows (repo idiom). Pushed fa80b50c (#2941), merge 4944ce5d (#2942), preflight fix (#2943).
 - 08:39Z CI green on #2940-#2943 (review pending, cli-gate queued on #2943). Marked all four ready for review.
+- 09:05Z Reviews on #2940-#2943 queued in PR-Agent's one-at-a-time lane (queue: max) behind other sessions' PRs; draft-time runs cancelled by ready_for_review as designed. CodeRabbit: review limit reached on #2940.
