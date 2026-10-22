@@ -64,6 +64,7 @@ created: "2026-06-21"
 - [ ] Render half of `--refresh` in Go behind the existing gate
   - [ ] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
+  - [ ] Close #1733 with it: the shell render is the last reader of `targets:` by substring, and the deploy and doctor already use `harness.SkillTargetsAgent`
 
 ## Closing
 

@@ -16,10 +16,15 @@ created: "2026-06-21"
   - [x] deploy -> `tests/harness-deploy-parity.bats`: the full committed manifest deployed by `compile-harness.sh --deploy` and `dotf harness deploy` into two HOMEs, byte-identical but for agy's prompts and the copilot file, which differs only by the catalog's bullet order; a second Go deploy writes nothing. `TestHarnessDeploy_*` cover convergence and a failed agent record stopping presence and doctrine
 - [ ] AC5 check -> slice 6
   - [x] the Go verb -> `tests/harness-check-parity.bats` (5 tests): the same exit status and the same report lines as `compile-harness.sh --check` on the committed checkout and on each kind of drift (an edited, a missing and a doubly-marked region, an END line with a tail, a coverage gap, skill and agent records without their required frontmatter). `TestCheckDrift_*` (including a CRLF record that validates), `TestFirstDifference`
-  - [ ] `ci.yml` and `dotf doctor` call it on every OS -> after a release carries the verb
-- [ ] AC6 `--against-vault` -> slice 6
+  - [x] `dotf doctor` calls it in process on every OS -> #2921, `TestCheckRecordDrift` (the Windows case passes instead of skipping)
+  - [ ] `ci.yml` calls it on Linux, macOS and Windows -> #2923, green on all three test jobs, waiting for the owner to land it
+- [x] AC6 `--against-vault` -> #2936, `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
 - [ ] AC7 refresh in Go -> slice 7
 - [ ] AC8 callers rewired -> slices 3 and 5
+  - [x] converge -> #2902, `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout`
+  - [x] `setup-linux.sh` -> #2912, `tests/setup-fails-loudly.bats`
+  - [x] `setup-windows.ps1` -> #2914, `tests/setup-windows.bats`, `tests/setup-fails-loudly.bats`
+  - [ ] live acceptance on the work-lab Windows box after a release carries it (#1387)
 - [ ] AC9 bash engine deleted -> slice 7
 
 ## Test status
