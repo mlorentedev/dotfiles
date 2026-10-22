@@ -33,8 +33,8 @@ A1 is about 600 executable lines, so it ships as three PRs, each based on the pr
   - [x] [AC1] `Probe` and `Verdict`. The key travels only in the `x-api-key` header, and no redirect is followed with any client.
   - [x] [AC1] `Result`, with its outputs, summary and notice.
 - **A1b: the route.**
-  - [ ] [AC1] `Route`: the weighted draw, the risk route, the overrides and the refusals, with the bats cases ported (`route_test.go`).
-  - [ ] [AC1] A differential test: the script and `Route` on the same inputs and the same httptest server give identical outputs, warnings and probes.
+  - [x] [AC1] `Route`: the weighted draw, the risk route, the overrides and the refusals, with the bats cases ported (`route_test.go`).
+  - [x] [AC1] A differential test: the script and `Route` on the same inputs and the same httptest server give identical outputs, warnings and probes.
 - **A1c: the command.**
   - [ ] [AC1] `dotf pr route` (`--changed-lines`, `--labels`, `--pool`, `--json`, `--print-allowlist`), with the GitHub outputs and step summary written when `GITHUB_OUTPUT` is set. Exit 2 on a refusal.
 
