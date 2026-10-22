@@ -102,9 +102,11 @@ func reproductionRow(r reproduce.Result, probe string, inverted bool) string {
 	return fmt.Sprintf("Reproduction: %s (exit %d%s) on %s%s: `%s`", r.State, r.Exit, read, head, with, commandLine(r.Command))
 }
 
-// commandLine renders argv so the row can be run again as written: an
-// argument a shell would split or expand is single-quoted. The row is pasted
-// into a markdown table cell, where a bare | ends the cell, so it is escaped.
+// commandLine renders argv so the row, once rendered, can be run again: an
+// argument a shell would split or expand is single-quoted. The row is
+// markdown for a triage table cell, where a bare | ends the cell even inside
+// a code span, so it is written \|; GitHub renders that back to |. Copy the
+// command from the rendered table, not from the raw text.
 func commandLine(argv []string) string {
 	words := make([]string, len(argv))
 	for i, a := range argv {
