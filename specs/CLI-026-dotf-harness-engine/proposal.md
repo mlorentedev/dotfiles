@@ -74,7 +74,7 @@ End state: one engine, invoked identically on every OS; `scripts/compile-harness
 - [ ] **AC3** The copilot skill catalog is written by Go, and the parity oracle covers it (seeded instructions file on both sides).
 - [ ] **AC4** `dotf harness agents`, `dotf harness doctrine` and `dotf harness deploy` exist, with parity against the oracle for each surface.
 - [ ] **AC5** `dotf harness check` runs offline and is green in CI on a fresh checkout; `dotf doctor`'s harness drift check calls it on every OS, so the Windows SKIP from #804 is retired.
-- [ ] **AC6** `dotf harness check --against-vault` flags a record whose vault source changed but was never refreshed (regression test: mutate a vault skill, assert a non-zero exit).
+- [x] **AC6** `dotf harness check --against-vault` flags a record whose vault source changed but was never refreshed (regression test: mutate a vault skill, assert a non-zero exit).
 - [ ] **AC7** `dotf harness refresh` renders in Go; no caller runs `compile-harness.sh --refresh`.
 - [ ] **AC8** `setup-windows.ps1`, `setup-linux.sh` and the `records-harness` converge step invoke the Go deploy; `Deploy-SkillRecord` and its helpers are removed; `install-dotf` → deploy ordering is preserved.
 - [ ] **AC9** `scripts/compile-harness.sh` and `tests/compile-harness*.bats` are deleted; a guard-grep finds no reference in `setup-*`, `ci.yml`, `cli/` or the profile.

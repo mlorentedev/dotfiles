@@ -56,12 +56,13 @@ created: "2026-06-21"
 - [x] Offline drift check in Go (`dotf harness check`, `tests/harness-check-parity.bats`)
 - [ ] `ci.yml` and `dotf doctor`'s harness drift check call it on every OS (0.77.0 carries the verb)
   - [x] `dotf doctor` runs `harness.CheckDrift` in process on every OS (`checkRecordDrift`); its remedies name `dotf harness deploy` and `dotf harness refresh`
-  - [ ] `ci.yml` (a `.github/**` change: prepared here, landed by the owner)
-- [ ] `--against-vault` with a regression test (#1545)
+  - [ ] `ci.yml` (#2923, a `.github/**` change: prepared here, landed by the owner)
+- [x] `--against-vault` with a regression test (#1545): `harness.CompareWithVault`, shared with doctor's WARN; `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
 
 ## Slice 7 — `refresh` in Go and deletion (AC7, AC9)
 
 - [ ] Render half of `--refresh` in Go behind the existing gate
+  - [ ] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
 
 ## Closing
