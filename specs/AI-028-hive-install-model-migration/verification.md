@@ -146,7 +146,7 @@ So on x64, V2 and V3 flip in one setup run. That job was red for another reason:
 
 ## Guest run on Arm64 (2026-10-22)
 
-`dotf vm windows --ref 68ed76db --dotf <windows/arm64 build of 68ed76db>`. Clean Windows 11 Arm64 guest, standard user, hive pinned at 4.4.2 with `self_install.no_build: ["cryptography"]`. Full log: `.agent/runs/ai028-20261022t0735z/vm-ac2-68ed76db.log` on `chore/autopilot-ai028-20261022t0735z`.
+`dotf vm windows --ref 68ed76db --dotf <windows/arm64 build of 68ed76db>`. Clean Windows 11 Arm64 guest, standard user, hive pinned at 4.4.2 with `self_install.no_build: ["cryptography"]`. The quoted lines, with their log line numbers, are in `.agent/runs/ai028-20261022t0735z/report.md` on `chore/autopilot-ai028-20261022t0735z`. The full 1909-line log is not committed.
 
 | # | Baseline 2 (main, 2026-10-21) | This run |
 |---|---|---|
