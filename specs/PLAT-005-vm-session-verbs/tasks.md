@@ -31,7 +31,7 @@ created: "2026-10-22"
 ### PR 1b: `Session`, `Record` and the Linux verbs
 
 - [ ] [P] [AC9] `noGuest(t)` coverage for every new verb's refusals: failing test per verb, `go -C cli test ./internal/cmd/ -run TestVMVerbRefusals`
-- [ ] [P] [AC2] Failing test for the record shape and the status, exit and process-code table in `cli/internal/vm/session_test.go`
+- [x] [P] [AC2] Failing test for the record shape and the status, exit and process-code table in `cli/internal/vm/session_test.go`
 - [ ] [AC2] `Session` interface and `Record` type in `cli/internal/vm/session.go`; `--json` writes one record, empty lists are `[]`
 - [ ] [AC1] Linux `up --session` over Lima (default name `<os>-<unix time>`); `status` lists what `limactl list` answers
 - [ ] [AC1] `up` on a name whose guest is gone: `stale`, exit 2, names `down`

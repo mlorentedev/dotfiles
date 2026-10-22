@@ -52,18 +52,11 @@ func Verify(l Limactl, o Options) (err error) {
 	if o.Source == "" {
 		return errors.New("no source archive to converge")
 	}
-	tmpl, err := os.CreateTemp("", "dotf-vm-*.yaml")
+	tmpl, cleanup, err := writeTemplate()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.Remove(tmpl.Name()) }()
-	if _, err := tmpl.Write(LinuxTemplate); err != nil {
-		_ = tmpl.Close()
-		return err
-	}
-	if err := tmpl.Close(); err != nil {
-		return err
-	}
+	defer cleanup()
 
 	// Registered before the start: a start that fails partway (an image
 	// download, provisioning) can leave the instance and its disk behind.
@@ -77,7 +70,7 @@ func Verify(l Limactl, o Options) (err error) {
 		}
 	}()
 	step(o.Progress, "boot %s (Ubuntu 24.04, nothing shared with the host)", o.Name)
-	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl.Name()); err != nil {
+	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl); err != nil {
 		return fmt.Errorf("limactl start: %w", err)
 	}
 
@@ -208,4 +201,24 @@ func step(w io.Writer, format string, a ...any) {
 		return
 	}
 	_, _ = fmt.Fprintf(w, "==> "+format+"\n", a...)
+}
+
+// writeTemplate writes the Lima template to a temporary file and returns its
+// path and the function that removes it.
+func writeTemplate() (path string, cleanup func(), err error) {
+	f, err := os.CreateTemp("", "dotf-vm-*.yaml")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup = func() { _ = os.Remove(f.Name()) }
+	if _, err := f.Write(LinuxTemplate); err != nil {
+		_ = f.Close()
+		cleanup()
+		return "", nil, err
+	}
+	if err := f.Close(); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return f.Name(), cleanup, nil
 }
