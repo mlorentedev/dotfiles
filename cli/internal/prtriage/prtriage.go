@@ -140,6 +140,10 @@ type Status struct {
 	// FindingsUnread is set when the inline findings could not be read, so an
 	// empty Unclassified does not read as "every finding is classified".
 	FindingsUnread bool
+	// Unreproduced are the REAL findings a triage record dispositioned
+	// without the reproduction they need (TOOL-017 AC4, AC6). Unlike
+	// Unclassified they make the PR pending, so land refuses it (#1062).
+	Unreproduced []Unreproduced
 }
 
 // RegistryPath is where a repository keeps its reviewer registry.
@@ -251,14 +255,21 @@ func hasMarker(body string, markers []string) bool {
 // any commenter could post the marker and clear the disposition step a merge
 // is held to.
 func lastTriage(pr PR, reg Registry) (time.Time, bool) {
-	var newest time.Time
+	c, found := triageRecord(pr, reg)
+	return c.CreatedAt, found
+}
+
+// triageRecord is the newest triage record with standing: the one whose
+// dispositions are read.
+func triageRecord(pr PR, reg Registry) (Comment, bool) {
+	var newest Comment
 	found := false
 	for _, c := range pr.Comments {
 		if !hasLinePrefix(c.Body, reg.Triage.Marker) || !hasStanding(c, reg.Triage.Standing) {
 			continue
 		}
-		if !found || c.CreatedAt.After(newest) {
-			newest, found = c.CreatedAt, true
+		if !found || c.CreatedAt.After(newest.CreatedAt) {
+			newest, found = c, true
 		}
 	}
 	return newest, found

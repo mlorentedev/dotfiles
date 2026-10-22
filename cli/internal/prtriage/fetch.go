@@ -209,13 +209,69 @@ func pendingOf(ctx context.Context, run ghRunner, base string, wire []restPR, re
 	if err != nil {
 		return nil, err
 	}
-	pending := Queue(prs, reg)
+	findings := inlineReader(ctx, run, base, reg)
+	var pending []Status
+	for _, pr := range prs {
+		st := Evaluate(pr, reg)
+		if !st.Pending {
+			st = withReproductions(st, findings, reg)
+		}
+		if st.Pending {
+			pending = append(pending, st)
+		}
+	}
 	if len(reg.Exempt.Signatures) > 0 {
 		if pending, err = withoutExempt(ctx, run, base, pending, reg); err != nil {
 			return nil, err
 		}
 	}
-	return withFindings(ctx, run, base, pending, reg), nil
+	return withFindings(pending, findings, reg), nil
+}
+
+// inlineReader reads a PR's inline findings at most once per queue run: the
+// AC4 gate and the AC3 report both need them for a PR the gate holds. It
+// reads nothing when the registry asks no reviewer for a class.
+func inlineReader(ctx context.Context, run ghRunner, base string, reg Registry) func(int) ([]Comment, error) {
+	type read struct {
+		inline []Comment
+		err    error
+	}
+	seen := map[int]read{}
+	return func(number int) ([]Comment, error) {
+		if len(reg.Classification.Reviewers) == 0 {
+			return nil, nil
+		}
+		r, ok := seen[number]
+		if !ok {
+			r.inline, r.err = fetchInline(ctx, run, base, number)
+			seen[number] = r
+		}
+		return r.inline, r.err
+	}
+}
+
+// withReproductions holds a triaged PR whose record dispositioned a REAL
+// finding without the reproduction it needs (TOOL-017 AC4, AC6; the owner
+// ruled on #1062 that the gate refuses). Findings that cannot be read hold
+// it too: a gate that cannot see what it gates on fails closed.
+//
+// Without a classifying reviewer no finding is REAL and findings reads
+// nothing, so this costs no request.
+func withReproductions(st Status, findings func(int) ([]Comment, error), reg Registry) Status {
+	if _, triaged := triageRecord(st.PR, reg); !triaged {
+		return st
+	}
+	inline, err := findings(st.PR.Number)
+	if err != nil {
+		st.Pending, st.FindingsUnread = true, true
+		st.Reason = "triaged, but the inline findings could not be read: whether its REAL findings were reproduced is unknown"
+		return st
+	}
+	if st.Unreproduced = UnreproducedFindings(st.PR, inline, reg); len(st.Unreproduced) > 0 {
+		st.Pending = true
+		st.Reason = fmt.Sprintf("triaged, but %d REAL finding(s) lack the reproduction their disposition needs", len(st.Unreproduced))
+	}
+	return st
 }
 
 // withFindings attaches each pending PR's unclassified inline findings
@@ -225,12 +281,12 @@ func pendingOf(ctx context.Context, run ghRunner, base string, wire []restPR, re
 // A read failure marks the PR FindingsUnread and keeps it listed: the findings
 // are a report on top of a verdict already computed, so losing them must make
 // the answer say "unknown", never drop the PR or the rest of the queue.
-func withFindings(ctx context.Context, run ghRunner, base string, pending []Status, reg Registry) []Status {
+func withFindings(pending []Status, findings func(int) ([]Comment, error), reg Registry) []Status {
 	if len(reg.Classification.Reviewers) == 0 {
 		return pending
 	}
 	for i, st := range pending {
-		inline, err := fetchInline(ctx, run, base, st.PR.Number)
+		inline, err := findings(st.PR.Number)
 		if err != nil {
 			pending[i].FindingsUnread = true
 			continue
