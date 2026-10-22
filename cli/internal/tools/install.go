@@ -683,7 +683,15 @@ func (in *Installer) verifyOnPath(t Tool, manager string) error {
 	if err == nil || version == "" {
 		return err
 	}
-	switch copies := in.PathCopies(t.Name); len(copies) {
+	copies := in.PathCopies(t.Name)
+	if retireLegacyShims(t.Name, copies) {
+		_, _ = fmt.Fprintf(in.Out, "%s: removed the legacy launcher that shadowed the %s install\n", t.Name, manager)
+		if err = checkProbed(t, in.current(t), absent); err == nil {
+			return nil
+		}
+		copies = in.PathCopies(t.Name)
+	}
+	switch len(copies) {
 	case 0:
 		return err
 	case 1:
