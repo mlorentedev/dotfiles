@@ -179,8 +179,15 @@ func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 		}
 
 		prStatus := "-"
-		if info.PRMerged {
+		switch {
+		case info.PRMerged:
 			prStatus = "merged"
+		case info.PRMergedUnknown != "":
+			prStatus = "unknown"
+		}
+		reason := info.StateReason
+		if info.PRMergedUnknown != "" && !strings.Contains(reason, info.PRMergedUnknown) {
+			reason += "; the forge could not be asked: " + info.PRMergedUnknown
 		}
 
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -189,7 +196,7 @@ func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 			status,
 			prStatus,
 			info.State,
-			info.StateReason,
+			reason,
 		); err != nil {
 			return err
 		}
@@ -441,8 +448,10 @@ clean git status, confirmed merged PR, and minimum age.`,
 					report.UninspectableProcesses)
 			}
 
-			for _, s := range report.SessionSkips {
-				c.Printf("  - skipped: %s: %s\n", s.Path, s.Reason)
+			for _, skips := range [][]worktree.SessionSkip{report.SessionSkips, report.MergeUnknownSkips} {
+				for _, s := range skips {
+					c.Printf("  - skipped: %s: %s\n", s.Path, s.Reason)
+				}
 			}
 			if opts.DryRun {
 				c.Printf("[DRY-RUN] Found %d reapable worktree(s), %d skipped.\n", len(report.Reaped), report.SkippedCount)

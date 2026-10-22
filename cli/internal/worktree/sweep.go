@@ -103,7 +103,10 @@ type SweepReport struct {
 	// or uninspectable session: a false refusal (a sibling slug) is only
 	// visible to an operator who sees which worktree it was.
 	SessionSkips []SessionSkip `json:"session_skips,omitempty"`
-	DryRun       bool          `json:"dry_run"`
+	// MergeUnknownSkips names each worktree kept only because the forge could
+	// not say whether its branch landed (#2873).
+	MergeUnknownSkips []SessionSkip `json:"merge_unknown_skips,omitempty"`
+	DryRun            bool          `json:"dry_run"`
 	// ProcessDiscovery is false when Gate f has no implementation on this
 	// platform and is therefore refusing everything. Reported because an inert
 	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
@@ -283,6 +286,9 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 		}
 		if !candidate {
 			report.SkippedCount++
+			if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {
+				report.MergeUnknownSkips = append(report.MergeUnknownSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
+			}
 			continue
 		}
 		// After gate f, so only a worktree sweep would otherwise reap is

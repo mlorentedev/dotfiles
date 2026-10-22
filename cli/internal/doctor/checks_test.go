@@ -574,16 +574,14 @@ func statusOfLine(output, needle string) Status {
 func TestCheckHarnessDrift(t *testing.T) {
 	home := t.TempDir()
 	dotfiles := filepath.Join(home, ".dotfiles")
-	writeExec(t, filepath.Join(dotfiles, "scripts", "compile-harness.sh"))
+	writeFile(t, filepath.Join(dotfiles, "harness", "manifest.json"), `{"enforced":[],"targets":[]}`)
 	cfg := &Config{DotfilesDir: dotfiles}
 
-	// compile-harness --check "passes" (bash returns the script's output, nil err).
-	cmd := map[string]string{"bash " + filepath.Join(dotfiles, "scripts", "compile-harness.sh") + " --check": "ok"}
 	var buf bytes.Buffer
 	rep := capture(&buf)
-	checkHarnessDrift(newSys(map[string]string{"HOME": home}, nil, cmd), cfg, rep, false)
+	checkHarnessDrift(newSys(map[string]string{"HOME": home}, nil, nil), cfg, rep, false)
 	if rep.Failures() != 0 {
-		t.Fatalf("compile-harness --check passing should not fail\n%s", buf.String())
+		t.Fatalf("a mirror with no drift should not fail\n%s", buf.String())
 	}
 	if !strings.Contains(buf.String(), "no drift") {
 		t.Error("expected the no-drift pass line")

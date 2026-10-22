@@ -106,9 +106,9 @@ Each slice PR fills its own section below and nothing else.
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`?
-- [ ] ADR-worthy decision for the repo's `docs/adr/`? (the per-thread store changes the layout of every project's `memory/`)
-- [ ] New pattern candidate for `00_meta/patterns/`?
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-513-a-read-only-allowlist-that-names-a-code-runner-is-not-read-only.md (also lesson 507 and lesson 508)
+- [x] ADR-worthy decision for the repo's `docs/adr/`? (the per-thread store changes the layout of every project's `memory/`) yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md
+- [x] New pattern candidate for `00_meta/patterns/`? no: the store and the resume render are this repo's `dotf mem` contract, recorded in ADR-056; nothing in them generalises beyond it yet
 
 ## Archive checklist
 
@@ -203,3 +203,31 @@ The second review (`review-round-2.md`, at `2e8777c6`, nan/deepseek-v4-flash) re
 
 Mutations: dropping the `As written` line and dropping the lowercase both turn `go test ./internal/mem` red.
 
+### Review round 3 (FAIL) and its fixes
+
+The third review (`review-round-3.md`, at `4f19d07d`, nan/qwen3.8-flash) returned FAIL on three REAL Majors, two of them against the round-1 allowlist. Three rounds kept finding holes in the "verified read-only" claim because each fix defended it at a narrower point than the shell acts on. This round moves the claim to where it is decidable instead (lesson 513, amended).
+
+| Finding | Disposition | Test |
+|---|---|---|
+| F-1: `go test ${IFS}-exec=/tmp/evil` rendered as verified | **Applied.** A command is read-only only if it is a listed prefix followed by plain words: characters `[A-Za-z0-9_./ -]`, no word starting with `-`, no absolute path or `..` segment. Such a string holds no shell metacharacter, so the shell splits it where `strings.Fields` does. `codeRunners`, `writesFile` and `shellControl` are gone, subsumed | `TestReadOnlyCommand`: `${IFS}-exec=`, quoted `'-exec='`, `HEAD:secrets/x`, a tab |
+| F-2: `dotf doctor --fix` and `gh pr view 1 --web` rendered as read-only | **Applied** by the same rule: every flag renders unverified. Accepted cost: `go test ./... -run X`, `gh pr view 1 --json state` and `git diff main -- x.go` render unverified too; the permission gate still runs them. Getting flags back means a real shell parser as a dependency and an ADR | `TestReadOnlyCommand`: both inputs, and the formerly-true flag rows flipped |
+| F-3: `As written:` kept only the field's first line, and repeated a marked command unmarked | **Applied.** The field renders once, as written, every line kept, with `(unverified)` placed right after each command that fails the check; the explanation appears once in the heading line, only when something is marked | `TestResumeKeepsVerifyProseBesideTheCommands`: one line, two lines, bullets with a prose-only bullet; the note and the markers must agree |
+| Minor: `handoff_resume` undeclared in `session-start-config.json` | **Ticketed**, #2915 (open) | n/a |
+| Question: live `source=compact` payload unobserved | **Kept open**, as in round 2 | n/a |
+| Minor: contract-set boxes unticked, "about 350 B" | **Carried** to the archive PR | n/a |
+| Speculative: uncapped resume | **Declined**, as in round 2 | n/a |
+
+Mutations, each applied with `go vet` passing, all turn `go test ./internal/mem` red: the charset check removed, flags allowed, the field cut to its first line, the marker removed, a `..` segment allowed.
+
+### Review round 4 (FAIL): the run's review budget is spent
+
+The fourth review (`review-round-4.md`, at `dee3fe4f`, nan/deepseek-v4-flash) returned FAIL on two REAL Majors. F-1 is the same class rounds 1 and 3 failed on: only a backticked span is checked, so a command written as prose renders with no marker and no note. Rather than a fourth narrower patch, the shape of the "verified" promise goes to the owner on #1689 (keep it and make it total, or retire it).
+
+| Finding | Disposition | Test |
+|---|---|---|
+| F-1: a prose (unbackticked) Verify command renders unmarked | **Owner decision** on #1689: mark every field with no backticked span, or drop the read-only promise and render one fixed note | UNTESTED until the shape is chosen |
+| F-2: the candidate lines interpolate the thread key and `--agent` raw | **Applied.** Both are one shell word: as written when plain (`[A-Za-z0-9_./@+-]`), single-quoted otherwise | `TestMemResumeQuotesTheCandidateLine`; quoting removed from either the key or the agent turns it red |
+| F-3: `proposal.md` AC boxes and the `tasks.md` Closing block unticked | **Carried** with F-1: AC2 and the slice 3 box depend on the chosen shape | n/a |
+| F-4: `features.json` states are `pending` | **Declined:** the states are harness-owned; the six commands exit 0, re-run by the reviewer | n/a |
+| F-5: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Carried** with F-1: the criterion wording moves with the contract set | n/a |
+| F-6: promotion candidates unanswered | **Applied** above | n/a |

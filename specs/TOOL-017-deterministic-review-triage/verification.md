@@ -15,9 +15,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: `cd cli && go test ./...` -> exit 0 (2026-10-22, #2926 branch); `golangci-lint run` -> 0 issues; `GOOS=windows go vet ./...` -> ok
+- Manual smoke test: the #1059 replay rerun at `1719024f` with `--defect-when-passes` (see `tasks.md`); the AC4 gate run on #2924's own triage record -> `[OK]`, exit 0
+- No regressions in existing test suite: yes
 
 ## Decisions made during implementation
 
@@ -38,6 +38,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The command applies nothing and decides nothing: a human pastes its row into `## Review triage`. Gating `apply` on it is AC4, the next slice.
 - 2026-10-22, AC4 and AC6 (owner: the gate refuses, option A over report-only). The check reads the existing human-written `## Review triage` table rather than a new format: a finding's row is the first naming its `path:line` (bounded, so `a.go:4` is not `a.go:40`; the base name will do), and its disposition the first later cell opening with apply, defer, refuted or skip, so a disposition word in the item cell is not read. `apply` needs `Reproduction: reproduced`, `refuted` needs `Reproduction: did-not-reproduce`, `skip` of a REAL finding is refused, `defer` passes. Only the newest triage record with standing (#2870) counts, and only for findings it could have seen.
 - The gate lives in the queue, not in `land`: a held PR is pending, so `land` refuses it through the condition it already checks, and `triage-queue` names the finding and what its row lacks. A triaged PR now costs one inline read when the registry declares a classifying reviewer; the read is shared with the AC3 report.
+- 2026-10-22, #2926: a check is inverted by the harness (`--defect-when-passes`), never by the shell. `sh -c '! check'` maps 127 to 0, so a check that never ran refuted the finding it was meant to test (lesson 518). The inversion is applied after the could-not-run cases are classified, so those stay `could-not-run` in both directions.
+- The row names the direction (`defect when the check passes`), because the same exit code now means opposite things on two rows and a reader cannot tell them apart otherwise.
+- The row quotes its command and escapes `|`. Dogfooding the gate on #2924 produced two rows whose quoted pattern lost its quotes, so the recorded command was not the one that ran; a pipe inside the row also splits the triage table's cell. The gate still reads such a row, since the disposition is the first cell after the naming one.
+- `classify` lost its `started` parameter: a mutation removing `!started` survived, because a check that never started keeps exit -1 and `exit < 0` already catches it. Deleted rather than kept as documentation, per the mutation discipline.
 
 ## Promotion candidates
 

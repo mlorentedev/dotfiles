@@ -119,6 +119,26 @@ _launch_fake() {
     "$@" >/dev/null 2>&1 3>&- &
 }
 
+# The detector prints whole `pid args` lines. A pid searched as a substring of
+# that output also matches a longer pid, or digits inside an argument path such
+# as the run's tmpdir; that reported a human's process as matched once on
+# test-macos (#2872). Compare the first field exactly.
+_found_has_pid() {
+    printf '%s\n' "$1" | awk -v p="$2" '$1 == p { hit = 1 } END { exit !hit }'
+}
+
+@test "guard: the pid check matches the pid field, not digits elsewhere in the line" {
+    local found
+    found="$(printf '%s\n' \
+        '13799 /bin/sh /tmp/bats-run-13800/obsidian --user-data-dir=/tmp/bats-run-13800/test/1' \
+        '113800 /bin/sh /tmp/obsidian')"
+    _found_has_pid "$found" 13799
+    run _found_has_pid "$found" 13800
+    [ "$status" -eq 1 ]
+    run _found_has_pid "$found" 1380
+    [ "$status" -eq 1 ]
+}
+
 # The leak itself, asserted rather than timed: no descendant of a fake launched
 # through _launch_fake holds the descriptor bats waits on.
 @test "guard: a fake GUI launched by this file does not hold bats' fd 3" {
@@ -175,14 +195,14 @@ _launch_fake() {
 
     kill -9 "$stray" "$human" 2>/dev/null || true
 
-    printf '%s' "$found" | grep -q "$stray" || {
+    _found_has_pid "$found" "$stray" || {
         printf 'detector missed a test-shaped process (pid %s):\n%s\n' "$stray" "$found" >&2
         return 1
     }
     # The half that matters more: it must never sweep up something a human
     # opened. Killing the developer's editor would be a worse bug than the one
     # this guard exists to fix.
-    if printf '%s' "$found" | grep -q "$human"; then
+    if _found_has_pid "$found" "$human"; then
         printf 'detector matched a human-shaped process (pid %s) — it would kill a real editor\n' "$human" >&2
         return 1
     fi
@@ -216,8 +236,8 @@ _launch_fake() {
 
     kill -9 "$ours" "$theirs" 2>/dev/null || true
 
-    printf '%s' "$found" | grep -q "^$ours " || { printf 'missed this run'"'"'s process (pid %s):\n%s\n' "$ours" "$found" >&2; return 1; }
-    if printf '%s' "$found" | grep -q "^$theirs "; then
+    _found_has_pid "$found" "$ours" || { printf 'missed this run'"'"'s process (pid %s):\n%s\n' "$ours" "$found" >&2; return 1; }
+    if _found_has_pid "$found" "$theirs"; then
         printf 'matched another run'"'"'s process (pid %s); teardown would kill it\n' "$theirs" >&2
         return 1
     fi

@@ -51,10 +51,10 @@ func checkAgentSkillsMigrated(cfg *Config, rep *Report) {
 			continue
 		}
 		path := filepath.Join(cfg.DotfilesDir, recordDir, e.Name(), "AGENT.md")
-		// LoadPersona, not readAgentFrontmatter: the latter reads single-line
-		// values only and its own docstring says it never reads `skills`. Using
-		// it here would report every record as having no skills at all — a
-		// check that passes on the broken thing.
+		// LoadPersona, not a single-line field reader: `skills` may be a block
+		// list, and a reader that skips indented lines would report every such
+		// record as having no skills at all — a check that passes on the
+		// broken thing.
 		p, err := harness.LoadPersona(path)
 		if err != nil {
 			rep.Warn(fmt.Sprintf("persona record %s does not parse, so its skills were not checked: %v",

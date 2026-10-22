@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -248,11 +249,21 @@ func markExecutable(dest string) error {
 			return fmt.Errorf("chmod %s: %w", p, err)
 		}
 	}
-	libs, err := filepath.Glob(filepath.Join(dest, "lib", "*.sh"))
-	if err != nil {
-		return err
+	// os.ReadDir, not filepath.Glob: Glob drops the I/O error, so an unreadable
+	// lib/ read as holding no helpers and the deploy reported success (#2812).
+	lib := filepath.Join(dest, "lib")
+	entries, err := os.ReadDir(lib)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
 	}
-	for _, p := range libs {
+	if err != nil {
+		return fmt.Errorf("read %s: %w", lib, err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".sh" {
+			continue
+		}
+		p := filepath.Join(lib, e.Name())
 		if err := os.Chmod(p, 0o755); err != nil {
 			return fmt.Errorf("chmod %s: %w", p, err)
 		}

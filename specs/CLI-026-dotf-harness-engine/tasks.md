@@ -33,7 +33,7 @@ created: "2026-06-21"
 - [x] ~~`deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`~~ superseded: no caller runs `compile-harness.sh --deploy` once the slice 5 rewire lands, and slice 7 deletes it
 - [x] `setup-windows.ps1` calls `dotf harness deploy` (slice 5), which runs the skills surface; `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their bats parity tests deleted; the copilot smoke test runs `dotf harness skills`
 - [ ] Note the skills half fixed on #1733
-- [ ] `doctor`'s `recordTargets` (`checks_agent_tiers.go`) mirrors the shell's substring match on purpose (`TestRecordTargetsAgreesWithTheRender`); switch it and its test to `harness.SkillTargetsAgent` in the slice that moves the agent render to Go (slice 4), so the check keeps predicting the render
+- [x] `doctor`'s agent-tier check reads targets and tier with the Go render's own predicates (`harness.SkillTargetsAgent`, `harness.RecordModelTier`); `recordTargets`, `readAgentFrontmatter` and the two awk-agreement tests are gone, because the shell render they followed no longer deploys
 
 ## Slice 4 — agents and doctrine (AC4)
 
@@ -44,23 +44,27 @@ created: "2026-06-21"
 ## Slice 5 — `dotf harness deploy` (AC4, AC8)
 
 - [x] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell (`dotf harness deploy`, `tests/harness-deploy-parity.bats`)
-- [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
+- [x] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
   - [x] `records-harness` calls `harness.Deploy` in process (`converge.HarnessDeploy`); `CompileHarnessDeploy` deleted
   - [x] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
   - [x] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
   - [ ] Live acceptance on the work-lab Windows box after a release carries it: setup, then `dotf converge` reports `records-harness` changed=0, and `~/.claude/agents/` holds the seven personas (#1387)
-  - [ ] doctor's `instructionsRemedy` (`checks_deploy.go`) still tells Windows to re-run setup; switch it to `dotf converge` with slice 6's doctor wiring
+  - [x] doctor's `instructionsRemedy` (`checks_deploy.go`) is gone: every OS is told `run: dotf harness deploy`
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)
 
 - [x] Offline drift check in Go (`dotf harness check`, `tests/harness-check-parity.bats`)
-- [ ] `ci.yml` and `dotf doctor`'s harness drift check call it on every OS (after a release carries the verb)
-- [ ] `--against-vault` with a regression test (#1545)
+- [ ] `ci.yml` and `dotf doctor`'s harness drift check call it on every OS (0.77.0 carries the verb)
+  - [x] `dotf doctor` runs `harness.CheckDrift` in process on every OS (`checkRecordDrift`); its remedies name `dotf harness deploy` and `dotf harness refresh`
+  - [ ] `ci.yml` (#2923, a `.github/**` change: prepared here, landed by the owner)
+- [x] `--against-vault` with a regression test (#1545): `harness.CompareWithVault`, shared with doctor's WARN; `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
 
 ## Slice 7 — `refresh` in Go and deletion (AC7, AC9)
 
 - [ ] Render half of `--refresh` in Go behind the existing gate
+  - [ ] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
+  - [ ] Close #1733 with it: the shell render is the last reader of `targets:` by substring, and the deploy and doctor already use `harness.SkillTargetsAgent`
 
 ## Closing
 

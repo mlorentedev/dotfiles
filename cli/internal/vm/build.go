@@ -43,6 +43,7 @@ type BuildOptions struct {
 	Install      time.Duration // the whole unattended install, reboots included
 	Agent        time.Duration // until the guest agent answers on the check boot
 	Out          io.Writer
+	Progress     io.Writer // the `==> ` lines
 }
 
 // Build installs Windows unattended into clean-base, checks the result on a
@@ -55,14 +56,14 @@ func Build(h Host, o BuildOptions) (err error) {
 	}
 	if done, err := baseBuilt(l, o.Rebuild); err != nil || done {
 		if done {
-			step(o.Out, "clean-base is built at %s; --rebuild replaces it", l.BaseDisk())
+			step(o.Progress, "clean-base is built at %s; --rebuild replaces it", l.BaseDisk())
 		}
 		return err
 	}
-	if err := Ensure(o.Client, l.WindowsISO(), o.Windows, o.ISO, o.Out); err != nil {
+	if err := Ensure(o.Client, l.WindowsISO(), o.Windows, o.ISO, o.Progress); err != nil {
 		return err
 	}
-	if err := Ensure(o.Client, l.VirtioISO(), o.Virtio, o.Virtio.URL, o.Out); err != nil {
+	if err := Ensure(o.Client, l.VirtioISO(), o.Virtio, o.Virtio.URL, o.Progress); err != nil {
 		return err
 	}
 	if err := WriteUnattend(l.UnattendDir()); err != nil {
@@ -90,11 +91,11 @@ func Build(h Host, o BuildOptions) (err error) {
 		return err
 	}
 
-	step(o.Out, "install Windows unattended (up to %s; QEMU's output in %s)", o.Install, l.Log())
+	step(o.Progress, "install Windows unattended (up to %s; QEMU's output in %s)", o.Install, l.Log())
 	if err := install(h, o, log); err != nil {
 		return err
 	}
-	step(o.Out, "check boot: the guest agent answers and no sshd is installed")
+	step(o.Progress, "check boot: the guest agent answers and no sshd is installed")
 	if err := checkBoot(h, o, log); err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func Build(h Host, o BuildOptions) (err error) {
 			return err
 		}
 	}
-	step(o.Out, "clean-base ready: %s", l.BaseDisk())
+	step(o.Progress, "clean-base ready: %s", l.BaseDisk())
 	return nil
 }
 
@@ -232,7 +233,7 @@ func checkBoot(h Host, o BuildOptions, log io.Writer) (err error) {
 	if err != nil {
 		return err
 	}
-	step(o.Out, "guest: %s", strings.TrimSpace(string(ver.Stdout)))
+	step(o.Progress, "guest: %s", strings.TrimSpace(string(ver.Stdout)))
 	sshd, err := q.Run("sc.exe", []string{"query", "sshd"})
 	if err != nil {
 		return err

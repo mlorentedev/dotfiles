@@ -19,7 +19,7 @@ created: "2026-10-18"
 
 ## Implementation
 
-- [x] [AC6] Failing test: each wrapper's line is compared whole, so `HERDR_AGENT`
+- [x] [AC6] (landed in `216fa210`, not in this change's diff) Failing test: each wrapper's line is compared whole, so `HERDR_AGENT`
       cannot be swapped between pi and opencode (`tests/pi-config.bats`).
       The old regex broke on the prefix and was widened to assert the hint.
 - [x] [AC6] Wrappers take `HERDR_AGENT=<canonical id>` on both shells, with the
@@ -38,17 +38,21 @@ created: "2026-10-18"
       `HERDR_ACTIVE_*` first and `HERDR_PANE_ID`/`HERDR_TAB_ID` second.
 - [x] [AC3] Failing test: a second call with an explorer already running closes
       it and opens nothing; another tab's explorer is never touched.
-- [x] [AC3] Toggle detection by foreground process (`yazi`), not by a pane label
-      that any rename clears; verified live: opened `w10:p9`, then closed it.
+- [x] [AC3] Toggle ownership by the `files` pane label, never by the foreground
+      process (#2815, and #2854 for the press from inside the explorer); verified
+      live: opened `w10:p9`, then closed it.
 - [x] [AC4] Failing test: no yazi on PATH refuses and names `dotf tools sync`.
 - [x] [AC4] `herdrLookPath` preflight before any herdr call.
 - [x] [AC1] Ordering guard: a test fails if a binding names `dotf herdr explorer`
-      while `DOTF_VERSION` predates it (lesson 373). Removed by the follow-up PR
-      that lands the binding.
+      while `DOTF_VERSION` predates it (lesson 373). Narrowed to one direction in
+      #2827 (lesson 498), then replaced by the binding test when the binding landed.
 - [x] `ui.agent_panel_sort = "priority"` + a static test.
 - [x] Collateral: the `herdr config check` canary appended a second `[ui]`, which
       is a duplicate-table error — it now appends `[terminal]`, a table this file
       does not define, and names the key it expects.
+
+- [x] [AC1] `[[keys.command]] prefix+shift+e` -> `dotf herdr explorer`, once
+      `DOTF_VERSION` reached 0.77.0 (0.76.0 carried the subcommand, 0.77.0 the toggle fix); the guard became the binding's own test.
 
 ## Closing
 

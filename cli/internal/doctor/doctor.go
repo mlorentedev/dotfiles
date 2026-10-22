@@ -88,7 +88,7 @@ func Run(opts Options) (int, error) {
 	// Folded env-contract sweep (the doctor.sh surface). In --quick mode this is
 	// the ONLY work: it is the fast, fork-free subset wired into the SessionStart
 	// hook (CLI-013), so it must skip the heavy healthcheck sweep below — chiefly
-	// the ~2.8s compile-harness drift gate.
+	// the harness drift gate and the vault reads.
 	if contract != nil {
 		checkContractEnvVars(sys, contract, rep, opts.Fix)
 		checkPersistedEnv(sys, cfg, rep)
@@ -307,6 +307,7 @@ func (e sweepEnv) deployAndHooks() []check {
 		{kind: kindMachine, run: func() { checkDeployDrift(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkWorkstationTarget(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkSelfDeploy(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkMachineIdentity(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkDockerEngine(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkColimaSize(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkDockerCompose(e.sys, e.rep) }},

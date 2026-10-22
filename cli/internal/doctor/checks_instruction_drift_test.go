@@ -122,7 +122,7 @@ func TestCheckInstructionDrift(t *testing.T) {
 		if rep.Failures() != 1 {
 			t.Fatalf("want 1 failure, got %d\n%s", rep.Failures(), buf.String())
 		}
-		if !strings.Contains(buf.String(), ".claude/CLAUDE.md") || !strings.Contains(buf.String(), "compile-harness.sh --deploy") {
+		if !strings.Contains(buf.String(), ".claude/CLAUDE.md") || !strings.Contains(buf.String(), "dotf harness deploy") {
 			t.Errorf("expected the stale path + remedy in output\n%s", buf.String())
 		}
 	})
@@ -346,10 +346,10 @@ func TestCheckInstructionDrift_InstalledAgentWithoutItsInstructionsFailsWithNoRe
 	}
 }
 
-// The remedy names what actually deploys the file on each OS: dotf converge on
-// linux and darwin, the setup script on Windows until the Go deploy ships.
-func TestCheckInstructionDrift_TheRemedyFitsTheOS(t *testing.T) {
-	for goos, want := range map[string]string{"darwin": "run: dotf converge", "windows": "re-run setup-windows.ps1"} {
+// The remedy is the same on every OS: `dotf harness deploy` writes the
+// instruction files on linux, darwin and windows alike (CLI-026).
+func TestCheckInstructionDrift_TheRemedyIsTheSameOnEveryOS(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux", "windows"} {
 		t.Run(goos, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			sys := newSys(map[string]string{"HOME": t.TempDir()}, []string{"claude"}, nil)
@@ -358,8 +358,8 @@ func TestCheckInstructionDrift_TheRemedyFitsTheOS(t *testing.T) {
 			var buf bytes.Buffer
 			checkInstructionDrift(sys, capture(&buf))
 
-			if !strings.Contains(buf.String(), want) {
-				t.Errorf("want %q in the FAIL\n%s", want, buf.String())
+			if !strings.Contains(buf.String(), "run: dotf harness deploy") {
+				t.Errorf("want the deploy verb in the FAIL\n%s", buf.String())
 			}
 		})
 	}

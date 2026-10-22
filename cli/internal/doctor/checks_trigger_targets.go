@@ -80,6 +80,6 @@ func checkTriggerTargets(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 	rep.Fail(fmt.Sprintf("%d of %d triggers name a pattern the vault does not have: %s "+
-		"(fix harness/triggers.json, re-run compile-harness.sh --refresh, then setup)",
+		"(fix harness/triggers.json, re-run dotf harness refresh, then dotf harness deploy)",
 		len(dangling), named, strings.Join(dangling, ", ")))
 }
