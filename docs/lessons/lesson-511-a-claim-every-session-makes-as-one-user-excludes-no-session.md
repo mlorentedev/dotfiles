@@ -1,5 +1,5 @@
 ---
-id: "lesson-509-a-claim-every-session-makes-as-one-user-excludes-no-session"
+id: "lesson-511-a-claim-every-session-makes-as-one-user-excludes-no-session"
 type: lesson
 status: active
 title: "A claim every session makes as one user excludes no session"
