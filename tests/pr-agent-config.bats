@@ -1366,3 +1366,45 @@ if missing:
 PY
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
+
+@test "pr-agent: every writer of the triage record spells the registry's marker" {
+    # GUARD-003 review F2 (#2870). The queue reads triage.marker from the
+    # registry; the skill and runbooks that tell a person what to write carry
+    # their own copy. A copy that drifts makes every triage invisible to the
+    # queue, with nothing failing.
+    run python3 - "$REPO" <<'PY'
+import json, os, sys
+
+repo = sys.argv[1]
+marker = json.load(open(os.path.join(repo, "harness/review-attestation.json")))["triage"]["marker"]
+writers = ["harness/skills/pr-review-triage/SKILL.md",
+           "docs/runbooks/release-dotf.md",
+           "docs/runbooks/guide-pr-agent-reviewer.md"]
+missing = [w for w in writers if marker not in open(os.path.join(repo, w)).read()]
+if missing:
+    print(f"{marker!r} is not in: " + ", ".join(missing))
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
+
+@test "pr-agent: who may ask for a review is who may record its triage" {
+    # #2870. The workflow trusts a set of author associations to ask for a
+    # review with a slash command; the registry declares who may write the
+    # triage record. One set, two spellings, held together here.
+    run python3 - "$WF" "$REPO/harness/review-attestation.json" <<'PY'
+import json, re, sys
+
+wf = open(sys.argv[1]).read()
+m = re.search(r"fromJSON\('(\[[^']*\])'\), github\.event\.comment\.author_association\)", wf)
+if not m:
+    print("the workflow no longer gates slash commands on author_association")
+    sys.exit(1)
+asked = sorted(json.loads(m.group(1)))
+standing = sorted(json.load(open(sys.argv[2]))["triage"].get("standing") or [])
+if asked != standing:
+    print(f"workflow {asked} != registry triage.standing {standing}")
+    sys.exit(1)
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}
