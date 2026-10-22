@@ -68,11 +68,13 @@ Ships on its own. AI-028 still cannot archive until PR2's Windows check, but the
 
 Two halves. The deletion needs no decision; the retire step on live machines does.
 
-- [ ] [AC9] Failing guard: no setup script installs `hive-upgrade`, `DotfilesHiveUpgrade` or a `uv tool upgrade hive-vault`, and the units and script are gone (`tests/hive-daemon-gate.bats`). *Written, not on main:* branch `chore/retire-hive-upgrade-timers`, ticked by its own PR
-- [ ] [AC9] Delete `systemd/hive-upgrade.{service,timer}`, `windows/hive-upgrade.ps1`, the two setup blocks that install them, `Register-HiveScheduledTask` (its only caller was the task) and `tests/hive-upgrade-timer.bats`; the daemon-gate parity test moves to `tests/hive-daemon-gate.bats`. *Same branch, not on main*
-- [ ] [AC9] **Owner decision:** where the retire step lives. It disables and removes `hive-upgrade.timer` and the `DotfilesHiveUpgrade` task on a machine that has them, records it and changes nothing on a second run, in Go, in the shape of the converge retire in #2799
-- [ ] [AC9] Edit the stale mentions outside the deletion: `docs/architecture.md:27,29` and the comments in `systemd/hive.service.d/10-dotf-secrets.conf:8,58`
-- [ ] State in the PR: until #1993 retires `prerequisite_command`, Windows setup still runs `uv tool install --upgrade hive-vault` on every run
+- [x] [AC9] Failing guard: no setup script installs `hive-upgrade`, `DotfilesHiveUpgrade` or a `uv tool upgrade hive-vault`, and the units and script are gone (`tests/hive-daemon-gate.bats`).
+- [x] [AC9] Delete `systemd/hive-upgrade.{service,timer}`, `windows/hive-upgrade.ps1`, the two setup blocks that install them, `Register-HiveScheduledTask` (its only caller was the task) and `tests/hive-upgrade-timer.bats`; the daemon-gate parity test moves to `tests/hive-daemon-gate.bats`
+- [x] [AC9] Failing tests, then the `hive-upgrade-retire` converge step (owner, 2026-10-21: converge, not `doctor --fix`). It removes `hive-upgrade.timer`, the `DotfilesHiveUpgrade` task and the script copy at `~/.claude/scripts/hive-upgrade.ps1` from a machine that has them, unmanaged as they are, and a second run changes nothing (`TestHiveUpgradeRetire_*`, `cli/internal/converge/hiveupgrade.go`)
+- [ ] [AC9] Live: `dotf converge --only hive-upgrade-retire` twice on msi (1 change, then 0), after a release carrying it
+- [ ] [AC9] Live on the work-lab box, elevated (the task an elevated setup registered is S4U): the same two runs remove `DotfilesHiveUpgrade` and the script
+- [x] [AC9] Edit the stale mentions outside the deletion: `docs/architecture.md:27,29` and the comments in `systemd/hive.service.d/10-dotf-secrets.conf:8,58`, plus `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`, which now calls the timer historical
+- [x] State in the PR: until #1993 retires `prerequisite_command`, Windows setup still runs `uv tool install --upgrade hive-vault` on every run
 
 ### PR6 — Windows installs hive through hive's own layout (AC2, AC4) — added 2026-10-21
 

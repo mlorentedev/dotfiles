@@ -255,6 +255,7 @@ func newWorktreeAddCmd() *cobra.Command {
 		branch     string
 		base       string
 		issue      int
+		shareIssue bool
 		ttl        time.Duration
 		agent      string
 		promptFile string
@@ -273,7 +274,9 @@ already exists, locally or on origin, is checked out under its own name (one onl
 on origin tracks it), whatever its shape: a release or dependabot branch. Only its
 directory is slugified, and --base is refused for it.
 It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
-adds it to .git/info/exclude.
+adds it to .git/info/exclude. With --issue, add refuses while another worktree of
+the repository holds a live lease on that issue, and names it; --share-issue adds a
+second worktree on it anyway.
 
 --agent <harness> then opens the worktree in herdr and starts that agent in its
 root pane, named after the worktree directory; --prompt-file sends the file as
@@ -296,6 +299,7 @@ refuses before creating anything.`,
 				Branch:       branch,
 				BaseRef:      base,
 				Issue:        issue,
+				ShareIssue:   shareIssue,
 				TTL:          ttl,
 			}
 
@@ -333,6 +337,7 @@ refuses before creating anything.`,
 	cmd.Flags().StringVarP(&branch, "branch", "b", "", "custom branch name (defaults to feat/<slug>)")
 	cmd.Flags().StringVar(&base, "base", "", "base commit or branch (defaults to origin's default branch, fetched first: origin/HEAD, origin/main, origin/master)")
 	cmd.Flags().IntVar(&issue, "issue", 0, "associated GitHub issue number")
+	cmd.Flags().BoolVar(&shareIssue, "share-issue", false, "with --issue, add even though another live worktree holds that issue")
 	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "initial lease duration before eligible for reap")
 	cmd.Flags().StringVar(&agent, "agent", "", "start this harness (claude, codex, pi, agy, opencode, copilot) in herdr on the new worktree")
 	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "with --agent, send this file as the agent's first prompt")

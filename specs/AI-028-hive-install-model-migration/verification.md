@@ -72,7 +72,42 @@ $ LC_ALL=C grep -nP '[^\x00-\x7F]' windows/hive-upgrade.ps1
 
 > **Do not verify against the deployed copy.** `~/.claude/scripts/hive-upgrade.ps1` is deployed from `windows/hive-upgrade.ps1` by setup. Re-deploy (or invoke the SSOT directly) before treating B5 as flipped, or a stale copy will read as a pass.
 
-## PR6 evidence (2026-10-21)
+### PR5: the timer deletion (#2857), 2026-10-21
+
+```
+$ bats tests/hive-daemon-gate.bats        # red: the guard copied onto d233110d^, before the deletion
+not ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+#   `[ "$status" -eq 1 ]' failed
+$ bats tests/hive-daemon-gate.bats        # the same guard with setup-linux.sh moved away: grep exits 2
+not ok 1 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+
+$ bats tests/hive-daemon-gate.bats        # green, head
+ok 1 parity: both setups probe hive's version through dotf tools version, not uv tool list (AI-034, #791)
+ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+
+$ dotf lint powershell          -> exit 0
+$ bash -n setup-linux.sh; echo "bash -n exit=$?"; zsh -n setup-linux.sh; echo "zsh -n exit=$?"
+bash -n exit=0
+zsh -n exit=0
+
+# every bats file that names a changed path, run under bash so the list splits
+$ bash -c 'files=$(for p in $(git diff --name-only origin/main...HEAD); do git grep -l "$(basename $p)" -- "tests/*.bats"; done | sort -u); bats $files > out.txt 2>&1; echo "exit=$?"; head -1 out.txt; grep -c "^not ok" out.txt'
+exit=0
+1..840
+0
+```
+
+Those 840 tests in 50 files pass. That is the repo half of AC9: nothing installs a timer any more. The machine half is the `hive-upgrade-retire` converge step:
+
+```
+$ go test ./internal/converge/ -run HiveUpgradeRetire   -> ok (7 tests)
+$ go test ./... && go vet ./... && GOOS=windows go vet ./...   -> ok
+$ golangci-lint run ./internal/converge/...   -> 0 issues
+```
+
+The tests run against a fake scheduler. The live proof is two runs on msi (Linux) and on the work-lab box (Windows, elevated), after a release carrying the step; both are open tasks in PR5.
+
+### PR6: hive self-installs on Windows (2026-10-21)
 
 ```
 $ go test ./internal/tools/ -run 'SelfInstall|TheRepoCatalogDeclaresHive' -v | grep -E '^--- '
@@ -106,7 +141,7 @@ The tests run against a fake uv and a fake probe. Nothing here has run `hive sel
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
 - **Split into AI-028 + AI-029 rather than one ticket** (2026-08-07). The install model and the multi-client registration SSOT are separate failures with separate blast radii; the repo's own precedent is #574 being split out of #551 for atomic-PR discipline.
-- **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993, and the owner re-confirms it on return.
+- **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993. The owner re-confirmed it the same day, and decided the three open questions: PR6 is a `hive-self` catalog source, Arm64 is fixed in hive (hive#515), and the retire step is a converge step.
 - **PR1 sequenced before the model change.** The loud-vs-quiet fix does not depend on resolving the bootstrap question, and it is what makes the next recurrence visible. Shipping it first means the session produces a durable improvement even if the model migration proves deeper than expected.
 
 ## Promotion candidates

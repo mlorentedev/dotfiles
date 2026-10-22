@@ -15,7 +15,7 @@ func TestFetchPRScopesTheQueueToOnePullRequest(t *testing.T) {
 	const (
 		open10     = `{"number":10,"title":"mine","html_url":"https://github.com/o/r/pull/10","state":"open"}`
 		reviewed   = `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nfindings","created_at":"2026-10-15T08:00:00Z"}]`
-		triaged    = `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nfindings","created_at":"2026-10-15T08:00:00Z"},{"user":{"login":"manu"},"body":"## Review triage\nall disposed","created_at":"2026-10-15T08:10:00Z"}]`
+		triaged    = `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nfindings","created_at":"2026-10-15T08:00:00Z"},{"user":{"login":"manu"},"author_association":"OWNER","body":"## Review triage\nall disposed","created_at":"2026-10-15T08:10:00Z"}]`
 		otherPRs   = `[{"number":10,"title":"mine","html_url":"u10"},{"number":11,"title":"another session's","html_url":"u11"}]`
 		pendingOn  = `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-15T07:00:00Z"}]`
 		wantNoList = "pulls?state"
