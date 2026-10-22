@@ -26,17 +26,15 @@ created: "2026-08-18"
 > TDD order. The reproduction harness comes first, because every later task
 > depends on it and it is the piece most able to be silently vacuous.
 >
-> **Parked for the owner (2026-10-21, A/B on #1062).** Two decisions gate the
-> rest, and neither is taken unattended:
-> - AC4-AC6, what counts as a reproduction. (A) only a committed failing test or
->   a command whose non-zero exit is recorded; anything else is "not reproduced"
->   and goes to a human. (B) also accept a recorded manual or model-judged
->   reproduction. Recommended: A, the only machine-checkable boundary.
-> - AC7, per-comment dispositions. (A) `dotf pr land` checks that every inline
->   finding appears in the `## Review triage` table. (B) keep the PR-level gate
->   and let the unclassified-findings report be the per-finding signal for now.
->   Recommended: B, until the marker has a measured adoption window.
->   Close-without-merge rides with (A): it widens `land`'s authority.
+> **Decided by the owner (2026-10-21, #1062).**
+> - AC4-AC6, what counts as a reproduction: **(A)**. Only a committed failing
+>   test, or a command whose non-zero exit is recorded, reproduces a finding.
+>   Anything else is "not reproduced" and goes to a human; a model's judgement
+>   never counts.
+> - AC7, per-comment dispositions: **(B)**. The PR-level gate stays (`dotf pr
+>   land` refuses a PR the triage queue lists), and the unclassified-findings
+>   report is the per-finding signal until the marker's adoption is measured.
+>   A per-row check and a close-without-merge guard are not built.
 
 - [ ] `[AC5]` reproduction harness: apply a mutation, **verify by checksum that it landed**, report `did-not-land` as a state distinct from `did-not-reproduce`
 - [ ] `[AC5]` red-direction: an invalid mutation must report `did-not-land`, never a clean result — the exact failure two sessions hit on 2026-08-17
@@ -45,15 +43,12 @@ created: "2026-08-18"
 - [x] `[AC3]` extract a finding's class from a declared marker; absent marker → `unclassified`
 - [x] `[AC3]` red-direction: a finding whose class appears only in prose is `unclassified`, not parsed
 - [x] `[AC3]` consume `Classify` where findings are read: `dotf pr triage-queue` names a pending PR's inline findings without a declared class (report only, the verdict is unchanged)
-- [ ] `[AC3]` declare the classifying reviewers in the registry (`classification.reviewers`, e.g. `["github-actions"]`); until then the consumer reports nothing. `harness/` is owner-landed
+- [x] `[AC3]` declare the classifying reviewers in the registry: `classification.reviewers: ["github-actions"]`, pinned by `TestTheRealRegistryDeclaresTheClassificationMarker`
 - [ ] `[AC4]` gate `apply` on a successful reproduction for REAL findings
 - [ ] `[AC6]` record a refuted REAL finding with its evidence, distinct from a skip
 - [x] `[AC1]` ~~trigger from the reviewer-finished signal (GUARD-003's `workflow_run`)~~ superseded: the pull-based `dotf pr triage-queue` (#1057, #1101), accepted by the owner on #1062 (2026-10-10)
-- [ ] `[AC7]` closing guard: a PR with an undispositioned reviewer comment cannot close or merge
-      (partly in place: `dotf pr land` refuses a PR the triage queue lists,
-      `cli/internal/prland/prland.go:118`, at PR granularity. Still open:
-      per-comment dispositions and close-without-merge)
-- [ ] `[AC7]` red-direction: a PR with one undispositioned comment fails the guard
+- [x] `[AC7]` closing guard, re-scoped to PR level by the owner (option B): `dotf pr land` refuses a PR the triage queue lists (`cli/internal/prland/prland.go:118`)
+- [x] `[AC7]` red-direction: a PR whose reviewer spoke after the last triage is pending (`TestEvaluate`), and `land` refuses it
 - [ ] `[AC8]` every check above has a red-direction test — asserted, not assumed
 
 ## Verification

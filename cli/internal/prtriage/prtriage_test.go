@@ -292,6 +292,21 @@ func TestTheRealRegistryDeclaresTheClassificationMarker(t *testing.T) {
 	if got := Classify("Class: REAL", r); got != "REAL" {
 		t.Fatalf("the shipped registry does not classify its own REAL line: got %q", got)
 	}
+	// The report is inert without a classifying reviewer, and a login that
+	// matches no declared reviewer is a typo that leaves it inert just as
+	// silently, with every other test green.
+	declared := map[string]bool{}
+	for _, rv := range r.Reviewers {
+		declared[normaliseLogin(rv.Login)] = true
+	}
+	if len(r.Classification.Reviewers) == 0 {
+		t.Fatal("the shipped registry names no classification.reviewers: unclassified findings are never reported")
+	}
+	for _, login := range r.Classification.Reviewers {
+		if !declared[normaliseLogin(login)] {
+			t.Errorf("classification.reviewers names %q, which is not a declared reviewer", login)
+		}
+	}
 }
 
 // TOOL-017 AC3, the consumer: a finding the registry's classifying reviewers
