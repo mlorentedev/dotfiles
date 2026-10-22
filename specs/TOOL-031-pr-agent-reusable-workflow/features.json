@@ -1,0 +1,44 @@
+[
+  {
+    "id": "TOOL-031-pr-agent-reusable-workflow-f1",
+    "behavior": "dotf pr route reproduces the bash route: exact shares, risk route, allowlist with price and ceiling, key on stdin",
+    "verification": "cd cli && go test ./internal/prreview/ -run 'Route' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-031-pr-agent-reusable-workflow-f2",
+    "behavior": "dotf pr preflight, guard and gate reproduce their scripts' cases with the same output names",
+    "verification": "cd cli && go test ./internal/prreview/ -run 'Preflight|Guard|Gate' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-031-pr-agent-reusable-workflow-f3",
+    "behavior": "dotfiles' pr-agent.yml calls dotf pr built from the PR head and no pr-agent script remains",
+    "verification": "bats tests/pr-agent-config.bats && [ -z \"$(find scripts -maxdepth 1 -name 'pr-agent-*.sh')\" ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-031-pr-agent-reusable-workflow-f4",
+    "behavior": "The reusable workflow's interface, install, push-gate action and declare_unreviewed input",
+    "verification": "cd ~/Projects/ci-workflows && bats tests/ && actionlint",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-031-pr-agent-reusable-workflow-f5",
+    "behavior": "hive calls the reusable workflow pinned by full SHA",
+    "verification": "cd ~/Projects/hive && grep -qE 'uses: mlorentedev/ci-workflows/.github/workflows/pr-agent.yml@[0-9a-f]{40}' .github/workflows/pr-agent-shared.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-031-pr-agent-reusable-workflow-f6",
+    "behavior": "kubelab-, dotfiles- and hive-shaped caller fixtures match the workflow's interface unchanged",
+    "verification": "cd ~/Projects/ci-workflows && bats tests/caller-fixtures.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
