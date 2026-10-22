@@ -78,14 +78,15 @@ func newVMWindowsCmd() *cobra.Command {
 			}
 			defer func() { _ = os.Remove(src) }()
 			return vm.Run(host, vm.RunOptions{
-				Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
-				Source:  src,
-				Dotf:    dotf,
-				Keep:    keep,
-				Agent:   10 * time.Minute,
-				Step:    time.Hour,
-				Poll:    5 * time.Second,
-				Out:     cmd.OutOrStdout(),
+				Machine:  vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
+				Source:   src,
+				Dotf:     dotf,
+				Keep:     keep,
+				Agent:    10 * time.Minute,
+				Step:     time.Hour,
+				Poll:     5 * time.Second,
+				Out:      cmd.OutOrStdout(),
+				Progress: cmd.ErrOrStderr(),
 			})
 		},
 	}
@@ -109,7 +110,7 @@ func newVMWindowsStopCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return vm.Stop(host, layout, cmd.OutOrStdout())
+			return vm.Stop(host, layout, cmd.ErrOrStderr())
 		},
 	}
 }
@@ -208,6 +209,7 @@ func newVMWindowsBuildCmd() *cobra.Command {
 				Install:      2 * time.Hour,
 				Agent:        10 * time.Minute,
 				Out:          cmd.OutOrStdout(),
+				Progress:     cmd.ErrOrStderr(),
 			})
 		},
 	}
@@ -259,12 +261,13 @@ func newVMLinuxCmd() *cobra.Command {
 			}
 			defer func() { _ = os.Remove(src) }()
 			return vm.Verify(execLimactl, vm.Options{
-				Ref:    ref,
-				Source: src,
-				Name:   fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
-				Keep:   keep,
-				Token:  os.Getenv("GITHUB_TOKEN"),
-				Out:    cmd.OutOrStdout(),
+				Ref:      ref,
+				Source:   src,
+				Name:     fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
+				Keep:     keep,
+				Token:    os.Getenv("GITHUB_TOKEN"),
+				Out:      cmd.OutOrStdout(),
+				Progress: cmd.ErrOrStderr(),
 			})
 		},
 	}
