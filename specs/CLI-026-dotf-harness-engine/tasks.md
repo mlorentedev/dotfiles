@@ -33,7 +33,7 @@ created: "2026-06-21"
 - [x] ~~`deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`~~ superseded: no caller runs `compile-harness.sh --deploy` once the slice 5 rewire lands, and slice 7 deletes it
 - [x] `setup-windows.ps1` calls `dotf harness deploy` (slice 5), which runs the skills surface; `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their bats parity tests deleted; the copilot smoke test runs `dotf harness skills`
 - [ ] Note the skills half fixed on #1733
-- [ ] `doctor`'s `recordTargets` (`checks_agent_tiers.go`) mirrors the shell's substring match on purpose (`TestRecordTargetsAgreesWithTheRender`); switch it and its test to `harness.SkillTargetsAgent` in the slice that moves the agent render to Go (slice 4), so the check keeps predicting the render
+- [x] `doctor`'s agent-tier check reads targets and tier with the Go render's own predicates (`harness.SkillTargetsAgent`, `harness.RecordModelTier`); `recordTargets`, `readAgentFrontmatter` and the two awk-agreement tests are gone, because the shell render they followed no longer deploys
 
 ## Slice 4 — agents and doctrine (AC4)
 
@@ -64,6 +64,7 @@ created: "2026-06-21"
 - [ ] Render half of `--refresh` in Go behind the existing gate
   - [ ] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
+  - [ ] Close #1733 with it: the shell render is the last reader of `targets:` by substring, and the deploy and doctor already use `harness.SkillTargetsAgent`
 
 ## Closing
 

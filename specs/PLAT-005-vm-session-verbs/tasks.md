@@ -25,8 +25,8 @@ created: "2026-10-22"
 
 - [x] [P] [AC5] Failing test: progress and the guest's output are two writers; `==> ` goes to stderr
 - [x] [AC5] Split `Options.Out`/`RunOptions.Out`; the tests that read the progress writer follow the stream
-- [ ] [AC7] Move `redactWriter` out of `cmd/secrets.go` into one package; its tests move with it, not rewritten, and `dotf secrets run` keeps passing
-- [ ] Own PR, never bundled: the redaction move is a security primitive
+- [x] [AC7] Move `redactWriter` out of `cmd/secrets.go` into one package; its tests move with it, not rewritten, and `dotf secrets run` keeps passing
+- [x] Own PR, never bundled: the redaction move is a security primitive
 
 ### PR 1b: `Session`, `Record` and the Linux verbs
 

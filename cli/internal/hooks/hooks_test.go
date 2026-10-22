@@ -327,6 +327,38 @@ func TestInstallMakesEntrypointsExecutable(t *testing.T) {
 	}
 }
 
+// TestMarkExecutableRefusesAnUnreadableLib — filepath.Glob drops the I/O error,
+// so an unreadable lib/ read as holding no helpers and the deploy reported
+// success while memory-sink-guard.sh stayed non-executable (#2812). A dest
+// without lib/ is still fine: nothing there to mark.
+func TestMarkExecutableRefusesAnUnreadableLib(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions that bind the caller")
+	}
+	dest := t.TempDir()
+	if err := markExecutable(dest); err != nil {
+		t.Fatalf("a dest without lib/ must not fail: %v", err)
+	}
+	lib := filepath.Join(dest, "lib")
+	if err := os.Mkdir(lib, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lib, "memory-sink-guard.sh"), []byte("#!/bin/sh\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(lib, 0o300); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(lib, 0o755) })
+	err := markExecutable(dest)
+	if err == nil {
+		t.Fatal("an unreadable lib/ was read as holding no helpers")
+	}
+	if !strings.Contains(err.Error(), lib) {
+		t.Errorf("error does not name the directory: %v", err)
+	}
+}
+
 // --- core.hooksPath wiring -------------------------------------------------
 
 func TestInstallWiresHooksPath(t *testing.T) {

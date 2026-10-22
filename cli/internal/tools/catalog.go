@@ -109,9 +109,14 @@ type Source struct {
 
 // SelfInstall is a source's self_install: the OSes it applies to and the
 // arguments the tool is run with there. Args expand {version} to the pin.
+// NoBuild names dependencies uv must never build from source in that run: uv
+// resolves them before the tool starts, so the tool's own guard cannot reach
+// them (hive#523: cryptography has no win_arm64 wheel, and its build needs a
+// linker a fresh Windows does not have).
 type SelfInstall struct {
 	Platforms []string `json:"platforms"`
 	Args      []string `json:"args"`
+	NoBuild   []string `json:"no_build,omitempty"`
 }
 
 // SelfInstalls reports whether the source installs itself on goos.
@@ -139,6 +144,9 @@ func validateSelfInstall(t Tool) error {
 	}
 	if len(si.Args) == 0 {
 		return fmt.Errorf("tool %q: self_install declares no args", t.Name)
+	}
+	if slices.Contains(si.NoBuild, "") {
+		return fmt.Errorf("tool %q: self_install no_build lists an empty package name", t.Name)
 	}
 	// Without the pin in its argv the tool installs whatever is newest: an
 	// unattended upgrade, which hive ADR-020 rules out.
