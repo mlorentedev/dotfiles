@@ -109,7 +109,7 @@
       "source": {
         "type": "uv-tool",
         "package": "hive-vault",
-        "self_install": {"platforms": ["windows"], "args": ["self-upgrade", "{version}"]}
+        "self_install": {"platforms": ["windows"], "args": ["self-upgrade", "{version}"], "no_build": ["cryptography"]}
       }
     },
     {
