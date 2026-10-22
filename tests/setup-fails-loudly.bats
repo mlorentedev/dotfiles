@@ -30,6 +30,14 @@ setup() {
     [ "$status" -eq 1 ] || { echo "$block"; false; }
 }
 
+@test "setup-windows.ps1 stops when dotf harness deploy fails" {
+    block="$(sed 's/\r$//' "$PS1" | awk '/^& dotf harness deploy --repo-root \$DotfilesDir$/{f=1} f{print} f&&/^}$/{exit}')"
+    [ -n "$block" ] || false
+    grep -qE '^    exit 1' <<<"$block"
+    run grep -E 'Write-Warn' <<<"$block"
+    [ "$status" -eq 1 ] || { echo "$block"; false; }
+}
+
 @test "setup-windows.ps1 stops when dotf cannot be installed" {
     block="$(awk '/if \(-not \(Install-Dotf\)\) \{/{f=1} f{print} f&&/^    \}/{exit}' "$PS1")"
     [ -n "$block" ] || false

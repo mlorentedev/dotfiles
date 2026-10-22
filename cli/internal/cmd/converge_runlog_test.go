@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -315,12 +314,8 @@ func TestConverge_AStepsOutputPrecedesItsResultLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The first step that runs the child: records-harness on linux and darwin,
-	// legacy-setup on windows, where records-harness does not run.
-	step := "records-harness"
-	if runtime.GOOS == "windows" {
-		step = "legacy-setup"
-	}
+	// The first step that runs the child, on every OS.
+	const step = "records-harness"
 	at := regexp.MustCompile(`(?m)^  \[[^\]]*\]\s+` + step + `\s`).FindIndex(raw)
 	if at == nil {
 		t.Fatalf("no result line for %s in the transcript:\n%s", step, bytes.ReplaceAll(raw, []byte(line), nil))
