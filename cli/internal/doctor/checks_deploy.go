@@ -468,7 +468,7 @@ func reportAgentLaunchability(sys *System, rep *Report) {
 // checkDeployDrift (CLI-019).
 func checkHarnessDrift(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("Harness + skill drift")
-	checkCompileHarnessDrift(sys, cfg, rep)
+	checkRecordDrift(cfg, rep)
 	checkSkillRecordsAgainstVault(sys, rep)
 	checkHarnessMirrorOrphans(sys, cfg, rep, fix)
 	checkDeployedSkillSymlinks(sys, cfg, rep)
@@ -537,7 +537,7 @@ func checkDeployedDoctrine(sys *System, cfg *Config, rep *Report) {
 				continue
 			}
 			if !strings.Contains(content, marker) {
-				rep.Fail(fmt.Sprintf("enforced region %q missing from deployed %s (run: compile-harness.sh --deploy)", regionID, tgt.homeRel))
+				rep.Fail(fmt.Sprintf("enforced region %q missing from deployed %s (run: dotf harness deploy)", regionID, tgt.homeRel))
 				failures++
 			}
 		}
@@ -554,7 +554,7 @@ func checkDeployedDoctrine(sys *System, cfg *Config, rep *Report) {
 
 // deployedInstructionTargets mirrors harness/manifest.json's agents.presence[]
 // (agent/file/source/requires_command) — the four instruction files
-// compile-harness.sh --deploy copies verbatim (HARNESS-058/#828). Kept here
+// `dotf harness deploy` copies verbatim (HARNESS-058/#828). Kept here
 // rather than parsed from the manifest because the doctor binary must run
 // with no repo/vault present at all; the manifest is only reachable once a
 // repo IS found, at which point this list and the manifest are asserted in
@@ -610,7 +610,7 @@ func checkInstructionDrift(sys *System, rep *Report) {
 		// ends a file with exactly one, while a source may end with a blank
 		// line, and that alone read as drift on the CI runner (#1308).
 		if !harness.DeployedMatchesSource(string(dc), string(sc)) {
-			rep.Fail("stale: " + tgt.homeRel + " has drifted from " + tgt.repoRel + " (run: compile-harness.sh --deploy)")
+			rep.Fail("stale: " + tgt.homeRel + " has drifted from " + tgt.repoRel + " (run: dotf harness deploy)")
 			drift++
 		}
 	}
@@ -634,20 +634,10 @@ func checkInstalledAgentsHaveInstructions(sys *System, rep *Report) int {
 		if !sys.has(tgt.agent) || pathExists(filepath.Join(sys.home(), filepath.FromSlash(tgt.homeRel))) {
 			continue
 		}
-		rep.Fail(tgt.agent + " is installed but " + tgt.homeRel + " is missing (" + instructionsRemedy(sys.GOOS) + ")")
+		rep.Fail(tgt.agent + " is installed but " + tgt.homeRel + " is missing (run: dotf harness deploy)")
 		failed++
 	}
 	return failed
-}
-
-// instructionsRemedy names what deploys the instruction files on goos: the
-// records-harness reconciler covers linux and darwin, and Windows keeps its
-// setup-script copies until the Go deploy of these files ships (PLAT-001b).
-func instructionsRemedy(goos string) string {
-	if goos == "windows" {
-		return "re-run setup-windows.ps1"
-	}
-	return "run: dotf converge"
 }
 
 // Harness marker-region delimiters, owned by package harness (DeployedMatchesSource).
@@ -664,7 +654,7 @@ const (
 // BUG-058/#843 describes: the repo->mirror copy (`dotf harness mirror`, and the
 // setup-linux.sh bash block before it) is copy-only, so a record deleted from
 // the repo survives in the mirror forever and keeps failing
-// checkCompileHarnessDrift, which runs FROM the mirror. Per #802's decided
+// checkRecordDrift, which runs FROM the mirror. Per #802's decided
 // semantic (doctor --fix prunes; setup only copies/warns) — generated records
 // are prunable automatically here, unlike sensitive/*.secret.age.
 //
@@ -724,24 +714,29 @@ func checkHarnessMirrorOrphans(sys *System, cfg *Config, rep *Report, fix bool) 
 	}
 }
 
-// checkCompileHarnessDrift runs the compile-harness --check drift gate. It is
-// Linux-only: compile-harness.sh is the Linux generation engine, so on Windows
-// (which deploys committed records via Deploy-SkillRecord and has no --check
-// port yet — CLI-035) it SKIPs with the platform reason rather than the
-// misleading "not found" of a mirror that never holds the script (BUG-052).
-func checkCompileHarnessDrift(sys *System, cfg *Config, rep *Report) {
-	compile := filepath.Join(cfg.DotfilesDir, "scripts", "compile-harness.sh")
-	switch {
-	case sys.GOOS == "windows":
-		// CLI-035
-		rep.Skip("harness drift gate is Linux-only; Windows deploys committed records, no --check port yet")
-	case !isExecFile(compile):
-		rep.Skip("compile-harness.sh not found at " + compile)
-	default:
-		if _, err := sys.CommandOutput("bash", compile, "--check"); err == nil {
-			rep.Pass("harness blocks + skill records match their source-of-record (no drift)")
-		} else {
-			rep.Fail("harness/skill drift (run: compile-harness.sh --refresh, then re-deploy)")
+// checkRecordDrift runs the offline harness drift gate (`dotf harness check`)
+// in process, on every OS, against the deploy mirror: enforced-id coverage,
+// each target's GENERATED region, and each record's required frontmatter keys.
+// It replaced the Linux-only `compile-harness.sh --check` fork (CLI-026), which
+// skipped on Windows because the shell engine never ran there (CLI-035).
+func checkRecordDrift(cfg *Config, rep *Report) {
+	manifest := filepath.Join(cfg.DotfilesDir, filepath.FromSlash(harness.ManifestFile))
+	if !pathExists(manifest) {
+		rep.Skip("harness manifest not found at " + manifest)
+		return
+	}
+	report, err := harness.CheckDrift(cfg.DotfilesDir)
+	if err != nil {
+		rep.Fail("harness drift gate could not run: " + err.Error())
+		return
+	}
+	if !harness.HasDrift(report) {
+		rep.Pass("harness blocks + skill records match their source-of-record (no drift)")
+		return
+	}
+	for _, l := range report {
+		if l.Problem {
+			rep.Fail("harness drift: " + l.Text + " (run: dotf harness refresh in a worktree, then dotf harness deploy)")
 		}
 	}
 }

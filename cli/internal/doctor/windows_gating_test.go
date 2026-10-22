@@ -106,41 +106,33 @@ func TestSystemHas_ExtensionlessOnPath(t *testing.T) {
 	}
 }
 
-// The compile-harness drift gate is Linux-only. On Windows it SKIPs with the
-// platform reason; on Linux with the script absent it SKIPs with the not-found
-// reason; on Linux with a passing --check it PASSes. One case per branch.
-func TestCheckCompileHarnessDrift(t *testing.T) {
+// The harness drift gate runs in process on every OS, Windows included, against
+// the deploy mirror. One case per branch: no manifest, a manifest that does not
+// parse, a clean mirror, and a coverage gap.
+func TestCheckRecordDrift(t *testing.T) {
 	tests := []struct {
-		name       string
-		goos       string
-		withScript bool
-		checkOK    bool
-		status     Status
-		mustReport string
+		name, goos, manifest string
+		status               Status
+		mustReport           string
 	}{
-		{"windows → SKIP, Linux-only reason", "windows", false, false, StatusSkip, "Linux-only"},
-		{"linux, no script → SKIP, not found", "linux", false, false, StatusSkip, "not found"},
-		{"linux, script, --check clean → PASS", "linux", true, true, StatusPass, "no drift"},
-		{"linux, script, --check drift → FAIL", "linux", true, false, StatusFail, "drift"},
+		{"no manifest → SKIP", "linux", "", StatusSkip, "manifest not found"},
+		{"unparseable manifest → FAIL", "linux", "{", StatusFail, "could not run"},
+		{"windows, clean → PASS", "windows", `{"enforced":[],"targets":[]}`, StatusPass, "no drift"},
+		{"linux, a gap → FAIL", "linux", `{"enforced":[{"id":"rule"}],"doctrine":{"inject":[]}}`, StatusFail, "dotf harness deploy"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dotfiles := t.TempDir()
-			compile := filepath.Join(dotfiles, "scripts", "compile-harness.sh")
-			var cmdOut map[string]string
-			if tt.withScript {
-				writeExec(t, compile)
-				if tt.checkOK {
-					cmdOut = map[string]string{"bash " + compile + " --check": "ok"}
-				}
+			if tt.manifest != "" {
+				writeFile(t, filepath.Join(dotfiles, "harness", "manifest.json"), tt.manifest)
 			}
-			sys := newSys(nil, nil, cmdOut)
+			sys := newSys(nil, nil, nil)
 			sys.GOOS = tt.goos
 			var buf bytes.Buffer
 			rep := capture(&buf)
-			checkCompileHarnessDrift(sys, &Config{DotfilesDir: dotfiles}, rep)
-			if got := rep.totals[tt.status]; got != 1 {
-				t.Errorf("expected one %v; totals=%v\n%s", statusTag[tt.status], rep.totals, buf.String())
+			checkRecordDrift(&Config{DotfilesDir: dotfiles}, rep)
+			if got := rep.totals[tt.status]; got != 1 || rep.totals[StatusSkip]+rep.totals[StatusPass]+rep.totals[StatusFail] != 1 {
+				t.Errorf("expected exactly one %v; totals=%v\n%s", statusTag[tt.status], rep.totals, buf.String())
 			}
 			if !strings.Contains(buf.String(), tt.mustReport) {
 				t.Errorf("output should state %q; got:\n%s", tt.mustReport, buf.String())

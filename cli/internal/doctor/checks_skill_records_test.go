@@ -69,7 +69,7 @@ func TestCheckSkillRecordsAgainstVault(t *testing.T) {
 		if rep.Warnings() != 1 {
 			t.Fatalf("want 1 warning, got %d\n%s", rep.Warnings(), out)
 		}
-		for _, want := range []string{"skills/teardown", "compile-harness.sh --refresh"} {
+		for _, want := range []string{"skills/teardown", "dotf harness refresh"} {
 			if !strings.Contains(out, want) {
 				t.Errorf("want %q in the warning\n%s", want, out)
 			}
