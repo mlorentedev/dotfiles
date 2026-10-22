@@ -229,5 +229,5 @@ The fourth review (`review-round-4.md`, at `dee3fe4f`, nan/deepseek-v4-flash) re
 | F-2: the candidate lines interpolate the thread key and `--agent` raw | **Applied.** Both are one shell word: as written when plain (`[A-Za-z0-9_./@+-]`), single-quoted otherwise | `TestMemResumeQuotesTheCandidateLine`; quoting removed from either the key or the agent turns it red |
 | F-3: `proposal.md` AC boxes and the `tasks.md` Closing block unticked | **Carried** with F-1: AC2 and the slice 3 box depend on the chosen shape | n/a |
 | F-4: `features.json` states are `pending` | **Declined:** the states are harness-owned; the six commands exit 0, re-run by the reviewer | n/a |
-| F-5: promotion candidates unanswered | **Applied** above | n/a |
-| F-6: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Carried** with F-1: the criterion wording moves with the contract set | n/a |
+| F-5: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Carried** with F-1: the criterion wording moves with the contract set | n/a |
+| F-6: promotion candidates unanswered | **Applied** above | n/a |
