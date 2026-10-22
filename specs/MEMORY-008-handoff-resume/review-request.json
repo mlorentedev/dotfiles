@@ -1,7 +1,7 @@
 {
-  "reviewed_sha": "4f19d07d06799ba376fe888e29a07a303895d66f",
-  "reviewer": "nan/qwen3.8-flash",
-  "requested_at": "2026-10-22T06:32:34Z",
+  "reviewed_sha": "dee3fe4f31aeccdd7abeddd7e3d6bbc9b40fb60a",
+  "reviewer": "nan/deepseek-v4-flash",
+  "requested_at": "2026-10-22T08:33:59Z",
   "review_digest_before": "",
   "base_sha": "e1c5754c604c45fb8d236694bf7a2a916e80cfde",
   "contract_digests": {
