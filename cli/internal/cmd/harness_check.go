@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -16,10 +17,10 @@ import (
 var errHarnessDrift = errors.New("harness drift detected")
 
 // newHarnessCheckCmd is the offline drift gate: the Go form of
-// compile-harness.sh --check, which ci.yml and dotf doctor move onto once a
-// release carries it (CLI-026).
+// compile-harness.sh --check, which ci.yml and dotf doctor run (CLI-026).
 func newHarnessCheckCmd() *cobra.Command {
-	var repoRoot string
+	var repoRoot, vault string
+	var againstVault bool
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "Check the checkout's harness regions and records for drift, offline",
@@ -27,8 +28,12 @@ func newHarnessCheckCmd() *cobra.Command {
 			"reach every target file and the doctrine payload, or carry an opt_out reason\n" +
 			"for it. Each target's GENERATED region must equal the enforced records it\n" +
 			"injects. Each skill and agent record must open with frontmatter holding every\n" +
-			"key its schema requires. Any failure is printed on stderr and exits non-zero.",
-		Example:      "  dotf harness check\n  dotf harness check --repo-root /path/to/checkout",
+			"key its schema requires. Any failure is printed on stderr and exits non-zero.\n\n" +
+			"--against-vault also compares each skill and agent record with the vault source\n" +
+			"it was refreshed from, by the generated_sha it carries: a vault edit nobody\n" +
+			"refreshed, a source that is gone, or a record with no provenance is drift.\n" +
+			"It needs a vault, so it is not part of the offline check CI runs.",
+		Example:      "  dotf harness check\n  dotf harness check --repo-root /path/to/checkout\n  dotf harness check --against-vault",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -42,10 +47,21 @@ func newHarnessCheckCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if againstVault {
+				if vault == "" {
+					vault = env.ResolvePath("VAULT_PATH")
+				}
+				if fi, err := os.Stat(vault); vault == "" || err != nil || !fi.IsDir() {
+					return fmt.Errorf("--against-vault: no vault at %q — pass --vault or set VAULT_PATH", vault)
+				}
+				report = append(report, harness.CompareWithVault(repoRoot, vault).Lines()...)
+			}
 			return reportCheck(cmd.OutOrStdout(), cmd.ErrOrStderr(), report)
 		},
 	}
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "checkout holding harness/manifest.json (default: DOTFILES_REPO_DIR or the cwd walk-up)")
+	cmd.Flags().BoolVar(&againstVault, "against-vault", false, "also compare each skill and agent record with its vault source")
+	cmd.Flags().StringVar(&vault, "vault", "", "vault for --against-vault (default: $VAULT_PATH, then machine.json, then the env-contract default)")
 	return cmd
 }
 
