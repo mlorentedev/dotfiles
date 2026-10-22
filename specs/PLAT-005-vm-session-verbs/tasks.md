@@ -15,26 +15,46 @@ created: "2026-10-22"
 
 - [ ] Branch created from main: `feat/PLAT-005-vm-session-verbs`
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [ ] No open questions left in `proposal.md` "Risks / open questions" (one `[AGENT-SUGGESTION]` to accept or remove)
+- [x] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Three PRs, in order; each leaves `main` green. Every refusal test uses `noGuest(t)` (lesson 489).
+> Three stages and a PR 1 split into 1a to 1d to stay under the 300-LOC cap (pattern-git-workflow §10); each leaves `main` green on its own. Every refusal test uses `noGuest(t)` (lesson 489).
 
-### PR 1: the verbs, `run` recomposed, no behaviour change except the stream
+### PR 1a: the output split and the shared redaction primitive (no new verb)
 
-- [ ] [P] [AC9] Add `noGuest(t)` coverage for every new verb's refusals: failing test per verb, `go -C cli test ./internal/cmd/ -run TestVMVerbRefusals`
-- [ ] [P] [AC2] Failing test for the record shape and the status/exit/process-code table in `cli/internal/vm/session_test.go`
+- [ ] [P] [AC5] Failing test: progress and the guest's output are two writers; `==> ` goes to stderr
+- [ ] [AC5] Split `Options.Out`/`RunOptions.Out`; the tests that read the progress writer follow the stream
+- [ ] [AC7] Move `redactWriter` out of `cmd/secrets.go` into one package; its tests move with it, not rewritten, and `dotf secrets run` keeps passing
+- [ ] Own PR, never bundled: the redaction move is a security primitive
+
+### PR 1b: `Session`, `Record` and the Linux verbs
+
+- [ ] [P] [AC9] `noGuest(t)` coverage for every new verb's refusals: failing test per verb, `go -C cli test ./internal/cmd/ -run TestVMVerbRefusals`
+- [ ] [P] [AC2] Failing test for the record shape and the status, exit and process-code table in `cli/internal/vm/session_test.go`
 - [ ] [AC2] `Session` interface and `Record` type in `cli/internal/vm/session.go`; `--json` writes one record, empty lists are `[]`
-- [ ] [AC1] Linux session: `up --session` over Lima, name default `<os>-<unix time>`, `status` lists them
-- [ ] [AC1] Windows session: one fixed guest, a second `up` is `busy`, exit 2
-- [ ] [AC2] `exec` over `limactl shell` (argv, no shell) and `--script`; Windows over QGA and the scheduled task
-- [ ] [AC3] stdin forwarded on Linux; Windows refuses with `unsupported`, exit 2
-- [ ] [AC4] `cp` both ways: `limactl copy`; `QGA.WriteFile`/`ReadFile` in 48 KiB chunks; the isolation tests stay green
-- [ ] [AC5] Progress writer separate from the guest's output; `==> ` to stderr; the tests that read the progress writer follow the stream
-- [ ] [AC7] Failing test: a guest echoes the forwarded token; wire the shared redaction (`redactWriter` moved out of `cmd/secrets.go` into one package) onto the guest's stdout and stderr
-- [ ] [AC6] `run` composed of the verbs; the existing `run` tests pass unedited
-- [ ] Verb help states ADR-055's `--elevated` caveat; PR description names the stream move and lists the allow rules (#2859)
+- [ ] [AC1] Linux `up --session` over Lima (default name `<os>-<unix time>`); `status` lists what `limactl list` answers
+- [ ] [AC1] `up` on a name whose guest is gone: `stale`, exit 2, names `down`
+- [ ] [AC2] Linux `exec` over `limactl shell` (argv, no shell) and `--script`
+- [ ] [AC3] stdin forwarded on Linux
+- [ ] [AC7] `exec --secret <registry-id>`: resolve through the catalog, write on the guest's stdin like `withToken`, key the redaction; a guest that echoes it yields a masked record
+- [ ] [AC4] Linux `cp` both ways with `limactl copy`; the isolation tests stay green
+- [ ] [AC11] Linux `down`: no instance and no state; `no-session` exit 3 for an unknown name; `timeout` exits 1
+- [ ] Description names `stale` as an additive status value (no `version` bump, ADR-055 decision 7) and lists the allow rules (#2859)
+
+### PR 1c: the Windows verbs
+
+- [ ] [AC1] One fixed guest: a second `up` is `busy`; `up` and `status` share the `running` check of `vm/run.go`
+- [ ] [AC2] Windows `exec` over QGA and the scheduled task
+- [ ] [AC3] Windows refuses stdin with `unsupported`, exit 2
+- [ ] [AC4] Windows `cp` with `QGA.WriteFile`/`ReadFile` in 48 KiB chunks
+- [ ] [AC11] Windows `down`: no overlay and no state, `clean-base` untouched; `stale` cleaned by `down`
+- [ ] Verb help states ADR-055's `--elevated` caveat
+
+### PR 1d: `run` recomposed
+
+- [ ] [AC6] `run` composed of the verbs, with `--secret GITHUB_TOKEN`; the assertions of its tests are unchanged
+- [ ] [AC5] `run` writes progress where the verbs do; the description names the stream move as the one behaviour change
 
 ### PR 2: elevation and the guest prerequisites
 

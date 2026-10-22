@@ -1,8 +1,8 @@
 [
   {
     "id": "PLAT-005-vm-session-verbs-f1",
-    "behavior": "`up --session` creates a Linux session; a second Windows `up` is `busy` with exit 2",
-    "verification": "go -C cli test ./internal/vm/ -run 'TestSessionUp'",
+    "behavior": "`up --session` creates a Linux session; a second Windows `up` is `busy` (exit 2); a gone guest is `stale` (exit 2, names `down`); `status` follows the hypervisor",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestSessionUp|TestSessionStale|TestSessionStatus'",
     "state": "pending",
     "evidence": ""
   },
@@ -36,14 +36,14 @@
   },
   {
     "id": "PLAT-005-vm-session-verbs-f6",
-    "behavior": "`run` composed of the verbs; its existing tests pass unedited",
+    "behavior": "`run` composed of the verbs; the assertions of its existing tests are unchanged",
     "verification": "go -C cli test ./internal/vm/ ./internal/cmd/ -run 'TestRun|TestVerify'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "PLAT-005-vm-session-verbs-f7",
-    "behavior": "a guest that echoes the forwarded token yields a masked record and masked plain stdout",
+    "behavior": "a guest that echoes a value `exec --secret` forwarded yields a masked record and masked plain stdout",
     "verification": "go -C cli test ./internal/vm/ -run 'TestExecRedactsForwardedValues'",
     "state": "pending",
     "evidence": ""
@@ -66,6 +66,13 @@
     "id": "PLAT-005-vm-session-verbs-f10",
     "behavior": "the Windows sshd -T fixture holds the proof and the guest acceptance converges twice at changed 0",
     "verification": "go -C cli test ./internal/sshtarget/ -run 'CheckEffective'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f11",
+    "behavior": "`down` leaves no instance, overlay or state and never touches clean-base; an unknown name is `no-session` (exit 3); a timeout exits 1",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestSessionDown|TestSessionNoSession'",
     "state": "pending",
     "evidence": ""
   }
