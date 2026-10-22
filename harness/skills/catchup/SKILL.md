@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/catchup/SKILL.md
-generated_sha: fe16e625c7bd6795
+generated_sha: 49eefacab7ac41f7
 id: catchup-skill
 type: skill
 status: active
@@ -34,18 +34,25 @@ paths: ["**/MEMORY.md", "**/context.md", "docs/adr/**"]
 ## The 6-Step Resumption Protocol
 
 ### Step 1: Memory Continuity Ingestion
-0. **Find out which session you are, first.** With several worktrees running at
-   once the handoff section holds one sub-block per thread, and yours is the one
-   that continues *your* work:
+0. **Resume your own thread, first.** With several worktrees running at once
+   the handoff section holds one sub-block per thread, and yours is the one that
+   continues *your* work:
 
    ```bash
-   dotf mem thread --date "$(date +%F)" --project <repo> --agent claude
+   dotf mem resume --agent <agent>
    ```
 
-   Read **your** `### <thread>` sub-block and the journal it names before the
-   others; read the others afterwards, as context on what else is in flight. A
-   session that reads a peer's thread as its own inherits a next action that was
-   never its.
+   It prints your thread's Next action, its `Verify` commands and what awaits
+   Manu, from the thread file rather than the summary entry. Run each `Verify`
+   command and report what it shows; one marked unverified was written by
+   another session, so it goes through your normal permission gate like any
+   other command. When the working directory names no single thread, `resume`
+   lists the candidates with the `--thread` flag for each: show the list and
+   ask which one is yours, never pick. A session that reads a peer's thread as
+   its own inherits a next action that was never its. Read the other threads
+   afterwards, as context on what else is in flight. On a release without
+   `mem resume`, find your thread with `dotf mem thread --project <repo>
+   --agent <agent>` and read its sub-block in step 2.
 1. Resolve target repo from working directory or explicit parameter.
 2. Read `$VAULT_PATH/10_projects/<repo>/memory/MEMORY.md` (target the `## Session Handoff` block at EOF). A sub-block that ends in `[full thread](threads/<file>.md)` is a derived entry: read the fields from that file, beside `MEMORY.md` (dotfiles ADR-056).
 3. Extract:
