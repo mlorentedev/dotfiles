@@ -71,7 +71,9 @@ ADR-042's classes place each piece. No new rule is needed.
 - **R4: `vars.PR_AGENT_PROVIDER` in a called workflow** is not asserted. It becomes a smoke row on hive's first run, and an input if that row fails.
 - **R5: owner actions.**
   - Create the repository: `gh repo create mlorentedev/ci-workflows --public`.
-  - Decide whether hive gets `PR_AGENT_ANTHROPIC_API_KEY` (a cost decision). Without the key, hive draws over NaN only, and AC5's Haiku clause cannot be observed.
+  - **Decided 2026-10-22: hive gets `PR_AGENT_ANTHROPIC_API_KEY`.** The owner judged that the Console budget has room, and that the pool is meant to be common to every repository. The key is delivered as #2508 delivered kubelab's: `ci:mlorentedev/hive` is added to the consumers in `secrets/registry.yaml` once PR-C is open, and the owner then runs `dotf secrets sync ci`. A key synced weeks before anything reads it only widens the surface. hive's spend joins the #2215 measurement.
+  - **Other repositories.** Each one that adopts the workflow in D6 is declared the same way, and the ci-workflows caller template lists that step.
+  - **Out of scope here.** kubelab's forge stays NaN-only until its volume is measured (the 2026-10-18 condition).
 
 ## Acceptance criteria
 

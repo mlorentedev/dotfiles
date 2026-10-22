@@ -74,7 +74,7 @@ created: "2026-10-21"
 - [ ] [AC4] `actions/push-gate`: the composite runs `dotf pr gate` and fails the step on error. Test first.
 - [ ] [AC4] [AC6] Inputs `declare_unreviewed` and `skip_branch_prefixes`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:411-640, 485-527`) ported as bats
 - [ ] [AC6] Add caller fixtures `tests/fixtures/callers/{kubelab,dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface
-- [ ] C: README (inputs, secrets, caller template, pinning rule) and a CI workflow (bats and actionlint); tag `v0.1.0`
+- [ ] C: README (inputs, secrets, caller template with the `ci:` consumer step in dotfiles `secrets/registry.yaml` and `dotf secrets sync ci`, pinning rule) and a CI workflow (bats and actionlint); tag `v0.1.0`
 
 ### C/D. H: pilot
 
@@ -83,7 +83,7 @@ created: "2026-10-21"
   - The caller owns triggers, permissions and concurrency.
   - A pin-shape test is added.
 - [ ] [AC5] On one PR, both jobs run, and the summary names the member, the pool source and the dotf version
-- [ ] Owner: `dotf secrets sync ci` for `PR_AGENT_ANTHROPIC_API_KEY` to hive (R5)
+- [ ] D: once PR-C is open, add `ci:mlorentedev/hive` to the consumers of `PR_AGENT_ANTHROPIC_API_KEY` in `secrets/registry.yaml`, with its bats test, in the shape of #2508. The owner then runs `dotf secrets sync ci` (R5).
 - [ ] [AC5] Tabulate seven days of runs in `verification.md`
 - [ ] [AC5] H PR-D: remove the old job. Record that `review` is not a required check (`gh api repos/mlorentedev/hive/branches/master/protection`).
 
