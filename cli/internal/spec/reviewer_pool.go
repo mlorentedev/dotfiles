@@ -13,12 +13,23 @@ import (
 // a review.md (HARNESS-071, #955).
 const ReviewerPoolFile = "harness/reviewer-pool.json"
 
-// reviewerPool is the file's shape. `id` is what the GATE matches on; the
-// runner/provider/model fields are what the LAUNCHER needs. The `why` prose is
-// for humans and is deliberately not parsed, so editorial changes to it can
-// never break either consumer.
-type reviewerPool struct {
-	Pool []ReviewerEntry `json:"pool"`
+// ReviewerPool is the file's shape. `id` is what the GATE matches on; the
+// runner/provider/model fields are what the LAUNCHER needs; the `pr_agent`
+// blocks and `pr_agent_risk` are what the CI review route draws from. The `why`
+// prose is for humans and is deliberately not parsed, so editorial changes to
+// it can never break any consumer.
+type ReviewerPool struct {
+	Pool        []ReviewerEntry `json:"pool"`
+	PRAgentRisk *PRAgentRisk    `json:"pr_agent_risk,omitempty"`
+}
+
+// PRAgentRisk is the line past which a PR reviews first on the `route: risk`
+// member: additions plus deletions at or above MinChangedLines, or the label.
+// MinChangedLines is a pointer so an absent line is not read as 0, which every
+// PR would reach.
+type PRAgentRisk struct {
+	MinChangedLines *int   `json:"min_changed_lines,omitempty"`
+	Label           string `json:"label,omitempty"`
 }
 
 // LoadReviewerPoolEntries returns the full pool, in file order, for callers that
@@ -110,23 +121,34 @@ func loadReviewerPoolEntries(repoRoot string) ([]ReviewerEntry, error) {
 		return nil, fmt.Errorf("%s exists but could not be read: %w", ReviewerPoolFile, err)
 	}
 
-	var p reviewerPool
+	p, pErr := ParseReviewerPool(raw, ReviewerPoolFile)
+	if pErr != nil {
+		return nil, pErr
+	}
+	return p.Pool, nil
+}
+
+// ParseReviewerPool is the one validator of a pool document, whoever reads it:
+// the gate, the launcher and the CI review route. source names the document in
+// every message, so a pool read from a path says which one.
+func ParseReviewerPool(raw []byte, source string) (ReviewerPool, error) {
+	var p ReviewerPool
 	if jErr := json.Unmarshal(raw, &p); jErr != nil {
-		return nil, fmt.Errorf("%s is not valid JSON: %w", ReviewerPoolFile, jErr)
+		return ReviewerPool{}, fmt.Errorf("%s is not valid JSON: %w", source, jErr)
 	}
 
 	for i, entry := range p.Pool {
 		if strings.TrimSpace(entry.ID) == "" {
-			return nil, fmt.Errorf("%s entry %d has a blank id", ReviewerPoolFile, i)
+			return ReviewerPool{}, fmt.Errorf("%s entry %d has a blank id", source, i)
 		}
 		if vErr := validateSigns(entry); vErr != nil {
-			return nil, fmt.Errorf("%s: %w", ReviewerPoolFile, vErr)
+			return ReviewerPool{}, fmt.Errorf("%s: %w", source, vErr)
 		}
 	}
 	if len(p.Pool) == 0 {
-		return nil, fmt.Errorf("%s declares an empty pool — remove the file to disable the check, or list the models allowed to review", ReviewerPoolFile)
+		return ReviewerPool{}, fmt.Errorf("%s declares an empty pool — remove the file to disable the check, or list the models allowed to review", source)
 	}
-	return p.Pool, nil
+	return p, nil
 }
 
 // checkReviewerPool refuses a review signed by a model outside the pool.
