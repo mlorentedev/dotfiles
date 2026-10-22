@@ -203,3 +203,19 @@ The second review (`review-round-2.md`, at `2e8777c6`, nan/deepseek-v4-flash) re
 
 Mutations: dropping the `As written` line and dropping the lowercase both turn `go test ./internal/mem` red.
 
+### Review round 3 (FAIL) and its fixes
+
+The third review (`review-round-3.md`, at `4f19d07d`, nan/qwen3.8-flash) returned FAIL on three REAL Majors, two of them against the round-1 allowlist. Three rounds kept finding holes in the "verified read-only" claim because each fix defended it at a narrower point than the shell acts on. This round moves the claim to where it is decidable instead (lesson 513, amended).
+
+| Finding | Disposition | Test |
+|---|---|---|
+| F-1: `go test ${IFS}-exec=/tmp/evil` rendered as verified | **Applied.** A command is read-only only if it is a listed prefix followed by plain words: characters `[A-Za-z0-9_./ -]`, no word starting with `-`, no absolute path or `..` segment. Such a string holds no shell metacharacter, so the shell splits it where `strings.Fields` does. `codeRunners`, `writesFile` and `shellControl` are gone, subsumed | `TestReadOnlyCommand`: `${IFS}-exec=`, quoted `'-exec='`, `HEAD:secrets/x`, a tab |
+| F-2: `dotf doctor --fix` and `gh pr view 1 --web` rendered as read-only | **Applied** by the same rule: every flag renders unverified. Accepted cost: `go test ./... -run X`, `gh pr view 1 --json state` and `git diff main -- x.go` render unverified too; the permission gate still runs them. Getting flags back means a real shell parser as a dependency and an ADR | `TestReadOnlyCommand`: both inputs, and the formerly-true flag rows flipped |
+| F-3: `As written:` kept only the field's first line, and repeated a marked command unmarked | **Applied.** The field renders once, as written, every line kept, with `(unverified)` placed right after each command that fails the check; the explanation appears once in the heading line, only when something is marked | `TestResumeKeepsVerifyProseBesideTheCommands`: one line, two lines, bullets with a prose-only bullet; the note and the markers must agree |
+| Minor: `handoff_resume` undeclared in `session-start-config.json` | **Ticketed**, #2915 (open) | n/a |
+| Question: live `source=compact` payload unobserved | **Kept open**, as in round 2 | n/a |
+| Minor: contract-set boxes unticked, "about 350 B" | **Carried** to the archive PR | n/a |
+| Speculative: uncapped resume | **Declined**, as in round 2 | n/a |
+
+Mutations, each applied with `go vet` passing, all turn `go test ./internal/mem` red: the charset check removed, flags allowed, the field cut to its first line, the marker removed, a `..` segment allowed.
+
