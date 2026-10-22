@@ -96,6 +96,23 @@ func TestReadOnlyCommand(t *testing.T) {
 		"git diff main -- x.go":         true,
 		"cat ~/.config/secrets.env":     false,
 		"grep -r token ~":               false,
+		// The code runners take only flags that neither name a program nor an
+		// output, and paths inside the checkout (MEMORY-008 review, F-A).
+		"go test -exec=/tmp/evil-shim ./...":             false,
+		"go test -exec /tmp/shim ./...":                  false,
+		"go test --outputdir=/tmp/x ./...":               false,
+		"go test -cpuprofile cpu.out ./x":                false,
+		"go test -toolexec=x ./...":                      false,
+		"go vet -vettool=/tmp/x ./...":                   false,
+		"bats /tmp/evil.bats":                            false,
+		"bats ../outside.bats":                           false,
+		"bats --formatter /tmp/f tests/x.bats":           false,
+		"shellcheck ~/x.sh":                              false,
+		"go test ./... -run '^TestX$' -count=1 -v":       true,
+		"go test ./internal/mem ./internal/cmd -count=1": true,
+		"go vet ./...":                                   true,
+		"bats tests/x.bats --filter 'under 8000'":        true,
+		"shellcheck scripts/a.sh":                        true,
 	} {
 		if got := readOnlyCommand(cmd); got != want {
 			t.Errorf("readOnlyCommand(%q) = %v, want %v", cmd, got, want)
@@ -109,13 +126,19 @@ func TestResumeListsCandidatesWhenTheThreadIsAmbiguous(t *testing.T) {
 	doc := "# M\n\n## Session Handoff\n\n" +
 		"### thread: master@msi (writer: pi)\n\n**Next action:** pi's.\n\n" +
 		"### thread: feat-a (writer: claude)\n\n**Next action:** a.\n\n" +
-		"### thread: feat-b\n\n**Next action:** b.\n"
+		"### thread: feat-b\n\n**Next action:** b.\n\n" +
+		"### thread: feat-j\n\n**Next action:** pi's step.<br>\nJournal: sessions/2026-10-20-dotfiles-pi-feat-j.md\n"
 	for _, tc := range []struct {
 		key, agent, want string
 	}{
 		{"feat-a", "claude", "feat-a"},
 		{"feat-b", "claude", "feat-b"}, // unstamped: nothing says it is another's
 		{"feat-b", "", "feat-b"},
+		// Owned by its journal, as threadOwner reads it: not claude's (F-B).
+		{"feat-j", "claude", ""},
+		{"feat-j", "pi", "feat-j"},
+		// An owned thread is not handed to a caller that names no agent (F-C).
+		{"feat-a", "", ""},
 		{"master@msi", "pi", "master@msi"},
 		{"master@msi", "claude", ""}, // pi's, and claude has no fork of it
 		{"feat-none", "claude", ""},
@@ -124,7 +147,7 @@ func TestResumeListsCandidatesWhenTheThreadIsAmbiguous(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("%s as %q: chose %q, want %q", tc.key, tc.agent, got, tc.want)
 		}
-		if tc.want == "" && strings.Join(candidates, ",") != "master@msi,feat-a,feat-b" {
+		if tc.want == "" && strings.Join(candidates, ",") != "master@msi,feat-a,feat-b,feat-j" {
 			t.Errorf("%s as %q: candidates %v, want every thread in order", tc.key, tc.agent, candidates)
 		}
 	}
@@ -146,12 +169,55 @@ func TestThreadTextForKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc := "## Session Handoff\n\n### thread: feat-a\n\n**Next action:** a.<br>\n[full thread](threads/feat-a.md)\n\n### thread: feat-b\n\n**Next action:** b.\n"
-	text, source := ThreadText(doc, "feat-a", dir)
+	memory := filepath.Join(dir, "memory2.md") // not MEMORY.md: the source is the file read (F-D)
+	text, source := ThreadText(doc, "feat-a", memory)
 	if !strings.Contains(text, "only in the file") || source != filepath.Join(dir, "threads", "feat-a.md") {
 		t.Errorf("feat-a read %q from %q", text, source)
 	}
-	text, source = ThreadText(doc, "feat-b", dir)
-	if !strings.Contains(text, "**Next action:** b.") || source != filepath.Join(dir, "MEMORY.md") {
+	text, source = ThreadText(doc, "feat-b", memory)
+	if !strings.Contains(text, "**Next action:** b.") || source != memory {
 		t.Errorf("feat-b read %q from %q", text, source)
+	}
+}
+
+// A one-item list renders under its label like a longer one, not glued to the
+// label line (MEMORY-008 review, F-G).
+func TestResumeRendersAOneItemListAsABlock(t *testing.T) {
+	text := "### thread: feat-a\n\n**Next action:** x.<br>\n**Awaiting Manu:**\n- A or B on #1\n"
+	out, err := RenderResume(text, "src", "context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "**Awaiting Manu:**\n- A or B on #1") {
+		t.Errorf("a one-item list is not a block:\n%s", out)
+	}
+}
+
+// A Verify field's prose is part of the record: a caveat written beside the
+// commands survives the render in both formats (MEMORY-008 review round 2).
+func TestResumeKeepsVerifyProseBesideTheCommands(t *testing.T) {
+	text := "### thread: feat-a\n\n**Next action:** x.<br>\n**Verify:** do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` only after review.<br>\n"
+	for _, format := range []string{"context", "prompt"} {
+		out, err := RenderResume(text, "src", format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"do NOT run this on mba", "only after review", "- `go test ./...`", "- `rm -rf /tmp/x` (unverified"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s lacks %q:\n%s", format, want, out)
+			}
+		}
+	}
+	// A field of commands alone renders no prose line.
+	out, _ := RenderResume("### thread: feat-a\n\n**Verify:** `git status`, `dotf spec audit`<br>\n", "src", "context")
+	if strings.Contains(out, "As written") {
+		t.Errorf("a field of commands alone grew a prose line:\n%s", out)
+	}
+}
+
+// A source is matched as a harness may spell it (MEMORY-008 review round 2).
+func TestSessionStartResumeNormalisesTheSource(t *testing.T) {
+	if got, want := normaliseSource(" Compact\n"), "compact"; got != want {
+		t.Errorf("normaliseSource = %q, want %q", got, want)
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
 
 // AddOptions configures the creation of a new worktree.
@@ -23,8 +25,13 @@ type AddOptions struct {
 	// branch (AddRunner.DefaultBase), never the caller's HEAD.
 	BaseRef string
 	Issue   int
-	TTL     time.Duration
-	Creator string
+	// ShareIssue adds a worktree for Issue although another live lease holds it.
+	ShareIssue bool
+	TTL        time.Duration
+	Creator    string
+	// LockPath and LockTimeout default to DefaultLockPath and a minute.
+	LockPath    string
+	LockTimeout time.Duration
 }
 
 // AddRunner executes the low-level git worktree creation.
@@ -38,9 +45,14 @@ type AddRunner interface {
 	// WorktreeAttach checks out an existing branch at target. With remote set,
 	// it creates the local branch of the same name tracking remote's.
 	WorktreeAttach(repo, target, branch, remote string) error
+	WorktreeListPorcelain(repo string) (string, error)
 }
 
 type RealAddRunner struct{}
+
+func (r *RealAddRunner) WorktreeListPorcelain(repo string) (string, error) {
+	return (&RealGitRunner{}).WorktreeListPorcelain(repo)
+}
 
 // remoteBaseRefs is the order the remote's default branch is looked for in:
 // origin/HEAD where the clone recorded it, else main, else master (the vault).
@@ -209,6 +221,14 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 	}
 
 	branchName, ttl, creator := resolveAddDefaults(opts)
+	unlock, err := lockIssueClaim(opts)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	if err := refuseHeldIssue(opts, runner, now); err != nil {
+		return nil, err
+	}
 	// A branch that already exists is attached under its own name: the shape
 	// rule gates the branches add creates, and a bot's release or dependabot
 	// branch is not one of them (#2822). Only the directory is slugified.
@@ -262,6 +282,52 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		Metadata: &meta,
 		State:    StateActive,
 	}, nil
+}
+
+// lockIssueClaim holds the worktree lock from the held-issue scan until the
+// lease is saved, so two adds for one issue cannot both pass the scan.
+func lockIssueClaim(opts AddOptions) (func(), error) {
+	if opts.Issue == 0 || opts.ShareIssue {
+		return func() {}, nil
+	}
+	path, timeout := opts.LockPath, opts.LockTimeout
+	if path == "" {
+		path = DefaultLockPath()
+	}
+	if timeout <= 0 {
+		timeout = time.Minute
+	}
+	unlock, err := filelock.Lock(path, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("another worktree operation holds the lock, so #%d cannot be checked: %w", opts.Issue, err)
+	}
+	return unlock, nil
+}
+
+// refuseHeldIssue stops a second session on one machine from taking an issue
+// a live worktree lease already holds: the assignee and the claim comment are
+// the same GitHub user for every session, the lease is not (#2877).
+func refuseHeldIssue(opts AddOptions, runner AddRunner, now time.Time) error {
+	if opts.Issue == 0 || opts.ShareIssue {
+		return nil
+	}
+	var raws []RawWorktree
+	out, err := runner.WorktreeListPorcelain(opts.RepoRoot)
+	if err == nil {
+		raws, err = ParsePorcelain(out)
+	}
+	if err != nil {
+		return fmt.Errorf("cannot check whether another worktree holds #%d (%w): pass --share-issue to skip the check", opts.Issue, err)
+	}
+	for _, raw := range raws {
+		meta, err := LoadMetadata(raw.Path)
+		if err != nil || meta == nil || meta.Issue != opts.Issue || !now.Before(meta.LeaseExpiresAt) {
+			continue
+		}
+		return fmt.Errorf("#%d is held by the worktree at %s (branch %s) until %s: work there, or pass --share-issue for a second worktree on it",
+			opts.Issue, raw.Path, raw.Branch, meta.LeaseExpiresAt.Format(time.RFC3339))
+	}
+	return nil
 }
 
 // createBranch starts branch from opts.BaseRef, or from origin's default branch.

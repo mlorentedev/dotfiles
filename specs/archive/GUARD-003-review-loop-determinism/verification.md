@@ -22,16 +22,25 @@ otherwise.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: see "Closing checks" (bats 83/83, shellcheck and `bash -n` exit 0) and "T13 and T14" (`go test ./...` ok, golangci-lint 0 issues, bats 182/182). The round-2 review reproduced both at `a97495e8`: 46 Go packages ok, 83/83 bats.
+- Manual smoke test: the live runs in "T12" (the `/review` path reaching the gate) and "AC1" (the reviewer finishing wakes the gate).
+- No regressions in existing test suite: yes, none.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
+- The PR number crosses from `pr-agent` to the gate as an artifact, trusted only for `issue_comment` runs, which always execute the default branch's workflow (T11, lesson 502).
+- An absent `triage.standing` defaults to `OWNER, MEMBER, COLLABORATOR` instead of being refused, because thirteen repositories carry hand-ported registries (T13, lesson 509).
 
--
--
+## Round-2 review dispositions (PASS-WITH-GAPS)
+
+| Finding | Disposition |
+|---|---|
+| F1: `dotf spec digest` is missing from the released CLI | Resolved by release: #2875 (`d8d76274`) is on main and ships in 0.77.0 |
+| F2: a triage posted as a review body never counts | Ticketed: #2896 |
+| F3: the skill does not say who may write the record | Ticketed: #2896 |
+| F4: `merge-grant.yml` holds an unguarded spelling of the marker | Ticketed: #2896 |
+| F5: template stubs in this file | Applied: filled above |
+| F6: the review base predates ~2000 merges | Out of scope: #1551, with this spec's measurement |
 
 ## Promotion candidates
 
@@ -43,10 +52,10 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/GUARD-003-review-loop-determinism/` -> `specs/archive/GUARD-003-review-loop-determinism/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/GUARD-003-review-loop-determinism/` -> `specs/archive/GUARD-003-review-loop-determinism/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 
 ## Session evidence — the trigger (T1, T2)
@@ -290,3 +299,44 @@ The run was **cancelled** at 15:01:03 without publishing a review. It was not ca
 - `bats tests/check-review-attestation.bats tests/review-attestation-workflow.bats`: 83/83 ok.
 - AC3's failure mode, observed: with the classifier's final `exit 1` (line 437) mutated to `exit 0`, so that every declined or pending verdict passes, `check-review-attestation.bats` fails 21 cases. The mutation was confirmed applied by checksum and then reverted. AC1, AC2 and AC4 are covered live (above), and AC5 and T11 by their mutation tables.
 - PRs referencing this spec folder: #1056, #1185, #2209, #2848, #2855.
+
+## T13 and T14: who may write the triage record (#2870)
+
+From the independent review's FAIL (F1, F2). A triage record counts only when
+its author's `author_association` is in `triage.standing`. The registry
+declares `OWNER, MEMBER, COLLABORATOR`, the set `pr-agent.yml` trusts to ask
+for a review. A ported registry without the key takes the same set from the
+code; an explicit empty list is refused (lesson 509).
+
+Live check that the predicate does not lock out the real writer: the
+`## Review triage` comment on #2855 (6319957885) reads `author_association`
+`OWNER`, and the `coderabbitai[bot]` and `github-actions[bot]` comments there
+read `NONE`.
+
+Red before the fix: `TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue`
+failed for `NONE`, `CONTRIBUTOR`, `FIRST_TIMER` and the empty association
+("a \"NONE\" triage record cleared the queue: triaged"), and
+`TestTheRealRegistryDeclaresTheDefaultStanding` failed on the registry without
+the key.
+
+Mutations, each checked to have changed the file (sha256 prefix before -> after),
+then restored:
+
+| Mutation | File | Checksum | Guard | Result |
+|---|---|---|---|---|
+| standing predicate removed from `lastTriage` | prtriage.go | 80b2f9598966 -> ccc3a964c7ff | AnUndeclaredAuthor test | exit 1 |
+| empty association counts as standing | prtriage.go | 80b2f9598966 -> c248f73b6aa8 | AnUndeclaredAuthor test | exit 1 |
+| fetch drops `author_association` | fetch.go | 48e77ffebc47 -> c3d77ecb4885 | package tests | exit 1 |
+| explicit empty `standing` accepted | prtriage.go | 80b2f9598966 -> b8c956e7949f | ParseRegistryStanding | exit 1 |
+| absent `standing` not defaulted | prtriage.go | 80b2f9598966 -> bc2fa8d71f00 | ParseRegistryStanding | exit 1 |
+| registry drops COLLABORATOR | review-attestation.json | c59e029981e9 -> 5dda3e9eef5a | TheRealRegistryDeclaresTheDefaultStanding | exit 1 |
+| registry drops COLLABORATOR | review-attestation.json | c59e029981e9 -> 5dda3e9eef5a | bats: who may ask … record its triage | exit 1 |
+| runbook spells `## Review Triage` | release-dotf.md | aa706f1e51a5 -> fc0b297bc92c | bats: every writer … spells the registry's marker | exit 1 |
+| a drifted spelling next to a correct mention | guide-pr-agent-reviewer.md | cb8a2e79c92d -> 1b87f67b42b2 | same guard, tightened after PR-Agent's review of #2886 | exit 1 |
+| skill template loses its line-start heading | pr-review-triage/SKILL.md | c2d6bf794d85 -> d552af58a95d | same guard | exit 1 |
+
+Checks on the final tree: `go build ./...`, `go vet ./...`,
+`GOOS=windows go vet ./...` clean; `go test -count=1 ./...` all ok;
+golangci-lint v2.12.2 (the pin, after `cache clean`) 0 issues; bats over
+check-review-attestation, dependabot-ci, pr-agent-config,
+pr-agent-publish-guard, triggers-registry and stub-real-pairing: 182/182.

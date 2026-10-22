@@ -28,8 +28,8 @@ func harnessEnv(t *testing.T) Env {
 	return Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
 }
 
-// deployingRunner stands in for compile-harness.sh --deploy: it copies each
-// source and appends a presence region, the shape the real script leaves.
+// deployingRunner stands in for the harness deploy: it copies each source and
+// appends a presence region, the shape harness.Deploy leaves.
 func deployingRunner(t *testing.T) func(Env) error {
 	return func(env Env) error {
 		for src, dst := range map[string]string{
@@ -62,7 +62,7 @@ func TestRecordsHarness_PlanCountsMissingInstructionFilesAndWritesNothing(t *tes
 		t.Errorf("want claude and opencode to deploy (copilot is not installed), got %d: %s", plan.Changes, plan.Detail)
 	}
 	if ran {
-		t.Error("a plan ran compile-harness.sh")
+		t.Error("a plan ran the deploy")
 	}
 	if entries, _ := os.ReadDir(env.Home); len(entries) != 0 {
 		t.Errorf("a plan wrote into HOME: %v", entries)
@@ -100,9 +100,9 @@ func TestRecordsHarness_ProbeFailsWhenTheDeployLeftAFileOut(t *testing.T) {
 
 func TestRecordsHarness_ARunnerFailureFailsTheApply(t *testing.T) {
 	env := harnessEnv(t)
-	r := recordsHarness{run: func(Env) error { return errors.New("compile-harness.sh exited 2") }, has: noCommands}
+	r := recordsHarness{run: func(Env) error { return errors.New("harness deploy failed") }, has: noCommands}
 
-	if _, err := r.Reconcile(env, false); err == nil || !strings.Contains(err.Error(), "exited 2") {
+	if _, err := r.Reconcile(env, false); err == nil || !strings.Contains(err.Error(), "harness deploy failed") {
 		t.Fatalf("want the runner's error, got %v", err)
 	}
 }
@@ -182,7 +182,7 @@ func presenceEnv(t *testing.T) Env {
 }
 
 // copyingRunner deploys the claude instruction file verbatim and, when
-// withPresence is set, injects the roster the way compile-harness.sh does.
+// withPresence is set, injects the roster the way harness.Deploy does.
 func copyingRunner(t *testing.T, withPresence bool) func(Env) error {
 	return func(env Env) error {
 		body, err := os.ReadFile(filepath.Join(env.RepoRoot, "ai/claude/CLAUDE.md"))
@@ -241,5 +241,29 @@ func TestRecordsHarness_ARefreshedSourceRegionIsPlannedAndFailsTheProbe(t *testi
 	}
 	if err := r.Probe(env); err == nil {
 		t.Fatal("the probe passed on a stale source region")
+	}
+}
+
+// The production runner is the Go deploy, not a script: an apply on the real
+// checkout leaves every instruction file the probe asks for, and a second plan
+// finds nothing to change. The plan asks PATH, as HarnessDeploy does, so the two
+// agree on which agents are installed on whatever machine runs the test.
+func TestRecordsHarness_TheGoDeployConvergesTheRealCheckout(t *testing.T) {
+	repo, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
+	r := recordsHarness{run: HarnessDeploy, has: onPath}
+
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Fatalf("probe after the Go deploy: %v", err)
+	}
+	again, err := r.Reconcile(env, true)
+	if err != nil || again.Changes != 0 {
+		t.Errorf("second plan: want 0 changes, got %d (%v): %s", again.Changes, err, again.Detail)
 	}
 }

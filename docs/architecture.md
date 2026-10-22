@@ -24,9 +24,9 @@
 | `sensitive/` | age-encrypted secrets (`*.secret.age`); var mapping in `secrets/registry.yaml` |
 | `specs/` | Active per-feature SDD specs; closed ones move to `specs/archive/` |
 | `ssh/` | SSH client config + public key (deployed by setup) |
-| `systemd/` | systemd user units (self-update + hive-upgrade timers, Linux) |
+| `systemd/` | systemd drop-ins for units other tools own (`hive.service.d`, Linux) |
 | `tests/` | bats (shell) + Pester (PowerShell) suites; structural guards (`agents-md.bats`, `architecture-md.bats`) |
-| `windows/` | Windows-only assets without a Linux twin (e.g. `hive-upgrade.ps1`) |
+| `windows/` | Windows-only assets without a Linux twin (e.g. `hive-serve-supervisor.ps1`) |
 | `.zsh/` | zsh config modules (aliases, functions, nvm) sourced by `.zshrc` |
 | `.github/` | CI workflows (lint, test matrix, integration, cli, spec-gate, bitácora) |
 | `.claude/` | Repo-local Claude Code settings |

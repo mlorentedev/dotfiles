@@ -72,12 +72,84 @@ $ LC_ALL=C grep -nP '[^\x00-\x7F]' windows/hive-upgrade.ps1
 
 > **Do not verify against the deployed copy.** `~/.claude/scripts/hive-upgrade.ps1` is deployed from `windows/hive-upgrade.ps1` by setup. Re-deploy (or invoke the SSOT directly) before treating B5 as flipped, or a stale copy will read as a pass.
 
+### PR5: the timer deletion (#2857), 2026-10-21
+
+```
+$ bats tests/hive-daemon-gate.bats        # red: the guard copied onto d233110d^, before the deletion
+not ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+#   `[ "$status" -eq 1 ]' failed
+$ bats tests/hive-daemon-gate.bats        # the same guard with setup-linux.sh moved away: grep exits 2
+not ok 1 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+
+$ bats tests/hive-daemon-gate.bats        # green, head
+ok 1 parity: both setups probe hive's version through dotf tools version, not uv tool list (AI-034, #791)
+ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+
+$ dotf lint powershell          -> exit 0
+$ bash -n setup-linux.sh; echo "bash -n exit=$?"; zsh -n setup-linux.sh; echo "zsh -n exit=$?"
+bash -n exit=0
+zsh -n exit=0
+
+# every bats file that names a changed path, run under bash so the list splits
+$ bash -c 'files=$(for p in $(git diff --name-only origin/main...HEAD); do git grep -l "$(basename $p)" -- "tests/*.bats"; done | sort -u); bats $files > out.txt 2>&1; echo "exit=$?"; head -1 out.txt; grep -c "^not ok" out.txt'
+exit=0
+1..840
+0
+```
+
+Those 840 tests in 50 files pass. That is the repo half of AC9: nothing installs a timer any more. The machine half is the `hive-upgrade-retire` converge step:
+
+```
+$ go test ./internal/converge/ -run HiveUpgradeRetire   -> ok (7 tests)
+$ go test ./... && go vet ./... && GOOS=windows go vet ./...   -> ok
+$ golangci-lint run ./internal/converge/...   -> 0 issues
+```
+
+The tests run against a fake scheduler. The live proof is two runs on msi (Linux) and on the work-lab box (Windows, elevated), after a release carrying the step; both are open tasks in PR5.
+
+### PR6: hive self-installs on Windows (2026-10-21)
+
+```
+$ go test ./internal/tools/ -run 'SelfInstall|TheRepoCatalogDeclaresHive' -v | grep -E '^--- '
+--- PASS: TestTheRepoCatalogDeclaresHiveSelfInstalledOnWindows
+--- PASS: TestLoad_SelfInstall
+--- PASS: TestInstallUvTool_SelfInstall
+--- PASS: TestInstallUvTool_SelfInstallRunsOnThePinnedPython
+--- PASS: TestInstallUvTool_SelfInstallProbesThePersistentPath
+--- PASS: TestInstallUvTool_SelfInstallThatPlacesNothingFails
+$ go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...   -> ok
+$ golangci-lint run   -> 0 issues
+
+# the argv against a real uv (Mac, ephemeral: nothing is installed)
+$ uv --version
+uv 0.12.18 (01cb90c1a 2026-09-22 aarch64-apple-darwin)
+$ uv tool run --refresh-package hive-vault --from hive-vault==4.4.1 --python 3.13 hive --version
+hive-vault 4.4.1        # exit 0
+
+# mutation: current() without the registered-PATH fallback
+--- FAIL: TestInstallUvTool_SelfInstallProbesThePersistentPath
+
+# mutation: packages.json self_install args "latest" instead of "{version}"
+$ jq -e '<the tests/packages-json.bats self_install filter>' mutated.json
+false        # exit 1
+```
+
+On the x64 `test-windows` runner (#2901, run 39721972641, job 119637916180), the setup run's own log:
+
+```
+hive self-upgrade: switched none -> 4.4.1.
+hive 4.4.1 installed via hive self-upgrade 4.4.1 (hive-vault)
+[SUCCESS] Installed hive daemon service (Scheduled Task, v4.4.1)
+```
+
+So on x64, V2 and V3 flip in one setup run. That job was red for another reason: the spec audit flagged GUARD-003 as a zombie, because #2898 closed #1052 after this branch last merged main. AC2 still needs its guest run: the second converge with changed=0, and Arm64, which is gated on hive#515.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
 - **Split into AI-028 + AI-029 rather than one ticket** (2026-08-07). The install model and the multi-client registration SSOT are separate failures with separate blast radii; the repo's own precedent is #574 being split out of #551 for atomic-PR discipline.
-- **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993, and the owner re-confirms it on return.
+- **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993. The owner re-confirmed it the same day, and decided the three open questions: PR6 is a `hive-self` catalog source, Arm64 is fixed in hive (hive#515), and the retire step is a converge step.
 - **PR1 sequenced before the model change.** The loud-vs-quiet fix does not depend on resolving the bootstrap question, and it is what makes the next recurrence visible. Shipping it first means the session produces a durable improvement even if the model migration proves deeper than expected.
 
 ## Promotion candidates
@@ -85,7 +157,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
 - [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-159-a-guard-that-is-quiet-when-idle-and-quiet-when-bro.md (captured 2026-08-07, *"A guard that is quiet when idle and quiet when broken is not a guard"*; Baseline 2 shows the class again on the converge path)
-- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the mechanism and the upgrade policy are hive's decisions (hive ADR-015, ADR-019, ADR-020) and this repo consumes them. Re-ask if PR6's install shape turns out to be a new catalog source type, which is a decision of this repo's own
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes, for PR6: the catalog's `self_install` field is this repo's own contract, recorded as `docs/adr/adr-036-install-channels.md`'s 2026-10-21 amendment. The mechanism and the upgrade policy stay hive's (hive ADR-015, ADR-019, ADR-020)
 - [x] New pattern candidate for `00_meta/patterns/`? no: lesson-159 holds the insight, and a second instance inside the same spec is not a recurrence outside the incident
 
 ## Archive checklist

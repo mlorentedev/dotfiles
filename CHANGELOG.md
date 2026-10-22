@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.77.0](https://github.com/mlorentedev/dotfiles/compare/v0.76.0...v0.77.0) (2026-10-22)
+
+
+### Features
+
+* **converge:** retire the hive auto-upgrade timers ([#2876](https://github.com/mlorentedev/dotfiles/issues/2876)) ([ec5170f](https://github.com/mlorentedev/dotfiles/commit/ec5170ffb0835a78f840d42716a2c7468cbd7365))
+* **harness:** check the checkout for harness drift with dotf harness check ([#2883](https://github.com/mlorentedev/dotfiles/issues/2883)) ([e220d80](https://github.com/mlorentedev/dotfiles/commit/e220d80a8b187a6e0bfd44606c8fbdfde2a8ae1a))
+* **harness:** compose every harness surface with dotf harness deploy ([#2882](https://github.com/mlorentedev/dotfiles/issues/2882)) ([a40e6a6](https://github.com/mlorentedev/dotfiles/commit/a40e6a6846be47d952e33a2139f4730d6a8ad5bb))
+* **harness:** render the agent records from Go with dotf harness agents ([#2871](https://github.com/mlorentedev/dotfiles/issues/2871)) ([215335a](https://github.com/mlorentedev/dotfiles/commit/215335a6b12e9f3fce78a51d937f6670214fcc21))
+* **harness:** render the skill records from Go with dotf harness skills ([#2849](https://github.com/mlorentedev/dotfiles/issues/2849)) ([dd8a6f9](https://github.com/mlorentedev/dotfiles/commit/dd8a6f9ae8d15142e88dc9ad81c3ce8408ae19fa))
+* **harness:** write the compact doctrine payload from dotf harness doctrine ([#2879](https://github.com/mlorentedev/dotfiles/issues/2879)) ([1932db9](https://github.com/mlorentedev/dotfiles/commit/1932db92f9ec9e6c181cf999ae1e5318d58aa0b0))
+* **harness:** write the copilot skill catalog from dotf harness skills ([#2864](https://github.com/mlorentedev/dotfiles/issues/2864)) ([a15132a](https://github.com/mlorentedev/dotfiles/commit/a15132ab7bdd818897d927e8dafd477feb6dcbe4)), closes [#495](https://github.com/mlorentedev/dotfiles/issues/495)
+* **mem:** begin a cleared or compacted session with its handoff thread ([#2881](https://github.com/mlorentedev/dotfiles/issues/2881)) ([1753d52](https://github.com/mlorentedev/dotfiles/commit/1753d5201d29f9f58b0c3f2c30c6403a455cae1b))
+* **mem:** render a handoff thread as a resume prompt or session context ([#2880](https://github.com/mlorentedev/dotfiles/issues/2880)) ([1fd9bfa](https://github.com/mlorentedev/dotfiles/commit/1fd9bfacaaf228dfac7411b5d835603a9ebeb282))
+* **mem:** store each handoff thread in its own file and refuse a write past the budget ([#2852](https://github.com/mlorentedev/dotfiles/issues/2852)) ([2ed09c3](https://github.com/mlorentedev/dotfiles/commit/2ed09c3f81dcb7ad692a617a75c93dc1cb21a70e))
+* **prtriage:** name the inline findings that carry no declared class ([#2863](https://github.com/mlorentedev/dotfiles/issues/2863)) ([9772442](https://github.com/mlorentedev/dotfiles/commit/97724428508d4e427ba5ff1ddecd676fa9dbebab)), closes [#1062](https://github.com/mlorentedev/dotfiles/issues/1062)
+* **prtriage:** read a review finding's class from a declared marker line ([#2845](https://github.com/mlorentedev/dotfiles/issues/2845)) ([50e538d](https://github.com/mlorentedev/dotfiles/commit/50e538dbe3e6b9d724278f6ac3af22e8572feaeb)), closes [#1062](https://github.com/mlorentedev/dotfiles/issues/1062)
+* **review:** ask PR-Agent for a declared finding class in the triage queue ([#2889](https://github.com/mlorentedev/dotfiles/issues/2889)) ([ac5d6fb](https://github.com/mlorentedev/dotfiles/commit/ac5d6fb04ee3fc3ed16486b9aca4acca235eb453)), closes [#1062](https://github.com/mlorentedev/dotfiles/issues/1062)
+* **spec:** print the contract digests a review request records ([#2875](https://github.com/mlorentedev/dotfiles/issues/2875)) ([d8d7627](https://github.com/mlorentedev/dotfiles/commit/d8d7627425f8437f27ae29d67f201de0ca39e8f1)), closes [#2684](https://github.com/mlorentedev/dotfiles/issues/2684)
+
+
+### Bug Fixes
+
+* **ci:** keep a comment the review job skips out of its concurrency group ([#2887](https://github.com/mlorentedev/dotfiles/issues/2887)) ([77bae25](https://github.com/mlorentedev/dotfiles/commit/77bae25944241baff3a8c85d3a40cdc6962a50f9)), closes [#2867](https://github.com/mlorentedev/dotfiles/issues/2867)
+* **ci:** re-evaluate the attestation for a review asked for with /review ([#2848](https://github.com/mlorentedev/dotfiles/issues/2848)) ([0ad7ac2](https://github.com/mlorentedev/dotfiles/commit/0ad7ac215f2faea636e260735edb4f017ae512b9))
+* **deps:** build with Go 1.26.10 and pin Node 24.22.1 for the October security releases ([#2895](https://github.com/mlorentedev/dotfiles/issues/2895)) ([fb0367d](https://github.com/mlorentedev/dotfiles/commit/fb0367d045a521bef41328acee1ece7e01385475)), closes [#2894](https://github.com/mlorentedev/dotfiles/issues/2894)
+* **doctor:** name hive's own install as the missing-hive fix on Windows ([#2869](https://github.com/mlorentedev/dotfiles/issues/2869)) ([c213ae9](https://github.com/mlorentedev/dotfiles/commit/c213ae908070f9f03e2fd99c080a4d4facfa1d4c)), closes [#2856](https://github.com/mlorentedev/dotfiles/issues/2856)
+* **herdr:** close the explorer when the key is pressed from inside it ([#2854](https://github.com/mlorentedev/dotfiles/issues/2854)) ([4c92cfc](https://github.com/mlorentedev/dotfiles/commit/4c92cfc48d47832be4a72266952219c7fe55bd8e))
+* **mem:** suggest only dated threads in the budget refusal ([#2885](https://github.com/mlorentedev/dotfiles/issues/2885)) ([2cfa06e](https://github.com/mlorentedev/dotfiles/commit/2cfa06ea128edd9e23aa8b956fbe82cb193fc42a)), closes [#1477](https://github.com/mlorentedev/dotfiles/issues/1477)
+* **prtriage:** count a triage record only from an author with standing ([#2886](https://github.com/mlorentedev/dotfiles/issues/2886)) ([577fb05](https://github.com/mlorentedev/dotfiles/commit/577fb05e595da48e7840e28e355ce68a9873d719)), closes [#2870](https://github.com/mlorentedev/dotfiles/issues/2870)
+* **spec:** fold the archive's provenance line out of the contract digest ([#2861](https://github.com/mlorentedev/dotfiles/issues/2861)) ([4c48ee3](https://github.com/mlorentedev/dotfiles/commit/4c48ee33727de6edfd0a72c83f2f66da1a1c4ebb))
+* **worktree:** ask the origin's forge whether list and sweep branches landed ([#2865](https://github.com/mlorentedev/dotfiles/issues/2865)) ([0b52b85](https://github.com/mlorentedev/dotfiles/commit/0b52b85190cfdbdd1b674eca417cfb07e0bdf568)), closes [#2818](https://github.com/mlorentedev/dotfiles/issues/2818)
+* **worktree:** refuse add --issue while another live worktree holds that issue ([#2890](https://github.com/mlorentedev/dotfiles/issues/2890)) ([276806a](https://github.com/mlorentedev/dotfiles/commit/276806a12b340f2c56e7b39d01dd753dc4677fa6))
+
 ## [0.76.0](https://github.com/mlorentedev/dotfiles/compare/v0.75.0...v0.76.0) (2026-10-21)
 
 

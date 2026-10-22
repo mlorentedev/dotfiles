@@ -165,36 +165,6 @@ function Backup-AndRestoreClaudeJson {
     }
 }
 
-# ADR-015 / dotfiles#230: single registration point for hive Scheduled Tasks so
-# they ALWAYS run with the strongest achievable principal. A task registered
-# without an explicit principal defaults to the Interactive logon type, which
-# runs in the user's desktop session and pops a console window every tick for a
-# powershell.exe action. An S4U principal ("run whether the user is logged on
-# or not", no stored password) runs the task in session 0 -- the non-interactive
-# session with no desktop -- so no window can appear. BUT registering an S4U
-# task requires an elevated caller: on a non-admin box Register-ScheduledTask
-# raises "Access is denied" as a NON-terminating error, which used to slip past
-# every call site's try/catch and print a false SUCCESS while a stale task
-# survived. So: compute the strongest achievable logon type once (elevated ->
-# S4U windowless; non-admin -> Interactive, where -WindowStyle Hidden on the
-# action softens the console flash), and register with -ErrorAction Stop so any
-# residual failure is terminating and the call-site catch reports the truth.
-$script:HiveTaskLogonType =
-    if (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { 'S4U' } else { 'Interactive' }
-function Register-HiveScheduledTask {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$TaskName,
-        [Parameter(Mandatory)]$Action,
-        [Parameter(Mandatory)]$Trigger,
-        [Parameter(Mandatory)]$Settings,
-        [Parameter(Mandatory)][string]$Description
-    )
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType $script:HiveTaskLogonType -RunLevel Limited
-    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
-        -Settings $Settings -Principal $principal -Description $Description -Force -ErrorAction Stop | Out-Null
-}
-
 # ============================================================================
 # BANNER
 # ============================================================================
@@ -351,31 +321,18 @@ Install-AgentBinary -Name "Antigravity CLI (agy)" -Command "agy" -InstallerUrl "
 
 Write-Info "Deploying Claude configuration..."
 
-# Bulk copy all Claude config files EXCEPT settings.json: `dotf deploy` merges
-# it (the claude-settings entry), and its hooks come from `dotf harness bind`.
+# Bulk copy the Claude config files EXCEPT settings.json and CLAUDE.md:
+# `dotf deploy` merges settings.json (the claude-settings entry), its hooks
+# come from `dotf harness bind`, and CLAUDE.md is a harness instruction file
+# that `dotf harness deploy` writes near the end of this script.
 $claudeSource = "$DotfilesDir\ai\claude"
 if (Test-Path $claudeSource) {
-    Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -Exclude 'settings.json' -ErrorAction SilentlyContinue
-}
-
-# Force copy CLAUDE.md (Neural Hive Protocol)
-$claudeMdSource = "$DotfilesDir\ai\claude\CLAUDE.md"
-if (Test-Path $claudeMdSource) {
-    Copy-Item $claudeMdSource "$ClaudeHome\" -Force
-    if (Select-String -Path "$ClaudeHome\CLAUDE.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet) {
-        Write-Success "CLAUDE.md deployed successfully (verified pointer to AGENTS.md)"
-    } else {
-        Write-Err "CLAUDE.md deployment failed verification (expected pointer to AGENTS.md)"
-    }
-} else {
-    Write-Warn "CLAUDE.md not found at $claudeMdSource"
+    Copy-Item "$claudeSource\*" "$ClaudeHome\" -Recurse -Force -Exclude 'settings.json', 'CLAUDE.md' -ErrorAction SilentlyContinue
 }
 
 # Skills (claude, opencode, agy) are deployed from the committed vault skill
-# records by Deploy-SkillRecord near the end of this script (SDD-008, option A),
-# replacing the former ai\skills copy loops. Deploy is a regular copy that
-# de-junctions any pre-existing vault junction first (BUG-100), honoring each
-# skill's targets[].
+# records by `dotf harness deploy` near the end of this script (SDD-008,
+# CLI-026), honoring each skill's targets[].
 Ensure-Directory "$ClaudeHome\skills"
 
 # dotf CLI (ADR-020 / WIN-006): install the pinned release binary into ~/.local/bin
@@ -625,59 +582,6 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
             Write-Warn "hive-serve supervisor script not found at $hiveSupSrc"
         }
     }
-
-    # AI-023 / hive#176 / ADR-015: the upgrade policy that FEEDS the daemon's
-    # restart-on-upgrade. Windows cannot replace a running executable, so the task
-    # does NOT call `uv tool upgrade` directly -- it runs the orchestration script
-    # (only-if-newer -> defer-if-locked -> stop daemon -> upgrade -> start),
-    # deployed from the dotfiles SSOT. Cadence matches Linux: every 15 min.
-    # Self-healing: re-register when the action OR the S4U principal drift, so a
-    # box that still has the old Interactive (windowed) task gets repaired.
-    $hiveUpgradeTask = "DotfilesHiveUpgrade"
-    $hiveUpgradeSrc = Join-Path $DotfilesDir "windows\hive-upgrade.ps1"
-    $hiveUpgradeDst = Join-Path $ClaudeHome "scripts\hive-upgrade.ps1"
-    # -WindowStyle Hidden is belt-and-suspenders; the S4U principal applied by
-    # Register-HiveScheduledTask (session 0) is what actually guarantees no
-    # window when elevated. Non-admin boxes fall back to Interactive, where
-    # Hidden is the only mitigation (brief console flash possible).
-    $hiveUpgradeArg = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$hiveUpgradeDst`""
-    if (Test-Path $hiveUpgradeSrc) {
-        Ensure-Directory (Split-Path $hiveUpgradeDst -Parent)
-        Copy-Item $hiveUpgradeSrc $hiveUpgradeDst -Force
-    } else {
-        Write-Warn "hive-upgrade orchestration script not found at $hiveUpgradeSrc"
-    }
-    $existingHiveTask = Get-ScheduledTask -TaskName $hiveUpgradeTask -ErrorAction SilentlyContinue
-    $existingHiveArg = $null
-    $existingHiveExe = $null
-    $existingHiveLogon = $null
-    if ($existingHiveTask -and $existingHiveTask.Actions -and $existingHiveTask.Actions[0]) {
-        $existingHiveArg = $existingHiveTask.Actions[0].Arguments
-        $existingHiveExe = $existingHiveTask.Actions[0].Execute
-        if ($existingHiveTask.Principal) { $existingHiveLogon = "$($existingHiveTask.Principal.LogonType)" }
-    }
-    if ($existingHiveTask -and ($existingHiveExe -eq "powershell.exe") -and ($existingHiveArg -eq $hiveUpgradeArg) -and ($existingHiveLogon -eq $script:HiveTaskLogonType)) {
-        Write-Info "hive-upgrade task already correctly configured, skipping"
-    } else {
-        try {
-            $hiveAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $hiveUpgradeArg
-            $hiveTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-                -RepetitionInterval (New-TimeSpan -Minutes 15)
-            $hiveSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
-            Register-HiveScheduledTask -TaskName $hiveUpgradeTask -Action $hiveAction -Trigger $hiveTrigger `
-                -Settings $hiveSettings `
-                -Description "hive-vault auto-upgrade every 15 min (ADR-015 orchestrated stop-before-upgrade; feeds hive serve restart-on-upgrade)"
-            Write-Success "Installed hive-upgrade task (15-min, $($script:HiveTaskLogonType) principal, v$hiveVer)"
-            if ($script:HiveTaskLogonType -ne 'S4U') {
-                Write-Info "not elevated: windowless S4U registration unavailable; using Interactive logon with -WindowStyle Hidden"
-            }
-            if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-                Write-Warn "hive-upgrade task registered but uv is not on PATH"
-            }
-        } catch {
-            Write-Warn "Could not register hive-upgrade task (non-fatal; setup still upgrades hive each run): $_"
-        }
-    }
 } elseif (Get-Command hive -ErrorAction SilentlyContinue) {
     $shownVer = if ($hiveVer) { $hiveVer } else { '<unknown>' }
     Write-Warn "hive $shownVer predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
@@ -693,8 +597,8 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
 
 # Vault-hosted skills are no longer junctioned into ~/.claude/skills (that was
 # the BUG-100 fragility source). They are migrated into the vault SSOT, compiled
-# into committed records, and rendered to a regular copy by Deploy-SkillRecord
-# near the end of this script (SDD-008, option A).
+# into committed records, and rendered to a regular copy by `dotf harness
+# deploy` near the end of this script (SDD-008, CLI-026).
 
 # poetry is a packages.json uv-tool entry, converged by `dotf tools install`
 # above; uv is installed earlier in this script (OPS-044).
@@ -719,23 +623,9 @@ Write-Info ("PATH after the tool installers: {0} entries; npm: {1}" -f (($env:PA
 # opencode.jsonc is the `opencode` entry of ai/deploy.json, rendered with its
 # {env:VAR} secrets by `dotf deploy` below (SDD-009, #1843 B12).
 
-# Deploy the canonical AGENTS.md as opencode's global system prompt.
-# OpenCode reads ~/.config/opencode/AGENTS.md (per upstream docs); unlike
-# claude/agy/copilot which use pointer files, opencode reads the filename
-# "AGENTS.md" natively so we copy the full SSOT (~22KB) verbatim.
-# Linux parity: setup-linux.sh:584+
-$agentsSrc = Join-Path $DotfilesDir 'AGENTS.md'
-$agentsDst = Join-Path $env:USERPROFILE '.config\opencode\AGENTS.md'
-if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $agentsSrc -Destination $agentsDst)
-    } else {
-        Copy-Item -LiteralPath $agentsSrc -Destination $agentsDst -Force
-        Write-Success "Deployed AGENTS.md to $agentsDst (fallback)"
-    }
-} else {
-    Write-Warn "AGENTS.md source missing at $agentsSrc"
-}
+# opencode's and pi's AGENTS.md (the canonical SSOT, read natively under that
+# name) are harness/manifest.json agents.presence targets, deployed by
+# `dotf harness deploy` near the end of this script.
 
 # ============================================================================
 # 2e. PI CODING AGENT CONFIG (AI-025)
@@ -827,16 +717,6 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     exit 1
 }
 
-$piAgentsDst = Join-Path $piAgentDir 'AGENTS.md'
-if (Test-Path -LiteralPath $agentsSrc -PathType Leaf) {
-    if (Get-Command Deploy-File -ErrorAction SilentlyContinue) {
-        [void](Deploy-File -Source $agentsSrc -Destination $piAgentsDst)
-    } else {
-        Copy-Item -LiteralPath $agentsSrc -Destination $piAgentsDst -Force
-        Write-Success "Deployed AGENTS.md to $piAgentsDst (fallback)"
-    }
-}
-
 # pi packages (HARNESS-139, #1628): `dotf pi packages apply` converges pi on
 # ai\pi\packages.json in BOTH directions -- installs what is declared, removes
 # what is not, and archives the paths the manifest retires -- through pi's own
@@ -858,7 +738,7 @@ if ($dotfPath) {
 # by the bare `dotf deploy` above (#1843 B11).
 
 # OpenCode commands are deployed from the committed vault skill records by
-# Deploy-SkillRecord near the end of this script (SDD-008, option A): each
+# `dotf harness deploy` near the end of this script (SDD-008, CLI-026): each
 # record whose targets[] includes opencode is rendered to a
 # .config\opencode\commands\<n>.md command file (name: dropped), with stale
 # commands pruned. This replaces the former ai\opencode\commands copy loop; the
@@ -905,8 +785,8 @@ if (Test-Path $projAgyBak) { Remove-Item -Recurse -Force $projAgyBak -ErrorActio
 
 # Agy skills (native Shared skills under $GeminiHome\skills and frontmatter-
 # stripped flat prompts under $GeminiHome\prompts) are deployed from the
-# committed vault skill records by Deploy-SkillRecord near the end of this
-# script (SDD-008, option A), honoring each skill's targets[]. The former
+# committed vault skill records by `dotf harness deploy` near the end of this
+# script (SDD-008, CLI-026), honoring each skill's targets[]. The former
 # ai\skills extraction loops are gone.
 Ensure-Directory (Join-Path $GeminiHome 'skills')
 Ensure-Directory (Join-Path $GeminiHome 'prompts')
@@ -1239,20 +1119,11 @@ if ($copilotCmd) {
     $CopilotHome = "$env:USERPROFILE\.copilot"
     Ensure-Directory $CopilotHome
 
-    $copilotSource = "$DotfilesDir\ai\copilot"
-    if (Test-Path $copilotSource) {
-        # Only the instructions file is copied here. settings.json, config.json
-        # and mcp-config.json are `dotf deploy` entries (ai/deploy.json,
-        # AI-039/#1322): the first two by MERGE, because the CLI writes both
-        # files itself and a verbatim copy wiped the box's own keys.
-        Copy-Item "$copilotSource\copilot-instructions.md" "$CopilotHome\copilot-instructions.md" -Force -ErrorAction SilentlyContinue
-        if ((Test-Path "$CopilotHome\copilot-instructions.md") -and
-            (Select-String -Path "$CopilotHome\copilot-instructions.md" -Pattern 'First, read `AGENTS.md`' -SimpleMatch -Quiet)) {
-            Write-Success "copilot-instructions.md deployed successfully (verified pointer to AGENTS.md)"
-        } else {
-            Write-Warn "copilot-instructions.md deployment failed verification (expected pointer to AGENTS.md)"
-        }
-    }
+    # copilot-instructions.md is an agents.presence target gated on
+    # `requires_command: copilot`, deployed by `dotf harness deploy` near the
+    # end of this script. settings.json, config.json and mcp-config.json are
+    # `dotf deploy` entries (ai/deploy.json, AI-039/#1322): the first two by
+    # MERGE, because the CLI writes both files itself.
 
     Write-Success "GitHub Copilot CLI configured (aliases cop/cops in profile.ps1)"
 } else {
@@ -1268,251 +1139,18 @@ if ($copilotCmd) {
 # committed file at deploy time.
 
 # ============================================================================
-# SDD-008: deploy skills from committed records (option A, render-at-deploy)
-# Windows port of `compile-harness.sh --deploy`. ENGINE-001's --refresh/--check
-# stay Linux-only; Windows consumes the committed records under harness/skills/,
-# the same way it consumes the committed harness override blocks. Each record is
-# rendered to its per-agent path under the user profile as a regular copy (never
-# a junction -- ends the BUG-100 class), honoring each skill's targets[]. Runs
-# after the per-agent base files are deployed so copilot catalog injection sees
-# the instructions file already in place.
+# Harness deploy (CLI-026): instruction files, skills, agent records, persona
+# presence and doctrine, rendered from the committed records under harness\ to
+# each agent's path under the user profile as regular copies (never a junction,
+# BUG-100). One Go implementation for every OS: setup-linux.sh makes the same
+# call. Runs after the per-agent config is deployed; a failure stops setup.
 # ============================================================================
-
-function Test-SkillTargetsAgent {
-    param([string]$SkillMd, [string]$Agent)
-    if (-not (Test-Path -LiteralPath $SkillMd)) { return $false }
-    $fm = 0
-    foreach ($line in Get-Content -LiteralPath $SkillMd) {
-        if ($line -match '^---\s*$') { $fm++; if ($fm -ge 2) { break }; continue }
-        if ($fm -eq 1 -and $line -match '^targets:\s*(.+)$') {
-            return [bool]($Matches[1] -match ('\b' + [regex]::Escape($Agent) + '\b'))
-        }
-    }
-    return $true   # no targets: -> all agents
+& dotf harness deploy --repo-root $DotfilesDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Err "dotf harness deploy failed -- see its errors above; the agents' harness is incomplete"
+    exit 1
 }
-
-function Get-SkillField {
-    param([string]$SkillMd, [string]$Key)
-    $fm = 0
-    foreach ($line in Get-Content -LiteralPath $SkillMd) {
-        if ($line -match '^---\s*$') { $fm++; if ($fm -ge 2) { break }; continue }
-        if ($fm -eq 1 -and $line -match ('^' + [regex]::Escape($Key) + ':\s*(.+)$')) { return $Matches[1].Trim() }
-    }
-    return ''
-}
-
-# One frontmatter key line's fate, as a pure decision: $true keeps the line and
-# every continuation line under it, $false drops both. This is the twin of the
-# awk rule in render_skill (scripts/compile-harness.sh), and a bats parity test
-# compares the two allowlists textually, so an edit here that is not mirrored
-# there fails loudly instead of quietly deploying a skill the other OS drops.
-#
-# -cmatch, not -match: PowerShell's -match is case-insensitive by default, and
-# bash's grep/awk are not, so a faithful mirror needs the case-sensitive
-# operator.
-function Test-SkillFrontmatterKeyKept {
-    param([string]$Line, [string]$Kind)
-    # A command carries its name in its filename, not its frontmatter.
-    if ($Kind -eq 'command' -and $Line -cmatch '^name:') { return $false }
-    # The record (HARNESS-069) already carries its own generated_* fields,
-    # describing its relationship to the vault. Strip them here so deploy
-    # injects one fresh set, describing the deploy target's relationship to the
-    # record, instead of stacking a second set on top.
-    if ($Line -cmatch '^generated(_from|_sha)?:') { return $false }
-    # Native skill execution fields recognized by agent runtimes (Claude Code, AGY, OpenCode, Copilot)
-    if ($Line -cmatch '^(name|description|allowed-tools|when_to_use|model|effort|context|argument-hint|arguments|user-invocable|disable-model-invocation):') { return $true }
-    # Drop neutral/store-only keys (id, type, status, created, owner, paths, keywords, requires, targets, source, license, etc.)
-    # In particular, dropping `paths:` ensures Claude Code discovers skills as unconditional at session start.
-    return $false
-}
-
-# The injected generated_* fields are deliberately dual-referent, not a
-# single "where did this come from" answer (HARNESS-069): generated_from is
-# always the vault path in $SrcPath -- where a human edits, the SSOT -- while
-# generated_sha hashes $RecordMd (the committed harness\skills\... file this
-# call renders FROM), not the vault source. Mirrors render_skill in
-# scripts/compile-harness.sh exactly; see that function's comment for the
-# full rationale, including why the record's own provenance must be
-# stripped rather than passed through.
-function Convert-SkillRecord {
-    param([string]$Kind, [string]$RecordMd, [string]$SrcPath)
-    $sha = (Get-FileHash -LiteralPath $RecordMd -Algorithm SHA256).Hash.Substring(0, 16).ToLower()
-    if ($Kind -eq 'prompt') {
-        $raw = Get-Content -LiteralPath $RecordMd -Raw
-        if ($raw -match '^---\r?\n[\s\S]*?\r?\n---\r?\n([\s\S]*)$') { $body = $Matches[1] } else { $body = $raw }
-        return "<!-- generated: true; from: $SrcPath; sha256:$sha; edit the vault source + re-run setup -->`n`n" + $body.Trim()
-    }
-    $fm = 0
-    $keep = $false
-    $out = New-Object System.Collections.Generic.List[string]
-    foreach ($line in Get-Content -LiteralPath $RecordMd) {
-        if ($line -match '^---\s*$') {
-            $fm++
-            $out.Add($line)
-            if ($fm -eq 1) {
-                $out.Add('generated: true')
-                $out.Add("generated_from: $SrcPath")
-                $out.Add("generated_sha: $sha")
-            }
-            continue
-        }
-        if ($fm -eq 1) {
-            # A key line decides its own fate and that of the continuation
-            # lines under it: dropping `paths:` while keeping its indented list
-            # items would emit YAML no reader accepts. The flag therefore
-            # survives across lines, and starts false, so anything before the
-            # first key (a comment, say) is dropped -- which is what the awk
-            # twin does with its uninitialised keep.
-            if ($line -cmatch '^[a-zA-Z0-9_-]+:') {
-                $keep = Test-SkillFrontmatterKeyKept -Line $line -Kind $Kind
-            }
-            if ($keep) { $out.Add($line) }
-            continue
-        }
-        $out.Add($line)
-    }
-    return ($out -join "`n")
-}
-
-function Deploy-SkillRecord {
-    param([string]$DotfilesDir)
-    $manifestPath = Join-Path $DotfilesDir 'harness\manifest.json'
-    if (-not (Test-Path -LiteralPath $manifestPath)) { Write-Warn "harness manifest not found: $manifestPath"; return }
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    if (-not $manifest.skills) { Write-Info "no skills block in manifest; skipping skill deploy"; return }
-    $recordDir = Join-Path $DotfilesDir ($manifest.skills.record_dir -replace '/', '\')
-    $vsub = $manifest.skills.vault_subpath
-    if (-not (Test-Path -LiteralPath $recordDir)) { Write-Warn "no skill records at $recordDir; skipping skill deploy"; return }
-    $records = @(Get-ChildItem -LiteralPath $recordDir -Directory -ErrorAction SilentlyContinue)
-
-    foreach ($d in $manifest.skills.deploy) {
-        # Optional per-target requires_command (manifest-declared, not hardcoded
-        # here): a tool this repo does not auto-install itself (Copilot, per
-        # BUG-003's explicit "no auto-install" policy) only gets its config
-        # deployed once genuinely present, mirroring the same gate on the Linux
-        # engine and the existing detect-and-act rule for Copilot's
-        # instructions.md. pi is gated too: a file under ~/.pi is read by pi
-        # alone (#2102). Other tools this repo installs deploy unconditionally.
-        #
-        # .PSObject.Properties guard, not $d.requires_command directly: utils.ps1
-        # sets Set-StrictMode Latest, and most deploy entries have no
-        # requires_command key at all, so direct access throws instead of
-        # returning $null (same class of bug as the winget ContainsKey guard
-        # above).
-        $requiresCmd = $null
-        if ($d.PSObject.Properties.Match('requires_command').Count -gt 0) {
-            $requiresCmd = $d.requires_command
-        }
-        if ($requiresCmd -and -not (Get-Command $requiresCmd -ErrorAction SilentlyContinue)) {
-            Write-Info "skill target $($d.agent) skipped: $requiresCmd not on PATH"
-            continue
-        }
-        $destBase = Join-Path $env:USERPROFILE ($d.dir -replace '/', '\')
-        Ensure-Directory $destBase
-        foreach ($rec in $records) {
-            $recMd = Join-Path $rec.FullName 'SKILL.md'
-            if (-not (Test-Path -LiteralPath $recMd)) { continue }
-            if (-not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $d.agent)) { continue }
-            $src = "$vsub/$($rec.Name)/SKILL.md"
-            if ($d.render -eq 'command' -or $d.render -eq 'prompt') {
-                $target = Join-Path $destBase ("{0}.md" -f $rec.Name)
-                if ((Test-Path -LiteralPath $target) -and ((Get-Item -LiteralPath $target -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-                    Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
-                }
-                Write-Utf8LfFile -Path $target -Content (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src)
-            } else {
-                $destDir = Join-Path $destBase $rec.Name
-                if (Test-Path -LiteralPath $destDir) {
-                    $item = Get-Item -LiteralPath $destDir -Force
-                    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { cmd /c rmdir "$destDir" 2>&1 | Out-Null }
-                }
-                Ensure-Directory $destDir
-                Copy-Item -Path (Join-Path $rec.FullName '*') -Destination $destDir -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Utf8LfFile -Path (Join-Path $destDir 'SKILL.md') -Content (Convert-SkillRecord -Kind $d.render -RecordMd $recMd -SrcPath $src)
-            }
-        }
-        # Prune our own stale outputs (skill removed, or targets[] dropped this agent).
-        if ($d.render -eq 'command' -or $d.render -eq 'prompt') {
-            foreach ($f in Get-ChildItem -LiteralPath $destBase -Filter '*.md' -File -ErrorAction SilentlyContinue) {
-                if (-not (Select-String -LiteralPath $f.FullName -Pattern 'generated: true' -SimpleMatch -Quiet)) { continue }
-                $recMd = Join-Path (Join-Path $recordDir $f.BaseName) 'SKILL.md'
-                if (-not (Test-Path -LiteralPath $recMd) -or -not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $d.agent)) {
-                    Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue
-                }
-            }
-        } else {
-            foreach ($sd in Get-ChildItem -LiteralPath $destBase -Directory -ErrorAction SilentlyContinue) {
-                $deployedMd = Join-Path $sd.FullName 'SKILL.md'
-                if (-not (Test-Path -LiteralPath $deployedMd)) { continue }
-                if (-not (Select-String -LiteralPath $deployedMd -Pattern 'generated: true' -SimpleMatch -Quiet)) { continue }
-                $recMd = Join-Path (Join-Path $recordDir $sd.Name) 'SKILL.md'
-                if (-not (Test-Path -LiteralPath $recMd) -or -not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $d.agent)) {
-                    Remove-Item -LiteralPath $sd.FullName -Recurse -Force -ErrorAction SilentlyContinue
-                }
-            }
-        }
-    }
-
-    # Copilot catalog: inject a bullet list into the deployed instructions file.
-    if ($manifest.skills.catalog) {
-        $catFile = Join-Path $env:USERPROFILE ($manifest.skills.catalog.file -replace '/', '\')
-        $catAgent = $manifest.skills.catalog.agent
-        $beginPrefix = '<!-- BEGIN HARNESS GENERATED'
-        $endMarker = '<!-- END HARNESS GENERATED -->'
-        if ((Test-Path -LiteralPath $catFile) -and (Select-String -LiteralPath $catFile -Pattern $beginPrefix -SimpleMatch -Quiet)) {
-            $bullets = New-Object System.Collections.Generic.List[string]
-            foreach ($rec in ($records | Sort-Object Name)) {
-                $recMd = Join-Path $rec.FullName 'SKILL.md'
-                if (-not (Test-Path -LiteralPath $recMd)) { continue }
-                if (-not (Test-SkillTargetsAgent -SkillMd $recMd -Agent $catAgent)) { continue }
-                $desc = Get-SkillField -SkillMd $recMd -Key 'description'
-                $bullets.Add(("- **{0}** -- {1}" -f $rec.Name, $desc))
-            }
-            $catBody = ($bullets -join "`n")
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($catBody + "`n")
-            $sha = (([System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 16)
-            $beginLine = "$beginPrefix (sha256:$sha) -- skill catalog from vault $vsub; edit there + re-run setup, do NOT edit between markers -->"
-            $result = New-Object System.Collections.Generic.List[string]
-            $state = 'before'
-            foreach ($line in Get-Content -LiteralPath $catFile) {
-                if ($state -eq 'before' -and $line.StartsWith($beginPrefix)) {
-                    $result.Add($beginLine)
-                    foreach ($b in $bullets) { $result.Add($b) }
-                    $state = 'inside'
-                    continue
-                }
-                if ($state -eq 'inside') {
-                    if ($line -eq $endMarker) { $result.Add($line); $state = 'after' }
-                    continue
-                }
-                $result.Add($line)
-            }
-            # LF + no BOM (WIN-008/#1289): Set-Content joined this list with CRLF and
-            # rewrote the whole file, so the deployed copy drifted from its LF source
-            # on every run and the doctor's drift FAIL could never clear.
-            Write-Utf8LfFile -Path $catFile -Content ($result -join "`n")
-            Write-Success "Injected skill catalog into $catFile"
-        }
-    }
-
-    Write-Success "Skills deployed from records (claude / opencode / agy / copilot)"
-}
-
-Deploy-SkillRecord -DotfilesDir $DotfilesDir
-
-# Agent presence (HARNESS-092, #1326): the forced-skills roster every harness
-# instructions file carries between AGENT-PRESENCE markers. Linux gets it from
-# compile-harness.sh --deploy, which delegates to this same verb; Windows had
-# no port, so no harness on this OS was ever told what a persona MUST consume.
-# Runs after the base files (CLAUDE.md, AGENTS.md, copilot-instructions.md) and
-# the skill records are in place; a target file that is absent is skipped and
-# said so.
-& dotf harness presence --repo-root $DotfilesDir
-if ($LASTEXITCODE -eq 0) {
-    Write-Success "Agent presence injected into the harness instructions files (dotf harness presence)"
-} else {
-    Write-Warn "dotf harness presence failed (no harness is told which skills a persona forces; see 'dotf doctor')"
-}
+Write-Success "Harness deployed from records (instructions, skills, agents, presence, doctrine)"
 
 # Weekly vault maintenance scheduled task (Sundays 10:07 AM)
 # Self-healing: compare existing action arguments against expected and rewrite

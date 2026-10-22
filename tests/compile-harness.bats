@@ -338,13 +338,9 @@ EOF
 # the script; the behavioral `compile-harness.sh --check` gate is still
 # exercised end-to-end below.
 
-@test "setup-linux.sh runs compile-harness --deploy to render skills from records" {
-    grep -q 'compile-harness.sh" --deploy' "$BATS_TEST_DIRNAME/../setup-linux.sh"
-}
-
 @test "setup-linux.sh no longer deploys skills from the removed ai/skills tree" {
     # assert no ACTIVE code path reads the deleted sources (historical mentions
-    # in comments are allowed; the deploy is now compile-harness.sh --deploy)
+    # in comments are allowed; the deploy is now `dotf harness deploy`)
     refute_grep_fixed '"$CURRENT_DIR/ai/skills/' "$BATS_TEST_DIRNAME/../setup-linux.sh"
     refute_grep_fixed '"$CURRENT_DIR/ai/opencode/commands' "$BATS_TEST_DIRNAME/../setup-linux.sh"
     refute_grep_fixed 'OPENCODE_CMDS_SRC=' "$BATS_TEST_DIRNAME/../setup-linux.sh"

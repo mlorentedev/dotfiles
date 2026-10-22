@@ -1,7 +1,6 @@
 package converge
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -12,19 +11,18 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
-// recordsHarness deploys the agents' instruction files, skills and persona
-// presence by running scripts/compile-harness.sh --deploy, which already does
-// them in the order they need (instruction files, then the skill catalog and
-// the presence regions injected into them). It is the instructions-first step
-// (#2016): no agent is installed or run before its instructions exist.
+// recordsHarness deploys the agents' instruction files, skills, agent records,
+// persona presence and doctrine with harness.Deploy, in the order they need
+// (instruction files, then the skill catalog and the presence regions injected
+// into them). It is the instructions-first step (#2016): no agent is installed
+// or run before its instructions exist.
 //
-// The plan and the probe are Go: an instruction file that is missing, or whose
-// content outside the harness regions differs from its source, is a change.
-// The deploy itself stays in the script until its Go port lands (PLAT-001b
-// PR 2c), so linux and darwin only; Windows deploys these files from its own
-// setup script, which runs as the legacy reconciler there.
+// The plan and the probe read the instruction files: one that is missing, or
+// whose content outside the harness regions differs from its source, is a
+// change. It runs on every OS: setup-windows.ps1 and setup-linux.sh deploy
+// through the same harness.Deploy, as `dotf harness deploy`.
 type recordsHarness struct {
-	run func(Env) error   // the deploy; CompileHarnessDeploy in production
+	run func(Env) error   // the deploy; HarnessDeploy in production
 	has func(string) bool // is a command on PATH
 }
 
@@ -33,7 +31,7 @@ func (recordsHarness) Name() string { return "records-harness" }
 // RevisitAfter re-runs the deploy after tools changed the machine: an agent
 // tools installs had no instruction files when this step first ran (#2013 D11).
 func (recordsHarness) RevisitAfter() string { return "tools" }
-func (recordsHarness) Platforms() []string  { return []string{"linux", "darwin"} }
+func (recordsHarness) Platforms() []string  { return []string{"linux", "darwin", "windows"} }
 
 func (r recordsHarness) Reconcile(env Env, dryRun bool) (Result, error) {
 	stale, err := r.staleInstructions(env)
@@ -147,17 +145,11 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-// CompileHarnessDeploy runs scripts/compile-harness.sh --deploy from the
-// checkout. Its output is returned with the error, so a failed deploy says why.
-func CompileHarnessDeploy(env Env) error {
-	cmd := exec.Command("bash", filepath.Join(env.RepoRoot, "scripts", "compile-harness.sh"), "--deploy") //nolint:gosec // the checkout's own script
-	cmd.Dir = env.RepoRoot
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("compile-harness.sh --deploy: %w\n%s", err, strings.TrimSpace(out.String()))
-	}
-	return nil
+// HarnessDeploy deploys every harness surface from the checkout into the home.
+// The error names each item that failed, so a failed deploy says why.
+func HarnessDeploy(env Env) error {
+	_, err := harness.Deploy(env.RepoRoot, env.Home, onPath, false)
+	return err
 }
 
 // onPath reports whether a command is on PATH.

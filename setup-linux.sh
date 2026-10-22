@@ -227,7 +227,7 @@ ensure_directory "$AGY_HOME"
 rm -f "$GEMINI_HOME/config/.migrated" 2>/dev/null
 
 # Agy skills (native Shared skills + flat prompts) are deployed from the vault
-# skill records by `compile-harness.sh --deploy` (SDD-008), which renders each
+# skill records by `dotf harness deploy` (SDD-008), which renders each
 # committed record under harness/skills/ to ~/.gemini/skills/<n>/ and a
 # frontmatter-stripped flat prompt to ~/.gemini/prompts/<n>.md, honoring each
 # skill's targets[]. The single --deploy call near the end of this script does
@@ -291,7 +291,7 @@ unset _dotf
 ensure_directory "$HOME/.claude"
 ensure_directory "$HOME/.claude/skills"
 # The Claude instruction file (~/.claude/CLAUDE.md) and its skills are deployed
-# by the single `compile-harness.sh --deploy` call near the end of this script,
+# by the single `dotf harness deploy` call near the end of this script,
 # which copies every harness/manifest.json agents.presence[] file and then
 # injects the skill catalog and the persona presence regions into it (SDD-008,
 # HARNESS-058). `dotf converge` runs the same deploy with a content-comparing
@@ -321,7 +321,7 @@ log_info "Setting up OpenCode configuration..."
 
 # opencode's and pi's AGENTS.md (the canonical SSOT, read natively under that
 # name) are harness/manifest.json agents.presence targets, deployed by
-# `dotf harness instructions` through the `compile-harness.sh --deploy` call
+# the instructions surface of the `dotf harness deploy` call
 # near the end of this script (#1843 B11).
 
 # Deploy pi coding agent config (AI-025) — mirrors the opencode block so the two
@@ -391,7 +391,7 @@ unset _dotf
 # above (#1843 B11).
 
 # opencode commands are deployed from the vault skill records by
-# `compile-harness.sh --deploy` (SDD-008): each committed record under
+# `dotf harness deploy` (SDD-008): each committed record under
 # harness/skills/ whose targets[] includes opencode is rendered to a
 # ~/.config/opencode/commands/<n>.md command file (name: dropped — opencode
 # keys commands off the filename). This replaces the former
@@ -426,7 +426,7 @@ fi
 
 # Its instruction file (~/.copilot/copilot-instructions.md) is an
 # agents.presence[] entry gated on `requires_command: copilot`, deployed by the
-# `compile-harness.sh --deploy` call near the end of this script. settings.json,
+# `dotf harness deploy` call near the end of this script. settings.json,
 # config.json and mcp-config.json are `dotf deploy` entries (ai/deploy.json,
 # AI-039/#1322): the first two by MERGE, because the CLI writes both files itself
 # and a verbatim copy wiped the box's own keys (allowedUrls, effortLevel, ...).
@@ -478,9 +478,8 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
     # CLI-042 AC7: the NaN credential reaches the daemon through
     # `dotf secrets run`, never through a file. `hive service install` above owns
     # hive.service and exposes no flag to change its ExecStart, so the override
-    # is a systemd DROP-IN. That also makes it survive the next re-install --
-    # which the hive-upgrade.timer can trigger every 15 minutes, and which would
-    # silently clobber a competing hive.service shipped from this repo.
+    # is a systemd DROP-IN. That also makes it survive the next re-install,
+    # which would silently clobber a competing hive.service shipped from this repo.
     if command -v systemctl >/dev/null 2>&1; then
         HIVE_DROPIN_SRC="$CURRENT_DIR/systemd/hive.service.d/10-dotf-secrets.conf"
         HIVE_DROPIN_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/hive.service.d"
@@ -521,30 +520,6 @@ if command -v hive >/dev/null 2>&1 && [ -n "$hive_ver" ] \
         log_success "Provisioned hive daemon vault path via environment.d ($HIVE_VAULT_RESOLVED)"
     fi
 
-    # AI-023 / hive#176: the upgrade policy that FEEDS the daemon's
-    # restart-on-upgrade. Deploy the --user timer + oneshot from the repo's
-    # systemd/ SSOT and enable the timer (every 15 min). Same version gate as the
-    # service above -- daemon + its feeder install together or not at all.
-    if command -v systemctl >/dev/null 2>&1; then
-        SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-        ensure_directory "$SYSTEMD_USER_DIR"
-        if cp -f "$CURRENT_DIR/systemd/hive-upgrade.service" "$SYSTEMD_USER_DIR/" \
-            && cp -f "$CURRENT_DIR/systemd/hive-upgrade.timer" "$SYSTEMD_USER_DIR/"; then
-            systemctl --user daemon-reload >/dev/null 2>&1 || true
-            if systemctl --user enable --now hive-upgrade.timer >/dev/null 2>&1; then
-                log_success "Enabled hive-upgrade.timer (every 15 min, systemd --user)"
-                # A removal of the legacy 'uv tool upgrade hive-vault' crontab
-                # line ran here until OPS-040, retiring it once the timer owned
-                # upgrade policy. Probed absent from `crontab -l` before removal.
-            else
-                log_warning "hive-upgrade.timer enable failed (non-fatal; setup still upgrades hive each run)"
-            fi
-        else
-            log_warning "Could not deploy hive-upgrade units to $SYSTEMD_USER_DIR (non-fatal)"
-        fi
-    else
-        log_warning "systemctl not found; skipping hive-upgrade.timer (setup still upgrades hive each run)"
-    fi
 elif command -v hive >/dev/null 2>&1; then
     log_warning "hive ${hive_ver:-<unknown>} predates 'hive service' (need >= 1.32.0); skipping daemon supervision"
 fi
@@ -602,20 +577,14 @@ unset _dotf
 # session opens, on every OS, and `dotf doctor --fix` repairs the current one,
 # a dangling link included. A real memory dir is never moved aside (#1843 B13).
 
-# Deploy all skills from the committed records to their per-agent $HOME paths
-# (SDD-008, option A). Renders each harness/skills/<n> record to ~/.claude/skills,
-# ~/.config/opencode/commands, ~/.gemini/skills + ~/.gemini/prompts, and injects
-# the copilot catalog into ~/.copilot/copilot-instructions.md, honoring each
-# skill's targets[]. Deploy is a regular copy — never a symlink — and replaces
-# any pre-existing vault symlink with a copy first, ending the BUG-100 fragility
-# class. Records are committed, so this runs offline (no vault required); the
-# earlier --refresh re-renders the records from the vault SSOT when present.
-# Runs last so the per-agent base files (e.g. ~/.copilot/copilot-instructions.md)
-# are already in place for catalog injection.
-if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --deploy ) >/dev/null; then
-    log_success "Skills deployed from records (claude / opencode / agy / copilot)"
+# Deploy the harness from the committed records (CLI-026): instruction files,
+# skills, agent records, persona presence and doctrine, each as a regular copy
+# in its agent's $HOME path. Runs offline; the earlier --refresh re-renders the
+# records from the vault when there is one.
+if dotf harness deploy --repo-root "$CURRENT_DIR" >/dev/null; then
+    log_success "Harness deployed from records (instructions, skills, agents, presence, doctrine)"
 else
-    log_error "compile-harness --deploy failed -- see its errors above; no skill reached the agents"
+    log_error "dotf harness deploy failed -- see its errors above; the agents' harness is incomplete"
     exit 1
 fi
 

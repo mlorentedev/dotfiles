@@ -53,13 +53,12 @@ setup() {
 
 @test "setup-windows.ps1 deploys agy skills via the SDD-008 engine (closes 0-skills-on-Windows bug, cross-OS parity)" {
     # SDD-008 (#179) replaced the per-agent sharedSkillsDir sync with the unified
-    # render-at-deploy engine (Deploy-SkillRecord on Windows, compile-harness
-    # --deploy on Linux). The old 'Synced Shared Skills to' / 'sharedSkillsDir'
-    # literals are gone from both setups. From a Linux box we cannot run the
-    # Windows setup, so we static-check that the Windows script still wires up
-    # agy skill deployment: it invokes Deploy-SkillRecord and provisions the
-    # gemini skills dir. This locks the cross-OS parity at the live mechanism.
-    grep -qF 'Deploy-SkillRecord' "$DOTFILES_DIR/setup-windows.ps1"
+    # render-at-deploy engine, `dotf harness deploy` on every OS (CLI-026). The
+    # old 'Synced Shared Skills to' / 'sharedSkillsDir' literals are gone from
+    # both setups. From a Linux box we cannot run the Windows setup, so we
+    # static-check that the Windows script still wires up agy skill deployment:
+    # it runs the deploy and provisions the gemini skills dir.
+    grep -qF '& dotf harness deploy --repo-root $DotfilesDir' "$DOTFILES_DIR/setup-windows.ps1"
     grep -qF "GeminiHome 'skills'" "$DOTFILES_DIR/setup-windows.ps1"
 }
 
