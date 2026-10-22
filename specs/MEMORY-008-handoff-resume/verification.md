@@ -154,3 +154,11 @@ The first live refusal on the real file named `legacy-undated` first and told th
 | Inline threads worded as stored | killed |
 | Dated threads left unsorted | killed |
 | The no-dated-thread message removed | killed |
+
+### Slice 5: skills and doctrine (AC5, AC6)
+
+- **AC5:** the vault `catchup` skill's step 1 runs `dotf mem resume --agent <agent>` and its `Verify` commands, and lists and asks when the thread is ambiguous; the `handoff` skill's summary points the next session at `dotf mem resume` and says never to hand-type a resume prompt. Vault commit `75d90a9a`; the repo records are its `--refresh` output. f5's command exits 0.
+- **AC6:** the fallback is one bullet in the `pr-stewardship` record, beside the other session-start obligation (`dotf pr triage-queue`): "at session start, where no hook injected a resume block, run it and follow its Next action". It is conditional so it does not contradict the SessionStart injection Claude already gets. It goes in an existing record rather than a new enforced id: a new id costs a manifest row, an inject row and coverage entries for one sentence. f6's command exits 0.
+- **Budget:** the capped agy surface measured 7,574 characters on main before this slice (the proposal's 7,798 was stale) and 7,691 after it, against the 8,000 budget.
+- `--refresh` also rewrote the `adversarial-review` and `crystallize` records from vault edits other sessions made; those are left out of this slice (#1502).
+
