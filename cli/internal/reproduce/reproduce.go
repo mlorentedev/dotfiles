@@ -48,7 +48,7 @@ type Options struct {
 	Dir     string        // repository root
 	Command []string      // the check; its exit decides the state
 	Timeout time.Duration // zero means no limit beyond ctx
-	Probe   string        // a patch applied for the run and reverted after it
+	Probe   string        // a patch applied for the run; its files are restored after it
 }
 
 // outputTail bounds the output a record carries: the end of a failing
@@ -101,7 +101,7 @@ func Run(ctx context.Context, o Options) (Result, error) {
 }
 
 // probed applies the probe, runs the check only if the probe changed a
-// file it names, and reverts it whatever happened. Landing is decided by
+// file it names, and restores the targets whatever happened. Landing is decided by
 // the targets' bytes, not by git apply's exit: an apply that succeeds and
 // changes no content (a mode-only patch) did not land either.
 func probed(ctx context.Context, o Options, top string, res Result) (Result, error) {
@@ -125,11 +125,45 @@ func probed(ctx context.Context, o Options, top string, res Result) (Result, err
 	}
 	// The revert must not inherit a check's timeout: a probe left applied
 	// is worse than any verdict.
-	_, revertErr := git(context.WithoutCancel(ctx), top, "apply", "-R", o.Probe)
+	revertErr := restore(context.WithoutCancel(ctx), top, targets)
 	if revertErr != nil || !maps.Equal(before, fingerprint(top, targets)) {
 		return res, fmt.Errorf("%w: %s no longer match the commit %s (%v)", ErrNotReverted, strings.Join(targets, ", "), res.Head, revertErr)
 	}
 	return res, nil
+}
+
+// restore puts the targets back as HEAD has them, which is how they were
+// found: the tree was clean. A reverse patch would not do: under autocrlf,
+// git apply writes LF where the checkout wrote CRLF, so the bytes do not
+// come back (measured on the Windows runner). A target HEAD lacks was
+// created by the probe and is removed.
+func restore(ctx context.Context, top string, targets []string) error {
+	tracked, err := git(ctx, top, append([]string{"ls-tree", "--name-only", "-z", "HEAD", "--"}, targets...)...)
+	if err != nil {
+		return err
+	}
+	inHead := map[string]bool{}
+	var checkout []string
+	for _, t := range strings.Split(tracked, "\x00") {
+		if t != "" {
+			inHead[t] = true
+			checkout = append(checkout, t)
+		}
+	}
+	if len(checkout) > 0 {
+		if _, err := git(ctx, top, append([]string{"checkout", "HEAD", "--"}, checkout...)...); err != nil {
+			return err
+		}
+	}
+	for _, t := range targets {
+		if inHead[t] {
+			continue
+		}
+		if err := os.Remove(filepath.Join(top, t)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 // probeTargets lists the files a patch touches, both sides of a rename.

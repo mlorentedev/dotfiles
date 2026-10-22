@@ -221,14 +221,46 @@ func TestRunWithAProbeThatDoesNotLand(t *testing.T) {
 	}
 }
 
-// A check that rewrites the probed file leaves a tree the probe cannot be
-// reverted from. That is an error, loud, never a result.
-func TestRunFailsLoudlyWhenTheProbeCannotBeReverted(t *testing.T) {
+// A check that rewrites a probed file does not leave it rewritten: the
+// targets are put back as the commit has them, not by a reverse patch that
+// would no longer apply.
+func TestRunRestoresAFileTheCheckRewrote(t *testing.T) {
 	dir := newRepo(t)
 	probe := probeFor(t, dir, "two\n")
-	_, err := Run(context.Background(), Options{Dir: dir, Command: []string{"git", "checkout", "--", "a.txt"}, Probe: probe})
-	if !errors.Is(err, ErrNotReverted) {
-		t.Fatalf("err = %v, want ErrNotReverted", err)
+	// The check puts a.txt back itself, so a reverse patch would not apply.
+	check := []string{"git", "checkout", "--", "a.txt"}
+	if _, err := Run(context.Background(), Options{Dir: dir, Command: check, Probe: probe}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+		t.Errorf("the tree was left changed:\n%s", st)
+	}
+}
+
+// A probe that creates a file leaves nothing behind.
+func TestRunRemovesAFileTheProbeCreated(t *testing.T) {
+	dir := newRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "add", "-N", "new.txt")
+	probe := filepath.Join(t.TempDir(), "create.diff")
+	if err := os.WriteFile(probe, []byte(run(t, dir, "diff")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "rm", "-q", "--cached", "new.txt")
+	if err := os.Remove(filepath.Join(dir, "new.txt")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"git", "status"}, Probe: probe})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got.State != DidNotReproduce {
+		t.Errorf("State = %q, want %q (output %q)", got.State, DidNotReproduce, got.Output)
+	}
+	if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+		t.Errorf("the probe's file was left behind:\n%s", st)
 	}
 }
 

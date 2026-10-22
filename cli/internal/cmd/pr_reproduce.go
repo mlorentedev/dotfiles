@@ -37,7 +37,7 @@ is recorded; anything else, a model's judgement included, goes to a human.
   did-not-land       --probe changed no file it names: the check is not run
 
 --probe applies a mutation for the run (a patch that removes a fix) and
-reverts it afterwards, whatever the check said; a test that names a defect is
+restores its files from HEAD afterwards, whatever the check said; a test that names a defect is
 committed and run without one. The patch names files from the repository
 root and may be applied from any directory below it. A
 probe lands only if a file it names changed bytes; one that did not is never
@@ -71,7 +71,7 @@ nothing and decides nothing on its own.`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&probe, "probe", "", "a patch applied for the run and reverted after it")
+	cmd.Flags().StringVar(&probe, "probe", "", "a patch applied for the run; its files are restored from HEAD after it")
 	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Minute, "kill the check after this long; a killed check is could-not-run")
 	return cmd
 }
