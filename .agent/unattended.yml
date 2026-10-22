@@ -1,0 +1,25 @@
+version: 1
+run_id: tool031-20261022T0735Z
+armed_by: manu
+armed_at: 2026-10-22T07:35:00Z
+expires_at: 2026-10-22T15:35:00Z
+objective: "Land TOOL-031's A1 stack (dotf pr route) as three draft PRs, verified and triaged, then port A2 (dotf pr preflight) if budget allows (#2893)."
+scope:
+  write_paths: ["cli/**", "docs/lessons/**", "specs/TOOL-031-pr-agent-reusable-workflow/**", ".agent/runs/tool031-20261022T0735Z/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "scripts/**", "secrets/**", "setup-*", "versions.conf", ".agent/unattended.yml"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, bats, golangci-lint, jq]
+queue:
+  source: bitacora
+  filter: "dotfiles #2893 TOOL-031 tasks A1-A4 only"
+  max_items: 2
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: never
+  push: true
+  open_pr: true
+  advisor_tier: top
