@@ -9,6 +9,10 @@ name: Bitácora status — In Progress on assign
 # "Backlog" on add and "Done" on close; "Blocked" stays a deliberate manual
 # transition (no reliable machine signal) — see runbook §5.
 #
+# So the move happens only from "Backlog" or from no status. A run that sits in
+# the queue can finish after a deliberate "Blocked" set right after the
+# assignment, and an unconditional write erased that park silently (#2878).
+#
 # Uses actions/github-script for the Projects v2 GraphQL (the `gh project` CLI
 # fails with "unknown owner type" under a fine-grained PAT).
 #
@@ -51,6 +55,24 @@ jobs:
               { projectId, contentId },
             );
             const itemId = added.addProjectV2ItemById.item.id;
+
+            const current = await github.graphql(
+              `query($itemId: ID!) {
+                node(id: $itemId) {
+                  ... on ProjectV2Item {
+                    fieldValueByName(name: "Status") {
+                      ... on ProjectV2ItemFieldSingleSelectValue { name }
+                    }
+                  }
+                }
+              }`,
+              { itemId },
+            );
+            const status = current.node?.fieldValueByName?.name;
+            if (status && status !== 'Backlog') {
+              core.info(`Issue #${context.payload.issue.number} is "${status}"; left as is`);
+              return;
+            }
 
             await github.graphql(
               `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
