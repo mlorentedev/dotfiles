@@ -22,20 +22,21 @@ created: "2026-10-21"
 
 ## Implementation
 
-### A1. D: `dotf pr route` (one PR)
+### A1. D: `dotf pr route` (three stacked PRs, each under the 300 executable-LOC cap)
 
-- [ ] [AC1] Go tests first, in `cli/internal/prreview/route_test.go`, ported from `tests/pr-agent-route.bats`:
-  - an exact share at every weight point;
-  - the risk route at 1500 lines and at 1499;
-  - the label route;
-  - the allowlist refusal;
-  - a missing price row or ceiling;
-  - the key on stdin;
-  - the summary lines.
+A1 is about 600 executable lines, so it ships as three PRs, each based on the previous one.
 
-  Expected: FAIL (package absent).
-- [ ] [AC1] Implement `cli/internal/prreview/route.go` and the embedded pool (`//go:embed` of a build-time copy of `harness/reviewer-pool.json`, with a test that the copy equals the source). `--pool embedded|<path>`, no implicit fallback. Expected: PASS.
-- [ ] [AC1] Wire `dotf pr route` in `cli/internal/cmd/pr.go` (`--changed-lines`, `--labels`, `--pool`, `--json`, with the GitHub outputs and step summary written when `GITHUB_OUTPUT` is set). Then a differential test: the bats fixture pools through the script and through `dotf pr route` give identical outputs.
+- **A1a: the pieces the route reads and writes.**
+  - [x] [AC1] The shared pool parser reads the `pr_agent` blocks and `pr_agent_risk` (`spec.ParseReviewerPool`).
+  - [x] [AC1] The allowlist, with a price row and ceiling per model, and drift tests against the script's `ALLOWED_ANTHROPIC` and the bats `prices` dict.
+  - [x] [AC1] `--pool embedded|<path>` with no fallback, and a test that the embedded copy equals `harness/reviewer-pool.json`.
+  - [x] [AC1] `Probe` and `Verdict`. The key travels only in the `x-api-key` header, and no redirect is followed with any client.
+  - [x] [AC1] `Result`, with its outputs, summary and notice.
+- **A1b: the route.**
+  - [ ] [AC1] `Route`: the weighted draw, the risk route, the overrides and the refusals, with the bats cases ported (`route_test.go`).
+  - [ ] [AC1] A differential test: the script and `Route` on the same inputs and the same httptest server give identical outputs, warnings and probes.
+- **A1c: the command.**
+  - [ ] [AC1] `dotf pr route` (`--changed-lines`, `--labels`, `--pool`, `--json`, `--print-allowlist`), with the GitHub outputs and step summary written when `GITHUB_OUTPUT` is set. Exit 2 on a refusal.
 
 ### A2 to A4. D: `preflight`, `guard`, `gate` (one PR each)
 
