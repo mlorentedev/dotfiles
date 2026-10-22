@@ -55,6 +55,11 @@ func TestRouteMatchesTheScript(t *testing.T) {
 	}
 	for _, tool := range []string{"bash", "jq", "curl"} {
 		if _, err := exec.LookPath(tool); err != nil {
+			// On a Linux CI runner the script's tools are a given; their absence
+			// there would skip every comparison silently, so it fails instead.
+			if os.Getenv("CI") != "" {
+				t.Fatalf("%s is not installed on this CI runner, so the port is not compared to the script", tool)
+			}
 			t.Skipf("%s is not installed", tool)
 		}
 	}
