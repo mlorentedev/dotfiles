@@ -1,0 +1,32 @@
+version: 1
+run_id: plat005b-20261022t0734z
+armed_by: manu
+armed_at: 2026-10-22T07:34:00Z
+expires_at: 2026-10-22T15:30:00Z
+objective: Land PLAT-005 PR 1a (#2930), then the redaction move and PR 1b as small PRs, advancing #2842 under the standing grant.
+scope:
+  write_paths:
+    - "cli/internal/vm/**"
+    - "cli/internal/redact/**"
+    - "cli/internal/cmd/vm*.go"
+    - "cli/internal/cmd/secrets*.go"
+    - "specs/PLAT-005-vm-session-verbs/**"
+    - "docs/lessons/**"
+    - ".agent/runs/**"
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck]
+queue:
+  source: bitacora
+  filter: 'PLAT-005 / #2842 session verbs and the Windows leg of #2763'
+  max_items: 4
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
